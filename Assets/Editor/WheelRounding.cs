@@ -69,6 +69,18 @@ public static class WheelRounding
         }
 
         Mesh rounded = Correct(source, space, profile);
+        WheelProfile check = WheelProfile.Measure(rounded, space, axis);
+
+        // DÜZELTME KÖTÜLEŞTİRİYORSA UYGULANMIYOR. Ölçüm gürültülü olduğunda düzeltme
+        // gürültüyü yüzeye basıyor; bir kez oldu ve sapmayı ikiye katladı. Sonucu
+        // ölçmeden kabul etmek, aracın kendisini denetimsiz bırakmak demek.
+        if (check.Deviation >= profile.Deviation)
+        {
+            Debug.LogWarning($"[Tekerlek] {label} düzeltmesi uygulanmadı: sapma "
+                + $"{profile.Deviation * 1000f:F1} mm → {check.Deviation * 1000f:F1} mm, "
+                + "yani ölçüm düzeltmeden gürültülü.");
+            return source;
+        }
 
         if (!AssetDatabase.IsValidFolder(Folder))
             AssetDatabase.CreateFolder("Assets/Models/Bike", "Generated");
@@ -76,13 +88,11 @@ public static class WheelRounding
         AssetDatabase.CreateAsset(rounded, path);
         AssetDatabase.SaveAssets();
 
-        WheelProfile after = WheelProfile.Measure(rounded, space, axis);
-
         Debug.Log($"[Tekerlek] {label} çembere oturtuldu.\n"
-            + $"  sapma {profile.Deviation * 1000f:F1} mm → {after.Deviation * 1000f:F1} mm\n"
+            + $"  sapma {profile.Deviation * 1000f:F1} mm → {check.Deviation * 1000f:F1} mm\n"
             + $"  en geniş − en dar {(profile.Max - profile.Min) * 1000f:F0} mm → "
-            + $"{(after.Max - after.Min) * 1000f:F0} mm\n"
-            + $"  yarıçap {after.Radius:F3} m, genişlik {after.Width * 1000f:F0} mm");
+            + $"{(check.Max - check.Min) * 1000f:F0} mm\n"
+            + $"  yarıçap {check.Radius:F3} m, genişlik {check.Width * 1000f:F0} mm");
 
         return rounded;
     }
