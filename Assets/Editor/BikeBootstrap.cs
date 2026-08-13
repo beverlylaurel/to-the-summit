@@ -110,6 +110,10 @@ public static class BikeBootstrap
 
     static GameObject Place(Material material, BikeSettings settings)
     {
+        // Seçim ÖNCE bırakılıyor: Inspector yok edilen nesneyi çizmeye devam edip
+        // her açılışta bir yığın `MissingReferenceException` basıyordu.
+        Selection.activeGameObject = null;
+
         var existing = Object.FindAnyObjectByType<BikeController>();
         if (existing != null) Object.DestroyImmediate(existing.gameObject);
 
