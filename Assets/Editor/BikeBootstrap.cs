@@ -175,7 +175,7 @@ public static class BikeBootstrap
     /// TEKERLEK MATERYALİ. Lastik, jant ve göbek tek mesh'te geldiği için ayrı materyal
     /// atanamıyor; ayrım gölgelendiricide yarıçaptan yapılıyor ve göbek ile dış yarıçap
     /// buradan veriliyor. İki tekerleğin ölçüsü farklı, o yüzden iki ayrı materyal.
-    static Material WheelMaterial(string name, Mesh mesh, Transform space,
+    static Material WheelMaterial(string name, Transform space,
         Vector3 axisWorld, WheelProfile profile)
     {
         Shader shader = Shader.Find(ShaderName);
@@ -202,18 +202,6 @@ public static class BikeBootstrap
         material.SetFloat("_Dust", 0.22f);
         material.SetFloat("_Fade", 0.04f);
         material.SetFloat("_Grime", 0.45f);
-
-        // Bölgeler bu iki sayıdan çıkıyor. Göbek mesh'in metrik sınırları içinde
-        // değilse ya da yarıçap sınırların yarısına uymuyorsa eşleme bozuktur.
-        Bounds metric = mesh.bounds;
-        Vector3 size = metric.size * space.lossyScale.x;
-        Vector3 min = metric.min * space.lossyScale.x;
-
-        ToolLog.Write($"[Tekerlek] {name} ölçek {space.lossyScale.x:F2}\n"
-            + $"  göbek (nesne, m) {centre.x:F3}, {centre.y:F3}, {centre.z:F3}\n"
-            + $"  mesh metrik sınır min {min.x:F3}, {min.y:F3}, {min.z:F3}  "
-            + $"boyut {size.x:F3} x {size.y:F3} x {size.z:F3}\n"
-            + $"  yarıçap {profile.Radius:F3} m (sınır yarısı {size.x * 0.5f:F3})");
 
         EditorUtility.SetDirty(material);
         AssetDatabase.SaveAssets();
@@ -485,7 +473,7 @@ public static class BikeBootstrap
 
         WheelProfile profile = WheelProfile.Measure(filter.sharedMesh, filter.transform, axis);
         part.GetComponent<Renderer>().sharedMaterial =
-            WheelMaterial(materialName, filter.sharedMesh, filter.transform, axis, profile);
+            WheelMaterial(materialName, filter.transform, axis, profile);
     }
 
     static Transform FindPart(GameObject model, string name)
