@@ -868,6 +868,27 @@ sahneyi düz bir vuruşla yakıyordu. Batımdan sonra kalan pay, atmosferde saç
 artçı parıltısıdır: gölgesiz ama cılız. Rengi `TimeOfDay`'in süzülmüş güneşi, penceresi
 `HorizonFactor`.
 
+### Bisiklet (`BikeController`, `BikeSurface`)
+
+**Okur:** hiçbir şey. Yaklaşma aracı; hava, rüzgâr, sıcaklık ve kar sistemleriyle
+**bağı yok** ve bu bilinçli — bisiklet başka bir projeye taşınabilsin diye tek bağımlılığı
+kendi ayar asset'i.
+
+Hız fizikten çıkıyor, tablodan değil: `P = v·(Crr·m·g + m·g·sin θ + ½·ρ·CdA·v²)`. Zemin
+eğimi ışının döndürdüğü yüzey normalinden okunuyor, arazi sistemine sorulmuyor.
+
+Görsel üç ayrı bileşende ve hiçbiri fiziği bilmiyor: `BikeWheels` yol hızından dönüş
+(`ω = v/r`), `BikeSteeringVisual` yatma açısından gidon sapması, gölgelendirici yüzey.
+Model olmadan da fizik çalışıyor.
+
+**Yüzey desenin kaynağı nesne uzayı**, dünya değil: bisiklet hareket ediyor ve dünya
+uzayında örneklenseydi boya yüzeyin üstünde kayardı. Aşınma yine de dünya yukarısını
+okuyor — toz üstte birikir, kir altta toplanır, sebebi yerçekimi.
+
+Malzeme üç yerden geliyor: parça→yüzey tablosu (kaba atama), mesh bölgeleri (tek mesh'te
+gelen tutamak/kablo/pedal), köşe rengi maskesi (elle boyanan sınırlar). Sonuncusu
+diğerlerinin üstüne yazıyor.
+
 ### Renk düzenlemesi (`LookController`)
 
 **Okur:** şiddet ve karlılık (fırtına ağırlığı), gündüz katsayısı.
