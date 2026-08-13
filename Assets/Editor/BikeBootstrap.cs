@@ -140,17 +140,6 @@ public static class BikeBootstrap
             material.SetFloat("_Grime", surface.Grime);
             material.SetFloat("_WheelMode", 0f);
 
-            // ELLE BOYANAN KANALLARIN IŞIK DAVRANIŞI. Renk fırçadan seçiliyor ama
-            // metaliklik ve parlaklık kanalın ne olduğundan çıkıyor: kauçuk mat, deri
-            // yarı mat, çelik metalik. Fırçada üç kaydırıcı daha olsaydı her boyamada
-            // üç karar daha verilirdi.
-            material.SetFloat("_MaskRMetallic", 0f);
-            material.SetFloat("_MaskRSmoothness", 0.22f);
-            material.SetFloat("_MaskGMetallic", 0f);
-            material.SetFloat("_MaskGSmoothness", 0.34f);
-            material.SetFloat("_MaskBMetallic", 0.85f);
-            material.SetFloat("_MaskBSmoothness", 0.32f);
-
             EditorUtility.SetDirty(material);
             materials[surface.Name] = material;
         }
