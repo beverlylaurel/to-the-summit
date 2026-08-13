@@ -264,6 +264,7 @@ public static class BikeBootstrap
         model.transform.localRotation = Quaternion.identity;
 
         Paint(model, materials);
+        Painted(model);
         Zone(model, materials);
         Report(model);
 
@@ -310,6 +311,20 @@ public static class BikeBootstrap
                 ? named : "Paint";
 
             renderer.sharedMaterial = materials[surface];
+        }
+    }
+
+    /// ELLE BOYANMIŞ KOPYALARI bağlar. Fırça, FBX'ten gelen mesh'e köşe rengi
+    /// yazamadığı için parçanın kendi kopyasını üretiyor; kurulum o kopyayı bulmazsa
+    /// boyama her "Sahneye Kur" ile düşerdi.
+    static void Painted(GameObject model)
+    {
+        foreach (MeshFilter filter in model.GetComponentsInChildren<MeshFilter>())
+        {
+            var copy = AssetDatabase.LoadAssetAtPath<Mesh>(
+                $"{Folder}/Generated/{filter.name}_Paint.asset");
+
+            if (copy != null) filter.sharedMesh = copy;
         }
     }
 
