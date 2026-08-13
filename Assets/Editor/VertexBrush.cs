@@ -23,11 +23,16 @@ public class VertexBrush : EditorWindow
     /// kablo için doğru mu diye düşünmek gerekiyordu; oysa seçilen şey kauçuk olup olmadığı
     /// değil, parlamayıp parlamadığı. Kablo kılıfı da lastik de aynı yuvaya giriyor çünkü
     /// ikisi de mat ve metalik değil.
-    static readonly string[] SlotNames =
+    static readonly string[] SlotNames = { "Mat", "Yarı mat", "Metalik" };
+
+    /// Yuvanın ne için olduğu açılır listenin altında yazıyor. Ad tek başına yeterli
+    /// değil: "mat" seçerken kablonun oraya girip girmediği akla geliyor ve her boyamada
+    /// aynı soru tekrar soruluyordu.
+    static readonly string[] SlotHints =
     {
-        "Mat — lastik, kablo, plastik",
-        "Yarı mat — deri, kumaş, boya",
-        "Metalik — çelik, krom, alüminyum",
+        "Lastik, kablo kılıfı, plastik, gidon tutamağı. Işığı yaymıyor, parlamıyor.",
+        "Deri, kumaş, boyalı yüzey. Hafif parlıyor ama yansıma vermiyor.",
+        "Çelik, krom, alüminyum, zincir. Çevresini yansıtıyor.",
     };
 
     [SerializeField] MeshFilter target;
@@ -78,7 +83,7 @@ public class VertexBrush : EditorWindow
     {
         Toolbar();
 
-        Rect view = GUILayoutUtility.GetRect(position.width, position.height - 136f);
+        Rect view = GUILayoutUtility.GetRect(position.width, position.height - 152f);
 
         if (target == null || mesh == null)
         {
@@ -120,6 +125,7 @@ public class VertexBrush : EditorWindow
         using (new EditorGUI.DisabledScope(target == null))
         {
             channel = EditorGUILayout.Popup("Malzeme", channel, SlotNames);
+            EditorGUILayout.LabelField(" ", SlotHints[channel], EditorStyles.miniLabel);
 
             EditorGUILayout.BeginHorizontal();
             radius = EditorGUILayout.Slider("Yarıçap (m)", radius, 0.003f, 0.2f);
