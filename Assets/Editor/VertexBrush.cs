@@ -324,18 +324,30 @@ public class VertexBrush : EditorWindow
 
     /// Pencere içindeki noktadan parçaya ışın. Önizleme kamerası parçanın gerçek dünya
     /// konumunda duruyor, o yüzden ışın doğrudan sahnedeki çarpışmaya atılabiliyor.
+    ///
+    /// IŞIN ELDE KURULUYOR. `ScreenPointToRay` kameranın piksel dikdörtgenini okuyor;
+    /// önizleme kendi hedef dokusuna çizdiği için o dikdörtgen pencereyle tutmuyordu ve
+    /// ışın imlecin durduğu yere değil, yanına gidiyordu — ince kabloda hiç tutmuyor,
+    /// kalın yüzeyde kaymış görünüyordu. Görüntü hangi açı ve orandan çiziliyorsa ışın
+    /// da ondan kuruluyor.
     bool Trace(Rect view, Vector2 mouse, out RaycastHit hit)
     {
         hit = default;
         if (preview == null || collider == null) return false;
 
-        Vector2 local = mouse - view.position;
-        var point = new Vector3(local.x, view.height - local.y, 0f);
-
         Camera camera = preview.camera;
-        camera.pixelRect = new Rect(0f, 0f, view.width, view.height);
 
-        return collider.Raycast(camera.ScreenPointToRay(point), out hit, 10000f);
+        // Pencere içinde göreli konum: sol üstten sağ alta 0..1.
+        float x = Mathf.InverseLerp(view.xMin, view.xMax, mouse.x) * 2f - 1f;
+        float y = 1f - Mathf.InverseLerp(view.yMin, view.yMax, mouse.y) * 2f;
+
+        float height = Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        float width = height * (view.width / Mathf.Max(1f, view.height));
+
+        Vector3 direction = camera.transform.rotation
+            * new Vector3(x * width, y * height, 1f).normalized;
+
+        return collider.Raycast(new Ray(camera.transform.position, direction), out hit, 10000f);
     }
 
     // ------------------------------------------------------------------ hedef
