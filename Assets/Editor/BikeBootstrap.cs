@@ -243,7 +243,7 @@ public static class BikeBootstrap
         var filter = part.GetComponent<MeshFilter>();
         Vector3 axis = filter.transform.InverseTransformDirection(axisWorld);
 
-        filter.sharedMesh = WheelRounder.Round(filter.sharedMesh, axis, part.name, label);
+        filter.sharedMesh = WheelRounding.Round(filter.sharedMesh, axis, part.name, label);
     }
 
     static Transform FindPart(GameObject model, string name)
