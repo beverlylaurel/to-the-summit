@@ -123,6 +123,12 @@ public static class BikeBootstrap
         var root = new GameObject("Bicycle");
         GameObject model = (GameObject)PrefabUtility.InstantiatePrefab(prefab, root.transform);
 
+        // Prefab bağı ÇÖZÜLÜYOR: prefab örneğinin çocukları yeniden ebeveynlenemiyor ve
+        // dönen parçaları ayırmak tam olarak bunu gerektiriyor. Mesh'ler yine FBX'ten
+        // paylaşılıyor — kopya çıkmıyor, yalnız hiyerarşi serbest kalıyor.
+        PrefabUtility.UnpackPrefabInstance(model, PrefabUnpackMode.Completely,
+            InteractionMode.AutomatedAction);
+
         // Kök başlangıçta orijinde ve model dönüşsüz: bütün ölçüler böylece doğrudan
         // modelin kendi eksenlerinde okunuyor, dönüşüm çevirmeye gerek kalmıyor.
         model.transform.localPosition = Vector3.zero;
