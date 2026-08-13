@@ -52,7 +52,7 @@ public static class BikePartSheet
         Material lit = Flat(new Color(1f, 0.35f, 0.02f), CompareFunction.Always);
 
         Matrix4x4 view = View(bike.transform, bounds);
-        Matrix4x4 projection = Projection(bounds);
+        Matrix4x4 projection = Projection(view, bounds);
 
         var target = new RenderTexture(CellWidth, CellHeight, 24, RenderTextureFormat.ARGB32);
         int rows = Mathf.CeilToInt(parts.Length / (float)Columns);
@@ -161,22 +161,62 @@ public static class BikePartSheet
         return Matrix4x4.TRS(position, rotation, new Vector3(1f, 1f, -1f)).inverse;
     }
 
-    static Matrix4x4 Projection(Bounds bounds)
+    /// Kadraj SINIR KUTUSUNUN KÖŞELERİNDEN kuruluyor: sekiz köşe bakış uzayına taşınıp
+    /// en ve boy oradan okunuyor. Dünya eksenlerine bakılarak kurulduğunda hangi eksenin
+    /// bisikletin boyu olduğu varsayım oluyordu ve kadraj arka tekerleği kesiyordu.
+    static Matrix4x4 Projection(Matrix4x4 view, Bounds bounds)
     {
+        Vector3 min = bounds.min;
+        Vector3 max = bounds.max;
+
+        float left = float.MaxValue, right = float.MinValue;
+        float bottom = float.MaxValue, top = float.MinValue;
+        float near = float.MaxValue, far = float.MinValue;
+
+        for (int i = 0; i < 8; i++)
+        {
+            var corner = new Vector3(
+                (i & 1) == 0 ? min.x : max.x,
+                (i & 2) == 0 ? min.y : max.y,
+                (i & 4) == 0 ? min.z : max.z);
+
+            Vector3 seen = view.MultiplyPoint3x4(corner);
+
+            left = Mathf.Min(left, seen.x);
+            right = Mathf.Max(right, seen.x);
+            bottom = Mathf.Min(bottom, seen.y);
+            top = Mathf.Max(top, seen.y);
+
+            // Bakış uzayında kamera -Z yönüne bakıyor: uzaklık eksi Z.
+            near = Mathf.Min(near, -seen.z);
+            far = Mathf.Max(far, -seen.z);
+        }
+
+        float margin = Mathf.Max(right - left, top - bottom) * 0.06f;
+        left -= margin; right += margin;
+        bottom -= margin; top += margin;
+
+        // Kare oranına tamamlama: eksik kalan eksen İKİ YANDAN büyütülüyor, yoksa
+        // bisiklet karenin bir kenarına yaslanıyor.
         float aspect = CellWidth / (float)CellHeight;
+        float width = right - left;
+        float height = top - bottom;
 
-        // Kadraj İKİ ÖLÇÜNÜN BÜYÜĞÜNE göre: köşegen kullanılıyordu ve bisiklet karenin
-        // dörtte birinde kalıyordu — ince parçalar (zincir, kablo, pedal) seçilmiyordu.
-        float height = bounds.extents.y * 1.08f;
-        float width = Mathf.Max(bounds.extents.x, bounds.extents.z) * 1.08f;
-
-        if (width < height * aspect) width = height * aspect;
-        else height = width / aspect;
-        float far = bounds.size.magnitude * 6f;
+        if (width < height * aspect)
+        {
+            float pad = (height * aspect - width) * 0.5f;
+            left -= pad; right += pad;
+        }
+        else
+        {
+            float pad = (width / aspect - height) * 0.5f;
+            bottom -= pad; top += pad;
+        }
 
         // Doku hedefi için Y ÇEVİRMESİ İSTENMİYOR: `ReadPixels` zaten alttan okuyor,
         // ikisi üst üste gelince bisiklet baş aşağı çıkıyordu.
         return GL.GetGPUProjectionMatrix(
-            Matrix4x4.Ortho(-width, width, -height, height, 0.01f, far), false);
+            Matrix4x4.Ortho(left, right, bottom, top,
+                Mathf.Max(0.01f, near - 1f), far + 1f), false);
     }
 }
