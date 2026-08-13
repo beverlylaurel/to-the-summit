@@ -51,6 +51,12 @@ public static class MeshZones
         Vector2[] uv = source.uv;
         if (uv.Length == vertices.Length) mesh.SetUVs(0, uv);
 
+        // KÖŞE RENGİ SIFIRLANIYOR. Üretilen modelde köşe rengi var ve gölgelendirici onu
+        // elle boyanan malzeme maskesi olarak okuyor; taşınsaydı hiç boyanmamış yüzey
+        // kendiliğinden boyalı görünürdü. Boyama bu temiz zeminin üstüne yazılıyor.
+        var blank = new Color32[vertices.Length];
+        mesh.SetColors(blank);
+
         mesh.subMeshCount = zones;
         for (int i = 0; i < zones; i++) mesh.SetTriangles(buckets[i], i);
 

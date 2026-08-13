@@ -94,14 +94,13 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.polybrush": {
-      "version": "1.2.1",
+      "version": "file:com.unity.polybrush",
       "depth": 0,
-      "source": "registry",
+      "source": "embedded",
       "dependencies": {
-        "com.unity.modules.imgui": "1.0.0",
-        "com.unity.settings-manager": "2.0.1"
-      },
-      "url": "https://packages.unity.com"
+        "com.unity.settings-manager": "2.0.1",
+        "com.unity.modules.imgui": "1.0.0"
+      }
     },
     "com.unity.render-pipelines.core": {
       "version": "17.5.0",
