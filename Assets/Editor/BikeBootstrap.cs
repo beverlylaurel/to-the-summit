@@ -188,6 +188,12 @@ public static class BikeBootstrap
         Transform rearPart = FindPart(model, RearWheelPart);
         Transform barPart = FindPart(model, HandlebarPart);
 
+        // Jant düzeltmesi göbek ölçümünden ÖNCE: düzeltme dış kenarı oynatıyor, pivot da
+        // o kenardan uydurulan çemberin merkezine oturuyor. Sonra yapılsaydı pivot eski
+        // mesh'in merkezinde kalırdı.
+        RoundWheel(frontPart, model.transform.forward, "Ön");
+        RoundWheel(rearPart, model.transform.forward, "Arka");
+
         Vector3 frontHub = frontPart.GetComponent<Renderer>().bounds.center;
         Vector3 rearHub = rearPart.GetComponent<Renderer>().bounds.center;
         Vector3 bar = barPart.GetComponent<Renderer>().bounds.center;
@@ -228,6 +234,16 @@ public static class BikeBootstrap
         rearWheel.SetParent(model.transform, false);
         rearWheel.localPosition = rearHub;
         rearPart.SetParent(rearWheel, true);
+    }
+
+    /// Tekerleğin dönme ekseni modelin genişlik ekseni; ölçüm ve düzeltme mesh'in kendi
+    /// uzayında çalıştığı için eksen oraya çevriliyor.
+    static void RoundWheel(Transform part, Vector3 axisWorld, string label)
+    {
+        var filter = part.GetComponent<MeshFilter>();
+        Vector3 axis = filter.transform.InverseTransformDirection(axisWorld);
+
+        filter.sharedMesh = WheelRounder.Round(filter.sharedMesh, axis, part.name, label);
     }
 
     static Transform FindPart(GameObject model, string name)

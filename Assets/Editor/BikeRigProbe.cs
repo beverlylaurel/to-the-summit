@@ -136,116 +136,32 @@ public class BikeRigProbe : EditorWindow
     ///
     /// - Pivot yanlış yerde: mesh yuvarlak ama dönme merkezi kenara kaçmış. Ölçüde
     ///   "kaçıklık" büyük, "yuvarlaklık sapması" küçük çıkar. Çözüm pivotu taşımak.
-    /// - Tekerlek oval: dönme merkezi doğru ama jant çember değil. Kaçıklık küçük,
-    ///   sapma büyük. Çözüm modeli düzeltmek — pivot oynatmak işe yaramaz.
+    /// - Jant çember değil: dönme merkezi doğru ama kenar oynuyor. Kaçıklık küçük, sapma
+    ///   büyük. Çözüm `WheelRounder` — pivot oynatmak işe yaramaz.
     ///
-    /// Ölçüm janta bakıyor, bütün mesh'e değil: göbek ve teller merkeze yakın duruyor ve
-    /// ortalamaya karışsalardı yarıçap diye anlamsız bir sayı çıkardı. Her açı diliminin
-    /// EN UZAK noktası alınıyor, o da jantın dış kenarı.
+    /// Ölçümün kendisi `WheelProfile`'da: düzeltme de aynı ölçüden besleniyor, iki ayrı
+    /// hesap olsaydı biri düzeltip diğeri "hâlâ bozuk" derdi.
     static void MeasureWheel(string label, Transform wheel)
     {
         var filter = wheel.GetComponentInChildren<MeshFilter>();
-        Vector3[] vertices = filter.sharedMesh.vertices;
+        Mesh mesh = filter.sharedMesh;
 
-        Vector3 axis = wheel.forward;
-        Vector3 boxCentre = filter.GetComponent<Renderer>().bounds.center;
+        Vector3 axis = filter.transform.InverseTransformDirection(wheel.forward);
+        WheelProfile profile = WheelProfile.Measure(mesh, axis);
 
-        // Düzlem içi iki dik yön: yarıçap ve açı bunlarla okunuyor.
-        Vector3 right = Vector3.Normalize(Vector3.Cross(axis, Vector3.up));
-        Vector3 up = Vector3.Cross(right, axis);
-
-        const int Bins = 720;
-        var far = new Vector2[Bins];
-        var hit = new bool[Bins];
-
-        float thickMin = float.MaxValue, thickMax = float.MinValue;
-
-        foreach (Vector3 local in vertices)
-        {
-            Vector3 offset = filter.transform.TransformPoint(local) - boxCentre;
-
-            float along = Vector3.Dot(offset, axis);
-            thickMin = Mathf.Min(thickMin, along);
-            thickMax = Mathf.Max(thickMax, along);
-
-            var plane = new Vector2(Vector3.Dot(offset, right), Vector3.Dot(offset, up));
-            int bin = Mathf.Clamp((int)((Mathf.Atan2(plane.y, plane.x) + Mathf.PI)
-                                        / (2f * Mathf.PI) * Bins), 0, Bins - 1);
-
-            if (!hit[bin] || plane.sqrMagnitude > far[bin].sqrMagnitude)
-            {
-                far[bin] = plane;
-                hit[bin] = true;
-            }
-        }
-
-        // Çember uydurma (Kåsa): dış kenar noktalarına en iyi oturan merkez ve yarıçap.
-        // Kutu merkezi yalnız sınırlara bakıyor, bu ise bütün kenarı hesaba katıyor.
-        float sx = 0f, sy = 0f, sxx = 0f, syy = 0f, sxy = 0f, sxz = 0f, syz = 0f, sz = 0f;
-        int count = 0;
-
-        for (int i = 0; i < Bins; i++)
-        {
-            if (!hit[i]) continue;
-
-            float x = far[i].x, y = far[i].y, z = x * x + y * y;
-            sx += x; sy += y; sz += z;
-            sxx += x * x; syy += y * y; sxy += x * y;
-            sxz += x * z; syz += y * z;
-            count++;
-        }
-
-        float n = count;
-        float a11 = 2f * (sxx - sx * sx / n), a12 = 2f * (sxy - sx * sy / n);
-        float a22 = 2f * (syy - sy * sy / n);
-        float b1 = sxz - sx * sz / n, b2 = syz - sy * sz / n;
-
-        float det = a11 * a22 - a12 * a12;
-        float cx = (b1 * a22 - b2 * a12) / det;
-        float cy = (a11 * b2 - a12 * b1) / det;
-
-        float mean = 0f, min = float.MaxValue, max = float.MinValue;
-        var radius = new float[Bins];
-
-        for (int i = 0; i < Bins; i++)
-        {
-            if (!hit[i]) continue;
-
-            radius[i] = Vector2.Distance(far[i], new Vector2(cx, cy));
-            mean += radius[i] / n;
-            min = Mathf.Min(min, radius[i]);
-            max = Mathf.Max(max, radius[i]);
-        }
-
-        // SAPMA NEREYE YAYILMIŞ. Tek bir çıkıntı (valf, reflektör, çamurluk artığı) ile
-        // ovallik aynı "en dar / en geniş" farkını veriyor ama çözümleri farklı: çıkıntı
-        // kesilir, ovallik jantı çembere oturtmayı gerektirir. Ayıran şey, ortalamadan
-        // sapan noktaların açıya yayılması.
-        float rms = 0f;
-        int wide = 0;
-
-        for (int i = 0; i < Bins; i++)
-        {
-            if (!hit[i]) continue;
-
-            float deviation = radius[i] - mean;
-            rms += deviation * deviation / n;
-            if (deviation > 0.003f) wide++;
-        }
-
-        rms = Mathf.Sqrt(rms);
-
-        Vector3 fitted = boxCentre + right * cx + up * cy;
+        Vector3 boxCentre = filter.transform.TransformPoint(mesh.bounds.center);
+        Vector3 fitted = filter.transform.TransformPoint(profile.Centre);
 
         Debug.Log($"[Tekerlek] {label}\n"
-            + $"  yarıçap {mean:F3} m  (en dar {min:F3}, en geniş {max:F3})\n"
-            + $"  yuvarlaklık sapması {(max - min) * 1000f:F0} mm, ortalamadan sapma "
-            + $"{rms * 1000f:F1} mm (rms)\n"
-            + $"  3 mm'den fazla taşan açı dilimi: {wide * 100f / Bins:F0}% "
+            + $"  yarıçap {profile.Radius:F3} m  (en dar {profile.Min:F3}, "
+            + $"en geniş {profile.Max:F3})\n"
+            + $"  yuvarlaklık sapması {(profile.Max - profile.Min) * 1000f:F0} mm, "
+            + $"ortalamadan sapma {profile.Deviation * 1000f:F1} mm (rms)\n"
+            + $"  3 mm'den fazla taşan açı dilimi: {profile.WideFraction * 100f:F0}% "
             + $"(küçükse çıkıntı, büyükse oval)\n"
-            + $"  pivot kaçıklığı {new Vector2(cx, cy).magnitude * 1000f:F0} mm "
+            + $"  pivot kaçıklığı {Vector3.Distance(boxCentre, fitted) * 1000f:F0} mm "
             + $"(kutu merkezi {Format(boxCentre)} → uydurma {Format(fitted)})\n"
-            + $"  genişlik {(thickMax - thickMin) * 1000f:F0} mm, "
-            + $"eksende kayma {((thickMax + thickMin) * 0.5f) * 1000f:F0} mm");
+            + $"  genişlik {profile.Width * 1000f:F0} mm, "
+            + $"eksende kayma {profile.AxisOffset * 1000f:F0} mm");
     }
 }
