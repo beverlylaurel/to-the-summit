@@ -37,15 +37,6 @@ public static class BikeBootstrap
     const string RackPart = "model_part10";
     const string PedalPart = "model_part11";
 
-    /// Gidon mesh'inde kablo sınırı: parçanın kendi yüksekliğinin bu oranının altı.
-    /// Ölçüm: bar z>1.10'da (oran 0.82); sınır hemen altına konuyor, kablo boydan boya
-    /// koyu kalsın. 0.75'te kablonun üst yarısı krom kalıyordu.
-    const float CableBelow = 0.80f;
-
-    /// Tutamak sınırı: gidon yarı genişliğinin bu oranından dışarısı. 0.69 tutamağı
-    /// bara doğru taşırıyordu; 0.78 uçta yedi buçuk santim bırakıyor.
-    const float GripBeyond = 0.78f;
-
     /// Pedal gövdesinin başladığı yer: bisikletin orta düzleminden metre. Ölçüm: pedal
     /// gövdesi ile krank kolu ayrı kümeler, arada boşluk var. Kural iki pedal için de
     /// aynı — sağ pedal ayrı parça, sol pedal bagaj mesh'inin içinde.
@@ -322,23 +313,10 @@ public static class BikeBootstrap
     /// Sonuç mesh'i dosyaya yazılıyor ve git'e girmiyor: üretilen varlık depoda durmaz.
     static void Zone(GameObject model, Dictionary<string, Material> materials)
     {
-        var handlebar = FindPart(model, HandlebarPart).GetComponent<MeshFilter>();
-        Bounds bar = handlebar.sharedMesh.bounds;
-
-        handlebar.sharedMesh = Zoned("Handlebar", () =>
-            MeshZones.Build(handlebar.sharedMesh, point =>
-            {
-                if (MeshZones.Height(bar, point) < CableBelow) return 2;
-                if (MeshZones.Lateral(bar, point) > GripBeyond) return 1;
-                return 0;
-            }, 3, "Handlebar"));
-
-        handlebar.GetComponent<Renderer>().sharedMaterials = new[]
-        {
-            materials["Chrome"],   // gidon borusu
-            materials["Rubber"],   // tutamaklar
-            materials["Rubber"],   // kablolar
-        };
+        // GİDON BÖLÜNMÜYOR. Tutamak ve kablo sınırı eşikle konuyordu ve tutamak bara
+        // taşıyordu; sınır eşik sayısıyla tarif edilemiyor. Gidonun tamamı krom, kauçuk
+        // olması gereken yerler ELLE boyanıyor (bkz. `VertexBrush`). Alt-mesh olarak
+        // bırakılsaydı fırça o siyahı geri alamazdı — maske malzeme ekliyor, silmiyor.
 
         // PEDAL SINIRI DÜNYA UZAYINDA. İki pedal ayna simetrik ve ayrı mesh'lerde;
         // her mesh'in kendi ekseni farklı yöne bakıyor. Orta düzleme uzaklık ikisi için
