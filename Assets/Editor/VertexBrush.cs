@@ -52,10 +52,17 @@ public class VertexBrush : EditorWindow
     float cell;
 
     PreviewRenderUtility preview;
+
+    /// SERBEST KAMERA. Yörünge kamerası parçanın etrafında dönüyordu ve ince bir kablonun
+    /// arkasına geçmek, doğru açıyı yakalamak zordu. Uçuş sahne penceresindekiyle aynı:
+    /// sağ tuş basılıyken fare bakıyor, WASD yürüyor.
+    Vector3 eye;
     float yaw = 30f;
     float pitch = 12f;
-    float zoom = 1.4f;
-    Vector3 focus;
+
+    readonly HashSet<KeyCode> held = new HashSet<KeyCode>();
+    bool flying;
+    double lastFrame;
 
     bool painting;
 
@@ -201,16 +208,17 @@ public class VertexBrush : EditorWindow
         Input(view);
 
         Bounds bounds = target.GetComponent<Renderer>().bounds;
-        float distance = Mathf.Max(0.05f, bounds.size.magnitude * zoom);
+        float span = Mathf.Max(0.05f, bounds.size.magnitude);
+
+        Fly(span);
 
         Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
-        Vector3 position = focus - rotation * Vector3.forward * distance;
 
         preview.BeginPreview(view, GUIStyle.none);
 
-        preview.camera.transform.SetPositionAndRotation(position, rotation);
-        preview.camera.nearClipPlane = distance * 0.01f;
-        preview.camera.farClipPlane = distance * 10f;
+        preview.camera.transform.SetPositionAndRotation(eye, rotation);
+        preview.camera.nearClipPlane = span * 0.002f;
+        preview.camera.farClipPlane = span * 40f;
         preview.camera.fieldOfView = 35f;
         preview.camera.clearFlags = CameraClearFlags.SolidColor;
         preview.camera.backgroundColor = new Color(0.16f, 0.17f, 0.19f);
@@ -241,6 +249,33 @@ public class VertexBrush : EditorWindow
         Cursor(view);
     }
 
+    /// WASD ile yürüyor, Q ve E ile alçalıp yükseliyor, Shift hızlandırıyor. Hız
+    /// parçanın kendi boyundan türüyor: sabit metre/saniye verilseydi tekerlekte uygun
+    /// olan hız fren kolunda ışık hızı olurdu.
+    void Fly(float span)
+    {
+        double now = EditorApplication.timeSinceStartup;
+        float step = (float)(now - lastFrame);
+        lastFrame = now;
+
+        if (!flying || held.Count == 0) return;
+
+        var move = Vector3.zero;
+        if (held.Contains(KeyCode.W)) move.z += 1f;
+        if (held.Contains(KeyCode.S)) move.z -= 1f;
+        if (held.Contains(KeyCode.D)) move.x += 1f;
+        if (held.Contains(KeyCode.A)) move.x -= 1f;
+        if (held.Contains(KeyCode.E)) move.y += 1f;
+        if (held.Contains(KeyCode.Q)) move.y -= 1f;
+
+        if (move == Vector3.zero) return;
+
+        float speed = span * (held.Contains(KeyCode.LeftShift) ? 2.4f : 0.8f);
+        eye += Quaternion.Euler(pitch, yaw, 0f) * move.normalized * speed * Mathf.Min(step, 0.1f);
+
+        Repaint();
+    }
+
     /// Fırça halkası: imlecin altındaki yüzeye çiziliyor. Halka olmadan fırçanın nereye
     /// değdiği ancak boyadıktan sonra anlaşılıyor.
     void Cursor(Rect view)
@@ -263,20 +298,39 @@ public class VertexBrush : EditorWindow
         Event current = Event.current;
         if (!view.Contains(current.mousePosition)) return;
 
+        float span = Mathf.Max(0.05f, target.GetComponent<Renderer>().bounds.size.magnitude);
+        Quaternion look = Quaternion.Euler(pitch, yaw, 0f);
+
         if (current.type == EventType.ScrollWheel)
         {
-            zoom = Mathf.Clamp(zoom * (1f + current.delta.y * 0.05f), 0.15f, 4f);
+            eye -= look * Vector3.forward * current.delta.y * span * 0.04f;
             current.Use();
             Repaint();
             return;
         }
 
-        // Sağ tuş döndürüyor, orta tuş kaydırıyor: sol tuş boyamaya ayrıldı, yoksa her
-        // fırça darbesi kamerayı da oynatırdı.
+        // Sağ tuş bakıyor ve uçuşu açıyor; sol tuş boyamaya ayrıldı, yoksa her fırça
+        // darbesi kamerayı da oynatırdı.
+        if (current.type == EventType.MouseDown && current.button == 1)
+        {
+            flying = true;
+            lastFrame = EditorApplication.timeSinceStartup;
+            current.Use();
+            return;
+        }
+
+        if (current.type == EventType.MouseUp && current.button == 1)
+        {
+            flying = false;
+            held.Clear();
+            current.Use();
+            return;
+        }
+
         if (current.type == EventType.MouseDrag && current.button == 1)
         {
-            yaw += current.delta.x;
-            pitch = Mathf.Clamp(pitch + current.delta.y, -85f, 85f);
+            yaw += current.delta.x * 0.25f;
+            pitch = Mathf.Clamp(pitch + current.delta.y * 0.25f, -89f, 89f);
             current.Use();
             Repaint();
             return;
@@ -284,11 +338,17 @@ public class VertexBrush : EditorWindow
 
         if (current.type == EventType.MouseDrag && current.button == 2)
         {
-            Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
-            float scale = target.GetComponent<Renderer>().bounds.size.magnitude * zoom * 0.002f;
+            eye -= look * new Vector3(current.delta.x, -current.delta.y, 0f) * span * 0.002f;
+            current.Use();
+            Repaint();
+            return;
+        }
 
-            focus -= rotation * new Vector3(current.delta.x * scale,
-                -current.delta.y * scale, 0f);
+        // Tuşlar uçuş sırasında tutuluyor: her karede hangi yönlere gidildiği buradan.
+        if (flying && (current.type == EventType.KeyDown || current.type == EventType.KeyUp))
+        {
+            if (current.type == EventType.KeyDown) held.Add(current.keyCode);
+            else held.Remove(current.keyCode);
 
             current.Use();
             Repaint();
@@ -370,7 +430,10 @@ public class VertexBrush : EditorWindow
         collider.sharedMesh = mesh;
         collider.hideFlags = HideFlags.HideAndDontSave;
 
-        focus = target.GetComponent<Renderer>().bounds.center;
+        Bounds bounds = target.GetComponent<Renderer>().bounds;
+        eye = bounds.center - Quaternion.Euler(pitch, yaw, 0f)
+            * Vector3.forward * bounds.size.magnitude * 1.4f;
+
         BuildGrid();
     }
 
