@@ -40,8 +40,11 @@ public static class BikePartSheet
         MeshFilter[] parts = bike.GetComponentsInChildren<MeshFilter>();
         Bounds bounds = Frame(bike);
 
-        Material dim = Flat(new Color(0.34f, 0.35f, 0.38f), CompareFunction.LessEqual);
-        Material lit = Flat(new Color(1f, 0.36f, 0.05f), CompareFunction.Always);
+        // Renkler AYNI ALANDA seçiliyor: temizleme rengi gama dönüşümünden geçiyor,
+        // gölgelendiricinin yazdığı renk geçmiyor. İkisi aynı sayıyla verildiğinde
+        // zemin ile parça aynı griye düşüyor ve föy okunmuyordu.
+        Material dim = Flat(new Color(0.55f, 0.56f, 0.60f), CompareFunction.LessEqual);
+        Material lit = Flat(new Color(1f, 0.35f, 0.02f), CompareFunction.Always);
 
         Matrix4x4 view = View(bike.transform, bounds);
         Matrix4x4 projection = Projection(bounds);
@@ -55,7 +58,7 @@ public static class BikePartSheet
         for (int i = 0; i < parts.Length; i++)
         {
             Graphics.SetRenderTarget(target);
-            GL.Clear(true, true, new Color(0.10f, 0.10f, 0.12f));
+            GL.Clear(true, true, Color.black);
 
             GL.PushMatrix();
             GL.LoadProjectionMatrix(projection);
