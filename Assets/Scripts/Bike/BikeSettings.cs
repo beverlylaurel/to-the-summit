@@ -9,12 +9,18 @@ using UnityEngine;
 /// yazılsaydı her yeni eğim için yeni satır gerekirdi ve arazi değişince yalan olurdu.
 ///
 /// Denge hızı: P = v * (Crr*m*g + m*g*sin(eğim) + 0.5*rho*CdA*v^2)
+///
+/// VARSAYILANLAR ESKİ BİR ŞEHİR BİSİKLETİ. Çelik kadro ağır, düz lastik çakılda tutmaz,
+/// dik oturuş rüzgâr yer. Ölçülen sonuç: toprak yolda 20 km/h, patikada 15, %10 yokuşta
+/// 6.4 — yani yokuşta yürümekten yavaş, düzde iki buçuk kat hızlı. Dağ bisikleti
+/// istenirse kütle 95, direnç 0.022, CdA 0.65, yatma 30 yapılır.
 [CreateAssetMenu(menuName = "To The Summit/Bisiklet Ayarları", fileName = "BikeSettings")]
 public class BikeSettings : ScriptableObject
 {
     [Header("Kütle ve güç")]
-    [Tooltip("Sürücü, bisiklet ve yükün toplam kütlesi (kg). Sefer yüküyle 90-100 kg.")]
-    [Range(40f, 160f)] public float mass = 95f;
+    [Tooltip("Sürücü, bisiklet ve yükün toplam kütlesi (kg). Çelik kadrolu eski bir "
+             + "şehir bisikleti 16-18 kg; sürücü ve sefer yüküyle 100 kg.")]
+    [Range(40f, 160f)] public float mass = 100f;
 
     [Tooltip("Sürekli pedal gücü (watt). Antrenmanlı bir sürücü 200-250 W'ı saatlerce " +
              "verebilir; 400 W ancak dakikalarca sürer.")]
@@ -34,11 +40,11 @@ public class BikeSettings : ScriptableObject
     [Tooltip("Yuvarlanma direnci katsayısı. Asfalt 0.005, toprak yol 0.022, " +
              "çakıl ve patika 0.035, gevşek kum 0.06. Zemin sistemi varsa çalışma " +
              "anında değiştirilebiliyor.")]
-    [Range(0.003f, 0.12f)] public float rollingResistance = 0.025f;
+    [Range(0.003f, 0.12f)] public float rollingResistance = 0.03f;
 
     [Tooltip("Sürükleme alanı CdA (m²). Dik oturuş ve sırt yüküyle 0.6-0.7; yarış " +
              "duruşunda 0.3.")]
-    [Range(0.15f, 1.2f)] public float dragArea = 0.65f;
+    [Range(0.15f, 1.2f)] public float dragArea = 0.72f;
 
     [Tooltip("Hava yoğunluğu (kg/m³). Deniz seviyesinde 1.225; irtifada düşer ve " +
              "sürükleme azalır. Sabit bırakmak yaklaşma için yeterli.")]
@@ -51,12 +57,12 @@ public class BikeSettings : ScriptableObject
     [Tooltip("Serbest bırakınca inişte ulaşılan en yüksek hız (m/s). Fizik %10 inişte " +
              "64 km/h veriyor — gerçek ama oynanabilir değil, sürücü zaten fren yapar. " +
              "Bu tavan o refleksin yerine geçiyor.")]
-    [Range(4f, 25f)] public float comfortMaxSpeed = 12.5f;
+    [Range(4f, 25f)] public float comfortMaxSpeed = 10f;
 
     [Header("Direksiyon")]
     [Tooltip("En büyük yatma açısı (derece). Viraj yarıçapı buradan çıkıyor: " +
              "r = v² / (g·tan(yatma)). Otuz derece toprakta tutunabilen sınır.")]
-    [Range(10f, 45f)] public float maxLean = 30f;
+    [Range(10f, 45f)] public float maxLean = 25f;
 
     [Tooltip("Düşük hızda dönüş hızı tavanı (derece/saniye). Fizik neredeyse duran " +
              "bisikleti yerinde döndürmeye izin veriyor; gerçekte gidon açısı sınırlı.")]
