@@ -35,15 +35,21 @@ public static class BikeBootstrap
     // tutamak ve kablolar tek parça, bagaj ile zincir muhafazası ve pedal tek parça.
     // Sınırlar üçgen dağılımından ölçüldü (bkz. `MeshZones`).
     const string RackPart = "model_part10";
+    const string PedalPart = "model_part11";
 
     /// Gidon mesh'inde kablo sınırı: parçanın kendi yüksekliğinin bu oranının altı.
-    /// Ölçüm: üçgenlerin %57'si en üst dört dilimde, yani bar üstte; altta kalan ince
-    /// yapı fren kabloları.
-    const float CableBelow = 0.75f;
+    /// Ölçüm: bar z>1.10'da (oran 0.82); sınır hemen altına konuyor, kablo boydan boya
+    /// koyu kalsın. 0.75'te kablonun üst yarısı krom kalıyordu.
+    const float CableBelow = 0.80f;
 
-    /// Tutamak sınırı: gidon yarı genişliğinin bu oranından dışarısı. Bar 0.68 m,
-    /// tutamaklar son 12'şer santim.
-    const float GripBeyond = 0.69f;
+    /// Tutamak sınırı: gidon yarı genişliğinin bu oranından dışarısı. 0.69 tutamağı
+    /// bara doğru taşırıyordu; 0.78 uçta yedi buçuk santim bırakıyor.
+    const float GripBeyond = 0.78f;
+
+    /// Pedal gövdesinin başladığı yer: bisikletin orta düzleminden metre. Ölçüm: pedal
+    /// gövdesi ile krank kolu ayrı kümeler, arada boşluk var. Kural iki pedal için de
+    /// aynı — sağ pedal ayrı parça, sol pedal bagaj mesh'inin içinde.
+    const float PedalFrom = 0.14f;
 
     /// Bagaj mesh'inde aktarma organları sınırı: parçanın kendi yüksekliğinin bu
     /// oranının altı. Ölçüm: alt bölgede 290 bin üçgen (muhafaza, krank, sol pedal),
@@ -54,7 +60,7 @@ public static class BikeBootstrap
     /// Ön takımın tamamı (çatal, gidon, fren kolları, kablolar) bu eşiğin önünde duruyor.
     const float SteeringFrom = 1.20f;
 
-    /// YÜZEY TAKIMI. Kadro boyası, krom ve deri. Hepsi aynı gölgelendirici, farklı ayar —
+    /// YÜZEY TAKIMI. Kadro boyası, krom, kauçuk, deri ve yağlı çelik. Hepsi aynı gölgelendirici, farklı ayar —
     /// malzemeyi ayıran şey renk değil, ışığa verdiği cevap: krom metalik ve fırça izli,
     /// deri yarı mat ve renkçe oynak.
     ///
@@ -69,6 +75,7 @@ public static class BikeBootstrap
         ("Chrome",  new Color(0.60f, 0.61f, 0.63f), 0.9f, 0.64f, 0.03f, 0.12f, 0.7f, 0.18f, 0.04f, 0.34f),
         ("Leather", new Color(0.26f, 0.16f, 0.10f), 0.0f, 0.34f, 0.11f, 0.18f, 0.0f, 0.14f, 0.20f, 0.24f),
         ("Rubber",  new Color(0.07f, 0.07f, 0.08f), 0.0f, 0.22f, 0.04f, 0.10f, 0.0f, 0.16f, 0.06f, 0.30f),
+        ("Steel",   new Color(0.13f, 0.13f, 0.14f), 0.85f, 0.32f, 0.05f, 0.14f, 0.4f, 0.20f, 0.03f, 0.55f),
     };
 
     /// PARÇA → YÜZEY. Eşleşme parça tablosundaki ölçüden çıkarıldı: konumu, boyu ve
@@ -90,7 +97,7 @@ public static class BikeBootstrap
         { "model_part9",  "Paint"   },  // kadro üstü ince levha
         { "model_part10", "Paint"   },  // arka bagaj ve destekleri
         { "model_part11", "Chrome"  },  // krank ve pedal
-        { "model_part12", "Chrome"  },  // zincir
+        { "model_part12", "Steel"   },  // zincir — yağlı çelik, krom değil
         { "model_part13", "Chrome"  },  // arka çamurluk
         { "model_part15", "Chrome"  },  // çamurluk çubuğu
         { "model_part16", "Chrome"  },  // arka göbek yanı
@@ -329,16 +336,41 @@ public static class BikeBootstrap
             materials["Rubber"],   // kablolar
         };
 
+        // PEDAL SINIRI DÜNYA UZAYINDA. İki pedal ayna simetrik ve ayrı mesh'lerde;
+        // her mesh'in kendi ekseni farklı yöne bakıyor. Orta düzleme uzaklık ikisi için
+        // de aynı kuralı veriyor: dışarıda kalan kütle pedal gövdesi, içeride kalan kol.
+        float middle = Measure(model).center.z;
+
         var rack = FindPart(model, RackPart).GetComponent<MeshFilter>();
         Bounds carrier = rack.sharedMesh.bounds;
+        Matrix4x4 toWorld = rack.transform.localToWorldMatrix;
 
         rack.sharedMesh = Store(MeshZones.Build(rack.sharedMesh, point =>
-            MeshZones.Height(carrier, point) < DriveBelow ? 1 : 0, 2, "Rack"), "Rack");
+        {
+            if (MeshZones.Height(carrier, point) >= DriveBelow) return 0;
+
+            float lateral = Mathf.Abs(toWorld.MultiplyPoint3x4(point).z - middle);
+            return lateral > PedalFrom ? 2 : 1;
+        }, 3, "Rack"), "Rack");
 
         rack.GetComponent<Renderer>().sharedMaterials = new[]
         {
             materials["Paint"],    // bagaj tablası ve destekleri
-            materials["Chrome"],   // zincir muhafazası, krank, sol pedal
+            materials["Chrome"],   // zincir muhafazası ve krank kolu
+            materials["Rubber"],   // sol pedal gövdesi
+        };
+
+        var pedal = FindPart(model, PedalPart).GetComponent<MeshFilter>();
+        Matrix4x4 pedalToWorld = pedal.transform.localToWorldMatrix;
+
+        pedal.sharedMesh = Store(MeshZones.Build(pedal.sharedMesh, point =>
+            Mathf.Abs(pedalToWorld.MultiplyPoint3x4(point).z - middle) > PedalFrom ? 1 : 0,
+            2, "Pedal"), "Pedal");
+
+        pedal.GetComponent<Renderer>().sharedMaterials = new[]
+        {
+            materials["Chrome"],   // krank kolu ve mil
+            materials["Rubber"],   // pedal gövdesi
         };
     }
 
