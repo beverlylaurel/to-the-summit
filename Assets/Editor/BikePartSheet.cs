@@ -17,7 +17,7 @@ public static class BikePartSheet
     const int CellWidth = 420;
     const int CellHeight = 320;
 
-    [MenuItem("To The Summit/Model/Bisiklet Parça Föyü", false, 124)]
+    [MenuItem("To The Summit/Model/Bisiklet/Parça Föyü", false, 122)]
     static void Build()
     {
         var bike = Object.FindAnyObjectByType<BikeController>();

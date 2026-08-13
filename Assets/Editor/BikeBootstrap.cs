@@ -85,7 +85,7 @@ public static class BikeBootstrap
         { "model_part24", "Paint"   },  // kadro
     };
 
-    [MenuItem("To The Summit/Model/Bisikleti Sahneye Kur", false, 121)]
+    [MenuItem("To The Summit/Model/Bisiklet/Sahneye Kur", false, 120)]
     static void Build()
     {
         Dictionary<string, Material> materials = BuildMaterials();
