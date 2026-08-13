@@ -5,14 +5,16 @@ using UnityEngine;
 /// BİSİKLETİ SAHNEYE KURAR. Model, materyal, ayar asset'i ve bileşenler koddan
 /// bağlanıyor — sahne elle düzenlenmiyor (bkz. `CLAUDE.md`).
 ///
+/// İçe aktarma ayarı burada DEĞİL: rig, ölçek ve okunabilirlik `ModelImportRules`'ta,
+/// yani modelin her yenilenmesinde kendiliğinden uygulanıyor. Menüye bağlı olsaydı
+/// modeli değiştirip menüye basmayı unutmak sessizce yanlış ayar bırakırdı.
+///
 /// DOKU DOSYASI YOK. Model remesh edilmeden geldiği için UV'sine güvenilmiyor; yüzey
 /// `ToTheSummit/BikeSurface` ile prosedürel boyanıyor ve bütün desen dünya konumundan
-/// türüyor. Meshy'nin pişirdiği 4K doku denendi ve geri alındı: metallic/roughness
-/// maskesi kenarları parlatıyordu ve düzeltmek dokuyu yeniden pişirmek demekti.
+/// türüyor.
 ///
-/// PARÇA TABLOSU BASILIYOR. Modelde 26 parça var ve hangisinin tekerlek, hangisinin
-/// gidon olduğu adından anlaşılmıyor (`model_part7`). Boyut ve konum yazılınca gözle
-/// eşleştirilebiliyor; materyal ataması ve döndürme bağlaması ona göre yapılıyor.
+/// PARÇA TABLOSU BASILIYOR. Modelde 26 parça var ve adlarından hangisinin ne olduğu
+/// anlaşılmıyor (`model_part7`); boyut ve konum yazılınca eşleştirilebiliyor.
 public static class BikeBootstrap
 {
     const string Folder = "Assets/Models/Bike";
@@ -21,9 +23,19 @@ public static class BikeBootstrap
     const string RoutePath = "Assets/Settings/MountainRoute.asset";
     const string ShaderName = "ToTheSummit/BikeSurface";
 
-    /// Bisikletin gerçek boyu (metre). Meshy 120 cm yükseklikle veriyor; içe aktarma
-    /// ölçeği bununla doğrulanıyor.
+    /// Bisikletin gerçek boyu (metre). Model 120 cm yükseklikle geliyor.
     const float ExpectedHeight = 1.20f;
+
+    // Parça tablosundan okunan eşleşmeler. Tekerlek çapı 0.73 m ve ikisi bisikletin iki
+    // ucunda; gidon tam genişlikte ve en yukarıda — hepsi ölçüden ayırt edilebiliyor.
+    const string FrontWheelPart = "model_part25";
+    const string RearWheelPart = "model_part14";
+    const string HandlebarPart = "model_part8";
+
+    /// Direksiyonla dönen parçaların başladığı yer: modelin arka ucundan itibaren metre.
+    /// Ön takımın tamamı (çatal, gidon, fren kolları, kablolar) bu eşiğin önünde duruyor.
+    /// Yanlış parça dönüyorsa `BikeRigProbe` ile görülüp bu sayı değiştirilir.
+    const float SteeringFrom = 1.20f;
 
     /// Malzeme takımı. Bisiklet dört yüzeyden ibaret: boyalı çelik, mat krom, lastik,
     /// deri. Hepsi aynı gölgelendirici, farklı ayar.
@@ -39,42 +51,11 @@ public static class BikeBootstrap
     [MenuItem("To The Summit/Model/Bisikleti Sahneye Kur", false, 121)]
     static void Build()
     {
-        ConfigureModel();
         Material[] materials = BuildMaterials();
+        if (materials.Length == 0) return;
+
         BikeSettings settings = LoadOrCreateSettings();
-
-        GameObject bike = Place(materials[0], settings);
-        Selection.activeGameObject = bike;
-    }
-
-    // ------------------------------------------------------------------- model
-
-    static void ConfigureModel()
-    {
-        var importer = (ModelImporter)AssetImporter.GetAtPath(ModelPath);
-        if (importer == null)
-        {
-            Debug.LogError($"[Bisiklet] model yok: {ModelPath}");
-            return;
-        }
-
-        // Rig YOK. Unity bisikleti insansı sanıp "Hips bulunamadı" hatası basıyordu.
-        importer.animationType = ModelImporterAnimationType.None;
-        importer.importAnimation = false;
-        importer.importBlendShapes = false;
-        importer.importCameras = false;
-        importer.importLights = false;
-
-        // FBX'in kendi materyali dokusuz ve üstüne yazılamıyor.
-        importer.materialImportMode = ModelImporterMaterialImportMode.None;
-
-        importer.importNormals = ModelImporterNormals.Import;
-        importer.importTangents = ModelImporterTangents.None;
-
-        // Bölme ve ölçüm mesh'i CPU'da okuyor.
-        importer.isReadable = true;
-
-        importer.SaveAndReimport();
+        Selection.activeGameObject = Place(materials[0], settings);
     }
 
     static Material[] BuildMaterials()
@@ -141,27 +122,110 @@ public static class BikeBootstrap
 
         var root = new GameObject("Bicycle");
         GameObject model = (GameObject)PrefabUtility.InstantiatePrefab(prefab, root.transform);
+
+        // Kök başlangıçta orijinde ve model dönüşsüz: bütün ölçüler böylece doğrudan
+        // modelin kendi eksenlerinde okunuyor, dönüşüm çevirmeye gerek kalmıyor.
         model.transform.localPosition = Vector3.zero;
+        model.transform.localRotation = Quaternion.identity;
 
         foreach (Renderer renderer in model.GetComponentsInChildren<Renderer>())
             renderer.sharedMaterial = material;
 
         Report(model);
+        Rig(model, out Transform steering, out Transform frontWheel, out Transform rearWheel);
 
+        // Modelin uzunluk ekseni +X'te geliyor, oysa kontrolcü `transform.forward` (+Z)
+        // yönünde sürüyor. Çeyrek tur çevirip modeli kökün önüne bakacak hâle getiriyoruz.
+        model.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
+
+        // Tekerlekler yere değsin ve bisiklet kökün üstünde ortalansın: model kendi
+        // orijinini nerede taşırsa taşısın, kök hep yer temasında duruyor.
         Bounds bounds = Measure(model);
+        model.transform.localPosition -= new Vector3(bounds.center.x, bounds.min.y, bounds.center.z);
+        bounds = Measure(model);
 
         var controller = root.AddComponent<CharacterController>();
         controller.height = Mathf.Max(0.6f, bounds.size.y);
         controller.radius = 0.3f;
         controller.center = new Vector3(0f, controller.height * 0.5f, 0f);
 
-        root.AddComponent<BikeController>().Bind(settings);
+        var bike = root.AddComponent<BikeController>();
+        bike.Bind(settings);
         root.AddComponent<BikePlayerInput>();
+
+        // Tekerlek ekseni modelin genişlik ekseni (+Z). Direksiyon altındaki ön tekerlek
+        // de aynı eksende dönüyor: eğik direksiyon pivotu ile tekerlek arasına dönüşü
+        // sıfırlayan bir yuva konuyor (bkz. `Rig`).
+        root.AddComponent<BikeWheels>().Bind(bike, settings, frontWheel, rearWheel, Vector3.forward);
+        root.AddComponent<BikeSteeringVisual>().Bind(bike, steering);
 
         root.transform.position = SpawnPoint();
 
         Undo.RegisterCreatedObjectUndo(root, "Bisikleti kur");
         return root;
+    }
+
+    /// DÖNEN PARÇALARI AYIRIR. Model tek dosyada 26 parça olarak geliyor ama hepsi
+    /// kımıldamaz bir hiyerarşide; tekerleğin kendi göbeğinde dönmesi ve ön takımın
+    /// direksiyon ekseninde çevrilmesi için araya pivot nesneleri giriyor.
+    ///
+    /// Parçaların kendi dönüşüm orijini modelin orijininde duruyor: doğrudan
+    /// döndürülselerdi tekerlek kendi ekseninde değil bisikletin ortasında dönerdi.
+    static void Rig(GameObject model, out Transform steering,
+        out Transform frontWheel, out Transform rearWheel)
+    {
+        Transform frontPart = FindPart(model, FrontWheelPart);
+        Transform rearPart = FindPart(model, RearWheelPart);
+        Transform barPart = FindPart(model, HandlebarPart);
+
+        Vector3 frontHub = frontPart.GetComponent<Renderer>().bounds.center;
+        Vector3 rearHub = rearPart.GetComponent<Renderer>().bounds.center;
+        Vector3 bar = barPart.GetComponent<Renderer>().bounds.center;
+
+        // Direksiyon ekseni ÖLÇÜLÜYOR, yazılmıyor: ön göbekten gidon merkezine giden
+        // doğru. Sabit bir açı yazılsaydı model değişince sessizce yalan olurdu.
+        Vector3 axis = (bar - frontHub).normalized;
+
+        steering = new GameObject("Steering").transform;
+        steering.SetParent(model.transform, false);
+        steering.localPosition = frontHub;
+        steering.localRotation = Quaternion.FromToRotation(Vector3.up, axis);
+
+        float back = Measure(model).min.x;
+
+        foreach (MeshRenderer renderer in model.GetComponentsInChildren<MeshRenderer>())
+        {
+            if (renderer.transform == frontPart) continue;
+            if (renderer.bounds.center.x - back < SteeringFrom) continue;
+
+            renderer.transform.SetParent(steering, true);
+        }
+
+        // Ön tekerlek direksiyonla birlikte çevriliyor ama kendi dönüşü modelin
+        // ekseninde: eğik pivotun altına dönüşü sıfırlayan bir yuva giriyor, böylece iki
+        // tekerlek de aynı yerel eksende (+Z) dönüyor ve `BikeWheels` tek eksenle
+        // yetiniyor.
+        var mount = new GameObject("FrontWheelMount").transform;
+        mount.SetParent(steering, false);
+        mount.position = frontHub;
+        mount.rotation = model.transform.rotation;
+
+        frontWheel = new GameObject("FrontWheel").transform;
+        frontWheel.SetParent(mount, false);
+        frontPart.SetParent(frontWheel, true);
+
+        rearWheel = new GameObject("RearWheel").transform;
+        rearWheel.SetParent(model.transform, false);
+        rearWheel.localPosition = rearHub;
+        rearPart.SetParent(rearWheel, true);
+    }
+
+    static Transform FindPart(GameObject model, string name)
+    {
+        foreach (Transform child in model.GetComponentsInChildren<Transform>())
+            if (child.name == name) return child;
+
+        throw new System.InvalidOperationException($"[Bisiklet] parça yok: {name}");
     }
 
     /// Parçaları boyut ve konumla listeler. Hangi parçanın ne olduğu ancak böyle

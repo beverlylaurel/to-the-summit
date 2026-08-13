@@ -27,12 +27,13 @@ public class BikeWheels : MonoBehaviour
     float angle;
 
     public void Bind(BikeController bikeRef, BikeSettings settingsRef,
-        Transform front, Transform rear)
+        Transform front, Transform rear, Vector3 axis)
     {
         bike = bikeRef;
         settings = settingsRef;
         frontWheel = front;
         rearWheel = rear;
+        spinAxis = axis;
     }
 
     void OnEnable()
