@@ -66,11 +66,20 @@ public class VertexBrush : EditorWindow
         MeshFilter picked = (MeshFilter)EditorGUILayout.ObjectField(
             "Parça", target, typeof(MeshFilter), true);
 
+        // HAZIRLIK BİR SONRAKİ KAREYE. Seçim değiştiğinde çarpışma ekleniyor ve ilk
+        // boyamada mesh asset'i üretiliyor; ikisi de çizim ortasında yapılınca Unity'nin
+        // yerleşim düzeni kırılıyor ("BeginLayoutGroup must be called first").
         if (picked != target)
         {
-            Release();
-            target = picked;
-            Prepare();
+            MeshFilter chosen = picked;
+
+            EditorApplication.delayCall += () =>
+            {
+                Release();
+                target = chosen;
+                Prepare();
+                Repaint();
+            };
         }
 
         using (new EditorGUI.DisabledScope(target == null))
