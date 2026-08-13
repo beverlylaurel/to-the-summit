@@ -6,16 +6,17 @@ using UnityEngine;
 /// mesh'te geliyor; tutamağın nerede bittiği, kablonun nerede başladığı bir eşik sayısıyla
 /// tarif edilemiyor. Fırça o sınırı gözle koyuyor.
 ///
-/// MASKE KÖŞEDE DURUYOR, DOKUDA DEĞİL. Model 1.5 milyon köşe taşıyor: santimetre altı
-/// çözünürlük demek, doku çözünürlüğünden yüksek ve UV gerektirmiyor. Gölgelendirici üç
-/// kanalı üç malzeme olarak okuyor (bkz. `BikeSurface`).
+/// MASKE KÖŞEDE DURUYOR, DOKUDA DEĞİL. Model milyonlarca köşe taşıyor: santimetre altı
+/// çözünürlük demek, üstelik UV gerektirmiyor. Gölgelendirici üç kanalı üç malzeme olarak
+/// okuyor (bkz. `BikeSurface`).
 ///
-/// IŞIN İÇİN GEÇİCİ ÇARPIŞMA. Parçalarda çarpışma yok; boyarken hedefe `MeshCollider`
-/// takılıp iş bitince alınıyor. Kalıcı bırakılsaydı üç milyon üçgenlik çarpışma sahnede
-/// dururdu.
+/// BOYAMA PENCERENİN İÇİNDE VE YALNIZ SEÇİLİ PARÇA ÇİZİLİYOR. Sahnede boyamak, sekiz
+/// kilometre ötedeki karanlık bir noktaya gidip parçayı bulmak ve komşu parçaların
+/// arkasından boyamak demekti.
 ///
-/// KOMŞU ARAMA IZGARAYLA. Her darbede bütün köşeleri taramak yarım milyon karşılaştırma
-/// demek; köşeler bir kez hücrelere bölünüyor, fırça yalnız değdiği hücrelere bakıyor.
+/// IŞIN GERÇEK KONUMDAN. Parça sahnedeki yerinde çiziliyor ve ışın oraya atılıyor:
+/// önizleme için ayrı bir dünya kurulsaydı fırçanın değdiği nokta ile mesh'in köşeleri
+/// farklı uzaylarda kalırdı.
 public class VertexBrush : EditorWindow
 {
     static readonly string[] ChannelNames = { "Kırmızı — kauçuk", "Yeşil — deri", "Mavi — çelik" };
@@ -31,9 +32,16 @@ public class VertexBrush : EditorWindow
     Color32[] colours;
     MeshCollider collider;
 
-    /// Köşe ızgarası: hücre boyutu fırça yarıçapından, hücre başına köşe listesi.
+    /// Köşe ızgarası: hücre boyutu fırça yarıçapından, hücre başına köşe listesi. Her
+    /// darbede bütün köşeleri taramak yarım milyon karşılaştırma demek.
     Dictionary<Vector3Int, List<int>> grid;
     float cell;
+
+    PreviewRenderUtility preview;
+    float yaw = 30f;
+    float pitch = 12f;
+    float zoom = 1.4f;
+    Vector3 focus;
 
     bool painting;
 
@@ -42,26 +50,44 @@ public class VertexBrush : EditorWindow
 
     void OnEnable()
     {
-        SceneView.duringSceneGui += OnScene;
-
         // Derleme sonrası hedef alanı seri hâlde duruyor ama mesh, ızgara ve çarpışma
         // kayboluyor; hazırlık yenilenmezse fırça sessizce ölü kalıyordu.
-        if (target != null) Prepare();
+        if (target != null) EditorApplication.delayCall += Prepare;
     }
 
     void OnDisable()
     {
-        SceneView.duringSceneGui -= OnScene;
         Release();
+
+        preview?.Cleanup();
+        preview = null;
     }
+
+    // -------------------------------------------------------------------- gui
 
     void OnGUI()
     {
-        EditorGUILayout.HelpBox(
-            "1. Boyanacak parçayı seç (sahnede tıkla, sonra aşağıdaki alana sürükle).\n" +
-            "2. Kanal seç: her kanal bir malzeme.\n" +
-            "3. Sahnede sol tuşla sür. Shift basılıyken siler.\n\n" +
-            "Ctrl+tekerlek yarıçapı değiştirir.", MessageType.None);
+        Toolbar();
+
+        Rect view = GUILayoutUtility.GetRect(position.width, position.height - 116f);
+
+        if (target == null || mesh == null)
+        {
+            EditorGUI.HelpBox(view,
+                "Boyanacak parçayı yukarıdaki alana sürükle.\n\n"
+                + "Sol tuş boyar, Shift basılıyken siler.\n"
+                + "Sağ tuş döndürür, orta tuş kaydırır, tekerlek yakınlaştırır.",
+                MessageType.Info);
+            return;
+        }
+
+        Viewport(view);
+        Footer();
+    }
+
+    void Toolbar()
+    {
+        EditorGUILayout.Space(4f);
 
         MeshFilter picked = (MeshFilter)EditorGUILayout.ObjectField(
             "Parça", target, typeof(MeshFilter), true);
@@ -85,21 +111,30 @@ public class VertexBrush : EditorWindow
         using (new EditorGUI.DisabledScope(target == null))
         {
             channel = EditorGUILayout.Popup("Kanal", channel, ChannelNames);
-            radius = EditorGUILayout.Slider("Yarıçap (m)", radius, 0.005f, 0.25f);
+
+            EditorGUILayout.BeginHorizontal();
+            radius = EditorGUILayout.Slider("Yarıçap (m)", radius, 0.003f, 0.2f);
+            erase = GUILayout.Toggle(erase, "Silgi", EditorStyles.miniButton, GUILayout.Width(52f));
+            EditorGUILayout.EndHorizontal();
+
             strength = EditorGUILayout.Slider("Şiddet", strength, 0.05f, 1f);
-            erase = EditorGUILayout.Toggle("Silgi", erase);
         }
+    }
 
-        if (target == null || mesh == null) return;
+    void Footer()
+    {
+        EditorGUILayout.BeginHorizontal();
 
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Köşe", $"{vertices.Length:N0}");
-        EditorGUILayout.LabelField("Boyalı köşe", $"{Painted():N0}");
+        EditorGUILayout.LabelField($"Köşe {vertices.Length:N0}   Boyalı {Painted():N0}",
+            EditorStyles.miniLabel);
 
-        EditorGUILayout.Space();
+        if (GUILayout.Button("Kanalı temizle", EditorStyles.miniButton, GUILayout.Width(110f)))
+            Clear(channel);
 
-        if (GUILayout.Button("Bu kanalı temizle")) Clear(channel);
-        if (GUILayout.Button("Bütün maskeyi temizle")) Clear(-1);
+        if (GUILayout.Button("Hepsini temizle", EditorStyles.miniButton, GUILayout.Width(110f)))
+            Clear(-1);
+
+        EditorGUILayout.EndHorizontal();
     }
 
     int Painted()
@@ -109,6 +144,152 @@ public class VertexBrush : EditorWindow
             if (colour.r > 8 || colour.g > 8 || colour.b > 8) count++;
 
         return count;
+    }
+
+    // ---------------------------------------------------------------- görüntü
+
+    void Viewport(Rect view)
+    {
+        preview ??= new PreviewRenderUtility();
+
+        Input(view);
+
+        Bounds bounds = target.GetComponent<Renderer>().bounds;
+        float distance = Mathf.Max(0.05f, bounds.size.magnitude * zoom);
+
+        Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
+        Vector3 position = focus - rotation * Vector3.forward * distance;
+
+        preview.BeginPreview(view, GUIStyle.none);
+
+        preview.camera.transform.SetPositionAndRotation(position, rotation);
+        preview.camera.nearClipPlane = distance * 0.01f;
+        preview.camera.farClipPlane = distance * 10f;
+        preview.camera.fieldOfView = 35f;
+        preview.camera.clearFlags = CameraClearFlags.SolidColor;
+        preview.camera.backgroundColor = new Color(0.16f, 0.17f, 0.19f);
+
+        // İki ışık: karşıdan ana, arkadan dolgu. Tek ışıkta siyah kauçuk ile koyu çelik
+        // birbirinden ayırt edilemiyor. Işıklar kamerayla dönüyor, yoksa parçayı
+        // çevirdiğinde karanlıkta kalıyor.
+        preview.lights[0].intensity = 1.4f;
+        preview.lights[0].transform.rotation = Quaternion.Euler(35f, yaw + 40f, 0f);
+        preview.lights[1].intensity = 0.7f;
+        preview.lights[1].transform.rotation = Quaternion.Euler(-20f, yaw + 200f, 0f);
+
+        // YALNIZ SEÇİLİ PARÇA. Alt-mesh'ler kendi materyalleriyle çiziliyor ki boyama
+        // oyundaki hâliyle görünsün.
+        Material[] materials = target.GetComponent<Renderer>().sharedMaterials;
+
+        for (int i = 0; i < mesh.subMeshCount; i++)
+        {
+            Material material = materials.Length > 0
+                ? materials[Mathf.Min(i, materials.Length - 1)] : null;
+
+            preview.DrawMesh(mesh, target.transform.localToWorldMatrix, material, i);
+        }
+
+        preview.camera.Render();
+        GUI.DrawTexture(view, preview.EndPreview(), ScaleMode.StretchToFill, false);
+
+        Cursor(view);
+    }
+
+    /// Fırça halkası: imlecin altındaki yüzeye çiziliyor. Halka olmadan fırçanın nereye
+    /// değdiği ancak boyadıktan sonra anlaşılıyor.
+    void Cursor(Rect view)
+    {
+        if (Event.current.type != EventType.Repaint) return;
+        if (!view.Contains(Event.current.mousePosition)) return;
+        if (!Trace(view, Event.current.mousePosition, out RaycastHit hit)) return;
+
+        Handles.SetCamera(preview.camera);
+        Handles.color = erase || Event.current.shift
+            ? new Color(1f, 0.35f, 0.2f) : new Color(0.2f, 0.9f, 1f);
+
+        Handles.DrawWireDisc(hit.point, hit.normal, radius);
+    }
+
+    // ------------------------------------------------------------------ girdi
+
+    void Input(Rect view)
+    {
+        Event current = Event.current;
+        if (!view.Contains(current.mousePosition)) return;
+
+        if (current.type == EventType.ScrollWheel)
+        {
+            zoom = Mathf.Clamp(zoom * (1f + current.delta.y * 0.05f), 0.15f, 4f);
+            current.Use();
+            Repaint();
+            return;
+        }
+
+        // Sağ tuş döndürüyor, orta tuş kaydırıyor: sol tuş boyamaya ayrıldı, yoksa her
+        // fırça darbesi kamerayı da oynatırdı.
+        if (current.type == EventType.MouseDrag && current.button == 1)
+        {
+            yaw += current.delta.x;
+            pitch = Mathf.Clamp(pitch + current.delta.y, -85f, 85f);
+            current.Use();
+            Repaint();
+            return;
+        }
+
+        if (current.type == EventType.MouseDrag && current.button == 2)
+        {
+            Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
+            float scale = target.GetComponent<Renderer>().bounds.size.magnitude * zoom * 0.002f;
+
+            focus -= rotation * new Vector3(current.delta.x * scale,
+                -current.delta.y * scale, 0f);
+
+            current.Use();
+            Repaint();
+            return;
+        }
+
+        if (current.button != 0) return;
+
+        if (current.type == EventType.MouseDown
+            && Trace(view, current.mousePosition, out RaycastHit down))
+        {
+            // Darbe başına değil, fırça basımı başına kayıt: sürüklerken her karede
+            // kayıt alınsaydı geri alma yığını yüz binlerce köşeyle dolardı.
+            Undo.RegisterCompleteObjectUndo(mesh, "Malzeme fırçası");
+
+            painting = true;
+            Paint(down.point, current.shift);
+            current.Use();
+        }
+        else if (current.type == EventType.MouseDrag && painting
+                 && Trace(view, current.mousePosition, out RaycastHit drag))
+        {
+            Paint(drag.point, current.shift);
+            current.Use();
+        }
+        else if (current.type == EventType.MouseUp && painting)
+        {
+            painting = false;
+            Commit();
+            current.Use();
+        }
+    }
+
+    /// Pencere içindeki noktadan parçaya ışın. Önizleme kamerası parçanın gerçek dünya
+    /// konumunda duruyor, o yüzden ışın doğrudan sahnedeki çarpışmaya atılabiliyor.
+    bool Trace(Rect view, Vector2 mouse, out RaycastHit hit)
+    {
+        hit = default;
+        if (preview == null || collider == null) return false;
+
+        Vector2 local = mouse - view.position;
+        var point = new Vector3(local.x, view.height - local.y, 0f);
+
+        Camera camera = preview.camera;
+        camera.pixelRect = new Rect(0f, 0f, view.width, view.height);
+
+        return collider.Raycast(camera.ScreenPointToRay(point), out hit, 10000f);
     }
 
     // ------------------------------------------------------------------ hedef
@@ -125,11 +306,13 @@ public class VertexBrush : EditorWindow
         if (colours == null || colours.Length != vertices.Length)
             colours = new Color32[vertices.Length];
 
-        // Çarpışma hedefin üstüne takılıyor; ışın buna atılıyor ve `OnDisable` alıyor.
+        // Işın için geçici çarpışma; `Release` alıyor. Kalıcı bırakılsaydı iki yüz bin
+        // üçgenlik çarpışma sahnede dururdu.
         collider = target.gameObject.AddComponent<MeshCollider>();
         collider.sharedMesh = mesh;
         collider.hideFlags = HideFlags.HideAndDontSave;
 
+        focus = target.GetComponent<Renderer>().bounds.center;
         BuildGrid();
     }
 
@@ -153,7 +336,7 @@ public class VertexBrush : EditorWindow
 
         if (existing == null)
         {
-            existing = Object.Instantiate(source);
+            existing = Instantiate(source);
             existing.name = source.name;
             existing.SetColors(new Color32[existing.vertexCount]);
 
@@ -177,8 +360,6 @@ public class VertexBrush : EditorWindow
         grid = null;
     }
 
-    /// Izgara hücresi fırça yarıçapı kadar: fırça en fazla iki hücre komşuluğuna bakıyor.
-    /// Hücre küçük olsaydı sözlük şişerdi, büyük olsaydı hücre başına düşen köşe artardı.
     void BuildGrid()
     {
         // Hücre MESH UZAYINDA. Köşeler o uzayda duruyor ve parça dönüşümünde yüz kat
@@ -203,67 +384,7 @@ public class VertexBrush : EditorWindow
         Mathf.FloorToInt(local.y / cell),
         Mathf.FloorToInt(local.z / cell));
 
-    // ------------------------------------------------------------------ boyama
-
-    void OnScene(SceneView view)
-    {
-        if (target == null || mesh == null) return;
-
-        Event current = Event.current;
-
-        // Ctrl+tekerlek yarıçapı değiştiriyor: fırça boyunu ayarlamak için pencereye
-        // dönmek gerekmesin.
-        if (current.type == EventType.ScrollWheel && current.control)
-        {
-            radius = Mathf.Clamp(radius * (1f - current.delta.y * 0.05f), 0.005f, 0.25f);
-            BuildGrid();
-            current.Use();
-            Repaint();
-            return;
-        }
-
-        int control = GUIUtility.GetControlID(FocusType.Passive);
-
-        if (current.type == EventType.Layout)
-            HandleUtility.AddDefaultControl(control);
-
-        Ray ray = HandleUtility.GUIPointToWorldRay(current.mousePosition);
-        bool hit = collider.Raycast(ray, out RaycastHit surface, 1000f);
-
-        if (hit)
-        {
-            Handles.color = erase || current.shift
-                ? new Color(1f, 0.3f, 0.2f, 0.9f)
-                : new Color(0.2f, 0.9f, 1f, 0.9f);
-
-            Handles.DrawWireDisc(surface.point, surface.normal, radius);
-            view.Repaint();
-        }
-
-        if (current.alt || current.button != 0) return;
-
-        if (current.type == EventType.MouseDown && hit)
-        {
-            // Darbe başına değil, fırça basımı başına kayıt: sürüklerken her karede
-            // kayıt alınsaydı geri alma yığını yüz binlerce köşeyle dolardı.
-            Undo.RegisterCompleteObjectUndo(mesh, "Malzeme fırçası");
-
-            painting = true;
-            Paint(surface.point, current.shift);
-            current.Use();
-        }
-        else if (current.type == EventType.MouseDrag && painting && hit)
-        {
-            Paint(surface.point, current.shift);
-            current.Use();
-        }
-        else if (current.type == EventType.MouseUp && painting)
-        {
-            painting = false;
-            Commit();
-            current.Use();
-        }
-    }
+    // ----------------------------------------------------------------- boyama
 
     void Paint(Vector3 worldPoint, bool eraseNow)
     {
@@ -293,22 +414,20 @@ public class VertexBrush : EditorWindow
                 // Kenara doğru zayıflıyor: sert kenar boyalı ile boyasız arasında
                 // görünür bir çizgi bırakıyor.
                 float falloff = 1f - Mathf.SmoothStep(0f, 1f, distance / localRadius);
-                float amount = strength * falloff;
-
-                colours[index] = Blend(colours[index], amount, removing);
+                colours[index] = Blend(colours[index], strength * falloff, removing);
             }
         }
 
         mesh.SetColors(colours);
+        Repaint();
     }
 
     Color32 Blend(Color32 colour, float amount, bool removing)
     {
         byte[] rgb = { colour.r, colour.g, colour.b };
-        float target = removing ? 0f : 255f;
+        float goal = removing ? 0f : 255f;
 
-        rgb[channel] = (byte)Mathf.RoundToInt(
-            Mathf.Lerp(rgb[channel], target, amount));
+        rgb[channel] = (byte)Mathf.RoundToInt(Mathf.Lerp(rgb[channel], goal, amount));
 
         // Diğer kanallar aynı köşede duruyorsa siliniyor: bir köşe tek malzeme.
         if (!removing)
