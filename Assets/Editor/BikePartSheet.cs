@@ -37,7 +37,12 @@ public static class BikePartSheet
             return;
         }
 
+        // SIRA ADA GÖRE. Hiyerarşi sırası rig kurulurken bozuluyor: tekerlekler ve ön
+        // takım kendi pivotlarının altına taşınıyor. Föydeki kare numarası parça
+        // numarasıyla aynı olmazsa föy yanlış okunuyor — ilk sürümde tam bunu yaptı.
         MeshFilter[] parts = bike.GetComponentsInChildren<MeshFilter>();
+        System.Array.Sort(parts, (a, b) => Number(a.name).CompareTo(Number(b.name)));
+
         Bounds bounds = Frame(bike);
 
         // Renkler AYNI ALANDA seçiliyor: temizleme rengi gama dönüşümünden geçiyor,
@@ -110,6 +115,17 @@ public static class BikePartSheet
                 + $"(sol üst = ilk parça).");
     }
 
+    /// Parça adının sonundaki sayı (`model_part7` → 7). Ad sırası düz metin olarak
+    /// sıralanırsa `model_part10`, `model_part2`'den önce geliyor.
+    static int Number(string name)
+    {
+        int index = name.Length;
+        while (index > 0 && char.IsDigit(name[index - 1])) index--;
+
+        return index < name.Length && int.TryParse(name.Substring(index), out int value)
+            ? value : 0;
+    }
+
     /// Anlık çizimde kullanılabilen düz renk materyali. Projenin kendi gölgelendiricileri
     /// boru hattına bağlı ve `SetPass` ile çizilemiyor.
     static Material Flat(Color colour, CompareFunction depth)
@@ -155,7 +171,9 @@ public static class BikePartSheet
         float width = height * aspect;
         float far = bounds.size.magnitude * 6f;
 
+        // Doku hedefi için Y ÇEVİRMESİ İSTENMİYOR: `ReadPixels` zaten alttan okuyor,
+        // ikisi üst üste gelince bisiklet baş aşağı çıkıyordu.
         return GL.GetGPUProjectionMatrix(
-            Matrix4x4.Ortho(-width, width, -height, height, 0.01f, far), true);
+            Matrix4x4.Ortho(-width, width, -height, height, 0.01f, far), false);
     }
 }
