@@ -10,12 +10,20 @@ using UnityEngine;
 /// bağlamı kaybolurdu, bisikletin neresinde olduğu görülmezdi. Kareler tek bir resimde
 /// ızgara olarak birleşiyor, sıra parça numarasıyla aynı.
 ///
+/// SAHNENİN GERİSİ DIŞARIDA. Parçalar geçici olarak kendi katmanına alınıp kamera yalnız
+/// o katmanı çiziyor; sis de kapatılıyor. İlk sürümde arazi ve sis kadraja doluyor,
+/// vurgulanan parça seçilemiyordu.
+///
 /// GEÇİCİ ARAÇ. Parça eşleşmesi oturunca silinecek (bkz. `DECISIONS.md`).
 public static class BikePartSheet
 {
     const int Columns = 6;
-    const int CellWidth = 420;
-    const int CellHeight = 320;
+    const int CellWidth = 560;
+    const int CellHeight = 420;
+
+    /// Yalnız föy çizimi için kullanılan katman. Sahnede hiçbir şey bu katmanda durmuyor;
+    /// parçalar çizim boyunca buraya alınıp sonra kendi katmanlarına dönüyor.
+    const int SheetLayer = 31;
 
     [MenuItem("To The Summit/Model/Bisiklet/Parça Föyü", false, 122)]
     static void Build()
@@ -28,15 +36,25 @@ public static class BikePartSheet
         }
 
         MeshRenderer[] parts = bike.GetComponentsInChildren<MeshRenderer>();
-        Material[] original = new Material[parts.Length];
-        for (int i = 0; i < parts.Length; i++) original[i] = parts[i].sharedMaterial;
+
+        var material = new Material[parts.Length];
+        var layer = new int[parts.Length];
+
+        for (int i = 0; i < parts.Length; i++)
+        {
+            material[i] = parts[i].sharedMaterial;
+            layer[i] = parts[i].gameObject.layer;
+            parts[i].gameObject.layer = SheetLayer;
+        }
+
+        bool fog = RenderSettings.fog;
+        RenderSettings.fog = false;
 
         Shader unlit = Shader.Find("Universal Render Pipeline/Unlit");
-        var dim = new Material(unlit) { color = new Color(0.22f, 0.22f, 0.24f) };
-        var lit = new Material(unlit) { color = new Color(1f, 0.35f, 0.05f) };
+        var dim = new Material(unlit) { color = new Color(0.30f, 0.31f, 0.34f) };
+        var lit = new Material(unlit) { color = new Color(1f, 0.36f, 0.05f) };
 
-        Bounds bounds = Frame(parts);
-        Camera camera = BuildCamera(bounds);
+        Camera camera = BuildCamera(bike.transform, Frame(parts));
         var target = new RenderTexture(CellWidth, CellHeight, 24, RenderTextureFormat.ARGB32);
         camera.targetTexture = target;
 
@@ -70,7 +88,13 @@ public static class BikePartSheet
 
         sheet.Apply();
 
-        for (int i = 0; i < parts.Length; i++) parts[i].sharedMaterial = original[i];
+        for (int i = 0; i < parts.Length; i++)
+        {
+            parts[i].sharedMaterial = material[i];
+            parts[i].gameObject.layer = layer[i];
+        }
+
+        RenderSettings.fog = fog;
 
         camera.targetTexture = null;
         Object.DestroyImmediate(camera.gameObject);
@@ -99,25 +123,34 @@ public static class BikePartSheet
         return bounds;
     }
 
-    /// Bisikleti yandan çeken dik izdüşümlü kamera. Perspektif kullanılsaydı yakın
-    /// parçalar büyür ve karelerin ölçüsü karşılaştırılamazdı.
-    static Camera BuildCamera(Bounds bounds)
+    /// Bisikleti kendi yanından çeken dik izdüşümlü kamera. Yön bisikletin kendi
+    /// eksenlerinden alınıyor: dünya eksenine göre kurulsaydı bisiklet doğuş noktasında
+    /// hangi yöne bakıyorsa föy o açıdan çıkardı.
+    static Camera BuildCamera(Transform bike, Bounds bounds)
     {
         var holder = new GameObject("ParçaFöyüKamerası");
         Camera camera = holder.AddComponent<Camera>();
 
-        camera.orthographic = true;
-        camera.orthographicSize = bounds.extents.magnitude * 0.62f;
-        camera.backgroundColor = new Color(0.05f, 0.05f, 0.06f);
-        camera.clearFlags = CameraClearFlags.SolidColor;
-        camera.nearClipPlane = 0.01f;
-        camera.farClipPlane = bounds.size.magnitude * 4f;
+        float aspect = CellWidth / (float)CellHeight;
 
-        // Hafif yandan ve yukarıdan: tam yandan bakınca sağ ve sol taraftaki eş parçalar
+        // Kadraj HER İKİ EKSENDEN sıkıştırılıyor: yalnız yüksekliğe bakılsaydı uzun
+        // bisiklet yanlardan taşar, yalnız uzunluğa bakılsaydı kare boşluk dolardı.
+        float size = Mathf.Max(bounds.extents.y, bounds.extents.magnitude / aspect) * 1.15f;
+
+        camera.orthographic = true;
+        camera.orthographicSize = size;
+        camera.backgroundColor = new Color(0.10f, 0.10f, 0.12f);
+        camera.clearFlags = CameraClearFlags.SolidColor;
+        camera.cullingMask = 1 << SheetLayer;
+        camera.nearClipPlane = 0.01f;
+        camera.farClipPlane = bounds.size.magnitude * 6f;
+        camera.allowHDR = false;
+
+        // Hafif önden ve yukarıdan: tam yandan bakınca sağ ve sol taraftaki eş parçalar
         // üst üste biniyor ve hangisinin vurgulandığı seçilemiyor.
-        Vector3 direction = new Vector3(0.35f, 0.28f, -1f).normalized;
-        holder.transform.position = bounds.center - direction * bounds.size.magnitude * 1.5f;
-        holder.transform.LookAt(bounds.center);
+        Vector3 direction = (bike.right * -1f + bike.forward * 0.35f + bike.up * 0.25f).normalized;
+        holder.transform.position = bounds.center - direction * bounds.size.magnitude * 2f;
+        holder.transform.LookAt(bounds.center, bike.up);
 
         return camera;
     }
