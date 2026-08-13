@@ -147,7 +147,8 @@ public static class BikeBootstrap
     /// TEKERLEK MATERYALİ. Lastik, jant ve göbek tek mesh'te geldiği için ayrı materyal
     /// atanamıyor; ayrım gölgelendiricide yarıçaptan yapılıyor ve göbek ile dış yarıçap
     /// buradan veriliyor. İki tekerleğin ölçüsü farklı, o yüzden iki ayrı materyal.
-    static Material WheelMaterial(string name, Mesh mesh, Transform space, WheelProfile profile)
+    static Material WheelMaterial(string name, Mesh mesh, Transform space,
+        Vector3 axisWorld, WheelProfile profile)
     {
         Shader shader = Shader.Find(ShaderName);
         Material material = LoadOrCreate(shader, name);
@@ -160,6 +161,11 @@ public static class BikeBootstrap
         material.SetFloat("_WheelMode", 1f);
         material.SetVector("_WheelCentre", centre);
         material.SetFloat("_WheelRadius", profile.Radius);
+
+        // Eksen de nesne uzayında veriliyor: mesh verisi FBX'in Z-yukarı düzeninde,
+        // Unity'nin Y-yukarı dönüşü parçanın transform'unda duruyor.
+        material.SetVector("_WheelAxis",
+            space.InverseTransformDirection(axisWorld).normalized);
         material.SetColor("_TireColor", new Color(0.07f, 0.07f, 0.08f));
         material.SetColor("_RimColor", new Color(0.58f, 0.59f, 0.61f));
         material.SetFloat("_Variation", 0.05f);
@@ -350,7 +356,7 @@ public static class BikeBootstrap
 
         WheelProfile profile = WheelProfile.Measure(filter.sharedMesh, filter.transform, axis);
         part.GetComponent<Renderer>().sharedMaterial =
-            WheelMaterial(materialName, filter.sharedMesh, filter.transform, profile);
+            WheelMaterial(materialName, filter.sharedMesh, filter.transform, axis, profile);
     }
 
     static Transform FindPart(GameObject model, string name)
@@ -385,8 +391,10 @@ public static class BikeBootstrap
             Bounds b = renderers[i].bounds;
             Vector3 local = b.center - whole.min;
 
-            string surface = PartSurface.TryGetValue(renderers[i].name, out string named)
-                ? named : "Paint";
+            string surface = renderers[i].name == FrontWheelPart
+                          || renderers[i].name == RearWheelPart ? "Wheel"
+                : PartSurface.TryGetValue(renderers[i].name, out string named) ? named
+                : "Paint";
 
             report.Append($"\n  {renderers[i].name,-14} {surface,-8} {triangles,7} üçgen   "
                         + $"boyut {b.size.x:F2} x {b.size.y:F2} x {b.size.z:F2}   "
