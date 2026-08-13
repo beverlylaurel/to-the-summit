@@ -101,7 +101,7 @@ public static class BikeZoneSheet
         Object.DestroyImmediate(target);
         foreach (Material material in materials) Object.DestroyImmediate(material);
 
-        Debug.Log($"{report}\n  {path}\n  satırlar: {string.Join(", ", Parts)} "
+        ToolLog.Write($"{report}\n  {path}\n  satırlar: {string.Join(", ", Parts)} "
                 + "(üstten alta), sol sütun yandan, sağ sütun önden.");
     }
 

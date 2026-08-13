@@ -209,7 +209,7 @@ public static class BikeBootstrap
         Vector3 size = metric.size * space.lossyScale.x;
         Vector3 min = metric.min * space.lossyScale.x;
 
-        Debug.Log($"[Tekerlek] {name} ölçek {space.lossyScale.x:F2}\n"
+        ToolLog.Write($"[Tekerlek] {name} ölçek {space.lossyScale.x:F2}\n"
             + $"  göbek (nesne, m) {centre.x:F3}, {centre.y:F3}, {centre.z:F3}\n"
             + $"  mesh metrik sınır min {min.x:F3}, {min.y:F3}, {min.z:F3}  "
             + $"boyut {size.x:F3} x {size.y:F3} x {size.z:F3}\n"
@@ -531,7 +531,7 @@ public static class BikeBootstrap
         }
 
         report.Append($"\n  TOPLAM {total} üçgen");
-        Debug.Log(report.ToString());
+        ToolLog.Write(report.ToString());
     }
 
     static Bounds Measure(GameObject model)

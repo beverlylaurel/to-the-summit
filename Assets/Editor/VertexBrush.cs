@@ -151,7 +151,7 @@ public class VertexBrush : EditorWindow
             AssetDatabase.CreateAsset(existing, copyPath);
             AssetDatabase.SaveAssets();
 
-            Debug.Log($"[Fırça] {target.name} için boyanabilir kopya üretildi: {copyPath}");
+            ToolLog.Write($"[Fırça] {target.name} için boyanabilir kopya üretildi: {copyPath}");
         }
 
         target.sharedMesh = existing;

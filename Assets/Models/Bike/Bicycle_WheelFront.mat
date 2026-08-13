@@ -41,7 +41,7 @@ Material:
     - _Smoothness: 0.45
     - _Variation: 0.05
     - _WheelMode: 1
-    - _WheelRadius: 0.36111116
+    - _WheelRadius: 0.36265257
     m_Colors:
     - _BaseColor: {r: 0.45, g: 0.11999995, b: 0.079999976, a: 1}
     - _DustColor: {r: 0.62, g: 0.6, b: 0.54999995, a: 1}
@@ -51,6 +51,6 @@ Material:
     - _RimColor: {r: 0.58, g: 0.59, b: 0.61, a: 1}
     - _TireColor: {r: 0.07, g: 0.07, b: 0.08, a: 1}
     - _WheelAxis: {r: 0, g: -1, b: -0.0000001192093, a: 0}
-    - _WheelCentre: {r: 0.6272235, g: 0.012372403, b: 0.36133006, a: 0}
+    - _WheelCentre: {r: 0.6275647, g: 0.012372403, b: 0.36128563, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
