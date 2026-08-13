@@ -27,7 +27,8 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   ve yol dokusu oturunca silinir
 - **Bisiklet rig kontrolü** (`BikeRigProbe`, `BikeBootstrap`'ın parça tablosu ve tekerlek
   bölge logu) — dönen parçalar doğrulanıp hiyerarşi oturunca silinir
-- **Bisiklet parça föyü** (`BikePartSheet`) — parça→malzeme eşleşmesi oturunca silinir
+- **Bisiklet parça ve bölge föyleri** (`BikePartSheet`, `BikeZoneSheet`, `FlatColor`
+  gölgelendiricisi) — parça→malzeme eşleşmesi ve bölge sınırları oturunca silinir
 
 
 ## Bekleyen kararlar
