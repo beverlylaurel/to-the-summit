@@ -82,7 +82,7 @@ public static class StochasticTextureBaker
         foreach (var set in sets) TextureIngest.Resolve(set);
         AssetDatabase.SaveAssets();
 
-        Debug.Log($"Stokastik döşeme pişti: {baked.Count} doku.");
+        ToolLog.Write($"Stokastik döşeme pişti: {baked.Count} doku.");
         return true;
     }
 

@@ -72,7 +72,7 @@ public static class TestGroundBootstrap
 
         Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
         EditorSceneManager.SaveScene(scene, ScenePath);
-        Debug.Log($"Test sahnesi kuruldu: {ScenePath} — {Size}x{Size} m, "
+        ToolLog.Write($"Test sahnesi kuruldu: {ScenePath} — {Size}x{Size} m, "
                 + $"{GridSpacing} m ızgara.");
     }
 

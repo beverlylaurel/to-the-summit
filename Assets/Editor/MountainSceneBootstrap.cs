@@ -438,7 +438,7 @@ public static class MountainSceneBootstrap
 
         // Eşik 200 ms: altındaki kurulumlar zaten fark edilmiyor.
         if (clock.ElapsedMilliseconds >= 200)
-            Debug.Log($"[Kurulum] toplam {clock.ElapsedMilliseconds} ms{timings}");
+            ToolLog.Write($"[Kurulum] toplam {clock.ElapsedMilliseconds} ms{timings}");
     }
 
     static readonly string[] BandNames =
@@ -875,7 +875,7 @@ public static class MountainSceneBootstrap
             removed += GameObjectUtility.RemoveMonoBehavioursWithMissingScript(transform.gameObject);
 
         if (removed > 0)
-            Debug.Log($"Sahneden {removed} adet kayıp script kaldırıldı.");
+            ToolLog.Write($"Sahneden {removed} adet kayıp script kaldırıldı.");
 
         return removed > 0;
     }

@@ -112,7 +112,7 @@ public static class CloudWeatherMapBaker
         importer.wrapMode = TextureWrapMode.Repeat;
         importer.SaveAndReimport();
 
-        Debug.Log($"Boyanacak taban yazıldı: {PaintPath}. Boyadıktan sonra "
+        ToolLog.Write($"Boyanacak taban yazıldı: {PaintPath}. Boyadıktan sonra "
                   + "AtmosphereSettings'te 'Art Direction Map' alanına ver ve payı aç.");
         EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<Texture2D>(PaintPath));
     }
@@ -135,7 +135,7 @@ public static class CloudWeatherMapBaker
             AssetDatabase.CreateAsset(skip, SkipPath);
 
             AssetDatabase.SaveAssets();
-            Debug.Log($"Hava haritası pişti: {version}, "
+            ToolLog.Write($"Hava haritası pişti: {version}, "
                       + $"periyot {settings.weatherMapWorldSize / 1000f:F0} km.");
             return texture;
         }

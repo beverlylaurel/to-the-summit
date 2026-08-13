@@ -235,7 +235,7 @@ public static class RouteTerrainShaper
                         + Spread(heights, res, cell, vertical, origin, middle, 14f));
         }
 
-        Debug.Log(report.ToString());
+        ToolLog.Write(report.ToString());
     }
 
     /// Verilen yarıçaptaki yüzeyin PÜRÜZÜ: en küçük kareler düzleminden sapma. Ham kot
