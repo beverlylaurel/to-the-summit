@@ -16,6 +16,11 @@ public class ModelImportRules : AssetPostprocessor
     bool InScope => assetPath.StartsWith(Root);
     bool IsCharacter => assetPath.StartsWith(Character);
 
+    /// Kural değişince modellerin yeniden içe aktarılmasını Unity buradan anlıyor. Sayı
+    /// artmazsa dosyalar eski ayarla kalıyor ve değişiklik ancak elle "Reimport" ile
+    /// uygulanıyor — yani unutuluyor. Kuralların içeriği her değiştiğinde artırılır.
+    public override uint GetVersion() => 2;
+
     void OnPreprocessModel()
     {
         if (!InScope) return;
