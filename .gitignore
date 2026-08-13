@@ -77,3 +77,6 @@ Assets/Terrain/RouteShapeMask.png*
 # DÜZELTİLMİŞ TEKERLEK MESH'LERİ. Kaynak FBX'ten ölçülüp yeniden üretiliyor; her biri
 # birkaç yüz bin köşe, yani depoya yazmanın bedeli var ve kazancı yok.
 Assets/Models/Bike/Generated/
+
+# Arka plan yenileme tetikleyicisi. Icerigi onemsiz, yalniz zaman damgasi okunuyor.
+Logs/refresh.trigger
