@@ -19,10 +19,16 @@ using UnityEngine;
 /// farklı uzaylarda kalırdı.
 public class VertexBrush : EditorWindow
 {
-    /// Malzeme yuvaları. Adları KANAL DEĞİL MALZEME: maske köşe renginin R, G, B
-    /// kanallarında saklanıyor ama bu bir depolama ayrıntısı. "Kırmızı — kauçuk" yazınca
-    /// kauçuğun kırmızı olmak zorunda olduğu sanılıyordu; renk serbest, yuva sabit.
-    static readonly string[] SlotNames = { "Kauçuk", "Deri", "Çelik" };
+    /// Yuvalar YÜZEYİN IŞIĞA CEVABIYLA anılıyor, malzeme adıyla değil. "Kauçuk" yazınca
+    /// kablo için doğru mu diye düşünmek gerekiyordu; oysa seçilen şey kauçuk olup olmadığı
+    /// değil, parlamayıp parlamadığı. Kablo kılıfı da lastik de aynı yuvaya giriyor çünkü
+    /// ikisi de mat ve metalik değil.
+    static readonly string[] SlotNames =
+    {
+        "Mat — lastik, kablo, plastik",
+        "Yarı mat — deri, kumaş, boya",
+        "Metalik — çelik, krom, alüminyum",
+    };
 
     [SerializeField] MeshFilter target;
     [SerializeField] int channel;
