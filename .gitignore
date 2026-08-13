@@ -77,3 +77,8 @@ Assets/Terrain/RouteShapeMask.png*
 # DÜZELTİLMİŞ TEKERLEK MESH'LERİ. Kaynak FBX'ten ölçülüp yeniden üretiliyor; her biri
 # birkaç yüz bin köşe, yani depoya yazmanın bedeli var ve kazancı yok.
 Assets/Models/Bike/Generated/
+
+# GÖMÜLÜ POLYBRUSH. Unity 6.3'ten itibaren desteği bırakılmış paket; 6.5'te derlenmiyordu
+# ve yedi çağrısı yeni API'ye çevrildi. Deneme aşamasında depoya alınmıyor — kalıcı olursa
+# yamalarıyla birlikte girer.
+Packages/com.unity.polybrush/
