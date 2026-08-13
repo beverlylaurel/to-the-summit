@@ -1,25 +1,44 @@
 Shader "ToTheSummit/BikeSurface"
 {
-    // PROSEDÜREL YÜZEY. Model doku dosyası olmadan geliyor ve UV'sine güvenilmiyor:
-    // remesh edilmemiş üretim modelinde UV ya bozuk ya hiç yok. Bu yüzden bütün desen
-    // DÜNYA KONUMUNDAN türüyor — üçlü düzlem (triplanar), UV'ye hiç bakmıyor.
+    // PROSEDÜREL YÜZEY. Model doku dosyası olmadan geliyor ve UV'si yok (FBX'te tek bir
+    // UV katmanı bile bulunmuyor — ölçüldü). Bütün desen konumdan türüyor.
     //
-    // Aşınma SEBEPLİ, rastgele değil: toz yukarı bakan yüzeyde birikiyor, boya yukarı
-    // bakan yüzeyde güneşten soluyor, kir aşağıda topluyor. Tek tip gürültü "gürültü
-    // uygulanmış plastik" olarak okunuyor.
+    // DESEN NESNE UZAYINDA, DÜNYA UZAYINDA DEĞİL. Bisiklet hareket eden bir nesne:
+    // dünya uzayında örneklenseydi sürerken desen yüzeyin üstünde kayardı — boya
+    // bisikletle gitmez, dünyada asılı kalırdı. Nesne uzayı bunu kökten çözüyor.
+    // Ölçek de düzeltiliyor: parça dönüşümlerinde yüz kat ölçek var, ham nesne uzayında
+    // bir metrelik desen bir santime düşerdi.
+    //
+    // AŞINMA SEBEPLİ, RASTGELE DEĞİL: toz yukarı bakan yüzeyde birikiyor, boya yukarıda
+    // güneşten soluyor, kir aşağıda topluyor. Yön dünya yukarısından okunuyor çünkü
+    // sebebi yerçekimi.
+    //
+    // GEÇİŞLER YUMUŞAK. Her karışım smoothstep ile ve genlikler düşük; sert eşik keskin
+    // leke bırakıyor ve yüzey "gürültü uygulanmış plastik" gibi okunuyor.
     Properties
     {
         _BaseColor       ("Renk", Color) = (0.45, 0.12, 0.08, 1)
         _Metallic        ("Metaliklik", Range(0,1)) = 0
         _Smoothness      ("Parlaklık", Range(0,1)) = 0.45
 
-        _DustColor       ("Toz rengi", Color) = (0.62, 0.60, 0.55, 1)
-        _Dust            ("Toz miktarı", Range(0,1)) = 0.35
-        _DustScale       ("Toz ölçeği (metre)", Range(0.01, 1)) = 0.12
+        _Variation       ("Renk oynaması", Range(0,0.3)) = 0.06
+        _Grain           ("İnce doku (parlaklıkta)", Range(0,0.5)) = 0.15
+        _Brushed         ("Fırça izi", Range(0,1)) = 0
 
-        _Fade            ("Güneş soldurması", Range(0,1)) = 0.25
-        _Grime           ("Alt kir", Range(0,1)) = 0.3
-        _Variation       ("Renk oynaması", Range(0,0.5)) = 0.08
+        _DustColor       ("Toz rengi", Color) = (0.62, 0.60, 0.55, 1)
+        _Dust            ("Toz miktarı", Range(0,1)) = 0.25
+        _DustScale       ("Toz ölçeği (metre)", Range(0.02, 1)) = 0.18
+
+        _Fade            ("Güneş soldurması", Range(0,1)) = 0.2
+        _Grime           ("Alt kir", Range(0,1)) = 0.25
+
+        // Tekerlek tek parça geliyor: lastik, jant ve göbek aynı mesh'te. Ayrı materyal
+        // atanamıyor, o yüzden ayrım YARIÇAPTAN yapılıyor.
+        _WheelMode       ("Tekerlek modu", Float) = 0
+        _WheelCentre     ("Göbek (nesne uzayı, metre)", Vector) = (0,0,0,0)
+        _WheelRadius     ("Dış yarıçap (metre)", Float) = 0.36
+        _TireColor       ("Lastik rengi", Color) = (0.07, 0.07, 0.08, 1)
+        _RimColor        ("Jant rengi", Color) = (0.58, 0.59, 0.61, 1)
     }
 
     SubShader
@@ -50,12 +69,19 @@ Shader "ToTheSummit/BikeSurface"
                 half4 _BaseColor;
                 half _Metallic;
                 half _Smoothness;
+                half _Variation;
+                half _Grain;
+                half _Brushed;
                 half4 _DustColor;
                 half _Dust;
                 half _DustScale;
                 half _Fade;
                 half _Grime;
-                half _Variation;
+                float _WheelMode;
+                float4 _WheelCentre;
+                float _WheelRadius;
+                half4 _TireColor;
+                half4 _RimColor;
             CBUFFER_END
 
             struct Attributes
@@ -69,8 +95,19 @@ Shader "ToTheSummit/BikeSurface"
                 float4 positionCS : SV_POSITION;
                 float3 positionWS : TEXCOORD0;
                 float3 normalWS   : TEXCOORD1;
-                float  fogCoord   : TEXCOORD2;
+                float3 positionMS : TEXCOORD2;
+                float  fogCoord   : TEXCOORD3;
             };
+
+            /// Metrik nesne uzayı: nesne uzayı, dönüşümün ölçeğiyle çarpılmış. Desen
+            /// nesneye yapışık kalıyor ama ölçüsü metrede kalıyor.
+            float3 MetricObject(float3 positionOS)
+            {
+                float scale = length(float3(unity_ObjectToWorld._m00,
+                                            unity_ObjectToWorld._m10,
+                                            unity_ObjectToWorld._m20));
+                return positionOS * scale;
+            }
 
             Varyings Vertex(Attributes input)
             {
@@ -81,22 +118,24 @@ Shader "ToTheSummit/BikeSurface"
                 output.positionCS = position.positionCS;
                 output.positionWS = position.positionWS;
                 output.normalWS = normal.normalWS;
+                output.positionMS = MetricObject(input.positionOS.xyz);
                 output.fogCoord = ComputeFogFactor(position.positionCS.z);
                 return output;
             }
 
-            // Değer gürültüsü. Doku okuması yok: bisiklet ekranın küçük bir parçası ve
-            // her piksel için doku örneklemek, üretilen desenden pahalıya geliyor.
             float Hash(float3 cell)
             {
                 return frac(sin(dot(cell, float3(127.1, 311.7, 74.7))) * 43758.5453);
             }
 
+            /// Değer gürültüsü, BEŞİNCİ DERECE yumuşatmayla. Üçüncü derece (3t²-2t³)
+            /// hücre sınırlarında ikinci türevi kırıyor ve ışık altında ızgara gibi
+            /// okunuyordu; beşinci derece o kırılmayı bırakmıyor.
             float Noise(float3 position)
             {
                 float3 cell = floor(position);
                 float3 f = frac(position);
-                f = f * f * (3.0 - 2.0 * f);
+                f = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
 
                 float n000 = Hash(cell + float3(0,0,0)), n100 = Hash(cell + float3(1,0,0));
                 float n010 = Hash(cell + float3(0,1,0)), n110 = Hash(cell + float3(1,1,0));
@@ -107,41 +146,79 @@ Shader "ToTheSummit/BikeSurface"
                             lerp(lerp(n001, n101, f.x), lerp(n011, n111, f.x), f.y), f.z);
             }
 
+            /// Dört katman. Genlikler ikiye bölünüyor, yani en kaba katman deseni
+            /// belirliyor ve incesi yalnız kıpırdatıyor — tek katman lekeli duruyor.
             float Fbm(float3 position)
             {
-                return Noise(position) * 0.6
-                     + Noise(position * 2.7) * 0.3
-                     + Noise(position * 6.1) * 0.1;
+                return Noise(position) * 0.53
+                     + Noise(position * 2.1) * 0.27
+                     + Noise(position * 4.3) * 0.13
+                     + Noise(position * 8.7) * 0.07;
             }
 
             half4 Fragment(Varyings input) : SV_Target
             {
                 float3 normalWS = normalize(input.normalWS);
+                float3 p = input.positionMS;
 
-                // ÜÇ SEBEP, ÜÇ AYRI DESEN.
-                //
-                // Toz yukarı bakan yüzeyde birikiyor: yatay yüzeyde çok, dikeyde yok.
+                half3 albedo = _BaseColor.rgb;
+                half metallic = _Metallic;
+                half smoothness = _Smoothness;
+
+                // TEKERLEK: lastik, jant ve göbek tek mesh'te geldiği için ayrım
+                // yarıçaptan. Geçişler yarıçapın yüzde biriyle yumuşatılıyor; keskin
+                // olsaydı dönerken titreşen bir halka olurdu.
+                if (_WheelMode > 0.5)
+                {
+                    float2 offset = p.xy - _WheelCentre.xy;
+                    float r = length(offset) / max(1e-4, _WheelRadius);
+
+                    float tire = smoothstep(0.82, 0.87, r);
+                    float rim  = smoothstep(0.55, 0.62, r) * (1.0 - tire);
+                    float hub  = 1.0 - max(tire, rim);
+
+                    albedo = _TireColor.rgb * tire
+                           + _RimColor.rgb * rim
+                           + _RimColor.rgb * 0.75 * hub;
+
+                    metallic = (1.0 - tire) * 0.8;
+                    smoothness = lerp(0.5, 0.18, tire);
+                }
+
+                // Renk oynaması: tek düz renk boyanmış plastik gibi duruyor. Genlik
+                // küçük ve ölçek büyük — göze desen olarak değil derinlik olarak giriyor.
+                float variation = (Fbm(p * 3.1) - 0.5) * _Variation;
+                albedo *= 1.0 + variation;
+
                 float up = saturate(normalWS.y);
-                float dustNoise = Fbm(input.positionWS / max(0.01, _DustScale));
-                float dust = saturate(up * up * _Dust * 2.0 * (0.4 + dustNoise));
 
-                // Boya yukarı bakan yüzeyde güneşten soluyor — aynı yön, farklı etki.
+                // Boya yukarı bakan yüzeyde güneşten soluyor. Karesi alınmıyor: solma
+                // eğik yüzeyde de oluyor, yalnız yatayda değil.
                 float fade = up * _Fade;
+                albedo = lerp(albedo, saturate(albedo * 1.3 + 0.02), fade);
 
                 // Kir aşağıda topluyor: çamur sıçraması ve el değmeyen yüzler.
-                float down = saturate(-normalWS.y);
-                float grime = down * _Grime * (0.5 + Fbm(input.positionWS * 7.0) * 0.8);
+                float grime = saturate(-normalWS.y) * _Grime
+                            * (0.45 + Fbm(p * 9.0) * 0.7);
+                albedo = lerp(albedo, albedo * 0.5, grime);
 
-                // Renk oynaması: tek düz renk boyanmış plastik gibi duruyor.
-                float variation = (Fbm(input.positionWS * 1.7) - 0.5) * _Variation;
+                // Toz yatay yüzeyde birikiyor. Eşik değil rampa: dik yüzeyde sıfır,
+                // yatayda tam, arası yumuşak.
+                float dust = smoothstep(0.25, 0.95, up) * _Dust
+                           * (0.5 + Fbm(p / max(0.02, _DustScale)) * 0.8);
+                albedo = lerp(albedo, _DustColor.rgb, saturate(dust));
 
-                half3 albedo = _BaseColor.rgb * (1.0 + variation);
-                albedo = lerp(albedo, albedo * 1.35, fade);        // solma açıyor
-                albedo = lerp(albedo, albedo * 0.45, grime);       // kir koyultuyor
-                albedo = lerp(albedo, _DustColor.rgb, dust);
+                // İnce doku PARLAKLIKTA, renkte değil. Gerçek boyada ve metalde göze
+                // çarpan şey rengin lekelenmesi değil, yansımanın kıpırdaması.
+                float grain = (Fbm(p * 60.0) - 0.5) * _Grain;
 
-                // Tozlu ve kirli yüzey mat: parlaklık örtülüyor.
-                half smoothness = _Smoothness * (1.0 - dust * 0.8) * (1.0 - grime * 0.5);
+                // Fırça izi: bir eksende uzatılmış gürültü. Krom ve alüminyumda yüzey
+                // izleri hep bir yöne bakar.
+                float brushed = (Fbm(float3(p.x * 90.0, p.y * 6.0, p.z * 90.0)) - 0.5)
+                              * _Brushed * 0.35;
+
+                smoothness = saturate(smoothness + grain + brushed);
+                smoothness *= (1.0 - dust * 0.7) * (1.0 - grime * 0.45);
 
                 InputData lighting = (InputData)0;
                 lighting.positionWS = input.positionWS;
@@ -153,7 +230,7 @@ Shader "ToTheSummit/BikeSurface"
 
                 SurfaceData surface = (SurfaceData)0;
                 surface.albedo = albedo;
-                surface.metallic = _Metallic;
+                surface.metallic = metallic;
                 surface.smoothness = smoothness;
                 surface.occlusion = 1.0;
                 surface.alpha = 1.0;

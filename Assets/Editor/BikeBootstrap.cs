@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
@@ -6,12 +7,10 @@ using UnityEngine;
 /// bağlanıyor — sahne elle düzenlenmiyor (bkz. `CLAUDE.md`).
 ///
 /// İçe aktarma ayarı burada DEĞİL: rig, ölçek ve okunabilirlik `ModelImportRules`'ta,
-/// yani modelin her yenilenmesinde kendiliğinden uygulanıyor. Menüye bağlı olsaydı
-/// modeli değiştirip menüye basmayı unutmak sessizce yanlış ayar bırakırdı.
+/// yani modelin her yenilenmesinde kendiliğinden uygulanıyor.
 ///
-/// DOKU DOSYASI YOK. Model remesh edilmeden geldiği için UV'sine güvenilmiyor; yüzey
-/// `ToTheSummit/BikeSurface` ile prosedürel boyanıyor ve bütün desen dünya konumundan
-/// türüyor.
+/// DOKU DOSYASI YOK. Modelde UV yok (FBX'te tek UV katmanı bile bulunmuyor); yüzey
+/// `ToTheSummit/BikeSurface` ile nesne uzayında prosedürel boyanıyor.
 ///
 /// PARÇA TABLOSU BASILIYOR. Modelde 26 parça var ve adlarından hangisinin ne olduğu
 /// anlaşılmıyor (`model_part7`); boyut ve konum yazılınca eşleştirilebiliyor.
@@ -34,65 +33,145 @@ public static class BikeBootstrap
 
     /// Direksiyonla dönen parçaların başladığı yer: modelin arka ucundan itibaren metre.
     /// Ön takımın tamamı (çatal, gidon, fren kolları, kablolar) bu eşiğin önünde duruyor.
-    /// Yanlış parça dönüyorsa `BikeRigProbe` ile görülüp bu sayı değiştirilir.
     const float SteeringFrom = 1.20f;
 
-    /// Malzeme takımı. Bisiklet dört yüzeyden ibaret: boyalı çelik, mat krom, lastik,
-    /// deri. Hepsi aynı gölgelendirici, farklı ayar.
+    /// YÜZEY TAKIMI. Kadro boyası, krom ve deri. Hepsi aynı gölgelendirici, farklı ayar —
+    /// malzemeyi ayıran şey renk değil, ışığa verdiği cevap: krom metalik ve fırça izli,
+    /// deri yarı mat ve renkçe oynak.
+    ///
+    /// Kauçuk BURADA YOK: lastik tekerlek mesh'inin içinde ve ayrı materyal atanamıyor;
+    /// gölgelendirici onu yarıçaptan ayırıyor (bkz. `WheelMaterial`).
     static readonly (string Name, Color Colour, float Metallic, float Smoothness,
-                     float Dust, float Fade)[] Surfaces =
+                     float Variation, float Grain, float Brushed,
+                     float Dust, float Fade, float Grime)[] Surfaces =
     {
-        ("Paint",   new Color(0.42f, 0.10f, 0.07f), 0.0f, 0.45f, 0.35f, 0.30f),
-        ("Chrome",  new Color(0.62f, 0.63f, 0.65f), 0.9f, 0.55f, 0.30f, 0.05f),
-        ("Rubber",  new Color(0.09f, 0.09f, 0.10f), 0.0f, 0.18f, 0.45f, 0.10f),
-        ("Leather", new Color(0.24f, 0.15f, 0.09f), 0.0f, 0.30f, 0.25f, 0.20f),
+        ("Paint",   new Color(0.40f, 0.10f, 0.08f), 0.0f, 0.58f, 0.06f, 0.10f, 0.0f, 0.20f, 0.25f, 0.28f),
+        ("Chrome",  new Color(0.60f, 0.61f, 0.63f), 0.9f, 0.64f, 0.03f, 0.12f, 0.7f, 0.18f, 0.04f, 0.34f),
+        ("Leather", new Color(0.26f, 0.16f, 0.10f), 0.0f, 0.34f, 0.11f, 0.18f, 0.0f, 0.14f, 0.20f, 0.24f),
+    };
+
+    /// PARÇA → YÜZEY. Eşleşme parça tablosundaki ölçüden çıkarıldı: konumu, boyu ve
+    /// simetrik eşi olup olmadığı. Listede olmayan parça boyalı sayılıyor.
+    ///
+    /// Bu tablo GÖZLE DOĞRULANIR. Ölçü bir parçanın nerede durduğunu söylüyor, ne
+    /// olduğunu söylemiyor; yanlış eşleşme görülünce burası düzeltilir.
+    static readonly Dictionary<string, string> PartSurface = new Dictionary<string, string>
+    {
+        { "model_part0",  "Chrome"  },  // ön üstte kütle: far ve kablo demeti
+        { "model_part1",  "Chrome"  },  // ön küçük parça
+        { "model_part2",  "Chrome"  },  // fren kolu (sağ)
+        { "model_part3",  "Chrome"  },  // fren kolu (sol)
+        { "model_part4",  "Leather" },  // gidon tutamağı (sağ)
+        { "model_part5",  "Leather" },  // gidon tutamağı (sol)
+        { "model_part6",  "Chrome"  },  // ön fren pabucu (sağ)
+        { "model_part7",  "Chrome"  },  // ön fren pabucu (sol)
+        { "model_part8",  "Chrome"  },  // gidon
+        { "model_part9",  "Paint"   },  // kadro üstü ince levha
+        { "model_part10", "Paint"   },  // arka bagaj ve destekleri
+        { "model_part11", "Chrome"  },  // krank ve pedal
+        { "model_part12", "Chrome"  },  // zincir
+        { "model_part13", "Chrome"  },  // arka çamurluk
+        { "model_part15", "Chrome"  },  // çamurluk çubuğu
+        { "model_part16", "Chrome"  },  // arka göbek yanı
+        { "model_part17", "Chrome"  },  // arka uçtaki çubuk
+        { "model_part18", "Leather" },  // sele
+        { "model_part19", "Chrome"  },  // arka üstteki küçük parça
+        { "model_part20", "Chrome"  },  // gidon boğazı
+        { "model_part21", "Chrome"  },  // ön çatal kolu
+        { "model_part22", "Chrome"  },  // ön çatal gövdesi
+        { "model_part23", "Chrome"  },  // ön çamurluk
+        { "model_part24", "Paint"   },  // kadro
     };
 
     [MenuItem("To The Summit/Model/Bisikleti Sahneye Kur", false, 121)]
     static void Build()
     {
-        Material[] materials = BuildMaterials();
-        if (materials.Length == 0) return;
+        Dictionary<string, Material> materials = BuildMaterials();
+        if (materials.Count == 0) return;
 
         BikeSettings settings = LoadOrCreateSettings();
-        Selection.activeGameObject = Place(materials[0], settings);
+        Selection.activeGameObject = Place(materials, settings);
     }
 
-    static Material[] BuildMaterials()
+    // --------------------------------------------------------------- materyal
+
+    static Dictionary<string, Material> BuildMaterials()
     {
+        var materials = new Dictionary<string, Material>();
+
         Shader shader = Shader.Find(ShaderName);
         if (shader == null)
         {
             Debug.LogError($"[Bisiklet] gölgelendirici bulunamadı: {ShaderName}");
-            return new Material[0];
+            return materials;
         }
 
-        var materials = new Material[Surfaces.Length];
-
-        for (int i = 0; i < Surfaces.Length; i++)
+        foreach (var surface in Surfaces)
         {
-            string path = $"{Folder}/Bicycle_{Surfaces[i].Name}.mat";
-            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            Material material = LoadOrCreate(shader, surface.Name);
 
-            if (material == null)
-            {
-                material = new Material(shader);
-                AssetDatabase.CreateAsset(material, path);
-            }
-
-            material.shader = shader;
-            material.SetColor("_BaseColor", Surfaces[i].Colour);
-            material.SetFloat("_Metallic", Surfaces[i].Metallic);
-            material.SetFloat("_Smoothness", Surfaces[i].Smoothness);
-            material.SetFloat("_Dust", Surfaces[i].Dust);
-            material.SetFloat("_Fade", Surfaces[i].Fade);
+            material.SetColor("_BaseColor", surface.Colour);
+            material.SetFloat("_Metallic", surface.Metallic);
+            material.SetFloat("_Smoothness", surface.Smoothness);
+            material.SetFloat("_Variation", surface.Variation);
+            material.SetFloat("_Grain", surface.Grain);
+            material.SetFloat("_Brushed", surface.Brushed);
+            material.SetFloat("_Dust", surface.Dust);
+            material.SetFloat("_Fade", surface.Fade);
+            material.SetFloat("_Grime", surface.Grime);
+            material.SetFloat("_WheelMode", 0f);
 
             EditorUtility.SetDirty(material);
-            materials[i] = material;
+            materials[surface.Name] = material;
         }
 
         AssetDatabase.SaveAssets();
         return materials;
+    }
+
+    static Material LoadOrCreate(Shader shader, string name)
+    {
+        string path = $"{Folder}/Bicycle_{name}.mat";
+        var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+
+        if (material == null)
+        {
+            material = new Material(shader);
+            AssetDatabase.CreateAsset(material, path);
+        }
+
+        material.shader = shader;
+        return material;
+    }
+
+    /// TEKERLEK MATERYALİ. Lastik, jant ve göbek tek mesh'te geldiği için ayrı materyal
+    /// atanamıyor; ayrım gölgelendiricide yarıçaptan yapılıyor ve göbek ile dış yarıçap
+    /// buradan veriliyor. İki tekerleğin ölçüsü farklı, o yüzden iki ayrı materyal.
+    static Material WheelMaterial(string name, Transform space, WheelProfile profile)
+    {
+        Shader shader = Shader.Find(ShaderName);
+        Material material = LoadOrCreate(shader, name);
+
+        // Göbek gölgelendiricinin okuduğu uzayda veriliyor: nesne uzayı, ölçekle
+        // çarpılmış. Parça dönüşümünde yüz kat ölçek var; ham yerel konum verilseydi
+        // göbek yarıçapın yüzde birinde kalır, bütün tekerlek lastik sayılırdı.
+        Vector3 centre = space.InverseTransformPoint(profile.Centre) * space.lossyScale.x;
+
+        material.SetFloat("_WheelMode", 1f);
+        material.SetVector("_WheelCentre", centre);
+        material.SetFloat("_WheelRadius", profile.Radius);
+        material.SetColor("_TireColor", new Color(0.07f, 0.07f, 0.08f));
+        material.SetColor("_RimColor", new Color(0.58f, 0.59f, 0.61f));
+        material.SetFloat("_Variation", 0.05f);
+        material.SetFloat("_Grain", 0.10f);
+        material.SetFloat("_Brushed", 0.5f);
+        material.SetFloat("_Dust", 0.22f);
+        material.SetFloat("_Fade", 0.04f);
+        material.SetFloat("_Grime", 0.45f);
+
+        EditorUtility.SetDirty(material);
+        AssetDatabase.SaveAssets();
+        return material;
     }
 
     static BikeSettings LoadOrCreateSettings()
@@ -108,7 +187,7 @@ public static class BikeBootstrap
 
     // ----------------------------------------------------------------- sahneye
 
-    static GameObject Place(Material material, BikeSettings settings)
+    static GameObject Place(Dictionary<string, Material> materials, BikeSettings settings)
     {
         // Seçim ÖNCE bırakılıyor: Inspector yok edilen nesneyi çizmeye devam edip
         // her açılışta bir yığın `MissingReferenceException` basıyordu.
@@ -138,10 +217,9 @@ public static class BikeBootstrap
         model.transform.localPosition = Vector3.zero;
         model.transform.localRotation = Quaternion.identity;
 
-        foreach (Renderer renderer in model.GetComponentsInChildren<Renderer>())
-            renderer.sharedMaterial = material;
-
+        Paint(model, materials);
         Report(model);
+
         Rig(model, out Transform steering, out Transform frontWheel, out Transform rearWheel);
 
         // Modelin uzunluk ekseni +X'te geliyor, oysa kontrolcü `transform.forward` (+Z)
@@ -175,6 +253,19 @@ public static class BikeBootstrap
         return root;
     }
 
+    /// Tabloya göre materyal atar. Tabloda olmayan parça boyalı sayılıyor: eksik bir
+    /// eşleşme atanmamış materyal bırakmasın.
+    static void Paint(GameObject model, Dictionary<string, Material> materials)
+    {
+        foreach (Renderer renderer in model.GetComponentsInChildren<Renderer>())
+        {
+            string surface = PartSurface.TryGetValue(renderer.name, out string named)
+                ? named : "Paint";
+
+            renderer.sharedMaterial = materials[surface];
+        }
+    }
+
     /// DÖNEN PARÇALARI AYIRIR. Model tek dosyada 26 parça olarak geliyor ama hepsi
     /// kımıldamaz bir hiyerarşide; tekerleğin kendi göbeğinde dönmesi ve ön takımın
     /// direksiyon ekseninde çevrilmesi için araya pivot nesneleri giriyor.
@@ -189,10 +280,9 @@ public static class BikeBootstrap
         Transform barPart = FindPart(model, HandlebarPart);
 
         // Jant düzeltmesi göbek ölçümünden ÖNCE: düzeltme dış kenarı oynatıyor, pivot da
-        // o kenardan uydurulan çemberin merkezine oturuyor. Sonra yapılsaydı pivot eski
-        // mesh'in merkezinde kalırdı.
-        RoundWheel(frontPart, model.transform.forward, "Ön");
-        RoundWheel(rearPart, model.transform.forward, "Arka");
+        // o kenardan uydurulan çemberin merkezine oturuyor.
+        SetupWheel(frontPart, model.transform.forward, "Ön", "WheelFront");
+        SetupWheel(rearPart, model.transform.forward, "Arka", "WheelRear");
 
         Vector3 frontHub = frontPart.GetComponent<Renderer>().bounds.center;
         Vector3 rearHub = rearPart.GetComponent<Renderer>().bounds.center;
@@ -236,15 +326,19 @@ public static class BikeBootstrap
         rearPart.SetParent(rearWheel, true);
     }
 
-    /// Tekerleğin dönme ekseni modelin genişlik ekseni. Ölçüm dünya uzayında yapılıyor:
+    /// Tekerleği çembere oturtup kendi materyalini bağlar. Ölçüm dünya uzayında yapılıyor:
     /// parça dönüşümlerinde yüz kat ölçek var ve mesh'in kendi uzayında milimetreler
     /// mikrona iniyor.
-    static void RoundWheel(Transform part, Vector3 axisWorld, string label)
+    static void SetupWheel(Transform part, Vector3 axis, string label, string materialName)
     {
         var filter = part.GetComponent<MeshFilter>();
 
         filter.sharedMesh = WheelRounding.Round(
-            filter.sharedMesh, filter.transform, axisWorld, part.name, label);
+            filter.sharedMesh, filter.transform, axis, part.name, label);
+
+        WheelProfile profile = WheelProfile.Measure(filter.sharedMesh, filter.transform, axis);
+        part.GetComponent<Renderer>().sharedMaterial =
+            WheelMaterial(materialName, filter.transform, profile);
     }
 
     static Transform FindPart(GameObject model, string name)
@@ -255,8 +349,8 @@ public static class BikeBootstrap
         throw new System.InvalidOperationException($"[Bisiklet] parça yok: {name}");
     }
 
-    /// Parçaları boyut ve konumla listeler. Hangi parçanın ne olduğu ancak böyle
-    /// anlaşılıyor: tekerlek yüksek ve dar, sele küçük ve yukarıda, gidon önde.
+    /// Parçaları boyut, konum ve atanan yüzeyle listeler. Hangi parçanın ne olduğu ancak
+    /// böyle anlaşılıyor: tekerlek yüksek ve dar, sele küçük ve yukarıda, gidon önde.
     static void Report(GameObject model)
     {
         var renderers = model.GetComponentsInChildren<MeshRenderer>();
@@ -279,7 +373,10 @@ public static class BikeBootstrap
             Bounds b = renderers[i].bounds;
             Vector3 local = b.center - whole.min;
 
-            report.Append($"\n  {renderers[i].name,-14} {triangles,7} üçgen   "
+            string surface = PartSurface.TryGetValue(renderers[i].name, out string named)
+                ? named : "Paint";
+
+            report.Append($"\n  {renderers[i].name,-14} {surface,-8} {triangles,7} üçgen   "
                         + $"boyut {b.size.x:F2} x {b.size.y:F2} x {b.size.z:F2}   "
                         + $"merkez ön{local.x:F2} yük{local.y:F2} yan{local.z:F2}");
         }
