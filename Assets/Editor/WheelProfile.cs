@@ -37,9 +37,10 @@ public class WheelProfile
 
     readonly float[] radii = new float[Bins];
 
-    /// Verilen eksende ölçer. Bütün hesap mesh'in KENDİ uzayında: dönüşüm zincirine
-    /// bağlanmıyor, aynı ölçü sahneden de asset'ten de aynı çıkıyor.
-    public static WheelProfile Measure(Mesh mesh, Vector3 axis)
+    /// Verilen eksende ölçer. Hesap DÜNYA UZAYINDA, yani metrede: parça dönüşümlerinde
+    /// yüz kat ölçek var ve mesh'in kendi uzayında ölçülseydi bütün sayılar yüzde bire
+    /// inerdi — iki milimetrelik salgı yirmi mikron görünüp sınırın altında kalıyordu.
+    public static WheelProfile Measure(Mesh mesh, Transform space, Vector3 axis)
     {
         var profile = new WheelProfile { Axis = axis.normalized };
 
@@ -47,8 +48,12 @@ public class WheelProfile
         profile.Right = Vector3.Normalize(Vector3.Cross(profile.Axis, reference));
         profile.Up = Vector3.Cross(profile.Right, profile.Axis);
 
-        Vector3 boxCentre = mesh.bounds.center;
+        Matrix4x4 toWorld = space.localToWorldMatrix;
+        Vector3 boxCentre = toWorld.MultiplyPoint3x4(mesh.bounds.center);
+
         Vector3[] vertices = mesh.vertices;
+        for (int i = 0; i < vertices.Length; i++)
+            vertices[i] = toWorld.MultiplyPoint3x4(vertices[i]);
 
         var far = new Vector2[Bins];
         var hit = new bool[Bins];

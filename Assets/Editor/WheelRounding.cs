@@ -44,7 +44,8 @@ public static class WheelRounding
 
     /// Tekerleği düzeltir ve düzeltilmiş mesh'i döndürür. Ölçüm sınırın altındaysa
     /// kaynak mesh olduğu gibi geri veriliyor.
-    public static Mesh Round(Mesh source, Vector3 axis, string assetName, string label)
+    public static Mesh Round(Mesh source, Transform space, Vector3 axis,
+        string assetName, string label)
     {
         // Dosya adı PARÇADAN geliyor, mesh adından değil: üretilen modelde iki parçanın
         // mesh adı aynı olabiliyor ve o durumda ikinci tekerlek birincinin dosyasını
@@ -54,7 +55,7 @@ public static class WheelRounding
         var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
         if (existing != null) return existing;
 
-        WheelProfile profile = WheelProfile.Measure(source, axis);
+        WheelProfile profile = WheelProfile.Measure(source, space, axis);
 
         if (profile.Deviation < Threshold)
         {
@@ -63,7 +64,7 @@ public static class WheelRounding
             return source;
         }
 
-        Mesh rounded = Correct(source, profile);
+        Mesh rounded = Correct(source, space, profile);
 
         if (!AssetDatabase.IsValidFolder(Folder))
             AssetDatabase.CreateFolder("Assets/Models/Bike", "Generated");
@@ -71,7 +72,7 @@ public static class WheelRounding
         AssetDatabase.CreateAsset(rounded, path);
         AssetDatabase.SaveAssets();
 
-        WheelProfile after = WheelProfile.Measure(rounded, axis);
+        WheelProfile after = WheelProfile.Measure(rounded, space, axis);
 
         Debug.Log($"[Tekerlek] {label} çembere oturtuldu.\n"
             + $"  sapma {profile.Deviation * 1000f:F1} mm → {after.Deviation * 1000f:F1} mm\n"
@@ -82,13 +83,20 @@ public static class WheelRounding
         return rounded;
     }
 
-    static Mesh Correct(Mesh source, WheelProfile profile)
+    static Mesh Correct(Mesh source, Transform space, WheelProfile profile)
     {
+        // Ölçüm dünya uzayında, köşe verisi mesh uzayında: her köşe ölçüme gidip
+        // düzeltilmiş hâlde geri geliyor. Düzeltmeyi mesh uzayında yapmak, parça
+        // dönüşümündeki yüz kat ölçeği hesaba katmamak demekti.
+        Matrix4x4 toWorld = space.localToWorldMatrix;
+        Matrix4x4 toLocal = space.worldToLocalMatrix;
+
         Vector3[] vertices = source.vertices;
 
         for (int i = 0; i < vertices.Length; i++)
         {
-            Vector3 offset = vertices[i] - profile.Centre;
+            Vector3 world = toWorld.MultiplyPoint3x4(vertices[i]);
+            Vector3 offset = world - profile.Centre;
 
             float along = Vector3.Dot(offset, profile.Axis);
             float x = Vector3.Dot(offset, profile.Right);
@@ -108,8 +116,8 @@ public static class WheelRounding
             float scale = Mathf.Lerp(1f, profile.Radius / measured, weight);
             float target = radius * scale;
 
-            vertices[i] = profile.Centre + profile.Axis * along
-                        + (profile.Right * x + profile.Up * y) / radius * target;
+            vertices[i] = toLocal.MultiplyPoint3x4(profile.Centre + profile.Axis * along
+                        + (profile.Right * x + profile.Up * y) / radius * target);
         }
 
         var mesh = new Mesh { name = source.name };
