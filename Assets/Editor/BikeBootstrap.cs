@@ -39,8 +39,9 @@ public static class BikeBootstrap
     /// malzemeyi ayıran şey renk değil, ışığa verdiği cevap: krom metalik ve fırça izli,
     /// deri yarı mat ve renkçe oynak.
     ///
-    /// Kauçuk BURADA YOK: lastik tekerlek mesh'inin içinde ve ayrı materyal atanamıyor;
-    /// gölgelendirici onu yarıçaptan ayırıyor (bkz. `WheelMaterial`).
+    /// Lastiğin kendisi burada değil: tekerlek mesh'inin içinde ve ayrı materyal
+    /// atanamıyor, gölgelendirici onu yarıçaptan ayırıyor (bkz. `WheelMaterial`).
+    /// Kauçuk yine de var — gidon tutamağı ve pedal lastiği ayrı parça.
     static readonly (string Name, Color Colour, float Metallic, float Smoothness,
                      float Variation, float Grain, float Brushed,
                      float Dust, float Fade, float Grime)[] Surfaces =
@@ -48,6 +49,7 @@ public static class BikeBootstrap
         ("Paint",   new Color(0.40f, 0.10f, 0.08f), 0.0f, 0.58f, 0.06f, 0.10f, 0.0f, 0.20f, 0.25f, 0.28f),
         ("Chrome",  new Color(0.60f, 0.61f, 0.63f), 0.9f, 0.64f, 0.03f, 0.12f, 0.7f, 0.18f, 0.04f, 0.34f),
         ("Leather", new Color(0.26f, 0.16f, 0.10f), 0.0f, 0.34f, 0.11f, 0.18f, 0.0f, 0.14f, 0.20f, 0.24f),
+        ("Rubber",  new Color(0.07f, 0.07f, 0.08f), 0.0f, 0.22f, 0.04f, 0.10f, 0.0f, 0.16f, 0.06f, 0.30f),
     };
 
     /// PARÇA → YÜZEY. Eşleşme parça tablosundaki ölçüden çıkarıldı: konumu, boyu ve
@@ -61,8 +63,8 @@ public static class BikeBootstrap
         { "model_part1",  "Chrome"  },  // ön küçük parça
         { "model_part2",  "Chrome"  },  // fren kolu (sağ)
         { "model_part3",  "Chrome"  },  // fren kolu (sol)
-        { "model_part4",  "Leather" },  // gidon tutamağı (sağ)
-        { "model_part5",  "Leather" },  // gidon tutamağı (sol)
+        { "model_part4",  "Rubber"  },  // gidon tutamağı (sağ)
+        { "model_part5",  "Rubber"  },  // gidon tutamağı (sol)
         { "model_part6",  "Chrome"  },  // ön fren pabucu (sağ)
         { "model_part7",  "Chrome"  },  // ön fren pabucu (sol)
         { "model_part8",  "Chrome"  },  // gidon

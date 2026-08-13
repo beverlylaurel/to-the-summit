@@ -25,8 +25,9 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 - **Ova ve patika ölçüm araçları** (`ForelandProbe`, F1'deki kurulum süresi logu) — ova
   ve yol dokusu oturunca silinir
-- **Bisiklet rig kontrolü** (`BikeRigProbe`, `BikeBootstrap`'ın parça tablosu) — dönen
-  parçalar doğrulanıp hiyerarşi oturunca silinir
+- **Bisiklet rig kontrolü** (`BikeRigProbe`, `BikeBootstrap`'ın parça tablosu ve tekerlek
+  bölge logu) — dönen parçalar doğrulanıp hiyerarşi oturunca silinir
+- **Bisiklet parça föyü** (`BikePartSheet`) — parça→malzeme eşleşmesi oturunca silinir
 
 
 ## Bekleyen kararlar
