@@ -137,7 +137,7 @@ public class BikeRigProbe : EditorWindow
     /// - Pivot yanlış yerde: mesh yuvarlak ama dönme merkezi kenara kaçmış. Ölçüde
     ///   "kaçıklık" büyük, "yuvarlaklık sapması" küçük çıkar. Çözüm pivotu taşımak.
     /// - Jant çember değil: dönme merkezi doğru ama kenar oynuyor. Kaçıklık küçük, sapma
-    ///   büyük. Çözüm `WheelRounder` — pivot oynatmak işe yaramaz.
+    ///   büyük. Çözüm `WheelRounding` — pivot oynatmak işe yaramaz.
     ///
     /// Ölçümün kendisi `WheelProfile`'da: düzeltme de aynı ölçüden besleniyor, iki ayrı
     /// hesap olsaydı biri düzeltip diğeri "hâlâ bozuk" derdi.

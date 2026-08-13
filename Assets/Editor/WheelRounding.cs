@@ -15,7 +15,7 @@ using UnityEngine;
 ///
 /// Sonuç dosyaya yazılıyor ve git'e girmiyor: üretilen varlık repoda durmaz, menüden
 /// yeniden üretilir.
-public static class WheelRounder
+public static class WheelRounding
 {
     const string Folder = "Assets/Models/Bike/Generated";
 
