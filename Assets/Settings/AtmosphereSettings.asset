@@ -1,0 +1,120 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac762f2ac8ba7be4bb923743a420e7c5, type: 3}
+  m_Name: AtmosphereSettings
+  m_EditorClassIdentifier: Assembly-CSharp::AtmosphereSettings
+  clearVisibility: 25000
+  rainVisibility: 900
+  snowVisibility: 320
+  windClosure: 0.65
+  clearDay: {r: 0.6, g: 0.68, b: 0.8, a: 1}
+  rainDay: {r: 0.42, g: 0.45, b: 0.5, a: 1}
+  snowDay: {r: 0.8, g: 0.84, b: 0.9, a: 1}
+  duskOvercast: {r: 0.62, g: 0.44, b: 0.38, a: 1}
+  duskStrength: 0.75
+  clearNight: {r: 0.05, g: 0.07, b: 0.12, a: 1}
+  rainNight: {r: 0.06, g: 0.07, b: 0.09, a: 1}
+  snowNight: {r: 0.14, g: 0.16, b: 0.22, a: 1}
+  clearCoverage: 0.18
+  stormCoverage: 0.95
+  minCoverage: 0.27
+  openCoverage: 0.1
+  coverageGain: 0.35
+  cloudBottom: 2600
+  calmCloudBottom: 1700
+  cloudBottomSmoothing: 120
+  cloudTop: 7000
+  cumulonimbusHeight: 3800
+  cloudTopFloor: 0.55
+  cloudScale: 0.0003
+  detailScale: 0.0011
+  detailStrength: 0.4
+  weatherScale: 0.00014
+  regionDetail: 850
+  regionContrast: 2
+  regionPeak: 1.3
+  largeCloudWeight: 1
+  cloudWarp: 500
+  shearAmount: 0.6
+  shearTurnDegrees: 28
+  headingSmoothing: 240
+  variationScale: 0.00012
+  variationStrength: 0.5
+  densityScale: 0.0105
+  cloudDrift: 0.4
+  minCloudSpeed: 90
+  evolutionSpeed: 0.011
+  convectiveRise: 0.9
+  stormDensityBoost: 2.4
+  highCloudClear: 0.45
+  highCloudStorm: 0.8
+  highCloudType: 0.25
+  highCloudAltitude: 12000
+  highCloudScale: 0.00004
+  raymarchSteps: 140
+  lightSteps: 5
+  detailDistance: 9000
+  cloudDither: 1
+  cloudEdgeSoften: 0.6
+  stepGrowthDistance: 1900
+  maxHazeDistance: 60000
+  planetRadius: 6360000
+  minHazeDistance: 16000
+  hazeVisibilityFactor: 8
+  rimStrength: 0.08
+  powderStrength: 0.75
+  cloudAmbient: 0.6
+  ambientFloor: 0.1
+  massWarmth: 0.35
+  massBrightness: 0.55
+  lightProbeMeters: 1200
+  multiScatter: 0.42
+  rainAbsorption: 1.6
+  duskCloudStrength: 0.6
+  fogHalfHeightClear: 400
+  fogHalfHeightStorm: 2000
+  fogBaseAltitude: 0
+  fogThickness: 3.9
+  inversionHeight: 1700
+  inversionWidth: 220
+  freeAirVisibility: 290000
+  freeAirHalfHeight: 5545
+  inversionStormRise: 900
+  dawnSeaVisibility: 2200
+  dawnSeaHalfHeight: 120
+  valleyFogBurnOff: 0.45
+  spindriftDensity: 0.005
+  spindriftWindThreshold: 0.22
+  spindriftWindBand: 0.45
+  spindriftBrightness: 2.2
+  spindriftMaxDepthCalm: 0.35
+  spindriftMaxDepthStorm: 1.2
+  spindriftCrestBoost: 3
+  spindriftCrestRise: 4
+  spindriftHeightCalm: 10
+  spindriftHeightStorm: 150
+  deckLeadMeters: 400
+  deckThickness: 900
+  deckVisibility: 60
+  deckClearAmount: 0.35
+  ambientStrength: 0.85
+  maxShadowDistance: 150
+  shadowVisibilityRatio: 0.8
+  transitionSeconds: 3
+  weatherMapSeed: 86
+  weatherMapWorldSize: 48000
+  coreRadiusMax: 1600
+  corePacking: 0.9
+  packingFloor: 0.35
+  patchWindow: 0.35
+  coreDensity: 1.6
+  curlStrength: 240

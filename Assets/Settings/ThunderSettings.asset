@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 93da9aff5251be649a911ec1e8aa4107, type: 3}
+  m_Name: ThunderSettings
+  m_EditorClassIdentifier: Assembly-CSharp::ThunderSettings
+  minInterval: 15
+  maxInterval: 110
+  minPrecipitation: 0.2
+  snowCutoff: 0.65
+  minVolume: 0.5
+  closeChanceAtPeak: 0.85
+  closeThreshold: 0.6
+  volumeVariation: 0.25
+  pitchVariation: 0.15
+  panVariation: 0.6
+  distantCutoff: {x: 400, y: 1200}
+  closeCutoff: {x: 3000, y: 8000}
+  closeDistance: {x: 200, y: 1500}
+  distantDistance: {x: 2500, y: 8000}

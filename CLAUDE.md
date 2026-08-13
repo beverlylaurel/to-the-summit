@@ -1,0 +1,170 @@
+# To The Summit — Çalışma Kuralları
+
+Karlı, fırtınalı bir dağa tırmanma oyunu. Unity 6000.5.6f1, URP, birinci şahıs.
+
+## Rol dağılımı
+
+- **Claude yapar.** Kod, dosya, klasör, ayar — hepsi Claude tarafından yazılır.
+- **Kullanıcı sadece Unity içinde tıklanması zorunlu olan yerleri yapar** (Play, editör penceresi etkileşimleri).
+- Claude bir şeyi otomatikleştirebiliyorsa otomatikleştirir. Kullanıcıya "şu menüye tıkla" demek son çaredir.
+- Sahne kurulumu `Assets/Editor/MountainSceneBootstrap.cs` üzerinden koddan yönetilir. Elle sahne düzenleme yok.
+
+## Kod mimarisi
+
+React component mantığı geçerlidir: her parça kendi içinde kapalı, dışarıdan gelen parametreyle çalışır, başka parçalara bağımlı değildir.
+
+Unity'deki karşılıkları:
+
+- **Bağımlılık Inspector'dan enjekte edilir.** `[SerializeField]` alanla dışarıdan verilir. `FindObjectOfType`, singleton, `GameObject.Find` kullanılmaz — bunlar gizli bağımlılık yaratır.
+- **Ayarlar `ScriptableObject`'e taşınır.** Bir sistemin ayarları koda gömülmez; asset olarak dışarıdan verilir. Aynı sistem farklı ayarla tekrar kullanılabilir olur.
+- **Sistemler birbirini doğrudan çağırmaz.** İletişim event/callback ile olur. Tırmanma sistemi kar sistemini bilmez, hava sistemi oyuncuyu bilmez.
+- **Bir script tek iş yapar.** İki iş yapıyorsa ikiye bölünür.
+- **Public API dar tutulur.** Dışarıdan erişilmesi gerekmeyen her şey `private`.
+
+Hedef: bir sistemi değiştirmek veya silmek diğerlerini bozmaz. "Bunu değiştirmek çok maliyetli, her yeri bozarız" cümlesi kurulacak bir durum oluşmamalıdır. Böyle bir risk doğuyorsa mimari yanlıştır, mimari düzeltilir.
+
+## Atmosfer tutarlılığı
+
+Hava, rüzgâr, bulut, sis, ışık, ses ve renk düzenlemesi **tek bir durumdan** türer ve
+birbiriyle çelişemez. Yeni bir özellik eklerken bu zincire nasıl bağlanacağı baştan
+belirlenir; bağımsız çalışan ikinci bir kaynak yaratılmaz.
+
+Kaynaklar:
+- `WeatherState` — yağış şiddeti, karlılık
+- `WindField` — rüzgâr vektörü ve şiddeti (şiddetini `AltitudeWeatherDriver`, arazi
+  maruziyetini `TerrainWindShelter` sürer)
+- `TimeOfDay` — günün saati, güneş yönü, gündüz katsayısı
+- `TemperatureField` — sıcaklık ve hissedilen sıcaklık; donma seviyesi buradan türer
+
+Yeni sistem eklerken sorulacaklar:
+- Bu özellik yağış şiddetinden etkilenmeli mi? Rüzgârdan? Günün saatinden?
+- Şiddetlendiğinde diğer sistemler de şiddetlenmeli mi, yoksa tersine mi davranmalı?
+- Kendi zamanlayıcısını/rastgeleliğini mi kuruyor, yoksa mevcut duruma mı bağlanıyor?
+
+"Rüzgâr uğulduyor ama kar dik iniyor", "fırtına var ama gökyüzü açık", "gece oldu ama
+bulutlar hâlâ gündüz rengi" gibi bir çelişki oluşuyorsa özellik yanlış bağlanmıştır.
+
+Mevcut bağların tamamı `SYSTEMS.md`'de: ne neyi okur, ne neyi okumaz, hangi kural
+bilinçli. İki sistem arasında yeni bir bağ kurulduğunda, bir bağ koptuğunda veya bilinçli
+bir kural eklendiğinde `SYSTEMS.md` **aynı adımda** güncellenir. Sayılar orada tutulmaz;
+eşik ve katsayı kodda ve ayar asset'lerinde durur.
+
+`SYSTEMS.md` yön gösterir, otorite değildir. Nereye bakılacağı oradan bulunur, davranış
+**koddan doğrulanır**. İkisi çeliştiğinde kod haklıdır ve belge aynı adımda düzeltilir.
+"Belgede öyle yazıyor" bir gerekçe değildir; hafızadan konuşmak da değildir.
+
+## Temizlik
+
+- Çöp kod yok. Kullanılmayan dosya, ölü kod, yoruma alınmış kod, template artığı projede durmaz.
+- Bir şey gereksizleşince aynı adımda silinir, sonraya bırakılmaz.
+- Gereksiz paket/modül kurulmaz. Sadece o anki adım için gerekli olan kurulur.
+- Savunmacı `try/catch`, "ne olur ne olmaz" fallback'leri yazılmaz. Hata yutulmaz, açıkça fırlatılır.
+
+## Klasör yapısı
+
+```
+Assets/
+  Scripts/
+    <Sistem>/          her sistem kendi klasöründe
+  Editor/              editör araçları, sahne bootstrap
+  Settings/            render pipeline, volume profilleri
+  Terrain/             üretilen terrain verisi
+  Scenes/
+```
+
+Yeni sistem = yeni klasör. Dosyalar `Assets/Scripts` kökünde birikmez.
+
+## Ölçmeden düzeltme yok
+
+Belirti kodu okuyarak açıklanamıyorsa tahminle düzeltme yapılmaz. Kod her satırında doğru
+görünüp sonuç yanlışsa, yanlış olan **varsayımdır** — ve varsayım ancak ölçülerek bulunur.
+
+**İki turdan fazla "düzelttim, bir bak" denmişse dur.** Üçüncü turda kod değil ölçüm aracı
+yazılır: ekrana basılan sayı, tek bakışta ayıran renk probu, sınırın iki yakasındaki değer.
+Aracın kendisi önce doğrulanır — ışıktan, tonemap'ten, pozlamadan etkilenen bir teşhis
+görünümü yalan söyler ve turları katlar.
+
+Ölçüm sonucu gelmeden bir sonraki düzeltme yazılmaz. Aynı belirtiye üst üste dört farklı
+"düzeltme" uygulamak, dördünün de yanlış yeri hedeflemesi demektir.
+
+## Bir değere bağlanmadan önce
+
+Yeni bir görsel/davranış mevcut bir değere (global, ayar, örnek) bağlanacaksa, bağlamadan
+**önce** o değerin fiziksel karşılığı tek cümleyle yazılır: radyans mı, ışınım mı, gök mü,
+yüzey mi, yön bağımlı mı. "Zaten var, elimin altında" gerekçe değildir.
+
+Sonra uçlar **kâğıtta** hesaplanır — şafak, öğle, gece, kapalı hava, fırtına. Sabit katsayı
+koyuluyorsa aralığın iki ucundaki sonuç yazılır.
+
+**Kaynak HDR ve üst sınırsızsa katsayı ayarlanmaz, tavan konur.** Tavanın fiziksel bir
+karşılığı olmalı. Renk ile parlaklık ayrılır: ton kaynaktan alınır (parlaklığı 1'e
+normalize edilerek), seviye sınırlı ve bilinen bir büyüklükten kurulur.
+
+Atlanırsa belirti hep aynı: bir saatte doğru, başka saatte fosforlu ya da kapkara.
+
+## Ölçek bağımlılıkları
+
+Dağın boyu değiştiğinde nelerin kendiliğinden kaydığı, nelerin elle düzeltilmesi
+gerektiği `SCALE.md`'de. Dağ büyütülüp küçültülmeden **önce** baştan sona okunur.
+
+Yeni bir özellik eklerken tek soru sorulur: *bu sayı dağın boyuna bağlı mı?* Evetse
+`SCALE.md`'ye **aynı adımda** yazılır — hangi kategoriye girdiğiyle birlikte
+(kendiliğinden ölçeklenir / bilerek mutlak / elle bakılacak).
+
+## Ertelenmiş kararlar
+
+Bilinçli olarak ertelenen veya sınırlandırılan her karar `DECISIONS.md`'ye yazılır: karar,
+gerekçe, **tetikleyici** (hangi belirti görülünce geri dönülecek), maliyet.
+
+"Sonra bakarız" denen hiçbir şey sadece konuşmada kalmaz. Karar geri alındığında kaydı silinir.
+
+Dosyanın başında durum indeksi var: **bloke eden açık sorular**, **bekleyen kararlar**,
+**silinecek geçiciler**. Yeni kayıt bu üçünden birine giriyorsa aynı adımda indekse de
+yazılır; iş bitince indeksten silinir. Kapanmış kararlar indekse girmez.
+
+## Co-op borcu
+
+Ağ katmanı gelince yeniden yazılması gerekecek bir şey fark edildiğinde `COOP.md`'ye
+**aynı adımda** yazılır: ne yapıyor, ne olması gerekiyor, maliyeti ne. Ödendiğinde satır
+silinir.
+
+Kararın kendisi ve "başlamadan önce uyar" kuralı `DECISIONS.md`'de; `COOP.md` yalnızca
+envanterdir.
+
+## Varlık üretimi (kredili servisler)
+
+Model, doku ve referans görsel kredili servislerde üretiliyor. **Her üretim kullanıcının
+parasını harcıyor** — ilk deneme doğru olmak zorunda. Teknik olarak bozulmayan ama işe
+yaramayan çıktı israftır.
+
+İstem yazarken iki kriter **ayrı ayrı** karşılanır, biri diğerine feda edilmez:
+
+- **Teknik güvenlik** — neyin üretimi bozacağı
+- **İşin amacı** — çıktıdan ne beklendiği (özgünlük, detay, karakter)
+
+Neyin kesileceği bu ayrımdan çıkar:
+
+- **Kesilir — silueti tehdit eden geometri:** sarkan kayış, ip, karabina, gevşek kordon,
+  elde tutulan alet. İnce ve serbest olan her şey lapa olur, rig'de çöker. Ekipman ayrı
+  model olarak üretilip kemiğe takılır.
+- **Kesilmez — yüzey detayı:** dikiş, panel, cep, fermuar, renk bloklama, aşınma, leke,
+  solma, yara izi, bronzluk çizgisi. Dokuda taşınır, silueti bozmaz, karakteri o verir.
+
+İkisini birden kesmek "güvenli ama kişiliksiz" üretir; bu bir kez oldu ve kredi yaktı.
+
+Kimlik tutarlılığı: beğenilen yüz/tasarım sonraki turlarda **görsel referans** olarak
+verilir, istem yeniden yazılmaz.
+
+## İş akışı
+
+- **Hiçbir işlem onaysız yapılmaz.** Dosya yazma, düzenleme, silme, komut çalıştırma — önce ne yapılacağı söylenir, kullanıcı onay verir, sonra uygulanır. "Küçük değişiklik" istisnası yoktur.
+- Onay bir adım içindir, sonraki adıma taşınmaz. Plan onaylandıysa bu, plandaki her dosyayı arka arkaya yazma yetkisi değildir.
+- Çok dosyalı veya mimari değişiklikten önce kısa plan sunulur, onay beklenir.
+- Kullanıcı Play'e bastığını söylediğinde `Logs/play.log` okunur. Bulunan hata ve uyarılar kullanıcıya düzeltme önerisi olarak sunulur.
+- Değişiklikler diff olarak gösterilir, tam dosya yapıştırılmaz.
+- Değişiklik bitmeden **yan etkileri** kontrol edilir; kullanıcı bariz sonuçları bildirmek zorunda kalmaz:
+  UI'ya içerik eklendiyse taşma/kaydırma, bileşene alan eklendiyse sahnedeki eski örneklerin yeniden
+  bağlanması, serileştirilmiş varsayılan değiştiyse mevcut asset/sahnenin bundan etkilenmediği,
+  imza değiştiyse tüm çağıranlar.
+- "Yaptım, çalışıyor" denmeden önce doğrulanır. Unity'de doğrulama gerekiyorsa kullanıcıdan sonuç istenir.
+- Commit ve push kullanıcı açıkça istemedikçe yapılmaz.

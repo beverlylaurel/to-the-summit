@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4dcb407d66bff894da37f7308b09434a, type: 3}
+  m_Name: TerrainMaterialSettings
+  m_EditorClassIdentifier: Assembly-CSharp::TerrainMaterialSettings
+  rockPrimary: {r: 0.13, g: 0.14, b: 0.16, a: 1}
+  rockSecondary: {r: 0.27, g: 0.26, b: 0.24, a: 1}
+  grainScale: 0.08
+  grainStrength: 0.35
+  rockSmoothness: 0.12
+  bandThickness: 130
+  bandWarp: 150
+  bandWarpScale: 0.0016
+  bandContrast: 0.5
+  lowlandTint: {r: 0.3, g: 0.26, b: 0.2, a: 1}
+  alpineTint: {r: 0.29, g: 0.32, b: 0.37, a: 1}
+  lowlandCeiling: 1400
+  alpineFloor: 3200
+  altitudeTintStrength: 0.5
+  lichenColor: {r: 0.33, g: 0.35, b: 0.21, a: 1}
+  lichenAmount: 0.5
+  lichenCeiling: 2600
+  lichenMoistureBias: 0.55
+  lichenSunSensitivity: 0.7
+  oxideColor: {r: 0.4, g: 0.2, b: 0.1, a: 1}
+  oxideAmount: 0.3
+  oxideScale: 0.004
+  screeColor: {r: 0.3, g: 0.29, b: 0.27, a: 1}
+  screeAmount: 0.6
+  screeRange: {x: 0.62, y: 0.88}
+  screeSlopeLimit: 38
+  snowColor: {r: 0.9, g: 0.93, b: 0.98, a: 1}
+  snowSlopeLimit: 65
+  snowBreakup: 0.5
+  snowBurial: 0.9
+  snowRounding: 0.28
+  snowlineSunLift: 200
+  snowlineGullyDrop: 150
+  snowlineRagged: 120
+  sastrugi: 0.6
+  snowSmoothness: 0.3
+  wetDarkening: 0.45
+  wetSmoothness: 0.6
+  dryingSeconds: 120
+  bumpStrength: 0.9
+  bumpScale: 0.3
+  cavityStrength: 0.55
