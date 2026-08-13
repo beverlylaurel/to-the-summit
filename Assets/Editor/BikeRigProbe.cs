@@ -68,6 +68,16 @@ public class BikeRigProbe : EditorWindow
             return;
         }
 
+        // Play'de bileşenler her karede dönüşü kendileri kuruyor; kaydırıcının yazdığı
+        // değer bir sonraki `LateUpdate`'te siliniyor.
+        if (EditorApplication.isPlaying)
+        {
+            EditorGUILayout.HelpBox(
+                "Play açıkken kaydırıcı işe yaramaz: tekerlek ve gidon bileşenleri her "
+                + "karede dönüşün üstüne yazıyor. Play'den çık.", MessageType.Warning);
+            return;
+        }
+
         EditorGUILayout.HelpBox(
             "Gidonu çevir: yalnız ön takım dönmeli — çatal, gidon, fren kolları, ön "
             + "çamurluk ve ön tekerlek. Kadro, sele, pedal ve arka tekerlek KIMILDAMAMALI.\n\n"
