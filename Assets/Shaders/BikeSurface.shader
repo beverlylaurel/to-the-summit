@@ -36,6 +36,7 @@ Shader "ToTheSummit/BikeSurface"
         // atanamıyor, o yüzden ayrım YARIÇAPTAN yapılıyor.
         _WheelMode       ("Tekerlek modu", Float) = 0
         _WheelCentre     ("Göbek (nesne uzayı, metre)", Vector) = (0,0,0,0)
+        _WheelAxis       ("Dönme ekseni (nesne uzayı)", Vector) = (0,1,0,0)
         _WheelRadius     ("Dış yarıçap (metre)", Float) = 0.36
         _TireColor       ("Lastik rengi", Color) = (0.07, 0.07, 0.08, 1)
         _RimColor        ("Jant rengi", Color) = (0.58, 0.59, 0.61, 1)
@@ -79,6 +80,7 @@ Shader "ToTheSummit/BikeSurface"
                 half _Grime;
                 float _WheelMode;
                 float4 _WheelCentre;
+                float4 _WheelAxis;
                 float _WheelRadius;
                 half4 _TireColor;
                 half4 _RimColor;
@@ -170,8 +172,15 @@ Shader "ToTheSummit/BikeSurface"
                 // olsaydı dönerken titreşen bir halka olurdu.
                 if (_WheelMode > 0.5)
                 {
-                    float2 offset = p.xy - _WheelCentre.xy;
-                    float r = length(offset) / max(1e-4, _WheelRadius);
+                    // Dönme ekseni DIŞARIDAN veriliyor. Modelin kendi ekseni ile Unity'nin
+                    // ekseni aynı değil: FBX Z-yukarı geliyor, Unity dönüşü transform'a
+                    // koyuyor ve mesh verisi kendi düzeninde kalıyor. Eksen varsayıldığında
+                    // yarıçap yerine şerit hesaplanıyordu.
+                    float3 axis = normalize(_WheelAxis.xyz);
+                    float3 offset = p - _WheelCentre.xyz;
+                    float3 radial = offset - axis * dot(offset, axis);
+
+                    float r = length(radial) / max(1e-4, _WheelRadius);
 
                     float tire = smoothstep(0.82, 0.87, r);
                     float rim  = smoothstep(0.55, 0.62, r) * (1.0 - tire);
