@@ -116,7 +116,7 @@ public static class ForelandProbe
         float average = windows > 0 ? reliefSum / windows : 0f;
         float spacing = peaks > 0 ? Length / peaks : 0f;
 
-        Debug.Log($"[Ova ölçümü] {label}\n"
+        ToolLog.Write($"[Ova ölçümü] {label}\n"
                 + $"  toplam aralık   {high - low:F1} m\n"
                 + $"  60 m pencerede  en fazla {relief:F1} m, ortalama {average:F1} m\n"
                 + $"  tepe sayısı     {peaks} ({Length:F0} m boyunca, {spacing:F0} m arayla)\n"
@@ -169,7 +169,7 @@ public static class ForelandProbe
 
         edgeHeight /= Mathf.Max(1, edgeCount);
 
-        Debug.Log($"[Patika kesiti] {label} (yarıçap {marks[middle].radius:F1} m)\n"
+        ToolLog.Write($"[Patika kesiti] {label} (yarıçap {marks[middle].radius:F1} m)\n"
                 + $"  merkez {centreHeight:F2} m, kenar ortalaması {edgeHeight:F2} m\n"
                 + $"  >>> İZ DERİNLİĞİ {edgeHeight - centreHeight:F2} m <<<"
                 + line);
@@ -195,7 +195,7 @@ public static class ForelandProbe
     {
         if (marks.Count < 12)
         {
-            Debug.Log($"[Rota taraması] {label}: nokta az ({marks.Count})");
+            ToolLog.Write($"[Rota taraması] {label}: nokta az ({marks.Count})");
             return;
         }
 
@@ -234,7 +234,7 @@ public static class ForelandProbe
 
         if (samples == 0) return;
 
-        Debug.Log($"[Rota taraması] {label} — {samples} nokta\n"
+        ToolLog.Write($"[Rota taraması] {label} — {samples} nokta\n"
                 + $"  ortalama oyuk {sum / samples:F2} m, en derin {deepest:F2} m\n"
                 + $"  oyuk {cut}, dolgu {fill}, dokunulmamış {flat}"
                 + $"   (%{100 * cut / samples} oyuk)");
@@ -284,7 +284,7 @@ public static class ForelandProbe
 
         if (found.Count == 0)
         {
-            Debug.Log("[Hendek avı] 1.5 metreden derin oyuk yok.");
+            ToolLog.Write("[Hendek avı] 1.5 metreden derin oyuk yok.");
             return;
         }
 
@@ -313,7 +313,7 @@ public static class ForelandProbe
             }
         }
 
-        Debug.Log($"[Hendek avı] 1.5 m'den derin {found.Count} oyuk\n"
+        ToolLog.Write($"[Hendek avı] 1.5 m'den derin {found.Count} oyuk\n"
                 + $"  ROTANIN ÜSTÜNDE (<30 m): {near}\n"
                 + $"  ROTADAN UZAKTA:          {far}\n"
                 + $"  en derin yirmisi:{report}");

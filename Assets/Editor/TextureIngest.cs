@@ -88,7 +88,7 @@ public static class TextureIngest
         StochasticTextureBaker.EnsureAll();
         Resolve(set);
 
-        Debug.Log($"{prefix}: {found} harita alındı. Işık korelasyonu "
+        ToolLog.Write($"{prefix}: {found} harita alındı. Işık korelasyonu "
                 + $"{set.bakedLightCorrelation:F3}, yönlülük {set.anisotropy:F2}.");
         return set;
     }
