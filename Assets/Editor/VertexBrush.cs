@@ -37,6 +37,7 @@ public class VertexBrush : EditorWindow
 
     [SerializeField] MeshFilter target;
     [SerializeField] int channel;
+    [SerializeField] Color colour = new Color(0.07f, 0.07f, 0.08f);
     [SerializeField] float radius = 0.03f;
     [SerializeField] float strength = 1f;
     [SerializeField] bool erase;
@@ -44,6 +45,7 @@ public class VertexBrush : EditorWindow
     Mesh mesh;
     Vector3[] vertices;
     Color32[] colours;
+    Vector2[] surfaces;
     MeshCollider collider;
 
     /// Köşe ızgarası: hücre boyutu fırça yarıçapından, hücre başına köşe listesi. Her
@@ -142,36 +144,10 @@ public class VertexBrush : EditorWindow
             strength = EditorGUILayout.Slider("Şiddet", strength, 0.05f, 1f);
         }
 
-        if (target != null) ChannelSurface();
-    }
-
-    /// MALZEMENİN RENGİ BURADAN. Renk tamamen serbest: kauçuk sarı da olabilir, deri
-    /// siyah da. Sabit olan ışığa verdiği cevap — kauçuk mat, deri yarı mat, çelik
-    /// metalik. Onu da kaydırıcıya bağlamak her boyamada üç sayı daha karar vermekti.
-    ///
-    /// Renk parçanın BÜTÜN materyallerine yazılıyor: bir yuva her yerde aynı malzemeyi
-    /// anlatmalı, gidonun kauçuğu ile pedalınki farklı olmamalı.
-    void ChannelSurface()
-    {
-        Material[] materials = target.GetComponent<Renderer>().sharedMaterials;
-        if (materials.Length == 0 || materials[0] == null) return;
-
-        string property = "_Mask" + "RGB"[channel] + "Color";
-
-        EditorGUI.BeginChangeCheck();
-        Color colour = EditorGUILayout.ColorField("Renk", materials[0].GetColor(property));
-        if (!EditorGUI.EndChangeCheck()) return;
-
-        foreach (Material material in materials)
-        {
-            if (material == null) continue;
-
-            material.SetColor(property, colour);
-            EditorUtility.SetDirty(material);
-        }
-
-        AssetDatabase.SaveAssets();
-        Repaint();
+            // RENK FIRÇANIN, MALZEMENİN DEĞİL. Materyale yazılsaydı rengi değiştirmek
+            // o yuvayla boyanmış her yeri değiştirirdi; şimdi renk boyandığı anda köşeye
+            // yazılıyor ve orada kalıyor.
+            colour = EditorGUILayout.ColorField("Renk", colour);
     }
 
     void Footer()
@@ -181,10 +157,10 @@ public class VertexBrush : EditorWindow
         EditorGUILayout.LabelField($"Köşe {vertices.Length:N0}   Boyalı {Painted():N0}",
             EditorStyles.miniLabel);
 
-        if (GUILayout.Button("Malzemeyi temizle", EditorStyles.miniButton, GUILayout.Width(110f)))
+        if (GUILayout.Button("Bu malzemeyi sil", EditorStyles.miniButton, GUILayout.Width(110f)))
             Clear(channel);
 
-        if (GUILayout.Button("Hepsini temizle", EditorStyles.miniButton, GUILayout.Width(110f)))
+        if (GUILayout.Button("Boyamayı sil", EditorStyles.miniButton, GUILayout.Width(110f)))
             Clear(-1);
 
         EditorGUILayout.EndHorizontal();
@@ -193,8 +169,8 @@ public class VertexBrush : EditorWindow
     int Painted()
     {
         int count = 0;
-        foreach (Color32 colour in colours)
-            if (colour.r > 8 || colour.g > 8 || colour.b > 8) count++;
+        foreach (Color32 painted in colours)
+            if (painted.a > 8) count++;
 
         return count;
     }
@@ -424,6 +400,12 @@ public class VertexBrush : EditorWindow
         if (colours == null || colours.Length != vertices.Length)
             colours = new Color32[vertices.Length];
 
+        // Yuva numarası ikinci UV kanalında: köşe rengi renge ve örtme gücüne ayrıldı,
+        // yüzeyin ışığa cevabına yer kalmadı.
+        surfaces = mesh.uv2;
+        if (surfaces == null || surfaces.Length != vertices.Length)
+            surfaces = new Vector2[vertices.Length];
+
         // Işın için geçici çarpışma; `Release` alıyor. Kalıcı bırakılsaydı iki yüz bin
         // üçgenlik çarpışma sahnede dururdu.
         collider = target.gameObject.AddComponent<MeshCollider>();
@@ -460,6 +442,7 @@ public class VertexBrush : EditorWindow
             existing = Instantiate(source);
             existing.name = source.name;
             existing.SetColors(new Color32[existing.vertexCount]);
+            existing.SetUVs(1, new Vector2[existing.vertexCount]);
 
             AssetDatabase.CreateAsset(existing, copyPath);
             AssetDatabase.SaveAssets();
@@ -535,39 +518,47 @@ public class VertexBrush : EditorWindow
                 // Kenara doğru zayıflıyor: sert kenar boyalı ile boyasız arasında
                 // görünür bir çizgi bırakıyor.
                 float falloff = 1f - Mathf.SmoothStep(0f, 1f, distance / localRadius);
-                colours[index] = Blend(colours[index], strength * falloff, removing);
+                float amount = strength * falloff;
+
+                Color32 current = colours[index];
+
+                if (removing)
+                {
+                    current.a = (byte)Mathf.RoundToInt(Mathf.Lerp(current.a, 0f, amount));
+                }
+                else
+                {
+                    // Renk ve örtme gücü birlikte yürüyor: yarım örtülü bir köşe eski
+                    // rengiyle yeni rengin arasında kalıyor, sert kenar bırakmıyor.
+                    current.r = (byte)Mathf.RoundToInt(Mathf.Lerp(current.r, colour.r * 255f, amount));
+                    current.g = (byte)Mathf.RoundToInt(Mathf.Lerp(current.g, colour.g * 255f, amount));
+                    current.b = (byte)Mathf.RoundToInt(Mathf.Lerp(current.b, colour.b * 255f, amount));
+                    current.a = (byte)Mathf.RoundToInt(Mathf.Lerp(current.a, 255f, amount));
+
+                    surfaces[index] = new Vector2(channel, 0f);
+                }
+
+                colours[index] = current;
             }
         }
 
         mesh.SetColors(colours);
+        mesh.SetUVs(1, surfaces);
         Repaint();
     }
 
-    Color32 Blend(Color32 colour, float amount, bool removing)
-    {
-        byte[] rgb = { colour.r, colour.g, colour.b };
-        float goal = removing ? 0f : 255f;
-
-        rgb[channel] = (byte)Mathf.RoundToInt(Mathf.Lerp(rgb[channel], goal, amount));
-
-        // Diğer yuvalar aynı köşede duruyorsa siliniyor: bir köşe tek malzeme.
-        if (!removing)
-            for (int i = 0; i < 3; i++)
-                if (i != channel)
-                    rgb[i] = (byte)Mathf.RoundToInt(Mathf.Lerp(rgb[i], 0f, amount));
-
-        return new Color32(rgb[0], rgb[1], rgb[2], 255);
-    }
-
-    void Clear(int only)
+    /// Boyamayı siler: seçili yuvayla boyanmış köşeleri ya da hepsini. Örtme gücü
+    /// sıfırlanıyor, renk olduğu gibi kalıyor — görünmeyen renk zarar vermiyor ve
+    /// yeniden boyanınca üstüne yazılıyor.
+    void Clear(int slot)
     {
         for (int i = 0; i < colours.Length; i++)
         {
-            if (only < 0) { colours[i] = new Color32(0, 0, 0, 255); continue; }
+            if (slot >= 0 && Mathf.RoundToInt(surfaces[i].x) != slot) continue;
 
-            byte[] rgb = { colours[i].r, colours[i].g, colours[i].b };
-            rgb[only] = 0;
-            colours[i] = new Color32(rgb[0], rgb[1], rgb[2], 255);
+            Color32 current = colours[i];
+            current.a = 0;
+            colours[i] = current;
         }
 
         mesh.SetColors(colours);

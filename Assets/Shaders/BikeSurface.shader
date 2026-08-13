@@ -41,20 +41,10 @@ Shader "ToTheSummit/BikeSurface"
         _TireColor       ("Lastik rengi", Color) = (0.07, 0.07, 0.08, 1)
         _RimColor        ("Jant rengi", Color) = (0.58, 0.59, 0.61, 1)
 
-        // ELLE BOYANAN MASKE. Köşe renginin üç kanalı üç malzeme: kırmızı, yeşil, mavi.
-        // Nerede hangi malzemenin durduğu ölçüyle değil elle belirleniyor — tutamağın
-        // bittiği yer, kablonun başladığı yer eşik sayısıyla tarif edilemiyor.
-        _MaskRColor      ("Maske R rengi", Color) = (0.07, 0.07, 0.08, 1)
-        _MaskRMetallic   ("Maske R metaliklik", Range(0,1)) = 0
-        _MaskRSmoothness ("Maske R parlaklık", Range(0,1)) = 0.22
-
-        _MaskGColor      ("Maske G rengi", Color) = (0.26, 0.16, 0.10, 1)
-        _MaskGMetallic   ("Maske G metaliklik", Range(0,1)) = 0
-        _MaskGSmoothness ("Maske G parlaklık", Range(0,1)) = 0.34
-
-        _MaskBColor      ("Maske B rengi", Color) = (0.13, 0.13, 0.14, 1)
-        _MaskBMetallic   ("Maske B metaliklik", Range(0,1)) = 0.85
-        _MaskBSmoothness ("Maske B parlaklık", Range(0,1)) = 0.32
+        // ELLE BOYANAN YÜZEY köşede duruyor, materyalde değil: renk köşe renginde,
+        // örtme gücü onun alfasında, yüzeyin ışığa cevabı ikinci UV kanalında. Renk
+        // materyalde tutulsaydı bir yeri boyayıp rengini değiştirmek daha önce aynı
+        // yuvayla boyanmış her yeri değiştirirdi.
     }
 
     SubShader
@@ -99,15 +89,6 @@ Shader "ToTheSummit/BikeSurface"
                 float _WheelRadius;
                 half4 _TireColor;
                 half4 _RimColor;
-                half4 _MaskRColor;
-                half _MaskRMetallic;
-                half _MaskRSmoothness;
-                half4 _MaskGColor;
-                half _MaskGMetallic;
-                half _MaskGSmoothness;
-                half4 _MaskBColor;
-                half _MaskBMetallic;
-                half _MaskBSmoothness;
             CBUFFER_END
 
             struct Attributes
@@ -115,6 +96,7 @@ Shader "ToTheSummit/BikeSurface"
                 float4 positionOS : POSITION;
                 float3 normalOS   : NORMAL;
                 half4  colour     : COLOR;
+                float2 surface    : TEXCOORD1;
             };
 
             struct Varyings
@@ -124,7 +106,8 @@ Shader "ToTheSummit/BikeSurface"
                 float3 normalWS   : TEXCOORD1;
                 float3 positionMS : TEXCOORD2;
                 float  fogCoord   : TEXCOORD3;
-                half3  mask       : TEXCOORD4;
+                half4  paint      : TEXCOORD4;
+                float2 surface    : TEXCOORD5;
             };
 
             /// Metrik nesne uzayı: nesne uzayı, dönüşümün ölçeğiyle çarpılmış. Desen
@@ -147,7 +130,8 @@ Shader "ToTheSummit/BikeSurface"
                 output.positionWS = position.positionWS;
                 output.normalWS = normal.normalWS;
                 output.positionMS = MetricObject(input.positionOS.xyz);
-                output.mask = input.colour.rgb;
+                output.paint = input.colour;
+                output.surface = input.surface;
                 output.fogCoord = ComputeFogFactor(position.positionCS.z);
                 return output;
             }
@@ -221,20 +205,20 @@ Shader "ToTheSummit/BikeSurface"
                     smoothness = lerp(0.5, 0.18, tire);
                 }
 
-                // ELLE BOYANAN MALZEME. Maske kanalları sırayla uygulanıyor: sonraki
-                // kanal öncekinin üstüne yazıyor, yani bir köşeye iki kanal birden
-                // sürülürse son sürülen kazanıyor. Karıştırmak yerine üstüne yazmak,
-                // fırçanın kenarındaki yarım değerlerde çamur renk üretmiyor.
-                half3 maskColour[3] = { _MaskRColor.rgb, _MaskGColor.rgb, _MaskBColor.rgb };
-                half maskMetallic[3] = { _MaskRMetallic, _MaskGMetallic, _MaskBMetallic };
-                half maskSmooth[3] = { _MaskRSmoothness, _MaskGSmoothness, _MaskBSmoothness };
+                // ELLE BOYANAN YÜZEY. Renk köşeden geliyor, örtme gücü alfadan: her
+                // fırça darbesi kendi rengini taşıyor. Yüzeyin ışığa cevabı ikinci UV
+                // kanalındaki yuva numarasından — mat, yarı mat, metalik.
+                half cover = saturate(input.paint.a);
 
-                for (int channel = 0; channel < 3; channel++)
+                if (cover > 0.002)
                 {
-                    half weight = saturate(input.mask[channel]);
-                    albedo = lerp(albedo, maskColour[channel], weight);
-                    metallic = lerp(metallic, maskMetallic[channel], weight);
-                    smoothness = lerp(smoothness, maskSmooth[channel], weight);
+                    half slot = input.surface.x;
+                    half paintMetallic = slot > 1.5 ? 0.85 : 0.0;
+                    half paintSmooth = slot > 1.5 ? 0.32 : (slot > 0.5 ? 0.34 : 0.22);
+
+                    albedo = lerp(albedo, input.paint.rgb, cover);
+                    metallic = lerp(metallic, paintMetallic, cover);
+                    smoothness = lerp(smoothness, paintSmooth, cover);
                 }
 
                 // Renk oynaması: tek düz renk boyanmış plastik gibi duruyor. Genlik

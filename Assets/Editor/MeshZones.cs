@@ -54,8 +54,11 @@ public static class MeshZones
         // KÖŞE RENGİ SIFIRLANIYOR. Üretilen modelde köşe rengi var ve gölgelendirici onu
         // elle boyanan malzeme maskesi olarak okuyor; taşınsaydı hiç boyanmamış yüzey
         // kendiliğinden boyalı görünürdü. Boyama bu temiz zeminin üstüne yazılıyor.
-        var blank = new Color32[vertices.Length];
-        mesh.SetColors(blank);
+        mesh.SetColors(new Color32[vertices.Length]);
+
+        // Yuva numarasının durduğu ikinci UV kanalı da boş açılıyor: bölgeli parçalar
+        // sonradan elle boyanıyor ve kanal yoksa fırça yazacak yer bulamıyor.
+        mesh.SetUVs(1, new Vector2[vertices.Length]);
 
         mesh.subMeshCount = zones;
         for (int i = 0; i < zones; i++) mesh.SetTriangles(buckets[i], i);

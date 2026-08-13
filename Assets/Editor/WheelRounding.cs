@@ -152,6 +152,7 @@ public static class WheelRounding
         // Köşe rengi akışı sıfır dolu taşınıyor: akış olmayan mesh'te gölgelendirici
         // köşe rengini beyaz okuyor ve bütün malzeme maskesi açılıyor.
         mesh.SetColors(new Color32[vertices.Length]);
+        mesh.SetUVs(1, new Vector2[vertices.Length]);
 
         mesh.RecalculateBounds();
         return mesh;
