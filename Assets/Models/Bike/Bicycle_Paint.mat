@@ -25,15 +25,22 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Dust: 0.35
+    - _Brushed: 0
+    - _Dust: 0.2
     - _DustScale: 0.12
-    - _Fade: 0.3
-    - _Grime: 0.3
+    - _Fade: 0.25
+    - _Grain: 0.1
+    - _Grime: 0.28
     - _Metallic: 0
-    - _Smoothness: 0.45
-    - _Variation: 0.08
+    - _Smoothness: 0.58
+    - _Variation: 0.06
+    - _WheelMode: 0
+    - _WheelRadius: 0.36
     m_Colors:
-    - _BaseColor: {r: 0.42, g: 0.1, b: 0.07, a: 1}
+    - _BaseColor: {r: 0.4, g: 0.1, b: 0.08, a: 1}
     - _DustColor: {r: 0.62, g: 0.6, b: 0.54999995, a: 1}
+    - _RimColor: {r: 0.58, g: 0.59, b: 0.61, a: 1}
+    - _TireColor: {r: 0.06999998, g: 0.06999998, b: 0.079999976, a: 1}
+    - _WheelCentre: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

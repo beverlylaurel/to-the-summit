@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Bicycle_Leather
+  m_Name: Bicycle_WheelFront
   m_Shader: {fileID: 4800000, guid: 85c9ec0941e9ef644b2aec812cd9ca99, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -25,22 +25,22 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Brushed: 0
-    - _Dust: 0.14
-    - _DustScale: 0.12
-    - _Fade: 0.2
-    - _Grain: 0.18
-    - _Grime: 0.24
+    - _Brushed: 0.5
+    - _Dust: 0.22
+    - _DustScale: 0.18
+    - _Fade: 0.04
+    - _Grain: 0.1
+    - _Grime: 0.45
     - _Metallic: 0
-    - _Smoothness: 0.34
-    - _Variation: 0.11
-    - _WheelMode: 0
-    - _WheelRadius: 0.36
+    - _Smoothness: 0.45
+    - _Variation: 0.05
+    - _WheelMode: 1
+    - _WheelRadius: 0.36267474
     m_Colors:
-    - _BaseColor: {r: 0.26, g: 0.16, b: 0.1, a: 1}
+    - _BaseColor: {r: 0.45, g: 0.11999995, b: 0.079999976, a: 1}
     - _DustColor: {r: 0.62, g: 0.6, b: 0.54999995, a: 1}
     - _RimColor: {r: 0.58, g: 0.59, b: 0.61, a: 1}
-    - _TireColor: {r: 0.06999998, g: 0.06999998, b: 0.079999976, a: 1}
-    - _WheelCentre: {r: 0, g: 0, b: 0, a: 0}
+    - _TireColor: {r: 0.07, g: 0.07, b: 0.08, a: 1}
+    - _WheelCentre: {r: 0.6275994, g: 0.012039363, b: 0.36127996, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
