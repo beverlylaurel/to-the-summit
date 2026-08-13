@@ -205,22 +205,44 @@ public class BikeRigProbe : EditorWindow
         float cy = (a11 * b2 - a12 * b1) / det;
 
         float mean = 0f, min = float.MaxValue, max = float.MinValue;
+        var radius = new float[Bins];
 
         for (int i = 0; i < Bins; i++)
         {
             if (!hit[i]) continue;
 
-            float r = Vector2.Distance(far[i], new Vector2(cx, cy));
-            mean += r / n;
-            min = Mathf.Min(min, r);
-            max = Mathf.Max(max, r);
+            radius[i] = Vector2.Distance(far[i], new Vector2(cx, cy));
+            mean += radius[i] / n;
+            min = Mathf.Min(min, radius[i]);
+            max = Mathf.Max(max, radius[i]);
         }
+
+        // SAPMA NEREYE YAYILMIŞ. Tek bir çıkıntı (valf, reflektör, çamurluk artığı) ile
+        // ovallik aynı "en dar / en geniş" farkını veriyor ama çözümleri farklı: çıkıntı
+        // kesilir, ovallik jantı çembere oturtmayı gerektirir. Ayıran şey, ortalamadan
+        // sapan noktaların açıya yayılması.
+        float rms = 0f;
+        int wide = 0;
+
+        for (int i = 0; i < Bins; i++)
+        {
+            if (!hit[i]) continue;
+
+            float deviation = radius[i] - mean;
+            rms += deviation * deviation / n;
+            if (deviation > 0.003f) wide++;
+        }
+
+        rms = Mathf.Sqrt(rms);
 
         Vector3 fitted = boxCentre + right * cx + up * cy;
 
         Debug.Log($"[Tekerlek] {label}\n"
             + $"  yarıçap {mean:F3} m  (en dar {min:F3}, en geniş {max:F3})\n"
-            + $"  yuvarlaklık sapması {(max - min) * 1000f:F0} mm — oval mı\n"
+            + $"  yuvarlaklık sapması {(max - min) * 1000f:F0} mm, ortalamadan sapma "
+            + $"{rms * 1000f:F1} mm (rms)\n"
+            + $"  3 mm'den fazla taşan açı dilimi: {wide * 100f / Bins:F0}% "
+            + $"(küçükse çıkıntı, büyükse oval)\n"
             + $"  pivot kaçıklığı {new Vector2(cx, cy).magnitude * 1000f:F0} mm "
             + $"(kutu merkezi {Format(boxCentre)} → uydurma {Format(fitted)})\n"
             + $"  genişlik {(thickMax - thickMin) * 1000f:F0} mm, "
