@@ -27,19 +27,23 @@ public static class WheelRounding
     /// köşeler (göbek, teller, fren yüzeyi) hiç kıpırdamıyor.
     const float Inner = 0.7f;
 
-    /// Düzeltilmiş mesh'ler bir kez üretilip dosyada duruyor; düzeltme ayarları
-    /// değişirse eskisi geçersiz olur ve elle silinmesi gerekir.
-    [MenuItem("To The Summit/Model/Bisiklet/Jant Düzeltmesini Sıfırla", false, 123)]
+    /// Üretilen mesh'ler (düzeltilmiş jant, bölgeli gidon/bagaj/pedal) bir kez üretilip
+    /// dosyada duruyor. Bölge sınırı ya da düzeltme ayarı değişirse eskisi geçersiz olur.
+    ///
+    /// DİKKAT: elle boyanan malzeme maskesi de bu mesh'lerin içinde. Sıfırlamak boyamayı
+    /// da siler.
+    [MenuItem("To The Summit/Model/Bisiklet/Üretilen Mesh'leri Sıfırla", false, 125)]
     static void Reset()
     {
         if (!AssetDatabase.IsValidFolder(Folder))
         {
-            Debug.Log("[Tekerlek] düzeltilmiş mesh yok.");
+            Debug.Log("[Bisiklet] üretilen mesh yok.");
             return;
         }
 
         AssetDatabase.DeleteAsset(Folder);
-        Debug.Log("[Tekerlek] düzeltilmiş mesh'ler silindi; kurulumda yeniden üretilecek.");
+        Debug.Log("[Bisiklet] üretilen mesh'ler silindi (boyama dahil); "
+                + "kurulumda yeniden üretilecek.");
     }
 
     /// Tekerleği düzeltir ve düzeltilmiş mesh'i döndürür. Ölçüm sınırın altındaysa
