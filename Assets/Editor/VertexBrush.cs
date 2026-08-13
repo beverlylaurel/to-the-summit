@@ -69,7 +69,7 @@ public class VertexBrush : EditorWindow
     {
         Toolbar();
 
-        Rect view = GUILayoutUtility.GetRect(position.width, position.height - 158f);
+        Rect view = GUILayoutUtility.GetRect(position.width, position.height - 136f);
 
         if (target == null || mesh == null)
         {
@@ -123,42 +123,28 @@ public class VertexBrush : EditorWindow
         if (target != null) ChannelSurface();
     }
 
-    /// KANALIN MALZEMESİ BURADAN AYARLANIYOR. Kanal adı (kauçuk, deri, çelik) yalnız bir
-    /// etiket; yüzeyin nasıl göründüğü materyalde duruyor. Fırçayı kullanan kişi rengi
-    /// seçemezse boyama "şu kanalı sür, sonucu başka yerden ayarla" hâline geliyor.
+    /// KANALIN RENGİ BURADAN. Işık davranışı (metaliklik, parlaklık) ayarlanmıyor:
+    /// kanalın ne olduğu zaten belli — kauçuk mat, deri yarı mat, çelik metalik. Onları
+    /// da kaydırıcıya bağlamak, her boyamada üç sayı daha karar vermek demekti.
     ///
-    /// Değer parçanın BÜTÜN materyallerine yazılıyor: bir kanal her yerde aynı malzemeyi
-    /// anlatmalı, aynı bisikletin iki parçasında farklı kauçuk olmamalı.
+    /// Renk parçanın BÜTÜN materyallerine yazılıyor: bir kanal her yerde aynı malzemeyi
+    /// anlatmalı, gidonun kauçuğu ile pedalınki farklı olmamalı.
     void ChannelSurface()
     {
         Material[] materials = target.GetComponent<Renderer>().sharedMaterials;
         if (materials.Length == 0 || materials[0] == null) return;
 
-        string prefix = "_Mask" + "RGB"[channel];
+        string property = "_Mask" + "RGB"[channel] + "Color";
 
-        var colour = materials[0].GetColor(prefix + "Color");
-        float metallic = materials[0].GetFloat(prefix + "Metallic");
-        float smoothness = materials[0].GetFloat(prefix + "Smoothness");
-
-        EditorGUILayout.Space(2f);
         EditorGUI.BeginChangeCheck();
-
-        colour = EditorGUILayout.ColorField("Renk", colour);
-
-        EditorGUILayout.BeginHorizontal();
-        metallic = EditorGUILayout.Slider("Metaliklik", metallic, 0f, 1f);
-        smoothness = EditorGUILayout.Slider("Parlaklık", smoothness, 0f, 1f);
-        EditorGUILayout.EndHorizontal();
-
+        Color colour = EditorGUILayout.ColorField("Renk", materials[0].GetColor(property));
         if (!EditorGUI.EndChangeCheck()) return;
 
         foreach (Material material in materials)
         {
             if (material == null) continue;
 
-            material.SetColor(prefix + "Color", colour);
-            material.SetFloat(prefix + "Metallic", metallic);
-            material.SetFloat(prefix + "Smoothness", smoothness);
+            material.SetColor(property, colour);
             EditorUtility.SetDirty(material);
         }
 
