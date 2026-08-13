@@ -236,14 +236,15 @@ public static class BikeBootstrap
         rearPart.SetParent(rearWheel, true);
     }
 
-    /// Tekerleğin dönme ekseni modelin genişlik ekseni; ölçüm ve düzeltme mesh'in kendi
-    /// uzayında çalıştığı için eksen oraya çevriliyor.
+    /// Tekerleğin dönme ekseni modelin genişlik ekseni. Ölçüm dünya uzayında yapılıyor:
+    /// parça dönüşümlerinde yüz kat ölçek var ve mesh'in kendi uzayında milimetreler
+    /// mikrona iniyor.
     static void RoundWheel(Transform part, Vector3 axisWorld, string label)
     {
         var filter = part.GetComponent<MeshFilter>();
-        Vector3 axis = filter.transform.InverseTransformDirection(axisWorld);
 
-        filter.sharedMesh = WheelRounding.Round(filter.sharedMesh, axis, part.name, label);
+        filter.sharedMesh = WheelRounding.Round(
+            filter.sharedMesh, filter.transform, axisWorld, part.name, label);
     }
 
     static Transform FindPart(GameObject model, string name)

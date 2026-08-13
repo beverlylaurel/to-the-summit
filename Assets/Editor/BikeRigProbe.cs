@@ -146,11 +146,10 @@ public class BikeRigProbe : EditorWindow
         var filter = wheel.GetComponentInChildren<MeshFilter>();
         Mesh mesh = filter.sharedMesh;
 
-        Vector3 axis = filter.transform.InverseTransformDirection(wheel.forward);
-        WheelProfile profile = WheelProfile.Measure(mesh, axis);
+        WheelProfile profile = WheelProfile.Measure(mesh, filter.transform, wheel.forward);
 
         Vector3 boxCentre = filter.transform.TransformPoint(mesh.bounds.center);
-        Vector3 fitted = filter.transform.TransformPoint(profile.Centre);
+        Vector3 fitted = profile.Centre;
 
         Debug.Log($"[Tekerlek] {label}\n"
             + $"  yarıçap {profile.Radius:F3} m  (en dar {profile.Min:F3}, "
