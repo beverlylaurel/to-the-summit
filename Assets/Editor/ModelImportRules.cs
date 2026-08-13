@@ -1,4 +1,5 @@
 using UnityEditor;
+using UnityEngine;
 
 /// MODEL VE DOKU İÇE AKTARMA AYARLARI. Inspector'dan elle tıklanmaz: model yeniden
 /// indirildiğinde ayarların da yeniden kurulması gerekirdi ve o an unutulur.
@@ -19,7 +20,7 @@ public class ModelImportRules : AssetPostprocessor
     /// Kural değişince modellerin yeniden içe aktarılmasını Unity buradan anlıyor. Sayı
     /// artmazsa dosyalar eski ayarla kalıyor ve değişiklik ancak elle "Reimport" ile
     /// uygulanıyor — yani unutuluyor. Kuralların içeriği her değiştiğinde artırılır.
-    public override uint GetVersion() => 2;
+    public override uint GetVersion() => 3;
 
     void OnPreprocessModel()
     {
@@ -63,6 +64,26 @@ public class ModelImportRules : AssetPostprocessor
         // modeli santimetreye çevirip minyatüre döndürüyordu.
         importer.useFileScale = true;
         importer.globalScale = 1f;
+    }
+
+    /// KÖŞE RENGİ SIFIRLANIR. Üretilen modelde köşe rengi var ve bisiklet gölgelendiricisi
+    /// onu ELLE BOYANAN MALZEME MASKESİ olarak okuyor; taşınsaydı hiç boyanmamış yüzey
+    /// kendiliğinden boyalı görünürdü.
+    ///
+    /// Renk akışı SİLİNMİYOR, sıfırlanıyor. Akış hiç yoksa gölgelendirici köşe rengini
+    /// beyaz okuyor — yani bütün maske kanalları açık, bütün bisiklet tek malzemeye
+    /// düşüyor. Sıfır dolu bir akış bu tuzağı kapatıyor.
+    void OnPostprocessModel(GameObject model)
+    {
+        if (!InScope || IsCharacter) return;
+
+        foreach (MeshFilter filter in model.GetComponentsInChildren<MeshFilter>())
+        {
+            Mesh mesh = filter.sharedMesh;
+            if (mesh == null) continue;
+
+            mesh.colors32 = new Color32[mesh.vertexCount];
+        }
     }
 
     void OnPreprocessTexture()

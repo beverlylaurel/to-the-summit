@@ -40,7 +40,14 @@ public class VertexBrush : EditorWindow
     [MenuItem("To The Summit/Model/Bisiklet/Malzeme Fırçası", false, 124)]
     static void Open() => GetWindow<VertexBrush>("Malzeme Fırçası").Show();
 
-    void OnEnable() => SceneView.duringSceneGui += OnScene;
+    void OnEnable()
+    {
+        SceneView.duringSceneGui += OnScene;
+
+        // Derleme sonrası hedef alanı seri hâlde duruyor ama mesh, ızgara ve çarpışma
+        // kayboluyor; hazırlık yenilenmezse fırça sessizce ölü kalıyordu.
+        if (target != null) Prepare();
+    }
 
     void OnDisable()
     {
@@ -101,6 +108,7 @@ public class VertexBrush : EditorWindow
     {
         if (target == null) return;
 
+        EnsureWritable();
         mesh = target.sharedMesh;
         vertices = mesh.vertices;
 
@@ -114,6 +122,39 @@ public class VertexBrush : EditorWindow
         collider.hideFlags = HideFlags.HideAndDontSave;
 
         BuildGrid();
+    }
+
+    /// BOYANABİLİR KOPYA. Parçaların çoğu mesh'ini doğrudan FBX'ten alıyor; oraya köşe
+    /// rengi yazılamaz, yazılsa da modelin her yeniden içe aktarımında silinir. İlk
+    /// boyamada parçanın kendi kopyası üretiliyor ve kurulum betiği bu kopyayı bulup
+    /// bağlıyor (bkz. `BikeBootstrap.Painted`).
+    void EnsureWritable()
+    {
+        Mesh source = target.sharedMesh;
+        string path = AssetDatabase.GetAssetPath(source);
+
+        if (!path.EndsWith(".fbx", System.StringComparison.OrdinalIgnoreCase)) return;
+
+        const string folder = "Assets/Models/Bike/Generated";
+        if (!AssetDatabase.IsValidFolder(folder))
+            AssetDatabase.CreateFolder("Assets/Models/Bike", "Generated");
+
+        string copyPath = $"{folder}/{target.name}_Paint.asset";
+        var existing = AssetDatabase.LoadAssetAtPath<Mesh>(copyPath);
+
+        if (existing == null)
+        {
+            existing = Object.Instantiate(source);
+            existing.name = source.name;
+            existing.SetColors(new Color32[existing.vertexCount]);
+
+            AssetDatabase.CreateAsset(existing, copyPath);
+            AssetDatabase.SaveAssets();
+
+            Debug.Log($"[Fırça] {target.name} için boyanabilir kopya üretildi: {copyPath}");
+        }
+
+        target.sharedMesh = existing;
     }
 
     void Release()
@@ -131,7 +172,11 @@ public class VertexBrush : EditorWindow
     /// Hücre küçük olsaydı sözlük şişerdi, büyük olsaydı hücre başına düşen köşe artardı.
     void BuildGrid()
     {
-        cell = Mathf.Max(0.01f, radius);
+        // Hücre MESH UZAYINDA. Köşeler o uzayda duruyor ve parça dönüşümünde yüz kat
+        // ölçek var; dünya metresiyle kurulsaydı bütün model birkaç hücreye düşer,
+        // ızgara hiçbir şey kazandırmazdı.
+        float scale = Mathf.Max(1e-6f, target.transform.lossyScale.x);
+        cell = Mathf.Max(1e-5f, radius / scale);
         grid = new Dictionary<Vector3Int, List<int>>(vertices.Length / 8 + 1);
 
         for (int i = 0; i < vertices.Length; i++)
@@ -190,6 +235,10 @@ public class VertexBrush : EditorWindow
 
         if (current.type == EventType.MouseDown && hit)
         {
+            // Darbe başına değil, fırça basımı başına kayıt: sürüklerken her karede
+            // kayıt alınsaydı geri alma yığını yüz binlerce köşeyle dolardı.
+            Undo.RegisterCompleteObjectUndo(mesh, "Malzeme fırçası");
+
             painting = true;
             Paint(surface.point, current.shift);
             current.Use();
