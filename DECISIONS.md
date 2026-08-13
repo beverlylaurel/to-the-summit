@@ -29,6 +29,9 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   bölge logu) — dönen parçalar doğrulanıp hiyerarşi oturunca silinir
 - **Bisiklet parça ve bölge föyleri** (`BikePartSheet`, `BikeZoneSheet`, `FlatColor`
   gölgelendiricisi) — parça→malzeme eşleşmesi ve bölge sınırları oturunca silinir
+- **Bisiklet maskesi remesh'te silinecek** — malzeme maskesi köşe renginde duruyor;
+  remesh topolojiyi yenileyince boyama kaybolur. Boyama remesh'ten SONRA yapılacak,
+  yoksa maske aktarımı yazmak gerekir
 
 
 ## Bekleyen kararlar

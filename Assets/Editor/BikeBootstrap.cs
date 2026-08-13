@@ -322,12 +322,13 @@ public static class BikeBootstrap
         var handlebar = FindPart(model, HandlebarPart).GetComponent<MeshFilter>();
         Bounds bar = handlebar.sharedMesh.bounds;
 
-        handlebar.sharedMesh = Store(MeshZones.Build(handlebar.sharedMesh, point =>
-        {
-            if (MeshZones.Height(bar, point) < CableBelow) return 2;
-            if (MeshZones.Lateral(bar, point) > GripBeyond) return 1;
-            return 0;
-        }, 3, "Handlebar"), "Handlebar");
+        handlebar.sharedMesh = Zoned("Handlebar", () =>
+            MeshZones.Build(handlebar.sharedMesh, point =>
+            {
+                if (MeshZones.Height(bar, point) < CableBelow) return 2;
+                if (MeshZones.Lateral(bar, point) > GripBeyond) return 1;
+                return 0;
+            }, 3, "Handlebar"));
 
         handlebar.GetComponent<Renderer>().sharedMaterials = new[]
         {
@@ -345,13 +346,14 @@ public static class BikeBootstrap
         Bounds carrier = rack.sharedMesh.bounds;
         Matrix4x4 toWorld = rack.transform.localToWorldMatrix;
 
-        rack.sharedMesh = Store(MeshZones.Build(rack.sharedMesh, point =>
-        {
-            if (MeshZones.Height(carrier, point) >= DriveBelow) return 0;
+        rack.sharedMesh = Zoned("Rack", () =>
+            MeshZones.Build(rack.sharedMesh, point =>
+            {
+                if (MeshZones.Height(carrier, point) >= DriveBelow) return 0;
 
-            float lateral = Mathf.Abs(toWorld.MultiplyPoint3x4(point).z - middle);
-            return lateral > PedalFrom ? 2 : 1;
-        }, 3, "Rack"), "Rack");
+                float lateral = Mathf.Abs(toWorld.MultiplyPoint3x4(point).z - middle);
+                return lateral > PedalFrom ? 2 : 1;
+            }, 3, "Rack"));
 
         rack.GetComponent<Renderer>().sharedMaterials = new[]
         {
@@ -363,9 +365,10 @@ public static class BikeBootstrap
         var pedal = FindPart(model, PedalPart).GetComponent<MeshFilter>();
         Matrix4x4 pedalToWorld = pedal.transform.localToWorldMatrix;
 
-        pedal.sharedMesh = Store(MeshZones.Build(pedal.sharedMesh, point =>
-            Mathf.Abs(pedalToWorld.MultiplyPoint3x4(point).z - middle) > PedalFrom ? 1 : 0,
-            2, "Pedal"), "Pedal");
+        pedal.sharedMesh = Zoned("Pedal", () =>
+            MeshZones.Build(pedal.sharedMesh, point =>
+                Mathf.Abs(pedalToWorld.MultiplyPoint3x4(point).z - middle) > PedalFrom ? 1 : 0,
+                2, "Pedal"));
 
         pedal.GetComponent<Renderer>().sharedMaterials = new[]
         {
@@ -374,16 +377,21 @@ public static class BikeBootstrap
         };
     }
 
-    /// Üretilen mesh'i dosyaya yazar. Sahnede tutulsaydı sahne dosyası yüz binlerce
-    /// köşeyle şişerdi.
-    static Mesh Store(Mesh mesh, string name)
+    /// Bölgeli mesh'i dosyadan okur, yoksa üretir. VAR OLANIN ÜSTÜNE YAZILMIYOR: maske
+    /// elle boyanıyor ve köşe renginde bu mesh'in içinde duruyor; her kurulumda yeniden
+    /// üretilseydi boyama silinirdi. Bölge sınırı değiştirilecekse menüden sıfırlanıyor.
+    static Mesh Zoned(string name, System.Func<Mesh> build)
     {
         const string folder = Folder + "/Generated";
+        string path = $"{folder}/{name}_Zoned.asset";
+
+        var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+        if (existing != null) return existing;
+
         if (!AssetDatabase.IsValidFolder(folder))
             AssetDatabase.CreateFolder(Folder, "Generated");
 
-        string path = $"{folder}/{name}_Zoned.asset";
-        AssetDatabase.DeleteAsset(path);
+        Mesh mesh = build();
         AssetDatabase.CreateAsset(mesh, path);
         AssetDatabase.SaveAssets();
 
