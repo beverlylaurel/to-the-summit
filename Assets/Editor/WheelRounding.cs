@@ -37,12 +37,12 @@ public static class WheelRounding
     {
         if (!AssetDatabase.IsValidFolder(Folder))
         {
-            Debug.Log("[Bisiklet] üretilen mesh yok.");
+            ToolLog.Write("[Bisiklet] üretilen mesh yok.");
             return;
         }
 
         AssetDatabase.DeleteAsset(Folder);
-        Debug.Log("[Bisiklet] üretilen mesh'ler silindi (boyama dahil); "
+        ToolLog.Write("[Bisiklet] üretilen mesh'ler silindi (boyama dahil); "
                 + "kurulumda yeniden üretilecek.");
     }
 
@@ -63,7 +63,7 @@ public static class WheelRounding
 
         if (profile.Deviation < Threshold)
         {
-            Debug.Log($"[Tekerlek] {label} zaten çember "
+            ToolLog.Write($"[Tekerlek] {label} zaten çember "
                     + $"({profile.Deviation * 1000f:F1} mm sapma) — düzeltilmedi.");
             return source;
         }
@@ -88,7 +88,7 @@ public static class WheelRounding
         AssetDatabase.CreateAsset(rounded, path);
         AssetDatabase.SaveAssets();
 
-        Debug.Log($"[Tekerlek] {label} çembere oturtuldu.\n"
+        ToolLog.Write($"[Tekerlek] {label} çembere oturtuldu.\n"
             + $"  sapma {profile.Deviation * 1000f:F1} mm → {check.Deviation * 1000f:F1} mm\n"
             + $"  en geniş − en dar {(profile.Max - profile.Min) * 1000f:F0} mm → "
             + $"{(check.Max - check.Min) * 1000f:F0} mm\n"

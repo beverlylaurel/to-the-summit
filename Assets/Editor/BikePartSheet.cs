@@ -110,7 +110,7 @@ public static class BikePartSheet
         Object.DestroyImmediate(dim);
         Object.DestroyImmediate(lit);
 
-        Debug.Log($"[Föy] {parts.Length} parça yazıldı: {path}\n"
+        ToolLog.Write($"[Föy] {parts.Length} parça yazıldı: {path}\n"
                 + $"  ızgara {Columns} sütun, sıra parça numarasıyla aynı "
                 + $"(sol üst = ilk parça).");
     }

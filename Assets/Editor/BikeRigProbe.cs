@@ -151,7 +151,7 @@ public class BikeRigProbe : EditorWindow
         Vector3 boxCentre = filter.transform.TransformPoint(mesh.bounds.center);
         Vector3 fitted = profile.Centre;
 
-        Debug.Log($"[Tekerlek] {label}\n"
+        ToolLog.Write($"[Tekerlek] {label}\n"
             + $"  yarıçap {profile.Radius:F3} m  (en dar {profile.Min:F3}, "
             + $"en geniş {profile.Max:F3})\n"
             + $"  yuvarlaklık sapması {(profile.Max - profile.Min) * 1000f:F0} mm, "
