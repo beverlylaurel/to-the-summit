@@ -1,0 +1,17 @@
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.psd binary
+*.fbx binary
+*.blend binary
+*.ttf binary
+*.otf binary
+# Büyük ikili varlıklar LFS'te tutulur: her sürümleri repoda birikirse
+# klonlama zamanla ağırlaşır
+*.wav filter=lfs diff=lfs merge=lfs -text
+*.ogg filter=lfs diff=lfs merge=lfs -text
+*.mp3 filter=lfs diff=lfs merge=lfs -text
+Assets/Terrain/**/*.asset filter=lfs diff=lfs merge=lfs -text
+Assets/Settings/Cloud*Noise.asset filter=lfs diff=lfs merge=lfs -text
+Assets/Rain/RainStreakDatabase.asset filter=lfs diff=lfs merge=lfs -text

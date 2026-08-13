@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(git push:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git checkout:*)",
+      "Bash(git ls-files:*)",
+      "Bash(python:*)",
+      "Bash(sed:*)",
+      "Bash(find:*)",
+      "Bash(rm -f:*)",
+      "Bash(wc:*)",
+      "Bash(printf:*)"
+    ]
+  }
+}

@@ -1,0 +1,69 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 44abfbedc2e358f43ad33ec01ddb52eb, type: 3}
+  m_Name: LookSettings
+  m_EditorClassIdentifier: Assembly-CSharp::LookSettings
+  clearDay:
+    exposure: -0.15
+    contrast: 12
+    saturation: -14
+    colorFilter: {r: 0.94, g: 0.95, b: 1, a: 1}
+    temperature: -14
+    tint: 2
+    shadowChill: 0.45
+    bloom: 0.5
+    bloomThreshold: 1.05
+    grain: 0.12
+  clearNight:
+    exposure: -1.5
+    contrast: 6
+    saturation: -22
+    colorFilter: {r: 0.74, g: 0.8, b: 1, a: 1}
+    temperature: -32
+    tint: 6
+    shadowChill: 0.7
+    bloom: 0.35
+    bloomThreshold: 1.2
+    grain: 0.3
+  stormDay:
+    exposure: -0.8
+    contrast: 4
+    saturation: -34
+    colorFilter: {r: 0.86, g: 0.89, b: 0.95, a: 1}
+    temperature: -26
+    tint: 0
+    shadowChill: 0.85
+    bloom: 0.8
+    bloomThreshold: 0.85
+    grain: 0.28
+  stormNight:
+    exposure: -2.1
+    contrast: -4
+    saturation: -42
+    colorFilter: {r: 0.66, g: 0.72, b: 0.9, a: 1}
+    temperature: -40
+    tint: 4
+    shadowChill: 1
+    bloom: 0.55
+    bloomThreshold: 0.95
+    grain: 0.45
+  goldenHour:
+    exposure: -0.8
+    contrast: 10
+    saturation: 10
+    colorFilter: {r: 1, g: 0.97, b: 0.9, a: 1}
+    temperature: 14
+    tint: 4
+    shadowChill: 0.25
+    bloom: 0.35
+    bloomThreshold: 1.1
+    grain: 0.07
