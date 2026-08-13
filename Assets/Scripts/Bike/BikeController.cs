@@ -43,6 +43,11 @@ public class BikeController : MonoBehaviour
     /// mesh döndürmüyor — görsel ile fizik ayrı kalsın diye.
     public float LeanAngle => lean;
 
+    /// Ayardaki en büyük yatma açısı. Görsel bileşenler yatmayı ORANA çevirmek için
+    /// okuyor; ayarın kendisini dışarı açmak, her tüketicinin istediği alanı okumasına
+    /// kapı açardı.
+    public float MaxLean => settings != null ? settings.maxLean : 1f;
+
     /// Zeminin yuvarlanma direnci. Oyun dünyası biliyorsa (asfalt, çakıl, kar) buradan
     /// verir; vermezse ayardaki değer geçerli. Bisiklet zemin TÜRLERİNİ bilmiyor,
     /// yalnız sayıyı okuyor.
