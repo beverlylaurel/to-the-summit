@@ -19,7 +19,10 @@ using UnityEngine;
 /// farklı uzaylarda kalırdı.
 public class VertexBrush : EditorWindow
 {
-    static readonly string[] ChannelNames = { "Kırmızı — kauçuk", "Yeşil — deri", "Mavi — çelik" };
+    /// Malzeme yuvaları. Adları KANAL DEĞİL MALZEME: maske köşe renginin R, G, B
+    /// kanallarında saklanıyor ama bu bir depolama ayrıntısı. "Kırmızı — kauçuk" yazınca
+    /// kauçuğun kırmızı olmak zorunda olduğu sanılıyordu; renk serbest, yuva sabit.
+    static readonly string[] SlotNames = { "Kauçuk", "Deri", "Çelik" };
 
     [SerializeField] MeshFilter target;
     [SerializeField] int channel;
@@ -110,7 +113,7 @@ public class VertexBrush : EditorWindow
 
         using (new EditorGUI.DisabledScope(target == null))
         {
-            channel = EditorGUILayout.Popup("Kanal", channel, ChannelNames);
+            channel = EditorGUILayout.Popup("Malzeme", channel, SlotNames);
 
             EditorGUILayout.BeginHorizontal();
             radius = EditorGUILayout.Slider("Yarıçap (m)", radius, 0.003f, 0.2f);
@@ -123,11 +126,11 @@ public class VertexBrush : EditorWindow
         if (target != null) ChannelSurface();
     }
 
-    /// KANALIN RENGİ BURADAN. Işık davranışı (metaliklik, parlaklık) ayarlanmıyor:
-    /// kanalın ne olduğu zaten belli — kauçuk mat, deri yarı mat, çelik metalik. Onları
-    /// da kaydırıcıya bağlamak, her boyamada üç sayı daha karar vermek demekti.
+    /// MALZEMENİN RENGİ BURADAN. Renk tamamen serbest: kauçuk sarı da olabilir, deri
+    /// siyah da. Sabit olan ışığa verdiği cevap — kauçuk mat, deri yarı mat, çelik
+    /// metalik. Onu da kaydırıcıya bağlamak her boyamada üç sayı daha karar vermekti.
     ///
-    /// Renk parçanın BÜTÜN materyallerine yazılıyor: bir kanal her yerde aynı malzemeyi
+    /// Renk parçanın BÜTÜN materyallerine yazılıyor: bir yuva her yerde aynı malzemeyi
     /// anlatmalı, gidonun kauçuğu ile pedalınki farklı olmamalı.
     void ChannelSurface()
     {
@@ -159,7 +162,7 @@ public class VertexBrush : EditorWindow
         EditorGUILayout.LabelField($"Köşe {vertices.Length:N0}   Boyalı {Painted():N0}",
             EditorStyles.miniLabel);
 
-        if (GUILayout.Button("Kanalı temizle", EditorStyles.miniButton, GUILayout.Width(110f)))
+        if (GUILayout.Button("Malzemeyi temizle", EditorStyles.miniButton, GUILayout.Width(110f)))
             Clear(channel);
 
         if (GUILayout.Button("Hepsini temizle", EditorStyles.miniButton, GUILayout.Width(110f)))
@@ -460,7 +463,7 @@ public class VertexBrush : EditorWindow
 
         rgb[channel] = (byte)Mathf.RoundToInt(Mathf.Lerp(rgb[channel], goal, amount));
 
-        // Diğer kanallar aynı köşede duruyorsa siliniyor: bir köşe tek malzeme.
+        // Diğer yuvalar aynı köşede duruyorsa siliniyor: bir köşe tek malzeme.
         if (!removing)
             for (int i = 0; i < 3; i++)
                 if (i != channel)
