@@ -29,7 +29,7 @@ public static class WheelRounding
 
     /// Düzeltilmiş mesh'ler bir kez üretilip dosyada duruyor; düzeltme ayarları
     /// değişirse eskisi geçersiz olur ve elle silinmesi gerekir.
-    [MenuItem("To The Summit/Model/Jant Düzeltmesini Sıfırla", false, 123)]
+    [MenuItem("To The Summit/Model/Bisiklet/Jant Düzeltmesini Sıfırla", false, 123)]
     static void Reset()
     {
         if (!AssetDatabase.IsValidFolder(Folder))

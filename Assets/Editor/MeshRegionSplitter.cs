@@ -23,7 +23,7 @@ public class MeshRegionSplitter : EditorWindow
     Transform region;
     string pieceName = "parca";
 
-    [MenuItem("To The Summit/Model/Mesh'i Bölgeye Göre Ayır", false, 120)]
+    [MenuItem("To The Summit/Model/Mesh'i Bölgeye Göre Ayır", false, 140)]
     static void Open() => GetWindow<MeshRegionSplitter>("Mesh Ayırıcı").Show();
 
     void OnGUI()

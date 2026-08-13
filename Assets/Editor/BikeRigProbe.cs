@@ -23,7 +23,7 @@ public class BikeRigProbe : EditorWindow
     float steer;
     float spin;
 
-    [MenuItem("To The Summit/Model/Bisiklet Rig Kontrolü", false, 122)]
+    [MenuItem("To The Summit/Model/Bisiklet/Rig Kontrolü", false, 121)]
     static void Open() => GetWindow<BikeRigProbe>("Bisiklet Rig").Show();
 
     void OnEnable() => Bind();
