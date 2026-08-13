@@ -24,8 +24,8 @@ using UnityEngine.Rendering;
 public static class BikePartSheet
 {
     const int Columns = 6;
-    const int CellWidth = 560;
-    const int CellHeight = 420;
+    const int CellWidth = 700;
+    const int CellHeight = 520;
 
     [MenuItem("To The Summit/Model/Bisiklet/Parça Föyü", false, 122)]
     static void Build()
@@ -165,10 +165,13 @@ public static class BikePartSheet
     {
         float aspect = CellWidth / (float)CellHeight;
 
-        // Kadraj HER İKİ EKSENDEN sıkıştırılıyor: yalnız yüksekliğe bakılsaydı uzun
-        // bisiklet yanlardan taşar, yalnız uzunluğa bakılsaydı kare boşluk dolardı.
-        float height = Mathf.Max(bounds.extents.y, bounds.extents.magnitude / aspect) * 1.1f;
-        float width = height * aspect;
+        // Kadraj İKİ ÖLÇÜNÜN BÜYÜĞÜNE göre: köşegen kullanılıyordu ve bisiklet karenin
+        // dörtte birinde kalıyordu — ince parçalar (zincir, kablo, pedal) seçilmiyordu.
+        float height = bounds.extents.y * 1.08f;
+        float width = Mathf.Max(bounds.extents.x, bounds.extents.z) * 1.08f;
+
+        if (width < height * aspect) width = height * aspect;
+        else height = width / aspect;
         float far = bounds.size.magnitude * 6f;
 
         // Doku hedefi için Y ÇEVİRMESİ İSTENMİYOR: `ReadPixels` zaten alttan okuyor,
