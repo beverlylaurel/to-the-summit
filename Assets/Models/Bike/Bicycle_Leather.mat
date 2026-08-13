@@ -31,6 +31,12 @@ Material:
     - _Fade: 0.2
     - _Grain: 0.18
     - _Grime: 0.24
+    - _MaskBMetallic: 0.85
+    - _MaskBSmoothness: 0.32
+    - _MaskGMetallic: 0
+    - _MaskGSmoothness: 0.34
+    - _MaskRMetallic: 0
+    - _MaskRSmoothness: 0.22
     - _Metallic: 0
     - _Smoothness: 0.34
     - _Variation: 0.11
@@ -39,6 +45,9 @@ Material:
     m_Colors:
     - _BaseColor: {r: 0.26, g: 0.16, b: 0.1, a: 1}
     - _DustColor: {r: 0.62, g: 0.6, b: 0.54999995, a: 1}
+    - _MaskBColor: {r: 0.12999997, g: 0.12999997, b: 0.13999996, a: 1}
+    - _MaskGColor: {r: 0.25999996, g: 0.15999997, b: 0.09999997, a: 1}
+    - _MaskRColor: {r: 0.06999998, g: 0.06999998, b: 0.079999976, a: 1}
     - _RimColor: {r: 0.58, g: 0.59, b: 0.61, a: 1}
     - _TireColor: {r: 0.06999998, g: 0.06999998, b: 0.079999976, a: 1}
     - _WheelAxis: {r: 0, g: 1, b: 0, a: 0}

@@ -12,9 +12,16 @@ using UnityEngine;
 /// çember uydurma (Kåsa) bütün kenarı hesaba katıyor. Dönme merkezi bu.
 public class WheelProfile
 {
-    /// Açı çözünürlüğü. 720 dilim = yarım derece; 0.36 m yarıçapta 3 mm'lik yay, yani
-    /// milimetrelik bir çıkıntı kendi diliminde kalıyor, komşusuna bulaşmıyor.
-    const int Bins = 720;
+    /// Açı çözünürlüğü KÖŞE SAYISINDAN türüyor. Sabit 720 dilim yoğun mesh'te doğruydu
+    /// ama seyreltilmiş tekerlekte jant çevresinde birkaç yüz köşe kalıyor: dilimlerin
+    /// çoğu boş düşüyor, uzun boşluklardan doldurulan profil gürültüye dönüyor ve
+    /// düzeltme o gürültüyü yüzeye basıyordu (sapma 4.6 mm'den 8.1 mm'ye çıktı).
+    ///
+    /// Dilim başına ortalama üç köşe hedefleniyor; jant köşelerinin kabaca onda biri
+    /// çevrede duruyor.
+    static int BinCount(int vertices) => Mathf.Clamp(vertices / 120, 48, 720);
+
+    int bins;
 
     public Vector3 Centre { get; private set; }
     public Vector3 Axis { get; private set; }
@@ -35,7 +42,7 @@ public class WheelProfile
     public float Width { get; private set; }
     public float AxisOffset { get; private set; }
 
-    readonly float[] radii = new float[Bins];
+    float[] radii;
 
     /// Verilen eksende ölçer. Hesap DÜNYA UZAYINDA, yani metrede: parça dönüşümlerinde
     /// yüz kat ölçek var ve mesh'in kendi uzayında ölçülseydi bütün sayılar yüzde bire
@@ -43,6 +50,8 @@ public class WheelProfile
     public static WheelProfile Measure(Mesh mesh, Transform space, Vector3 axis)
     {
         var profile = new WheelProfile { Axis = axis.normalized };
+        profile.bins = BinCount(mesh.vertexCount);
+        profile.radii = new float[profile.bins];
 
         Vector3 reference = Mathf.Abs(profile.Axis.y) > 0.9f ? Vector3.right : Vector3.up;
         profile.Right = Vector3.Normalize(Vector3.Cross(profile.Axis, reference));
@@ -55,8 +64,8 @@ public class WheelProfile
         for (int i = 0; i < vertices.Length; i++)
             vertices[i] = toWorld.MultiplyPoint3x4(vertices[i]);
 
-        var far = new Vector2[Bins];
-        var hit = new bool[Bins];
+        var far = new Vector2[profile.bins];
+        var hit = new bool[profile.bins];
 
         float thickMin = float.MaxValue, thickMax = float.MinValue;
 
@@ -71,7 +80,7 @@ public class WheelProfile
             var plane = new Vector2(Vector3.Dot(offset, profile.Right),
                                     Vector3.Dot(offset, profile.Up));
 
-            int bin = BinOf(Mathf.Atan2(plane.y, plane.x));
+            int bin = profile.BinOf(Mathf.Atan2(plane.y, plane.x));
 
             if (!hit[bin] || plane.sqrMagnitude > far[bin].sqrMagnitude)
             {
@@ -83,23 +92,23 @@ public class WheelProfile
         profile.Width = thickMax - thickMin;
         profile.AxisOffset = (thickMax + thickMin) * 0.5f;
 
-        Vector2 fitted = FitCircle(far, hit);
+        Vector2 fitted = profile.FitCircle(far, hit);
         profile.Centre = boxCentre + profile.Right * fitted.x + profile.Up * fitted.y;
 
         profile.Summarise(far, hit, fitted);
         return profile;
     }
 
-    static int BinOf(float angle) =>
-        Mathf.Clamp((int)((angle + Mathf.PI) / (2f * Mathf.PI) * Bins), 0, Bins - 1);
+    int BinOf(float angle) =>
+        Mathf.Clamp((int)((angle + Mathf.PI) / (2f * Mathf.PI) * bins), 0, bins - 1);
 
     /// Kåsa çember uydurma: kenar noktalarına en küçük kareler anlamında oturan merkez.
-    static Vector2 FitCircle(Vector2[] points, bool[] hit)
+    Vector2 FitCircle(Vector2[] points, bool[] hit)
     {
         float sx = 0f, sy = 0f, sxx = 0f, syy = 0f, sxy = 0f, sxz = 0f, syz = 0f, sz = 0f;
         int count = 0;
 
-        for (int i = 0; i < Bins; i++)
+        for (int i = 0; i < bins; i++)
         {
             if (!hit[i]) continue;
 
@@ -129,7 +138,7 @@ public class WheelProfile
 
         int count = 0;
 
-        for (int i = 0; i < Bins; i++)
+        for (int i = 0; i < bins; i++)
         {
             radii[i] = hit[i] ? Vector2.Distance(far[i], fitted) : 0f;
             if (!hit[i]) continue;
@@ -142,35 +151,55 @@ public class WheelProfile
 
         Radius /= Mathf.Max(1, count);
         FillGaps(hit);
+        Smooth();
 
         int wide = 0;
 
-        for (int i = 0; i < Bins; i++)
+        for (int i = 0; i < bins; i++)
         {
             float deviation = radii[i] - Radius;
-            Deviation += deviation * deviation / Bins;
+            Deviation += deviation * deviation / bins;
             if (deviation > 0.003f) wide++;
         }
 
         Deviation = Mathf.Sqrt(Deviation);
-        WideFraction = wide / (float)Bins;
+        WideFraction = wide / (float)bins;
     }
 
     /// Boş kalan dilimler komşularından dolduruluyor. Boş dilim sıfır yarıçap demek
     /// olurdu ve düzeltme o açıda köşeleri merkeze çekerdi.
     void FillGaps(bool[] hit)
     {
-        for (int i = 0; i < Bins; i++)
+        for (int i = 0; i < bins; i++)
         {
             if (hit[i]) continue;
 
             int back = i, forward = i;
-            while (!hit[(back + Bins) % Bins]) back--;
-            while (!hit[forward % Bins]) forward++;
+            while (!hit[(back + bins) % bins]) back--;
+            while (!hit[forward % bins]) forward++;
 
             float span = forward - back;
             float t = span > 0f ? (i - back) / span : 0f;
-            radii[i] = Mathf.Lerp(radii[(back + Bins) % Bins], radii[forward % Bins], t);
+            radii[i] = Mathf.Lerp(radii[(back + bins) % bins], radii[forward % bins], t);
+        }
+    }
+
+    /// PROFİL YUMUŞATILIYOR. Ölçülen dış kenar köşe köşe zıplıyor; düzeltme ham profile
+    /// göre yapılsaydı o zıplama yüzeye kalıcı olarak yazılırdı. Pencere çevrenin yüzde
+    /// üçü — jantın gerçek şişkinliği kırk derecelik bir yay, yani bu pencereden çok daha
+    /// geniş ve yumuşatmadan sağ çıkıyor.
+    void Smooth()
+    {
+        int window = Mathf.Max(1, bins / 32);
+        var source = (float[])radii.Clone();
+
+        for (int i = 0; i < bins; i++)
+        {
+            float total = 0f;
+            for (int k = -window; k <= window; k++)
+                total += source[((i + k) % bins + bins) % bins];
+
+            radii[i] = total / (window * 2 + 1);
         }
     }
 
@@ -178,12 +207,12 @@ public class WheelProfile
     /// basamaklı okunsaydı düzeltme jantta yarım derecelik basamaklar bırakırdı.
     public float RadiusAt(float angle)
     {
-        float position = (angle + Mathf.PI) / (2f * Mathf.PI) * Bins;
+        float position = (angle + Mathf.PI) / (2f * Mathf.PI) * bins;
         int low = Mathf.FloorToInt(position);
         float t = position - low;
 
-        return Mathf.Lerp(radii[((low % Bins) + Bins) % Bins],
-                          radii[((low + 1) % Bins + Bins) % Bins], t);
+        return Mathf.Lerp(radii[((low % bins) + bins) % bins],
+                          radii[((low + 1) % bins + bins) % bins], t);
     }
 
     /// Düzlem içi açı: köşenin bu profile göre nerede durduğu.
