@@ -111,11 +111,9 @@ public static class BikePartSheet
     /// boru hattına bağlı ve `SetPass` ile çizilemiyor.
     static Material Flat(Color colour, CompareFunction depth)
     {
-        var material = new Material(Shader.Find("Hidden/Internal-Colored"));
+        var material = new Material(Shader.Find("ToTheSummit/FlatColor"));
         material.SetColor("_Color", colour);
-        material.SetInt("_ZWrite", 1);
-        material.SetInt("_ZTest", (int)depth);
-        material.SetInt("_Cull", (int)CullMode.Back);
+        material.SetFloat("_ZTest", (float)depth);
         material.hideFlags = HideFlags.HideAndDontSave;
         return material;
     }
@@ -133,7 +131,9 @@ public static class BikePartSheet
     /// o açıdan çıkardı.
     static Matrix4x4 View(Transform bike, Bounds bounds)
     {
-        Vector3 direction = (-bike.right + bike.forward * 0.35f + bike.up * 0.25f).normalized;
+        // TAM YANDAN. Eğik bakış siluetleri üst üste bindiriyor ve hangi parçanın
+        // vurgulandığı okunmuyordu; yan görünüşte bisikletin her parçası kendi yerinde.
+        Vector3 direction = -bike.right;
         Vector3 position = bounds.center - direction * bounds.size.magnitude * 2f;
         Quaternion rotation = Quaternion.LookRotation(direction, bike.up);
 
