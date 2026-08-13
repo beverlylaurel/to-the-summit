@@ -25,13 +25,10 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 - **Ova ve patika ölçüm araçları** (`ForelandProbe`, F1'deki kurulum süresi logu) — ova
   ve yol dokusu oturunca silinir
-- **Bisiklet rig kontrolü** (`BikeRigProbe`, `BikeBootstrap`'ın parça tablosu ve tekerlek
-  bölge logu) — dönen parçalar doğrulanıp hiyerarşi oturunca silinir
-- **Bisiklet parça ve bölge föyleri** (`BikePartSheet`, `BikeZoneSheet`, `FlatColor`
-  gölgelendiricisi) — parça→malzeme eşleşmesi ve bölge sınırları oturunca silinir
-- **Bisiklet maskesi remesh'te silinecek** — malzeme maskesi köşe renginde duruyor;
-  remesh topolojiyi yenileyince boyama kaybolur. Boyama remesh'ten SONRA yapılacak,
-  yoksa maske aktarımı yazmak gerekir
+- **Bisiklet maskesi yeniden seyreltmede silinecek** — malzeme maskesi köşe renginde duruyor;
+  model yeniden seyreltilirse topoloji değişir ve boyama kaybolur. Seyreltme yapıldı
+  (3.1 M → 200 bin), boyama artık güvenle yapılabilir; bütçe değişirse maske aktarımı
+  yazmak gerekir
 
 
 ## Bekleyen kararlar
