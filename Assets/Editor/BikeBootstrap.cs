@@ -31,6 +31,25 @@ public static class BikeBootstrap
     const string RearWheelPart = "model_part14";
     const string HandlebarPart = "model_part8";
 
+    // BÖLGELİ PARÇALAR. Üretilen modelde farklı malzemeler aynı mesh'te: gidon ile
+    // tutamak ve kablolar tek parça, bagaj ile zincir muhafazası ve pedal tek parça.
+    // Sınırlar üçgen dağılımından ölçüldü (bkz. `MeshZones`).
+    const string RackPart = "model_part10";
+
+    /// Gidon mesh'inde kablo sınırı: parçanın kendi yüksekliğinin bu oranının altı.
+    /// Ölçüm: üçgenlerin %57'si en üst dört dilimde, yani bar üstte; altta kalan ince
+    /// yapı fren kabloları.
+    const float CableBelow = 0.75f;
+
+    /// Tutamak sınırı: gidon yarı genişliğinin bu oranından dışarısı. Bar 0.68 m,
+    /// tutamaklar son 12'şer santim.
+    const float GripBeyond = 0.69f;
+
+    /// Bagaj mesh'inde aktarma organları sınırı: parçanın kendi yüksekliğinin bu
+    /// oranının altı. Ölçüm: alt bölgede 290 bin üçgen (muhafaza, krank, sol pedal),
+    /// üstte 46 bin (bagaj tablası).
+    const float DriveBelow = 0.49f;
+
     /// Direksiyonla dönen parçaların başladığı yer: modelin arka ucundan itibaren metre.
     /// Ön takımın tamamı (çatal, gidon, fren kolları, kablolar) bu eşiğin önünde duruyor.
     const float SteeringFrom = 1.20f;
@@ -238,6 +257,7 @@ public static class BikeBootstrap
         model.transform.localRotation = Quaternion.identity;
 
         Paint(model, materials);
+        Zone(model, materials);
         Report(model);
 
         Rig(model, out Transform steering, out Transform frontWheel, out Transform rearWheel);
@@ -284,6 +304,58 @@ public static class BikeBootstrap
 
             renderer.sharedMaterial = materials[surface];
         }
+    }
+
+    /// BÖLGELİ PARÇALARA ayrı materyal bağlar. Gidon mesh'i bar, tutamak ve kablo
+    /// olarak; bagaj mesh'i tabla ve aktarma organları olarak alt-mesh'lere ayrılıyor.
+    ///
+    /// Sonuç mesh'i dosyaya yazılıyor ve git'e girmiyor: üretilen varlık depoda durmaz.
+    static void Zone(GameObject model, Dictionary<string, Material> materials)
+    {
+        var handlebar = FindPart(model, HandlebarPart).GetComponent<MeshFilter>();
+        Bounds bar = handlebar.sharedMesh.bounds;
+
+        handlebar.sharedMesh = Store(MeshZones.Build(handlebar.sharedMesh, point =>
+        {
+            if (MeshZones.Height(bar, point) < CableBelow) return 2;
+            if (MeshZones.Lateral(bar, point) > GripBeyond) return 1;
+            return 0;
+        }, 3, "Handlebar"), "Handlebar");
+
+        handlebar.GetComponent<Renderer>().sharedMaterials = new[]
+        {
+            materials["Chrome"],   // gidon borusu
+            materials["Rubber"],   // tutamaklar
+            materials["Rubber"],   // kablolar
+        };
+
+        var rack = FindPart(model, RackPart).GetComponent<MeshFilter>();
+        Bounds carrier = rack.sharedMesh.bounds;
+
+        rack.sharedMesh = Store(MeshZones.Build(rack.sharedMesh, point =>
+            MeshZones.Height(carrier, point) < DriveBelow ? 1 : 0, 2, "Rack"), "Rack");
+
+        rack.GetComponent<Renderer>().sharedMaterials = new[]
+        {
+            materials["Paint"],    // bagaj tablası ve destekleri
+            materials["Chrome"],   // zincir muhafazası, krank, sol pedal
+        };
+    }
+
+    /// Üretilen mesh'i dosyaya yazar. Sahnede tutulsaydı sahne dosyası yüz binlerce
+    /// köşeyle şişerdi.
+    static Mesh Store(Mesh mesh, string name)
+    {
+        const string folder = Folder + "/Generated";
+        if (!AssetDatabase.IsValidFolder(folder))
+            AssetDatabase.CreateFolder(Folder, "Generated");
+
+        string path = $"{folder}/{name}_Zoned.asset";
+        AssetDatabase.DeleteAsset(path);
+        AssetDatabase.CreateAsset(mesh, path);
+        AssetDatabase.SaveAssets();
+
+        return mesh;
     }
 
     /// DÖNEN PARÇALARI AYIRIR. Model tek dosyada 26 parça olarak geliyor ama hepsi
