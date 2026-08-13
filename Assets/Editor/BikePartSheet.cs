@@ -43,7 +43,7 @@ public static class BikePartSheet
         Material dim = Flat(new Color(0.34f, 0.35f, 0.38f), CompareFunction.LessEqual);
         Material lit = Flat(new Color(1f, 0.36f, 0.05f), CompareFunction.Always);
 
-        Matrix4x4 view = View(bike, bounds);
+        Matrix4x4 view = View(bike.transform, bounds);
         Matrix4x4 projection = Projection(bounds);
 
         var target = new RenderTexture(CellWidth, CellHeight, 24, RenderTextureFormat.ARGB32);
