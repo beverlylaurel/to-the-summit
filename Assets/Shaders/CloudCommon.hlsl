@@ -1408,20 +1408,15 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
                 // yenilenmesinin ekrana katkısı yok: katkı zaten geçirgenlikle çarpılıyor.
                 bool nearAndOpen = travelled < 5000.0 && transmittance > 0.85;
 
-                // ÖNBELLEK FAZI PİKSEL PİKSEL KAYIYOR. Sonda her adımda değil, iki-dört
-                // adımda bir çalışıyor ve aradaki adımlar aynı aydınlanmayı taşıyor.
-                // Faz bütün piksellerde aynı olduğu için o merdiven ekranda eşmerkezli
-                // kabuk — soğan halkası — olarak hizalanıyordu. Yoğunluk arttıkça
-                // geçirgenlik daha hızlı düşüyor, önbellek seyrekleşiyor ve halkalar
-                // belirginleşiyordu; ölçüm de tam bunu gösterdi.
+                // ÖNBELLEK FAZI PİKSEL PİKSEL KAYDIRILDI VE GERİ ALINDI. Amaç sondanın
+                // merdivenini halka olmaktan çıkarmaktı; halkalar bir miktar azaldı ama
+                // komşu pikseller aydınlanmayı farklı adımda yenileyince değerleri
+                // ayrışıyor ve bulut kenarında gren bırakıyor. Zamansal harman olmadığı
+                // için (bkz. `VolumetricClouds.shader`) o gren kalıcı.
                 //
-                // Faz kaydırılınca merdiven kalıyor ama komşu pikseller farklı yerde
-                // basamak atlıyor: hizalanma bozuluyor, halka gürültüye dönüşüyor.
-                // Maliyet sıfır — sonda sayısı değişmiyor.
-                int probePhase = (int)(pixelHash * 4.0) & 3;
-
+                // Halka bastırma işini giriş fazı yapıyor; sonda fazı ortak kalıyor.
                 if (cachedLit < 0.0 || (nearAndOpen && probeMask == 0)
-                    || ((i + probePhase) & max(probeMask, 1)) == 0)
+                    || (i & max(probeMask, 1)) == 0)
                     cachedLit = CloudLightTransmittance(samplePoint, lightDirection,
                                                         transmittance <= 0.7, travelled,
                                                         openness);
