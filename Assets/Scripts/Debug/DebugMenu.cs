@@ -229,6 +229,25 @@ public class DebugMenu : MonoBehaviour
 
         GUILayout.Label($"Bisiklet zeminden {gap * 100f:F1} cm"
                         + $"   güneş {elevation:F1}°   gölge kayması {slip:F2} m");
+
+        // ÜÇ YÜZEY AYRI AYRI. Bisiklet çarpışmaya oturuyor, göz görsel kar yüzeyini
+        // görüyor; ikisi arasında fark varsa nesne havada ya da gömülü görünüyor.
+        // Kapsülün tabanı da yazılıyor çünkü fizik onu zemine oturtuyor, modeli değil.
+        var capsule = bike.GetComponent<CharacterController>();
+        float capsuleBottom = bike.transform.position.y + capsule.center.y
+                            - capsule.height * 0.5f;
+
+        GUILayout.Label($"  çarpışma {hit.point.y:F2}   model altı {bottom:F2}"
+                        + $"   kapsül altı {capsuleBottom:F2}"
+                        + $"   kar {SnowDepth(bike.transform.position) * 100f:F0} cm");
+    }
+
+    /// Bisikletin durduğu noktadaki kar derinliği. Kar yüzeyi ayrı bir bileşende
+    /// duruyor; yoksa sıfır okunuyor.
+    float SnowDepth(Vector3 point)
+    {
+        var snow = UnityEngine.Object.FindAnyObjectByType<SnowSurface>();
+        return snow != null ? snow.DepthAt(point) : 0f;
     }
 
     void BeginSection(string label)
