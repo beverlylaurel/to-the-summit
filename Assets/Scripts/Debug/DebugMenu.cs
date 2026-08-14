@@ -46,7 +46,10 @@ public class DebugMenu : MonoBehaviour
 
     float cloudDensityScale = 1f;
     float cloudAmbientScale = 1f;
+    static readonly int CloudStepScaleId = Shader.PropertyToID("_CloudStepScale");
+
     bool lodLock;
+    float stepScale = 1f;
 
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
@@ -275,6 +278,7 @@ public class DebugMenu : MonoBehaviour
                 Shader.GetGlobalFloat(CloudAmbientId) * cloudAmbientScale);
 
         Shader.SetGlobalFloat(CloudLodLockId, lodLock ? 1f : 0f);
+        Shader.SetGlobalFloat(CloudStepScaleId, stepScale);
     }
 
     void BeginSection(string label)
@@ -475,11 +479,15 @@ public class DebugMenu : MonoBehaviour
         // doku kademe geçişi, kalırsa adımlama.
         lodLock = GUILayout.Toggle(lodLock, "Doku kademesini kilitle (teşhis)");
 
+        GUILayout.Label($"Adım boyu {stepScale:F2}× (teşhis)");
+        stepScale = GUILayout.HorizontalSlider(stepScale, 0.15f, 1f);
+
         if (GUILayout.Button("Ayarları geri al"))
         {
             cloudDensityScale = 1f;
             cloudAmbientScale = 1f;
             lodLock = false;
+            stepScale = 1f;
         }
 
 
