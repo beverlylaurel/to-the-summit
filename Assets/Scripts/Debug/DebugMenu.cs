@@ -39,6 +39,12 @@ public class DebugMenu : MonoBehaviour
     float speedMultiplier = StartSpeedMultiplier;
     bool freeFly;
 
+    static readonly int DensityScaleId = Shader.PropertyToID("_DensityScale");
+    static readonly int CloudAmbientId = Shader.PropertyToID("_CloudAmbient");
+
+    float cloudDensityScale = 1f;
+    float cloudAmbientScale = 1f;
+
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
     float lockedSnowiness;
@@ -433,6 +439,23 @@ public class DebugMenu : MonoBehaviour
         GUILayout.Label($"Süzülme {atmosphere.CloudSpeed:F1} m/s"
                         + $" = {atmosphere.CloudSpeed * 3.6f:F0} km/h");
         GUILayout.Label($"Biriken kayma {atmosphere.CloudShift:F0} m");
+
+        // GEÇİCİ — açık havada bulutlar fazla beyaz ve düz görünüyor. İki aday var:
+        // yoğunluk (açık havada düşük, fırtınada çarpanla artıyor — bu yüzden fırtınada
+        // daha iyi duruyorlar) ve gökyüzünden gelen dağınık ışık (havadan bağımsız
+        // sabit). Doğru değer gözle bulunacak, sonra ayara yazılıp bu bölüm silinecek.
+        GUILayout.Label($"Yoğunluk {cloudDensityScale:F2}×");
+        cloudDensityScale = GUILayout.HorizontalSlider(cloudDensityScale, 0.3f, 4f);
+
+        GUILayout.Label($"Gök ışığı {cloudAmbientScale:F2}×");
+        cloudAmbientScale = GUILayout.HorizontalSlider(cloudAmbientScale, 0.2f, 1.5f);
+
+        // Atmosfer bu globalleri her karede yazıyor; çarpan onun ÜSTÜNE, çizimden önce
+        // uygulanıyor.
+        Shader.SetGlobalFloat(DensityScaleId,
+            Shader.GetGlobalFloat(DensityScaleId) * cloudDensityScale);
+        Shader.SetGlobalFloat(CloudAmbientId,
+            Shader.GetGlobalFloat(CloudAmbientId) * cloudAmbientScale);
 
 
         GUILayout.Label($"Kapsama %{atmosphere.Coverage * 100f:F0}   " +
