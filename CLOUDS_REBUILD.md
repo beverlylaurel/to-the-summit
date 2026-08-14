@@ -6,6 +6,8 @@ yeniden kurulacak.** Kod değil, sözleşme listesi.
 > **Belgeler arası iş bölümü.** Bulut konusunda **geçerli olan tek belge budur.**
 > `SYSTEMS.md`'nin bulut kısmı silinmiş koda ait, oraya bakılmaz (başında uyarısı var).
 > `DECISIONS.md` yalnız kararın kendisini ve tetikleyicisini tutuyor.
+> `NUBIS_NOTES.md` makale okumalarını tutuyor — soru-cevap, her cevabın yanında kaynak
+> sayfa. Buradaki dersler ÖLÇÜMDEN, oradaki cevaplar MAKALEDEN gelir; ikisi karışmaz.
 > Yeni sistem çalışır hâle gelince bu dosya `SYSTEMS.md`'ye taşınır ve buradaki bağlar
 > orada güncellenir; iki yerde birden bulut anlatımı durmaz.
 
