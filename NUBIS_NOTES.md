@@ -645,6 +645,14 @@ ile boş alan sıçranarak geçiliyor. Kaynak Houdini'den gelen gerçek bulut mo
 (kök: Schneider'in 2011 *Rio* çalışması, Blue Sky Studios). Nubis³'ün voksel mimarisine
 giden yol. Bizim için şimdilik kapsam dışı.
 
+`[N22 s.202]` **Source-Agnostic Distance Step Mapping** şeması: ışın boş alanda mesafe
+alanının söylediği kadar büyük sıçrıyor, kütleye girince örnekler sıklaşıyor. Kaynağın
+prosedürel mi pişmiş mi olduğu fark etmiyor — "source-agnostic" o demek.
+
+**Kaynakça** `[N22 s.206]`: Hart 1995 (sphere tracing), Dummer 2006 (cone step mapping),
+Beer 1852, Henyey-Greenstein 1941, Uman *Lightning* 1969, Hamblyn *The Invention of
+Clouds*, Hargrove *The Man Who Caught The Storm*.
+
 ---
 
 ## Okuma defteri
@@ -655,7 +663,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
-| `[N22]` nubis-2022 | **207** | s.1–198 | s.199–207 |
+| `[N22]` nubis-2022 | **207** | **s.1–207 TAMAM** | — |
 | `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
@@ -665,3 +673,25 @@ linearization ipucu `/N 100` diyor). Okuma sırasında son sayfaya varılınca k
 
 `[N15]`'in atlanan kısımları da okunacak — s.1–17 giriş, s.88+ optimizasyon bölümü.
 Bugün ortadan girilip ortada bırakılmıştı.
+
+
+---
+
+## `[N22]` bitti — soruların durumu
+
+| # | soru | durum |
+|---|---|---|
+| 1 | Bulutun eni/boyu | **cevaplandı** — s.20, 106, 129 |
+| 2 | Gürültü periyodu / katman oranı | **kısmi** — adım boyu cevabı geldi (s.39), periyot oranı H18'de aranacak |
+| 3 | Kapsama sürgüsü | **cevaplandı** — s.30 |
+| 4 | Gradyan çarpar mı | **cevaplandı** — s.28, 34, 97 |
+| 5 | Kenar yumuşaklığı | **cevaplandı** — s.34 (bölme yok), s.105 (üs 0.27) |
+| 6 | Adım ve mip | **cevaplandı** — s.39, 183 |
+| 7 | Buluta girmek | **kısmi** — Environments bölümü yakın alanı anlatıyor ama "kamera kütlenin İÇİNDE" ayrı bir başlık değil |
+| 8 | Temporal | **cevaplandı** — s.152, 157, 158 |
+| 9 | Aydınlatma sayıları | **cevaplandı** — s.41-48, 54, 59, 183 |
+| 10 | Yer gölgesi | **kısmi** — uzun mesafe gölge haritası var (s.112) ama üretimi anlatılmıyor |
+| 11 | Harita kanalları | **cevaplandı** — s.20, 75, 106, 129, 139 |
+| 12 | Optimizasyonlar | **cevaplandı** — s.81, 82, 90, 125, 183, 184 |
+
+Kalan üç boşluk (2, 7, 10) `[H18]` ve `[N17]`'de aranacak.
