@@ -391,15 +391,20 @@ public class AtmosphereController : MonoBehaviour
         // nesneler içinde bulundukları havayla aynı ışığı alır
         RenderSettings.ambientLight = color * settings.ambientStrength;
 
-        // YANSIMA TEK KAYNAKTAN: GÖKYÜZÜNÜN KENDİSİ. Sahnenin yansıma haritası gökyüzünden
-        // pişiyor, yani gece kararması, fırtına grisi ve bulut denizi zaten haritanın
-        // içinde. Şiddet katsayısı bir dönem gök seviyesine bağlanmıştı ve aynı kararmayı
-        // İKİNCİ kez uyguluyordu — iki kaynak, biri diğerini bilmeden.
+        // YANSIMA İKİ ADIMDA. Harita gökyüzünden pişiyor ve gökyüzü rengi kaydığında
+        // yenileniyor — gece, fırtına, bulut denizi, şafak, hepsi aynı kapıdan.
         //
-        // Harita gökyüzü DEĞİŞTİĞİNDE pişiyor: yalnız gündüz katsayısına bakılsaydı hava
-        // değişince bayat kalırdı. Ölçü rengin kendisi; eşik, bir karede olmayacak kadar
-        // büyük bir fark.
-        RenderSettings.reflectionIntensity = 1f;
+        // ŞİDDET DE KISILIYOR ve bu ÖLÇÜLMÜŞ bir gerek: harita tek başına gece
+        // kararmıyor. Kaldırıldığında bisikletin kromu karanlıkta yeniden parladı, geri
+        // konduğunda düzeldi. Sebebi, pişen haritanın gök kubbenin ortalama radyansını
+        // değil malzemenin kendi parlaklığını taşıması; ölçüm kazanıyor, teori değil.
+        //
+        // Oran ayrı bir "gece ayarı" değil: ortam ışığının kendi parlaklığından çıkıyor,
+        // yani gökyüzü hangi sebeple kararırsa yansıma da onunla kararıyor.
+        float skyLevel = Mathf.Max(color.r, Mathf.Max(color.g, color.b))
+                       * settings.ambientStrength;
+
+        RenderSettings.reflectionIntensity = Mathf.Clamp01(skyLevel * 2.2f);
 
         if (ColourMoved(color, reflectionSky, 0.02f))
         {
