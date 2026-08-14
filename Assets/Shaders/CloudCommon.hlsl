@@ -256,9 +256,13 @@ float CloudHeightGradient(float fraction, float type, float ceiling, float baseL
 
     // Stratus: alçak, yayvan, ince dilim. Kümülüs: geniş tabanlı, orta gövdeli,
     // yuvarlak tepeli. Kümülonimbus: neredeyse tüm katmanı kaplar, geç söner.
+    // KÜMÜLÜSÜN TEPESİ KUBBE, KONİ DEĞİL. Sönüm 0.52-0.92 arasındaydı: boyun %40'ı
+    // incelerek bitiyor ve zarf eşiği yükselttikçe yalnız gürültü zirveleri hayatta
+    // kalıyor — ekranda üçgen/koni tepeler. Gerçek kümülüs karnabahar gibi: gövde
+    // tepeye kadar dolgun, son %20'de omuz verip kapanıyor.
     float stratus = smoothstep(0.0, 0.10, h) - smoothstep(0.18, 0.32, h);
-    float cumulus = smoothstep(0.0, 0.14, h) - smoothstep(0.52, 0.92, h);
-    float cumulonimbus = smoothstep(0.0, 0.08, h) - smoothstep(0.05, 1.0, h);
+    float cumulus = smoothstep(0.0, 0.14, h) - smoothstep(0.78, 1.0, h);
+    float cumulonimbus = smoothstep(0.0, 0.08, h) - smoothstep(0.35, 1.0, h);
 
     float profile = type < 0.5
         ? lerp(stratus, cumulus, saturate(type * 2.0))
@@ -553,8 +557,16 @@ float CloudDensity(float3 position, bool cheap, float distance, float stepSize,
     // %70'e çıkarken tavan 1.75 katına çıkıyor, yatay ayak izi ise eşik yumuşamasıyla
     // çok daha yavaş genişliyordu: aynı genişlikte daha uzun bulut, yani silindir.
     // Gerçek kümülüste en/boy 1:1 ile 1:1.5 arası; kök o oranı koruyor.
+    // TAVAN AYRICA KISILIYOR. Katman 1745-7000 m, yani 5.3 km kalın; haritanın tavan
+    // tabanı 0.55 olduğu için en ince bulut bile 2.9 km boyunda çıkıyordu. Yatay çekirdek
+    // çapı ~3.2 km — boy ile en eşit, sonuç silindir. Gerçek kümülüs 1-2 km boyunda,
+    // 1-3 km eninde: en/boy oranı 1.5-2.
+    //
+    // Çarpanın alt ucu düşürüldü (0.75 → 0.42): kapsama düşükken bulutlar bastırılmış
+    // ve yayvan, kapsama arttıkça hem genişliyor hem yükseliyor ama boy artışı kökle
+    // sınırlı.
     float lateralGrowth = saturate(0.30 + 0.85 * _Coverage);
-    ceiling01 *= lerp(0.75, 1.0, sqrt(lateralGrowth));
+    ceiling01 *= lerp(0.42, 0.78, sqrt(lateralGrowth));
 
     // Zarf, şekil alanını ÇARPMAZ — kapsamayı kısar. Çarpım alanı tepeye doğru
     // inceltiyor ve eşiği yalnız gürültü zirveleri geçebiliyordu: hayatta kalanlar
