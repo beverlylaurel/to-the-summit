@@ -1048,6 +1048,155 @@ Her ikisinde de yeniden yansıtma açık (efektif çeyrek çözünürlük).
 - **Ayrı bir hava sistemine bağlanmak GELECEK İŞ olarak listelenmiş** — yani onlar da
   bulutu önce bağımsız kurup sonra bağlamayı planlamış. Bizim v1 kuralımızı doğruluyor.
 
+## `[H18]` EK B — GERÇEK KOD
+
+Tez HLSL, Stingray motoru. Aşağıdakiler birebir kopyadır.
+
+### Şekil değiştiren yükseklik fonksiyonu `[H18 Ek B.2]`
+
+```hlsl
+float HeightAlter(float percent_height, float4 weather_map)
+{
+    // Round bottom a bit
+    float ret_val = saturate(ReMap(percent_height, 0.0, 0.07, 0.0, 1.0));
+
+    // Round top a lot
+    float stop_height = saturate(weather_map.b + 0.12);
+    ret_val *= saturate(ReMap(percent_height, stop_height * 0.2, stop_height, 1.0, 0.0));
+
+    // Apply anvil (cumulonimbus / "giant storm" clouds)
+    ret_val = pow(ret_val, saturate(ReMap(percent_height, 0.65, 0.95, 1.0,
+                                          (1 - cloud_anvil_amount * global_coverage))));
+    return ret_val;
+}
+```
+
+### Yoğunluk değiştiren yükseklik fonksiyonu `[H18 Ek B.3]`
+
+```hlsl
+float DensityAlter(float percent_height, float4 weather_map)
+{
+    // Have density be generally increasing over height
+    float ret_val = percent_height;
+
+    // Reduce density at base
+    ret_val *= saturate(ReMap(percent_height, 0.0, 0.2, 0.0, 1.0));
+
+    // Apply weather_map density
+    ret_val *= weather_map.a * 2;
+
+    // Reduce density for the anvil
+    ret_val *= lerp(1, saturate(ReMap(pow(percent_height, 0.5), 0.4, 0.95, 1.0, 0.2)),
+                    cloud_anvil_amount);
+
+    // Reduce density at top to make better transition
+    ret_val *= saturate(ReMap(percent_height, 0.9, 1.0, 1.0, 0.0));
+
+    return ret_val;
+}
+```
+
+### Taban gürültüsü `[H18 Ek B.4]`
+
+```hlsl
+float shape_noise = shape_sample.g * 0.625 + shape_sample.b * 0.25 + shape_sample.a * 0.125;
+shape_noise = -(1 - shape_noise);
+shape_noise = ReMap(shape_sample.r, shape_noise, 1.0, 0.0, 1.0);
+```
+
+### Detay gürültüsü `[H18 Ek B.5]`
+
+```hlsl
+float detail = (detail_noise.r) * 0.625 + (detail_noise.g) * 0.25 + (detail_noise.b) * 0.125; // FBM
+
+// For low altitude regions the detail noise is used (inverted) to instead of creating
+// round shapes, create more wispy shapes. Transitions to round shapes over altitude.
+float detail_modifier = lerp(detail, 1 - detail, saturate(percent_height * 5.0));
+
+// Reduce the amount of detail noise being "subtracted" with the global_coverage.
+detail_modifier *= 0.35 * exp(-global_coverage * 0.75);
+
+// Carve away more from the shape_noise using detail_noise
+final_density = saturate(ReMap(shape_noise, detail_modifier, 1.0, 0.0, 1.0));
+```
+
+### Aydınlatma — TAMAMI `[H18 Ek B.6]`
+
+```hlsl
+float HG(float cos_angle, float g)
+{
+    float g2 = g * g;
+    float val = ((1.0 - g2) / pow(1.0 + g2 - 2.0 * g * cos_angle, 1.5)) / (4 * 3.1415);
+    return val;
+}
+
+float InOutScatter(float cos_angle)
+{
+    float first_hg  = HG(cos_angle, cloud_inscatter);
+    float second_hg = cloud_silver_intensity * pow(saturate(cos_angle), cloud_silver_exponent);
+
+    float in_scatter_hg  = max(first_hg, second_hg);
+    float out_scatter_hg = HG(cos_angle, -cloud_outscatter);
+
+    return lerp(in_scatter_hg, out_scatter_hg, cloud_in_vs_outscatter);
+}
+
+float Attenuation(float density_to_sun, float cos_angle)
+{
+    float prim = exp(-cloud_beer * density_to_sun);
+    float scnd = exp(-cloud_beer * cloud_attenuation_clampval) * 0.7;
+
+    // reduce clamping while facing the sun
+    float checkval = ReMap(cos_angle, 0.0, 1.0, scnd, scnd * 0.5);
+
+    return max(checkval, prim);
+}
+
+float OutScatterAmbient(float density, float percent_height)
+{
+    float depth    = cloud_outscatter_ambient * pow(density, ReMap(percent_height, 0.3, 0.9, 0.5, 1.0));
+    float vertical = pow(saturate(ReMap(percent_height, 0.0, 0.3, 0.8, 1.0)), 0.8);
+
+    float out_scatter = depth * vertical;
+    out_scatter = 1.0 - saturate(out_scatter);
+
+    return out_scatter;
+}
+
+float3 CalculateLight(float density, float density_to_sun, float cos_angle,
+                      float percent_height, float bluenoise, float dist_along_ray)
+{
+    float attenuation_prob    = Attenuation(density_to_sun, cos_angle);
+    float ambient_out_scatter = OutScatterAmbient(density, percent_height);
+
+    // Can be calculated once for each march but gave no/tiny perf improvements.
+    const float sun_highlight = InOutScatter(cos_angle);
+
+    float attenuation = attenuation_prob * sun_highlight * ambient_out_scatter;
+
+    // Ambient min (dist_along_ray used so that far away regions (huge steps)
+    // arent calculated (wrongly))
+    attenuation = max(density * cloud_ambient_minimum
+                      * (1 - pow(saturate(dist_along_ray / 4000), 2)), attenuation);
+
+    // combat banding a bit more
+    attenuation += bluenoise * 0.003;
+
+    float3 ret_color = attenuation * sun_color;
+    return ret_color;
+}
+```
+
+**Koddan çıkan üç ek ayrıntı** (metinde yoktu):
+
+1. `Attenuation` içinde **kelepçe güneşe bakarken gevşiyor** (`checkval` `cos_angle` ile
+   `scnd`'den `scnd*0.5`'e iniyor). Yani kelepçe her yerde aynı değil.
+2. `CalculateLight` sonunda **asgari ambient mesafeyle söndürülüyor**:
+   `(1 - pow(saturate(dist_along_ray/4000), 2))`. Gerekçe yorumda: uzak bölgelerde adım
+   devasa olduğu için o hesap **yanlış** çıkıyor. 4000 m'de tamamen kapanıyor.
+3. **Mavi gürültü aydınlatmaya da ekleniyor**: `attenuation += bluenoise * 0.003`.
+   Bantlaşma yalnız yürüyüş başlangıcında değil, ışıkta da kırılıyor.
+
 ---
 
 ## Okuma defteri
@@ -1059,7 +1208,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
 | `[N22]` nubis-2022 | **207** | **s.1–207 TAMAM** | — |
-| `[H18]` haggstrom-2018 | **81 basılı / PDF daha uzun** | PDF s.1–80 (basılı 1–68) | ekler: Ek A parametreler, **Ek B KOD** |
+| `[H18]` haggstrom-2018 | **93 PDF / 81 basılı** | **PDF s.1–93 TAMAM** | — |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
 
