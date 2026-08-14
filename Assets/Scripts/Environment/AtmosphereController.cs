@@ -231,6 +231,11 @@ public class AtmosphereController : MonoBehaviour
     /// çağrılmamış olabilir.
     void OnEnable() => Initialize();
 
+    /// TEŞHİS: yansıma haritasının yeniden pişmesini durdurur. Pişirme küresel harmonik
+    /// ve yansıma küpünü yeniden üretiyor; kare süresindeki payı ancak durdurup ölçerek
+    /// bilinir. GEÇİCİ.
+    public bool ReflectionFrozen { get; set; }
+
     /// Bulutların şu ana kadar biriktirdiği kayma (metre). Teşhis: hız doğru görünüp de
     /// gökyüzü sabit duruyorsa, kaymanın büyüyüp büyümediği bu sayıdan anlaşılıyor.
     public float CloudShift => cloudOffset.magnitude;
@@ -420,7 +425,8 @@ public class AtmosphereController : MonoBehaviour
         // kıpırdadıkça her kare pişiyordu: küresel harmonik ve yansıma küpü yeniden
         // üretiliyor, kare süresi ikiye katlanıyordu (180 FPS'ten 100'e). Gökyüzü bir
         // saniyede gözle görülür kadar değişmiyor.
-        if (Time.time - reflectionTime > 1f && ColourMoved(color, reflectionSky, 0.02f))
+        if (!ReflectionFrozen && Time.time - reflectionTime > 1f
+            && ColourMoved(color, reflectionSky, 0.02f))
         {
             reflectionSky = color;
             reflectionTime = Time.time;

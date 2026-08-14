@@ -51,6 +51,10 @@ public class DebugMenu : MonoBehaviour
     bool lodLock;
     float stepScale = 1f;
 
+    bool aoOff;
+    bool shadowsSmall;
+    bool reflectionOff;
+
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
     float lockedSnowiness;
@@ -281,6 +285,74 @@ public class DebugMenu : MonoBehaviour
         Shader.SetGlobalFloat(CloudStepScaleId, stepScale);
     }
 
+    /// TEŞHİS — kare süresini kim yiyor. Bir oturumda üç şey birden açıldı (örtüşme
+    /// gölgesi, 4096 gölge atlası, yansıma haritasının yeniden pişmesi) ve FPS 180'den
+    /// 100'e düştü. Hangisinin ne kadar yediği ancak TEK TEK kapatılarak bulunur;
+    /// üçünü birden kapatmak toplamı verir, suçluyu vermez.
+    ///
+    /// GEÇİCİ. Ölçüm bitince bu bölüm silinecek (bkz. `DECISIONS.md`).
+    void FrameCostSwitches()
+    {
+        GUILayout.Space(6f);
+        GUILayout.Label("Kare süresi teşhisi — tek tek kapat, FPS oku");
+
+        bool nextAo = GUILayout.Toggle(!aoOff, "Örtüşme gölgesi (SSAO)");
+        if (nextAo == aoOff)
+        {
+            aoOff = !nextAo;
+            SetRendererFeature("ScreenSpaceAmbientOcclusion", !aoOff);
+        }
+
+        bool nextShadow = GUILayout.Toggle(!shadowsSmall, "Gölge atlası 4096 (kapalı: 2048)");
+        if (nextShadow == shadowsSmall)
+        {
+            shadowsSmall = !nextShadow;
+            SetShadowResolution(shadowsSmall ? 2048 : 4096);
+        }
+
+        bool nextReflection = GUILayout.Toggle(!reflectionOff, "Yansıma haritası tazeleme");
+        if (nextReflection == reflectionOff)
+        {
+            reflectionOff = !nextReflection;
+            atmosphere.ReflectionFrozen = reflectionOff;
+        }
+    }
+
+    /// Boru hattındaki bir çizim eklentisini açıp kapatır. Eklenti listesi asset'te
+    /// duruyor; ada göre bulunuyor çünkü tip referansı vermek bu teşhis için gereksiz
+    /// bir bağımlılık olurdu.
+    static void SetRendererFeature(string name, bool active)
+    {
+        var pipeline = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline
+            as UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset;
+
+        if (pipeline == null) return;
+
+        var field = typeof(UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset)
+            .GetField("m_RendererDataList",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        if (field?.GetValue(pipeline) is not UnityEngine.Rendering.Universal.ScriptableRendererData[] data)
+            return;
+
+        foreach (var renderer in data)
+        {
+            if (renderer == null) continue;
+
+            foreach (var feature in renderer.rendererFeatures)
+                if (feature != null && feature.name.Contains(name))
+                    feature.SetActive(active);
+        }
+    }
+
+    static void SetShadowResolution(int resolution)
+    {
+        var pipeline = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline
+            as UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset;
+
+        if (pipeline != null) pipeline.mainLightShadowmapResolution = resolution;
+    }
+
     void BeginSection(string label)
     {
         GUILayout.BeginVertical(GUI.skin.box);
@@ -489,6 +561,8 @@ public class DebugMenu : MonoBehaviour
             lodLock = false;
             stepScale = 1f;
         }
+
+        FrameCostSwitches();
 
 
         GUILayout.Label($"Kapsama %{atmosphere.Coverage * 100f:F0}   " +

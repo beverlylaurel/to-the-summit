@@ -549,7 +549,12 @@ float CloudDensity(float3 position, bool cheap, float distance, float stepSize,
     // tırmanınca bulutlar genişlemeden sadece DİKEY büyüyordu, üstelik merkez uzun
     // kenar basık kalıp mermi çekirdeği çiziyordu. Küresel eğri %25'in (doğru
     // görünen) oranını sabitler, %69+'ta 1'e doyup efsane hâli korur.
-    ceiling01 *= saturate(0.30 + 0.85 * _Coverage);
+    // Tavan, yatay büyümenin KÖKÜ kadar yükseliyor. Doğrusal bağlıyken kapsama %25'ten
+    // %70'e çıkarken tavan 1.75 katına çıkıyor, yatay ayak izi ise eşik yumuşamasıyla
+    // çok daha yavaş genişliyordu: aynı genişlikte daha uzun bulut, yani silindir.
+    // Gerçek kümülüste en/boy 1:1 ile 1:1.5 arası; kök o oranı koruyor.
+    float lateralGrowth = saturate(0.30 + 0.85 * _Coverage);
+    ceiling01 *= lerp(0.75, 1.0, sqrt(lateralGrowth));
 
     // Zarf, şekil alanını ÇARPMAZ — kapsamayı kısar. Çarpım alanı tepeye doğru
     // inceltiyor ve eşiği yalnız gürültü zirveleri geçebiliyordu: hayatta kalanlar
@@ -1244,6 +1249,19 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
             prevDensity = 0.0;
             samplePoint -= direction * step;
             travelled -= step;
+
+            // GİRİŞ FAZI: pay ADIMIN KESRİ. Faz rastgeleliği ışının başında
+            // uygulanıyordu ve orada adım 14 m; kabuklar ise bulutun içinde, adımın
+            // 40-165 m olduğu yerde doğuyor. Piksel başına faz farkı adımın onda birine
+            // düşünce komşu pikseller aynı yerde basamak atıyor ve ekranda eşmerkezli
+            // halka çıkıyordu. Ölçüldü: adım boyu küçültülünce halkalar kayboluyor.
+            //
+            // Buluta girerken faz o ANKİ adıma göre kaydırılıyor: pikseller bulutun ön
+            // yüzüne farklı yerlerden giriyor, kabuklar hizalanacak ortak faz bulamıyor.
+            // Örnek sayısı değişmiyor — bedeli yok.
+            float entry = dither * nominalStep;
+            travelled += entry;
+            samplePoint += direction * entry;
             continue;
         }
 
@@ -1365,6 +1383,14 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
                 int probeMask = transmittance > 0.6 ? 0
                               : transmittance > 0.35 ? 1 : 3;
 
+                // MESAFE KAPISI GEÇİRGENLİĞE DE BAĞLI. Beş kilometre içinde sonda her
+                // adımda çalışıyordu; kamera bulutun İÇİNDEYKEN bütün yol o bölgede
+                // geçiyor ve her adım yedi yoğunluk okuması yapıyor (5 üstel örnek +
+                // koni + uzak komşu). Kare süresinin bulut içinde ikiye katlanmasının
+                // ana sebebi buydu. Işın kapanmaya başladıktan sonra sondanın her adımda
+                // yenilenmesinin ekrana katkısı yok: katkı zaten geçirgenlikle çarpılıyor.
+                bool nearAndOpen = travelled < 5000.0 && transmittance > 0.85;
+
                 // ÖNBELLEK FAZI PİKSEL PİKSEL KAYIYOR. Sonda her adımda değil, iki-dört
                 // adımda bir çalışıyor ve aradaki adımlar aynı aydınlanmayı taşıyor.
                 // Faz bütün piksellerde aynı olduğu için o merdiven ekranda eşmerkezli
@@ -1377,7 +1403,7 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
                 // Maliyet sıfır — sonda sayısı değişmiyor.
                 int probePhase = (int)(pixelHash * 4.0) & 3;
 
-                if (cachedLit < 0.0 || (travelled < 5000.0 && probeMask == 0)
+                if (cachedLit < 0.0 || (nearAndOpen && probeMask == 0)
                     || ((i + probePhase) & max(probeMask, 1)) == 0)
                     cachedLit = CloudLightTransmittance(samplePoint, lightDirection,
                                                         transmittance <= 0.7, travelled,
@@ -1494,7 +1520,10 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
             scattered += transmittance * energy * (1.0 - stepTransmittance);
             transmittance *= stepTransmittance;
 
-            if (transmittance < 0.06) break;
+            // ERKEN ÇIKIŞ 0.06'dan 0.12'ye. Işın %94 kapandıktan sonra yürümeye devam
+            // ediyordu; kalan %6'nın ekrana katkısı görünmez ama adımların bir kısmı
+            // orada harcanıyor. Bulut içinde bu kuyruk yolun çoğu.
+            if (transmittance < 0.12) break;
         }
 
         samplePoint += direction * step;
@@ -1573,7 +1602,12 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
         // Peçenin rengi de aradaki havanın kendisi. Sabit taban renk yüzünden şafakta
         // zeminden bakılan bulutlar griye boyanıyordu — sis kapatılınca düzelmesinin
         // sebebi buydu (integral sıfırlanınca peçe devre dışı kalıyor).
-        scattered = lerp(airHere * coverage, scattered, veil);
+        // PEÇENİN TABANI. Tipide görüş 320 m, bulut tabanı 1745 m: integral öyle
+        // büyüyor ki peçe sıfıra iniyor ve bulut tamamen havanın rengine çöküyor —
+        // "gökyüzünde bulut yok" hissi. Fizikte tipide gökyüzü görülmez, doğru; ama kar
+        // tanesi ileri saçılım yapar ve bulut tabanının parlaklığı zeminden tamamen
+        // kopmaz. Taban, bulutun kendi renginden %15'i her koşulda bırakıyor.
+        scattered = lerp(airHere * coverage, scattered, max(veil, 0.15));
     }
 
     // YÜKSEK KATMAN hacimsel bulutların ARKASINDA: fiziksel olarak daha yüksek ve
