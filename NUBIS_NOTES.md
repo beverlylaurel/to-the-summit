@@ -373,6 +373,70 @@ Perlin'in bağlantılılığı korunuyor, Worley'nin kabarcıkları ekleniyor.
 
 ---
 
+## Zarf Modeli (Envelope Model) — DAĞ BULUTLARI
+
+`[N22 s.94-106]`. Gökyüzü modelinden ayrı ikinci bir sistem: dağa yaslanan, zirveden
+savrulan, belli bir yere çakılı bulut kütleleri. **Bizim oyunumuzun asıl ihtiyacı bu**
+ve repo'nun "local clouds — Not Included" dediği şey.
+
+**NDF: dört kanal** `[N22 s.106]` — Cloud Min Height, Cloud Max Height, Cloud Type,
+Cloud Density. (Gökyüzündeki beş kanaldan farklı: kapsama yok, yoğunluk var.)
+
+**Profil analitik, arama tablosu YOK** `[N22 s.97]`:
+
+```hlsl
+float height_fraction = Remap(height, min_height, max_height, 0.0, 1.0);
+float top_gradient    = pow(1.0 - height_fraction, 1.5);
+float bottom_gradient = pow(height_fraction, 2.0);
+float edge_gradient   = Remap(sample_height, 0.0, 35.0, 1.0, 0.0);
+
+float dimensional_profile = bottom_gradient * top_gradient * edge_gradient;
+```
+
+Üç gradyanın çarpımı. `edge_gradient` kütlenin yatay kenarını 35 birimde söndürüyor.
+
+**Gürültü yükseklikle harmanlanıyor** `[N22 s.99]`:
+
+```hlsl
+float noise_height_blend = Remap(height_fraction, cloud_type + 0.1, cloud_type - 0.1);
+float composite = lerp(wispy_noise, billowy_noise, noise_height_blend);
+```
+
+Tabanda tüylü (wispy), tepede kabarık (billowy) — ve **geçişin nerede olacağını
+`cloud_type` belirliyor**. Bizim "taban ters Worley, tepe normal" yaklaşımımızın doğru
+hâli bu: sabit bir yükseklikte değil, tipin söylediği yükseklikte.
+
+**Yoğunluk** `[N22 s.105]`:
+
+```hlsl
+float cloud_density_sample =
+    height_fraction * pow(saturate(noise_composite - (1.0 - dimensional_profile)), 0.27);
+
+float inv_edge_signal_pow_3 = pow(inv_edge_signal, 3.0);
+
+float cloud_density        = cloud_density_sample;
+float cloud_coarse_density = pow(ValueErosion(dimensional_profile, 0.04), 0.5)
+                             * inv_edge_signal_pow_3 * 5.0;
+```
+
+**ÜS 0.27.** Bizde `pow(t, 4)` vardı — birden büyük üs alt ucu eziyor, kenar bandını
+daraltıyor. 0.27 birden KÜÇÜK: alt uç genişliyor. Kenar sertliği şikâyetinin sayısal
+karşılığı burada.
+
+Ayrıca **kaba yoğunluk için ayrı bir ifade** var (`cloud_coarse_density`) — iki kademeli
+yürüyüşün ucuz kademesi gürültüyü hiç okumuyor, profili aşındırıp kullanıyor.
+
+**Örnekleme koordinatı zarf kalınlığına göre kaydırılıyor** `[N22 s.102]`:
+
+```hlsl
+float3 noise_sample_pos = inSamplePosition
+    + float3(0.0, 0.0, (1.0 - saturate((max_height - min_height) * 0.0125)) * 40.0);
+```
+
+İnce zarflar gürültünün farklı bir diliminden okuyor — aynı gürültüyle farklı karakter.
+
+---
+
 ## Okuma defteri
 
 Kesintisiz olmalı. Boşluk = okunmamış sayfa.
@@ -381,7 +445,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
-| `[N22]` nubis-2022 | **207** | s.1–94 | s.95–207 |
+| `[N22]` nubis-2022 | **207** | s.1–106 | s.107–207 |
 | `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
