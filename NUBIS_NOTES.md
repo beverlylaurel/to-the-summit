@@ -835,6 +835,127 @@ IOS(θ) = L_i(max(HG(θ, in_s), IS_extra(θ)), HG(θ, −out_s), ivo)
 **İçe ve dışa saçılma ayrı iki HG**, aralarında `ivo` ile lerp. Bizde tek faz vardı.
 `b` açıkça "gerçekçi yoğunluktan kopuk, dengelemek için sanatsal terim" diye tanımlanmış.
 
+### `[H18]` fiziksel olmayan aydınlatma düzeltmeleri `[H18 s.29-31]`
+
+Uzun güneş adımları gerçek fizikle düzelmeyen üç sorun çıkarıyor; üçünün de çözümü
+açıkça "fiziksel değil" diye etiketlenmiş.
+
+**1. Dışa saçılma ambient'i** — güneş perspektifinden bakınca bulut kontursuz büyük beyaz
+lekeye dönüyor:
+```
+OS_ambient = 1 − SAT(os_a × d^(R(p_h, 0.3, 0.9, 0.5, 1.0))) × (SAT(R(p_h, 0, 0.3, 0.8, 1.0)^0.8))
+```
+
+**2. Sönüm kelepçesi** — Beer yasası uzun güneş adımlarıyla aydınlık/karanlık arasında
+aşırı kontrast veriyor:
+```
+A_clamp = max(E(b, d_s), E(b, a_c))          // b = 12, a_c = 0.2
+```
+
+**3. Yoğunluğa bağlı ambient** — kelepçe bu sefer bulut altını **düz gri ve detaysız**
+bırakıyor:
+```
+A_alter = max(d × a_min, A_clamp)            // a_min = 0.2
+```
+
+**Bizim "bulutun ortası keskin kararıyor, iki tonlu görünüyor" belirtimizin karşılığı
+2 ve 3.** Kelepçe koyu ucu sınırlıyor, yoğunluk-ambient'i kelepçelenmiş bölgeye detay
+geri veriyor. Bizde ikisi de yoktu.
+
+**Nihai aydınlatma** `[H18 s.32]`:
+```
+L_final(θ) = A_alter × IOS(θ) × OS_ambient
+```
+
+**Dokuz ayar, anlamlarıyla listelenmiş** `[H18 s.32]` — panel için hazır liste:
+Beer terimi · içe saçılma · dışa saçılma · içe/dışa oranı (`ivo`) · ek gümüş kenar
+şiddeti · ek gümüş kenar üssü · ambient dışa saçılma · **sönüm kelepçe değeri** ·
+**asgari sönüm ambient'i**.
+
+### Render hattı `[H18 s.33-34]`
+
+Üç adım:
+1. Bulut katmanını **çeyrek çözünürlükte** yürü. **Yürürken derinlik alınıp o adımdaki
+   alfa ile ağırlıklanıyor** — hareket vektörleri o derinlikten hesaplanıyor, ayrıca
+   3. adımda derinlik testi için saklanıyor. (N22 s.188'deki opaklık-ağırlıklı mesafenin
+   aynısı.)
+2. Hareket vektörleriyle önceki kareyi yeniden yansıt, karenin 1/16'sını yeni veriyle
+   güncelle.
+3. Yansıtılmış kareyi derinlik haritasıyla birlikte ekrana çiz.
+
+**Gölge ayrı geçişte**: her fragman için güneşe doğru ışın yürüyüşü, **çeyrek çözünürlük
+ve büyük adımlarla**. Bizim `CloudShadowAt`'imizin karşılığı — ama biz tek örnek
+alıyorduk, onlar yürüyor.
+
+### Hareket `[H18 s.34]`
+
+Üç doku ayrı ayrı ötelenir:
+- **hava haritası** → bulutların tamamı yer değiştirir
+- **şekil gürültüsü** → bulutlar şekil değiştirir
+- **detay gürültüsü** → türbülans, şekil çok değişmeden
+
+Üçü yaklaşık aynı yönde ötelenirse bulut hem gider hem değişir. Bizim `_Evolution` +
+`_CloudWind` ikilisinin doğru hâli bu — biz haritayı rüzgârın %72'siyle kaydırıyorduk,
+onlar üçünü ayrı ayrı ele alıyor.
+
+## `[H18]` ÖLÇÜLMÜŞ DENEYLER — sayılar
+
+Hepsi GTX 980 Ti, tam ekran render süresi.
+
+### Güneş adımı sayısı `[H18 s.36-39, Tablo 1]`
+
+| `s_n` | süre | görsel |
+|---|---|---|
+| 100 (referans) | 60.00 ms | pürüzsüz aydınlatma kenarları |
+| 1 | 1.90 ms | kaba, sert aydınlatma geçişleri |
+| 2 | 2.80 ms | çok daha iyi, ince detay eksik |
+| 3 | 3.35 ms | ince detay görünmeye başlıyor |
+| **4** | **3.85 ms** | **azalan getiri başlıyor — SEÇİLEN** |
+| 5 | 4.40 ms | 4'e göre çok küçük iyileşme |
+
+Bizim `lightSteps = 4` doğru değermiş — ama tesadüfen.
+
+### Adım büyüme oranı `[H18 s.40-43, Tablo 2]`
+
+`step_new = step_orig + dist_start × inc_rate`, `step_orig = 14`
+
+| `inc_rate` | süre | görsel |
+|---|---|---|
+| kullanılmıyor | 15.00 ms | referans, sabit adım |
+| 0.1 | 1.30 ms | belirgin gürültü ve bantlaşma |
+| 0.0667 | 1.70 ms | azaldı ama hâlâ görünür |
+| 0.05 | 2.10 ms | çoğu gitti, tam ekranda hâlâ seçiliyor |
+| **0.04** | **2.45 ms** | **tam ekranda bile görünmüyor — SEÇİLEN** |
+
+**Sabit adım 15 ms, 0.04 ile 2.45 ms — altı kat.** Ve görsel fark küçük.
+
+### Kapsama düşükken adımı KISALT `[H18 s.44-47, Tablo 3]`
+
+```
+step_new = step_orig × max(mult_min, min(1, R(g_c, 0.2, 0.7, mult_min, 1)))
+```
+
+Sorun: ufka doğru adım uzayınca **uzaktaki küçük bulutlar büyüklerden daha gürültülü**
+görünüyor — adım bulutun yarıçapından büyük olunca bazı pikseller bulutu tamamen atlıyor.
+
+| `mult_min` | süre | görsel |
+|---|---|---|
+| kullanılmıyor | 2.00 ms | kapsama düşükken gürültülü |
+| 0.1 | 8.00 ms | referans, gürültü yok |
+| 0.3 | 3.30 ms | referansa göre görünür fark yok |
+| **0.4** | — | **en tutarlı performans — SEÇİLEN** |
+| 0.5 | 2.30 ms | görünür bozulma |
+
+### Yoğunluk düşükken adımı UZAT `[H18 s.48]`
+
+```
+step_new = step_orig × 1 / max(g_d, div_min)^0.8
+```
+
+Gerekçe: yoğunluk düşükken ışın tam opaklığa varamıyor ve **bütün aralığı yürüyor**.
+`g_d = 0.1`'de süre 5 ms — `g_d = 1`'dekinin iki katı. Her örneğin katkısı azaldığı için
+adım uzatılabilir.
+
 ---
 
 ## Okuma defteri
@@ -846,7 +967,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
 | `[N22]` nubis-2022 | **207** | **s.1–207 TAMAM** | — |
-| `[H18]` haggstrom-2018 | **81** | s.1–40 | s.41–81 |
+| `[H18]` haggstrom-2018 | **81** | s.1–60 | s.61–81 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
 
