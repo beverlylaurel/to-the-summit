@@ -161,13 +161,27 @@ public static class CloudWeatherMapGenerator
                 // bile ayrı zirveler ve vadiler. Profil PLATOLU (iç ~%60 düz, omuzda
                 // yuvarlanır): çıplak paraboloit her bulutu sivri tepeli beze
                 // yapıyordu — gerçek bulut tepesi yayvan kubbedir.
-                // 1.25: 1.6'da iç %60 dümdüz tavandı — kolon derinliği ayak izi
-                // boyunca sabit kalıp bulutu LEVHA gibi gösteriyordu. Uzun omuz =
-                // kenara doğru kademeli incelme, yanal dağılmanın yarısı.
-                float plateau = Mathf.Min(1f, (1f - d2) * 1.25f);
+                // PLATO DARALDI, OMUZ GENİŞLEDİ. 1.25 çarpanı çekirdeğin iç %60'ını
+                // dümdüz tavan yapıyordu: kapsama ve tavan o bölgede sabit kalınca bulut
+                // kenarını gürültü değil ZARFIN DUVARI belirliyor ve bulut yanlardan
+                // bıçakla kesilmiş gibi bitiyordu (ekran görüntüsüyle doğrulandı: dik yan
+                // duvar, düz taban, yuvarlak tepe).
+                //
+                // Yeni profil: iç ~%25 düz, kalan yol boyunca yumuşak iniş. Kenarda tavan
+                // kademeli düştüğü için son sözü aşındırma gürültüsü söylüyor — geçiş
+                // saçaklı bitiyor, duvar kalmıyor.
+                float shoulder = 1f - d2;
+                float plateau = Mathf.Min(1f, shoulder * shoulder * (3f - 2f * shoulder) * 1.1f);
                 aDome[iy, ix] = Mathf.Max(aDome[iy, ix], c.ceiling * plateau);
             }
         }
+
+        // TAVAN KANALI YUMUŞATILIYOR. Tavan çekirdek başına MAX ile birleşiyor: iki
+        // çekirdeğin sınırında değer bir kolondan diğerine sıçrıyor ve bulut orada dik
+        // duvar veriyor. Küçük yarıçaplı bir bulanıklık sıçramayı rampaya çeviriyor;
+        // MAX'ın kazandırdığı ayrı zirveler korunuyor çünkü yarıçap çekirdek boyunun
+        // çok altında (birkaç texel).
+        aDome = SmoothWrapped(aDome, n, 2);
 
         float layerThickness = Mathf.Max(1f, settings.cloudTop - settings.cloudBottom);
 

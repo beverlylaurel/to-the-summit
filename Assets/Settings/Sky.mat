@@ -37,8 +37,8 @@ Material:
     - _CloudBright: {r: 0.90000004, g: 1.02, b: 1.2, a: 1.5}
     - _CloudDark: {r: 0.24000001, g: 0.272, b: 0.32000002, a: 0.4}
     - _HorizonColor: {r: 0.6, g: 0.68, b: 0.8, a: 1}
-    - _MoonColor: {r: 0.49445, g: 0.55825, b: 0.73370004, a: 0.7975}
-    - _SunColor: {r: 0.7975, g: 0.65640044, b: 0.4751329, a: 0.7975}
+    - _MoonColor: {r: 0.434, g: 0.48999998, b: 0.644, a: 0.7}
+    - _SunColor: {r: 0.7, g: 0.57615083, b: 0.41704455, a: 0.7}
     - _ZenithColor: {r: 0.33, g: 0.374, b: 0.44000003, a: 0.55}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

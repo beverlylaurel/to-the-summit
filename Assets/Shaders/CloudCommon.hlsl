@@ -581,7 +581,11 @@ float CloudDensity(float3 position, bool cheap, float distance, float stepSize,
     //
     // Yerel kapsama ayak izinin ölçüsü: küçükken tavan yarıya iniyor, büyük kütlelerde
     // dokunulmuyor.
-    ceiling01 *= lerp(0.45, 1.0, smoothstep(0.15, 0.55, localCoverage));
+    // BAĞ SIKI. Önce 0.45-1.0 aralığıyla denendi ve yetmedi: çekirdeğin kenarındaki dar
+    // kolon, komşunun MAX ile birleşmiş yüksek tavanını miras alıp PARMAK gibi çıkıyordu
+    // (ekran görüntüsüyle görüldü). Dar kolon artık tavanın ancak beşte birine erişiyor;
+    // yükselmek için ayak izinin de büyümesi gerekiyor.
+    ceiling01 *= lerp(0.2, 1.0, smoothstep(0.10, 0.62, localCoverage));
 
     // Zarf, şekil alanını ÇARPMAZ — kapsamayı kısar. Çarpım alanı tepeye doğru
     // inceltiyor ve eşiği yalnız gürültü zirveleri geçebiliyordu: hayatta kalanlar
