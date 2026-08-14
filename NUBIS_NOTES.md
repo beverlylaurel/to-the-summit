@@ -58,7 +58,19 @@ arasındaki oran ne olmalı?
 Bizde `harita × sürgü` yazılıydı ve %100'de bile gök kapanmıyordu (haritanın sıfır
 olduğu yer hiçbir sürgüde dolmaz). Ölçekleme mi, eşik kaydırma mı, başka bir şey mi?
 
-> *(cevap)*
+Kapsama **dikey profili çarpıyor**, sonra sonuç eşiğe dönüşüyor `[N22 s.30]`:
+
+```hlsl
+float dimensional_profile = vertical_profile * cloud_coverage;
+```
+
+Yani kapsama doğrudan gürültüyü ölçeklemiyor; önce profili ölçekliyor, profil de aşağıda
+eşiği belirliyor. Kapsama 0 → profil 0 → eşik 1 → hiçbir gürültü geçemez. Kapsama 1 →
+eşik profilin kendisi.
+
+**Bizim hatamız buydu:** `saturate(harita.r × sürgü × 1.8)` yazmıştık — kapsamayı
+haritayla ÇARPIP eşiğe çeviriyorduk. Haritanın sıfır olduğu yerde çarpım sıfır kalıyor
+ve sürgü ne olursa olsun bulut gelmiyordu.
 
 ## 4. Yükseklik gradyanı şekli ÇARPAR mı, eşiği mi yükseltir?
 
@@ -80,14 +92,40 @@ okunuyor — ara değerler tanım gereği pürüzsüz.
 Bizde `pow(t, 4)` uydurulmuştu. Makalelerde kenarı yumuşatan şey ne — erozyon mu,
 yoğunluk eğrisi mi, örnekleme mi?
 
-> *(cevap)*
+**`[N22]`'de gradyan ne çarpıyor ne eşik yükseltiyor — ÇIKARILIYOR** `[N22 s.34]`:
+
+```hlsl
+float cloud_density = saturate(cloud_noise_composite - (1.0 - dimensional_profile));
+```
+
+Yani gürültüden `(1 − profil)` çıkarılıyor. Cebirsel olarak `gürültü + profil − 1`:
+profil gürültüyü YUKARI itiyor, eşik sabit 0'da kalıyor, `saturate` kırpıyor.
+
+**Bölme YOK.** Bizim `CloudRemap(shape, 1-cov, 1, 0, 1)` = `(shape − (1−cov)) / cov`
+kullanıyorduk — payı aynı ama **kapsamaya bölüyorduk**. Bölme, kenar bandını
+normalize edip yoğunluğu hızla 1'e çıkarıyor; keskin kenarların matematiksel kaynağı bu.
+`[N22]` bölmediği için kenar doğal olarak yayvan çıkıyor.
+
+**Profilin kendisi iki 2B arama tablosunun ÇARPIMI** `[N22 s.28]`:
+
+```
+vertical_profile = LUT(yükseklik, top_type) × LUT(yükseklik, bottom_type)
+```
+
+`[N22 s.21-22]` üst tip tablosu: tip 0 düz ince dilim (stratus) → tip 1 dikine kabaran
+(cumulus). `[N22 s.26]` alt tip tablosu ayrı ve yatayda çok daha yumuşak — bulutun
+tabanının tüylülüğünü o taşıyor. Elle yazılmış `smoothstep` eğrisi yok, hepsi doku.
 
 ## 6. Adım boyu ve mip seçimi
 
 Bizde adım mesafeyle büyüyor, uzakta mip 4.5'e çıkıp gürültüyü siliyordu. Kaç örnek,
 adım nasıl büyüyor, mip nasıl seçiliyor, çizim menzili kaç?
 
-> *(cevap)*
+Kısmi cevap `[N22 s.34]`: kenarı yumuşatan ilk şey **bölmemek**. `saturate(gürültü −
+(1 − profil))` kenarda doğrusal ve yavaş açılıyor; bizim yaptığımız gibi kapsamaya
+bölünürse aynı bant kapsama küçüldükçe daralıp bıçağa dönüşüyor.
+
+*(Erozyon katmanının payı ileride.)*
 
 ## 7. Kameranın bulutun İÇİNDEN geçmesi
 
@@ -148,6 +186,13 @@ bizim bildiğimiz eksiklerden yapıldı; bilmediklerimiz burada birikir. Kaynak 
 **Katman kotları 256 m – 2048 m** `[N22 s.20]`, insan figürüyle ölçeklenmiş. Kalınlık
 1792 m. 2015'te 1500–4000 m'ydi; alçalmış ve incelmiş.
 
+**Gürültü tek doku, 4 kanal, 128³** `[N22 s.33]` — "Noise Composite". Kanallar artan
+frekansta; ilki Perlin-Worley, kalanlar Worley. 2015'teki yapının aynısı, yani doku
+tarafı yedi yılda değişmemiş.
+
+**Perlin-Worley'nin tanımı** `[N22 s.32]`: Perlin ile `1−Worley` birleştiriliyor —
+Perlin'in bağlantılılığı korunuyor, Worley'nin kabarcıkları ekleniyor.
+
 **Terim:** "Nubis" adı Luke Howard'ın 1802'deki bulut sınıflandırmasından
 ("nubification") geliyor `[N22 s.12]`. İşe yaramaz ama kaynağı belli olsun.
 
@@ -161,7 +206,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
-| `[N22]` nubis-2022 | **207** | s.1–22 | s.23–207 |
+| `[N22]` nubis-2022 | **207** | s.1–34 | s.35–207 |
 | `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
