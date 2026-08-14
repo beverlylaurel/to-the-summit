@@ -204,7 +204,7 @@ public class DebugMenu : MonoBehaviour
     /// gölgeyi metrelerce öteliyor — boşluğun büyüklüğü tek başına bir şey söylemiyor.
     void BikeHeight()
     {
-        var bike = Object.FindAnyObjectByType<BikeController>();
+        var bike = UnityEngine.Object.FindAnyObjectByType<BikeController>();
         if (bike == null) return;
 
         var box = bike.GetComponentInChildren<Renderer>();
