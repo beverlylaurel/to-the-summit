@@ -562,11 +562,11 @@ float CloudDensity(float3 position, bool cheap, float distance, float stepSize,
     // çapı ~3.2 km — boy ile en eşit, sonuç silindir. Gerçek kümülüs 1-2 km boyunda,
     // 1-3 km eninde: en/boy oranı 1.5-2.
     //
-    // Çarpanın alt ucu düşürüldü (0.75 → 0.42): kapsama düşükken bulutlar bastırılmış
-    // ve yayvan, kapsama arttıkça hem genişliyor hem yükseliyor ama boy artışı kökle
-    // sınırlı.
+    // Aralık kâğıtta çıkarıldı: 3.2 km çapındaki bir çekirdek için boy 1.5-1.8 km,
+    // yani en/boy 1.8-2.1. Gerçek kümülüs bandı bu. İlk deneme (0.42-0.78) düşük
+    // kapsamada bulutu UZATIYORDU — sayı hesaplanınca görüldü, gözle değil.
     float lateralGrowth = saturate(0.30 + 0.85 * _Coverage);
-    ceiling01 *= lerp(0.42, 0.78, sqrt(lateralGrowth));
+    ceiling01 *= lerp(0.30, 0.62, sqrt(lateralGrowth));
 
     // Zarf, şekil alanını ÇARPMAZ — kapsamayı kısar. Çarpım alanı tepeye doğru
     // inceltiyor ve eşiği yalnız gürültü zirveleri geçebiliyordu: hayatta kalanlar
