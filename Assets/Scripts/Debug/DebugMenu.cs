@@ -249,6 +249,13 @@ public class DebugMenu : MonoBehaviour
         GUILayout.Label($"Işık şiddeti {time.LightIntensity:F3}   Ay {time.MoonLevel:F4}");
         GUILayout.Label($"Güneş rengi {sc.r:F2} {sc.g:F2} {sc.b:F2}");
 
+        // TEŞHİS — metal parçaların gece parlaması iki kaynaktan gelebiliyor: sahnenin
+        // çevre ışığı ya da gökyüzünden pişen yansıma haritası. İkisi ayrı ayrı yazılıyor
+        // ki hangisinin kararmadığı gözle değil sayıyla ayrılsın.
+        Color ambient = RenderSettings.ambientLight;
+        GUILayout.Label($"Çevre ışığı {ambient.r:F3} {ambient.g:F3} {ambient.b:F3}"
+                        + $"   Yansıma {RenderSettings.reflectionIntensity:F2}");
+
         float value = time.Normalized;
         float next = GUILayout.HorizontalSlider(value, 0f, 1f);
         if (!Mathf.Approximately(next, value)) time.SetNormalized(next);
