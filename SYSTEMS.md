@@ -876,9 +876,10 @@ Sahnenin çevre yansıması gökyüzünden pişiyor ve gökyüzü rengi kanallar
 kayınca yeniden pişiriliyor. Gece kararması, fırtına grisi, bulut denizi ve şafağın
 kızıllığı — hepsi aynı kapıdan geçiyor, ayrı bir "gece yansıması" ayarı yok.
 
-Şiddet katsayısı (`reflectionIntensity`) sabit 1.0. Bir dönem gök seviyesine bağlanmıştı
-ve aynı kararmayı ikinci kez uyguluyordu: harita zaten karanlıkken katsayı da kısınca
-metal gece tamamen ölüyordu. **Kararma haritanın içinde, katsayıda değil.**
+Şiddet katsayısı (`reflectionIntensity`) da gök seviyesinden türüyor ve bu ÖLÇÜLMÜŞ bir
+gerek: harita tek başına gece kararmıyor. Katsayı kaldırıldığında bisikletin kromu
+karanlıkta yeniden parladı, geri konduğunda düzeldi. Yani kararma iki adımda — haritanın
+içeriği ve şiddet — ve ikisi de aynı gök renginden besleniyor, ayrı bir gece ayarı yok.
 
 Harita bayat kalırsa belirti nettir: gece metal yüzeyler gündüz gökyüzünü aynalar,
 bisikletin kromu karanlıkta parlar.
