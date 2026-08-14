@@ -9,6 +9,18 @@ zorunlu: `[N22 s.34]`. Kaynağı olmayan cümle nottan sayılmaz, tahmindir.
 
 Okuma **ilerledikçe** doldurulur, sonunda değil.
 
+## Hiçbir şey kaçmasın diye: okuma kuralları
+
+1. **15'er sayfa, sırayla, atlama yok.** "Bu bize lazım değil" diye sayfa geçilmez.
+2. **Her bloktan sonra defter güncellenir** (`s.X–Y okundu`). Defter baştan sona
+   KESİNTİSİZ olmalı; boşluk varsa o sayfalar okunmamıştır. Kanıt defterde, hafızada
+   değil.
+3. **Sorulara girmeyen her şey aşağıdaki "Sorulmamış bulgular" bölümüne** yazılır.
+   Yukarıdaki 12 soru bizim BİLDİĞİMİZ eksikler; bilmediklerimiz oraya düşer.
+4. **Bağlam biterse defterdeki son sayfadan devam edilir.** Oturum kesilse bile
+   kaldığı yer bellidir.
+5. Kaynaksız cümle yazılmaz.
+
 ---
 
 ## 1. Bir bulutun eni ve boyu neyden gelir?
@@ -98,11 +110,27 @@ ucuzlatmalar var, hangileri gönderilmiş, hangileri geri alınmış?
 
 ---
 
-## Okuma durumu
+## Sorulmamış bulgular
 
-| makale | okunan | not |
-|---|---|---|
-| `[N15]` nubis-2015 | s.18-87 | 2026-08-14 oturumunda okundu |
-| `[N22]` nubis-2022 | s.1-10 | yalnız kapak ve arka plan |
-| `[H18]` haggstrom-2018 | — | |
-| `[N17]` nubis-2017 | — | |
+Yukarıdaki on iki sorunun hiçbirine girmeyen ama önemli görünen her şey. Soru listesi
+bizim bildiğimiz eksiklerden yapıldı; bilmediklerimiz burada birikir. Kaynak zorunlu.
+
+> *(boş)*
+
+---
+
+## Okuma defteri
+
+Kesintisiz olmalı. Boşluk = okunmamış sayfa.
+
+| makale | toplam | okunan | eksik |
+|---|---|---|---|
+| `[N15]` nubis-2015 | ? | s.18–87 | **s.1–17 ve s.88–son** |
+| `[N22]` nubis-2022 | ? | s.1–10 | s.11–son |
+| `[H18]` haggstrom-2018 | ? | — | tamamı |
+| `[N17]` nubis-2017 | ? | — | tamamı |
+
+İlk iş: her PDF'in **toplam sayfa sayısını** yazmak. Bilinmeden "bitti" denemez.
+
+`[N15]`'in atlanan kısımları da okunacak — s.1–17 giriş, s.88+ optimizasyon bölümü.
+Bugün ortadan girilip ortada bırakılmıştı.
