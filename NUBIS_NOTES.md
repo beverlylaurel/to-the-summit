@@ -366,6 +366,29 @@ Bizim TEK katmanımız 4 ms'ti — onların üç katmanlı en kötü durumu kada
 
 ## Sorulmamış bulgular
 
+### `[H18]` — kimlik ve yapı
+
+Fredrik Häggström, Umeå Üniversitesi yüksek lisans tezi, 2018. Arrowhead Game Studios'ta
+yapılmış. **Doğrudan Schneider'in işini geliştirmeyi hedefliyor** `[H18 s.2]`.
+
+**Performans hedefi: 2 ms altı**, NVIDIA GTX 980 Ti `[H18 s.2]`. Bizim referansımız
+olabilir — Nubis'in PS5 sayıları (0.4 ms) konsola özel, bu masaüstü kartı.
+
+**Özetteki iki bulgu tam bizim açık sorularımız** `[H18 abstract]`:
+- güneşe atılan adım sayısı **tek haneye** indirilebiliyor
+- ışın yürüyüşü adım boyu, **başlangıç mesafesine + küresel kapsamaya + küresel
+  yoğunluğa** göre değiştirilebiliyor
+
+İkincisi kritik: bizde adım yalnız mesafeye bağlıydı. Kapsama ve yoğunluğa da bağlamak
+akla gelmemişti.
+
+**Bölüm haritası** (basılı sayfa): 3.1 şekil/yoğunluk 10 · 3.1.2 hava haritası 10 ·
+3.1.3 yüksekliğe bağlı fonksiyonlar 12 · 3.1.4 şekil ve detay gürültüsü 14 ·
+3.1.5 örs 16 · 3.2 ışın yürüyüşü 18 · **3.2.1 optimizasyonlar 19** · 3.3 aydınlatma 27 ·
+3.4 renk harmanı 32 · 3.5 render hattı 33 · 3.6 hareket 34 · **4 deneyler 35** ·
+**6.2.4 bulutların içinden geçmek 64** ← soru 7 · **Ek B: KOD 77**
+
+
 Yukarıdaki on iki sorunun hiçbirine girmeyen ama önemli görünen her şey. Soru listesi
 bizim bildiğimiz eksiklerden yapıldı; bilmediklerimiz burada birikir. Kaynak zorunlu.
 
@@ -664,12 +687,12 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
 | `[N22]` nubis-2022 | **207** | **s.1–207 TAMAM** | — |
-| `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
+| `[H18]` haggstrom-2018 | **81** | s.1–20 | s.21–81 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
 
-`[H18]`'in sayısı kesin değil (PDF nesne akışları sıkıştırılmış, ham sayım çalışmadı;
-linearization ipucu `/N 100` diyor). Okuma sırasında son sayfaya varılınca kesinleşir.
+`[H18]` **81 sayfa** — sayfa altbilgisinden (`1(81)`) doğrulandı. PDF sayfası = basılı
+sayfa + 12 (önsöz kayması).
 
 `[N15]`'in atlanan kısımları da okunacak — s.1–17 giriş, s.88+ optimizasyon bölümü.
 Bugün ortadan girilip ortada bırakılmıştı.
