@@ -30,6 +30,7 @@ public static class BikeBootstrap
     const string FrontWheelPart = "model_part25";
     const string RearWheelPart = "model_part14";
     const string HandlebarPart = "model_part8";
+    const string SaddlePart = "model_part18";
 
     // BÖLGELİ PARÇALAR. Üretilen modelde farklı malzemeler aynı mesh'te: gidon ile
     // tutamak ve kablolar tek parça, bagaj ile zincir muhafazası ve pedal tek parça.
@@ -274,10 +275,56 @@ public static class BikeBootstrap
         root.AddComponent<BikeWheels>().Bind(bike, settings, frontWheel, rearWheel, Vector3.forward);
         root.AddComponent<BikeSteeringVisual>().Bind(bike, steering);
 
+        var input = root.GetComponent<BikePlayerInput>();
+        Ride(bike, input, model);
+
+        // GÖLGE AÇIK. Bisiklet gölge düşürmüyordu; arazi ve kar sistemleri gölgeyi
+        // okuyor, gölgesiz duran nesne havada asılı gibi görünüyor.
+        foreach (Renderer renderer in model.GetComponentsInChildren<Renderer>())
+        {
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            renderer.receiveShadows = true;
+        }
+
         root.transform.position = SpawnPoint();
 
         Undo.RegisterCreatedObjectUndo(root, "Bisikleti kur");
         return root;
+    }
+
+    /// OYUNCUYU BİSİKLETE BAĞLAR. Binme bileşeni oyuncunun üstünde duruyor: bisiklet
+    /// oyuncuyu bilmiyor, oyuncu da bisikleti bilmiyor — ikisini tanıştıran tek yer bu.
+    ///
+    /// Selenin yeri sele parçasından ÖLÇÜLÜYOR. Elle girilseydi model değişince sürücü
+    /// havada ya da kadronun içinde otururdu.
+    static void Ride(BikeController bike, BikePlayerInput input, GameObject model)
+    {
+        var walker = Object.FindAnyObjectByType<FirstPersonController>();
+        if (walker == null)
+        {
+            Debug.LogWarning("[Bisiklet] sahnede oyuncu yok; binme bağlanmadı.");
+            return;
+        }
+
+        var look = walker.GetComponent<MouseLook>();
+        var body = walker.GetComponent<CharacterController>();
+        var camera = walker.GetComponentInChildren<Camera>();
+
+        if (look == null || body == null || camera == null)
+        {
+            Debug.LogWarning("[Bisiklet] oyuncuda bakış, çarpışma ya da kamera yok.");
+            return;
+        }
+
+        Transform saddle = FindPart(model, SaddlePart);
+        Vector3 seat = bike.transform.InverseTransformPoint(
+            saddle.GetComponent<Renderer>().bounds.center);
+
+        var rider = walker.GetComponent<BikeRider>();
+        if (rider == null) rider = walker.gameObject.AddComponent<BikeRider>();
+
+        rider.Bind(walker, look, body, camera.transform, bike, input, seat);
+        EditorUtility.SetDirty(rider);
     }
 
     /// Tabloya göre materyal atar. Tabloda olmayan parça boyalı sayılıyor: eksik bir
