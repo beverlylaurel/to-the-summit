@@ -394,6 +394,18 @@ public class AtmosphereController : MonoBehaviour
         // nesneler içinde bulundukları havayla aynı ışığı alır
         RenderSettings.ambientLight = color * settings.ambientStrength;
 
+        // YANSIMA ŞİDDETİ DE AYNI ZİNCİRDEN. Gökyüzü kararırken yansıma tam güçte
+        // kalıyordu: çevre ışığı geceleyin 0.04'e inerken metal yüzeyler hâlâ gündüz
+        // gücünde yansıma alıyor ve bisikletin kromu karanlıkta parlıyordu.
+        //
+        // Ölçüden bağımsız bir "gece katsayısı" konmuyor; oran ortam ışığının kendi
+        // parlaklığından çıkıyor, yani gökyüzü hangi sebeple kararırsa (gece, fırtına,
+        // bulut denizi) yansıma da onunla kararıyor.
+        float skyLevel = Mathf.Max(color.r, Mathf.Max(color.g, color.b))
+                       * settings.ambientStrength;
+
+        RenderSettings.reflectionIntensity = Mathf.Clamp01(skyLevel * 2.2f);
+
         if (view != null) view.clearFlags = CameraClearFlags.Skybox;
 
         ApplyShadowDistance();
