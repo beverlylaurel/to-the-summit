@@ -61,6 +61,10 @@ float _DetailDistance;
 /// adımda opaklaşıyor ve adım sınırları eşmerkezli kabuk olarak görünüyor.
 static const float CloudMaxOpticalStep = 0.2;
 
+/// TEŞHİS: birincil yürüyüşün adım boyu çarpanı. 1 iken normal. Küçültünce halkalar
+/// kayboluyorsa kaynak adım kabukları, kalıyorsa ışık sondası.
+float _CloudStepScale;
+
 float _DensityScale;
 float _CloudSteps;
 float _CloudLightSteps;
@@ -1175,7 +1179,7 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
         // içinde eşiği defalarca kesiyor ve her kesişimde adım boyu sıçrıyor; entegrasyon
         // hatası da onunla sıçrayınca bulutun içi kat kat kabuklara ayrılıyordu — her
         // geçiş bir dikiş. Sürekli bir fonksiyon o dikişleri tamamen ortadan kaldırıyor.
-        float nominalStep = baseStep;
+        float nominalStep = baseStep * (_CloudStepScale > 0.0 ? _CloudStepScale : 1.0);
 
         // Kuyruk incelmesi: önceki örnek zayıf-ama-sıfır değilse (yumuşak kenar
         // gradyanındayız) adım yarıya iner. Halkaların kaldığı yer tam burası —
