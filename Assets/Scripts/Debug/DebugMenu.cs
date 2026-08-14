@@ -51,6 +51,9 @@ public class DebugMenu : MonoBehaviour
     bool lodLock;
     float stepScale = 1f;
 
+    static readonly int TerrainShadowId = Shader.PropertyToID("_TerrainShadowReceive");
+
+    bool terrainShadowOff;
     bool aoOff;
     bool shadowsSmall;
     bool reflectionOff;
@@ -283,6 +286,7 @@ public class DebugMenu : MonoBehaviour
 
         Shader.SetGlobalFloat(CloudLodLockId, lodLock ? 1f : 0f);
         Shader.SetGlobalFloat(CloudStepScaleId, stepScale);
+        Shader.SetGlobalFloat(TerrainShadowId, terrainShadowOff ? 0f : 1f);
     }
 
     /// TEŞHİS — kare süresini kim yiyor. Bir oturumda üç şey birden açıldı (örtüşme
@@ -308,6 +312,13 @@ public class DebugMenu : MonoBehaviour
         {
             shadowsSmall = !nextShadow;
             SetShadowResolution(shadowsSmall ? 2048 : 4096);
+        }
+
+        bool nextTerrain = GUILayout.Toggle(!terrainShadowOff, "Arazi gölge haritasını okusun");
+        if (nextTerrain == terrainShadowOff)
+        {
+            terrainShadowOff = !nextTerrain;
+            Shader.SetGlobalFloat(TerrainShadowId, terrainShadowOff ? 0f : 1f);
         }
 
         bool nextReflection = GUILayout.Toggle(!reflectionOff, "Yansıma haritası tazeleme");

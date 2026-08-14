@@ -58,6 +58,8 @@ Shader "ToTheSummit/MountainSurface"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            float _TerrainShadowReceive;
             #include "MountainSurface.hlsl"
             #include "SnowTessellation.hlsl"
 
@@ -135,8 +137,12 @@ Shader "ToTheSummit/MountainSurface"
                 // Hareketli nesnelerin gölgesi haritadan ve arazininkiyle ÇARPILIYOR:
                 // ikisi ayrı olay — biri sırtın arkasında kalmak, öteki üstünde bir cisim
                 // durmak. Aynı kanaldan gidiyorlar çünkü ikisi de doğrudan güneşi kesiyor.
-                mainLight.shadowAttenuation *=
-                    MainLightRealtimeShadow(TransformWorldToShadowCoord(IN.positionWS));
+                // TEŞHİS ANAHTARI: `_TerrainShadowReceive` sıfırken gölge haritası hiç
+                // okunmuyor. Arazi ekranın çoğunu kaplıyor ve bu okuma piksel başına
+                // yapılıyor — kare süresindeki payı ancak kapatıp ölçerek bilinir.
+                if (_TerrainShadowReceive > 0.5)
+                    mainLight.shadowAttenuation *=
+                        MainLightRealtimeShadow(TransformWorldToShadowCoord(IN.positionWS));
 
                 // BULUT GÖLGESİ arazi gölgesiyle ÇARPILIR, ikisi ayrı olay: biri sırtın
                 // arkasında kalmak, öteki üstünden bulut geçmek. Aynı kanaldan gidiyorlar
