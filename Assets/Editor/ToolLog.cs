@@ -15,7 +15,13 @@ using System.Text;
 /// izin veriliyor.
 public static class ToolLog
 {
-    const string LogPath = "Logs/editor.log";
+    /// ADI UNITY'NİNKİYLE ÇAKIŞAMAZ. Yol `Logs/editor.log` idi; Unity kendi logunu aynı
+    /// klasöre `Logs/Editor.log` diye yazıyor ve Windows dosya adlarında büyük-küçük harf
+    /// ayrımı YOK — ikisi tek dosyaydı. Sonuçları: araç çıktısı Unity'nin logunun içine
+    /// karışıyordu, aşağıdaki 512 KB kesme Unity'nin logunu kırpıyordu ve Unity kendi
+    /// eski konumundan yazmaya devam ettiği için araya sıfır bayt dolgusu giriyordu
+    /// (bir kez 23 MB'lık NUL dosyası buradan çıktı, sebebi o zaman anlaşılmamıştı).
+    const string LogPath = "Logs/tools.log";
 
     /// Dosya bu boyutu aşınca baştan yazılıyor. Sınırsız büyüseydi okunamaz olurdu;
     /// yarım megabayt son birkaç yüz kaydı tutuyor.

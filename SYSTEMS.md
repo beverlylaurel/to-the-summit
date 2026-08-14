@@ -424,9 +424,18 @@ Kütle ağır olduğu için taban esintiyle inip kalkmaz, dakikalar ölçeğinde
 
 **Bulut dağılımının tek kaynağı pişirilmiş 2B hava haritasıdır.** Üretim matematiği
 `CloudWeatherMapGenerator`'da (çalışma anı, salt matematik) yaşar; iki tüketicisi var:
-`CloudWeatherMapBaker` (editör, asset kaydeder; ad parametre imzası taşır — ayar
-değişince kendiliğinden yeniden pişer) ve F1 teşhis panelinin canlı "Haritayı yeniden
-pişir" düğmesi (Play içinde kalibrasyon, `AtmosphereController.SetWeatherMap`).
+`CloudWeatherMapBaker` (editör, asset kaydeder) ve F1 teşhis panelinin canlı "Haritayı
+yeniden pişir" düğmesi (Play içinde kalibrasyon, `AtmosphereController.SetWeatherMap`).
+
+Pişmiş harita **türetilmiş veridir ve kendi kendini tazeler.** Geçerlilik imzası iki
+girdiden kurulur: ayar alanları **ve** `CloudWeatherMapGenerator.Version`. Sürüm
+üreticinin içinde durur çünkü onu artırmayı unutan, algoritmaya dokunan kişidir; imza
+yalnız ayarlardan kurulduğu sürece kod değişikliği haritaya hiç yansımıyor, menüden
+"yeniden pişir" bile eski sonucu üretiyordu. Tazeleme editör yüklenirken
+(`[InitializeOnLoadMethod]`) yapılır, sahne kurulumunda değil — düzeltmeyi değerlendiren
+kişi eski haritaya bakmasın diye. Pişirme asset'in **üstüne** yazar; silip yeniden
+kurmak GUID'i düşürüp sahnedeki başvuruları koparıyordu ve her pişirmeden sonra sahneyi
+yeniden kurmak gerekiyordu.
 Dağılım vidaları ayar asset'inde: dev tavanı, istif, boşluk serpintisi, yama penceresi,
 yoğunluk, tohum. `AtmosphereController` haritayı global yayınlar.
 Kanallar: R kapsama, G tip, B taban kayması, A tavan. Harita gürültüden türetilmez,
@@ -581,7 +590,9 @@ küme türetleri örtüyü içinden deler. Kapalı örtüde döşeme tekrarına 
 boş bölgelerin tip/taban/tavan kanalları pişirmede 48 km periyotlu alanlarla boyanır
 (düz 0.5 bırakılınca tek doku değişkeni 2.86 km'de döşenen şekil gürültüsü kalıyor,
 örtü zirveden kafes gibi okunuyordu) ve şekil alanına 37° döndürülmüş ×1.26 ölçekli
-ikinci bir taban örneklemi max ile katılır — iki kafes hiçbir yerde hizalanamaz.
+ikinci bir taban örneklemi katılır. İkisi de **yetmiyor**: ikinci örneklemin kendi
+periyodu da menzilin altında, zirveden bakınca kafes yine okunuyor (ölçüldü, ekran
+görüntüsüyle). Asıl kırıcı 48 km periyotlu kaydırma — bkz. aşağıdaki "Döşeme kırıcı".
 
 Bulut ve sis rengi aynı kaynaktan gelir; ayrı sabitler tutmak gökyüzü kızarırken sisin
 soluk kalmasına yol açıyordu.
@@ -980,6 +991,46 @@ yerde silik siluet kalır.
 türetilmez. Yürüyüş mesafesi sahne derinliğiyle kesiliyor; adım boyu ona bağlanınca komşu
 pikseller farklı kafeste örneklenir ve **arazinin silüeti buluta desen olarak basılır**.
 Derinlik yürüyüşün nerede duracağını belirler, nasıl örnekleneceğini değil.
+
+**Bulutun BOYU tipinden gelir, metre cinsinden.** Kaynak HZD (Schneider 2015, s.34-35):
+hava haritasının boyla ilgili tek kanalı **tiptir**, boy tipin seçtiği yükseklik
+gradyanından çıkar. Bizde ayrıca bir **tavan kanalı** vardı — çekirdek başına kubbe, MAX
+ile birleşen, bulanıklaştırılan, sonra shader'da beş çarpandan geçen ikinci bir yükseklik
+kaynağı. Ürettikleri ekranda tek tek görüldü: dar kolonun komşusundan tavan miras alması
+(**parmaklar**), çarpanların üst üste binip tavanı sıfıra indirmesi (**dümdüz çökmüş
+örtü**), tavanın yatayda hızlı değişmesi (**sivri uçlar**). Kanal ve zinciri silindi.
+
+Boy **metre**, katman oranı değil: HZD'nin hacimsel katmanı 2.5 km, bizimki 5.3 km
+(kümülonimbusa yer açmak için). Oran kullanılsaydı katmanı kalınlaştırmak bütün bulutları
+birlikte uzatırdı — tavan kanalı zaten bunu telafi etmek için icat edilmişti. Katman
+kalınlığı artık yalnızca kümülonimbusun tavanı.
+
+**Zarf şekil alanını ÇARPAR** (HZD s.35: `SetRange(gürültü × yükseklikSinyali) × kapsama`).
+Bir dönem eşiği yükseltiyordu, çünkü çarpınca tepeler iğneye dönüyordu; o gözlem doğruydu
+ama sebep zarf değil sönüm bandının GENİŞLİĞİYDİ — tavan kanalı yüzünden ~1.2 km'ye
+yayılıyor ve gürültünün özellik boyuyla (~1 km) yarışıyordu. Metre boyla bant her tipte
+180-456 m, özellik boyunun altında: daralma pürüzsüz, tepe kubbe. Dalga boyu kuralı.
+
+**Kolon-sabit bir alan yüksekliği süremez.** Sürerse desenini dikey sütun olarak basar —
+kolon-sabitin tanımı zaten "dikeyde değişmeyen". Genişliği ve yoğunluğu sürebilir.
+
+**Yoğunluk alanı ve gölge sondası, görüş ışınının ne kadar kapandığına bakamaz.** Ne
+`CloudDensity` ne `CloudLightTransmittance` `transmittance` üzerinden dallanır. Böyle bir
+dal, geçirgenliğin eşiği geçtiği YÜZEYİ uzayda çiziyor: bulutun ortasında makasla
+kesilmiş düz beyaz ada (yoğunluk dalı), kenarda koyu zar (sonda dalı), ikinci bir halka
+ailesi (sonda aralığı dalı). Üçü de yaşandı ve söküldü — ucuzlatma yalnız **ışından
+bağımsız** ölçütlerle olur: mesafe (`_DetailDistance`), LOD, iki kademeli yürüyüşün
+kendi kademesi (`cheap`, ve orada `cheap ≥ full` garantisi şart).
+
+**Döşeme kırıcı görüş menzilinden uzun periyotlu olmak zorunda.** Taban gürültüsü dünyada
+2.86 km'de aynen tekrar ediyor; yakından bir-iki tekrar görünür ve göz seçemez, zirveden
+yüzlercesi aynı anda görünür ve desen okunur. 37°'lik ikinci örneklem, 7.7 km'lik 3B
+büküm ve 5.7 km'lik kolon warp'ı **kendileri de kafestir** — tekrarı gizlemezler, süslerler.
+Şekil alanına 48 km periyotlu analitik bir kaydırma biner (genlik 1400 m = döşemenin
+yarısı; gradyan 0.23, uzay katlanmaz) ve ikinci örnekleme de aynısı uygulanır — yalnız
+birincisi bükülseydi ikincisi kendi tekrarını olduğu gibi taşırdı. Hava haritasının kendi
+periyodu (48 km) ayrı bir sınır: görüş menzili onu aşarsa bulutların **yerleşimi** tekrar
+eder ve bunu büküm çözmez, harita büyür.
 
 **Esintiyi herkes okumaz.** Yeni bir sistem rüzgâra bağlanırken hangisini okuduğu
 seçilir: anında tepki veriyorsa sürekli şiddet + esinti, ağır ve yavaşsa yalnızca

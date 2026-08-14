@@ -404,13 +404,7 @@ public static class MountainSceneBootstrap
             Object.FindAnyObjectByType<TimeOfDay>(),
             driver,
             camera,
-            LoadOrCreateSkyMaterial(),
-            CloudNoiseGenerator.LoadOrCreateBase(),
-            CloudNoiseGenerator.LoadOrCreateDetail(),
-            CloudWeatherMapBaker.LoadOrCreate(atmosphereSettings),
-            CloudWeatherMapBaker.LoadSkipMap(),
-            CloudNoiseGenerator.LoadOrCreateCurl(),
-            CloudNoiseGenerator.LoadOrCreateHigh());
+            LoadOrCreateSkyMaterial());
         EditorUtility.SetDirty(atmosphere);
 
         var lookController = Object.FindAnyObjectByType<LookController>();
@@ -534,7 +528,7 @@ public static class MountainSceneBootstrap
         var material = AssetDatabase.LoadAssetAtPath<Material>(SkyMaterialPath);
         if (material != null)
         {
-            AssignCloudNoise(material);
+            // (bulut dokusu ataması silindi)
             return material;
         }
 
@@ -546,7 +540,7 @@ public static class MountainSceneBootstrap
         AssetDatabase.CreateAsset(material, SkyMaterialPath);
         AssetDatabase.SaveAssets();
 
-        AssignCloudNoise(material);
+        // (bulut dokusu ataması silindi)
         return material;
     }
 
@@ -580,21 +574,7 @@ public static class MountainSceneBootstrap
         AssetDatabase.ImportAsset(RendererPath);
     }
 
-    /// 3B gürültü dokuları ilk kez üretilirken birkaç dakika sürer, sonra asset olarak kalır
-    static void AssignCloudNoise(Material material)
-    {
-        if (material.GetTexture(BaseNoiseId) == null)
-            material.SetTexture(BaseNoiseId, CloudNoiseGenerator.LoadOrCreateBase());
-
-        if (material.GetTexture(DetailNoiseId) == null)
-            material.SetTexture(DetailNoiseId, CloudNoiseGenerator.LoadOrCreateDetail());
-
-        // Hava haritası buraya YAZILMAZ: Sky.shader onu materyal özelliği olarak
-        // bildirmiyor, bulut geçişi global dokudan okuyor (AtmosphereController
-        // SetGlobalTexture). Tanımsız özelliğe GetTexture konsola hata basıyordu.
-
-        EditorUtility.SetDirty(material);
-    }
+    // (AssignCloudNoise SİLİNDİ — bulut dokuları yeniden yazılıyor.)
 
     static readonly int BaseNoiseId = Shader.PropertyToID("_BaseNoise");
     static readonly int DetailNoiseId = Shader.PropertyToID("_DetailNoise");

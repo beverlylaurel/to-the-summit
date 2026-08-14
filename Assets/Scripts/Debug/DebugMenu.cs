@@ -39,27 +39,13 @@ public class DebugMenu : MonoBehaviour
     float speedMultiplier = StartSpeedMultiplier;
     bool freeFly;
 
-    static readonly int DensityScaleId = Shader.PropertyToID("_DensityScale");
-    static readonly int CloudAmbientId = Shader.PropertyToID("_CloudAmbient");
 
-    static readonly int CloudLodLockId = Shader.PropertyToID("_CloudLodLock");
 
-    float cloudDensityScale = 1f;
-    float cloudAmbientScale = 1f;
-    static readonly int CloudStepScaleId = Shader.PropertyToID("_CloudStepScale");
 
-    static readonly int CloudFlatLightId = Shader.PropertyToID("_CloudFlatLight");
 
-    bool lodLock;
-    bool flatLight;
-    float stepScale = 1f;
 
     static readonly int TerrainShadowId = Shader.PropertyToID("_TerrainShadowReceive");
 
-    bool terrainShadowOff;
-    bool aoOff;
-    bool shadowsSmall;
-    bool reflectionOff;
 
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
@@ -68,6 +54,11 @@ public class DebugMenu : MonoBehaviour
     bool windLocked;
     float lockedWindStrength = 0.5f;
     float lockedWindAngle;
+
+    /// AYARLARIN AÇILIŞTAKİ HÂLİ. Her sürgünün yanındaki geri al düğmesi buradan
+    /// okuyor. Asset'in kendisi Play sırasında değişiyor (sürgüler doğrudan ona
+    /// yazıyor); kopya alınmazsa "geri al" neye döneceğini bilemezdi.
+    AtmosphereSettings defaults;
 
     bool open;
     float timeScale = 1f;
@@ -107,6 +98,9 @@ public class DebugMenu : MonoBehaviour
 
     void OnEnable()
     {
+        if (defaults == null && atmosphere != null && atmosphere.Settings != null)
+            defaults = Instantiate(atmosphere.Settings);
+
         if (walker == null || flyer == null || weather == null || weatherDriver == null
             || wind == null || thunder == null || lightning == null || time == null
             || atmosphere == null
@@ -185,7 +179,6 @@ public class DebugMenu : MonoBehaviour
         EndColumn();
 
         BeginColumn();
-        DrawClouds();
         DrawOverlays();
         DrawSnowCollision();
         EndColumn();
@@ -224,149 +217,11 @@ public class DebugMenu : MonoBehaviour
     /// ve iki açıklaması var: bisiklet havada duruyor ya da gölge kaydırılmış. Yükseklik
     /// ile güneşin açısı birlikte yazılıyor çünkü alçak güneşte bir santimlik boşluk bile
     /// gölgeyi metrelerce öteliyor — boşluğun büyüklüğü tek başına bir şey söylemiyor.
-    void BikeHeight()
-    {
-        var bike = UnityEngine.Object.FindAnyObjectByType<BikeController>();
-        if (bike == null) return;
-
-        var box = bike.GetComponentInChildren<Renderer>();
-        if (box == null) return;
-
-        // IŞIN BİSİKLETİN ALTINDAN başlıyor. Üstünden atıldığında bisikletin kendi
-        // çarpışma kapsülüne çarpıp "zeminden -65 cm" gibi anlamsız bir sayı veriyordu.
-        float bottom = box.bounds.min.y;
-        var ray = new Ray(new Vector3(box.bounds.center.x, bottom - 0.02f, box.bounds.center.z),
-            Vector3.down);
-
-        if (!Physics.Raycast(ray, out RaycastHit hit, 12f, ~0, QueryTriggerInteraction.Ignore))
-        {
-            GUILayout.Label("Bisiklet: zemin bulunamadı");
-            return;
-        }
-
-        float gap = bottom - 0.02f - hit.point.y;
-        float elevation = Mathf.Asin(Mathf.Clamp(time.SunHeight, -1f, 1f)) * Mathf.Rad2Deg;
-        float slip = Mathf.Abs(elevation) > 0.5f
-            ? gap / Mathf.Tan(Mathf.Abs(elevation) * Mathf.Deg2Rad) : 0f;
-
-        GUILayout.Label($"Bisiklet zeminden {gap * 100f:F1} cm"
-                        + $"   güneş {elevation:F1}°   gölge kayması {slip:F2} m");
-
-        // ÜÇ YÜZEY AYRI AYRI. Bisiklet çarpışmaya oturuyor, göz görsel kar yüzeyini
-        // görüyor; ikisi arasında fark varsa nesne havada ya da gömülü görünüyor.
-        // Kapsülün tabanı da yazılıyor çünkü fizik onu zemine oturtuyor, modeli değil.
-        var capsule = bike.GetComponent<CharacterController>();
-        float capsuleBottom = bike.transform.position.y + capsule.center.y
-                            - capsule.height * 0.5f;
-
-        GUILayout.Label($"  çarpışma {hit.point.y:F2}   model altı {bottom:F2}"
-                        + $"   kapsül altı {capsuleBottom:F2}"
-                        + $"   kar {SnowDepth(bike.transform.position) * 100f:F0} cm");
-    }
-
-    /// Bisikletin durduğu noktadaki kar derinliği. Kar yüzeyi ayrı bir bileşende
-    /// duruyor; yoksa sıfır okunuyor.
-    float SnowDepth(Vector3 point)
-    {
-        var snow = UnityEngine.Object.FindAnyObjectByType<SnowSurface>();
-        return snow != null ? snow.DepthAt(point) : 0f;
-    }
-
-    /// Bulut çarpanları ÇİZİMDEN ÖNCE uygulanıyor. `OnGUI` sahne çizildikten sonra
-    /// koşuyor; oraya yazılan değer bir sonraki karede atmosfer tarafından eziliyor ve
-    /// kaydırıcılar hiçbir şey yapmıyordu.
     void LateUpdate()
     {
-        if (atmosphere == null) return;
-
-        if (!Mathf.Approximately(cloudDensityScale, 1f))
-            Shader.SetGlobalFloat(DensityScaleId,
-                Shader.GetGlobalFloat(DensityScaleId) * cloudDensityScale);
-
-        if (!Mathf.Approximately(cloudAmbientScale, 1f))
-            Shader.SetGlobalFloat(CloudAmbientId,
-                Shader.GetGlobalFloat(CloudAmbientId) * cloudAmbientScale);
-
-        Shader.SetGlobalFloat(CloudLodLockId, lodLock ? 1f : 0f);
-        Shader.SetGlobalFloat(CloudStepScaleId, stepScale);
-        Shader.SetGlobalFloat(TerrainShadowId, terrainShadowOff ? 0f : 1f);
-        Shader.SetGlobalFloat(CloudFlatLightId, flatLight ? 1f : 0f);
-    }
-
-    /// TEŞHİS — kare süresini kim yiyor. Bir oturumda üç şey birden açıldı (örtüşme
-    /// gölgesi, 4096 gölge atlası, yansıma haritasının yeniden pişmesi) ve FPS 180'den
-    /// 100'e düştü. Hangisinin ne kadar yediği ancak TEK TEK kapatılarak bulunur;
-    /// üçünü birden kapatmak toplamı verir, suçluyu vermez.
-    ///
-    /// GEÇİCİ. Ölçüm bitince bu bölüm silinecek (bkz. `DECISIONS.md`).
-    void FrameCostSwitches()
-    {
-        GUILayout.Space(6f);
-        GUILayout.Label("Kare süresi teşhisi — tek tek kapat, FPS oku");
-
-        bool nextAo = GUILayout.Toggle(!aoOff, "Örtüşme gölgesi (SSAO)");
-        if (nextAo == aoOff)
-        {
-            aoOff = !nextAo;
-            SetRendererFeature("ScreenSpaceAmbientOcclusion", !aoOff);
-        }
-
-        bool nextShadow = GUILayout.Toggle(!shadowsSmall, "Gölge atlası 4096 (kapalı: 2048)");
-        if (nextShadow == shadowsSmall)
-        {
-            shadowsSmall = !nextShadow;
-            SetShadowResolution(shadowsSmall ? 2048 : 4096);
-        }
-
-        bool nextTerrain = GUILayout.Toggle(!terrainShadowOff, "Arazi gölge haritasını okusun");
-        if (nextTerrain == terrainShadowOff)
-        {
-            terrainShadowOff = !nextTerrain;
-            Shader.SetGlobalFloat(TerrainShadowId, terrainShadowOff ? 0f : 1f);
-        Shader.SetGlobalFloat(CloudFlatLightId, flatLight ? 1f : 0f);
-        }
-
-        bool nextReflection = GUILayout.Toggle(!reflectionOff, "Yansıma haritası tazeleme");
-        if (nextReflection == reflectionOff)
-        {
-            reflectionOff = !nextReflection;
-            atmosphere.ReflectionFrozen = reflectionOff;
-        }
-    }
-
-    /// Boru hattındaki bir çizim eklentisini açıp kapatır. Eklenti listesi asset'te
-    /// duruyor; ada göre bulunuyor çünkü tip referansı vermek bu teşhis için gereksiz
-    /// bir bağımlılık olurdu.
-    static void SetRendererFeature(string name, bool active)
-    {
-        var pipeline = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline
-            as UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset;
-
-        if (pipeline == null) return;
-
-        var field = typeof(UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset)
-            .GetField("m_RendererDataList",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-        if (field?.GetValue(pipeline) is not UnityEngine.Rendering.Universal.ScriptableRendererData[] data)
-            return;
-
-        foreach (var renderer in data)
-        {
-            if (renderer == null) continue;
-
-            foreach (var feature in renderer.rendererFeatures)
-                if (feature != null && feature.name.Contains(name))
-                    feature.SetActive(active);
-        }
-    }
-
-    static void SetShadowResolution(int resolution)
-    {
-        var pipeline = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline
-            as UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset;
-
-        if (pipeline != null) pipeline.mainLightShadowmapResolution = resolution;
+        // Arazi gölge okuması teşhis anahtarıyla kapatılabiliyordu; anahtar silindi ama
+        // global kalmalı — yazılmazsa sıfır kalır ve arazi gölge almaz.
+        Shader.SetGlobalFloat(TerrainShadowId, 1f);
     }
 
     void BeginSection(string label)
@@ -386,8 +241,6 @@ public class DebugMenu : MonoBehaviour
         BeginSection("Hareket");
 
         GUILayout.Label($"Hız çarpanı {speedMultiplier:F0}×");
-
-        BikeHeight();
 
         // Sürgü karesel: küçük değerlerde hassas, uçta 100×'e ulaşır
         float normalized = Mathf.Sqrt((speedMultiplier - 1f) / 99f);
@@ -413,21 +266,6 @@ public class DebugMenu : MonoBehaviour
         BeginSection("Günün saati");
 
         GUILayout.Label($"Saat {time.Clock}");
-
-        // TEŞHİS — güneşin ışık zinciri. Disk ve zemin aynı kaynaktan besleniyor;
-        // hangisinin koptuğunu ayırmak için dördü birden görünür.
-        var sc = time.CurrentSunColor;
-        GUILayout.Label($"Yükseklik {Mathf.Asin(Mathf.Clamp(time.SunHeight, -1f, 1f)) * Mathf.Rad2Deg:F2}°"
-                        + $"   Huzme {time.BeamLevel:F4}");
-        GUILayout.Label($"Işık şiddeti {time.LightIntensity:F3}   Ay {time.MoonLevel:F4}");
-        GUILayout.Label($"Güneş rengi {sc.r:F2} {sc.g:F2} {sc.b:F2}");
-
-        // TEŞHİS — metal parçaların gece parlaması iki kaynaktan gelebiliyor: sahnenin
-        // çevre ışığı ya da gökyüzünden pişen yansıma haritası. İkisi ayrı ayrı yazılıyor
-        // ki hangisinin kararmadığı gözle değil sayıyla ayrılsın.
-        Color ambient = RenderSettings.ambientLight;
-        GUILayout.Label($"Çevre ışığı {ambient.r:F3} {ambient.g:F3} {ambient.b:F3}"
-                        + $"   Yansıma {RenderSettings.reflectionIntensity:F2}");
 
         float value = time.Normalized;
         float next = GUILayout.HorizontalSlider(value, 0f, 1f);
@@ -543,68 +381,9 @@ public class DebugMenu : MonoBehaviour
         EndSection();
     }
 
-    void DrawClouds()
-    {
-        BeginSection("Bulutlar");
-
-        // TEŞHİS — bulutların gerçek süzülme hızı. Rüzgâr sıfırlanınca da hareket
-        // ediyorlardı ve sebebi görünmüyordu: taban hız ayarı yer rüzgârını eziyordu.
-        GUILayout.Label($"Süzülme {atmosphere.CloudSpeed:F1} m/s"
-                        + $" = {atmosphere.CloudSpeed * 3.6f:F0} km/h");
-        GUILayout.Label($"Biriken kayma {atmosphere.CloudShift:F0} m");
-
-        // GEÇİCİ — açık havada bulutlar fazla beyaz ve düz görünüyor. İki aday var:
-        // yoğunluk (açık havada düşük, fırtınada çarpanla artıyor — bu yüzden fırtınada
-        // daha iyi duruyorlar) ve gökyüzünden gelen dağınık ışık (havadan bağımsız
-        // sabit). Doğru değer gözle bulunacak, sonra ayara yazılıp bu bölüm silinecek.
-        GUILayout.Label($"Yoğunluk {cloudDensityScale:F2}× (ayarın üstüne)");
-        cloudDensityScale = GUILayout.HorizontalSlider(cloudDensityScale, 0.3f, 4f);
-
-        GUILayout.Label($"Gök ışığı {cloudAmbientScale:F2}× (ayarın üstüne)");
-        cloudAmbientScale = GUILayout.HorizontalSlider(cloudAmbientScale, 0.2f, 1.5f);
-
-        // TEŞHİS — bulut içindeki eşmerkezli halkalar. Mip kilitliyken kaybolursa suçu
-        // doku kademe geçişi, kalırsa adımlama.
-        lodLock = GUILayout.Toggle(lodLock, "Doku kademesini kilitle (teşhis)");
-
-        flatLight = GUILayout.Toggle(flatLight, "Aydınlanmayı düzleştir (teşhis)");
-
-        GUILayout.Label($"Adım boyu {stepScale:F2}× (teşhis)");
-        stepScale = GUILayout.HorizontalSlider(stepScale, 0.15f, 1f);
-
-        if (GUILayout.Button("Ayarları geri al"))
-        {
-            cloudDensityScale = 1f;
-            cloudAmbientScale = 1f;
-            lodLock = false;
-            flatLight = false;
-            stepScale = 1f;
-        }
-
-        FrameCostSwitches();
-
-
-        GUILayout.Label($"Kapsama %{atmosphere.Coverage * 100f:F0}   " +
-                        $"taban {atmosphere.CloudBottom:F0} m");
-
-        atmosphere.CoverageLocked = GUILayout.Toggle(atmosphere.CoverageLocked,
-            "Bulut kapsamasını elle ayarla");
-
-        using (new Disabled(!atmosphere.CoverageLocked))
-        {
-            GUILayout.Label($"Kapsama %{atmosphere.LockedCoverage * 100f:F0}");
-            atmosphere.LockedCoverage = GUILayout.HorizontalSlider(atmosphere.LockedCoverage, 0f, 1f);
-
-            using (new GUILayout.HorizontalScope())
-            {
-                if (GUILayout.Button("Açık")) atmosphere.LockedCoverage = 0.12f;
-                if (GUILayout.Button("Parçalı")) atmosphere.LockedCoverage = 0.5f;
-                if (GUILayout.Button("Kapalı")) atmosphere.LockedCoverage = 0.92f;
-            }
-        }
-
-        EndSection();
-    }
+    // (BULUT BÖLÜMLERİ SİLİNDİ — bulut sistemi baştan yazılıyor. Sürgü listesi ve
+    // hangi bağın nereye gittiği `CLOUDS_REBUILD.md`'de duruyor; yeni sistem gelince
+    // panel oradan yeniden kurulacak.)
 
     void DrawOverlays()
     {

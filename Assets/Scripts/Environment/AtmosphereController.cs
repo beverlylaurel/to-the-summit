@@ -102,6 +102,7 @@ public class AtmosphereController : MonoBehaviour
     static readonly int CoverageId = Shader.PropertyToID("_Coverage");
     static readonly int CloudBottomId = Shader.PropertyToID("_CloudBottom");
     static readonly int CloudTopId = Shader.PropertyToID("_CloudTop");
+
     static readonly int PlanetRadiusId = Shader.PropertyToID("_PlanetRadius");
     static readonly int CloudScaleId = Shader.PropertyToID("_CloudScale");
     static readonly int DetailScaleId = Shader.PropertyToID("_DetailScale");
@@ -206,9 +207,7 @@ public class AtmosphereController : MonoBehaviour
     public float CloudTop => settings.cloudTop;
 
     public void Bind(AtmosphereSettings source, WeatherState weatherState, WindField windField,
-        TimeOfDay timeOfDay, AltitudeWeatherDriver driver, Camera camera, Material sky,
-        Texture3D shapeNoise, Texture3D erosionNoise, Texture2D weatherMapTexture,
-        Texture2D skipMapTexture, Texture2D curlNoiseTexture, Texture2D highNoiseTexture)
+        TimeOfDay timeOfDay, AltitudeWeatherDriver driver, Camera camera, Material sky)
     {
         settings = source;
         weather = weatherState;
@@ -217,12 +216,6 @@ public class AtmosphereController : MonoBehaviour
         weatherDriver = driver;
         view = camera;
         skyMaterial = sky;
-        baseNoise = shapeNoise;
-        detailNoise = erosionNoise;
-        weatherMap = weatherMapTexture;
-        skipMap = skipMapTexture;
-        curlNoise = curlNoiseTexture;
-        highNoise = highNoiseTexture;
 
         Initialize();
     }
@@ -594,8 +587,11 @@ public class AtmosphereController : MonoBehaviour
         Shader.SetGlobalVector(CloudWindId, new Vector3(cloudOffset.x, 0f, cloudOffset.y));
 
         // Makaslama sabit bir mesafe: katman kalınlığının oranı kadar yanal kayma
-        Shader.SetGlobalVector(CloudShearOffsetId,
-            heading * (settings.shearAmount * (settings.cloudTop - activeCloudBottom)));
+        // BOYUTSUZ: shader katman kalınlığıyla çarpıyor. Burada çarpılıyordu ve katman
+        // 5.3 km'yken ötelenme 2927 m oluyordu — tipik bulutun eninden büyük, kolonun
+        // tepesi tabanının yanından çıkıyor, dönmeyle birlikte kancaya dönüşüyordu.
+        // Katman 2.5 km olunca aynı oran 1500 m veriyor: bulutun kendi ölçeğinde.
+        Shader.SetGlobalVector(CloudShearOffsetId, heading * settings.shearAmount);
 
         // Yön dönmesi rüzgâr şiddetiyle azalır: sert rüzgârda hava kütlesi bütün
         // katmanda aynı yöne sürüklenir, sakin havada sapma belirginleşir.

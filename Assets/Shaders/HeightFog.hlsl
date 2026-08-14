@@ -110,6 +110,17 @@ float3 _CloudShearOffset;   // ust katmanlarin yanal kaymasi (metre)
 /// dalgasiz bir levhaya ceviriyor; kucuk bir pay birakmak tabanin kivrimini koruyor.
 static const float CloudCoverageCeiling = 0.85;
 
+/// KAPSAMA KAZANCLARI TEK YERDE. Kaba eleme (`CloudDensity`) kapsamanin UST SINIRINI
+/// bagimsiz olarak hesapliyor ve o sinir gercek degerin altinda kalirsa var olan bir
+/// bulutun ustunden atliyor. Sicrama haritasi 64x64 ve POINT filtreli, yani kesim
+/// 750 m'lik eksen hizali hucre yuzlerinden gecer: bulut duz kenarli bir KIYMIK olarak
+/// kirpilir.
+///
+/// Bu iki kez oldu. Ilkinde cephe nefesi eklendi, sinira 1.22 yazildi; sonra formul
+/// `1.20 + 0.80*b` (ust sinir 2.00) olarak degistirildi ve sinir 1.22'de kaldi — eleme
+/// gercegin 1.64 kati altinda kaldi. Sayilar artik burada duruyor ve sinir bunlardan
+/// TURETILIYOR; iki yerde ayri yazilamaz.
+
 /// Ornekler arasi mesafeye gore mip seviyesi. Bir texel adim boyundan kucuk kaldiginda
 /// o doku artik orneklenemez ve okunan deger aliasing olarak geri gelir. Dokular
 /// mipmap'li; cozulemeyen frekansi okumak yerine donanimin ortalamasini okuruz.
@@ -130,78 +141,52 @@ float CloudSampleLod(float stepSize, float scale, float texels)
 /// Bir kolonun hava durumu: bulut govdesi de yer golgesi de bundan turer.
 struct CloudFootprint
 {
-    float4 colWarp;    // kolonsal alan; warp, dalga ve cephe nefesi bunu okur
     float4 weather;    // haritanin ham okumasi: g tip, b taban kaymasi, a tavan
     float coverage;    // esiklenmis yerel kapsama, 0 - CloudCoverageCeiling
 };
 
-/// stormFill: firtina dolgusunun payi. horizonBias: uzakta gogu kapatma payi - YER
-/// golgesi icin sifir, o duzeltme isinin ufka teget gecmesiyle ilgili.
+/// stormFill: firtina dolgusunun payi.
 /// colLod / mapLod: ornekleme ayak izinden gelen mip. Gokyuzu adim boyundan hesaplar,
 /// golge pikselin dunya genisliginden.
-CloudFootprint CloudFootprintAt(float2 mapPos, float stormFill, float horizonBias,
-                                float colLod, float mapLod)
+///
+/// MESAFE GIRDI DEGIL. Bir `horizonBias` parametresi vardi ve 15 km'den sonra hem
+/// kapsamaya taban koyuyor hem tipi yukseltiyordu (HZD s.45, ufkun "epik" kalmasi icin).
+/// Ikisi de bir bulutu KAMERANIN NEREDE OLDUGUNA gore degistiriyor: uzaktan yuksek
+/// kumulus goruneni, uzerine ucunca yayvan stratusa donusuyordu. HZD'de bulutlara
+/// uculmuyor; burada uculuyor.
+CloudFootprint CloudFootprintAt(float2 mapPos, float colLod, float mapLod)
 {
-    float4 colWarp = SAMPLE_TEXTURE3D_LOD(_BaseNoise, sampler_BaseNoise,
-                                          float3(mapPos.x, 87.3 + _Evolution * 26.0, mapPos.y)
-                                          * (_CloudScale * 0.5),
-                                          colLod);
-    // Yalnız pürüzsüz kanallar: r (perlin ağırlıklı, ~1.3 km) ve g (worley-6,
-    // ~1.1 km). b/a kanalları bu ölçekte de 300-550 m'lik hücreler taşıyor —
-    // vektöre girseler katlanma geri gelir.
-    float2 windFlat = normalize(_CloudShearOffset.xz + float2(0.001, 0.0));
-    float2 mapWarp = float2(colWarp.g - 0.5, colWarp.r - 0.5) * 650.0
-                   + windFlat * saturate(colWarp.r - 0.45) * 1000.0;
-
-    // HAVA KOLONSALDIR: kapsama, tip, tepe kotu ve taban kayması bir kolonun TAMAMI
-    // için tek değerdir — 2B harita bunu yapısal olarak garanti eder. Harita editörde
-    // pişirilir (CloudWeatherMapBaker): çekirdek-birleşim dağılımı, bulut başına
-    // kimlik ve eğim garantili tavan orada kurulur; burada tek doku okuması kalır.
+    // HAVA KOLONSALDIR: kapsama, tip ve taban kayması bir kolonun TAMAMI için tek
+    // değerdir — 2B harita bunu yapısal olarak garanti eder.
+    //
+    // HARITA BUKULMEZ. Koordinata kolonsal gurultuden ±650 m + ruzgaralti 1000 m'lik
+    // bir warp biniyordu ("kiyi disleme"). PDF'te yok: kenari yontan sey erozyon
+    // katmani (s.37), haritanin UV'si degil. Warp kaldirilinca kolonsal 3B okuma da
+    // dustu — ornek basina bir doku okumasi eksildi.
     float4 w = SAMPLE_TEXTURE2D_LOD(_WeatherMap, sampler_WeatherMap,
-                                    (mapPos + mapWarp) * _WeatherMapScale,
-                                    mapLod);
+                                    mapPos * _WeatherMapScale, mapLod);
 
-    // Fırtına dolgusu: kapsama arttıkça haritanın boşlukları da dolar — kapalı gök
-    // gerçek bir örtüdür, delikli bir kolaj değil. Taban SABİT DEĞİL, tavan kanalından
-    // varyanslı: sabit taban (0.75) her yeri doyuruyor, eşik düzleşiyor ve örtü tek
-    // parça halıya dönüyordu — doyma sınırında gezen dolgu örtüyü yamalı bırakır.
-    // Dolgu 0.45'te başlar, 0.85'te tam: harita kendi kapsamasını ~0.5'te tüketiyor,
-    // geç başlayan dolgu 0.5-0.7 arasında ÖLÜ PLATO bırakıyordu — boşluklarda hiç
-    // bulut yok, sonra 0.7'de pat diye katman. Erken başlamak güvenli çünkü dolgu
-    // artık DESENLİ (aşağıda): tutkal değil, ayrık bulut serper.
-    // Dolgu geç başlar (0.55): erken başlangıç "ölü plato" içindi; harita artık
-    // orta kapsamayı kendisi taşıyor (yoğun istif kalibrasyonu) ve erken dolgu
-    // %70'te göğü %100 gibi kapatıyordu.
-    float p = w.r;
-
-    // Dolgu DÜZ TABAN değil, kolon gürültüsü DESENLİ. Düz taban (0.45+0.35A)
-    // iki fazlı yapaylık üretiyordu: %70'e kadar boşluklar bomboş, sonra pat diye
-    // ince bir tabaka yükseliyordu. Desenli dolgu boşluklara kapsamayla birlikte
-    // sayısı ve boyu büyüyen ~1 km'lik YENİ bulutlar serper — gökyüzü büyüyerek
-    // kapanır, ayrı bir çarşaf belirmez.
-    // Desen kaynağı PÜRÜZSÜZ kanal (colWarp.g, ~1.1 km): colBump'ın perlin-worley
-    // karışımı onlarca metrelik iç frekans taşıyor — kolon-sabit olduğu için
-    // yoğunluğa dikeyde hiç değişmeyen dev DİKEY PERDELER basıyordu (yakından
-    // kocaman soğan halkaları).
-    p = lerp(p, max(p, 0.06 + 0.70 * colWarp.g), stormFill);
-
-    // Kapsamanın bire dayanmasına izin verilmez: eşik sıfırlanınca şekil gürültüsünün
-    // tamamı buluta dönüşüyor ve kapalı hava dümdüz kâğıt oluyordu.
-    // Kazanç 1.8 — 2.4 iç bölgeyi doyuruyordu: eşik düzleşince şekil gürültüsü gövdeyi
-    // oyamıyor ve bulut çıplak çekirdek geometrisi olarak (silindir) çiziliyordu.
-    // Kapsama-eşik bağı DOĞRUSAL ve sade tutulur. İki ders: alt-doğrusal üs köprü
-    // dokusunu eşiğin üstüne itip yamaları kıtaya kaynattı; çekirdek vurgusu da
-    // seyrek bulutların dengesini bozdu. Dev kütle sorunu buranın işi değil —
-    // haritanın yama içi doluluğunun işi (pişiricide parçalama alanı).
-    // Cephe nefesi: kolonsal alanın (zamanla ilerleyen) bir kanalı kapsamayı yavaşça
-    // güçlendirip zayıflatır — bulut kümeleri yerinde büyür ve dağılır.
-    p *= 1.20 + 0.80 * colWarp.b;
-    p = lerp(p, max(p, 0.34), horizonBias);
-
-    float localCoverage = saturate(p * _Coverage * 1.8) * CloudCoverageCeiling;
+    // KAPSAMA = HARITA × SURGU. Arada iki terim daha vardi ve ikisi de sokuldu:
+    //
+    //   firtina dolgusu  max(p, 0.06 + 0.70·colWarp.g)  — bosluklari dolduruyordu
+    //   cephe nefesi     p *= 1.20 + 0.80·colWarp.b     — kapsamayi 1.67 kat oynatiyordu
+    //
+    // PDF'te kapsama tek bir kanaldir (s.34-35): haritadan okunur, sanat yonu sürgüsüyle
+    // olceklenir, biter. Nefes terimi kaba eleme ust sinirini iki kez bozdu (kiymik
+    // bulutlar); dolgu terimi bosluklari kapatip gokyuzunu tek kutle yapiyordu. Ikisi de
+    // kolonsal 3B gurultuye bagliydi, yani ucuncu bir gizli girdiydi.
+    //
+    // SURGU ESIGI KAYDIRIR, HARITAYI OLCEKLEMEZ.
+    //
+    // `w.r * _Coverage` yaziliydi ve %100'de bile gokyuzu kapanmiyordu: haritanin R'si
+    // alanin %41'inde tam sifir (cekirdek butcesi 0.9 -> doluluk %59) ve sifiri neyle
+    // carparsan sifir kalir. Kapali hava bir turlu gelmiyordu.
+    //
+    // `r + 2c - 1` uc ucta da dogru: c=0 -> 0 (acik), c=0.5 -> r (haritanin kendisi),
+    // c=1 -> 1 (tam ortu). Ikisinde de monoton, gizli girdi yok.
+    float localCoverage = saturate(w.r + 2.0 * _Coverage - 1.0) * CloudCoverageCeiling;
 
     CloudFootprint fp;
-    fp.colWarp = colWarp;
     fp.weather = w;
     fp.coverage = localCoverage;
     return fp;
@@ -236,10 +221,8 @@ float CloudShadowAt(float3 worldPos)
     float footprint = max(1.0, distance(worldPos, _WorldSpaceCameraPos) * 0.0012);
 
     // GOLGE, BULUTUN KENDI YER IZI. Gokyuzu hangi fonksiyondan yogunluk aliyorsa yer de
-    // ondan golge aliyor; ikinci bir alan yok. horizonBias sifir: o duzeltme isinin
-    // ufka teget gecmesiyle ilgili, yerdeki golgeyle degil.
+    // ondan golge aliyor; ikinci bir alan yok.
     CloudFootprint fp = CloudFootprintAt(mapPos,
-        smoothstep(0.55, 0.95, _Coverage), 0.0,
         CloudSampleLod(footprint, _CloudScale * 0.5, _BaseNoiseTexels),
         CloudSampleLod(footprint, _WeatherMapScale, _WeatherMapTexels));
 
