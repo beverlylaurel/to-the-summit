@@ -195,7 +195,36 @@ AYRI bir fazla. `[N22 s.44-45]` ikisinin geometrisini ayrı ayrı çiziyor — b
 
 Beer-Lambert `T = e^(−d)` temelde duruyor `[N22 s.46]`.
 
-*(Faz fonksiyonlarının kendisi ve eksantriklik değerleri ileride.)*
+**Henyey-Greenstein** `[N22 s.48]` standart hâliyle:
+
+```hlsl
+float HenyeyGreenstein(float inCosAngle, float inG)
+{
+    float num = 1.0 - inG * inG;
+    float denom = 1.0 + inG * inG - 2.0 * inG * inCosAngle;
+    float rsqrt_denom = rsqrt(denom);
+    return num * rsqrt_denom * rsqrt_denom * rsqrt_denom * (1.0 / (4.0 * M_PI));
+}
+```
+
+**Çoklu saçılma hacmi** `[N22 s.54]` — bizim en çok uğraştığımız yer:
+
+```hlsl
+float ms_volume = Remap(dimensional_profile * step_size, 0.1, 1.0, 0.0, 1.0);
+ms_volume *= pow(attenuated_light, cMultipleScatteringDepthPower);
+ms_volume *= pow(height_fraction, cMultipleScatteringHeightPower);
+```
+
+Üç çarpan: **profil × adım boyu** (yani o dilimin optik kalınlığı), **sönümlenmiş ışık**
+bir üsse, ve **yükseklik oranı** bir üsse.
+
+**Bizim için kritik:** koyuluğu süren şey `attenuated_light` — yani ışık ışınının
+geçirgenliği. Görüş ışınının geçirgenliği DEĞİL. Gün sonunda `buried = 1 − lit`e
+kendiliğimizden varmıştık; `[N22]` aynı büyüklüğü kullanıyor ama üsle şekillendiriyor
+ve ayrıca yüksekliğe bağlıyor (bulutun dibi daha koyu).
+
+Yerel yoğunlukla (`local`) sürmek burada da yok — o bizim uydurmamızdı ve iki tonlu,
+bıçak sınırlı görüntünün sebebiydi.
 
 ## 10. Bulut gölgesinin yere düşürülmesi
 
@@ -260,7 +289,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
-| `[N22]` nubis-2022 | **207** | s.1–46 | s.47–207 |
+| `[N22]` nubis-2022 | **207** | s.1–58 | s.59–207 |
 | `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
