@@ -25,15 +25,20 @@ public static class ToolLog
     {
         Directory.CreateDirectory(Path.GetDirectoryName(LogPath));
 
-        // KESME İLE EKLEME KARIŞTIRILMIYOR. Dosya akışı bir çağrıda kesilip başka bir
-        // çağrıda eklenince Windows aradaki boşluğu sıfır baytla dolduruyor: log yirmi üç
-        // megabaytlık boşlukla şişti. Dolduğunda içerik baştan yazılıyor, dolmadığında
-        // sonuna ekleniyor — ikisi de tek adımda.
         string line = $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}{Environment.NewLine}";
 
-        if (File.Exists(LogPath) && new FileInfo(LogPath).Length > MaxBytes)
-            File.WriteAllText(LogPath, line, Encoding.UTF8);
-        else
-            File.AppendAllText(LogPath, line, Encoding.UTF8);
+        // AKIŞ ELLE AÇILIYOR, iki sebeple. Birincisi paylaşım: `File.AppendAllText`
+        // dosyayı okumaya kapalı açıyor ve log okunurken yazma "sharing violation" ile
+        // düşüp kurulumu kesiyordu. İkincisi kesme: bir çağrıda `Create`, diğerinde
+        // `Append` kullanılınca Windows aradaki boşluğu sıfır baytla dolduruyor ve dosya
+        // yirmi üç megabayta şişti — burada uzunluk sıfırlanıp sona konumlanılıyor.
+        using var stream = new FileStream(LogPath, FileMode.OpenOrCreate, FileAccess.Write,
+            FileShare.ReadWrite | FileShare.Delete);
+
+        if (stream.Length > MaxBytes) stream.SetLength(0);
+        stream.Seek(0, SeekOrigin.End);
+
+        using var writer = new StreamWriter(stream, Encoding.UTF8);
+        writer.Write(line);
     }
 }
