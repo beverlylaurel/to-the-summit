@@ -550,6 +550,55 @@ float superstorm_mask = pow(saturate(1.0 - length(pos.xy - center) / radius), 0.
 ```
 Üs 0.1 — merkeze çok yakınına kadar 1'de kalıp kenarda hızla düşen bir maske.
 
+**Örs (anvil)** `[N22 s.160-161]`: iki dikey gradyanın TOPLAMI (çarpımı değil) + üstte
+cirrus NDF'i ile dışa yayılan başlık.
+
+**Fırtına merkezine göre yoğunluk ölçeği** `[N22 s.165]`:
+```hlsl
+density_scale   = pow(min(1.0 - (dist / radius), 0.0) + 1.0, 0.5);
+summed_density += d(n) * density_scale;
+transmittance   = exp(-1.0 * summed_density);
+```
+
+**Ambient ayarları konuma göre harmanlanıyor** `[N22 s.167]`: normal bulut ayarı ile
+fırtına ayarı arasında, merkeze uzaklık ve yüksekliğe göre lerp.
+
+## Şimşek ve iç parlama — bizim `LightningFlash`'imizin doğrusu
+
+`[N22 s.170-172]`. Bulutun içindeki çakma, **ışın yürüyüşünün İÇİNDE üçüncü bir enerji
+terimi** olarak veriliyor:
+
+```hlsl
+potential_energy   = pow(1.0 - (d1 / radius), 12.0);      // ışığa uzaklık
+height_gradient    = (d2 / height);                        // bulut tabanından yükseklik
+pseudo_attenuation = (1.0 - saturate(fine_density * 5.0)); // yoğun yer daha az geçirir
+
+glow_energy  = potential_energy * height_gradient * pseudo_attenuation;
+light_energy = direct_scattering + ambient_scattering + glow_energy;
+```
+
+**Bizde çakma bindirme geçişinde** (`VolumetricClouds.shader`) `_LightningFlash * clouds.a`
+olarak ekleniyordu — yani kütlenin İÇİNDEN değil, üstünden. Gerekçemiz "ışın yürüyüşü
+kareye yayılı, parlama blok blok titrer"di. `[N22]` yürüyüşün içine koyabiliyor çünkü
+zamansal yeniden yansıtması doğru kurulmuş (bkz. soru 8).
+
+**Çakma dizisi** `[N22 s.175, 178]`: iki tür var — **Intra-Cloud** (bulut içi) ve
+**Ground Discharge** (yere boşalma). Sıra:
+
+```
+Intra-Cloud → rastgele gecikme → ... (tekrar, şiddet artarak) → Intra-Cloud + Ground Discharge
+```
+
+Yani yere inen çakma tek başına gelmiyor; önce bulut içinde birkaç kez çakıp şiddetleniyor.
+Kaynak: Martin A. Uman, *Lightning*.
+
+## Sönüm katsayısı — hiç ayar olarak açmadığımız şey
+
+`[N22 s.164]` üç render yan yana: `T = e^(−5d)`, `e^(−10d)`, `e^(−20d)`. Katsayı
+büyüdükçe bulut opaklaşıyor ve kontrast artıyor. Bizde `exp(-density * step)` sabitti,
+katsayı yoktu — `_DensityScale` dolaylı olarak aynı işi yapıyordu ama fiziksel karşılığı
+belirsizdi.
+
 ---
 
 ## Okuma defteri
@@ -560,7 +609,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
-| `[N22]` nubis-2022 | **207** | s.1–158 | s.159–207 |
+| `[N22]` nubis-2022 | **207** | s.1–178 | s.179–207 |
 | `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
