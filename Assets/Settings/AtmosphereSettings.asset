@@ -112,9 +112,9 @@ MonoBehaviour:
   transitionSeconds: 3
   weatherMapSeed: 86
   weatherMapWorldSize: 48000
-  coreRadiusMax: 1600
-  corePacking: 0.9
-  packingFloor: 0.35
+  coreRadiusMax: 2800
+  corePacking: 0.95
+  packingFloor: 0.1
   patchWindow: 0.35
   coreDensity: 1.6
   curlStrength: 240
