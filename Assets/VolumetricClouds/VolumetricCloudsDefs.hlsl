@@ -34,8 +34,10 @@ half _AmbientProbeDimmer;
 half _SunLightDimmer;
 float _EarthRadius;
 half _AccumulationFactor;
-half _NormalizationFactor;
 half _CloudNearPlane;
+float4 _CloudMapTiling;
+half _CloudCoverage;
+half _AnvilAmount;
 CBUFFER_END
 
 // Ambient Probe (unity_SH)

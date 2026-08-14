@@ -30,6 +30,152 @@ Aşağıdaki iki liste **v2 ve sonrası** içindir.
 
 ---
 
+## v1 ilerlemesi — port ve makaleyle farkları
+
+Temel: `UnityVolumetricCloudsURP` (MIT, jiaozi158'in HDRP→URP portu), `Assets/VolumetricClouds/`.
+
+`NUBIS_NOTES.md` ile satır satır karşılaştırıldı. Bulunan sekiz fark, kapatılma sırasıyla:
+
+| # | Konu | Portta | `[H18]` | Durum |
+|---|---|---|---|---|
+| 1 | Hava haritası | `GetCloudCoverageData` sabit `half4(0.9, 0, 0.25, 1)` | R/G iki kapsama kanalı, B azami yükseklik `[s.11]` | **kapandı** |
+| 2 | Şekil gürültüsü kanalları | `_Worley128RGBA.r` | `R(sn_r, fBm(g,b,a)−1, 1, 0, 1)` `[s.14]` | **fark yok** — doku tek kanal, fBm pişmiş (ölçüldü) |
+| 3 | Detay gürültüsü kanalları | `_ErosionNoise.x` | `dn_r·0.625 + dn_g·0.25 + dn_b·0.125` `[s.14]` | **fark yok** — aynı sebep |
+| 4 | Detay ↔ kapsama yönü | kapsama arttıkça detay artar | `0.35·e^(−g_c·0.75)`, azalır `[s.14]` | **kapandı** |
+| 5 | Detayın yükseklikle tersi | yok | `L_i(DN_fbm, 1−DN_fbm, SAT(p_h·5))` `[s.14]` | **kapandı** |
+| 6 | Yükseklik fonksiyonu | tek eğri dokusu | iki ayrı: SA şekil, DA yoğunluk `[s.12-13]` | **kapandı** (7b) |
+| 7 | Yoğunluk zinciri sırası | gradyan kapsama-remap'inin içinde | DA en son çarpan `[s.14-16]` | **kapandı** (7a + 7b) |
+| 8 | Örs | yok | `[s.17]` | **kapandı** |
+
+**2 ve 3 nasıl kapandı:** dokular PIL ile okundu, üçü de `mod=L` — tek kanal. İsimlerindeki
+RGB/RGBA yanıltıcı. `WorleyNoise128RGBA` min 0.090 / ort 0.753, ham Worley dağılımı değil;
+oktav toplamı ve Perlin-Worley remap'i üretim anında dokuya pişmiş. Portun `.r` / `.x`
+örneklemesi doğru, kayıp yok.
+
+### 1 — hava haritası (kapandı)
+
+Portta yol tamamen sökülmüştü, geriye yalnız yorum satırları kalmıştı. Geri getirilen:
+
+- `VolumetricClouds.shader` — `_CloudMapTexture`, `_CloudMapTiling`, `_CloudCoverage`
+- `VolumetricCloudsUtilities.hlsl` — `GetCloudCoverageData` gerçek örnekleme yapıyor
+- `VolumetricCloudsVolume.cs` — `cloudMap`, `cloudMapSize`, `cloudCoverage`
+- `VolumetricCloudsURP.cs` — üçünü materyale yüklüyor
+- `Assets/Editor/CloudMapGenerator.cs` — haritayı üretiyor
+- `MountainSceneBootstrap.EnsureCloudVolume` — haritayı profile bağlıyor
+
+Harita kanalları `[H18 s.11]`: **R** seyrek kapsama (w_c0), **G** yoğun kapsama (w_c1),
+**B** azami bulut yüksekliği (w_h). Kapsama sürgüsü iki harita arasında geçiyor:
+`WM_c = max(w_c0, SAT(g_c − 0.5) × w_c1 × 2)`.
+
+**A** yoğunluk (w_d) — 7b'de eklendi, tüketicisi `DensityAlter`. Aralık [0.35, 0.65];
+`DA` içinde 2 ile çarpıldığı için etkisi [0.70, 1.30] ve 0.5 nötr `[H18 Ek B.3]`.
+
+Portun üstüne eklenen üç şey, üçü de gerekçeli:
+
+- `_CloudCoverage` (`g_c`) — portta yok, `[H18 s.11]` formülü olmadan çalışmıyor
+- `cloudMapSize` metre — ham `_CloudMapTiling` yerine; fiziksel karşılığı olan tek sayı.
+  48 000 m, silinen sistemin `weatherMapWorldSize`'ı ile aynı (`SCALE.md`)
+- Dünya XZ döşemesi — HDRP'nin `_NormalizationFactor` kubbe eşlemesi gezegen ölçeği için
+
+Kamera kayması `GetCloudCoverageData`'nın **içinde** yapılıyor. Sebep: gölge yolu
+(`VolumetricCloudsShadows.hlsl:61`) aynı fonksiyonu kaymasız çağırıyor; kayma çağıran
+tarafta kalsaydı iki yol farklı dünya noktası okurdu.
+
+Üretici sinüs hash'i kullanmıyor — tamsayı bit karıştırıcı (aşağıdaki kurtarılan kod).
+
+**Üreticinin kendisi makaleden gelmiyor.** `[H18]` R kanalı için "elle çizilmiş yerleşim"
+diyor, üretim yöntemi vermiyor. fBm, kendi aralığına normalize, eşik 0.50, plato genişliği
+0.15 — hepsi bizim, ölçülerek seçildi:
+
+| kenar biçimi | bulutlu alan | doygun çekirdek | bulut içi ort |
+|---|---|---|---|
+| doğrusal germe (kenar = 1 − eşik) | %47 | **%0.24** | 0.148 |
+| plato, kenar 0.15 | %47 | **%23** | 0.743 |
+
+Doğrusal germe çekirdeği 1.0'a taşımıyor; shader `coverage²` aldığı için bulut görünmez
+oluyordu. Ekranda görünen oran **doygun çekirdek** oranını izliyor, sıfır olmayan alanı
+değil — %47 bulutlu harita gökyüzünün çeyreğinden azını doldurdu.
+
+### 7a — zincir sırası ve `g_c` bağı (kapandı)
+
+`VolumetricCloudsUtilities.hlsl`, `EvaluateCloudProperties`:
+
+- Remap sınırı `1 − densityErosionAO.x × WM_c × (1 − shapeFactor)` yerine
+  `1 − g_c × WM_c` `[s.14]`. Kapsama sürgüsü zincire buradan giriyor; portta bu bağ yoktu
+  ve sürgünün **alt yarısı ölüydü** (`max(R, SAT(g_c−0.5)…)` 0.5 altında sabit).
+- Yoğunluk-yükseklik gradyanı (`densityErosionAO.x`) remap sınırının içinden çıkarılıp
+  zincirin **en sonuna** çarpan olarak alındı `[s.14-16]`.
+
+Bilerek dokunulmayanlar, ikisi de portun kendi terimi, `[H18]`'de karşılığı yok:
+
+- `× coverage²` — kaldırılması ayrı bir tek-sayı denemesi
+- `lerp(1, lowFrequencyNoise, shapeFactor)` — portun şekil sürgüsü
+
+### 7b — SA/DA ayrımı (kapandı)
+
+`[H18 Ek B.2]` ve `[Ek B.3]`'teki iki fonksiyon `VolumetricCloudsUtilities.hlsl`'e girdi:
+`HeightAlter` şekli, `DensityAlter` yoğunluğu değiştiriyor. Zincir `[s.14-16]`:
+
+```
+SN_sample × SA  →  kapsamayla remap  →  detayla remap  →  × DA × g_d
+```
+
+Portun eğri dokusunun `.x` kanalı (`densityCurve` sürgüsü) yerini `DensityAlter` aldı;
+sürgü ölü kalacağı için Volume'dan, editörden ve `PrepareCustomLutData`'dan silindi.
+`.y` (erozyon eğrisi) ve `.z` (ortam örtmesi) duruyor.
+
+### 4 ve 5 — detay değiştirici (kapandı)
+
+Tek fonksiyonda toplandı: `DetailModifier` `[H18 Ek B.5]`.
+
+| | portta | şimdi |
+|---|---|---|
+| yükseklik | sabit `1 − detail`, her kotta aynı | `lerp(detail, 1 − detail, SAT(p_h × 5))` — tabanda tüylü, tepede yuvarlak |
+| kapsama | `× 0.75 × WM_c`, kapsamayla **artıyordu** | `× 0.35 × e^(−g_c × 0.75)`, kapsamayla **azalıyor** |
+
+Erozyon sürgüsü bunun üstünde ayrı çarpan kaldı; 1.0'da makaleyle birebir. Mikro erozyon
+(portun kendi eklemesi, makalede yok) aynı fonksiyonu kullanıyor — iki detay katmanı ters
+yönlere çalışmasın diye.
+
+### 8 — örs (kapandı)
+
+Örs **iki fonksiyonu birden** değiştiriyor `[H18 s.17]`: şekli üs olarak, yoğunluğu ayrıca
+azaltarak. İkincisi olmadan tepe fazla yoğun kalıyor (makale s.17 şekil 12b).
+
+Yeni sürgü `anvilAmount`, varsayılan **0** — o değerde üs 1'e, `lerp` 1'e sadeleşiyor,
+yani mevcut görüntü değişmiyor.
+
+### 9 — güneş geçirgenliğinin tabanı (kapandı)
+
+**Belirti.** Bulut içi kapkara. Yoğunluk düşürülünce siyah gidiyor ama bulut yassılaşıp
+boşalıyor — yani yoğunluk doğru, karartan başka bir şey.
+
+**Sebep, kâğıtta bulundu — sürgü denemesiyle değil:**
+
+| terim | tavanı | siyah yapabilir mi |
+|---|---|---|
+| Toz etkisi | `lerp(1, powder, 0.25)` → en kötü **0.75×** | hayır, matematiksel olarak imkânsız |
+| Erozyon örtmesi | `sqrt(0.35 × 0.1)` = 0.19, yalnız ortam ışığından | hayır |
+| Ortam / güneş kısıcı | ikisi de 1.0, nötr | hayır |
+| **Güneş geçirgenliği** | `sigmaT` 0.04 × adım 1000 m × yoğunluk 0.2 × 2 adım → `extinction ≈ 16`, `exp(−16) = 1.1e−7`; ikinci oktav `exp(−8.4) = 2.2e−4` | **evet, sıfır** |
+
+Bulut içine güneşten hiçbir şey ulaşmıyordu; geriye yalnız ortam ışığı kalıyordu.
+
+**Düzeltme** `[H18 Ek B.6]` `Attenuation`: geçirgenliğin **tabanı** var.
+`exp(−b × a_c) × 0.7`, `b = 6`, `a_c = 0.2` `[H18 s.58]` → **0.211**. Güneşe bakarken
+kelepçe gevşiyor, yarıya iniyor. Gerçek bulut kara değil çünkü ışık içeride çok kez
+saçılıyor; HZD çok saçılmayı bu tabanla karşılıyor.
+
+Portta `EvaluateSunTransmittance` saf `exp(-extinction)` yazıyordu, taban yoktu. Taban
+oktav başına Beer terimine uygulandı; faz fonksiyonu dokunulmadan kaldı.
+
+### Açık kalan
+
+Yoğunluk, şekil ve aydınlatma zinciri bitti. Sırada **bağlar** — on tanesi aşağıda,
+teker teker, her birinden sonra buluta tekrar bakılarak.
+
+---
+
 ## Bulut sisteminin OKUDUKLARI (girdi)
 
 | kaynak | ne veriyor | nereye gidiyor |

@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
 
 /// F1 ile açılan test paneli. Esc oyunun kendi menüsüne ayrıldı.
 /// Sistemlerin içine "debug modu" kavramı sızmaz; kilitler bileşenin KENDİ test
@@ -25,8 +26,10 @@ public class DebugMenu : MonoBehaviour
     [SerializeField] SnowCollisionProbe snowProbe;
     [Tooltip("Rota çizgilerinin oyun görünümü katmanı.")]
     [SerializeField] RouteOverlay routeOverlay;
+    [Tooltip("Bulut ayarlarını taşıyan Volume bileşeni.")]
+    [SerializeField] Volume cloudVolume;
 
-    const float PanelWidth = 960f;
+    const float PanelWidth = 1280f;
     const float ColumnWidth = 300f;
     const float Margin = 24f;
 
@@ -55,10 +58,21 @@ public class DebugMenu : MonoBehaviour
     float lockedWindStrength = 0.5f;
     float lockedWindAngle;
 
-    /// AYARLARIN AÇILIŞTAKİ HÂLİ. Her sürgünün yanındaki geri al düğmesi buradan
-    /// okuyor. Asset'in kendisi Play sırasında değişiyor (sürgüler doğrudan ona
-    /// yazıyor); kopya alınmazsa "geri al" neye döneceğini bilemezdi.
-    AtmosphereSettings defaults;
+    /// Bulut ayarları `cloudVolume.profile` üzerinden sürülüyor — asset'in kendisi değil,
+    /// Volume'un çalışma zamanı KOPYASI. `sharedProfile`'a yazmak işe yaramıyor: sahnede
+    /// başka bir bileşen `.profile`'a dokunduğu an Volume harmanlamayı kopyadan yapmaya
+    /// başlıyor ve asset'e yazılan değer hiç okunmuyor (ölçüldü: profil 0.71, yığın 0.40).
+    /// Açılıştaki değerler geri al düğmeleri için saklanıyor.
+    VolumetricClouds clouds;
+    float cloudCoverageDefault, anvilDefault, densityDefault, shapeFactorDefault, shapeScaleDefault;
+    float erosionFactorDefault, erosionScaleDefault;
+    int primaryStepsDefault, lightStepsDefault;
+
+    /// AYDINLATMA ŞÜPHELİLERİ. Bulut içi aşırı siyah ve sebep yoğunluk değil (ölçüldü:
+    /// yoğunluk düşünce siyah gidiyor ama bulut yassılaşıyor). Karartabilecek her terim
+    /// aynı anda sürgüye çıkarıldı; hangisi sorumluysa tek hamlede görülsün.
+    float multiScatteringDefault, powderDefault, ambientDimmerDefault;
+    float sunDimmerDefault, erosionOcclusionDefault;
 
     bool open;
     float timeScale = 1f;
@@ -77,8 +91,9 @@ public class DebugMenu : MonoBehaviour
         AtmosphereController atmosphereRef, PrecipitationRenderer precipitationRef,
         PerformanceHud hudRef, ClimbHud climbHudRef,
         CursorLock cursorLockRef, SnowCollisionProbe snowProbeRef,
-        RouteOverlay routeOverlayRef)
+        RouteOverlay routeOverlayRef, Volume cloudVolumeRef)
     {
+        cloudVolume = cloudVolumeRef;
         cursorLock = cursorLockRef;
         walker = walkerRef;
         flyer = flyerRef;
@@ -98,15 +113,48 @@ public class DebugMenu : MonoBehaviour
 
     void OnEnable()
     {
-        if (defaults == null && atmosphere != null && atmosphere.Settings != null)
-            defaults = Instantiate(atmosphere.Settings);
-
         if (walker == null || flyer == null || weather == null || weatherDriver == null
             || wind == null || thunder == null || lightning == null || time == null
             || atmosphere == null
             || precipitation == null || hud == null || climbHud == null
-            || cursorLock == null || snowProbe == null || routeOverlay == null)
+            || cursorLock == null || snowProbe == null || routeOverlay == null
+            || cloudVolume == null)
             throw new InvalidOperationException($"{nameof(DebugMenu)}: bağımlılıklar atanmadı.");
+
+        if (!cloudVolume.profile.TryGet(out clouds))
+            throw new InvalidOperationException($"{nameof(DebugMenu)}: profilde {nameof(VolumetricClouds)} yok.");
+
+        // Parametrenin `overrideState`'i kapalıysa harmanlama onu atlıyor: sürgü profile
+        // yazıyor ama yığına hiç geçmiyor. Panelin sürdüğü her alan açık olmak zorunda.
+        clouds.cloudCoverage.overrideState = true;
+        clouds.anvilAmount.overrideState = true;
+        clouds.densityMultiplier.overrideState = true;
+        clouds.shapeFactor.overrideState = true;
+        clouds.shapeScale.overrideState = true;
+        clouds.erosionFactor.overrideState = true;
+        clouds.erosionScale.overrideState = true;
+        clouds.numPrimarySteps.overrideState = true;
+        clouds.numLightSteps.overrideState = true;
+        clouds.multiScattering.overrideState = true;
+        clouds.powderEffectIntensity.overrideState = true;
+        clouds.ambientLightProbeDimmer.overrideState = true;
+        clouds.sunLightDimmer.overrideState = true;
+        clouds.erosionOcclusion.overrideState = true;
+
+        cloudCoverageDefault = clouds.cloudCoverage.value;
+        anvilDefault = clouds.anvilAmount.value;
+        densityDefault = clouds.densityMultiplier.value;
+        shapeFactorDefault = clouds.shapeFactor.value;
+        shapeScaleDefault = clouds.shapeScale.value;
+        erosionFactorDefault = clouds.erosionFactor.value;
+        erosionScaleDefault = clouds.erosionScale.value;
+        primaryStepsDefault = clouds.numPrimarySteps.value;
+        lightStepsDefault = clouds.numLightSteps.value;
+        multiScatteringDefault = clouds.multiScattering.value;
+        powderDefault = clouds.powderEffectIntensity.value;
+        ambientDimmerDefault = clouds.ambientLightProbeDimmer.value;
+        sunDimmerDefault = clouds.sunLightDimmer.value;
+        erosionOcclusionDefault = clouds.erosionOcclusion.value;
 
         // Hız çarpanı yalnızca panel çizilirken uygulanıyordu; panel hiç açılmazsa
         // başlangıç değeri de hiç etkili olmuyordu.
@@ -179,6 +227,11 @@ public class DebugMenu : MonoBehaviour
         EndColumn();
 
         BeginColumn();
+        DrawClouds();
+        DrawCloudLighting();
+        EndColumn();
+
+        BeginColumn();
         DrawOverlays();
         DrawSnowCollision();
         EndColumn();
@@ -234,6 +287,93 @@ public class DebugMenu : MonoBehaviour
     {
         GUILayout.EndVertical();
         GUILayout.Space(4f);
+    }
+
+    /// BULUT AYARLARI. Değerler Volume profilinde, yani asset'te: sürgü doğrudan ona yazıyor
+    /// ve Play bitince değişiklik kalıyor. Her satırın sonundaki ↺ açılıştaki değere döner.
+    void DrawClouds()
+    {
+        BeginSection("Bulut");
+
+        CloudSlider("Kapsama", clouds.cloudCoverage, cloudCoverageDefault);
+        CloudSlider("Örs", clouds.anvilAmount, anvilDefault);
+        CloudSlider("Yoğunluk", clouds.densityMultiplier, densityDefault);
+        CloudSlider("Şekil oranı", clouds.shapeFactor, shapeFactorDefault);
+        CloudSlider("Şekil ölçeği", clouds.shapeScale, shapeScaleDefault, 0.5f, 20f, "F1");
+        CloudSlider("Erozyon oranı", clouds.erosionFactor, erosionFactorDefault);
+        CloudSlider("Erozyon ölçeği", clouds.erosionScale, erosionScaleDefault, 10f, 300f, "F0");
+        CloudSlider("Görüş adımı", clouds.numPrimarySteps, primaryStepsDefault);
+        CloudSlider("Işık adımı", clouds.numLightSteps, lightStepsDefault);
+
+        if (GUILayout.Button("Ayarları geri al"))
+        {
+            clouds.cloudCoverage.value = cloudCoverageDefault;
+            clouds.anvilAmount.value = anvilDefault;
+            clouds.densityMultiplier.value = densityDefault;
+            clouds.shapeFactor.value = shapeFactorDefault;
+            clouds.shapeScale.value = shapeScaleDefault;
+            clouds.erosionFactor.value = erosionFactorDefault;
+            clouds.erosionScale.value = erosionScaleDefault;
+            clouds.numPrimarySteps.value = primaryStepsDefault;
+            clouds.numLightSteps.value = lightStepsDefault;
+        }
+
+        EndSection();
+    }
+
+    /// AYDINLATMA ŞÜPHELİLERİ TEK YERDE. Bulut içinin siyahlığı bunlardan birinden geliyor;
+    /// hepsi aynı anda açık ki tek turda ayrışsın. Sorumlu bulununca bu bölüm sadeleşir.
+    void DrawCloudLighting()
+    {
+        BeginSection("Bulut ışığı");
+
+        CloudSlider("Çoklu saçılma", clouds.multiScattering, multiScatteringDefault);
+        CloudSlider("Toz etkisi", clouds.powderEffectIntensity, powderDefault);
+        CloudSlider("Ortam ışığı", clouds.ambientLightProbeDimmer, ambientDimmerDefault);
+        CloudSlider("Güneş ışığı", clouds.sunLightDimmer, sunDimmerDefault);
+        CloudSlider("Erozyon örtmesi", clouds.erosionOcclusion, erosionOcclusionDefault);
+
+        if (GUILayout.Button("Ayarları geri al"))
+        {
+            clouds.multiScattering.value = multiScatteringDefault;
+            clouds.powderEffectIntensity.value = powderDefault;
+            clouds.ambientLightProbeDimmer.value = ambientDimmerDefault;
+            clouds.sunLightDimmer.value = sunDimmerDefault;
+            clouds.erosionOcclusion.value = erosionOcclusionDefault;
+        }
+
+        EndSection();
+    }
+
+    static void CloudSlider(string label, ClampedFloatParameter parameter, float original,
+        string format = "F2")
+    {
+        parameter.value = CloudRow(label, parameter.value, original, parameter.min, parameter.max, format);
+    }
+
+    /// `MinFloatParameter`'ın üst sınırı yok; sürgü için burada veriliyor.
+    static void CloudSlider(string label, MinFloatParameter parameter, float original,
+        float min, float max, string format)
+    {
+        parameter.value = CloudRow(label, parameter.value, original, min, max, format);
+    }
+
+    static void CloudSlider(string label, ClampedIntParameter parameter, int original)
+    {
+        parameter.value = Mathf.RoundToInt(
+            CloudRow(label, parameter.value, original, parameter.min, parameter.max, "F0"));
+    }
+
+    static float CloudRow(string label, float value, float original, float min, float max,
+        string format)
+    {
+        using (new GUILayout.HorizontalScope())
+        {
+            GUILayout.Label($"{label} {value.ToString(format)}");
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("↺", GUILayout.Width(26f))) value = original;
+        }
+        return GUILayout.HorizontalSlider(value, min, max);
     }
 
     void DrawMovement()

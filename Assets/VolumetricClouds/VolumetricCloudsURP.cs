@@ -388,6 +388,8 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
         private const string profilerTag = "Volumetric Clouds";
         private readonly ProfilingSampler m_ProfilingSampler = new ProfilingSampler(profilerTag);
 
+        private bool isCloudMapPrinted = false;
+
         public VolumetricClouds cloudsVolume;
         public ColorAdjustments colorAdjustments;
     #if URP_PBSKY
@@ -447,8 +449,11 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
         private static readonly int earthRadius = Shader.PropertyToID("_EarthRadius");
         private static readonly int accumulationFactor = Shader.PropertyToID("_AccumulationFactor");
         private static readonly int improvedTransmittanceBlend = Shader.PropertyToID("_ImprovedTransmittanceBlend");
-        //private static readonly int normalizationFactor = Shader.PropertyToID("_NormalizationFactor");
         private static readonly int cloudsCurveLut = Shader.PropertyToID("_CloudCurveTexture");
+        private static readonly int cloudMapTexture = Shader.PropertyToID("_CloudMapTexture");
+        private static readonly int cloudMapTiling = Shader.PropertyToID("_CloudMapTiling");
+        private static readonly int cloudCoverage = Shader.PropertyToID("_CloudCoverage");
+        private static readonly int anvilAmount = Shader.PropertyToID("_AnvilAmount");
         private static readonly int cloudnearPlane = Shader.PropertyToID("_CloudNearPlane");
         private static readonly int sunColor = Shader.PropertyToID("_SunColor");
         private static readonly int planetCenterRadius = Shader.PropertyToID("_PlanetCenterRadius");
@@ -637,9 +642,17 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
             Vector3 cameraPosPS = camera.transform.position - new Vector3(0.0f, -actualEarthRad, 0.0f);
             cloudsMaterial.SetFloat(cloudnearPlane, max(GetCloudNearPlane(cameraPosPS, bottomAltitude, highestAltitude), camera.nearClipPlane));
 
-            // Custom cloud map is not supported yet.
-            //float lowerCloudRadius = (bottomAltitude + highestAltitude) * 0.5f - actualEarthRad;
-            //cloudsMaterial.SetFloat(normalizationFactor, Mathf.Sqrt((earthRad + lowerCloudRadius) * (earthRad + lowerCloudRadius) - earthRad * actualEarthRad));
+            // Hava haritası dünya XZ'sinde döşeniyor: kenar uzunluğunun tersi periyodu veriyor.
+            if (cloudsVolume.cloudMap.value == null)
+            {
+                if (!isCloudMapPrinted) { Debug.LogError("Volumetric Clouds URP: Cloud map is empty."); isCloudMapPrinted = true; }
+            }
+            else isCloudMapPrinted = false;
+            float cloudMapPeriod = 1.0f / cloudsVolume.cloudMapSize.value;
+            cloudsMaterial.SetTexture(cloudMapTexture, cloudsVolume.cloudMap.value);
+            cloudsMaterial.SetVector(cloudMapTiling, new Vector4(cloudMapPeriod, cloudMapPeriod, 0.0f, 0.0f));
+            cloudsMaterial.SetFloat(cloudCoverage, cloudsVolume.cloudCoverage.value);
+            cloudsMaterial.SetFloat(anvilAmount, cloudsVolume.anvilAmount.value);
 
             float postExposureLinear = colorAdjustments != null && colorAdjustments.active ? Mathf.Pow(2.0f, colorAdjustments.postExposure.value) : 1.0f;
             cloudsMaterial.SetFloat(postExposure, postExposureLinear);
@@ -671,9 +684,11 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
                 cloudsMaterial.SetVector(sunColor, mainLightColor);
             }
 
-            // Update preset values
-            VolumetricClouds.CloudPresets cloudPreset = cloudsVolume.cloudPreset;
-            cloudsVolume.cloudPreset = cloudPreset;
+            // Ön ayarın HER KAREDE yeniden uygulanması kaldırıldı. `cloudPreset` setter'ı
+            // `ApplyCurrentCloudPreset()` çağırıyor; o da yoğunluk, şekil ve erozyon
+            // değerlerini ön ayardan yığına geri yazıyordu. Harmanlama profilden yığına her
+            // kare yazıyor, hemen ardından bu satır üzerine yazıyordu: sürgüler ölüydü.
+            // Ön ayarı editör seçim anında uyguluyor, değerler profilde serileşiyor.
 
             UpdateMaterialProperties(camera);
             denoiseClouds = cloudsVolume.temporalAccumulationFactor.value >= 0.01f;
@@ -694,14 +709,14 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
 
             var pixels = customLutColorArray;
 
-            var densityCurve = clouds.densityCurve.value;
+            // `.x` (yoğunluk eğrisi) artık okunmuyor: yerini `DensityAlter` aldı `[H18 Ek B.3]`.
+            // Kalan iki kanal shader'da kullanılıyor — `.y` erozyon, `.z` ortam örtmesi.
             var erosionCurve = clouds.erosionCurve.value;
             var ambientOcclusionCurve = clouds.ambientOcclusionCurve.value;
-            Color white = Color.white;
-            if (densityCurve == null || densityCurve.length == 0)
+            if (erosionCurve == null || erosionCurve.length == 0)
             {
                 for (int i = 0; i < customLutMapResolution; i++)
-                    pixels[i] = white;
+                    pixels[i] = Color.white;
             }
             else
             {
@@ -710,10 +725,9 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
                 for (int i = 0; i < customLutMapResolution; i++)
                 {
                     float currTime = step * i;
-                    float density = (i == 0 || i == customLutMapResolution - 1) ? 0 : Mathf.Clamp(densityCurve.Evaluate(currTime), 0.0f, 1.0f);
                     float erosion = Mathf.Clamp(erosionCurve.Evaluate(currTime), 0.0f, 1.0f);
                     float ambientOcclusion = Mathf.Clamp(1.0f - ambientOcclusionCurve.Evaluate(currTime), 0.0f, 1.0f);
-                    pixels[i] = new Color(density, erosion, ambientOcclusion, 1.0f);
+                    pixels[i] = new Color(0.0f, erosion, ambientOcclusion, 1.0f);
                 }
             }
 

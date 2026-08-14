@@ -128,44 +128,22 @@ MonoBehaviour:
   m_CloudPreset:
     m_OverrideState: 1
     m_Value: 1
+  cloudMap:
+    m_OverrideState: 1
+    m_Value: {fileID: 2800000, guid: a6045734f32cdb6429ea9985f2b673f6, type: 2}
+    dimension: 1
+  cloudMapSize:
+    m_OverrideState: 0
+    m_Value: 40000
+  cloudCoverage:
+    m_OverrideState: 1
+    m_Value: 0.5
+  anvilAmount:
+    m_OverrideState: 0
+    m_Value: 0
   densityMultiplier:
     m_OverrideState: 1
     m_Value: 0.4
-  densityCurve:
-    m_OverrideState: 1
-    m_Value:
-      serializedVersion: 2
-      m_Curve:
-      - serializedVersion: 3
-        time: 0
-        value: 0
-        inSlope: 0
-        outSlope: 0
-        tangentMode: 0
-        weightedMode: 0
-        inWeight: 0
-        outWeight: 0
-      - serializedVersion: 3
-        time: 0.15
-        value: 1
-        inSlope: 0
-        outSlope: 0
-        tangentMode: 0
-        weightedMode: 0
-        inWeight: 0
-        outWeight: 0
-      - serializedVersion: 3
-        time: 1
-        value: 0.1
-        inSlope: 0
-        outSlope: 0
-        tangentMode: 0
-        weightedMode: 0
-        inWeight: 0
-        outWeight: 0
-      m_PreInfinity: 2
-      m_PostInfinity: 2
-      m_RotationOrder: 4
   shapeFactor:
     m_OverrideState: 1
     m_Value: 0.9

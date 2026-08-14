@@ -137,6 +137,7 @@ yeniden kuruluyor.
 | **Tırmanma ve ip** | Oyuncular arası fiziksel bağ; iki oyuncunun aynı ipe asılı olması | `DECISIONS.md` → "Oynanış mekaniği netleşmeden koda başlanmaz" |
 | **Envanter ve ekipman** | Oyuncu durumu, kayıp/ölüm senkronu | aynı madde |
 | **Kamp ve sığınak** | Paylaşılan etkileşimli obje, ortak koşu durumu | aynı madde |
+| **Bulut sürüklenmesi** | Bulutların konumu **her istemcide yerel birikiyor**: `VolumetricCloudsURP` her karede `windVector += deltaTime × globalSpeed × yön` yapıyor. Şu an `globalSpeed = 0` olduğu için hiçbir şey kaymıyor ve borç doğmuyor; rüzgâr bağlandığı gün iki oyuncu farklı gökyüzü görür — sonradan katılan ise bambaşkasını. Birikimin ağdan gelen mutlak bir zamandan türemesi gerekecek | `CLOUDS_REBUILD.md` → v1 bağları, rüzgâr |
 
 Bu satırlardan biri yazıldığı gün karşılığı yukarıdaki borç listesine geçer.
 

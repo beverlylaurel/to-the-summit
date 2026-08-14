@@ -33,16 +33,35 @@ public class VolumetricClouds : VolumeComponent, IPostProcessComponent
     private CloudPresetsParameter m_CloudPreset = new(CloudPresets.Cloudy, overrideState: false);
 
     /// <summary>
+    /// Hava haritası. R seyrek kapsama, G yoğun kapsama, B azami bulut yüksekliği `[H18 s.11]`.
+    /// </summary>
+    [Tooltip("Hava haritası. R seyrek kapsama, G yoğun kapsama, B azami bulut yüksekliği.")]
+    public TextureParameter cloudMap = new(null);
+
+    /// <summary>
+    /// Hava haritasının dünyada kapladığı kenar uzunluğu (metre). Harita bu periyotla döşeniyor.
+    /// </summary>
+    [Tooltip("Hava haritasının dünyada kapladığı kenar uzunluğu (metre).")]
+    public MinFloatParameter cloudMapSize = new(48000.0f, 1000.0f);
+
+    /// <summary>
+    /// Küresel kapsama. 0.5'e kadar yalnız seyrek yerleşim; üstünde yoğun harita devreye giriyor `[H18 s.11]`.
+    /// </summary>
+    [Tooltip("Küresel kapsama. 0.5'e kadar yalnız seyrek yerleşim, üstünde gök kapanmaya başlıyor.")]
+    public ClampedFloatParameter cloudCoverage = new(0.5f, 0.0f, 1.0f);
+
+    /// <summary>
+    /// Örs miktarı. Şekil fonksiyonunu üs olarak değiştiriyor, yoğunluk fonksiyonunu da
+    /// birlikte azaltıyor — yoksa tepe fazla yoğun kalıyor `[H18 s.17]`.
+    /// </summary>
+    [Tooltip("Örs miktarı. Kümülonimbüs tepesini yayar; küresel kapsamayla birlikte çalışır.")]
+    public ClampedFloatParameter anvilAmount = new(0.0f, 0.0f, 1.0f);
+
+    /// <summary>
     /// Controls the global density of the cloud volume.
     /// </summary>
     [Tooltip("Controls the global density of the cloud volume.")]
     public ClampedFloatParameter densityMultiplier = new(0.4f, 0.0f, 1.0f);
-
-    /// <summary>
-    /// Controls the density (Y axis) of the volumetric clouds as a function of the height (X Axis) inside the cloud volume.
-    /// </summary>
-    [Tooltip("Controls the density (Y axis) of the volumetric clouds as a function of the height (X Axis) inside the cloud volume.")]
-    public AnimationCurveParameter densityCurve = new(new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.15f, 1.0f), new Keyframe(1.0f, 0.1f)), false);
 
     /// <summary>
     /// Controls the larger noise passing through the cloud coverage. A higher value will yield less cloud coverage and smaller clouds.
@@ -338,19 +357,15 @@ public class VolumetricClouds : VolumeComponent, IPostProcessComponent
     }
 
     // Cloud preset curves
-    static readonly AnimationCurve s_SparseDensityCurve = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.05f, 1.0f), new Keyframe(0.75f, 1.0f), new Keyframe(1.0f, 0.0f));
     static readonly AnimationCurve s_SparseErosionCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.1f, 0.9f), new Keyframe(1.0f, 1.0f));
     static readonly AnimationCurve s_SparseAmbientOcclusionCurve = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.25f, 0.5f), new Keyframe(1.0f, 0.0f));
 
-    static readonly AnimationCurve s_CloudyDensityCurve = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.15f, 1.0f), new Keyframe(1.0f, 0.1f));
     static readonly AnimationCurve s_CloudyErosionCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.1f, 0.9f), new Keyframe(1.0f, 1.0f));
     static readonly AnimationCurve s_CloudyAmbientOcclusionCurve = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.25f, 0.4f), new Keyframe(1.0f, 0.0f));
 
-    static readonly AnimationCurve s_OvercastDensityCurve = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.05f, 1.0f), new Keyframe(0.9f, 0.0f), new Keyframe(1.0f, 0.0f));
     static readonly AnimationCurve s_OvercastErosionCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.1f, 0.9f), new Keyframe(1.0f, 1.0f));
     static readonly AnimationCurve s_OvercastAmbientOcclusionCurve = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(1.0f, 0.0f));
 
-    static readonly AnimationCurve s_StormyDensityCurve = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.037f, 1.0f), new Keyframe(0.6f, 1.0f), new Keyframe(1.0f, 0.0f));
     static readonly AnimationCurve s_StormyErosionCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.05f, 0.8f), new Keyframe(0.2438f, 0.9498f), new Keyframe(0.5f, 1.0f), new Keyframe(0.93f, 0.9268f), new Keyframe(1.0f, 1.0f));
     static readonly AnimationCurve s_StormyAmbientOcclusionCurve = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.1f, 0.4f), new Keyframe(1.0f, 0.0f));
 
@@ -381,10 +396,8 @@ public class VolumetricClouds : VolumeComponent, IPostProcessComponent
                 }
 
                 // Curves
-                //densityCurve.value = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.05f, 1.0f), new Keyframe(0.75f, 1.0f), new Keyframe(1.0f, 0.0f));
                 //erosionCurve.value = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.1f, 0.9f), new Keyframe(1.0f, 1.0f));
                 //ambientOcclusionCurve.value = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.25f, 0.5f), new Keyframe(1.0f, 0.0f));
-                densityCurve.value = s_SparseDensityCurve;
                 erosionCurve.value = s_SparseErosionCurve;
                 ambientOcclusionCurve.value = s_SparseAmbientOcclusionCurve;
 
@@ -415,10 +428,8 @@ public class VolumetricClouds : VolumeComponent, IPostProcessComponent
                 }
 
                 // Curves
-                //densityCurve.value = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.15f, 1.0f), new Keyframe(1.0f, 0.1f));
                 //erosionCurve.value = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.1f, 0.9f), new Keyframe(1.0f, 1.0f));
                 //ambientOcclusionCurve.value = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.25f, 0.4f), new Keyframe(1.0f, 0.0f));
-                densityCurve.value = s_CloudyDensityCurve;
                 erosionCurve.value = s_CloudyErosionCurve;
                 ambientOcclusionCurve.value = s_CloudyAmbientOcclusionCurve;
 
@@ -449,10 +460,8 @@ public class VolumetricClouds : VolumeComponent, IPostProcessComponent
                 }
 
                 // Curves
-                //densityCurve.value = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.05f, 1.0f), new Keyframe(0.9f, 0.0f), new Keyframe(1.0f, 0.0f));
                 //erosionCurve.value = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.1f, 0.9f), new Keyframe(1.0f, 1.0f));
                 //ambientOcclusionCurve.value = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(1.0f, 0.0f));
-                densityCurve.value = s_OvercastDensityCurve;
                 erosionCurve.value = s_OvercastErosionCurve;
                 ambientOcclusionCurve.value = s_OvercastAmbientOcclusionCurve;
 
@@ -483,10 +492,8 @@ public class VolumetricClouds : VolumeComponent, IPostProcessComponent
                 }
 
                 // Curves
-                //densityCurve.value = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.037f, 1.0f), new Keyframe(0.6f, 1.0f), new Keyframe(1.0f, 0.0f));
                 //erosionCurve.value = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.05f, 0.8f), new Keyframe(0.2438f, 0.9498f), new Keyframe(0.5f, 1.0f), new Keyframe(0.93f, 0.9268f), new Keyframe(1.0f, 1.0f));
                 //ambientOcclusionCurve.value = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.1f, 0.4f), new Keyframe(1.0f, 0.0f));
-                densityCurve.value = s_StormyDensityCurve;
                 erosionCurve.value = s_StormyErosionCurve;
                 ambientOcclusionCurve.value = s_StormyAmbientOcclusionCurve;
 
