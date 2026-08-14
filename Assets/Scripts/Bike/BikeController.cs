@@ -58,12 +58,42 @@ public class BikeController : MonoBehaviour
 
     public void SetInput(BikeInput value) => input = value.Sanitised();
 
-    void Awake() => controller = GetComponent<CharacterController>();
+    void Awake()
+    {
+        controller = GetComponent<CharacterController>();
+        FitCapsule();
+    }
 
     void OnEnable()
     {
         if (settings == null)
             throw new InvalidOperationException($"{nameof(BikeController)}: ayar atanmadı.");
+    }
+
+    /// ÇARPIŞMA KAPSÜLÜ MODELDEN ÖLÇÜLÜYOR. Kurulum betiği bunu bir kez yazıyordu ve
+    /// sahnede kalan eski değerler geçerli oluyordu: kapsülün tabanı modelin altından
+    /// kırk santim aşağıda kalınca bisiklet havada duruyor, gölgesi altında bir metre
+    /// ötede çıkıyordu.
+    ///
+    /// Ölçü her açılışta yeniden alınıyor: model değişse de, sahnedeki bileşen eski
+    /// kalsa da kapsül modele oturuyor.
+    void FitCapsule()
+    {
+        var renderers = GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0) return;
+
+        Bounds bounds = renderers[0].bounds;
+        foreach (Renderer renderer in renderers) bounds.Encapsulate(renderer.bounds);
+
+        float height = Mathf.Max(0.6f, bounds.size.y);
+        float bottom = bounds.min.y - transform.position.y;
+
+        controller.height = height;
+        controller.radius = Mathf.Min(0.3f, height * 0.4f);
+
+        // Merkez modelin ALTINDAN ölçülüyor: kök ile modelin tabanı arasında pay varsa
+        // kapsül o payı da hesaba katıyor.
+        controller.center = new Vector3(0f, bottom + height * 0.5f, 0f);
     }
 
     void Update()
