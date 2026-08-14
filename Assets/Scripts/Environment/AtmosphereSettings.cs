@@ -127,10 +127,19 @@ public class AtmosphereSettings : ScriptableObject
              "adım sınırı ekranda dilim olarak görünür. 700 m kalınlıkta bir kümülüsün " +
              "opaklaşması için 0.006 civarı doğru; on katı bulutu hacim değil duvar yapar.")]
     public float densityScale = 0.006f;
-    [Tooltip("Yer rüzgârının bulut hızına çarpanı. Yüksekteki rüzgâr yerdekinden kat kat güçlüdür.")]
-    public float cloudDrift = 0.4f;
-    [Tooltip("Yer rüzgârı dinginken bile bulutların süzülme hızı (m/s).")]
-    public float minCloudSpeed = 90f;
+    [Tooltip("Yer rüzgârının bulut hızına çarpanı. Yüksekteki rüzgâr yerdekinden güçlü: " +
+             "yerde 10 m/s esen rüzgâr iki kilometre yukarıda 20 m/s dolayında. Katsayı " +
+             "birin altındayken bulutlar yer rüzgârından yavaş gidiyordu, kendi " +
+             "açıklamasıyla çelişiyordu.")]
+    public float cloudDrift = 2f;
+    [Tooltip("Yer rüzgârı dinginken bile bulutların süzülme hızı (m/s). Dingin havada " +
+             "yüksek katmanlar durmaz, birkaç metre saniye süzülür.
+
+" +
+             "Bu değer 90 m/s idi — 324 km/h, yani rüzgâr sıfıra çekilse bile gökyüzü " +
+             "akıp gidiyordu. Rüzgâr kilidi bulutları durdurmuyordu çünkü taban zaten " +
+             "her şeyi eziyordu.")]
+    public float minCloudSpeed = 5f;
     [Tooltip("Bulut biçimlerinin değişme hızı. Sıfırsa bulutlar yalnızca öteler, şekil değiştirmez.")]
     public float evolutionSpeed = 0.004f;
     [Tooltip("Konvektif yükselme hızı (m/s). Bulut kütlesi yerden gelen ısıyla yükselir: " +
