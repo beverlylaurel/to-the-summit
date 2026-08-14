@@ -485,8 +485,15 @@ public class AtmosphereController : MonoBehaviour
         // istisna açık pencere — sürücünün nadiren açtığı o an, tabanın delinebildiği
         // tek yol. İki kural aksi halde çelişiyordu: sürücü "bulutlar aralanır, zirve
         // görünür" diye söz verirken taban o anın hiç gelmemesini sağlıyordu.
+        // Kapsamanın tabanı SÜRÜCÜDEN geliyor: yağış sıfırken bile gökyüzü kendi
+        // ritmiyle kapanıp açılıyor (bkz. `AltitudeWeatherDriver.DryCoverage`). Sabit bir
+        // taban, yağmadığı her an aynı gökyüzü demekti.
+        float floor = Mathf.Max(settings.minCoverage, weatherDriver.DryCoverage);
+
+        // Tek istisna açık pencere — sürücünün nadiren açtığı o an, tabanın delinebildiği
+        // tek yol.
         coverage = Mathf.Max(coverage,
-            Mathf.Lerp(settings.minCoverage, settings.openCoverage, weatherDriver.ClearWindow));
+            Mathf.Lerp(floor, settings.openCoverage, weatherDriver.ClearWindow));
 
         // Bulutlar rüzgârla aynı yöne sürüklenir, ama yer rüzgârının hızıyla değil:
         // 3 km yükseklikteki hava akımı çok daha güçlüdür ve yer dinginken bile eser.

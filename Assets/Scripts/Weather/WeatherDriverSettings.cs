@@ -75,6 +75,16 @@ public class WeatherDriverSettings : ScriptableObject
              "olmalı: bulut yağış kesildikten sonra da bir süre durur. Eşitlenirse " +
              "yağışın durduğu karede gökyüzü açılır.")]
     public float cloudLagSeconds = 150f;
+
+    [Header("Kuru hava bulutluluğu")]
+    [Tooltip("Yağış olmadan da gökyüzü boş durmaz: alçak basınç geçer, nem taşınır, " +
+             "kapsama saatler içinde gezinir. Bu değer o gezinmenin periyodu (saniye).")]
+    public float cloudWanderSeconds = 420f;
+    [Tooltip("Kuru havada kapsamanın inebileceği en düşük değer.")]
+    [Range(0f, 1f)] public float dryCoverageLow = 0.4f;
+    [Tooltip("Kuru havada kapsamanın çıkabileceği en yüksek değer. Yağış olmadan da " +
+             "gökyüzü kapanabilir — kapalı hava yağmurlu hava demek değil.")]
+    [Range(0f, 1f)] public float dryCoverageHigh = 0.85f;
     [Tooltip("Ulaşılan seviyenin bu kadar altına inmek havayı etkilemez (metre). " +
              "Boyun geçişleri ve rota sapmaları fırtınayı geri almasın.")]
     public float descentDeadband = 250f;

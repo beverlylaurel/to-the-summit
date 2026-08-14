@@ -26,7 +26,7 @@ MonoBehaviour:
   snowNight: {r: 0.14, g: 0.16, b: 0.22, a: 1}
   clearCoverage: 0.18
   stormCoverage: 0.95
-  minCoverage: 0.27
+  minCoverage: 0.4
   openCoverage: 0.1
   coverageGain: 0.35
   cloudBottom: 2600
@@ -49,7 +49,7 @@ MonoBehaviour:
   headingSmoothing: 240
   variationScale: 0.00012
   variationStrength: 0.5
-  densityScale: 0.0105
+  densityScale: 0.00735
   cloudDrift: 6
   minCloudSpeed: 30
   evolutionSpeed: 0.011
@@ -72,7 +72,7 @@ MonoBehaviour:
   hazeVisibilityFactor: 8
   rimStrength: 0.08
   powderStrength: 0.75
-  cloudAmbient: 0.6
+  cloudAmbient: 0.42
   ambientFloor: 0.1
   massWarmth: 0.35
   massBrightness: 0.55

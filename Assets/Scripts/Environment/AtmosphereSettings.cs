@@ -46,7 +46,7 @@ public class AtmosphereSettings : ScriptableObject
     [Tooltip("En yoğun yağıştaki kapsama.")]
     [Range(0f, 1f)] public float stormCoverage = 0.95f;
     [Tooltip("Kapsamanın alt sınırı. Altında gökyüzü boş ve bulutlar cılız görünüyor.")]
-    [Range(0f, 1f)] public float minCoverage = 0.27f;
+    [Range(0f, 1f)] public float minCoverage = 0.4f;
     [Tooltip("Açık pencere tam açıldığında inilen kapsama. Tabanı delebilen tek şey bu: " +
              "nadir, kısa, ve tırmanışın ödülü — bulutlar aralanır, zirve görünür.")]
     [Range(0f, 1f)] public float openCoverage = 0.1f;
@@ -126,7 +126,7 @@ public class AtmosphereSettings : ScriptableObject
              "adım boyuyla çarpımıdır ve ~0.2'yi aşarsa bulut bir-iki adımda opaklaşıp her " +
              "adım sınırı ekranda dilim olarak görünür. 700 m kalınlıkta bir kümülüsün " +
              "opaklaşması için 0.006 civarı doğru; on katı bulutu hacim değil duvar yapar.")]
-    public float densityScale = 0.006f;
+    public float densityScale = 0.00735f;
     [Tooltip("Yer rüzgârının bulut hızına çarpanı. Yüksekteki rüzgâr yerdekinden güçlü: " +
              "yerde 10 m/s esen rüzgâr iki kilometre yukarıda 20 m/s dolayında. Katsayı " +
              "birin altındayken bulutlar yer rüzgârından yavaş gidiyordu, kendi " +
@@ -229,7 +229,7 @@ public class AtmosphereSettings : ScriptableObject
              "okunur — güneşe bakarken gümüş kenar hâkimdir.")]
     [Range(0f, 1f)] public float powderStrength = 0.75f;
     [Tooltip("Gökyüzünden gelen dağınık ışığın şiddeti. Bulutun genel aydınlığı.")]
-    [Range(0f, 2f)] public float cloudAmbient = 0.75f;
+    [Range(0f, 2f)] public float cloudAmbient = 0.42f;
     [Tooltip("Bulut altının en düşük aydınlığı. Yükseldikçe altlar aydınlanır ama hacim " +
              "hissi ışık-gölge farkından doğduğu için form da düzleşir: 0.35'te bulutlar " +
              "havada uçan beyaz levhalara dönüyordu.")]

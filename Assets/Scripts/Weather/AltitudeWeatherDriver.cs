@@ -92,6 +92,15 @@ public class AltitudeWeatherDriver : MonoBehaviour
     /// süresine bağlı, ayrı bir kurala değil.
     public float CloudMass => cloudMass;
 
+    /// KURU HAVA BULUTLULUĞU. Yağış sıfırken bile gökyüzü boş durmaz: alçak basınç
+    /// geçer, nem taşınır, kapsama saatler içinde gezinir. Yağıştan BAĞIMSIZ ama aynı
+    /// zaman çizgisinde — ayrı bir rastgelelik kaynağı değil, sürücünün kendi saati.
+    ///
+    /// Atmosfer bunu kapsamanın TABANI olarak okuyor: yağış geldiğinde kapsama zaten
+    /// yükseliyor, bu değer yalnız "yağmıyorken gökyüzü ne kadar kapalı" sorusunu
+    /// cevaplıyor.
+    public float DryCoverage { get; private set; }
+
     /// Bulut sütununun tepesi (metre). Atmosfer her karede iter — gerçek yüksekliğini
     /// yalnızca o biliyor (hava haritası + o anki bulut tabanı). Sürücü çekmiyor ki
     /// iki sistem birbirine referansla bağlanmasın. Skaler bir kesme payı yerine KOT
@@ -234,6 +243,11 @@ public class AltitudeWeatherDriver : MonoBehaviour
             float m = 1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(0.01f, settings.cloudLagSeconds));
             cloudMass = Mathf.Lerp(cloudMass, target, m);
         }
+
+        // Kuru hava bulutluluğu: yavaş gezinen tek boyutlu bir alan. Perlin sürekli ve
+        // türevlenebilir, yani kapsama zıplamıyor; periyot dakikalar mertebesinde.
+        float wander = Mathf.PerlinNoise(Time.time / Mathf.Max(1f, settings.cloudWanderSeconds), 0.37f);
+        DryCoverage = Mathf.Lerp(settings.dryCoverageLow, settings.dryCoverageHigh, wander);
 
         // Bulut tavanının üstünde yağış olamaz: tepende bulut yoksa kar düşmez.
         // Sütunun tepesi ATMOSFERDEN İTİLİR (CloudColumnTop), buradan hesaplanmaz. Burada
