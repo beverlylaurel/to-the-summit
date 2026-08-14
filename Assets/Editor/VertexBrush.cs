@@ -528,11 +528,14 @@ public class VertexBrush : EditorWindow
                 }
                 else
                 {
-                    // Renk ve örtme gücü birlikte yürüyor: yarım örtülü bir köşe eski
-                    // rengiyle yeni rengin arasında kalıyor, sert kenar bırakmıyor.
-                    current.r = (byte)Mathf.RoundToInt(Mathf.Lerp(current.r, colour.r * 255f, amount));
-                    current.g = (byte)Mathf.RoundToInt(Mathf.Lerp(current.g, colour.g * 255f, amount));
-                    current.b = (byte)Mathf.RoundToInt(Mathf.Lerp(current.b, colour.b * 255f, amount));
+                    // RENK SERT YAZILIYOR, YALNIZ ÖRTME GÜCÜ YUMUŞUYOR. Renk de örtme
+                    // gücüyle birlikte karıştırılınca fırçanın kenarındaki köşeler eski
+                    // rengin ve yenisinin arasında bir tonda kalıyor: siyah sürerken
+                    // kenarda önceki renk hâlesi çıkıyordu. Şimdi kenar, parçanın kendi
+                    // yüzeyinden yeni renge geçiyor; arada üçüncü bir renk yok.
+                    current.r = (byte)Mathf.RoundToInt(colour.r * 255f);
+                    current.g = (byte)Mathf.RoundToInt(colour.g * 255f);
+                    current.b = (byte)Mathf.RoundToInt(colour.b * 255f);
                     current.a = (byte)Mathf.RoundToInt(Mathf.Lerp(current.a, 255f, amount));
 
                     surfaces[index] = new Vector2(channel, 0f);
