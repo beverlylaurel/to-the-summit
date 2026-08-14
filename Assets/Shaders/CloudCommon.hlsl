@@ -1219,6 +1219,17 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
         if (!coarsePass && prevDensity > 1e-6)
             step = min(step, max(CloudMaxOpticalStep / prevDensity, nominalStep * 0.25));
 
+        // GİRİŞ ADIMI AYRICA KISA. Kelepçe bir ÖNCEKİ örneğin yoğunluğuna bakıyor;
+        // boşluktan buluta girerken o değer sıfır, yani ilk adım kelepçesiz giriyor ve
+        // uzun bir yolu tek örnekle integre ediyor. Ekranda bu, bulutun ön yüzünde eşit
+        // mesafelerde duran eşmerkezli kabuklar olarak görünüyor — ölçüldü: adım boyu
+        // sürgüsü küçültülünce halkalar kayboluyor, büyütülünce geri geliyor.
+        //
+        // Kısıtlama yalnız ışın HENÜZ AÇIKKEN: kapanmış ışında giriş hatası zaten
+        // geçirgenlikle çarpılıp siliniyor, orada bedel ödemeye değmiyor.
+        if (!coarsePass && prevDensity <= 1e-6 && transmittance > 0.5)
+            step = min(step, nominalStep * 0.35);
+
         // İlk adım Bayer kayması kadar kısa: tarama fazı piksele göre kayar, pencere
         // her pikselde tam kalır. Mip yine anma adımına bakar, kırpılmışa değil.
         if (i == 0 && dither > 0.0) step = min(step, max(nominalStep * dither, 1.0));
