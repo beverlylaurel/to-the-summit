@@ -515,8 +515,12 @@ public class AtmosphereController : MonoBehaviour
         // saatlerce kayan değer bile doku örneklemesi için fazlasıyla ince.
         cloudOffset -= new Vector2(heading.x, heading.z) * (speed * Time.deltaTime);
 
-        // Biçim evrimi rüzgârla hızlanır: fırtınada bulutlar daha çabuk değişir
-        evolution += settings.evolutionSpeed * (0.5f + wind.Strength) * Time.deltaTime;
+        // BİÇİM EVRİMİ RÜZGÂRDAN BAĞIMSIZ. Bir dönem rüzgâr şiddetiyle çarpılıyordu ve
+        // fırtınada bulut kenarları çalkalanıyordu: sürüklenme zaten hızlanmışken evrim
+        // de hızlanınca ince yapı yerinde kaynıyor gibi okunuyor. Gerçekte de bulutun
+        // biçim değiştirme temposu rüzgârın hızıyla değil, içindeki dikey hareketle
+        // ilgili — sürüklenmesi hızlanan bir bulut aynı hızla dağılmaz.
+        evolution += settings.evolutionSpeed * Time.deltaTime;
 
         // Konvektif yükselme gündüz sürer: kaynağı ısınan zemindir. Gece zemin
         // soğur, yükselme durur — bulutlar yalnız sürüklenir.

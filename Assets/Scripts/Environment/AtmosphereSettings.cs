@@ -139,7 +139,7 @@ public class AtmosphereSettings : ScriptableObject
              "her şeyi eziyordu.")]
     public float minCloudSpeed = 30f;
     [Tooltip("Bulut biçimlerinin değişme hızı. Sıfırsa bulutlar yalnızca öteler, şekil değiştirmez.")]
-    public float evolutionSpeed = 0.004f;
+    public float evolutionSpeed = 0.0015f;
     [Tooltip("Konvektif yükselme hızı (m/s). Bulut kütlesi yerden gelen ısıyla yükselir: " +
              "tomurcuklar tabandan doğup yukarı tırmanır. Gündüz güçlü, gece söner — " +
              "yükselmenin kaynağı ısınan zemindir.")]
