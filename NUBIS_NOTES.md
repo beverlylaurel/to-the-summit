@@ -1245,6 +1245,75 @@ fiziği gerçekten anlamak için yakından deneyimlememiz gerekiyor."*
 - **Kümülüs congestus'un KENARLARI KOYU görünüyor** — yerden bakınca görülmeyen bir
   etki. (Powder etkisinin kurulumu.)
 
+### `[N17]` yoğunluk modeli — her şey İKİ bilgiye iniyor
+
+`[N17 s.26-27]`: *"Gerçek zaman tamamen sıkıştırmadır."* Balon yolculuğunda görülen her
+şey iki değişkene indirgeniyor: **Bulut Kapsaması** ve **Bulut Tipi**. Yoğunluk
+modelindeki davranışların çoğunu bu ikisi belirliyor.
+
+### Yükseklik gradyanı = İKİ REMAP'İN ÇARPIMI, tip uç noktaları oynatıyor
+
+`[N17 s.28-29]` — bu, bizim üç `smoothstep` eğrisini karıştırma yaklaşımımızdan daha
+sade:
+
+```
+stratus = remap(height, 0.0, 0.1, 0.0, 1.0) * remap(height, 0.2, 0.3, 1.0, 0.0)
+                        ↑                             ↑    ↑
+                   tip bu uçları kaydırıyor
+```
+
+> *"Tip, remap fonksiyonlarımızın giriş ve çıkış noktalarını değiştiren değer olarak
+> hizmet edebilir."*
+
+Yani **tek bir remap çifti** var; stratus / stratokümülüs / kümülüs, o çiftin uç
+noktalarının tip tarafından kaydırılmasıyla çıkıyor. Ayrı ayrı üç eğri yok.
+
+### Perlin-Worley'in TANIMI `[N17 s.33-34]`
+
+```
+perlin-worley = remap(perlin, 1.0 - worley, 1.0, 0.0, 1.0)
+```
+
+Niyet açıkça yazılmış: *"Worley gürültüsünün ağ benzeri biçimlerini, Perlin'in DÜŞÜK
+YOĞUNLUKLU bölgelerinden çıkarıp oraya yuvarlak biçimler sokmak."*
+
+Kaynak kodları da veriyorlar:
+- Sébastien Hillaire'in üreticisi: `github.com/sebh/TileableVolumeNoise`
+- Kendi Houdini üreticileri: `bit.ly/nubisnoisegen` (döşenen 2B doku dizisi döndürüyor)
+
+### ÇARPMA DEĞİL REMAP — gerekçesi yazılı `[N17 s.36]`
+
+```
+base_cloud = remap(low_freq_noise, high_freq_noise, 1.0, 0.0, 1.0)
+```
+
+> *"Gürültü fBm'lerimizde remap fonksiyonlarını kullanmaya karar verdik çünkü gerçekten
+> yararlı bir davranışı var: gürültüleri birbiriyle ÇARPMANIN aksine, remap **taban bulut
+> şeklinin ÇEKİRDEĞİNDE fazla yoğunluk kaybını önlüyor**."*
+
+Bizim `shape = lerp(shape, shapeB, 0.4)` ve `max(shape, secondary * weight)` gibi
+birleştirmelerimizin hiçbirinin gerekçesi bu kadar netti değildi.
+
+### Gürültüsüz bulut nasıl görünüyor `[N17 s.37]`
+
+Slaytta "gürültüyü taban olasılık olarak KULLANMADAN" render var: **düz levhalar, dik
+keskin kenarlar** — bizim bir ara "kutu bulutlar" dediğimiz görüntünün birebir aynısı.
+Yani o görüntü, gürültünün şekle karışmadığı anlamına geliyor.
+
+**Alçak frekans bulutun temelini kuruyor** `[N17 s.38]`, **yüksek frekans detay ekliyor
+ama çekirdekten bir şey almıyor** `[N17 s.39]`. Benzetme: *"kilden blok yontmak gibi —
+ama bütün detaylar zaten kilin içinde saklı, sen yontarken onları ortaya çıkarıyorsun."*
+
+### Kapsama da bir EROZYON remap'i `[N17 s.40]`
+
+```
+cloud_with_coverage = remap(noise, cloud_coverage, 1.0, 0.0, 1.0)
+```
+
+> *"Kapsama değerini başka bir remap fonksiyonunda EROZYON olarak uygulayabiliriz. Bu,
+> bulutun uzaydaki bir kapsama gradyanı boyunca genişliyor ya da büzülüyor görünmesini
+> sağlar."*
+
 ---
 
 ## Okuma defteri
@@ -1254,7 +1323,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 | makale | toplam | okunan | eksik |
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
-| `[N17]` nubis-2017 | **108** | s.1–20 | s.21–108 |
+| `[N17]` nubis-2017 | **108** | s.1–40 | s.41–108 |
 | `[N22]` nubis-2022 | **207** | **s.1–207 TAMAM** | — |
 | `[H18]` haggstrom-2018 | **93 PDF / 81 basılı** | **PDF s.1–93 TAMAM** | — |
 
