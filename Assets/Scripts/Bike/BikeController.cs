@@ -70,6 +70,37 @@ public class BikeController : MonoBehaviour
             throw new InvalidOperationException($"{nameof(BikeController)}: ayar atanmadı.");
     }
 
+    /// TEKERLEK YERE OTURTULUYOR. Kapsül modele göre kuruluyor ama modelin kökle arasında
+    /// pay kalabiliyor: ölçüldü, kapsülün tabanı çarpışmanın yedi santim üstünde (deri
+    /// payı kadar, doğru) iken modelin altı kapsülün otuz beş santim üstündeydi. Yani
+    /// fizik doğru yerde duruyor, görüntü havada asılı kalıyordu.
+    ///
+    /// Kurulum betiği bunu bir kez yapıyor ama sahnede eski konum kalabiliyor; burada her
+    /// açılışta yeniden ölçülüyor. Kapsül kapatılıp açılıyor çünkü `CharacterController`
+    /// açıkken doğrudan konum ataması bir sonraki karede geri alınıyor.
+    void Start()
+    {
+        var renderers = GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0) return;
+
+        Bounds bounds = renderers[0].bounds;
+        foreach (Renderer renderer in renderers) bounds.Encapsulate(renderer.bounds);
+
+        var ray = new Ray(new Vector3(bounds.center.x, bounds.min.y + 3f, bounds.center.z),
+            Vector3.down);
+
+        if (!Physics.Raycast(ray, out RaycastHit hit, 20f, settings.groundLayers,
+                QueryTriggerInteraction.Ignore))
+            return;
+
+        float gap = bounds.min.y - hit.point.y;
+        if (Mathf.Abs(gap) < 0.005f) return;
+
+        controller.enabled = false;
+        transform.position -= Vector3.up * gap;
+        controller.enabled = true;
+    }
+
     /// ÇARPIŞMA KAPSÜLÜ MODELDEN ÖLÇÜLÜYOR. Kurulum betiği bunu bir kez yazıyordu ve
     /// sahnede kalan eski değerler geçerli oluyordu: kapsülün tabanı modelin altından
     /// kırk santim aşağıda kalınca bisiklet havada duruyor, gölgesi altında bir metre
