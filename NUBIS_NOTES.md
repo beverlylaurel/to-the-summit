@@ -343,7 +343,24 @@ Yani bizim "kaba eleme"nin karşılığı: üç 2B okuma + bir çarpma. Sıçram
 genişletme, üst sınır türetme yok — profil zaten kolonun tamamını tarif ettiği için
 eşiği doğrudan test edebiliyorlar.
 
-*(Yeniden yansıtma sonraki sayfalarda.)*
+**PS4 / PS5 ölçekleme tablosu** `[N22 s.183]` — hangi kalem nereye kadar kısılıyor:
+
+| | PS4 | PS5 |
+|---|---|---|
+| Çözünürlük | 960 × 540 | 1920 × 1080 |
+| Işık ışını örneği | 6 | 10 |
+| Görüş ışını örneği | 60–90 | 96–180 |
+| Bulanıklık ölçeği (piksel) | 2× | 1× |
+| Gürültü dokusu MIP | 1 | 0 |
+
+**Bütçe** `[N22 s.184]`: fırtınaya bakarken **≤ 4 ms**, normalde **≤ 2-3 ms**.
+Bizim TEK katmanımız 4 ms'ti — onların üç katmanlı en kötü durumu kadar.
+
+**Çözünürlük TAM KARE.** PS5'te 1920×1080, yani yürüyüş tam çözünürlükte. Bizde
+`downsample = 4` idi (1/16 piksel) ve piksellenmenin bir kısmı oradan geliyordu.
+
+**Görüş ışını örneği 60-180**; bizde 110 (döngü sınırı 550). Aynı mertebede — sorun
+örnek sayısı değil, adım boyunun mesafeyle nasıl büyüdüğü (bkz. soru 6).
 
 ---
 
@@ -599,6 +616,35 @@ büyüdükçe bulut opaklaşıyor ve kontrast artıyor. Bizde `exp(-density * st
 katsayı yoktu — `_DensityScale` dolaylı olarak aynı işi yapıyordu ama fiziksel karşılığı
 belirsizdi.
 
+## Üç bulut sistemi TEK IŞINDA — ve hava perspektifi
+
+`[N22 s.187]` bir ışın boyunca sırayla: **Near Orographic → Far Orographic →
+Tropospheric/Superstorm**. Üç ayrı model aynı yürüyüşte birleşiyor.
+
+**Hava perspektifi OPAKLIKLA AĞIRLIKLANMIŞ ortalama mesafeden** `[N22 s.188]`:
+
+```hlsl
+while (...) { distance_sum += d[n] * sample_opacity; }
+
+float weighted_sum = distance_sum / opacity_sum;
+cloud_color = lerp(cloud_color, atmospherics_color, weighted_sum);
+```
+
+Bizde `firstHit` — ışının ilk değdiği yer — kullanılıyordu. Ağırlıklı ortalama daha
+doğru: ince bir tülün arkasındaki kalın kütle mesafeyi kendine çeker.
+
+**Şimşek maskesi AYRI VE KARARLI** `[N22 s.180]`: şimşek sistemi konumu üretip animasyonu
+tetikliyor; **renderer o konumdan kararlı bir maske üretiyor**, çakma şiddeti maskeyle
+çarpılıyor. Maske kare kare değişmiyor — titremenin çözümü bu.
+
+## Hacim Veri Alanları (NVDF) — ileri adım
+
+`[N22 s.193-198]`. Prosedürel alan yerine pişmiş hacim: iki 3B doku — **Cloud Density**
+ve **Cloud Distance**. İkincisi mesafe alanı; "Source-Agnostic Distance Step Mapping"
+ile boş alan sıçranarak geçiliyor. Kaynak Houdini'den gelen gerçek bulut modeli olabiliyor
+(kök: Schneider'in 2011 *Rio* çalışması, Blue Sky Studios). Nubis³'ün voksel mimarisine
+giden yol. Bizim için şimdilik kapsam dışı.
+
 ---
 
 ## Okuma defteri
@@ -609,7 +655,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
-| `[N22]` nubis-2022 | **207** | s.1–178 | s.179–207 |
+| `[N22]` nubis-2022 | **207** | s.1–198 | s.199–207 |
 | `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
