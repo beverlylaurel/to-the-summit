@@ -131,13 +131,13 @@ public class AtmosphereSettings : ScriptableObject
              "yerde 10 m/s esen rüzgâr iki kilometre yukarıda 20 m/s dolayında. Katsayı " +
              "birin altındayken bulutlar yer rüzgârından yavaş gidiyordu, kendi " +
              "açıklamasıyla çelişiyordu.")]
-    public float cloudDrift = 3f;
+    public float cloudDrift = 6f;
     [Tooltip("Yer rüzgârı dinginken bile bulutların süzülme hızı (m/s). Dingin havada " +
              "yüksek katmanlar durmaz, birkaç metre saniye süzülür. " +
              "Bu değer 90 m/s idi — 324 km/h, yani rüzgâr sıfıra çekilse bile gökyüzü " +
              "akıp gidiyordu. Rüzgâr kilidi bulutları durdurmuyordu çünkü taban zaten " +
              "her şeyi eziyordu.")]
-    public float minCloudSpeed = 8f;
+    public float minCloudSpeed = 30f;
     [Tooltip("Bulut biçimlerinin değişme hızı. Sıfırsa bulutlar yalnızca öteler, şekil değiştirmez.")]
     public float evolutionSpeed = 0.004f;
     [Tooltip("Konvektif yükselme hızı (m/s). Bulut kütlesi yerden gelen ısıyla yükselir: " +
