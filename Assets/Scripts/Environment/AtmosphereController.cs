@@ -22,27 +22,8 @@ public class AtmosphereController : MonoBehaviour
              "yeniden yazdığında koddan yapılan düzeltme sessizce kayboluyordu.")]
     [SerializeField] AtmosphereSettings settings;
 
-    [Tooltip("Perlin-Worley kütle dokusu. Bulut geçişi ayrı materyal kullandığı için " +
-             "global olarak yayınlanır.")]
-    [SerializeField] Texture3D baseNoise;
-    [Tooltip("Worley aşındırma dokusu.")]
-    [SerializeField] Texture3D detailNoise;
-    [Tooltip("2B hava haritası (CloudWeatherMapBaker pişirir): kapsama, tip, taban " +
-             "kayması ve eğim garantili tavan. Bulut dağılımının tek kaynağı.")]
-    [SerializeField] Texture2D weatherMap;
-    [Tooltip("Kaba maksimum-kapsama haritası: ışın yürüyüşü boş gökte bunu okuyup " +
-             "büyük adımlarla atlar. Görüntüyü etkilemez, yalnız hızlandırır.")]
-    [SerializeField] Texture2D skipMap;
-    [Tooltip("Iraksamasız curl gürültüsü: aşındırmanın koordinatını büker (türbülans).")]
-    [SerializeField] Texture2D curlNoise;
-    [Tooltip("Yüksek irtifa katmanı dokusu: sirrus / altokümülüs / altostratus.")]
-    [SerializeField] Texture2D highNoise;
     [SerializeField] Material skyMaterial;
 
-    static readonly int BaseNoiseId = Shader.PropertyToID("_BaseNoise");
-    static readonly int DetailNoiseId = Shader.PropertyToID("_DetailNoise");
-    static readonly int BaseNoiseTexelsId = Shader.PropertyToID("_BaseNoiseTexels");
-    static readonly int DetailNoiseTexelsId = Shader.PropertyToID("_DetailNoiseTexels");
     static readonly int HeightFogColorId = Shader.PropertyToID("_HeightFogColor");
     static readonly int HeightFogDensityId = Shader.PropertyToID("_HeightFogDensity");
     static readonly int HeightFogFalloffId = Shader.PropertyToID("_HeightFogFalloff");
@@ -110,12 +91,6 @@ public class AtmosphereController : MonoBehaviour
     static readonly int ShearAmountId = Shader.PropertyToID("_ShearAmount");
     static readonly int LargeWeightId = Shader.PropertyToID("_CloudLargeWeight");
 
-    static readonly int WeatherMapId = Shader.PropertyToID("_WeatherMap");
-    static readonly int WeatherMapScaleId = Shader.PropertyToID("_WeatherMapScale");
-    static readonly int WeatherMapTexelsId = Shader.PropertyToID("_WeatherMapTexels");
-    static readonly int SkipMapId = Shader.PropertyToID("_CloudSkipMap");
-    static readonly int CurlNoiseId = Shader.PropertyToID("_CloudCurlNoise");
-    static readonly int HighNoiseId = Shader.PropertyToID("_CloudHighNoise");
     static readonly int HighAmountId = Shader.PropertyToID("_HighCloudAmount");
     static readonly int HighTypeId = Shader.PropertyToID("_HighCloudType");
     static readonly int HighAltitudeId = Shader.PropertyToID("_HighCloudAltitude");
@@ -180,7 +155,6 @@ public class AtmosphereController : MonoBehaviour
 
     /// Teşhis paneli canlı ürettiği haritayı buradan takar; global doku bir sonraki
     /// Apply'da yeniden yayınlanır. Kalıcılık asset pişirmesinin işi.
-    public void SetWeatherMap(Texture2D map) => weatherMap = map;
 
     /// Oyuncunun ÜSTÜNDEKİ kolonun yağış payı, 0-1. Yağış artık gökten tek parça
     /// düşmüyor: yağmuru düşüren şey belirli bulutlardır, bir bulutun altındayken
@@ -554,33 +528,12 @@ public class AtmosphereController : MonoBehaviour
 
         Shader.SetGlobalFloat(StarStrengthId, (1f - day) * (1f - coverage) * 1.2f);
 
-        // Bulut parametreleri global: ayrı geçişte çalışan bulut shader'ı da bunları okur
-        // Çözünürlük dokunun kendisinden okunur: shader mip seviyesini adım boyuyla
-        // karşılaştırarak seçiyor ve bunun için bir texel'in kaç metre olduğunu bilmesi
-        // gerekiyor. Sabit olarak yazılsa gürültü üreticisi değiştiğinde sessizce ayrışır.
-        if (baseNoise != null)
-        {
-            Shader.SetGlobalTexture(BaseNoiseId, baseNoise);
-            Shader.SetGlobalFloat(BaseNoiseTexelsId, baseNoise.width);
-        }
-
-        if (detailNoise != null)
-        {
-            Shader.SetGlobalTexture(DetailNoiseId, detailNoise);
-            Shader.SetGlobalFloat(DetailNoiseTexelsId, detailNoise.width);
-        }
-
-        if (weatherMap != null)
-        {
-            Shader.SetGlobalTexture(WeatherMapId, weatherMap);
-            Shader.SetGlobalFloat(WeatherMapScaleId,
-                1f / Mathf.Max(1f, settings.weatherMapWorldSize));
-            Shader.SetGlobalFloat(WeatherMapTexelsId, weatherMap.width);
-        }
-
-        if (skipMap != null) Shader.SetGlobalTexture(SkipMapId, skipMap);
-        if (curlNoise != null) Shader.SetGlobalTexture(CurlNoiseId, curlNoise);
-        if (highNoise != null) Shader.SetGlobalTexture(HighNoiseId, highNoise);
+        // (BULUT DOKU YAYINLARI SİLİNDİ — gürültü ve hava haritası yeniden yazılıyor.)
+        //
+        // `_CloudBottom` aşağıda yazılmaya DEVAM ediyor: şimşek shader'ı çakmayı bulut
+        // tabanı küresiyle kesiştiriyor. Bulut DURUMU (kapsama, taban, tavan, sürüklenme)
+        // bu bileşende kalıyor — hava modelinin çıktısı, render tesisatı değil. Yeni
+        // bulut sistemi bunları okuyacak; bağların listesi `CLOUDS_REBUILD.md`'de.
 
         Shader.SetGlobalVector(SunDirectionId, time.SunDirection);
         Shader.SetGlobalVector(MoonDirectionId, time.MoonDirection);
@@ -755,39 +708,13 @@ public class AtmosphereController : MonoBehaviour
         return new Color(hue.r * scale, hue.g * scale, hue.b * scale, 1f);
     }
 
-    void UpdateLocalRain()
-    {
-        if (weatherMap == null || view == null) return;
-
-        Vector2 mapPos = new Vector2(view.transform.position.x, view.transform.position.z)
-                         + cloudOffset * 0.72f;
-        float scale = 1f / Mathf.Max(1f, settings.weatherMapWorldSize);
-        Color column = weatherMap.GetPixelBilinear(mapPos.x * scale, mapPos.y * scale);
-
-        // Kapsama eşiği: saçak altında yağmur olmaz. Tip eşiği: yağmuru kümülüs ve
-        // üstü düşürür.
-        float mass = Mathf.InverseLerp(0.12f, 0.55f, column.r);
-        float build = Mathf.InverseLerp(0.30f, 0.75f, column.g);
-        float target = Mathf.Clamp01(mass * build);
-
-        // Bulut tepesinin ÜSTÜNDE yağış yok — yağan şeyin kaynağı aşağıda kalır.
-        // Zirve bulutları deldiğinde yağmurun kesilmesi tırmanışın en belirgin
-        // eşiklerinden biri.
-        float columnTop = activeCloudBottom + column.a * (settings.cloudTop - activeCloudBottom);
-        float belowTop = 1f - Mathf.SmoothStep(0f, 1f,
-                              Mathf.InverseLerp(columnTop, columnTop + 300f, view.transform.position.y));
-        target *= belowTop;
-
-        // Sütunun tepesi sürücüye KOT olarak veriliyor, kesme payı olarak değil: kar
-        // profili her kot bandının kesmesini kendi yüksekliğinden hesaplıyor. Skaler
-        // pay yalnızca oyuncunun bulunduğu kot için doğruydu.
-        weatherDriver.CloudColumnTop = columnTop;
-
-        // Yavaş yumuşatma: bulut kenarından geçerken yağmurun bir anda kesilmesi
-        // yapay duruyor; gerçekte perde kenarı birkaç saniyede zayıflar.
-        localRain = Mathf.Lerp(localRain, target,
-                               1f - Mathf.Exp(-Time.deltaTime / 2.5f));
-    }
+    /// YEREL YAĞIŞ GEÇİCİ OLARAK KAPALI. Hava haritasından okunuyordu: yağmur yalnız
+    /// kalın kolonların altına düşsün, komşu bulut yağmazken bu yağsın diye. Harita
+    /// bulut sistemiyle birlikte silindi.
+    ///
+    /// Şimdilik 1 dönüyor — yağış çalışıyor ama her yerde aynı. Yeni bulut sistemi
+    /// gelince harita okuması geri gelecek; bağın tarifi `CLOUDS_REBUILD.md` madde 4.
+    void UpdateLocalRain() => localRain = 1f;
 
     /// Yükseklik sisi parametreleri. Görüş mesafesi zaten havayı, rüzgârı ve bulut
     /// kuşağını hesaba katıyor; burada yalnızca yüksekliğe dağıtılıyor.

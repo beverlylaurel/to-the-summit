@@ -50,7 +50,6 @@ public static class MountainSceneBootstrap
     const string PrecipitationShaderPath = "Assets/Shaders/Precipitation.shader";
     const string SkyShaderPath = "Assets/Shaders/Sky.shader";
     const string SkyMaterialPath = "Assets/Settings/Sky.mat";
-    const string CloudShaderPath = "Assets/Shaders/VolumetricClouds.shader";
     const string RendererPath = "Assets/Settings/PC_Renderer.asset";
 
     static MountainSceneBootstrap()
@@ -127,7 +126,6 @@ public static class MountainSceneBootstrap
         if (RemoveMissingScripts(scene)) changed = true;
         Phase("ölü script taraması");
 
-        EnsureCloudFeature();
         Phase("bulut geçişi");
 
         var settings = current = LoadOrCreateSettings();
@@ -544,35 +542,7 @@ public static class MountainSceneBootstrap
         return material;
     }
 
-    /// Bulut geçişini URP renderer'ına ekler. Renderer feature'lar asset içinde alt nesne
-    /// olarak tutulur; elle sürüklemek yerine burada kurulur.
-    static void EnsureCloudFeature()
-    {
-        var renderer = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.ScriptableRendererData>(RendererPath);
-        if (renderer == null)
-            throw new System.InvalidOperationException($"Renderer bulunamadı: {RendererPath}");
-
-        foreach (var existing in renderer.rendererFeatures)
-            if (existing is VolumetricCloudsFeature) return;
-
-        var shader = AssetDatabase.LoadAssetAtPath<Shader>(CloudShaderPath);
-        if (shader == null)
-            throw new System.InvalidOperationException($"Shader bulunamadı: {CloudShaderPath}");
-
-        var feature = ScriptableObject.CreateInstance<VolumetricCloudsFeature>();
-        feature.name = "Volumetric Clouds";
-
-        var serialized = new SerializedObject(feature);
-        serialized.FindProperty("shader").objectReferenceValue = shader;
-        serialized.ApplyModifiedPropertiesWithoutUndo();
-
-        renderer.rendererFeatures.Add(feature);
-
-        AssetDatabase.AddObjectToAsset(feature, renderer);
-        EditorUtility.SetDirty(renderer);
-        AssetDatabase.SaveAssets();
-        AssetDatabase.ImportAsset(RendererPath);
-    }
+    // (EnsureCloudFeature SİLİNDİ — bulut render geçişi yeniden yazılıyor.)
 
     // (AssignCloudNoise SİLİNDİ — bulut dokuları yeniden yazılıyor.)
 
