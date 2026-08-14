@@ -261,14 +261,40 @@ haritası mı pişiriliyor, yoksa aynı alan mı okunuyor?
 `[N15 s.40]` R kapsama, G yağış, B tip diyor. `[N17]` weather map sistemini anlatıyor.
 Kanallar zamanla nasıl değişiyor, simülasyon mu, boyanmış doku mu?
 
-> *(cevap)*
+**İki ayrı NDF kümesi, her birinin sonunda bir "Influence Mask"** `[N22 s.75]`:
+
+- Vertical Profile Model NDF: min h, max h, kapsama, alt tip, üst tip **+ influence mask**
+- 2.5D NDF (cirrus): kapsama, tip **+ influence mask**
+
+**İki üretim yolu aynı boru hattında** `[N22 s.69-74]`:
+- **NDF Generator** — prosedürel, döşenen hava haritası üretiyor
+- **NDF Editor** — Houdini içinde elle heykel; bulutlar viewport'ta gerçek hâliyle
+  görünüyor `[N22 s.72]`
+
+İkisi "Influence NDFs" üzerinden birleşip "Authored NDFs" oluyor.
+
+**Bölgesel:** dünya haritası bölgelere ayrılmış (San Francisco vb.) ve her bölgenin
+kendi Influence NDF'i var `[N22 s.77]`. Yani bulut karakteri coğrafyaya bağlı.
+
+**Hava durumu geçişi:** her hava durumu (Calm Cloudy / Stormy / Calm Clear) kendi
+**cloudscape**'ini VE kendi bölgesel influence NDF'ini taşıyor; "Current Weather" bunların
+harmanı `[N22 s.78]`. Yani hava değişimi tek bir kapsama sürgüsü değil, tam bir NDF
+kümesinin diğerine geçmesi.
 
 ## 12. Hangi optimizasyon ne kazandırıyor, hangisi artefakt üretiyor?
 
 Bizde ışından türeyen her ucuzlatma ekranda izo-yüzey çizdi. Makalelerde hangi
 ucuzlatmalar var, hangileri gönderilmiş, hangileri geri alınmış?
 
-> *(cevap)*
+**Ölçülmüş hedef: bulutlar ~0.4 ms** `[N22 s.82]` — GPU profilinde `Clouds 434 µs`,
+ortalama/medyan `329 µs / 401 µs`.
+
+Bizde bulutlar ~4 ms tutuyordu (bisikletde 280 FPS, gökyüzünde 130). **On kat fark.**
+
+Örnekleme deseni seyrek `[N22 s.81]`: ekran, aralıklı piksellerden oluşan bir ızgarayla
+örnekleniyor (her kare her piksel değil).
+
+*(Ayrıntısı ve yeniden yansıtma sonraki sayfalarda.)*
 
 ---
 
@@ -331,7 +357,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
-| `[N22]` nubis-2022 | **207** | s.1–70 | s.71–207 |
+| `[N22]` nubis-2022 | **207** | s.1–82 | s.83–207 |
 | `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
