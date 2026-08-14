@@ -109,6 +109,57 @@ public static class BikeBootstrap
         { "model_part24", "Paint"   },  // kadro
     };
 
+    /// YÜZEY DEĞERLERİ KENDİLİĞİNDEN EŞİTLENİYOR. Tablodaki bir sayı değiştiğinde
+    /// materyale ancak menü çalışınca geçiyordu; her renk denemesi için "Sahneye Kur"a
+    /// basmak gerekiyordu. Derleme sonrası tablo ile materyal karşılaştırılıyor, yalnız
+    /// FARKLI olan yazılıyor — her açılışta asset kirletmek yeniden içe aktarma demek.
+    ///
+    /// Yapısal kurulum (hiyerarşi, rig, binme, zemine oturtma) burada değil: o menüde
+    /// kalıyor çünkü sahneyi değiştiriyor ve her derlemede yapılması istenmez.
+    [InitializeOnLoadMethod]
+    static void SyncMaterials()
+    {
+        Shader shader = Shader.Find(ShaderName);
+        if (shader == null) return;
+
+        foreach (var surface in Surfaces)
+        {
+            var material = AssetDatabase.LoadAssetAtPath<Material>(
+                $"{Folder}/Bicycle_{surface.Name}.mat");
+
+            if (material == null) continue;
+
+            bool changed = false;
+            changed |= Set(material, "_BaseColor", surface.Colour);
+            changed |= Set(material, "_Metallic", surface.Metallic);
+            changed |= Set(material, "_Smoothness", surface.Smoothness);
+            changed |= Set(material, "_Variation", surface.Variation);
+            changed |= Set(material, "_Grain", surface.Grain);
+            changed |= Set(material, "_Brushed", surface.Brushed);
+            changed |= Set(material, "_Dust", surface.Dust);
+            changed |= Set(material, "_Fade", surface.Fade);
+            changed |= Set(material, "_Grime", surface.Grime);
+
+            if (changed) EditorUtility.SetDirty(material);
+        }
+    }
+
+    static bool Set(Material material, string property, float value)
+    {
+        if (Mathf.Approximately(material.GetFloat(property), value)) return false;
+
+        material.SetFloat(property, value);
+        return true;
+    }
+
+    static bool Set(Material material, string property, Color value)
+    {
+        if (material.GetColor(property) == value) return false;
+
+        material.SetColor(property, value);
+        return true;
+    }
+
     [MenuItem("To The Summit/Model/Bisiklet/Sahneye Kur", false, 120)]
     static void Build()
     {
