@@ -133,9 +133,7 @@ public class AtmosphereSettings : ScriptableObject
              "açıklamasıyla çelişiyordu.")]
     public float cloudDrift = 2f;
     [Tooltip("Yer rüzgârı dinginken bile bulutların süzülme hızı (m/s). Dingin havada " +
-             "yüksek katmanlar durmaz, birkaç metre saniye süzülür.
-
-" +
+             "yüksek katmanlar durmaz, birkaç metre saniye süzülür. " +
              "Bu değer 90 m/s idi — 324 km/h, yani rüzgâr sıfıra çekilse bile gökyüzü " +
              "akıp gidiyordu. Rüzgâr kilidi bulutları durdurmuyordu çünkü taban zaten " +
              "her şeyi eziyordu.")]
