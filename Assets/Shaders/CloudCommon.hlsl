@@ -1412,16 +1412,22 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
                 // küçülüyor, dolayısıyla derinde birkaç örnekte bir hesaplamak
                 // görünmüyor. Sonda örnek başına ~35 doku okuması yapıyor, yani bu
                 // yürüyüşün en pahalı kalemi.
-                int probeMask = transmittance > 0.6 ? 0
-                              : transmittance > 0.35 ? 1 : 3;
+                // SONDA HER ADIMDA. Aralıklı çalışma (iki-dört adımda bir) kare süresi
+                // kazandırıyordu ama bütün pikseller aynı noktalarda okuduğu için
+                // aydınlanma eşit mesafelerde basamaklanıyor ve ekranda eşmerkezli kabuk
+                // — soğan halkası — bırakıyordu. Üç deneme yapıldı ve ölçüldü:
+                //   • fazı piksel piksel kaydırmak → halka kırıldı, KENARDA GREN
+                //   • basamağı rampaya çevirmek  → gren gitti, HALKA KALDI
+                //   • adım boyunu küçültmek      → halka gitti, FPS 15'e düştü
+                // Kalan tek yapısal yol aralığı kaldırmak: basamak yoksa kabuk da yok.
+                //
+                // Bedeli başka yerden ödeniyor: ışık örneği 5'ten 4'e, yürüyüş adımı
+                // 140'tan 110'a indi (bkz. `AtmosphereSettings`).
+                int probeMask = 0;
 
-                // MESAFE KAPISI GEÇİRGENLİĞE DE BAĞLI. Beş kilometre içinde sonda her
-                // adımda çalışıyordu; kamera bulutun İÇİNDEYKEN bütün yol o bölgede
-                // geçiyor ve her adım yedi yoğunluk okuması yapıyor (5 üstel örnek +
-                // koni + uzak komşu). Kare süresinin bulut içinde ikiye katlanmasının
-                // ana sebebi buydu. Işın kapanmaya başladıktan sonra sondanın her adımda
-                // yenilenmesinin ekrana katkısı yok: katkı zaten geçirgenlikle çarpılıyor.
-                bool nearAndOpen = travelled < 5000.0 && transmittance > 0.85;
+                // Işın büyük ölçüde kapandıktan sonra sonda seyrekleşiyor: oradaki
+                // katkı zaten geçirgenlikle çarpılıp siliniyor, kabuk da görünmüyor.
+                if (transmittance < 0.25) probeMask = 3;
 
                 // ÖNBELLEK FAZI PİKSEL PİKSEL KAYDIRILDI VE GERİ ALINDI. Amaç sondanın
                 // merdivenini halka olmaktan çıkarmaktı; halkalar bir miktar azaldı ama
@@ -1430,8 +1436,7 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
                 // için (bkz. `VolumetricClouds.shader`) o gren kalıcı.
                 //
                 // Halka bastırma işini giriş fazı yapıyor; sonda fazı ortak kalıyor.
-                if (cachedLit < 0.0 || (nearAndOpen && probeMask == 0)
-                    || (i & max(probeMask, 1)) == 0)
+                if (cachedLit < 0.0 || probeMask == 0 || (i & probeMask) == 0)
                     cachedLit = CloudLightTransmittance(samplePoint, lightDirection,
                                                         transmittance <= 0.7, travelled,
                                                         openness);
