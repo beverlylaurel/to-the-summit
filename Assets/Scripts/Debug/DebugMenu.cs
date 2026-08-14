@@ -198,6 +198,37 @@ public class DebugMenu : MonoBehaviour
     }
 
     /// Başlıklı kutu açar; kapatmak için EndSection
+    /// TEŞHİS — bisiklet zeminden ne kadar yukarıda. Gölgeyle arasında boşluk görülüyor
+    /// ve iki açıklaması var: bisiklet havada duruyor ya da gölge kaydırılmış. Yükseklik
+    /// ile güneşin açısı birlikte yazılıyor çünkü alçak güneşte bir santimlik boşluk bile
+    /// gölgeyi metrelerce öteliyor — boşluğun büyüklüğü tek başına bir şey söylemiyor.
+    void BikeHeight()
+    {
+        var bike = Object.FindAnyObjectByType<BikeController>();
+        if (bike == null) return;
+
+        var box = bike.GetComponentInChildren<Renderer>();
+        if (box == null) return;
+
+        float bottom = box.bounds.min.y;
+        var ray = new Ray(new Vector3(box.bounds.center.x, bottom + 3f, box.bounds.center.z),
+            Vector3.down);
+
+        if (!Physics.Raycast(ray, out RaycastHit hit, 12f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            GUILayout.Label("Bisiklet: zemin bulunamadı");
+            return;
+        }
+
+        float gap = bottom - hit.point.y;
+        float elevation = Mathf.Asin(Mathf.Clamp(time.SunHeight, -1f, 1f)) * Mathf.Rad2Deg;
+        float slip = Mathf.Abs(elevation) > 0.5f
+            ? gap / Mathf.Tan(Mathf.Abs(elevation) * Mathf.Deg2Rad) : 0f;
+
+        GUILayout.Label($"Bisiklet zeminden {gap * 100f:F1} cm"
+                        + $"   güneş {elevation:F1}°   gölge kayması {slip:F2} m");
+    }
+
     void BeginSection(string label)
     {
         GUILayout.BeginVertical(GUI.skin.box);
@@ -215,6 +246,8 @@ public class DebugMenu : MonoBehaviour
         BeginSection("Hareket");
 
         GUILayout.Label($"Hız çarpanı {speedMultiplier:F0}×");
+
+        BikeHeight();
 
         // Sürgü karesel: küçük değerlerde hassas, uçta 100×'e ulaşır
         float normalized = Mathf.Sqrt((speedMultiplier - 1f) / 99f);
