@@ -3,6 +3,12 @@
 Eski sistem silinmeden önce yazıldı. Amaç tek şey: **hangi bağ vardı, yenisinde ne
 yeniden kurulacak.** Kod değil, sözleşme listesi.
 
+> **Belgeler arası iş bölümü.** Bulut konusunda **geçerli olan tek belge budur.**
+> `SYSTEMS.md`'nin bulut kısmı silinmiş koda ait, oraya bakılmaz (başında uyarısı var).
+> `DECISIONS.md` yalnız kararın kendisini ve tetikleyicisini tutuyor.
+> Yeni sistem çalışır hâle gelince bu dosya `SYSTEMS.md`'ye taşınır ve buradaki bağlar
+> orada güncellenir; iki yerde birden bulut anlatımı durmaz.
+
 ---
 
 ## Bulut sisteminin OKUDUKLARI (girdi)

@@ -1,5 +1,17 @@
 # Sistemler
 
+> **BULUT SİSTEMİ ŞU AN YOK.** 2026-08-14'te tamamen silindi; yerine hazır bir uygulama
+> (`UnityVolumetricCloudsURP`) alınacak. Aşağıda bulutla ilgili yazan her şey **silinmiş
+> koda** aittir — kural olarak hâlâ doğru olabilir ama karşılığı olan satır yoktur.
+>
+> Yeni sistem gelene kadar geçerli olan belge `CLOUDS_REBUILD.md`: hangi bağ nereye
+> gidiyordu, ölçülerek bulunmuş on iki ders, kurtarılmış gürültü hash'i. Kararın kendisi
+> ve tetikleyicisi `DECISIONS.md`'de.
+>
+> Şu an stub olan iki bağ: yer bulut gölgesi (`CloudShadowAt` → 1.0) ve yerel yağış
+> (`UpdateLocalRain` → 1).
+
+
 Atmosferin **şu an nasıl çalıştığı**: ne neyden beslenir, ne neyi etkiler.
 
 `DECISIONS.md` ertelenmiş kararları ve tetikleyicilerini tutar; bu dosya mevcut durumu.
@@ -282,6 +294,10 @@ Kanalın nerede biteceğini yamacın kendisi belirler. Değme noktasındaki ış
 ve kümelemeyi boğmuyor.
 
 ### Sis ve bulutlar (`AtmosphereController`)
+
+**Bu bölümün bulutla ilgili kısmı SİLİNMİŞ koda ait — bkz. dosyanın başındaki uyarı.**
+Sis, gökyüzü, görüş mesafesi ve yansıma anlatımı geçerlidir.
+
 
 **Okur:** şiddet, karlılık, rüzgârın **sürekli** şiddeti ve yönü, günün saati, ve
 sürücüden yalnızca **açık pencere** sinyali. Sürücüden başka hiçbir değer okunmaz;
