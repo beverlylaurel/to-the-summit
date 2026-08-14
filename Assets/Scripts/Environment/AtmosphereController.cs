@@ -231,6 +231,10 @@ public class AtmosphereController : MonoBehaviour
     /// çağrılmamış olabilir.
     void OnEnable() => Initialize();
 
+    /// Bulutların şu ana kadar biriktirdiği kayma (metre). Teşhis: hız doğru görünüp de
+    /// gökyüzü sabit duruyorsa, kaymanın büyüyüp büyümediği bu sayıdan anlaşılıyor.
+    public float CloudShift => cloudOffset.magnitude;
+
     /// Bulutların o anki süzülme hızı (m/s). Teşhis içindir: rüzgâr sıfırlanınca da
     /// hareket ediyorlarsa sebebin taban hız mı yoksa rüzgâr mı olduğu ancak bu sayıyla
     /// ayrılıyor.
