@@ -74,9 +74,15 @@ Assets/Terrain/MountainSurfaceMaps.asset*
 Assets/Terrain/MountainSnowDrift.asset*
 Assets/Terrain/RouteShapeMask.png*
 
-# DÜZELTİLMİŞ TEKERLEK MESH'LERİ. Kaynak FBX'ten ölçülüp yeniden üretiliyor; her biri
-# birkaç yüz bin köşe, yani depoya yazmanın bedeli var ve kazancı yok.
-Assets/Models/Bike/Generated/
+# ÜRETİLEN BİSİKLET MESH'LERİ. Jant düzeltmesi ve bölge ayrımı kaynaktan yeniden
+# hesaplanıyor; depoya yazmanın bedeli var, kazancı yok.
+#
+# BOYANMIŞ MESH'LER HARİÇ. Onlar elle boyandı, yeniden üretilemez: silinirse iş
+# baştan yapılır. Klasörün kendisi değil İÇERİĞİ yok sayılıyor, yoksa istisna
+# çalışmıyor — git, dışlanmış bir klasörün içindeki dosyayı geri alamıyor.
+Assets/Models/Bike/Generated/*
+!Assets/Models/Bike/Generated/*_Paint.asset
+!Assets/Models/Bike/Generated/*_Paint.asset.meta
 
 # Arka plan yenileme tetikleyicisi. Icerigi onemsiz, yalniz zaman damgasi okunuyor.
 Logs/refresh.trigger
