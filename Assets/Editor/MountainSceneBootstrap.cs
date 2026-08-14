@@ -51,6 +51,7 @@ public static class MountainSceneBootstrap
     const string SkyShaderPath = "Assets/Shaders/Sky.shader";
     const string SkyMaterialPath = "Assets/Settings/Sky.mat";
     const string RendererPath = "Assets/Settings/PC_Renderer.asset";
+    const string CloudMaterialPath = "Assets/Settings/VolumetricClouds.mat";
 
     static MountainSceneBootstrap()
     {
@@ -126,6 +127,8 @@ public static class MountainSceneBootstrap
         if (RemoveMissingScripts(scene)) changed = true;
         Phase("ölü script taraması");
 
+        EnsureCloudFeature();
+        EnsureCloudVolume();
         Phase("bulut geçişi");
 
         var settings = current = LoadOrCreateSettings();
@@ -542,7 +545,101 @@ public static class MountainSceneBootstrap
         return material;
     }
 
-    // (EnsureCloudFeature SİLİNDİ — bulut render geçişi yeniden yazılıyor.)
+    /// BULUT RENDER GEÇİŞİ. `VolumetricCloudsURP` (jiaozi158, MIT — HDRP'nin URP portu)
+    /// URP renderer'ına alt nesne olarak ekleniyor. Feature'ın kendi materyali var; shader
+    /// gizli olduğu için materyal asset olarak üretilip bağlanıyor.
+    static void EnsureCloudFeature()
+    {
+        var renderer = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.ScriptableRendererData>(RendererPath);
+        if (renderer == null)
+            throw new System.InvalidOperationException($"Renderer bulunamadı: {RendererPath}");
+
+        var shader = Shader.Find("Hidden/Sky/VolumetricClouds");
+        if (shader == null)
+            throw new System.InvalidOperationException("Bulut shader'ı bulunamadı: Hidden/Sky/VolumetricClouds");
+
+        var material = AssetDatabase.LoadAssetAtPath<Material>(CloudMaterialPath);
+        if (material == null)
+        {
+            material = new Material(shader) { name = "VolumetricClouds" };
+            AssetDatabase.CreateAsset(material, CloudMaterialPath);
+        }
+        BindCloudTextures(material);
+
+        foreach (var existing in renderer.rendererFeatures)
+            if (existing is VolumetricCloudsURP) return;
+
+        var feature = ScriptableObject.CreateInstance<VolumetricCloudsURP>();
+        feature.name = "Volumetric Clouds";
+
+        var serialized = new SerializedObject(feature);
+        serialized.FindProperty("material").objectReferenceValue = material;
+        serialized.ApplyModifiedPropertiesWithoutUndo();
+
+        // `Create()` ÖRNEK ÜRETİLİRKEN Unity tarafından bir kez çağrılıyor ve materyal o
+        // an henüz atanmamış oluyor; feature "Material is empty" deyip erken dönüyor.
+        // Materyal bağlandıktan sonra elle tekrar çağrılıyor ki geçişler kurulsun.
+        feature.Create();
+
+        renderer.rendererFeatures.Add(feature);
+        AssetDatabase.AddObjectToAsset(feature, renderer);
+        EditorUtility.SetDirty(renderer);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.ImportAsset(RendererPath);
+    }
+
+    /// Gürültü dokuları materyalde duruyor, hiçbir kod atamıyor — repo hazır materyalle geliyordu.
+    /// Eşleşme shader'daki örneklemeden: `_Worley128RGBA` düşük frekans şekil, `_ErosionNoise` detay.
+    static void BindCloudTextures(Material material)
+    {
+        material.SetTexture("_Worley128RGBA", LoadCloudTexture("WorleyNoise128RGBA"));
+        material.SetTexture("_ErosionNoise", LoadCloudTexture("WorleyNoise32RGB"));
+        material.SetTexture("_CloudLutTexture", LoadCloudTexture("CloudLutRainAO"));
+        EditorUtility.SetDirty(material);
+        AssetDatabase.SaveAssets();
+    }
+
+    static Texture LoadCloudTexture(string fileName)
+    {
+        var path = $"Assets/VolumetricClouds/Textures/{fileName}.png";
+        var texture = AssetDatabase.LoadAssetAtPath<Texture>(path);
+        if (texture == null)
+            throw new System.InvalidOperationException($"Bulut dokusu bulunamadı: {path}");
+        return texture;
+    }
+
+    /// BULUT VOLUME BİLEŞENİ. Ayarlar `VolumetricClouds` (VolumeComponent) üzerinden geliyor ve
+    /// varsayılanı KAPALI; sahnedeki profile ekleyip açıyoruz.
+    ///
+    /// v1 KURALI: buraya bizim hiçbir ayarımız yazılmıyor (bkz. `CLOUDS_REBUILD.md`).
+    /// Repo'nun varsayılanları neyse o çalışıyor.
+    static void EnsureCloudVolume()
+    {
+        var volume = Object.FindAnyObjectByType<UnityEngine.Rendering.Volume>();
+        if (volume == null)
+            throw new System.InvalidOperationException("Sahnede Volume yok, bulut hacmi eklenemedi.");
+        if (volume.sharedProfile == null)
+            throw new System.InvalidOperationException($"{volume.name} Volume'unda profil yok.");
+
+        var profile = volume.sharedProfile;
+        if (profile.TryGet(out VolumetricClouds existing))
+        {
+            if (!existing.state.value)
+            {
+                existing.state.value = true;
+                EditorUtility.SetDirty(profile);
+            }
+            return;
+        }
+
+        var clouds = profile.Add<VolumetricClouds>(overrides: true);
+        clouds.state.value = true;
+        clouds.name = nameof(VolumetricClouds);
+        AssetDatabase.AddObjectToAsset(clouds, profile);
+        EditorUtility.SetDirty(profile);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath(profile));
+    }
 
     // (AssignCloudNoise SİLİNDİ — bulut dokuları yeniden yazılıyor.)
 
