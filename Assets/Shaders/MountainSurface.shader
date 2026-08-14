@@ -47,7 +47,14 @@ Shader "ToTheSummit/MountainSurface"
             #pragma multi_compile_fragment _ _CLUSTER_LIGHT_LOOP
             #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
-            #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
+            // EKRAN UZAYI ÖRTÜŞME GÖLGESİ ARAZİDE OKUNMUYOR. Derinlik tamponundan
+            // çalışıyor ve arazi örgüsünün üçgen yüzeylerini yüzey kıvrımı sanıp zemine
+            // yumuşak kafes çizgileri çiziyor (bkz. `DECISIONS.md` — SSAO kapalı).
+            // Büyük ölçekli oyuk gölgesini pişmiş maruziyet kanalı zaten veriyor.
+            //
+            // Özellik boru hattında AÇIK: yakın plan nesneler (bisiklet, ekipman, çadır)
+            // onu okuyor ve kuytuları kararıyor. Anahtar burada bildirilmediği için
+            // arazi etkilenmiyor.
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -115,7 +122,7 @@ Shader "ToTheSummit/MountainSurface"
                     surface.smoothness, alpha, brdfData);
 
                 AmbientOcclusionFactor aoFactor = CreateAmbientOcclusionFactor(
-                    inputData.normalizedScreenSpaceUV, surface.occlusion);
+                    float2(0.0, 0.0), surface.occlusion);
 
                 // Arazinin kendi gölgesi yükseklik alanından. Işığa sırtı dönük piksel
                 // yürümüyor: katkısı zaten sıfır, kırk adım boşa giderdi.

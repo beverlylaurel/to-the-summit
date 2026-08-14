@@ -824,9 +824,15 @@ görülürdü. Materyalin ilk denemesi bu yüzden geri alındı.
 
 ---
 
-### SSAO kapalı
+### SSAO yalnız nesnelerde
 
-**Karar:** PC renderer'da ScreenSpaceAmbientOcclusion devre dışı (2026-08-09).
+**Karar:** ScreenSpaceAmbientOcclusion boru hattında AÇIK ama araziye okutulmuyor
+(2026-08-14). Anahtar yalnız nesne gölgelendiricilerinde bildiriliyor; `MountainSurface`
+onu bildirmediği için arazi etkilenmiyor.
+
+**Önceki karar (2026-08-09):** özellik tamamen kapalıydı, gerekçesi aşağıda. Tetikleyici
+gerçekleşti — bisiklet geldi ve kuytuları kararmadığı için fazla parlak duruyordu;
+kararın öngördüğü iki çözümden "yalnız objelere AO" seçildi.
 **Gerekçe:** SSAO derinlik tamponundan çalışıyor ve arazi örgüsünün üçgen yüzeylerini
 "yüzey kıvrımı" sanıp gölgeliyor: zeminde, yakında (30 m falloff), dünyaya çakılı,
 saatten bağımsız yumuşak kafes çizgileri. DepthNormals geçişine pürüzsüz pişmiş normal
