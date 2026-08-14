@@ -1207,18 +1207,6 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
                          ? lerp(1.0, 0.5, openness) : 1.0;
         float step = min(nominalStep * (coarsePass ? 2.0 : tailRefine), limit - travelled);
 
-        // ADIM BAŞINA OPTİK DERİNLİK KELEPÇELİ. Halkaların ölçülmüş sebebi bu: yoğunluk
-        // arttıkça halkalar artıyor, azaldıkça azalıyor (F1 sürgüsüyle doğrulandı). Bir
-        // adımda kesilen ışık miktarı σ·Δ; bu çarpım 0.2'yi aştığında bulut bir-iki
-        // adımda opaklaşıyor ve her adım sınırı ekranda eşmerkezli kabuk olarak
-        // görünüyor. Uzak adım 200 m ve σ=0.00735 iken çarpım 1.5 — sınırın yedi katı.
-        //
-        // Kelepçe yalnız BULUTUN İÇİNDE bağlıyor: boş gökte yoğunluk sıfır, bölme
-        // devasa bir sayı veriyor ve adım kısıtlanmıyor. Yani maliyet yalnız bulutun
-        // içinde artıyor, gökyüzünün büyük boş kısmında değil.
-        if (!coarsePass && prevDensity > 1e-6)
-            step = min(step, max(CloudMaxOpticalStep / prevDensity, nominalStep * 0.25));
-
         // İlk adım Bayer kayması kadar kısa: tarama fazı piksele göre kayar, pencere
         // her pikselde tam kalır. Mip yine anma adımına bakar, kırpılmışa değil.
         if (i == 0 && dither > 0.0) step = min(step, max(nominalStep * dither, 1.0));
@@ -1374,8 +1362,20 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
                 int probeMask = transmittance > 0.6 ? 0
                               : transmittance > 0.35 ? 1 : 3;
 
+                // ÖNBELLEK FAZI PİKSEL PİKSEL KAYIYOR. Sonda her adımda değil, iki-dört
+                // adımda bir çalışıyor ve aradaki adımlar aynı aydınlanmayı taşıyor.
+                // Faz bütün piksellerde aynı olduğu için o merdiven ekranda eşmerkezli
+                // kabuk — soğan halkası — olarak hizalanıyordu. Yoğunluk arttıkça
+                // geçirgenlik daha hızlı düşüyor, önbellek seyrekleşiyor ve halkalar
+                // belirginleşiyordu; ölçüm de tam bunu gösterdi.
+                //
+                // Faz kaydırılınca merdiven kalıyor ama komşu pikseller farklı yerde
+                // basamak atlıyor: hizalanma bozuluyor, halka gürültüye dönüşüyor.
+                // Maliyet sıfır — sonda sayısı değişmiyor.
+                int probePhase = (int)(pixelHash * 4.0) & 3;
+
                 if (cachedLit < 0.0 || (travelled < 5000.0 && probeMask == 0)
-                    || (i & max(probeMask, 1)) == 0)
+                    || ((i + probePhase) & max(probeMask, 1)) == 0)
                     cachedLit = CloudLightTransmittance(samplePoint, lightDirection,
                                                         transmittance <= 0.7, travelled,
                                                         openness);
