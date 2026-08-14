@@ -210,8 +210,10 @@ public class DebugMenu : MonoBehaviour
         var box = bike.GetComponentInChildren<Renderer>();
         if (box == null) return;
 
+        // IŞIN BİSİKLETİN ALTINDAN başlıyor. Üstünden atıldığında bisikletin kendi
+        // çarpışma kapsülüne çarpıp "zeminden -65 cm" gibi anlamsız bir sayı veriyordu.
         float bottom = box.bounds.min.y;
-        var ray = new Ray(new Vector3(box.bounds.center.x, bottom + 3f, box.bounds.center.z),
+        var ray = new Ray(new Vector3(box.bounds.center.x, bottom - 0.02f, box.bounds.center.z),
             Vector3.down);
 
         if (!Physics.Raycast(ray, out RaycastHit hit, 12f, ~0, QueryTriggerInteraction.Ignore))
@@ -220,7 +222,7 @@ public class DebugMenu : MonoBehaviour
             return;
         }
 
-        float gap = bottom - hit.point.y;
+        float gap = bottom - 0.02f - hit.point.y;
         float elevation = Mathf.Asin(Mathf.Clamp(time.SunHeight, -1f, 1f)) * Mathf.Rad2Deg;
         float slip = Mathf.Abs(elevation) > 0.5f
             ? gap / Mathf.Tan(Mathf.Abs(elevation) * Mathf.Deg2Rad) : 0f;
@@ -406,6 +408,11 @@ public class DebugMenu : MonoBehaviour
     void DrawClouds()
     {
         BeginSection("Bulutlar");
+
+        // TEŞHİS — bulutların gerçek süzülme hızı. Rüzgâr sıfırlanınca da hareket
+        // ediyorlardı ve sebebi görünmüyordu: taban hız ayarı yer rüzgârını eziyordu.
+        GUILayout.Label($"Süzülme {atmosphere.CloudSpeed:F1} m/s"
+                        + $" = {atmosphere.CloudSpeed * 3.6f:F0} km/h");
 
         GUILayout.Label($"Kapsama %{atmosphere.Coverage * 100f:F0}   " +
                         $"taban {atmosphere.CloudBottom:F0} m");
