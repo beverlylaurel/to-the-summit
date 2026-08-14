@@ -654,9 +654,13 @@ float CloudDensity(float3 position, bool cheap, float distance, float stepSize,
         // curl yalnız kaydırır. Büküm TABANDA güçlü: alt kenarların rüzgârla
         // taranmış, tutam tutam görüntüsü oradan gelir.
         // Aşındırma kendi zamanında kaynar (evrimin ~3 katı): ince yapı en hızlı
-        // değişen katmandır, gövdeyle aynı tempoda ötelenirse desen buluta yapışık
-        // duruyor ve kaymayı vurguluyordu.
-        float3 detailUvw = (drifted + _CloudWind * 0.4) * _DetailScale
+        // değişen katmandır.
+        //
+        // AMA ÖTELENMESİ GÖVDEYLE AYNI. Bir dönem rüzgârın 1.4 katıyla kaydırılıyordu ve
+        // sonuç şuydu: bulut kütlesi yerinde duruyor, kenarları sürünüyordu. Bulut
+        // hızı yavaşlatılınca bu iyice belli oldu — "bulutlar hareket etmiyor ama
+        // kenarları çok hızlı değişiyor". İnce yapı da aynı hava kütlesinin parçası.
+        float3 detailUvw = drifted * _DetailScale
                          + curl * _CloudCurlStrength * (1.0 - saturate(span)) * _DetailScale
                          + float3(_Evolution * 2.1, _Evolution * 3.0, _Evolution * 1.6);
         float3 detail = SAMPLE_TEXTURE3D_LOD(_DetailNoise, sampler_DetailNoise, detailUvw,
