@@ -231,6 +231,10 @@ public class AtmosphereController : MonoBehaviour
     /// çağrılmamış olabilir.
     void OnEnable() => Initialize();
 
+    /// Yansıma haritasının en son hangi gündüz katsayısında pişirildiği. Gökyüzü sürekli
+    /// değişiyor ama harita her karede pişirilemez — pişirme milisaniyeler yiyor.
+    float reflectionDay = float.MinValue;
+
     void Initialize()
     {
         if (settings == null || weather == null || wind == null || time == null
@@ -266,6 +270,19 @@ public class AtmosphereController : MonoBehaviour
         float precipitation = weather.Precipitation;
         float snowiness = weather.Snowiness;
         float day = time.DayFactor;
+
+        // YANSIMA HARİTASI GÖKYÜZÜYLE BİRLİKTE PİŞİYOR. Sahnenin yansıma kaynağı gökyüzü
+        // ve Unity onu yalnız istendiğinde pişiriyor: gökyüzü kararırken harita gündüz
+        // hâlinde kalıyordu. Sonuç, gece kromun hâlâ gündüz gökyüzünü aynalamasıydı —
+        // bisiklet karanlıkta parlıyordu.
+        //
+        // Her karede değil, gündüz katsayısı belirgin değişince: pişirme milisaniye
+        // yiyor ve gökyüzü bir karede o kadar değişmiyor.
+        if (Mathf.Abs(day - reflectionDay) > 0.02f)
+        {
+            reflectionDay = day;
+            DynamicGI.UpdateEnvironment();
+        }
 
         // Bulut denizi sakin havada oluşur: soğuk hava vadiye çöker ve üstünde durgun
         // bir tavan bulur. Rüzgâr o havayı karıştırıp inversiyonu dağıtır, yağış ise
