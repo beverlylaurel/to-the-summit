@@ -11,7 +11,8 @@ Okuma **ilerledikçe** doldurulur, sonunda değil.
 
 ## Hiçbir şey kaçmasın diye: okuma kuralları
 
-1. **15'er sayfa, sırayla, atlama yok.** "Bu bize lazım değil" diye sayfa geçilmez.
+1. **20'şer sayfa, sırayla, atlama yok.** "Bu bize lazım değil" diye sayfa geçilmez.
+   (Blok formül yoğunsa 12'ye düşülür — not incelirse kural çiğnenmiş olur.)
 2. **Her bloktan sonra defter güncellenir** (`s.X–Y okundu`). Defter baştan sona
    KESİNTİSİZ olmalı; boşluk varsa o sayfalar okunmamıştır. Kanıt defterde, hafızada
    değil.
@@ -473,6 +474,34 @@ kaba ve elle ayarlanan hâliydi; sphere tracing aynı işi ölçüden türeterek
 bölge boyanıyor, sonuç motorda dağa yaslanmış bulut. Bizim "dağa yaslanan bulut"
 ihtiyacımızın birebir karşılığı.
 
+### Zarf modelinin maliyeti — ölçülmüş
+
+`[N22 s.125-126]` GPU profilinde "Oro clouds — high res":
+
+| | süre |
+|---|---|
+| İlk hâli | **4.2 ms** |
+| Optimize | **1.3 ms** |
+
+Yani orografik (dağ) bulutları gökyüzünden çok daha pahalı: gökyüzü 0.4 ms, dağ bulutu
+1.3 ms. Toplam ~1.7 ms. Bizim tek katmanımız 4 ms tutuyordu.
+
+**Zarf NDF'i aslında YEDİ kanal** `[N22 s.129]` — s.106'da dördü gösterilmişti, tam hâli:
+
+Cloud Min Height · Cloud Max Height · Cloud Type · Cloud Density ·
+**Cloud Distance · Upper Angle · Lower Angle**
+
+Son üçü "Locations" için: kütlenin mesafesi ve üst/alt açıları. Muhtemelen zarf
+geometrisini bir yamaç boyunca eğmek/yaslamak için.
+
+### VFX bölümü — süper hücreler
+
+`[N22 s.134+]`. Amaçlar: gerçekçi, güçlü, tehditkâr, performanslı. Konu **supercell**
+fırtınaları: örs (anvil) ve mezosiklon `[N22 s.137-138]`. Referans hem fotoğraf hem
+gerçek bir sayısal simülasyon (El Reno, OK 2013 — Leigh Orf, NCSA görselleştirmesi).
+
+Bizim "sürekli fırtına" kuşağımızın karşılığı burası olabilir ama öncelik değil.
+
 ---
 
 ## Okuma defteri
@@ -483,7 +512,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
-| `[N22]` nubis-2022 | **207** | s.1–118 | s.119–207 |
+| `[N22]` nubis-2022 | **207** | s.1–138 | s.139–207 |
 | `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
