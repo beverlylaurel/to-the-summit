@@ -52,7 +52,13 @@ public static class BikeBootstrap
     /// Ön takımın tamamı (çatal, gidon, fren kolları, kablolar) bu eşiğin önünde duruyor.
     const float SteeringFrom = 1.20f;
 
-    /// YÜZEY TAKIMI. Kadro boyası, krom, kauçuk, deri ve yağlı çelik. Hepsi aynı gölgelendirici, farklı ayar —
+    /// YÜZEY TAKIMI. Kadro boyası, krom, kauçuk, deri ve yağlı çelik.
+    ///
+    /// PARLAKLIK BİLEREK DÜŞÜK. Fabrika çıkışı krom karlı havada bütün gökyüzünü aynalıyor
+    /// ve bisiklet plastik gibi parlıyordu; kullanılmış bir bisikletin kromu çukurlu ve
+    /// mat. Aynı sebeple kadro boyası da cilalı değil, yıllanmış.
+    ///
+    /// Hepsi aynı gölgelendirici, farklı ayar —
     /// malzemeyi ayıran şey renk değil, ışığa verdiği cevap: krom metalik ve fırça izli,
     /// deri yarı mat ve renkçe oynak.
     ///
@@ -63,8 +69,8 @@ public static class BikeBootstrap
                      float Variation, float Grain, float Brushed,
                      float Dust, float Fade, float Grime)[] Surfaces =
     {
-        ("Paint",   new Color(0.40f, 0.10f, 0.08f), 0.0f, 0.58f, 0.06f, 0.10f, 0.0f, 0.20f, 0.25f, 0.28f),
-        ("Chrome",  new Color(0.60f, 0.61f, 0.63f), 0.9f, 0.64f, 0.03f, 0.12f, 0.7f, 0.18f, 0.04f, 0.34f),
+        ("Paint",   new Color(0.36f, 0.09f, 0.07f), 0.0f, 0.48f, 0.07f, 0.12f, 0.0f, 0.22f, 0.25f, 0.30f),
+        ("Chrome",  new Color(0.55f, 0.56f, 0.58f), 0.85f, 0.50f, 0.04f, 0.14f, 0.8f, 0.22f, 0.04f, 0.38f),
         ("Leather", new Color(0.26f, 0.16f, 0.10f), 0.0f, 0.34f, 0.11f, 0.18f, 0.0f, 0.14f, 0.20f, 0.24f),
         ("Rubber",  new Color(0.07f, 0.07f, 0.08f), 0.0f, 0.22f, 0.04f, 0.10f, 0.0f, 0.16f, 0.06f, 0.30f),
         ("Steel",   new Color(0.13f, 0.13f, 0.14f), 0.85f, 0.32f, 0.05f, 0.14f, 0.4f, 0.20f, 0.03f, 0.55f),
