@@ -125,7 +125,30 @@ Kısmi cevap `[N22 s.34]`: kenarı yumuşatan ilk şey **bölmemek**. `saturate(
 (1 − profil))` kenarda doğrusal ve yavaş açılıyor; bizim yaptığımız gibi kapsamaya
 bölünürse aynı bant kapsama küçüldükçe daralıp bıçağa dönüşüyor.
 
-*(Erozyon katmanının payı ileride.)*
+**BİRİKTİRME FORMÜLÜ — bizimkinden bambaşka** `[N22 s.61]`:
+
+```hlsl
+// Absorption from sampled density
+light_absorption += sampled_density * (1.0 - light_absorption);
+
+// Energy, attenuated by depth along the view ray
+light_intensity  += (light_energy * sampled_density * (1.0 - light_absorption));
+
+float3 color = direct_intensity * sun_color + amb_intensity * amb_color;
+float  alpha = light_absorption;
+```
+
+`exp(−density × step)` ile geçirgenlik çarpımı YOK. Alfa harmanı gibi birikiyor ve
+`light_absorption` kendiliğinden 1'e doyuyor — bizim "erken çıkışta alfa 0.88'de kalıyor,
+arka plan bulutun içinden görünüyor" sorunumuz bu formülde yapısal olarak yok.
+
+**Ambient tek satır** `[N22 s.59]`:
+```hlsl
+float ambient_scattering = pow(1.0 - dimensional_profile, 0.5);
+```
+Sonda yok, koni yok, gökten örnekleme yok — profilin tersinin karekökü. Bizim
+`_CloudAmbient`, `ambientFloor`, `massWarmth`, `massBrightness` zincirinin karşılığı
+bu tek satır.
 
 ## 7. Kameranın bulutun İÇİNDEN geçmesi
 
@@ -264,6 +287,25 @@ bizim bildiğimiz eksiklerden yapıldı; bilmediklerimiz burada birikir. Kaynak 
 **Katman kotları 256 m – 2048 m** `[N22 s.20]`, insan figürüyle ölçeklenmiş. Kalınlık
 1792 m. 2015'te 1500–4000 m'ydi; alçalmış ve incelmiş.
 
+**Cirrus için AYRI model: 2.5-D** `[N22 s.62-67]`. NDF'i yalnız iki kanal (kapsama,
+tip). Yoğunluk üç 2B dokunun tiple harmanı — `cr_streaky`, `cr_wispy`, `cr_round`:
+
+```hlsl
+density = ValueRemap(cloud_type, 0.5, 1.0,
+              ValueRemap(cloud_type, 0.0, 0.5, cr_streaky, cr_wispy), cr_round);
+density = pow(density, 1.0 - ValueRemap(cloud_coverage, 0.0, 1.0, -0.9, 0.9));
+density *= ValueRemap(pow(cloud_coverage, 3.0), 0.0, 0.5, 0.0, 1.0);
+```
+
+Burada kapsama **üs olarak** giriyor (kontrast) + ayrıca çarpıyor. Eşik değil.
+Işık için ince katmanda 4 örnek yetiyor `[N22 s.67]`.
+
+**Yazarlık zinciri** `[N22 s.69]`: NDF Generator + NDF Editor → Influence NDFs →
+Authored NDFs. Yani prosedürel üretim ve elle boyama aynı boru hattında birleşiyor.
+
+**Onların hava haritası da DÖŞENİYOR** `[N22 s.70]` — ekrandaki hava penceresinde
+tekrar açıkça görünüyor. Yani döşeme tekrarı kabul edilmiş bir durum, gizlenmemiş.
+
 **Hareket tek satır** `[N22 s.37]`: `noise_sample_position = sample_position −
 wind_direction × scroll_offset`. Örnekleme koordinatı rüzgârla kaydırılıyor, başka bir
 şey yok. Bizdeki makaslama, konvektif yükselme, evrim, döşeme kırıcı — hiçbirinin
@@ -289,7 +331,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
-| `[N22]` nubis-2022 | **207** | s.1–58 | s.59–207 |
+| `[N22]` nubis-2022 | **207** | s.1–70 | s.71–207 |
 | `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
