@@ -192,7 +192,41 @@ ince gürültü kullanılamaz.
 Bizde harman yoktu, piksellenme kalıcıydı. History nasıl tutuluyor, komşuluk kelepçesi
 nasıl, hareket hâlinde ne bozuluyor?
 
-> *(cevap)*
+**Yeniden yansıtma BULUTUN KENDİ HAREKETİNİ hesaba katıyor** — kamera hareketini değil
+yalnız. `[N22 s.152, 157]`:
+
+```hlsl
+// 1) Pikselin dünya konumu, AYRI BİR MESAFE TAMPONUNDAN
+float3 view_space_vec  = CreateEyeRay(inViewportUV, inFovScale);
+float  cloud_distance  = inCloudAttrWorkingBuffer.SampleLOD(inSampler, inUV, 0).r;
+float3 cloud_world_space = mul(inInvViewMatrix, float4(view_space_vec * cloud_distance, 1.0)).xyz;
+
+// 2) Bulutun KENDİ hareketi eklenir (gökyüzü için sürüklenme, fırtına için dönme)
+cloud_world_space = lerp(cloud_world_space + scroll_direction_2D * inDeltaTime,
+                         superstorm_rotated_world_space_position, superstorm_mask);
+
+// 3) Bir önceki karedeki ekran konumu
+float4 prev_sample_pos = mul(inReprojectionMatrix, float4(view_space_vec, 1.0));
+prev_sample_pos /= prev_sample_pos.w;
+prev_sample_pos.xy *= float2(0.5, -0.5);
+prev_sample_pos.xy += float2(0.5, 0.5);
+```
+
+**İki şey bizde hiç yoktu:**
+
+1. **Bulut mesafe tamponu.** Piksel başına bulutun dünya mesafesi ayrı bir tampona
+   yazılıyor; geçmiş kareye eşleme o mesafeden kurulan dünya konumuyla yapılıyor.
+   Mesafe olmadan doğru yeniden yansıtma zaten imkânsız.
+2. **Bulutun kendi hareketi.** `+ scroll_direction_2D * inDeltaTime` — bulut rüzgârla
+   kayıyorsa geçmiş kare de o kadar kaydırılarak okunuyor. Bu olmadan hareket eden
+   bulutta geçmiş yanlış yerden okunur ve kenar bulanır/beneklenir.
+
+`[N22 s.158]` iki görüntüyü yan yana koyuyor: hareketi hesaba katmayan sol taraf
+gürültülü, katan sağ taraf temiz.
+
+**Bizde zamansal harman hiç yoktu** — `VolumetricClouds.shader`'da "bilinçli HARMANSIZ"
+yazıyordu ve piksellenme kalıcıydı. Doğru çözüm harmanı kapatmak değil, yeniden
+yansıtmayı mesafe tamponu + bulut hareketiyle kurmakmış.
 
 ## 9. Aydınlatma parametreleri
 
@@ -502,6 +536,20 @@ gerçek bir sayısal simülasyon (El Reno, OK 2013 — Leigh Orf, NCSA görselle
 
 Bizim "sürekli fırtına" kuşağımızın karşılığı burası olabilir ama öncelik değil.
 
+**Süper fırtına NDF'i** `[N22 s.139]`: gökyüzünün beş kanalı + **Superstorm Mask**.
+
+**Mezosiklon dönmesi** `[N22 s.144-148]`: gürültü, fırtına merkezi etrafında döndürülmüş
+koordinattan okunuyor. Eş merkezli halkalar farklı hızlarda dönüyor
+(`time_offset * ring_rotation_speed[n] + ring_skew[n]`) — tek parça dönme yerine
+kesme (shear) veren bir alan. Kaynak: "M.D.R. Vortex Field", Matthew D. Roach'un
+sinüs/kosinüs dönme fikri.
+
+**Fırtına maskesi** `[N22 s.152]`:
+```hlsl
+float superstorm_mask = pow(saturate(1.0 - length(pos.xy - center) / radius), 0.1);
+```
+Üs 0.1 — merkeze çok yakınına kadar 1'de kalıp kenarda hızla düşen bir maske.
+
 ---
 
 ## Okuma defteri
@@ -512,7 +560,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
-| `[N22]` nubis-2022 | **207** | s.1–138 | s.139–207 |
+| `[N22]` nubis-2022 | **207** | s.1–158 | s.159–207 |
 | `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
