@@ -23,9 +23,6 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ## Silinecek geçiciler
 
-- **F1'deki bulut teşhis araçları** (yoğunluk/gök ışığı çarpanı, adım boyu çarpanı, doku
-  kademesi kilidi, biriken kayma göstergesi) ve **bisiklet yükseklik göstergesi** —
-  `CLOUDS_REPORT.md`'deki işler bitince silinir
 
 - **Ova ve patika ölçüm araçları** (`ForelandProbe`, F1'deki kurulum süresi logu) — ova
   ve yol dokusu oturunca silinir
@@ -1035,3 +1032,29 @@ test sahnesi açıkken dağ kurmuyor. Oyun sahnesinde kalan test nesneleri
 oyuncu kurulumu iki yerde ayrışmıştır ve ortak bir kuruluma çıkarılır.
 
 **Maliyet:** atmosfer test sahnesinde yok. Görsel doğrulama oyun sahnesinde yapılıyor.
+
+---
+
+### Bulut sistemi söküldü, hazır bir uygulamadan yeniden kurulacak
+
+**Karar (2026-08-14).** Kendi hacimsel bulut sistemimiz tamamen silindi. Yerine
+`UnityVolumetricCloudsURP` (jiaozi158, MIT — HDRP'nin kendi sisteminin URP portu)
+alınacak.
+
+**Gerekçe.** HZD'nin dört satırlık yoğunluk formülünün üstüne on birden fazla kendi
+terimimiz birikmişti; her biri bir belirtiyi kapatmak için eklenmiş, her biri yenisini
+doğurmuştu. Kökteki hata ise en altta, gürültü dokusunun kendisindeydi: Worley'nin
+öznitelik noktasını yerleştiren sinüs hash'i küçük tamsayı hücre koordinatlarında korele
+çıkıyor ve doku düzensiz değil kare ızgara oluyordu. Üstteki katmanlarda saatlerce
+düzeltme arandı.
+
+**Tetikleyici.** Yeni sistemde görüntü yanlışsa: önce onun parametrelerine ve ürettiği
+dokulara bakılır, tek seferde tek sayı değişir. **Repo'nun üstüne kendi terimimiz
+eklenmez.** Ekleme ihtiyacı doğuyorsa önce ilgili makale okunur.
+
+**Maliyet.** Repo Unity 2022.3 / URP 14.0.7 hedefliyor, biz Unity 6000.5 / URP 17'yiz:
+HLSL taşınır, render geçişi RenderGraph'a yeniden yazılır.
+
+**Bağlar** `CLOUDS_REBUILD.md`'de — on tüketici, on iki ölçülmüş ders, kurtarılmış
+gürültü hash'i. İki bağ şu an stub: yer bulut gölgesi (`CloudShadowAt` → 1.0) ve yerel
+yağış (`UpdateLocalRain` → 1).
