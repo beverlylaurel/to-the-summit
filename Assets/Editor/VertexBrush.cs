@@ -515,10 +515,12 @@ public class VertexBrush : EditorWindow
                 float distance = Vector3.Distance(vertices[index], local);
                 if (distance > localRadius) continue;
 
-                // Kenara doğru zayıflıyor: sert kenar boyalı ile boyasız arasında
-                // görünür bir çizgi bırakıyor.
-                float falloff = 1f - Mathf.SmoothStep(0f, 1f, distance / localRadius);
-                float amount = strength * falloff;
+                // FIRÇA TAM ÖRTÜYOR, KENARA DOĞRU ZAYIFLAMIYOR. Yumuşak kenarda örtme
+                // gücü yarım kalıyor ve gölgelendirici parçanın kendi rengiyle seçilen
+                // rengi karıştırıyor: siyah sürerken kenarda kadronun kırmızısı çıkıyordu.
+                // Seçilen renk değdiği yeri eziyor; yumuşaklık isteniyorsa şiddet
+                // düşürülüyor.
+                float amount = strength;
 
                 Color32 current = colours[index];
 
