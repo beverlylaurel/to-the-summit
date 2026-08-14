@@ -23,6 +23,10 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ## Silinecek geçiciler
 
+- **F1'deki bulut teşhis araçları** (yoğunluk/gök ışığı çarpanı, adım boyu çarpanı, doku
+  kademesi kilidi, biriken kayma göstergesi) ve **bisiklet yükseklik göstergesi** —
+  `CLOUDS_REPORT.md`'deki işler bitince silinir
+
 - **Ova ve patika ölçüm araçları** (`ForelandProbe`, F1'deki kurulum süresi logu) — ova
   ve yol dokusu oturunca silinir
 - **Bisiklet maskesi yeniden seyreltmede silinecek** — malzeme maskesi köşe renginde duruyor;
