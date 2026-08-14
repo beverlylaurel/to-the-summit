@@ -243,6 +243,7 @@ public class AtmosphereController : MonoBehaviour
     /// Yansıma haritasının en son hangi gökyüzünde pişirildiği. Gökyüzü sürekli
     /// değişiyor ama harita her karede pişirilemez — pişirme milisaniyeler yiyor.
     Color reflectionSky = new Color(-1f, -1f, -1f);
+    float reflectionTime = -99f;
 
     void Initialize()
     {
@@ -415,9 +416,14 @@ public class AtmosphereController : MonoBehaviour
 
         RenderSettings.reflectionIntensity = Mathf.Clamp01(skyLevel * 2.2f);
 
-        if (ColourMoved(color, reflectionSky, 0.02f))
+        // PİŞİRME SANİYEDE BİRDEN SIK OLMAZ. Yalnız renk eşiğine bakılınca gökyüzü
+        // kıpırdadıkça her kare pişiyordu: küresel harmonik ve yansıma küpü yeniden
+        // üretiliyor, kare süresi ikiye katlanıyordu (180 FPS'ten 100'e). Gökyüzü bir
+        // saniyede gözle görülür kadar değişmiyor.
+        if (Time.time - reflectionTime > 1f && ColourMoved(color, reflectionSky, 0.02f))
         {
             reflectionSky = color;
+            reflectionTime = Time.time;
             DynamicGI.UpdateEnvironment();
         }
 
