@@ -30,12 +30,14 @@ public class DebugMenu : MonoBehaviour
     const float ColumnWidth = 300f;
     const float Margin = 24f;
 
-    /// Test oturumu serbest uçuşta, tam hızda ve durmuş saatte başlar: geliştirme
-    /// sırasında her açılışta aynı üç anahtarı elle çevirmek gerekiyordu.
-    const float StartSpeedMultiplier = 100f;
+    /// Oturum OYUNUN KENDİ HIZINDA ve yürüyerek başlar. Bir dönem serbest uçuş ve yüz
+    /// kat hız açık başlıyordu — arazi büyükken her açılışta uzak noktaya gitmek
+    /// gerekiyordu. Artık mesafe algısı ve bisiklet sürüşü doğru hissedilsin diye
+    /// varsayılan gerçek hız; ikisi de F1 panelinde açık duruyor.
+    const float StartSpeedMultiplier = 1f;
 
     float speedMultiplier = StartSpeedMultiplier;
-    bool freeFly = true;
+    bool freeFly;
 
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
