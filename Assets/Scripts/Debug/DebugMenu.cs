@@ -48,7 +48,10 @@ public class DebugMenu : MonoBehaviour
     float cloudAmbientScale = 1f;
     static readonly int CloudStepScaleId = Shader.PropertyToID("_CloudStepScale");
 
+    static readonly int CloudFlatLightId = Shader.PropertyToID("_CloudFlatLight");
+
     bool lodLock;
+    bool flatLight;
     float stepScale = 1f;
 
     static readonly int TerrainShadowId = Shader.PropertyToID("_TerrainShadowReceive");
@@ -287,6 +290,7 @@ public class DebugMenu : MonoBehaviour
         Shader.SetGlobalFloat(CloudLodLockId, lodLock ? 1f : 0f);
         Shader.SetGlobalFloat(CloudStepScaleId, stepScale);
         Shader.SetGlobalFloat(TerrainShadowId, terrainShadowOff ? 0f : 1f);
+        Shader.SetGlobalFloat(CloudFlatLightId, flatLight ? 1f : 0f);
     }
 
     /// TEŞHİS — kare süresini kim yiyor. Bir oturumda üç şey birden açıldı (örtüşme
@@ -319,6 +323,7 @@ public class DebugMenu : MonoBehaviour
         {
             terrainShadowOff = !nextTerrain;
             Shader.SetGlobalFloat(TerrainShadowId, terrainShadowOff ? 0f : 1f);
+        Shader.SetGlobalFloat(CloudFlatLightId, flatLight ? 1f : 0f);
         }
 
         bool nextReflection = GUILayout.Toggle(!reflectionOff, "Yansıma haritası tazeleme");
@@ -562,6 +567,8 @@ public class DebugMenu : MonoBehaviour
         // doku kademe geçişi, kalırsa adımlama.
         lodLock = GUILayout.Toggle(lodLock, "Doku kademesini kilitle (teşhis)");
 
+        flatLight = GUILayout.Toggle(flatLight, "Aydınlanmayı düzleştir (teşhis)");
+
         GUILayout.Label($"Adım boyu {stepScale:F2}× (teşhis)");
         stepScale = GUILayout.HorizontalSlider(stepScale, 0.15f, 1f);
 
@@ -570,6 +577,7 @@ public class DebugMenu : MonoBehaviour
             cloudDensityScale = 1f;
             cloudAmbientScale = 1f;
             lodLock = false;
+            flatLight = false;
             stepScale = 1f;
         }
 
