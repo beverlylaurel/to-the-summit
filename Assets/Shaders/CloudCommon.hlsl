@@ -65,6 +65,10 @@ static const float CloudMaxOpticalStep = 0.2;
 /// kayboluyorsa kaynak adım kabukları, kalıyorsa ışık sondası.
 float _CloudStepScale;
 
+/// TEŞHİS: 1 iken aydınlanma tamamen düz (sonda hiç okunmuyor). Halkalar bu hâlde de
+/// duruyorsa kaynak yoğunluk integrali, kayboluyorsa ışık sondası.
+float _CloudFlatLight;
+
 float _DensityScale;
 float _CloudSteps;
 float _CloudLightSteps;
@@ -567,6 +571,16 @@ float CloudDensity(float3 position, bool cheap, float distance, float stepSize,
     // kapsamada bulutu UZATIYORDU — sayı hesaplanınca görüldü, gözle değil.
     float lateralGrowth = saturate(0.30 + 0.85 * _Coverage);
     ceiling01 *= lerp(0.30, 0.62, sqrt(lateralGrowth));
+
+    // BULUT KENDİ AYAK İZİ KADAR YÜKSELİR. Tavan yalnız küresel kapsamadan
+    // ölçekleniyordu: haritanın boşluklarına düşen küçük çekirdekler de büyük kütlelerle
+    // aynı boya çıkıyor, eni dört yüz metre boyu bin beş yüz metre olan kütleler ekranda
+    // TOP gibi duruyordu. Gerçekte bulutun boyu genişliğiyle orantılı — kümülüs
+    // humilis yayvandır, ancak büyüdükçe dikleşir.
+    //
+    // Yerel kapsama ayak izinin ölçüsü: küçükken tavan yarıya iniyor, büyük kütlelerde
+    // dokunulmuyor.
+    ceiling01 *= lerp(0.45, 1.0, smoothstep(0.15, 0.55, localCoverage));
 
     // Zarf, şekil alanını ÇARPMAZ — kapsamayı kısar. Çarpım alanı tepeye doğru
     // inceltiyor ve eşiği yalnız gürültü zirveleri geçebiliyordu: hayatta kalanlar
@@ -1433,7 +1447,7 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
                 // birkaç adımda varıyor. Bütün pikseller aynı işlemi yaptığı için gren
                 // yok; basamak kalmadığı için halka da yok. Sonda sayısı değişmiyor.
                 smoothLit = smoothLit < 0.0 ? cachedLit : lerp(smoothLit, cachedLit, 0.5);
-                lit = smoothLit * gate;
+                lit = _CloudFlatLight > 0.5 ? gate : smoothLit * gate;
             }
             else
             {
