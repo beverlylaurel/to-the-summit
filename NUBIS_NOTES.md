@@ -1568,6 +1568,31 @@ atmospheric_blend_factor = GetAtmosphere(depth, angle)
 Yani mesafe ölçüsü **alfanın 0.5'e vardığı yer** — medyan derinlik. Bizde `firstHit`,
 `[N22]`'de opaklıkla ağırlıklı ortalama. Üç ayrı seçim.
 
+### `[N17]` ışık huzmeleri — MASKE olarak `[N17 s.106]`
+
+Bulut yoğunluk tamponu sahneye **doğrudan eklenmiyor**; atmosferik saçılma shader'ında
+**Mie saçılmasını uygularken MASKE** olarak kullanılıyor — ve o shader yalnız büyük
+mesafelerde çalışıyor.
+
+> *"Böylece huzmelerin rengi ve şiddeti Mie saçılmasından beklenene uyuyor, huzmeler
+> yakındaki manzaranın üstüne çizilmiyor, ve diğer volumetriklere kusursuz bağlanıyor."*
+
+Bizim `LightningFlash` ve güneş yamasını bindirme geçişinde toplama yaklaşımımızın
+doğrusu bu: **ekleme değil, var olan bir hesaba maske.**
+
+### `[N17]` kapanış — kayda değer cümle `[N17 s.107]`
+
+> *"Dikkat etmezsen, ÇİRKİN ÜRETMEKTE mükemmel olan bir prosedürel sistem yapabilirsin.
+> İlk turda hedefimiz %80 çirkin-değil'e ulaşmak olmalı. Buna epey yaklaştığımızı
+> hissediyoruz ama daha yapacak çok iş var."*
+
+Bizim 2026-08-14'te yaşadığımız şeyin tarifi. Prosedürel sistem kurmak kolay; çirkin
+üretmemesini sağlamak asıl iş.
+
+**Sıradaki cephe olarak sayılanlar** `[N17 s.108]`: bulutları cisimlerin ÖNÜNDE çizmek,
+oyuncuya yakında daha çok detay, daha fazla bozunma davranışı, kalan bulut katmanları.
+(Bunların hepsi `[N22]`'de yapılmış.)
+
 ---
 
 ## Okuma defteri
@@ -1577,7 +1602,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 | makale | toplam | okunan | eksik |
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
-| `[N17]` nubis-2017 | **108** | s.1–103 | s.104–108 |
+| `[N17]` nubis-2017 | **108** | **s.1–108 TAMAM** | — |
 | `[N22]` nubis-2022 | **207** | **s.1–207 TAMAM** | — |
 | `[H18]` haggstrom-2018 | **93 PDF / 81 basılı** | **PDF s.1–93 TAMAM** | — |
 
