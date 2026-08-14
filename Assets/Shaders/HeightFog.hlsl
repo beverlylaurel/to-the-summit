@@ -116,9 +116,15 @@ static const float CloudCoverageCeiling = 0.85;
 ///
 /// Bir texel'in dunya karsiligi 1 / (olcek x texel sayisi) metredir. Taban ve detay
 /// dokularinin cozunurlugu farkli oldugu icin texel sayisi disaridan verilir.
+float _CloudLodLock;   // TESHIS: 1 iken mip seviyesi sifira kilitleniyor
+
 float CloudSampleLod(float stepSize, float scale, float texels)
 {
-    return max(0.0, log2(max(1e-6, stepSize * scale * texels)));
+    // TESHIS ANAHTARI. Bulutun icinde esmerkezli soganlar goruluyor ve iki aday var:
+    // adim kabuklari ile mip gecisleri. Mip sifira kilitlendiginde halkalar kayboluyorsa
+    // sucu mip gecisi, duruyorsa adimlama. Anahtar kapaliyken hesap aynen isliyor.
+    float lod = max(0.0, log2(max(1e-6, stepSize * scale * texels)));
+    return lerp(lod, 0.0, saturate(_CloudLodLock));
 }
 
 /// Bir kolonun hava durumu: bulut govdesi de yer golgesi de bundan turer.

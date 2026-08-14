@@ -42,8 +42,11 @@ public class DebugMenu : MonoBehaviour
     static readonly int DensityScaleId = Shader.PropertyToID("_DensityScale");
     static readonly int CloudAmbientId = Shader.PropertyToID("_CloudAmbient");
 
+    static readonly int CloudLodLockId = Shader.PropertyToID("_CloudLodLock");
+
     float cloudDensityScale = 1f;
     float cloudAmbientScale = 1f;
+    bool lodLock;
 
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
@@ -256,6 +259,24 @@ public class DebugMenu : MonoBehaviour
         return snow != null ? snow.DepthAt(point) : 0f;
     }
 
+    /// Bulut çarpanları ÇİZİMDEN ÖNCE uygulanıyor. `OnGUI` sahne çizildikten sonra
+    /// koşuyor; oraya yazılan değer bir sonraki karede atmosfer tarafından eziliyor ve
+    /// kaydırıcılar hiçbir şey yapmıyordu.
+    void LateUpdate()
+    {
+        if (atmosphere == null) return;
+
+        if (!Mathf.Approximately(cloudDensityScale, 1f))
+            Shader.SetGlobalFloat(DensityScaleId,
+                Shader.GetGlobalFloat(DensityScaleId) * cloudDensityScale);
+
+        if (!Mathf.Approximately(cloudAmbientScale, 1f))
+            Shader.SetGlobalFloat(CloudAmbientId,
+                Shader.GetGlobalFloat(CloudAmbientId) * cloudAmbientScale);
+
+        Shader.SetGlobalFloat(CloudLodLockId, lodLock ? 1f : 0f);
+    }
+
     void BeginSection(string label)
     {
         GUILayout.BeginVertical(GUI.skin.box);
@@ -450,12 +471,16 @@ public class DebugMenu : MonoBehaviour
         GUILayout.Label($"Gök ışığı {cloudAmbientScale:F2}×");
         cloudAmbientScale = GUILayout.HorizontalSlider(cloudAmbientScale, 0.2f, 1.5f);
 
-        // Atmosfer bu globalleri her karede yazıyor; çarpan onun ÜSTÜNE, çizimden önce
-        // uygulanıyor.
-        Shader.SetGlobalFloat(DensityScaleId,
-            Shader.GetGlobalFloat(DensityScaleId) * cloudDensityScale);
-        Shader.SetGlobalFloat(CloudAmbientId,
-            Shader.GetGlobalFloat(CloudAmbientId) * cloudAmbientScale);
+        // TEŞHİS — bulut içindeki eşmerkezli halkalar. Mip kilitliyken kaybolursa suçu
+        // doku kademe geçişi, kalırsa adımlama.
+        lodLock = GUILayout.Toggle(lodLock, "Doku kademesini kilitle (teşhis)");
+
+        if (GUILayout.Button("Ayarları geri al"))
+        {
+            cloudDensityScale = 1f;
+            cloudAmbientScale = 1f;
+            lodLock = false;
+        }
 
 
         GUILayout.Label($"Kapsama %{atmosphere.Coverage * 100f:F0}   " +
