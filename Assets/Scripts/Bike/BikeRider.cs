@@ -35,9 +35,15 @@ public class BikeRider : MonoBehaviour
              "binmek oyuncuyu ışınlıyor gibi duruyor.")]
     [Range(0.5f, 4f)] [SerializeField] float reach = 2.2f;
 
-    [Tooltip("Oturan sürücünün gözünün seleden yüksekliği (metre). Bisiklete oturmuş bir " +
-             "yetişkinde 0.7-0.8 m.")]
-    [Range(0.4f, 1.1f)] [SerializeField] float eyeAboveSeat = 0.75f;
+    [Tooltip("Oturan sürücünün gözünün seleden yüksekliği (metre). Sele 0.91 m'de; 0.75 " +
+             "verilince göz 1.66 m'ye çıkıyor ve sürücü ayakta duruyormuş gibi " +
+             "hissediliyor. Oturmuş bir yetişkinde göz yerden 1.45-1.55 m.")]
+    [Range(0.3f, 1.1f)] [SerializeField] float eyeAboveSeat = 0.58f;
+
+    [Tooltip("Gözün seleden ne kadar önde olduğu (metre). Sürücü gövdesini gidona doğru " +
+             "eğiyor; tam selenin üstünde otursaydı gidon kadrajın dışında kalır ve " +
+             "bisiklete bindiği hissi kaybolurdu.")]
+    [Range(0f, 0.5f)] [SerializeField] float eyeAhead = 0.12f;
 
     [Tooltip("İnerken oyuncunun bırakıldığı yan mesafe (metre). Bisikletin içine " +
              "bırakılırsa çarpışma onu bir yana fırlatıyor.")]
@@ -122,7 +128,8 @@ public class BikeRider : MonoBehaviour
         transform.SetParent(bike.transform, false);
         transform.localRotation = Quaternion.identity;
         transform.localPosition = seat
-            + Vector3.up * (eyeAboveSeat - cameraPivot.localPosition.y);
+            + Vector3.up * (eyeAboveSeat - cameraPivot.localPosition.y)
+            + Vector3.forward * eyeAhead;
 
         headYaw = 0f;
         headPitch = cameraPivot.localEulerAngles.x;
