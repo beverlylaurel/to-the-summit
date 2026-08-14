@@ -1219,17 +1219,6 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
         if (!coarsePass && prevDensity > 1e-6)
             step = min(step, max(CloudMaxOpticalStep / prevDensity, nominalStep * 0.25));
 
-        // GİRİŞ ADIMI AYRICA KISA. Kelepçe bir ÖNCEKİ örneğin yoğunluğuna bakıyor;
-        // boşluktan buluta girerken o değer sıfır, yani ilk adım kelepçesiz giriyor ve
-        // uzun bir yolu tek örnekle integre ediyor. Ekranda bu, bulutun ön yüzünde eşit
-        // mesafelerde duran eşmerkezli kabuklar olarak görünüyor — ölçüldü: adım boyu
-        // sürgüsü küçültülünce halkalar kayboluyor, büyütülünce geri geliyor.
-        //
-        // Kısıtlama yalnız ışın HENÜZ AÇIKKEN: kapanmış ışında giriş hatası zaten
-        // geçirgenlikle çarpılıp siliniyor, orada bedel ödemeye değmiyor.
-        if (!coarsePass && prevDensity <= 1e-6 && transmittance > 0.5)
-            step = min(step, nominalStep * 0.35);
-
         // İlk adım Bayer kayması kadar kısa: tarama fazı piksele göre kayar, pencere
         // her pikselde tam kalır. Mip yine anma adımına bakar, kırpılmışa değil.
         if (i == 0 && dither > 0.0) step = min(step, max(nominalStep * dither, 1.0));
@@ -1239,9 +1228,19 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
         // kuyruk boyunca yoğunluk olması gerekenden yüksek kalıyor, optik derinlik
         // fazla birikiyor ve bulutlar toptan kararıyordu. Derinde ucuzlatılabilecek
         // olanlar yalnızca yoğunluğa yön vermeyenler (sn2, colBump, sec4).
+        // ÖRNEK ADIMIN ORTASINDAN. Yoğunluk adımın BAŞINDA okunup bütün adım boyunca
+        // sabit sayılıyordu: sol uç toplamı: taraflı bir integral ve hatası adım boyuyla
+        // doğru orantılı. Ekranda bu, eşit mesafelerde duran eşmerkezli kabuklar olarak
+        // görünüyor — halkaların ölçülmüş kaynağı (adım boyu sürgüsü küçültülünce
+        // kayboluyor, büyütülünce geri geliyor).
+        //
+        // Orta nokta toplamı aynı örnek sayısıyla hatayı bir mertebe düşürüyor: bedeli
+        // YOK, yalnız örneğin alındığı yer değişiyor.
+        float3 sampleMid = samplePoint + direction * (step * 0.5);
+
         float slabSkip;
-        float density = CloudDensity(samplePoint, coarsePass, travelled, nominalStep,
-                                     direction, slabSkip,
+        float density = CloudDensity(sampleMid, coarsePass, travelled + step * 0.5,
+                                     nominalStep, direction, slabSkip,
                                      !coarsePass && transmittance < 0.35);
 
         // Ucuz kademede bulut bulundu: bir adım geri dön, tam örneklemeye geç.
