@@ -1179,12 +1179,10 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
         // içinde eşiği defalarca kesiyor ve her kesişimde adım boyu sıçrıyor; entegrasyon
         // hatası da onunla sıçrayınca bulutun içi kat kat kabuklara ayrılıyordu — her
         // geçiş bir dikiş. Sürekli bir fonksiyon o dikişleri tamamen ortadan kaldırıyor.
-        // ADIM BOYU PİKSEL PİKSEL ±%15 OYNUYOR. Faz kaydırmak (ilk adımı kısaltmak)
-        // kabukların YERİNİ kaydırıyor ama ARALIĞINI değil: komşu pikseller aynı
-        // aralıkta basamak attığı için halkalar hâlâ hizalanıyordu. Aralık da oynayınca
-        // hizalanacak ortak periyot kalmıyor.
-        float nominalStep = baseStep * (_CloudStepScale > 0.0 ? _CloudStepScale : 1.0)
-                          * (0.85 + 0.3 * pixelHash);
+        // Adım aralığını piksel piksel oynatmak denendi ve GERİ ALINDI: halkalar
+        // azalmadı, yerine tanecikli bir piksellenme geldi. Kabuk aralığını bozmak
+        // halkayı gürültüye çeviriyor ama gürültünün kendisi de görünüyor.
+        float nominalStep = baseStep * (_CloudStepScale > 0.0 ? _CloudStepScale : 1.0);
 
         // Kuyruk incelmesi: önceki örnek zayıf-ama-sıfır değilse (yumuşak kenar
         // gradyanındayız) adım yarıya iner. Halkaların kaldığı yer tam burası —
