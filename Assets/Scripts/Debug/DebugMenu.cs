@@ -465,10 +465,10 @@ public class DebugMenu : MonoBehaviour
         // yoğunluk (açık havada düşük, fırtınada çarpanla artıyor — bu yüzden fırtınada
         // daha iyi duruyorlar) ve gökyüzünden gelen dağınık ışık (havadan bağımsız
         // sabit). Doğru değer gözle bulunacak, sonra ayara yazılıp bu bölüm silinecek.
-        GUILayout.Label($"Yoğunluk {cloudDensityScale:F2}×");
+        GUILayout.Label($"Yoğunluk {cloudDensityScale:F2}× (ayarın üstüne)");
         cloudDensityScale = GUILayout.HorizontalSlider(cloudDensityScale, 0.3f, 4f);
 
-        GUILayout.Label($"Gök ışığı {cloudAmbientScale:F2}×");
+        GUILayout.Label($"Gök ışığı {cloudAmbientScale:F2}× (ayarın üstüne)");
         cloudAmbientScale = GUILayout.HorizontalSlider(cloudAmbientScale, 0.2f, 1.5f);
 
         // TEŞHİS — bulut içindeki eşmerkezli halkalar. Mip kilitliyken kaybolursa suçu
