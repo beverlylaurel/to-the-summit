@@ -57,6 +57,10 @@ float _DetailScale;
 float _DetailStrength;
 float _ShearAmount;
 float _DetailDistance;
+/// Bir adımda birikmesine izin verilen en büyük optik derinlik. Üstünde bulut bir-iki
+/// adımda opaklaşıyor ve adım sınırları eşmerkezli kabuk olarak görünüyor.
+static const float CloudMaxOpticalStep = 0.2;
+
 float _DensityScale;
 float _CloudSteps;
 float _CloudLightSteps;
@@ -1198,6 +1202,18 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
                             && travelled < 12000.0)
                          ? lerp(1.0, 0.5, openness) : 1.0;
         float step = min(nominalStep * (coarsePass ? 2.0 : tailRefine), limit - travelled);
+
+        // ADIM BAŞINA OPTİK DERİNLİK KELEPÇELİ. Halkaların ölçülmüş sebebi bu: yoğunluk
+        // arttıkça halkalar artıyor, azaldıkça azalıyor (F1 sürgüsüyle doğrulandı). Bir
+        // adımda kesilen ışık miktarı σ·Δ; bu çarpım 0.2'yi aştığında bulut bir-iki
+        // adımda opaklaşıyor ve her adım sınırı ekranda eşmerkezli kabuk olarak
+        // görünüyor. Uzak adım 200 m ve σ=0.00735 iken çarpım 1.5 — sınırın yedi katı.
+        //
+        // Kelepçe yalnız BULUTUN İÇİNDE bağlıyor: boş gökte yoğunluk sıfır, bölme
+        // devasa bir sayı veriyor ve adım kısıtlanmıyor. Yani maliyet yalnız bulutun
+        // içinde artıyor, gökyüzünün büyük boş kısmında değil.
+        if (!coarsePass && prevDensity > 1e-6)
+            step = min(step, max(CloudMaxOpticalStep / prevDensity, nominalStep * 0.25));
 
         // İlk adım Bayer kayması kadar kısa: tarama fazı piksele göre kayar, pencere
         // her pikselde tam kalır. Mip yine anma adımına bakar, kırpılmışa değil.
