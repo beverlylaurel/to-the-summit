@@ -231,6 +231,11 @@ public class AtmosphereController : MonoBehaviour
     /// çağrılmamış olabilir.
     void OnEnable() => Initialize();
 
+    /// Bulutların o anki süzülme hızı (m/s). Teşhis içindir: rüzgâr sıfırlanınca da
+    /// hareket ediyorlarsa sebebin taban hız mı yoksa rüzgâr mı olduğu ancak bu sayıyla
+    /// ayrılıyor.
+    public float CloudSpeed => smoothedDrift;
+
     /// Yansıma haritasının en son hangi gökyüzünde pişirildiği. Gökyüzü sürekli
     /// değişiyor ama harita her karede pişirilemez — pişirme milisaniyeler yiyor.
     Color reflectionSky = new Color(-1f, -1f, -1f);
