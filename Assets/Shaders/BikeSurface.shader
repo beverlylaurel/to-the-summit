@@ -68,6 +68,11 @@ Shader "ToTheSummit/BikeSurface"
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
             #pragma multi_compile_fog
 
+            // EKRAN UZAYI ÖRTÜŞME GÖLGESİ. Bildirilmezse kuytular kararmıyor: çamurluk
+            // altı, sepet içi ve kadro araları gökyüzü ışığını açık yüzeyle aynı alıyor
+            // ve bisiklet fazla parlak duruyor.
+            #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
+
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
@@ -263,6 +268,11 @@ Shader "ToTheSummit/BikeSurface"
                 lighting.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 lighting.fogCoord = input.fogCoord;
                 lighting.bakedGI = SampleSH(normalWS);
+
+                // Örtüşme gölgesi ekran uzayında hesaplanıyor; hangi pikselden okunacağı
+                // buradan veriliyor.
+                lighting.normalizedScreenSpaceUV =
+                    GetNormalizedScreenSpaceUV(input.positionCS);
 
                 SurfaceData surface = (SurfaceData)0;
                 surface.albedo = albedo;
