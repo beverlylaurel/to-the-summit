@@ -100,8 +100,12 @@ public class AtmosphereSettings : ScriptableObject
     [Tooltip("Yama penceresi: organizasyon alanının bulutlu saydığı eşik. Küçük değer " +
              "bulutlu bölgeleri genişletir, büyük değer boşluk payını artırır.")]
     [Range(0.30f, 0.60f)] public float patchWindow = 0.35f;
-    [Tooltip("Çekirdek yoğunluğu çarpanı: genel gök doluluğu.")]
-    [Range(0.4f, 2.2f)] public float coreDensity = 1.6f;
+    [Tooltip("Çekirdek alan bütçesi: toplam çekirdek alanının harita alanına ORANI. " +
+             "1 = çekirdekler haritayı bir kez örtecek kadar (örtüşmeler yüzünden " +
+             "görünür doluluk ~%63). Üstü doyurur: 4 iken her nokta dört çekirdeğin " +
+             "altında kalıyor, kapsama kanalı her yerde 1'e yapışıyor ve gökyüzü ayrı " +
+             "bulut değil tek levha oluyordu.")]
+    [Range(0.15f, 1.6f)] public float coreDensity = 0.9f;
 
     [Header("Bulut biçimi")]
     [Tooltip("Kütle dokusunun dünya ölçeği. 1/değer = tekrar periyodu.")]

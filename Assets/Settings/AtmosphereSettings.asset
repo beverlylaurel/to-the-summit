@@ -32,10 +32,10 @@ MonoBehaviour:
   cloudBottom: 2600
   calmCloudBottom: 1700
   cloudBottomSmoothing: 120
-  cloudTop: 7000
+  cloudTop: 5100
   cumulonimbusHeight: 3800
   cloudTopFloor: 0.55
-  cloudScale: 0.0003
+  cloudScale: 0.0006
   detailScale: 0.0011
   detailStrength: 0.4
   weatherScale: 0.00014
@@ -116,5 +116,5 @@ MonoBehaviour:
   corePacking: 0.95
   packingFloor: 0.1
   patchWindow: 0.35
-  coreDensity: 1.6
+  coreDensity: 0.9
   curlStrength: 240

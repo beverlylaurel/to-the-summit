@@ -50,6 +50,34 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Kare süresi jitter'ı** — editörde ölçüldü, patoloji çıkmadı; aynı ölçüm bir
   **derlemede** tekrarlanacak
   → [Kare süresi jitter'ı ölçüldü](#kare-süresi-jitterı-ölçüldü--patoloji-yok-derlemede-tekrar-bakılacak)
+- **Işından bağımsızlık için ödenen kare süresi** — üç ucuzlatma söküldü, bedeli
+  ölçülmedi
+  → [Geçirgenliğe bağlı üç ucuzlatma söküldü](#geçirgenliğe-bağlı-üç-ucuzlatma-söküldü--bedeli-ölçülmedi)
+
+---
+
+### Geçirgenliğe bağlı üç ucuzlatma söküldü — bedeli ölçülmedi
+
+**Karar (2026-08-14).** Yoğunluk alanı ve gölge sondası artık görüş ışınının
+geçirgenliğine bakmıyor. Sökülenler:
+
+| ne | eşik | kazandırdığı |
+|---|---|---|
+| `deep` — tepe tümseği, büyük oktav, 3B büküm okunmuyordu | `< 0.35` | 3 adet 3B okuma |
+| sonda aralığı — ışık sondası iki adımda bir | `< 0.25` | sonda başına ~35 doku okuması |
+| sonda kademesi — erozyon katmanı okunmuyordu | `<= 0.70` | 2 adet doku okuması |
+
+**Gerekçe.** Üçü de eşiğin geçildiği yüzeyi ekranda çiziyordu: bulutun ortasında
+kesilmiş düz beyaz ada, kenarda koyu zar, ikinci halka ailesi. Ekran görüntüsüyle
+doğrulandı.
+
+**Bedel ölçülmedi.** Kazanç da kayıp da tamamen bulutun **iç** kısmında, yani kare
+süresinin zaten en kötü olduğu yerde (bulutun içinde ~40 FPS). Sökme bu sayıyı
+düşürür, ne kadar bilinmiyor.
+
+**Tetikleyici.** Bulut içinde kare süresi kabul edilemez olursa geri dönülür — ama
+aynı eşiklerle değil. Ucuzlatma **ışından bağımsız** bir ölçüte bağlanır: mesafe, LOD,
+ya da yürüyüşün kendi kademesi. Işına bağlanan her ucuzlatma kenar üretir.
 
 ---
 
