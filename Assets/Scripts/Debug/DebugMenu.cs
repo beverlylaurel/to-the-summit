@@ -432,6 +432,7 @@ public class DebugMenu : MonoBehaviour
         // ediyorlardı ve sebebi görünmüyordu: taban hız ayarı yer rüzgârını eziyordu.
         GUILayout.Label($"Süzülme {atmosphere.CloudSpeed:F1} m/s"
                         + $" = {atmosphere.CloudSpeed * 3.6f:F0} km/h");
+        GUILayout.Label($"Biriken kayma {atmosphere.CloudShift:F0} m");
 
 
         GUILayout.Label($"Kapsama %{atmosphere.Coverage * 100f:F0}   " +
