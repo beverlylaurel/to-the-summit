@@ -125,10 +125,16 @@ public class BikeRider : MonoBehaviour
         // çarpışmasıyla itişir ve ikisi birbirini fırlatırdı.
         body.enabled = false;
 
+        // GÖZ YÜKSEKLİĞİ ZİNCİRİN TOPLAMINDAN ölçülüyor, pivotun kendi yerel
+        // konumundan değil: pivot bir ara nesnenin çocuğu ve yerel yüksekliği gerçek
+        // göz yüksekliğini vermiyordu. Sonuç, sürücünün seleden iki metre yukarıda
+        // durmasıydı — bisikletin üstünde ayakta gibi.
+        float eyeOffset = cameraPivot.position.y - transform.position.y;
+
         transform.SetParent(bike.transform, false);
         transform.localRotation = Quaternion.identity;
         transform.localPosition = seat
-            + Vector3.up * (eyeAboveSeat - cameraPivot.localPosition.y)
+            + Vector3.up * (eyeAboveSeat - eyeOffset)
             + Vector3.forward * eyeAhead;
 
         headYaw = 0f;

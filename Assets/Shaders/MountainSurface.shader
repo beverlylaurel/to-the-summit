@@ -33,9 +33,12 @@ Shader "ToTheSummit/MountainSurface"
             #pragma fragment Fragment
             #pragma target 4.6
 
-            // Kafa lambası ek ışık olarak gelecek. Ana ışığın gölge haritası anahtarları
-            // bilerek yok: arazi kendi gölgesini yükseklik alanından yürüyerek hesaplıyor
-            // (bkz. TerrainSunShadow) ve haritayı hiç okumuyor.
+            // ARAZİNİN GÖLGESİ İKİ KAYNAKTAN. Dağın kendi sırtı yükseklik alanından
+            // yürüyerek bulunuyor (bkz. TerrainSunShadow) — gölge haritası o mesafeyi
+            // taşımıyor, elli metrede bitiyor. Ama HAREKETLİ NESNELER haritada: bisiklet,
+            // oyuncu, ileride kaya ve çadır. Harita okunmadığı sürece bunların hiçbiri
+            // yere gölge düşürmüyordu.
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
 
             // Renderer Forward+ modunda: ışıklar kümelerle dağıtılıyor ve nesne başına
@@ -114,13 +117,19 @@ Shader "ToTheSummit/MountainSurface"
                 AmbientOcclusionFactor aoFactor = CreateAmbientOcclusionFactor(
                     inputData.normalizedScreenSpaceUV, surface.occlusion);
 
-                // Ana ışığın gölgesi haritadan değil, yükseklik alanından. Işığa sırtı
-                // dönük piksel yürümüyor: katkısı zaten sıfır, kırk adım boşa giderdi.
+                // Arazinin kendi gölgesi yükseklik alanından. Işığa sırtı dönük piksel
+                // yürümüyor: katkısı zaten sıfır, kırk adım boşa giderdi.
                 Light mainLight = GetMainLight();
                 mainLight.shadowAttenuation =
                     dot(inputData.normalWS, mainLight.direction) > 0.0
                         ? TerrainSunShadow(IN.positionWS, mainLight.direction)
                         : 1.0;
+
+                // Hareketli nesnelerin gölgesi haritadan ve arazininkiyle ÇARPILIYOR:
+                // ikisi ayrı olay — biri sırtın arkasında kalmak, öteki üstünde bir cisim
+                // durmak. Aynı kanaldan gidiyorlar çünkü ikisi de doğrudan güneşi kesiyor.
+                mainLight.shadowAttenuation *=
+                    MainLightRealtimeShadow(TransformWorldToShadowCoord(IN.positionWS));
 
                 // BULUT GÖLGESİ arazi gölgesiyle ÇARPILIR, ikisi ayrı olay: biri sırtın
                 // arkasında kalmak, öteki üstünden bulut geçmek. Aynı kanaldan gidiyorlar
