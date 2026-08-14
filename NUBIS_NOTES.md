@@ -676,6 +676,165 @@ prosedürel mi pişmiş mi olduğu fark etmiyor — "source-agnostic" o demek.
 Beer 1852, Henyey-Greenstein 1941, Uman *Lightning* 1969, Hamblyn *The Invention of
 Clouds*, Hargrove *The Man Who Caught The Storm*.
 
+## `[H18]` şekil ve yürüyüş — tam formüller
+
+Basılı sayfa numarası kullanıyorum (PDF sayfası = basılı + 12).
+
+### Hava haritası: İKİ kapsama kanalı `[H18 s.11]`
+
+```
+WM_c = max(w_c0, SAT(g_c − 0.5) × w_c1 × 2)
+```
+
+- **R** = seyrek kapsama haritası (elle çizilmiş bulut yerleşimi)
+- **G** = yoğun kapsama haritası (gürültü, gök kapanırken devreye girer)
+- **B** = azami bulut yüksekliği · **A** = bulut yoğunluğu
+
+Küresel kapsama sürgüsü **iki harita arasında geçiş yapıyor**: düşükken yalnız R, 0.5'i
+geçince G devreye girip göğü dolduruyor. Bizim "sürgü haritayı ölçekliyor, sıfır olan
+yer hiç dolmuyor" sorunumuzun bir başka çözümü — ikinci bir harita.
+
+### Katman: taban 400 m, tepe 1000 m `[H18 s.10]`
+
+Bilerek alçak ve küçük: *"bulutlar daha küçük yapıldı ve yere yaklaştırıldı ki dünyada
+dolaşırken daha çeşitli bulutlar görülsün."* Sanatsal karar olduğu açıkça yazılmış.
+
+### Yükseklik fonksiyonları — İKİ TANE `[H18 s.12-13]`
+
+**Şekil değiştiren** (kenarları yuvarlar):
+```
+SR_b = SAT(R(p_h, 0, 0.07, 0, 1))            // tabana doğru yuvarla
+SR_t = SAT(R(p_h, w_h × 0.2, w_h, 1, 0))     // tepeye doğru; w_h haritanın B kanalı
+SA   = SR_b × SR_t
+```
+
+**Yoğunluk değiştiren** (tabanı tüylü, tepeyi belirgin yapar):
+```
+DR_b = p_h × SAT(R(p_h, 0, 0.15, 0, 1))
+DR_t = SAT(R(p_h, 0.9, 1.0, 1, 0))
+DA   = g_d × DR_b × DR_t × w_d × 2
+```
+
+İkisi ayrı: biri **şekli**, öbürü **yoğunluğu** değiştiriyor. Bizde tek zarf vardı.
+
+### Yoğunluk zinciri `[H18 s.14-16]`
+
+Şekil gürültüsü 128³ RGBA (R alçak frekans Perlin-Worley, GBA artan Worley):
+```
+SN_sample = R(sn_r, (sn_g×0.625 + sn_b×0.25 + sn_a×0.125) − 1, 1, 0, 1)
+```
+
+Detay gürültüsü 32³ RGB (Worley):
+```
+DN_fbm = dn_r×0.625 + dn_g×0.25 + dn_b×0.125
+DN_mod = 0.35 × e^(−g_c × 0.75) × L_i(DN_fbm, 1 − DN_fbm, SAT(p_h × 5))
+```
+
+**İki şey burada:**
+- `e^(−g_c×0.75)` — **detayın etkisi küresel kapsamayla AZALIYOR.** Kapalı havada ince
+  yapı gereksiz; bizde sabitti.
+- `L_i(DN_fbm, 1−DN_fbm, SAT(p_h×5))` — **tabanda ters Worley, tepede normal**, geçiş
+  ilk %20'de. Bizde de vardı ama sabit yükseklikteydi.
+
+Son yoğunluk:
+```
+SN_nd = SAT(R(SN_sample × SA, 1 − g_c × WM_c, 1, 0, 1))
+d     = SAT(R(SN_nd, DN_mod, 1, 0, 1)) × DA
+```
+
+**Sıra kritik:** şekil gürültüsü × şekil-yükseklik → kapsamayla remap → detayla remap →
+**en son** yoğunluk-yükseklikle çarp. Bizde bu sıra karışıktı.
+
+### Örs `[H18 s.17]`
+
+```
+SA_anvil = (SA)^SAT(R(p_h, 0.65, 0.95, 1, 1 − a_a × c_g))
+DA_anvil = DA × L_i(1, SAT(R(√p_h, 0.4, 0.95, 1, 0.2)), a_a)
+```
+Örs, şekil fonksiyonunu **üs olarak** değiştiriyor. Ve örs eklenince yoğunluk modeli de
+değiştirilmek zorunda — yoksa tepe fazla yoğun kalıyor (s.17 şekil 12b bunu gösteriyor).
+
+### Maliyet modeli `[H18 s.18]`
+
+```
+t_tot = p × (n × t_d0 + n × s_n × t_d1)
+```
+p piksel, n görüş adımı, s_n güneş adımı. Optimizasyon bu üç değişkenden birine dokunur.
+
+### Adım boyu ve optimizasyonlar `[H18 s.19-21]`
+
+```
+step_new = step_orig + dist_start × inc_rate
+```
+**Başlangıç mesafesine** doğrusal — N22'nin `3.0 + 60·d/16384`'üyle aynı aile.
+
+Diğerleri:
+1. **Bulut bulunana kadar uzun adım**, bulununca **bir adım geri** ve kısa adıma geç.
+   Bulut geçilince tekrar uzun adım — ama **asgari kısa-adım mesafesi** dolmadan geri
+   dönülmüyor (histerezis). Bizim `emptyRun >= 6`'mızın karşılığı.
+2. **Uzun adımda yalnız TABAN şekli örnekleniyor, detay değil** — çünkü nihai şekil her
+   zaman taban şekil hacminin İÇİNDE kalır `[H18 s.20-21 şekil 18]`. Bizim
+   "cheap ≥ full garantisi"nin temiz ifadesi.
+3. **Tam opaklığa varınca dur.**
+4. **Kapsama düşükken adım KISALIR, yoğunluk düşükken adım UZAR.** İkisi de deneysel,
+   §4.2'de test ediliyor. Bizde adım yalnız mesafeye bağlıydı — bu iki bağ hiç aklımıza
+   gelmemişti.
+
+### Güneş adımları `[H18 s.22]`
+
+```
+step_sun = 0.5 × (ch_stop − ch_start) / s_n        // s_n = 4
+miplevel = Integer(i × 0.5)                        // i: 0..s_n
+```
+
+- Güneş yürüyüşünün **toplam mesafesi her zaman katman yüksekliğinin yarısı**, s_n ne
+  olursa olsun. Bizde `lightProbeMeters` bağımsız bir sayıydı.
+- **Mip seviyesi güneş adımı ilerledikçe artıyor**: ilk örnek mip 0, dördüncü mip 2.
+  Uzaktaki gölge örneği daha kaba dokudan okunuyor.
+- Örnek bulutun içinde değilse **güneş yürüyüşü hiç başlatılmıyor**.
+
+### Yeniden yansıtma `[H18 s.22-25]`
+
+- Her kare **4×4 bloğun 1 pikseli** işleniyor (1/16).
+- Sıra **naif değil, çapraz desen** — naif sıra gözle seçilebilen bir örüntü bırakıyor.
+- Hareket vektörleri ayrı bir render-target'ta (kırmızı x, yeşil y ekran uzayı).
+- İşlenmeyen pikseller için hareket vektörüyle **önceki karedeki karşılık** bulunuyor.
+- Sonuç: render süresi **1/10'a** iniyor (1/16 değil — yansıtmanın kendi maliyeti var).
+
+**Bilinen sorunlar — birebir bizim belirtilerimiz `[H18 s.25]`:**
+
+> *"Bulutların içinden geçerken göreli hareket çok büyük oluyor ve görsel olarak
+> hoş olmayan bir sonuç veriyor. Bu, yeniden yansıtmayı kapatıp yalnız yeni ışın
+> yürütülen pikselleri kullanarak çözülebilir; hayalet gider ama **daha piksellenmiş**
+> bir sonuç gelir."*
+
+Bizim `downsample = 4` + harmansız birleştirme kararımız tam olarak bu ödünleşmenin
+kötü tarafında duruyordu. Ayrıca:
+- Bulutlar cismin arkasında bile çizilmek zorunda (bir sonraki karede o piksel lazım).
+- Hareket vektörü ekran dışını gösterirse yeni örnek kullanılıyor → hızlı dönüşte
+  kenarlar piksellenir.
+
+### Mavi gürültü `[H18 s.26]`
+
+```
+dist_start += (bn − 0.5) × 2 × step_new
+```
+Yürüyüş başlangıcını ±1 adım kaydırıyor. **Bantlaşmanın çözümü bu.** Bizde Bayer 4×4
+kullanılıyordu; mavi gürültü ekran uzayında döşeniyor ve daha iyi dağılıyor. Bedeli:
+görüntü belirgin şekilde daha gürültülü, hafif bulanıklaştırma gerekiyor.
+
+### Aydınlatma `[H18 s.27-28]`
+
+```
+E(b, d_s) = e^(−b × d_s)                                    // Beer, b sanatsal terim
+HG(θ, g)  = (1/4π)(1 − g²) / [1 + g² − 2g·cos θ]^(3/2)
+IS_extra(θ) = cs_i × SAT(θ)^cs_e                            // güneş çevresine ek yoğunluk
+IOS(θ) = L_i(max(HG(θ, in_s), IS_extra(θ)), HG(θ, −out_s), ivo)
+```
+
+**İçe ve dışa saçılma ayrı iki HG**, aralarında `ivo` ile lerp. Bizde tek faz vardı.
+`b` açıkça "gerçekçi yoğunluktan kopuk, dengelemek için sanatsal terim" diye tanımlanmış.
+
 ---
 
 ## Okuma defteri
@@ -687,7 +846,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
 | `[N22]` nubis-2022 | **207** | **s.1–207 TAMAM** | — |
-| `[H18]` haggstrom-2018 | **81** | s.1–20 | s.21–81 |
+| `[H18]` haggstrom-2018 | **81** | s.1–40 | s.41–81 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
 
