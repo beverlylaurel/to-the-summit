@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 /// KÖŞE RENGİNE MALZEME MASKESİ SÜRER. Üretilen modelde UV yok ve farklı malzemeler aynı
 /// mesh'te geliyor; tutamağın nerede bittiği, kablonun nerede başladığı bir eşik sayısıyla
@@ -48,9 +49,11 @@ public class VertexBrush : EditorWindow
     Vector2[] surfaces;
     MeshCollider collider;
 
-    /// Köşe ızgarası: hücre boyutu fırça yarıçapından, hücre başına köşe listesi. Her
-    /// darbede bütün köşeleri taramak yarım milyon karşılaştırma demek.
+    /// Üçgen ızgarası: hücre boyutu fırça yarıçapından, hücre başına üçgen numarası.
+    /// Her darbede bütün üçgenleri taramak yüz binlerce karşılaştırma demek.
     Dictionary<Vector3Int, List<int>> grid;
+    Vector3[] centres;
+    int[] triangles;
     float cell;
 
     PreviewRenderUtility preview;
@@ -396,6 +399,8 @@ public class VertexBrush : EditorWindow
         mesh = target.sharedMesh;
         vertices = mesh.vertices;
 
+        triangles = mesh.triangles;
+
         colours = mesh.colors32;
         if (colours == null || colours.Length != vertices.Length)
             colours = new Color32[vertices.Length];
@@ -439,18 +444,62 @@ public class VertexBrush : EditorWindow
 
         if (existing == null)
         {
-            existing = Instantiate(source);
-            existing.name = source.name;
-            existing.SetColors(new Color32[existing.vertexCount]);
-            existing.SetUVs(1, new Vector2[existing.vertexCount]);
+            existing = Unweld(source);
 
             AssetDatabase.CreateAsset(existing, copyPath);
             AssetDatabase.SaveAssets();
 
-            ToolLog.Write($"[Fırça] {target.name} için boyanabilir kopya üretildi: {copyPath}");
+            ToolLog.Write($"[Fırça] {target.name} boyanabilir kopyası: {copyPath}, köşe "
+                + $"{source.vertexCount:N0} → {existing.vertexCount:N0}");
         }
 
         target.sharedMesh = existing;
+    }
+
+    /// KÖŞELERİ AYIRIR. Boyama üçgen başına yapılıyor; köşeler paylaşılsaydı bir üçgeni
+    /// boyamak komşusunu da boyar ve sınır yine bulanırdı. Bedeli köşe sayısının artması —
+    /// parça başına birkaç yüz bin köşe, bellekte birkaç megabayt.
+    static Mesh Unweld(Mesh source)
+    {
+        Vector3[] positions = source.vertices;
+        Vector3[] normals = source.normals;
+        Vector2[] uv = source.uv;
+
+        var mesh = new Mesh { name = source.name, indexFormat = IndexFormat.UInt32 };
+        mesh.subMeshCount = source.subMeshCount;
+
+        var newPositions = new List<Vector3>();
+        var newNormals = new List<Vector3>();
+        var newUv = new List<Vector2>();
+        var newTriangles = new List<int>[source.subMeshCount];
+
+        for (int sub = 0; sub < source.subMeshCount; sub++)
+        {
+            int[] indices = source.GetTriangles(sub);
+            newTriangles[sub] = new List<int>(indices.Length);
+
+            foreach (int index in indices)
+            {
+                newTriangles[sub].Add(newPositions.Count);
+                newPositions.Add(positions[index]);
+
+                if (normals.Length > 0) newNormals.Add(normals[index]);
+                if (uv.Length > 0) newUv.Add(uv[index]);
+            }
+        }
+
+        mesh.SetVertices(newPositions);
+        if (newNormals.Count == newPositions.Count) mesh.SetNormals(newNormals);
+        if (newUv.Count == newPositions.Count) mesh.SetUVs(0, newUv);
+
+        for (int sub = 0; sub < source.subMeshCount; sub++)
+            mesh.SetTriangles(newTriangles[sub], sub);
+
+        mesh.SetColors(new Color32[newPositions.Count]);
+        mesh.SetUVs(1, new Vector2[newPositions.Count]);
+        mesh.RecalculateBounds();
+
+        return mesh;
     }
 
     void Release()
@@ -471,15 +520,22 @@ public class VertexBrush : EditorWindow
         // ızgara hiçbir şey kazandırmazdı.
         float scale = Mathf.Max(1e-6f, target.transform.lossyScale.x);
         cell = Mathf.Max(1e-5f, radius / scale);
-        grid = new Dictionary<Vector3Int, List<int>>(vertices.Length / 8 + 1);
 
-        for (int i = 0; i < vertices.Length; i++)
+        int count = triangles.Length / 3;
+        centres = new Vector3[count];
+        grid = new Dictionary<Vector3Int, List<int>>(count / 4 + 1);
+
+        for (int t = 0; t < count; t++)
         {
-            Vector3Int key = Cell(vertices[i]);
+            centres[t] = (vertices[triangles[t * 3]]
+                        + vertices[triangles[t * 3 + 1]]
+                        + vertices[triangles[t * 3 + 2]]) / 3f;
+
+            Vector3Int key = Cell(centres[t]);
             if (!grid.TryGetValue(key, out List<int> bucket))
                 grid[key] = bucket = new List<int>();
 
-            bucket.Add(i);
+            bucket.Add(t);
         }
     }
 
@@ -490,6 +546,13 @@ public class VertexBrush : EditorWindow
 
     // ----------------------------------------------------------------- boyama
 
+    /// ÜÇGEN BOYANIYOR, KÖŞE DEĞİL. Köşe boyandığında Unity komşu köşeye kadar olan
+    /// yüzeyi iki rengin arasında geçiriyor: ikinci rengi sürdüğünde sınırda hiç
+    /// seçilmemiş bir ara ton beliriyordu. Üçgenin üç köşesi birlikte yazılınca üçgen
+    /// tek renk kalıyor ve sınır keskin oluyor.
+    ///
+    /// Bunun çalışması için kopyanın köşeleri paylaşılmıyor (bkz. `Unweld`); paylaşılsaydı
+    /// bir üçgeni boyamak komşusunu da boyardı.
     void Paint(Vector3 worldPoint, bool eraseNow)
     {
         Vector3 local = target.transform.InverseTransformPoint(worldPoint);
@@ -503,6 +566,14 @@ public class VertexBrush : EditorWindow
         int reach = Mathf.CeilToInt(localRadius / cell);
         bool removing = eraseNow || erase;
 
+        var paint = new Color32(
+            (byte)Mathf.RoundToInt(colour.r * 255f),
+            (byte)Mathf.RoundToInt(colour.g * 255f),
+            (byte)Mathf.RoundToInt(colour.b * 255f),
+            (byte)Mathf.RoundToInt(255f * strength));
+
+        var slot = new Vector2(channel, 0f);
+
         for (int x = -reach; x <= reach; x++)
         for (int y = -reach; y <= reach; y++)
         for (int z = -reach; z <= reach; z++)
@@ -510,40 +581,25 @@ public class VertexBrush : EditorWindow
             var key = new Vector3Int(centre.x + x, centre.y + y, centre.z + z);
             if (!grid.TryGetValue(key, out List<int> bucket)) continue;
 
-            foreach (int index in bucket)
+            foreach (int triangle in bucket)
             {
-                float distance = Vector3.Distance(vertices[index], local);
-                if (distance > localRadius) continue;
+                if (Vector3.Distance(centres[triangle], local) > localRadius) continue;
 
-                // FIRÇA TAM ÖRTÜYOR, KENARA DOĞRU ZAYIFLAMIYOR. Yumuşak kenarda örtme
-                // gücü yarım kalıyor ve gölgelendirici parçanın kendi rengiyle seçilen
-                // rengi karıştırıyor: siyah sürerken kenarda kadronun kırmızısı çıkıyordu.
-                // Seçilen renk değdiği yeri eziyor; yumuşaklık isteniyorsa şiddet
-                // düşürülüyor.
-                float amount = strength;
-
-                Color32 current = colours[index];
-
-                if (removing)
+                for (int corner = 0; corner < 3; corner++)
                 {
-                    current.a = (byte)Mathf.RoundToInt(Mathf.Lerp(current.a, 0f, amount));
-                }
-                else
-                {
-                    // RENK SERT YAZILIYOR, YALNIZ ÖRTME GÜCÜ YUMUŞUYOR. Renk de örtme
-                    // gücüyle birlikte karıştırılınca fırçanın kenarındaki köşeler eski
-                    // rengin ve yenisinin arasında bir tonda kalıyor: siyah sürerken
-                    // kenarda önceki renk hâlesi çıkıyordu. Şimdi kenar, parçanın kendi
-                    // yüzeyinden yeni renge geçiyor; arada üçüncü bir renk yok.
-                    current.r = (byte)Mathf.RoundToInt(colour.r * 255f);
-                    current.g = (byte)Mathf.RoundToInt(colour.g * 255f);
-                    current.b = (byte)Mathf.RoundToInt(colour.b * 255f);
-                    current.a = (byte)Mathf.RoundToInt(Mathf.Lerp(current.a, 255f, amount));
+                    int index = triangles[triangle * 3 + corner];
 
-                    surfaces[index] = new Vector2(channel, 0f);
-                }
+                    if (removing)
+                    {
+                        Color32 cleared = colours[index];
+                        cleared.a = 0;
+                        colours[index] = cleared;
+                        continue;
+                    }
 
-                colours[index] = current;
+                    colours[index] = paint;
+                    surfaces[index] = slot;
+                }
             }
         }
 
