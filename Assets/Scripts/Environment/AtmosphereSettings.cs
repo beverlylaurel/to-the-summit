@@ -165,9 +165,9 @@ public class AtmosphereSettings : ScriptableObject
     [Header("Bulut kalitesi")]
     [Tooltip("Adım boyunu belirler: taban adım = 2000 / bu sayı. Maliyetin ana kaynağı, " +
              "ve dilimlenmenin de: adım boyu × yoğunluk ölçeği ~0.2'yi aşmamalı.")]
-    [Range(16, 128)] public int raymarchSteps = 100;
+    [Range(16, 128)] public int raymarchSteps = 110;
     [Tooltip("Işık yönünde örnek sayısı. İkinci en pahalı kalem.")]
-    [Range(2, 8)] public int lightSteps = 5;
+    [Range(2, 8)] public int lightSteps = 4;
     [Tooltip("Bu mesafenin ötesinde ince aşındırma dokusu okunmaz; bir pikselden küçük kalır.")]
     public float detailDistance = 9000f;
     [Tooltip("Işın başlangıcını dağıtan Bayer kaymasının gücü. 1'de desen ekrana ham basılıp " +
