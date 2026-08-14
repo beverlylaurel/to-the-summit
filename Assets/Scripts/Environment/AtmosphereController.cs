@@ -231,9 +231,9 @@ public class AtmosphereController : MonoBehaviour
     /// çağrılmamış olabilir.
     void OnEnable() => Initialize();
 
-    /// Yansıma haritasının en son hangi gündüz katsayısında pişirildiği. Gökyüzü sürekli
+    /// Yansıma haritasının en son hangi gökyüzünde pişirildiği. Gökyüzü sürekli
     /// değişiyor ama harita her karede pişirilemez — pişirme milisaniyeler yiyor.
-    float reflectionDay = float.MinValue;
+    Color reflectionSky = new Color(-1f, -1f, -1f);
 
     void Initialize()
     {
@@ -247,6 +247,14 @@ public class AtmosphereController : MonoBehaviour
         initialized = false;
         Apply();
     }
+
+    /// İki gök rengi arasındaki fark verilen eşiği geçiyor mu. Kanal kanal bakılıyor:
+    /// toplam parlaklık aynı kalırken renk kayabiliyor (şafakta kızıl, fırtınada gri) ve
+    /// yansıma o kaymayı da taşımalı.
+    static bool ColourMoved(Color a, Color b, float threshold) =>
+        Mathf.Abs(a.r - b.r) > threshold
+        || Mathf.Abs(a.g - b.g) > threshold
+        || Mathf.Abs(a.b - b.b) > threshold;
 
     void Update()
     {
@@ -271,18 +279,7 @@ public class AtmosphereController : MonoBehaviour
         float snowiness = weather.Snowiness;
         float day = time.DayFactor;
 
-        // YANSIMA HARİTASI GÖKYÜZÜYLE BİRLİKTE PİŞİYOR. Sahnenin yansıma kaynağı gökyüzü
-        // ve Unity onu yalnız istendiğinde pişiriyor: gökyüzü kararırken harita gündüz
-        // hâlinde kalıyordu. Sonuç, gece kromun hâlâ gündüz gökyüzünü aynalamasıydı —
-        // bisiklet karanlıkta parlıyordu.
-        //
-        // Her karede değil, gündüz katsayısı belirgin değişince: pişirme milisaniye
-        // yiyor ve gökyüzü bir karede o kadar değişmiyor.
-        if (Mathf.Abs(day - reflectionDay) > 0.02f)
-        {
-            reflectionDay = day;
-            DynamicGI.UpdateEnvironment();
-        }
+
 
         // Bulut denizi sakin havada oluşur: soğuk hava vadiye çöker ve üstünde durgun
         // bir tavan bulur. Rüzgâr o havayı karıştırıp inversiyonu dağıtır, yağış ise
@@ -394,17 +391,21 @@ public class AtmosphereController : MonoBehaviour
         // nesneler içinde bulundukları havayla aynı ışığı alır
         RenderSettings.ambientLight = color * settings.ambientStrength;
 
-        // YANSIMA ŞİDDETİ DE AYNI ZİNCİRDEN. Gökyüzü kararırken yansıma tam güçte
-        // kalıyordu: çevre ışığı geceleyin 0.04'e inerken metal yüzeyler hâlâ gündüz
-        // gücünde yansıma alıyor ve bisikletin kromu karanlıkta parlıyordu.
+        // YANSIMA TEK KAYNAKTAN: GÖKYÜZÜNÜN KENDİSİ. Sahnenin yansıma haritası gökyüzünden
+        // pişiyor, yani gece kararması, fırtına grisi ve bulut denizi zaten haritanın
+        // içinde. Şiddet katsayısı bir dönem gök seviyesine bağlanmıştı ve aynı kararmayı
+        // İKİNCİ kez uyguluyordu — iki kaynak, biri diğerini bilmeden.
         //
-        // Ölçüden bağımsız bir "gece katsayısı" konmuyor; oran ortam ışığının kendi
-        // parlaklığından çıkıyor, yani gökyüzü hangi sebeple kararırsa (gece, fırtına,
-        // bulut denizi) yansıma da onunla kararıyor.
-        float skyLevel = Mathf.Max(color.r, Mathf.Max(color.g, color.b))
-                       * settings.ambientStrength;
+        // Harita gökyüzü DEĞİŞTİĞİNDE pişiyor: yalnız gündüz katsayısına bakılsaydı hava
+        // değişince bayat kalırdı. Ölçü rengin kendisi; eşik, bir karede olmayacak kadar
+        // büyük bir fark.
+        RenderSettings.reflectionIntensity = 1f;
 
-        RenderSettings.reflectionIntensity = Mathf.Clamp01(skyLevel * 2.2f);
+        if (ColourMoved(color, reflectionSky, 0.02f))
+        {
+            reflectionSky = color;
+            DynamicGI.UpdateEnvironment();
+        }
 
         if (view != null) view.clearFlags = CameraClearFlags.Skybox;
 
