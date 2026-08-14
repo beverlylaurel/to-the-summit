@@ -1197,6 +1197,54 @@ float3 CalculateLight(float density, float density_to_sun, float cos_angle,
 3. **Mavi gürültü aydınlatmaya da ekleniyor**: `attenuation += bluenoise * 0.003`.
    Bantlaşma yalnız yürüyüş başlangıcında değil, ışıkta da kırılıyor.
 
+## `[N17]` Decima — yazarlık sistemi
+
+**Bu PDF'te KONUŞMACI NOTLARI var** — her slaydın altında. N22'den çok daha ayrıntılı.
+
+### Kimlik ve hedef `[N17 s.10-11]`
+
+2015 prototipi 2 ms altında çalışıyordu ama *"ağır sanat yönlendirmeli bir oyun olan
+Horizon için gereken tekrarlanabilirlik ve kontrol seviyesinden yoksundu"*. 2017 işi
+yazarlık bileşenini ekliyor **ve** 2 ms bütçesinin de altına iniyor.
+
+> *"Nubis hiçbir ASSET kullanmaz, yalnız yazarlık sistemimizden gelen, olasılıkla
+> tanımlanmış davranışları uyandıran talimat kümeleri."* `[N17 s.11]`
+
+Bizim "hava haritasını pişir" yaklaşımımızla farkı bu — onlarda pişmiş doku yok,
+talimat var. (N22'de NDF'lere dönmüş; yani 2017→2022 arasında bu değişmiş.)
+
+### Beş bileşen `[N17 s.12]`
+
+```
+Yazarlık Sistemi ──→ Bulut Yoğunluk Modeli ──→ Işın Yürüyüşü ──→ Son İşlem
+                            ↑
+                   Bulut Aydınlatma Modeli
+```
+
+- **Yazarlık**: nereye, hangi tip bulut, geçişler, detay karakteri
+- **Yoğunluk modeli**: fiziksel biçimler — tüylü/kabarık şekiller ve deformasyonlar
+- **Aydınlatma modeli**: saçılma ve soğurma
+- **Işın yürüyüşü**: yoğunluk ve aydınlatmayı kameradan uzaklaşan dilimlerde çiziyor
+- **Son işlem**: bulut manzarasını kareye entegre ediyor
+
+### Fiziksel arka plan — balonla yolculuk `[N17 s.13-20]`
+
+Uygulamaya geçmeden önce bilerek bir düşünce deneyi yapıyorlar: *"bulut oluşumundaki
+fiziği gerçekten anlamak için yakından deneyimlememiz gerekiyor."*
+
+- **Stratus**: buharın soğuk sabah havasına YAVAŞ sızması → levha biçimler
+- **Kümülüs**: sıcak buharın BÜYÜK darbeleri → istiflenmiş yuvarlak biçimler; konveksiyon
+  akımının yükselen kolu
+- **Türbülans**: konveksiyon akımındaki kararsızlık cebi bulutları parçalıyor →
+  **tüylü ve kıvrımlı** biçimler
+- **Yoğuşma çizgisi**: belli bir kotta buhar yoğunlaşıp ışığı saçacak kadar
+  yoğunlaşıyor — keskin bir sınır
+- **Stratokümülüs**: kümülüslerin örtüşüp kendi levhalarına kümelenmesi
+- **Sıcaklık her kilometrede 6.5 °C düşüyor**
+- **Rüzgâr yükseldikçe güçleniyor** ve bulutları yana itiyor
+- **Kümülüs congestus'un KENARLARI KOYU görünüyor** — yerden bakınca görülmeyen bir
+  etki. (Powder etkisinin kurulumu.)
+
 ---
 
 ## Okuma defteri
@@ -1206,7 +1254,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 | makale | toplam | okunan | eksik |
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
-| `[N17]` nubis-2017 | **108** | — | s.1–108 |
+| `[N17]` nubis-2017 | **108** | s.1–20 | s.21–108 |
 | `[N22]` nubis-2022 | **207** | **s.1–207 TAMAM** | — |
 | `[H18]` haggstrom-2018 | **93 PDF / 81 basılı** | **PDF s.1–93 TAMAM** | — |
 
