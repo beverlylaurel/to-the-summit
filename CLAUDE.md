@@ -49,6 +49,28 @@ bilinçli. İki sistem arasında yeni bir bağ kurulduğunda, bir bağ koptuğun
 bir kural eklendiğinde `SYSTEMS.md` **aynı adımda** güncellenir. Sayılar orada tutulmaz;
 eşik ve katsayı kodda ve ayar asset'lerinde durur.
 
+## Bulut sistemi — ayrı belgeler
+
+Bulut sistemi 2026-08-14'te tamamen silindi; hazır bir uygulamadan (`UnityVolumetricCloudsURP`,
+Nubis türevi) yeniden kurulacak. **Bulut konusunda `SYSTEMS.md`'ye BAKILMAZ** — oradaki
+anlatım silinmiş koda ait, dosyanın başında uyarısı var.
+
+Buluta dair her iş şu üç dosyayla başlar:
+
+- **`CLOUDS_REBUILD.md`** — hangi sistem bulutu okuyordu (yer gölgesi, `CloudCeiling`,
+  ClimbHud, yağış, yansıma, şimşek), ölçülerek bulunmuş 12 ders, kurtarılmış gürültü hash'i
+- **`NUBIS_NOTES.md`** — makale okumaları. 12 soru, her cevabın yanında kaynak sayfa
+  (`[N22 s.34]`). Okuma defteri hangi sayfaların okunduğunu gösterir; boşluk varsa
+  okunmamıştır
+- **`DECISIONS.md`** — sökme kararı ve tetikleyicisi
+
+**Repo'nun üstüne kendi terimimiz eklenmez.** Görüntü yanlışsa önce onun parametrelerine
+ve ürettiği dokulara bakılır, tek seferde tek sayı değişir. Ekleme ihtiyacı doğuyorsa
+önce ilgili makale okunur — eski sistem dört satırlık formülün üstüne on bir terim
+biriktirdiği için silindi.
+
+## Belge otoritesi
+
 `SYSTEMS.md` yön gösterir, otorite değildir. Nereye bakılacağı oradan bulunur, davranış
 **koddan doğrulanır**. İkisi çeliştiğinde kod haklıdır ve belge aynı adımda düzeltilir.
 "Belgede öyle yazıyor" bir gerekçe değildir; hafızadan konuşmak da değildir.
