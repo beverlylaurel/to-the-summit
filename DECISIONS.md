@@ -824,6 +824,35 @@ görülürdü. Materyalin ilk denemesi bu yüzden geri alındı.
 
 ---
 
+### Yakın plan nesnelerin ışık borcu
+
+**Karar:** Bisiklet için kurulan ışık ayarları props gelene kadar olduğu gibi kalıyor
+(2026-08-14). Üçü bilerek eksik bırakıldı, üçünün de tetikleyicisi aynı gün gelecek.
+
+**1. Kapalı hacimlerde yansıma.** Sahnenin yansıma kaynağı gökyüzü; çadırın içindeki
+metal eşya dışarıdaki gökyüzünü aynalar. **Tetikleyici:** kapalı ya da yarı kapalı bir
+mekân (çadır, sığınak, kulübe) sahneye girdiğinde. **Çözüm:** o hacme yerel yansıma probu.
+**Maliyet:** şimdilik yok, kapalı mekân yok.
+
+**2. Yansıma katsayısındaki 2.2 çarpanı.** Şiddet ortam ışığının parlaklığından türüyor
+ama çarpan elle konmuş: `reflectionIntensity = clamp01(gökSeviyesi * 2.2)`.
+`ambientStrength` değişirse yansıma da kayar. **Tetikleyici:** "gündüz yansıma sönük
+kaldı" ya da "gece yine parlıyor" belirtisi. **Maliyet:** bugün doğru çalışıyor,
+ölçülerek kondu.
+
+**3. Gölge mesafesi 60 m.** Bu mesafenin ötesindeki hareketli nesneler gölge düşürmüyor.
+Bisiklette 50 mm'lik boşluk bile fark edildi; uzaktaki kamp çadırının hiç gölgesi olmaması
+daha çok batar. **Tetikleyici:** kamp alanı ya da ekipman uzaktan görünür olduğunda.
+**Çözüm:** mesafeyi artırmak (dokel kabalaşır, gölge pikselleşir) ya da uzak nesneler için
+ayrı bir yöntem. **Maliyet:** yakın planda gölge kalitesi şu an iyi, uzakta yok.
+
+**4. SSAO yarıçapı 0.3 m.** Bisiklet ölçeğine göre seçildi. Üç santimlik karabinada etkisi
+zayıf, üç metrelik çadırda kuytuyu tam yakalamaz. **Tetikleyici:** ölçekçe çok farklı
+nesneler bir arada göründüğünde. **Maliyet:** küçük, kabul edilebilir.
+
+
+---
+
 ### SSAO yalnız nesnelerde
 
 **Karar:** ScreenSpaceAmbientOcclusion boru hattında AÇIK ama araziye okutulmuyor
