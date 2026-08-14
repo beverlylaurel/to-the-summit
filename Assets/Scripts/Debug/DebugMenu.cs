@@ -39,6 +39,8 @@ public class DebugMenu : MonoBehaviour
     float speedMultiplier = StartSpeedMultiplier;
     bool freeFly;
 
+    float cloudSpeedScale = 1f;
+
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
     float lockedSnowiness;
@@ -413,6 +415,12 @@ public class DebugMenu : MonoBehaviour
         // ediyorlardı ve sebebi görünmüyordu: taban hız ayarı yer rüzgârını eziyordu.
         GUILayout.Label($"Süzülme {atmosphere.CloudSpeed:F1} m/s"
                         + $" = {atmosphere.CloudSpeed * 3.6f:F0} km/h");
+
+        // GEÇİCİ — doğru hızı gözle bulmak için. Beğenilen çarpan ayara yazılınca bu
+        // kaydırıcı silinecek.
+        GUILayout.Label($"Hız çarpanı {cloudSpeedScale:F1}×");
+        cloudSpeedScale = GUILayout.HorizontalSlider(cloudSpeedScale, 0.5f, 8f);
+        atmosphere.CloudSpeedScale = cloudSpeedScale;
 
         GUILayout.Label($"Kapsama %{atmosphere.Coverage * 100f:F0}   " +
                         $"taban {atmosphere.CloudBottom:F0} m");

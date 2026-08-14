@@ -231,6 +231,10 @@ public class AtmosphereController : MonoBehaviour
     /// çağrılmamış olabilir.
     void OnEnable() => Initialize();
 
+    /// Bulut hızına elle verilen çarpan. GEÇİCİ: doğru hız gözle bulunuyor, bulununca
+    /// ayara yazılıp bu alan silinecek (bkz. `DECISIONS.md`).
+    public float CloudSpeedScale { get; set; } = 1f;
+
     /// Bulutların o anki süzülme hızı (m/s). Teşhis içindir: rüzgâr sıfırlanınca da
     /// hareket ediyorlarsa sebebin taban hız mı yoksa rüzgâr mı olduğu ancak bu sayıyla
     /// ayrılıyor.
@@ -502,7 +506,8 @@ public class AtmosphereController : MonoBehaviour
         // eklenen saniyelik sarsıntılarla titremeye başlayınca kayan doku 16 karelik
         // zamansal birikimin altında seğiriyor, geçmiş kelepçeden atılıyor ve bulut
         // kenarları blok blok pikselleşiyordu.
-        float targetSpeed = Mathf.Max(settings.minCloudSpeed, horizontal.magnitude * settings.cloudDrift);
+        float targetSpeed = Mathf.Max(settings.minCloudSpeed,
+            horizontal.magnitude * settings.cloudDrift) * CloudSpeedScale;
         float speed = smoothedDrift = smoothedDrift <= 0f
             ? targetSpeed
             : Mathf.Lerp(smoothedDrift, targetSpeed, turn);
