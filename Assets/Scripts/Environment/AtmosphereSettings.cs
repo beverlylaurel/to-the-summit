@@ -83,14 +83,24 @@ public class AtmosphereSettings : ScriptableObject
              "döşeme tekrarı görünmez; görünürse büyütülür, pişirme maliyeti değişmez.")]
     public float weatherMapWorldSize = 48000f;
     [Tooltip("Tek çekirdeğin en büyük yarıçapı (metre). Dev bulut boyunun ana vidası: " +
-             "birleşmeler bunun 2-3 katına çıkabilir.")]
-    [Range(1200f, 4500f)] public float coreRadiusMax = 1600f;
+             "birleşmeler bunun 2-3 katına çıkabilir.
+
+" +
+             "1600 m iken bulutlar boylarıyla aynı ölçüdeydi (3.2 km çap, 2-3 km boy) ve " +
+             "top gibi duruyordu. Gerçek kümülüs enine yatıktır: 5-6 km çap, 1.5-2.5 km " +
+             "boy. Kapsama %100'de birleşmelerle 10 km'yi aşan kütleler çıkıyor.")]
+    [Range(1200f, 4500f)] public float coreRadiusMax = 2800f;
     [Tooltip("İstif tavanı: bulutlu bölgelerde çekirdeklerin ne kadar sık dizilebildiği. " +
              "Yükseldikçe birleşme artar — devasa kütleler buradan doğar.")]
-    [Range(0.3f, 0.95f)] public float corePacking = 0.9f;
+    [Range(0.3f, 0.95f)] public float corePacking = 0.95f;
     [Tooltip("Boşluk serpintisi: harita boşluklarına düşen tek tük bulut payı. " +
-             "0 = boşluklar bomboş; yükseldikçe boş/dolu farkı silinir.")]
-    [Range(0f, 0.5f)] public float packingFloor = 0.35f;
+             "0 = boşluklar bomboş; yükseldikçe boş/dolu farkı silinir.
+
+" +
+             "0.35'te boşluklara düşen küçük çekirdekler ekranda FUTBOL TOPU gibi " +
+             "duruyordu: eni birkaç yüz metre, boyu bir kilometre. Gerçek gökyüzünde " +
+             "boşluk boşluktur, serpinti azdır.")]
+    [Range(0f, 0.5f)] public float packingFloor = 0.1f;
     [Tooltip("Yama penceresi: organizasyon alanının bulutlu saydığı eşik. Küçük değer " +
              "bulutlu bölgeleri genişletir, büyük değer boşluk payını artırır.")]
     [Range(0.30f, 0.60f)] public float patchWindow = 0.35f;

@@ -566,11 +566,12 @@ float CloudDensity(float3 position, bool cheap, float distance, float stepSize,
     // çapı ~3.2 km — boy ile en eşit, sonuç silindir. Gerçek kümülüs 1-2 km boyunda,
     // 1-3 km eninde: en/boy oranı 1.5-2.
     //
-    // Aralık kâğıtta çıkarıldı: 3.2 km çapındaki bir çekirdek için boy 1.5-1.8 km,
-    // yani en/boy 1.8-2.1. Gerçek kümülüs bandı bu. İlk deneme (0.42-0.78) düşük
-    // kapsamada bulutu UZATIYORDU — sayı hesaplanınca görüldü, gözle değil.
+    // EĞRİ KARESEL. Kökle sürülünce açık havada bulut fazla uzuyor, kapalı havada ise
+    // yeterince büyümüyordu: kapsama %100'e çekildiğinde bile bulutlar devasalaşmıyordu.
+    // Kare, alt ucu bastırıp üst ucu serbest bırakıyor — açık havada yayvan kümülüs,
+    // fırtınada katmanı dolduran kütle.
     float lateralGrowth = saturate(0.30 + 0.85 * _Coverage);
-    ceiling01 *= lerp(0.30, 0.62, sqrt(lateralGrowth));
+    ceiling01 *= lerp(0.28, 0.88, lateralGrowth * lateralGrowth);
 
     // BULUT KENDİ AYAK İZİ KADAR YÜKSELİR. Tavan yalnız küresel kapsamadan
     // ölçekleniyordu: haritanın boşluklarına düşen küçük çekirdekler de büyük kütlelerle
