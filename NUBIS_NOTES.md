@@ -1593,6 +1593,73 @@ Bizim 2026-08-14'te yaşadığımız şeyin tarifi. Prosedürel sistem kurmak ko
 oyuncuya yakında daha çok detay, daha fazla bozunma davranışı, kalan bulut katmanları.
 (Bunların hepsi `[N22]`'de yapılmış.)
 
+## `[N15]` eksik uçlar — giriş ve optimizasyon
+
+### Neden prosedürel? `[N15 s.2-14]`
+
+**Killzone** (önceki oyunları): oyuncu önceden belirlenmiş bir güzergâhta, bulutlar elle
+yerleştirilen billboard ve gök kubbeleriyle. Günün saati sabit olduğu için aydınlatma
+önceden pişiriliyor.
+
+**Horizon**: açık dünya, gündüz/gece döngüsü, dinamik hava, ve *"gökyüzü ekranın
+YARISINI kaplıyor"*.
+
+**Bulut hedefleri** `[N15 s.7]`: sanat yönlendirilebilir · gerçekçi (birden çok tip) ·
+hava sistemiyle bütünleşik · zamanla evrilen · **epik**.
+
+**BAŞARISIZ OLAN YAKLAŞIMLAR** `[N15 s.9-14]` — hepsi denenmiş ve elenmiş:
+
+| deneme | neden elendi |
+|---|---|
+| Akışkan çözücüyle bulut büyütme | sanatçılar kontrol edemiyor |
+| Poligon bulut + küresel harmonik ışık pişirme | yalnız KALIN bulutlarda çalışıyor, tüylülerde değil |
+| Billboard (çok yönlü, çok saatli) | **bulutlar arası gölge** üretilemiyor |
+| Gök kubbesi (tüm voksel bulutlar tek set) | evrim yok, tepeden geçen bulut yok, bellek ve overdraw yüksek |
+
+> *"Belki de geleneksel ASSET tabanlı yaklaşım gidilecek yol değildi."*
+
+**İlk voksel denemesi** `[N15 s.16]`: kameranın önüne poligonlar dizip 3B Perlin
+örneklemek. *"Aşırı yavaş, ama umut verici — gerçi biz yalnız bu bantlı bulutları değil
+birden çok bulut tipini temsil etmek istiyoruz."*
+
+### Renk modeli `[N15 s.88]`
+
+- **Ambient gök katkısı YÜKSEKLİKLE ARTIYOR**
+- **Doğrudan aydınlatma güneş rengiyle domine**
+- **Atmosfer bulutları DERİNLİK boyunca örtüyor**
+
+Ambient ve doğrudan bileşenler toplanıyor, sonra derinlik kanalına göre atmosfer rengine
+doğru sönümleniyor.
+
+### Bellek `[N15 s.89]`
+
+Ön pişirme yok. **Bütün gökyüzü için benzersiz bellek = 2 adet 3B doku + 1 adet 2B
+doku**, "düzinelerce billboard ya da gök kubbesi yerine". Toplam **20 MB** `[N15 s.2]`.
+
+### Yürüyüşün özeti `[N15 s.90]`
+
+- Örnekleyici, **potansiyel olarak bir bulutun içinde değilse ucuz iş** yapıyor
+- **64-128 yürüyüş örneği, yürüyüş başına konide 6 ışık örneği**
+- **Işık örnekleri belli bir derinlikte tamdan ucuza geçiyor**
+
+### VE ASIL SAYI `[N15 s.91-93]`
+
+> *"Şimdiye kadar anlattığım yaklaşım yaklaşık **20 MİLİSANİYE** tutuyor. (gülüşme için
+> duraklama) Yani güzel ama oyunumuza koyulacak kadar hızlı değil."*
+
+Nathan Vos'un fikri:
+- Her kare **çeyrek çözünürlüklü tampon**
+- Nihai görüntüdeki her **4×4 blokta 16 pikselden 1'ini** güncelle
+- Önceki kareyi yeniden yansıt (kalıcı bir şey olsun diye)
+- **Yansıtılamayan yerlerde (ekran kenarı) düşük çözünürlüklü tampondan ikame et**
+
+> *"Nathan'ın fikri shader'ı **10 kat ya da daha fazla** hızlandırdı... Bu, bunu oyunumuza
+> koyabilmemizin neredeyse tek sebebi. Bu sayede hedef performansımız yaklaşık 2
+> milisaniye, ve bunun çoğu **komut sayısından** geliyor."*
+
+**20 ms → 2 ms, tamamen yeniden yansıtmadan.** Bizim "bilinçli HARMANSIZ" kararımız bu
+kazancın tamamını reddetmek anlamına geliyormuş.
+
 ---
 
 ## Okuma defteri
@@ -1601,7 +1668,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 
 | makale | toplam | okunan | eksik |
 |---|---|---|---|
-| `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
+| `[N15]` nubis-2015 | **99** | **s.1–99 TAMAM** | — |
 | `[N17]` nubis-2017 | **108** | **s.1–108 TAMAM** | — |
 | `[N22]` nubis-2022 | **207** | **s.1–207 TAMAM** | — |
 | `[H18]` haggstrom-2018 | **93 PDF / 81 basılı** | **PDF s.1–93 TAMAM** | — |
@@ -1611,8 +1678,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 `[H18]` **81 BASILI sayfa**; PDF sayfası = basılı + 12, yani PDF ~93 sayfa. Basılı 68
 (kaynakça sonu) = PDF 80. **Ekler (A parametreler, B KOD) PDF 81'den sonra.**
 
-`[N15]`'in atlanan kısımları da okunacak — s.1–17 giriş, s.88+ optimizasyon bölümü.
-Bugün ortadan girilip ortada bırakılmıştı.
+**DÖRT MAKALE DE TAMAMLANDI.** Defterde boşluk yok.
 
 
 ---
