@@ -294,6 +294,22 @@ public static class BikeBootstrap
 
         root.transform.position = SpawnPoint();
 
+        // YERE OTURUYOR MU, ÖLÇÜLÜYOR. Model kökün üstünde alt sınırı sıfıra çekilerek
+        // duruyor ama doğuş noktası ışınla bulunuyor ve arada beş santimlik pay vardı;
+        // alçak güneşte o pay gölgeyi bisikletten koparıyor, nesne havada duruyormuş gibi
+        // görünüyor. Ölçüm yazılıyor ki "havada mı" sorusu gözle değil sayıyla cevaplansın.
+        Bounds placed = Measure(model);
+        var down = new Ray(placed.center + Vector3.up * 2f, Vector3.down);
+
+        if (Physics.Raycast(down, out RaycastHit ground, 20f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            float gap = placed.min.y - ground.point.y;
+            root.transform.position -= Vector3.up * gap;
+
+            ToolLog.Write($"[Bisiklet] zeminle arası {gap * 1000f:F0} mm ölçüldü, "
+                        + "kapatıldı; tekerlek yere değiyor.");
+        }
+
         Undo.RegisterCreatedObjectUndo(root, "Bisikleti kur");
         return root;
     }
