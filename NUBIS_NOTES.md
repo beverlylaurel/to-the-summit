@@ -1386,6 +1386,91 @@ Temiz bir ayrım: **konuma göre değişen veri haritada, her yerde aynı olan s
 hava durumunda.** Bizim `AtmosphereSettings` + hava haritası ayrımımızın olması gereken
 hâli bu.
 
+### `[N17]` yazarlık hedefleri `[N17 s.64]`
+
+- Karşılaşma / keşif / ara sahne için ton kurmak
+- Manzarayı uzatmak
+- **Sanat yönlendirilebilir, GERÇEKÇİ yapılar** — *"salt rastgele gürültü desenleri değil"*
+- **Detayların evrimi, bulut oluşumlarının değil**
+- Hava koşullarına göre davranış değişimi
+
+### Yazarlık boru hattı `[N17 s.68]`
+
+```
+Kontroller ──→ Hava Simülasyonu ──→ RGB Doku ──→ Düzeltmeler ──→ Cloud Map
+(Decima ed.)      (Shader)          (üretilen)   (görüntü ed.)   (RGB tampon)
+                       └──────────────────────────────────────────────↗
+```
+
+Oyunun çoğunda simülasyon prosedürel harita üretiyor; ara sahne ve önemli olaylarda
+**herhangi bir dokuyla ezilebiliyor** ve görüntü editöründe elle düzeltiliyor.
+
+> *"Sanat yönetmeni gelip 'tam şuraya bir delik istiyorum' dediğinde, iş cloud map'te o
+> alana SİYAH BOYAMAK kadar basitti."* `[N17 s.69]`
+
+### Hava durumu zinciri `[N17 s.70-72]`
+
+```
+Weather State ("Cloudy") ─┐
+Weather State ("Clear")   ├─→ Weather Cycle (Bölge A) ─→ Weather Scheduler
+Weather State ("Storm")   ─┘   Weather Cycle ("Boss")  ─↗
+```
+
+- Her bölgenin kendi hava durumu koleksiyonu ve döngüsü var
+- **Zamanlayıcı bir sonraki durumu ŞANSA göre seçiyor**, ama hangi durumların
+  kullanılabileceği **günün saatine** göre kısıtlanabiliyor (*"kümülüs sabahları
+  genellikle görünmez"*)
+- Karşılaşmalar (boss dövüşü) bölgesel döngüyü ezen kendi döngülerini tanımlıyor
+- **Geçiş 10-30 saniyede, basit lerp** `[N17 s.71]`
+- Horizon'da **10 bölgesel zon + 70 zon** (haydut kampı gibi yerler için — sanat yönetmeni
+  oralarda hep tehditkâr koyu bulut istiyormuş) `[N17 s.72]`
+- Zon değişince zamanlayıcı sıradaki durumu yeni zondan rastgele biriyle değiştirip
+  geçişi hemen başlatıyor
+
+### Aydınlatma modeli — ÜÇ OLASILIK `[N17 s.75-76]`
+
+Standart tek-saçılma modeli:
+```
+Energy = exp(-density_along_light_ray) * HG(cos θ, eccentricity)
+```
+> *"Bu, sis gibi optik olarak İNCE ortamlar için çalışıyor ama kalın bulutlar için iyi
+> çalışmıyor, çünkü bulut içindeki varsayımsal su moleküllerinden sekerek örnek noktasına
+> İÇE SAÇILAN ışığı hesaba katmıyor."*
+
+Onların modeli bir **SÖNÜM modeli**: *"tam ışık şiddetiyle başlıyoruz ve yalnız onu
+AZALTMAK için iş yapıyoruz."* Üç olasılığın birleşimi:
+
+1. **Yönlü saçılma olasılığı** — gümüş kenar üzerinde ince kontrol
+2. **Soğurma / dışa saçılma olasılığı** — içe saçılmayı da hesaba katıyor
+3. **İçe saçılma olasılığı** — bulutların koyu kenar ve tabanlarını veriyor
+
+### İki HG, max ile `[N17 s.77-81]`
+
+```
+cos_angle = dot(normalize(light_vector), normalize(view_vector));
+
+HenyeyGreenstein(cos_angle, eccentricity)
+{
+    return ((1.0 - eccentricity * eccentricity)
+          / pow((1.0 + eccentricity * eccentricity - 2.0 * eccentricity * cos_angle), 3.0/2.0))
+          / 4.0 * PI;
+}
+```
+
+**Sorun:** öğlen iyi çalışan eksantriklik, batımda güneş çevresindeki parlak vurguları
+veremiyor. Eksantrikliği 1.0'a çıkarınca vurgular geliyor ama **güneşten 90° uzaktaki
+bulutlar fazla kararıyor**.
+
+**Çözüm** `[N17 s.80-81]`:
+```
+eccentricity = 0.6
+Energy = max( HG(cos θ, eccentricity),
+              silver_intensity * HG(cos θ, 0.99 - silver_spread) )
+```
+
+İki faz fonksiyonu `max()` ile birleşiyor, ikincisinin şiddeti ayrı kontrol ediliyor.
+H18'deki `IS_extra` bunun türevi.
+
 ---
 
 ## Okuma defteri
@@ -1395,7 +1480,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 | makale | toplam | okunan | eksik |
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
-| `[N17]` nubis-2017 | **108** | s.1–61 | s.62–108 |
+| `[N17]` nubis-2017 | **108** | s.1–81 | s.82–108 |
 | `[N22]` nubis-2022 | **207** | **s.1–207 TAMAM** | — |
 | `[H18]` haggstrom-2018 | **93 PDF / 81 basılı** | **PDF s.1–93 TAMAM** | — |
 
