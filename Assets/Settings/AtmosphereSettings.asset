@@ -50,8 +50,8 @@ MonoBehaviour:
   variationScale: 0.00012
   variationStrength: 0.5
   densityScale: 0.0105
-  cloudDrift: 0.4
-  minCloudSpeed: 90
+  cloudDrift: 2
+  minCloudSpeed: 5
   evolutionSpeed: 0.011
   convectiveRise: 0.9
   stormDensityBoost: 2.4
