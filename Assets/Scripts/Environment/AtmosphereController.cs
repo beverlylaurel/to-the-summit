@@ -56,55 +56,16 @@ public class AtmosphereController : MonoBehaviour
     static readonly int HeightFogZenithId = Shader.PropertyToID("_HeightFogZenith");
     static readonly int HeightFogSunColorId = Shader.PropertyToID("_HeightFogSunColor");
     static readonly int HeightFogChromaId = Shader.PropertyToID("_HeightFogChroma");
-    static readonly int CloudBrightId = Shader.PropertyToID("_CloudBrightColor");
-    static readonly int CloudDarkId = Shader.PropertyToID("_CloudDarkColor");
-    static readonly int CloudSunColorId = Shader.PropertyToID("_CloudSunColor");
-    static readonly int CloudHazeDistanceId = Shader.PropertyToID("_CloudHazeDistance");
-    static readonly int CloudRimStrengthId = Shader.PropertyToID("_CloudRimStrength");
-    static readonly int CloudPowderStrengthId = Shader.PropertyToID("_CloudPowderStrength");
-    static readonly int CloudRainAbsorbId = Shader.PropertyToID("_CloudRainAbsorb");
-    static readonly int CloudAmbientId = Shader.PropertyToID("_CloudAmbient");
-    static readonly int CloudAmbientFloorId = Shader.PropertyToID("_CloudAmbientFloor");
-    static readonly int CloudMassWarmthId = Shader.PropertyToID("_CloudMassWarmth");
-    static readonly int CloudMassBrightnessId = Shader.PropertyToID("_CloudMassBrightness");
-    static readonly int CloudLightReachId = Shader.PropertyToID("_CloudLightReach");
-    static readonly int CloudMultiScatterId = Shader.PropertyToID("_CloudMultiScatter");
-    static readonly int CloudDuskTintId = Shader.PropertyToID("_CloudDuskTint");
-    static readonly int CloudDuskStrengthId = Shader.PropertyToID("_CloudDuskStrength");
-    static readonly int CloudMoonColorId = Shader.PropertyToID("_CloudMoonColor");
     static readonly int SunDirectionId = Shader.PropertyToID("_SunDirection");
     static readonly int SunColorId = Shader.PropertyToID("_SunColor");
     static readonly int MoonColorId = Shader.PropertyToID("_MoonColor");
     static readonly int MoonDirectionId = Shader.PropertyToID("_MoonDirection");
-    static readonly int CloudWindId = Shader.PropertyToID("_CloudWind");
-    static readonly int CloudShearOffsetId = Shader.PropertyToID("_CloudShearOffset");
-    static readonly int CloudShearTurnId = Shader.PropertyToID("_CloudShearTurn");
-    static readonly int CloudRiseId = Shader.PropertyToID("_CloudRise");
-    static readonly int CoverageId = Shader.PropertyToID("_Coverage");
     static readonly int CloudBottomId = Shader.PropertyToID("_CloudBottom");
     static readonly int CloudTopId = Shader.PropertyToID("_CloudTop");
 
     static readonly int PlanetRadiusId = Shader.PropertyToID("_PlanetRadius");
-    static readonly int CloudScaleId = Shader.PropertyToID("_CloudScale");
-    static readonly int DetailScaleId = Shader.PropertyToID("_DetailScale");
-    static readonly int DetailStrengthId = Shader.PropertyToID("_DetailStrength");
-    static readonly int ShearAmountId = Shader.PropertyToID("_ShearAmount");
-    static readonly int LargeWeightId = Shader.PropertyToID("_CloudLargeWeight");
 
-    static readonly int HighAmountId = Shader.PropertyToID("_HighCloudAmount");
-    static readonly int HighTypeId = Shader.PropertyToID("_HighCloudType");
-    static readonly int HighAltitudeId = Shader.PropertyToID("_HighCloudAltitude");
-    static readonly int HighScaleId = Shader.PropertyToID("_HighCloudScale");
-    static readonly int CurlStrengthId = Shader.PropertyToID("_CloudCurlStrength");
-    static readonly int EvolutionId = Shader.PropertyToID("_Evolution");
-    static readonly int DetailDistanceId = Shader.PropertyToID("_DetailDistance");
-    static readonly int CloudDitherId = Shader.PropertyToID("_CloudDither");
-    static readonly int CloudEdgeSoftenId = Shader.PropertyToID("_CloudEdgeSoften");
-    static readonly int StepGrowthId = Shader.PropertyToID("_CloudStepDouble");
 
-    static readonly int DensityScaleId = Shader.PropertyToID("_DensityScale");
-    static readonly int StepsId = Shader.PropertyToID("_CloudSteps");
-    static readonly int LightStepsId = Shader.PropertyToID("_CloudLightSteps");
     static readonly int StarStrengthId = Shader.PropertyToID("_StarStrength");
 
     float visibility;
@@ -136,7 +97,6 @@ public class AtmosphereController : MonoBehaviour
     float smoothedDrift;
     float nextEditorApply;
     float evolution;
-    float convectiveRise;
     float localRain = 1f;
     Vector2 spindriftDrift;
     float appliedShadowDistance = -1f;
@@ -514,7 +474,6 @@ public class AtmosphereController : MonoBehaviour
 
         // Konvektif yükselme gündüz sürer: kaynağı ısınan zemindir. Gece zemin
         // soğur, yükselme durur — bulutlar yalnız sürüklenir.
-        convectiveRise += settings.convectiveRise * time.DayFactor * Time.deltaTime;
 
         UpdateLocalRain();
 
@@ -537,19 +496,15 @@ public class AtmosphereController : MonoBehaviour
 
         Shader.SetGlobalVector(SunDirectionId, time.SunDirection);
         Shader.SetGlobalVector(MoonDirectionId, time.MoonDirection);
-        Shader.SetGlobalVector(CloudWindId, new Vector3(cloudOffset.x, 0f, cloudOffset.y));
 
         // Makaslama sabit bir mesafe: katman kalınlığının oranı kadar yanal kayma
         // BOYUTSUZ: shader katman kalınlığıyla çarpıyor. Burada çarpılıyordu ve katman
         // 5.3 km'yken ötelenme 2927 m oluyordu — tipik bulutun eninden büyük, kolonun
         // tepesi tabanının yanından çıkıyor, dönmeyle birlikte kancaya dönüşüyordu.
         // Katman 2.5 km olunca aynı oran 1500 m veriyor: bulutun kendi ölçeğinde.
-        Shader.SetGlobalVector(CloudShearOffsetId, heading * settings.shearAmount);
 
         // Yön dönmesi rüzgâr şiddetiyle azalır: sert rüzgârda hava kütlesi bütün
         // katmanda aynı yöne sürüklenir, sakin havada sapma belirginleşir.
-        Shader.SetGlobalFloat(CloudShearTurnId,
-            settings.shearTurnDegrees * Mathf.Deg2Rad * Mathf.Lerp(1f, 0.35f, wind.Strength));
 
         // Bulut renkleri atmosferin renginden türer: şafakta kızıllık buluta da geçer
         // Çarpan bire yakın tutulur: renk zaten doygun geldiği için 1.5 ile çarpmak
@@ -560,10 +515,6 @@ public class AtmosphereController : MonoBehaviour
         // gökten gelen toplam IŞINIM, arada π kat fark var. Radyansın taşıdığı doğru
         // bilgi RENK; parlaklık zaten kalibre edilmiş taban rengin işi. İkisi ayrılınca
         // bulut şafakta turuncuya döner ama kararmaz.
-        Shader.SetGlobalColor(CloudBrightId,
-            Recolour(color, skyBright) * Mathf.Lerp(1.05f, 1.25f, snowiness * day));
-        Shader.SetGlobalColor(CloudDarkId,
-            Recolour(color, skyShade) * Mathf.Lerp(0.4f, 0.7f, snowiness));
         // BULUTUN IŞIĞI KENDİ KOTUNDAN. Yerdeki huzme kullanılıyordu: şafakta güneş
         // ufkun altındayken yerde ışık yok, dolayısıyla bulut da ışıksız kalıyor ve
         // koyu bir siluete dönüşüyordu — en ince sis bile onu yutuyordu.
@@ -584,8 +535,6 @@ public class AtmosphereController : MonoBehaviour
         cloudWarm *= cloudWarm;
         cloudBeam *= cloudWarm;
 
-        Shader.SetGlobalColor(CloudSunColorId,
-            new Color(cloudBeam.x, cloudBeam.y, cloudBeam.z, 1f));
 
         // Bulut perspektifi görüşle birlikte değişir. Sabit bir mesafe, dağ üç yüz
         // metrede kaybolurken bulutları hâlâ berrak gösteriyordu: ikisi aynı havayı
@@ -610,25 +559,9 @@ public class AtmosphereController : MonoBehaviour
         hazeDistance = Mathf.Clamp(hazeDistance,
             settings.minHazeDistance, settings.maxHazeDistance);
 
-        Shader.SetGlobalFloat(CloudHazeDistanceId, hazeDistance);
-        Shader.SetGlobalFloat(CloudRimStrengthId, settings.rimStrength);
-        Shader.SetGlobalFloat(CloudPowderStrengthId, settings.powderStrength);
-        Shader.SetGlobalFloat(CloudRainAbsorbId, settings.rainAbsorption * storm);
 
         // Yüksek katman hacimsel örtü kapandıkça sönümlenir: altından görünmez zaten,
         // çizmek boşuna. Cinsi ayarın kendisi seçer.
-        Shader.SetGlobalFloat(HighAmountId,
-            Mathf.Lerp(settings.highCloudClear, settings.highCloudStorm, storm)
-            * Mathf.Clamp01(1f - coverage * 0.9f));
-        Shader.SetGlobalFloat(HighTypeId, settings.highCloudType);
-        Shader.SetGlobalFloat(HighAltitudeId, settings.highCloudAltitude);
-        Shader.SetGlobalFloat(HighScaleId, settings.highCloudScale);
-        Shader.SetGlobalFloat(CloudAmbientId, settings.cloudAmbient);
-        Shader.SetGlobalFloat(CloudAmbientFloorId, settings.ambientFloor);
-        Shader.SetGlobalFloat(CloudMassWarmthId, settings.massWarmth);
-        Shader.SetGlobalFloat(CloudMassBrightnessId, settings.massBrightness);
-        Shader.SetGlobalFloat(CloudLightReachId, settings.lightProbeMeters);
-        Shader.SetGlobalFloat(CloudMultiScatterId, settings.multiScatter);
         // Buluta binen sıcak ton huzmenin süzülme renginden gelir ve yalnızca güneş
         // ufka yakınken açılır.
         //
@@ -640,34 +573,14 @@ public class AtmosphereController : MonoBehaviour
         // zaten FAZLA parlak (−6°'de 5.6 kat). Yani ufkun altına renk taşımak, olmayan
         // bir olguyu üretmek olurdu. Şafağın gerçek gösterisi −1° ile +3° arasında,
         // huzmenin zaten var olduğu yerde.
-        Shader.SetGlobalColor(CloudDuskTintId, time.CurrentSunColor);
-        Shader.SetGlobalFloat(CloudDuskStrengthId,
-            settings.duskCloudStrength * time.HorizonFactor * cloudWarm);
-        Shader.SetGlobalColor(CloudMoonColorId, time.MoonTint);
 
-        Shader.SetGlobalFloat(CoverageId, coverage);
         Shader.SetGlobalFloat(CloudBottomId, activeCloudBottom);
         Shader.SetGlobalFloat(CloudTopId, settings.cloudTop);
         Shader.SetGlobalFloat(PlanetRadiusId, settings.planetRadius);
-        Shader.SetGlobalFloat(CloudScaleId, settings.cloudScale);
-        Shader.SetGlobalFloat(DetailScaleId, settings.detailScale);
-        Shader.SetGlobalFloat(DetailStrengthId, settings.detailStrength);
-        Shader.SetGlobalFloat(ShearAmountId, settings.shearAmount);
-        Shader.SetGlobalFloat(LargeWeightId, settings.largeCloudWeight);
-        Shader.SetGlobalFloat(CurlStrengthId, settings.curlStrength);
-        Shader.SetGlobalFloat(EvolutionId, evolution);
-        Shader.SetGlobalFloat(CloudRiseId, convectiveRise);
-        Shader.SetGlobalFloat(DetailDistanceId, settings.detailDistance);
-        Shader.SetGlobalFloat(CloudDitherId, settings.cloudDither);
-        Shader.SetGlobalFloat(CloudEdgeSoftenId, settings.cloudEdgeSoften);
-        Shader.SetGlobalFloat(StepGrowthId, settings.stepGrowthDistance);
 
 
         // Fırtınada bulut yalnızca gökyüzünü kaplamaz, kalınlaşır da. Kapsamayla aynı
         // kaynaktan: kalınlık da katmanın kendi durumu.
-        Shader.SetGlobalFloat(DensityScaleId, settings.densityScale * Mathf.Lerp(1f, settings.stormDensityBoost, storm));
-        Shader.SetGlobalFloat(StepsId, settings.raymarchSteps);
-        Shader.SetGlobalFloat(LightStepsId, settings.lightSteps);
     }
 
     /// Oyuncunun üstündeki kolonu hava haritasından okur: yağış payı kapsamayla ve

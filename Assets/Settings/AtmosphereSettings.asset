@@ -33,53 +33,22 @@ MonoBehaviour:
   calmCloudBottom: 1700
   cloudBottomSmoothing: 120
   cloudTop: 5100
-  cumulonimbusHeight: 3800
-  cloudTopFloor: 0.55
-  cloudScale: 0.0006
-  detailScale: 0.0011
-  detailStrength: 0.4
   weatherScale: 0.00014
   regionDetail: 850
   regionContrast: 2
   regionPeak: 1.3
-  largeCloudWeight: 1
   cloudWarp: 500
-  shearAmount: 0.6
-  shearTurnDegrees: 28
   headingSmoothing: 240
   variationScale: 0.00012
   variationStrength: 0.5
-  densityScale: 0.00735
   cloudDrift: 6
   minCloudSpeed: 30
   evolutionSpeed: 0.011
   convectiveRise: 0.9
-  stormDensityBoost: 2.4
-  highCloudClear: 0.45
-  highCloudStorm: 0.8
-  highCloudType: 0.25
-  highCloudAltitude: 12000
-  highCloudScale: 0.00004
-  raymarchSteps: 110
-  lightSteps: 4
-  detailDistance: 9000
-  cloudDither: 1
-  cloudEdgeSoften: 0.6
-  stepGrowthDistance: 1900
   maxHazeDistance: 60000
   planetRadius: 6360000
   minHazeDistance: 16000
   hazeVisibilityFactor: 8
-  rimStrength: 0.08
-  powderStrength: 0.75
-  cloudAmbient: 0.42
-  ambientFloor: 0.1
-  massWarmth: 0.35
-  massBrightness: 0.55
-  lightProbeMeters: 1200
-  multiScatter: 0.42
-  rainAbsorption: 1.6
-  duskCloudStrength: 0.6
   fogHalfHeightClear: 400
   fogHalfHeightStorm: 2000
   fogBaseAltitude: 0
@@ -110,11 +79,3 @@ MonoBehaviour:
   maxShadowDistance: 150
   shadowVisibilityRatio: 0.8
   transitionSeconds: 3
-  weatherMapSeed: 86
-  weatherMapWorldSize: 48000
-  coreRadiusMax: 2800
-  corePacking: 0.95
-  packingFloor: 0.1
-  patchWindow: 0.35
-  coreDensity: 0.9
-  curlStrength: 240
