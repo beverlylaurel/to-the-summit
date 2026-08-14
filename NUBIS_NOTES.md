@@ -435,6 +435,44 @@ float3 noise_sample_pos = inSamplePosition
 
 İnce zarflar gürültünün farklı bir diliminden okuyor — aynı gürültüyle farklı karakter.
 
+### Zarf modelinde aydınlatma
+
+**Doğrudan saçılma** `[N22 s.112]`:
+```hlsl
+float transmittance = exp(-inSummedSamples);
+float long_distance_shadow_sample = SampleLongDistanceShadowMap(inSamplePosition);
+float direct_scattering = transmittance * long_distance_shadow_sample;
+```
+Ayrı bir **uzun mesafe gölge haritası** var — bulut kütlesi hem kendi ışık ışınından
+hem de o haritadan gölge alıyor.
+
+**Ambient** `[N22 s.113]`:
+```hlsl
+float height_fraction = ValueRemap(inSamplePosition.z, min_height, max_height, 0.0, 1.0);
+float ambient_scattering = pow(1.0 - saturate(cloud_coarse_density), 0.25) * height_fraction;
+```
+Gökyüzü modelindeki `pow(1 - profil, 0.5)` yerine burada `pow(1 - kabaYoğunluk, 0.25)`
+ve ayrıca **yükseklikle çarpım** — kütlenin dibi ambient'ten daha az pay alıyor.
+(Dünyaları Z-yukarı: `inSamplePosition.z` yükseklik.)
+
+### Zarf modelinde ışın yürüyüşü — SABİT ADIM DEĞİL
+
+`[N22 s.115-118]`. Boş alanı geçmek için iki teknik:
+
+- **Sphere Tracing** — Hart, John C. 1995, *"Sphere Tracing: Simple Robust Antialiased
+  Rendering of Distance-Based Implicit Surfaces"*
+- **Cone Step Mapping** — Dummer, Jonathan. 2006, *"Cone Step Mapping: An Iterative
+  Ray-Heightfield Intersection Algorithm"*
+
+Yani mesafe alanı mantığıyla, örnek noktasından kütleye olan güvenli mesafe kadar
+sıçranıyor. Bizim `CloudSkipMap` + genişletme + `CloudSkipCoarseMeters` zincirimiz bunun
+kaba ve elle ayarlanan hâliydi; sphere tracing aynı işi ölçüden türeterek yapıyor ve
+"sıçrama bulutun üstünden atladı" hatası yapısal olarak imkânsız.
+
+**Yazarlık** `[N22 s.107-109]`: zarf Houdini'de araziye yerleştiriliyor, dağın üstüne
+bölge boyanıyor, sonuç motorda dağa yaslanmış bulut. Bizim "dağa yaslanan bulut"
+ihtiyacımızın birebir karşılığı.
+
 ---
 
 ## Okuma defteri
@@ -445,7 +483,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
-| `[N22]` nubis-2022 | **207** | s.1–106 | s.107–207 |
+| `[N22]` nubis-2022 | **207** | s.1–118 | s.119–207 |
 | `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
