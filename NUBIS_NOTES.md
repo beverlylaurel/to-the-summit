@@ -125,12 +125,15 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 
 | makale | toplam | okunan | eksik |
 |---|---|---|---|
-| `[N15]` nubis-2015 | ? | s.18–87 | **s.1–17 ve s.88–son** |
-| `[N22]` nubis-2022 | ? | s.1–10 | s.11–son |
-| `[H18]` haggstrom-2018 | ? | — | tamamı |
-| `[N17]` nubis-2017 | ? | — | tamamı |
+| `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
+| `[N17]` nubis-2017 | **108** | — | s.1–108 |
+| `[N22]` nubis-2022 | **207** | s.1–10 | s.11–207 |
+| `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
 
-İlk iş: her PDF'in **toplam sayfa sayısını** yazmak. Bilinmeden "bitti" denemez.
+**Toplam ~514 sayfa, okunan 80.** Kalan 434.
+
+`[H18]`'in sayısı kesin değil (PDF nesne akışları sıkıştırılmış, ham sayım çalışmadı;
+linearization ipucu `/N 100` diyor). Okuma sırasında son sayfaya varılınca kesinleşir.
 
 `[N15]`'in atlanan kısımları da okunacak — s.1–17 giriş, s.88+ optimizasyon bölümü.
 Bugün ortadan girilip ortada bırakılmıştı.
