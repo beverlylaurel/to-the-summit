@@ -64,6 +64,19 @@ Buluta dair her iş şu üç dosyayla başlar:
   okunmamıştır
 - **`DECISIONS.md`** — sökme kararı ve tetikleyicisi
 
+### İlk sürüm HİÇBİR ŞEYE BAĞLANMAZ
+
+**v1 bulut sistemi tamamen bağımsız çalışır.** Hava durumundan, rüzgârdan, günün
+saatinden, yağıştan, şimşekten, sıcaklıktan — hiçbirinden girdi almaz. Kendi ayarları
+neyse onu çizer.
+
+Sebep: PDF'e sadık kurulmuş bulutun kendi hâlini görmek. Olaylar hemen bağlanırsa
+bozulan şeyin buluttan mı bağdan mı geldiği ayırt edilemez — 2026-08-14'te tam olarak
+bu oldu, on bir telafi terimi böyle birikti.
+
+Bağlar **v1 beğenildikten sonra, teker teker** eklenir. Her bağ eklendiğinde bulut
+tekrar bakılır; bozulursa o bağ geri alınır. Sıra ve sözleşmeler `CLOUDS_REBUILD.md`'de.
+
 **Repo'nun üstüne kendi terimimiz eklenmez.** Görüntü yanlışsa önce onun parametrelerine
 ve ürettiği dokulara bakılır, tek seferde tek sayı değişir. Ekleme ihtiyacı doğuyorsa
 önce ilgili makale okunur — eski sistem dört satırlık formülün üstüne on bir terim

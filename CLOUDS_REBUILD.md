@@ -13,6 +13,23 @@ yeniden kurulacak.** Kod değil, sözleşme listesi.
 
 ---
 
+## v1 KURALI: HİÇBİR BAĞ YOK
+
+**İlk sürüm bu belgedeki hiçbir bağı kurmaz.** Ne aşağıdaki girdileri okur, ne aşağıdaki
+tüketicilere veri verir. Tamamen kendi başına, kendi ayarlarıyla çalışır.
+
+Bağlar ancak v1 **görsel olarak onaylandıktan sonra**, **teker teker** eklenir. Her bağdan
+sonra buluta tekrar bakılır; görüntü bozulursa o bağ geri alınır ve sebebi bulunmadan
+bir sonrakine geçilmez.
+
+Gerekçe ölçülmüş: 2026-08-14'te bulut sistemi aynı anda hava durumuna, rüzgâra, saate,
+yağışa ve şimşeğe bağlıydı. Her belirtide hangi kaynağın suçlu olduğu ayırt edilemedi ve
+her tur bir telafi terimi eklendi — on bir tanesi birikti, sonunda sistem silindi.
+
+Aşağıdaki iki liste **v2 ve sonrası** içindir.
+
+---
+
 ## Bulut sisteminin OKUDUKLARI (girdi)
 
 | kaynak | ne veriyor | nereye gidiyor |
