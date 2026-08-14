@@ -235,10 +235,21 @@ public static class MountainSceneBootstrap
 
         var terrainComponent = gen.GetComponent<Terrain>();
         if (!Mathf.Approximately(terrainComponent.heightmapPixelError, TerrainPixelError)
-            || !Mathf.Approximately(terrainComponent.basemapDistance, TerrainBasemapDistance))
+            || !Mathf.Approximately(terrainComponent.basemapDistance, TerrainBasemapDistance)
+            || terrainComponent.shadowCastingMode != ShadowCastingMode.Off)
         {
             terrainComponent.heightmapPixelError = TerrainPixelError;
             terrainComponent.basemapDistance = TerrainBasemapDistance;
+
+            // ARAZİ GÖLGE HARİTASINA YAZMIYOR. Kendi gölgesini yükseklik alanından
+            // yürüyerek hesaplıyor (bkz. `TerrainSunShadow`) ve o hesap kilometrelerce
+            // uzağı taşıyor; harita altmış metrede bitiyor. İkisi birden açıkken arazi
+            // kendi kendini gölgeliyordu ve ovada çizgi çizgi gölge akneleri çıkıyordu.
+            //
+            // Haritada yalnız HAREKETLİ nesneler kalıyor: bisiklet, oyuncu, ileride
+            // çadır ve ekipman. Onların gölgesi araziye böyle düşüyor.
+            terrainComponent.shadowCastingMode = ShadowCastingMode.Off;
+
             EditorUtility.SetDirty(terrainComponent);
             changed = true;
         }
