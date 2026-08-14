@@ -1058,3 +1058,4 @@ HLSL taşınır, render geçişi RenderGraph'a yeniden yazılır.
 **Bağlar** `CLOUDS_REBUILD.md`'de — on tüketici, on iki ölçülmüş ders, kurtarılmış
 gürültü hash'i. İki bağ şu an stub: yer bulut gölgesi (`CloudShadowAt` → 1.0) ve yerel
 yağış (`UpdateLocalRain` → 1).
+

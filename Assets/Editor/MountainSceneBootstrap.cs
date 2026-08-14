@@ -53,6 +53,9 @@ public static class MountainSceneBootstrap
     const string RendererPath = "Assets/Settings/PC_Renderer.asset";
     const string CloudMaterialPath = "Assets/Settings/VolumetricClouds.mat";
 
+    /// `EnsureCloudVolume`'un bulut bileşenini yazdığı Volume. F1 paneli buradan bağlanıyor.
+    static UnityEngine.Rendering.Volume cloudVolume;
+
     static MountainSceneBootstrap()
     {
         EditorApplication.delayCall += Run;
@@ -594,7 +597,6 @@ public static class MountainSceneBootstrap
     {
         material.SetTexture("_Worley128RGBA", LoadCloudTexture("WorleyNoise128RGBA"));
         material.SetTexture("_ErosionNoise", LoadCloudTexture("WorleyNoise32RGB"));
-        material.SetTexture("_CloudLutTexture", LoadCloudTexture("CloudLutRainAO"));
         EditorUtility.SetDirty(material);
         AssetDatabase.SaveAssets();
     }
@@ -622,20 +624,21 @@ public static class MountainSceneBootstrap
             throw new System.InvalidOperationException($"{volume.name} Volume'unda profil yok.");
 
         var profile = volume.sharedProfile;
-        if (profile.TryGet(out VolumetricClouds existing))
+        if (!profile.TryGet(out VolumetricClouds clouds))
         {
-            if (!existing.state.value)
-            {
-                existing.state.value = true;
-                EditorUtility.SetDirty(profile);
-            }
-            return;
+            clouds = profile.Add<VolumetricClouds>(overrides: true);
+            clouds.name = nameof(VolumetricClouds);
+            AssetDatabase.AddObjectToAsset(clouds, profile);
         }
 
-        var clouds = profile.Add<VolumetricClouds>(overrides: true);
+        // F1 paneli de bunu okuyor: sahnede birden fazla Volume var, ayrı ayrı aranırsa
+        // panel bulutu taşımayan profile bağlanabilir.
+        cloudVolume = volume;
+
         clouds.state.value = true;
-        clouds.name = nameof(VolumetricClouds);
-        AssetDatabase.AddObjectToAsset(clouds, profile);
+        // Harita ayar değil, bağlantı: olmadan kapsama alanı yok.
+        clouds.cloudMap.value = CloudMapGenerator.EnsureExists();
+        clouds.cloudMap.overrideState = true;
         EditorUtility.SetDirty(profile);
         AssetDatabase.SaveAssets();
         AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath(profile));
@@ -916,7 +919,8 @@ public static class MountainSceneBootstrap
             Object.FindAnyObjectByType<ClimbHud>(),
             player.GetComponent<CursorLock>(),
             player.GetComponentInChildren<SnowCollisionProbe>(true),
-            Object.FindAnyObjectByType<RouteOverlay>(FindObjectsInactive.Include));
+            Object.FindAnyObjectByType<RouteOverlay>(FindObjectsInactive.Include),
+            cloudVolume);
 
         EditorUtility.SetDirty(menu);
     }

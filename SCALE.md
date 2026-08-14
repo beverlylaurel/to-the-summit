@@ -72,7 +72,7 @@ geçirilir.
 | `openingRise` 400 m | zeminin ilk %7'si | Oransal olarak daralır; açılış kuşağı kaybolabilir |
 | `descentDeadband` 250 m | — | İniş ölü bandı oransal daralır |
 | Kar çizgisi düzensizlik dalga boyu | `worldPos × 0.0016` ≈ 625 m | Dağa göre incelir, çizgi daha "dişli" okunur |
-| `weatherMapWorldSize` 48 000 m | dağın ~2.7 katı | Hava haritası dağı kapsamalı; dağ büyürse birlikte büyümeli |
+| `VolumetricClouds.cloudMapSize` 48 000 m | dağın ~2.7 katı | Hava haritası dağı kapsamalı; dağ büyürse birlikte büyümeli. 512 texel → 94 m/texel |
 | `maxHazeDistance` 60 000 m | — | Görüş menzili dağı görebilmeli |
 | Bootstrap `SpawnPoint()` | eteğin dışı | Konum dağın boyundan türüyor, kontrol edilmeli |
 

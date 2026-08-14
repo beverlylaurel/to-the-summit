@@ -353,32 +353,81 @@ struct CloudCoverageData
     half coverage;
     // From a top down view, in what proportions this pixel has clouds
     half rainClouds;
-    // Value that allows us to request the cloudtype using the density
-    half cloudType;
     // Maximal cloud height
     half maxCloudHeight;
+    // Hava haritasının yoğunluk kanalı (`w_d`) — `DensityAlter` bunu okuyor `[H18 Ek B.3]`
+    half mapDensity;
 };
 
 // Function that evaluates the coverage data for a given point in planet space
 void GetCloudCoverageData(float3 positionPS, out CloudCoverageData data)
 {
-    // Convert the position into dome space and center the texture is centered above (0, 0, 0)
-    //float2 normalizedPosition = AnimateCloudMapPosition(positionPS).xz / _NormalizationFactor * _CloudMapTiling.xy + _CloudMapTiling.zw - 0.5;
-//#if defined(CLOUDS_SIMPLE_PRESET)
-    half4 cloudMapData = half4(0.9, 0.0, 0.25, 1.0);
-//#else
-    //float4 cloudMapData = SAMPLE_TEXTURE2D_LOD(_CloudMapTexture, s_linear_repeat_sampler, float2(normalizedPosition), 0);
-//#endif
-    data.coverage = cloudMapData.x;
-    data.rainClouds = cloudMapData.y;
-    data.cloudType = cloudMapData.z;
-    data.maxCloudHeight = cloudMapData.w;
+    // Hava haritası dünya XZ'sinde döşeniyor; periyodu `_CloudMapTiling.xy` taşıyor.
+    // Kamera kayması burada uygulanıyor: gölge yolu da bu fonksiyonu çağırıyor ve iki yolun
+    // aynı dünya noktasını okuması gerekiyor.
+    float2 cloudMapPositionWS = positionPS.xz;
+#ifndef _LOCAL_VOLUMETRIC_CLOUDS
+    cloudMapPositionWS += _WorldSpaceCameraPos.xz;
+#endif
+    float2 cloudMapUV = cloudMapPositionWS * _CloudMapTiling.xy + _CloudMapTiling.zw;
+    half4 cloudMapData = SAMPLE_TEXTURE2D_LOD(_CloudMapTexture, s_linear_repeat_sampler, cloudMapUV, 0);
+
+    // `[H18 s.11]`: kapsama sürgüsü İKİ harita arasında geçiyor. 0.5'e kadar yalnız seyrek
+    // yerleşim (R); üstünde yoğun harita (G) devreye girip göğü kapatıyor.
+    data.coverage = max(cloudMapData.x, saturate(_CloudCoverage - 0.5) * cloudMapData.y * 2.0);
+    // Yağmur bulutu v1'de bağlanmıyor; sigmaT sabit kalıyor (bkz. `CLOUDS_REBUILD.md`).
+    data.rainClouds = 0.0;
+    data.maxCloudHeight = cloudMapData.z;
+    data.mapDensity = cloudMapData.w;
 }
+
 
 // Density remapping function
 half DensityRemap(half x, half a, half b, half c, half d)
 {
     return (((x - a) * rcp(b - a)) * (d - c)) + c;
+}
+
+/// ŞEKİL DEĞİŞTİREN yükseklik fonksiyonu `[H18 Ek B.2]`. Tabanı biraz, tepeyi çok
+/// yuvarlıyor. Örs şekli ÜS olarak değiştiriyor, çarpan olarak değil; `_AnvilAmount = 0`
+/// iken üs 1'e sadeleşip terim düşüyor.
+half HeightAlter(half percentHeight, half maxCloudHeight)
+{
+    half value = saturate(DensityRemap(percentHeight, 0.0, 0.07, 0.0, 1.0));
+    half stopHeight = saturate(maxCloudHeight + 0.12);
+    value *= saturate(DensityRemap(percentHeight, stopHeight * 0.2, stopHeight, 1.0, 0.0));
+    value = pow(value, saturate(DensityRemap(percentHeight, 0.65, 0.95,
+                                             1.0, 1.0 - _AnvilAmount * _CloudCoverage)));
+    return value;
+}
+
+/// DETAY DEĞİŞTİRİCİ `[H18 Ek B.5]`. İki şey yapıyor:
+///
+/// 1. Tabanda düz, tepede ters Worley — geçiş ilk %20'de (`SAT(p_h × 5)`). Alçakta tüylü,
+///    yüksekte yuvarlak yapı çıkıyor. Portta sabit `1 - detail` idi, her yükseklikte aynı.
+/// 2. Kazıma miktarı küresel kapsamayla AZALIYOR (`0.35 × e^(−g_c × 0.75)`). Portta
+///    kapsamayla ARTIYORDU (`0.75 × WM_c`) — ters yöndeydi. Kapalı havada ince yapı
+///    gereksiz, makale bunu ölçüp azaltıyor.
+///
+/// Kullanıcının erozyon sürgüsü bunun üstünde ayrı çarpan: 1.0'da makaleyle birebir.
+half DetailModifier(half detail, half percentHeight)
+{
+    half modifier = lerp(detail, 1.0 - detail, saturate(percentHeight * 5.0));
+    return modifier * 0.35 * exp(-_CloudCoverage * 0.75);
+}
+
+/// YOĞUNLUK DEĞİŞTİREN yükseklik fonksiyonu `[H18 Ek B.3]`. Tabanı tüylü, tepeyi geçişli
+/// yapıyor; küresel yoğunluk (`g_d`) çağıran tarafta çarpılıyor. Örs eklenince yoğunluk
+/// modeli de değişmek ZORUNDA — yoksa tepe fazla yoğun kalıyor `[H18 s.17]`.
+half DensityAlter(half percentHeight, half mapDensity)
+{
+    half value = percentHeight;
+    value *= saturate(DensityRemap(percentHeight, 0.0, 0.2, 0.0, 1.0));
+    value *= mapDensity * 2.0;
+    value *= lerp(1.0, saturate(DensityRemap(sqrt(percentHeight), 0.4, 0.95, 1.0, 0.2)),
+                  _AnvilAmount);
+    value *= saturate(DensityRemap(percentHeight, 0.9, 1.0, 1.0, 0.0));
+    return value;
 }
 
 // Horizon zero dawn technique to darken the clouds
@@ -413,6 +462,15 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
     // Evaluate the normalized height of the position within the cloud volume
     properties.height = EvaluateNormalizedCloudHeight(positionPS);
 
+    // Kapsama, kamera kayması UYGULANMADAN okunuyor: kaymayı `GetCloudCoverageData` kendisi
+    // yapıyor, burada da yapılırsa iki kere eklenir.
+    CloudCoverageData cloudCoverageData;
+    GetCloudCoverageData(positionPS, cloudCoverageData);
+
+    // If this region of space has no cloud coverage, exit right away
+    if (cloudCoverageData.coverage.x <= CLOUD_DENSITY_TRESHOLD || cloudCoverageData.maxCloudHeight < properties.height)
+        return;
+
     // When rendering in camera space, we still want horizontal scrolling
 #ifndef _LOCAL_VOLUMETRIC_CLOUDS
     positionPS.xz += _WorldSpaceCameraPos.xz;
@@ -427,20 +485,8 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
     // Read the low frequency Perlin-Worley and Worley noises
     half lowFrequencyNoise = SAMPLE_TEXTURE3D_LOD(_Worley128RGBA, s_trilinear_repeat_sampler, baseNoiseSamplingCoordinates.xyz, noiseMipOffset).r;
 
-    // Evaluate the cloud coverage data for this position
-    CloudCoverageData cloudCoverageData;
-    GetCloudCoverageData(positionPS, cloudCoverageData);
-
-    // If this region of space has no cloud coverage, exit right away
-    if (cloudCoverageData.coverage.x <= CLOUD_DENSITY_TRESHOLD || cloudCoverageData.maxCloudHeight < properties.height)
-        return;
-
     // Read from the LUT
-//#if defined(CLOUDS_SIMPLE_PRESET)
     half3 densityErosionAO = SAMPLE_TEXTURE2D_LOD(_CloudCurveTexture, s_linear_repeat_sampler, half2(0.0, properties.height), 0).xyz;
-//#else
-    //half3 densityErosionAO = SAMPLE_TEXTURE2D_LOD(_CloudLutTexture, s_linear_repeat_sampler, float2(cloudCoverageData.cloudType, properties.height), CLOUD_LUT_MIP_OFFSET).xyz;
-//#endif
 
     // Adjust the shape and erosion factor based on the LUT and the coverage
     half shapeFactor = lerp(0.1, 1.0, _ShapeFactor) * densityErosionAO.y;
@@ -451,7 +497,13 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
 
     // Combine with the low frequency noise, we want less shaping for large clouds
     lowFrequencyNoise = lerp(1.0, lowFrequencyNoise, shapeFactor);
-    half base_cloud = 1.0 - densityErosionAO.x * cloudCoverageData.coverage.x * (1.0 - shapeFactor);
+
+    // `[H18 s.14-16]`: şekil gürültüsü ÖNCE şekil-yükseklik fonksiyonuyla çarpılıyor,
+    // kapsama remap'ine öyle giriyor.
+    lowFrequencyNoise *= HeightAlter(properties.height, cloudCoverageData.maxCloudHeight);
+    // `[H18 s.14]`: remap sınırı `1 − g_c × WM_c`. Kapsama sürgüsü zincire BURADAN giriyor;
+    // portta bu bağ yoktu, sürgünün alt yarısı bu yüzden hiçbir şey yapmıyordu.
+    half base_cloud = 1.0 - _CloudCoverage * cloudCoverageData.coverage.x;
     base_cloud = saturate(DensityRemap(lowFrequencyNoise, base_cloud, 1.0, 0.0, 1.0)) * cloudCoverageData.coverage.x * cloudCoverageData.coverage.x;
 
     // Weight the ambient occlusion's contribution
@@ -468,15 +520,18 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
     if (!cheapVersion)
     {
         float3 erosionCoords = AnimateErosionNoisePosition(positionPS) / NOISE_TEXTURE_NORMALIZATION_FACTOR * _ErosionScale;
-        half erosionNoise = 1.0 - SAMPLE_TEXTURE3D_LOD(_ErosionNoise, s_linear_repeat_sampler, erosionCoords, CLOUD_DETAIL_MIP_OFFSET + erosionMipOffset).x;
-        erosionNoise = lerp(0.0, erosionNoise, erosionFactor * 0.75 * cloudCoverageData.coverage.x);
+        half detail = SAMPLE_TEXTURE3D_LOD(_ErosionNoise, s_linear_repeat_sampler, erosionCoords, CLOUD_DETAIL_MIP_OFFSET + erosionMipOffset).x;
+        half erosionNoise = DetailModifier(detail, properties.height);
+        erosionNoise = lerp(0.0, erosionNoise, erosionFactor);
         properties.ambientOcclusion = saturate(properties.ambientOcclusion - sqrt(erosionNoise * _ErosionOcclusion));
         base_cloud = DensityRemap(base_cloud, erosionNoise, 1.0, 0.0, 1.0);
 
         #if defined(_CLOUDS_MICRO_EROSION)
+        // Mikro erozyonun makalede karşılığı yok, portun kendi eklemesi. Aynı yükseklik ve
+        // kapsama davranışını kullanıyor ki iki detay katmanı ters yönlere çalışmasın.
         float3 fineCoords = AnimateErosionNoisePosition(positionPS) / (NOISE_TEXTURE_NORMALIZATION_FACTOR) * _MicroErosionScale;
-        half fineNoise = 1.0 - SAMPLE_TEXTURE3D_LOD(_ErosionNoise, s_linear_repeat_sampler, fineCoords, CLOUD_DETAIL_MIP_OFFSET + erosionMipOffset).x;
-        fineNoise = lerp(0.0, fineNoise, microDetailFactor * 0.5 * cloudCoverageData.coverage.x);
+        half fine = SAMPLE_TEXTURE3D_LOD(_ErosionNoise, s_linear_repeat_sampler, fineCoords, CLOUD_DETAIL_MIP_OFFSET + erosionMipOffset).x;
+        half fineNoise = lerp(0.0, DetailModifier(fine, properties.height), microDetailFactor);
         base_cloud = DensityRemap(base_cloud, fineNoise, 1.0, 0.0, 1.0);
         #endif
     }
@@ -493,12 +548,31 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
     // Make sure we do not send any negative values
     base_cloud = max(0, base_cloud);
 
-    // Attenuate everything by the density multiplier
-    properties.density = base_cloud * _DensityMultiplier;
+    // `[H18 s.14-16]`: yoğunluk-yükseklik fonksiyonu zincirin EN SONUNDA çarpan. Portta
+    // eğri dokusunun `.x` kanalı remap sınırının içindeydi; yerini `DensityAlter` aldı.
+    properties.density = base_cloud * DensityAlter(properties.height, cloudCoverageData.mapDensity)
+                       * _DensityMultiplier;
 }
 
 // Function that evaluates the transmittance to the sun at a given cloud position
-half3 EvaluateSunTransmittance(float3 positionPS, half3 sunDirection, PHASE_FUNCTION_STRUCTURE phaseFunction)
+/// GÜNEŞ GEÇİRGENLİĞİNİN TABANI `[H18 Ek B.6]`, `Attenuation`.
+///
+/// Saf Beer-Lambert bulut içinde sıfıra iniyor: `sigmaT` 0.04, ışık adımı 1000 m, tipik
+/// yoğunluk 0.2 → `extinction ≈ 16`, `exp(−16) = 1.1e−7`. İkinci oktav bile `exp(−8.4)`.
+/// Bulut içi yalnız ortam ışığıyla kalıyor ve kapkara çıkıyor.
+///
+/// Gerçek bulut kara değil çünkü ışık içeride çok kez saçılıyor. HZD bunu tabanla
+/// karşılıyor: `exp(−b × a_c) × 0.7`, `b = 6`, `a_c = 0.2` `[H18 s.58]` → 0.211.
+/// Güneşe bakarken kelepçe gevşiyor, yarıya iniyor.
+half SunTransmittanceFloor(half cosAngle)
+{
+    const half beer = 6.0;
+    const half attenuationClamp = 0.2;
+    half value = exp(-beer * attenuationClamp) * 0.7;
+    return lerp(value, value * 0.5, saturate(cosAngle));
+}
+
+half3 EvaluateSunTransmittance(float3 positionPS, half3 sunDirection, half cosAngle, PHASE_FUNCTION_STRUCTURE phaseFunction)
 {
     // Compute the Ray to the limits of the cloud volume in the direction of the light
     float totalLightDistance = 0.0;
@@ -536,10 +610,12 @@ half3 EvaluateSunTransmittance(float3 positionPS, half3 sunDirection, PHASE_FUNC
         // Compute the luminance for each octave
         // https://magnuswrenninge.com/wp-content/uploads/2010/03/Wrenninge-OzTheGreatAndVolumetric.pdf
         half3 extinction = intervalSize * opticalDepth * _ScatteringTint.xyz;
+        half floorValue = SunTransmittanceFloor(cosAngle);
         for (int o = 0; o < NUM_MULTI_SCATTERING_OCTAVES; ++o)
         {
             half msFactor = PositivePow(_MultiScattering, o);
-            transmittance += exp(-extinction * msFactor) * (phaseFunction[o] * msFactor);
+            half3 beerTerm = max(floorValue, exp(-extinction * msFactor));
+            transmittance += beerTerm * (phaseFunction[o] * msFactor);
         }
     }
 
@@ -699,7 +775,7 @@ void EvaluateCloud(CloudProperties cloudProperties, half3 rayDirection,
     half powderEffect = PowderEffect(cloudProperties.density, cosAngle, _PowderEffectIntensity);
 
     // Evaluate the sun visibility
-    half3 sunTransmittance = EvaluateSunTransmittance(currentPositionPS, sun.direction, phaseFunction);
+    half3 sunTransmittance = EvaluateSunTransmittance(currentPositionPS, sun.direction, cosAngle, phaseFunction);
 
     // Compute luminance separately to factor out color multiplication at the end of the loop
     // Use 1 as placeholder to compute the 'transfer function'

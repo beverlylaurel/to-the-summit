@@ -2,8 +2,11 @@ Shader "Hidden/Sky/VolumetricClouds"
 {
     Properties
     {
-        [HideInInspector][NoScaleOffset] _CloudLutTexture("Cloud LUT Texture", 2D) = "white" {}
         [HideInInspector][NoScaleOffset] _CloudCurveTexture("Cloud LUT Curve Texture", 2D) = "white" {}
+        [HideInInspector][NoScaleOffset] _CloudMapTexture("Cloud Map Texture", 2D) = "white" {}
+        [HideInInspector] _CloudMapTiling("Cloud Map Tiling", Vector) = (0.0000208, 0.0000208, 0.0, 0.0)
+        [HideInInspector] _CloudCoverage("Cloud Coverage", Float) = 0.9
+        [HideInInspector] _AnvilAmount("Anvil Amount", Float) = 0.0
         [NoScaleOffset] _ErosionNoise("Erosion Noise Texture", 3D) = "white" {}
         [NoScaleOffset] _Worley128RGBA("Worley Noise Texture", 3D) = "white" {}
         [HideInInspector] _Seed("Private: Random Seed", Float) = 0.0
@@ -38,7 +41,6 @@ Shader "Hidden/Sky/VolumetricClouds"
         [HideInInspector] _AmbientProbeDimmer("Ambient Light Probe Dimmer", Float) = 1.0
         [HideInInspector] _SunLightDimmer("Sun Light Dimmer", Float) = 1.0
         [HideInInspector] _EarthRadius("Earth Radius", Float) = 6378100.0
-        [HideInInspector] _NormalizationFactor("Normalization Factor", Float) = 0.7854
         [HideInInspector] _AccumulationFactor("Accumulation Factor", Float) = 0.95
         [HideInInspector] _CloudNearPlane("Cloud Near Plane", Float) = 0.3
     }
@@ -76,8 +78,8 @@ Shader "Hidden/Sky/VolumetricClouds"
 
             #pragma target 3.5
             
-            TEXTURE2D(_CloudLutTexture);
             TEXTURE2D(_CloudCurveTexture);
+            TEXTURE2D(_CloudMapTexture);
             TEXTURE3D(_Worley128RGBA);
             TEXTURE3D(_ErosionNoise);
             TEXTURECUBE(_VolumetricCloudsAmbientProbe);
@@ -415,8 +417,8 @@ Shader "Hidden/Sky/VolumetricClouds"
 
             #pragma target 3.5
 
-            TEXTURE2D(_CloudLutTexture);
             TEXTURE2D(_CloudCurveTexture);
+            TEXTURE2D(_CloudMapTexture);
             TEXTURE3D(_Worley128RGBA);
             TEXTURE3D(_ErosionNoise);
             TEXTURECUBE(_VolumetricCloudsAmbientProbe);
@@ -457,8 +459,8 @@ Shader "Hidden/Sky/VolumetricClouds"
 
             #pragma target 3.5
 
-            TEXTURE2D(_CloudLutTexture);
             TEXTURE2D(_CloudCurveTexture);
+            TEXTURE2D(_CloudMapTexture);
             TEXTURE3D(_Worley128RGBA);
             TEXTURE3D(_ErosionNoise);
             TEXTURECUBE(_VolumetricCloudsAmbientProbe);
@@ -654,8 +656,8 @@ Shader "Hidden/Sky/VolumetricClouds"
 
             #pragma target 3.5
             
-            TEXTURE2D(_CloudLutTexture);
             TEXTURE2D(_CloudCurveTexture);
+            TEXTURE2D(_CloudMapTexture);
             TEXTURE3D(_Worley128RGBA);
             TEXTURE3D(_ErosionNoise);
             TEXTURECUBE(_VolumetricCloudsAmbientProbe);

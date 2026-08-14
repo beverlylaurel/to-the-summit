@@ -24,7 +24,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
 
     //SerializedDataParameter m_CloudSimpleMode;
     SerializedDataParameter m_CloudPreset;
-    SerializedDataParameter m_DensityCurve;
     SerializedDataParameter m_ErosionCurve;
     SerializedDataParameter m_AmbientOcclusionCurve;
 
@@ -51,6 +50,10 @@ class VolumetricCloudsEditor : VolumeComponentEditor
 
     // Shape
     // General
+    SerializedDataParameter m_CloudMap;
+    SerializedDataParameter m_CloudMapSize;
+    SerializedDataParameter m_CloudCoverage;
+    SerializedDataParameter m_AnvilAmount;
     SerializedDataParameter m_DensityMultiplier;
     // Shape
     SerializedDataParameter m_ShapeFactor;
@@ -133,7 +136,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
 
         //m_CloudSimpleMode = Unpack(o.Find(x => x.cloudSimpleMode));
         m_CloudPreset = Unpack(o.Find(x => x.cloudPreset));
-        m_DensityCurve = Unpack(o.Find(x => x.densityCurve));
         m_ErosionCurve = Unpack(o.Find(x => x.erosionCurve));
         m_AmbientOcclusionCurve = Unpack(o.Find(x => x.ambientOcclusionCurve));
 
@@ -159,6 +161,10 @@ class VolumetricCloudsEditor : VolumeComponentEditor
         m_FadeInStart = Unpack(o.Find(x => x.fadeInStart));
         m_FadeInDistance = Unpack(o.Find(x => x.fadeInDistance));
 
+        m_CloudMap = Unpack(o.Find(x => x.cloudMap));
+        m_CloudMapSize = Unpack(o.Find(x => x.cloudMapSize));
+        m_CloudCoverage = Unpack(o.Find(x => x.cloudCoverage));
+        m_AnvilAmount = Unpack(o.Find(x => x.anvilAmount));
         m_DensityMultiplier = Unpack(o.Find(x => x.densityMultiplier));
         m_ShapeFactor = Unpack(o.Find(x => x.shapeFactor));
         m_ShapeScale = Unpack(o.Find(x => x.shapeScale));
@@ -360,7 +366,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
                     }
 
                     // Curves
-                    m_DensityCurve.value.animationCurveValue = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.05f, 1.0f), new Keyframe(0.75f, 1.0f), new Keyframe(1.0f, 0.0f));
                     m_ErosionCurve.value.animationCurveValue = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.1f, 0.9f), new Keyframe(1.0f, 1.0f));
                     m_AmbientOcclusionCurve.value.animationCurveValue = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.25f, 0.5f), new Keyframe(1.0f, 0.0f));
 
@@ -391,7 +396,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
                     }
 
                     // Curves
-                    m_DensityCurve.value.animationCurveValue = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.15f, 1.0f), new Keyframe(1.0f, 0.1f));
                     m_ErosionCurve.value.animationCurveValue = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.1f, 0.9f), new Keyframe(1.0f, 1.0f));
                     m_AmbientOcclusionCurve.value.animationCurveValue = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.25f, 0.4f), new Keyframe(1.0f, 0.0f));
 
@@ -422,7 +426,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
                     }
 
                     // Curves
-                    m_DensityCurve.value.animationCurveValue = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.05f, 1.0f), new Keyframe(0.9f, 0.0f), new Keyframe(1.0f, 0.0f));
                     m_ErosionCurve.value.animationCurveValue = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.1f, 0.9f), new Keyframe(1.0f, 1.0f));
                     m_AmbientOcclusionCurve.value.animationCurveValue = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(1.0f, 0.0f));
 
@@ -453,7 +456,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
                     }
 
                     // Curves
-                    m_DensityCurve.value.animationCurveValue = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.037f, 1.0f), new Keyframe(0.6f, 1.0f), new Keyframe(1.0f, 0.0f));
                     m_ErosionCurve.value.animationCurveValue = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.05f, 0.8f), new Keyframe(0.2438f, 0.9498f), new Keyframe(0.5f, 1.0f), new Keyframe(0.93f, 0.9268f), new Keyframe(1.0f, 1.0f));
                     m_AmbientOcclusionCurve.value.animationCurveValue = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(0.1f, 0.4f), new Keyframe(1.0f, 0.0f));
 
@@ -496,7 +498,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
                 // subsidiary properties. This is different from the quality settings, all the properties need to be forced
                 // If a preset is selected and active.
                 m_DensityMultiplier.overrideState.boolValue = m_CloudPreset.overrideState.boolValue;
-                m_DensityCurve.overrideState.boolValue = m_CloudPreset.overrideState.boolValue;
                 m_ShapeFactor.overrideState.boolValue = m_CloudPreset.overrideState.boolValue;
                 m_ShapeScale.overrideState.boolValue = m_CloudPreset.overrideState.boolValue;
                 m_ErosionFactor.overrideState.boolValue = m_CloudPreset.overrideState.boolValue;
@@ -510,6 +511,13 @@ class VolumetricCloudsEditor : VolumeComponentEditor
                 m_AltitudeRange.overrideState.boolValue = m_CloudPreset.overrideState.boolValue;
             }
 
+            // Hava haritası ön ayarlardan sürülmüyor; değişim denetiminin dışında duruyor ki
+            // haritayı atamak ön ayarı Custom'a çevirmesin.
+            PropertyField(m_CloudMap);
+            PropertyField(m_CloudMapSize);
+            PropertyField(m_CloudCoverage);
+            PropertyField(m_AnvilAmount);
+
             // Start checking for changes
             EditorGUI.BeginChangeCheck();
 
@@ -519,7 +527,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
                 using (new IndentLevelScope())
                 {
                     PropertyField(m_DensityMultiplier);
-                    PropertyField(m_DensityCurve);
                     PropertyField(m_ShapeFactor);
                     PropertyField(m_ShapeScale);
                     PropertyField(m_ErosionFactor);
