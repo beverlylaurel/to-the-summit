@@ -83,154 +83,24 @@ float TerrainHeightAt(float2 xz)
                                 saturate(uv), 0).r * _TerrainHeightArea.w;
 }
 
-// Hava haritası: bulutların NEREDE olduğu. Bulut shader'ı da aynı dokuyu okur —
-// gölgenin bulutla uyuşması için ikisinin aynı kaynaktan beslenmesi şart.
-TEXTURE2D(_WeatherMap);
-SAMPLER(sampler_WeatherMap);
-float _WeatherMapScale;    // 1 / harita periyodu (metre)
-float3 _CloudWind;         // bulutların birikmiş sürüklenmesi (metre)
+// BULUT SİSTEMİ SÖKÜLDÜ — burada yalnız iki iz kaldı.
+//
+// `_CloudBottom` bildirimi DURUYOR: şimşek shader'ı (`LightningBolt.shader`) çakmayı
+// bulut tabanı küresiyle kesiştiriyor ve globali oradan okuyor. Kendi bildirimini
+// açarsa derleyici çakışıyor.
+//
+// `CloudShadowAt` şimdilik 1.0 dönüyor, yani yerde bulut gölgesi yok. Çağrı yeri
+// (`MountainSurface.shader`) bilerek bırakıldı: yeni bulut sistemi gelince tek satır
+// değişecek ve bağ orada olduğu için aranması gerekmeyecek.
+//
+// Bağın sözleşmesi `CLOUDS_REBUILD.md` madde 1'de: gökyüzü hangi yoğunluk alanından
+// besleniyorsa yer gölgesi de aynısından beslenmek zorunda. İkinci bir yaklaşım
+// kurulursa gökte bulut olmayan yerde gölge çıkıyor — bu bir kez yaşandı.
 float _CloudBottom;        // katmanın tabanı (metre)
-float _Coverage;           // o anki bulut kapsaması
 
-float _WeatherMapTexels;   // haritanin texel sayisi; mip secimi icin gerekli
-
-// BULUT YER IZININ ORTAK KAYNAGI. Bu bildirimler ve asagidaki fonksiyon eskiden
-// CloudCommon.hlsl'deydi, yani yalniz GOKYUZU onlari goruyordu. Yer golgesi kendi
-// yaklasimini kuruyordu: warp'siz, evrimsiz, firtina dolgusuz. Iki alan hicbir zaman
-// tutmadi - gokte bulut olmayan yerde golge, golge olmayan yerde bulut. Katsayi
-// ayarlamak bunu duzeltmez; tek kaynak duzeltir.
-TEXTURE3D(_BaseNoise);
-SAMPLER(sampler_BaseNoise);
-float _BaseNoiseTexels;
-float _CloudScale;
-float _Evolution;
-float3 _CloudShearOffset;   // ust katmanlarin yanal kaymasi (metre)
-
-/// Kapsamanin cikabilecegi tavan. Bire dayanmasi esigi sifirliyor ve kapali havayi
-/// dalgasiz bir levhaya ceviriyor; kucuk bir pay birakmak tabanin kivrimini koruyor.
-static const float CloudCoverageCeiling = 0.85;
-
-/// KAPSAMA KAZANCLARI TEK YERDE. Kaba eleme (`CloudDensity`) kapsamanin UST SINIRINI
-/// bagimsiz olarak hesapliyor ve o sinir gercek degerin altinda kalirsa var olan bir
-/// bulutun ustunden atliyor. Sicrama haritasi 64x64 ve POINT filtreli, yani kesim
-/// 750 m'lik eksen hizali hucre yuzlerinden gecer: bulut duz kenarli bir KIYMIK olarak
-/// kirpilir.
-///
-/// Bu iki kez oldu. Ilkinde cephe nefesi eklendi, sinira 1.22 yazildi; sonra formul
-/// `1.20 + 0.80*b` (ust sinir 2.00) olarak degistirildi ve sinir 1.22'de kaldi — eleme
-/// gercegin 1.64 kati altinda kaldi. Sayilar artik burada duruyor ve sinir bunlardan
-/// TURETILIYOR; iki yerde ayri yazilamaz.
-
-/// Ornekler arasi mesafeye gore mip seviyesi. Bir texel adim boyundan kucuk kaldiginda
-/// o doku artik orneklenemez ve okunan deger aliasing olarak geri gelir. Dokular
-/// mipmap'li; cozulemeyen frekansi okumak yerine donanimin ortalamasini okuruz.
-///
-/// Bir texel'in dunya karsiligi 1 / (olcek x texel sayisi) metredir. Taban ve detay
-/// dokularinin cozunurlugu farkli oldugu icin texel sayisi disaridan verilir.
-float _CloudLodLock;   // TESHIS: 1 iken mip seviyesi sifira kilitleniyor
-
-float CloudSampleLod(float stepSize, float scale, float texels)
-{
-    // TESHIS ANAHTARI. Bulutun icinde esmerkezli soganlar goruluyor ve iki aday var:
-    // adim kabuklari ile mip gecisleri. Mip sifira kilitlendiginde halkalar kayboluyorsa
-    // sucu mip gecisi, duruyorsa adimlama. Anahtar kapaliyken hesap aynen isliyor.
-    float lod = max(0.0, log2(max(1e-6, stepSize * scale * texels)));
-    return lerp(lod, 0.0, saturate(_CloudLodLock));
-}
-
-/// Bir kolonun hava durumu: bulut govdesi de yer golgesi de bundan turer.
-struct CloudFootprint
-{
-    float4 weather;    // haritanin ham okumasi: g tip, b taban kaymasi, a tavan
-    float coverage;    // esiklenmis yerel kapsama, 0 - CloudCoverageCeiling
-};
-
-/// stormFill: firtina dolgusunun payi.
-/// colLod / mapLod: ornekleme ayak izinden gelen mip. Gokyuzu adim boyundan hesaplar,
-/// golge pikselin dunya genisliginden.
-///
-/// MESAFE GIRDI DEGIL. Bir `horizonBias` parametresi vardi ve 15 km'den sonra hem
-/// kapsamaya taban koyuyor hem tipi yukseltiyordu (HZD s.45, ufkun "epik" kalmasi icin).
-/// Ikisi de bir bulutu KAMERANIN NEREDE OLDUGUNA gore degistiriyor: uzaktan yuksek
-/// kumulus goruneni, uzerine ucunca yayvan stratusa donusuyordu. HZD'de bulutlara
-/// uculmuyor; burada uculuyor.
-CloudFootprint CloudFootprintAt(float2 mapPos, float colLod, float mapLod)
-{
-    // HAVA KOLONSALDIR: kapsama, tip ve taban kayması bir kolonun TAMAMI için tek
-    // değerdir — 2B harita bunu yapısal olarak garanti eder.
-    //
-    // HARITA BUKULMEZ. Koordinata kolonsal gurultuden ±650 m + ruzgaralti 1000 m'lik
-    // bir warp biniyordu ("kiyi disleme"). PDF'te yok: kenari yontan sey erozyon
-    // katmani (s.37), haritanin UV'si degil. Warp kaldirilinca kolonsal 3B okuma da
-    // dustu — ornek basina bir doku okumasi eksildi.
-    float4 w = SAMPLE_TEXTURE2D_LOD(_WeatherMap, sampler_WeatherMap,
-                                    mapPos * _WeatherMapScale, mapLod);
-
-    // KAPSAMA = HARITA × SURGU. Arada iki terim daha vardi ve ikisi de sokuldu:
-    //
-    //   firtina dolgusu  max(p, 0.06 + 0.70·colWarp.g)  — bosluklari dolduruyordu
-    //   cephe nefesi     p *= 1.20 + 0.80·colWarp.b     — kapsamayi 1.67 kat oynatiyordu
-    //
-    // PDF'te kapsama tek bir kanaldir (s.34-35): haritadan okunur, sanat yonu sürgüsüyle
-    // olceklenir, biter. Nefes terimi kaba eleme ust sinirini iki kez bozdu (kiymik
-    // bulutlar); dolgu terimi bosluklari kapatip gokyuzunu tek kutle yapiyordu. Ikisi de
-    // kolonsal 3B gurultuye bagliydi, yani ucuncu bir gizli girdiydi.
-    //
-    // SURGU ESIGI KAYDIRIR, HARITAYI OLCEKLEMEZ.
-    //
-    // `w.r * _Coverage` yaziliydi ve %100'de bile gokyuzu kapanmiyordu: haritanin R'si
-    // alanin %41'inde tam sifir (cekirdek butcesi 0.9 -> doluluk %59) ve sifiri neyle
-    // carparsan sifir kalir. Kapali hava bir turlu gelmiyordu.
-    //
-    // `r + 2c - 1` uc ucta da dogru: c=0 -> 0 (acik), c=0.5 -> r (haritanin kendisi),
-    // c=1 -> 1 (tam ortu). Ikisinde de monoton, gizli girdi yok.
-    float localCoverage = saturate(w.r + 2.0 * _Coverage - 1.0) * CloudCoverageCeiling;
-
-    CloudFootprint fp;
-    fp.weather = w;
-    fp.coverage = localCoverage;
-    return fp;
-}
-
-
-/// BULUT GÖLGESİ. Bulutlar tepede geziyordu ama yer bunu bilmiyordu: ışık sabit
-/// kaldığı sürece yamaç hep aynı okunuyor. Dağ manzarasının imzası, yamaçlar boyunca
-/// süzülen gölgelerdir.
-///
-/// Gölge güneşe doğru GERİ İZLENİR: yüzeyden bulut tabanına kadar olan yükseklik,
-/// güneşin eğimiyle yatay bir kaymaya dönüşür. Bu yapılmazsa gölge bulutun tam altında
-/// kalır ve güneş alçakken manzarayla uyuşmaz.
-///
-/// Kaynak bulutun kendi hava haritası ve kendi sürüklenmesi; ayrı bir gürültü kurulmuyor.
 float CloudShadowAt(float3 worldPos)
 {
-    if (_Coverage <= 0.001) return 1.0;
-
-    // Gunes ufkun altindaysa golge diye bir sey yok; ay isigi golge basacak kadar
-    // guclu degil.
-    float sunUp = saturate(_SunDirection.y * 6.0);
-    if (sunUp <= 0.001) return 1.0;
-
-    float rise = max(0.0, _CloudBottom - worldPos.y);
-    float2 slide = _SunDirection.xz / max(0.15, _SunDirection.y) * rise;
-    float2 mapPos = worldPos.xz + slide + _CloudWind.xz * 0.72;
-
-    // Ornekleme ayak izi: uzaktaki bir piksel yerde metrelerce genisligi kapsar. LOD 0
-    // okunursa cozulemeyen frekans kayniyor. 0.0012 ~ 1080p / 60 derece yatay icin
-    // piksel basina aci; mesafeyle carpilinca pikselin dunyadaki genisligi cikar.
-    float footprint = max(1.0, distance(worldPos, _WorldSpaceCameraPos) * 0.0012);
-
-    // GOLGE, BULUTUN KENDI YER IZI. Gokyuzu hangi fonksiyondan yogunluk aliyorsa yer de
-    // ondan golge aliyor; ikinci bir alan yok.
-    CloudFootprint fp = CloudFootprintAt(mapPos,
-        CloudSampleLod(footprint, _CloudScale * 0.5, _BaseNoiseTexels),
-        CloudSampleLod(footprint, _WeatherMapScale, _WeatherMapTexels));
-
-    float shade = saturate(fp.coverage / CloudCoverageCeiling);
-
-    // Tam karanlik olmuyor: bulut golgesindeki yuzey gokten hala isik aliyor. Kapali
-    // havada zaten her yer golgede, orada da kontrast dusuk olmali.
-    return 1.0 - shade * 0.55 * sunUp;
+    return 1.0;
 }
 
 // Birikmiş taze kar, KOT EKSENİNDE. 128x1 doku: R örtü, G kalınlık deposu. Yüzey
