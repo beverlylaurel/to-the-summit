@@ -1142,6 +1142,7 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
     float3 scattered = 0.0;
     float prevDensity = 0.0;
     float cachedLit = -1.0;   // gölge sondası önbelleği (bkz. aşağıdaki adımlama)
+    float smoothLit = -1.0;   // önbelleğin basamağını rampaya çeviren yumuşatma
 
     // İKİ KADEMELİ YÜRÜYÜŞ (Nubis/HZD): ışın, buluta değene kadar UCUZ örnek alır —
     // aşındırma ve kafes kırıcı okumalar yapılmaz, adım iki katıdır. İzo-yüzeye
@@ -1420,9 +1421,25 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
                     cachedLit = CloudLightTransmittance(samplePoint, lightDirection,
                                                         transmittance <= 0.7, travelled,
                                                         openness);
-                lit = cachedLit * gate;
+
+                // MERDİVEN YUMUŞATILIYOR, FAZ OYNATILMIYOR. Sonda iki-dört adımda bir
+                // çalışıyor ve aradaki adımlar aynı değeri taşıyordu: o basamaklar
+                // ekranda eşmerkezli kabuk, yani soğan halkası. Fazı piksel piksel
+                // kaydırmak halkayı kırıyor ama komşu pikselleri ayrıştırıp kenarda gren
+                // bırakıyor (denendi, ikisi de görüldü).
+                //
+                // Üçüncü yol: basamağı rampa yapmak. Değer her adımda öncekine doğru
+                // yarı yarıya çekiliyor, yani sonda yenilendiğinde sıçrama olmuyor,
+                // birkaç adımda varıyor. Bütün pikseller aynı işlemi yaptığı için gren
+                // yok; basamak kalmadığı için halka da yok. Sonda sayısı değişmiyor.
+                smoothLit = smoothLit < 0.0 ? cachedLit : lerp(smoothLit, cachedLit, 0.5);
+                lit = smoothLit * gate;
             }
-            else cachedLit = -1.0;
+            else
+            {
+                cachedLit = -1.0;
+                smoothLit = -1.0;
+            }
 
             // Işık katkısı eşikte sıfırdan başlar. Sert açılışta eşiğin bir tık üstündeki
             // örnek aydınlanıyor, bir tık altındaki yalnızca ambient alıyordu: eşik yüzeyi
