@@ -132,7 +132,36 @@ bölünürse aynı bant kapsama küçüldükçe daralıp bıçağa dönüşüyor
 Bizim senaryomuz. `[N22]`'nin ana konusu. Yakın alanda ne değişiyor, maliyet nereden
 çıkıyor, hangi yaklaşım terk edilmiş?
 
-> *(cevap)*
+**Sayılar `[N22 s.39]`:**
+
+```hlsl
+float near_step_size           = 3.0;
+float far_step_size_offset     = 60.0;
+float step_adjustment_distance = 16384.0;
+
+float step_size = near_step_size
+                + ((far_step_size_offset * distance_from_camera) / step_adjustment_distance);
+```
+
+**Doğrusal**, üstel değil. Kamerada 3 m, 16.4 km'de 63 m.
+
+Bizimkiyle karşılaştırma — bizde `(2000/110) × (1 + d/2300)`:
+
+| mesafe | `[N22]` | bizde | oran |
+|---|---|---|---|
+| 0 m | **3 m** | 18 m | 6× kaba |
+| 1 km | **6.7 m** | 26 m | 3.9× kaba |
+| 10 km | **39 m** | 96 m | 2.5× kaba |
+| 16 km | **63 m** | 143 m | 2.3× kaba |
+
+**Mip sorunumuzun cevabı bu.** 3 m adımla 128³ doku mip 0'da okunuyor; ince gürültü
+hiçbir yerde ortalamaya yatmıyor. Bizim 18 m'lik taban adımımızla doku daha kameranın
+dibinde mip 1-2'ye düşüyordu. "İnce gürültü koyunca bulutlar kayboluyor" belirtisinin
+kaynağı gürültü değil, **adım boyu**.
+
+Karşılığında menzil kısa: `step_adjustment_distance` 16384 m, yani ölçek 16 km'ye göre
+kurulmuş. Bizim 300 km'lik görüş menzilimizle bu adım boyu tutmaz — menzil kesilmeden
+ince gürültü kullanılamaz.
 
 ## 8. Temporal yeniden yansıtma ve artefaktlar
 
@@ -146,7 +175,27 @@ nasıl, hareket hâlinde ne bozuluyor?
 Koni kaç örnek, uzak örnek nerede, HG eksantrikliği kaç, powder formülü ve gücü,
 yağışta soğurma nasıl artıyor?
 
-> *(cevap)*
+**Işık örneklemesi `[N22 s.41]`:** güneş yönünde **256 m** boyunca, örnekler ÜSTEL
+aralıklı (örnek noktasına yakın sık, uzakta seyrek).
+
+**Enerji ayrışımı `[N22 s.42]`:**
+```
+Light Energy = Direct Scattering + Ambient Scattering
+```
+
+**Doğrudan saçılma İKİ terimli `[N22 s.43]`:**
+```
+Direct Scattering = (Transmittance × Primary Scattering Phase)
+                  + (Multiple Scattering × Secondary Scattering Phase)
+```
+
+Yani tek bir Henyey-Greenstein değil: birincil saçılma kendi fazıyla, çoklu saçılma
+AYRI bir fazla. `[N22 s.44-45]` ikisinin geometrisini ayrı ayrı çiziyor — birincil
+ışın buluta girip tek sekmede göze geliyor, çoklu saçılma içeride birkaç kez sekiyor.
+
+Beer-Lambert `T = e^(−d)` temelde duruyor `[N22 s.46]`.
+
+*(Faz fonksiyonlarının kendisi ve eksantriklik değerleri ileride.)*
 
 ## 10. Bulut gölgesinin yere düşürülmesi
 
@@ -186,6 +235,11 @@ bizim bildiğimiz eksiklerden yapıldı; bilmediklerimiz burada birikir. Kaynak 
 **Katman kotları 256 m – 2048 m** `[N22 s.20]`, insan figürüyle ölçeklenmiş. Kalınlık
 1792 m. 2015'te 1500–4000 m'ydi; alçalmış ve incelmiş.
 
+**Hareket tek satır** `[N22 s.37]`: `noise_sample_position = sample_position −
+wind_direction × scroll_offset`. Örnekleme koordinatı rüzgârla kaydırılıyor, başka bir
+şey yok. Bizdeki makaslama, konvektif yükselme, evrim, döşeme kırıcı — hiçbirinin
+karşılığı yok.
+
 **Gürültü tek doku, 4 kanal, 128³** `[N22 s.33]` — "Noise Composite". Kanallar artan
 frekansta; ilki Perlin-Worley, kalanlar Worley. 2015'teki yapının aynısı, yani doku
 tarafı yedi yılda değişmemiş.
@@ -206,7 +260,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
-| `[N22]` nubis-2022 | **207** | s.1–34 | s.35–207 |
+| `[N22]` nubis-2022 | **207** | s.1–46 | s.47–207 |
 | `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
