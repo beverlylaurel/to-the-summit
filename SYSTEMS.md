@@ -868,6 +868,21 @@ sahneyi düz bir vuruşla yakıyordu. Batımdan sonra kalan pay, atmosferde saç
 artçı parıltısıdır: gölgesiz ama cılız. Rengi `TimeOfDay`'in süzülmüş güneşi, penceresi
 `HorizonFactor`.
 
+### Yansıma haritası (`AtmosphereController`)
+
+**Okur:** gökyüzü rengi (yağış, karlılık ve günün saatinden türeyen).
+
+Sahnenin çevre yansıması gökyüzünden pişiyor ve gökyüzü rengi kanalların birinde %2
+kayınca yeniden pişiriliyor. Gece kararması, fırtına grisi, bulut denizi ve şafağın
+kızıllığı — hepsi aynı kapıdan geçiyor, ayrı bir "gece yansıması" ayarı yok.
+
+Şiddet katsayısı (`reflectionIntensity`) sabit 1.0. Bir dönem gök seviyesine bağlanmıştı
+ve aynı kararmayı ikinci kez uyguluyordu: harita zaten karanlıkken katsayı da kısınca
+metal gece tamamen ölüyordu. **Kararma haritanın içinde, katsayıda değil.**
+
+Harita bayat kalırsa belirti nettir: gece metal yüzeyler gündüz gökyüzünü aynalar,
+bisikletin kromu karanlıkta parlar.
+
 ### Bisiklet (`BikeController`, `BikeSurface`)
 
 **Okur:** hiçbir şey. Yaklaşma aracı; hava, rüzgâr, sıcaklık ve kar sistemleriyle
