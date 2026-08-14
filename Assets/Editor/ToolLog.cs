@@ -25,13 +25,15 @@ public static class ToolLog
     {
         Directory.CreateDirectory(Path.GetDirectoryName(LogPath));
 
-        bool full = File.Exists(LogPath) && new FileInfo(LogPath).Length > MaxBytes;
-        FileMode mode = full ? FileMode.Create : FileMode.Append;
+        // KESME İLE EKLEME KARIŞTIRILMIYOR. Dosya akışı bir çağrıda kesilip başka bir
+        // çağrıda eklenince Windows aradaki boşluğu sıfır baytla dolduruyor: log yirmi üç
+        // megabaytlık boşlukla şişti. Dolduğunda içerik baştan yazılıyor, dolmadığında
+        // sonuna ekleniyor — ikisi de tek adımda.
+        string line = $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}{Environment.NewLine}";
 
-        using var stream = new FileStream(LogPath, mode, FileAccess.Write,
-            FileShare.ReadWrite | FileShare.Delete);
-        using var writer = new StreamWriter(stream, Encoding.UTF8);
-
-        writer.Write($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}{Environment.NewLine}");
+        if (File.Exists(LogPath) && new FileInfo(LogPath).Length > MaxBytes)
+            File.WriteAllText(LogPath, line, Encoding.UTF8);
+        else
+            File.AppendAllText(LogPath, line, Encoding.UTF8);
     }
 }
