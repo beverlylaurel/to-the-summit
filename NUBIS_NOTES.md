@@ -28,7 +28,22 @@ Okuma **ilerledikçe** doldurulur, sonunda değil.
 Bizde yerleşimi gürültü belirliyordu, harita değil — sonuç ızgara. Hangi büyüklük
 haritadan, hangisi gürültüden geliyor?
 
-> *(cevap)*
+**`[N22]` boyu HARİTADAN alıyor — 2015'ten farkı bu.** Cloudscape "Nubis Data Fields"
+(NDF) denen üst üste 2B alanlardan kuruluyor `[N22 s.18]`. Dikey profil modelinin
+NDF'leri **beş kanal** `[N22 s.20]`:
+
+- Cloud Min Height
+- Cloud Max Height
+- Cloud Coverage
+- Cloud Bottom Type
+- Cloud Top Type
+
+Yani bir kolonun tabanı ve tavanı doğrudan haritada yazıyor; boy = max − min. 2015'te
+(`[N15 s.34]`) boy yalnız tipten geliyordu ve harita üç kanaldı.
+
+**Bizim için:** sildiğimiz A "tavan" kanalı fikren yanlış değilmiş — 2022 aynısını iki
+kanalla yapıyor. Yanlış olan bizim uygulamamızdı (çekirdek başına kubbe + MAX birleşimi
++ shader'da beş çarpan). 2022'de tavan doğrudan okunuyor, türetilmiyor.
 
 ## 2. Gürültünün dünya periyodu neye göre seçilir?
 
@@ -50,7 +65,15 @@ olduğu yer hiçbir sürgüde dolmaz). Ölçekleme mi, eşik kaydırma mı, baş
 `[N15 s.35]` çarpıyor: `SetRange(gürültü × gradyan) × kapsama`. Bizde çarpınca tepeler
 iğneye döndü. Sönüm bandının genişliği ile gürültünün özellik boyu arasındaki ilişki ne?
 
-> *(cevap)*
+**`[N22]`'de gradyan artık elle yazılmış eğri değil, 2B ARAMA TABLOSU** `[N22 s.21-22]`.
+Yatay eksen "Top Type" (0→1), dikey eksen yükseklik; hücre değeri o yükseklikteki
+yoğunluk. Tip 0'da düz ince dilim (stratus), tip 1'e doğru stratocumulus → cumulus:
+taban yayılıp tepe dikleşiyor.
+
+Yani üç `smoothstep` eğrisini karıştırmak yerine, geçişin tamamı **pişmiş bir dokudan**
+okunuyor — ara değerler tanım gereği pürüzsüz.
+
+*(Çarpma mı eşik mi sorusu henüz cevaplanmadı; ilerideki sayfalarda.)*
 
 ## 5. Kenar yumuşaklığı nereden gelir?
 
@@ -115,7 +138,18 @@ ucuzlatmalar var, hangileri gönderilmiş, hangileri geri alınmış?
 Yukarıdaki on iki sorunun hiçbirine girmeyen ama önemli görünen her şey. Soru listesi
 bizim bildiğimiz eksiklerden yapıldı; bilmediklerimiz burada birikir. Kaynak zorunlu.
 
-> *(boş)*
+**Katman ikiye bölünmüş** `[N22 s.16]`: alçak **Stratus alt-katmanı** ve yüksek
+**Cirrus alt-katmanı**. Kamera stratus alt-katmanının içinden geçiyor. Bizdeki
+"hacimsel + üstte 2B" ayrımının 2022'deki karşılığı bu.
+
+**NDF alanı 16 km × 16 km** `[N22 s.19]`. Bizim hava haritamız 48 km'ydi. Onlarınki
+üç kat küçük — yani tekrar daha sık ama görüş menzili de dar.
+
+**Katman kotları 256 m – 2048 m** `[N22 s.20]`, insan figürüyle ölçeklenmiş. Kalınlık
+1792 m. 2015'te 1500–4000 m'ydi; alçalmış ve incelmiş.
+
+**Terim:** "Nubis" adı Luke Howard'ın 1802'deki bulut sınıflandırmasından
+("nubification") geliyor `[N22 s.12]`. İşe yaramaz ama kaynağı belli olsun.
 
 ---
 
@@ -127,7 +161,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
-| `[N22]` nubis-2022 | **207** | s.1–10 | s.11–207 |
+| `[N22]` nubis-2022 | **207** | s.1–22 | s.23–207 |
 | `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
