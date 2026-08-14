@@ -1471,6 +1471,103 @@ Energy = max( HG(cos θ, eccentricity),
 İki faz fonksiyonu `max()` ile birleşiyor, ikincisinin şiddeti ayrı kontrol ediliyor.
 H18'deki `IS_extra` bunun türevi.
 
+### `[N17]` çoklu saçılma yaklaşımı — İKİ BEER, max ile `[N17 s.84-85]`
+
+Tek Beer bulutları **fazla koyu** bırakıyor (s.84'te görüntü var):
+```
+Energy = exp(-density_along_light_ray)
+```
+
+Çözüm (Magnus Wrenninge 2013'ün çoklu saçılma yaklaşımına benzer):
+```
+Energy = max( exp(-density_along_light_ray),
+              exp(-density_along_light_ray * 0.25) * 0.7 )
+```
+
+- İkinci fonksiyonun sönümü **0.25'e düşürülmüş** → ışık bulutun daha derinine işliyor
+- Etkisi **0.7 ile kısılmış** → sonucu ezmesin
+- **Ve yalnız GÜNEŞTEN UZAĞA bakarken devrede**: görüş ışını ile ışık ışını arasındaki
+  açı küçüldükçe etki rampayla söndürülüyor
+
+### İçe saçılma olasılığı `[N17 s.89-92]`
+
+İlk deneme `pow(lodded_density, 2.0)` — *"kenarlarda içe saçılma yok gibi davranıyor,
+bu tabii ki yanlış"*, sonuç fazla koyu.
+
+Düzeltilmiş hâli:
+```
+depth_probability      = 0.05 + pow(lodded_density, remap(height, 0.3, 0.85, 0.5, 2.0));
+vertical_probability   = pow(remap(height, 0.07, 0.14, 0.1, 1.0), 0.8);
+in_scatter_probability = depth_probability * vertical_probability;
+```
+
+- **Üs yükseklikle gevşiyor** (0.5 → 2.0)
+- **0.05 sabit pay** kenarların tamamen kararmasını engelliyor
+- İkinci terim **tabanda içe saçılmanın azlığını** taşıyor (bulutun altında güçlü saçılma
+  kaynağı yok)
+
+Yoğunluk **düşük LOD'da** örnekleniyor — çevredeki kütleyi temsil etsin diye.
+
+**Aydınlatma modelinde HİÇBİR DEĞER KIRPILMIYOR** `[N17 s.93]` — HDR desteği için.
+
+### Işın yürüyüşü `[N17 s.96]`
+
+- Küresel atmosfer katmanı
+- **Adım sayısı 54-96**, ışın yukarı mı ufka mı bakıyor ona göre
+- Başta **büyük adım + yalnız alçak frekans gürültü + düşük LOD**. Gerekçe: *"yüksek
+  frekanslı gürültüler alçak frekansın KENARLARINA çıkarma olarak uygulandığı için bunu
+  yapabiliyoruz"* — yani ucuz örnek her zaman ≥ gerçek değer
+- Sonra kısa adım + tüm frekanslar
+- **Arka arkaya 10 örnek sıfır yoğunluk dönerse** büyük adıma ve ucuz örneğe geri dön
+- Alfa 1'e varana ya da hacim bitene kadar
+- Yoğunluğu sıfır olmayan her pahalı örnekte: **ışık hizalı konide 5 yoğunluk örneği,
+  her örnekte LOD DÜŞÜRÜLEREK**. *"Koni örneği ve azalan LOD, yoğun bir hacmi yalnız 5
+  ışık örneğiyle aydınlatınca normalde çıkacak artefaktları yumuşatıyor."*
+
+### OPTİMİZASYON TABLOSU — PS4, bulutlar ekranın ~yarısı `[N17 s.99-100]`
+
+| adım | süre |
+|---|---|
+| Temel + zamansal yeniden yansıtma | **22.00 ms** |
+| + Uyarlanır adım boyu ve LOD | **8.10 ms** |
+| + Yalnız sıfır olmayan yoğunlukta ışık örneği | **3.34 ms** |
+| + Ufkun altını ele | **1.81 ms** |
+| + Derinlik elemesi | **1.20 ms** |
+
+**22 ms'den 1.2 ms'ye — 18 kat.** Ve konuşmacı notu: *"her optimizasyonda bulutlarda
+gözle görülür bir fark YOK."*
+
+**Derinlik elemesi ayrıntısı:** ışın yürüyüşü yalnız göğün olduğu ya da **bir sonraki
+karede açığa çıkma ihtimali olan** yerlerde başlatılıyor. Ağaç gibi ince engeller kare
+içinde hızlı hareket edip yansıtma artefaktı üretebildiği için derinlik kanalının
+**düşük LOD'lu bir örneğinin max()'ı** alınıyor — muhafazakâr kalıp yine de adım sayısını
+düşürüyor.
+
+### Son işlem — ÇIKTI TAMPONUNUN KANALLARI `[N17 s.102-103]`
+
+Işın yürüyüşünden çıkan RGBA:
+
+| kanal | ne |
+|---|---|
+| **R** | Doğrudan ışık şiddeti |
+| **G** | Atmosferik harman payı |
+| **B** | Ambient ışık şiddeti |
+| **A** | Alfa |
+
+Doğrudan ve ambient **ayrı kanallarda** taşınıyor — son işlemde renklendiriliyor.
+Bizde tek renk çıkıyordu.
+
+**Atmosferik harman payı:**
+```
+atmospheric_blend_factor = GetAtmosphere(depth, angle)
+```
+İki adımda: (1) yürüyüş sırasında **alfa 0.5'e vardığı** noktada bir derinlik değeri
+üretiliyor, (2) yürüyüşten sonra o derinlikteki birikmiş atmosferik saçılma
+örnekleniyor. Sonuç bulut rengi ile gök rengi arasında harman payı olarak kullanılıyor.
+
+Yani mesafe ölçüsü **alfanın 0.5'e vardığı yer** — medyan derinlik. Bizde `firstHit`,
+`[N22]`'de opaklıkla ağırlıklı ortalama. Üç ayrı seçim.
+
 ---
 
 ## Okuma defteri
@@ -1480,7 +1577,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 | makale | toplam | okunan | eksik |
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
-| `[N17]` nubis-2017 | **108** | s.1–81 | s.82–108 |
+| `[N17]` nubis-2017 | **108** | s.1–103 | s.104–108 |
 | `[N22]` nubis-2022 | **207** | **s.1–207 TAMAM** | — |
 | `[H18]` haggstrom-2018 | **93 PDF / 81 basılı** | **PDF s.1–93 TAMAM** | — |
 
