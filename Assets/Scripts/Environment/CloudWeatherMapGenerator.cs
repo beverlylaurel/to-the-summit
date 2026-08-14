@@ -432,4 +432,38 @@ public static class CloudWeatherMapGenerator
     }
 
     static float Smooth(float t) => t * t * (3f - 2f * t);
+
+    /// SARMALANAN KUTU BULANIKLIĞI. Harita döşeniyor, yani sol kenarı sağ kenarına
+    /// bağlanıyor; normal bulanıklık kenarda koyulaşma bırakır ve döşeme dikişi gökyüzünde
+    /// çizgi olarak görünür. İki geçiş (önce yatay, sonra dikey): ayrılabilir çekirdek,
+    /// yarıçapla doğrusal maliyet.
+    static float[,] SmoothWrapped(float[,] source, int n, int radius)
+    {
+        var pass = new float[n, n];
+        float span = radius * 2 + 1;
+
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float total = 0f;
+            for (int k = -radius; k <= radius; k++)
+                total += source[y, ((x + k) % n + n) % n];
+
+            pass[y, x] = total / span;
+        }
+
+        var result = new float[n, n];
+
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float total = 0f;
+            for (int k = -radius; k <= radius; k++)
+                total += pass[((y + k) % n + n) % n, x];
+
+            result[y, x] = total / span;
+        }
+
+        return result;
+    }
 }
