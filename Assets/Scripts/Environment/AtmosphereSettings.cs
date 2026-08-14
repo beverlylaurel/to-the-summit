@@ -67,76 +67,12 @@ public class AtmosphereSettings : ScriptableObject
              "kuruluyor, bu değer yalnızca en yükseğin tavana çarpmaması için var: " +
              "gerçek kümülonimbus troposferin tepesine kadar çıkar.")]
     public float cloudTop = 7000f;
-    [Tooltip("Kümülonimbusun (fırtına bulutu) erişebileceği kalınlık (metre). " +
-             "Gerçekte 10 km'yi aşar; oyun ölçeğinde zirveyi (5686 m) ezmeyecek " +
-             "kadar tutulur.")]
-    public float cumulonimbusHeight = 3800f;
-    [Tooltip("Bulut tepesinin inebileceği en alçak seviye, katman kalınlığının oranı. " +
-             "PİŞİRME girdisi: hava haritasının tavan kanalına işlenir, çalışma anında " +
-             "okunmaz. Değiştirince harita yeniden pişirilmeli (To The Summit menüsü).")]
-    [Range(0.15f, 1f)] public float cloudTopFloor = 0.55f;
 
-    [Header("Hava haritası (pişirme)")]
-    [Tooltip("Haritanın deterministik tohumu. Aynı tohum aynı gökyüzü dağılımını üretir.")]
-    public int weatherMapSeed = 86;
-    [Tooltip("Haritanın dünya periyodu (metre). Ufuk pusu 45 km'de kapandığı için 48 km " +
-             "döşeme tekrarı görünmez; görünürse büyütülür, pişirme maliyeti değişmez.")]
-    public float weatherMapWorldSize = 48000f;
-    [Tooltip("Tek çekirdeğin en büyük yarıçapı (metre). Dev bulut boyunun ana vidası: " +
-             "birleşmeler bunun 2-3 katına çıkabilir. " +
-             "1600 m iken bulutlar boylarıyla aynı ölçüdeydi (3.2 km çap, 2-3 km boy) ve " +
-             "top gibi duruyordu. Gerçek kümülüs enine yatıktır: 5-6 km çap, 1.5-2.5 km " +
-             "boy. Kapsama %100'de birleşmelerle 10 km'yi aşan kütleler çıkıyor.")]
-    [Range(1200f, 4500f)] public float coreRadiusMax = 2800f;
-    [Tooltip("İstif tavanı: bulutlu bölgelerde çekirdeklerin ne kadar sık dizilebildiği. " +
-             "Yükseldikçe birleşme artar — devasa kütleler buradan doğar.")]
-    [Range(0.3f, 0.95f)] public float corePacking = 0.95f;
-    [Tooltip("Boşluk serpintisi: harita boşluklarına düşen tek tük bulut payı. " +
-             "0 = boşluklar bomboş; yükseldikçe boş/dolu farkı silinir. " +
-             "0.35'te boşluklara düşen küçük çekirdekler ekranda FUTBOL TOPU gibi " +
-             "duruyordu: eni birkaç yüz metre, boyu bir kilometre. Gerçek gökyüzünde " +
-             "boşluk boşluktur, serpinti azdır.")]
-    [Range(0f, 0.5f)] public float packingFloor = 0.1f;
-    [Tooltip("Yama penceresi: organizasyon alanının bulutlu saydığı eşik. Küçük değer " +
-             "bulutlu bölgeleri genişletir, büyük değer boşluk payını artırır.")]
-    [Range(0.30f, 0.60f)] public float patchWindow = 0.35f;
-    [Tooltip("Çekirdek alan bütçesi: toplam çekirdek alanının harita alanına ORANI. " +
-             "1 = çekirdekler haritayı bir kez örtecek kadar (örtüşmeler yüzünden " +
-             "görünür doluluk ~%63). Üstü doyurur: 4 iken her nokta dört çekirdeğin " +
-             "altında kalıyor, kapsama kanalı her yerde 1'e yapışıyor ve gökyüzü ayrı " +
-             "bulut değil tek levha oluyordu.")]
-    [Range(0.15f, 1.6f)] public float coreDensity = 0.9f;
 
     [Header("Bulut biçimi")]
-    [Tooltip("Kütle dokusunun dünya ölçeği. 1/değer = tekrar periyodu.")]
-    public float cloudScale = 0.00035f;
-    [Tooltip("Aşındırma dokusunun ölçeği. Yüksek frekans: bulutun ince yapısı buradan gelir.")]
-    public float detailScale = 0.0011f;
-    [Range(0f, 1f)] public float detailStrength = 0.4f;
-    [Tooltip("Büyük ölçekli bulut oktavının payı. İki ölçek ortalanmaz, en büyüğü alınır: " +
-             "ortalamak ikisini de silip gökyüzünü tek boy bulutla dolduruyordu. Sıfırda " +
-             "yalnızca küçük bulutlar kalır; bire yaklaştıkça devasa kütleler baskınlaşıp " +
-             "gökyüzünü ele geçirir. Karışım aradadır.")]
-    [Range(0f, 1f)] public float largeCloudWeight = 1f;
-    [Tooltip("Curl bükümünün gücü (metre). Aşındırma dokusunun okunduğu koordinat " +
-             "ıraksamasız bir alanla kaydırılır: kenarlarda burgulu türbülans. Tabanda " +
-             "güçlü, tepeye doğru söner — alt kenarların rüzgârla taranmış hâli.")]
-    public float curlStrength = 240f;
-    [Tooltip("Rüzgâr makaslaması: üst katmanlar alta göre kayar, bulutlar dikey sıvanmaz.")]
-    [Range(0f, 1f)] public float shearAmount = 0.6f;
-    [Tooltip("Rüzgâr yönünün katman boyunca dönmesi (derece). Gerçek atmosferde " +
-             "sürtünme yerdeki rüzgârı saptırır, yükseldikçe düzelir (Ekman spirali): " +
-             "bulutun tepesi tabanına göre hem kayar hem DÖNER. 0 = tüm katmanlar aynı " +
-             "yönde, kütleler burulmadan öteler.")]
-    [Range(0f, 90f)] public float shearTurnDegrees = 28f;
     [Tooltip("Bulut yönünün rüzgâra uyum süresi (saniye). Kısa tutulursa bulut kütlesi " +
              "yer rüzgârıyla birlikte savrulur.")]
     public float headingSmoothing = 240f;
-    [Tooltip("Metre başına sönümleme katsayısı. Adım başına biriken optik derinlik bunun " +
-             "adım boyuyla çarpımıdır ve ~0.2'yi aşarsa bulut bir-iki adımda opaklaşıp her " +
-             "adım sınırı ekranda dilim olarak görünür. 700 m kalınlıkta bir kümülüsün " +
-             "opaklaşması için 0.006 civarı doğru; on katı bulutu hacim değil duvar yapar.")]
-    public float densityScale = 0.00735f;
     [Tooltip("Yer rüzgârının bulut hızına çarpanı. Yüksekteki rüzgâr yerdekinden güçlü: " +
              "yerde 10 m/s esen rüzgâr iki kilometre yukarıda 20 m/s dolayında. Katsayı " +
              "birin altındayken bulutlar yer rüzgârından yavaş gidiyordu, kendi " +
@@ -150,47 +86,9 @@ public class AtmosphereSettings : ScriptableObject
     public float minCloudSpeed = 30f;
     [Tooltip("Bulut biçimlerinin değişme hızı. Sıfırsa bulutlar yalnızca öteler, şekil değiştirmez.")]
     public float evolutionSpeed = 0.0015f;
-    [Tooltip("Konvektif yükselme hızı (m/s). Bulut kütlesi yerden gelen ısıyla yükselir: " +
-             "tomurcuklar tabandan doğup yukarı tırmanır. Gündüz güçlü, gece söner — " +
-             "yükselmenin kaynağı ısınan zemindir.")]
-    [Range(0f, 3f)] public float convectiveRise = 0.9f;
-    [Tooltip("Fırtınada bulutun kalınlaşma oranı. 1 = yağıştan bağımsız sabit kalınlık.")]
-    [Range(1f, 4f)] public float stormDensityBoost = 2.4f;
 
-    [Header("Yüksek irtifa katmanı")]
-    [Tooltip("Sirrus/alto katmanının açık havadaki varlığı. Hacimsel katmanın çok " +
-             "üstünde, ince: ışın yürüyüşü yerine tek kesişimle çizilir.")]
-    [Range(0f, 1f)] public float highCloudClear = 0.45f;
-    [Tooltip("Fırtınada varlığı. Yaklaşan cephenin önü sirrusla kaplanır; sonra " +
-             "hacimsel katman kalınlaştıkça zaten görünmez olur.")]
-    [Range(0f, 1f)] public float highCloudStorm = 0.8f;
-    [Tooltip("Cinsi: 0 sirrus (tüy çizgileri) · 0.5 altokümülüs (benek tarlası) · " +
-             "1 altostratus (düz levha).")]
-    [Range(0f, 1f)] public float highCloudType = 0.25f;
-    [Tooltip("Katmanın kotu (metre). Hacimsel tavanın belirgin üstünde olmalı.")]
-    public float highCloudAltitude = 9000f;
-    [Tooltip("Dünya ölçeği. 1/değer = tekrar periyodu; 0.00004 ≈ 25 km.")]
-    public float highCloudScale = 0.00004f;
 
     [Header("Bulut kalitesi")]
-    [Tooltip("Adım boyunu belirler: taban adım = 2000 / bu sayı. Maliyetin ana kaynağı, " +
-             "ve dilimlenmenin de: adım boyu × yoğunluk ölçeği ~0.2'yi aşmamalı.")]
-    [Range(16, 128)] public int raymarchSteps = 110;
-    [Tooltip("Işık yönünde örnek sayısı. İkinci en pahalı kalem.")]
-    [Range(2, 8)] public int lightSteps = 4;
-    [Tooltip("Bu mesafenin ötesinde ince aşındırma dokusu okunmaz; bir pikselden küçük kalır.")]
-    public float detailDistance = 9000f;
-    [Tooltip("Işın başlangıcını dağıtan Bayer kaymasının gücü. 1'de desen ekrana ham basılıp " +
-             "bulutlar dama tahtası gibi görünür; 0'da desen yok ama adım kafesi kenarlarda " +
-             "basamak bırakır.")]
-    [Range(0f, 1f)] public float cloudDither = 0.2f;
-    [Tooltip("Kenar yumuşatması. Eşiğin alt ucunu örnekleme ölçeğiyle aşağı açar: kenarlar " +
-             "yumuşar, ama her bulutun çevresinde zayıf bir zar kalır.")]
-    [Range(0f, 1f)] public float cloudEdgeSoften = 0.6f;
-    [Tooltip("Işın adımının iki katına çıktığı mesafe (metre). Küçük değer ufka yetişir ama " +
-             "uzaktaki adımı kalınlaştırıp dilimlenmeyi geri getirir; büyük değer dilimi " +
-             "keser, menzili kısaltır.")]
-    public float stepGrowthDistance = 2300f;
     [Tooltip("Görüş mesafesinin kaç katında bulut tamamen atmosfere karışır. Bulutlar " +
              "kilometrelerce yukarıda ve havanın o yüksekliği daha berrak.")]
     [Range(2f, 12f)] public float hazeVisibilityFactor = 5.5f;
@@ -202,18 +100,6 @@ public class AtmosphereSettings : ScriptableObject
              "tam karışıma girer ve kaybolur — belirgin şekilde uzun tutulur.")]
     public float maxHazeDistance = 55000f;
 
-    [Tooltip("SANAT YÖNÜ: elle boyanmış hava haritası. Kanallar üretilenle aynı anlamı " +
-             "taşır — R kapsama, G tip, B taban kayması, A tavan. Boş bırakılırsa " +
-             "yalnız üretilen harita kullanılır. Boyanacak taban dosyayı " +
-             "'To The Summit/Hava Haritasını PNG Olarak Dışa Aktar' üretir. " +
-             "Dokunun Read/Write Enabled olması şart.")]
-    public Texture2D artDirectionMap;
-
-    [Tooltip("Elle boyanmış haritanın payı. 0 = tamamen üretilen, 1 = tamamen boyanan. " +
-             "Harman PİŞİRMEDE yapılır: kaba sıçrama haritası sonuçtan türediği için " +
-             "çalışma zamanında harmanlamak sıçramayı yalancı yapar ve boyanmış " +
-             "bulutun üstünden atlar. Çalışma zamanı maliyeti sıfır.")]
-    [Range(0f, 1f)] public float artDirectionBlend;
 
     [Tooltip("Bulut küresinin yarıçapı (metre). Denizin ufka değdiği mesafe sqrt(2·R·Δh) " +
              "ve buradaki Δh gözün DENİZ ÜSTÜNDEKİ payı — zirvede topu topu birkaç yüz " +
@@ -230,37 +116,6 @@ public class AtmosphereSettings : ScriptableObject
              "düşüyor ve yanı başındaki bulut çizilmiyordu.")]
     public float minHazeDistance = 16000f;
 
-    [Header("Bulut aydınlatma")]
-    [Tooltip("Güneşe bakan kenarlardaki gümüş parlama. Yüksek değer beyaz kontur yapar.")]
-    [Range(0f, 1f)] public float rimStrength = 0.08f;
-    [Tooltip("Beer's-Powder etkisinin gücü: ışığa BAKAN kenarların koyulaşması. " +
-             "Gerçek bulutlarda yüzeye yakın noktaya çevreden saçılan ışık az gelir; " +
-             "bu terim olmadan bulutlar yıkanmış beyaz görünür. Yalnız güneş arkadayken " +
-             "okunur — güneşe bakarken gümüş kenar hâkimdir.")]
-    [Range(0f, 1f)] public float powderStrength = 0.75f;
-    [Tooltip("Gökyüzünden gelen dağınık ışığın şiddeti. Bulutun genel aydınlığı.")]
-    [Range(0f, 2f)] public float cloudAmbient = 0.42f;
-    [Tooltip("Bulut altının en düşük aydınlığı. Yükseldikçe altlar aydınlanır ama hacim " +
-             "hissi ışık-gölge farkından doğduğu için form da düzleşir: 0.35'te bulutlar " +
-             "havada uçan beyaz levhalara dönüyordu.")]
-    [Range(0f, 1f)] public float ambientFloor = 0.15f;
-    [Tooltip("Kütleden kütleye renk sıcaklığı farkı.")]
-    [Range(0f, 0.6f)] public float massWarmth = 0.35f;
-    [Tooltip("Kütleden kütleye parlaklık farkı.")]
-    [Range(0f, 0.8f)] public float massBrightness = 0.35f;
-    [Tooltip("Işık sondasının menzili (metre). Kısa = ışık derine işler, uzun = gövde " +
-             "kararır. Katman kalınlığından bağımsız: gölgeyi belirleyen bulutun kendi " +
-             "kalınlığıdır (~1-2 km), katmanın toplam yüksekliği değil.")]
-    [Range(200f, 3000f)] public float lightProbeMeters = 1200f;
-    [Tooltip("Çoklu saçılma gücü. 0 = tek saçılma, gövde simsiyah kalır. Yüksek değer " +
-             "ışığı derine taşır ama kontrastı da yıkar; hacmi görünür kılan şey o kontrast.")]
-    [Range(0f, 1f)] public float multiScatter = 0.6f;
-    [Tooltip("Yağışta ışık soğurmasının artışı. Yağmur bulutu gözle görülür şekilde " +
-             "kararır: fırtına ağırlaşır, kütlenin altı kurşuni olur. 0 = yağış rengi " +
-             "etkilemez.")]
-    [Range(0f, 3f)] public float rainAbsorption = 1.6f;
-    [Tooltip("Şafak ve batımda buluta binen sıcak tonun gücü. Rengin kendisi TimeOfDay'den gelir.")]
-    [Range(0f, 1f)] public float duskCloudStrength = 0.6f;
 
     [Header("Yükseklik sisi")]
     [Tooltip("Açık havada yoğunluğun yarıya indiği yükseklik farkı (metre). Katmanın " +
