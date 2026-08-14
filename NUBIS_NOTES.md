@@ -294,7 +294,21 @@ Bizde bulutlar ~4 ms tutuyordu (bisikletde 280 FPS, gökyüzünde 130). **On kat
 Örnekleme deseni seyrek `[N22 s.81]`: ekran, aralıklı piksellerden oluşan bir ızgarayla
 örnekleniyor (her kare her piksel değil).
 
-*(Ayrıntısı ve yeniden yansıtma sonraki sayfalarda.)*
+**Ucuz boşluk testi** `[N22 s.90]` — 3B gürültüye hiç dokunmadan:
+
+```hlsl
+float cloud_coverage      = GetCloudCoverageSample(sample_position);  // 1 doku okuması
+float vertical_profile    = GetVerticalProfile(sample_position);      // 2 doku okuması
+float dimensional_profile = vertical_profile * cloud_coverage;        // 1 çarpma
+
+if (dimensional_profile < density_threshold) return 0.0;
+```
+
+Yani bizim "kaba eleme"nin karşılığı: üç 2B okuma + bir çarpma. Sıçrama haritası,
+genişletme, üst sınır türetme yok — profil zaten kolonun tamamını tarif ettiği için
+eşiği doğrudan test edebiliyorlar.
+
+*(Yeniden yansıtma sonraki sayfalarda.)*
 
 ---
 
@@ -312,6 +326,16 @@ bizim bildiğimiz eksiklerden yapıldı; bilmediklerimiz burada birikir. Kaynak 
 
 **Katman kotları 256 m – 2048 m** `[N22 s.20]`, insan figürüyle ölçeklenmiş. Kalınlık
 1792 m. 2015'te 1500–4000 m'ydi; alçalmış ve incelmiş.
+
+**BİZİM SENARYOMUZUN BÖLÜMÜ: "Environments"** `[N22 s.84+]`. Amaçlar: açık dünya,
+performanslı, detaylı. Konusu **orografik bulutlar** `[N22 s.88-93]` — dağa yaslanan,
+zirveden bayrak gibi savrulan, dağın beline halka gibi oturan bulutlar. Kaynak yine
+Clausse & Facy'nin 1961 kitabı; "cloud banner on the side of a mountain" fotoğrafı
+doğrudan bizim oyunumuzun görüntüsü.
+
+Bu bölüm "The Envelope Model" ile devam ediyor `[N22 s.94]` — repo'nun README'sinde
+"Not Included" dediği **local clouds** bu olsa gerek. Bizim dağ senaryomuz için asıl
+kaynak burası.
 
 **Cirrus için AYRI model: 2.5-D** `[N22 s.62-67]`. NDF'i yalnız iki kanal (kapsama,
 tip). Yoğunluk üç 2B dokunun tiple harmanı — `cr_streaky`, `cr_wispy`, `cr_round`:
@@ -357,7 +381,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
-| `[N22]` nubis-2022 | **207** | s.1–82 | s.83–207 |
+| `[N22]` nubis-2022 | **207** | s.1–94 | s.95–207 |
 | `[H18]` haggstrom-2018 | **~100** | — | s.1–100 |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
