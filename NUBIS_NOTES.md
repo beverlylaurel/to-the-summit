@@ -289,7 +289,23 @@ bıçak sınırlı görüntünün sebebiydi.
 Bizde `CloudShadowAt` gökyüzüyle aynı alandan besleniyordu. Makalelerde ayrı bir gölge
 haritası mı pişiriliyor, yoksa aynı alan mı okunuyor?
 
-> *(cevap)*
+**`[H18 s.64]` — bölüm 6.2.4, LİMİTASYONLAR başlığı altında.** Yani çözülmüş değil,
+kabul edilmiş bir kısıt:
+
+> *"Uygulanan aşırı yeniden yansıtma optimizasyonu yüzünden bulutların içinden geçerken
+> ciddi görsel kalite sorunları çıkıyor. Sebep, piksellerin kare hızından yavaş
+> güncellenmesi ve bir sonraki karede pikselin temsil ettiği bulut kameranın arkasında
+> kaldığında yeniden yansıtmanın yetmemesi. Yalnız en son işlenmiş pikselleri seçerek
+> çözmek mümkün ama bu sefer kalite düşer, çünkü bulutlar çeyrek çözünürlükte
+> işleniyor."*
+
+**`[N22]`'nin cevabı farklı ve daha iyi:** mesafe tamponu + bulutun kendi hareketini
+yeniden yansıtmaya katmak (soru 8). H18'de bu yok, o yüzden kısıt olarak kalmış.
+
+**Bizim için sonuç:** kameranın buluttan geçmesi, çeyrek çözünürlük + yeniden yansıtma
+ile YAPISAL olarak çelişiyor. İki seçenek var — ya `[N22]`'nin hareket-farkındalıklı
+yansıtması kurulur, ya da bulut tam çözünürlükte yürünür (`[N22]` PS5'te bunu yapıyor).
+Bizim eski `downsample = 4` + harmansız birleştirme kararı ikisinin de dışındaydı.
 
 ## 11. Hava haritası kanalları ve nasıl sürüldükleri
 
@@ -956,6 +972,82 @@ Gerekçe: yoğunluk düşükken ışın tam opaklığa varamıyor ve **bütün a
 `g_d = 0.1`'de süre 5 ms — `g_d = 1`'dekinin iki katı. Her örneğin katkısı azaldığı için
 adım uzatılabilir.
 
+### `[H18]` yoğunluk düşükken adımı uzat — tablo `[H18 s.51, Tablo 4]`
+
+```
+step_new = step_orig × 1 / max(g_d, div_min)^0.8
+```
+
+| `div_min` | süre | görsel |
+|---|---|---|
+| kullanılmıyor | 5.00 ms | `g_d = 1`'dekinin iki katı |
+| 0.1 | 0.90 ms | aşırı gürültü |
+| 0.2 | 1.50 ms | hâlâ çok belirgin |
+| 0.3 | 2.00 ms | biraz belirgin |
+| **0.4** | **2.50 ms** | **gürültünün çoğu gitti — SEÇİLEN** |
+
+### Bulut TİPLERİ yalnız hava haritası + iki sürgüyle `[H18 s.53-57]`
+
+Dört tip de aynı sistemden, **yalnız hava haritası ve iki küresel sayı** değişerek:
+
+| tip | değişiklik | `g_c` | `g_d` |
+|---|---|---|---|
+| Kümülüs | yok (temel harita) | 0.6 | 1.0 |
+| Stratokümülüs | yok | 0.8 | 0.5 |
+| Stratus | yükseklik kanalı merkezde koyulaştırılmış (ince bulut) | 1.0 | 0.35 |
+| Kalın stratus | iki kapsama kanalı da beyaz (tam) | 1.0 | 0.2 |
+| Kümülonimbus | seyrek haritada merkeze büyük noktalar, yoğun harita çevrede kısılmış | 1.0 | 1.0 |
+
+**Yoğunluk sürgüsü tipi belirliyor**: kapsama yüksek + yoğunluk düşük = stratus levhası;
+ikisi de yüksek = kümülonimbus. Bizde bu ilişki hiç kurulmamıştı.
+
+### Aydınlatma varsayılanları — TAM LİSTE `[H18 s.58]`
+
+| ayar | değer |
+|---|---|
+| Beer terimi `b` | **6** |
+| İçe saçılma `in_s` | 0.2 |
+| Dışa saçılma `out_s` | 0.1 |
+| İçe/dışa oranı `ivo` | 0.5 |
+| Ek gümüş kenar şiddeti `cs_i` | 2.5 |
+| Ek gümüş kenar üssü `cs_e` | 2 |
+| Ambient dışa saçılma `os_a` | 0.9 |
+| Sönüm kelepçesi `a_c` | 0.2 |
+| Asgari sönüm ambient `a_min` | 0.2 |
+
+**Batım/şafak** `[H18 s.59]`: yalnız üç sayı değişiyor — `in_s` 0.2→**0.5**,
+`cs_i` 2.5→**8**, `cs_e` 2→**15**. Gerisi aynı.
+
+**Gece** `[H18 s.60]`: aydınlatma ayarlarında **hiçbir değişiklik yok**; yalnız ışık
+kaynağı ay oluyor (daha mavi, düşük şiddet).
+
+Bizde gece için ayrı renk zinciri, `duskCore`, `duskWide`, `duskOverlap` gibi terimler
+vardı. Burada üç sayı yetiyor.
+
+### Performans — tip başına `[H18 s.61, Tablo 5]`
+
+| tip | 1920×1080 | 960×540 |
+|---|---|---|
+| Kümülüs | 2.05 ms | 0.85 ms |
+| Stratokümülüs | 2.20 ms | 0.90 ms |
+| Stratus | 1.90 ms | 0.80 ms |
+| Kümülonimbus | 2.00 ms | 0.85 ms |
+
+Her ikisinde de yeniden yansıtma açık (efektif çeyrek çözünürlük).
+
+### `[H18]` neyi YAPMADI `[H18 s.63-65]`
+
+- **Curl gürültüsü kullanılmamış** — performans için. Gerekçe: Schneider'in bulutları
+  yerinde hareket ediyor, curl ona hareket katıyor; bu uygulamada bulutlar rüzgâr yönünde
+  gittiği için curl'ün önemi az.
+- **Bulutun farklı parçaları farklı hızda hareket edemiyor** — dönen fırtına zor.
+- **Bulutlar bir katmana bağlı** — hortum yere kadar inemiyor.
+- **Orta ve yüksek irtifa bulutları yok** — yalnız alçak katman. Yüksek irtifa için
+  "görüntü tabanlı bir çözüm üstte" öneriliyor.
+- **Hava haritalarının hepsi ELLE ÇİZİLMİŞ.** Gelecek iş olarak bir üretici öneriliyor.
+- **Ayrı bir hava sistemine bağlanmak GELECEK İŞ olarak listelenmiş** — yani onlar da
+  bulutu önce bağımsız kurup sonra bağlamayı planlamış. Bizim v1 kuralımızı doğruluyor.
+
 ---
 
 ## Okuma defteri
@@ -967,12 +1059,12 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
 | `[N17]` nubis-2017 | **108** | — | s.1–108 |
 | `[N22]` nubis-2022 | **207** | **s.1–207 TAMAM** | — |
-| `[H18]` haggstrom-2018 | **81** | s.1–60 | s.61–81 |
+| `[H18]` haggstrom-2018 | **81 basılı / PDF daha uzun** | PDF s.1–80 (basılı 1–68) | ekler: Ek A parametreler, **Ek B KOD** |
 
 **Toplam ~514 sayfa, okunan 80.** Kalan 434.
 
-`[H18]` **81 sayfa** — sayfa altbilgisinden (`1(81)`) doğrulandı. PDF sayfası = basılı
-sayfa + 12 (önsöz kayması).
+`[H18]` **81 BASILI sayfa**; PDF sayfası = basılı + 12, yani PDF ~93 sayfa. Basılı 68
+(kaynakça sonu) = PDF 80. **Ekler (A parametreler, B KOD) PDF 81'den sonra.**
 
 `[N15]`'in atlanan kısımları da okunacak — s.1–17 giriş, s.88+ optimizasyon bölümü.
 Bugün ortadan girilip ortada bırakılmıştı.
