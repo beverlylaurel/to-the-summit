@@ -1271,7 +1271,12 @@ float4 RaymarchClouds(float3 origin, float3 direction, float2 pixel, float maxDi
             // Buluta girerken faz o ANKİ adıma göre kaydırılıyor: pikseller bulutun ön
             // yüzüne farklı yerlerden giriyor, kabuklar hizalanacak ortak faz bulamıyor.
             // Örnek sayısı değişmiyor — bedeli yok.
-            float entry = dither * nominalStep;
+            // PAY YARIM ADIM. Tam adım kaydırma halkaları bastırdı ama bulutun ön
+            // yüzünde gren bıraktı: komşu pikseller yüzeye farklı derinliklerden girince
+            // alfa farkı doğrudan piksellenme olarak okunuyor (zamansal harman yok, bkz.
+            // `VolumetricClouds.shader`). Yarım pay halkayı yine kırıyor çünkü kabuk
+            // hizalanması için gereken şey ortak faz; grenin genliği ise yarıya iniyor.
+            float entry = dither * nominalStep * 0.5;
             travelled += entry;
             samplePoint += direction * entry;
             continue;
