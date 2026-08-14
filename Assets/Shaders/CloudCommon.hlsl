@@ -660,9 +660,14 @@ float CloudDensity(float3 position, bool cheap, float distance, float stepSize,
         // sonuç şuydu: bulut kütlesi yerinde duruyor, kenarları sürünüyordu. Bulut
         // hızı yavaşlatılınca bu iyice belli oldu — "bulutlar hareket etmiyor ama
         // kenarları çok hızlı değişiyor". İnce yapı da aynı hava kütlesinin parçası.
+        // KAYNAMA SÜRÜKLENMENİN GERİSİNDE. Çarpanlar 2.1/3.0/1.6 iken ince yapının
+        // yerinde değişme hızı (0.009 birim/s) sürüklenmeyle (0.017 birim/s) aynı
+        // mertebedeydi: göz bunu "kütle duruyor, kenarlar kaynıyor" diye okuyor. Beşte
+        // birine indirilince ötelenme baskın kalıyor, bulut gidiyor ve giderken yavaşça
+        // değişiyor.
         float3 detailUvw = drifted * _DetailScale
                          + curl * _CloudCurlStrength * (1.0 - saturate(span)) * _DetailScale
-                         + float3(_Evolution * 2.1, _Evolution * 3.0, _Evolution * 1.6);
+                         + float3(_Evolution * 0.42, _Evolution * 0.6, _Evolution * 0.32);
         float3 detail = SAMPLE_TEXTURE3D_LOD(_DetailNoise, sampler_DetailNoise, detailUvw,
                                              CloudSampleLod(stepSize, _DetailScale, _DetailNoiseTexels)).rgb;
         float erosionFbm = detail.r * 0.625 + detail.g * 0.25 + detail.b * 0.125;
