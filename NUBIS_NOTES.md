@@ -1314,6 +1314,78 @@ cloud_with_coverage = remap(noise, cloud_coverage, 1.0, 0.0, 1.0)
 > bulutun uzaydaki bir kapsama gradyanı boyunca genişliyor ya da büzülüyor görünmesini
 > sağlar."*
 
+### `[N17]` hareket — ve BÜYÜK YAPI KIPIRDAMIYOR
+
+`[N17 s.45]` iki satır:
+
+```
+p += wind_direction * time_offset;                    // sürüklenme
+p += height_fraction * wind_direction * 500.0;         // yükseklikle kesme (skew)
+```
+
+Ama asıl önemli olan konuşmacı notunda:
+
+> *"Genel şekiller değişmiyor, ama detaylar değişiyor. Çünkü yoğunluk modelindeki
+> gürültü animasyonlu, **kapsama sinyali DEĞİL**. Bizim için bu, prototip sistemimizden
+> önemli bir sapma: simüle edilmiş bir gök yerine SANAT YÖNLENDİRMELİ bulut manzaraları
+> kurarken, bulut manzarasının daha büyük yapısını değiştirmeden yalnız değişiyormuş
+> gibi GÖRÜNMELERİNİ istiyoruz."*
+
+**Bizim "bulutlar hareket etmiyor, sadece kenarları kaynıyor" kavgamızın kaynağı bu
+ayrım.** Onlarda büyük yapı bilerek sabit; yalnız gürültü akıyor. Bizde ikisi de
+akıyordu ve hangisinin ne yaptığı belirsizdi.
+
+### Örs `[N17 s.46-50]`
+
+```
+coverage = pow(coverage, remap(height, 0.7, 0.8, 1.0, lerp(1.0, 0.5, anvil_bias)));
+```
+
+Kapsama sinyali katmanın tepesine yaklaşırken **üs alınarak şişiriliyor**. Ayrıca
+rüzgâr vektörüne "doğal olmayan ama havalı görünen" bir varyasyon ekleyip örsleri
+eğiyorlar.
+
+**Horizon'da gönderilen sürüm yalnız ALÇAK bulutları modelliyor**; sirrus için 2B doku
+okuması kullanılıyor `[N17 s.50]`.
+
+### CLOUD MAP — bizim hava haritamızın karşılığı `[N17 s.53-59]`
+
+- **RGB tampon**, kapsadığı alan **~100 km²** (yani ~10×10 km). Bizimki 48×48 km'ydi.
+- **R ve G kanalları = kapsama.** İkisi farklı gürültü:
+  - **R = Perlin** → *"birbirine BAĞLI bulut oluşumları"*
+  - **G = Perlin-Worley** → *"aralarında bağ dokusu olan, daha çok ADA benzeri ayrık
+    biçimler"*
+  - Sanatçı hangisini istiyorsa yoğunluk örnekleyicisinde o kullanılıyor.
+- **B kanalı = tip.** 0 stratus · 0.5 stratokümülüs · 1 kümülüs.
+
+**Nasıl kuruluyor** `[N17 s.54-56]`:
+1. Tüm harita %100 kapsamayla başlıyor
+2. **Alçak frekanslı gürültü** kapsamayı modüle ediyor — *"hava kütlelerinin örtüştüğü
+   ve bulut oluşmasına izin verilen büyük bölgeleri"* simüle ediyor
+3. **Birkaç yüksek frekanslı gürültü** üstüne bindiriliyor — bulutların ayak izleri
+
+Kaynak: Clausse & Facy 1961, *The Clouds* — bulut oluşumları **iki veya daha fazla hava
+kütlesinin örtüştüğü yerde** oluşur; sıcak kütledeki buhar soğuk kütleye değince
+yoğunlaşır.
+
+### WEATHER STATE — harita + küresel sabitler `[N17 s.60]`
+
+```
+Cloud Map ("Cloudy")  ──→  Weather State ("Cloudy, Windy")
+                              · Skew
+                              · Anvil Shapes
+                              · Movement Speed
+                              · Movement Direction
+                              · Cloud Density
+```
+
+> *"Bunlar her örnekte AYNI ele alınıyor, o yüzden Cloud Map'te saklanmalarına gerek
+> yoktu."*
+
+Temiz bir ayrım: **konuma göre değişen veri haritada, her yerde aynı olan sabitler
+hava durumunda.** Bizim `AtmosphereSettings` + hava haritası ayrımımızın olması gereken
+hâli bu.
+
 ---
 
 ## Okuma defteri
@@ -1323,7 +1395,7 @@ Kesintisiz olmalı. Boşluk = okunmamış sayfa.
 | makale | toplam | okunan | eksik |
 |---|---|---|---|
 | `[N15]` nubis-2015 | **99** | s.18–87 | **s.1–17, s.88–99** |
-| `[N17]` nubis-2017 | **108** | s.1–40 | s.41–108 |
+| `[N17]` nubis-2017 | **108** | s.1–61 | s.62–108 |
 | `[N22]` nubis-2022 | **207** | **s.1–207 TAMAM** | — |
 | `[H18]` haggstrom-2018 | **93 PDF / 81 basılı** | **PDF s.1–93 TAMAM** | — |
 
