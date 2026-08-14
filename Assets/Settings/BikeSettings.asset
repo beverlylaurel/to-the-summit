@@ -13,14 +13,14 @@ MonoBehaviour:
   m_Name: BikeSettings
   m_EditorClassIdentifier: Assembly-CSharp::BikeSettings
   mass: 100
-  steadyPower: 230
-  sprintPower: 400
+  steadyPower: 320
+  sprintPower: 520
   maxDriveForce: 400
-  rollingResistance: 0.03
+  rollingResistance: 0.022
   dragArea: 0.72
   airDensity: 1.2
   brakeDeceleration: 5
-  comfortMaxSpeed: 10
+  comfortMaxSpeed: 14
   maxLean: 25
   maxYawRate: 120
   leanSmoothing: 0.25
