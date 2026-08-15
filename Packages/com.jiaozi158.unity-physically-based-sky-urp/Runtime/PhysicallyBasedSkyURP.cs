@@ -918,7 +918,13 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 // `ComputeEarthshine` uyguluyor, yani evre ve dünya parıltısı geliyor.
                 // `sunDirection` evre hesabı için güneşin yönü.
                 bool hasMoon = MoonLight != null && MoonLight.isActiveAndEnabled && MoonLight.intensity > 0.0f;
+
+                // GLOBAL OLARAK DA YAZILIYOR: `AtmosphericScattering.hlsl`'i bulut
+                // birleştirme geçişi de kullanıyor ve o materyalde bu alan yok. Yalnız
+                // materyale yazılırsa bulut tarafında sayaç sıfır kalıyor ve hava
+                // perspektifi hiç uygulanmıyor.
                 material.SetInt(_CelestialBodyCount, hasMoon ? 2 : 1);
+                Shader.SetGlobalInt(_CelestialBodyCount, hasMoon ? 2 : 1);
 
                 if (hasMoon)
                 {

@@ -162,10 +162,14 @@ void EvaluatePbrAtmosphere(float3 positionPS, half3 V, float distAlongRay, bool 
 
         skyOpacity = 1 - TransmittanceFromOpticalDepth(optDepth); // from 'tEntry' to 'tFrag'
 
-        //for (uint i = 0; i < _CelestialLightCount; i++)
+        // PROJE EKİ: döngü açıldı. ASIL YOL BURASI — `LOCAL_SKY` tanımlıyken gökyüzü
+        // sky-view LUT'undan değil bu analitik yürüyüşten geliyor. Tek cisimken gökyüzü
+        // yalnız güneşi görüyordu; ölçüldü, 19:17'de `probe tepe` tam sıfır (güneş 0.022),
+        // 19:20'de 0.0154 (güneş 0.003). Zemin bloğu ayı zaten sayıyordu, o yüzden
+        // `probe taban` hep aydınlıktı — fark tam olarak buradaydı.
+        for (uint bi = 0; bi < _CelestialBodyCount; bi++)
         {
-            //CelestialBodyData light = _CelestialBodyDatas[i];
-            CelestialBodyData light = GetCelestialBody(0);
+            CelestialBodyData light = GetCelestialBody(bi);
             half3 L = -light.forward.xyz;
 
             // The sun disk hack causes some issues when applied to nearby geometry, so don't do that.

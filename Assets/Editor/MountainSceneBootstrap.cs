@@ -1253,6 +1253,16 @@ public static class MountainSceneBootstrap
         moon.type = LightType.Directional;
         moon.shadows = LightShadows.None;
 
+        // URP EK VERİSİ ELLE EKLENİYOR. Unity bu bileşeni yalnız ışık MENÜDEN
+        // eklendiğinde otomatik koyuyor; `AddComponent<Light>()` koymuyor. Bulut gölge
+        // geçişi ana ışığın cookie ayarlarını buradan okuyor ve yoksa
+        // `NullReferenceException` atıyor — gece ana ışık aya geçtiğinde oluyordu.
+        if (moon.GetComponent<UniversalAdditionalLightData>() == null)
+        {
+            moonObject.AddComponent<UniversalAdditionalLightData>();
+            changed = true;
+        }
+
         timeOfDay.Bind(sun, moon);
         EditorUtility.SetDirty(timeOfDay);
         EditorUtility.SetDirty(moon);
