@@ -389,6 +389,22 @@ public class DebugMenu : MonoBehaviour
         GUILayout.Label($"güneş {time.SunIntensity:F2} · ay {time.MoonIntensity:F3}");
         GUILayout.Label($"ay disk parlaklığı: {PhysicallyBasedSkyURP.MoonDiskBrightness:F3}");
 
+        // ÖLÇÜM: ekranın ORTASININ baktığı yön ve o yönün gök cisimleriyle ilişkisi.
+        // Siyah bölgeye ve aydınlık bölgeye nişan alıp iki okuma alınınca, farkın hangi
+        // terimde olduğu hesapla bulunabiliyor.
+        var view = Camera.main;
+        if (view != null)
+        {
+            Vector3 forward = view.transform.forward;
+            Vector3 moonDir = -time.SunDirection;
+
+            float elevation = Mathf.Asin(Mathf.Clamp(forward.y, -1f, 1f)) * Mathf.Rad2Deg;
+
+            GUILayout.Label($"bakış {forward.x:F2} {forward.y:F2} {forward.z:F2} · yükseklik {elevation:F0}°");
+            GUILayout.Label($"aya açı {Vector3.Angle(forward, moonDir):F0}° · güneşe açı {Vector3.Angle(forward, time.SunDirection):F0}°");
+            GUILayout.Label($"kamera kotu {view.transform.position.y:F0} m");
+        }
+
         EndSection();
 #endif
     }
