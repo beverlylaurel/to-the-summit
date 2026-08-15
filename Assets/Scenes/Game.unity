@@ -963,6 +963,8 @@ MonoBehaviour:
   snowProbe: {fileID: 798857321}
   routeOverlay: {fileID: 2018777761}
   cloudVolume: {fileID: 832575518}
+  cloudDriver: {fileID: 1147612207}
+  skyDriver: {fileID: 1147612208}
 --- !u!4 &813786006
 Transform:
   m_ObjectHideFlags: 0
@@ -1227,6 +1229,7 @@ GameObject:
   - component: {fileID: 1147612206}
   - component: {fileID: 1147612205}
   - component: {fileID: 1147612207}
+  - component: {fileID: 1147612208}
   m_Layer: 0
   m_Name: CloudLayerProbe
   m_TagString: Untagged
@@ -1278,6 +1281,24 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CloudWeatherDriver
   cloudVolume: {fileID: 832575518}
   wind: {fileID: 1805896805}
+  weatherDriver: {fileID: 1805896804}
+  atmosphere: {fileID: 1805896809}
+  settings: {fileID: 11400000, guid: 5613d208323b5cf43b7685c32873c812, type: 2}
+--- !u!114 &1147612208
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1147612204}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5cca52fc2b8a59449b0f9da8a1bb13c7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkyWeatherDriver
+  skyVolume: {fileID: 832575518}
+  weather: {fileID: 1805896806}
+  settings: {fileID: 11400000, guid: cc853f85f6a00f9459360765aea23ccd, type: 2}
 --- !u!1 &1233237509
 GameObject:
   m_ObjectHideFlags: 0
