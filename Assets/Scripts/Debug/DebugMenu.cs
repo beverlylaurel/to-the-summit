@@ -448,8 +448,18 @@ public class DebugMenu : MonoBehaviour
 
         Color top = ProbeResults[0];
         Color bottom = ProbeResults[1];
-        GUILayout.Label($"probe tepe {top.r:F3} {top.g:F3} {top.b:F3}");
-        GUILayout.Label($"probe taban {bottom.r:F3} {bottom.g:F3} {bottom.b:F3}");
+
+        // ÜÇ ONDALIK YETMİYOR: öğlen zenit 0.114 iken fiziksel bir alacakaranlık binde bir
+        // mertebesindedir ve `F3` onu sıfır gösterir. Parlaklık ayrıca EV cinsinden de
+        // yazılıyor — öğleye göre kaç durak aşağıda olduğu tek bakışta görülsün diye.
+        float topLuminance = top.r * 0.2126f + top.g * 0.7152f + top.b * 0.0722f;
+        const float NoonZenith = 0.148f;
+
+        GUILayout.Label($"probe tepe {top.r:F5} {top.g:F5} {top.b:F5}");
+        GUILayout.Label($"probe taban {bottom.r:F5} {bottom.g:F5} {bottom.b:F5}");
+        GUILayout.Label(topLuminance > 1e-7f
+            ? $"tepe parlaklık {topLuminance:F5} · öğlenin {Mathf.Log(topLuminance / NoonZenith, 2f):F1} EV altı"
+            : "tepe parlaklık TAM SIFIR");
     }
 
     void DrawCloudErosion()
