@@ -303,7 +303,6 @@ public class TimeOfDay : MonoBehaviour
             moon.color = moonColor;
             moon.intensity = moonIntensity * MoonBlend(MoonDirection.y);
         }
-        }
 
         // Güneş yüksekliği GLOBAL olarak da yayınlanır. Materyal property'si olarak
         // taşınan sürüm arazi shader'ında gece kapısını kapatmadı (kar pırıltısı gece
