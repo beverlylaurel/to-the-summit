@@ -38,6 +38,7 @@ half _CloudNearPlane;
 float4 _CloudMapTiling;
 half _CloudCoverage;
 half _AnvilAmount;
+half _ExtinctionCoefficient;
 CBUFFER_END
 
 // Ambient Probe (unity_SH)
@@ -52,6 +53,12 @@ half4 clouds_SHC;
 half _ImprovedTransmittanceBlend;
 float _PostExposure; // Exposure from the ColorAdjustments override
 half3 _SunColor;
+
+/// ÇAKMA. `LightningFlash` global olarak yazıyor: `_LightningFlash.rgb` o anki parlama,
+/// `_LightningPosition` = (dünya konumu xyz, leke yarıçapı w). Konum çakma başına bir kez
+/// yazılıyor, yani maske kare kare değişmiyor — `[N22 s.180]`'in titreme çaresi bu.
+float4 _LightningFlash;
+float4 _LightningPosition;
 
 #ifndef URP_PHYSICALLY_BASED_SKY_DEFINES_INCLUDED
 float4 _PlanetCenterRadius;

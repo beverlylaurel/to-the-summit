@@ -37,6 +37,7 @@ VolumetricRayResult TraceVolumetricRay(CloudRay cloudRay)
     VolumetricRayResult volumetricRay;
     volumetricRay.scattering = 0.0;
     volumetricRay.ambient = 0.0;
+    volumetricRay.glow = 0.0;
     volumetricRay.transmittance = 1.0;
     volumetricRay.meanDistance = FLT_MAX;
     volumetricRay.invalidRay = true;
@@ -192,6 +193,9 @@ VolumetricRayResult TraceVolumetricRay(CloudRay cloudRay)
 
                 volumetricRay.scattering = sunColor * volumetricRay.scattering;
                 volumetricRay.scattering += ambient * volumetricRay.ambient;
+
+                // Çakma üçüncü ışık kaynağı: rengi güneşin de ortamın da değil, kendisinin.
+                volumetricRay.scattering += _LightningFlash.rgb * volumetricRay.glow;
             }
         }
     }

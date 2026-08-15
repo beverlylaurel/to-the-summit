@@ -7,6 +7,7 @@ Shader "Hidden/Sky/VolumetricClouds"
         [HideInInspector] _CloudMapTiling("Cloud Map Tiling", Vector) = (0.0000208, 0.0000208, 0.0, 0.0)
         [HideInInspector] _CloudCoverage("Cloud Coverage", Float) = 0.9
         [HideInInspector] _AnvilAmount("Anvil Amount", Float) = 0.0
+        [HideInInspector] _ExtinctionCoefficient("Extinction Coefficient", Float) = 0.04
         [NoScaleOffset] _ErosionNoise("Erosion Noise Texture", 3D) = "white" {}
         [NoScaleOffset] _Worley128RGBA("Worley Noise Texture", 3D) = "white" {}
         [HideInInspector] _Seed("Private: Random Seed", Float) = 0.0
@@ -195,11 +196,6 @@ Shader "Hidden/Sky/VolumetricClouds"
 
             SAMPLER(s_linear_clamp_sampler);
 
-            /// ÇAKMA IŞIĞI. `LightningFlash` global olarak yazıyor, `.rgb` o anki parlama.
-            /// Burada BİLDİRİLİYOR çünkü bulut shader'ı `HeightFog.hlsl`'i include etmiyor;
-            /// etseydi iki bildirim çakışırdı.
-            float4 _LightningFlash;
-
             #pragma multi_compile_local_fragment _ _LOW_RESOLUTION_CLOUDS
 
             #include "./VolumetricCloudsUpscale.hlsl"
@@ -214,13 +210,6 @@ Shader "Hidden/Sky/VolumetricClouds"
             #else
                 half4 cloudsColor = SAMPLE_TEXTURE2D_X_LOD(_VolumetricCloudsLightingTexture, s_linear_clamp_sampler, screenUV, 0).rgba;
             #endif
-
-                // ŞİMŞEK KÜTLEYİ İÇERİDEN AYDINLATIR (bağ 6). Parlama bulut örtücülüğüyle
-                // çarpılıyor: kalın yerde güçlü, ince kenarda zayıf, açık gökte yok.
-                //
-                // Işın yürüyüşünün içine konamaz: yürüyüş kareye yayılı ve dörtte bir
-                // çözünürlükte, parlama blok blok titrer.
-                cloudsColor.xyz += _LightningFlash.rgb * (1.0 - cloudsColor.w);
 
                 return half4(cloudsColor.xyz, cloudsColor.w);
             }

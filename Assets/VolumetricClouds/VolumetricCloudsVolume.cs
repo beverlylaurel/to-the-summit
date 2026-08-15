@@ -64,6 +64,17 @@ public class VolumetricClouds : VolumeComponent, IPostProcessComponent
     public ClampedFloatParameter densityMultiplier = new(0.4f, 0.0f, 1.0f);
 
     /// <summary>
+    /// SÖNÜM KATSAYISI: birim yoğunlukta metre başına sönüm (m⁻¹). Işın boyunca
+    /// `exp(−yoğunluk × katsayı × adım)` olarak uygulanıyor.
+    ///
+    /// Büyüdükçe bulut opaklaşıyor ve kontrast artıyor `[N22 s.164]`. Makaledeki
+    /// 5/10/20 karşılaştırması normalize yolda ölçülmüş, metre cinsine doğrudan
+    /// çevrilemez; portun 0.04'ü varsayılan olarak korundu.
+    /// </summary>
+    [Tooltip("Birim yoğunlukta metre başına sönüm (m⁻¹). Büyüdükçe bulut opaklaşır, kontrast artar.")]
+    public ClampedFloatParameter extinctionCoefficient = new(0.04f, 0.005f, 0.2f);
+
+    /// <summary>
     /// Controls the larger noise passing through the cloud coverage. A higher value will yield less cloud coverage and smaller clouds.
     /// </summary>
     [Tooltip("Controls the larger noise passing through the cloud coverage. A higher value will yield less cloud coverage and smaller clouds.")]

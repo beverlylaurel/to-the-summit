@@ -454,6 +454,7 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
         private static readonly int cloudMapTiling = Shader.PropertyToID("_CloudMapTiling");
         private static readonly int cloudCoverage = Shader.PropertyToID("_CloudCoverage");
         private static readonly int anvilAmount = Shader.PropertyToID("_AnvilAmount");
+        private static readonly int extinctionCoefficient = Shader.PropertyToID("_ExtinctionCoefficient");
         private static readonly int cloudnearPlane = Shader.PropertyToID("_CloudNearPlane");
         private static readonly int sunColor = Shader.PropertyToID("_SunColor");
         private static readonly int planetCenterRadius = Shader.PropertyToID("_PlanetCenterRadius");
@@ -653,6 +654,7 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
             cloudsMaterial.SetVector(cloudMapTiling, new Vector4(cloudMapPeriod, cloudMapPeriod, 0.0f, 0.0f));
             cloudsMaterial.SetFloat(cloudCoverage, cloudsVolume.cloudCoverage.value);
             cloudsMaterial.SetFloat(anvilAmount, cloudsVolume.anvilAmount.value);
+            cloudsMaterial.SetFloat(extinctionCoefficient, cloudsVolume.extinctionCoefficient.value);
 
             float postExposureLinear = colorAdjustments != null && colorAdjustments.active ? Mathf.Pow(2.0f, colorAdjustments.postExposure.value) : 1.0f;
             cloudsMaterial.SetFloat(postExposure, postExposureLinear);
