@@ -35,6 +35,15 @@ public class TimeOfDay : MonoBehaviour
         set => sunIntensity = value;
     }
 
+    /// Ayın tepe şiddeti. Güneşle AYNI ışığa yazılıyor, yani gökyüzü paketi geceleyin ayı
+    /// güneş yerine koyup atmosferi ondan aydınlatıyor. Değer ışık zinciri süzülüyorken
+    /// ayarlanmıştı; ham ışığa geçince `LowSunFade` çarpanı düştü ve gece parlaklaştı.
+    public float MoonIntensity
+    {
+        get => moonIntensity;
+        set => moonIntensity = value;
+    }
+
 
 
     public event Action<TimeOfDay> Changed;

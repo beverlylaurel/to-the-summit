@@ -76,6 +76,7 @@ public class DebugMenu : MonoBehaviour
     VisualEnvironment visualEnvironment;
     bool detachSkyFromWeather;
     float sunIntensityDefault;
+    float moonIntensityDefault;
 #endif
 
     /// Acilistaki degerler: her satirin ↺'u ve "Bulut ayarlarini geri al" buradan okuyor.
@@ -166,6 +167,7 @@ public class DebugMenu : MonoBehaviour
         CaptureDefaults(visualEnvironment);
 
         sunIntensityDefault = time.SunIntensity;
+        moonIntensityDefault = time.MoonIntensity;
         detachSkyFromWeather = skyDriver != null && !skyDriver.enabled;
 #endif
 
@@ -374,6 +376,11 @@ public class DebugMenu : MonoBehaviour
         float sun = CloudRow("Güneş şiddeti (tepe)", time.SunIntensity, sunIntensityDefault, 0f, 6f, "F2");
         if (!Mathf.Approximately(sun, time.SunIntensity)) time.SunIntensity = sun;
 
+        // Ay aynı ışığa yazılıyor: paket geceleyin atmosferi ondan aydınlatıyor ve bulut
+        // yolu `× π` ile ölçeklediği için buluta araziden ~3 kat fazla giriyor.
+        float moon = CloudRow("Ay şiddeti (tepe)", time.MoonIntensity, moonIntensityDefault, 0f, 0.4f, "F3");
+        if (!Mathf.Approximately(moon, time.MoonIntensity)) time.MoonIntensity = moon;
+
         // ÖLÇÜM: ışığa GERÇEKTEN yazılan şiddet ve renk. Tepe değerinden farkı bizim
         // kendi atmosfer süzmemiz (`BeamLevel` ve `CurrentSunColor`). Paket bu ışığı
         // okuyup üstüne kendi transmittance'ını uyguluyor — fark büyükse atmosfer iki
@@ -407,6 +414,7 @@ public class DebugMenu : MonoBehaviour
             RestoreDefaults(sky);
             RestoreDefaults(visualEnvironment);
             time.SunIntensity = sunIntensityDefault;
+            time.MoonIntensity = moonIntensityDefault;
         }
 
         EndSection();
