@@ -21,7 +21,19 @@ public class TimeOfDay : MonoBehaviour
     [Tooltip("Atmosfer dışındaki ham güneş rengi. Şafak tonu bundan türetilir, ayrıca " +
              "seçilmez — süzülme hesabı yapar.")]
     [SerializeField] Color sunColor = new(1f, 0.97f, 0.92f);
-    [SerializeField] Color moonColor = new(0.62f, 0.70f, 0.92f);
+    // AY ALBEDOSU — atmosferden GEÇMEDEN önceki hâli. Doğan ayın fazla turuncu olması
+    // bundan geliyordu ve hesabı şu:
+    //
+    // Zenit optik derinliği hava yoğunluklarımızdan: R 0.046 · G 0.108 · B 0.265.
+    // Ay 10°'deyken hava kütlesi ~5.6 kat, geçirgenlik R 0.77 · G 0.55 · B 0.23.
+    //
+    //   0.62 0.70 0.92 → 10°'de 1.00 0.80 0.43 · zenitte 0.84 0.89 1.00
+    //   0.52 0.64 1.00 → 10°'de 1.00 0.87 0.56 · zenitte 0.65 0.75 1.00
+    //
+    // Tam telafi (0.29 0.42 1.00) turuncuyu bitirir ama tepedeki ayı mora çeker. Yarı
+    // yol seçildi: doğan ayın mavisi 0.43'ten 0.56'ya çıkıyor, tepedeki ay ise fazla
+    // soğumuyor.
+    [SerializeField] Color moonColor = new(0.52f, 0.64f, 1.00f);
     // 3.030782 gökyüzü paketinin kalibrasyonu: 100000 lux yer aydınlığı. Sahne kurulumu
     // da bunu yazıyor, ikisi ayrışmasın diye varsayılan burada da güncellendi.
     [SerializeField] float sunIntensity = 3.030782f;

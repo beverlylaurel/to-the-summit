@@ -429,6 +429,10 @@ public static class MountainSceneBootstrap
         // atmosferi ondan hesaplıyor; ortam probe'u da o gökyüzünden pişiyor. Değer göz
         // kararı bulundu, gerçek ay parlaklığının karşılığı değil.
         timeOfDay.MoonIntensity = 0.204f;
+
+        // Ay albedosu. Doğan ay atmosferden geçerken sarıya kayıyordu; taban soğutuldu.
+        // Hesap `TimeOfDay.moonColor` yorumunda.
+        timeOfDay.MoonColor = new Color(0.52f, 0.64f, 1.00f, 1f);
     #endif
 
         // Debug menüsünde olduğu gibi her çalışmada yeniden bağlanır
