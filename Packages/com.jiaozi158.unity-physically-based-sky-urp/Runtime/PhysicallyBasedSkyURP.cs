@@ -923,7 +923,11 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             // `type = 1` ay demek; shader o zaman `ComputeMoonPhase` ve
             // `ComputeEarthshine` uyguluyor, yani evre ve dünya parıltısı geliyor.
             // `sunDirection` evre hesabı için güneşin yönü.
-            bool hasMoon = MoonLight != null && MoonLight.isActiveAndEnabled && MoonLight.intensity > 0.0f;
+            // AYNI IŞIK İKİ CİSİM OLAMAZ. Ana ışık aya çözüldüğü karelerde ay hem birinci
+            // (güneş parametreleriyle: 0.5° disk, 2° parıltı) hem ikinci cisim olarak
+            // çiziliyordu — diskin yanında ayrı bir parıltı beliriyordu.
+            bool hasMoon = MoonLight != null && MoonLight.isActiveAndEnabled
+                        && MoonLight.intensity > 0.0f && mainLight != MoonLight;
 
             // SAYAÇ VE İKİNCİ CİSMİN TÜM ALANLARI GLOBAL. `AtmosphericScattering.hlsl`'i
             // bulut birleştirme geçişi de kullanıyor ve o materyalde bu alanlar yok.
@@ -973,8 +977,12 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 Shader.SetGlobalVector(_CelestialBody2_SurfaceColor, moonSurfaceColor);
                 Shader.SetGlobalFloat(_CelestialBody2_Earthshine, 1.0f * 0.01f);
                 Shader.SetGlobalVector(_CelestialBody2_SurfaceTextureScaleOffset, Vector4.zero);
+                // EVRE GÜNEŞİN YÖNÜNDEN, ANA IŞIĞINKİNDEN DEĞİL. Ana ışık aya çözülünce
+                // `sunDirection` ayın kendi yönü oluyor, `ComputeMoonPhase` sıfıra
+                // düşüyor ve diskin çekirdeği simsiyah kalıyordu.
+                Light sunForPhase = RenderSettings.sun != null ? RenderSettings.sun : mainLight;
                 Shader.SetGlobalVector(_CelestialBody2_SunDirection,
-                    mainLight != null ? mainLight.transform.forward : Vector3.forward);
+                    sunForPhase != null ? sunForPhase.transform.forward : Vector3.forward);
                 Shader.SetGlobalFloat(_CelestialBody2_FlareCosInner, moonFlareCosInner);
                 Shader.SetGlobalFloat(_CelestialBody2_FlareCosOuter, Mathf.Cos(moonAngularRadius + moonFlareSize));
                 Shader.SetGlobalFloat(_CelestialBody2_FlareSize, moonFlareSize);
