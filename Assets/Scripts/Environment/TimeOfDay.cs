@@ -35,15 +35,7 @@ public class TimeOfDay : MonoBehaviour
         set => sunIntensity = value;
     }
 
-    /// TEŞHİS ANAHTARI. Açıkken ışığa HAM güneş yazılıyor: kendi atmosfer süzmemiz
-    /// (`Tint`, `BeamLevel`, `LowSunFade`) atlanıyor ve soğurmayı yalnız gökyüzü paketi
-    /// yapıyor.
-    ///
-    /// Sebebi ölçüldü: öğlen ışığa `şiddet 2.55 · renk 1.00 0.88 0.70` yazılıyordu, yani
-    /// mavi kanal daha kaynakta 0.70'e inmişti. Paket bunun üstüne kendi transmittance'ını
-    /// uyguluyor ve Rayleigh'in en çok saçtığı kanal iki kez kesiliyor — öğlen gökyüzünün
-    /// lacivert kalmasının sebebi bu.
-    public bool RawSunlight { get; set; }
+
 
     public event Action<TimeOfDay> Changed;
 
@@ -239,21 +231,22 @@ public class TimeOfDay : MonoBehaviour
             Vector3 lightSource = sunShare > 0.5f ? SunDirection : MoonDirection;
             sun.transform.rotation = Quaternion.LookRotation(-lightSource);
 
-            if (RawSunlight)
-            {
-                // Ham güneş: yalnız ufkun ALTINDA sönüyor (ışık yukarıdan gelmiyor),
-                // atmosferik soğurma yok. Geri kalanı paketin işi.
-                float above = Mathf.Clamp01(SunDirection.y * 4f);
-                sun.color = Color.Lerp(moonColor, sunColor, sunShare);
-                sun.intensity = sunShare > 0.5f
-                    ? sunIntensity * above
-                    : moonIntensity * MoonLevel;
-            }
-            else
-            {
-                sun.color = Color.Lerp(MoonLight, CurrentSunColor, sunShare);
-                sun.intensity = sunPower + moonPower;
-            }
+            // IŞIĞA HAM GÜNEŞ YAZILIYOR. Atmosferik soğurmanın tek sahibi gökyüzü paketi:
+            // paket ışığı okuyup üstüne kendi transmittance'ını uyguluyor, bizim
+            // süzmemiz de uygulansaydı aynı atmosfer iki kez soğururdu.
+            //
+            // ÖLÇÜLDÜ: öğlen ışığa `şiddet 2.55 · renk 1.00 0.88 0.70` yazılıyordu. Mavi
+            // kanal daha kaynakta 0.70'e iniyordu ve Rayleigh'in en çok saçtığı kanal iki
+            // kez kesiliyordu — öğlen gökyüzünün lacivert kalmasının sebebi buydu.
+            //
+            // `above` ATMOSFERİK DEĞİL, GEOMETRİK: güneş ufkun altındayken ışık yukarıdan
+            // gelmiyor. Kızıllık ve sönüm paketin işi, bu yalnız gece arazinin güneş
+            // almasını engelliyor.
+            float above = Mathf.Clamp01(SunDirection.y * 4f);
+            sun.color = Color.Lerp(moonColor, sunColor, sunShare);
+            sun.intensity = sunShare > 0.5f
+                ? sunIntensity * above
+                : moonIntensity * MoonLevel;
         }
 
         // Güneş yüksekliği GLOBAL olarak da yayınlanır. Materyal property'si olarak

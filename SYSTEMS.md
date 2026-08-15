@@ -952,6 +952,19 @@ gökyüzünden alıyor: gezegen merkezi ve yarıçapı, ambient probe, hava pers
 brief'in şartı — uzak dağ, silüet ve bulut aynı atmosferik perdeden geçiyor. Gök yansıması
 da bulut materyalini alıyor, yani yansımada gök varsa bulut da var.
 
+**SOĞURMANIN TEK SAHİBİ PAKET.** Yönlü ışığa HAM güneş yazılıyor — `TimeOfDay`'in kendi
+süzmesi (`Tint`, `BeamLevel`, `LowSunFade`) ışığa uygulanmıyor. Paket ışığı okuyup üstüne
+kendi transmittance'ını koyuyor; bizimki de uygulansaydı aynı atmosfer iki kez soğururdu.
+Ölçülmüştü: öğlen ışığa `şiddet 2.55 · renk 1.00 0.88 0.70` yazılıyordu, mavi kanal
+kaynakta 0.70'e iniyordu ve gökyüzü lacivert kalıyordu.
+
+Işıktaki tek kısıcı `above` ve o ATMOSFERİK DEĞİL, GEOMETRİK: güneş ufkun altındayken ışık
+yukarıdan gelmiyor.
+
+`Atmosphere` modeli SİLİNMEDİ — ışığa değil, başka tüketicilere bakıyor: sis rengi, bulut
+tonu, arazi şafak rengi (`TerrainSurface`) ve pozlama uyumu (`LookController`). Kendi
+yükseklik sisimiz durduğu sürece o zincir de duruyor.
+
 **Hava bağı.** `SkyWeatherDriver` yalnız bir şey çeviriyor: yağış şiddeti → `aerosolDensity`
 (aerosol sütununun zenit opaklığı, 0.006 temiz ↔ 0.069 fırtına). Güneşin yönü ve rengi
 BURADAN GEÇMİYOR — `TimeOfDay` ana ışığı sürüyor, paket aynı ışığı okuyor. İkinci bir yol

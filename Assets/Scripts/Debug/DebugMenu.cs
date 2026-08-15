@@ -378,14 +378,7 @@ public class DebugMenu : MonoBehaviour
         // kendi atmosfer süzmemiz (`BeamLevel` ve `CurrentSunColor`). Paket bu ışığı
         // okuyup üstüne kendi transmittance'ını uyguluyor — fark büyükse atmosfer iki
         // kez soğuruyor demektir.
-        // İZOLASYON: kendi atmosfer süzmemizi atlar, soğurmayı yalnız pakete bırakır.
-        bool raw = GUILayout.Toggle(time.RawSunlight, "Ham güneş (soğurmayı paket yapsın)");
-        if (raw != time.RawSunlight) time.RawSunlight = raw;
 
-        Color lit = time.CurrentSunColor;
-        GUILayout.Label($"ışığa yazılan: şiddet {time.LightIntensity:F2} · " +
-            $"renk {lit.r:F2} {lit.g:F2} {lit.b:F2}");
-        GUILayout.Label($"süzme kaybı: {(time.SunIntensity > 0f ? time.LightIntensity / time.SunIntensity : 0f):P0}");
 
         CloudSlider("Pozlama (EV)", sky.exposure, -5f, 5f, "F2");
         CloudSlider("Parlaklık çarpanı", sky.multiplier, 0f, 4f, "F2");
