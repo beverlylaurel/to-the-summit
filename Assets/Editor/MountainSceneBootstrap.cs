@@ -1283,7 +1283,13 @@ public static class MountainSceneBootstrap
         }
 
         moon.type = LightType.Directional;
-        moon.shadows = LightShadows.None;
+
+        // AY GÖLGE DÜŞÜRÜYOR ve bu gerekli: paketin `GetMainLight`'ı gölgesiz cismi ana
+        // ışık saymayıp `RenderSettings.sun`'a düşüyor. Gökyüzü saçılımı tek cisimden
+        // geldiği için ay ana ışık olamazsa gece göğü hiç aydınlanmıyor.
+        //
+        // URP yalnız ana ışığın gölgesini çiziyor, yani iki gölge kaynağı oluşmuyor.
+        moon.shadows = LightShadows.Soft;
 
         // GÜNEŞ BİLEŞENDEN AYIRT EDİLİYOR, ADDAN DEĞİL. Sahnede ÜÇ yönlü ışık var:
         // güneş, ay ve şimşek. Eskiden yalnız ay adı eleniyordu ve `FindObjectsByType`
