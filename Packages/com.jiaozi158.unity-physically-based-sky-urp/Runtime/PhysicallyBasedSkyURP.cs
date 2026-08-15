@@ -464,6 +464,14 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
 
         private static readonly int _DisableSunDisk = Shader.PropertyToID("_DisableSunDisk");
 
+        // PROJE EKİ: gok cismi diskini disaridan gizleme anahtari. Alacakaranlikta isigin
+        // YONU ufukta kirpiliyor (yoksa paket gogu sifirla carpiyor ve gece bir anda
+        // basliyor), ama disk o zaman batmayi birakip ufukta yatay kayiyor. Bu global
+        // diski susturuyor; gok glow'u kaliyor, disk gitmis oluyor.
+        private static readonly int _HideCelestialBody = Shader.PropertyToID("_HideCelestialBody");
+
+        private static bool IsCelestialBodyHidden() => Shader.GetGlobalFloat(_HideCelestialBody) > 0.5f;
+
         private static readonly int _HasGroundAlbedoTexture = Shader.PropertyToID("_HasGroundAlbedoTexture");
         private static readonly int _GroundAlbedoTexture = Shader.PropertyToID("_GroundAlbedoTexture");
 
@@ -650,7 +658,7 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             using (new ProfilingScope(cmd, m_ProfilingSampler))
             {
                 bool isReflectionCamera = renderingData.cameraData.camera.cameraType == CameraType.Reflection;
-                cmd.SetGlobalFloat(_DisableSunDisk, isReflectionCamera ? 1.0f : 0.0f);
+                cmd.SetGlobalFloat(_DisableSunDisk, isReflectionCamera || IsCelestialBodyHidden() ? 1.0f : 0.0f);
                 cmd.SetGlobalVector(_MainLightColor, float4(mainLightColor, 0.0f));
                 cmd.EnableShaderKeyword(PHYSICALLY_BASED_SKY);
                 cmd.EnableShaderKeyword(SKY_NOT_BAKING);
@@ -694,7 +702,7 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
         {
             CommandBuffer cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            cmd.SetGlobalFloat(_DisableSunDisk, data.isReflectionCamera ? 1.0f : 0.0f);
+            cmd.SetGlobalFloat(_DisableSunDisk, data.isReflectionCamera || IsCelestialBodyHidden() ? 1.0f : 0.0f);
             cmd.SetGlobalVector(_MainLightColor, data.mainLightColor);
             cmd.EnableShaderKeyword(PHYSICALLY_BASED_SKY);
             cmd.EnableShaderKeyword(SKY_NOT_BAKING);

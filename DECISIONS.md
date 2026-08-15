@@ -1091,6 +1091,19 @@ mesafesi. Gökyüzü bunları bilmiyor; çeviriyi `SkyWeatherDriver` yapıyor.
 
 **Uyarı.** Brief 2016 ve 2020 katsayı setlerini ayrı tutmayı şart koşuyor; birleştirilmeyecek.
 
+## Gökyüzü paketine disk gizleme anahtarı eklendi
+
+**Karar.** Pakete `_HideCelestialBody` globali eklendi; `_DisableSunDisk`'i dışarıdan
+zorluyor. Paketin kaynağına dokunulan ikinci yer.
+
+**Gerekçe.** Alacakaranlıkta ışığın YÖNÜ ufukta kırpılıyor (paket gök parlaklığını ışığın
+kamera konumundaki transmittance'ıyla ölçeklediği için, cisim ufkun altına inince gök tam
+sıfır oluyor — ölçüldü, 36 dakika `0.000`). Ama yön kırpılınca disk de batmayı bırakıp
+ufukta yatay kayıyordu. Gök glow'u yönden, disk ayrı çiziliyor; ikisini ayırmak için
+paketin kendi anahtarı kullanıldı, yeni bir mekanizma yazılmadı.
+
+**Tetikleyici.** Paket güncellenirse kaybolur; belirti güneşin ufukta yatay kayması.
+
 ## Gökyüzü paketinde uyumluluk kipi kapatıldı
 
 **Karar.** `PhysicallyBasedSkyURP.cs`'teki beş `#region Non Render Graph Pass` bloğu
