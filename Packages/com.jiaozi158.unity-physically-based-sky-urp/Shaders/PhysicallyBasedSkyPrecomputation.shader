@@ -93,8 +93,15 @@ Shader "Hidden/Sky/PhysicallyBasedSkyPrecomputation"
                     }
                     */
 
+                    // PROJE EKİ: döngü açıldı. Tek cisimken gökyüzünü yalnız ana ışık
+                    // aydınlatıyordu; güneş −18°'de sıfırlanınca gök TAM SİYAH oluyor,
+                    // ana ışık aya geçince bir anda doluyordu. Ölçüldü: 19:12'de probe
+                    // 0.00000, 19:22'de 0.00228 — sıçrama tam da güneşin sıfırlandığı
+                    // anda. İki cismin katkısı toplanınca ayınki güneşinki sönerken
+                    // devralıyor ve sıçrama kalmıyor.
+                    for (uint bi = 0; bi < _CelestialBodyCount; bi++)
                     {
-                        CelestialBodyData light = GetCelestialBody(0);
+                        CelestialBodyData light = GetCelestialBody(bi);
                         half3 L = -light.forward.xyz;
 
                         const half3 sunTransmittance = EvaluateSunColorAttenuation(dot(N, L), r);
@@ -219,8 +226,15 @@ Shader "Hidden/Sky/PhysicallyBasedSkyPrecomputation"
                     }
                     */
 
+                    // PROJE EKİ: döngü açıldı. Tek cisimken gökyüzünü yalnız ana ışık
+                    // aydınlatıyordu; güneş −18°'de sıfırlanınca gök TAM SİYAH oluyor,
+                    // ana ışık aya geçince bir anda doluyordu. Ölçüldü: 19:12'de probe
+                    // 0.00000, 19:22'de 0.00228 — sıçrama tam da güneşin sıfırlandığı
+                    // anda. İki cismin katkısı toplanınca ayınki güneşinki sönerken
+                    // devralıyor ve sıçrama kalmıyor.
+                    for (uint bi = 0; bi < _CelestialBodyCount; bi++)
                     {
-                        CelestialBodyData light = GetCelestialBody(0);
+                        CelestialBodyData light = GetCelestialBody(bi);
                         half3 L = -light.forward.xyz;
 
                         const half3 sunTransmittance = EvaluateSunColorAttenuation(dot(N, L), r);
@@ -852,6 +866,22 @@ Shader "Hidden/Sky/PhysicallyBasedSkyPrecomputation"
                     // Compute color
                     half3 S = sunTransmittance * phaseScatter + multiScatteredLuminance * scatteringMS;
                     skyColor = IntegrateOverSegment(light.color * S, transmittanceOverSegment, skyTransmittance, sigmaE);
+                }
+
+                // PROJE EKİ: ikinci gök cismi (ay). Yukarıdaki blok `=` kullanıyor, yani
+                // döngüye çevrilemez; ay ayrıca EKLENİYOR. Gölge örneği yalnız ana ışığın
+                // cookie'sinden geliyor, ay için uygulanmıyor — ay gölgesi yok.
+                if (_CelestialBodyCount > 1)
+                {
+                    CelestialBodyData moon = GetCelestialBody(1);
+                    half3 Lm = -moon.forward.xyz;
+
+                    const half3 moonTransmittance = EvaluateSunColorAttenuation(dot(N, Lm), r);
+                    const half3 moonPhase = AirScatter(height) * AirPhase(-dot(Lm, V)) + AerosolScatter(height) * AerosolPhase(-dot(Lm, V));
+                    const half3 moonMultiScatter = EvaluateMultipleScattering(dot(N, Lm), height);
+
+                    half3 Sm = moonTransmittance * moonPhase + moonMultiScatter * scatteringMS;
+                    skyColor += IntegrateOverSegment(moon.color * Sm, transmittanceOverSegment, skyTransmittance, sigmaE);
                 }
                 
                 //skyColor = ParallelPostfixSum(s, skyColor);

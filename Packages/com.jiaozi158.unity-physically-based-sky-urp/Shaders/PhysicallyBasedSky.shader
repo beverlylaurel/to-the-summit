@@ -151,7 +151,11 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
                         half3 gBrdf = INV_PI * albedo;
 
                         {
-                            CelestialBodyData light = GetCelestialBody(0);
+                            // PROJE EKİ: zemin aydınlatması iki cisimden. Tek cisimken ay
+                            // yeri hiç aydınlatmıyordu.
+                            for (uint bi = 0; bi < _CelestialBodyCount; bi++)
+                            {
+                            CelestialBodyData light = GetCelestialBody(bi);
                             half3 L         = -light.forward.xyz;
                             half3 intensity = light.color.rgb;
 
@@ -163,6 +167,7 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
                         #endif
 
                             radiance += gBrdf * intensity;
+                            }
                         }
 
                         // TODO: Multiple Celestial Bodies
@@ -360,7 +365,11 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
                         half3 gBrdf = INV_PI * albedo;
 
                         {
-                            CelestialBodyData light = GetCelestialBody(0);
+                            // PROJE EKİ: zemin aydınlatması iki cisimden. Tek cisimken ay
+                            // yeri hiç aydınlatmıyordu.
+                            for (uint bi = 0; bi < _CelestialBodyCount; bi++)
+                            {
+                            CelestialBodyData light = GetCelestialBody(bi);
                             half3 L         = -light.forward.xyz;
                             half3 intensity = light.color.rgb;
 
@@ -372,6 +381,7 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
                         #endif
 
                             radiance += gBrdf * intensity;
+                            }
                         }
 
                         // TODO: Multiple Celestial Bodies

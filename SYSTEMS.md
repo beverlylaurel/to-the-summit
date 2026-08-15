@@ -980,9 +980,16 @@ anında disk 180° atlıyordu. Ölçmeye gerek yok, yapısal.
   Disk ana ışıktan bağımsız: evre ve dünya parıltısı paketin kendi hesabından
   (`ComputeMoonPhase`, `ComputeEarthshine`).
 
-**Ay gökyüzünü AYDINLATMIYOR.** Sky-view LUT tek ışıktan pişiyor; iki ışık için
-akümülasyon gerekiyor. Ay yalnız diski ve araziyi sürüyor. Gece göğü karanlık, manzara
-aylı — denizci alacakaranlığında gerçek tablo da budur.
+**AY GÖKYÜZÜNÜ DE AYDINLATIYOR.** Sky-view, çoklu saçılım ve hava perspektifi LUT'ları
+artık `_CelestialBodyCount` üzerinden iki cismi de topluyor; zemin aydınlatması da öyle.
+Tek cisimken sıçrama kaçınılmazdı ve ÖLÇÜLMÜŞTÜ: 19:12'de probe `0.00000`, 19:22'de
+`0.00228` — atlama tam da güneşin şiddetinin sıfırlandığı anda, çünkü gökyüzü o ana kadar
+güneşten sürülüyor, sonra aya geçiyordu. İki katkı toplanınca ayınki güneşinki sönerken
+devralıyor.
+
+**Bulutlar ayı YALNIZ ortam ışığından alıyor.** Bulut geçişinin tek yönlü ışığı var
+(`_SunColor`); gece ay bulutları doğrudan değil, gökyüzünden pişen ortam probe'u üzerinden
+aydınlatıyor. Yani ayda gümüş kenar yok.
 
 **Hava bağı.** `SkyWeatherDriver` yalnız bir şey çeviriyor: yağış şiddeti → `aerosolDensity`
 (aerosol sütununun zenit opaklığı, 0.006 temiz ↔ 0.069 fırtına). Güneşin yönü ve rengi
