@@ -70,6 +70,11 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
     /// ekranı kaplayan bir leke üretiyordu.
     public static float MoonDiskBrightness { get; set; } = 0.05f;
 
+    /// TEŞHİS — GEÇİCİ. Açıkken ay `type = 0` (güneş) olarak veriliyor: shader
+    /// `ComputeMoonPhase` ve `ComputeEarthshine` uygulamıyor. Zenitteki siyahlığın evre
+    /// hesabından gelip gelmediğini ayırmak için.
+    public static bool MoonAsPlainDisk { get; set; }
+
     /// TEŞHİS — GEÇİCİ. Paketin o an ne çözdüğü. Fasulye ve yıldız sorunu kapanınca silinecek.
     public static string ResolvedMainLightName { get; private set; } = "-";
     public static int ResolvedBodyCount { get; private set; }
@@ -1001,7 +1006,7 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 Shader.SetGlobalFloat(_CelestialBody2_AngularRadius, moonAngularRadius);
                 Shader.SetGlobalFloat(_CelestialBody2_Radius, Mathf.Tan(moonAngularRadius) * moonDistanceFromCamera);
                 Shader.SetGlobalVector(_CelestialBody2_Up, MoonLight.transform.up.normalized);
-                Shader.SetGlobalInt(_CelestialBody2_Type, 1);
+                Shader.SetGlobalInt(_CelestialBody2_Type, MoonAsPlainDisk ? 0 : 1);
                 Shader.SetGlobalVector(_CelestialBody2_SurfaceColor, moonSurfaceColor);
                 Shader.SetGlobalFloat(_CelestialBody2_Earthshine, 1.0f * 0.01f);
                 Shader.SetGlobalVector(_CelestialBody2_SurfaceTextureScaleOffset, Vector4.zero);

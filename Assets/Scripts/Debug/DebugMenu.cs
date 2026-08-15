@@ -334,6 +334,10 @@ public class DebugMenu : MonoBehaviour
             sky.spaceEmissionTexture.value = starsDisabled ? null : starTexture;
         }
 
+        bool plainMoon = GUILayout.Toggle(PhysicallyBasedSkyURP.MoonAsPlainDisk,
+            "6 — Ay evresiz (tip = güneş)");
+        PhysicallyBasedSkyURP.MoonAsPlainDisk = plainMoon;
+
         bool noMoonBody = GUILayout.Toggle(moonBodyDisabled, "5 — İkinci gök cismi KAPALI");
         if (noMoonBody != moonBodyDisabled)
         {
