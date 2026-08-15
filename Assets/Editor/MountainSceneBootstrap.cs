@@ -638,8 +638,10 @@ public static class MountainSceneBootstrap
 
         property.boolValue = true;
         serialized.ApplyModifiedPropertiesWithoutUndo();
-        feature.Create();
 
+        // `Create()` ÇAĞRILMIYOR: `_PHYSICALLY_BASED_SUN` anahtarı her karede
+        // `UpdateMaterialProperties` içinde bu bool'a bakılarak ayarlanıyor, kurulum
+        // gerektirmiyor. Elle çağırmak `Create()`'in içindeki hacim okumasında patlıyor.
         EditorUtility.SetDirty(feature);
         AssetDatabase.SaveAssets();
         AssetDatabase.ImportAsset(RendererPath);
