@@ -421,6 +421,7 @@ public class DebugMenu : MonoBehaviour
         GUILayout.Label($"ay {time.MoonLightIntensity:F3} × yük {time.MoonUp:F3}");
         GUILayout.Label($"yüzey ışığı {time.SurfaceLightLevel:F4}"
             + (lookController != null ? $" · uyum {lookController.CurrentAdapt:F2} EV" : ""));
+        GUILayout.Label($"paketin ana ışığı: {PhysicallyBasedSkyURP.ResolvedMainLightName}");
 
         CloudSlider("Pozlama (EV)", sky.exposure, -5f, 5f, "F2");
 

@@ -56,6 +56,9 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
     /// (ayrı bir yönlü ışık olarak) araziyi sürüyor.
     public static Light MoonLight { get; set; }
 
+    /// TEŞHİS: paketin o an ana ışık olarak çözdüğü cisim. Gökyüzü bundan sürülüyor.
+    public static string ResolvedMainLightName { get; private set; } = "-";
+
     private PBSkyPrePass m_PBSkyPrePass;
     private SkyViewLUTPass m_SkyViewLUTPass;
     private AtmosphericScatteringPass m_AtmosphericScatteringPass;
@@ -833,6 +836,8 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
 
             material.SetMatrix(_PlanetRotation, planetRotationMatrix);
             material.SetMatrix(_SpaceRotation, Matrix4x4.Rotate(spaceRotation));
+
+            ResolvedMainLightName = mainLight != null ? mainLight.gameObject.name : "YOK";
 
             if (mainLight != null)
             {
