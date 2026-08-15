@@ -20,6 +20,7 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             #include "./PhysicallyBasedSkyRendering.hlsl"
+            #include "Assets/Shaders/StarField.hlsl"
             #include "./PhysicallyBasedSkyEvaluation.hlsl"
             #include "./AtmosphericScattering.hlsl"
 
@@ -58,7 +59,6 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
 
             int _HasGroundAlbedoTexture;    // bool...
             int _HasGroundEmissionTexture;  // bool...
-            int _HasSpaceEmissionTexture;   // bool...
 
             half _GroundEmissionMultiplier;
             half _SpaceEmissionMultiplier;
@@ -74,7 +74,6 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
 
             TEXTURECUBE(_GroundAlbedoTexture);
             TEXTURECUBE(_GroundEmissionTexture);
-            TEXTURECUBE(_SpaceEmissionTexture);
 
             float4 RenderSky(float2 screenUV, float3 positionWS)
             {
@@ -198,13 +197,12 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
                 }
                 else if (tFrag == FLT_INF) // See the stars?
                 {
-                    UNITY_BRANCH
-                    if (_HasSpaceEmissionTexture)
-                    {
-                        // V points towards the camera.
-                        half4 ts = SAMPLE_TEXTURECUBE(_SpaceEmissionTexture, s_trilinear_clamp_sampler, mul(-V, (half3x3)_SpaceRotation));
-                        radiance += _SpaceEmissionMultiplier * ts.rgb;
-                    }
+                    // PROJE EKİ: yıldız alanı küp haritadan değil prosedürel üretiliyor.
+                    // Gerekçe ve sayılar `Assets/Shaders/StarField.hlsl` başında.
+                    // `-V` bakış yönü; hava kütlesi DÜNYA uzayındaki yükseklikten
+                    // hesaplanıyor, yıldız alanının dönüşünden değil.
+                    radiance += _SpaceEmissionMultiplier
+                              * EvaluateStarField(mul(-V, (half3x3)_SpaceRotation), -V.y);
                 }
 
                 float3 skyColor = 0, skyOpacity = 0;
@@ -245,6 +243,7 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
 
             #include "./PhysicallyBasedSkyRendering.hlsl"
+            #include "Assets/Shaders/StarField.hlsl"
             #include "./PhysicallyBasedSkyEvaluation.hlsl"
             #include "./AtmosphericScattering.hlsl"
 
@@ -285,7 +284,6 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
 
             int _HasGroundAlbedoTexture;    // bool...
             int _HasGroundEmissionTexture;  // bool...
-            int _HasSpaceEmissionTexture;   // bool...
 
             half _GroundEmissionMultiplier;
             half _SpaceEmissionMultiplier;
@@ -299,7 +297,6 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
 
             TEXTURECUBE(_GroundAlbedoTexture);
             TEXTURECUBE(_GroundEmissionTexture);
-            TEXTURECUBE(_SpaceEmissionTexture);
 
             float4 RenderSky(float2 screenUV, float3 positionWS)
             {
@@ -416,13 +413,12 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
                 }
                 else if (tFrag == FLT_INF) // See the stars?
                 {
-                    UNITY_BRANCH
-                    if (_HasSpaceEmissionTexture)
-                    {
-                        // V points towards the camera.
-                        half4 ts = SAMPLE_TEXTURECUBE(_SpaceEmissionTexture, s_trilinear_clamp_sampler, mul(-V, (half3x3)_SpaceRotation));
-                        radiance += _SpaceEmissionMultiplier * ts.rgb;
-                    }
+                    // PROJE EKİ: yıldız alanı küp haritadan değil prosedürel üretiliyor.
+                    // Gerekçe ve sayılar `Assets/Shaders/StarField.hlsl` başında.
+                    // `-V` bakış yönü; hava kütlesi DÜNYA uzayındaki yükseklikten
+                    // hesaplanıyor, yıldız alanının dönüşünden değil.
+                    radiance += _SpaceEmissionMultiplier
+                              * EvaluateStarField(mul(-V, (half3x3)_SpaceRotation), -V.y);
                 }
 
                 float3 skyColor = 0, skyOpacity = 0;

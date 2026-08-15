@@ -493,8 +493,6 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
         private static readonly int _GroundEmissionTexture = Shader.PropertyToID("_GroundEmissionTexture");
         private static readonly int _GroundEmissionMultiplier = Shader.PropertyToID("_GroundEmissionMultiplier");
 
-        private static readonly int _HasSpaceEmissionTexture = Shader.PropertyToID("_HasSpaceEmissionTexture");
-        private static readonly int _SpaceEmissionTexture = Shader.PropertyToID("_SpaceEmissionTexture");
         private static readonly int _SpaceEmissionMultiplier = Shader.PropertyToID("_SpaceEmissionMultiplier");
 
         private static readonly int _PlanetRotation = Shader.PropertyToID("_PlanetRotation");
@@ -841,8 +839,6 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             material.SetTexture(_GroundEmissionTexture, pbrSky.groundEmissionTexture.value);
             material.SetFloat(_GroundEmissionMultiplier, pbrSky.groundEmissionMultiplier.value);
 
-            material.SetInteger(_HasSpaceEmissionTexture, pbrSky.spaceEmissionTexture.value == null ? 0 : 1);
-            material.SetTexture(_SpaceEmissionTexture, pbrSky.spaceEmissionTexture.value);
             material.SetFloat(_SpaceEmissionMultiplier, pbrSky.spaceEmissionMultiplier.value);
 
             material.SetMatrix(_PlanetRotation, planetRotationMatrix);

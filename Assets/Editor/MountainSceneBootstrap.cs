@@ -807,23 +807,30 @@ public static class MountainSceneBootstrap
         // geçiyor.
         SetSky(pbrSky.atmosphericScattering, true);
 
-        // YILDIZLAR. Paket bunu yalnız uzaya bakarken ekliyor ve `(1 − skyOpacity)` ile
-        // çarpıyor: gündüz atmosfer opaklaştıkça kendiliğinden yıkanıyor, bulut örtüsünü
-        // de hacimsel bulutların kendisi kesiyor. Eski sistemin
-        // `(1−gündüz) × (1−kapsama)` kuralına gerek kalmadı.
+        // YILDIZLAR PROSEDÜREL. Küp harita silindi: 512'lik yüzde bir teksel 0.176°,
+        // ekranda bir piksel 0.047° — her yıldız zorunlu olarak dört piksel genişliğinde
+        // ve bilineer süzmeyle yumuşak bir lekeydi. Bir piksele inmek 2048'lik yüz, yani
+        // RGBAHalf'ta 201 MB isterdi. Ayrıca durağan doku TİTREYEMEZ.
+        // Üretim ve sayılar `Assets/Shaders/StarField.hlsl` başında.
         //
-        // ÇARPAN 0.08 — ölçülen gece göğüne göre seçildi ve sayılar ALGORİTMA
-        // ÇALIŞTIRILARAK doğrulandı, tahminle değil:
+        // ÇARPAN 0.08 → 0.55. Eski sayı gökyüzü BEŞ DURAK DAHA PARLAKKEN kurulmuştu ve
+        // ölçütü "en parlak yıldız gökten 12 kat parlak" idi. Ay fiziksel orana çekilince
+        // gök koyulaştı ama yıldızların MUTLAK seviyesi yerinde kaldı; oran 400 kata
+        // çıktı, buna karşın ekranda yıldızlar kayboldu. Oran yanlış ölçüttü: görünürlüğü
+        // gökle kıyas değil, yıldızın ekrandaki kendi seviyesi belirliyor.
         //
-        //   1500 örnekte çekilen en parlak kadir 0.68, bağıl parlaklığı 0.53 (1.0 değil —
-        //   kadir 0'a düşen yıldız yok, gerçek gökyüzünde de yok denecek kadar az).
-        //   0.08 çarpanıyla 0.043; gece zenit göğü 0.0036, yani en parlak yıldız gökten
-        //   12 KAT parlak. Nokta olarak seçiliyor, gökyüzünü yıkamıyor.
+        // Yeni ölçüt fiziksel: 6. KADİR ÇIPLAK GÖZÜN SINIRINDA OLMALI. Gece pozlaması
+        // ×2 (profil −1.5 EV + uyum tavanı 2.5 EV) alınarak kâğıtta:
         //
-        //   En sönük yıldız 0.0032 × 0.08 = 0.00032, göğün onda biri — görünmüyor,
-        //   olması gereken de bu (6. kadir çıplak gözle zaten sınırda).
-        SetSky(pbrSky.spaceEmissionTexture, StarFieldGenerator.EnsureExists());
-        SetSky(pbrSky.spaceEmissionMultiplier, 0.08f);
+        //   kadir 0–1  bağıl 1.00  → 0.55 × 2 = 1.10   → doygun nokta
+        //   kadir 2    bağıl 0.158 → 0.174             → sRGB ~0.42, belirgin
+        //   kadir 4    bağıl 0.025 → 0.0276            → sRGB ~0.19, sönük ama var
+        //   kadir 6    bağıl 0.004 → 0.0044            → sRGB ~0.08, tam sınırda
+        //
+        // GÜNDÜZ SOLMASI ARTIK AÇIKÇA YAZILI. Eskiden `(1 − skyOpacity)`in halledeceği
+        // varsayılmıştı; ölçüldü, yanlış — zenitte gündüz opaklık ~0.2 ve sabah 8'de
+        // gökyüzü yıldızlıydı. Solma güneş yüksekliğinden, kadire göre ayrı ayrı.
+        SetSky(pbrSky.spaceEmissionMultiplier, 0.55f);
 
         // PAKETİN SİSİ ŞİMDİLİK KAPALI. Kendi yükseklik sisimiz sis bankları, inversiyon
         // ve vadi sis denizi taşıyor; pakette bunların karşılığı yok. İkisi birlikte

@@ -64,6 +64,18 @@ public class SkyWeatherDriver : MonoBehaviour
         // ters yöne kayıyor — açının işareti bu yüzden negatif.
         sky.spaceRotation.value =
             Quaternion.AngleAxis(-time.Normalized * 360f, time.CelestialPole).eulerAngles;
+
+        // YILDIZLARIN GÜNDÜZ SOLMASI GÜNEŞ YÜKSEKLİĞİNDEN. Shader parlak yıldızı −3°'ye,
+        // en sönüğünü −18°'ye kadar bekletiyor; eşik kadire göre değişiyor.
+        //
+        // İKİNCİ BİR ZAMAN KAYNAĞI DEĞİL: değer `TimeOfDay`in güneş yönünden geliyor,
+        // yani gölgelerle ve gökyüzü hesabıyla aynı tek durumdan.
+        Shader.SetGlobalVector(StarFieldParamsId,
+            new Vector4(time.SunDirection.y, 0f, 0f, 0f));
 #endif
     }
+
+#if URP_PBSKY
+    static readonly int StarFieldParamsId = Shader.PropertyToID("_StarFieldParams");
+#endif
 }

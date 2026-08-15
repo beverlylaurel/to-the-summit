@@ -1228,88 +1228,50 @@ bir tanedir ve devir anında disk 180° atlıyordu. Bant ayarıyla yalnız yerin
 
 ## Gece tamamlandı: yıldızlar geldi, ay ikincil kaynak oldu
 
-**Yıldızlar.** `StarFieldGenerator` küp harita üretiyor, paketin `spaceEmissionTexture`
-girişine bağlanıyor. Paket onu yalnız uzaya bakarken ekliyor ve `(1 − skyOpacity)` ile
-çarpıyor.
+**Yıldızlar PROSEDÜREL (2026-08-16).** Önce `StarFieldGenerator` küp harita üretiyordu;
+silindi. Sebep ölçüldü: 512'lik yüzde bir teksel 0.176°, ekranda 1920px/90° FOV'da bir
+piksel 0.047°. Yani her yıldız zorunlu olarak dört piksel genişliğindeydi ve bilineer
+süzme onu 2×2 tekseline yayıp yumuşak lekeye çeviriyordu — "bulanık", "çok büyük",
+"pikselleşme" şikâyetlerinin üçü de bu tek sayıdan. Bir piksele inmek 2048'lik yüz, yani
+RGBAHalf'ta **201 MB** isterdi.
 
-**Eski görünürlük kuralı GEREKSİZLEŞTİ.** Silinen koddaki hâli
-`yıldız = (1 − gündüz payı) × (1 − kapsama) × 1.2` idi. Yeni mekanizmada gündüzü
-atmosfer opaklığı, bulut örtüsünü de hacimsel bulutların kendisi kesiyor — ikisi de
-fiziksel olarak oluyor, elle kural yazmak çifte sayım olurdu.
+Ayrıca **durağan doku titreyemez**: sintilasyon istendiği an doku yolu zaten elenmişti.
 
-**Çarpan 0.08, sayılar algoritma çalıştırılarak doğrulandı.** 1500 örnekte çekilen en
-parlak kadir 0.68 (kadir 0'a yıldız düşmüyor — gerçek gökyüzünde de yok denecek kadar az),
-bağıl parlaklığı 0.53. Çarpanla 0.043; gece zenit göğü 0.0036, yani **12 kat** parlak.
-En sönük yıldız 0.00032, göğün onda biri — görünmüyor, 6. kadir zaten çıplak gözle sınırda.
+Yeni yol `Assets/Shaders/StarField.hlsl`: yön küp yüzü ızgarasına (yüz başına 128, hücre
+0.70°) bölünüyor, hücre hash'inden konum/kadir/renk üretiliyor. Yarıçap ekran-uzayı
+türevinden geliyor, yani çözünürlükten bağımsız olarak ~1 piksel; parlak yıldız biraz
+büyük (gözde de öyle okunur). Sayı 1500 → ~6000, çıplak gözle görülen gerçek sayı.
 
-**Dağılım da ölçüldü:** altı yüze 209–291 (beklenen 250), yarıküreler 762/738, aynı
-teksele düşen yıldız yok, aralık dışı örnek yok. Kadir histogramı 4/50/121/259/436/630.
+**Sintilasyon hava kütlesine bağlı.** Ufka yakın yıldız çok daha kalın hava katmanından
+geçiyor, zenitte neredeyse sabit durur. Kendi zamanlayıcısı yok: `_Time` ve hash fazı,
+iki frekanslı (tek sinüs düzenli nabız gibi okunuyordu).
+
+**GÜNDÜZ SOLMASI AÇIKÇA YAZILDI — eski gerekçe yanlıştı.** "Paket yıldızları
+`(1 − skyOpacity)` ile çarpıyor, gündüzü o halleder, elle kural yazmak çifte sayım olur"
+denmişti. ÖLÇÜLDÜ: zenitte gündüz optik derinlik ~0.2, yani opaklık ~0.2 ve yıldızların
+%80'i geçiyor — sabah 8'de gökyüzü yıldızlıydı. Gerçekte yıldızları saklayan şey opaklık
+değil, gök parlaklığının 10⁵ kat büyük olması; bizim yıldızlar gece görünsün diye
+yükseltildiği için gündüz de hayatta kalıyorlardı.
+
+Solma güneş yüksekliğinden ve **kadire göre ayrı ayrı**: parlak yıldız güneş −3°'nin
+altına inince görünür, en sönüğü −18°'yi (astronomik alacakaranlığın sonu) bekler. Değer
+`TimeOfDay`in güneş yönünden geliyor, ikinci bir zaman kaynağı kurulmadı.
+
+**Sayılar (üretici silinmeden önce ölçülmüştü, dağılım korundu):** kadir histogramı
+4/50/121/259/436/630 (1500 örnekte), kadir başına ~2.5 kat — gerçek sayıma yakın.
+
+**ÇARPAN 0.08 → 0.55, ÖLÇÜT DEĞİŞTİ.** Eski ölçüt "en parlak yıldız gece zenit göğünden
+12 kat parlak" idi ve o sayı gökyüzü beş durak daha parlakken kurulmuştu. Ay fiziksel
+orana çekilip gece koyulaşınca oran 400 kata çıktı ama yıldızlar ekrandan **kayboldu** —
+çünkü görünürlüğü gökle kıyas değil, yıldızın ekrandaki kendi seviyesi belirliyor. Oran
+yanlış ölçüttü.
+
+Yeni ölçüt fiziksel ve gökten bağımsız: **6. kadir çıplak gözün sınırında olmalı.** Gece
+pozlaması ×2 alınarak kadir 2 → sRGB ~0.42, kadir 4 → ~0.19, kadir 6 → ~0.08.
 
 **DOĞRULANMAYAN TEK ŞEY — yıldızların dönüş YÖNÜ.** Shader arama yönünü döndürüyor
 (`mul(-V, _SpaceRotation)`), bu yüzden açı negatif verildi. Ekranda yıldızlar ters yöne
 akıyorsa düzeltme tek işaret: `SkyWeatherDriver`'daki `-time.Normalized * 360f`.
-
-## Gecedeki "fasulye" kapandı: sebep gökyüzü değil, gece ışık seviyesiydi (2026-08-16)
-
-**Belirti.** Gece gökyüzünde devasa, keskin kenarlı siyah bölge. Zenit merkezli,
-irtifayla büyüyor, yükseğe uçunca tüm göğü kaplıyor. Haftalarca gökyüzü hesabında arandı.
-
-**Orada değildi.** Gökyüzü shader'ının içine on dokuz modluk bir sonda kondu (ara
-değerleri ekrana basan geçici teşhis). Ölçümler:
-
-- `rayIntersectsAtmosphere`, `lookAboveHorizon`, `tFrag`, NaN/negatif — hepsi temiz.
-- 4B tablo **dolu** (mod 15 tüm gökte yeşil).
-- **Durak konturu tek sınır verdi:** gökyüzünün en parlak ve en sönük yeri arasında
-  **1 duraktan az** fark var. Yani veride ne kopukluk ne belirgin eğim var.
-- Aynı veri ×50 basıldığında fasulye **yok**, ×1 basıldığında **var**.
-
-Sonuç: 2 kattan küçük bir fark, ekrana basılırken siyah/görünür diye ikiye ayrılıyordu.
-Sebep gökyüzü hesabı değil, gecenin ekrandaki seviyesi.
-
-**Aracın kendisi iki kez yalan söyledi, ikisi de yakalandı.** Önce LUT eksenlerini
-parlaklıkla basmak: gece pozlaması tavanda olduğu için düz renge ezdi. Sonra ×50
-parlatma: göreli karanlığı doyurup yuttu, "shader temiz" sanıldı. Bundan sonrası ton
-(kırmızı/yeşil) ve kontur ile ölçüldü — ikisi de pozlamadan bağımsız.
-
-**Kök sebep: ay on dört durak fazla parlaktı.** Gerçekte dolunay ≈ 0,25 lüks, güneş
-≈ 133.000 lüks — arada 19 durak. Bizde güneş 3,0308'e karşı etkin ay 0,204 × renk
-ışıması 0,384 = 0,078, yani 5,3 durak. Gece öğlenin beş durak altında duruyordu; bu
-yüzden hem her şey aydınlıktı hem de gökyüzü ton eğrisinin o dibine oturuyordu.
-`MoonIntensity` 0.204 → 0.0058 (etkin oran 10,4 durak). Fasulye kapandı.
-
-**Yol boyunca düzeltilen gerçek kusurlar** (fasulyenin sebebi değil ama hepsi vardı):
-
-- `m_HDRColorBufferPrecision` 0 → 1. R11G11B10'un mavi kanalında mantis 5 bit, yani
-  %3'lük basamaklar; düz gökte eş merkezli halkalar üretiyordu. +4 EV'de halkaların
-  **artması** nicelendirmenin pozlamadan önce olduğunu söyledi.
-- `m_ColorGradingMode` 0 → 1 (LDR → HDR). Gece değerleri 32 düğümlü LDR LUT'un en alt
-  hücrelerinde eziliyordu; keskin kenarlar buradan geliyordu, HDR'a geçince yumuşadı.
-- `m_ColorGradingLutSize` 32 → 64.
-- Kamerada `dithering` açıldı (URP varsayılanı kapalı).
-
-**Denenip GERİ ALINAN:** `adaptShare` 0.35 → 0.60. Fasulyeyi kapatıyordu ama karanlık
-ucu kaldırırken parlak ucu da kaldırdı, gece sahnesi aydınlandı. Pozlama bu iş için
-yanlış alet; 0.35'te kaldı, gece profilinde `contrast` 6 → −22 ile karanlık uç ayrıca
-kaldırıldı.
-
-**Ders.** Belirti "gökyüzünde" göründü diye üç hafta gökyüzü kodunda arandı. Ölçüm
-gökyüzünü ilk turda eledi. Aynı hata bir daha yapılmasın: **belirtinin göründüğü yer,
-belirtinin doğduğu yer değildir** — önce verinin kendisi ölçülür, sonra onu ekrana
-basan zincir.
-
-## Gece seviyesi sisin üstünde ayarlandı — sis yenilenince tekrar bakılacak
-
-`MoonIntensity = 0.0058` hesapla bulundu (−4 durak hedefi, pozlama uyumunun tavana
-dayalı olduğu formülden). Ama son gözle ayar turunda sahnede parlak kalan şeyin
-**yükseklik sisi** olduğu ortaya çıktı ve sis sistemi yeniden yazılacak.
-
-Sise bakarak yapılan iki kırpma bu yüzden GERİ ALINDI: ay 0.0035'ten 0.0058'e,
-kar albedosu 0.66'dan 0.90'a döndürüldü. İkisi de belirtiye göre seçilmişti,
-belirtinin sebebi çürüyünce sayı da düştü.
-
-**Tetikleyici:** sis yeniden yazıldığında gece seviyesi (`MoonIntensity`, gece
-profilinin `contrast`/`exposure` değerleri) yeniden değerlendirilir. Sisin katkısı
-çıkınca gece bir miktar koyulaşacak; ayarın sise telafi olarak binmediği doğrulanır.
 
 ## Bulutlar ayı doğrudan almıyor — maliyeti ölçülmedi
 
