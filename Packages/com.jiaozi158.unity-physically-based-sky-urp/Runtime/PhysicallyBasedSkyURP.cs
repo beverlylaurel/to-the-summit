@@ -925,10 +925,14 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             // `sunDirection` evre hesabı için güneşin yönü.
             bool hasMoon = MoonLight != null && MoonLight.isActiveAndEnabled && MoonLight.intensity > 0.0f;
 
-            // GLOBAL OLARAK DA YAZILIYOR: `AtmosphericScattering.hlsl`'i bulut
-            // birleştirme geçişi de kullanıyor ve o materyalde bu alan yok. Yalnız
-            // materyale yazılırsa bulut tarafında sayaç sıfır kalıyor ve hava
-            // perspektifi hiç uygulanmıyor.
+            // SAYAÇ VE İKİNCİ CİSMİN TÜM ALANLARI GLOBAL. `AtmosphericScattering.hlsl`'i
+            // bulut birleştirme geçişi de kullanıyor ve o materyalde bu alanlar yok.
+            //
+            // Sayaç global, alanlar materyal olduğunda bulut materyali "iki cisim var"
+            // okuyup ikinci cismin verisini SIFIR görüyordu: `ComputeMoonPhase` sıfır
+            // vektörü normalize edip NaN üretiyor, ekranın büyük bölümü bozuluyordu ve
+            // yıldızlar da o çöpün altında kalıyordu. Tek mantıksal yapının alanları iki
+            // ayrı kapsamda olamaz.
             material.SetInt(_CelestialBodyCount, hasMoon ? 2 : 1);
             Shader.SetGlobalInt(_CelestialBodyCount, hasMoon ? 2 : 1);
 
@@ -960,22 +964,22 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 moonSurfaceColor = Vector4.Scale(moonColor, moonSurfaceColor);
                 moonFlareColor = Vector4.Scale(moonColor, moonFlareColor);
 
-                material.SetFloat(_CelestialBody2_DistanceFromCamera, moonDistanceFromCamera);
-                material.SetVector(_CelestialBody2_Right, MoonLight.transform.right.normalized);
-                material.SetFloat(_CelestialBody2_AngularRadius, moonAngularRadius);
-                material.SetFloat(_CelestialBody2_Radius, Mathf.Tan(moonAngularRadius) * moonDistanceFromCamera);
-                material.SetVector(_CelestialBody2_Up, MoonLight.transform.up.normalized);
-                material.SetInt(_CelestialBody2_Type, 1);
-                material.SetVector(_CelestialBody2_SurfaceColor, moonSurfaceColor);
-                material.SetFloat(_CelestialBody2_Earthshine, 1.0f * 0.01f);
-                material.SetVector(_CelestialBody2_SurfaceTextureScaleOffset, Vector4.zero);
-                material.SetVector(_CelestialBody2_SunDirection,
+                Shader.SetGlobalFloat(_CelestialBody2_DistanceFromCamera, moonDistanceFromCamera);
+                Shader.SetGlobalVector(_CelestialBody2_Right, MoonLight.transform.right.normalized);
+                Shader.SetGlobalFloat(_CelestialBody2_AngularRadius, moonAngularRadius);
+                Shader.SetGlobalFloat(_CelestialBody2_Radius, Mathf.Tan(moonAngularRadius) * moonDistanceFromCamera);
+                Shader.SetGlobalVector(_CelestialBody2_Up, MoonLight.transform.up.normalized);
+                Shader.SetGlobalInt(_CelestialBody2_Type, 1);
+                Shader.SetGlobalVector(_CelestialBody2_SurfaceColor, moonSurfaceColor);
+                Shader.SetGlobalFloat(_CelestialBody2_Earthshine, 1.0f * 0.01f);
+                Shader.SetGlobalVector(_CelestialBody2_SurfaceTextureScaleOffset, Vector4.zero);
+                Shader.SetGlobalVector(_CelestialBody2_SunDirection,
                     mainLight != null ? mainLight.transform.forward : Vector3.forward);
-                material.SetFloat(_CelestialBody2_FlareCosInner, moonFlareCosInner);
-                material.SetFloat(_CelestialBody2_FlareCosOuter, Mathf.Cos(moonAngularRadius + moonFlareSize));
-                material.SetFloat(_CelestialBody2_FlareSize, moonFlareSize);
-                material.SetVector(_CelestialBody2_FlareColor, moonFlareColor);
-                material.SetFloat(_CelestialBody2_FlareFalloff, 4.0f);
+                Shader.SetGlobalFloat(_CelestialBody2_FlareCosInner, moonFlareCosInner);
+                Shader.SetGlobalFloat(_CelestialBody2_FlareCosOuter, Mathf.Cos(moonAngularRadius + moonFlareSize));
+                Shader.SetGlobalFloat(_CelestialBody2_FlareSize, moonFlareSize);
+                Shader.SetGlobalVector(_CelestialBody2_FlareColor, moonFlareColor);
+                Shader.SetGlobalFloat(_CelestialBody2_FlareFalloff, 4.0f);
             }
         }
 
