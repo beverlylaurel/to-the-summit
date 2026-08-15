@@ -464,14 +464,6 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
 
         private static readonly int _DisableSunDisk = Shader.PropertyToID("_DisableSunDisk");
 
-        // PROJE EKİ: gok cismi diskini disaridan gizleme anahtari. Alacakaranlikta isigin
-        // YONU ufukta kirpiliyor (yoksa paket gogu sifirla carpiyor ve gece bir anda
-        // basliyor), ama disk o zaman batmayi birakip ufukta yatay kayiyor. Bu global
-        // diski susturuyor; gok glow'u kaliyor, disk gitmis oluyor.
-        private static readonly int _HideCelestialBody = Shader.PropertyToID("_HideCelestialBody");
-
-        private static bool IsCelestialBodyHidden() => Shader.GetGlobalFloat(_HideCelestialBody) > 0.5f;
-
         private static readonly int _HasGroundAlbedoTexture = Shader.PropertyToID("_HasGroundAlbedoTexture");
         private static readonly int _GroundAlbedoTexture = Shader.PropertyToID("_GroundAlbedoTexture");
 
@@ -626,10 +618,8 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
 
             if (mainLight != null)
             {
-                float3 sunAttenuation = EvaluateSunColorAttenuation(float3(camera.transform.position) - visualEnvironment.GetPlanetCenterRadius(camera.transform.position).xyz, -mainLight.transform.forward);
-
                 Color color = mainLight.color.linear * (mainLight.useColorTemperature ? Mathf.CorrelatedColorTemperatureToRGB(mainLight.colorTemperature) : Color.white);
-                mainLightColor = float3(color.r, color.g, color.b) * mainLight.intensity * sunAttenuation;
+                mainLightColor = float3(color.r, color.g, color.b) * mainLight.intensity;
 
             #if URP_PHYSICAL_LIGHT
                 bool isPhysicalLight = mainLight.GetComponent<AdditionalLightData>() != null;
@@ -658,7 +648,7 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             using (new ProfilingScope(cmd, m_ProfilingSampler))
             {
                 bool isReflectionCamera = renderingData.cameraData.camera.cameraType == CameraType.Reflection;
-                cmd.SetGlobalFloat(_DisableSunDisk, isReflectionCamera || IsCelestialBodyHidden() ? 1.0f : 0.0f);
+                cmd.SetGlobalFloat(_DisableSunDisk, isReflectionCamera ? 1.0f : 0.0f);
                 cmd.SetGlobalVector(_MainLightColor, float4(mainLightColor, 0.0f));
                 cmd.EnableShaderKeyword(PHYSICALLY_BASED_SKY);
                 cmd.EnableShaderKeyword(SKY_NOT_BAKING);
@@ -702,7 +692,7 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
         {
             CommandBuffer cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            cmd.SetGlobalFloat(_DisableSunDisk, data.isReflectionCamera || IsCelestialBodyHidden() ? 1.0f : 0.0f);
+            cmd.SetGlobalFloat(_DisableSunDisk, data.isReflectionCamera ? 1.0f : 0.0f);
             cmd.SetGlobalVector(_MainLightColor, data.mainLightColor);
             cmd.EnableShaderKeyword(PHYSICALLY_BASED_SKY);
             cmd.EnableShaderKeyword(SKY_NOT_BAKING);
@@ -725,10 +715,24 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 float3 mainLightColor = 0.0f;
                 if (mainLight != null)
                 {
-                    float3 sunAttenuation = EvaluateSunColorAttenuation(float3(camera.transform.position) - visualEnvironment.GetPlanetCenterRadius(camera.transform.position).xyz, -mainLight.transform.forward);
-
+                    // PROJE DÜZELTMESİ — KAMERA KONUMUNDAKİ SÖNÜM KALDIRILDI.
+                    // `EvaluateSunColorAttenuation(kamera, güneş)` ile çarpılıyordu. O
+                    // sönüm LUT'un İÇİNDE zaten örnek başına uygulanıyor
+                    // (`PhysicallyBasedSkyPrecomputation.shader`, `dot(N,L)` ve örnek
+                    // yarıçapı `r` ile). Burada bir kez daha uygulanması iki sonuç
+                    // veriyordu: gündüz gök gereğinden sönük, güneş ufkun altına inince
+                    // çarpan SIFIR olduğu için gök TAM SİYAH.
+                    //
+                    // ÖLÇÜLDÜ (ortam probe'u, zenit): 17:54 → 0.029, 18:10 → 0.000,
+                    // 18:30 → 0.000, 18:41 → 0.000. Otuz altı dakika alacakaranlık yerine
+                    // sıfır.
+                    //
+                    // Hillaire (EGSR 2020) denklem 3 ve 11'de `Ei` atmosfer DIŞINDAKİ
+                    // aydınlıktır; sönüm `T(c,x)` ve `S(x,li)` olarak integralin içinde
+                    // durur. Disk bundan etkilenmiyor: kendi rengini `mainLight` renginden
+                    // ayrıca alıyor ve kızıllığını görüş ışını boyunca shader'da kazanıyor.
                     Color color = mainLight.color.linear * (mainLight.useColorTemperature ? Mathf.CorrelatedColorTemperatureToRGB(mainLight.colorTemperature) : Color.white);
-                    mainLightColor = float3(color.r, color.g, color.b) * mainLight.intensity * sunAttenuation;
+                    mainLightColor = float3(color.r, color.g, color.b) * mainLight.intensity;
 
                 #if URP_PHYSICAL_LIGHT
                     bool isPhysicalLight = mainLight.GetComponent<AdditionalLightData>() != null;
