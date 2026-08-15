@@ -64,6 +64,7 @@ Material:
     - _ErosionFactor: 0.2
     - _ErosionOcclusion: 0.1
     - _ErosionScale: 107
+    - _ExtinctionCoefficient: 0.04
     - _FadeInDistance: 600
     - _FadeInStart: 400
     - _HighestCloudAltitude: 6381300
@@ -74,7 +75,7 @@ Material:
     - _MicroErosionScale: 200
     - _MultiScattering: 0.525
     - _NormalizationFactor: 0.7854
-    - _NumLightSteps: 2
+    - _NumLightSteps: 4
     - _NumPrimarySteps: 32
     - _PowderEffectIntensity: 0.25
     - _Seed: 0
@@ -82,7 +83,7 @@ Material:
     - _ShapeScale: 20
     - _SmallWindSpeed: 0.25
     - _SunLightDimmer: 1
-    - _VerticalErosionWindDisplacement: -3.9247801
+    - _VerticalErosionWindDisplacement: -0.0028021128
     - _VerticalShapeNoiseOffset: 0
     - _VerticalShapeWindDisplacement: 0
     m_Colors:

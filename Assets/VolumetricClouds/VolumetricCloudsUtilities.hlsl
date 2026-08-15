@@ -75,6 +75,9 @@ struct VolumetricRayResult
     half ambient;
     // Transmittance through the clouds
     half transmittance;
+    // Çakmanın kütle içinde biriktirdiği parlama. Ayrı tutuluyor çünkü rengi güneşin de
+    // ortamın da değil, çakmanın kendisinin.
+    half glow;
     // Mean distance of the clouds
     float meanDistance;
     // Flag that defines if the ray is valid or not
@@ -509,8 +512,9 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
     // Weight the ambient occlusion's contribution
     properties.ambientOcclusion = densityErosionAO.z;
 
-    // Change the sigma based on the rain cloud data
-    properties.sigmaT = lerp(0.04, 0.12, cloudCoverageData.rainClouds);
+    // SÖNÜM KATSAYISI: birim yoğunlukta metre başına sönüm (m⁻¹). Yağmur bulutunda üç
+    // katına çıkıyor — portun 0.04 → 0.12'si aynı orandı, artık ayardan türüyor `[N22 s.164]`.
+    properties.sigmaT = _ExtinctionCoefficient * lerp(1.0, 3.0, cloudCoverageData.rainClouds);
 
     // The ambient occlusion value that is baked is less relevant if there is shaping or erosion, small hack to compensate that
     half ambientOcclusionBlend = saturate(1.0 - max(erosionFactor, shapeFactor) * 0.5);
@@ -774,6 +778,20 @@ void EvaluateCloud(CloudProperties cloudProperties, half3 rayDirection,
     // Compute the powder effect
     half powderEffect = PowderEffect(cloudProperties.density, cosAngle, _PowderEffectIntensity);
 
+    // ÇAKMA IŞIN YÜRÜYÜŞÜNÜN İÇİNDE, üçüncü bir enerji terimi `[N22 s.170-172]`:
+    //   potential_energy   = pow(1 - d/yarıçap, 12)    — çakmaya uzaklık
+    //   height_gradient    = p_h                        — bulut tabanından yükseklik
+    //   pseudo_attenuation = 1 - SAT(yoğunluk × 5)      — yoğun yer daha az geçirir
+    //
+    // Bindirme geçişinde değil burada: orada parlama kütlenin İÇİNDEN değil üstünden
+    // biniyordu. Titreme kaygısı yok çünkü çakma konumu çakma başına bir kez yazılıyor,
+    // maske kare kare değişmiyor `[N22 s.180]`.
+    float3 currentPositionWS = currentPositionPS + _PlanetCenterPosition;
+    half strikeDistance = length(currentPositionWS - _LightningPosition.xyz);
+    half potentialEnergy = PositivePow(saturate(1.0 - strikeDistance / _LightningPosition.w), 12.0);
+    half pseudoAttenuation = 1.0 - saturate(cloudProperties.density * 5.0);
+    half glowEnergy = potentialEnergy * cloudProperties.height * pseudoAttenuation;
+
     // Evaluate the sun visibility
     half3 sunTransmittance = EvaluateSunTransmittance(currentPositionPS, sun.direction, cosAngle, phaseFunction);
 
@@ -788,6 +806,7 @@ void EvaluateCloud(CloudProperties cloudProperties, half3 rayDirection,
     // Note: this is not true anymore when _ScatteringTint is modified, but it still looks correct
     volumetricRay.scattering += sunLuminance     * (volumetricRay.transmittance - volumetricRay.transmittance * transmittance);
     volumetricRay.ambient    += ambientLuminance * (volumetricRay.transmittance - volumetricRay.transmittance * transmittance);
+    volumetricRay.glow       += glowEnergy       * (volumetricRay.transmittance - volumetricRay.transmittance * transmittance);
     volumetricRay.transmittance *= transmittance;
 }
 

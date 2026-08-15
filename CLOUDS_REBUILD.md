@@ -183,6 +183,18 @@ Bilerek bırakıldı, sebebiyle birlikte — tekrar araştırılmasın.
 daha iyi, ince detay eksik / 4: azalan getiri başlıyor"*, maliyet 2.80 → 3.85 ms. Portun
 şemasıyla çakışmıyor, düz parametre.
 
+### Notlardan gelen ek işler
+
+| iş | kaynak | durum |
+|---|---|---|
+| **Zarf modeli — orografik dağ bulutları** | `[N22 s.94-106]` | **AÇIK.** Hiç başlanmadı. Gökyüzü modelinden **ayrı ikinci bir sistem**: dağa yaslanan, zirveden savrulan, yere çakılı kütleler. Not "bizim oyunumuzun asıl ihtiyacı bu" diyor; repo'nun "local clouds — Not Included" dediği şey. Analitik profil, `pow(…, 0.27)`, wispy↔billowy harmanı ve NDF'nin dört kanalı notta tam |
+| Şimşek ışın yürüyüşünün İÇİNDE | `[N22 s.170-180]` | **KAPANDI.** Üç terimli formül `EvaluateCloud`'a girdi: `pow(1 − d/yarıçap, 12) × p_h × (1 − SAT(yoğunluk×5))`. Parlama ayrı biriktiriliyor (`VolumetricRayResult.glow`), ışının sonunda çakma rengiyle çarpılıyor — rengi güneşin de ortamın da değil. Bindirme geçişindeki eski terim kaldırıldı. Titreme yok: çakma konumu çakma başına bir kez yazılıyor, maske kare kare değişmiyor `[s.180]` |
+| Sönüm katsayısı ayar olarak | `[N22 s.164]` | **KAPANDI.** `extinctionCoefficient` Volume ayarı: birim yoğunlukta metre başına sönüm (m⁻¹), varsayılan 0.04, aralık 0.005–0.2. Yağmur bulutunda ×3 (portun 0.04→0.12'si aynı orandı). Makaledeki 5/10/20 normalize yolda ölçülmüş, metre cinsine çevrilemiyor — sayı kopyalanmadı, büyüklük adlandırıldı |
+
+Hava perspektifi için **opaklıkla ağırlıklandırılmış ortalama mesafe** `[N22 s.188]`
+portta zaten var (`volumetricRay.meanDistance`, ağırlık `transmittance × density`) —
+o madde kapalı.
+
 ### Açık kalan
 
 Yoğunluk, şekil ve aydınlatma zinciri bitti; bağların tamamı kuruldu (`SYSTEMS.md`).

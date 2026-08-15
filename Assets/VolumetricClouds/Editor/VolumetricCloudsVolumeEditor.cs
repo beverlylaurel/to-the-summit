@@ -38,6 +38,7 @@ class VolumetricCloudsEditor : VolumeComponentEditor
     SerializedDataParameter m_CloudCoverage;
     SerializedDataParameter m_AnvilAmount;
     SerializedDataParameter m_DensityMultiplier;
+    SerializedDataParameter m_ExtinctionCoefficient;
     // Shape
     SerializedDataParameter m_ShapeFactor;
     SerializedDataParameter m_ShapeScale;
@@ -129,6 +130,7 @@ class VolumetricCloudsEditor : VolumeComponentEditor
         m_CloudCoverage = Unpack(o.Find(x => x.cloudCoverage));
         m_AnvilAmount = Unpack(o.Find(x => x.anvilAmount));
         m_DensityMultiplier = Unpack(o.Find(x => x.densityMultiplier));
+        m_ExtinctionCoefficient = Unpack(o.Find(x => x.extinctionCoefficient));
         m_ShapeFactor = Unpack(o.Find(x => x.shapeFactor));
         m_ShapeScale = Unpack(o.Find(x => x.shapeScale));
         m_ShapeOffset = Unpack(o.Find(x => x.shapeOffset));
@@ -484,6 +486,7 @@ class VolumetricCloudsEditor : VolumeComponentEditor
                 using (new IndentLevelScope())
                 {
                     PropertyField(m_DensityMultiplier);
+                    PropertyField(m_ExtinctionCoefficient);
                     PropertyField(m_ShapeFactor);
                     PropertyField(m_ShapeScale);
                     PropertyField(m_ErosionFactor);
