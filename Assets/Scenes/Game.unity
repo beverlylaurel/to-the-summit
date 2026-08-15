@@ -747,7 +747,7 @@ MonoBehaviour:
   sunColor: {r: 1, g: 0.96, b: 0.89, a: 1}
   moonColor: {r: 0.62, g: 0.7, b: 0.92, a: 1}
   sunIntensity: 3.030782
-  moonIntensity: 0.4
+  moonIntensity: 0.204
 --- !u!4 &508855606
 Transform:
   m_ObjectHideFlags: 0
@@ -965,6 +965,7 @@ MonoBehaviour:
   cloudVolume: {fileID: 832575518}
   cloudDriver: {fileID: 1147612207}
   skyDriver: {fileID: 1147612208}
+  lookController: {fileID: 832575520}
 --- !u!4 &813786006
 Transform:
   m_ObjectHideFlags: 0
@@ -1042,6 +1043,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0a78e3eca4aa5894992be6bcb32eddf1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LookController
+  exposureCap: 2.5
+  adaptShare: 0.35
   look: {fileID: 11400000, guid: d76cc6346da06ad439e573b0e3d86aa2, type: 2}
   weather: {fileID: 1805896806}
   time: {fileID: 508855605}
@@ -1230,6 +1233,7 @@ GameObject:
   - component: {fileID: 1147612205}
   - component: {fileID: 1147612207}
   - component: {fileID: 1147612208}
+  - component: {fileID: 1147612209}
   m_Layer: 0
   m_Name: CloudLayerProbe
   m_TagString: Untagged
@@ -1299,6 +1303,21 @@ MonoBehaviour:
   skyVolume: {fileID: 832575518}
   weather: {fileID: 1805896806}
   settings: {fileID: 11400000, guid: cc853f85f6a00f9459360765aea23ccd, type: 2}
+--- !u!114 &1147612209
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1147612204}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d098f867e43e6b1479715eb544062f22, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkyAmbientBaker
+  time: {fileID: 508855605}
+  minimumInterval: 0.5
+  movementDegrees: 0.25
 --- !u!1 &1233237509
 GameObject:
   m_ObjectHideFlags: 0
