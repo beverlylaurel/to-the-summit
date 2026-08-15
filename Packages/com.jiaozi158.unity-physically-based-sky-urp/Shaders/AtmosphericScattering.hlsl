@@ -165,7 +165,7 @@ void EvaluatePbrAtmosphere(float3 positionPS, half3 V, float distAlongRay, bool 
         //for (uint i = 0; i < _CelestialLightCount; i++)
         {
             //CelestialBodyData light = _CelestialBodyDatas[i];
-            CelestialBodyData light = GetCelestialBody();
+            CelestialBodyData light = GetCelestialBody(0);
             half3 L = -light.forward.xyz;
 
             // The sun disk hack causes some issues when applied to nearby geometry, so don't do that.

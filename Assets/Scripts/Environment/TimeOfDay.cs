@@ -30,6 +30,10 @@ public class TimeOfDay : MonoBehaviour
     // tek kaynak ay kaldı. Değer göz kararı bulundu.
     [SerializeField] float moonIntensity = 0.204f;
 
+    [Tooltip("Ayın kendi yönlü ışığı. Gölge DÜŞÜRMEZ: gökyüzü paketi gölgesiz cismi " +
+             "ana ışık saymayıp güneşe düşüyor, böylece gökyüzü hep güneşten sürülüyor.")]
+    [SerializeField] Light moon;
+
     /// Güneşin tepe şiddeti. Gökyüzü paketi kendi parlaklığını ana ışıktan türettiği için
     /// gök ile sahnenin göreli parlaklığı buradan ayarlanıyor; F1 paneli bunu sürüyor.
     /// Gök cisminin ışığa katkısı, 0-1. ATMOSFERİK DEĞİL, GEOMETRİK: soğurma ve kızıllık
@@ -141,11 +145,20 @@ public class TimeOfDay : MonoBehaviour
     /// şiddet mi kayboluyor.
     public float LightIntensity => sun != null ? sun.intensity : 0f;
 
-    /// Yönlü ışığın YÜKSEKLİĞİ, 0-1. Işık ufkun altındayken sıfır: o şiddet hiçbir düz
-    /// yüzeye ulaşmıyor demektir (`N·L` negatif). Pozlama uyumu bunu okuyor — yoksa
-    /// ufkun altındaki güneşin şiddetini "sahne aydınlık" sanıp alacakaranlıkta pozlamayı
-    /// kapatıyor, gece ise ay tepedeyken fazla açıyordu.
-    public float LightUp => sun != null ? Mathf.Max(0f, -sun.transform.forward.y) : 0f;
+    /// DÜZ ZEMİNE ULAŞAN IŞIK. İki cismin katkısı toplanıyor ve her biri KENDİ
+    /// yüksekliğiyle çarpılıyor: ufkun altındaki cismin şiddeti düz zemine ulaşmıyor
+    /// (`N·L` negatif). Pozlama uyumu bunu okuyor.
+    public float SurfaceLightLevel
+    {
+        get
+        {
+            float level = 0f;
+            if (sun != null) level += sun.intensity * Mathf.Max(0f, -sun.transform.forward.y);
+            if (moon != null) level += moon.intensity * Mathf.Max(0f, -moon.transform.forward.y);
+            return level;
+        }
+    }
+
 
 
 
@@ -161,10 +174,17 @@ public class TimeOfDay : MonoBehaviour
     /// güneşlenmeye göre yerleşir, anlık güneş konumuna bağlanırsa gün içinde yanıp söner.
     public Vector3 NoonSunDirection => DirectionAt(0.5f);
 
-    public void Bind(Light directional)
+    public void Bind(Light directional, Light moonLight)
     {
         sun = directional;
+        moon = moonLight;
         MarkAsSun();
+
+#if URP_PBSKY
+        // Ay gökyüzü paketine İKİNCİ GÖK CİSMİ olarak veriliyor: diski ana ışıktan
+        // bağımsız çiziliyor, evresi ve dünya parıltısı paketin kendi hesabından geliyor.
+        PhysicallyBasedSkyURP.MoonLight = moonLight;
+#endif
     }
 
     /// URP ana yönlü ışığı en parlak olana göre seçiyor. Şimşek çakması güneşten
@@ -262,36 +282,27 @@ public class TimeOfDay : MonoBehaviour
                   * Atmosphere.LowSunFade(0f, MoonDirection);
         MoonLevel = (moonBeam.x + moonBeam.y + moonBeam.z) / 3f;
 
+        // İKİ CİSİM, İKİ IŞIK. Tek ışığa sığdırmak yapısal olarak çözülemiyordu: ay
+        // güneşin tam karşısında, yön bir tanedir ve devir anında disk 180° atlıyordu.
+        // Artık her cisim kendi ışığını sürüyor; gökyüzü paketi ayı ikinci GÖK CİSMİ
+        // olarak ayrıca çiziyor (`PhysicallyBasedSkyURP.MoonLight`).
+        //
+        // Bant asimetrisi duruyor: güneşinki −18°'ye (astronomik alacakaranlık sonu)
+        // iner çünkü gökyüzünü o sürüyor; ayınki ±3°, ikincil kaynak için alacakaranlık
+        // modellemiyoruz.
         if (sun != null)
         {
-            // KAYNAK PAYI GEOMETRİDEN, ESKİ MODELDEN DEĞİL. Önce `BeamLevel`'den
-            // türetiliyordu ve o ufukta hızlı yükseliyor: güneş 3.03, ay 0.4 olduğu için
-            // oran daha güneş ufkun dibindeyken 0'dan 1'e fırlıyor, ışık da onunla
-            // sıçrıyordu (05:59 → 06:00 bir anda aydınlanma).
-            //
-            // ŞİDDET TOPLAM, HARMANLAMA DEĞİL. İki kaynağın katkısı toplanır; `Lerp`
-            // kullanılırsa pay sıçradığında şiddet de sıçrar. Toplam sürekli, çünkü iki
-            // terim de sürekli.
-            //
-            // Eğri `SmoothStep`'ten çıkıyor, tahminden değil. Taban −18° olunca
-            // alacakaranlık gökyüzü taşıyacak kadar uzun sürüyor ve aya devrederken
-            // arada karanlık boşluk kalmıyor.
-            //
-            // KALAN KUSUR: yön hâlâ SERT dönüyor (güneş ≈ −14.7°, ay o an +14.7°'de) ve
-            // ay gökte beliriyor. Tek yönlü ışığa iki cisim sığdırmanın bedeli; gerçek
-            // çözümü paketin ikinci gök cismi (`DECISIONS.md`).
-            float sunAbove = SunBlend(SunDirection.y);
-            float moonAbove = MoonBlend(MoonDirection.y);
+            sun.transform.rotation = Quaternion.LookRotation(-SunDirection);
+            sun.color = sunColor;
+            sun.intensity = sunIntensity * SunBlend(SunDirection.y);
+        }
 
-            float sunPower = sunIntensity * sunAbove;
-            float moonPower = moonIntensity * moonAbove;
-            float sunShare = sunPower / Mathf.Max(1e-5f, sunPower + moonPower);
-
-            Vector3 lightSource = sunShare > 0.5f ? SunDirection : MoonDirection;
-            sun.transform.rotation = Quaternion.LookRotation(-lightSource);
-
-            sun.color = Color.Lerp(moonColor, sunColor, sunShare);
-            sun.intensity = sunPower + moonPower;
+        if (moon != null)
+        {
+            moon.transform.rotation = Quaternion.LookRotation(-MoonDirection);
+            moon.color = moonColor;
+            moon.intensity = moonIntensity * MoonBlend(MoonDirection.y);
+        }
         }
 
         // Güneş yüksekliği GLOBAL olarak da yayınlanır. Materyal property'si olarak

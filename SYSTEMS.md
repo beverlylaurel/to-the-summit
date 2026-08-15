@@ -968,6 +968,22 @@ ufkun altında sıfırlanırsa ALACAKARANLIK DA SÖNÜYOR — 18:10 gece yarıs�
 tonu, arazi şafak rengi (`TerrainSurface`) ve pozlama uyumu (`LookController`). Kendi
 yükseklik sisimiz durduğu sürece o zincir de duruyor.
 
+**GÜNEŞ VE AY AYRI IŞIK, AY İKİNCİ GÖK CİSMİ.** Tek yönlü ışığa iki cisim sığmıyordu:
+ay güneşin tam karşısında (`MoonDirection = −SunDirection`), yön bir tanedir ve devir
+anında disk 180° atlıyordu. Ölçmeye gerek yok, yapısal.
+
+- `TimeOfDay` iki ışığı ayrı sürüyor. Güneşin bandı **+3° → −18°** (astronomik
+  alacakaranlık sonu) çünkü gökyüzünü o sürüyor; ayınki **±3°**, ikincil kaynak.
+- **Ay gölge düşürmüyor.** Paketin `GetMainLight`'ı gölgesiz cismi ana ışık saymayıp
+  `RenderSettings.sun`'a düşüyor, yani gökyüzü gece bile güneşten sürülüyor.
+- Paket ayı **ikinci gök cismi** olarak çiziyor (`PhysicallyBasedSkyURP.MoonLight`).
+  Disk ana ışıktan bağımsız: evre ve dünya parıltısı paketin kendi hesabından
+  (`ComputeMoonPhase`, `ComputeEarthshine`).
+
+**Ay gökyüzünü AYDINLATMIYOR.** Sky-view LUT tek ışıktan pişiyor; iki ışık için
+akümülasyon gerekiyor. Ay yalnız diski ve araziyi sürüyor. Gece göğü karanlık, manzara
+aylı — denizci alacakaranlığında gerçek tablo da budur.
+
 **Hava bağı.** `SkyWeatherDriver` yalnız bir şey çeviriyor: yağış şiddeti → `aerosolDensity`
 (aerosol sütununun zenit opaklığı, 0.006 temiz ↔ 0.069 fırtına). Güneşin yönü ve rengi
 BURADAN GEÇMİYOR — `TimeOfDay` ana ışığı sürüyor, paket aynı ışığı okuyor. İkinci bir yol

@@ -54,6 +54,7 @@ public static class MountainSceneBootstrap
     const string CloudMaterialPath = "Assets/Settings/VolumetricClouds.mat";
     const string CloudWeatherPath = "Assets/Settings/CloudWeatherSettings.asset";
     const string SkyWeatherPath = "Assets/Settings/SkyWeatherSettings.asset";
+    const string MoonLightName = "Moon Light";
 
     /// `EnsureCloudVolume`'un bulut bileşenini yazdığı Volume. F1 paneli buradan bağlanıyor.
     static UnityEngine.Rendering.Volume cloudVolume;
@@ -413,6 +414,8 @@ public static class MountainSceneBootstrap
             CreateTimeOfDay();
             changed = true;
         }
+
+        EnsureSunAndMoon(ref changed);
 
     #if URP_PBSKY
         // GÜNEŞ ŞİDDETİ GÖKYÜZÜ PAKETİNİN KALİBRASYONUNDAN. Paket 100000 lux yer
@@ -1206,12 +1209,53 @@ public static class MountainSceneBootstrap
     /// Gün döngüsü. Sahnedeki yönlü ışığı sürer, havayı tanımaz.
     static void CreateTimeOfDay()
     {
-        var sun = Object.FindAnyObjectByType<Light>();
-        if (sun == null || sun.type != LightType.Directional)
+        var go = new GameObject("Time Of Day");
+        go.AddComponent<TimeOfDay>();
+    }
+
+    /// GÜNEŞ VE AY AYRI IŞIK. Tek ışığa iki cisim sığmıyordu: ay güneşin tam karşısında,
+    /// yön bir tanedir ve devir anında disk 180° atlıyordu.
+    ///
+    /// AY GÖLGE DÜŞÜRMÜYOR ve bu bilinçli: gökyüzü paketinin `GetMainLight`'ı gölgesiz
+    /// cismi ana ışık saymayıp `RenderSettings.sun`'a düşüyor. Böylece gökyüzü her zaman
+    /// güneşten sürülüyor, ana ışık gece bile değişmiyor.
+    static void EnsureSunAndMoon(ref bool changed)
+    {
+        var timeOfDay = Object.FindAnyObjectByType<TimeOfDay>();
+
+        Light sun = null;
+        foreach (var light in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+        {
+            if (light.type != LightType.Directional) continue;
+            if (light.gameObject.name == MoonLightName) continue;
+
+            sun = light;
+            break;
+        }
+
+        if (sun == null)
             throw new System.InvalidOperationException("Sahnede yönlü ışık bulunamadı.");
 
-        var go = new GameObject("Time Of Day");
-        go.AddComponent<TimeOfDay>().Bind(sun);
+        var moonObject = GameObject.Find(MoonLightName);
+        if (moonObject == null)
+        {
+            moonObject = new GameObject(MoonLightName);
+            changed = true;
+        }
+
+        var moon = moonObject.GetComponent<Light>();
+        if (moon == null)
+        {
+            moon = moonObject.AddComponent<Light>();
+            changed = true;
+        }
+
+        moon.type = LightType.Directional;
+        moon.shadows = LightShadows.None;
+
+        timeOfDay.Bind(sun, moon);
+        EditorUtility.SetDirty(timeOfDay);
+        EditorUtility.SetDirty(moon);
     }
 
     /// Renk düzenlemesi. Mevcut Global Volume objesine bağlanır.

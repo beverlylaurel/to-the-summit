@@ -79,6 +79,31 @@ float _CelestialBody_FlareSize;
 float3 _CelestialBody_FlareColor;
 float _CelestialBody_FlareFalloff;
 
+// PROJE EKİ — İKİNCİ GÖK CİSMİ (ay). Paket diziyi tek cisme kısmıştı; `RenderSunDisk`
+// yalnız ana ışığın yönünde çiziyordu ve ışık güneşten aya döndüğü an disk 180° atlıyordu.
+// İki cisim aynı anda tanımlı olunca disk atlaması ortadan kalkıyor: her biri kendi
+// yönünde, kendi tipiyle çiziliyor.
+//
+// Alanlar birinci setle birebir aynı; `PhysicallyBasedSkyRendering.hlsl` içindeki
+// `GetCelestialBody(index)` ikisini de okuyor.
+float3 _CelestialBody2_Color;
+float _CelestialBody2_Radius;
+float3 _CelestialBody2_Forward;
+float _CelestialBody2_DistanceFromCamera;
+half3 _CelestialBody2_Right;
+float _CelestialBody2_AngularRadius;
+half3 _CelestialBody2_Up;
+int _CelestialBody2_Type;
+float3 _CelestialBody2_SurfaceColor;
+float _CelestialBody2_Earthshine;
+float4 _CelestialBody2_SurfaceTextureScaleOffset;
+half3 _CelestialBody2_SunDirection;
+float _CelestialBody2_FlareCosInner;
+float _CelestialBody2_FlareCosOuter;
+float _CelestialBody2_FlareSize;
+float3 _CelestialBody2_FlareColor;
+float _CelestialBody2_FlareFalloff;
+
 #ifndef URP_VOLUMETRIC_CLOUDS_UTILITIES_HLSL
 float4 _PlanetCenterRadius;
 #endif
