@@ -63,29 +63,8 @@ public class AtmosphereSettings : ScriptableObject
     [Tooltip("Tabanın yeni yüksekliğine varma süresi (saniye). Kütle ağırdır, rüzgârın " +
              "sekiz saniyelik esintileriyle inip kalkmaz.")]
     public float cloudBottomSmoothing = 120f;
-    [Tooltip("Katmanın üst sınırı (metre). Bulut boyları artık METRE cinsinden " +
-             "kuruluyor, bu değer yalnızca en yükseğin tavana çarpmaması için var: " +
-             "gerçek kümülonimbus troposferin tepesine kadar çıkar.")]
-    public float cloudTop = 7000f;
 
 
-    [Header("Bulut biçimi")]
-    [Tooltip("Bulut yönünün rüzgâra uyum süresi (saniye). Kısa tutulursa bulut kütlesi " +
-             "yer rüzgârıyla birlikte savrulur.")]
-    public float headingSmoothing = 240f;
-    [Tooltip("Yer rüzgârının bulut hızına çarpanı. Yüksekteki rüzgâr yerdekinden güçlü: " +
-             "yerde 10 m/s esen rüzgâr iki kilometre yukarıda 20 m/s dolayında. Katsayı " +
-             "birin altındayken bulutlar yer rüzgârından yavaş gidiyordu, kendi " +
-             "açıklamasıyla çelişiyordu.")]
-    public float cloudDrift = 6f;
-    [Tooltip("Yer rüzgârı dinginken bile bulutların süzülme hızı (m/s). Dingin havada " +
-             "yüksek katmanlar durmaz, birkaç metre saniye süzülür. " +
-             "Bu değer 90 m/s idi — 324 km/h, yani rüzgâr sıfıra çekilse bile gökyüzü " +
-             "akıp gidiyordu. Rüzgâr kilidi bulutları durdurmuyordu çünkü taban zaten " +
-             "her şeyi eziyordu.")]
-    public float minCloudSpeed = 30f;
-    [Tooltip("Bulut biçimlerinin değişme hızı. Sıfırsa bulutlar yalnızca öteler, şekil değiştirmez.")]
-    public float evolutionSpeed = 0.0015f;
 
 
     [Header("Bulut kalitesi")]

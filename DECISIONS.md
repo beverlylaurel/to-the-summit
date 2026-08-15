@@ -1055,9 +1055,9 @@ eklenmez.** Ekleme ihtiyacı doğuyorsa önce ilgili makale okunur.
 **Maliyet.** Repo Unity 2022.3 / URP 14.0.7 hedefliyor, biz Unity 6000.5 / URP 17'yiz:
 HLSL taşınır, render geçişi RenderGraph'a yeniden yazılır.
 
-**Bağlar** `CLOUDS_REBUILD.md`'de — on tüketici, on iki ölçülmüş ders, kurtarılmış
-gürültü hash'i. İki bağ şu an stub: yer bulut gölgesi (`CloudShadowAt` → 1.0) ve yerel
-yağış (`UpdateLocalRain` → 1).
+**Sonuç:** port alındı, yoğunluk/şekil/aydınlatma zinciri makaleye göre düzeltildi ve
+bağların tamamı kuruldu. Güncel bağ listesi `SYSTEMS.md` → Bulutlar; farkların teknik
+kaydı `CLOUDS_REBUILD.md`. Bu karar kapandı, tetikleyicisi de geçersiz.
 
 
 ---

@@ -59,7 +59,8 @@ zinciri Nubis/HZD makalesine göre düzeltildi. Bağların tamamı kuruldu.
   kapandı, ölçülmüş sayılar, kurtarılmış gürültü hash'i. Yeni bir sapma yapılacaksa
   önce oraya bakılır — aynı hata iki kez ölçülmesin.
 - **`NUBIS_NOTES.md`** makale okumaları: 12 soru, her cevabın yanında kaynak sayfa.
-  Buradaki dersler ÖLÇÜMDEN, oradaki cevaplar MAKALEDEN gelir; ikisi karışmaz.
+  Bulut tarafında bir sayı veya formül gerektiğinde önce oraya bakılır, tahmin
+  yürütülmez. Buradaki dersler ÖLÇÜMDEN, oradaki cevaplar MAKALEDEN gelir.
 
 **Repo'nun üstüne kendi terimimiz eklenmez.** Görüntü yanlışsa önce onun parametrelerine
 ve ürettiği dokulara bakılır, tek seferde tek sayı değişir. Ekleme ihtiyacı doğuyorsa

@@ -890,7 +890,6 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
         }
     #endif
 
-
     #if !UNITY_6000_0_OR_NEWER
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
@@ -1216,7 +1215,6 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
 
         private static readonly int worldSpaceCameraPos = Shader.PropertyToID("_WorldSpaceCameraPos");
         private static readonly int disableSunDisk = Shader.PropertyToID("_DisableSunDisk");
-        //private static readonly int unity_MatrixVP = Shader.PropertyToID("unity_MatrixVP");
         private static readonly int unity_MatrixInvVP = Shader.PropertyToID("unity_MatrixInvVP");
         private static readonly int scaledScreenParams = Shader.PropertyToID("_ScaledScreenParams");
         private static readonly int screenSize = Shader.PropertyToID("_ScreenSize");
@@ -1274,12 +1272,10 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
         }
     #endif
 
-
     #if !UNITY_6000_0_OR_NEWER
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
             // UpdateEnvironment() is another way to update ambient lighting but it's really slow.
-            //DynamicGI.UpdateEnvironment();
 
             CommandBuffer cmd = CommandBufferPool.Get();
 
@@ -1399,8 +1395,6 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
 
                 // Camera matrices for skybox rendering
                 cmd.SetViewMatrix(data.skyViewMatrices[i]);
-                //cmd.SetProjectionMatrix(skyMatrixP);
-                //context.cmd.SetGlobalMatrix(unity_MatrixVP, skyMatrixVP);
                 context.cmd.SetGlobalMatrix(unity_MatrixInvVP, skyMatrixVP.inverse);
 
                 context.cmd.DrawRendererList(data.rendererListHandles[i]);
@@ -1415,8 +1409,6 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
 
             // Camera matrices for objects rendering
             cmd.SetViewMatrix(data.worldToCameraMatrix);
-            //cmd.SetProjectionMatrix(data.projectionMatrix);
-            //context.cmd.SetGlobalMatrix(unity_MatrixVP, matrixVP);
             context.cmd.SetGlobalMatrix(unity_MatrixInvVP, matrixVP.inverse);
             context.cmd.SetGlobalVector(scaledScreenParams, data.cameraScreenParams);
             context.cmd.SetGlobalVector(screenSize, data.cameraScreenSize);
@@ -1526,7 +1518,6 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
         private static readonly int cameraPositionPS = Shader.PropertyToID("_CameraPositionPS");
         private static readonly int volumetricCloudsShadowOriginToggle = Shader.PropertyToID("_VolumetricCloudsShadowOriginToggle");
         private static readonly int volumetricCloudsShadowScale = Shader.PropertyToID("_VolumetricCloudsShadowScale");
-        //private static readonly int shadowPlaneOffset = Shader.PropertyToID("_ShadowPlaneOffset");
 
         private const string _VolumetricCloudsShadowTexture = "_VolumetricCloudsShadowTexture";
         private const string _VolumetricCloudsShadowTempTexture = "_VolumetricCloudsShadowTempTexture";
@@ -1597,7 +1588,6 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
             ConfigureTarget(shadowTextureHandle, shadowTextureHandle);
         }
     #endif
-
 
     #if !UNITY_6000_0_OR_NEWER
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
