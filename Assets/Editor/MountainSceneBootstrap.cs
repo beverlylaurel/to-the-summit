@@ -624,6 +624,28 @@ public static class MountainSceneBootstrap
     #endif
     }
 
+    /// GÜNEŞ SOĞURMASI BULUTUN KENDİ KONUMUNDA. Kapalıyken bulut shader'ı
+    /// `sun.color * PI` yazıyor, yani HAM güneşi — soğurma hiç uygulanmıyor ve bulutlar
+    /// 18:00'de bile bembeyaz kalıyordu. Açıkken `_PHYSICALLY_BASED_SUN` devreye giriyor
+    /// ve gökyüzü paketinin `EvaluateSunColorAttenuation`'ı bulutun bulunduğu KOTTA
+    /// uygulanıyor; kameradaki değerden daha doğru, çünkü bulut 2-5 km yukarıda.
+    static void SetCloudSunAttenuation(VolumetricCloudsURP feature)
+    {
+    #if URP_PBSKY
+        var serialized = new SerializedObject(feature);
+        var property = serialized.FindProperty("sunAttenuation");
+        if (property.boolValue) return;
+
+        property.boolValue = true;
+        serialized.ApplyModifiedPropertiesWithoutUndo();
+        feature.Create();
+
+        EditorUtility.SetDirty(feature);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.ImportAsset(RendererPath);
+    #endif
+    }
+
     /// GÖKYÜZÜ HACMİ. Üç override bulut hacminin profiline yazılıyor; bulut portu gezegen
     /// yarıçapını ve ambient kipini oradan okuyor.
     ///
@@ -725,7 +747,11 @@ public static class MountainSceneBootstrap
         BindCloudTextures(material);
 
         foreach (var existing in renderer.rendererFeatures)
-            if (existing is VolumetricCloudsURP) return;
+            if (existing is VolumetricCloudsURP existingClouds)
+            {
+                SetCloudSunAttenuation(existingClouds);
+                return;
+            }
 
         var feature = ScriptableObject.CreateInstance<VolumetricCloudsURP>();
         feature.name = "Volumetric Clouds";
@@ -733,6 +759,8 @@ public static class MountainSceneBootstrap
         var serialized = new SerializedObject(feature);
         serialized.FindProperty("material").objectReferenceValue = material;
         serialized.ApplyModifiedPropertiesWithoutUndo();
+
+        SetCloudSunAttenuation(feature);
 
         // `Create()` ÖRNEK ÜRETİLİRKEN Unity tarafından bir kez çağrılıyor ve materyal o
         // an henüz atanmamış oluyor; feature "Material is empty" deyip erken dönüyor.
