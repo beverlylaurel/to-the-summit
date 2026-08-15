@@ -995,22 +995,36 @@ aydınlatıyor. Yani ayda gümüş kenar yok.
 analitik probe'u devre dışı: o yol çoklu saçılım taşımıyor ve alacakaranlıkta sıfır
 veriyordu. Pişirme kısık — güneş 0.25° kayınca ve en fazla yarım saniyede bir.
 
-**YILDIZLAR paketin `spaceEmissionTexture` girişinden.** `StarFieldGenerator` 512'lik bir
-küp harita üretiyor: 1500 yıldız, kadir 0–6 arası, sayım küp kökle dağıtılıyor (kadir
-başına ~2.5 kat artan gerçek sayıma yakın), renk sıcaklıktan (mavi-beyaz ↔ turuncu).
-Gürültü tamsayı karıştırıcıdan.
+**YILDIZLAR PROSEDÜREL** (`Assets/Shaders/StarField.hlsl`, paketin uzay dalından
+çağrılıyor). Küp harita yolu ölçülüp elendi: 512'lik yüzde teksel 0.176°, ekranda piksel
+0.047° — yıldız zorunlu olarak dört piksel ve bilineer süzmeyle leke oluyordu; bir piksel
+için 2048'lik yüz, yani 201 MB gerekirdi. Durağan doku ayrıca titreyemez.
 
-Paket bunu YALNIZ uzaya bakarken ekliyor ve `(1 − skyOpacity)` ile çarpıyor: gündüz
-atmosfer opaklaştıkça yıldızlar kendiliğinden yıkanıyor, bulut örtüsünü de hacimsel
-bulutlar kesiyor. Eski sistemin `(1−gündüz) × (1−kapsama)` kuralına gerek kalmadı —
-mekanizma ikisini de fiziksel olarak yapıyor.
+Yön küp yüzü ızgarasına bölünüyor (yüz başına 128, hücre 0.70°), hücre hash'inden konum,
+kadir ve renk üretiliyor. ~6000 yıldız, kadir 0–6, sayım küp kökle dağıtılıyor (kadir
+başına ~2.5 kat, gerçek sayıma yakın), renk sıcaklıktan (mavi-beyaz ↔ turuncu). Gürültü
+tamsayı karıştırıcıdan. Yarıçap ekran-uzayı türevinden, yani çözünürlükten bağımsız ~1
+piksel.
+
+**Sintilasyon hava kütlesinden.** Ufka yakın yıldız kalın hava katmanından geçtiği için
+çok titriyor, zenitte neredeyse sabit. Kendi zamanlayıcısı yok — `_Time` ve hash fazı.
+
+**Gündüz solması güneş yüksekliğinden, kadire göre ayrı ayrı:** parlak yıldız güneş
+−3°'nin altına inince görünüyor, en sönüğü −18°'yi bekliyor. `SkyWeatherDriver` bu değeri
+`TimeOfDay`in güneş yönünden sürüyor, ikinci bir zaman kaynağı yok.
+
+**`(1 − skyOpacity)` GÜNDÜZÜ KAPATMIYOR** — bir dönem öyle varsayıldı, ölçüm çürüttü:
+zenitte gündüz opaklık ~0.2, yıldızların %80'i geçiyordu ve sabah 8'de gökyüzü
+yıldızlıydı. Bulut örtüsünü hacimsel bulutlar kesmeye devam ediyor.
 
 **Yıldızlar gök kutbu etrafında dönüyor**, günde bir tur, ekseni güneşin yayıyla AYNI
 (`TimeOfDay.CelestialPole`). Ayrı bir eksen verilseydi güneşle yıldızlar farklı yönlerde
 dönerdi.
 
-**Ay albedosu 0.52 0.64 1.00.** Doğan ay uzun atmosfer yolundan geçip sarıya kayıyor;
-taban soğutuldu ki soğurma sonrası sonuç nötre yaklaşsın. Hesap `TimeOfDay.moonColor`
+**Ay albedosu 0.586 0.653 0.818.** Doğan ay uzun atmosfer yolundan geçip sarıya kayıyor;
+taban soğutuldu ki soğurma sonrası sonuç nötre yaklaşsın. Doygunluğu bir kez düşürüldü ve
+ton lineer uzayda ESKİ IŞIMAYA ölçeklendi (Y = 0.3844): renk değişirken parlaklık
+değişmemeli, yoksa `SurfaceLightLevel` üzerinden pozlama da kayıyor. Hesap `TimeOfDay.moonColor`
 yorumunda: 10°'de eski renk `1.00 0.80 0.43`, yeni renk `1.00 0.87 0.56`.
 
 **Hava bağı.** `SkyWeatherDriver` yalnız bir şey çeviriyor: yağış şiddeti → `aerosolDensity`
