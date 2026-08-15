@@ -247,6 +247,20 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
+        // DITHERING AÇIK. Gökyüzü tüm görüş alanında 1 duraktan az değişiyor (ölçüldü,
+        // durak konturu tek sınır veriyor). Bu kadar düz bir gradyanda 8 bit çıkışın
+        // basamakları lekeli bantlara dönüyor; belirti "gökyüzünde devasa koyu bölge"
+        // diye okunuyordu ve haftalarca gökyüzü hesabında arandı — orada değildi.
+        //
+        // URP varsayılanı KAPALI. Açıkken son geçişte mavi gürültü ekleniyor, basamak
+        // sınırı eriyor. TAA ile birlikte çalışır, deseni ayrıca zamanda da dağıtır.
+        if (!cameraData.dithering)
+        {
+            cameraData.dithering = true;
+            EditorUtility.SetDirty(cameraData);
+            changed = true;
+        }
+
         var terrainComponent = gen.GetComponent<Terrain>();
         if (!Mathf.Approximately(terrainComponent.heightmapPixelError, TerrainPixelError)
             || !Mathf.Approximately(terrainComponent.basemapDistance, TerrainBasemapDistance)
@@ -429,11 +443,41 @@ public static class MountainSceneBootstrap
         // AY GÖKYÜZÜNÜ AYDINLATAN TEK KAYNAK. Paket geceleyin ayı güneş yerine koyup
         // atmosferi ondan hesaplıyor; ortam probe'u da o gökyüzünden pişiyor. Değer göz
         // kararı bulundu, gerçek ay parlaklığının karşılığı değil.
-        timeOfDay.MoonIntensity = 0.204f;
+        // 0.204 → 0.0058. AY ON DÖRT DURAK FAZLA PARLAKTI ve gecenin gündüz gibi
+        // okunmasının kökü buydu; üstüne yapılan pozlama/kontrast düzeltmeleri yamaydı.
+        //
+        // Gerçek oran: dolunay aydınlanması ≈ 0,25 lüks, güneş ≈ 133.000 lüks — arada
+        // 19 durak var. Eski değerde güneş 3,0308'e karşı etkin ay 0,204 × renk ışıması
+        // 0,384 = 0,078, yani 39:1 = 5,3 durak. Gece öğlenin beş durak altındaydı.
+        //
+        // Yeni değerde etkin 0,0022 → 1360:1 = 10,4 durak. Fiziğin hâlâ 8,6 durak
+        // üstünde ve bu BİLEREK: tam fiziksel gece için pozlamanın 19 durak açması
+        // gerekirdi, `exposureCap` 2,5'te duruyor.
+        //
+        // POZLAMA UYUMU TAVANA DAYALI (`adapt` 3,5 isterken 2,5'te kırpılıyor), yani
+        // buradan yapılan her kısıntı ekrana BİREBİR iniyor. Bir sonraki ayar bu
+        // sayıdan yapılır, başka yerden telafi aranmaz.
+        //
+        // Ekrandaki karşılığı −4 durak. Kısıntının tamamı yansımıyor: ay kısılınca
+        // `SurfaceLightLevel` de düşüyor, pozlama uyumu tavana dayanıp +1,13 durak geri
+        // veriyor. Yıldızlar aydan bağımsız (`spaceEmissionMultiplier`), o yüzden gökyüzü
+        // koyulaşırken yıldızlar belirginleşiyor.
+        timeOfDay.MoonIntensity = 0.0058f;
 
         // Ay albedosu. Doğan ay atmosferden geçerken sarıya kayıyordu; taban soğutuldu.
         // Hesap `TimeOfDay.moonColor` yorumunda.
-        timeOfDay.MoonColor = new Color(0.52f, 0.64f, 1.00f, 1f);
+        //
+        // DOYGUNLUK DÜŞÜRÜLDÜ. Pozlama uyum payı yükselince gece bir durak açıldı ve o
+        // soğuk taban olduğundan fazla göze çarptı. Ay ışığı fizikte güneş ışığının gri
+        // regolitten yansıması, yani nötre yakın; gecenin mavi görünmesi gözün karanlıkta
+        // maviye kaymasından (Purkinje) geliyor ve bu kadar doygun değil.
+        //
+        // TON DEĞİŞTİ, PARLAKLIK DEĞİŞMEDİ. Doygunluğu düşürmek tek başına ışıma gücünü
+        // de yükseltiyor — `(0.72,0.80,1.00)` denendi, sahne bir tık daha aydınlandı.
+        // Ton lineer uzayda eski rengin ışımasına (Y = 0.3844) ölçeklendi; `MoonIntensity`
+        // bu yüzden 0.204'te kalıyor ve `SurfaceLightLevel` üzerinden pozlama uyumu da
+        // kaymıyor.
+        timeOfDay.MoonColor = new Color(0.586f, 0.653f, 0.818f, 1f);
     #endif
 
         // Debug menüsünde olduğu gibi her çalışmada yeniden bağlanır
@@ -459,6 +503,24 @@ public static class MountainSceneBootstrap
             lookController.Bind(LoadOrCreateLookSettings(), weatherState,
                 Object.FindAnyObjectByType<TimeOfDay>());
             changed = true;
+        }
+
+        // POZLAMA UYUM PAYI SAHNEYE YAZILIYOR. Alan serileştirilmiş: koddaki varsayılanı
+        // değiştirmek sahnedeki eski örneği etkilemiyor, ölçülen düzeltme kaybolurdu.
+        // Gerekçe ve ölçüm `LookController.adaptShare` başında.
+        // YENİDEN ARANIYOR: yukarıdaki dal bileşeni bu karede yaratmış olabilir, o
+        // durumda eldeki başvuru hâlâ boş.
+        lookController = Object.FindAnyObjectByType<LookController>();
+        if (lookController != null)
+        {
+            var lookSerialized = new SerializedObject(lookController);
+            var share = lookSerialized.FindProperty("adaptShare");
+            if (!Mathf.Approximately(share.floatValue, 0.35f))
+            {
+                share.floatValue = 0.35f;
+                lookSerialized.ApplyModifiedProperties();
+                changed = true;
+            }
         }
 
         Phase("sistemler");
@@ -1302,7 +1364,7 @@ public static class MountainSceneBootstrap
         // Şimşek `[RequireComponent(typeof(Light))]` ile kendi ışığını taşıyor, yani
         // bileşeninden kesin ayırt ediliyor.
         Light sun = null;
-        foreach (var light in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+        foreach (var light in Object.FindObjectsByType<Light>())
         {
             if (light.type != LightType.Directional) continue;
             if (light == moon) continue;

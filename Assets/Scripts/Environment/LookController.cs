@@ -19,6 +19,13 @@ public class LookController : MonoBehaviour
     [Tooltip("Karanlıkta açılabilecek en fazla durak (EV).")]
     [SerializeField, Range(0f, 6f)] float exposureCap = 2.5f;
 
+    /// 0.35'TE KALIYOR. Bir ara 0.60'a çıkarıldı: gece göğü ton eğrisinin dibinde
+    /// oturuyordu, veri tüm görüş alanında 1 duraktan az değişirken ekranda "siyah
+    /// bölge / normal gök" diye ikiye ayrılıyordu ve +1 EV bunu kapatıyordu.
+    ///
+    /// AMA POZLAMA YANLIŞ ALET. Karanlık ucu kaldırırken parlak ucu da kaldırdı; ay
+    /// ışığındaki kar ve tüm gece sahnesi gereğinden aydınlık oldu. Karanlık ucu tek
+    /// başına kaldıran şey ton eğrisidir: gece profilinde kontrast düşürüldü.
     [Tooltip("Işık farkının kapatılan payı. 1 = tam normalizasyon, şafağı öğlene çevirir.")]
     [SerializeField, Range(0f, 1f)] float adaptShare = 0.35f;
 
