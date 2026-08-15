@@ -334,6 +334,10 @@ public class DebugMenu : MonoBehaviour
             sky.spaceEmissionTexture.value = starsDisabled ? null : starTexture;
         }
 
+        bool frozenStars = GUILayout.Toggle(SkyWeatherDriver.FreezeStarRotation,
+            "7 — Yıldız dönüşü DONDURULDU");
+        SkyWeatherDriver.FreezeStarRotation = frozenStars;
+
         bool plainMoon = GUILayout.Toggle(PhysicallyBasedSkyURP.MoonAsPlainDisk,
             "6 — Ay evresiz (tip = güneş)");
         PhysicallyBasedSkyURP.MoonAsPlainDisk = plainMoon;
