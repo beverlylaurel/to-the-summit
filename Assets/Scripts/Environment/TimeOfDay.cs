@@ -25,6 +25,14 @@ public class TimeOfDay : MonoBehaviour
     [SerializeField] float sunIntensity = 1.5f;
     [SerializeField] float moonIntensity = 0.12f;
 
+    /// Güneşin tepe şiddeti. Gökyüzü paketi kendi parlaklığını ana ışıktan türettiği için
+    /// gök ile sahnenin göreli parlaklığı buradan ayarlanıyor; F1 paneli bunu sürüyor.
+    public float SunIntensity
+    {
+        get => sunIntensity;
+        set => sunIntensity = value;
+    }
+
     public event Action<TimeOfDay> Changed;
 
     public float Normalized => normalized;
