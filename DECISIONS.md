@@ -1091,6 +1091,26 @@ mesafesi. Gökyüzü bunları bilmiyor; çeviriyi `SkyWeatherDriver` yapıyor.
 
 **Uyarı.** Brief 2016 ve 2020 katsayı setlerini ayrı tutmayı şart koşuyor; birleştirilmeyecek.
 
+## Gökyüzü paketinde uyumluluk kipi kapatıldı
+
+**Karar.** `PhysicallyBasedSkyURP.cs`'teki beş `#region Non Render Graph Pass` bloğu
+`#if !UNITY_6000_0_OR_NEWER` ile kapatıldı. Paketin kaynağına dokunulmuş bir yer var,
+tek yer burası.
+
+**Gerekçe.** URP 17'de uyumluluk kipi API'leri kaldırıldı: `OnCameraSetup(CommandBuffer,
+ref RenderingData)` ve `Execute(ScriptableRenderContext, ref RenderingData)` artık taban
+sınıfta yok, `override` derlenmiyor (CS0115 × 4). Paket URP 14'e yazılmış ve bu bloklarda
+yalnız `[Obsolete]` niteliğini sürümle kapatmış, metotları değil. Bulut portu (aynı yazar,
+daha yeni) tam olarak bu kalıbı kullanıyor — düzeltme bizim icadımız değil, portun kendi
+çözümü.
+
+**Güvenli olmasının sebebi.** Bloklar temiz ayrılmış: uyumluluk kipinin durumu
+(`mainLightColor`, `GetMainLight(LightData)`) kendi bölgesinde duruyor, RenderGraph yolu
+kendi yerelini kullanıyor. Paylaşılan yardımcılar ayrı `#region Shared` bloklarında.
+
+**Tetikleyici.** Paket güncellenirse bu düzeltme kaybolur ve aynı dört hata döner. Yeni
+sürüm URP 17'yi destekliyorsa düzeltme gereksizleşir ve bu kayıt silinir.
+
 ## Paketin sisi kapalı başlıyor
 
 **Karar.** `Fog` override'ı profile eklendi ama `enabled = false`.

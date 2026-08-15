@@ -584,6 +584,12 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             this.celestialBodyData = celestialBodyData;
         }
 
+// URP 17'de uyumluluk kipi API'leri KALDIRILDI: `OnCameraSetup(CommandBuffer, ref
+// RenderingData)` ve `Execute(ScriptableRenderContext, ref RenderingData)` artik taban
+// sinifta yok, `override` derlenmiyor. Paket URP 14'e yazilmis ve bu bolgelerde
+// yalniz `[Obsolete]` niteligini surumle kapatmis, metotlari degil.
+// RenderGraph yolu asagida duruyor ve Unity 6'da zaten o calisiyor.
+#if !UNITY_6000_0_OR_NEWER
         #region Non Render Graph Pass
         // Passing the final sun color to the Execute() method
         private float3 mainLightColor;
@@ -657,6 +663,7 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             CommandBufferPool.Release(cmd);
         }
         #endregion
+#endif
 
     #if UNITY_6000_0_OR_NEWER
         #region Render Graph Pass
@@ -1096,6 +1103,12 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             this.celestialBodyData = celestialBodyData;
         }
 
+// URP 17'de uyumluluk kipi API'leri KALDIRILDI: `OnCameraSetup(CommandBuffer, ref
+// RenderingData)` ve `Execute(ScriptableRenderContext, ref RenderingData)` artik taban
+// sinifta yok, `override` derlenmiyor. Paket URP 14'e yazilmis ve bu bolgelerde
+// yalniz `[Obsolete]` niteligini surumle kapatmis, metotlari degil.
+// RenderGraph yolu asagida duruyor ve Unity 6'da zaten o calisiyor.
+#if !UNITY_6000_0_OR_NEWER
         #region Non Render Graph Pass
         bool lutDataChanged;
     #if UNITY_6000_0_OR_NEWER
@@ -1275,6 +1288,7 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             CommandBufferPool.Release(cmd);
         }
         #endregion
+#endif
 
     #if UNITY_6000_0_OR_NEWER
         #region Render Graph Pass
@@ -1620,6 +1634,12 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             this.lutMaterial = lutMaterial;
         }
 
+// URP 17'de uyumluluk kipi API'leri KALDIRILDI: `OnCameraSetup(CommandBuffer, ref
+// RenderingData)` ve `Execute(ScriptableRenderContext, ref RenderingData)` artik taban
+// sinifta yok, `override` derlenmiyor. Paket URP 14'e yazilmis ve bu bolgelerde
+// yalniz `[Obsolete]` niteligini surumle kapatmis, metotlari degil.
+// RenderGraph yolu asagida duruyor ve Unity 6'da zaten o calisiyor.
+#if !UNITY_6000_0_OR_NEWER
         #region Non Render Graph Pass
     #if UNITY_6000_0_OR_NEWER
         [Obsolete]
@@ -1661,6 +1681,7 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             CommandBufferPool.Release(cmd);
         }
         #endregion
+#endif
 
     #if UNITY_6000_0_OR_NEWER
         #region Render Graph Pass
@@ -1825,6 +1846,12 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
 
         }
 
+// URP 17'de uyumluluk kipi API'leri KALDIRILDI: `OnCameraSetup(CommandBuffer, ref
+// RenderingData)` ve `Execute(ScriptableRenderContext, ref RenderingData)` artik taban
+// sinifta yok, `override` derlenmiyor. Paket URP 14'e yazilmis ve bu bolgelerde
+// yalniz `[Obsolete]` niteligini surumle kapatmis, metotlari degil.
+// RenderGraph yolu asagida duruyor ve Unity 6'da zaten o calisiyor.
+#if !UNITY_6000_0_OR_NEWER
         #region Non Render Graph Pass
     #if UNITY_6000_0_OR_NEWER
         [Obsolete]
@@ -1855,6 +1882,7 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             CommandBufferPool.Release(cmd);
         }
         #endregion
+#endif
 
     #if UNITY_6000_0_OR_NEWER
         #region Render Graph Pass
@@ -1963,6 +1991,12 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             cloudsMaterial = material;
         }
 
+// URP 17'de uyumluluk kipi API'leri KALDIRILDI: `OnCameraSetup(CommandBuffer, ref
+// RenderingData)` ve `Execute(ScriptableRenderContext, ref RenderingData)` artik taban
+// sinifta yok, `override` derlenmiyor. Paket URP 14'e yazilmis ve bu bolgelerde
+// yalniz `[Obsolete]` niteligini surumle kapatmis, metotlari degil.
+// RenderGraph yolu asagida duruyor ve Unity 6'da zaten o calisiyor.
+#if !UNITY_6000_0_OR_NEWER
         #region Non Render Graph Pass
     #if UNITY_6000_0_OR_NEWER
         [Obsolete]
@@ -2107,6 +2141,7 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             CommandBufferPool.Release(cmd);
         }
         #endregion
+#endif
 
     #if UNITY_6000_0_OR_NEWER
         #region Render Graph Pass
