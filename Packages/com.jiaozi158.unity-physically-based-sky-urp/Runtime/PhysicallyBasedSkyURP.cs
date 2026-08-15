@@ -56,6 +56,13 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
     /// (ayrı bir yönlü ışık olarak) araziyi sürüyor.
     public static Light MoonLight { get; set; }
 
+    /// TEŞHİS — GEÇİCİ. Paketin o an ne çözdüğü. Fasulye ve yıldız sorunu kapanınca silinecek.
+    public static string ResolvedMainLightName { get; private set; } = "-";
+    public static int ResolvedBodyCount { get; private set; }
+    public static Vector3 ResolvedBody0Forward { get; private set; }
+    public static Vector3 ResolvedBody1Forward { get; private set; }
+    public static bool ResolvedHasSpaceTexture { get; private set; }
+
     private PBSkyPrePass m_PBSkyPrePass;
     private SkyViewLUTPass m_SkyViewLUTPass;
     private AtmosphericScatteringPass m_AtmosphericScatteringPass;
@@ -926,6 +933,10 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             // AYNI IŞIK İKİ CİSİM OLAMAZ. Ana ışık aya çözüldüğü karelerde ay hem birinci
             // (güneş parametreleriyle: 0.5° disk, 2° parıltı) hem ikinci cisim olarak
             // çiziliyordu — diskin yanında ayrı bir parıltı beliriyordu.
+            ResolvedMainLightName = mainLight != null ? mainLight.gameObject.name : "YOK";
+            ResolvedBody0Forward = mainLight != null ? mainLight.transform.forward : Vector3.zero;
+            ResolvedHasSpaceTexture = pbrSky.spaceEmissionTexture.value != null;
+
             bool hasMoon = MoonLight != null && MoonLight.isActiveAndEnabled
                         && MoonLight.intensity > 0.0f && mainLight != MoonLight;
 
@@ -939,6 +950,9 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             // ayrı kapsamda olamaz.
             material.SetInt(_CelestialBodyCount, hasMoon ? 2 : 1);
             Shader.SetGlobalInt(_CelestialBodyCount, hasMoon ? 2 : 1);
+
+            ResolvedBodyCount = hasMoon ? 2 : 1;
+            ResolvedBody1Forward = hasMoon ? MoonLight.transform.forward : Vector3.zero;
 
             if (hasMoon)
             {
