@@ -25,10 +25,10 @@ public class TimeOfDay : MonoBehaviour
     // 3.030782 gökyüzü paketinin kalibrasyonu: 100000 lux yer aydınlığı. Sahne kurulumu
     // da bunu yazıyor, ikisi ayrışmasın diye varsayılan burada da güncellendi.
     [SerializeField] float sunIntensity = 3.030782f;
-    // 0.12'den 0.4'e: ortam probe'u donmuşken gece sahte bir maviyle doluyordu ve ay
-    // gereksiz görünüyordu. Probe dürüstleşince gece gerçek değerine indi, gökyüzünü
-    // aydınlatan tek kaynak ay kaldı ve 0.12 yetmedi. Göz kararı bulundu.
-    [SerializeField] float moonIntensity = 0.4f;
+    // Ortam probe'u donmuşken gece sahte bir maviyle doluyordu ve ay gereksiz
+    // görünüyordu. Probe dürüstleşince gece gerçek değerine indi ve gökyüzünü aydınlatan
+    // tek kaynak ay kaldı. Değer göz kararı bulundu.
+    [SerializeField] float moonIntensity = 0.204f;
 
     /// Güneşin tepe şiddeti. Gökyüzü paketi kendi parlaklığını ana ışıktan türettiği için
     /// gök ile sahnenin göreli parlaklığı buradan ayarlanıyor; F1 paneli bunu sürüyor.
