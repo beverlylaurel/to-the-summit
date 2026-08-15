@@ -995,6 +995,20 @@ aydınlatıyor. Yani ayda gümüş kenar yok.
 analitik probe'u devre dışı: o yol çoklu saçılım taşımıyor ve alacakaranlıkta sıfır
 veriyordu. Pişirme kısık — güneş 0.25° kayınca ve en fazla yarım saniyede bir.
 
+**YILDIZLAR paketin `spaceEmissionTexture` girişinden.** `StarFieldGenerator` 512'lik bir
+küp harita üretiyor: 1500 yıldız, kadir 0–6 arası, sayım küp kökle dağıtılıyor (kadir
+başına ~2.5 kat artan gerçek sayıma yakın), renk sıcaklıktan (mavi-beyaz ↔ turuncu).
+Gürültü tamsayı karıştırıcıdan.
+
+Paket bunu YALNIZ uzaya bakarken ekliyor ve `(1 − skyOpacity)` ile çarpıyor: gündüz
+atmosfer opaklaştıkça yıldızlar kendiliğinden yıkanıyor, bulut örtüsünü de hacimsel
+bulutlar kesiyor. Eski sistemin `(1−gündüz) × (1−kapsama)` kuralına gerek kalmadı —
+mekanizma ikisini de fiziksel olarak yapıyor.
+
+**Yıldızlar gök kutbu etrafında dönüyor**, günde bir tur, ekseni güneşin yayıyla AYNI
+(`TimeOfDay.CelestialPole`). Ayrı bir eksen verilseydi güneşle yıldızlar farklı yönlerde
+dönerdi.
+
 **Ay albedosu 0.52 0.64 1.00.** Doğan ay uzun atmosfer yolundan geçip sarıya kayıyor;
 taban soğutuldu ki soğurma sonrası sonuç nötre yaklaşsın. Hesap `TimeOfDay.moonColor`
 yorumunda: 10°'de eski renk `1.00 0.80 0.43`, yeni renk `1.00 0.87 0.56`.

@@ -43,6 +43,12 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Güneş 3.03'e çıktıktan sonra yüzeyler** — arazi, kar ve bisiklet 1.5'e göre
   ayarlanmıştı; yeniden ayar gerekip gerekmediğine bakılmadı
   → [Güneş şiddeti pakete kalibre edildi](#güneş-şiddeti-pakete-kalibre-edildi-15--3030782)
+- **Yıldızların dönüş yönü** — shader arama yönünü döndürdüğü için açı negatif verildi,
+  ekranda doğrulanmadı; ters akıyorsa düzeltme tek işaret
+  → [Gece tamamlandı](#gece-tamamlandı-yıldızlar-geldi-ay-ikincil-kaynak-oldu)
+- **Bulutların gece görünümü** — ay bulutları yalnız ortam ışığından aydınlatıyor,
+  doğrudan ışık maliyeti ölçülmedi
+  → [Bulutlar ayı doğrudan almıyor](#bulutlar-ayı-doğrudan-almıyor--maliyeti-ölçülmedi)
 - **Hava perspektifi + yükseklik sisi birlikte** — paketin atmosferik saçılımı açık,
   bizim yükseklik sisimiz de duruyor; ikisinin üst üste binip binmediği bakılmadı
   → [Paketin sisi kapalı başlıyor](#paketin-sisi-kapalı-başlıyor)
@@ -1217,31 +1223,38 @@ bir tanedir ve devir anında disk 180° atlıyordu. Bant ayarıyla yalnız yerin
 - Bulut gölge geçişi gece `NullReferenceException` atıyordu: koddan eklenen ışıkta
   `UniversalAdditionalLightData` yok. İki ışıkta da garanti edildi.
 
-## Gece boş: yıldızlar gitti, ay tek kaynak## Gece boş: yıldızlar gitti, ay tek kaynak
+## Gece tamamlandı: yıldızlar geldi, ay ikincil kaynak oldu
 
-**Durum.** Ortam kipi Skybox'a alınınca probe dürüstleşti ve gece gerçek değerine indi
-(`0.001–0.007`, öğlen tepe `0.114 0.153 0.193`). Gökyüzü simsiyah çıkıyor.
+**Yıldızlar.** `StarFieldGenerator` küp harita üretiyor, paketin `spaceEmissionTexture`
+girişine bağlanıyor. Paket onu yalnız uzaya bakarken ekliyor ve `(1 − skyOpacity)` ile
+çarpıyor.
 
-**İki eksik var, ikisi ayrı.**
+**Eski görünürlük kuralı GEREKSİZLEŞTİ.** Silinen koddaki hâli
+`yıldız = (1 − gündüz payı) × (1 − kapsama) × 1.2` idi. Yeni mekanizmada gündüzü
+atmosfer opaklığı, bulut örtüsünü de hacimsel bulutların kendisi kesiyor — ikisi de
+fiziksel olarak oluyor, elle kural yazmak çifte sayım olurdu.
 
-1. **Yıldızlar YOK.** `_StarStrength` ve yıldız çizimi `Sky.shader`'da duruyor, o da artık
-   skybox değil — paket onun yerine geçti. Kod hâlâ globali yazıyor ama kimse okumuyor.
-   Brief yıldızlar için kesin değer vermiyor (`sprite`, luminance soru işaretli).
+**Çarpan 0.08 ve gerekçesi ölçümden.** Gece zenit parlaklığı 0.0036 (ay tepedeyken). En
+parlak yıldız 0.08'de gökten ~20 kat parlak, yani nokta olarak seçiliyor ama gökyüzünü
+yıkamıyor. 6. kadir bunun %0.4'ü (0.0003), gök gürültüsünün altında kalıyor.
 
-   GÖRÜNÜRLÜK KURALI KORUNSUN — silinen koddaki hâli:
-   `yıldız = (1 − gündüz payı) × (1 − kapsama) × 1.2`. Gece açılır, bulut kapanınca söner.
-   Yeniden yazılırken bu bağ tekrar kurulmalı; yıldızın buluttan bağımsız olması
-   "fırtına var ama yıldızlar pırıl pırıl" çelişkisi üretir.
+**DOĞRULANMAYAN TEK ŞEY — yıldızların dönüş YÖNÜ.** Shader arama yönünü döndürüyor
+(`mul(-V, _SpaceRotation)`), bu yüzden açı negatif verildi. Ekranda yıldızlar ters yöne
+akıyorsa düzeltme tek işaret: `SkyWeatherDriver`'daki `-time.Normalized * 360f`.
 
-2. **Ay ikincil saçılım kaynağı OLDU.** Kendi ışığı, kendi diski, gökyüzüne kendi
-   katkısı var. Açısal çapı 0.52° (brief: 0.48–0.56). Kalan: bulutları doğrudan
-   aydınlatmıyor, yalnız ortam ışığından geçiyor — ayda gümüş kenar yok.
+## Bulutlar ayı doğrudan almıyor — maliyeti ölçülmedi
 
-**Tetikleyici.** Gece sahnesi oynanabilir olmalıysa. Sıra: önce ay şiddeti göz kararı
-(F1 → Gökyüzü → Ay şiddeti), sonra yıldızlar.
+**Durum.** Bulut geçişinin TEK yönlü ışığı var (`_SunColor`). Gece ay bulutları doğrudan
+değil, gökyüzünden pişen ortam probe'u üzerinden aydınlatıyor. Sonuç: ayda gümüş kenar
+yok, faz fonksiyonu gece devrede değil.
 
-**Uyarı — geçersiz eleme.** Ay şiddeti bir kez denendi ve "etkisi yok" diye elendi. O deneme
-probe DONMUŞKEN yapıldı, dolayısıyla sonuç anlamsızdı. Eleme geçersizdir, yeniden denenmeli.
+**Neden yapılmadı.** İkinci ışık, ışın yürüyüşünde örnek başına ikinci bir
+`EvaluateSunTransmittance` demek. Işık adımı 8 ve bu döngü bulut aydınlatmasının en pahalı
+kısmı; maliyet kabaca iki katına çıkar ve kazanç YALNIZ gece. Ölçüm yapılmadan bu takas
+kabul edilemez.
+
+**Tetikleyici.** Gece bulutlarının düz ve ölü görünmesi rahatsız ederse. O turda önce
+kare süresi ölçülür, sonra yazılır.
 
 ## Paketin sisi kapalı başlıyor
 
