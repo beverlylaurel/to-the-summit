@@ -414,6 +414,14 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
+    #if URP_PBSKY
+        // GÜNEŞ ŞİDDETİ GÖKYÜZÜ PAKETİNİN KALİBRASYONUNDAN. Paket 100000 lux yer
+        // aydınlığına göre kurulu ve gökyüzü parlaklığını ana ışıktan türetiyor; 1.5'te
+        // gök sahneye göre sönük kalıyordu. Sayı paketin kendi önerisi, bizim seçimimiz
+        // değil — gök ile sahnenin göreli parlaklığı buradan geliyor.
+        Object.FindAnyObjectByType<TimeOfDay>().SunIntensity = 3.030782f;
+    #endif
+
         // Debug menüsünde olduğu gibi her çalışmada yeniden bağlanır
         atmosphere.Bind(
             atmosphereSettings,

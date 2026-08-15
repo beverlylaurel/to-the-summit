@@ -22,7 +22,9 @@ public class TimeOfDay : MonoBehaviour
              "seçilmez — süzülme hesabı yapar.")]
     [SerializeField] Color sunColor = new(1f, 0.97f, 0.92f);
     [SerializeField] Color moonColor = new(0.62f, 0.70f, 0.92f);
-    [SerializeField] float sunIntensity = 1.5f;
+    // 3.030782 gökyüzü paketinin kalibrasyonu: 100000 lux yer aydınlığı. Sahne kurulumu
+    // da bunu yazıyor, ikisi ayrışmasın diye varsayılan burada da güncellendi.
+    [SerializeField] float sunIntensity = 3.030782f;
     [SerializeField] float moonIntensity = 0.12f;
 
     /// Güneşin tepe şiddeti. Gökyüzü paketi kendi parlaklığını ana ışıktan türettiği için
