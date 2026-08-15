@@ -82,6 +82,16 @@ public class TimeOfDay : MonoBehaviour
         set => moonIntensity = value;
     }
 
+    /// Ayın kendi rengi — yüzeyinin albedosu, atmosferden GEÇMEDEN önceki hâli.
+    /// Ay ufka yakınken uzun bir atmosfer yolundan geçiyor, mavi soğuruluyor ve disk
+    /// sarı-turuncuya kayıyor; bu fiziksel olarak doğru. Daha soğuk bir taban seçilirse
+    /// soğurma sonrası sonuç nötre yaklaşıyor.
+    public Color MoonColor
+    {
+        get => moonColor;
+        set => moonColor = value;
+    }
+
 
 
     public event Action<TimeOfDay> Changed;
