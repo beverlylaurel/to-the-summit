@@ -149,23 +149,9 @@ public class TimeOfDay : MonoBehaviour
 
     public Color MoonTint => moonColor;
 
-    /// Ay güneşin karşısındadır.
-    public Vector3 MoonDirection => -SunDirection;
-
-    /// Huzmenin atmosferden geçen payı (0-1). Renk değil ŞİDDET taşır.
-    public float BeamLevel { get; private set; }
-    public float MoonLevel { get; private set; }
-
-    /// Gök ışığı: güneş battıktan sonra manzarayı aydınlatan kaynak.
-    public float SkyLevel { get; private set; }
-
-    /// Ay ışığının rengi — sabit değil, ay da ufukta kızarır.
-    public Color MoonLight { get; private set; } = Color.white;
-
-    /// TEŞHİS — yönlü ışığın o andaki şiddeti. Zincirin hangi halkasının koptuğunu
-    /// ekrandan okumak için: huzme mi sıfırlanıyor, renk mi siyaha düşüyor, yoksa
-    /// şiddet mi kayboluyor.
-    public float LightIntensity => sun != null ? sun.intensity : 0f;
+    /// Ay güneşin karşısındadır. Yalnız bu bileşen kullanıyor: dışarıdan okunacak bir
+    /// şey kalmadı, ayın kendi ışığı ve gök cismi verisi buradan sürülüyor.
+    Vector3 MoonDirection => -SunDirection;
 
     /// DÜZ ZEMİNE ULAŞAN IŞIK. İki cismin katkısı toplanıyor ve her biri KENDİ
     /// yüksekliğiyle çarpılıyor: ufkun altındaki cismin şiddeti düz zemine ulaşmıyor
@@ -277,16 +263,10 @@ public class TimeOfDay : MonoBehaviour
         // Normalizasyon YOK — huzme kızarırken SÖNMEK zorunda. Eski hâl en parlak
         // kanalı hep 1'e çekiyordu: batış sönmeyen bir kızılda kilitleniyor, göz
         // alıyordu.
+        // GÜNEŞ HUZMESİ YALNIZ RENK İÇİN. Şiddet artık buradan gelmiyor — soğurmanın
+        // sahibi gökyüzü paketi, ışığa ham güneş yazılıyor. `CurrentSunColor` ise hâlâ
+        // tüketiliyor: sis rengi, bulut tonu ve arazinin şafak rengi ondan besleniyor.
         Vector3 beam = Atmosphere.BeamTransmittance(0f, SunDirection);
-        Vector3 moonBeam = Atmosphere.BeamTransmittance(0f, MoonDirection);
-
-        // Gök ışığı: güneş battıktan sonra manzarayı aydınlatan şey. Zenit yönü
-        // temsilî alınıyor — tek renk yeter, yön dağılımı gökyüzü shader'ının işi.
-        Vector3 sky = Atmosphere.SkyRadiance(0f, Vector3.up, SunDirection)
-                    * Atmosphere.SceneGain;
-
-        BeamLevel = (beam.x + beam.y + beam.z) / 3f;
-        SkyLevel = (sky.x + sky.y + sky.z) / 3f;
 
         // Renk ve şiddet ayrı taşınır: tüketicilerin çoğu rengi bir TON olarak
         // kullanıyor, sönümü ışık şiddeti taşıyor. Çarpımları gerçek huzmeye eşit.
@@ -296,13 +276,6 @@ public class TimeOfDay : MonoBehaviour
         float sunFade = Atmosphere.LowSunFade(0f, SunDirection);
         CurrentSunColor = Tint(Vector3.Scale(beam,
             new Vector3(sunColor.r, sunColor.g, sunColor.b))) * sunFade;
-
-        // Ay ayrı bir fizik değil: güneş ışığının aydan yansıyıp AYNI atmosferden
-        // geçmesi. Sabit mavi bir renk yapaydı — ay da ufukta kızarır.
-        MoonLight = Tint(Vector3.Scale(moonBeam,
-            new Vector3(moonColor.r, moonColor.g, moonColor.b)))
-                  * Atmosphere.LowSunFade(0f, MoonDirection);
-        MoonLevel = (moonBeam.x + moonBeam.y + moonBeam.z) / 3f;
 
         // İKİ CİSİM, İKİ IŞIK. Tek ışığa sığdırmak yapısal olarak çözülemiyordu: ay
         // güneşin tam karşısında, yön bir tanedir ve devir anında disk 180° atlıyordu.
