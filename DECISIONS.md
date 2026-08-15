@@ -43,9 +43,6 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Güneş 3.03'e çıktıktan sonra yüzeyler** — arazi, kar ve bisiklet 1.5'e göre
   ayarlanmıştı; yeniden ayar gerekip gerekmediğine bakılmadı
   → [Güneş şiddeti pakete kalibre edildi](#güneş-şiddeti-pakete-kalibre-edildi-15--3030782)
-- **Yıldızların dönüş yönü** — shader arama yönünü döndürdüğü için açı negatif verildi,
-  ekranda doğrulanmadı; ters akıyorsa düzeltme tek işaret
-  → [Gece tamamlandı](#gece-tamamlandı-yıldızlar-geldi-ay-ikincil-kaynak-oldu)
 - **Bulutların gece görünümü** — ay bulutları yalnız ortam ışığından aydınlatıyor,
   doğrudan ışık maliyeti ölçülmedi
   → [Bulutlar ayı doğrudan almıyor](#bulutlar-ayı-doğrudan-almıyor--maliyeti-ölçülmedi)
@@ -1269,9 +1266,9 @@ yanlış ölçüttü.
 Yeni ölçüt fiziksel ve gökten bağımsız: **6. kadir çıplak gözün sınırında olmalı.** Gece
 pozlaması ×2 alınarak kadir 2 → sRGB ~0.42, kadir 4 → ~0.19, kadir 6 → ~0.08.
 
-**DOĞRULANMAYAN TEK ŞEY — yıldızların dönüş YÖNÜ.** Shader arama yönünü döndürüyor
-(`mul(-V, _SpaceRotation)`), bu yüzden açı negatif verildi. Ekranda yıldızlar ters yöne
-akıyorsa düzeltme tek işaret: `SkyWeatherDriver`'daki `-time.Normalized * 360f`.
+**Dönüş yönü DOĞRULANDI (2026-08-16).** Shader arama yönünü döndürdüğü için
+(`mul(-V, _SpaceRotation)`) açı negatif verilmişti; ekranda kontrol edildi, yıldızlar
+doğru yönde akıyor. `SkyWeatherDriver`'daki `-time.Normalized * 360f` işareti doğru.
 
 ## Bulutlar ayı doğrudan almıyor — maliyeti ölçülmedi
 

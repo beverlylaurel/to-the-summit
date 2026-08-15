@@ -966,8 +966,24 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                     ? moonColor * Mathf.CorrelatedColorTemperatureToRGB(MoonLight.colorTemperature)
                     : moonColor;
 
+                // PARILTI DİSKİN LAMBERT ÖLÇEĞİNE BAĞLI. Shader diski `type != 0` iken
+                // `evre × 1/π + earthshine` ile çarpıyor, parıltıyı ÇARPMIYOR — güneşte
+                // (`type = 0`) Lambert terimi hiç uygulanmadığı için orada süreklilik
+                // bozulmuyor, ayda bozuluyordu.
+                //
+                // Aynı yazıldıklarında dolunayda: disk merkezi 0.318 + 0.01 = 0.328,
+                // disk kenarı 0.01 (Lambert kararması), hemen dışındaki parıltı 1.00.
+                // Parıltı merkezin 3, kenarın 100 katı — ayın ortası karanlık, çevresi
+                // parlak halka görünüyordu.
+                //
+                // Parıltı diskin ışığının atmosferde saçılmış hâli, diskten parlak
+                // olamaz. Ölçek diskin ORTALAMASI: dolunayda Lambert'in görünen disk
+                // üzerindeki ortalaması 2/3.
+                const float moonEarthshine = 0.01f; // dünya güneş ışığının ~%1'ini yansıtıyor
+                float moonDiskAverage = (1.0f / Mathf.PI) * (2.0f / 3.0f) + moonEarthshine;
+
                 Vector4 moonSurfaceColor = Vector4.one * moonRcpSolidAngle * MoonDiskBrightness;
-                Vector4 moonFlareColor = Vector4.one * moonRcpSolidAngle * MoonDiskBrightness;
+                Vector4 moonFlareColor = moonSurfaceColor * moonDiskAverage;
 
                 Shader.SetGlobalVector(_CelestialBody2_Color, new Vector4(moonColor.r, moonColor.g, moonColor.b, 0.0f));
                 Shader.SetGlobalVector(_CelestialBody2_Forward, MoonLight.transform.forward);
@@ -985,7 +1001,7 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 Shader.SetGlobalVector(_CelestialBody2_Up, MoonLight.transform.up.normalized);
                 Shader.SetGlobalInt(_CelestialBody2_Type, 1);
                 Shader.SetGlobalVector(_CelestialBody2_SurfaceColor, moonSurfaceColor);
-                Shader.SetGlobalFloat(_CelestialBody2_Earthshine, 1.0f * 0.01f);
+                Shader.SetGlobalFloat(_CelestialBody2_Earthshine, moonEarthshine);
                 Shader.SetGlobalVector(_CelestialBody2_SurfaceTextureScaleOffset, Vector4.zero);
                 // EVRE GÜNEŞİN YÖNÜNDEN, ANA IŞIĞINKİNDEN DEĞİL. Ana ışık aya çözülünce
                 // `sunDirection` ayın kendi yönü oluyor, `ComputeMoonPhase` sıfıra
