@@ -48,6 +48,14 @@ public class WindField : MonoBehaviour
     /// açılıp kapanmaz, bulut katmanı esintiyle inip kalkmaz.
     public float Strength { get; private set; }
 
+    /// SERBEST HAVA HIZI (m/s): yalnız `Severity`'den türer. Arazi maruziyeti ve esinti
+    /// UYGULANMAZ.
+    ///
+    /// Bulut katmanı bunu okur. `Strength` maruziyetle ölçekleniyor; onu okusaydı oyuncu
+    /// kayanın arkasına geçtiğinde iki kilometre yukarıdaki bulut yavaşlardı.
+    public float FreeAirSpeed => Mathf.Lerp(settings.calmSpeed, settings.stormSpeed,
+        overrideActive ? overrideSeverity : Mathf.Clamp01(Severity));
+
     /// Sürekli şiddetin üstüne binen anlık sapma, -1..1. Duyulan ve görülen şey budur.
     ///
     /// Tek bir sayı ikisini birden taşıyamıyordu: esinti fırtına hızını aştığında

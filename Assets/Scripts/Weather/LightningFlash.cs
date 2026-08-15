@@ -26,6 +26,7 @@ public class LightningFlash : MonoBehaviour
 
     [SerializeField] ThunderPlayer thunder;
     [SerializeField] AtmosphereController atmosphere;
+    [SerializeField] CloudLayerProbe cloudLayer;
     [SerializeField] Transform observer;
     [SerializeField] LightningSettings settings;
 
@@ -63,10 +64,11 @@ public class LightningFlash : MonoBehaviour
     /// Sahne kurulumu ışığı da buradan yapılandırır: biçimi bileşenin kendi işi,
     /// kurulum betiğine dağılmamalı.
     public void Bind(ThunderPlayer source, AtmosphereController air, Transform eye,
-        LightningSettings tuning)
+        LightningSettings tuning, CloudLayerProbe layer)
     {
         thunder = source;
         atmosphere = air;
+        cloudLayer = layer;
         observer = eye;
         settings = tuning;
 
@@ -131,11 +133,6 @@ public class LightningFlash : MonoBehaviour
         float nearness = 1f - Mathf.SmoothStep(0f, 1f,
             Mathf.InverseLerp(settings.nearDistance, settings.farDistance, distance));
 
-        // Şimşek bulutun içinde boşalır. Katmanın alt çeyreğine yerleşiyor: kanal aşağı
-        // doğru büyüdüğü için görünen boşalma tabana yakın oluyor.
-        float cloudBase = atmosphere.CloudBottom;
-        float height = Mathf.Lerp(cloudBase, atmosphere.CloudTop, 0.25f);
-
         // Yön oyuncunun baktığı tarafa ağırlıklı. Tamamen rastgele dağıtmak "doğru" ama
         // görüş açısı gökyüzünün beşte birini gördüğü için çakmaların çoğu arkada kalıyor
         // ve fırtına boş görünüyordu. Kaçırılan bir şimşek hiç çakmamış demektir.
@@ -144,9 +141,16 @@ public class LightningFlash : MonoBehaviour
         float bearing = look + UnityEngine.Random.Range(-spread, spread);
 
         Vector3 eye = observer.position;
-        origin = new Vector3(eye.x + Mathf.Cos(bearing) * distance,
-                             height,
-                             eye.z + Mathf.Sin(bearing) * distance);
+        Vector3 strike = new Vector3(eye.x + Mathf.Cos(bearing) * distance, 0f,
+                                     eye.z + Mathf.Sin(bearing) * distance);
+
+        // Şimşek bulutun içinde boşalır. Katmanın alt çeyreğine yerleşiyor: kanal aşağı
+        // doğru büyüdüğü için görünen boşalma tabana yakın oluyor. Tepe ÇAKMA SÜTUNUNDAN
+        // okunuyor; sütun boşsa katmanın azami tepesi kullanılıyor.
+        float top = cloudLayer.TopAt(strike);
+        if (float.IsPositiveInfinity(top)) top = cloudLayer.MaxTop;
+        strike.y = Mathf.Lerp(cloudLayer.Bottom, top, 0.25f);
+        origin = strike;
 
         // Ters kare sönüm: şiddet referans mesafede verilmiş, gerçek mesafeye taşınıyor.
         // Yakınında patlayan şimşeğin gözü kamaştırması bundan — ton eşleme orada beyaza
@@ -182,7 +186,7 @@ public class LightningFlash : MonoBehaviour
         active = true;
         LastDistance = distance;
 
-        Placed?.Invoke(new LightningStrike(origin, cloudBase, distance, nearness, duration));
+        Placed?.Invoke(new LightningStrike(origin, cloudLayer.Bottom, distance, nearness, duration));
     }
 
     /// Vuruşların örtüşen sönümleri. Toplamak yerine en güçlüsü alınıyor: üst üste

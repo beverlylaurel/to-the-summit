@@ -36,6 +36,10 @@ Shader "ToTheSummit/Sky"
             float3 _MoonDirection;
             float _StarStrength;
 
+            /// Bulut sisteminin ortam sondası geçişi 1 yazar, geçiş bitince 0'a döner.
+            /// Sondanın küpüne güneş/ay diski girmesin diye (`VolumetricCloudsURP`).
+            float _DisableSunDisk;
+
             float4 _LightningPosition;   // xyz çakmanın dünya konumu, w leke yarıçapı
 
             struct Attributes { float4 positionOS : POSITION; };
@@ -183,9 +187,15 @@ Shader "ToTheSummit/Sky"
                 // ufukta da görünür, batımı izleyebilmemizin sebebi bu. Sonsuz gök
                 // yolu yerine sınırlı bir yolla sönür: berrakta loş kızıl disk kalır
                 // (rengi zaten süzülmüş güneş), yağışta ve çorbada kaybolur.
-                float3 disks =
+                // BULUT ORTAM SONDASI ÇİZİLİRKEN KADRANLAR KAPANIR. Bulut sistemi göğü
+                // 16×16'lık bir küpe çizip ortalamasını ortam ışığı olarak kullanıyor;
+                // güneş diski oraya girerse (parlaklık 1400) ortalama diskin rengine
+                // kayıyor ve bulutlar kahverengiye çalıyor. Kaynak bunu şart koşuyor:
+                // "capture the sky environment without sun disk" (`sky brief.md`).
+                // Global'i bulut sisteminin ortam geçişi kuruyor.
+                float3 disks = (1.0 - _DisableSunDisk) * (
                     Disk(direction, _SunDirection, sunDiskColor, 0.0016, 1400.0, sunVisible)
-                  + Disk(direction, _MoonDirection, _MoonColor.rgb, 0.0011, 3000.0, moonVisible * 0.5);
+                  + Disk(direction, _MoonDirection, _MoonColor.rgb, 0.0011, 3000.0, moonVisible * 0.5));
 
                 // Şimşek boşluklardan görünen gökyüzünü de aydınlatır, ama asıl parlayan
                 // bulut kütlesinin kendisi — o bindirme geçişinde ekleniyor. Burada pay

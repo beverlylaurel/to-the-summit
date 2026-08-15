@@ -52,6 +52,7 @@ public static class MountainSceneBootstrap
     const string SkyMaterialPath = "Assets/Settings/Sky.mat";
     const string RendererPath = "Assets/Settings/PC_Renderer.asset";
     const string CloudMaterialPath = "Assets/Settings/VolumetricClouds.mat";
+    const string CloudWeatherPath = "Assets/Settings/CloudWeatherSettings.asset";
 
     /// `EnsureCloudVolume`'un bulut bileşenini yazdığı Volume. F1 paneli buradan bağlanıyor.
     static UnityEngine.Rendering.Volume cloudVolume;
@@ -316,13 +317,18 @@ public static class MountainSceneBootstrap
         shelter.Bind(player.transform, SurfaceComponent(gen, ref changed), windField);
         EditorUtility.SetDirty(shelter);
 
+        // Bulut katmanının tek kaynağı. Yağış ve şimşek kotlarını buradan okuyor,
+        // ikisinden de ÖNCE kurulmak zorunda.
+        EnsureCloudLayerProbe(player, ref changed);
+
         // Yağış her çalışmada yeniden bağlanır: bulut kaynağı burada kuruluyor ve
         // yağışın nereden düştüğünü o belirliyor.
         var precipitationRenderer = Object.FindAnyObjectByType<PrecipitationRenderer>();
         var precipitationShader = AssetDatabase.LoadAssetAtPath<Shader>(PrecipitationShaderPath);
         if (precipitationShader == null)
             throw new System.InvalidOperationException($"Shader bulunamadı: {PrecipitationShaderPath}");
-        precipitationRenderer.Bind(weatherState, windField, precipitationShader, atmosphere);
+        precipitationRenderer.Bind(weatherState, windField, precipitationShader,
+            Object.FindAnyObjectByType<CloudLayerProbe>(), player.transform);
         EditorUtility.SetDirty(precipitationRenderer);
 
         // Eski kurulumdan kalan çizim bileşenleri: yağış artık doğrudan çiziliyor
@@ -591,6 +597,39 @@ public static class MountainSceneBootstrap
         AssetDatabase.ImportAsset(RendererPath);
     }
 
+    /// BAĞ 2 ve 3: bulut katmanının oyun tarafındaki tek kaynağı. Yağış kesimi ve tırmanma
+    /// göstergesi kotları buradan alıyor; bulutları çizen render özelliğine soramazlar.
+    static void EnsureCloudLayerProbe(FirstPersonController player, ref bool changed)
+    {
+        var probe = Object.FindAnyObjectByType<CloudLayerProbe>();
+        if (probe == null)
+        {
+            probe = new GameObject("CloudLayerProbe").AddComponent<CloudLayerProbe>();
+            changed = true;
+        }
+
+        probe.Bind(cloudVolume,
+            Object.FindAnyObjectByType<AltitudeWeatherDriver>(),
+            player.transform);
+
+        EditorUtility.SetDirty(probe);
+
+        // GİRDİ BAĞLARI: dünya durumunu bulut ayarlarına çeviren tek yön.
+        var driver = Object.FindAnyObjectByType<CloudWeatherDriver>();
+        if (driver == null)
+        {
+            driver = probe.gameObject.AddComponent<CloudWeatherDriver>();
+            changed = true;
+        }
+
+        driver.Bind(cloudVolume,
+            Object.FindAnyObjectByType<WindField>(),
+            Object.FindAnyObjectByType<AltitudeWeatherDriver>(),
+            Object.FindAnyObjectByType<AtmosphereController>(),
+            LoadOrCreate<CloudWeatherSettings>(CloudWeatherPath));
+        EditorUtility.SetDirty(driver);
+    }
+
     /// Gürültü dokuları materyalde duruyor, hiçbir kod atamıyor — repo hazır materyalle geliyordu.
     /// Eşleşme shader'daki örneklemeden: `_Worley128RGBA` düşük frekans şekil, `_ErosionNoise` detay.
     static void BindCloudTextures(Material material)
@@ -636,6 +675,19 @@ public static class MountainSceneBootstrap
         cloudVolume = volume;
 
         clouds.state.value = true;
+
+        // KATMAN MUTLAK KOTTA. Yerel olmayan kipte ışın başlangıcı `float3(0,0,0)`, yani
+        // kamera deniz seviyesindeymiş gibi davranılıyor ve bulutlar oyuncuyla birlikte
+        // yükseliyor — 5709 m'lik dağda katmanın üstüne hiç çıkılamıyordu. Ayrıca hava
+        // haritası kamera XZ'siyle kaydırılıyor; `CloudLayerProbe` mutlak XZ okuduğu için
+        // gökyüzüyle gösterge ayrışıyordu. Yerel kip ikisini de düzeltiyor.
+        clouds.localClouds.value = true;
+        clouds.localClouds.overrideState = true;
+
+        // BAĞ 1: yer bulut gölgesi. Bulut sistemi gölgeyi ana ışığın cookie dokusuna
+        // yazıyor, arazi shader'ı `_LIGHT_COOKIES` ile okuyor.
+        clouds.shadows.value = true;
+        clouds.shadows.overrideState = true;
         // Harita ayar değil, bağlantı: olmadan kapsama alanı yok.
         clouds.cloudMap.value = CloudMapGenerator.EnsureExists();
         clouds.cloudMap.overrideState = true;
@@ -787,7 +839,8 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
-        flash.Bind(thunder, atmosphere, observer, tuning);
+        flash.Bind(thunder, atmosphere, observer, tuning,
+            Object.FindAnyObjectByType<CloudLayerProbe>());
         EditorUtility.SetDirty(flash);
 
         // Kol ışıkla aynı nesnede durabilir: ikisi de aynı çakmayı çiziyor ve kol
@@ -1164,7 +1217,8 @@ public static class MountainSceneBootstrap
             Object.FindAnyObjectByType<TimeOfDay>(),
             Object.FindAnyObjectByType<AtmosphereController>(),
             Object.FindAnyObjectByType<TerrainSurface>(),
-            Object.FindAnyObjectByType<TemperatureField>());
+            Object.FindAnyObjectByType<TemperatureField>(),
+            Object.FindAnyObjectByType<CloudLayerProbe>());
 
         EditorUtility.SetDirty(climbHud);
     }

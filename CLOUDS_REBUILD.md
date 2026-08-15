@@ -92,9 +92,10 @@ diyor, üretim yöntemi vermiyor. fBm, kendi aralığına normalize, eşik 0.50,
 | doğrusal germe (kenar = 1 − eşik) | %47 | **%0.24** | 0.148 |
 | plato, kenar 0.15 | %47 | **%23** | 0.743 |
 
-Doğrusal germe çekirdeği 1.0'a taşımıyor; shader `coverage²` aldığı için bulut görünmez
-oluyordu. Ekranda görünen oran **doygun çekirdek** oranını izliyor, sıfır olmayan alanı
-değil — %47 bulutlu harita gökyüzünün çeyreğinden azını doldurdu.
+Doğrusal germe çekirdeği 1.0'a taşımıyor; o sırada shader `coverage²` de aldığı için
+bulut tamamen görünmez oluyordu (o terim sonradan kaldırıldı, aşağıda). Ekranda görünen
+oran **doygun çekirdek** oranını izliyor, sıfır olmayan alanı değil — %47 bulutlu harita
+gökyüzünün çeyreğinden azını doldurdu.
 
 ### 7a — zincir sırası ve `g_c` bağı (kapandı)
 
@@ -106,10 +107,12 @@ değil — %47 bulutlu harita gökyüzünün çeyreğinden azını doldurdu.
 - Yoğunluk-yükseklik gradyanı (`densityErosionAO.x`) remap sınırının içinden çıkarılıp
   zincirin **en sonuna** çarpan olarak alındı `[s.14-16]`.
 
-Bilerek dokunulmayanlar, ikisi de portun kendi terimi, `[H18]`'de karşılığı yok:
+Portun kendi terimlerinden `× coverage²` **sonradan kaldırıldı**: kapsama zaten remap
+sınırından giriyor, kare almak ikinci kez cezalandırıyordu. Kapsaması 0.6'ya inen bölge
+0.36'ya düşüyor ve remap sınırıyla birleşince tam delik açılıyordu — kapalı gökte bile
+boşluk çıkmasının sebebi buydu.
 
-- `× coverage²` — kaldırılması ayrı bir tek-sayı denemesi
-- `lerp(1, lowFrequencyNoise, shapeFactor)` — portun şekil sürgüsü
+Duran tek port terimi: `lerp(1, lowFrequencyNoise, shapeFactor)` — şekil sürgüsü.
 
 ### 7b — SA/DA ayrımı (kapandı)
 
@@ -180,8 +183,9 @@ teker teker, her birinden sonra buluta tekrar bakılarak.
 
 | kaynak | ne veriyor | nereye gidiyor |
 |---|---|---|
-| `WeatherState` | yağış şiddeti, karlılık | kapsama hedefi, yoğunluk, soğurma |
-| `WindField` | şiddet + yön | sürüklenme hızı, makaslama yönü |
+| `AtmosphereController` | **KURULDU** — `Coverage` (küresel kapsamanın TEK eşlemesi) | `cloudCoverage` |
+| `AltitudeWeatherDriver` | **KURULDU** — `CloudMass`, yağışın geciken hâli | `densityMultiplier` |
+| `WindField` | **KURULDU** — `FreeAirSpeed` (m/s) + `PrevailingDirection` | `globalSpeed` (km/h, ×3.6) + `globalOrientation` (derece) |
 | `TimeOfDay` | güneş yönü/rengi, ay, gündüz katsayısı | aydınlatma, batım tonu, gece rengi |
 | `AtmosphereSettings` | bütün ayarlar | — |
 | Hava haritası (pişmiş) | R kapsama, G tip, B taban kayması | yerleşim |
@@ -193,43 +197,74 @@ teker teker, her birinden sonra buluta tekrar bakılarak.
 
 ## Bulut sistemini OKUYANLAR (çıktı) — yenisinde geri bağlanacak
 
-### 1. Yer bulut gölgesi
-`HeightFog.hlsl` içindeki `CloudShadowAt`, yüzey shader'larından çağrılıyor.
-**Sözleşme:** gökyüzü hangi yoğunluk alanından besleniyorsa yer gölgesi de aynısından
-beslenmek zorunda. İkinci bir yaklaşım kurulursa gökte bulut olmayan yerde gölge çıkıyor.
-Işın yer noktasından güneşe doğru kaydırılıp (`slide`) harita okunuyor.
+### 1. Yer bulut gölgesi — **KURULDU**
+Portun kendi yolu kullanıldı: `VolumetricCloudsURP` gölgeyi ana ışığın **cookie
+dokusuna** yazıyor (`_MainLightCookieTexture`), `MountainSurface.shader` da
+`_LIGHT_COOKIES` anahtarıyla okuyup `mainLight.color`'a uyguluyor.
 
-### 2. `CloudCeiling` → `AltitudeWeatherDriver`
-Bulut tepesinin üstünde yağış yoktur. Gerçek yüksekliği yalnız bulut sistemi bilir;
-sürücüye **itiliyor** (sürücü çekmiyor — iki sistem birbirine referansla bağlanmasın diye).
-Nominal tavan kullanılırsa kural hiç işlemiyor.
+Sözleşme kendiliğinden sağlanıyor: gölge, gökyüzünü çizen yoğunluk alanının ta
+kendisinden türüyor — ikinci bir yaklaşım yok, dolayısıyla "gökte bulut yokken yerde
+gölge" durumu da yok. `HeightFog.hlsl`'deki `CloudShadowAt` stub'ı silindi.
 
-### 3. Katman kotları → `ClimbHud`
-"Bulut katmanı 1717–5100 m (içinde / altında / üstünde)". Taban dinamik: sakin havada
-iniyor, yağış ve rüzgâr yükseltiyor.
+`shadows` kurulumda açılıyor; F1 → Bulut ışığı altında anahtarı ve koyuluk sürgüsü var.
+URP asset'inde `m_SupportsLightCookies: 1` olmak zorunda (zaten öyle).
 
-### 4. Yağış başlangıcı → `PrecipitationRenderer`
-Yağmur/kar bulut tabanının altında doğuyor.
+### 2. Bulut tavanı → `AltitudeWeatherDriver` — **KURULDU**
+`CloudLayerProbe` her karede `driver.CloudColumnTop`'a **itiyor**; sürücü çekmiyor.
+Tepe sütuna göre: hava haritasının B kanalı (`w_h`) × `altitudeRange` + `bottomAltitude`.
+Sütunda kapsama sıfırsa sonsuz dönüyor — "tepesi yok" ile "tepesi yerde" aynı şey değil,
+ikincisi yağışı her yerde keserdi.
 
-### 5. Yansıma ve çevre ışığı → `AtmosphereController`
-Gök seviyesi `RenderSettings.reflectionIntensity` ve `DynamicGI.UpdateEnvironment`
-sürüyor (kısılmış, saniyede bir). Bulut kapsaması gök seviyesini düşürüyor.
-**Ölçülmüş kural:** yansıma ölçeklemesi kaldırılınca gece metal parçalar parlıyor.
+### 3. Katman kotları → `ClimbHud` — **KURULDU**
+Gösterge kapsamayı ve kotları `CloudLayerProbe`'dan okuyor. Eskiden `AtmosphereController`
+üzerinden geliyordu; o değerler silinen sisteme aitti ve gökyüzüyle ilgileri kalmamıştı.
+Kapsama formülü shader'dakinin aynısı — iki yerde iki formül olursa gösterge gökyüzüyle
+çelişir.
 
-### 6. Şimşek
-`LightningFlash` çakma noktasını bulut katmanının içine yerleştiriyor; bindirme geçişi
-`_LightningFlash`'i bulut alfasıyla çarpıp kütleyi içeriden aydınlatıyor. Işın
-yürüyüşünün içine konamaz (yürüyüş kareye yayılı, parlama blok blok titrer).
+### 4. Yağış başlangıcı → `PrecipitationRenderer` — **KURULDU**
+Yağış şiddeti o SÜTUNUN kapsamasıyla ölçekleniyor (`CloudLayerProbe.CoverageAt`):
+bir bulutun altındayken yağıyor, açıklığa çıkınca diniyor. Tavan kesimi ayrı iş,
+onu `AltitudeWeatherDriver` yapıyor (bağ 2); burada yalnız yatay dağılım var.
+
+`AtmosphereController.LocalRain` ve `UpdateLocalRain` stub'ı silindi — yağış artık
+atmosferden geçmiyor, doğrudan bulut kaynağını okuyor.
+
+### 5. Yansıma ve çevre ışığı → `AtmosphereController` — **KURULDU (yön ters çevrildi)**
+Sözleşme "bulut kapsaması gök seviyesini düşürür" diyordu; ölçüldüğünde iki tarafın da
+aynı kaynaktan (`CloudMass`, `DryCoverage`, `ClearWindow`) beslendiği görüldü — yani
+**iki ayrı eşleme** vardı ve gökyüzü "kapalı" derken bulut "açık" diyebilirdi.
+
+Tek eşlemeye indirildi: kural `AtmosphereController.Coverage`'ta kalıyor, hacimsel bulut
+sistemi `CloudWeatherDriver` üzerinden onu tüketiyor. Yansıma seviyesi ve
+`DynamicGI.UpdateEnvironment` zaten aynı kapsamadan türüyor, ek bağ gerekmedi.
+
+Yan kazanç: F1'deki kapsama test kilidi (`CoverageLocked`) artık gerçek bulutları da
+sürüyor.
+
+### 6. Şimşek — **KISMEN KURULDU**
+`LightningFlash` çakma kotunu `CloudLayerProbe`'dan okuyor: önce çakmanın XZ'si
+belirleniyor, sonra O SÜTUNUN tepesi örnekleniyor, kot tabanla tepe arasında %25'e
+yerleşiyor. Sütun boşsa katmanın azami tepesi kullanılıyor.
+
+**Açık kalan:** bindirme geçişinin `_LightningFlash`'i bulut alfasıyla çarpıp kütleyi
+içeriden aydınlatması. Işın yürüyüşünün içine konamaz (yürüyüş kareye yayılı, parlama
+blok blok titrer).
 
 ### 7. Güneş yaması (kapalı gökte)
 Bindirme geçişinde `a(1−a)` çanıyla orta kalınlıkta tepe yapan sıcak yama. Işın
 yürüyüşü veremiyor: ışık sondası yatay güneşte sıfıra iniyor.
 
-### 8. Gökyüzü ve sis ile ortak globaller
-`_SunDirection`, `_LightningFlash`, `_PlanetRadius`, `_Coverage`, `_CloudBottom`,
-`_CloudWind`, `_WeatherMap`, `_WeatherMapScale`, `_BaseNoise`, `_CloudScale`,
-`_Evolution`. Bunlar `HeightFog.hlsl`'de bildiriliyor çünkü sis dosyası önce include
-ediliyor; iki yerde bildirilirse derleyici çakışıyor.
+### 8. Gökyüzü ve sis ile ortak globaller — **KURULDU**
+Eski listedeki globallerin çoğu silinen bulut sistemine aitti ve kimse okumuyordu.
+Ölçüldüğünde ayakta kalan iki tanesi çıktı: **`_CloudBottom` ve `_CloudTop`**, tek
+tüketici `LightningBolt.shader` (çakmayı bulut kabuğuyla kesiştiriyor).
+
+Yayın `AtmosphereController`'dan alınıp `CloudLayerProbe`'a taşındı — katmanın gerçek
+kotlarını yalnız bulut sistemi biliyor. Kabuk küresel olduğu için sütun tepesi değil
+katmanın azamisi (`MaxTop`) veriliyor.
+
+Bildirim `HeightFog.hlsl`'de duruyor: sis dosyası önce include ediliyor, iki yerde
+bildirilirse derleyici çakışıyor.
 
 ### 9. Sahne kurulumu
 `MountainSceneBootstrap` bulut geçişini, dokuları ve ayarı bağlıyor.

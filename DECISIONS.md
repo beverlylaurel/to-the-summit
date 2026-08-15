@@ -1059,3 +1059,24 @@ HLSL taşınır, render geçişi RenderGraph'a yeniden yazılır.
 gürültü hash'i. İki bağ şu an stub: yer bulut gölgesi (`CloudShadowAt` → 1.0) ve yerel
 yağış (`UpdateLocalRain` → 1).
 
+
+---
+
+## Gökyüzü/atmosfer yeniden yazımı ertelendi
+
+**Karar.** `sky brief.md` (Frostbite SIGGRAPH 2016 + Hillaire EGSR 2020) fiziksel temelli bir
+atmosfer sistemi tarif ediyor: Transmittance LUT, Sky-View LUT, Aerial Perspective LUT,
+Rayleigh/Mie/ozon katsayıları, `Fms = 1/(1−fms)` sonsuz çoklu saçılım, güneş diskinin
+transmittance'tan geçirilmesi, limb darkening. **Bulutlar bitene kadar başlanmayacak.**
+
+**Gerekçe.** Mevcut `AtmosphereController` + `Sky.shader` kendi modeliyle çalışıyor ve
+bulut sistemi şu an ondan ışık alıyor. İkisini aynı anda değiştirmek, 2026-08-14'te bulut
+sisteminde yaşanan "hangi kaynak suçlu belli değil" durumunu tekrarlar.
+
+**Tetikleyici.** `CLOUDS_REBUILD.md`'deki bağ listesi ve girdi bağları kapandığında.
+
+**Kapsam ayrımı.** Brief'in bulutla ilgili maddeleri (ortam ışığında güneş diskinin hariç
+tutulması, iki loblu HG `g0=0.8 / g1=−0.5 / α=0.5`, enerji korunumlu analitik entegrasyon,
+aerial perspective'in buluta da uygulanması) bu ertelemenin DIŞINDA — onlar bulut işi.
+
+**Uyarı.** Brief 2016 ve 2020 katsayı setlerini ayrı tutmayı şart koşuyor; birleştirilmeyecek.

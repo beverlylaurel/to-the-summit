@@ -13,7 +13,10 @@ public class PrecipitationRenderer : MonoBehaviour
     [SerializeField] WeatherState weather;
     [SerializeField] WindField wind;
     [SerializeField] Shader shader;
-    [SerializeField] AtmosphereController clouds;
+    [Tooltip("Bulut katmanının tek kaynağı. Yağış kalın sütunların altına düşer.")]
+    [SerializeField] CloudLayerProbe cloudLayer;
+    [Tooltip("Yağışın örnekleneceği nokta — oyuncu.")]
+    [SerializeField] Transform observer;
 
     // Ayarlar bilerek serileştirilmiyor: Inspector'a girince sahnedeki bileşen eski
     // değerlerle donuyor ve koddaki değişiklik etkisiz kalıyor.
@@ -147,12 +150,13 @@ public class PrecipitationRenderer : MonoBehaviour
     /// Bulut sistemine tek yönlü, salt okunur bir bağ — yağış hangi bulutun yağdığını
     /// sormaz, yalnız "şu an başımın üstünde ne kadar var" değerini okur.
     public void Bind(WeatherState state, WindField windField, Shader precipitationShader,
-                     AtmosphereController cloudSource)
+                     CloudLayerProbe layer, Transform eye)
     {
         weather = state;
         wind = windField;
         shader = precipitationShader;
-        clouds = cloudSource;
+        cloudLayer = layer;
+        observer = eye;
     }
 
     void OnEnable()
@@ -163,8 +167,10 @@ public class PrecipitationRenderer : MonoBehaviour
             throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(wind)} atanmadı.");
         if (shader == null)
             throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(shader)} atanmadı.");
-        if (clouds == null)
-            throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(clouds)} atanmadı.");
+        if (cloudLayer == null)
+            throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(cloudLayer)} atanmadı.");
+        if (observer == null)
+            throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(observer)} atanmadı.");
 
         weather.Changed += OnWeatherChanged;
         OnWeatherChanged(weather);
@@ -200,7 +206,10 @@ public class PrecipitationRenderer : MonoBehaviour
     {
         EnsureResources();
 
-        localFactor = clouds.LocalRain;
+        // BAĞ 4: yağış o SÜTUNUN kapsamasıyla ölçekleniyor — komşu bulut yağmazken bunun
+        // altında yağabilsin diye. Sütunun tepesinin üstündeysen hiç yağmıyor; tavan
+        // kesimini `AltitudeWeatherDriver` yapıyor, burada yalnız yatay dağılım var.
+        localFactor = cloudLayer.CoverageAt(observer.position);
 
         // İnce serpinti yavaş düşüp rüzgârı tam yer, iri damla hızlı inip direnir.
         // Aradaki bütün açılar böylece kendiliğinden dolar.

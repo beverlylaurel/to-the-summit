@@ -47,6 +47,9 @@ Shader "ToTheSummit/MountainSurface"
             #pragma multi_compile_fragment _ _CLUSTER_LIGHT_LOOP
             #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            // Bulut gölgesi bu anahtarla geliyor: bulut sistemi gölgeyi ana ışığın cookie
+            // dokusuna yazıyor, URP de onu burada uyguluyor.
+            #pragma multi_compile_fragment _ _LIGHT_COOKIES
             // EKRAN UZAYI ÖRTÜŞME GÖLGESİ ARAZİDE OKUNMUYOR. Derinlik tamponundan
             // çalışıyor ve arazi örgüsünün üçgen yüzeylerini yüzey kıvrımı sanıp zemine
             // yumuşak kafes çizgileri çiziyor (bkz. `DECISIONS.md` — SSAO kapalı).
@@ -144,11 +147,12 @@ Shader "ToTheSummit/MountainSurface"
                     mainLight.shadowAttenuation *=
                         MainLightRealtimeShadow(TransformWorldToShadowCoord(IN.positionWS));
 
-                // BULUT GÖLGESİ arazi gölgesiyle ÇARPILIR, ikisi ayrı olay: biri sırtın
-                // arkasında kalmak, öteki üstünden bulut geçmek. Aynı kanaldan gidiyorlar
-                // çünkü ikisi de doğrudan güneşi kesiyor — gökten gelen dolaylı ışığa
-                // dokunmuyorlar.
-                mainLight.shadowAttenuation *= CloudShadowAt(IN.positionWS);
+                // BULUT GÖLGESİ bulut sisteminin kendi cookie dokusundan geliyor; gökyüzünü
+                // çizen yoğunluk alanının ta kendisi. Doğrudan güneşi kesiyor, gökten gelen
+                // dolaylı ışığa dokunmuyor — arazi gölgesiyle aynı kanaldan.
+            #ifdef _LIGHT_COOKIES
+                mainLight.color *= SampleMainLightCookie(IN.positionWS);
+            #endif
 
                 half3 lit = inputData.bakedGI * aoFactor.indirectAmbientOcclusion * brdfData.diffuse;
                 lit += LightingPhysicallyBased(brdfData, mainLight,

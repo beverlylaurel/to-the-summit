@@ -1,10 +1,8 @@
 fileFormatVersion: 2
-guid: a6045734f32cdb6429ea9985f2b673f6
-labels:
-- CloudMap-v4
+guid: 5613d208323b5cf43b7685c32873c812
 NativeFormatImporter:
   externalObjects: {}
-  mainObjectFileID: 2800000
+  mainObjectFileID: 11400000
   userData: 
   assetBundleName: 
   assetBundleVariant: 
