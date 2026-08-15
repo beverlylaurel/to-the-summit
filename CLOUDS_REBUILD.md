@@ -252,6 +252,17 @@ Bunlar ölçülerek bulundu, tekrar bulunmasın.
 12. **Ayar sürgüsü ölçeklemez, eşiği kaydırır.** `harita × sürgü` yazılırsa haritanın
     sıfır olduğu yer hiçbir sürgüde kapanmaz — %100 kapsama gökyüzünü kapatmıyordu.
 
+13. **Gürültünün bandı örnek ayak izinden çıkar, sabit mesafeden değil.** Portun erozyon
+    mip'i 3–100 km arasına gömülüydü; ekran çözünürlüğü, görüş açısı ve gürültü ölçeği
+    değişince tutmuyordu ve uzak bulutlar pikselleniyordu. Doğrusu: bir örneğin dünyada
+    kapladığı boy = `max(piksel izdüşümü, ışın adımı)`, mip = `log2(ayak izi / voxel)`.
+    Voxel boyu `NOISE_TEXTURE_NORMALIZATION_FACTOR / ölçek / çözünürlük`.
+
+14. **Zamansal birikim ancak sabit örnekle yakınsar.** Portun jitter hash'i her karede
+    zaman terimi taşıyordu: aynı piksel her karede farklı desen okuyordu, birikim hiç
+    yakınsamıyordu. Belirti titremeydi ve adım bütçesiyle, adım büyümesiyle, dither ile
+    üç tur boyunca yanlış yerde arandı. Hash ekran konumundan türeyince bitti.
+
 ---
 
 ## Kaynak

@@ -10,7 +10,6 @@ Shader "Hidden/Sky/VolumetricClouds"
         [HideInInspector] _ExtinctionCoefficient("Extinction Coefficient", Float) = 0.04
         [NoScaleOffset] _ErosionNoise("Erosion Noise Texture", 3D) = "white" {}
         [NoScaleOffset] _Worley128RGBA("Worley Noise Texture", 3D) = "white" {}
-        [HideInInspector] _Seed("Private: Random Seed", Float) = 0.0
         [HideInInspector] _VolumetricCloudsAmbientProbe("Ambient Probe", CUBE) = "grey" {}
         [HideInInspector] _NumPrimarySteps("Ray Steps", Float) = 32.0
         [HideInInspector] _NumLightSteps("Light Steps", Float) = 1.0

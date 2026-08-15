@@ -2,7 +2,7 @@
 #define URP_VOLUMETRIC_CLOUDS_DEFINES_HLSL
 
 CBUFFER_START(UnityPerMaterial)
-float _Seed;
+float _PixelFootprintScale;
 half _NumPrimarySteps;
 half _NumLightSteps;
 half _MaxStepSize;
