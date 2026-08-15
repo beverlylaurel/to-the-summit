@@ -56,6 +56,20 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
     /// (ayrı bir yönlü ışık olarak) araziyi sürüyor.
     public static Light MoonLight { get; set; }
 
+    /// AY DİSKİNİN PARLAKLIĞI, IŞIĞINDAN AYRI. İkisi ayrı fiziksel büyüklük: biri yüzey
+    /// radyansı, diğeri yerdeki aydınlık. Tek sayıdan türetilince disk absürt parlak
+    /// çıkıyordu — güneş diski ~3000, ay diski ~198, yani oran 15. Gerçekte oran
+    /// ~640 000 (güneş 1.6e9 cd/m², ay 2500 cd/m² `[brief, Gece/Ay]`).
+    ///
+    /// Gerçek oran uygulanırsa ay görünmez olur; oyunlar bu yüzden abartır. Bu bilinçli
+    /// bir abartma ve ŞİDDETİ DEĞİL YALNIZ DİSKİ etkiliyor: ay araziyi aynı güçte
+    /// aydınlatmaya devam ediyor.
+    ///
+    /// 0.05 seçildi: disk ~10 birim, gece göğü 0.004 — hâlâ 2500 kat parlak, yani net
+    /// bir disk. Bloom eşiği 1.1 olduğu için eşiğin 9 katı; 198'de 180 katıydı ve
+    /// ekranı kaplayan bir leke üretiyordu.
+    public static float MoonDiskBrightness { get; set; } = 0.05f;
+
     /// TEŞHİS — GEÇİCİ. Paketin o an ne çözdüğü. Fasulye ve yıldız sorunu kapanınca silinecek.
     public static string ResolvedMainLightName { get; private set; } = "-";
     public static int ResolvedBodyCount { get; private set; }
@@ -970,8 +984,8 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                     ? moonColor * Mathf.CorrelatedColorTemperatureToRGB(MoonLight.colorTemperature)
                     : moonColor;
 
-                Vector4 moonSurfaceColor = Vector4.one * moonRcpSolidAngle;
-                Vector4 moonFlareColor = Vector4.one * moonRcpSolidAngle;
+                Vector4 moonSurfaceColor = Vector4.one * moonRcpSolidAngle * MoonDiskBrightness;
+                Vector4 moonFlareColor = Vector4.one * moonRcpSolidAngle * MoonDiskBrightness;
 
                 Shader.SetGlobalVector(_CelestialBody2_Color, new Vector4(moonColor.r, moonColor.g, moonColor.b, 0.0f));
                 Shader.SetGlobalVector(_CelestialBody2_Forward, MoonLight.transform.forward);

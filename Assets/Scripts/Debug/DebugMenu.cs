@@ -313,6 +313,7 @@ public class DebugMenu : MonoBehaviour
         GUILayout.Label($"probe tepe {zenith.r:F5} {zenith.g:F5} {zenith.b:F5}");
 
         GUILayout.Label($"güneş {time.SunIntensity:F2} · ay {time.MoonIntensity:F3}");
+        GUILayout.Label($"ay disk parlaklığı: {PhysicallyBasedSkyURP.MoonDiskBrightness:F3}");
 
         EndSection();
 #endif
