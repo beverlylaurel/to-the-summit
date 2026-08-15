@@ -59,12 +59,10 @@ public class AtmosphereController : MonoBehaviour
     static readonly int SunDirectionId = Shader.PropertyToID("_SunDirection");
     static readonly int SunColorId = Shader.PropertyToID("_SunColor");
     static readonly int MoonColorId = Shader.PropertyToID("_MoonColor");
-    static readonly int MoonDirectionId = Shader.PropertyToID("_MoonDirection");
 
     static readonly int PlanetRadiusId = Shader.PropertyToID("_PlanetRadius");
 
 
-    static readonly int StarStrengthId = Shader.PropertyToID("_StarStrength");
 
     float visibility;
 
@@ -298,7 +296,7 @@ public class AtmosphereController : MonoBehaviour
         if (view != null) view.clearFlags = CameraClearFlags.Skybox;
 
         ApplyShadowDistance();
-        ApplySky(precipitation, snowiness, day);
+        ApplySky(precipitation, snowiness);
     }
 
     /// Kameranın bulut kuşağının neresinde olduğu: 0 dışında, 1 tam içinde.
@@ -339,7 +337,7 @@ public class AtmosphereController : MonoBehaviour
 
     /// Bulut geçişi ayrı bir shader'da çalıştığı için parametreler global yazılır;
     /// gökyüzü ve bulutlar aynı değerleri okur, ikisi çelişemez.
-    void ApplySky(float precipitation, float snowiness, float day)
+    void ApplySky(float precipitation, float snowiness)
     {
         if (skyMaterial == null) return;
 
@@ -384,8 +382,6 @@ public class AtmosphereController : MonoBehaviour
         skyMaterial.SetColor(SunColorId, time.CurrentSunColor * veil);
         skyMaterial.SetColor(MoonColorId, time.MoonTint * veil);
 
-        Shader.SetGlobalFloat(StarStrengthId, (1f - day) * (1f - coverage) * 1.2f);
-
         // (BULUT DOKU YAYINLARI SİLİNDİ — gürültü ve hava haritası yeniden yazılıyor.)
         //
         // `_CloudBottom` aşağıda yazılmaya DEVAM ediyor: şimşek shader'ı çakmayı bulut
@@ -393,8 +389,9 @@ public class AtmosphereController : MonoBehaviour
         // bu bileşende kalıyor — hava modelinin çıktısı, render tesisatı değil. Yeni
         // bulut sistemi bunları okuyacak; bağların listesi `CLOUDS_REBUILD.md`'de.
 
+        // `_SunDirection` yükseklik sisinin ışık yönü. `_MoonDirection` SİLİNDİ: onu
+        // yalnız `Sky.shader` okuyordu, o da artık skybox değil.
         Shader.SetGlobalVector(SunDirectionId, time.SunDirection);
-        Shader.SetGlobalVector(MoonDirectionId, time.MoonDirection);
 
         // Makaslama sabit bir mesafe: katman kalınlığının oranı kadar yanal kayma
         // BOYUTSUZ: shader katman kalınlığıyla çarpıyor. Burada çarpılıyordu ve katman

@@ -86,6 +86,19 @@ public class LookController : MonoBehaviour
         tonemapping.mode.value = TonemappingMode.ACES;
     }
 
+    /// Ortam probe'unun zenit yönündeki parlaklığı. Gökyüzü paketi probe'u her kare
+    /// gökyüzünden pişiriyor, yani bu sahnenin GERÇEK gök aydınlığı.
+    static readonly Vector3[] ZenithDirection = { Vector3.up };
+    static readonly Color[] ZenithResult = new Color[1];
+
+    static float AmbientZenithLuminance()
+    {
+        RenderSettings.ambientProbe.Evaluate(ZenithDirection, ZenithResult);
+
+        Color zenith = ZenithResult[0];
+        return zenith.r * 0.2126f + zenith.g * 0.7152f + zenith.b * 0.0722f;
+    }
+
     static T Ensure<T>(VolumeProfile profile) where T : VolumeComponent
         => profile.TryGet(out T component) ? component : profile.Add<T>(true);
 
@@ -119,15 +132,24 @@ public class LookController : MonoBehaviour
         //
         // Seviye ekrandan okunmuyor: sahnenin ışığını zaten biliyoruz (huzme + gök).
         // Öğle 0 EV, karanlık saatlerde yukarı açılır. Log2 çünkü pozlama EV cinsinden.
-        // Gök payı: `SkyLevel` bir ZENİT RADYANSI, manzarayı aydınlatan ise yarım küre
-        // ışınımı — arada π var, üstüne gözün göğe verdiği ağırlık biniyor. Katsayı
-        // ikisini birlikte taşır. `TimeOfDay` ayrı bir kazanç tutuyordu (67) ve bu
-        // ağırlık 0.35'ti; kazanç `Atmosphere.SceneGain`'e (3.6) bağlanınca oran buraya
-        // taşındı: 0.35 × 67 / 3.6. Pozlama davranışı BİREBİR aynı kaldı.
-        const float SkyShare = 6.51f;
+        // KAYNAK DEĞİŞTİ: eskiden `Atmosphere` modelinden (`BeamLevel`, `SkyLevel`,
+        // `MoonLevel`) okunuyordu. O model artık IŞIĞI SÜRMÜYOR — soğurmanın sahibi
+        // gökyüzü paketi, model yalnız sis ve bulut tonunu besliyor. Pozlama, sahneyi
+        // aydınlatmayan bir modele göre açılıp kapanıyordu; şafakta ışık tam şiddetteyken
+        // model hâlâ "karanlık" dediği için fazladan açıyordu.
+        //
+        // Şimdi iki GERÇEK büyüklük okunuyor, ikisi de öğlen 1'e normalize:
+        //   güneş   — yönlü ışığın şiddeti / kalibrasyon sabiti
+        //   gökyüzü — ortam probe'unun zenit parlaklığı / öğlen ölçümü
+        //
+        // Uçlar kâğıtta: öğlen 1 → uyum 0 EV. Gece güneş ~0.07, gök ~0.03 → tavan 0.6 EV.
+        // Şafakta güneş ufku geçer geçmez 1'e çıkıyor → uyum 0, fazladan açma yok.
+        const float ReferenceSunIntensity = 3.030782f;
+        const float ReferenceSkyLuminance = 0.148f;
 
         float lightLevel = time != null
-            ? Mathf.Max(time.BeamLevel, time.SkyLevel * SkyShare + time.MoonLevel * 0.02f)
+            ? Mathf.Max(time.LightIntensity / ReferenceSunIntensity,
+                        AmbientZenithLuminance() / ReferenceSkyLuminance)
             : 1f;
 
         // UYUM KISMİDİR. Farkın tamamını kapatmak (tam normalizasyon) şafağı öğlene
