@@ -425,7 +425,7 @@ public static class MountainSceneBootstrap
         // AY GÖKYÜZÜNÜ AYDINLATAN TEK KAYNAK. Paket geceleyin ayı güneş yerine koyup
         // atmosferi ondan hesaplıyor; ortam probe'u da o gökyüzünden pişiyor. Değer göz
         // kararı bulundu, gerçek ay parlaklığının karşılığı değil.
-        timeOfDay.MoonIntensity = 0.4f;
+        timeOfDay.MoonIntensity = 0.204f;
     #endif
 
         // Debug menüsünde olduğu gibi her çalışmada yeniden bağlanır
@@ -917,7 +917,7 @@ public static class MountainSceneBootstrap
         // yönü Play'de `CloudWeatherDriver` tarafından havadan yazılıyor — buradaki
         // değerler sürücü kapalıyken (F1 → "Havadan ayır") geçerli olan başlangıç.
         SetCloud(clouds.cloudCoverage, 0.65f);
-        SetCloud(clouds.densityMultiplier, 0.49f);
+        SetCloud(clouds.densityMultiplier, 0.39f);
         SetCloud(clouds.globalSpeed, 20f);
         SetCloud(clouds.globalOrientation, 205f);
         SetCloud(clouds.shapeSpeedMultiplier, 1.00f);
