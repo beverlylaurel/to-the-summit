@@ -56,107 +56,6 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
     /// (ayrı bir yönlü ışık olarak) araziyi sürüyor.
     public static Light MoonLight { get; set; }
 
-    /// TEŞHİS: paketin o an ana ışık olarak çözdüğü cisim. Gökyüzü bundan sürülüyor.
-    public static string ResolvedMainLightName { get; private set; } = "-";
-
-    /// TEŞHİS: iki gök cisminin o anki yönü ve sayacın değeri.
-    public static Vector3 Body0Forward { get; private set; }
-    public static Vector3 Body1Forward { get; private set; }
-    public static int BodyCount { get; private set; }
-
-    private PBSkyPrePass m_PBSkyPrePass;
-    private SkyViewLUTPass m_SkyViewLUTPass;
-    private AtmosphericScatteringPass m_AtmosphericScatteringPass;
-    private AmbientProbePass m_AmbientProbePass;
-    private PBSkyPostPass m_PBSkyPostPass;
-
-    [Header("Sky")]
-    [Tooltip("The fallback sky material when physically based sky is disabled.")]
-    [SerializeField] private Material m_FallbackSkyMaterial;
-
-    [Header("Volumetric Clouds")]
-    [Tooltip("[Optional] The material of volumetric clouds used when updating sky reflection.")]
-    [SerializeField] private Material m_VolumetricCloudsMaterial;
-
-    private const string k_PbrSkyShaderName = "Hidden/Skybox/PhysicallyBasedSky";
-    private const string k_PbrSkyLutShaderName = "Hidden/Sky/PhysicallyBasedSkyPrecomputation";
-
-    private const string k_CloudsShaderName = "Hidden/Sky/VolumetricClouds";
-    private const string k_PbrSkyMaterialName = "Physically Based Sky";
-    private const string k_DynamicAmbientProbeKeywordName = "VISUAL_ENVIRONMENT_DYNAMIC_SKY";
-    private const string k_AtmosphericScatteringLowResolutionKeywordName = "ATMOSPHERIC_SCATTERING_LOW_RES";
-
-    /// <summary>
-    /// Get the skybox material of physically based sky.
-    /// </summary>
-    /// <value>
-    /// The material of physically based sky.
-    /// </value>
-    public Material PBRSkyMaterial
-    {
-        get { return m_PbrSkyMaterial; }
-    }
-
-    /// <summary>
-    /// Get or set the fallback sky material when physically based sky is disabled.
-    /// </summary>
-    /// <value>
-    /// The material of fallback sky shader.
-    /// </value>
-    public Material FallbackSkyMaterial
-    {
-        get { return m_FallbackSkyMaterial; }
-        set { m_FallbackSkyMaterial = value; }
-    }
-
-    /// <summary>
-    /// Get or set the material of volumetric clouds shader.
-    /// </summary>
-    /// <value>
-    /// [Optional] The material of "Hidden/Sky/VolumetricClouds" shader used when updating sky reflection.
-    /// </value>
-    public Material CloudsMaterial
-    {
-        get { return m_VolumetricCloudsMaterial; }
-        set { m_VolumetricCloudsMaterial = value; ValidateCloudsMaterial(); }
-    }
-
-    /// <summary>
-    /// Get or set the shader of physically based sky.
-    /// </summary>
-    /// <value>
-    /// The shader of physically based sky.
-    /// </value>
-    public Shader PBSkyShader
-    {
-        get { return m_Shader; }
-        set { m_Shader = value; }
-    }
-
-    /// <summary>
-    /// Get or set the precomputation shader of physically based sky.
-    /// </summary>
-    /// <value>
-    /// The precomputation shader of physically based sky.
-    /// </value>
-    public Shader PBSkyLutShader
-    {
-        get { return m_LutShader; }
-        set { m_LutShader = value; }
-    }
-
-    /// <summary>
-    /// Get or set the precomputation quality of physically based sky.
-    /// </summary>
-    /// <value>
-    /// The precomputation quality of physically based sky.
-    /// </value>
-    public PrecomputationQualityMode PrecomputationQuality
-    {
-        get { return m_Precomputation; }
-        set { m_Precomputation = value; }
-    }
-
     public struct CelestialBodyData
     {
         public Vector3 color;
@@ -842,8 +741,6 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             material.SetMatrix(_PlanetRotation, planetRotationMatrix);
             material.SetMatrix(_SpaceRotation, Matrix4x4.Rotate(spaceRotation));
 
-            ResolvedMainLightName = mainLight != null ? mainLight.gameObject.name : "YOK";
-
             if (mainLight != null)
             {
                 // Celestial Body Data
@@ -941,10 +838,6 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             // perspektifi hiç uygulanmıyor.
             material.SetInt(_CelestialBodyCount, hasMoon ? 2 : 1);
             Shader.SetGlobalInt(_CelestialBodyCount, hasMoon ? 2 : 1);
-
-            BodyCount = hasMoon ? 2 : 1;
-            Body0Forward = mainLight.transform.forward;
-            Body1Forward = hasMoon ? MoonLight.transform.forward : Vector3.zero;
 
             if (hasMoon)
             {

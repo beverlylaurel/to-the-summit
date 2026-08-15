@@ -167,12 +167,6 @@ public class TimeOfDay : MonoBehaviour
     /// şiddet mi kayboluyor.
     public float LightIntensity => sun != null ? sun.intensity : 0f;
 
-    /// TEŞHİS: iki ışığın o anki hâli ve URP'nin hangisini ana ışık seçtiği.
-    public float SunLightIntensity => sun != null ? sun.intensity : 0f;
-    public float MoonLightIntensity => moon != null ? moon.intensity : 0f;
-    public float SunUp => sun != null ? Mathf.Max(0f, -sun.transform.forward.y) : 0f;
-    public float MoonUp => moon != null ? Mathf.Max(0f, -moon.transform.forward.y) : 0f;
-
     /// DÜZ ZEMİNE ULAŞAN IŞIK. İki cismin katkısı toplanıyor ve her biri KENDİ
     /// yüksekliğiyle çarpılıyor: ufkun altındaki cismin şiddeti düz zemine ulaşmıyor
     /// (`N·L` negatif). Pozlama uyumu bunu okuyor.

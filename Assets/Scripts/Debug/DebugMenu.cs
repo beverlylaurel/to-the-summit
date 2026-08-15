@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
@@ -33,13 +32,7 @@ public class DebugMenu : MonoBehaviour
     [Tooltip("Bulut ayarlarini havadan suren bilesen; \"Havadan ayir\" bunu kapatiyor.")]
     [SerializeField] CloudWeatherDriver cloudDriver;
 
-    [Tooltip("Atmosfer ayarlarini havadan suren bilesen.")]
-    [SerializeField] SkyWeatherDriver skyDriver;
-
-    [Tooltip("Pozlama uyumunu suren bilesen.")]
-    [SerializeField] LookController lookController;
-
-    const float PanelWidth = 1560f;
+    const float PanelWidth = 960f;
     const float ColumnWidth = 300f;
     const float Margin = 24f;
 
@@ -74,32 +67,11 @@ public class DebugMenu : MonoBehaviour
     /// başlıyor ve asset'e yazılan değer hiç okunmuyor (ölçüldü: profil 0.71, yığın 0.40).
     /// Açılıştaki değerler geri al düğmeleri için saklanıyor.
     VolumetricClouds clouds;
-#if URP_PBSKY
-    PhysicallyBasedSky sky;
-    VisualEnvironment visualEnvironment;
-    bool detachSkyFromWeather;
-    float sunIntensityDefault;
-    float moonIntensityDefault;
-    Color moonColorDefault;
-    float exposureCapDefault;
-    float adaptShareDefault;
-#endif
 
     /// Acilistaki degerler: her satirin ↺'u ve "Bulut ayarlarini geri al" buradan okuyor.
     /// Cizim aninda yakalanamaz — `CloudWeatherDriver` kapsama, yogunluk ve ruzgari her
     /// karede yaziyor, ilk cizimde okunan deger zaten surulmus olan olurdu.
-    /// `VolumeParameter` hem `Equals`'i hem `GetHashCode`'u DEGERINDEN turetiyor: sozluk
-    /// varsayilan karsilastiriciyla kullanilirsa surgu oynadigi anda anahtarin hash'i
-    /// degisiyor ve kayit bulunamaz oluyor. Anahtar kimlik olmali, deger degil.
-    sealed class ParameterIdentity : IEqualityComparer<VolumeParameter>
-    {
-        public static readonly ParameterIdentity Default = new();
-        public bool Equals(VolumeParameter a, VolumeParameter b) => ReferenceEquals(a, b);
-        public int GetHashCode(VolumeParameter p) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(p);
-    }
-
-    readonly Dictionary<VolumeParameter, float> cloudFloatDefaults = new(ParameterIdentity.Default);
-    readonly Dictionary<VolumeParameter, bool> cloudBoolDefaults = new(ParameterIdentity.Default);
+    float coverageDefault;
     bool detachFromWeather;
 
     bool open;
@@ -119,13 +91,10 @@ public class DebugMenu : MonoBehaviour
         AtmosphereController atmosphereRef, PrecipitationRenderer precipitationRef,
         PerformanceHud hudRef, ClimbHud climbHudRef,
         CursorLock cursorLockRef, SnowCollisionProbe snowProbeRef,
-        RouteOverlay routeOverlayRef, Volume cloudVolumeRef, CloudWeatherDriver cloudDriverRef,
-        SkyWeatherDriver skyDriverRef, LookController lookControllerRef)
+        RouteOverlay routeOverlayRef, Volume cloudVolumeRef, CloudWeatherDriver cloudDriverRef)
     {
-        lookController = lookControllerRef;
         cloudVolume = cloudVolumeRef;
         cloudDriver = cloudDriverRef;
-        skyDriver = skyDriverRef;
         cursorLock = cursorLockRef;
         walker = walkerRef;
         flyer = flyerRef;
@@ -166,47 +135,22 @@ public class DebugMenu : MonoBehaviour
         open = false;
     }
 
-    /// VARSAYILANLAR `Start`'TA YAKALANIYOR, `OnEnable`'DA DEĞİL.
-    ///
-    /// `VolumeComponent.parameters` tembel bir liste: dayandığı `parameterList` bileşenin
-    /// KENDİ `OnEnable`'ında doluyor. Unity iki `OnEnable` arasında sıra garanti etmiyor,
-    /// dolayısıyla panel önce çalıştığında liste henüz null oluyordu
-    /// (`ArgumentNullException: list`). `Start` tüm `OnEnable`'lardan sonra çalışır.
-    ///
-    /// Sürücüler değerleri `Update`'te yazıyor ve `Update` `Start`'tan sonra geliyor, yani
-    /// yakalanan değer hâlâ havanın ezmediği hâl.
+    /// BAĞLAMA `Start`'TA, `OnEnable`'DA DEĞİL. Bileşenin kendi `OnEnable`'ı henüz
+    /// çalışmamış olabiliyor ve Unity iki `OnEnable` arasında sıra garanti etmiyor.
+    /// `Start` hepsinden sonra çalışır; sürücüler değerleri `Update`'te yazdığı için
+    /// yakalanan varsayılan hâlâ havanın ezmediği hâl.
     void Start()
     {
         if (!cloudVolume.profile.TryGet(out clouds))
             throw new InvalidOperationException($"{nameof(DebugMenu)}: profilde {nameof(VolumetricClouds)} yok.");
 
-        cloudFloatDefaults.Clear();
-        cloudBoolDefaults.Clear();
+        coverageDefault = clouds.cloudCoverage.value;
 
-        CaptureDefaults(clouds);
+        // Parametrenin `overrideState`'i kapalıysa harmanlama onu atlıyor: sürgü profile
+        // yazıyor ama yığına hiç geçmiyor.
+        clouds.cloudCoverage.overrideState = true;
 
         detachFromWeather = !cloudDriver.enabled;
-
-#if URP_PBSKY
-        if (!cloudVolume.profile.TryGet(out sky))
-            throw new InvalidOperationException($"{nameof(DebugMenu)}: profilde {nameof(PhysicallyBasedSky)} yok.");
-        if (!cloudVolume.profile.TryGet(out visualEnvironment))
-            throw new InvalidOperationException($"{nameof(DebugMenu)}: profilde {nameof(VisualEnvironment)} yok.");
-
-        CaptureDefaults(sky);
-        CaptureDefaults(visualEnvironment);
-
-        sunIntensityDefault = time.SunIntensity;
-        moonIntensityDefault = time.MoonIntensity;
-        moonColorDefault = time.MoonColor;
-
-        if (lookController != null)
-        {
-            exposureCapDefault = lookController.ExposureCap;
-            adaptShareDefault = lookController.AdaptShare;
-        }
-        detachSkyFromWeather = skyDriver != null && !skyDriver.enabled;
-#endif
     }
 
     void OnDisable()
@@ -267,17 +211,7 @@ public class DebugMenu : MonoBehaviour
         EndColumn();
 
         BeginColumn();
-        DrawCloudShape();
-        DrawCloudErosion();
-        EndColumn();
-
-        BeginColumn();
-        DrawCloudLight();
-        DrawCloudQuality();
-        EndColumn();
-
-        BeginColumn();
-        DrawSky();
+        DrawClouds();
         DrawOverlays();
         DrawSnowCollision();
         EndColumn();
@@ -338,288 +272,27 @@ public class DebugMenu : MonoBehaviour
     /// BULUT AYARLARI. Degerler Volume profilinde, yani asset'te: surgu dogrudan ona
     /// yaziyor ve Play bitince degisiklik kaliyor. Her satirin sonundaki ↺ acilistaki
     /// degere doner.
-    void DrawCloudShape()
+    /// BULUT KAPSAMASI. Panelde kalan tek bulut ayarı; gerisi ayarlandı ve profile
+    /// yazıldı, sürgü olarak durmalarına gerek yok.
+    ///
+    /// "Havadan ayır" sürgünün çalışması için şart: `CloudWeatherDriver` kapsamayı her
+    /// karede fırtınadan yazıyor, sürücü kapatılmazsa sürgünün yazdığı değer bir sonraki
+    /// karede eziliyor.
+    void DrawClouds()
     {
-        BeginSection("Bulut — bicim");
+        BeginSection("Bulut");
 
-        // Kapsama, yogunluk ve ruzgar `CloudWeatherDriver` tarafindan her karede
-        // firtinadan yaziliyor; surucü kapatilmadan bu surgulerin yazdigi deger bir
-        // sonraki karede eziliyor.
-        bool detach = GUILayout.Toggle(detachFromWeather, "Havadan ayir (elle ayar)");
+        bool detach = GUILayout.Toggle(detachFromWeather, "Havadan ayır (elle ayar)");
         if (detach != detachFromWeather)
         {
             detachFromWeather = detach;
             cloudDriver.enabled = !detach;
         }
 
-        // ÖLÇÜM: toggle'ın gerçekten sürücüyü kapatıp kapatmadığı ve profilde o an ne
-        // yazdığı. "Sürücü AÇIK" kalıyorsa sorun toggle'da, değerler yine de eziliyorsa
-        // yazan başka biri var.
-        GUILayout.Label($"sürücü {(cloudDriver.enabled ? "AÇIK" : "KAPALI")} · " +
-            $"kapsama {clouds.cloudCoverage.value:F2} · yoğunluk {clouds.densityMultiplier.value:F2}");
-
-        CloudSlider("Kapsama", clouds.cloudCoverage);
-        CloudSlider("Yogunluk", clouds.densityMultiplier);
-        CloudSlider("Ruzgar hizi (km/s)", clouds.globalSpeed, 0f, 200f, "F0");
-        CloudSlider("Ruzgar yonu", clouds.globalOrientation);
-        CloudSlider("Sekil hiz carpani", clouds.shapeSpeedMultiplier);
-        CloudSlider("Erozyon hiz carpani", clouds.erosionSpeedMultiplier);
-        CloudSlider("Dikey sekil ruzgari", clouds.verticalShapeWindSpeed, -50f, 50f, "F1");
-        CloudSlider("Dikey erozyon ruzgari", clouds.verticalErosionWindSpeed, -50f, 50f, "F1");
-        CloudSlider("Sekil orani", clouds.shapeFactor);
-        CloudSlider("Sekil olcegi", clouds.shapeScale, 0.5f, 50f, "F1");
-        CloudSlider("Ors", clouds.anvilAmount);
-        CloudSlider("Taban kotu (m)", clouds.bottomAltitude, 0f, 8000f, "F0");
-        CloudSlider("Katman kalinligi (m)", clouds.altitudeRange, 100f, 8000f, "F0");
-        CloudSlider("Yukseklik carpitmasi", clouds.altitudeDistortion);
-        CloudSlider("Harita boyu (m)", clouds.cloudMapSize, 1000f, 100000f, "F0");
-        CloudSlider("Dunya egriligi", clouds.earthCurvature);
+        clouds.cloudCoverage.value = CloudRow("Kapsama", clouds.cloudCoverage.value,
+            coverageDefault, clouds.cloudCoverage.min, clouds.cloudCoverage.max, "F2");
 
         EndSection();
-    }
-
-    /// GÖKYÜZÜ. Paketin atmosfer parametreleri; hepsi profile yazılıyor, Play bitince kalıyor.
-    ///
-    /// "Güneş şiddeti" buraya BİLEREK konuldu: paket 100000 lux yer aydınlığına kalibreli
-    /// ve güneş şiddeti 3.03 bekliyor, bizimki 1.5. Hangi taraftan telafi edileceği
-    /// ölçülmedi (`DECISIONS.md`) — iki sürgü yan yana durursa gözle ayrılır.
-    void DrawSky()
-    {
-#if URP_PBSKY
-        BeginSection("Gökyüzü");
-
-        if (skyDriver != null)
-        {
-            bool detach = GUILayout.Toggle(detachSkyFromWeather, "Havadan ayır (elle ayar)");
-            if (detach != detachSkyFromWeather)
-            {
-                detachSkyFromWeather = detach;
-                skyDriver.enabled = !detach;
-            }
-        }
-
-        float sun = CloudRow("Güneş şiddeti (tepe)", time.SunIntensity, sunIntensityDefault, 0f, 6f, "F2");
-        if (!Mathf.Approximately(sun, time.SunIntensity)) time.SunIntensity = sun;
-
-        // Ay aynı ışığa yazılıyor: paket geceleyin atmosferi ondan aydınlatıyor ve bulut
-        // yolu `× π` ile ölçeklediği için buluta araziden ~3 kat fazla giriyor.
-        float moon = CloudRow("Ay şiddeti (tepe)", time.MoonIntensity, moonIntensityDefault, 0f, 1.5f, "F3");
-        if (!Mathf.Approximately(moon, time.MoonIntensity)) time.MoonIntensity = moon;
-
-        // AY RENGİ = yüzey albedosu, atmosferden geçmeden önceki hâli. Ufka yakın ay
-        // uzun yoldan geçip sarıya kayıyor; taban soğutulursa sonuç nötre yaklaşıyor.
-        Color moonTint = time.MoonColor;
-        float r = CloudRow("Ay rengi R", moonTint.r, moonColorDefault.r, 0f, 1f, "F2");
-        float g = CloudRow("Ay rengi G", moonTint.g, moonColorDefault.g, 0f, 1f, "F2");
-        float b = CloudRow("Ay rengi B", moonTint.b, moonColorDefault.b, 0f, 1f, "F2");
-        if (!Mathf.Approximately(r, moonTint.r) || !Mathf.Approximately(g, moonTint.g)
-            || !Mathf.Approximately(b, moonTint.b))
-            time.MoonColor = new Color(r, g, b, 1f);
-
-        // ÖLÇÜM: ışığa GERÇEKTEN yazılan şiddet ve renk. Tepe değerinden farkı bizim
-        // kendi atmosfer süzmemiz (`BeamLevel` ve `CurrentSunColor`). Paket bu ışığı
-        // okuyup üstüne kendi transmittance'ını uyguluyor — fark büyükse atmosfer iki
-        // kez soğuruyor demektir.
-
-
-        // ÖLÇÜM: bulutları besleyen ortam probe'unun gerçek değeri. Bulut shader'ı bu
-        // SH'i `clouds_SH*` olarak okuyor. Gece bu sayı gündüzden belirgin küçük değilse
-        // probe geceyi izlemiyor demektir.
-        DrawAmbientProbeReadout();
-
-        // ÖLÇÜM: iki ışığın gerçek hâli. 19:12 karanlık / 19:22 aydınlık arasındaki farkı
-        // bu üç satır gösterecek — hangisi değişiyor, şiddet mi yükseklik mi pozlama mı.
-        GUILayout.Label($"güneş {time.SunLightIntensity:F3} × yük {time.SunUp:F3}");
-        GUILayout.Label($"ay {time.MoonLightIntensity:F3} × yük {time.MoonUp:F3}");
-        GUILayout.Label($"yüzey ışığı {time.SurfaceLightLevel:F4}"
-            + (lookController != null ? $" · uyum {lookController.CurrentAdapt:F2} EV" : ""));
-        GUILayout.Label($"paketin ana ışığı: {PhysicallyBasedSkyURP.ResolvedMainLightName}");
-
-        Vector3 b0 = PhysicallyBasedSkyURP.Body0Forward;
-        Vector3 b1 = PhysicallyBasedSkyURP.Body1Forward;
-        GUILayout.Label($"cisim sayısı {PhysicallyBasedSkyURP.BodyCount}");
-        GUILayout.Label($"cisim0 {b0.x:F2} {b0.y:F2} {b0.z:F2}");
-        GUILayout.Label($"cisim1 {b1.x:F2} {b1.y:F2} {b1.z:F2}");
-
-        CloudSlider("Pozlama (EV)", sky.exposure, -5f, 5f, "F2");
-
-        // POZLAMA UYUMU KAMERANIN, GÖKYÜZÜNÜN DEĞİL. Üstteki `Pozlama (EV)` yalnız göğü
-        // parlatır ve araziyi olduğu yerde bırakır; bu ikisi ise gözün karanlığa açılması
-        // gibi sahnenin tamamını taşır. Alacakaranlığın görünmemesinin sebebi buydu:
-        // gök verisi vardı, tavan 0.6 EV olduğu için ekrana gelmiyordu.
-        if (lookController != null)
-        {
-            float cap = CloudRow("Pozlama tavanı (EV)", lookController.ExposureCap,
-                exposureCapDefault, 0f, 6f, "F2");
-            if (!Mathf.Approximately(cap, lookController.ExposureCap)) lookController.ExposureCap = cap;
-
-            float share = CloudRow("Pozlama uyum payı", lookController.AdaptShare,
-                adaptShareDefault, 0f, 1f, "F2");
-            if (!Mathf.Approximately(share, lookController.AdaptShare)) lookController.AdaptShare = share;
-        }
-        CloudSlider("Parlaklık çarpanı", sky.multiplier, 0f, 4f, "F2");
-
-        GUILayout.Space(4f);
-        CloudSlider("Hava yoğunluğu R", sky.airDensityR);
-        CloudSlider("Hava yoğunluğu G", sky.airDensityG);
-        CloudSlider("Hava yoğunluğu B", sky.airDensityB);
-        CloudSlider("Hava tavanı (m)", sky.airMaximumAltitude, 1000f, 200000f, "F0");
-
-        GUILayout.Space(4f);
-        CloudSlider("Aerosol yoğunluğu", sky.aerosolDensity, "F3");
-        CloudSlider("Aerosol anizotropi", sky.aerosolAnisotropy);
-        CloudSlider("Aerosol tavanı (m)", sky.aerosolMaximumAltitude, 1000f, 50000f, "F0");
-
-        GUILayout.Space(4f);
-        CloudSlider("Ozon yoğunluğu", sky.ozoneDensityDimmer);
-        CloudSlider("Ozon tabanı (m)", sky.ozoneMinimumAltitude, 0f, 60000f, "F0");
-        CloudSlider("Ozon genişliği (m)", sky.ozoneLayerWidth, 1000f, 60000f, "F0");
-
-        GUILayout.Space(4f);
-        CloudSlider("Gezegen yarıçapı (km)", visualEnvironment.planetRadius, 100f, 12000f, "F0");
-
-        if (GUILayout.Button("Gökyüzü ayarlarını geri al"))
-        {
-            RestoreDefaults(sky);
-            RestoreDefaults(visualEnvironment);
-            time.SunIntensity = sunIntensityDefault;
-            time.MoonIntensity = moonIntensityDefault;
-            time.MoonColor = moonColorDefault;
-
-            if (lookController != null)
-            {
-                lookController.ExposureCap = exposureCapDefault;
-                lookController.AdaptShare = adaptShareDefault;
-            }
-        }
-
-        EndSection();
-#endif
-    }
-
-    /// Ortam probe'unun tepe ve taban yönündeki değeri. Bulut aydınlatmasının ambient
-    /// tarafı birebir bunu okuyor (`clouds_SHAr` ... `clouds_SHC`).
-    static readonly Vector3[] ProbeDirections = { Vector3.up, Vector3.down };
-    static readonly Color[] ProbeResults = new Color[2];
-
-    static void DrawAmbientProbeReadout()
-    {
-        RenderSettings.ambientProbe.Evaluate(ProbeDirections, ProbeResults);
-
-        Color top = ProbeResults[0];
-        Color bottom = ProbeResults[1];
-
-        // ÜÇ ONDALIK YETMİYOR: öğlen zenit 0.114 iken fiziksel bir alacakaranlık binde bir
-        // mertebesindedir ve `F3` onu sıfır gösterir. Parlaklık ayrıca EV cinsinden de
-        // yazılıyor — öğleye göre kaç durak aşağıda olduğu tek bakışta görülsün diye.
-        float topLuminance = top.r * 0.2126f + top.g * 0.7152f + top.b * 0.0722f;
-        const float NoonZenith = 0.148f;
-
-        GUILayout.Label($"probe tepe {top.r:F5} {top.g:F5} {top.b:F5}");
-        GUILayout.Label($"probe taban {bottom.r:F5} {bottom.g:F5} {bottom.b:F5}");
-        GUILayout.Label(topLuminance > 1e-7f
-            ? $"tepe parlaklık {topLuminance:F5} · öğlenin {Mathf.Log(topLuminance / NoonZenith, 2f):F1} EV altı"
-            : "tepe parlaklık TAM SIFIR");
-    }
-
-    void DrawCloudErosion()
-    {
-        BeginSection("Bulut — erozyon");
-
-        CloudSlider("Erozyon orani", clouds.erosionFactor);
-        CloudSlider("Erozyon olcegi", clouds.erosionScale, 10f, 300f, "F0");
-        CloudSlider("Erozyon ortmesi", clouds.erosionOcclusion);
-        CloudToggle("Mikro erozyon", clouds.microErosion);
-        CloudSlider("Mikro oran", clouds.microErosionFactor);
-        CloudSlider("Mikro olcek", clouds.microErosionScale, 50f, 400f, "F0");
-
-        EndSection();
-    }
-
-    void DrawCloudLight()
-    {
-        BeginSection("Bulut — isik");
-
-        CloudSlider("Sonum katsayisi", clouds.extinctionCoefficient, "F3");
-        CloudSlider("Toz etkisi", clouds.powderEffectIntensity);
-        CloudSlider("Coklu sacilma", clouds.multiScattering);
-        CloudSlider("Ortam isigi", clouds.ambientLightProbeDimmer);
-        CloudSlider("Gunes isigi", clouds.sunLightDimmer);
-        CloudToggle("Yere golge dusur", clouds.shadows);
-        CloudSlider("Golge koyulugu", clouds.shadowOpacity);
-        CloudSlider("Golge yedek koyulugu", clouds.shadowOpacityFallback);
-        CloudSlider("Golge mesafesi (m)", clouds.shadowDistance, 1000f, 30000f, "F0");
-
-        EndSection();
-    }
-
-    void DrawCloudQuality()
-    {
-        BeginSection("Bulut — kalite");
-
-        CloudSlider("Gorus adimi", clouds.numPrimarySteps);
-        CloudSlider("Isik adimi", clouds.numLightSteps);
-        CloudSlider("Zamansal birikim", clouds.temporalAccumulationFactor);
-        CloudSlider("Algisal harmanlama", clouds.perceptualBlending);
-        CloudSlider("Sonumlenme baslangici (m)", clouds.fadeInStart, 0f, 10000f, "F0");
-        CloudSlider("Sonumlenme mesafesi (m)", clouds.fadeInDistance, 100f, 50000f, "F0");
-
-        if (GUILayout.Button("Bulut ayarlarini geri al")) RestoreDefaults(clouds);
-
-        EndSection();
-    }
-
-    /// Parametrenin `overrideState`'i kapaliysa harmanlama onu atliyor: surgu profile
-    /// yaziyor ama yigina hic gecmiyor. Panelin surdugu her alan acik olmak zorunda.
-    void CaptureDefaults(VolumeComponent component)
-    {
-        foreach (var parameter in component.parameters)
-        {
-            parameter.overrideState = true;
-
-            switch (parameter)
-            {
-                case FloatParameter f: cloudFloatDefaults[parameter] = f.value; break;
-                case IntParameter i: cloudFloatDefaults[parameter] = i.value; break;
-                case BoolParameter b: cloudBoolDefaults[parameter] = b.value; break;
-            }
-        }
-    }
-
-    void RestoreDefaults(VolumeComponent component)
-    {
-        foreach (var parameter in component.parameters)
-        {
-            if (parameter is FloatParameter f && cloudFloatDefaults.TryGetValue(parameter, out float value))
-                f.value = value;
-            else if (parameter is IntParameter i && cloudFloatDefaults.TryGetValue(parameter, out float intValue))
-                i.value = Mathf.RoundToInt(intValue);
-            else if (parameter is BoolParameter b && cloudBoolDefaults.TryGetValue(parameter, out bool flag))
-                b.value = flag;
-        }
-    }
-
-    void CloudSlider(string label, ClampedFloatParameter parameter, string format = "F2")
-    {
-        parameter.value = CloudRow(label, parameter.value, cloudFloatDefaults[parameter],
-            parameter.min, parameter.max, format);
-    }
-
-    /// `FloatParameter` ve `MinFloatParameter`'in ust siniri yok; surgu icin burada veriliyor.
-    void CloudSlider(string label, FloatParameter parameter, float min, float max, string format)
-    {
-        parameter.value = CloudRow(label, parameter.value, cloudFloatDefaults[parameter], min, max, format);
-    }
-
-    void CloudSlider(string label, ClampedIntParameter parameter)
-    {
-        parameter.value = Mathf.RoundToInt(CloudRow(label, parameter.value,
-            cloudFloatDefaults[parameter], parameter.min, parameter.max, "F0"));
-    }
-
-    void CloudToggle(string label, BoolParameter parameter)
-    {
-        parameter.value = GUILayout.Toggle(parameter.value, label);
     }
 
     static float CloudRow(string label, float value, float original, float min, float max,
