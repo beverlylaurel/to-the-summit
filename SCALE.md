@@ -73,6 +73,8 @@ geçirilir.
 | `descentDeadband` 250 m | — | İniş ölü bandı oransal daralır |
 | Kar çizgisi düzensizlik dalga boyu | `worldPos × 0.0016` ≈ 625 m | Dağa göre incelir, çizgi daha "dişli" okunur |
 | `VolumetricClouds.cloudMapSize` 48 000 m | dağın ~2.7 katı | Hava haritası dağı kapsamalı; dağ büyürse birlikte büyümeli. 512 texel → 94 m/texel |
+| `VolumetricClouds.shapeScale` 20 | bulut şekli dünyada 100 000 / 20 = **5 km** periyotta tekrarlıyor | Bulut kümesinin boyu. Dağ büyürse bulutlar orantısız küçük kalır; periyot dağın enine göre seçilmeli |
+| `VolumetricClouds.bottomAltitude` 1200 m / `altitudeRange` 2000 m | katman 1200–3200 m, zirve 5709 m | Katman MUTLAK kotta (`localClouds` açık). Zirvenin katmanın üstünde kalması bilinçli: tırmanırken bulut denizini aşmak görülüyor. Dağ küçülürse zirve katmanın içinde kalır, büyürse aradaki fark açılır — ikisinde de birlikte bakılmalı |
 | `maxHazeDistance` 60 000 m | — | Görüş menzili dağı görebilmeli |
 | Bootstrap `SpawnPoint()` | eteğin dışı | Konum dağın boyundan türüyor, kontrol edilmeli |
 

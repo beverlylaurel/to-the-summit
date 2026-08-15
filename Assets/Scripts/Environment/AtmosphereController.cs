@@ -60,8 +60,6 @@ public class AtmosphereController : MonoBehaviour
     static readonly int SunColorId = Shader.PropertyToID("_SunColor");
     static readonly int MoonColorId = Shader.PropertyToID("_MoonColor");
     static readonly int MoonDirectionId = Shader.PropertyToID("_MoonDirection");
-    static readonly int CloudBottomId = Shader.PropertyToID("_CloudBottom");
-    static readonly int CloudTopId = Shader.PropertyToID("_CloudTop");
 
     static readonly int PlanetRadiusId = Shader.PropertyToID("_PlanetRadius");
 
@@ -97,7 +95,6 @@ public class AtmosphereController : MonoBehaviour
     float smoothedDrift;
     float nextEditorApply;
     float evolution;
-    float localRain = 1f;
     Vector2 spindriftDrift;
     float appliedShadowDistance = -1f;
     float coverage;
@@ -116,29 +113,26 @@ public class AtmosphereController : MonoBehaviour
     /// Teşhis paneli canlı ürettiği haritayı buradan takar; global doku bir sonraki
     /// Apply'da yeniden yayınlanır. Kalıcılık asset pişirmesinin işi.
 
-    /// Oyuncunun ÜSTÜNDEKİ kolonun yağış payı, 0-1. Yağış artık gökten tek parça
-    /// düşmüyor: yağmuru düşüren şey belirli bulutlardır, bir bulutun altındayken
-    /// yağar, açıklığa çıkınca diner. Hava haritasından okunur (kapsama × kabarıklık),
-    /// yavaş yumuşatılır — bulut kenarından geçerken yağmur açılıp kapanmaz, kısalır.
-    public float LocalRain => localRain;
 
 
 
 
     public float Visibility => effectiveVisibility > 0f ? effectiveVisibility : visibility;
 
-    public float Coverage => coverage;
-
-
     /// Hata ayıklama paneli ayarları canlı değiştirebilsin diye açık.
     public AtmosphereSettings Settings => settings;
 
-    /// Bulut katmanının o anki tabanı (metre). Sakin havada iner, yağış ve rüzgâr
-    /// yükseltir; dakikalar ölçeğinde yer değiştirdiği için gözle takip edilemiyor.
-    public float CloudBottom => activeCloudBottom;
+    /// KÜRESEL BULUT KAPSAMASI, 0-1. Gök rengi, sis, yıldız yoğunluğu ve yansıma seviyesi
+    /// bunu kullanıyor; hacimsel bulut sistemi de `CloudWeatherDriver` üzerinden bunu
+    /// okuyor.
+    ///
+    /// TEK EŞLEME. Kural burada duruyor (fırtına kütlesi, kuru hava ritmi, açık pencere,
+    /// test kilidi) ve bulut onu tüketiyor. İki yerde iki eşleme olsaydı gökyüzü "kapalı"
+    /// derken bulutlar "açık" diyebilirdi.
+    public float Coverage => coverage;
 
-    /// Katmanın tavanı. Taban havayla oynadığı için değişken, tavan ayarın kendisi.
-    public float CloudTop => settings.cloudTop;
+    // `CloudBottom` ve `CloudTop` KALDIRILDI: silinen bulut sistemine aitti, gökyüzünde
+    // çizilenle ilgisi kalmamıştı. Tüketicileri artık `CloudLayerProbe`'dan okuyor.
 
     public void Bind(AtmosphereSettings source, WeatherState weatherState, WindField windField,
         TimeOfDay timeOfDay, AltitudeWeatherDriver driver, Camera camera, Material sky)
@@ -475,7 +469,6 @@ public class AtmosphereController : MonoBehaviour
         // Konvektif yükselme gündüz sürer: kaynağı ısınan zemindir. Gece zemin
         // soğur, yükselme durur — bulutlar yalnız sürüklenir.
 
-        UpdateLocalRain();
 
         // Gökyüzü gradyanı artık materyale gitmiyor: gökyüzü, sisle aynı AirColor
         // fonksiyonunu okur ve o fonksiyon _HeightFog* globallerinden beslenir.
@@ -574,8 +567,9 @@ public class AtmosphereController : MonoBehaviour
         // bir olguyu üretmek olurdu. Şafağın gerçek gösterisi −1° ile +3° arasında,
         // huzmenin zaten var olduğu yerde.
 
-        Shader.SetGlobalFloat(CloudBottomId, activeCloudBottom);
-        Shader.SetGlobalFloat(CloudTopId, settings.cloudTop);
+        // `_CloudBottom` ve `_CloudTop` BURADAN YAYINLANMIYOR. Katmanın gerçek kotlarını
+        // yalnız bulut sistemi biliyor; `CloudLayerProbe` yayınlıyor (bağ 8). Buradaki
+        // `activeCloudBottom` eski modelin kendi değeri ve yalnız sis/gök için duruyor.
         Shader.SetGlobalFloat(PlanetRadiusId, settings.planetRadius);
 
 
@@ -620,14 +614,6 @@ public class AtmosphereController : MonoBehaviour
         float scale = sourceLuma / hueLuma;
         return new Color(hue.r * scale, hue.g * scale, hue.b * scale, 1f);
     }
-
-    /// YEREL YAĞIŞ GEÇİCİ OLARAK KAPALI. Hava haritasından okunuyordu: yağmur yalnız
-    /// kalın kolonların altına düşsün, komşu bulut yağmazken bu yağsın diye. Harita
-    /// bulut sistemiyle birlikte silindi.
-    ///
-    /// Şimdilik 1 dönüyor — yağış çalışıyor ama her yerde aynı. Yeni bulut sistemi
-    /// gelince harita okuması geri gelecek; bağın tarifi `CLOUDS_REBUILD.md` madde 4.
-    void UpdateLocalRain() => localRain = 1f;
 
     /// Yükseklik sisi parametreleri. Görüş mesafesi zaten havayı, rüzgârı ve bulut
     /// kuşağını hesaba katıyor; burada yalnızca yüksekliğe dağıtılıyor.

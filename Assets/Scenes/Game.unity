@@ -166,7 +166,8 @@ MonoBehaviour:
   weather: {fileID: 1805896806}
   wind: {fileID: 1805896805}
   shader: {fileID: 4800000, guid: 64a1760316d80e84e8a8e4b127c3bca9, type: 3}
-  clouds: {fileID: 1805896809}
+  cloudLayer: {fileID: 1147612205}
+  observer: {fileID: 848219609}
 --- !u!1 &263682441
 GameObject:
   m_ObjectHideFlags: 0
@@ -961,6 +962,7 @@ MonoBehaviour:
   cursorLock: {fileID: 848219610}
   snowProbe: {fileID: 798857321}
   routeOverlay: {fileID: 2018777761}
+  cloudVolume: {fileID: 832575518}
 --- !u!4 &813786006
 Transform:
   m_ObjectHideFlags: 0
@@ -1214,6 +1216,68 @@ MonoBehaviour:
   headYawLimit: 80
   headPitchLimit: 65
   sensitivity: 0.12
+--- !u!1 &1147612204
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1147612206}
+  - component: {fileID: 1147612205}
+  - component: {fileID: 1147612207}
+  m_Layer: 0
+  m_Name: CloudLayerProbe
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1147612205
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1147612204}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b2034e0f0b30a24e873bf986cc01814, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CloudLayerProbe
+  cloudVolume: {fileID: 832575518}
+  driver: {fileID: 1805896804}
+  observer: {fileID: 848219609}
+--- !u!4 &1147612206
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1147612204}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1147612207
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1147612204}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc5f425d2d7076c41b11ad695e98cac5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CloudWeatherDriver
+  cloudVolume: {fileID: 832575518}
+  wind: {fileID: 1805896805}
 --- !u!1 &1233237509
 GameObject:
   m_ObjectHideFlags: 0
@@ -1417,6 +1481,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LightningFlash
   thunder: {fileID: 263682443}
   atmosphere: {fileID: 1805896809}
+  cloudLayer: {fileID: 1147612205}
   observer: {fileID: 848219609}
   settings: {fileID: 11400000, guid: 8dae1ecc7a0534c4dbae3f926c612a1c, type: 2}
 --- !u!108 &1544747437
@@ -1773,6 +1838,7 @@ MonoBehaviour:
   temperature: {fileID: 1805896810}
   atmosphere: {fileID: 1805896809}
   surface: {fileID: 1738276035}
+  cloudLayer: {fileID: 1147612205}
 --- !u!1 &1805896803
 GameObject:
   m_ObjectHideFlags: 0
@@ -1814,12 +1880,12 @@ MonoBehaviour:
   temperature: {fileID: 1805896810}
   settings: {fileID: 11400000, guid: b2c3544750df89a47884920f8b841e75, type: 2}
   groundAltitude: 185.67
-  rainCeiling: 738.01904
-  snowFloor: 958.9586
-  referenceRainCeiling: 738.01904
-  referenceSnowFloor: 958.9586
-  blizzardAltitude: 4709.16
-  summitAltitude: 5709.16
+  rainCeiling: 738.0263
+  snowFloor: 958.9688
+  referenceRainCeiling: 738.0263
+  referenceSnowFloor: 958.9688
+  blizzardAltitude: 4709.233
+  summitAltitude: 5709.233
 --- !u!114 &1805896805
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1884,12 +1950,6 @@ MonoBehaviour:
   weatherDriver: {fileID: 1805896804}
   view: {fileID: 330585545}
   settings: {fileID: 11400000, guid: d7c928400b3fb54409996c8034e851c1, type: 2}
-  baseNoise: {fileID: 11700000, guid: 8442175cf9900fb4d8b1417993f1c4b7, type: 2}
-  detailNoise: {fileID: 11700000, guid: eda661519887b984d810f1ecb7cc59b2, type: 2}
-  weatherMap: {fileID: 2800000, guid: 684d8509fe8befb44acab474074d55cc, type: 2}
-  skipMap: {fileID: 2800000, guid: 025c58ac013238344a99aa8df0ef0b23, type: 2}
-  curlNoise: {fileID: 2800000, guid: 8744404a8f95de345bddb7d6fc4d733f, type: 2}
-  highNoise: {fileID: 2800000, guid: 568ebc628459f83438a2f5cb56edc5d4, type: 2}
   skyMaterial: {fileID: 2100000, guid: 6384f9a4511193c4d97b7c80dadb7e01, type: 2}
 --- !u!114 &1805896810
 MonoBehaviour:
@@ -4373,3 +4433,4 @@ SceneRoots:
   - {fileID: 508855606}
   - {fileID: 2018777762}
   - {fileID: 1268737632}
+  - {fileID: 1147612206}

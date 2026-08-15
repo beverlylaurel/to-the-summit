@@ -14,6 +14,7 @@ public class ClimbHud : MonoBehaviour
     [SerializeField] TemperatureField temperature;
     [SerializeField] AtmosphereController atmosphere;
     [SerializeField] TerrainSurface surface;
+    [SerializeField] CloudLayerProbe cloudLayer;
 
     const float PanelWidth = 330f;
     const int FontSize = 12;
@@ -38,8 +39,9 @@ public class ClimbHud : MonoBehaviour
     public void Bind(Transform observerRef, Terrain terrainRef, AltitudeWeatherDriver driverRef,
         WeatherState weatherRef, WindField windRef, TimeOfDay timeRef,
         AtmosphereController atmosphereRef, TerrainSurface surfaceRef,
-        TemperatureField temperatureRef)
+        TemperatureField temperatureRef, CloudLayerProbe cloudLayerRef)
     {
+        cloudLayer = cloudLayerRef;
         observer = observerRef;
         terrain = terrainRef;
         weatherDriver = driverRef;
@@ -55,6 +57,7 @@ public class ClimbHud : MonoBehaviour
     {
         if (observer == null || terrain == null || weatherDriver == null || weather == null
             || wind == null || time == null || atmosphere == null || surface == null
+            || cloudLayer == null
             || temperature == null)
             throw new InvalidOperationException($"{nameof(ClimbHud)}: bağımlılıklar atanmadı.");
     }
@@ -126,15 +129,24 @@ public class ClimbHud : MonoBehaviour
         // "Kaplama" değil "kapsama": bu, katmanın ne kadarının bulut olduğu — göğün ne
         // kadarının kapandığı değil. Zirvede %95 yazarken gökyüzü açık olabiliyor, çünkü
         // oyuncu katmanın üstüne çıkmış oluyor. O yüzden nerede durduğu da yazılıyor.
-        float top = atmosphere.CloudTop;
-        float bottom = atmosphere.CloudBottom;
-        string place = observer.position.y > top ? "üstündesin"
-                     : observer.position.y < bottom ? "altındasın"
-                     : "içindesin";
+        // Kotlar bulut sisteminin KENDİ verisinden: aynı Volume ayarları, aynı hava
+        // haritası. Atmosferin `CloudTop`/`CloudBottom`'ı silinen sisteme aitti.
+        float top = cloudLayer.TopAt(observer.position);
+        float bottom = cloudLayer.Bottom;
 
-        builder.AppendFormat("  Bulut kapsaması        %{0:F0}\n", atmosphere.Coverage * 100f);
-        builder.AppendFormat("  Bulut katmanı          {0:F0} – {1:F0} m   ({2})\n\n",
-            bottom - ground, top - ground, place);
+        builder.AppendFormat("  Bulut kapsaması        %{0:F0}\n",
+            cloudLayer.CoverageAt(observer.position) * 100f);
+
+        if (float.IsPositiveInfinity(top))
+            builder.AppendFormat("  Bulut katmanı          bu sütunda bulut yok\n\n");
+        else
+        {
+            string place = observer.position.y > top ? "üstündesin"
+                         : observer.position.y < bottom ? "altındasın"
+                         : "içindesin";
+            builder.AppendFormat("  Bulut katmanı          {0:F0} – {1:F0} m   ({2})\n\n",
+                bottom - ground, top - ground, place);
+        }
 
         builder.AppendFormat("ZAMAN\n");
         builder.AppendFormat("  Saat                   {0}\n", time.Clock);

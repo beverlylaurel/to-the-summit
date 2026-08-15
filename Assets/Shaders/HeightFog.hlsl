@@ -89,19 +89,14 @@ float TerrainHeightAt(float2 xz)
 // bulut tabanı küresiyle kesiştiriyor ve globali oradan okuyor. Kendi bildirimini
 // açarsa derleyici çakışıyor.
 //
-// `CloudShadowAt` şimdilik 1.0 dönüyor, yani yerde bulut gölgesi yok. Çağrı yeri
-// (`MountainSurface.shader`) bilerek bırakıldı: yeni bulut sistemi gelince tek satır
-// değişecek ve bağ orada olduğu için aranması gerekmeyecek.
+// `CloudShadowAt` SİLİNDİ. Yer bulut gölgesi artık bulut sisteminin kendi yolundan
+// geliyor: `VolumetricCloudsURP` gölgeyi ana ışığın cookie dokusuna yazıyor, URP de
+// onu `_LIGHT_COOKIES` açık olan her yüzeye uyguluyor.
 //
-// Bağın sözleşmesi `CLOUDS_REBUILD.md` madde 1'de: gökyüzü hangi yoğunluk alanından
-// besleniyorsa yer gölgesi de aynısından beslenmek zorunda. İkinci bir yaklaşım
-// kurulursa gökte bulut olmayan yerde gölge çıkıyor — bu bir kez yaşandı.
+// Sözleşme böylece kendiliğinden sağlanıyor (`CLOUDS_REBUILD.md` madde 1): gölge,
+// gökyüzünü çizen yoğunluk alanının ta kendisinden türüyor. İkinci bir yaklaşım yok,
+// dolayısıyla "gökte bulut yokken yerde gölge" durumu da yok.
 float _CloudBottom;        // katmanın tabanı (metre)
-
-float CloudShadowAt(float3 worldPos)
-{
-    return 1.0;
-}
 
 // Birikmiş taze kar, KOT EKSENİNDE. 128x1 doku: R örtü, G kalınlık deposu. Yüzey
 // rengini de sürüklenen karı da bu belirliyor — yerde kar yoksa rüzgâr kaldıracak bir

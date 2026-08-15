@@ -18,7 +18,7 @@ public static class CloudMapGenerator
     /// diskteki haritanın etiketine bakıp bayatsa kendisi yeniliyor. Elle menüye basmaya
     /// bırakılırsa bayat harita sessizce kullanılıyor — A kanalı eklendiğinde yoğunluk iki
     /// katına çıkmıştı, ekranda "yanlış ayar" gibi görünüyordu.
-    const int MapVersion = 2;
+    const int MapVersion = 4;
     static string VersionLabel => $"CloudMap-v{MapVersion}";
     const int Resolution = 512;
     const int Octaves = 5;
@@ -36,8 +36,15 @@ public static class CloudMapGenerator
     // kalıyor, shader `coverage²` aldığı için bulut görünmez oluyor. Plato şart.
     const float SparseThreshold = 0.50f;
     const float SparseEdge = 0.15f;
-    const float DenseThreshold = 0.20f;
-    const float DenseEdge = 0.25f;
+
+    // Kapsama sürgüsü 1.0'de formül `max(R, G)`'ye düşüyor, yani gökyüzü tamamen G'ye
+    // kalıyor. Üç ölçüm yapıldı:
+    //   0.20 / 0.25 → ort 0.754, %55 doygun — sürgü sonundayken bile devasa boşluklar
+    //   0.00 / 0.20 → ort 0.982, %93 doygun — gök kapandı ama tamamen düz, detay yok
+    //   0.00 / 0.40 → ort 0.888, %64 doygun, TAM BOŞLUK %0, alanın %27'si inceliyor
+    // Sonuncusu seçildi: delik yok ama tavan düz değil. Kapalı hava da öyle.
+    const float DenseThreshold = 0.0f;
+    const float DenseEdge = 0.40f;
 
     [MenuItem("To The Summit/Bulut/Hava Haritasını Üret", false, 40)]
     public static void Generate()

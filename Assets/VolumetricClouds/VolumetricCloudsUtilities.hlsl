@@ -504,7 +504,11 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
     // `[H18 s.14]`: remap sınırı `1 − g_c × WM_c`. Kapsama sürgüsü zincire BURADAN giriyor;
     // portta bu bağ yoktu, sürgünün alt yarısı bu yüzden hiçbir şey yapmıyordu.
     half base_cloud = 1.0 - _CloudCoverage * cloudCoverageData.coverage.x;
-    base_cloud = saturate(DensityRemap(lowFrequencyNoise, base_cloud, 1.0, 0.0, 1.0)) * cloudCoverageData.coverage.x * cloudCoverageData.coverage.x;
+    // `× coverage²` KALDIRILDI. Portun kendi terimiydi, `[H18]`'de karşılığı yok: kapsama
+    // zaten remap sınırından (`1 − g_c × WM_c`) giriyor, kare almak ikinci kez cezalandırıyordu.
+    // Kapsaması 0.6'ya inen bölge 0.36'ya düşüyor, remap sınırıyla birleşince tam delik
+    // açılıyordu — kapalı gökte bile boşluklar bu yüzden çıkıyordu.
+    base_cloud = saturate(DensityRemap(lowFrequencyNoise, base_cloud, 1.0, 0.0, 1.0));
 
     // Weight the ambient occlusion's contribution
     properties.ambientOcclusion = densityErosionAO.z;

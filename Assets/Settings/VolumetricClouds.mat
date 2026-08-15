@@ -13,6 +13,7 @@ Material:
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
   - _CLOUDS_AMBIENT_PROBE
+  - _LOCAL_VOLUMETRIC_CLOUDS
   - _OUTPUT_CLOUDS_DEPTH
   - _PERCEPTUAL_BLENDING
   m_InvalidKeywords: []
@@ -60,7 +61,7 @@ Material:
     - _CloudNearPlane: 888.8677
     - _DensityMultiplier: 0.32000002
     - _EarthRadius: 6378100
-    - _ErosionFactor: 0.8
+    - _ErosionFactor: 0.2
     - _ErosionOcclusion: 0.1
     - _ErosionScale: 107
     - _FadeInDistance: 600
@@ -78,10 +79,10 @@ Material:
     - _PowderEffectIntensity: 0.25
     - _Seed: 0
     - _ShapeFactor: 0.9
-    - _ShapeScale: 5
+    - _ShapeScale: 20
     - _SmallWindSpeed: 0.25
     - _SunLightDimmer: 1
-    - _VerticalErosionWindDisplacement: -0.0022587166
+    - _VerticalErosionWindDisplacement: -0.07754242
     - _VerticalShapeNoiseOffset: 0
     - _VerticalShapeWindDisplacement: 0
     m_Colors:

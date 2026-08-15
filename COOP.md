@@ -125,6 +125,31 @@ diye bir hata raporu üretir.
 
 ---
 
+## 6. Bulut sürüklenmesi her istemcide yerel birikiyor
+
+`VolumetricCloudsURP` bulut konumunu her karede biriktiriyor:
+`windVector += deltaTime × globalSpeed × yön`. Başlangıç sıfır, artış yerel kare
+süresinden geliyor.
+
+`CloudWeatherDriver` rüzgârı bağladı, yani `globalSpeed` artık sıfır değil ve birikim
+gerçekten işliyor.
+
+Tek oyuncuda doğru: tek bir birikim var.
+
+İkinci oyuncu geldiğinde yanlış olacak: iki istemcinin kare süreleri ve başlama anları
+farklı, dolayısıyla `windVector` ayrışır. Aynı anda gökyüzüne bakan iki oyuncu **farklı
+bulut deseni** görür; sonradan katılan ise bambaşkasını. Yer bulut gölgesi de aynı
+alandan türediği için gölgeler de tutmaz.
+
+**Ne olması gerekiyor:** birikim yerel `deltaTime` toplamından değil, ağdan gelen mutlak
+bir dünya zamanından türemeli — `windVector = worldTime × globalSpeed × yön`. O zaman
+her istemci aynı deseni hesaplar.
+
+**Maliyet:** küçük. Birikim tek yerde (`VolumetricCloudsURP.UpdateMaterialProperties`).
+Asıl iş mutlak dünya zamanının ağdan gelmesi — o zaten gerekecek (bkz. madde 3).
+
+---
+
 ## Henüz yazılmadı, ama bu katmanı isteyecek
 
 Bunlar borç değil — ortada düzeltilecek kod yok. Ama ağ katmanını **tasarlayan** kişinin
@@ -137,7 +162,6 @@ yeniden kuruluyor.
 | **Tırmanma ve ip** | Oyuncular arası fiziksel bağ; iki oyuncunun aynı ipe asılı olması | `DECISIONS.md` → "Oynanış mekaniği netleşmeden koda başlanmaz" |
 | **Envanter ve ekipman** | Oyuncu durumu, kayıp/ölüm senkronu | aynı madde |
 | **Kamp ve sığınak** | Paylaşılan etkileşimli obje, ortak koşu durumu | aynı madde |
-| **Bulut sürüklenmesi** | Bulutların konumu **her istemcide yerel birikiyor**: `VolumetricCloudsURP` her karede `windVector += deltaTime × globalSpeed × yön` yapıyor. Şu an `globalSpeed = 0` olduğu için hiçbir şey kaymıyor ve borç doğmuyor; rüzgâr bağlandığı gün iki oyuncu farklı gökyüzü görür — sonradan katılan ise bambaşkasını. Birikimin ağdan gelen mutlak bir zamandan türemesi gerekecek | `CLOUDS_REBUILD.md` → v1 bağları, rüzgâr |
 
 Bu satırlardan biri yazıldığı gün karşılığı yukarıdaki borç listesine geçer.
 
