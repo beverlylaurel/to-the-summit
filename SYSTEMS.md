@@ -309,8 +309,9 @@ kesiştirilip bulunan dünya noktasının çakmaya uzaklığına göre sönüyor
 çünkü yön mesafe taşımıyor — yaklaştıkça büyümesi gereken leke sabit açıda kalıyordu.
 Uzağa da küçük bir pay düşer; ışık kütlenin içinde saçılıyor.
 
-Ortam ışığına dokunmaz: onu `AtmosphereController` her kare yazıyor, ikinci bir yazan
-olsaydı çakışırlardı. Yönlü kalması zaten doğrusu — gerçek şimşek de sert gölge bırakır.
+Ortam ışığına dokunmaz: onu gökyüzü paketi ambient probe olarak pişiriyor, ikinci bir
+yazan olsaydı çakışırlardı. Yönlü kalması zaten doğrusu — gerçek şimşek de sert gölge
+bırakır.
 
 ### Görünür kol (`LightningBolt`)
 
@@ -327,9 +328,10 @@ Kanalın nerede biteceğini yamacın kendisi belirler. Değme noktasındaki ış
 ışıktır — yönlü olanın aksine orası gerçekten yakında, menzili birkaç yüz metrede kalıyor
 ve kümelemeyi boğmuyor.
 
-### Sis ve bulutlar (`AtmosphereController`)
+### Sis ve hava sinyalleri (`AtmosphereController`)
 
-Bu bölüm sis, gökyüzü, görüş mesafesi ve yansımayı anlatır. Hacimsel bulutlar ayrı bir
+Bu bölüm sis, görüş mesafesi ve hava sinyallerini anlatır. **Gökyüzü, ortam ışığı ve
+yansıma artık burada değil** — bkz. **Gökyüzü ve atmosfer**. Hacimsel bulutlar da ayrı bir
 sistem — bkz. dosyanın başındaki **Bulutlar** bölümü. Buradaki `coverage` bulutların da
 okuduğu tek eşlemedir.
 
@@ -930,21 +932,35 @@ sahneyi düz bir vuruşla yakıyordu. Batımdan sonra kalan pay, atmosferde saç
 artçı parıltısıdır: gölgesiz ama cılız. Rengi `TimeOfDay`'in süzülmüş güneşi, penceresi
 `HorizonFactor`.
 
-### Yansıma haritası (`AtmosphereController`)
+### Gökyüzü ve atmosfer (`PhysicallyBasedSkyURP` paketi, `SkyWeatherDriver`)
 
-**Okur:** gökyüzü rengi (yağış, karlılık ve günün saatinden türeyen).
+**Okur:** ana ışığın yönü ve rengi (`TimeOfDay` sürüyor), yağış şiddeti (`WeatherState`).
+**Okumaz:** `AtmosphereController`'ın renk zincirini. Gökyüzü kendi fiziğinden çiziliyor.
 
-Sahnenin çevre yansıması gökyüzünden pişiyor ve gökyüzü rengi kanalların birinde %2
-kayınca yeniden pişiriliyor. Gece kararması, fırtına grisi, bulut denizi ve şafağın
-kızıllığı — hepsi aynı kapıdan geçiyor, ayrı bir "gece yansıması" ayarı yok.
+`Packages/com.jiaozi158.unity-physically-based-sky-urp` — HDRP'nin Physically Based
+Sky'ının URP portu (MIT). Rayleigh, Mie ve ozon soğurmasını LUT'lardan hesaplıyor;
+aynı LUT'lar üç yeri birden besliyor: gökyüzü, hava perspektifi ve ambient probe.
 
-Şiddet katsayısı (`reflectionIntensity`) da gök seviyesinden türüyor ve bu ÖLÇÜLMÜŞ bir
-gerek: harita tek başına gece kararmıyor. Katsayı kaldırıldığında bisikletin kromu
-karanlıkta yeniden parladı, geri konduğunda düzeldi. Yani kararma iki adımda — haritanın
-içeriği ve şiddet — ve ikisi de aynı gök renginden besleniyor, ayrı bir gece ayarı yok.
+Üç override tek profilde (bulutlarla aynı profil, çünkü bulut portu gezegeni oradan okuyor):
 
-Harita bayat kalırsa belirti nettir: gece metal yüzeyler gündüz gökyüzünü aynalar,
-bisikletin kromu karanlıkta parlar.
+- `VisualEnvironment` — gökyüzü tipi Fiziksel, uzay DÜNYA, ambient DİNAMİK
+- `PhysicallyBasedSky` — model EarthAdvanced, atmosferik saçılım AÇIK
+- `Fog` — KAPALI (gerekçe `DECISIONS.md` → Paketin sisi kapalı başlıyor)
+
+**Bulut bağı.** `URP_PBSKY` tanımlıyken (`SkyPackageDefine` kuruyor) bulut portu üç şeyi
+gökyüzünden alıyor: gezegen merkezi ve yarıçapı, ambient probe, hava perspektifi. Sonuncusu
+brief'in şartı — uzak dağ, silüet ve bulut aynı atmosferik perdeden geçiyor. Gök yansıması
+da bulut materyalini alıyor, yani yansımada gök varsa bulut da var.
+
+**Hava bağı.** `SkyWeatherDriver` yalnız bir şey çeviriyor: yağış şiddeti → `aerosolDensity`
+(aerosol sütununun zenit opaklığı, 0.006 temiz ↔ 0.069 fırtına). Güneşin yönü ve rengi
+BURADAN GEÇMİYOR — `TimeOfDay` ana ışığı sürüyor, paket aynı ışığı okuyor. İkinci bir yol
+"gökyüzü kızardı ama gölgeler öğle yönünde" çelişkisini üretirdi.
+
+**Ortam ışığı ve yansıma da burada.** `AtmosphereController` artık `RenderSettings.skybox`,
+`ambientLight`, `ambientMode` ve `reflectionIntensity` yazmıyor; paket ambient probe'u ve
+yansıma küpünü kendi gökyüzünden pişiriyor. İki yazar olduğunda sonuç kare içindeki yazma
+sırasına kalıyordu.
 
 ### Bisiklet (`BikeController`, `BikeSurface`)
 

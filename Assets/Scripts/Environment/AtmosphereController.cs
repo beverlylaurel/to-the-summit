@@ -148,36 +148,14 @@ public class AtmosphereController : MonoBehaviour
     /// çağrılmamış olabilir.
     void OnEnable() => Initialize();
 
-    /// TEŞHİS: yansıma haritasının yeniden pişmesini durdurur. Pişirme küresel harmonik
-    /// ve yansıma küpünü yeniden üretiyor; kare süresindeki payı ancak durdurup ölçerek
-    /// bilinir. GEÇİCİ.
-    public bool ReflectionFrozen { get; set; }
-
-    /// Yansıma haritasının en son hangi gökyüzünde pişirildiği. Gökyüzü sürekli
-    /// değişiyor ama harita her karede pişirilemez — pişirme milisaniyeler yiyor.
-    Color reflectionSky = new Color(-1f, -1f, -1f);
-    float reflectionTime = -99f;
-
     void Initialize()
     {
         if (settings == null || weather == null || wind == null || time == null
             || weatherDriver == null) return;
 
-        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-
-        if (skyMaterial != null) RenderSettings.skybox = skyMaterial;
-
         initialized = false;
         Apply();
     }
-
-    /// İki gök rengi arasındaki fark verilen eşiği geçiyor mu. Kanal kanal bakılıyor:
-    /// toplam parlaklık aynı kalırken renk kayabiliyor (şafakta kızıl, fırtınada gri) ve
-    /// yansıma o kaymayı da taşımalı.
-    static bool ColourMoved(Color a, Color b, float threshold) =>
-        Mathf.Abs(a.r - b.r) > threshold
-        || Mathf.Abs(a.g - b.g) > threshold
-        || Mathf.Abs(a.b - b.b) > threshold;
 
     void Update()
     {
@@ -310,36 +288,12 @@ public class AtmosphereController : MonoBehaviour
         // kendi hesabı olarak duruyor.
         ApplyHeightFog();
 
-        // Gökyüzü ve ortam ışığı aynı renkten türer: ufukta sınır kalmaz,
-        // nesneler içinde bulundukları havayla aynı ışığı alır
-        RenderSettings.ambientLight = color * settings.ambientStrength;
-
-        // YANSIMA İKİ ADIMDA. Harita gökyüzünden pişiyor ve gökyüzü rengi kaydığında
-        // yenileniyor — gece, fırtına, bulut denizi, şafak, hepsi aynı kapıdan.
+        // ORTAM IŞIĞI, GÖKYÜZÜ VE YANSIMA ARTIK PAKETTE. `PhysicallyBasedSkyURP` skybox'ı,
+        // ambient probe'u ve yansıma küpünü kendi LUT'larından pişiriyor; burada ikinci
+        // bir yazar olsaydı sonuç kare içindeki yazma sırasına kalırdı.
         //
-        // ŞİDDET DE KISILIYOR ve bu ÖLÇÜLMÜŞ bir gerek: harita tek başına gece
-        // kararmıyor. Kaldırıldığında bisikletin kromu karanlıkta yeniden parladı, geri
-        // konduğunda düzeldi. Sebebi, pişen haritanın gök kubbenin ortalama radyansını
-        // değil malzemenin kendi parlaklığını taşıması; ölçüm kazanıyor, teori değil.
-        //
-        // Oran ayrı bir "gece ayarı" değil: ortam ışığının kendi parlaklığından çıkıyor,
-        // yani gökyüzü hangi sebeple kararırsa yansıma da onunla kararıyor.
-        float skyLevel = Mathf.Max(color.r, Mathf.Max(color.g, color.b))
-                       * settings.ambientStrength;
-
-        RenderSettings.reflectionIntensity = Mathf.Clamp01(skyLevel * 2.2f);
-
-        // PİŞİRME SANİYEDE BİRDEN SIK OLMAZ. Yalnız renk eşiğine bakılınca gökyüzü
-        // kıpırdadıkça her kare pişiyordu: küresel harmonik ve yansıma küpü yeniden
-        // üretiliyor, kare süresi ikiye katlanıyordu (180 FPS'ten 100'e). Gökyüzü bir
-        // saniyede gözle görülür kadar değişmiyor.
-        if (!ReflectionFrozen && Time.time - reflectionTime > 1f
-            && ColourMoved(color, reflectionSky, 0.02f))
-        {
-            reflectionSky = color;
-            reflectionTime = Time.time;
-            DynamicGI.UpdateEnvironment();
-        }
+        // Buradan türeyen `color` duruyor: yükseklik sisi, bulut tonu ve ses/renk
+        // düzenlemesi onu okuyor.
 
         if (view != null) view.clearFlags = CameraClearFlags.Skybox;
 

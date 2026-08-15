@@ -40,6 +40,13 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ## Bekleyen ölçümler
 
+- **Gökyüzü/sahne göreli parlaklığı** — paket 100000 lux'e kalibreli, bizim güneş 1.5;
+  oran 2.02 (~1.01 EV) ve hangi taraftan telafi edileceği ölçülmedi
+  → [Güneş şiddeti kalibrasyonu ÖLÇÜLMEDİ](#güneş-şiddeti-kalibrasyonu-ölçülmedi)
+- **Hava perspektifi + yükseklik sisi birlikte** — paketin atmosferik saçılımı açık,
+  bizim yükseklik sisimiz de duruyor; ikisinin üst üste binip binmediği bakılmadı
+  → [Paketin sisi kapalı başlıyor](#paketin-sisi-kapalı-başlıyor)
+
 - **`DepthNormals` fragman maliyeti** — `SnowDisplacedNormal` fragman başına çağrılıyor
   ve üç `SnowDisplacement` açıyor: piksel başına dokuz doku okuması (birikim ağırlığından
   önce altıydı). Hiç ölçülmedi; gradyanın köşeye taşınması ya da geçişin kapatılması
@@ -1062,21 +1069,55 @@ kaydı `CLOUDS_REBUILD.md`. Bu karar kapandı, tetikleyicisi de geçersiz.
 
 ---
 
-## Gökyüzü/atmosfer yeniden yazımı ertelendi
+## Gökyüzü/atmosfer yeniden yazımına BAŞLANDI (2026-08-15)
 
-**Karar.** `sky brief.md` (Frostbite SIGGRAPH 2016 + Hillaire EGSR 2020) fiziksel temelli bir
-atmosfer sistemi tarif ediyor: Transmittance LUT, Sky-View LUT, Aerial Perspective LUT,
-Rayleigh/Mie/ozon katsayıları, `Fms = 1/(1−fms)` sonsuz çoklu saçılım, güneş diskinin
-transmittance'tan geçirilmesi, limb darkening. **Bulutlar bitene kadar başlanmayacak.**
+**Karar.** `sky brief.md`'nin tarif ettiği sistem sıfırdan yazılmadı; `UnityPhysicallyBasedSkyURP`
+(jiaozi158, MIT) gömülü paket olarak kuruldu. Paket HDRP'nin Physically Based Sky'ının URP
+portu ve brief'in zincirini zaten taşıyor: Transmittance LUT, Sky-View LUT, Aerial
+Perspective LUT, Rayleigh/Mie/ozon, dinamik ambient probe.
 
-**Gerekçe.** Mevcut `AtmosphereController` + `Sky.shader` kendi modeliyle çalışıyor ve
-bulut sistemi şu an ondan ışık alıyor. İkisini aynı anda değiştirmek, 2026-08-14'te bulut
-sisteminde yaşanan "hangi kaynak suçlu belli değil" durumunu tekrarlar.
+**Gerekçe.** Bulut sistemimiz aynı yazarın portu ve bu paketle çalışmak üzere yazılmış:
+`URP_PBSKY` tanımlıyken bulutlar gezegen merkezini/yarıçapını gökyüzünden alıyor, ambient
+probe'u paylaşıyor ve hava perspektifinden geçiyor (7 numaralı birleştirme pass'i). Kendi
+atmosferimizi yazmak bu bağların hepsini elle kurmak demekti.
 
-**Tetikleyici.** ÇALDI — bulut bağlarının tamamı kuruldu (`SYSTEMS.md` → Bulutlar).
+**Ne devredildi.** `AtmosphereController` artık `RenderSettings.skybox`, `ambientLight`,
+`ambientMode` ve `reflectionIntensity` YAZMIYOR; yansıma pişirme (`DynamicGI.UpdateEnvironment`)
+ve `ReflectionFrozen` teşhisi silindi. Gökyüzü, ortam ışığı ve yansıma tek sahipte.
 
-**Kapsam ayrımı.** Brief'in bulutla ilgili maddeleri (ortam ışığında güneş diskinin hariç
-tutulması, iki loblu HG `g0=0.8 / g1=−0.5 / α=0.5`, enerji korunumlu analitik entegrasyon,
-aerial perspective'in buluta da uygulanması) bu ertelemenin DIŞINDA — onlar bulut işi.
+**Ne kaldı.** `AtmosphereController` hava ve oyun sinyallerinin sahibi olarak duruyor:
+görüş mesafesi, kapsama, bulut kuşağı, sis bankları, savrulan kar, rüzgâr globali, gölge
+mesafesi. Gökyüzü bunları bilmiyor; çeviriyi `SkyWeatherDriver` yapıyor.
 
 **Uyarı.** Brief 2016 ve 2020 katsayı setlerini ayrı tutmayı şart koşuyor; birleştirilmeyecek.
+
+## Paketin sisi kapalı başlıyor
+
+**Karar.** `Fog` override'ı profile eklendi ama `enabled = false`.
+
+**Gerekçe.** Kendi yükseklik sisimiz sis bankları, inversiyon tavanı ve vadi sis denizi
+taşıyor; paketin `Fog`'unda bunların karşılığı yok — düz üstel yükseklik sisi. İkisi
+birlikte açılırsa sis iki kez uygulanır ve hangisinin ne kattığı ayırt edilemez.
+
+**Tetikleyici.** Kendi yükseklik sisimizin taşıdığı üç özellik (bank, inversiyon, sis
+denizi) pakete taşınabildiğinde ya da gereksiz görüldüğünde açılır ve bizimki silinir.
+
+**Maliyet.** Sis rengi gökyüzünden türemiyor; `AtmosphereController`'ın kendi renk
+zincirinden geliyor. Gökyüzü fiziksel, sis değil — ufukta ton farkı çıkabilir.
+
+## Güneş şiddeti kalibrasyonu ÖLÇÜLMEDİ
+
+**Karar.** Paket 100000 lux yer aydınlığına kalibreli ve README güneş şiddeti için
+**3 (3.030782)**, pozlama için **0** öneriyor. Bizim `TimeOfDay.sunIntensity` **1.5**.
+Değer DEĞİŞTİRİLMEDİ.
+
+**Gerekçe.** 1.5 sayısı sahnedeki her yüzeyin, ACES tonemap'in ve renk düzenlemesinin
+üstüne oturduğu değer. İki katına çıkarmak arazi, kar ve bisiklet dahil hepsini birden
+kaydırırdı — ve bu, ölçmeden yapılacak bir değişiklik olurdu.
+
+**Tetikleyici.** İlk Play'de gökyüzü araziye göre sönük ya da fosforlu görünürse. İki
+aday var ve ikisi ölçümle ayrılır: (a) güneşi 3.03'e çıkarıp yüzeyleri yeniden ayarlamak,
+(b) paketin kendi `exposure`/`multiplier` alanından telafi etmek. Oran 3.030782 / 1.5 = 2.02,
+yani ~1.01 EV.
+
+**Maliyet.** Ölçüm yapılana kadar gökyüzü ile sahnenin göreli parlaklığı doğrulanmamış.
