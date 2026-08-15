@@ -160,6 +160,16 @@ public class DebugMenu : MonoBehaviour
             throw new InvalidOperationException($"{nameof(DebugMenu)}: profilde {nameof(PhysicallyBasedSky)} yok.");
 
         ReadStarContent();
+
+        starTexture = sky.spaceEmissionTexture.value;
+        boundMoonLight = PhysicallyBasedSkyURP.MoonLight;
+
+        if (cloudVolume.profile.TryGet(out bloom))
+            bloomIntensityDefault = bloom.intensity.value;
+
+        clouds.state.overrideState = true;
+        sky.atmosphericScattering.overrideState = true;
+        sky.spaceEmissionTexture.overrideState = true;
 #endif
     }
 
@@ -223,6 +233,7 @@ public class DebugMenu : MonoBehaviour
         BeginColumn();
         DrawClouds();
         DrawSkyDiagnostics();
+        DrawIsolation();
         DrawOverlays();
         DrawSnowCollision();
         EndColumn();
@@ -289,6 +300,60 @@ public class DebugMenu : MonoBehaviour
     /// "Havadan ayır" sürgünün çalışması için şart: `CloudWeatherDriver` kapsamayı her
     /// karede fırtınadan yazıyor, sürücü kapatılmazsa sürgünün yazdığı değer bir sonraki
     /// karede eziliyor.
+    /// TEŞHİS — İZOLASYON. Zenitteki siyah bölgenin hangi aşamadan geldiğini ayırmak
+    /// için şüphelilerin TAMAMI tek seferde. Sorumlu bulununca bu bölüm silinecek.
+    ///
+    /// Her anahtar bir aşamayı devreden çıkarıyor; siyahlık hangisinde kayboluyorsa
+    /// sebep orada.
+    void DrawIsolation()
+    {
+#if URP_PBSKY
+        BeginSection("Teşhis: izolasyon");
+
+        bool noClouds = GUILayout.Toggle(!clouds.state.value, "1 — Bulut geçişi KAPALI");
+        clouds.state.value = !noClouds;
+
+        bool noAerial = GUILayout.Toggle(!sky.atmosphericScattering.value, "2 — Hava perspektifi KAPALI");
+        sky.atmosphericScattering.value = !noAerial;
+
+        if (bloom != null)
+        {
+            bool noBloom = GUILayout.Toggle(!bloomEnabled, "3 — Bloom KAPALI");
+            if (noBloom == bloomEnabled)
+            {
+                bloomEnabled = !noBloom;
+                bloom.intensity.value = bloomEnabled ? bloomIntensityDefault : 0f;
+            }
+        }
+
+        bool noStars = GUILayout.Toggle(starsDisabled, "4 — Yıldız dokusu ÇIKARILDI");
+        if (noStars != starsDisabled)
+        {
+            starsDisabled = noStars;
+            sky.spaceEmissionTexture.value = starsDisabled ? null : starTexture;
+        }
+
+        bool noMoonBody = GUILayout.Toggle(moonBodyDisabled, "5 — İkinci gök cismi KAPALI");
+        if (noMoonBody != moonBodyDisabled)
+        {
+            moonBodyDisabled = noMoonBody;
+            PhysicallyBasedSkyURP.MoonLight = moonBodyDisabled ? null : boundMoonLight;
+        }
+
+        EndSection();
+#endif
+    }
+
+#if URP_PBSKY
+    Bloom bloom;
+    bool bloomEnabled = true;
+    float bloomIntensityDefault;
+    bool starsDisabled;
+    Texture starTexture;
+    bool moonBodyDisabled;
+    Light boundMoonLight;
+#endif
+
     /// TEŞHİS — GEÇİCİ. Yalnız okuma, sürgü yok. Fasulye ve yıldız sorunu kapanınca
     /// bu bölüm ve paketteki `Resolved*` alanları silinecek.
     void DrawSkyDiagnostics()
