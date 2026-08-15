@@ -32,6 +32,14 @@ public class TimeOfDay : MonoBehaviour
 
     /// Güneşin tepe şiddeti. Gökyüzü paketi kendi parlaklığını ana ışıktan türettiği için
     /// gök ile sahnenin göreli parlaklığı buradan ayarlanıyor; F1 paneli bunu sürüyor.
+    /// Gök cisminin ufka göre payı, 0-1. ATMOSFERİK DEĞİL, GEOMETRİK: soğurma ve
+    /// kızıllık gökyüzü paketinin işi, bu yalnız cismin ufkun üstünde olup olmadığını
+    /// yumuşak bir geçişle söylüyor. sin(3°) ≈ 0.0523.
+    const float HorizonBand = 0.0523f;
+
+    static float HorizonBlend(float directionY) =>
+        Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-HorizonBand, HorizonBand, directionY));
+
     public float SunIntensity
     {
         get => sunIntensity;
@@ -227,49 +235,30 @@ public class TimeOfDay : MonoBehaviour
 
         if (sun != null)
         {
-            // Işığın kaynağı: 0 ay, 1 güneş. Bir gündüz ölçüsü değil, bir anahtar —
-            // DayFactor'dan çok daha dar bir kuşakta ve ufkun tam etrafında dönüyor.
-            // Geçiş yine de yumuşak olmalı: sert bir eşik tam ufukta ikisini birden
-            // söndürüyor — gündüz henüz başlamamış, gece şiddeti de yüksekliğe bağlı
-            // olduğu için sıfır. Günün en gösterişli anı sahnenin en karanlık anı
-            // oluyordu.
-            // Kaynak seçimi ŞİDDETTEN çıkar, ayrı bir eşikten değil: hangi kaynak o an
-            // daha çok ışık getiriyorsa yönlü ışık ona döner. Sert anahtar (eşik 0.5)
-            // ufkun tam etrafında atlama üretiyordu.
-            float sunPower = sunIntensity * BeamLevel;
-            float moonPower = moonIntensity * MoonLevel;
+            // KAYNAK PAYI GEOMETRİDEN, ESKİ MODELDEN DEĞİL. Önce `BeamLevel`'den
+            // türetiliyordu ve o ufukta hızlı yükseliyor: güneş 3.03, ay 0.4 olduğu için
+            // oran daha güneş ufkun dibindeyken 0'dan 1'e fırlıyor, ışık da onunla
+            // sıçrıyordu (05:59 → 06:00 bir anda aydınlanma).
+            //
+            // ŞİDDET TOPLAM, HARMANLAMA DEĞİL. İki kaynağın katkısı toplanır; `Lerp`
+            // kullanılırsa pay sıçradığında şiddet de sıçrar. Toplam sürekli, çünkü iki
+            // terim de sürekli.
+            //
+            // BANT ±3°. Ham ışıkta atmosferik sönüm yok, yani şafağın TEK rampası bu.
+            // ±1° (~8 dk) fazla dardı. ±3° ~24 dakikalık geçiş veriyor; ufukta (y=0)
+            // güneş yarım şiddette, diskin yarısı görünüyor demek.
+            float sunAbove = HorizonBlend(SunDirection.y);
+            float moonAbove = HorizonBlend(MoonDirection.y);
+
+            float sunPower = sunIntensity * sunAbove;
+            float moonPower = moonIntensity * moonAbove;
             float sunShare = sunPower / Mathf.Max(1e-5f, sunPower + moonPower);
 
             Vector3 lightSource = sunShare > 0.5f ? SunDirection : MoonDirection;
             sun.transform.rotation = Quaternion.LookRotation(-lightSource);
 
-            // IŞIĞA HAM GÜNEŞ YAZILIYOR. Atmosferik soğurmanın tek sahibi gökyüzü paketi:
-            // paket ışığı okuyup üstüne kendi transmittance'ını uyguluyor, bizim
-            // süzmemiz de uygulansaydı aynı atmosfer iki kez soğururdu.
-            //
-            // ÖLÇÜLDÜ: öğlen ışığa `şiddet 2.55 · renk 1.00 0.88 0.70` yazılıyordu. Mavi
-            // kanal daha kaynakta 0.70'e iniyordu ve Rayleigh'in en çok saçtığı kanal iki
-            // kez kesiliyordu — öğlen gökyüzünün lacivert kalmasının sebebi buydu.
-            //
-            // `above` ATMOSFERİK DEĞİL, GEOMETRİK: güneş ufkun altındayken ışık yukarıdan
-            // gelmiyor. Kızıllık ve sönüm paketin işi, bu yalnız gece arazinin güneş
-            // almasını engelliyor.
-            //
-            // GEÇİŞ UFKUN İKİ YANINDA ±1°, DAHA GENİŞ DEĞİL. `y * 4` yazıldığında güneş
-            // tam şiddete ancak 14°'de çıkıyordu: 06:00'da ışık sıfırdı (güneş hiç
-            // görünmüyordu, 06:05'te aniden beliriyordu) ve şafak boyunca sönük kalıyordu.
-            // Bulutlar da o yüzden neredeyse yalnız ortam ışığıyla aydınlanıp beyaz
-            // kalıyordu. Genişlik güneş diskinden geliyor: ~0.53° çap, üstüne kırılma
-            // payı. sin(1°) ≈ 0.0175.
-            const float HorizonBand = 0.0175f;
-            float above = Mathf.SmoothStep(0f, 1f,
-                Mathf.InverseLerp(-HorizonBand, HorizonBand, SunDirection.y));
-            // ŞİDDET DE HARMANLANIYOR, DALLANMIYOR. Eşikte `sunIntensity * above` ile
-            // `moonIntensity * MoonLevel` arasında atlıyordu: 05:59 ile 06:00 arasında
-            // güneş bir anda kayboluyor, sahne bir anda kararıyordu. Renk zaten `sunShare`
-            // ile harmanlanıyor; ikisi aynı eğriyi izlemezse geçiş kopuyor.
             sun.color = Color.Lerp(moonColor, sunColor, sunShare);
-            sun.intensity = Mathf.Lerp(moonIntensity * MoonLevel, sunIntensity * above, sunShare);
+            sun.intensity = sunPower + moonPower;
         }
 
         // Güneş yüksekliği GLOBAL olarak da yayınlanır. Materyal property'si olarak
