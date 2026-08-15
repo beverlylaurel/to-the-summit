@@ -948,6 +948,9 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
 
             if (hasMoon)
             {
+                // Ana ışık bloğundaki `distanceFromCamera` ile aynı: gök cismi atmosferin
+                // DIŞINDA olmak zorunda, disk o mesafede çiziliyor.
+                const float moonDistanceFromCamera = 1.5e+11f;
                 const float moonAngularDiameter = 0.52f; // derece, gerçek ay 0.48-0.56
                 float moonAngularRadius = moonAngularDiameter * 0.5f * Mathf.Deg2Rad;
                 float moonFlareSize = Mathf.Max(1.0f * Mathf.Deg2Rad, 5.960464478e-8f);
@@ -971,10 +974,10 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 moonSurfaceColor = Vector4.Scale(moonColor, moonSurfaceColor);
                 moonFlareColor = Vector4.Scale(moonColor, moonFlareColor);
 
-                material.SetFloat(_CelestialBody2_DistanceFromCamera, distanceFromCamera);
+                material.SetFloat(_CelestialBody2_DistanceFromCamera, moonDistanceFromCamera);
                 material.SetVector(_CelestialBody2_Right, MoonLight.transform.right.normalized);
                 material.SetFloat(_CelestialBody2_AngularRadius, moonAngularRadius);
-                material.SetFloat(_CelestialBody2_Radius, Mathf.Tan(moonAngularRadius) * distanceFromCamera);
+                material.SetFloat(_CelestialBody2_Radius, Mathf.Tan(moonAngularRadius) * moonDistanceFromCamera);
                 material.SetVector(_CelestialBody2_Up, MoonLight.transform.up.normalized);
                 material.SetInt(_CelestialBody2_Type, 1);
                 material.SetVector(_CelestialBody2_SurfaceColor, moonSurfaceColor);
