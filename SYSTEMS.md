@@ -1051,9 +1051,21 @@ diğerlerinin üstüne yazıyor.
 
 ### Renk düzenlemesi (`LookController`)
 
-**Okur:** şiddet ve karlılık (fırtına ağırlığı), gündüz katsayısı.
+**Okur:** şiddet ve karlılık (fırtına ağırlığı), gündüz katsayısı, `TimeOfDay`in
+`SurfaceLightLevel`i ve ortam probe'unun zenit parlaklığı.
 
 Post-process profilini sürer. Ayrı bir hava kavramı kurmaz.
+
+**Pozlama uyumu gökyüzünü OKUR, sürmez.** `adaptShare` × sahnenin ışık seviyesi kadar
+açılır, `exposureCap`te kırpılır. Gece kırpma etkin, yani ışık tarafında yapılan her
+kısıntı ekrana birebir iniyor — gece parlaklığı `MoonIntensity`den ayarlanır, buradan
+telafi aranmaz.
+
+**Pozlama karanlık ucu kaldırmak için kullanılmaz.** Bir kez denendi: gece göğü ton
+eğrisinin dibinde kalıp keskin sınırlı siyah bir bölge ürettiğinde `adaptShare`
+yükseltildi, belirti kapandı ama parlak uç da yükselip gece sahnesini aydınlattı.
+Karanlık ucun aleti gece profilinin `contrast` değeridir. Gerekçe ve ölçüm
+`DECISIONS.md` → "Gecedeki fasulye kapandı".
 
 ---
 

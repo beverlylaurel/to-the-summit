@@ -25,13 +25,13 @@ MonoBehaviour:
     grain: 0.12
   clearNight:
     exposure: -1.5
-    contrast: 6
+    contrast: -22
     saturation: -22
-    colorFilter: {r: 0.74, g: 0.8, b: 1, a: 1}
-    temperature: -32
+    colorFilter: {r: 0.765, g: 0.803, b: 0.898, a: 1}
+    temperature: -20
     tint: 6
     shadowChill: 0.7
-    bloom: 0.35
+    bloom: 0.15
     bloomThreshold: 1.2
     grain: 0.3
   stormDay:

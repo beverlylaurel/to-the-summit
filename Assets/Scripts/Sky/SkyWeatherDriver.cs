@@ -27,9 +27,6 @@ public class SkyWeatherDriver : MonoBehaviour
     PhysicallyBasedSky sky;
 #endif
 
-    /// TEŞHİS — GEÇİCİ. Yıldız alanının dönüşünü dondurur.
-    public static bool FreezeStarRotation { get; set; }
-
     public void Bind(Volume skyVolumeRef, WeatherState weatherRef, TimeOfDay timeRef,
         SkyWeatherSettings settingsRef)
     {
@@ -65,11 +62,8 @@ public class SkyWeatherDriver : MonoBehaviour
         //
         // Shader arama yönünü döndürüyor (`mul(-V, _SpaceRotation)`), yani yıldız alanı
         // ters yöne kayıyor — açının işareti bu yüzden negatif.
-        // TEŞHİS ANAHTARI — GEÇİCİ. Gece işinde çalışma zamanında değişen üç şeyden biri
-        // buydu; yıldız dokusu izolasyonla elendi, geriye bu kaldı.
-        sky.spaceRotation.value = FreezeStarRotation
-            ? Vector3.zero
-            : Quaternion.AngleAxis(-time.Normalized * 360f, time.CelestialPole).eulerAngles;
+        sky.spaceRotation.value =
+            Quaternion.AngleAxis(-time.Normalized * 360f, time.CelestialPole).eulerAngles;
 #endif
     }
 }

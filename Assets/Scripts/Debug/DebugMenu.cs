@@ -2,7 +2,6 @@ using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
 
 /// F1 ile açılan test paneli. Esc oyunun kendi menüsüne ayrıldı.
 /// Sistemlerin içine "debug modu" kavramı sızmaz; kilitler bileşenin KENDİ test
@@ -73,9 +72,6 @@ public class DebugMenu : MonoBehaviour
     /// Cizim aninda yakalanamaz — `CloudWeatherDriver` kapsama, yogunluk ve ruzgari her
     /// karede yaziyor, ilk cizimde okunan deger zaten surulmus olan olurdu.
     float coverageDefault;
-#if URP_PBSKY
-    PhysicallyBasedSky sky;
-#endif
     bool detachFromWeather;
 
     bool open;
@@ -155,23 +151,6 @@ public class DebugMenu : MonoBehaviour
         clouds.cloudCoverage.overrideState = true;
 
         detachFromWeather = !cloudDriver.enabled;
-
-#if URP_PBSKY
-        if (!cloudVolume.profile.TryGet(out sky))
-            throw new InvalidOperationException($"{nameof(DebugMenu)}: profilde {nameof(PhysicallyBasedSky)} yok.");
-
-        ReadStarContent();
-
-        starTexture = sky.spaceEmissionTexture.value;
-        boundMoonLight = PhysicallyBasedSkyURP.MoonLight;
-
-        if (cloudVolume.profile.TryGet(out bloom))
-            bloomIntensityDefault = bloom.intensity.value;
-
-        clouds.state.overrideState = true;
-        sky.atmosphericScattering.overrideState = true;
-        sky.spaceEmissionTexture.overrideState = true;
-#endif
     }
 
     void OnDisable()
@@ -233,8 +212,6 @@ public class DebugMenu : MonoBehaviour
 
         BeginColumn();
         DrawClouds();
-        DrawSkyDiagnostics();
-        DrawIsolation();
         DrawOverlays();
         DrawSnowCollision();
         EndColumn();
@@ -301,145 +278,6 @@ public class DebugMenu : MonoBehaviour
     /// "Havadan ayır" sürgünün çalışması için şart: `CloudWeatherDriver` kapsamayı her
     /// karede fırtınadan yazıyor, sürücü kapatılmazsa sürgünün yazdığı değer bir sonraki
     /// karede eziliyor.
-    /// TEŞHİS — İZOLASYON. Zenitteki siyah bölgenin hangi aşamadan geldiğini ayırmak
-    /// için şüphelilerin TAMAMI tek seferde. Sorumlu bulununca bu bölüm silinecek.
-    ///
-    /// Her anahtar bir aşamayı devreden çıkarıyor; siyahlık hangisinde kayboluyorsa
-    /// sebep orada.
-    void DrawIsolation()
-    {
-#if URP_PBSKY
-        BeginSection("Teşhis: izolasyon");
-
-        bool noClouds = GUILayout.Toggle(!clouds.state.value, "1 — Bulut geçişi KAPALI");
-        clouds.state.value = !noClouds;
-
-        bool noAerial = GUILayout.Toggle(!sky.atmosphericScattering.value, "2 — Hava perspektifi KAPALI");
-        sky.atmosphericScattering.value = !noAerial;
-
-        if (bloom != null)
-        {
-            bool noBloom = GUILayout.Toggle(!bloomEnabled, "3 — Bloom KAPALI");
-            if (noBloom == bloomEnabled)
-            {
-                bloomEnabled = !noBloom;
-                bloom.intensity.value = bloomEnabled ? bloomIntensityDefault : 0f;
-            }
-        }
-
-        bool noStars = GUILayout.Toggle(starsDisabled, "4 — Yıldız dokusu ÇIKARILDI");
-        if (noStars != starsDisabled)
-        {
-            starsDisabled = noStars;
-            sky.spaceEmissionTexture.value = starsDisabled ? null : starTexture;
-        }
-
-        bool frozenStars = GUILayout.Toggle(SkyWeatherDriver.FreezeStarRotation,
-            "7 — Yıldız dönüşü DONDURULDU");
-        SkyWeatherDriver.FreezeStarRotation = frozenStars;
-
-        bool plainMoon = GUILayout.Toggle(PhysicallyBasedSkyURP.MoonAsPlainDisk,
-            "6 — Ay evresiz (tip = güneş)");
-        PhysicallyBasedSkyURP.MoonAsPlainDisk = plainMoon;
-
-        bool noMoonBody = GUILayout.Toggle(moonBodyDisabled, "5 — İkinci gök cismi KAPALI");
-        if (noMoonBody != moonBodyDisabled)
-        {
-            moonBodyDisabled = noMoonBody;
-            PhysicallyBasedSkyURP.MoonLight = moonBodyDisabled ? null : boundMoonLight;
-        }
-
-        EndSection();
-#endif
-    }
-
-#if URP_PBSKY
-    Bloom bloom;
-    bool bloomEnabled = true;
-    float bloomIntensityDefault;
-    bool starsDisabled;
-    Texture starTexture;
-    bool moonBodyDisabled;
-    Light boundMoonLight;
-#endif
-
-    /// TEŞHİS — GEÇİCİ. Yalnız okuma, sürgü yok. Fasulye ve yıldız sorunu kapanınca
-    /// bu bölüm ve paketteki `Resolved*` alanları silinecek.
-    void DrawSkyDiagnostics()
-    {
-#if URP_PBSKY
-        BeginSection("Teşhis: gökyüzü");
-
-        GUILayout.Label($"ana ışık: {PhysicallyBasedSkyURP.ResolvedMainLightName}");
-        GUILayout.Label($"cisim sayısı: {PhysicallyBasedSkyURP.ResolvedBodyCount}");
-
-        Vector3 b0 = PhysicallyBasedSkyURP.ResolvedBody0Forward;
-        Vector3 b1 = PhysicallyBasedSkyURP.ResolvedBody1Forward;
-        GUILayout.Label($"cisim0 {b0.x:F2} {b0.y:F2} {b0.z:F2}");
-        GUILayout.Label($"cisim1 {b1.x:F2} {b1.y:F2} {b1.z:F2}");
-        GUILayout.Label($"aralarındaki açı: {Vector3.Angle(b0, b1):F0}°");
-
-        GUILayout.Label($"yıldız dokusu: {(PhysicallyBasedSkyURP.ResolvedHasSpaceTexture ? "BAĞLI" : "YOK")}");
-        GUILayout.Label($"yıldız içeriği: {starContentReport}");
-
-        RenderSettings.ambientProbe.Evaluate(ZenithDirection, ZenithResult);
-        Color zenith = ZenithResult[0];
-        GUILayout.Label($"probe tepe {zenith.r:F5} {zenith.g:F5} {zenith.b:F5}");
-
-        GUILayout.Label($"güneş {time.SunIntensity:F2} · ay {time.MoonIntensity:F3}");
-        GUILayout.Label($"ay disk parlaklığı: {PhysicallyBasedSkyURP.MoonDiskBrightness:F3}");
-
-        // ÖLÇÜM: ekranın ORTASININ baktığı yön ve o yönün gök cisimleriyle ilişkisi.
-        // Siyah bölgeye ve aydınlık bölgeye nişan alıp iki okuma alınınca, farkın hangi
-        // terimde olduğu hesapla bulunabiliyor.
-        var view = Camera.main;
-        if (view != null)
-        {
-            Vector3 forward = view.transform.forward;
-            Vector3 moonDir = -time.SunDirection;
-
-            float elevation = Mathf.Asin(Mathf.Clamp(forward.y, -1f, 1f)) * Mathf.Rad2Deg;
-
-            GUILayout.Label($"bakış {forward.x:F2} {forward.y:F2} {forward.z:F2} · yükseklik {elevation:F0}°");
-            GUILayout.Label($"aya açı {Vector3.Angle(forward, moonDir):F0}° · güneşe açı {Vector3.Angle(forward, time.SunDirection):F0}°");
-            GUILayout.Label($"kamera kotu {view.transform.position.y:F0} m");
-        }
-
-        EndSection();
-#endif
-    }
-
-    /// TEŞHİS: bağlı küp haritanın GERÇEKTEN yıldız taşıyıp taşımadığı. Doku bağlı
-    /// görünüp içi boş olabilir; "BAĞLI" tek başına yetmiyor.
-    string starContentReport = "okunmadı";
-
-    void ReadStarContent()
-    {
-#if URP_PBSKY
-        // `CubemapParameter` `Texture` taşıyor, `Cubemap` değil.
-        var texture = sky != null ? sky.spaceEmissionTexture.value as Cubemap : null;
-        if (texture == null) { starContentReport = "küp harita yok"; return; }
-
-        if (!texture.isReadable) { starContentReport = "doku okunabilir değil"; return; }
-
-        float max = 0f;
-        int lit = 0;
-
-        var pixels = texture.GetPixels(CubemapFace.PositiveX);
-        foreach (var p in pixels)
-        {
-            float v = Mathf.Max(p.r, Mathf.Max(p.g, p.b));
-            if (v > 0.0001f) lit++;
-            max = Mathf.Max(max, v);
-        }
-
-        starContentReport = $"+X yüzünde {lit} teksel, en parlak {max:F4}";
-#endif
-    }
-
-    static readonly Vector3[] ZenithDirection = { Vector3.up };
-    static readonly Color[] ZenithResult = new Color[1];
-
     void DrawClouds()
     {
         BeginSection("Bulut");
