@@ -1164,6 +1164,22 @@ ama ışığa etmiyor.
 (`LightningBolt` okuyor), `_SunColor` ve `_MoonColor` (yalnız materyale yazılıyor, bulut
 uniform'uyla çakışmıyor).
 
+## Işık yönü alacakaranlıkta sert dönüyor
+
+**Durum.** Güneş ve ay AYNI yönlü ışığa yazılıyor. Şiddet ve renk sürekli (toplam ve
+`Lerp`), ama YÖN `sunShare > 0.5` eşiğinde sert dönüyor.
+
+**Ölçüldü.** Dönüş güneş −9.60°'deyken oluyor, o anda toplam ışık 0.408 — tepe şiddetin
+%13'ü. Gölgeler 180° takla atıyor. Sıfır değil, yani görülebilir.
+
+**Neden şimdi düzeltilmedi.** İki cisim tam karşıt (`MoonDirection = −SunDirection`), yani
+yönü harmanlamak sıfır vektörden geçer — `Slerp` burada tanımsız. Gerçek çözüm ayı ikinci
+gök cismi olarak vermek: paket `CelestialBodyData` taşıyor ve brief ayı "ikincil saçılım
+kaynağı" diye tarif ediyor.
+
+**Tetikleyici.** Alacakaranlıkta gölgelerin döndüğü fark edilirse ya da gece sahnesi
+oynanabilir olması gerekirse. Yıldız işiyle aynı turda yapılmalı — ikisi de gece sistemi.
+
 ## Gece boş: yıldızlar gitti, ay tek kaynak
 
 **Durum.** Ortam kipi Skybox'a alınınca probe dürüstleşti ve gece gerçek değerine indi
