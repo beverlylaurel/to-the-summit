@@ -84,7 +84,7 @@ Material:
     - _ShapeScale: 34.1
     - _SmallWindSpeed: 0.25
     - _SunLightDimmer: 1
-    - _VerticalErosionWindDisplacement: -0.031486522
+    - _VerticalErosionWindDisplacement: -0.090773664
     - _VerticalShapeNoiseOffset: 0
     - _VerticalShapeWindDisplacement: 0
     m_Colors:
@@ -92,6 +92,6 @@ Material:
     - _ScatteringTint: {r: 1, g: 1, b: 1, a: 0.25}
     - _ShapeNoiseOffset: {r: 0, g: 0, b: 0, a: 0}
     - _WindDirection: {r: 0.9063078, g: 0.42261827, b: 0, a: 0}
-    - _WindVector: {r: 2.2829187, g: 1.0645423, b: 0, a: 0}
+    - _WindVector: {r: 6.581511, g: 3.069009, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

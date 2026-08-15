@@ -435,6 +435,12 @@ public class DebugMenu : MonoBehaviour
             + (lookController != null ? $" · uyum {lookController.CurrentAdapt:F2} EV" : ""));
         GUILayout.Label($"paketin ana ışığı: {PhysicallyBasedSkyURP.ResolvedMainLightName}");
 
+        Vector3 b0 = PhysicallyBasedSkyURP.Body0Forward;
+        Vector3 b1 = PhysicallyBasedSkyURP.Body1Forward;
+        GUILayout.Label($"cisim sayısı {PhysicallyBasedSkyURP.BodyCount}");
+        GUILayout.Label($"cisim0 {b0.x:F2} {b0.y:F2} {b0.z:F2}");
+        GUILayout.Label($"cisim1 {b1.x:F2} {b1.y:F2} {b1.z:F2}");
+
         CloudSlider("Pozlama (EV)", sky.exposure, -5f, 5f, "F2");
 
         // POZLAMA UYUMU KAMERANIN, GÖKYÜZÜNÜN DEĞİL. Üstteki `Pozlama (EV)` yalnız göğü
