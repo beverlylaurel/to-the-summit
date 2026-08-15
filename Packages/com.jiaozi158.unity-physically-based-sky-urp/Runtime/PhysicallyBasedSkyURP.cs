@@ -56,6 +56,99 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
     /// (ayrı bir yönlü ışık olarak) araziyi sürüyor.
     public static Light MoonLight { get; set; }
 
+    private PBSkyPrePass m_PBSkyPrePass;
+    private SkyViewLUTPass m_SkyViewLUTPass;
+    private AtmosphericScatteringPass m_AtmosphericScatteringPass;
+    private AmbientProbePass m_AmbientProbePass;
+    private PBSkyPostPass m_PBSkyPostPass;
+
+    [Header("Sky")]
+    [Tooltip("The fallback sky material when physically based sky is disabled.")]
+    [SerializeField] private Material m_FallbackSkyMaterial;
+
+    [Header("Volumetric Clouds")]
+    [Tooltip("[Optional] The material of volumetric clouds used when updating sky reflection.")]
+    [SerializeField] private Material m_VolumetricCloudsMaterial;
+
+    private const string k_PbrSkyShaderName = "Hidden/Skybox/PhysicallyBasedSky";
+    private const string k_PbrSkyLutShaderName = "Hidden/Sky/PhysicallyBasedSkyPrecomputation";
+
+    private const string k_CloudsShaderName = "Hidden/Sky/VolumetricClouds";
+    private const string k_PbrSkyMaterialName = "Physically Based Sky";
+    private const string k_DynamicAmbientProbeKeywordName = "VISUAL_ENVIRONMENT_DYNAMIC_SKY";
+    private const string k_AtmosphericScatteringLowResolutionKeywordName = "ATMOSPHERIC_SCATTERING_LOW_RES";
+
+    /// <summary>
+    /// Get the skybox material of physically based sky.
+    /// </summary>
+    /// <value>
+    /// The material of physically based sky.
+    /// </value>
+    public Material PBRSkyMaterial
+    {
+        get { return m_PbrSkyMaterial; }
+    }
+
+    /// <summary>
+    /// Get or set the fallback sky material when physically based sky is disabled.
+    /// </summary>
+    /// <value>
+    /// The material of fallback sky shader.
+    /// </value>
+    public Material FallbackSkyMaterial
+    {
+        get { return m_FallbackSkyMaterial; }
+        set { m_FallbackSkyMaterial = value; }
+    }
+
+    /// <summary>
+    /// Get or set the material of volumetric clouds shader.
+    /// </summary>
+    /// <value>
+    /// [Optional] The material of "Hidden/Sky/VolumetricClouds" shader used when updating sky reflection.
+    /// </value>
+    public Material CloudsMaterial
+    {
+        get { return m_VolumetricCloudsMaterial; }
+        set { m_VolumetricCloudsMaterial = value; ValidateCloudsMaterial(); }
+    }
+
+    /// <summary>
+    /// Get or set the shader of physically based sky.
+    /// </summary>
+    /// <value>
+    /// The shader of physically based sky.
+    /// </value>
+    public Shader PBSkyShader
+    {
+        get { return m_Shader; }
+        set { m_Shader = value; }
+    }
+
+    /// <summary>
+    /// Get or set the precomputation shader of physically based sky.
+    /// </summary>
+    /// <value>
+    /// The precomputation shader of physically based sky.
+    /// </value>
+    public Shader PBSkyLutShader
+    {
+        get { return m_LutShader; }
+        set { m_LutShader = value; }
+    }
+
+    /// <summary>
+    /// Get or set the precomputation quality of physically based sky.
+    /// </summary>
+    /// <value>
+    /// The precomputation quality of physically based sky.
+    /// </value>
+    public PrecomputationQualityMode PrecomputationQuality
+    {
+        get { return m_Precomputation; }
+        set { m_Precomputation = value; }
+    }
+
     public struct CelestialBodyData
     {
         public Vector3 color;
