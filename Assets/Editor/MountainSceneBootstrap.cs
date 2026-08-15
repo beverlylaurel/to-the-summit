@@ -1268,19 +1268,6 @@ public static class MountainSceneBootstrap
     {
         var timeOfDay = Object.FindAnyObjectByType<TimeOfDay>();
 
-        Light sun = null;
-        foreach (var light in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
-        {
-            if (light.type != LightType.Directional) continue;
-            if (light.gameObject.name == MoonLightName) continue;
-
-            sun = light;
-            break;
-        }
-
-        if (sun == null)
-            throw new System.InvalidOperationException("Sahnede yönlü ışık bulunamadı.");
-
         var moonObject = GameObject.Find(MoonLightName);
         if (moonObject == null)
         {
@@ -1297,6 +1284,35 @@ public static class MountainSceneBootstrap
 
         moon.type = LightType.Directional;
         moon.shadows = LightShadows.None;
+
+        // GÜNEŞ BİLEŞENDEN AYIRT EDİLİYOR, ADDAN DEĞİL. Sahnede ÜÇ yönlü ışık var:
+        // güneş, ay ve şimşek. Eskiden yalnız ay adı eleniyordu ve `FindObjectsByType`
+        // sırası garantili olmadığı için ŞİMŞEK ışığı güneş sanılıp `TimeOfDay`'e
+        // bağlanabiliyordu. O olduğunda gerçek güneş hiç sürülmüyor, son şiddetinde
+        // (3.03) ve son açısında gökte asılı kalıyor — gece yarısında ayın yanında
+        // ikinci bir parlak cisim olarak görünüyordu. Ölçüldü: cisim0 yönü güneşi
+        // +31°'de gösteriyordu, saat 00:00'da.
+        //
+        // Şimşek `[RequireComponent(typeof(Light))]` ile kendi ışığını taşıyor, yani
+        // bileşeninden kesin ayırt ediliyor.
+        Light sun = null;
+        foreach (var light in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+        {
+            if (light.type != LightType.Directional) continue;
+            if (light == moon) continue;
+            if (light.GetComponent<LightningFlash>() != null) continue;
+
+            if (sun != null)
+                throw new System.InvalidOperationException(
+                    $"Sahnede birden fazla güneş adayı yönlü ışık var: {sun.name} ve {light.name}. " +
+                    "Hangisinin güneş olduğu belirsiz.");
+
+            sun = light;
+        }
+
+        if (sun == null)
+            throw new System.InvalidOperationException(
+                "Güneş bulunamadı: ay ve şimşek dışında yönlü ışık yok.");
 
         // URP EK VERİSİ İKİ IŞIKTA DA OLMALI. Unity bu bileşeni yalnız ışık MENÜDEN
         // eklendiğinde otomatik koyuyor; koddan eklenen ışıkta olmuyor. Bulut gölge
