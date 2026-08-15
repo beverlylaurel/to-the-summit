@@ -326,8 +326,9 @@ public class DebugMenu : MonoBehaviour
     void ReadStarContent()
     {
 #if URP_PBSKY
-        var texture = sky != null ? sky.spaceEmissionTexture.value : null;
-        if (texture == null) { starContentReport = "doku yok"; return; }
+        // `CubemapParameter` `Texture` taşıyor, `Cubemap` değil.
+        var texture = sky != null ? sky.spaceEmissionTexture.value as Cubemap : null;
+        if (texture == null) { starContentReport = "küp harita yok"; return; }
 
         if (!texture.isReadable) { starContentReport = "doku okunabilir değil"; return; }
 
