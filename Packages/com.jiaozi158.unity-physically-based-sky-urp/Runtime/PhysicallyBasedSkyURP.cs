@@ -59,6 +59,11 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
     /// TEŞHİS: paketin o an ana ışık olarak çözdüğü cisim. Gökyüzü bundan sürülüyor.
     public static string ResolvedMainLightName { get; private set; } = "-";
 
+    /// TEŞHİS: iki gök cisminin o anki yönü ve sayacın değeri.
+    public static Vector3 Body0Forward { get; private set; }
+    public static Vector3 Body1Forward { get; private set; }
+    public static int BodyCount { get; private set; }
+
     private PBSkyPrePass m_PBSkyPrePass;
     private SkyViewLUTPass m_SkyViewLUTPass;
     private AtmosphericScatteringPass m_AtmosphericScatteringPass;
@@ -930,6 +935,10 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 // perspektifi hiç uygulanmıyor.
                 material.SetInt(_CelestialBodyCount, hasMoon ? 2 : 1);
                 Shader.SetGlobalInt(_CelestialBodyCount, hasMoon ? 2 : 1);
+
+                BodyCount = hasMoon ? 2 : 1;
+                Body0Forward = mainLight.transform.forward;
+                Body1Forward = hasMoon ? MoonLight.transform.forward : Vector3.zero;
 
                 if (hasMoon)
                 {
