@@ -49,38 +49,25 @@ bilinçli. İki sistem arasında yeni bir bağ kurulduğunda, bir bağ koptuğun
 bir kural eklendiğinde `SYSTEMS.md` **aynı adımda** güncellenir. Sayılar orada tutulmaz;
 eşik ve katsayı kodda ve ayar asset'lerinde durur.
 
-## Bulut sistemi — ayrı belgeler
+## Bulut sistemi
 
-Bulut sistemi 2026-08-14'te tamamen silindi; hazır bir uygulamadan (`UnityVolumetricCloudsURP`,
-Nubis türevi) yeniden kurulacak. **Bulut konusunda `SYSTEMS.md`'ye BAKILMAZ** — oradaki
-anlatım silinmiş koda ait, dosyanın başında uyarısı var.
+Hacimsel bulutlar `UnityVolumetricCloudsURP` (MIT) üzerine kurulu, yoğunluk/şekil/aydınlatma
+zinciri Nubis/HZD makalesine göre düzeltildi. Bağların tamamı kuruldu.
 
-Buluta dair her iş şu üç dosyayla başlar:
-
-- **`CLOUDS_REBUILD.md`** — hangi sistem bulutu okuyordu (yer gölgesi, `CloudCeiling`,
-  ClimbHud, yağış, yansıma, şimşek), ölçülerek bulunmuş 12 ders, kurtarılmış gürültü hash'i
-- **`NUBIS_NOTES.md`** — makale okumaları. 12 soru, her cevabın yanında kaynak sayfa
-  (`[N22 s.34]`). Okuma defteri hangi sayfaların okunduğunu gösterir; boşluk varsa
-  okunmamıştır
-- **`DECISIONS.md`** — sökme kararı ve tetikleyicisi
-
-### İlk sürüm HİÇBİR ŞEYE BAĞLANMAZ
-
-**v1 bulut sistemi tamamen bağımsız çalışır.** Hava durumundan, rüzgârdan, günün
-saatinden, yağıştan, şimşekten, sıcaklıktan — hiçbirinden girdi almaz. Kendi ayarları
-neyse onu çizer.
-
-Sebep: PDF'e sadık kurulmuş bulutun kendi hâlini görmek. Olaylar hemen bağlanırsa
-bozulan şeyin buluttan mı bağdan mı geldiği ayırt edilemez — 2026-08-14'te tam olarak
-bu oldu, on bir telafi terimi böyle birikti.
-
-Bağlar **v1 beğenildikten sonra, teker teker** eklenir. Her bağ eklendiğinde bulut
-tekrar bakılır; bozulursa o bağ geri alınır. Sıra ve sözleşmeler `CLOUDS_REBUILD.md`'de.
+- **Bağlar ve bilinçli kurallar `SYSTEMS.md` → Bulutlar.** Güncel olan orasıdır.
+- **`CLOUDS_REBUILD.md`** teknik kayıt: portun makaleyle sekiz farkı, hangisi nasıl
+  kapandı, ölçülmüş sayılar, kurtarılmış gürültü hash'i. Yeni bir sapma yapılacaksa
+  önce oraya bakılır — aynı hata iki kez ölçülmesin.
+- **`NUBIS_NOTES.md`** makale okumaları: 12 soru, her cevabın yanında kaynak sayfa.
+  Buradaki dersler ÖLÇÜMDEN, oradaki cevaplar MAKALEDEN gelir; ikisi karışmaz.
 
 **Repo'nun üstüne kendi terimimiz eklenmez.** Görüntü yanlışsa önce onun parametrelerine
 ve ürettiği dokulara bakılır, tek seferde tek sayı değişir. Ekleme ihtiyacı doğuyorsa
 önce ilgili makale okunur — eski sistem dört satırlık formülün üstüne on bir terim
 biriktirdiği için silindi.
+
+**Telafi terimi geri eklenmez.** Bir düzeltmenin gerekçesi ortadan kalktıysa terim de
+gelmez; bu bir kez uygulandı (güneş yaması, `CLOUDS_REBUILD.md` bağ 7).
 
 ## Belge otoritesi
 

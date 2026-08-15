@@ -32,10 +32,16 @@ half3 EvaluateVolumetricCloudsAmbientProbe(half3 normalWS)
 #define CLOUD_DENSITY_TRESHOLD 0.001
 // Number of steps before we start the large steps
 #define EMPTY_STEPS_BEFORE_LARGE_STEPS 8
-// Forward eccentricity
-#define FORWARD_ECCENTRICITY 0.7
-// Forward eccentricity
-#define BACKWARD_ECCENTRICITY 0.7
+// İKİ LOBLU HENYEY-GREENSTEIN. Değerler Frostbite'ın üretim varsayılanları
+// (`sky brief.md`): g0 = 0.8 ileri saçılım (gümüş kenar), g1 = −0.5 geri saçılım
+// (ters açıdaki bulut ölü görünmesin), karışım 0.5.
+//
+// Portta ikisi TOPLANIYORDU. Her HG küre üzerinde 1'e integre olduğu için toplam 2
+// ediyordu, yani enerji korunmuyordu. Brief normalize birleştirmeyi şart koşuyor;
+// `lerp` iki lobu ağırlıklı ortalıyor ve integral 1'de kalıyor.
+#define FORWARD_ECCENTRICITY 0.8
+#define BACKWARD_ECCENTRICITY -0.5
+#define PHASE_LOBE_BLEND 0.5
 // Distance until which the erosion texture is used
 #define MIN_EROSION_DISTANCE 3000.0
 #define MAX_EROSION_DISTANCE 100000.0
@@ -760,19 +766,19 @@ void EvaluateCloud(CloudProperties cloudProperties, half3 rayDirection,
     // Evaluate the phase function for each of the octaves
     half2 phaseFunction = half2(0.0, 0.0);
     half forwardP = HenyeyGreensteinPhaseFunction(FORWARD_ECCENTRICITY * PositivePow(_MultiScattering, 0), cosAngle);
-    half backwardsP = HenyeyGreensteinPhaseFunction(-BACKWARD_ECCENTRICITY * PositivePow(_MultiScattering, 0), cosAngle);
-    phaseFunction[0] = forwardP + backwardsP;
+    half backwardsP = HenyeyGreensteinPhaseFunction(BACKWARD_ECCENTRICITY * PositivePow(_MultiScattering, 0), cosAngle);
+    phaseFunction[0] = lerp(forwardP, backwardsP, PHASE_LOBE_BLEND);
 
 #if NUM_MULTI_SCATTERING_OCTAVES >= 2
     forwardP = HenyeyGreensteinPhaseFunction(FORWARD_ECCENTRICITY * PositivePow(_MultiScattering, 1), cosAngle);
-    backwardsP = HenyeyGreensteinPhaseFunction(-BACKWARD_ECCENTRICITY * PositivePow(_MultiScattering, 1), cosAngle);
-    phaseFunction[1] = forwardP + backwardsP;
+    backwardsP = HenyeyGreensteinPhaseFunction(BACKWARD_ECCENTRICITY * PositivePow(_MultiScattering, 1), cosAngle);
+    phaseFunction[1] = lerp(forwardP, backwardsP, PHASE_LOBE_BLEND);
 #endif
 
 #if NUM_MULTI_SCATTERING_OCTAVES >= 3
     forwardP = HenyeyGreensteinPhaseFunction(FORWARD_ECCENTRICITY * PositivePow(_MultiScattering, 2), cosAngle);
-    backwardsP = HenyeyGreensteinPhaseFunction(-BACKWARD_ECCENTRICITY * PositivePow(_MultiScattering, 2), cosAngle);
-    phaseFunction[2] = forwardP + backwardsP;
+    backwardsP = HenyeyGreensteinPhaseFunction(BACKWARD_ECCENTRICITY * PositivePow(_MultiScattering, 2), cosAngle);
+    phaseFunction[2] = lerp(forwardP, backwardsP, PHASE_LOBE_BLEND);
 #endif
 
     // Compute the powder effect
