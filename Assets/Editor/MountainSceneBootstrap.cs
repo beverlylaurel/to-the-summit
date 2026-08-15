@@ -1336,9 +1336,7 @@ public static class MountainSceneBootstrap
             player.GetComponentInChildren<SnowCollisionProbe>(true),
             Object.FindAnyObjectByType<RouteOverlay>(FindObjectsInactive.Include),
             cloudVolume,
-            Object.FindAnyObjectByType<CloudWeatherDriver>(),
-            Object.FindAnyObjectByType<SkyWeatherDriver>(),
-            Object.FindAnyObjectByType<LookController>());
+            Object.FindAnyObjectByType<CloudWeatherDriver>());
 
         EditorUtility.SetDirty(menu);
     }

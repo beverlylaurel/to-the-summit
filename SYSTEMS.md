@@ -991,6 +991,14 @@ devralıyor.
 (`_SunColor`); gece ay bulutları doğrudan değil, gökyüzünden pişen ortam probe'u üzerinden
 aydınlatıyor. Yani ayda gümüş kenar yok.
 
+**Ortam probe'u GERÇEK gökyüzünden pişiyor** (`SkyAmbientBaker`, `DynamicGI`). Paketin
+analitik probe'u devre dışı: o yol çoklu saçılım taşımıyor ve alacakaranlıkta sıfır
+veriyordu. Pişirme kısık — güneş 0.25° kayınca ve en fazla yarım saniyede bir.
+
+**Ay albedosu 0.52 0.64 1.00.** Doğan ay uzun atmosfer yolundan geçip sarıya kayıyor;
+taban soğutuldu ki soğurma sonrası sonuç nötre yaklaşsın. Hesap `TimeOfDay.moonColor`
+yorumunda: 10°'de eski renk `1.00 0.80 0.43`, yeni renk `1.00 0.87 0.56`.
+
 **Hava bağı.** `SkyWeatherDriver` yalnız bir şey çeviriyor: yağış şiddeti → `aerosolDensity`
 (aerosol sütununun zenit opaklığı, 0.006 temiz ↔ 0.069 fırtına). Güneşin yönü ve rengi
 BURADAN GEÇMİYOR — `TimeOfDay` ana ışığı sürüyor, paket aynı ışığı okuyor. İkinci bir yol

@@ -22,21 +22,6 @@ public class LookController : MonoBehaviour
     [Tooltip("Işık farkının kapatılan payı. 1 = tam normalizasyon, şafağı öğlene çevirir.")]
     [SerializeField, Range(0f, 1f)] float adaptShare = 0.35f;
 
-    public float ExposureCap
-    {
-        get => exposureCap;
-        set => exposureCap = value;
-    }
-
-    /// TEŞHİS: o an uygulanan pozlama telafisi (EV).
-    public float CurrentAdapt { get; private set; }
-
-    public float AdaptShare
-    {
-        get => adaptShare;
-        set => adaptShare = value;
-    }
-
     [SerializeField] LookSettings look;
     [SerializeField] WeatherState weather;
     [SerializeField] TimeOfDay time;
@@ -191,8 +176,6 @@ public class LookController : MonoBehaviour
         // kırpma alacakaranlığı tek bir seviyeye düzlüyordu.
         float adapt = Mathf.Clamp(adaptShare * -Mathf.Log(Mathf.Max(0.0005f, lightLevel), 2f),
                                   0f, exposureCap);
-
-        CurrentAdapt = adapt;
 
         Set(colorAdjustments.postExposure, profile.exposure + adapt);
         Set(colorAdjustments.contrast, profile.contrast);

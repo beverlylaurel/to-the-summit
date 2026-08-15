@@ -1190,23 +1190,34 @@ ama ışığa etmiyor.
 (`LightningBolt` okuyor), `_SunColor` ve `_MoonColor` (yalnız materyale yazılıyor, bulut
 uniform'uyla çakışmıyor).
 
-## Işık yönü alacakaranlıkta sert dönüyor
+## Ay ikinci gök cismi oldu — yön dönüşü kapandı
 
-**Durum.** Güneş ve ay AYNI yönlü ışığa yazılıyor. Şiddet ve renk sürekli (toplam ve
-`Lerp`), ama YÖN `sunShare > 0.5` eşiğinde sert dönüyor.
+**Karar.** Ay artık ayrı bir yönlü ışık VE gökyüzü paketinde ikinci gök cismi. Paketin
+kaynağına dokunulan üçüncü yer.
 
-**Ölçüldü.** Dönüş güneş −9.60°'deyken oluyor, o anda toplam ışık 0.408 — tepe şiddetin
-%13'ü. Gölgeler 180° takla atıyor. Sıfır değil, yani görülebilir.
+**Neden yapısaldı.** Tek yönlü ışığa iki cisim sığmıyor: ay güneşin tam karşısında, yön
+bir tanedir ve devir anında disk 180° atlıyordu. Bant ayarıyla yalnız yerini değiştirdik,
+üç tur böyle geçti. Ölçmeye gerek yoktu, geometriden çıkıyordu.
 
-**Neden şimdi düzeltilmedi.** İki cisim tam karşıt (`MoonDirection = −SunDirection`), yani
-yönü harmanlamak sıfır vektörden geçer — `Slerp` burada tanımsız. Gerçek çözüm ayı ikinci
-gök cismi olarak vermek: paket `CelestialBodyData` taşıyor ve brief ayı "ikincil saçılım
-kaynağı" diye tarif ediyor.
+**Ne değişti.**
+- Paket: ikinci cisim uniform seti, `GetCelestialBody(index)`, `RenderSunDisk` döngüsü.
+  Ay `type = 1` olduğu için evre ve dünya parıltısı paketin kendi hesabından geliyor.
+- Sky-view, çoklu saçılım, hava perspektifi ve zemin aydınlatması `_CelestialBodyCount`
+  üzerinden iki cismi topluyor. **Asıl yol `AtmosphericScattering.hlsl`'deki analitik
+  yürüyüştü** (`LOCAL_SKY` tanımlı); önce yalnız LUT'ları düzeltmek yetmedi.
+- Ay gölge düşürmüyor: paketin `GetMainLight`'ı gölgesiz cismi ana ışık saymayıp
+  `RenderSettings.sun`'a düşüyor, böylece gökyüzü hep güneşten sürülüyor.
 
-**Tetikleyici.** Alacakaranlıkta gölgelerin döndüğü fark edilirse ya da gece sahnesi
-oynanabilir olması gerekirse. Yıldız işiyle aynı turda yapılmalı — ikisi de gece sistemi.
+**Ölçüm.** 19:11→19:22 arası `probe tepe`: önce `0.00000 / 0.00000 / 0.00000 / 0.0154 /
+0.0154` (sıçrama), sonra `0.0768 / 0.0036 / 0.0036 / 0.0036 / 0.0036` (düz taban).
 
-## Gece boş: yıldızlar gitti, ay tek kaynak
+**Kapanan iki tuzak.**
+- İki ay görünüyordu: ikinci cismin verisi `if (mainLight != null)` bloğunun içindeydi,
+  ana ışığın çözülemediği karede yön donuyordu.
+- Bulut gölge geçişi gece `NullReferenceException` atıyordu: koddan eklenen ışıkta
+  `UniversalAdditionalLightData` yok. İki ışıkta da garanti edildi.
+
+## Gece boş: yıldızlar gitti, ay tek kaynak## Gece boş: yıldızlar gitti, ay tek kaynak
 
 **Durum.** Ortam kipi Skybox'a alınınca probe dürüstleşti ve gece gerçek değerine indi
 (`0.001–0.007`, öğlen tepe `0.114 0.153 0.193`). Gökyüzü simsiyah çıkıyor.
@@ -1222,10 +1233,9 @@ oynanabilir olması gerekirse. Yıldız işiyle aynı turda yapılmalı — ikis
    Yeniden yazılırken bu bağ tekrar kurulmalı; yıldızın buluttan bağımsız olması
    "fırtına var ama yıldızlar pırıl pırıl" çelişkisi üretir.
 
-2. **Ay ikincil saçılım kaynağı olmalı.** Brief: `Moon luminance ≈ 2500 cd/m²`,
-   `Moon = secondary sky/atmosphere scattering source`, açısal yarıçap 0.24–0.28°. Bizde ay
-   güneşle AYNI yönlü ışığa yazılıyor ve tepe şiddeti 0.12; paket onu güneş yerine koyup
-   atmosferi ondan aydınlatıyor. Bu kaba ama çalışan bir yaklaşım.
+2. **Ay ikincil saçılım kaynağı OLDU.** Kendi ışığı, kendi diski, gökyüzüne kendi
+   katkısı var. Açısal çapı 0.52° (brief: 0.48–0.56). Kalan: bulutları doğrudan
+   aydınlatmıyor, yalnız ortam ışığından geçiyor — ayda gümüş kenar yok.
 
 **Tetikleyici.** Gece sahnesi oynanabilir olmalıysa. Sıra: önce ay şiddeti göz kararı
 (F1 → Gökyüzü → Ay şiddeti), sonra yıldızlar.
