@@ -415,6 +415,13 @@ public class DebugMenu : MonoBehaviour
         // probe geceyi izlemiyor demektir.
         DrawAmbientProbeReadout();
 
+        // ÖLÇÜM: iki ışığın gerçek hâli. 19:12 karanlık / 19:22 aydınlık arasındaki farkı
+        // bu üç satır gösterecek — hangisi değişiyor, şiddet mi yükseklik mi pozlama mı.
+        GUILayout.Label($"güneş {time.SunLightIntensity:F3} × yük {time.SunUp:F3}");
+        GUILayout.Label($"ay {time.MoonLightIntensity:F3} × yük {time.MoonUp:F3}");
+        GUILayout.Label($"yüzey ışığı {time.SurfaceLightLevel:F4}"
+            + (lookController != null ? $" · uyum {lookController.CurrentAdapt:F2} EV" : ""));
+
         CloudSlider("Pozlama (EV)", sky.exposure, -5f, 5f, "F2");
 
         // POZLAMA UYUMU KAMERANIN, GÖKYÜZÜNÜN DEĞİL. Üstteki `Pozlama (EV)` yalnız göğü
