@@ -371,9 +371,17 @@ public class DebugMenu : MonoBehaviour
             }
         }
 
-        float sun = CloudRow("Güneş şiddeti", time.SunIntensity, sunIntensityDefault, 0f, 6f, "F2");
+        float sun = CloudRow("Güneş şiddeti (tepe)", time.SunIntensity, sunIntensityDefault, 0f, 6f, "F2");
         if (!Mathf.Approximately(sun, time.SunIntensity)) time.SunIntensity = sun;
-        GUILayout.Label("paket 3,03 bekliyor · bizde varsayılan 1,50");
+
+        // ÖLÇÜM: ışığa GERÇEKTEN yazılan şiddet ve renk. Tepe değerinden farkı bizim
+        // kendi atmosfer süzmemiz (`BeamLevel` ve `CurrentSunColor`). Paket bu ışığı
+        // okuyup üstüne kendi transmittance'ını uyguluyor — fark büyükse atmosfer iki
+        // kez soğuruyor demektir.
+        Color lit = time.CurrentSunColor;
+        GUILayout.Label($"ışığa yazılan: şiddet {time.LightIntensity:F2} · " +
+            $"renk {lit.r:F2} {lit.g:F2} {lit.b:F2}");
+        GUILayout.Label($"süzme kaybı: {(time.SunIntensity > 0f ? time.LightIntensity / time.SunIntensity : 0f):P0}");
 
         CloudSlider("Pozlama (EV)", sky.exposure, -5f, 5f, "F2");
         CloudSlider("Parlaklık çarpanı", sky.multiplier, 0f, 4f, "F2");

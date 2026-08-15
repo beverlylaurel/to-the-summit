@@ -627,12 +627,11 @@ public static class MountainSceneBootstrap
     /// GÖKYÜZÜ HACMİ. Üç override bulut hacminin profiline yazılıyor; bulut portu gezegen
     /// yarıçapını ve ambient kipini oradan okuyor.
     ///
-    /// İKİ PROFİLE BİRDEN yazılıyor ve bu gerekli. `Volume.profile` asset'in çalışma-zamanı
-    /// KOPYASI; kopya bir kez üretildikten sonra asset'e eklenen bileşen ona geçmiyor.
-    /// `LookController` (`[ExecuteAlways]`) kopyayı editörde üretiyor, sürücüler ve F1
-    /// paneli de kopyayı okuyor — asset'e yazmak tek başına "profilde PhysicallyBasedSky
-    /// yok" hatasını veriyordu. Kopyayı yok edip yeniden ürettirmek olmaz: `LookController`
-    /// kendi override referanslarını önbelleğe alıyor ve onlar kopar.
+    /// YALNIZ ASSET'E yazılıyor. `Volume.profile` asset'in çalışma-zamanı kopyası ve
+    /// kopyaya `Add<T>()` ile bileşen üretmek DENENDİ: üretilen bileşenler hiçbir asset'e
+    /// ait olmuyor, Play'e girerken yok ediliyor ve profilin bileşen listesi bozuluyor
+    /// (`VolumeComponent.parameters` null). Kopya zaten her domain reload'da asset'ten
+    /// yeniden üretiliyor, yani asset doğruysa kopya da doğru oluyor.
     static void EnsureSkyVolume()
     {
     #if URP_PBSKY
@@ -640,35 +639,32 @@ public static class MountainSceneBootstrap
             throw new System.InvalidOperationException(
                 "Gökyüzü hacmi bulut hacminden sonra kurulmalı: `cloudVolume` yazılmamış.");
 
-        ApplySkyOverrides(cloudVolume.sharedProfile, asset: true);
-
-        if (cloudVolume.HasInstantiatedProfile())
-            ApplySkyOverrides(cloudVolume.profile, asset: false);
+        ApplySkyOverrides(cloudVolume.sharedProfile);
     #endif
     }
 
 #if URP_PBSKY
-    static void ApplySkyOverrides(UnityEngine.Rendering.VolumeProfile profile, bool asset)
+    static void ApplySkyOverrides(UnityEngine.Rendering.VolumeProfile profile)
     {
         if (!profile.TryGet(out VisualEnvironment visualEnvironment))
         {
             visualEnvironment = profile.Add<VisualEnvironment>(overrides: true);
             visualEnvironment.name = nameof(VisualEnvironment);
-            if (asset) AssetDatabase.AddObjectToAsset(visualEnvironment, profile);
+            AssetDatabase.AddObjectToAsset(visualEnvironment, profile);
         }
 
         if (!profile.TryGet(out PhysicallyBasedSky pbrSky))
         {
             pbrSky = profile.Add<PhysicallyBasedSky>(overrides: true);
             pbrSky.name = nameof(PhysicallyBasedSky);
-            if (asset) AssetDatabase.AddObjectToAsset(pbrSky, profile);
+            AssetDatabase.AddObjectToAsset(pbrSky, profile);
         }
 
         if (!profile.TryGet(out Fog fog))
         {
             fog = profile.Add<Fog>(overrides: true);
             fog.name = nameof(Fog);
-            if (asset) AssetDatabase.AddObjectToAsset(fog, profile);
+            AssetDatabase.AddObjectToAsset(fog, profile);
         }
 
         // Fiziksel gökyüzü seçiliyor; 0 "gökyüzü yok" demek ve paket hiçbir şey çizmiyor.
@@ -694,8 +690,6 @@ public static class MountainSceneBootstrap
         // ve vadi sis denizi taşıyor; pakette bunların karşılığı yok. İkisi birlikte
         // açılırsa sis iki kez uygulanıyor. Geçiş `DECISIONS.md`'de kayıtlı.
         SetSky(fog.enabled, false);
-
-        if (!asset) return;
 
         EditorUtility.SetDirty(profile);
         AssetDatabase.SaveAssets();
