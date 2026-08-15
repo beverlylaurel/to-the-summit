@@ -38,9 +38,9 @@ half3 EvaluateVolumetricCloudsAmbientProbe(half3 normalWS)
 #define FORWARD_ECCENTRICITY 0.8
 #define BACKWARD_ECCENTRICITY -0.5
 #define PHASE_LOBE_BLEND 0.5
-// Distance until which the erosion texture is used
-#define MIN_EROSION_DISTANCE 3000.0
-#define MAX_EROSION_DISTANCE 100000.0
+// Gurultu dokularinin cozunurlugu; voxel dunya boyu buradan cikiyor.
+#define SHAPE_NOISE_RESOLUTION 128.0
+#define EROSION_NOISE_RESOLUTION 32.0
 // Value that is used to normalize the noise textures
 #define NOISE_TEXTURE_NORMALIZATION_FACTOR 100000.0
 // Maximal distance until which the "skybox"
@@ -135,11 +135,12 @@ float ConvertCloudDepth(float3 position)
     return hClip.z / hClip.w;
 }
 
+// Kare basina degisen terim YOK. Zamansal birikim ancak ayni piksel kareler boyunca
+// ayni ornegi okursa yakinsar; portun zaman terimi her karede yeni desen uretiyordu,
+// yakinsama hic olmuyor ve titreme olarak gorunuyordu.
 float GenerateRandomFloat(float2 screenUV)
 {
-    float time = unity_DeltaTime.y * _Time.y + _Seed;
-    _Seed += 1.0;
-    return GenerateHashedRandomFloat(uint3(screenUV * _ScreenSize.xy, time));
+    return GenerateHashedRandomFloat(uint3(screenUV * _ScreenSize.xy, 0));
 }
 
 // Returns the closest hit in X and the farthest hit in Y.
@@ -322,10 +323,36 @@ half DensityFadeValue(float distanceToCamera)
     return saturate((distanceToCamera - _FadeInStart) * rcp(_FadeInStart + _FadeInDistance));
 }
 
-// Evaluate the erosion mip offset based on the camera distance
-float ErosionMipOffset(float distanceToCamera)
+// Bir ornegin dunyada kapladigi en buyuk boy (m): ekran pikselinin o mesafedeki
+// izdusumu ile isin adiminin buyugu. Gurultu bundan ince olamaz.
+float SampleFootprint(float distanceToCamera, float stepSize)
 {
-    return lerp(0.0, 4.0, saturate((distanceToCamera - MIN_EROSION_DISTANCE) * rcp(MAX_EROSION_DISTANCE - MIN_EROSION_DISTANCE)));
+    return max(distanceToCamera * _PixelFootprintScale * _ScreenSize.w, stepSize);
+}
+
+// Gurultu dokusunun bir voxel'i `tekrar / cozunurluk` metre. Ornek ayak izi bundan
+// buyukse mip'e cikilir; her mip voxel boyunu ikiye katliyor.
+float BandLimitMip(float footprint, float repeatMeters, float resolution)
+{
+    float voxelSize = repeatMeters * rcp(resolution);
+    return max(0.0, log2(footprint * rcp(voxelSize)));
+}
+
+// Sekil ve erozyon gurultusu icin bant siniri. Portta erozyon mip'i 3-100 km arasina
+// sabitlenmisti: ekran cozunurlugu, gorus acisi ve gurultu olcegi degisince tutmuyordu,
+// uzak bulutlar bu yuzden pikselleniyordu.
+float ShapeMipOffset(float distanceToCamera, float stepSize)
+{
+    return BandLimitMip(SampleFootprint(distanceToCamera, stepSize),
+                        NOISE_TEXTURE_NORMALIZATION_FACTOR * rcp(max(_ShapeScale, 1e-4)),
+                        SHAPE_NOISE_RESOLUTION);
+}
+
+float ErosionMipOffset(float distanceToCamera, float stepSize)
+{
+    return BandLimitMip(SampleFootprint(distanceToCamera, stepSize),
+                        NOISE_TEXTURE_NORMALIZATION_FACTOR * rcp(max(_ErosionScale, 1e-4)),
+                        EROSION_NOISE_RESOLUTION);
 }
 
 // Function that returns the normalized height inside the cloud layer

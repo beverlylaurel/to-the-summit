@@ -133,29 +133,29 @@ MonoBehaviour:
     m_Value: {fileID: 2800000, guid: a6045734f32cdb6429ea9985f2b673f6, type: 2}
     dimension: 1
   cloudMapSize:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: 40000
   cloudCoverage:
     m_OverrideState: 1
-    m_Value: 0.5
+    m_Value: 0.65
   anvilAmount:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: 0
   densityMultiplier:
     m_OverrideState: 1
-    m_Value: 0.4
+    m_Value: 0.49
   extinctionCoefficient:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: 0.04
   shapeFactor:
     m_OverrideState: 1
-    m_Value: 0.9
+    m_Value: 0.4
   shapeScale:
     m_OverrideState: 1
-    m_Value: 20
+    m_Value: 34.1
   erosionFactor:
     m_OverrideState: 1
-    m_Value: 0.2
+    m_Value: 1
   erosionScale:
     m_OverrideState: 1
     m_Value: 107
@@ -231,19 +231,19 @@ MonoBehaviour:
       m_RotationOrder: 4
   microErosion:
     m_OverrideState: 1
-    m_Value: 0
+    m_Value: 1
   microErosionFactor:
     m_OverrideState: 1
-    m_Value: 0.5
+    m_Value: 0.7
   microErosionScale:
     m_OverrideState: 1
     m_Value: 200
   bottomAltitude:
     m_OverrideState: 1
-    m_Value: 1200
+    m_Value: 2086
   altitudeRange:
     m_OverrideState: 1
-    m_Value: 2000
+    m_Value: 3298
   shapeOffset:
     m_OverrideState: 1
     m_Value: {x: 0, y: 0, z: 0}
@@ -252,10 +252,10 @@ MonoBehaviour:
     m_Value: 0
   globalSpeed:
     m_OverrideState: 1
-    m_Value: 0
+    m_Value: 20
   globalOrientation:
     m_OverrideState: 1
-    m_Value: 0
+    m_Value: 205
   shapeSpeedMultiplier:
     m_OverrideState: 1
     m_Value: 1
@@ -312,10 +312,10 @@ MonoBehaviour:
     m_Value: 1
   numPrimarySteps:
     m_OverrideState: 1
-    m_Value: 32
+    m_Value: 80
   numLightSteps:
     m_OverrideState: 1
-    m_Value: 4
+    m_Value: 8
   fadeInMode:
     m_OverrideState: 1
     m_Value: 0

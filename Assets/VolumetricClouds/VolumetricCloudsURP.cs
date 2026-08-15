@@ -420,6 +420,7 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
         private static readonly int numPrimarySteps = Shader.PropertyToID("_NumPrimarySteps");
         private static readonly int numLightSteps = Shader.PropertyToID("_NumLightSteps");
         private static readonly int maxStepSize = Shader.PropertyToID("_MaxStepSize");
+        private static readonly int pixelFootprintScale = Shader.PropertyToID("_PixelFootprintScale");
         private static readonly int highestCloudAltitude = Shader.PropertyToID("_HighestCloudAltitude");
         private static readonly int lowestCloudAltitude = Shader.PropertyToID("_LowestCloudAltitude");
         private static readonly int shapeNoiseOffset = Shader.PropertyToID("_ShapeNoiseOffset");
@@ -551,6 +552,12 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
             cloudsMaterial.SetFloat(numPrimarySteps, cloudsVolume.numPrimarySteps.value);
             cloudsMaterial.SetFloat(numLightSteps, cloudsVolume.numLightSteps.value);
             cloudsMaterial.SetFloat(maxStepSize, cloudsVolume.altitudeRange.value / 8.0f);
+
+            // Dikey gorus acisinin tanjanti. Shader bunu `_ScreenSize.w` ile carpip bir
+            // ekran pikselinin metre basina dunya boyunu buluyor; gurultu bant siniri
+            // buradan turuyor, cozunurluk ve gorus acisi degisince kendiliginden kayiyor.
+            cloudsMaterial.SetFloat(pixelFootprintScale,
+                2.0f * Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad));
 
         #if URP_PBSKY
             float4 planetCenterRad = visualEnvVolume.GetPlanetCenterRadius(camera.transform.position);

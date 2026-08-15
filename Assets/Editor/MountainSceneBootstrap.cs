@@ -691,9 +691,74 @@ public static class MountainSceneBootstrap
         // Harita ayar değil, bağlantı: olmadan kapsama alanı yok.
         clouds.cloudMap.value = CloudMapGenerator.EnsureExists();
         clouds.cloudMap.overrideState = true;
+
+        // AYARLANMIŞ DEĞERLER. F1'de göz kararı bulunup onaylandı; burada duruyorlar ki
+        // sahne yeniden kurulduğunda geri gelsinler. Kapsama, yoğunluk, rüzgâr hızı ve
+        // yönü Play'de `CloudWeatherDriver` tarafından havadan yazılıyor — buradaki
+        // değerler sürücü kapalıyken (F1 → "Havadan ayır") geçerli olan başlangıç.
+        SetCloud(clouds.cloudCoverage, 0.65f);
+        SetCloud(clouds.densityMultiplier, 0.49f);
+        SetCloud(clouds.globalSpeed, 20f);
+        SetCloud(clouds.globalOrientation, 205f);
+        SetCloud(clouds.shapeSpeedMultiplier, 1.00f);
+        SetCloud(clouds.erosionSpeedMultiplier, 0.25f);
+        SetCloud(clouds.verticalShapeWindSpeed, 0f);
+        SetCloud(clouds.verticalErosionWindSpeed, 0f);
+        SetCloud(clouds.shapeFactor, 0.40f);
+        SetCloud(clouds.shapeScale, 34.1f);
+        SetCloud(clouds.anvilAmount, 0f);
+        SetCloud(clouds.bottomAltitude, 2086f);
+        SetCloud(clouds.altitudeRange, 3298f);
+        SetCloud(clouds.altitudeDistortion, 0.25f);
+        SetCloud(clouds.cloudMapSize, 40000f);
+        SetCloud(clouds.earthCurvature, 0.00f);
+
+        SetCloud(clouds.erosionFactor, 1.00f);
+        SetCloud(clouds.erosionScale, 107f);
+        SetCloud(clouds.erosionOcclusion, 0.10f);
+        SetCloud(clouds.microErosion, true);
+        SetCloud(clouds.microErosionFactor, 0.70f);
+        SetCloud(clouds.microErosionScale, 200f);
+
+        SetCloud(clouds.extinctionCoefficient, 0.040f);
+        SetCloud(clouds.powderEffectIntensity, 0.25f);
+        SetCloud(clouds.multiScattering, 0.50f);
+        SetCloud(clouds.ambientLightProbeDimmer, 1.00f);
+        SetCloud(clouds.sunLightDimmer, 1.00f);
+        SetCloud(clouds.shadowOpacity, 1.00f);
+        SetCloud(clouds.shadowOpacityFallback, 0.00f);
+        SetCloud(clouds.shadowDistance, 8000f);
+
+        SetCloud(clouds.numPrimarySteps, 80);
+        SetCloud(clouds.numLightSteps, 8);
+        SetCloud(clouds.temporalAccumulationFactor, 0.95f);
+        SetCloud(clouds.perceptualBlending, 1.00f);
+        SetCloud(clouds.fadeInStart, 0f);
+        SetCloud(clouds.fadeInDistance, 5000f);
+
         EditorUtility.SetDirty(profile);
         AssetDatabase.SaveAssets();
         AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath(profile));
+    }
+
+    /// `overrideState` açılmadan harmanlama parametreyi atlıyor: değer profile yazılır ama
+    /// yığına hiç geçmez.
+    static void SetCloud(FloatParameter parameter, float value)
+    {
+        parameter.value = value;
+        parameter.overrideState = true;
+    }
+
+    static void SetCloud(IntParameter parameter, int value)
+    {
+        parameter.value = value;
+        parameter.overrideState = true;
+    }
+
+    static void SetCloud(BoolParameter parameter, bool value)
+    {
+        parameter.value = value;
+        parameter.overrideState = true;
     }
 
     // (AssignCloudNoise SİLİNDİ — bulut dokuları yeniden yazılıyor.)
@@ -973,7 +1038,8 @@ public static class MountainSceneBootstrap
             player.GetComponent<CursorLock>(),
             player.GetComponentInChildren<SnowCollisionProbe>(true),
             Object.FindAnyObjectByType<RouteOverlay>(FindObjectsInactive.Include),
-            cloudVolume);
+            cloudVolume,
+            Object.FindAnyObjectByType<CloudWeatherDriver>());
 
         EditorUtility.SetDirty(menu);
     }

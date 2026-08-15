@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
@@ -29,7 +30,10 @@ public class DebugMenu : MonoBehaviour
     [Tooltip("Bulut ayarlarını taşıyan Volume bileşeni.")]
     [SerializeField] Volume cloudVolume;
 
-    const float PanelWidth = 960f;
+    [Tooltip("Bulut ayarlarini havadan suren bilesen; \"Havadan ayir\" bunu kapatiyor.")]
+    [SerializeField] CloudWeatherDriver cloudDriver;
+
+    const float PanelWidth = 1260f;
     const float ColumnWidth = 300f;
     const float Margin = 24f;
 
@@ -64,8 +68,23 @@ public class DebugMenu : MonoBehaviour
     /// başlıyor ve asset'e yazılan değer hiç okunmuyor (ölçüldü: profil 0.71, yığın 0.40).
     /// Açılıştaki değerler geri al düğmeleri için saklanıyor.
     VolumetricClouds clouds;
-    float anvilDefault, shapeFactorDefault, shapeScaleDefault;
-    float erosionFactorDefault, erosionScaleDefault;
+
+    /// Acilistaki degerler: her satirin ↺'u ve "Bulut ayarlarini geri al" buradan okuyor.
+    /// Cizim aninda yakalanamaz — `CloudWeatherDriver` kapsama, yogunluk ve ruzgari her
+    /// karede yaziyor, ilk cizimde okunan deger zaten surulmus olan olurdu.
+    /// `VolumeParameter` hem `Equals`'i hem `GetHashCode`'u DEGERINDEN turetiyor: sozluk
+    /// varsayilan karsilastiriciyla kullanilirsa surgu oynadigi anda anahtarin hash'i
+    /// degisiyor ve kayit bulunamaz oluyor. Anahtar kimlik olmali, deger degil.
+    sealed class ParameterIdentity : IEqualityComparer<VolumeParameter>
+    {
+        public static readonly ParameterIdentity Default = new();
+        public bool Equals(VolumeParameter a, VolumeParameter b) => ReferenceEquals(a, b);
+        public int GetHashCode(VolumeParameter p) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(p);
+    }
+
+    readonly Dictionary<VolumeParameter, float> cloudFloatDefaults = new(ParameterIdentity.Default);
+    readonly Dictionary<VolumeParameter, bool> cloudBoolDefaults = new(ParameterIdentity.Default);
+    bool detachFromWeather;
 
     bool open;
     float timeScale = 1f;
@@ -84,9 +103,10 @@ public class DebugMenu : MonoBehaviour
         AtmosphereController atmosphereRef, PrecipitationRenderer precipitationRef,
         PerformanceHud hudRef, ClimbHud climbHudRef,
         CursorLock cursorLockRef, SnowCollisionProbe snowProbeRef,
-        RouteOverlay routeOverlayRef, Volume cloudVolumeRef)
+        RouteOverlay routeOverlayRef, Volume cloudVolumeRef, CloudWeatherDriver cloudDriverRef)
     {
         cloudVolume = cloudVolumeRef;
+        cloudDriver = cloudDriverRef;
         cursorLock = cursorLockRef;
         walker = walkerRef;
         flyer = flyerRef;
@@ -111,25 +131,15 @@ public class DebugMenu : MonoBehaviour
             || atmosphere == null
             || precipitation == null || hud == null || climbHud == null
             || cursorLock == null || snowProbe == null || routeOverlay == null
-            || cloudVolume == null)
+            || cloudVolume == null || cloudDriver == null)
             throw new InvalidOperationException($"{nameof(DebugMenu)}: bağımlılıklar atanmadı.");
 
         if (!cloudVolume.profile.TryGet(out clouds))
             throw new InvalidOperationException($"{nameof(DebugMenu)}: profilde {nameof(VolumetricClouds)} yok.");
 
-        // Parametrenin `overrideState`'i kapalıysa harmanlama onu atlıyor: sürgü profile
-        // yazıyor ama yığına hiç geçmiyor. Panelin sürdüğü her alan açık olmak zorunda.
-        clouds.anvilAmount.overrideState = true;
-        clouds.shapeFactor.overrideState = true;
-        clouds.shapeScale.overrideState = true;
-        clouds.erosionFactor.overrideState = true;
-        clouds.erosionScale.overrideState = true;
+        CaptureCloudDefaults();
 
-        anvilDefault = clouds.anvilAmount.value;
-        shapeFactorDefault = clouds.shapeFactor.value;
-        shapeScaleDefault = clouds.shapeScale.value;
-        erosionFactorDefault = clouds.erosionFactor.value;
-        erosionScaleDefault = clouds.erosionScale.value;
+        detachFromWeather = !cloudDriver.enabled;
 
         // Hız çarpanı yalnızca panel çizilirken uygulanıyordu; panel hiç açılmazsa
         // başlangıç değeri de hiç etkili olmuyordu.
@@ -202,7 +212,13 @@ public class DebugMenu : MonoBehaviour
         EndColumn();
 
         BeginColumn();
-        DrawClouds();
+        DrawCloudShape();
+        DrawCloudErosion();
+        EndColumn();
+
+        BeginColumn();
+        DrawCloudLight();
+        DrawCloudQuality();
         DrawOverlays();
         DrawSnowCollision();
         EndColumn();
@@ -260,45 +276,148 @@ public class DebugMenu : MonoBehaviour
         GUILayout.Space(4f);
     }
 
-    /// BULUT AYARLARI. Değerler Volume profilinde, yani asset'te: sürgü doğrudan ona yazıyor
-    /// ve Play bitince değişiklik kalıyor. Her satırın sonundaki ↺ açılıştaki değere döner.
-    void DrawClouds()
+    /// BULUT AYARLARI. Degerler Volume profilinde, yani asset'te: surgu dogrudan ona
+    /// yaziyor ve Play bitince degisiklik kaliyor. Her satirin sonundaki ↺ acilistaki
+    /// degere doner.
+    void DrawCloudShape()
     {
-        BeginSection("Bulut");
+        BeginSection("Bulut — bicim");
 
-        // Kapsama ve yoğunluk BURADA YOK: `CloudWeatherDriver` onları her karede
-        // fırtınadan yazıyor, sürgü ölü kalırdı. Denemek için Hava durumu bölümündeki
-        // "Havayı elle ayarla" kullanılıyor — zincir oradan geçiyor.
-
-        CloudSlider("Örs", clouds.anvilAmount, anvilDefault);
-        CloudSlider("Şekil oranı", clouds.shapeFactor, shapeFactorDefault);
-        CloudSlider("Şekil ölçeği", clouds.shapeScale, shapeScaleDefault, 0.5f, 20f, "F1");
-        CloudSlider("Erozyon oranı", clouds.erosionFactor, erosionFactorDefault);
-        CloudSlider("Erozyon ölçeği", clouds.erosionScale, erosionScaleDefault, 10f, 300f, "F0");
-
-        if (GUILayout.Button("Ayarları geri al"))
+        // Kapsama, yogunluk ve ruzgar `CloudWeatherDriver` tarafindan her karede
+        // firtinadan yaziliyor; surucü kapatilmadan bu surgulerin yazdigi deger bir
+        // sonraki karede eziliyor.
+        bool detach = GUILayout.Toggle(detachFromWeather, "Havadan ayir (elle ayar)");
+        if (detach != detachFromWeather)
         {
-            clouds.anvilAmount.value = anvilDefault;
-            clouds.shapeFactor.value = shapeFactorDefault;
-            clouds.shapeScale.value = shapeScaleDefault;
-            clouds.erosionFactor.value = erosionFactorDefault;
-            clouds.erosionScale.value = erosionScaleDefault;
+            detachFromWeather = detach;
+            cloudDriver.enabled = !detach;
+        }
+
+        // ÖLÇÜM: toggle'ın gerçekten sürücüyü kapatıp kapatmadığı ve profilde o an ne
+        // yazdığı. "Sürücü AÇIK" kalıyorsa sorun toggle'da, değerler yine de eziliyorsa
+        // yazan başka biri var.
+        GUILayout.Label($"sürücü {(cloudDriver.enabled ? "AÇIK" : "KAPALI")} · " +
+            $"kapsama {clouds.cloudCoverage.value:F2} · yoğunluk {clouds.densityMultiplier.value:F2}");
+
+        CloudSlider("Kapsama", clouds.cloudCoverage);
+        CloudSlider("Yogunluk", clouds.densityMultiplier);
+        CloudSlider("Ruzgar hizi (km/s)", clouds.globalSpeed, 0f, 200f, "F0");
+        CloudSlider("Ruzgar yonu", clouds.globalOrientation);
+        CloudSlider("Sekil hiz carpani", clouds.shapeSpeedMultiplier);
+        CloudSlider("Erozyon hiz carpani", clouds.erosionSpeedMultiplier);
+        CloudSlider("Dikey sekil ruzgari", clouds.verticalShapeWindSpeed, -50f, 50f, "F1");
+        CloudSlider("Dikey erozyon ruzgari", clouds.verticalErosionWindSpeed, -50f, 50f, "F1");
+        CloudSlider("Sekil orani", clouds.shapeFactor);
+        CloudSlider("Sekil olcegi", clouds.shapeScale, 0.5f, 50f, "F1");
+        CloudSlider("Ors", clouds.anvilAmount);
+        CloudSlider("Taban kotu (m)", clouds.bottomAltitude, 0f, 8000f, "F0");
+        CloudSlider("Katman kalinligi (m)", clouds.altitudeRange, 100f, 8000f, "F0");
+        CloudSlider("Yukseklik carpitmasi", clouds.altitudeDistortion);
+        CloudSlider("Harita boyu (m)", clouds.cloudMapSize, 1000f, 100000f, "F0");
+        CloudSlider("Dunya egriligi", clouds.earthCurvature);
+
+        EndSection();
+    }
+
+    void DrawCloudErosion()
+    {
+        BeginSection("Bulut — erozyon");
+
+        CloudSlider("Erozyon orani", clouds.erosionFactor);
+        CloudSlider("Erozyon olcegi", clouds.erosionScale, 10f, 300f, "F0");
+        CloudSlider("Erozyon ortmesi", clouds.erosionOcclusion);
+        CloudToggle("Mikro erozyon", clouds.microErosion);
+        CloudSlider("Mikro oran", clouds.microErosionFactor);
+        CloudSlider("Mikro olcek", clouds.microErosionScale, 50f, 400f, "F0");
+
+        EndSection();
+    }
+
+    void DrawCloudLight()
+    {
+        BeginSection("Bulut — isik");
+
+        CloudSlider("Sonum katsayisi", clouds.extinctionCoefficient, "F3");
+        CloudSlider("Toz etkisi", clouds.powderEffectIntensity);
+        CloudSlider("Coklu sacilma", clouds.multiScattering);
+        CloudSlider("Ortam isigi", clouds.ambientLightProbeDimmer);
+        CloudSlider("Gunes isigi", clouds.sunLightDimmer);
+        CloudToggle("Yere golge dusur", clouds.shadows);
+        CloudSlider("Golge koyulugu", clouds.shadowOpacity);
+        CloudSlider("Golge yedek koyulugu", clouds.shadowOpacityFallback);
+        CloudSlider("Golge mesafesi (m)", clouds.shadowDistance, 1000f, 30000f, "F0");
+
+        EndSection();
+    }
+
+    void DrawCloudQuality()
+    {
+        BeginSection("Bulut — kalite");
+
+        CloudSlider("Gorus adimi", clouds.numPrimarySteps);
+        CloudSlider("Isik adimi", clouds.numLightSteps);
+        CloudSlider("Zamansal birikim", clouds.temporalAccumulationFactor);
+        CloudSlider("Algisal harmanlama", clouds.perceptualBlending);
+        CloudSlider("Sonumlenme baslangici (m)", clouds.fadeInStart, 0f, 10000f, "F0");
+        CloudSlider("Sonumlenme mesafesi (m)", clouds.fadeInDistance, 100f, 50000f, "F0");
+
+        if (GUILayout.Button("Bulut ayarlarini geri al"))
+        {
+            foreach (var parameter in clouds.parameters)
+            {
+                if (parameter is FloatParameter f && cloudFloatDefaults.TryGetValue(parameter, out float value))
+                    f.value = value;
+                else if (parameter is IntParameter i && cloudFloatDefaults.TryGetValue(parameter, out float intValue))
+                    i.value = Mathf.RoundToInt(intValue);
+                else if (parameter is BoolParameter b && cloudBoolDefaults.TryGetValue(parameter, out bool flag))
+                    b.value = flag;
+            }
         }
 
         EndSection();
     }
 
-    static void CloudSlider(string label, ClampedFloatParameter parameter, float original,
-        string format = "F2")
+    /// Parametrenin `overrideState`'i kapaliysa harmanlama onu atliyor: surgu profile
+    /// yaziyor ama yigina hic gecmiyor. Panelin surdugu her alan acik olmak zorunda.
+    void CaptureCloudDefaults()
     {
-        parameter.value = CloudRow(label, parameter.value, original, parameter.min, parameter.max, format);
+        cloudFloatDefaults.Clear();
+        cloudBoolDefaults.Clear();
+
+        foreach (var parameter in clouds.parameters)
+        {
+            parameter.overrideState = true;
+
+            switch (parameter)
+            {
+                case FloatParameter f: cloudFloatDefaults[parameter] = f.value; break;
+                case IntParameter i: cloudFloatDefaults[parameter] = i.value; break;
+                case BoolParameter b: cloudBoolDefaults[parameter] = b.value; break;
+            }
+        }
     }
 
-    /// `MinFloatParameter`'ın üst sınırı yok; sürgü için burada veriliyor.
-    static void CloudSlider(string label, MinFloatParameter parameter, float original,
-        float min, float max, string format)
+    void CloudSlider(string label, ClampedFloatParameter parameter, string format = "F2")
     {
-        parameter.value = CloudRow(label, parameter.value, original, min, max, format);
+        parameter.value = CloudRow(label, parameter.value, cloudFloatDefaults[parameter],
+            parameter.min, parameter.max, format);
+    }
+
+    /// `FloatParameter` ve `MinFloatParameter`'in ust siniri yok; surgu icin burada veriliyor.
+    void CloudSlider(string label, FloatParameter parameter, float min, float max, string format)
+    {
+        parameter.value = CloudRow(label, parameter.value, cloudFloatDefaults[parameter], min, max, format);
+    }
+
+    void CloudSlider(string label, ClampedIntParameter parameter)
+    {
+        parameter.value = Mathf.RoundToInt(CloudRow(label, parameter.value,
+            cloudFloatDefaults[parameter], parameter.min, parameter.max, "F0"));
+    }
+
+    void CloudToggle(string label, BoolParameter parameter)
+    {
+        parameter.value = GUILayout.Toggle(parameter.value, label);
     }
 
     static float CloudRow(string label, float value, float original, float min, float max,

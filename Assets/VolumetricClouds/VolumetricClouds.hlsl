@@ -85,8 +85,11 @@ VolumetricRayResult TraceVolumetricRay(CloudRay cloudRay)
             {
                 // Compute the camera-distance based attenuation
                 float densityAttenuationValue = DensityFadeValue(rayMarchRange.start + currentDistance);
-                // Compute the mip offset for the erosion texture
-                float erosionMipOffset = ErosionMipOffset(rayMarchRange.start + currentDistance);
+                // Gurultu mip'leri: ornek ayak izi (ekran pikseli ve isin adimi) kadar
+                // banda sinirlaniyor.
+                float sampleDistance = rayMarchRange.start + currentDistance;
+                float shapeMipOffset = ShapeMipOffset(sampleDistance, stepS);
+                float erosionMipOffset = ErosionMipOffset(sampleDistance, stepS);
 
                 // Accumulate in WS and convert at each iteration to avoid precision issues
                 float3 currentPositionPS = ConvertToPS(currentPositionWS);
@@ -96,7 +99,7 @@ VolumetricRayResult TraceVolumetricRay(CloudRay cloudRay)
                 {
                     // If the density is null, we can skip as there will be no contribution
                     CloudProperties properties;
-                    EvaluateCloudProperties(currentPositionPS, 0.0, erosionMipOffset, false, false, properties);
+                    EvaluateCloudProperties(currentPositionPS, shapeMipOffset, erosionMipOffset, false, false, properties);
 
                     // Apply the fade in function to the density
                     properties.density *= densityAttenuationValue;
@@ -137,7 +140,7 @@ VolumetricRayResult TraceVolumetricRay(CloudRay cloudRay)
                 else
                 {
                     CloudProperties properties;
-                    EvaluateCloudProperties(currentPositionPS, 1.0, 0.0, true, false, properties);
+                    EvaluateCloudProperties(currentPositionPS, max(1.0, ShapeMipOffset(sampleDistance, stepS * 2.0)), 0.0, true, false, properties);
 
                     // Apply the fade in function to the density
                     properties.density *= densityAttenuationValue;
