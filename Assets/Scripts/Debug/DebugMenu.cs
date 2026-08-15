@@ -80,6 +80,7 @@ public class DebugMenu : MonoBehaviour
     bool detachSkyFromWeather;
     float sunIntensityDefault;
     float moonIntensityDefault;
+    Color moonColorDefault;
     float exposureCapDefault;
     float adaptShareDefault;
 #endif
@@ -197,6 +198,7 @@ public class DebugMenu : MonoBehaviour
 
         sunIntensityDefault = time.SunIntensity;
         moonIntensityDefault = time.MoonIntensity;
+        moonColorDefault = time.MoonColor;
 
         if (lookController != null)
         {
@@ -404,6 +406,16 @@ public class DebugMenu : MonoBehaviour
         float moon = CloudRow("Ay şiddeti (tepe)", time.MoonIntensity, moonIntensityDefault, 0f, 1.5f, "F3");
         if (!Mathf.Approximately(moon, time.MoonIntensity)) time.MoonIntensity = moon;
 
+        // AY RENGİ = yüzey albedosu, atmosferden geçmeden önceki hâli. Ufka yakın ay
+        // uzun yoldan geçip sarıya kayıyor; taban soğutulursa sonuç nötre yaklaşıyor.
+        Color moonTint = time.MoonColor;
+        float r = CloudRow("Ay rengi R", moonTint.r, moonColorDefault.r, 0f, 1f, "F2");
+        float g = CloudRow("Ay rengi G", moonTint.g, moonColorDefault.g, 0f, 1f, "F2");
+        float b = CloudRow("Ay rengi B", moonTint.b, moonColorDefault.b, 0f, 1f, "F2");
+        if (!Mathf.Approximately(r, moonTint.r) || !Mathf.Approximately(g, moonTint.g)
+            || !Mathf.Approximately(b, moonTint.b))
+            time.MoonColor = new Color(r, g, b, 1f);
+
         // ÖLÇÜM: ışığa GERÇEKTEN yazılan şiddet ve renk. Tepe değerinden farkı bizim
         // kendi atmosfer süzmemiz (`BeamLevel` ve `CurrentSunColor`). Paket bu ışığı
         // okuyup üstüne kendi transmittance'ını uyguluyor — fark büyükse atmosfer iki
@@ -466,6 +478,7 @@ public class DebugMenu : MonoBehaviour
             RestoreDefaults(visualEnvironment);
             time.SunIntensity = sunIntensityDefault;
             time.MoonIntensity = moonIntensityDefault;
+            time.MoonColor = moonColorDefault;
 
             if (lookController != null)
             {
