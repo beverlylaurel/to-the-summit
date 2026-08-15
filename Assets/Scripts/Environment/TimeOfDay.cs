@@ -242,7 +242,16 @@ public class TimeOfDay : MonoBehaviour
             // `above` ATMOSFERİK DEĞİL, GEOMETRİK: güneş ufkun altındayken ışık yukarıdan
             // gelmiyor. Kızıllık ve sönüm paketin işi, bu yalnız gece arazinin güneş
             // almasını engelliyor.
-            float above = Mathf.Clamp01(SunDirection.y * 4f);
+            //
+            // GEÇİŞ UFKUN İKİ YANINDA ±1°, DAHA GENİŞ DEĞİL. `y * 4` yazıldığında güneş
+            // tam şiddete ancak 14°'de çıkıyordu: 06:00'da ışık sıfırdı (güneş hiç
+            // görünmüyordu, 06:05'te aniden beliriyordu) ve şafak boyunca sönük kalıyordu.
+            // Bulutlar da o yüzden neredeyse yalnız ortam ışığıyla aydınlanıp beyaz
+            // kalıyordu. Genişlik güneş diskinden geliyor: ~0.53° çap, üstüne kırılma
+            // payı. sin(1°) ≈ 0.0175.
+            const float HorizonBand = 0.0175f;
+            float above = Mathf.SmoothStep(0f, 1f,
+                Mathf.InverseLerp(-HorizonBand, HorizonBand, SunDirection.y));
             sun.color = Color.Lerp(moonColor, sunColor, sunShare);
             sun.intensity = sunShare > 0.5f
                 ? sunIntensity * above
