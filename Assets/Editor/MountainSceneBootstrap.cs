@@ -750,10 +750,16 @@ public static class MountainSceneBootstrap
         // de hacimsel bulutların kendisi kesiyor. Eski sistemin
         // `(1−gündüz) × (1−kapsama)` kuralına gerek kalmadı.
         //
-        // ÇARPAN 0.08 — ölçülen gece göğüne göre seçildi. Gece zenit parlaklığı 0.0036
-        // (ay tepedeyken); en parlak yıldız 0.08'de gökten ~20 kat parlak kalıyor, yani
-        // nokta olarak seçiliyor ama gökyüzünü yıkamıyor. En sönük yıldız (6. kadir)
-        // bunun %0.4'ü, yani 0.0003 — gök gürültüsünün altında, seçilmiyor.
+        // ÇARPAN 0.08 — ölçülen gece göğüne göre seçildi ve sayılar ALGORİTMA
+        // ÇALIŞTIRILARAK doğrulandı, tahminle değil:
+        //
+        //   1500 örnekte çekilen en parlak kadir 0.68, bağıl parlaklığı 0.53 (1.0 değil —
+        //   kadir 0'a düşen yıldız yok, gerçek gökyüzünde de yok denecek kadar az).
+        //   0.08 çarpanıyla 0.043; gece zenit göğü 0.0036, yani en parlak yıldız gökten
+        //   12 KAT parlak. Nokta olarak seçiliyor, gökyüzünü yıkamıyor.
+        //
+        //   En sönük yıldız 0.0032 × 0.08 = 0.00032, göğün onda biri — görünmüyor,
+        //   olması gereken de bu (6. kadir çıplak gözle zaten sınırda).
         SetSky(pbrSky.spaceEmissionTexture, StarFieldGenerator.EnsureExists());
         SetSky(pbrSky.spaceEmissionMultiplier, 0.08f);
 

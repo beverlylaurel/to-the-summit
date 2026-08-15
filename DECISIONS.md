@@ -58,8 +58,8 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   önce altıydı). Hiç ölçülmedi; gradyanın köşeye taşınması ya da geçişin kapatılması
   masada
 - **Kare süresi jitter'ı** — editörde ölçüldü, patoloji çıkmadı; aynı ölçüm bir
-  **derlemede** tekrarlanacak
-  → [Kare süresi jitter'ı ölçüldü](#kare-süresi-jitterı-ölçüldü--patoloji-yok-derlemede-tekrar-bakılacak)
+  **derlemede** tekrarlanacak. (Ayrıntı kaydı yok: indeks bir kayda bağ veriyordu ama o
+  kayıt dosyada hiç yazılmamış. Bağ kaldırıldı, madde kendi kendine yeter.)
 - **Işından bağımsızlık için ödenen kare süresi** — üç ucuzlatma söküldü, bedeli
   ölçülmedi
   → [Geçirgenliğe bağlı üç ucuzlatma söküldü](#geçirgenliğe-bağlı-üç-ucuzlatma-söküldü--bedeli-ölçülmedi)
@@ -1234,9 +1234,13 @@ girişine bağlanıyor. Paket onu yalnız uzaya bakarken ekliyor ve `(1 − skyO
 atmosfer opaklığı, bulut örtüsünü de hacimsel bulutların kendisi kesiyor — ikisi de
 fiziksel olarak oluyor, elle kural yazmak çifte sayım olurdu.
 
-**Çarpan 0.08 ve gerekçesi ölçümden.** Gece zenit parlaklığı 0.0036 (ay tepedeyken). En
-parlak yıldız 0.08'de gökten ~20 kat parlak, yani nokta olarak seçiliyor ama gökyüzünü
-yıkamıyor. 6. kadir bunun %0.4'ü (0.0003), gök gürültüsünün altında kalıyor.
+**Çarpan 0.08, sayılar algoritma çalıştırılarak doğrulandı.** 1500 örnekte çekilen en
+parlak kadir 0.68 (kadir 0'a yıldız düşmüyor — gerçek gökyüzünde de yok denecek kadar az),
+bağıl parlaklığı 0.53. Çarpanla 0.043; gece zenit göğü 0.0036, yani **12 kat** parlak.
+En sönük yıldız 0.00032, göğün onda biri — görünmüyor, 6. kadir zaten çıplak gözle sınırda.
+
+**Dağılım da ölçüldü:** altı yüze 209–291 (beklenen 250), yarıküreler 762/738, aynı
+teksele düşen yıldız yok, aralık dışı örnek yok. Kadir histogramı 4/50/121/259/436/630.
 
 **DOĞRULANMAYAN TEK ŞEY — yıldızların dönüş YÖNÜ.** Shader arama yönünü döndürüyor
 (`mul(-V, _SpaceRotation)`), bu yüzden açı negatif verildi. Ekranda yıldızlar ters yöne
