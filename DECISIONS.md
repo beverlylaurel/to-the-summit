@@ -1131,6 +1131,28 @@ pakete taşındığında o zincir de gider.
 soğurmasından geliyor. `duskStrength`, `duskOvercast` gibi ayarlar hâlâ SİSE etki ediyor
 ama ışığa etmiyor.
 
+## Gece boş: yıldızlar gitti, ay tek kaynak
+
+**Durum.** Ortam kipi Skybox'a alınınca probe dürüstleşti ve gece gerçek değerine indi
+(`0.001–0.007`, öğlen tepe `0.114 0.153 0.193`). Gökyüzü simsiyah çıkıyor.
+
+**İki eksik var, ikisi ayrı.**
+
+1. **Yıldızlar YOK.** `_StarStrength` ve yıldız çizimi `Sky.shader`'da duruyor, o da artık
+   skybox değil — paket onun yerine geçti. Kod hâlâ globali yazıyor ama kimse okumuyor.
+   Brief yıldızlar için kesin değer vermiyor (`sprite`, luminance soru işaretli).
+
+2. **Ay ikincil saçılım kaynağı olmalı.** Brief: `Moon luminance ≈ 2500 cd/m²`,
+   `Moon = secondary sky/atmosphere scattering source`, açısal yarıçap 0.24–0.28°. Bizde ay
+   güneşle AYNI yönlü ışığa yazılıyor ve tepe şiddeti 0.12; paket onu güneş yerine koyup
+   atmosferi ondan aydınlatıyor. Bu kaba ama çalışan bir yaklaşım.
+
+**Tetikleyici.** Gece sahnesi oynanabilir olmalıysa. Sıra: önce ay şiddeti göz kararı
+(F1 → Gökyüzü → Ay şiddeti), sonra yıldızlar.
+
+**Uyarı — geçersiz eleme.** Ay şiddeti bir kez denendi ve "etkisi yok" diye elendi. O deneme
+probe DONMUŞKEN yapıldı, dolayısıyla sonuç anlamsızdı. Eleme geçersizdir, yeniden denenmeli.
+
 ## Paketin sisi kapalı başlıyor
 
 **Karar.** `Fog` override'ı profile eklendi ama `enabled = false`.
