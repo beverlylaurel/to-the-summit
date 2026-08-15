@@ -443,26 +443,27 @@ public static class MountainSceneBootstrap
         // AY GÖKYÜZÜNÜ AYDINLATAN TEK KAYNAK. Paket geceleyin ayı güneş yerine koyup
         // atmosferi ondan hesaplıyor; ortam probe'u da o gökyüzünden pişiyor. Değer göz
         // kararı bulundu, gerçek ay parlaklığının karşılığı değil.
-        // 0.204 → 0.0058. AY ON DÖRT DURAK FAZLA PARLAKTI ve gecenin gündüz gibi
+        // 0.204 → 0.0199. AY ON DÖRT DURAK FAZLA PARLAKTI ve gecenin gündüz gibi
         // okunmasının kökü buydu; üstüne yapılan pozlama/kontrast düzeltmeleri yamaydı.
         //
         // Gerçek oran: dolunay aydınlanması ≈ 0,25 lüks, güneş ≈ 133.000 lüks — arada
         // 19 durak var. Eski değerde güneş 3,0308'e karşı etkin ay 0,204 × renk ışıması
         // 0,384 = 0,078, yani 39:1 = 5,3 durak. Gece öğlenin beş durak altındaydı.
         //
-        // Yeni değerde etkin 0,0022 → 1360:1 = 10,4 durak. Fiziğin hâlâ 8,6 durak
+        // Yeni değerde etkin 0,00765 → 396:1 = 8,6 durak. Fiziğin hâlâ 10,4 durak
         // üstünde ve bu BİLEREK: tam fiziksel gece için pozlamanın 19 durak açması
         // gerekirdi, `exposureCap` 2,5'te duruyor.
         //
-        // POZLAMA UYUMU TAVANA DAYALI (`adapt` 3,5 isterken 2,5'te kırpılıyor), yani
-        // buradan yapılan her kısıntı ekrana BİREBİR iniyor. Bir sonraki ayar bu
-        // sayıdan yapılır, başka yerden telafi aranmaz.
+        // SAYIYI BULUT BELİRLEDİ. Önce 0.0058'e çekilmişti (−4 durak hedefi, formülden);
+        // arazi doğru göründü ama ay ışığındaki bulut eşiğin altında kalıp simsiyah
+        // çıkıyordu. Sürgüyle ölçüldü: bulut karla birlikte ve orantılı parlıyor, yani
+        // saçılım integrali sağlam, mesele eşikti. 0.0199 ikisinin de eşiğin üstünde
+        // olduğu en düşük değer.
         //
-        // Ekrandaki karşılığı −4 durak. Kısıntının tamamı yansımıyor: ay kısılınca
-        // `SurfaceLightLevel` de düşüyor, pozlama uyumu tavana dayanıp +1,13 durak geri
-        // veriyor. Yıldızlar aydan bağımsız (`spaceEmissionMultiplier`), o yüzden gökyüzü
-        // koyulaşırken yıldızlar belirginleşiyor.
-        timeOfDay.MoonIntensity = 0.0058f;
+        // TAVAN KIL PAYI BAĞLI. Pozlama uyumu `0.35 × 7,25 = 2,54` istiyor, `exposureCap`
+        // 2,5'te kırpıyor. Yani buradan yapılan değişiklik ŞU AN ekrana birebir iniyor,
+        // ama ay biraz daha yükseltilirse kırpma kalkar ve kısıntının %65'i geri gelir.
+        timeOfDay.MoonIntensity = 0.0199f;
 
         // Ay albedosu. Doğan ay atmosferden geçerken sarıya kayıyordu; taban soğutuldu.
         // Hesap `TimeOfDay.moonColor` yorumunda.
