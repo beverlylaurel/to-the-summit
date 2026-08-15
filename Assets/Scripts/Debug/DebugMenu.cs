@@ -639,6 +639,30 @@ public class DebugMenu : MonoBehaviour
         EndSection();
     }
 
+    string clockInput = "19:11";
+
+    /// Bir gün 24 saat, yani bir dakika `1/1440`. Saat kaydırılırken sarma yapılıyor:
+    /// 00:00'ın bir dakika öncesi 23:59.
+    void StepMinutes(float minutes)
+    {
+        time.SetNormalized(time.Normalized + minutes / 1440f);
+    }
+
+    /// "19:11" ya da "19.11" kabul ediliyor. Saat 0-23, dakika 0-59 dışındaysa
+    /// yazılan değer yok sayılıyor — sessizce yanlış bir saate atlamasın.
+    static bool TryParseClock(string text, out float normalized)
+    {
+        normalized = 0f;
+
+        string[] parts = text.Split(':', '.');
+        if (parts.Length != 2) return false;
+        if (!int.TryParse(parts[0], out int hours) || !int.TryParse(parts[1], out int minutes)) return false;
+        if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return false;
+
+        normalized = (hours + minutes / 60f) / 24f;
+        return true;
+    }
+
     void DrawTimeOfDay()
     {
         BeginSection("Günün saati");
@@ -648,6 +672,21 @@ public class DebugMenu : MonoBehaviour
         float value = time.Normalized;
         float next = GUILayout.HorizontalSlider(value, 0f, 1f);
         if (!Mathf.Approximately(next, value)) time.SetNormalized(next);
+
+        // SÜRGÜ DAKİK DEĞİL: bir ekran pikseli ~5 dakikaya denk geliyor ve ölçüm
+        // alırken belirli bir dakikaya oturmak imkânsızdı. Yazıyla giriş ve dakika
+        // adımı bunun için.
+        using (new GUILayout.HorizontalScope())
+        {
+            GUILayout.Label("Saat gir", GUILayout.Width(56f));
+            clockInput = GUILayout.TextField(clockInput, 5, GUILayout.Width(50f));
+
+            if (GUILayout.Button("Git", GUILayout.Width(36f)) && TryParseClock(clockInput, out float typed))
+                time.SetNormalized(typed);
+
+            if (GUILayout.Button("−1 dk", GUILayout.Width(48f))) StepMinutes(-1f);
+            if (GUILayout.Button("+1 dk", GUILayout.Width(48f))) StepMinutes(1f);
+        }
 
         using (new GUILayout.HorizontalScope())
         {
