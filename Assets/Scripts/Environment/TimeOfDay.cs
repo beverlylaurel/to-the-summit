@@ -47,10 +47,15 @@ public class TimeOfDay : MonoBehaviour
     ///
     /// Ayın bandı dar kalıyor: ay ikincil kaynak, onun için bir alacakaranlık modellemiyoruz.
     ///
-    /// sin(3°) ≈ 0.0523, sin(−12°) ≈ −0.2079.
+    /// TABAN −18°: ASTRONOMİK ALACAKARANLIĞIN SONU. −12° denendi ve yetmedi — güneş
+    /// −11.5°'deyken (≈18:46) şiddet sıfırlanıyor, gökyüzü sönüyor, ay ise henüz taşıyacak
+    /// kadar yükselmemiş oluyordu; 18:38–18:46 arası zifiri karanlık kalıyordu. Gerçekte
+    /// gökyüzü −18°'ye kadar aydınlık kalır, gece orada başlar.
+    ///
+    /// sin(3°) ≈ 0.0523, sin(−18°) ≈ −0.3090.
     const float MoonHorizonBand = 0.0523f;
     const float SunHorizonTop = 0.0523f;
-    const float SunTwilightFloor = -0.2079f;
+    const float SunTwilightFloor = -0.3090f;
 
     static float SunBlend(float directionY) =>
         Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(SunTwilightFloor, SunHorizonTop, directionY));
@@ -268,20 +273,13 @@ public class TimeOfDay : MonoBehaviour
             // kullanılırsa pay sıçradığında şiddet de sıçrar. Toplam sürekli, çünkü iki
             // terim de sürekli.
             //
-            // ÖLÇÜLEN eğri (güneş 3.031, ay 0.204; sayılar `SmoothStep`'ten, tahminden
-            // değil):
-            //   +3°  3.031   tam gündüz
-            //    0°  2.815   batış
-            //   −2.5° 2.299  18:10 — gece yarısının (0.204) ON BİR KATI
-            //   −5°  1.556
-            //   −8°  0.727
-            //  −12°  0.204   gece; bu noktadan sonra sabit
-            // Sürekli ve monoton. Eskiden yön −3°'de aya dönüyordu ve alacakaranlık
-            // tamamen kayboluyordu; 18:10 gece yarısından karanlık çıkıyordu.
+            // Eğri `SmoothStep`'ten çıkıyor, tahminden değil. Taban −18° olunca
+            // alacakaranlık gökyüzü taşıyacak kadar uzun sürüyor ve aya devrederken
+            // arada karanlık boşluk kalmıyor.
             //
-            // KALAN KUSUR: yön −9.60°'de SERT dönüyor, o anda toplam ışık 0.408 (tepenin
-            // %13'ü) ve gölgeler 180° takla atıyor. Tek yönlü ışığa iki cisim sığdırmanın
-            // bedeli; gerçek çözümü paketin ikinci gök cismi (`DECISIONS.md`).
+            // KALAN KUSUR: yön hâlâ SERT dönüyor (güneş ≈ −14.7°, ay o an +14.7°'de) ve
+            // ay gökte beliriyor. Tek yönlü ışığa iki cisim sığdırmanın bedeli; gerçek
+            // çözümü paketin ikinci gök cismi (`DECISIONS.md`).
             float sunAbove = SunBlend(SunDirection.y);
             float moonAbove = MoonBlend(MoonDirection.y);
 
