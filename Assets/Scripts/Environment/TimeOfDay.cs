@@ -264,10 +264,12 @@ public class TimeOfDay : MonoBehaviour
             const float HorizonBand = 0.0175f;
             float above = Mathf.SmoothStep(0f, 1f,
                 Mathf.InverseLerp(-HorizonBand, HorizonBand, SunDirection.y));
+            // ŞİDDET DE HARMANLANIYOR, DALLANMIYOR. Eşikte `sunIntensity * above` ile
+            // `moonIntensity * MoonLevel` arasında atlıyordu: 05:59 ile 06:00 arasında
+            // güneş bir anda kayboluyor, sahne bir anda kararıyordu. Renk zaten `sunShare`
+            // ile harmanlanıyor; ikisi aynı eğriyi izlemezse geçiş kopuyor.
             sun.color = Color.Lerp(moonColor, sunColor, sunShare);
-            sun.intensity = sunShare > 0.5f
-                ? sunIntensity * above
-                : moonIntensity * MoonLevel;
+            sun.intensity = Mathf.Lerp(moonIntensity * MoonLevel, sunIntensity * above, sunShare);
         }
 
         // Güneş yüksekliği GLOBAL olarak da yayınlanır. Materyal property'si olarak
