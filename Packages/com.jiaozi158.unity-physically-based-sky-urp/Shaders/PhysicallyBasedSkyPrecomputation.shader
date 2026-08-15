@@ -94,7 +94,7 @@ Shader "Hidden/Sky/PhysicallyBasedSkyPrecomputation"
                     */
 
                     {
-                        CelestialBodyData light = GetCelestialBody();
+                        CelestialBodyData light = GetCelestialBody(0);
                         half3 L = -light.forward.xyz;
 
                         const half3 sunTransmittance = EvaluateSunColorAttenuation(dot(N, L), r);
@@ -220,7 +220,7 @@ Shader "Hidden/Sky/PhysicallyBasedSkyPrecomputation"
                     */
 
                     {
-                        CelestialBodyData light = GetCelestialBody();
+                        CelestialBodyData light = GetCelestialBody(0);
                         half3 L = -light.forward.xyz;
 
                         const half3 sunTransmittance = EvaluateSunColorAttenuation(dot(N, L), r);
@@ -830,7 +830,7 @@ Shader "Hidden/Sky/PhysicallyBasedSkyPrecomputation"
                 // We offset by one texel to not depend too much on the resolution of the shadow map
                 // Function call is inlined so share some computations between samples, which is not correct but faster
 
-                CelestialBodyData light = GetCelestialBody();
+                CelestialBodyData light = GetCelestialBody(0);
 
                 float3 posWS = P + _PlanetCenterPosition;
 

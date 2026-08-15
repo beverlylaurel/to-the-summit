@@ -151,7 +151,7 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
                         half3 gBrdf = INV_PI * albedo;
 
                         {
-                            CelestialBodyData light = GetCelestialBody();
+                            CelestialBodyData light = GetCelestialBody(0);
                             half3 L         = -light.forward.xyz;
                             half3 intensity = light.color.rgb;
 
@@ -360,7 +360,7 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
                         half3 gBrdf = INV_PI * albedo;
 
                         {
-                            CelestialBodyData light = GetCelestialBody();
+                            CelestialBodyData light = GetCelestialBody(0);
                             half3 L         = -light.forward.xyz;
                             half3 intensity = light.color.rgb;
 

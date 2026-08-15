@@ -48,6 +48,14 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
     
     private CelestialBodyData m_CelestialBodyData = new CelestialBodyData();
 
+    /// PROJE EKİ — AY. Paket tek gök cismi taşıyordu ve o cisim ana ışığın yönünde
+    /// çiziliyordu; ışık güneşten aya döndüğü an disk 180° atlıyordu. Ay buraya ayrıca
+    /// verilince kendi yönünde, kendi fazıyla çiziliyor ve atlama ortadan kalkıyor.
+    ///
+    /// Ay gökyüzünü AYDINLATMIYOR: sky-view LUT tek ışıktan pişiyor. Ay yalnız diski ve
+    /// (ayrı bir yönlü ışık olarak) araziyi sürüyor.
+    public static Light MoonLight { get; set; }
+
     private PBSkyPrePass m_PBSkyPrePass;
     private SkyViewLUTPass m_SkyViewLUTPass;
     private AtmosphericScatteringPass m_AtmosphericScatteringPass;
@@ -500,6 +508,25 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
         private static readonly int _CelestialBody_FlareSize = Shader.PropertyToID("_CelestialBody_FlareSize");
         private static readonly int _CelestialBody_FlareColor = Shader.PropertyToID("_CelestialBody_FlareColor");
         private static readonly int _CelestialBody_FlareFalloff = Shader.PropertyToID("_CelestialBody_FlareFalloff");
+
+        // PROJE EKİ — İKİNCİ GÖK CİSMİ (ay).
+        private static readonly int _CelestialBody2_Color = Shader.PropertyToID("_CelestialBody2_Color");
+        private static readonly int _CelestialBody2_Radius = Shader.PropertyToID("_CelestialBody2_Radius");
+        private static readonly int _CelestialBody2_Forward = Shader.PropertyToID("_CelestialBody2_Forward");
+        private static readonly int _CelestialBody2_DistanceFromCamera = Shader.PropertyToID("_CelestialBody2_DistanceFromCamera");
+        private static readonly int _CelestialBody2_Right = Shader.PropertyToID("_CelestialBody2_Right");
+        private static readonly int _CelestialBody2_AngularRadius = Shader.PropertyToID("_CelestialBody2_AngularRadius");
+        private static readonly int _CelestialBody2_Up = Shader.PropertyToID("_CelestialBody2_Up");
+        private static readonly int _CelestialBody2_Type = Shader.PropertyToID("_CelestialBody2_Type");
+        private static readonly int _CelestialBody2_SurfaceColor = Shader.PropertyToID("_CelestialBody2_SurfaceColor");
+        private static readonly int _CelestialBody2_Earthshine = Shader.PropertyToID("_CelestialBody2_Earthshine");
+        private static readonly int _CelestialBody2_SurfaceTextureScaleOffset = Shader.PropertyToID("_CelestialBody2_SurfaceTextureScaleOffset");
+        private static readonly int _CelestialBody2_SunDirection = Shader.PropertyToID("_CelestialBody2_SunDirection");
+        private static readonly int _CelestialBody2_FlareCosInner = Shader.PropertyToID("_CelestialBody2_FlareCosInner");
+        private static readonly int _CelestialBody2_FlareCosOuter = Shader.PropertyToID("_CelestialBody2_FlareCosOuter");
+        private static readonly int _CelestialBody2_FlareSize = Shader.PropertyToID("_CelestialBody2_FlareSize");
+        private static readonly int _CelestialBody2_FlareColor = Shader.PropertyToID("_CelestialBody2_FlareColor");
+        private static readonly int _CelestialBody2_FlareFalloff = Shader.PropertyToID("_CelestialBody2_FlareFalloff");
 
         private static readonly int _MainLightColor = Shader.PropertyToID("_MainLightColor");
         private static readonly int _EnableAtmosphericScattering = Shader.PropertyToID("_EnableAtmosphericScattering");
@@ -967,6 +994,57 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 material.SetFloat(_CelestialBody_FlareSize, celestialBodyData.flareSize);
                 material.SetVector(_CelestialBody_FlareColor, celestialBodyData.flareColor);
                 material.SetFloat(_CelestialBody_FlareFalloff, celestialBodyData.flareFalloff);
+
+                // PROJE EKİ — AY, İKİNCİ GÖK CİSMİ. Ana ışıktan bağımsız: hangi cisim
+                // ışığı sürerse sürsün ay kendi yönünde çiziliyor.
+                //
+                // `type = 1` ay demek; shader o zaman `ComputeMoonPhase` ve
+                // `ComputeEarthshine` uyguluyor, yani evre ve dünya parıltısı geliyor.
+                // `sunDirection` evre hesabı için güneşin yönü.
+                bool hasMoon = MoonLight != null && MoonLight.isActiveAndEnabled && MoonLight.intensity > 0.0f;
+                material.SetInt(_CelestialBodyCount, hasMoon ? 2 : 1);
+
+                if (hasMoon)
+                {
+                    const float moonAngularDiameter = 0.52f; // derece, gerçek ay 0.48-0.56
+                    float moonAngularRadius = moonAngularDiameter * 0.5f * Mathf.Deg2Rad;
+                    float moonFlareSize = Mathf.Max(1.0f * Mathf.Deg2Rad, 5.960464478e-8f);
+                    float moonFlareCosInner = Mathf.Cos(moonAngularRadius);
+                    float moonRcpSolidAngle = 1.0f / (Mathf.PI * 2.0f * (1 - moonFlareCosInner));
+
+                    var moonColor = MoonLight.color.linear * MoonLight.intensity * PI;
+                    moonColor = MoonLight.useColorTemperature
+                        ? moonColor * Mathf.CorrelatedColorTemperatureToRGB(MoonLight.colorTemperature)
+                        : moonColor;
+
+                    Vector4 moonSurfaceColor = Vector4.one * moonRcpSolidAngle;
+                    Vector4 moonFlareColor = Vector4.one * moonRcpSolidAngle;
+
+                    Shader.SetGlobalVector(_CelestialBody2_Color, new Vector4(moonColor.r, moonColor.g, moonColor.b, 0.0f));
+                    Shader.SetGlobalVector(_CelestialBody2_Forward, MoonLight.transform.forward);
+
+                    const float moonLightingUnitsMultiplier = 50.0f;
+                    moonColor *= 1.0f / moonLightingUnitsMultiplier;
+
+                    moonSurfaceColor = Vector4.Scale(moonColor, moonSurfaceColor);
+                    moonFlareColor = Vector4.Scale(moonColor, moonFlareColor);
+
+                    material.SetFloat(_CelestialBody2_DistanceFromCamera, distanceFromCamera);
+                    material.SetVector(_CelestialBody2_Right, MoonLight.transform.right.normalized);
+                    material.SetFloat(_CelestialBody2_AngularRadius, moonAngularRadius);
+                    material.SetFloat(_CelestialBody2_Radius, Mathf.Tan(moonAngularRadius) * distanceFromCamera);
+                    material.SetVector(_CelestialBody2_Up, MoonLight.transform.up.normalized);
+                    material.SetInt(_CelestialBody2_Type, 1);
+                    material.SetVector(_CelestialBody2_SurfaceColor, moonSurfaceColor);
+                    material.SetFloat(_CelestialBody2_Earthshine, 1.0f * 0.01f);
+                    material.SetVector(_CelestialBody2_SurfaceTextureScaleOffset, Vector4.zero);
+                    material.SetVector(_CelestialBody2_SunDirection, mainLight.transform.forward);
+                    material.SetFloat(_CelestialBody2_FlareCosInner, moonFlareCosInner);
+                    material.SetFloat(_CelestialBody2_FlareCosOuter, Mathf.Cos(moonAngularRadius + moonFlareSize));
+                    material.SetFloat(_CelestialBody2_FlareSize, moonFlareSize);
+                    material.SetVector(_CelestialBody2_FlareColor, moonFlareColor);
+                    material.SetFloat(_CelestialBody2_FlareFalloff, 4.0f);
+                }
             }
         }
 

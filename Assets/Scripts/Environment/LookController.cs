@@ -168,13 +168,12 @@ public class LookController : MonoBehaviour
         const float ReferenceSunIntensity = 3.030782f;
         const float ReferenceSkyLuminance = 0.148f;
 
-        // IŞIK YÜKSEKLİĞİYLE ÇARPILIYOR. Şiddet tek başına yanıltıyor: güneş ufkun
-        // altındayken şiddeti hâlâ büyük ama düz zemine hiç ulaşmıyor (`N·L` negatif).
-        // Çarpansız hâlde 18:30'da uyum 0.81 EV'de kalıyordu — gökyüzü öğlenin 7.4 EV
-        // altındayken sahne zifiri karanlık görünüyordu; gece ise ay tepedeyken uyum
-        // fazla açılıp geceyi gündüze çeviriyordu. Sıralama tersti.
+        // `SurfaceLightLevel` iki cismin DÜZ ZEMİNE ulaşan katkısını topluyor; her biri
+        // kendi yüksekliğiyle çarpılı. Şiddet tek başına yanıltıyordu: güneş ufkun
+        // altındayken şiddeti hâlâ büyük ama zemine hiç ulaşmıyor (`N·L` negatif).
+        // Çarpansız hâlde 18:30'da uyum 0.81 EV'de kalıyor ve sahne zifiri görünüyordu.
         float lightLevel = time != null
-            ? Mathf.Max(time.LightIntensity * time.LightUp / ReferenceSunIntensity,
+            ? Mathf.Max(time.SurfaceLightLevel / ReferenceSunIntensity,
                         AmbientZenithLuminance() / ReferenceSkyLuminance)
             : 1f;
 

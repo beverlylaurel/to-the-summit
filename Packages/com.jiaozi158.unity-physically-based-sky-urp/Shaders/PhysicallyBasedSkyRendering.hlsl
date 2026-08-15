@@ -36,9 +36,32 @@ struct CelestialBodyData
     //int shadowIndex;
 };
 
-CelestialBodyData GetCelestialBody()
+CelestialBodyData GetCelestialBody(uint index)
 {
     CelestialBodyData light;
+
+    if (index != 0)
+    {
+        light.color = _CelestialBody2_Color;
+        light.radius = _CelestialBody2_Radius;
+        light.forward = _CelestialBody2_Forward;
+        light.distanceFromCamera = _CelestialBody2_DistanceFromCamera;
+        light.right = _CelestialBody2_Right;
+        light.angularRadius = _CelestialBody2_AngularRadius;
+        light.up = _CelestialBody2_Up;
+        light.type = _CelestialBody2_Type;
+        light.surfaceColor = _CelestialBody2_SurfaceColor;
+        light.earthshine = _CelestialBody2_Earthshine;
+        light.surfaceTextureScaleOffset = _CelestialBody2_SurfaceTextureScaleOffset;
+        light.sunDirection = _CelestialBody2_SunDirection;
+        light.flareCosInner = _CelestialBody2_FlareCosInner;
+        light.flareCosOuter = _CelestialBody2_FlareCosOuter;
+        light.flareSize = _CelestialBody2_FlareSize;
+        light.flareColor = _CelestialBody2_FlareColor;
+        light.flareFalloff = _CelestialBody2_FlareFalloff;
+
+        return light;
+    }
 
     light.color = _CelestialBody_Color;
     light.radius = _CelestialBody_Radius;
@@ -95,9 +118,13 @@ float3 RenderSunDisk(inout float tFrag, float tExit, float3 V)
 
     // Intersect and shade emissive celestial bodies.
     // Unfortunately, they don't write depth.
-    //for (uint i = 0; i < _CelestialBodyCount; i++)
+    //
+    // PROJE EKİ: döngü açıldı. Tek cisimken disk ana ışığın yönünde çiziliyordu ve ışık
+    // güneşten aya döndüğü an 180° atlıyordu. `_CelestialBodyCount` ikiyse ay kendi
+    // yönünde ayrıca çiziliyor.
+    for (uint i = 0; i < _CelestialBodyCount; i++)
     {
-        CelestialBodyData light = GetCelestialBody();
+        CelestialBodyData light = GetCelestialBody(i);
 
         // Celestial body must be outside the atmosphere (request from Pierre D).
         float lightDist = max(light.distanceFromCamera, tExit);
