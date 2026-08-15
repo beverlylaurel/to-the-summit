@@ -133,12 +133,15 @@ public static class MountainSceneBootstrap
         Phase("ölü script taraması");
 
         EnsureSkyFeature();
-        EnsureSkyVolume();
-        Phase("gökyüzü geçişi");
-
         EnsureCloudFeature();
+        Phase("gökyüzü ve bulut geçişleri");
+
+        // SIRA ÖNEMLİ: `EnsureCloudVolume` sahnedeki Volume'u bulup `cloudVolume` statiğine
+        // yazıyor, gökyüzü de onun profiline yazıyor. Ayrı arama yapılsaydı sahnedeki
+        // birden fazla Volume arasından başkası seçilebilirdi.
         EnsureCloudVolume();
-        Phase("bulut geçişi");
+        EnsureSkyVolume();
+        Phase("gökyüzü ve bulut hacimleri");
 
         var settings = current = LoadOrCreateSettings();
 
@@ -613,38 +616,51 @@ public static class MountainSceneBootstrap
     #endif
     }
 
-    /// GÖKYÜZÜ HACMİ. Üç override tek profile yazılıyor; bulut hacmiyle aynı profil, çünkü
-    /// bulut portu gezegen yarıçapını ve ambient kipini oradan okuyor.
+    /// GÖKYÜZÜ HACMİ. Üç override bulut hacminin profiline yazılıyor; bulut portu gezegen
+    /// yarıçapını ve ambient kipini oradan okuyor.
+    ///
+    /// İKİ PROFİLE BİRDEN yazılıyor ve bu gerekli. `Volume.profile` asset'in çalışma-zamanı
+    /// KOPYASI; kopya bir kez üretildikten sonra asset'e eklenen bileşen ona geçmiyor.
+    /// `LookController` (`[ExecuteAlways]`) kopyayı editörde üretiyor, sürücüler ve F1
+    /// paneli de kopyayı okuyor — asset'e yazmak tek başına "profilde PhysicallyBasedSky
+    /// yok" hatasını veriyordu. Kopyayı yok edip yeniden ürettirmek olmaz: `LookController`
+    /// kendi override referanslarını önbelleğe alıyor ve onlar kopar.
     static void EnsureSkyVolume()
     {
     #if URP_PBSKY
-        var volume = Object.FindAnyObjectByType<UnityEngine.Rendering.Volume>();
-        if (volume == null)
-            throw new System.InvalidOperationException("Sahnede Volume yok, gökyüzü hacmi eklenemedi.");
-        if (volume.sharedProfile == null)
-            throw new System.InvalidOperationException($"{volume.name} Volume'unda profil yok.");
+        if (cloudVolume == null)
+            throw new System.InvalidOperationException(
+                "Gökyüzü hacmi bulut hacminden sonra kurulmalı: `cloudVolume` yazılmamış.");
 
-        var profile = volume.sharedProfile;
+        ApplySkyOverrides(cloudVolume.sharedProfile, asset: true);
 
+        if (cloudVolume.HasInstantiatedProfile())
+            ApplySkyOverrides(cloudVolume.profile, asset: false);
+    #endif
+    }
+
+#if URP_PBSKY
+    static void ApplySkyOverrides(UnityEngine.Rendering.VolumeProfile profile, bool asset)
+    {
         if (!profile.TryGet(out VisualEnvironment visualEnvironment))
         {
             visualEnvironment = profile.Add<VisualEnvironment>(overrides: true);
             visualEnvironment.name = nameof(VisualEnvironment);
-            AssetDatabase.AddObjectToAsset(visualEnvironment, profile);
+            if (asset) AssetDatabase.AddObjectToAsset(visualEnvironment, profile);
         }
 
         if (!profile.TryGet(out PhysicallyBasedSky pbrSky))
         {
             pbrSky = profile.Add<PhysicallyBasedSky>(overrides: true);
             pbrSky.name = nameof(PhysicallyBasedSky);
-            AssetDatabase.AddObjectToAsset(pbrSky, profile);
+            if (asset) AssetDatabase.AddObjectToAsset(pbrSky, profile);
         }
 
         if (!profile.TryGet(out Fog fog))
         {
             fog = profile.Add<Fog>(overrides: true);
             fog.name = nameof(Fog);
-            AssetDatabase.AddObjectToAsset(fog, profile);
+            if (asset) AssetDatabase.AddObjectToAsset(fog, profile);
         }
 
         // Fiziksel gökyüzü seçiliyor; 0 "gökyüzü yok" demek ve paket hiçbir şey çizmiyor.
@@ -671,11 +687,13 @@ public static class MountainSceneBootstrap
         // açılırsa sis iki kez uygulanıyor. Geçiş `DECISIONS.md`'de kayıtlı.
         SetSky(fog.enabled, false);
 
+        if (!asset) return;
+
         EditorUtility.SetDirty(profile);
         AssetDatabase.SaveAssets();
         AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath(profile));
-    #endif
     }
+#endif
 
     static void SetSky<T>(VolumeParameter<T> parameter, T value)
     {
