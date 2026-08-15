@@ -72,6 +72,9 @@ public class DebugMenu : MonoBehaviour
     /// Cizim aninda yakalanamaz — `CloudWeatherDriver` kapsama, yogunluk ve ruzgari her
     /// karede yaziyor, ilk cizimde okunan deger zaten surulmus olan olurdu.
     float coverageDefault;
+#if URP_PBSKY
+    PhysicallyBasedSky sky;
+#endif
     bool detachFromWeather;
 
     bool open;
@@ -151,6 +154,13 @@ public class DebugMenu : MonoBehaviour
         clouds.cloudCoverage.overrideState = true;
 
         detachFromWeather = !cloudDriver.enabled;
+
+#if URP_PBSKY
+        if (!cloudVolume.profile.TryGet(out sky))
+            throw new InvalidOperationException($"{nameof(DebugMenu)}: profilde {nameof(PhysicallyBasedSky)} yok.");
+
+        ReadStarContent();
+#endif
     }
 
     void OnDisable()
@@ -296,6 +306,7 @@ public class DebugMenu : MonoBehaviour
         GUILayout.Label($"aralarındaki açı: {Vector3.Angle(b0, b1):F0}°");
 
         GUILayout.Label($"yıldız dokusu: {(PhysicallyBasedSkyURP.ResolvedHasSpaceTexture ? "BAĞLI" : "YOK")}");
+        GUILayout.Label($"yıldız içeriği: {starContentReport}");
 
         RenderSettings.ambientProbe.Evaluate(ZenithDirection, ZenithResult);
         Color zenith = ZenithResult[0];
@@ -304,6 +315,33 @@ public class DebugMenu : MonoBehaviour
         GUILayout.Label($"güneş {time.SunIntensity:F2} · ay {time.MoonIntensity:F3}");
 
         EndSection();
+#endif
+    }
+
+    /// TEŞHİS: bağlı küp haritanın GERÇEKTEN yıldız taşıyıp taşımadığı. Doku bağlı
+    /// görünüp içi boş olabilir; "BAĞLI" tek başına yetmiyor.
+    string starContentReport = "okunmadı";
+
+    void ReadStarContent()
+    {
+#if URP_PBSKY
+        var texture = sky != null ? sky.spaceEmissionTexture.value : null;
+        if (texture == null) { starContentReport = "doku yok"; return; }
+
+        if (!texture.isReadable) { starContentReport = "doku okunabilir değil"; return; }
+
+        float max = 0f;
+        int lit = 0;
+
+        var pixels = texture.GetPixels(CubemapFace.PositiveX);
+        foreach (var p in pixels)
+        {
+            float v = Mathf.Max(p.r, Mathf.Max(p.g, p.b));
+            if (v > 0.0001f) lit++;
+            max = Mathf.Max(max, v);
+        }
+
+        starContentReport = $"+X yüzünde {lit} teksel, en parlak {max:F4}";
 #endif
     }
 
