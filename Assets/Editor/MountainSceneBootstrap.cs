@@ -600,8 +600,11 @@ public static class MountainSceneBootstrap
             AssetDatabase.LoadAssetAtPath<Material>(CloudMaterialPath);
         serialized.ApplyModifiedPropertiesWithoutUndo();
 
-        feature.Create();
-
+        // `Create()` ELLE ÇAĞRILMIYOR — bulut feature'ında çağrılıyor ama burada olmaz.
+        // Gökyüzü feature'ının `Create()`'i ilk satırında `VolumeManager.instance.stack`
+        // okuyor; bootstrap `delayCall`'dan çalışırken hacim yığını henüz kurulmamış
+        // oluyor ve `NullReferenceException` atıyor. Shader'lar zaten eklemeden ÖNCE
+        // bağlandığı için Unity kendi `Create()`'ini çağırdığında doğrulama geçiyor.
         renderer.rendererFeatures.Add(feature);
         AssetDatabase.AddObjectToAsset(feature, renderer);
         EditorUtility.SetDirty(renderer);
