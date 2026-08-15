@@ -36,6 +36,9 @@ public class DebugMenu : MonoBehaviour
     [Tooltip("Atmosfer ayarlarini havadan suren bilesen.")]
     [SerializeField] SkyWeatherDriver skyDriver;
 
+    [Tooltip("Pozlama uyumunu suren bilesen.")]
+    [SerializeField] LookController lookController;
+
     const float PanelWidth = 1560f;
     const float ColumnWidth = 300f;
     const float Margin = 24f;
@@ -77,6 +80,8 @@ public class DebugMenu : MonoBehaviour
     bool detachSkyFromWeather;
     float sunIntensityDefault;
     float moonIntensityDefault;
+    float exposureCapDefault;
+    float adaptShareDefault;
 #endif
 
     /// Acilistaki degerler: her satirin ↺'u ve "Bulut ayarlarini geri al" buradan okuyor.
@@ -114,8 +119,9 @@ public class DebugMenu : MonoBehaviour
         PerformanceHud hudRef, ClimbHud climbHudRef,
         CursorLock cursorLockRef, SnowCollisionProbe snowProbeRef,
         RouteOverlay routeOverlayRef, Volume cloudVolumeRef, CloudWeatherDriver cloudDriverRef,
-        SkyWeatherDriver skyDriverRef)
+        SkyWeatherDriver skyDriverRef, LookController lookControllerRef)
     {
+        lookController = lookControllerRef;
         cloudVolume = cloudVolumeRef;
         cloudDriver = cloudDriverRef;
         skyDriver = skyDriverRef;
@@ -191,6 +197,12 @@ public class DebugMenu : MonoBehaviour
 
         sunIntensityDefault = time.SunIntensity;
         moonIntensityDefault = time.MoonIntensity;
+
+        if (lookController != null)
+        {
+            exposureCapDefault = lookController.ExposureCap;
+            adaptShareDefault = lookController.AdaptShare;
+        }
         detachSkyFromWeather = skyDriver != null && !skyDriver.enabled;
 #endif
     }
@@ -404,6 +416,21 @@ public class DebugMenu : MonoBehaviour
         DrawAmbientProbeReadout();
 
         CloudSlider("Pozlama (EV)", sky.exposure, -5f, 5f, "F2");
+
+        // POZLAMA UYUMU KAMERANIN, GÖKYÜZÜNÜN DEĞİL. Üstteki `Pozlama (EV)` yalnız göğü
+        // parlatır ve araziyi olduğu yerde bırakır; bu ikisi ise gözün karanlığa açılması
+        // gibi sahnenin tamamını taşır. Alacakaranlığın görünmemesinin sebebi buydu:
+        // gök verisi vardı, tavan 0.6 EV olduğu için ekrana gelmiyordu.
+        if (lookController != null)
+        {
+            float cap = CloudRow("Pozlama tavanı (EV)", lookController.ExposureCap,
+                exposureCapDefault, 0f, 6f, "F2");
+            if (!Mathf.Approximately(cap, lookController.ExposureCap)) lookController.ExposureCap = cap;
+
+            float share = CloudRow("Pozlama uyum payı", lookController.AdaptShare,
+                adaptShareDefault, 0f, 1f, "F2");
+            if (!Mathf.Approximately(share, lookController.AdaptShare)) lookController.AdaptShare = share;
+        }
         CloudSlider("Parlaklık çarpanı", sky.multiplier, 0f, 4f, "F2");
 
         GUILayout.Space(4f);
@@ -431,6 +458,12 @@ public class DebugMenu : MonoBehaviour
             RestoreDefaults(visualEnvironment);
             time.SunIntensity = sunIntensityDefault;
             time.MoonIntensity = moonIntensityDefault;
+
+            if (lookController != null)
+            {
+                lookController.ExposureCap = exposureCapDefault;
+                lookController.AdaptShare = adaptShareDefault;
+            }
         }
 
         EndSection();
