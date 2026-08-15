@@ -146,10 +146,33 @@ public class DebugMenu : MonoBehaviour
             || cloudVolume == null || cloudDriver == null)
             throw new InvalidOperationException($"{nameof(DebugMenu)}: bağımlılıklar atanmadı.");
 
+        // Hız çarpanı yalnızca panel çizilirken uygulanıyordu; panel hiç açılmazsa
+        // başlangıç değeri de hiç etkili olmuyordu.
+        walker.SpeedMultiplier = speedMultiplier;
+        flyer.SpeedMultiplier = speedMultiplier;
+
+        walker.enabled = !freeFly;
+        flyer.enabled = freeFly;
+        time.Paused = true;
+        weatherDriver.Instant = true;
+
+        open = false;
+    }
+
+    /// VARSAYILANLAR `Start`'TA YAKALANIYOR, `OnEnable`'DA DEĞİL.
+    ///
+    /// `VolumeComponent.parameters` tembel bir liste: dayandığı `parameterList` bileşenin
+    /// KENDİ `OnEnable`'ında doluyor. Unity iki `OnEnable` arasında sıra garanti etmiyor,
+    /// dolayısıyla panel önce çalıştığında liste henüz null oluyordu
+    /// (`ArgumentNullException: list`). `Start` tüm `OnEnable`'lardan sonra çalışır.
+    ///
+    /// Sürücüler değerleri `Update`'te yazıyor ve `Update` `Start`'tan sonra geliyor, yani
+    /// yakalanan değer hâlâ havanın ezmediği hâl.
+    void Start()
+    {
         if (!cloudVolume.profile.TryGet(out clouds))
             throw new InvalidOperationException($"{nameof(DebugMenu)}: profilde {nameof(VolumetricClouds)} yok.");
 
-        // Üç bileşen için de biriktiriliyor; temizlik burada bir kez, yakalama üç kez.
         cloudFloatDefaults.Clear();
         cloudBoolDefaults.Clear();
 
@@ -170,18 +193,6 @@ public class DebugMenu : MonoBehaviour
         moonIntensityDefault = time.MoonIntensity;
         detachSkyFromWeather = skyDriver != null && !skyDriver.enabled;
 #endif
-
-        // Hız çarpanı yalnızca panel çizilirken uygulanıyordu; panel hiç açılmazsa
-        // başlangıç değeri de hiç etkili olmuyordu.
-        walker.SpeedMultiplier = speedMultiplier;
-        flyer.SpeedMultiplier = speedMultiplier;
-
-        walker.enabled = !freeFly;
-        flyer.enabled = freeFly;
-        time.Paused = true;
-        weatherDriver.Instant = true;
-
-        open = false;
     }
 
     void OnDisable()
