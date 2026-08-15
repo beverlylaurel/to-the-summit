@@ -136,6 +136,12 @@ public class TimeOfDay : MonoBehaviour
     /// şiddet mi kayboluyor.
     public float LightIntensity => sun != null ? sun.intensity : 0f;
 
+    /// Yönlü ışığın YÜKSEKLİĞİ, 0-1. Işık ufkun altındayken sıfır: o şiddet hiçbir düz
+    /// yüzeye ulaşmıyor demektir (`N·L` negatif). Pozlama uyumu bunu okuyor — yoksa
+    /// ufkun altındaki güneşin şiddetini "sahne aydınlık" sanıp alacakaranlıkta pozlamayı
+    /// kapatıyor, gece ise ay tepedeyken fazla açıyordu.
+    public float LightUp => sun != null ? Mathf.Max(0f, -sun.transform.forward.y) : 0f;
+
 
 
     /// Rengi tona indirger: en parlak kanal 1 olur, sönüm şiddete devredilir.
