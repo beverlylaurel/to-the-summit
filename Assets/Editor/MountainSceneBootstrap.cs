@@ -848,6 +848,18 @@ public static class MountainSceneBootstrap
             Object.FindAnyObjectByType<WeatherState>(),
             LoadOrCreate<SkyWeatherSettings>(SkyWeatherPath));
         EditorUtility.SetDirty(skyDriver);
+
+        // ORTAM IŞIĞI GERÇEK GÖKYÜZÜNDEN PİŞİYOR. Paketin analitik probe'u çoklu saçılım
+        // taşımıyordu ve alacakaranlıkta sıfır veriyordu; devre dışı bırakıldı.
+        var ambientBaker = Object.FindAnyObjectByType<SkyAmbientBaker>();
+        if (ambientBaker == null)
+        {
+            ambientBaker = probe.gameObject.AddComponent<SkyAmbientBaker>();
+            changed = true;
+        }
+
+        ambientBaker.Bind(Object.FindAnyObjectByType<TimeOfDay>());
+        EditorUtility.SetDirty(ambientBaker);
     }
 
     /// Gürültü dokuları materyalde duruyor, hiçbir kod atamıyor — repo hazır materyalle geliyordu.

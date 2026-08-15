@@ -631,11 +631,7 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             UpdateMaterialProperties(mainLight, camera, material);
             lutMaterial.CopyPropertiesFromMaterial(material);
 
-            if (mainLight != null && visualEnvironment.skyAmbientMode.value == VisualEnvironment.SkyAmbientMode.Dynamic)
-            {
-                ambientProbe = UpdateAmbientProbe(ambientProbe, mainLight.transform.forward, mainLightColor);
-                RenderSettings.ambientProbe = ambientProbe;
-            }
+            // (analitik probe devre disi - RenderGraph yolundaki acikalamaya bakin)
         }
 
     #if UNITY_6000_0_OR_NEWER
@@ -744,11 +740,20 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 UpdateMaterialProperties(mainLight, camera, material);
                 lutMaterial.CopyPropertiesFromMaterial(material);
 
-                if (mainLight != null && visualEnvironment.skyAmbientMode.value == VisualEnvironment.SkyAmbientMode.Dynamic)
-                {
-                    ambientProbe = UpdateAmbientProbe(ambientProbe, mainLight.transform.forward, mainLightColor);
-                    RenderSettings.ambientProbe = ambientProbe;
-                }
+                    // PROJE DÜZELTMESİ — ANALİTİK ORTAM PROBE'U DEVRE DIŞI.
+                    // `UpdateAmbientProbe` probe'u C#'taki `RenderSky`'dan pişiriyordu.
+                    // O yol ÇOKLU SAÇILIM TAŞIMIYOR (`EvaluateAtmosphericColor` içinde
+                    // `multiScatteredLuminance` yorum satırında ve fonksiyonun C#
+                    // karşılığı hiç yok — LUT'a erişimi olmadığı için yazılamaz).
+                    // Alacakaranlık tam olarak çoklu saçılımdan gelir: güneş ufkun
+                    // altındayken tek saçılım sıfırdır.
+                    //
+                    // ÖLÇÜLDÜ: 18:36'da çizilen gökyüzü kızıl, ortam probe'u `0.00000`.
+                    // Sahne bu yüzden zifiri karanlıktı.
+                    //
+                    // Probe artık `SkyAmbientBaker` tarafından GERÇEK gökyüzünden
+                    // pişiriliyor (`DynamicGI.UpdateEnvironment`), yani LUT'un ürettiği
+                    // alacakaranlık ortam ışığına da geçiyor.
 
                 passData.mainLightColor = mainLightColor;
                 passData.enableAtmosphericScattering = pbrSky.atmosphericScattering.value;
