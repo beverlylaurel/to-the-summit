@@ -16,6 +16,7 @@ Material:
   - _LOCAL_VOLUMETRIC_CLOUDS
   - _OUTPUT_CLOUDS_DEPTH
   - _PERCEPTUAL_BLENDING
+  - _PHYSICALLY_BASED_SUN
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -83,7 +84,7 @@ Material:
     - _ShapeScale: 34.1
     - _SmallWindSpeed: 0.25
     - _SunLightDimmer: 1
-    - _VerticalErosionWindDisplacement: -3.9322038
+    - _VerticalErosionWindDisplacement: -0.13437706
     - _VerticalShapeNoiseOffset: 0
     - _VerticalShapeWindDisplacement: 0
     m_Colors:
@@ -91,6 +92,6 @@ Material:
     - _ScatteringTint: {r: 1, g: 1, b: 1, a: 0.25}
     - _ShapeNoiseOffset: {r: 0, g: 0, b: 0, a: 0}
     - _WindDirection: {r: 0.9063078, g: 0.42261827, b: 0, a: 0}
-    - _WindVector: {r: 285.10297, g: 132.94571, b: 0, a: 0}
+    - _WindVector: {r: 9.74296, g: 4.5432153, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
