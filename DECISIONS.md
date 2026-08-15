@@ -1073,7 +1073,7 @@ transmittance'tan geçirilmesi, limb darkening. **Bulutlar bitene kadar başlanm
 bulut sistemi şu an ondan ışık alıyor. İkisini aynı anda değiştirmek, 2026-08-14'te bulut
 sisteminde yaşanan "hangi kaynak suçlu belli değil" durumunu tekrarlar.
 
-**Tetikleyici.** `CLOUDS_REBUILD.md`'deki bağ listesi ve girdi bağları kapandığında.
+**Tetikleyici.** ÇALDI — bulut bağlarının tamamı kuruldu (`SYSTEMS.md` → Bulutlar).
 
 **Kapsam ayrımı.** Brief'in bulutla ilgili maddeleri (ortam ışığında güneş diskinin hariç
 tutulması, iki loblu HG `g0=0.8 / g1=−0.5 / α=0.5`, enerji korunumlu analitik entegrasyon,

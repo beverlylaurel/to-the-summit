@@ -1,15 +1,49 @@
 # Sistemler
 
-> **BULUT SİSTEMİ ŞU AN YOK.** 2026-08-14'te tamamen silindi; yerine hazır bir uygulama
-> (`UnityVolumetricCloudsURP`) alınacak. Aşağıda bulutla ilgili yazan her şey **silinmiş
-> koda** aittir — kural olarak hâlâ doğru olabilir ama karşılığı olan satır yoktur.
->
-> Yeni sistem gelene kadar geçerli olan belge `CLOUDS_REBUILD.md`: hangi bağ nereye
-> gidiyordu, ölçülerek bulunmuş on iki ders, kurtarılmış gürültü hash'i. Kararın kendisi
-> ve tetikleyicisi `DECISIONS.md`'de.
->
-> Şu an stub olan iki bağ: yer bulut gölgesi (`CloudShadowAt` → 1.0) ve yerel yağış
-> (`UpdateLocalRain` → 1).
+## Bulutlar (`Assets/VolumetricClouds/`, `Assets/Scripts/Clouds/`)
+
+Hacimsel bulutlar `UnityVolumetricCloudsURP` (MIT) üzerine kurulu; yoğunluk, şekil ve
+aydınlatma zinciri Nubis/HZD makalesine göre düzeltildi. Fark listesi, ölçümler ve
+gerekçeler `CLOUDS_REBUILD.md`'de — o dosya artık **teknik kayıt**, bağ listesi burada.
+
+**Bulut ne okur**
+
+| kaynak | ne | nereye |
+|---|---|---|
+| `AtmosphereController.Coverage` | küresel kapsamanın TEK eşlemesi | `cloudCoverage` |
+| `AltitudeWeatherDriver.CloudMass` | yağışın geciken hâli | `densityMultiplier` |
+| `WindField.FreeAirSpeed` + `PrevailingDirection` | serbest hava rüzgârı, **arazi maruziyeti uygulanmadan** | `globalSpeed` (km/h), `globalOrientation` |
+| `TimeOfDay` | **dolaylı** — yönlü ışığın yönü/rengi/şiddeti | `GetMainLight()` |
+
+Çeviriyi `CloudWeatherDriver` yapıyor; tek yön, bulut geri yazmıyor.
+
+**Buluttan ne okunur** — hepsi `CloudLayerProbe` üzerinden, o da aynı Volume ayarlarını
+ve aynı hava haritasını okuyor:
+
+| tüketici | ne |
+|---|---|
+| `AltitudeWeatherDriver.CloudColumnTop` | sütunun tepesi; üstünde yağış yok |
+| `ClimbHud` | katman kotları ve kapsama |
+| `PrecipitationRenderer` | sütunun kapsaması — yağış bulutun altında yağar |
+| `LightningFlash` | çakma kotu, çakma sütununun tepesinden |
+| `_CloudBottom` / `_CloudTop` globalleri | `LightningBolt.shader` çakmayı bulut kabuğuyla kesiştiriyor |
+
+Yer bulut gölgesi bunlardan geçmiyor: bulut sistemi gölgeyi **ana ışığın cookie dokusuna**
+yazıyor, `MountainSurface.shader` `_LIGHT_COOKIES` ile okuyor. Gölge böylece gökyüzünü
+çizen yoğunluk alanının ta kendisinden türüyor — ikinci bir yaklaşım yok.
+
+**Bilinçli kurallar**
+- Rüzgârda **maruziyet uygulanmaz**: oyuncu kayanın arkasına geçince iki kilometre
+  yukarıdaki bulut yavaşlayamaz.
+- Yoğunluk `WeatherState.Precipitation`'dan **sürülmez**: o değer tavanla kesilmiş, döngü
+  kurardı (kapsama → tepe → tavan kesimi → yağış → kapsama).
+- Kapsamanın eşlemesi **tek yerde**, `AtmosphereController`'da. İki eşleme olsaydı gökyüzü
+  "kapalı" derken bulut "açık" diyebilirdi.
+- Katman **mutlak kotta** (`localClouds` açık). Kapalıyken ışın başlangıcı `(0,0,0)` olup
+  bulutlar oyuncuyla birlikte yükseliyordu.
+
+**Açık:** bulut rengi ufuk altı gök renginden besleniyor ve sıcağa çalıyor; düzeltmesi
+ertelenen atmosfer işinde (`DECISIONS.md`).
 
 
 Atmosferin **şu an nasıl çalıştığı**: ne neyden beslenir, ne neyi etkiler.
@@ -139,9 +173,9 @@ bağlıyken yağışın durduğu karede gökyüzü de açılıyordu; gerçekte b
 süre durur. Sonuç kendiliğinden çıkar: **kısa** açık pencereler gökyüzünü açmadan geçer,
 **uzun** olanlar açar — hangisi olacağı pencerenin süresine bağlı, ayrı bir kurala değil.
 
-**Bulut tepesinin üstünde yağış yoktur, ve bu kesme atmosferden itilir.** Sütunun gerçek
-yüksekliğini yalnızca `AtmosphereController` bilir (hava haritası + o anki bulut tabanı);
-sürücüye `CloudCeiling` olarak yazılır. Sürücü çekmez — iki sistem birbirine referansla
+**Bulut tepesinin üstünde yağış yoktur, ve bu kesme bulut sisteminden itilir.** Sütunun
+gerçek yüksekliğini yalnızca bulut sistemi bilir; `CloudLayerProbe` her karede
+`CloudColumnTop` olarak yazar. Sürücü çekmez — iki sistem birbirine referansla
 bağlanmasın diye. Önceden sürücü ayarın **nominal** tavanını (7000 m) kullanıyordu: sönme
 5800 m'de başlıyor, zirve 5686 m — kural hiç işlemiyordu. Görüntüde yağış kesiliyor ama
 `WeatherState` yağmaya devam ettiği için sis, ses ve zemin karı bulut denizinin üstünde de
@@ -169,7 +203,7 @@ rüzgâr vektörü (savrulma **ve girdap alanının sürüklenmesi** — türbü
 taşınır, dünyaya çakılı durmaz), rüzgârın **esintili** şiddeti (girdap genliği, kar
 tanesinin dönme hızı), **havanın rengi** (`_HeightFogColor`).
 
-Yağış gökten tek parça düşmez: kaynağı tepedeki buluttur. `AtmosphereController` hava
+Yağış gökten tek parça düşmez: kaynağı tepedeki buluttur. `CloudLayerProbe` hava
 haritasını oyuncunun konumunda CPU'dan okur — kapsama × kabarıklık (tip) yağış payını
 verir, yayvan ince katman yağdırmaz. Kolonun tepesinin üstüne çıkıldığında pay sıfırlanır:
 bulutları delip geçen tırmanışçının üstünde yağmur kalmaz. Pay ~2.5 s'lik sabitle
@@ -241,7 +275,7 @@ sekiz kilometre gerçekten yirmi dört saniye demek.
 
 ### Şimşek ışığı (`LightningFlash`)
 
-**Okur:** `ThunderPlayer.Struck` ve taşıdığı uzaklık, `AtmosphereController`'dan bulut
+**Okur:** `ThunderPlayer.Struck` ve taşıdığı uzaklık, `CloudLayerProbe`'dan bulut
 katmanının tabanı ve tavanı, oyuncunun konumu.
 
 **Okumaz:** yağış, rüzgâr, günün saati. Çakmanın koşulları tetikleyen tarafta zaten
@@ -295,8 +329,9 @@ ve kümelemeyi boğmuyor.
 
 ### Sis ve bulutlar (`AtmosphereController`)
 
-**Bu bölümün bulutla ilgili kısmı SİLİNMİŞ koda ait — bkz. dosyanın başındaki uyarı.**
-Sis, gökyüzü, görüş mesafesi ve yansıma anlatımı geçerlidir.
+Bu bölüm sis, gökyüzü, görüş mesafesi ve yansımayı anlatır. Hacimsel bulutlar ayrı bir
+sistem — bkz. dosyanın başındaki **Bulutlar** bölümü. Buradaki `coverage` bulutların da
+okuduğu tek eşlemedir.
 
 
 **Okur:** şiddet, karlılık, rüzgârın **sürekli** şiddeti ve yönü, günün saati, ve

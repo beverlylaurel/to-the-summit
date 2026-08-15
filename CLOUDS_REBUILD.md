@@ -1,36 +1,19 @@
-# Bulut sistemi — yeniden yazım envanteri
+# Bulut sistemi — teknik kayıt
 
-Eski sistem silinmeden önce yazıldı. Amaç tek şey: **hangi bağ vardı, yenisinde ne
-yeniden kurulacak.** Kod değil, sözleşme listesi.
+Portun (`UnityVolumetricCloudsURP`, MIT) makaleyle sekiz farkı, hangisinin nasıl kapandığı,
+ölçülmüş sayılar ve kurtarılmış gürültü hash'i. Amaç tek şey: **aynı hata iki kez
+ölçülmesin.**
 
-> **Belgeler arası iş bölümü.** Bulut konusunda **geçerli olan tek belge budur.**
-> `SYSTEMS.md`'nin bulut kısmı silinmiş koda ait, oraya bakılmaz (başında uyarısı var).
-> `DECISIONS.md` yalnız kararın kendisini ve tetikleyicisini tutuyor.
-> `NUBIS_NOTES.md` makale okumalarını tutuyor — soru-cevap, her cevabın yanında kaynak
-> sayfa. Buradaki dersler ÖLÇÜMDEN, oradaki cevaplar MAKALEDEN gelir; ikisi karışmaz.
-> Yeni sistem çalışır hâle gelince bu dosya `SYSTEMS.md`'ye taşınır ve buradaki bağlar
-> orada güncellenir; iki yerde birden bulut anlatımı durmaz.
-
----
-
-## v1 KURALI: HİÇBİR BAĞ YOK
-
-**İlk sürüm bu belgedeki hiçbir bağı kurmaz.** Ne aşağıdaki girdileri okur, ne aşağıdaki
-tüketicilere veri verir. Tamamen kendi başına, kendi ayarlarıyla çalışır.
-
-Bağlar ancak v1 **görsel olarak onaylandıktan sonra**, **teker teker** eklenir. Her bağdan
-sonra buluta tekrar bakılır; görüntü bozulursa o bağ geri alınır ve sebebi bulunmadan
-bir sonrakine geçilmez.
-
-Gerekçe ölçülmüş: 2026-08-14'te bulut sistemi aynı anda hava durumuna, rüzgâra, saate,
-yağışa ve şimşeğe bağlıydı. Her belirtide hangi kaynağın suçlu olduğu ayırt edilemedi ve
-her tur bir telafi terimi eklendi — on bir tanesi birikti, sonunda sistem silindi.
-
-Aşağıdaki iki liste **v2 ve sonrası** içindir.
+> **Belgeler arası iş bölümü.**
+> **Bağlar ve bilinçli kurallar `SYSTEMS.md` → Bulutlar'da** — güncel olan orasıdır, bu
+> dosyada bağ listesi tutulmaz.
+> `NUBIS_NOTES.md` makale okumalarını tutuyor: 12 soru, her cevabın yanında kaynak sayfa.
+> Buradaki dersler ÖLÇÜMDEN, oradaki cevaplar MAKALEDEN gelir; ikisi karışmaz.
+> `DECISIONS.md` kararları ve tetikleyicilerini tutuyor.
 
 ---
 
-## v1 ilerlemesi — port ve makaleyle farkları
+## Portun makaleyle farkları
 
 Temel: `UnityVolumetricCloudsURP` (MIT, jiaozi158'in HDRP→URP portu), `Assets/VolumetricClouds/`.
 
@@ -172,109 +155,30 @@ saçılıyor; HZD çok saçılmayı bu tabanla karşılıyor.
 Portta `EvaluateSunTransmittance` saf `exp(-extinction)` yazıyordu, taban yoktu. Taban
 oktav başına Beer terimine uygulandı; faz fonksiyonu dokunulmadan kaldı.
 
+### `sky brief.md`'nin bulut maddeleri
+
+| madde | durum |
+|---|---|
+| Ortam ışığında güneş diski hariç | **kapandı** — portun `_DisableSunDisk` global'i vardı, `Sky.shader` okumuyordu |
+| Enerji korunumlu analitik entegrasyon | **zaten vardı** — port Frostbite'ın formülünü kullanıyor, aynı slaytı kaynak gösteriyor |
+| İki loblu HG, normalize | **kapandı** — port iki HG'yi topluyordu (integral 2, enerji korunmuyor); `lerp`e çevrildi, `g0=0.8 / g1=−0.5 / α=0.5` |
+| Aerial perspective bulutlara | **açık** — ertelenen sky işinde |
+
+İki lobun toplanması yerine ortalanması bulutları **yaklaşık yarı yarıya söndürür**. Bu
+beklenen: eksik olan enerji zaten yoktu. Karanlık gelirse çözüm çift enerjiyi geri koymak
+değil, ışık seviyesine bakmaktır.
+
 ### Açık kalan
 
-Yoğunluk, şekil ve aydınlatma zinciri bitti. Sırada **bağlar** — on tanesi aşağıda,
-teker teker, her birinden sonra buluta tekrar bakılarak.
+Yoğunluk, şekil ve aydınlatma zinciri bitti; bağların tamamı kuruldu (`SYSTEMS.md`).
+
+Tek açık başlık **bulut rengi**: ortam sondasının alt yüzü ufkun altına bakıyor ve
+`Sky.shader` orada zemin çizmeyip pus rengini uzatıyor, bulutların altı o renkle
+aydınlanıyor. Düzeltmesi ertelenen atmosfer işinde — `DECISIONS.md`.
 
 ---
 
-## Bulut sisteminin OKUDUKLARI (girdi)
-
-| kaynak | ne veriyor | nereye gidiyor |
-|---|---|---|
-| `AtmosphereController` | **KURULDU** — `Coverage` (küresel kapsamanın TEK eşlemesi) | `cloudCoverage` |
-| `AltitudeWeatherDriver` | **KURULDU** — `CloudMass`, yağışın geciken hâli | `densityMultiplier` |
-| `WindField` | **KURULDU** — `FreeAirSpeed` (m/s) + `PrevailingDirection` | `globalSpeed` (km/h, ×3.6) + `globalOrientation` (derece) |
-| `TimeOfDay` | güneş yönü/rengi, ay, gündüz katsayısı | aydınlatma, batım tonu, gece rengi |
-| `AtmosphereSettings` | bütün ayarlar | — |
-| Hava haritası (pişmiş) | R kapsama, G tip, B taban kayması | yerleşim |
-| Taban/detay/curl gürültüsü | şekil, aşındırma, türbülans | — |
-
-**Kural:** bulut kendi zamanlayıcısını/rastgeleliğini kurmaz; hepsi yukarıdakilere bağlanır.
-
----
-
-## Bulut sistemini OKUYANLAR (çıktı) — yenisinde geri bağlanacak
-
-### 1. Yer bulut gölgesi — **KURULDU**
-Portun kendi yolu kullanıldı: `VolumetricCloudsURP` gölgeyi ana ışığın **cookie
-dokusuna** yazıyor (`_MainLightCookieTexture`), `MountainSurface.shader` da
-`_LIGHT_COOKIES` anahtarıyla okuyup `mainLight.color`'a uyguluyor.
-
-Sözleşme kendiliğinden sağlanıyor: gölge, gökyüzünü çizen yoğunluk alanının ta
-kendisinden türüyor — ikinci bir yaklaşım yok, dolayısıyla "gökte bulut yokken yerde
-gölge" durumu da yok. `HeightFog.hlsl`'deki `CloudShadowAt` stub'ı silindi.
-
-`shadows` kurulumda açılıyor; F1 → Bulut ışığı altında anahtarı ve koyuluk sürgüsü var.
-URP asset'inde `m_SupportsLightCookies: 1` olmak zorunda (zaten öyle).
-
-### 2. Bulut tavanı → `AltitudeWeatherDriver` — **KURULDU**
-`CloudLayerProbe` her karede `driver.CloudColumnTop`'a **itiyor**; sürücü çekmiyor.
-Tepe sütuna göre: hava haritasının B kanalı (`w_h`) × `altitudeRange` + `bottomAltitude`.
-Sütunda kapsama sıfırsa sonsuz dönüyor — "tepesi yok" ile "tepesi yerde" aynı şey değil,
-ikincisi yağışı her yerde keserdi.
-
-### 3. Katman kotları → `ClimbHud` — **KURULDU**
-Gösterge kapsamayı ve kotları `CloudLayerProbe`'dan okuyor. Eskiden `AtmosphereController`
-üzerinden geliyordu; o değerler silinen sisteme aitti ve gökyüzüyle ilgileri kalmamıştı.
-Kapsama formülü shader'dakinin aynısı — iki yerde iki formül olursa gösterge gökyüzüyle
-çelişir.
-
-### 4. Yağış başlangıcı → `PrecipitationRenderer` — **KURULDU**
-Yağış şiddeti o SÜTUNUN kapsamasıyla ölçekleniyor (`CloudLayerProbe.CoverageAt`):
-bir bulutun altındayken yağıyor, açıklığa çıkınca diniyor. Tavan kesimi ayrı iş,
-onu `AltitudeWeatherDriver` yapıyor (bağ 2); burada yalnız yatay dağılım var.
-
-`AtmosphereController.LocalRain` ve `UpdateLocalRain` stub'ı silindi — yağış artık
-atmosferden geçmiyor, doğrudan bulut kaynağını okuyor.
-
-### 5. Yansıma ve çevre ışığı → `AtmosphereController` — **KURULDU (yön ters çevrildi)**
-Sözleşme "bulut kapsaması gök seviyesini düşürür" diyordu; ölçüldüğünde iki tarafın da
-aynı kaynaktan (`CloudMass`, `DryCoverage`, `ClearWindow`) beslendiği görüldü — yani
-**iki ayrı eşleme** vardı ve gökyüzü "kapalı" derken bulut "açık" diyebilirdi.
-
-Tek eşlemeye indirildi: kural `AtmosphereController.Coverage`'ta kalıyor, hacimsel bulut
-sistemi `CloudWeatherDriver` üzerinden onu tüketiyor. Yansıma seviyesi ve
-`DynamicGI.UpdateEnvironment` zaten aynı kapsamadan türüyor, ek bağ gerekmedi.
-
-Yan kazanç: F1'deki kapsama test kilidi (`CoverageLocked`) artık gerçek bulutları da
-sürüyor.
-
-### 6. Şimşek — **KISMEN KURULDU**
-`LightningFlash` çakma kotunu `CloudLayerProbe`'dan okuyor: önce çakmanın XZ'si
-belirleniyor, sonra O SÜTUNUN tepesi örnekleniyor, kot tabanla tepe arasında %25'e
-yerleşiyor. Sütun boşsa katmanın azami tepesi kullanılıyor.
-
-**Açık kalan:** bindirme geçişinin `_LightningFlash`'i bulut alfasıyla çarpıp kütleyi
-içeriden aydınlatması. Işın yürüyüşünün içine konamaz (yürüyüş kareye yayılı, parlama
-blok blok titrer).
-
-### 7. Güneş yaması (kapalı gökte)
-Bindirme geçişinde `a(1−a)` çanıyla orta kalınlıkta tepe yapan sıcak yama. Işın
-yürüyüşü veremiyor: ışık sondası yatay güneşte sıfıra iniyor.
-
-### 8. Gökyüzü ve sis ile ortak globaller — **KURULDU**
-Eski listedeki globallerin çoğu silinen bulut sistemine aitti ve kimse okumuyordu.
-Ölçüldüğünde ayakta kalan iki tanesi çıktı: **`_CloudBottom` ve `_CloudTop`**, tek
-tüketici `LightningBolt.shader` (çakmayı bulut kabuğuyla kesiştiriyor).
-
-Yayın `AtmosphereController`'dan alınıp `CloudLayerProbe`'a taşındı — katmanın gerçek
-kotlarını yalnız bulut sistemi biliyor. Kabuk küresel olduğu için sütun tepesi değil
-katmanın azamisi (`MaxTop`) veriliyor.
-
-Bildirim `HeightFog.hlsl`'de duruyor: sis dosyası önce include ediliyor, iki yerde
-bildirilirse derleyici çakışıyor.
-
-### 9. Sahne kurulumu
-`MountainSceneBootstrap` bulut geçişini, dokuları ve ayarı bağlıyor.
-
-### 10. F1 paneli
-`DebugMenu` bulut bölümleri — sürgüler doğrudan `AtmosphereSettings`'e yazıyor.
-
----
-
-## Yeni sisteme taşınacak DERSLER
+## Ölçülerek bulunmuş dersler
 
 Bunlar ölçülerek bulundu, tekrar bulunmasın.
 
