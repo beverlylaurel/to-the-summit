@@ -387,6 +387,11 @@ public class DebugMenu : MonoBehaviour
         // kez soğuruyor demektir.
 
 
+        // ÖLÇÜM: bulutları besleyen ortam probe'unun gerçek değeri. Bulut shader'ı bu
+        // SH'i `clouds_SH*` olarak okuyor. Gece bu sayı gündüzden belirgin küçük değilse
+        // probe geceyi izlemiyor demektir.
+        DrawAmbientProbeReadout();
+
         CloudSlider("Pozlama (EV)", sky.exposure, -5f, 5f, "F2");
         CloudSlider("Parlaklık çarpanı", sky.multiplier, 0f, 4f, "F2");
 
@@ -419,6 +424,21 @@ public class DebugMenu : MonoBehaviour
 
         EndSection();
 #endif
+    }
+
+    /// Ortam probe'unun tepe ve taban yönündeki değeri. Bulut aydınlatmasının ambient
+    /// tarafı birebir bunu okuyor (`clouds_SHAr` ... `clouds_SHC`).
+    static readonly Vector3[] ProbeDirections = { Vector3.up, Vector3.down };
+    static readonly Color[] ProbeResults = new Color[2];
+
+    static void DrawAmbientProbeReadout()
+    {
+        RenderSettings.ambientProbe.Evaluate(ProbeDirections, ProbeResults);
+
+        Color top = ProbeResults[0];
+        Color bottom = ProbeResults[1];
+        GUILayout.Label($"probe tepe {top.r:F3} {top.g:F3} {top.b:F3}");
+        GUILayout.Label($"probe taban {bottom.r:F3} {bottom.g:F3} {bottom.b:F3}");
     }
 
     void DrawCloudErosion()
