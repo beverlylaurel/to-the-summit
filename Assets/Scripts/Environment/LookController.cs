@@ -9,9 +9,30 @@ using UnityEngine.Rendering.Universal;
 [RequireComponent(typeof(Volume))]
 public class LookController : MonoBehaviour
 {
-    /// Pozlama telafisinin tavanı (EV). Fırtınada otomatik pozlama sahneyi çok
-    /// açıyordu: karanlık hava karanlık kalmalı.
-    const float ExposureCap = 0.6f;
+    /// POZLAMA UYUMU. Göz karanlığa açılır ama farkın tamamını kapatmaz; `adaptShare`
+    /// kapatılan pay, `exposureCap` açılabilecek en fazla durak.
+    ///
+    /// Tavan 0.6'ydı ve o sayı gökyüzü FİZİKSEL OLARAK kararmıyorken ayarlanmıştı. Çifte
+    /// güneş sönümü kaldırılıp alacakaranlık gerçek seviyesine inince 0.6 EV hiçbir şeyi
+    /// açmaz oldu: gök verisi vardı ama ekranda zifiri karanlık görünüyordu.
+    [Header("Pozlama uyumu")]
+    [Tooltip("Karanlıkta açılabilecek en fazla durak (EV).")]
+    [SerializeField, Range(0f, 6f)] float exposureCap = 2.5f;
+
+    [Tooltip("Işık farkının kapatılan payı. 1 = tam normalizasyon, şafağı öğlene çevirir.")]
+    [SerializeField, Range(0f, 1f)] float adaptShare = 0.35f;
+
+    public float ExposureCap
+    {
+        get => exposureCap;
+        set => exposureCap = value;
+    }
+
+    public float AdaptShare
+    {
+        get => adaptShare;
+        set => adaptShare = value;
+    }
 
     [SerializeField] LookSettings look;
     [SerializeField] WeatherState weather;
@@ -158,16 +179,11 @@ public class LookController : MonoBehaviour
         // gösteriyor. Göz de öyle çalışmaz: karanlığa açılır ama farkın ancak yarısını
         // kapatır, geri kalanı karanlık olarak KALIR.
         //
-        // Kesir 0.35, tavan 1 EV. 0.55/2.0 denendi: şafakta sahne göz alan turuncu
-        // bir duvara dönüyordu — pozlama, zaten parlak olan ufuk bandını da birlikte
-        // yükseltiyor ve o bant ekranın yarısını kaplıyor.
-        // R6 — TAVAN 1.0 → 0.6 EV. Çok saçılma gelmeden önce gökyüzü topyekûn karanlıktı
-        // ve kaybı pozlama telafi ediyordu; artık ışık doğru seviyede, telafi payı da o
-        // kadar geniş olmak zorunda değil. 1 EV, şafakta zaten parlak olan ufuk bandını
-        // iki katına çıkarıp ton eşlemenin kırptığı yere itiyordu.
-        const float AdaptShare = 0.35f;
-        float adapt = Mathf.Clamp(AdaptShare * -Mathf.Log(Mathf.Max(0.02f, lightLevel), 2f),
-                                  0f, ExposureCap);
+        // ALT SINIR 0.02 → 0.0005. Eskiden `lightLevel` 0.02'de kırpılıyordu, yani
+        // uyum en fazla 5.6 durak görebiliyordu; gerçek gece bundan çok daha aşağıda ve
+        // kırpma alacakaranlığı tek bir seviyeye düzlüyordu.
+        float adapt = Mathf.Clamp(adaptShare * -Mathf.Log(Mathf.Max(0.0005f, lightLevel), 2f),
+                                  0f, exposureCap);
 
         Set(colorAdjustments.postExposure, profile.exposure + adapt);
         Set(colorAdjustments.contrast, profile.contrast);

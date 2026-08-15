@@ -1260,7 +1260,8 @@ public static class MountainSceneBootstrap
             Object.FindAnyObjectByType<RouteOverlay>(FindObjectsInactive.Include),
             cloudVolume,
             Object.FindAnyObjectByType<CloudWeatherDriver>(),
-            Object.FindAnyObjectByType<SkyWeatherDriver>());
+            Object.FindAnyObjectByType<SkyWeatherDriver>(),
+            Object.FindAnyObjectByType<LookController>());
 
         EditorUtility.SetDirty(menu);
     }
