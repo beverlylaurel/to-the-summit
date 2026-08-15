@@ -1152,8 +1152,13 @@ ama ışığa etmiyor.
 4. **Ölü global yazmalar:** `_StarStrength` ve `_MoonDirection` — ikisini de yalnız
    `Sky.shader` okuyordu, o da artık skybox değil.
 
-5. **`ApplySky()` her kare `Sky.mat`'e yazıyor.** O materyal artık yalnız paket kapalıyken
-   kullanılan yedek. Yanlış değil, boşa iş.
+5. **`ApplySky()` her kare `Sky.mat`'e yazıyor.** BİLEREK BIRAKILDI. O materyal paketin
+   `m_FallbackSkyMaterial`'ı: feature kapatıldığında gökyüzü ondan çiziliyor. Beslemeyi
+   kesmek yedek gökyüzünü donmuş bırakırdı — `ambientMode`'da yaşadığımızın aynısı.
+   Maliyeti kare başına birkaç materyal yazması.
+
+**Durum: 1-4 kapandı.** 1 sahne kaydedildi; 2 yansıma şiddeti bootstrap'te sahiplendi;
+3 pozlama uyumu gerçek ölçülere bağlandı; 4 ölü yazmalar silindi. 5 bilinçli.
 
 **Yanlış alarm çıkanlar:** `_SunDirection` (yükseklik sisi okuyor), `_PlanetRadius`
 (`LightningBolt` okuyor), `_SunColor` ve `_MoonColor` (yalnız materyale yazılıyor, bulut
