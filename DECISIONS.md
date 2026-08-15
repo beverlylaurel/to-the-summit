@@ -43,12 +43,9 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Güneş 3.03'e çıktıktan sonra yüzeyler** — arazi, kar ve bisiklet 1.5'e göre
   ayarlanmıştı; yeniden ayar gerekip gerekmediğine bakılmadı
   → [Güneş şiddeti pakete kalibre edildi](#güneş-şiddeti-pakete-kalibre-edildi-15--3030782)
-- **Bulutların gece görünümü** — ay bulutları yalnız ortam ışığından aydınlatıyor,
-  doğrudan ışık maliyeti ölçülmedi
-  → [Bulutlar ayı doğrudan almıyor](#bulutlar-ayı-doğrudan-almıyor--maliyeti-ölçülmedi)
-- **Gece seviyesi sisin üstünde ayarlandı** — sis yeniden yazılınca `MoonIntensity` ve
-  gece profili yeniden değerlendirilir; sisin katkısı çıkınca gece koyulaşacak
-  → [Gece seviyesi sisin üstünde ayarlandı](#gece-seviyesi-sisin-üstünde-ayarlandı--sis-yenilenince-tekrar-bakılacak)
+- **Gece seviyesi: ayı bulut belirledi** — sis yeniden yazılınca `MoonIntensity` ve gece
+  profili yeniden değerlendirilir; ortam şu an biraz aydınlık, o tur ele alınacak
+  → [Gece seviyesi: ayı BULUT belirledi](#gece-seviyesi-ayı-bulut-belirledi-sis-yenilenince-tekrar-bakılacak)
 - **Hava perspektifi + yükseklik sisi birlikte** — paketin atmosferik saçılımı açık,
   bizim yükseklik sisimiz de duruyor; ikisinin üst üste binip binmediği bakılmadı
   → [Paketin sisi kapalı başlıyor](#paketin-sisi-kapalı-başlıyor)
@@ -1270,19 +1267,70 @@ pozlaması ×2 alınarak kadir 2 → sRGB ~0.42, kadir 4 → ~0.19, kadir 6 → 
 (`mul(-V, _SpaceRotation)`) açı negatif verilmişti; ekranda kontrol edildi, yıldızlar
 doğru yönde akıyor. `SkyWeatherDriver`'daki `-time.Normalized * 360f` işareti doğru.
 
-## Bulutlar ayı doğrudan almıyor — maliyeti ölçülmedi
+## Gecedeki "fasulye" kapandı: sebep gökyüzü değil, gece ışık seviyesiydi (2026-08-16)
 
-**Durum.** Bulut geçişinin TEK yönlü ışığı var (`_SunColor`). Gece ay bulutları doğrudan
-değil, gökyüzünden pişen ortam probe'u üzerinden aydınlatıyor. Sonuç: ayda gümüş kenar
-yok, faz fonksiyonu gece devrede değil.
+**Belirti.** Gece gökyüzünde devasa, keskin kenarlı siyah bölge. Zenit merkezli, irtifayla
+büyüyor, yükseğe uçunca tüm göğü kaplıyor. Haftalarca gökyüzü hesabında arandı.
 
-**Neden yapılmadı.** İkinci ışık, ışın yürüyüşünde örnek başına ikinci bir
-`EvaluateSunTransmittance` demek. Işık adımı 8 ve bu döngü bulut aydınlatmasının en pahalı
-kısmı; maliyet kabaca iki katına çıkar ve kazanç YALNIZ gece. Ölçüm yapılmadan bu takas
-kabul edilemez.
+**Orada değildi.** Gökyüzü shader'ına on dokuz modluk geçici sonda kondu. Ölçümler:
+`rayIntersectsAtmosphere`, `lookAboveHorizon`, `tFrag`, NaN/negatif — hepsi temiz; 4B tablo
+dolu; **durak konturu tüm gökte tek sınır verdi**, yani en parlak ve en sönük yer arasında
+1 duraktan az fark var. Aynı veri ×50 basıldığında fasulye yok, ×1 basıldığında var.
 
-**Tetikleyici.** Gece bulutlarının düz ve ölü görünmesi rahatsız ederse. O turda önce
-kare süresi ölçülür, sonra yazılır.
+Sonuç: 2 kattan küçük bir fark ekrana basılırken siyah/görünür diye ikiye ayrılıyordu.
+
+**Araç iki kez yalan söyledi, ikisi de yakalandı.** Önce LUT eksenlerini parlaklıkla
+basmak (gece pozlaması tavanda, düz renge ezdi), sonra ×50 parlatma (göreli karanlığı
+doyurup yuttu). Bundan sonrası ton ve kontur ile ölçüldü — ikisi de pozlamadan bağımsız.
+
+**Kök sebep: ay on dört durak fazla parlaktı.** Gerçek güneş/ay oranı 19 durak, bizde
+5,3'tü. `MoonIntensity` 0.204 → 0.0058, sonra bulut görünürlüğü için 0.0199.
+
+**Yol boyunca düzeltilen ayrı kusurlar:** `m_HDRColorBufferPrecision` 0 → 1 (R11G11B10
+mavi kanalında %3 basamaklar, düz gökte eş merkezli halkalar); `m_ColorGradingMode` 0 → 1
+(gece değerleri 32 düğümlü LDR LUT'un en alt hücrelerinde eziliyordu, keskin kenarların
+kaynağı); `m_ColorGradingLutSize` 32 → 64; kamerada `dithering` açıldı.
+
+**Denenip GERİ ALINAN:** `adaptShare` 0.35 → 0.60. Fasulyeyi kapatıyordu ama karanlık ucu
+kaldırırken parlak ucu da kaldırdı. Pozlama bu iş için yanlış alet; karanlık ucun aleti
+gece profilinin `contrast` değeri (6 → −22).
+
+**Ders.** Belirtinin göründüğü yer, belirtinin doğduğu yer değildir. Önce verinin kendisi
+ölçülür, sonra onu ekrana basan zincir.
+
+## Gece seviyesi: ayı BULUT belirledi, sis yenilenince tekrar bakılacak
+
+`MoonIntensity` önce 0.0058'e çekildi (−4 durak hedefi, pozlama uyumunun tavana dayalı
+olduğu formülden). Arazi doğru göründü ama **ay ışığındaki bulut eşiğin altında kalıp
+simsiyah çıkıyordu** — kapsama arttıkça yıldızlar kayboluyordu, yani bulut oradaydı ve
+göğü kapatıyordu, kendi katkısı görünmüyordu.
+
+Sürgüyle ölçüldü: ay yükseltilince bulut karla **birlikte ve orantılı** parlıyor. Yani
+bulutun saçılım integrali sağlam, mesele eşikti. 0.0199 ikisinin de eşiğin üstünde olduğu
+en düşük değer. Etkin oran 396:1 = 8,6 durak (gerçek 19 durak).
+
+**TAVAN ARTIK KIL PAYI BAĞLI.** Uyum `0.35 × 7,25 = 2,54` istiyor, `exposureCap` 2,5'te
+kırpıyor. Buradan yapılan değişiklik şu an ekrana birebir iniyor; ay biraz daha
+yükseltilirse kırpma kalkar ve kısıntının %65'i geri gelir.
+
+**Sise bakarak yapılan iki kırpma GERİ ALINDI:** kar albedosu 0.66 → 0.90 ve ayın ilk
+gözle ayarı. Belirtinin sebebi (yükseklik sisi) çürüyünce sayı da düştü.
+
+**Tetikleyici:** sis yeniden yazıldığında gece seviyesi yeniden değerlendirilir. Ortamın
+"biraz aydınlık" kalması da o turda ele alınacak.
+
+## Bulut ayı DOĞRUDAN alıyor — eski kayıt ölçümle çürüdü
+
+Eskiden "ay bulutları yalnız ortam ışığından aydınlatıyor, doğrudan ışık maliyeti
+ölçülmedi" yazıyordu. Ölçüldü, yanlışmış.
+
+Gece bulutun okuduğu ışık F1'e basıldı: `bulut ışığı: Moon Light`, `bulut ışık rengi
+0,00551 0,00700 0,01157`, `ortam tepe 0,00004 0,00011 0,00033`. Yani bulut doğru cismi
+görüyor ve aldığı doğrudan ışık ortamın **35 katı**. Zincir: URP ana ışığı gece aya
+düşüyor (ay `LightShadows.Soft` taşıdığı için her iki paketin `GetMainLight`'ı da onu
+seçiyor), gökyüzü paketi `_MainLightColor`'ı aydan yazıyor, bulut onu okuyor.
+
+Ek maliyet yok: doğrudan ışık zaten uygulanıyordu.
 
 ## Paketin sisi kapalı başlıyor
 

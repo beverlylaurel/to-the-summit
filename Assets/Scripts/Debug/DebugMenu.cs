@@ -45,13 +45,7 @@ public class DebugMenu : MonoBehaviour
     float speedMultiplier = StartSpeedMultiplier;
     bool freeFly;
 
-
-
-
-
-
     static readonly int TerrainShadowId = Shader.PropertyToID("_TerrainShadowReceive");
-
 
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
@@ -215,7 +209,6 @@ public class DebugMenu : MonoBehaviour
         DrawOverlays();
         DrawSnowCollision();
         EndColumn();
-
 
         GUILayout.EndHorizontal();
         GUILayout.EndScrollView();

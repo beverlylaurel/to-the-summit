@@ -1006,6 +1006,12 @@ başına ~2.5 kat, gerçek sayıma yakın), renk sıcaklıktan (mavi-beyaz ↔ t
 tamsayı karıştırıcıdan. Yarıçap ekran-uzayı türevinden, yani çözünürlükten bağımsız ~1
 piksel.
 
+**Ortam probe'u SIÇRAMADA İKİ KEZ pişiriliyor** (`SkyAmbientBaker`). `DynamicGI` gökyüzü
+materyalini okuyor ama materyali render geçişi yazıyor, yani pişirme bir kare geriden
+görüyor. Zaman akarken görünmez; saat sıçrayıp durunca tek pişirme eski göğü yakalıyor ve
+probe donuyordu. `LookController` pozlamayı o probe'dan okuduğu için gece sahnesi gündüz
+pozlamasıyla çiziliyor, her şey siyah çıkıyordu.
+
 **Sintilasyon hava kütlesinden.** Ufka yakın yıldız kalın hava katmanından geçtiği için
 çok titriyor, zenitte neredeyse sabit. Kendi zamanlayıcısı yok — `_Time` ve hash fazı.
 
@@ -1021,7 +1027,7 @@ yıldızlıydı. Bulut örtüsünü hacimsel bulutlar kesmeye devam ediyor.
 (`TimeOfDay.CelestialPole`). Ayrı bir eksen verilseydi güneşle yıldızlar farklı yönlerde
 dönerdi.
 
-**Ay albedosu 0.586 0.653 0.818.** Doğan ay uzun atmosfer yolundan geçip sarıya kayıyor;
+**Ay şiddeti 0.0199, albedosu 0.586 0.653 0.818.** Doğan ay uzun atmosfer yolundan geçip sarıya kayıyor;
 taban soğutuldu ki soğurma sonrası sonuç nötre yaklaşsın. Doygunluğu bir kez düşürüldü ve
 ton lineer uzayda ESKİ IŞIMAYA ölçeklendi (Y = 0.3844): renk değişirken parlaklık
 değişmemeli, yoksa `SurfaceLightLevel` üzerinden pozlama da kayıyor. Hesap `TimeOfDay.moonColor`
