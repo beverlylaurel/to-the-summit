@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 /// F1 ile açılan test paneli. Esc oyunun kendi menüsüne ayrıldı.
 /// Sistemlerin içine "debug modu" kavramı sızmaz; kilitler bileşenin KENDİ test
