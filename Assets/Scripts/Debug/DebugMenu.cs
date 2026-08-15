@@ -378,7 +378,7 @@ public class DebugMenu : MonoBehaviour
 
         // Ay aynı ışığa yazılıyor: paket geceleyin atmosferi ondan aydınlatıyor ve bulut
         // yolu `× π` ile ölçeklediği için buluta araziden ~3 kat fazla giriyor.
-        float moon = CloudRow("Ay şiddeti (tepe)", time.MoonIntensity, moonIntensityDefault, 0f, 0.4f, "F3");
+        float moon = CloudRow("Ay şiddeti (tepe)", time.MoonIntensity, moonIntensityDefault, 0f, 1.5f, "F3");
         if (!Mathf.Approximately(moon, time.MoonIntensity)) time.MoonIntensity = moon;
 
         // ÖLÇÜM: ışığa GERÇEKTEN yazılan şiddet ve renk. Tepe değerinden farkı bizim
