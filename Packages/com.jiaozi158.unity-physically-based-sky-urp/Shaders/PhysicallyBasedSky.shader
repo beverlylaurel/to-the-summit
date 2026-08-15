@@ -153,7 +153,7 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
                         {
                             // PROJE EKİ: zemin aydınlatması iki cisimden. Tek cisimken ay
                             // yeri hiç aydınlatmıyordu.
-                            for (uint bi = 0; bi < _CelestialBodyCount; bi++)
+                            for (uint bi = 0; bi < max(_CelestialBodyCount, 1u); bi++)
                             {
                             CelestialBodyData light = GetCelestialBody(bi);
                             half3 L         = -light.forward.xyz;
@@ -367,7 +367,7 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
                         {
                             // PROJE EKİ: zemin aydınlatması iki cisimden. Tek cisimken ay
                             // yeri hiç aydınlatmıyordu.
-                            for (uint bi = 0; bi < _CelestialBodyCount; bi++)
+                            for (uint bi = 0; bi < max(_CelestialBodyCount, 1u); bi++)
                             {
                             CelestialBodyData light = GetCelestialBody(bi);
                             half3 L         = -light.forward.xyz;
