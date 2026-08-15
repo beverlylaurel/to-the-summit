@@ -868,21 +868,15 @@ Shader "Hidden/Sky/PhysicallyBasedSkyPrecomputation"
                     skyColor = IntegrateOverSegment(light.color * S, transmittanceOverSegment, skyTransmittance, sigmaE);
                 }
 
-                // PROJE EKİ: ikinci gök cismi (ay). Yukarıdaki blok `=` kullanıyor, yani
-                // döngüye çevrilemez; ay ayrıca EKLENİYOR. Gölge örneği yalnız ana ışığın
-                // cookie'sinden geliyor, ay için uygulanmıyor — ay gölgesi yok.
-                if (_CelestialBodyCount > 1)
-                {
-                    CelestialBodyData moon = GetCelestialBody(1);
-                    half3 Lm = -moon.forward.xyz;
-
-                    const half3 moonTransmittance = EvaluateSunColorAttenuation(dot(N, Lm), r);
-                    const half3 moonPhase = AirScatter(height) * AirPhase(-dot(Lm, V)) + AerosolScatter(height) * AerosolPhase(-dot(Lm, V));
-                    const half3 moonMultiScatter = EvaluateMultipleScattering(dot(N, Lm), height);
-
-                    half3 Sm = moonTransmittance * moonPhase + moonMultiScatter * scatteringMS;
-                    skyColor += IntegrateOverSegment(moon.color * Sm, transmittanceOverSegment, skyTransmittance, sigmaE);
-                }
+                // AY BURAYA EKLENMEZ. Bu tablo IŞIK YÖNÜNE GÖRE İNDEKSLİ: her dilim farklı
+                // bir ışık zenit açısını temsil ediyor ve arama sırasında `light.color` ile
+                // çarpılıyor. Ayın GERÇEK yönünden hesaplanmış bir terim eklenirse tablonun
+                // her dilimi bozuluyor ve bazı bakış yönlerinde katkı sıfıra düşüyor.
+                //
+                // Belirti buydu: gece zenit çevresinde keskin sınırlı, yükseldikçe büyüyen
+                // simsiyah bir bölge. Ay katkısı `AtmosphericScattering.hlsl` içindeki
+                // cisim döngüsünden geliyor — orası tabloyu cisim başına örnekleyip kendi
+                // rengiyle çarpıyor, doğru yer orası.
                 
                 //skyColor = ParallelPostfixSum(s, skyColor);
 
