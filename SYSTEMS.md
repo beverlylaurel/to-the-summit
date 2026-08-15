@@ -958,8 +958,11 @@ kendi transmittance'ını koyuyor; bizimki de uygulansaydı aynı atmosfer iki k
 Ölçülmüştü: öğlen ışığa `şiddet 2.55 · renk 1.00 0.88 0.70` yazılıyordu, mavi kanal
 kaynakta 0.70'e iniyordu ve gökyüzü lacivert kalıyordu.
 
-Işıktaki tek kısıcı `above` ve o ATMOSFERİK DEĞİL, GEOMETRİK: güneş ufkun altındayken ışık
-yukarıdan gelmiyor.
+Işıktaki tek kısıcı geometrik. Güneşin bandı **+3°'den −12°'ye** iniyor, ayınki **±3°**;
+asimetri bilinçli. Paket gökyüzünü ışığın yönünden ve şiddetinden hesapladığı için güneş
+ufkun altında sıfırlanırsa ALACAKARANLIK DA SÖNÜYOR — 18:10 gece yarısından karanlık
+çıkıyordu. Arazi bundan yanlış aydınlanmıyor: ışık neredeyse yatay geldiği için düz zeminde
+`N·L` negatif, yalnız güneşe bakan dik yamaçlar ışık alıyor (alpenglow).
 
 `Atmosphere` modeli SİLİNMEDİ — ışığa değil, başka tüketicilere bakıyor: sis rengi, bulut
 tonu, arazi şafak rengi (`TerrainSurface`) ve pozlama uyumu (`LookController`). Kendi

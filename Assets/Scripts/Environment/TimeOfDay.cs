@@ -32,13 +32,31 @@ public class TimeOfDay : MonoBehaviour
 
     /// Güneşin tepe şiddeti. Gökyüzü paketi kendi parlaklığını ana ışıktan türettiği için
     /// gök ile sahnenin göreli parlaklığı buradan ayarlanıyor; F1 paneli bunu sürüyor.
-    /// Gök cisminin ufka göre payı, 0-1. ATMOSFERİK DEĞİL, GEOMETRİK: soğurma ve
-    /// kızıllık gökyüzü paketinin işi, bu yalnız cismin ufkun üstünde olup olmadığını
-    /// yumuşak bir geçişle söylüyor. sin(3°) ≈ 0.0523.
-    const float HorizonBand = 0.0523f;
+    /// Gök cisminin ışığa katkısı, 0-1. ATMOSFERİK DEĞİL, GEOMETRİK: soğurma ve kızıllık
+    /// gökyüzü paketinin işi.
+    ///
+    /// GÜNEŞİN BANDI DERİN, AYINKI DAR — ve bu asimetri bilinçli. Paket gökyüzünü ışığın
+    /// yönünden ve şiddetinden hesaplıyor: güneş ufkun altına inip şiddeti sıfırlanınca
+    /// ALACAKARANLIK DA SÖNÜYOR. Oysa güneş ufkun altındayken gökyüzünü aydınlatmaya
+    /// devam eder; sivil alacakaranlık yarım saat sürer. Bant −12°'ye kadar iniyor ki o
+    /// saçılım pakete ulaşsın.
+    ///
+    /// Arazi bundan yanlış aydınlanmıyor: ışık ufkun altındayken neredeyse yatay geliyor,
+    /// düz zeminde `N·L` negatif kalıyor. Güneşe bakan dik yamaçlar bir miktar ışık
+    /// alıyor — alpenglow tam olarak budur.
+    ///
+    /// Ayın bandı dar kalıyor: ay ikincil kaynak, onun için bir alacakaranlık modellemiyoruz.
+    ///
+    /// sin(3°) ≈ 0.0523, sin(−12°) ≈ −0.2079.
+    const float MoonHorizonBand = 0.0523f;
+    const float SunHorizonTop = 0.0523f;
+    const float SunTwilightFloor = -0.2079f;
 
-    static float HorizonBlend(float directionY) =>
-        Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-HorizonBand, HorizonBand, directionY));
+    static float SunBlend(float directionY) =>
+        Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(SunTwilightFloor, SunHorizonTop, directionY));
+
+    static float MoonBlend(float directionY) =>
+        Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-MoonHorizonBand, MoonHorizonBand, directionY));
 
     public float SunIntensity
     {
@@ -244,11 +262,16 @@ public class TimeOfDay : MonoBehaviour
             // kullanılırsa pay sıçradığında şiddet de sıçrar. Toplam sürekli, çünkü iki
             // terim de sürekli.
             //
-            // BANT ±3°. Ham ışıkta atmosferik sönüm yok, yani şafağın TEK rampası bu.
-            // ±1° (~8 dk) fazla dardı. ±3° ~24 dakikalık geçiş veriyor; ufukta (y=0)
-            // güneş yarım şiddette, diskin yarısı görünüyor demek.
-            float sunAbove = HorizonBlend(SunDirection.y);
-            float moonAbove = HorizonBlend(MoonDirection.y);
+            // Uçlar kâğıtta (güneş 3.03, ay 0.204):
+            //   +3°  güneş 3.03            → tam gündüz
+            //    0°  güneş ~2.5            → gün batımı
+            //   −3°  güneş 1.33 + ay 0.20  → alacakaranlık, gece yarısından PARLAK
+            //   −8°  güneş 0.58 + ay 0.20  → geç alacakaranlık
+            //  −12°  güneş 0    + ay 0.20  → gece
+            // Yön −9.4°'de aya dönüyor, yani ikisi de sönükken. Eskiden −3°'de dönüyordu
+            // ve 18:10 gece yarısından karanlık çıkıyordu.
+            float sunAbove = SunBlend(SunDirection.y);
+            float moonAbove = MoonBlend(MoonDirection.y);
 
             float sunPower = sunIntensity * sunAbove;
             float moonPower = moonIntensity * moonAbove;
