@@ -182,6 +182,14 @@ public class TimeOfDay : MonoBehaviour
     /// güneşlenmeye göre yerleşir, anlık güneş konumuna bağlanırsa gün içinde yanıp söner.
     public Vector3 NoonSunDirection => DirectionAt(0.5f);
 
+    /// GÖK KUTBU — yıldız alanının döndüğü eksen. Güneşin yayı da bu eksen etrafında
+    /// dönüyor (`DirectionAt`'te `local` XY düzleminde dönüyor, yani eksen +Z'nin aynı
+    /// dönüşümden geçmiş hâli). Yıldızlara ayrı bir eksen verilseydi güneşle yıldızlar
+    /// farklı yönlerde dönerdi.
+    public Vector3 CelestialPole =>
+        Quaternion.Euler(0f, eastHeading, 0f)
+        * (Quaternion.AngleAxis(arcTilt, Vector3.right) * Vector3.forward);
+
     public void Bind(Light directional, Light moonLight)
     {
         sun = directional;

@@ -416,6 +416,7 @@ public static class MountainSceneBootstrap
         }
 
         EnsureSunAndMoon(ref changed);
+        EnsureSkyDrivers(ref changed);
 
     #if URP_PBSKY
         // GÜNEŞ ŞİDDETİ GÖKYÜZÜ PAKETİNİN KALİBRASYONUNDAN. Paket 100000 lux yer
@@ -744,6 +745,18 @@ public static class MountainSceneBootstrap
         // geçiyor.
         SetSky(pbrSky.atmosphericScattering, true);
 
+        // YILDIZLAR. Paket bunu yalnız uzaya bakarken ekliyor ve `(1 − skyOpacity)` ile
+        // çarpıyor: gündüz atmosfer opaklaştıkça kendiliğinden yıkanıyor, bulut örtüsünü
+        // de hacimsel bulutların kendisi kesiyor. Eski sistemin
+        // `(1−gündüz) × (1−kapsama)` kuralına gerek kalmadı.
+        //
+        // ÇARPAN 0.08 — ölçülen gece göğüne göre seçildi. Gece zenit parlaklığı 0.0036
+        // (ay tepedeyken); en parlak yıldız 0.08'de gökten ~20 kat parlak kalıyor, yani
+        // nokta olarak seçiliyor ama gökyüzünü yıkamıyor. En sönük yıldız (6. kadir)
+        // bunun %0.4'ü, yani 0.0003 — gök gürültüsünün altında, seçilmiyor.
+        SetSky(pbrSky.spaceEmissionTexture, StarFieldGenerator.EnsureExists());
+        SetSky(pbrSky.spaceEmissionMultiplier, 0.08f);
+
         // PAKETİN SİSİ ŞİMDİLİK KAPALI. Kendi yükseklik sisimiz sis bankları, inversiyon
         // ve vadi sis denizi taşıyor; pakette bunların karşılığı yok. İkisi birlikte
         // açılırsa sis iki kez uygulanıyor. Geçiş `DECISIONS.md`'de kayıtlı.
@@ -841,6 +854,18 @@ public static class MountainSceneBootstrap
             Object.FindAnyObjectByType<AtmosphereController>(),
             LoadOrCreate<CloudWeatherSettings>(CloudWeatherPath));
         EditorUtility.SetDirty(driver);
+    }
+
+    /// GÖKYÜZÜ SÜRÜCÜLERİ. Bulut sondasıyla aynı nesnede duruyorlar — ikisi de aynı
+    /// Volume'u sürüyor — ama kurulumları AYRI, çünkü `TimeOfDay`'e bağımlılar ve o
+    /// sahne kurulumunda daha sonra üretiliyor. Bulut sondasının içinde kurulduklarında
+    /// sıfırdan kurulan bir sahnede saat henüz yokken bağlanıyorlardı.
+    static void EnsureSkyDrivers(ref bool changed)
+    {
+        var probe = Object.FindAnyObjectByType<CloudLayerProbe>();
+        if (probe == null)
+            throw new System.InvalidOperationException(
+                "Gökyüzü sürücüleri bulut sondasından sonra kurulmalı: sonda yok.");
 
         // Atmosferin hava bağı bulut sondasıyla aynı nesnede: ikisi de aynı Volume'u
         // sürüyor ve aynı hava durumundan besleniyor.
@@ -853,6 +878,7 @@ public static class MountainSceneBootstrap
 
         skyDriver.Bind(cloudVolume,
             Object.FindAnyObjectByType<WeatherState>(),
+            Object.FindAnyObjectByType<TimeOfDay>(),
             LoadOrCreate<SkyWeatherSettings>(SkyWeatherPath));
         EditorUtility.SetDirty(skyDriver);
 
