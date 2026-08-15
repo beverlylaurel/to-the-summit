@@ -99,7 +99,11 @@ Shader "Hidden/Sky/PhysicallyBasedSkyPrecomputation"
                     // 0.00000, 19:22'de 0.00228 — sıçrama tam da güneşin sıfırlandığı
                     // anda. İki cismin katkısı toplanınca ayınki güneşinki sönerken
                     // devralıyor ve sıçrama kalmıyor.
-                    for (uint bi = 0; bi < max(_CelestialBodyCount, 1u); bi++)
+                    // SAÇILIM TEK CİSİMDEN. İki cisme açılması gece zenit çevresinde keskin
+                    // sınırlı siyah bir bölge üretiyordu ve sebebi bulunamadı; bilinen
+                    // çalışan hâle dönüldü. Ayın göğü aydınlatması ana ışık olmasından
+                    // geliyor. Diskler AYRI, `RenderSunDisk` iki cismi de çiziyor.
+                    for (uint bi = 0; bi < 1u; bi++)
                     {
                         CelestialBodyData light = GetCelestialBody(bi);
                         half3 L = -light.forward.xyz;
@@ -232,7 +236,11 @@ Shader "Hidden/Sky/PhysicallyBasedSkyPrecomputation"
                     // 0.00000, 19:22'de 0.00228 — sıçrama tam da güneşin sıfırlandığı
                     // anda. İki cismin katkısı toplanınca ayınki güneşinki sönerken
                     // devralıyor ve sıçrama kalmıyor.
-                    for (uint bi = 0; bi < max(_CelestialBodyCount, 1u); bi++)
+                    // SAÇILIM TEK CİSİMDEN. İki cisme açılması gece zenit çevresinde keskin
+                    // sınırlı siyah bir bölge üretiyordu ve sebebi bulunamadı; bilinen
+                    // çalışan hâle dönüldü. Ayın göğü aydınlatması ana ışık olmasından
+                    // geliyor. Diskler AYRI, `RenderSunDisk` iki cismi de çiziyor.
+                    for (uint bi = 0; bi < 1u; bi++)
                     {
                         CelestialBodyData light = GetCelestialBody(bi);
                         half3 L = -light.forward.xyz;

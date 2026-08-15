@@ -153,7 +153,11 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
                         {
                             // PROJE EKİ: zemin aydınlatması iki cisimden. Tek cisimken ay
                             // yeri hiç aydınlatmıyordu.
-                            for (uint bi = 0; bi < max(_CelestialBodyCount, 1u); bi++)
+                            // SAÇILIM TEK CİSİMDEN. İki cisme açılması gece zenit çevresinde keskin
+                    // sınırlı siyah bir bölge üretiyordu ve sebebi bulunamadı; bilinen
+                    // çalışan hâle dönüldü. Ayın göğü aydınlatması ana ışık olmasından
+                    // geliyor. Diskler AYRI, `RenderSunDisk` iki cismi de çiziyor.
+                    for (uint bi = 0; bi < 1u; bi++)
                             {
                             CelestialBodyData light = GetCelestialBody(bi);
                             half3 L         = -light.forward.xyz;
@@ -367,7 +371,11 @@ Shader "Hidden/Skybox/PhysicallyBasedSky"
                         {
                             // PROJE EKİ: zemin aydınlatması iki cisimden. Tek cisimken ay
                             // yeri hiç aydınlatmıyordu.
-                            for (uint bi = 0; bi < max(_CelestialBodyCount, 1u); bi++)
+                            // SAÇILIM TEK CİSİMDEN. İki cisme açılması gece zenit çevresinde keskin
+                    // sınırlı siyah bir bölge üretiyordu ve sebebi bulunamadı; bilinen
+                    // çalışan hâle dönüldü. Ayın göğü aydınlatması ana ışık olmasından
+                    // geliyor. Diskler AYRI, `RenderSunDisk` iki cismi de çiziyor.
+                    for (uint bi = 0; bi < 1u; bi++)
                             {
                             CelestialBodyData light = GetCelestialBody(bi);
                             half3 L         = -light.forward.xyz;
