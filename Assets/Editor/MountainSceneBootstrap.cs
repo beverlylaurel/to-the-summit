@@ -664,6 +664,18 @@ public static class MountainSceneBootstrap
                 "Gökyüzü hacmi bulut hacminden sonra kurulmalı: `cloudVolume` yazılmamış.");
 
         ApplySkyOverrides(cloudVolume.sharedProfile);
+
+        // ORTAM KİPİ SKYBOX OLMAK ZORUNDA. Sahnede `Flat` kalmıştı: `AtmosphereController`
+        // eskiden hem kipi hem rengi yazıyordu, yazan kod kaldırıldı ama sahnedeki kip
+        // kaldı ve paketin dinamik probe'u hiç devreye girmedi. ÖLÇÜLDÜ — probe öğle ve
+        // gece birebir aynıydı (`0.223 0.293 0.420`) ve tepe ile taban da aynıydı, yani
+        // gökyüzünden pişmiş değil düz bir renkti. Bulutlar günün her saatinde o donmuş
+        // rengi yiyordu.
+        if (RenderSettings.ambientMode != UnityEngine.Rendering.AmbientMode.Skybox)
+        {
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
+            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+        }
     #endif
     }
 

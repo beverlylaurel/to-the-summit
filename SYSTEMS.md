@@ -970,6 +970,11 @@ yükseklik sisimiz durduğu sürece o zincir de duruyor.
 BURADAN GEÇMİYOR — `TimeOfDay` ana ışığı sürüyor, paket aynı ışığı okuyor. İkinci bir yol
 "gökyüzü kızardı ama gölgeler öğle yönünde" çelişkisini üretirdi.
 
+**Ortam kipi `Skybox` olmak zorunda.** Sahne `Flat` kalırsa paketin dinamik probe'u hiç
+devreye girmez ve ortam ışığı donmuş bir renkte kalır — bulutlar da gece gündüz aynı
+aydınlanır. Ölçülmüştü: probe öğle ve gece birebir `0.223 0.293 0.420`, tepe ile taban da
+aynı. Kipi sahne kurulumu yazıyor.
+
 **Ortam ışığı ve yansıma da burada.** `AtmosphereController` artık `RenderSettings.skybox`,
 `ambientLight`, `ambientMode` ve `reflectionIntensity` yazmıyor; paket ambient probe'u ve
 yansıma küpünü kendi gökyüzünden pişiriyor. İki yazar olduğunda sonuç kare içindeki yazma
