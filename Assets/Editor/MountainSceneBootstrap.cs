@@ -1219,6 +1219,15 @@ public static class MountainSceneBootstrap
     /// AY GÖLGE DÜŞÜRMÜYOR ve bu bilinçli: gökyüzü paketinin `GetMainLight`'ı gölgesiz
     /// cismi ana ışık saymayıp `RenderSettings.sun`'a düşüyor. Böylece gökyüzü her zaman
     /// güneşten sürülüyor, ana ışık gece bile değişmiyor.
+    static void EnsureLightData(Light light, ref bool changed)
+    {
+        if (light.GetComponent<UniversalAdditionalLightData>() != null) return;
+
+        light.gameObject.AddComponent<UniversalAdditionalLightData>();
+        EditorUtility.SetDirty(light.gameObject);
+        changed = true;
+    }
+
     static void EnsureSunAndMoon(ref bool changed)
     {
         var timeOfDay = Object.FindAnyObjectByType<TimeOfDay>();
@@ -1253,15 +1262,13 @@ public static class MountainSceneBootstrap
         moon.type = LightType.Directional;
         moon.shadows = LightShadows.None;
 
-        // URP EK VERİSİ ELLE EKLENİYOR. Unity bu bileşeni yalnız ışık MENÜDEN
-        // eklendiğinde otomatik koyuyor; `AddComponent<Light>()` koymuyor. Bulut gölge
+        // URP EK VERİSİ İKİ IŞIKTA DA OLMALI. Unity bu bileşeni yalnız ışık MENÜDEN
+        // eklendiğinde otomatik koyuyor; koddan eklenen ışıkta olmuyor. Bulut gölge
         // geçişi ana ışığın cookie ayarlarını buradan okuyor ve yoksa
-        // `NullReferenceException` atıyor — gece ana ışık aya geçtiğinde oluyordu.
-        if (moon.GetComponent<UniversalAdditionalLightData>() == null)
-        {
-            moonObject.AddComponent<UniversalAdditionalLightData>();
-            changed = true;
-        }
+        // `NullReferenceException` atıyor. Ana ışık gece aya, gündüz güneşe döndüğü için
+        // ikisinde de bulunmak zorunda.
+        EnsureLightData(sun, ref changed);
+        EnsureLightData(moon, ref changed);
 
         timeOfDay.Bind(sun, moon);
         EditorUtility.SetDirty(timeOfDay);
