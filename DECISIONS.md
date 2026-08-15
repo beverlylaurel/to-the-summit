@@ -1131,6 +1131,34 @@ pakete taşındığında o zincir de gider.
 soğurmasından geliyor. `duskStrength`, `duskOvercast` gibi ayarlar hâlâ SİSE etki ediyor
 ama ışığa etmiyor.
 
+## Gökyüzü devri sonrası artık taraması (2026-08-15)
+
+`ambientMode` olayından sonra "yazanı silindi ama değeri kaldı" deseni baştan tarandı.
+
+1. **`m_AmbientMode` diskte hâlâ `3` (Flat).** Bootstrap çalışma zamanında Skybox'a alıyor
+   ve sahneyi dirty işaretliyor, ama SAHNE KAYDEDİLMEZSE kayboluyor.
+
+2. **`m_ReflectionIntensity` 1'de donmuş.** `AtmosphereController` bunu gök seviyesinden
+   türetiyordu ve bu ÖLÇÜLMÜŞ bir gerekti (kaldırılınca bisikletin kromu gece parlıyordu).
+   Yazan kod kaldırıldı. Paketin yansıma küpü gece zaten karanlık olduğu için muhtemelen
+   sorun değil — ama **doğrulanmadı**. Belirti aynı: gece metal yüzeyler parlar.
+
+3. **`LookController` pozlama uyumu eski modeli okuyor.** `BeamLevel`, `SkyLevel`,
+   `MoonLevel` — hepsi `Atmosphere`'dan, o da artık IŞIĞI sürmüyor. Pozlama, sahneyi
+   aydınlatmayan bir modele göre açılıp kapanıyor. Şafakta belirti: gerçek ışık tam
+   şiddetteyken model hâlâ "karanlık" dediği için pozlama fazladan açılır. Yorumlardaki
+   kalibrasyon (`AdaptShare 0.35`, `ExposureCap 0.6`, R6 kaydı) eski ışığa göre yapılmıştı.
+
+4. **Ölü global yazmalar:** `_StarStrength` ve `_MoonDirection` — ikisini de yalnız
+   `Sky.shader` okuyordu, o da artık skybox değil.
+
+5. **`ApplySky()` her kare `Sky.mat`'e yazıyor.** O materyal artık yalnız paket kapalıyken
+   kullanılan yedek. Yanlış değil, boşa iş.
+
+**Yanlış alarm çıkanlar:** `_SunDirection` (yükseklik sisi okuyor), `_PlanetRadius`
+(`LightningBolt` okuyor), `_SunColor` ve `_MoonColor` (yalnız materyale yazılıyor, bulut
+uniform'uyla çakışmıyor).
+
 ## Gece boş: yıldızlar gitti, ay tek kaynak
 
 **Durum.** Ortam kipi Skybox'a alınınca probe dürüstleşti ve gece gerçek değerine indi
@@ -1141,6 +1169,11 @@ ama ışığa etmiyor.
 1. **Yıldızlar YOK.** `_StarStrength` ve yıldız çizimi `Sky.shader`'da duruyor, o da artık
    skybox değil — paket onun yerine geçti. Kod hâlâ globali yazıyor ama kimse okumuyor.
    Brief yıldızlar için kesin değer vermiyor (`sprite`, luminance soru işaretli).
+
+   GÖRÜNÜRLÜK KURALI KORUNSUN — silinen koddaki hâli:
+   `yıldız = (1 − gündüz payı) × (1 − kapsama) × 1.2`. Gece açılır, bulut kapanınca söner.
+   Yeniden yazılırken bu bağ tekrar kurulmalı; yıldızın buluttan bağımsız olması
+   "fırtına var ama yıldızlar pırıl pırıl" çelişkisi üretir.
 
 2. **Ay ikincil saçılım kaynağı olmalı.** Brief: `Moon luminance ≈ 2500 cd/m²`,
    `Moon = secondary sky/atmosphere scattering source`, açısal yarıçap 0.24–0.28°. Bizde ay
