@@ -535,75 +535,7 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
         private const string LOCAL_SKY = "LOCAL_SKY";
         private const string SKY_NOT_BAKING = "SKY_NOT_BAKING";
 
-        private SphericalHarmonicsL2 ambientProbe = new SphericalHarmonicsL2();
 
-        private const int fibonacciSamplesCount = 64;
-        private static readonly float3[] fibonacciSamples = new float3[] {
-            new float3(-0.000000f, -1.000000f, -0.000000f),
-            new float3(0.184319f, -0.968254f, 0.168851f),
-            new float3(-0.030656f, -0.936508f, -0.349304f),
-            new float3(-0.259145f, -0.904762f, 0.338009f),
-            new float3(0.480237f, -0.873016f, -0.084947f),
-            new float3(-0.456147f, -0.841270f, -0.290163f),
-            new float3(0.152410f, -0.809524f, 0.566959f),
-            new float3(0.289698f, -0.777778f, -0.557796f),
-            new float3(-0.625504f, -0.746032f, 0.228433f),
-            new float3(0.646907f, -0.714286f, 0.267034f),
-            new float3(-0.309767f, -0.682540f, -0.661955f),
-            new float3(-0.227233f, -0.650794f, 0.724454f),
-            new float3(0.679497f, -0.619048f, -0.393782f),
-            new float3(-0.790490f, -0.587302f, -0.173787f),
-            new float3(0.478208f, -0.555556f, 0.680202f),
-            new float3(0.109470f, -0.523810f, -0.844772f),
-            new float3(-0.665672f, -0.492063f, 0.561029f),
-            new float3(0.886996f, -0.460317f, 0.036680f),
-            new float3(-0.640433f, -0.428571f, -0.637316f),
-            new float3(0.042399f, -0.396825f, 0.916914f),
-            new float3(0.596485f, -0.365079f, -0.714788f),
-            new float3(-0.934389f, -0.333333f, 0.125721f),
-            new float3(0.782638f, -0.301587f, 0.544539f),
-            new float3(-0.211340f, -0.269841f, -0.939426f),
-            new float3(-0.482883f, -0.238095f, 0.842695f),
-            new float3(0.932189f, -0.206349f, -0.297394f),
-            new float3(-0.893846f, -0.174603f, -0.412980f),
-            new float3(0.382101f, -0.142857f, 0.913012f),
-            new float3(0.336357f, -0.111111f, -0.935157f),
-            new float3(-0.882397f, -0.079365f, 0.463763f),
-            new float3(0.965873f, -0.047619f, 0.254601f),
-            new float3(-0.540770f, -0.015873f, -0.841021f),
-            new float3(-0.169355f, 0.015873f, 0.985427f),
-            new float3(0.789726f, 0.047619f, -0.611608f),
-            new float3(-0.993442f, 0.079365f, -0.082305f),
-            new float3(0.674874f, 0.111111f, 0.729520f),
-            new float3(-0.004828f, 0.142857f, -0.989732f),
-            new float3(-0.661564f, 0.174603f, 0.729278f),
-            new float3(0.974303f, 0.206349f, -0.090298f),
-            new float3(-0.773652f, 0.238095f, -0.587174f),
-            new float3(0.172344f, 0.269841f, 0.947356f),
-            new float3(0.507807f, 0.301587f, -0.806956f),
-            new float3(-0.909280f, 0.333333f, 0.249196f),
-            new float3(0.828277f, 0.365079f, 0.425058f),
-            new float3(-0.319075f, 0.396825f, -0.860651f),
-            new float3(-0.340661f, 0.428571f, 0.836825f),
-            new float3(0.802224f, 0.460317f, -0.380189f),
-            new float3(-0.831918f, 0.492063f, -0.256489f),
-            new float3(0.430707f, 0.523810f, 0.734925f),
-            new float3(0.174571f, 0.555556f, -0.812947f),
-            new float3(-0.659835f, 0.587302f, 0.468716f),
-            new float3(0.779324f, 0.619048f, 0.097126f),
-            new float3(-0.492126f, 0.650794f, -0.578169f),
-            new float3(-0.026634f, 0.682540f, 0.730363f),
-            new float3(0.491237f, 0.714286f, -0.498480f),
-            new float3(-0.665042f, 0.746032f, 0.034004f),
-            new float3(0.484541f, 0.777778f, 0.400352f),
-            new float3(-0.081124f, 0.809524f, -0.581455f),
-            new float3(-0.306594f, 0.841270f, 0.445270f),
-            new float3(0.475272f, 0.873016f, -0.109359f),
-            new float3(-0.370575f, 0.904762f, -0.209953f),
-            new float3(0.108202f, 0.936508f, 0.333534f),
-            new float3(0.103734f, 0.968254f, -0.227428f),
-            new float3(-0.000000f, 1.000000f, 0.000000f)
-        };
 
         public PBSkyPrePass(Material material, CelestialBodyData celestialBodyData)
         {
@@ -801,22 +733,6 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
 
         }
 
-        SphericalHarmonicsL2 UpdateAmbientProbe(SphericalHarmonicsL2 ambientProbe, float3 lightDirection, float3 lightColor)
-        {
-            ambientProbe.Clear();
-
-            float weightOverPdf = 4.0f * PI * rcp(fibonacciSamplesCount);
-            for (int i = 0; i < fibonacciSamplesCount; i++)
-            {
-                float3 V = fibonacciSamples[i];
-
-                pbrSky.RenderSky(-lightDirection, lightColor, V, out float3 skyColor, out _);
-
-                Color color = new Color(skyColor.x, skyColor.y, skyColor.z);
-                ambientProbe.AddDirectionalLight(V, color, weightOverPdf);
-            }
-            return ambientProbe;
-        }
 
         private void UpdateMaterialProperties(Light mainLight, Camera camera, Material material)
         {
