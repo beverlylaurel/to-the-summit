@@ -1613,6 +1613,7 @@ GameObject:
   - component: {fileID: 1544747437}
   - component: {fileID: 1544747436}
   - component: {fileID: 1544747438}
+  - component: {fileID: 1544747439}
   m_Layer: 0
   m_Name: Lightning
   m_TagString: Untagged
@@ -1733,6 +1734,35 @@ MonoBehaviour:
   terrain: {fileID: 1738276033}
   settings: {fileID: 11400000, guid: 8dae1ecc7a0534c4dbae3f926c612a1c, type: 2}
   material: {fileID: 2100000, guid: 34901609444d032439c0360b02707960, type: 2}
+--- !u!114 &1544747439
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1544747434}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1 &1738276030
 GameObject:
   m_ObjectHideFlags: 0
