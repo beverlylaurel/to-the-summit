@@ -212,6 +212,7 @@ public class DebugMenu : MonoBehaviour
 
         BeginColumn();
         DrawClouds();
+        DrawSkyDiagnostics();
         DrawOverlays();
         DrawSnowCollision();
         EndColumn();
@@ -278,6 +279,37 @@ public class DebugMenu : MonoBehaviour
     /// "Havadan ayır" sürgünün çalışması için şart: `CloudWeatherDriver` kapsamayı her
     /// karede fırtınadan yazıyor, sürücü kapatılmazsa sürgünün yazdığı değer bir sonraki
     /// karede eziliyor.
+    /// TEŞHİS — GEÇİCİ. Yalnız okuma, sürgü yok. Fasulye ve yıldız sorunu kapanınca
+    /// bu bölüm ve paketteki `Resolved*` alanları silinecek.
+    void DrawSkyDiagnostics()
+    {
+#if URP_PBSKY
+        BeginSection("Teşhis: gökyüzü");
+
+        GUILayout.Label($"ana ışık: {PhysicallyBasedSkyURP.ResolvedMainLightName}");
+        GUILayout.Label($"cisim sayısı: {PhysicallyBasedSkyURP.ResolvedBodyCount}");
+
+        Vector3 b0 = PhysicallyBasedSkyURP.ResolvedBody0Forward;
+        Vector3 b1 = PhysicallyBasedSkyURP.ResolvedBody1Forward;
+        GUILayout.Label($"cisim0 {b0.x:F2} {b0.y:F2} {b0.z:F2}");
+        GUILayout.Label($"cisim1 {b1.x:F2} {b1.y:F2} {b1.z:F2}");
+        GUILayout.Label($"aralarındaki açı: {Vector3.Angle(b0, b1):F0}°");
+
+        GUILayout.Label($"yıldız dokusu: {(PhysicallyBasedSkyURP.ResolvedHasSpaceTexture ? "BAĞLI" : "YOK")}");
+
+        RenderSettings.ambientProbe.Evaluate(ZenithDirection, ZenithResult);
+        Color zenith = ZenithResult[0];
+        GUILayout.Label($"probe tepe {zenith.r:F5} {zenith.g:F5} {zenith.b:F5}");
+
+        GUILayout.Label($"güneş {time.SunIntensity:F2} · ay {time.MoonIntensity:F3}");
+
+        EndSection();
+#endif
+    }
+
+    static readonly Vector3[] ZenithDirection = { Vector3.up };
+    static readonly Color[] ZenithResult = new Color[1];
+
     void DrawClouds()
     {
         BeginSection("Bulut");
