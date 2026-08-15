@@ -55,18 +55,6 @@ public class TimeOfDay : MonoBehaviour
     static float SunBlend(float directionY) =>
         Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(SunTwilightFloor, SunHorizonTop, directionY));
 
-    static readonly int HideCelestialBodyId = Shader.PropertyToID("_HideCelestialBody");
-
-    /// Yönü ufkun üstünde tutar: dikey bileşen negatifse sıfırlanıp yeniden normalize
-    /// edilir. Cismin AZİMUTU korunuyor, yalnız yüksekliği kırpılıyor.
-    static Vector3 ClampToHorizon(Vector3 direction)
-    {
-        if (direction.y >= 0f) return direction;
-
-        Vector3 flat = new Vector3(direction.x, 0f, direction.z);
-        return flat.sqrMagnitude > 1e-6f ? flat.normalized : Vector3.up;
-    }
-
     static float MoonBlend(float directionY) =>
         Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-MoonHorizonBand, MoonHorizonBand, directionY));
 
@@ -295,29 +283,7 @@ public class TimeOfDay : MonoBehaviour
             float moonPower = moonIntensity * moonAbove;
             float sunShare = sunPower / Mathf.Max(1e-5f, sunPower + moonPower);
 
-            // YÖN UFKUN ALTINA İNMİYOR. Paket gök parlaklığını ışığın KAMERA KONUMUNDAKİ
-            // transmittance'ıyla ölçekliyor; cisim ufkun altındayken o ışın gezegene
-            // çarpıyor, transmittance sıfırlanıyor ve gökyüzü TAM SİYAH oluyor.
-            //
-            // ÖLÇÜLDÜ (ortam probe'u, zenit): 17:54 → 0.029, 18:10 → 0.000,
-            // 18:30 → 0.000, 18:41 → 0.000. Otuz altı dakika boyunca sıfır.
-            //
-            // Gerçek alacakaranlık gözlemcinin ÜSTÜNDEKİ atmosferin hâlâ güneş
-            // görmesinden gelir; paket bunu modellemiyor. Yönü ufukta tutunca paket
-            // teğet geçen bir ışın görüyor: yol çok uzun, kızıl ve sönük ama SIFIR
-            // DEĞİL. Şiddeti kendi bandımız söndürüyor, yani alacakaranlık sönerek
-            // bitiyor, bir anda kesilmiyor.
             Vector3 lightSource = sunShare > 0.5f ? SunDirection : MoonDirection;
-
-            // DİSK KIRPILDIĞI SÜRECE GİZLİ. Yön ufukta tutulunca disk batmayı bırakıp
-            // ufukta yatay kayıyor ve sonra kayboluyordu. Gökyüzü parlaklığı yönden
-            // geliyor, disk ise ayrı çiziliyor — ikisini ayırmak için paketin
-            // `_DisableSunDisk` anahtarı kullanılıyor.
-            bool clamped = lightSource.y < 0f;
-            Shader.SetGlobalFloat(HideCelestialBodyId, clamped ? 1f : 0f);
-
-            lightSource = ClampToHorizon(lightSource);
-
             sun.transform.rotation = Quaternion.LookRotation(-lightSource);
 
             sun.color = Color.Lerp(moonColor, sunColor, sunShare);

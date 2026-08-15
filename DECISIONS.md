@@ -1091,18 +1091,31 @@ mesafesi. Gökyüzü bunları bilmiyor; çeviriyi `SkyWeatherDriver` yapıyor.
 
 **Uyarı.** Brief 2016 ve 2020 katsayı setlerini ayrı tutmayı şart koşuyor; birleştirilmeyecek.
 
-## Gökyüzü paketine disk gizleme anahtarı eklendi
+## Gökyüzü paketinde çifte güneş sönümü kaldırıldı
 
-**Karar.** Pakete `_HideCelestialBody` globali eklendi; `_DisableSunDisk`'i dışarıdan
-zorluyor. Paketin kaynağına dokunulan ikinci yer.
+**Karar.** `mainLightColor` artık kameradaki `EvaluateSunColorAttenuation` ile
+ÇARPILMIYOR. Paketin kaynağına dokunulan ikinci yer.
 
-**Gerekçe.** Alacakaranlıkta ışığın YÖNÜ ufukta kırpılıyor (paket gök parlaklığını ışığın
-kamera konumundaki transmittance'ıyla ölçeklediği için, cisim ufkun altına inince gök tam
-sıfır oluyor — ölçüldü, 36 dakika `0.000`). Ama yön kırpılınca disk de batmayı bırakıp
-ufukta yatay kayıyordu. Gök glow'u yönden, disk ayrı çiziliyor; ikisini ayırmak için
-paketin kendi anahtarı kullanıldı, yeni bir mekanizma yazılmadı.
+**Ölçüm.** Ortam probe'u (zenit): 17:54 → `0.029`, 18:10 → `0.000`, 18:30 → `0.000`,
+18:41 → `0.000`, 18:46 → `0.005`. Gökyüzü güneş ufku geçer geçmez TAM SIFIR oluyor ve
+otuz altı dakika öyle kalıyordu.
 
-**Tetikleyici.** Paket güncellenirse kaybolur; belirti güneşin ufukta yatay kayması.
+**Sebep.** Sönüm iki kez uygulanıyordu: LUT'un içinde örnek başına
+(`PhysicallyBasedSkyPrecomputation.shader`, `EvaluateSunColorAttenuation(dot(N,L), r)`) ve
+bir kez daha C#'ta kamera konumunda. İkincisi güneş ufkun altına inince sıfır oluyor ve
+her şeyi sıfırla çarpıyordu. Hillaire (EGSR 2020) denklem 3 ve 11'de `Ei` atmosfer
+DIŞINDAKİ aydınlıktır; sönüm integralin içinde `T(c,x)` ve `S(x,li)` olarak durur.
+
+**Disk etkilenmiyor.** Gök cismi rengini `mainLight`'tan ayrıca alıyor
+(`color.linear × intensity × π`) ve kızıllığını görüş ışını boyunca shader'da kazanıyor.
+
+**Denenip GERİ ALINAN iki yama** (aynı belirtiye, yanlış yerden):
+- Işığın yönünü ufukta kırpmak — güneş batmayı bırakıp ufukta yatay kayıyordu.
+- Diski `_HideCelestialBody` ile gizlemek — belirtiyi saklıyordu, sebebi değil.
+Kullanıcı doğru soruyu sordu: "doğrusu gerçek batış görüntüsü değil mi?"
+
+**Tetikleyici.** Paket güncellenirse kaybolur; belirti gün batımından sonra gökyüzünün
+bir anda tam siyaha düşmesi.
 
 ## Gökyüzü paketinde uyumluluk kipi kapatıldı
 
