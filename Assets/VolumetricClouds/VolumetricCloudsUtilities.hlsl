@@ -24,10 +24,6 @@ half3 EvaluateVolumetricCloudsAmbientProbe(half3 normalWS)
 #define PHASE_FUNCTION_STRUCTURE half2
 // Global offset to the high frequency noise
 #define CLOUD_DETAIL_MIP_OFFSET 0.0
-// Global offset for reaching the LUT/AO
-#define CLOUD_LUT_MIP_OFFSET 1.0
-// Size of Preset LUT (unused since it's not a compute shader)
-#define CLOUD_MAP_LUT_PRESET_SIZE 64.0
 // Density below wich we consider the density is zero (optimization reasons)
 #define CLOUD_DENSITY_TRESHOLD 0.001
 // Number of steps before we start the large steps
@@ -342,14 +338,12 @@ float3 AnimateShapeNoisePosition(float3 positionPS)
     positionPS.y += (positionPS.x / 3.0 + positionPS.z / 7.0);
     // We add the contribution of the wind displacements
     return positionPS + float3(_WindVector.x, 0.0, _WindVector.y) * _MediumWindSpeed + float3(0.0, _VerticalShapeWindDisplacement, 0.0);
-    //return positionPS;
 }
 
 // Animation of the cloud erosion position
 float3 AnimateErosionNoisePosition(float3 positionPS)
 {
     return positionPS + float3(_WindVector.x, 0.0, _WindVector.y) * _SmallWindSpeed + float3(0.0, _VerticalErosionWindDisplacement, 0.0);
-    //return positionPS;
 }
 
 // Structure that holds all the data used to define the cloud density of a point in space
@@ -386,7 +380,6 @@ void GetCloudCoverageData(float3 positionPS, out CloudCoverageData data)
     data.maxCloudHeight = cloudMapData.z;
     data.mapDensity = cloudMapData.w;
 }
-
 
 // Density remapping function
 half DensityRemap(half x, half a, half b, half c, half d)
@@ -451,16 +444,13 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
     // Initliaze all the values to 0 in case
     ZERO_INITIALIZE(CloudProperties, properties);
 
-//#ifndef CLOUDS_SIMPLE_PRESET
     // When using a cloud map, we cannot support the full planet due to UV issues
-//#endif
 
     // Remove global clouds below the horizon
 #ifndef _LOCAL_VOLUMETRIC_CLOUDS
     if (positionPS.y < _EarthRadius)
         return;
 #endif
-
 
     // By default the ambient occlusion is 1.0
     properties.ambientOcclusion = 1.0;

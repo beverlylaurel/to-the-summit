@@ -168,6 +168,21 @@ oktav başına Beer terimine uygulandı; faz fonksiyonu dokunulmadan kaldı.
 beklenen: eksik olan enerji zaten yoktu. Karanlık gelirse çözüm çift enerjiyi geri koymak
 değil, ışık seviyesine bakmaktır.
 
+### Makalede ölçülmüş ama UYGULANMAYANLAR
+
+Bilerek bırakıldı, sebebiyle birlikte — tekrar araştırılmasın.
+
+| madde | neden uygulanmadı |
+|---|---|
+| Adım büyüme oranı 0.04 `[s.40-43]` | Port kendi uyarlanabilir şemasını kullanıyor: boş uzayda büyük adım, buluta girince geri sarıp küçük adım (`activeSampling`). Makalenin doğrusal büyümesi onun üstüne binmez |
+| Kapsama düşükken adımı kısalt, `mult_min = 0.4` `[s.44-47]` | Portta `totalDistance = stepS × _NumPrimarySteps` — adımı çarpmak örnekleme sıklığını değil **ışının menzilini** değiştiriyor. Kısaltmak uzak bulutları keser. Makalede adım ve menzil bağımsız |
+| Yoğunluk düşükken adımı uzat, `div_min = 0.4` `[s.48, s.51]` | Aynı sebep, ters yönde: menzil uzar, kare süresi öngörülemez olur |
+| Aydınlatmaya mavi gürültü `+= bluenoise × 0.003` `[s.26]` | Portun bantlaşma çaresi başka: adım titremesi (`integrationNoise`) + zamansal birikim. Bantlaşma görülürse buraya dönülür |
+
+**Uygulanan:** ışık adımı 2 → **4**. Makale ölçüp seçmiş `[s.36-39, Tablo 1]`: *"2: çok
+daha iyi, ince detay eksik / 4: azalan getiri başlıyor"*, maliyet 2.80 → 3.85 ms. Portun
+şemasıyla çakışmıyor, düz parametre.
+
 ### Açık kalan
 
 Yoğunluk, şekil ve aydınlatma zinciri bitti; bağların tamamı kuruldu (`SYSTEMS.md`).

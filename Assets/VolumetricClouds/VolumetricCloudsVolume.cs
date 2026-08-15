@@ -188,15 +188,6 @@ public class VolumetricClouds : VolumeComponent, IPostProcessComponent
     [Tooltip("Controls the vertical wind speed of the erosion cloud shapes.")]
     public FloatParameter verticalErosionWindSpeed = new(0.0f);
 
-    /*
-    /// <summary>
-    /// Controls the multiplier to the speed of the cloud map.
-    /// </summary>
-    [AdditionalProperty]
-    [Tooltip("Controls the multiplier to the speed of the cloud map.")]
-    public ClampedFloatParameter cloudMapSpeedMultiplier = new(0.5f, 0.0f, 1.0f); 
-    */
-
     /// <summary>
     /// Controls the influence of the light probes on the cloud volume. A lower value will suppress the ambient light and produce darker clouds overall.
     /// </summary>

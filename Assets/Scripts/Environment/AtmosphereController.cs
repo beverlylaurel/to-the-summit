@@ -79,7 +79,6 @@ public class AtmosphereController : MonoBehaviour
     Color color;
     const float EditorApplyInterval = 0.1f;
 
-    Vector2 cloudOffset;
     Vector3 fogDrift;
     float activeCloudBottom;
     float airThinning = 1f;
@@ -91,10 +90,7 @@ public class AtmosphereController : MonoBehaviour
     Color skyBright = Color.white, skyShade = Color.gray;
 
     Color zenith, targetZenith;
-    Vector3 smoothedHeading = Vector3.right;
-    float smoothedDrift;
     float nextEditorApply;
-    float evolution;
     Vector2 spindriftDrift;
     float appliedShadowDistance = -1f;
     float coverage;
@@ -156,15 +152,6 @@ public class AtmosphereController : MonoBehaviour
     /// ve yansıma küpünü yeniden üretiyor; kare süresindeki payı ancak durdurup ölçerek
     /// bilinir. GEÇİCİ.
     public bool ReflectionFrozen { get; set; }
-
-    /// Bulutların şu ana kadar biriktirdiği kayma (metre). Teşhis: hız doğru görünüp de
-    /// gökyüzü sabit duruyorsa, kaymanın büyüyüp büyümediği bu sayıdan anlaşılıyor.
-    public float CloudShift => cloudOffset.magnitude;
-
-    /// Bulutların o anki süzülme hızı (m/s). Teşhis içindir: rüzgâr sıfırlanınca da
-    /// hareket ediyorlarsa sebebin taban hız mı yoksa rüzgâr mı olduğu ancak bu sayıyla
-    /// ayrılıyor.
-    public float CloudSpeed => smoothedDrift;
 
     /// Yansıma haritasının en son hangi gökyüzünde pişirildiği. Gökyüzü sürekli
     /// değişiyor ama harita her karede pişirilemez — pişirme milisaniyeler yiyor.
@@ -428,44 +415,9 @@ public class AtmosphereController : MonoBehaviour
         coverage = Mathf.Max(coverage,
             Mathf.Lerp(floor, settings.openCoverage, weatherDriver.ClearWindow));
 
-        // Bulutlar rüzgârla aynı yöne sürüklenir, ama yer rüzgârının hızıyla değil:
-        // 3 km yükseklikteki hava akımı çok daha güçlüdür ve yer dinginken bile eser.
-        Vector3 horizontal = new(wind.Velocity.x, 0f, wind.Velocity.z);
-        Vector3 target = horizontal.sqrMagnitude > 0.01f ? horizontal.normalized : Vector3.right;
-
-        // Yer rüzgârı yönü dakikada birkaç tur dönüyor. Bulut kütlesi bu kadar çevik
-        // değildir; ağır yumuşatma olmadan makaslama vektörü savrulup üst katmanları
-        // yüzlerce m/s hızla süpürüyordu.
-        float turn = 1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(1f, settings.headingSmoothing));
-        smoothedHeading = Vector3.Slerp(smoothedHeading.sqrMagnitude < 0.01f ? target : smoothedHeading,
-                                        target, turn).normalized;
-
-        Vector3 heading = smoothedHeading;
-
-        // Hız da yön gibi ağır yumuşatılır: kütle esintiyle hızlanmaz. Ham hız, rüzgâra
-        // eklenen saniyelik sarsıntılarla titremeye başlayınca kayan doku 16 karelik
-        // zamansal birikimin altında seğiriyor, geçmiş kelepçeden atılıyor ve bulut
-        // kenarları blok blok pikselleşiyordu.
-        float targetSpeed = Mathf.Max(settings.minCloudSpeed,
-            horizontal.magnitude * settings.cloudDrift);
-        float speed = smoothedDrift = smoothedDrift <= 0f
-            ? targetSpeed
-            : Mathf.Lerp(smoothedDrift, targetSpeed, turn);
-        // Sarmalama yok: aynı kayma vektörü hava haritası, temel şekil, varyasyon ve
-        // detay dokularında dört ayrı ölçekte örnekleniyor. Tek bir periyoda sarmak
-        // yalnızca birinde tam tura denk gelir, kalan üçü sarma anında yer değiştirir —
-        // en görünürü hava haritası, çünkü bulutların nerede olduğunu o belirler.
-        // Hassasiyet kaygısı makaslama ayrı vektöre taşındığında ortadan kalktı:
-        // saatlerce kayan değer bile doku örneklemesi için fazlasıyla ince.
-        cloudOffset -= new Vector2(heading.x, heading.z) * (speed * Time.deltaTime);
-
-        // BİÇİM EVRİMİ RÜZGÂRDAN BAĞIMSIZ. Bir dönem rüzgâr şiddetiyle çarpılıyordu ve
-        // fırtınada bulut kenarları çalkalanıyordu: sürüklenme zaten hızlanmışken evrim
-        // de hızlanınca ince yapı yerinde kaynıyor gibi okunuyor. Gerçekte de bulutun
-        // biçim değiştirme temposu rüzgârın hızıyla değil, içindeki dikey hareketle
-        // ilgili — sürüklenmesi hızlanan bir bulut aynı hızla dağılmaz.
-        evolution += settings.evolutionSpeed * Time.deltaTime;
-
+        // BULUT SÜRÜKLENMESİ BURADAN ÇIKTI. Kaymayı artık hacimsel bulut sistemi
+        // biriktiriyor ve rüzgârı `CloudWeatherDriver` üzerinden doğrudan okuyor; buradaki
+        // yumuşatılmış yön/hız çifti kimse tarafından okunmuyordu.
         // Konvektif yükselme gündüz sürer: kaynağı ısınan zemindir. Gece zemin
         // soğur, yükselme durur — bulutlar yalnız sürüklenir.
 

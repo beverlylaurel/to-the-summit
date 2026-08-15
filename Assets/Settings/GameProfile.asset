@@ -312,7 +312,7 @@ MonoBehaviour:
     m_Value: 32
   numLightSteps:
     m_OverrideState: 1
-    m_Value: 2
+    m_Value: 4
   fadeInMode:
     m_OverrideState: 1
     m_Value: 0

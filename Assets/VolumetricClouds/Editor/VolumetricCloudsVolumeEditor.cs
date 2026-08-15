@@ -20,27 +20,10 @@ class VolumetricCloudsEditor : VolumeComponentEditor
     SerializedDataParameter m_LocalClouds;
 
     // Shape
-    //SerializedDataParameter m_CloudControl;
 
-    //SerializedDataParameter m_CloudSimpleMode;
     SerializedDataParameter m_CloudPreset;
     SerializedDataParameter m_ErosionCurve;
     SerializedDataParameter m_AmbientOcclusionCurve;
-
-    //SerializedDataParameter m_CumulusMap;
-    //SerializedDataParameter m_CumulusMapMultiplier;
-    //SerializedDataParameter m_AltoStratusMap;
-    //SerializedDataParameter m_AltoStratusMapMultiplier;
-    //SerializedDataParameter m_CumulonimbusMap;
-    //SerializedDataParameter m_CumulonimbusMapMultiplier;
-    //SerializedDataParameter m_RainMap;
-    //SerializedDataParameter m_CloudMapResolution;
-
-    //SerializedDataParameter m_CloudMap;
-    //SerializedDataParameter m_CloudLut;
-
-    //SerializedDataParameter m_CloudTiling;
-    //SerializedDataParameter m_CloudOffset;
 
     SerializedDataParameter m_BottomAltitude;
     SerializedDataParameter m_AltitudeRange;
@@ -63,7 +46,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
     // Erosion
     SerializedDataParameter m_ErosionFactor;
     SerializedDataParameter m_ErosionScale;
-    //SerializedDataParameter m_ErosionNoiseType;
     // Micro-erosion
     SerializedDataParameter m_MicroErosion;
     SerializedDataParameter m_MicroErosionFactor;
@@ -80,7 +62,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
     // Wind
     SerializedDataParameter m_GlobalWindSpeed;
     SerializedDataParameter m_Orientation;
-    //SerializedDataParameter m_CloudMapSpeedMultiplier;
     SerializedDataParameter m_ShapeSpeedMultiplier;
     SerializedDataParameter m_ErosionSpeedMultiplier;
     SerializedDataParameter m_VerticalShapeWindSpeed;
@@ -89,7 +70,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
 
     // Quality
     SerializedDataParameter m_TemporalAccumulationFactor;
-    //SerializedDataParameter m_GhostingReduction;
     SerializedDataParameter m_PerceptualBlending;
     SerializedDataParameter m_NumPrimarySteps;
     SerializedDataParameter m_NumLightSteps;
@@ -132,27 +112,10 @@ class VolumetricCloudsEditor : VolumeComponentEditor
         m_LocalClouds = Unpack(o.Find(x => x.localClouds));
 
         // Shape
-        //m_CloudControl = Unpack(o.Find(x => x.cloudControl));
 
-        //m_CloudSimpleMode = Unpack(o.Find(x => x.cloudSimpleMode));
         m_CloudPreset = Unpack(o.Find(x => x.cloudPreset));
         m_ErosionCurve = Unpack(o.Find(x => x.erosionCurve));
         m_AmbientOcclusionCurve = Unpack(o.Find(x => x.ambientOcclusionCurve));
-
-        //m_CumulusMap = Unpack(o.Find(x => x.cumulusMap));
-        //m_CumulusMapMultiplier = Unpack(o.Find(x => x.cumulusMapMultiplier));
-        //m_AltoStratusMap = Unpack(o.Find(x => x.altoStratusMap));
-        //m_AltoStratusMapMultiplier = Unpack(o.Find(x => x.altoStratusMapMultiplier));
-        //m_CumulonimbusMap = Unpack(o.Find(x => x.cumulonimbusMap));
-        //m_CumulonimbusMapMultiplier = Unpack(o.Find(x => x.cumulonimbusMapMultiplier));
-        //m_RainMap = Unpack(o.Find(x => x.rainMap));
-        //m_CloudMapResolution = Unpack(o.Find(x => x.cloudMapResolution));
-
-        //m_CloudMap = Unpack(o.Find(x => x.cloudMap));
-        //m_CloudLut = Unpack(o.Find(x => x.cloudLut));
-
-        //m_CloudTiling = Unpack(o.Find(x => x.cloudTiling));
-        //m_CloudOffset = Unpack(o.Find(x => x.cloudOffset));
 
         m_BottomAltitude = Unpack(o.Find(x => x.bottomAltitude));
         m_AltitudeRange = Unpack(o.Find(x => x.altitudeRange));
@@ -172,7 +135,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
         m_EarthCurvature = Unpack(o.Find(x => x.earthCurvature));
         m_ErosionFactor = Unpack(o.Find(x => x.erosionFactor));
         m_ErosionScale = Unpack(o.Find(x => x.erosionScale));
-        //m_ErosionNoiseType = Unpack(o.Find(x => x.erosionNoiseType));
 
         // Micro-erosion
         m_MicroErosion = Unpack(o.Find(x => x.microErosion));
@@ -190,7 +152,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
         // Wind
         m_Orientation = Unpack(o.Find(x => x.globalOrientation));
         m_GlobalWindSpeed = Unpack(o.Find(x => x.globalSpeed));
-        //m_CloudMapSpeedMultiplier = Unpack(o.Find(x => x.cloudMapSpeedMultiplier));
         m_ShapeSpeedMultiplier = Unpack(o.Find(x => x.shapeSpeedMultiplier));
         m_ErosionSpeedMultiplier = Unpack(o.Find(x => x.erosionSpeedMultiplier));
         m_AltitudeDistortion = Unpack(o.Find(x => x.altitudeDistortion));
@@ -199,7 +160,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
 
         // Quality
         m_TemporalAccumulationFactor = Unpack(o.Find(x => x.temporalAccumulationFactor));
-        //m_GhostingReduction = Unpack(o.Find(x => x.ghostingReduction));
         m_PerceptualBlending = Unpack(o.Find(x => x.perceptualBlending));
         m_NumPrimarySteps = Unpack(o.Find(x => x.numPrimarySteps));
         m_NumLightSteps = Unpack(o.Find(x => x.numLightSteps));
@@ -282,7 +242,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
             using (new IndentLevelScope())
             {
                 //if (hasCloudMap)
-                    //PropertyField(m_CloudMapSpeedMultiplier);
                 PropertyField(m_ShapeSpeedMultiplier);
                 PropertyField(m_ErosionSpeedMultiplier);
             }
@@ -321,7 +280,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
         //DrawHeader("Quality");
         {
             PropertyField(m_TemporalAccumulationFactor);
-            //PropertyField(m_GhostingReduction);
 
             // Here we intentionally choose to display the perceptual blending as a toggle and not as float value to prevent the user from inputing arbitrary values
             // between 0.0f and 1.0f while preserving the ability to interpolate/blend between volumes.
@@ -502,7 +460,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
                 m_ShapeScale.overrideState.boolValue = m_CloudPreset.overrideState.boolValue;
                 m_ErosionFactor.overrideState.boolValue = m_CloudPreset.overrideState.boolValue;
                 m_ErosionScale.overrideState.boolValue = m_CloudPreset.overrideState.boolValue;
-                //m_ErosionNoiseType.overrideState.boolValue = m_CloudPreset.overrideState.boolValue;
                 m_ErosionCurve.overrideState.boolValue = m_CloudPreset.overrideState.boolValue;
                 m_MicroErosionFactor.overrideState.boolValue = m_CloudPreset.overrideState.boolValue;
                 m_MicroErosionScale.overrideState.boolValue = m_CloudPreset.overrideState.boolValue;
@@ -531,7 +488,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
                     PropertyField(m_ShapeScale);
                     PropertyField(m_ErosionFactor);
                     PropertyField(m_ErosionScale);
-                    //PropertyField(m_ErosionNoiseType);
                     PropertyField(m_ErosionCurve);
                 }
             }
@@ -591,7 +547,6 @@ class VolumetricCloudsEditor : VolumeComponentEditor
 
         // Evaluate the previous control Mode
         //VolumetricClouds.CloudControl previousControlMode = (VolumetricClouds.CloudControl)m_CloudControl.value.enumValueIndex;
-        //PropertyField(m_CloudControl);
         //VolumetricClouds.CloudControl controlMode = (VolumetricClouds.CloudControl)m_CloudControl.value.enumValueIndex;
 
         /*

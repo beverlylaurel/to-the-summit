@@ -4,25 +4,12 @@ Kaynaklar (`C:\Users\musta\Downloads\nubis`):
 `[H18]` haggstrom-2018 · `[N15]` nubis-2015-hzd · `[N17]` nubis-2017-decima · `[N22]` nubis-2022-evolved
 
 **Bu dosya makale özeti değil, SORU–CEVAP.** Sorular okumadan önce yazıldı ve hepsi
-2026-08-14'te ekranda görülmüş bir belirtiden geliyor. Cevap yazarken kaynak sayfa
-zorunlu: `[N22 s.34]`. Kaynağı olmayan cümle nottan sayılmaz, tahmindir.
+2026-08-14'te ekranda görülmüş bir belirtiden geliyor. Her cevabın yanında kaynak sayfa
+var: `[N22 s.34]`. Kaynağı olmayan cümle nottan sayılmaz, tahmindir.
 
-Okuma **ilerledikçe** doldurulur, sonunda değil.
-
-## Hiçbir şey kaçmasın diye: okuma kuralları
-
-1. **20'şer sayfa, sırayla, atlama yok.** "Bu bize lazım değil" diye sayfa geçilmez.
-   (Blok formül yoğunsa 12'ye düşülür — not incelirse kural çiğnenmiş olur.)
-2. **Her bloktan sonra defter güncellenir** (`s.X–Y okundu`). Defter baştan sona
-   KESİNTİSİZ olmalı; boşluk varsa o sayfalar okunmamıştır. Kanıt defterde, hafızada
-   değil.
-3. **Sorulara girmeyen her şey aşağıdaki "Sorulmamış bulgular" bölümüne** yazılır.
-   Yukarıdaki 12 soru bizim BİLDİĞİMİZ eksikler; bilmediklerimiz oraya düşer.
-4. **Bağlam biterse defterdeki son sayfadan devam edilir.** Oturum kesilse bile
-   kaldığı yer bellidir.
-5. Kaynaksız cümle yazılmaz.
-
----
+Dört makale de baştan sona okundu. **Referans dosyası** — bulut tarafında bir sayı veya
+formül gerektiğinde önce buraya bakılır, tahmin yürütülmez. Hangi bulgunun kodda
+karşılığı olduğu ve hangisinin bilerek uygulanmadığı `CLOUDS_REBUILD.md`'de.
 
 ## 1. Bir bulutun eni ve boyu neyden gelir?
 
@@ -403,7 +390,6 @@ akla gelmemişti.
 3.1.5 örs 16 · 3.2 ışın yürüyüşü 18 · **3.2.1 optimizasyonlar 19** · 3.3 aydınlatma 27 ·
 3.4 renk harmanı 32 · 3.5 render hattı 33 · 3.6 hareket 34 · **4 deneyler 35** ·
 **6.2.4 bulutların içinden geçmek 64** ← soru 7 · **Ek B: KOD 77**
-
 
 Yukarıdaki on iki sorunun hiçbirine girmeyen ama önemli görünen her şey. Soru listesi
 bizim bildiğimiz eksiklerden yapıldı; bilmediklerimiz burada birikir. Kaynak zorunlu.
@@ -1662,42 +1648,3 @@ kazancın tamamını reddetmek anlamına geliyormuş.
 
 ---
 
-## Okuma defteri
-
-Kesintisiz olmalı. Boşluk = okunmamış sayfa.
-
-| makale | toplam | okunan | eksik |
-|---|---|---|---|
-| `[N15]` nubis-2015 | **99** | **s.1–99 TAMAM** | — |
-| `[N17]` nubis-2017 | **108** | **s.1–108 TAMAM** | — |
-| `[N22]` nubis-2022 | **207** | **s.1–207 TAMAM** | — |
-| `[H18]` haggstrom-2018 | **93 PDF / 81 basılı** | **PDF s.1–93 TAMAM** | — |
-
-**Toplam ~514 sayfa, okunan 80.** Kalan 434.
-
-`[H18]` **81 BASILI sayfa**; PDF sayfası = basılı + 12, yani PDF ~93 sayfa. Basılı 68
-(kaynakça sonu) = PDF 80. **Ekler (A parametreler, B KOD) PDF 81'den sonra.**
-
-**DÖRT MAKALE DE TAMAMLANDI.** Defterde boşluk yok.
-
-
----
-
-## `[N22]` bitti — soruların durumu
-
-| # | soru | durum |
-|---|---|---|
-| 1 | Bulutun eni/boyu | **cevaplandı** — s.20, 106, 129 |
-| 2 | Gürültü periyodu / katman oranı | **kısmi** — adım boyu cevabı geldi (s.39), periyot oranı H18'de aranacak |
-| 3 | Kapsama sürgüsü | **cevaplandı** — s.30 |
-| 4 | Gradyan çarpar mı | **cevaplandı** — s.28, 34, 97 |
-| 5 | Kenar yumuşaklığı | **cevaplandı** — s.34 (bölme yok), s.105 (üs 0.27) |
-| 6 | Adım ve mip | **cevaplandı** — s.39, 183 |
-| 7 | Buluta girmek | **kısmi** — Environments bölümü yakın alanı anlatıyor ama "kamera kütlenin İÇİNDE" ayrı bir başlık değil |
-| 8 | Temporal | **cevaplandı** — s.152, 157, 158 |
-| 9 | Aydınlatma sayıları | **cevaplandı** — s.41-48, 54, 59, 183 |
-| 10 | Yer gölgesi | **kısmi** — uzun mesafe gölge haritası var (s.112) ama üretimi anlatılmıyor |
-| 11 | Harita kanalları | **cevaplandı** — s.20, 75, 106, 129, 139 |
-| 12 | Optimizasyonlar | **cevaplandı** — s.81, 82, 90, 125, 183, 184 |
-
-Kalan üç boşluk (2, 7, 10) `[H18]` ve `[N17]`'de aranacak.
