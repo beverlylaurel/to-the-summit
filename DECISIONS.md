@@ -40,9 +40,9 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ## Bekleyen ölçümler
 
-- **Gökyüzü/sahne göreli parlaklığı** — paket 100000 lux'e kalibreli, bizim güneş 1.5;
-  oran 2.02 (~1.01 EV) ve hangi taraftan telafi edileceği ölçülmedi
-  → [Güneş şiddeti kalibrasyonu ÖLÇÜLMEDİ](#güneş-şiddeti-kalibrasyonu-ölçülmedi)
+- **Güneş 3.03'e çıktıktan sonra yüzeyler** — arazi, kar ve bisiklet 1.5'e göre
+  ayarlanmıştı; yeniden ayar gerekip gerekmediğine bakılmadı
+  → [Güneş şiddeti pakete kalibre edildi](#güneş-şiddeti-pakete-kalibre-edildi-15--3030782)
 - **Hava perspektifi + yükseklik sisi birlikte** — paketin atmosferik saçılımı açık,
   bizim yükseklik sisimiz de duruyor; ikisinin üst üste binip binmediği bakılmadı
   → [Paketin sisi kapalı başlıyor](#paketin-sisi-kapalı-başlıyor)
@@ -1125,19 +1125,20 @@ denizi) pakete taşınabildiğinde ya da gereksiz görüldüğünde açılır ve
 **Maliyet.** Sis rengi gökyüzünden türemiyor; `AtmosphereController`'ın kendi renk
 zincirinden geliyor. Gökyüzü fiziksel, sis değil — ufukta ton farkı çıkabilir.
 
-## Güneş şiddeti kalibrasyonu ÖLÇÜLMEDİ
+## Güneş şiddeti pakete kalibre edildi (1.5 → 3.030782)
 
-**Karar.** Paket 100000 lux yer aydınlığına kalibreli ve README güneş şiddeti için
-**3 (3.030782)**, pozlama için **0** öneriyor. Bizim `TimeOfDay.sunIntensity` **1.5**.
-Değer DEĞİŞTİRİLMEDİ.
+**Karar.** `TimeOfDay.sunIntensity` **3.030782**. Sayı paketin kendi önerisi (100000 lux
+yer aydınlığı, pozlama 0), bizim seçimimiz değil. Hem koddaki varsayılan hem sahne kurulumu
+yazıyor.
 
-**Gerekçe.** 1.5 sayısı sahnedeki her yüzeyin, ACES tonemap'in ve renk düzenlemesinin
-üstüne oturduğu değer. İki katına çıkarmak arazi, kar ve bisiklet dahil hepsini birden
-kaydırırdı — ve bu, ölçmeden yapılacak bir değişiklik olurdu.
+**Tetikleyici ÇALDI.** Öğle vakti hava tuhaf görünüyordu; gökyüzü sahneye göre sönük
+kalıyordu çünkü paket gök parlaklığını ana ışıktan türetiyor ve 1.5 kalibrasyonun yarısı.
 
-**Tetikleyici.** İlk Play'de gökyüzü araziye göre sönük ya da fosforlu görünürse. İki
-aday var ve ikisi ölçümle ayrılır: (a) güneşi 3.03'e çıkarıp yüzeyleri yeniden ayarlamak,
-(b) paketin kendi `exposure`/`multiplier` alanından telafi etmek. Oran 3.030782 / 1.5 = 2.02,
-yani ~1.01 EV.
+**Neden telafi değil de kaynak düzeltildi.** İki aday vardı: güneşi 3.03'e çıkarmak ya da
+paketin `exposure`/`multiplier` alanından ~1.01 EV telafi etmek. İkincisi gökyüzünü
+düzeltip ışığı yanlış bırakırdı — aynı belirti gölge, yansıma ve bulut aydınlatmasında
+sürerdi. Kaynak tek olmalı.
 
-**Maliyet.** Ölçüm yapılana kadar gökyüzü ile sahnenin göreli parlaklığı doğrulanmamış.
+**Açık kalan.** 1.5 sayısının üstüne arazi, kar, bisiklet ve ACES tonemap oturmuştu.
+Yüzeylerin yeniden ayarlanması gerekip gerekmediği BAKILMADI — belirti fazla parlak arazi,
+patlamış kar ya da sönmüş kontrast olur. `LookController` pozlaması ilk bakılacak yer.
