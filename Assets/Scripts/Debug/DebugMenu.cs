@@ -33,7 +33,10 @@ public class DebugMenu : MonoBehaviour
     [Tooltip("Bulut ayarlarini havadan suren bilesen; \"Havadan ayir\" bunu kapatiyor.")]
     [SerializeField] CloudWeatherDriver cloudDriver;
 
-    const float PanelWidth = 1260f;
+    [Tooltip("Atmosfer ayarlarini havadan suren bilesen.")]
+    [SerializeField] SkyWeatherDriver skyDriver;
+
+    const float PanelWidth = 1560f;
     const float ColumnWidth = 300f;
     const float Margin = 24f;
 
@@ -68,6 +71,12 @@ public class DebugMenu : MonoBehaviour
     /// başlıyor ve asset'e yazılan değer hiç okunmuyor (ölçüldü: profil 0.71, yığın 0.40).
     /// Açılıştaki değerler geri al düğmeleri için saklanıyor.
     VolumetricClouds clouds;
+#if URP_PBSKY
+    PhysicallyBasedSky sky;
+    VisualEnvironment visualEnvironment;
+    bool detachSkyFromWeather;
+    float sunIntensityDefault;
+#endif
 
     /// Acilistaki degerler: her satirin ↺'u ve "Bulut ayarlarini geri al" buradan okuyor.
     /// Cizim aninda yakalanamaz — `CloudWeatherDriver` kapsama, yogunluk ve ruzgari her
@@ -103,10 +112,12 @@ public class DebugMenu : MonoBehaviour
         AtmosphereController atmosphereRef, PrecipitationRenderer precipitationRef,
         PerformanceHud hudRef, ClimbHud climbHudRef,
         CursorLock cursorLockRef, SnowCollisionProbe snowProbeRef,
-        RouteOverlay routeOverlayRef, Volume cloudVolumeRef, CloudWeatherDriver cloudDriverRef)
+        RouteOverlay routeOverlayRef, Volume cloudVolumeRef, CloudWeatherDriver cloudDriverRef,
+        SkyWeatherDriver skyDriverRef)
     {
         cloudVolume = cloudVolumeRef;
         cloudDriver = cloudDriverRef;
+        skyDriver = skyDriverRef;
         cursorLock = cursorLockRef;
         walker = walkerRef;
         flyer = flyerRef;
@@ -137,9 +148,26 @@ public class DebugMenu : MonoBehaviour
         if (!cloudVolume.profile.TryGet(out clouds))
             throw new InvalidOperationException($"{nameof(DebugMenu)}: profilde {nameof(VolumetricClouds)} yok.");
 
-        CaptureCloudDefaults();
+        // Üç bileşen için de biriktiriliyor; temizlik burada bir kez, yakalama üç kez.
+        cloudFloatDefaults.Clear();
+        cloudBoolDefaults.Clear();
+
+        CaptureDefaults(clouds);
 
         detachFromWeather = !cloudDriver.enabled;
+
+#if URP_PBSKY
+        if (!cloudVolume.profile.TryGet(out sky))
+            throw new InvalidOperationException($"{nameof(DebugMenu)}: profilde {nameof(PhysicallyBasedSky)} yok.");
+        if (!cloudVolume.profile.TryGet(out visualEnvironment))
+            throw new InvalidOperationException($"{nameof(DebugMenu)}: profilde {nameof(VisualEnvironment)} yok.");
+
+        CaptureDefaults(sky);
+        CaptureDefaults(visualEnvironment);
+
+        sunIntensityDefault = time.SunIntensity;
+        detachSkyFromWeather = skyDriver != null && !skyDriver.enabled;
+#endif
 
         // Hız çarpanı yalnızca panel çizilirken uygulanıyordu; panel hiç açılmazsa
         // başlangıç değeri de hiç etkili olmuyordu.
@@ -219,6 +247,10 @@ public class DebugMenu : MonoBehaviour
         BeginColumn();
         DrawCloudLight();
         DrawCloudQuality();
+        EndColumn();
+
+        BeginColumn();
+        DrawSky();
         DrawOverlays();
         DrawSnowCollision();
         EndColumn();
@@ -319,6 +351,63 @@ public class DebugMenu : MonoBehaviour
         EndSection();
     }
 
+    /// GÖKYÜZÜ. Paketin atmosfer parametreleri; hepsi profile yazılıyor, Play bitince kalıyor.
+    ///
+    /// "Güneş şiddeti" buraya BİLEREK konuldu: paket 100000 lux yer aydınlığına kalibreli
+    /// ve güneş şiddeti 3.03 bekliyor, bizimki 1.5. Hangi taraftan telafi edileceği
+    /// ölçülmedi (`DECISIONS.md`) — iki sürgü yan yana durursa gözle ayrılır.
+    void DrawSky()
+    {
+#if URP_PBSKY
+        BeginSection("Gökyüzü");
+
+        if (skyDriver != null)
+        {
+            bool detach = GUILayout.Toggle(detachSkyFromWeather, "Havadan ayır (elle ayar)");
+            if (detach != detachSkyFromWeather)
+            {
+                detachSkyFromWeather = detach;
+                skyDriver.enabled = !detach;
+            }
+        }
+
+        float sun = CloudRow("Güneş şiddeti", time.SunIntensity, sunIntensityDefault, 0f, 6f, "F2");
+        if (!Mathf.Approximately(sun, time.SunIntensity)) time.SunIntensity = sun;
+        GUILayout.Label("paket 3,03 bekliyor · bizde varsayılan 1,50");
+
+        CloudSlider("Pozlama (EV)", sky.exposure, -5f, 5f, "F2");
+        CloudSlider("Parlaklık çarpanı", sky.multiplier, 0f, 4f, "F2");
+
+        GUILayout.Space(4f);
+        CloudSlider("Hava yoğunluğu R", sky.airDensityR);
+        CloudSlider("Hava yoğunluğu G", sky.airDensityG);
+        CloudSlider("Hava yoğunluğu B", sky.airDensityB);
+        CloudSlider("Hava tavanı (m)", sky.airMaximumAltitude, 1000f, 200000f, "F0");
+
+        GUILayout.Space(4f);
+        CloudSlider("Aerosol yoğunluğu", sky.aerosolDensity, "F3");
+        CloudSlider("Aerosol anizotropi", sky.aerosolAnisotropy);
+        CloudSlider("Aerosol tavanı (m)", sky.aerosolMaximumAltitude, 1000f, 50000f, "F0");
+
+        GUILayout.Space(4f);
+        CloudSlider("Ozon yoğunluğu", sky.ozoneDensityDimmer);
+        CloudSlider("Ozon tabanı (m)", sky.ozoneMinimumAltitude, 0f, 60000f, "F0");
+        CloudSlider("Ozon genişliği (m)", sky.ozoneLayerWidth, 1000f, 60000f, "F0");
+
+        GUILayout.Space(4f);
+        CloudSlider("Gezegen yarıçapı (km)", visualEnvironment.planetRadius, 100f, 12000f, "F0");
+
+        if (GUILayout.Button("Gökyüzü ayarlarını geri al"))
+        {
+            RestoreDefaults(sky);
+            RestoreDefaults(visualEnvironment);
+            time.SunIntensity = sunIntensityDefault;
+        }
+
+        EndSection();
+#endif
+    }
+
     void DrawCloudErosion()
     {
         BeginSection("Bulut — erozyon");
@@ -361,30 +450,16 @@ public class DebugMenu : MonoBehaviour
         CloudSlider("Sonumlenme baslangici (m)", clouds.fadeInStart, 0f, 10000f, "F0");
         CloudSlider("Sonumlenme mesafesi (m)", clouds.fadeInDistance, 100f, 50000f, "F0");
 
-        if (GUILayout.Button("Bulut ayarlarini geri al"))
-        {
-            foreach (var parameter in clouds.parameters)
-            {
-                if (parameter is FloatParameter f && cloudFloatDefaults.TryGetValue(parameter, out float value))
-                    f.value = value;
-                else if (parameter is IntParameter i && cloudFloatDefaults.TryGetValue(parameter, out float intValue))
-                    i.value = Mathf.RoundToInt(intValue);
-                else if (parameter is BoolParameter b && cloudBoolDefaults.TryGetValue(parameter, out bool flag))
-                    b.value = flag;
-            }
-        }
+        if (GUILayout.Button("Bulut ayarlarini geri al")) RestoreDefaults(clouds);
 
         EndSection();
     }
 
     /// Parametrenin `overrideState`'i kapaliysa harmanlama onu atliyor: surgu profile
     /// yaziyor ama yigina hic gecmiyor. Panelin surdugu her alan acik olmak zorunda.
-    void CaptureCloudDefaults()
+    void CaptureDefaults(VolumeComponent component)
     {
-        cloudFloatDefaults.Clear();
-        cloudBoolDefaults.Clear();
-
-        foreach (var parameter in clouds.parameters)
+        foreach (var parameter in component.parameters)
         {
             parameter.overrideState = true;
 
@@ -394,6 +469,19 @@ public class DebugMenu : MonoBehaviour
                 case IntParameter i: cloudFloatDefaults[parameter] = i.value; break;
                 case BoolParameter b: cloudBoolDefaults[parameter] = b.value; break;
             }
+        }
+    }
+
+    void RestoreDefaults(VolumeComponent component)
+    {
+        foreach (var parameter in component.parameters)
+        {
+            if (parameter is FloatParameter f && cloudFloatDefaults.TryGetValue(parameter, out float value))
+                f.value = value;
+            else if (parameter is IntParameter i && cloudFloatDefaults.TryGetValue(parameter, out float intValue))
+                i.value = Mathf.RoundToInt(intValue);
+            else if (parameter is BoolParameter b && cloudBoolDefaults.TryGetValue(parameter, out bool flag))
+                b.value = flag;
         }
     }
 

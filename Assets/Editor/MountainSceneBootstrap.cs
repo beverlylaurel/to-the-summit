@@ -755,7 +755,6 @@ public static class MountainSceneBootstrap
             LoadOrCreate<CloudWeatherSettings>(CloudWeatherPath));
         EditorUtility.SetDirty(driver);
 
-    #if URP_PBSKY
         // Atmosferin hava bağı bulut sondasıyla aynı nesnede: ikisi de aynı Volume'u
         // sürüyor ve aynı hava durumundan besleniyor.
         var skyDriver = Object.FindAnyObjectByType<SkyWeatherDriver>();
@@ -769,7 +768,6 @@ public static class MountainSceneBootstrap
             Object.FindAnyObjectByType<WeatherState>(),
             LoadOrCreate<SkyWeatherSettings>(SkyWeatherPath));
         EditorUtility.SetDirty(skyDriver);
-    #endif
     }
 
     /// Gürültü dokuları materyalde duruyor, hiçbir kod atamıyor — repo hazır materyalle geliyordu.
@@ -1181,7 +1179,8 @@ public static class MountainSceneBootstrap
             player.GetComponentInChildren<SnowCollisionProbe>(true),
             Object.FindAnyObjectByType<RouteOverlay>(FindObjectsInactive.Include),
             cloudVolume,
-            Object.FindAnyObjectByType<CloudWeatherDriver>());
+            Object.FindAnyObjectByType<CloudWeatherDriver>(),
+            Object.FindAnyObjectByType<SkyWeatherDriver>());
 
         EditorUtility.SetDirty(menu);
     }
