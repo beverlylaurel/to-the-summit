@@ -53,6 +53,7 @@ public static class MountainSceneBootstrap
     const string RendererPath = "Assets/Settings/PC_Renderer.asset";
     const string CloudMaterialPath = "Assets/Settings/VolumetricClouds.mat";
     const string CloudWeatherPath = "Assets/Settings/CloudWeatherSettings.asset";
+    const string SkyWeatherPath = "Assets/Settings/SkyWeatherSettings.asset";
 
     /// `EnsureCloudVolume`'un bulut bileşenini yazdığı Volume. F1 paneli buradan bağlanıyor.
     static UnityEngine.Rendering.Volume cloudVolume;
@@ -130,6 +131,10 @@ public static class MountainSceneBootstrap
 
         if (RemoveMissingScripts(scene)) changed = true;
         Phase("ölü script taraması");
+
+        EnsureSkyFeature();
+        EnsureSkyVolume();
+        Phase("gökyüzü geçişi");
 
         EnsureCloudFeature();
         EnsureCloudVolume();
@@ -554,6 +559,127 @@ public static class MountainSceneBootstrap
         return material;
     }
 
+    /// GÖKYÜZÜ RENDER GEÇİŞİ. `PhysicallyBasedSkyURP` (jiaozi158, MIT — HDRP'nin PBSky'ının
+    /// URP portu). Rayleigh, Mie ve ozon soğurmasını LUT'lardan hesaplıyor; aynı LUT'lar
+    /// hava perspektifini ve ambient probe'u da besliyor.
+    ///
+    /// Bulut portu bu paketle çalışmak üzere yazılmış: `URP_PBSKY` tanımlıyken bulutlar
+    /// gezegen merkezini ve yarıçapını buradan alıyor, ambient probe'u paylaşıyor ve
+    /// hava perspektifinden geçiyor. Tanımı `SkyPackageDefine` kuruyor.
+    static void EnsureSkyFeature()
+    {
+    #if URP_PBSKY
+        var renderer = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.ScriptableRendererData>(RendererPath);
+        if (renderer == null)
+            throw new System.InvalidOperationException($"Renderer bulunamadı: {RendererPath}");
+
+        foreach (var existing in renderer.rendererFeatures)
+            if (existing is PhysicallyBasedSkyURP) return;
+
+        var skyShader = Shader.Find("Hidden/Skybox/PhysicallyBasedSky");
+        var lutShader = Shader.Find("Hidden/Sky/PhysicallyBasedSkyPrecomputation");
+        if (skyShader == null || lutShader == null)
+            throw new System.InvalidOperationException(
+                "Gökyüzü shader'ları bulunamadı. Paket kurulu mu: " +
+                "Packages/com.jiaozi158.unity-physically-based-sky-urp");
+
+        var feature = ScriptableObject.CreateInstance<PhysicallyBasedSkyURP>();
+        feature.name = "Physically Based Sky";
+
+        // Feature shader'ları `Create()` içinde `Shader.Find` ile KARŞILAŞTIRIYOR; eşleşmezse
+        // hata basıp hiçbir geçiş eklemiyor. Bu yüzden örnek üretildikten hemen sonra,
+        // `Create()` elle çağrılmadan önce bağlanıyorlar.
+        var serialized = new SerializedObject(feature);
+        serialized.FindProperty("m_Shader").objectReferenceValue = skyShader;
+        serialized.FindProperty("m_LutShader").objectReferenceValue = lutShader;
+        serialized.FindProperty("m_FallbackSkyMaterial").objectReferenceValue =
+            AssetDatabase.LoadAssetAtPath<Material>(SkyMaterialPath);
+        // Gök yansıması bulutları da içersin: paket yansıma küpünü pişirirken bu materyali
+        // kullanıyor. Boş bırakılırsa yansımada gök var, bulut yok.
+        serialized.FindProperty("m_VolumetricCloudsMaterial").objectReferenceValue =
+            AssetDatabase.LoadAssetAtPath<Material>(CloudMaterialPath);
+        serialized.ApplyModifiedPropertiesWithoutUndo();
+
+        feature.Create();
+
+        renderer.rendererFeatures.Add(feature);
+        AssetDatabase.AddObjectToAsset(feature, renderer);
+        EditorUtility.SetDirty(renderer);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.ImportAsset(RendererPath);
+    #endif
+    }
+
+    /// GÖKYÜZÜ HACMİ. Üç override tek profile yazılıyor; bulut hacmiyle aynı profil, çünkü
+    /// bulut portu gezegen yarıçapını ve ambient kipini oradan okuyor.
+    static void EnsureSkyVolume()
+    {
+    #if URP_PBSKY
+        var volume = Object.FindAnyObjectByType<UnityEngine.Rendering.Volume>();
+        if (volume == null)
+            throw new System.InvalidOperationException("Sahnede Volume yok, gökyüzü hacmi eklenemedi.");
+        if (volume.sharedProfile == null)
+            throw new System.InvalidOperationException($"{volume.name} Volume'unda profil yok.");
+
+        var profile = volume.sharedProfile;
+
+        if (!profile.TryGet(out VisualEnvironment visualEnvironment))
+        {
+            visualEnvironment = profile.Add<VisualEnvironment>(overrides: true);
+            visualEnvironment.name = nameof(VisualEnvironment);
+            AssetDatabase.AddObjectToAsset(visualEnvironment, profile);
+        }
+
+        if (!profile.TryGet(out PhysicallyBasedSky pbrSky))
+        {
+            pbrSky = profile.Add<PhysicallyBasedSky>(overrides: true);
+            pbrSky.name = nameof(PhysicallyBasedSky);
+            AssetDatabase.AddObjectToAsset(pbrSky, profile);
+        }
+
+        if (!profile.TryGet(out Fog fog))
+        {
+            fog = profile.Add<Fog>(overrides: true);
+            fog.name = nameof(Fog);
+            AssetDatabase.AddObjectToAsset(fog, profile);
+        }
+
+        // Fiziksel gökyüzü seçiliyor; 0 "gökyüzü yok" demek ve paket hiçbir şey çizmiyor.
+        SetSky(visualEnvironment.skyType, (int)VisualEnvironment.SkyType.PhysicallyBased);
+
+        // DÜNYA UZAYI. Kamera uzayında gök ve bulutlar kamerayla birlikte taşınıyor;
+        // 5709 m'lik dağda katmanın üstüne çıkmak imkânsız hâle geliyordu. Bulut tarafında
+        // `localClouds` anahtarı da bu değeri izliyor — ikisi tek yerden geliyor.
+        SetSky(visualEnvironment.renderingSpace, VisualEnvironment.RenderingSpace.World);
+
+        // Ortam ışığı gökyüzünden pişiyor. `AtmosphereController` artık `ambientLight`
+        // yazmıyor: iki yazar aynı kareyi çekiştirince sonuç yazma sırasına kalıyordu.
+        SetSky(visualEnvironment.skyAmbientMode, VisualEnvironment.SkyAmbientMode.Dynamic);
+
+        SetSky(pbrSky.type, PhysicallyBasedSky.PhysicallyBasedSkyModel.EarthAdvanced);
+
+        // HAVA PERSPEKTİFİ. Brief'in şartı: uzak dağ, silüet ve BULUT aynı atmosferik
+        // perdeden geçmeli. Bulut geçişi bunu okuyup 7 numaralı birleştirme pass'ine
+        // geçiyor.
+        SetSky(pbrSky.atmosphericScattering, true);
+
+        // PAKETİN SİSİ ŞİMDİLİK KAPALI. Kendi yükseklik sisimiz sis bankları, inversiyon
+        // ve vadi sis denizi taşıyor; pakette bunların karşılığı yok. İkisi birlikte
+        // açılırsa sis iki kez uygulanıyor. Geçiş `DECISIONS.md`'de kayıtlı.
+        SetSky(fog.enabled, false);
+
+        EditorUtility.SetDirty(profile);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath(profile));
+    #endif
+    }
+
+    static void SetSky<T>(VolumeParameter<T> parameter, T value)
+    {
+        parameter.value = value;
+        parameter.overrideState = true;
+    }
+
     /// BULUT RENDER GEÇİŞİ. `VolumetricCloudsURP` (jiaozi158, MIT — HDRP'nin URP portu)
     /// URP renderer'ına alt nesne olarak ekleniyor. Feature'ın kendi materyali var; shader
     /// gizli olduğu için materyal asset olarak üretilip bağlanıyor.
@@ -628,6 +754,22 @@ public static class MountainSceneBootstrap
             Object.FindAnyObjectByType<AtmosphereController>(),
             LoadOrCreate<CloudWeatherSettings>(CloudWeatherPath));
         EditorUtility.SetDirty(driver);
+
+    #if URP_PBSKY
+        // Atmosferin hava bağı bulut sondasıyla aynı nesnede: ikisi de aynı Volume'u
+        // sürüyor ve aynı hava durumundan besleniyor.
+        var skyDriver = Object.FindAnyObjectByType<SkyWeatherDriver>();
+        if (skyDriver == null)
+        {
+            skyDriver = probe.gameObject.AddComponent<SkyWeatherDriver>();
+            changed = true;
+        }
+
+        skyDriver.Bind(cloudVolume,
+            Object.FindAnyObjectByType<WeatherState>(),
+            LoadOrCreate<SkyWeatherSettings>(SkyWeatherPath));
+        EditorUtility.SetDirty(skyDriver);
+    #endif
     }
 
     /// Gürültü dokuları materyalde duruyor, hiçbir kod atamıyor — repo hazır materyalle geliyordu.

@@ -205,9 +205,7 @@ public class AtmosphereSettings : ScriptableObject
     [Tooltip("Kuşağın yoğunluğu havaya göre değişir; açık havada da bir miktar bulunur.")]
     [Range(0f, 1f)] public float deckClearAmount = 0.35f;
 
-    [Header("Ortam ışığı ve gölge")]
-    [Tooltip("Ortam ışığının sis rengine oranı. Yüksek = düz ve puslu aydınlatma.")]
-    [Range(0f, 1.5f)] public float ambientStrength = 0.85f;
+    [Header("Gölge")]
     [Tooltip("Açık havadaki gölge mesafesi (metre). Sis kapandıkça bu değer düşer.")]
     public float maxShadowDistance = 150f;
     [Tooltip("Gölge mesafesi görüşün bu oranı kadar olsun. Sisin içindeki gölge görünmez.")]
