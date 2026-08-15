@@ -419,7 +419,13 @@ public static class MountainSceneBootstrap
         // aydınlığına göre kurulu ve gökyüzü parlaklığını ana ışıktan türetiyor; 1.5'te
         // gök sahneye göre sönük kalıyordu. Sayı paketin kendi önerisi, bizim seçimimiz
         // değil — gök ile sahnenin göreli parlaklığı buradan geliyor.
-        Object.FindAnyObjectByType<TimeOfDay>().SunIntensity = 3.030782f;
+        var timeOfDay = Object.FindAnyObjectByType<TimeOfDay>();
+        timeOfDay.SunIntensity = 3.030782f;
+
+        // AY GÖKYÜZÜNÜ AYDINLATAN TEK KAYNAK. Paket geceleyin ayı güneş yerine koyup
+        // atmosferi ondan hesaplıyor; ortam probe'u da o gökyüzünden pişiyor. Değer göz
+        // kararı bulundu, gerçek ay parlaklığının karşılığı değil.
+        timeOfDay.MoonIntensity = 0.4f;
     #endif
 
         // Debug menüsünde olduğu gibi her çalışmada yeniden bağlanır
