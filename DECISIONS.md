@@ -1111,6 +1111,26 @@ kendi yerelini kullanıyor. Paylaşılan yardımcılar ayrı `#region Shared` bl
 **Tetikleyici.** Paket güncellenirse bu düzeltme kaybolur ve aynı dört hata döner. Yeni
 sürüm URP 17'yi destekliyorsa düzeltme gereksizleşir ve bu kayıt silinir.
 
+## Atmosferik soğurmanın tek sahibi gökyüzü paketi
+
+**Karar.** Yönlü ışığa HAM güneş yazılıyor. `TimeOfDay`'in `Tint` / `BeamLevel` /
+`LowSunFade` süzmesi ışığa UYGULANMIYOR.
+
+**Ölçüm.** Öğlen ışığa `şiddet 2.55 (tepe 3.03'ün %84'ü) · renk 1.00 0.88 0.70`
+yazılıyordu. Mavi kanal daha kaynakta 0.70'e iniyor, paket üstüne kendi transmittance'ını
+uyguluyordu — Rayleigh'in en çok saçtığı kanal iki kez kesiliyor ve öğlen gökyüzü lacivert
+kalıyordu. F1'e izolasyon anahtarı konup yan yana görüldü.
+
+**Gerekçe.** Port zaten bunun için alındı; atmosfer modelini iki yerde tutmanın anlamı yok.
+
+**Ne kaldı.** `Atmosphere` modeli silinmedi ama artık ışığı sürmüyor. Sis rengi, bulut
+tonu, arazi şafak rengi ve pozlama uyumu hâlâ ondan besleniyor. Kendi yükseklik sisimiz
+pakete taşındığında o zincir de gider.
+
+**Maliyet.** Arazinin şafak kızıllığı artık bizim ayarladığımız eğriden değil, paketin
+soğurmasından geliyor. `duskStrength`, `duskOvercast` gibi ayarlar hâlâ SİSE etki ediyor
+ama ışığa etmiyor.
+
 ## Paketin sisi kapalı başlıyor
 
 **Karar.** `Fog` override'ı profile eklendi ama `enabled = false`.
