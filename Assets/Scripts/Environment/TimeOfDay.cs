@@ -262,14 +262,20 @@ public class TimeOfDay : MonoBehaviour
             // kullanılırsa pay sıçradığında şiddet de sıçrar. Toplam sürekli, çünkü iki
             // terim de sürekli.
             //
-            // Uçlar kâğıtta (güneş 3.03, ay 0.204):
-            //   +3°  güneş 3.03            → tam gündüz
-            //    0°  güneş ~2.5            → gün batımı
-            //   −3°  güneş 1.33 + ay 0.20  → alacakaranlık, gece yarısından PARLAK
-            //   −8°  güneş 0.58 + ay 0.20  → geç alacakaranlık
-            //  −12°  güneş 0    + ay 0.20  → gece
-            // Yön −9.4°'de aya dönüyor, yani ikisi de sönükken. Eskiden −3°'de dönüyordu
-            // ve 18:10 gece yarısından karanlık çıkıyordu.
+            // ÖLÇÜLEN eğri (güneş 3.031, ay 0.204; sayılar `SmoothStep`'ten, tahminden
+            // değil):
+            //   +3°  3.031   tam gündüz
+            //    0°  2.815   batış
+            //   −2.5° 2.299  18:10 — gece yarısının (0.204) ON BİR KATI
+            //   −5°  1.556
+            //   −8°  0.727
+            //  −12°  0.204   gece; bu noktadan sonra sabit
+            // Sürekli ve monoton. Eskiden yön −3°'de aya dönüyordu ve alacakaranlık
+            // tamamen kayboluyordu; 18:10 gece yarısından karanlık çıkıyordu.
+            //
+            // KALAN KUSUR: yön −9.60°'de SERT dönüyor, o anda toplam ışık 0.408 (tepenin
+            // %13'ü) ve gölgeler 180° takla atıyor. Tek yönlü ışığa iki cisim sığdırmanın
+            // bedeli; gerçek çözümü paketin ikinci gök cismi (`DECISIONS.md`).
             float sunAbove = SunBlend(SunDirection.y);
             float moonAbove = MoonBlend(MoonDirection.y);
 
