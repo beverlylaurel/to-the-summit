@@ -677,11 +677,20 @@ public static class MountainSceneBootstrap
         // gece birebir aynıydı (`0.223 0.293 0.420`) ve tepe ile taban da aynıydı, yani
         // gökyüzünden pişmiş değil düz bir renkti. Bulutlar günün her saatinde o donmuş
         // rengi yiyordu.
-        if (RenderSettings.ambientMode != UnityEngine.Rendering.AmbientMode.Skybox)
-        {
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
+        // YANSIMA ŞİDDETİ 1, YANİ KISILMIYOR. Eskiden `AtmosphereController` bunu gök
+        // seviyesinden türetiyordu ve ölçülmüş bir gerekti: pişen harita gece kararmıyor,
+        // bisikletin kromu karanlıkta parlıyordu. O gerekçe ORTADAN KALKTI — paket
+        // yansıma küpünü gerçek gökyüzünden pişiriyor, gece küpün kendisi karanlık.
+        // Telafi terimi geri eklenmiyor; kısıcı yalnız haritanın yalan söylediği yerde
+        // gerekliydi.
+        bool ambientChanged = RenderSettings.ambientMode != UnityEngine.Rendering.AmbientMode.Skybox
+                           || !Mathf.Approximately(RenderSettings.reflectionIntensity, 1f);
+
+        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
+        RenderSettings.reflectionIntensity = 1f;
+
+        if (ambientChanged)
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
-        }
     #endif
     }
 
