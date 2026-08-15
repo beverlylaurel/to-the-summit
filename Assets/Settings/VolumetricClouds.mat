@@ -60,7 +60,7 @@ Material:
     - _AnvilAmount: 0
     - _CloudCoverage: 0.65
     - _CloudNearPlane: 1423.4832
-    - _DensityMultiplier: 0.48020002
+    - _DensityMultiplier: 0.30419996
     - _EarthRadius: 6378100
     - _ErosionFactor: 1
     - _ErosionOcclusion: 0.1
@@ -84,7 +84,7 @@ Material:
     - _ShapeScale: 34.1
     - _SmallWindSpeed: 0.25
     - _SunLightDimmer: 1
-    - _VerticalErosionWindDisplacement: -0.0027836405
+    - _VerticalErosionWindDisplacement: -4.1260705
     - _VerticalShapeNoiseOffset: 0
     - _VerticalShapeWindDisplacement: 0
     m_Colors:
@@ -92,6 +92,6 @@ Material:
     - _ScatteringTint: {r: 1, g: 1, b: 1, a: 0.25}
     - _ShapeNoiseOffset: {r: 0, g: 0, b: 0, a: 0}
     - _WindDirection: {r: 0.9063078, g: 0.42261827, b: 0, a: 0}
-    - _WindVector: {r: 0.20182681, g: 0.09411338, b: 0, a: 0}
+    - _WindVector: {r: 299.15918, g: 139.50021, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

@@ -356,7 +356,7 @@ MonoBehaviour:
     m_Value: 0
   densityMultiplier:
     m_OverrideState: 1
-    m_Value: 0.49
+    m_Value: 0.39
   extinctionCoefficient:
     m_OverrideState: 1
     m_Value: 0.04
