@@ -160,8 +160,15 @@ yükseltilirse kırpma kalkar ve kısıntının %65'i geri gelir.
 **Sise bakarak yapılan iki kırpma GERİ ALINDI:** kar albedosu 0.66 → 0.90 ve ayın ilk
 gözle ayarı. Belirtinin sebebi (yükseklik sisi) çürüyünce sayı da düştü.
 
-**Tetikleyici:** sis yeniden yazıldığında gece seviyesi yeniden değerlendirilir. Ortamın
-"biraz aydınlık" kalması da o turda ele alınacak.
+**KAPANDI (2026-08-16).** Sis yeniden yazıldı ve "ortam biraz aydınlık" kalıntısının
+sebebi bulundu: gece seviyesi değil, SİS RENGİNİN SEVİYESİYDİ. Renk elle yazılmış bir
+sabitti ve gökle birlikte kaymıyordu — gök gündüz-gece arası ~230 kat değişirken sis
+rengi 9.6 kat değişiyordu. Ölçüm: gece sis rengi ortam probunun 34.6 katı, kalibre oran
+ise 3.15; yani gece sis 11 kat fazla parlaktı ve örttüğü her şeyi 3.5 durak yukarı
+kaldırıyordu.
+
+Seviye artık probe'dan geliyor, sabit yalnız ton taşıyor (`SYSTEMS.md` → sis rengi).
+`MoonIntensity` 0.0199'a DOKUNULMADI: ölçüm ayın değil sisin yanlış olduğunu gösterdi.
 
 ## Bulut ayı DOĞRUDAN alıyor — eski kayıt ölçümle çürüdü
 
