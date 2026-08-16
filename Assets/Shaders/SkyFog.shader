@@ -1,4 +1,4 @@
-// include-rev: 30
+// include-rev: 31
 //
 // GÖKYÜZÜNE SİS. Sis katılımcı bir ortam: kameraya ulaşan her ışın onun içinden geçer.
 // Arazide biten ışınlar `MountainSurface` içinde sönümleniyordu, ama SONSUZA giden

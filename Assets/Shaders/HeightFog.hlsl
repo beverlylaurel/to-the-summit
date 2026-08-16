@@ -402,7 +402,20 @@ float3 AirColor(float3 direction)
     float alignment = saturate(dot(direction, normalize(_SunDirection + 0.0001)));
     // Dar lob ölçülü: büyütülünce diskin oturduğu yeri dolduruyor ve güneşin
     // kendisi kendi parlamasının içinde kayboluyordu
-    float forward = pow(alignment, 8.0) * 0.05 + pow(alignment, 64.0) * 0.12;
+    // DAR LOB SİSTE SÖNER, GENİŞ HÂLE KALIR. Dar lob güneş DİSKİNİN doğrudan
+    // görüntüsü; yoğun siste disk sönmüş olmalı, geriye yalnız çok saçılmanın kurduğu
+    // geniş hâle kalır. İkisi aynı katsayıyla durunca fırtınada güneş, görüş 140 m
+    // olmasına rağmen keskin ve gözü alan bir leke bırakıyordu.
+    //
+    // Sönüm sisin KENDİ kolon optik derinliğinden: `τ = β/k`, yani taban yoğunluğunun
+    // seyrelme katsayısına oranı — ikisi de mevcut, uydurma sayı yok. Kâğıtta:
+    //   berrak 25 km  → τ=0.09  → disk 0.91 (neredeyse tam)
+    //   yağışlı 1.5 km→ τ=1.51  → disk 0.22
+    //   fırtına 140 m → τ=16.2  → disk 0.00 (tamamen sönük)
+    float discVisibility = exp(-_HeightFogDensity / max(_HeightFogFalloff, 1e-6));
+
+    float forward = pow(alignment, 8.0) * 0.05
+                  + pow(alignment, 64.0) * 0.12 * discVisibility;
     air += _HeightFogSunColor.rgb * (forward * sunUp);
 
     return air;

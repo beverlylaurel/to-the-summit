@@ -1,4 +1,4 @@
-// include-rev: 67
+// include-rev: 68
 Shader "ToTheSummit/LightningBolt"
 {
     // Kanal katkısal çizilir: şimşek ışık yayan bir plazma, arkasındaki bulutu ya da
