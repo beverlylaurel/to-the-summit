@@ -46,6 +46,17 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Gölge mesafesi 60 m, sis hacmi 1000 m** — arazi huzmesi yalnız ilk 60 metrede
   oluşabiliyor; keskin ışık kolonu istendiğinde ilk bakılacak yer
   → [Volumetrik sis](#volumetrik-sis-wronski-froxel-hacmi-geldi-2026-08-16)
+- **Gece bulut aydınlatması** — koddan izlendi, bağ DOĞRU: PBSky dinamik olduğu için
+  paketin kendi bulut ortam küpü devre dışı (`!isDynamicPbrSky` kapısı) ve ortam
+  `RenderSettings.ambientProbe`'dan, yani `SkyAmbientBaker`'ın pişirdiği tek durumdan
+  geliyor. Doğrudan ışık da ana ışıktan (`sunLightDimmer` 1, `ambientProbeDimmer`
+  varsayılan 1, `scatteringTint` 0). Yani eksik olan BAĞ değil SEVİYE; ay şiddeti
+  0.0199 araziye göre kalibre edildi, bulut albedosu ~0.9 ve faz fonksiyonu ileri
+  yönlü. Tetikleyici: gece bulutu ekranda ölçülüp `MoonIntensity` ile birlikte
+  yeniden seviyelendirilmeli — tek başına bulut çarpanı eklemek ikinci bir kaynak olur
+- **Fırtınada güneş parlaması** — `AirColor`'ın ileri saçılım lobu (`pow(alignment, 8)*0.05
+  + pow(alignment, 64)*0.12`) sisin optik derinliğinden bağımsız; yoğun siste disk
+  görünmemesi gerekirken lob aynı kalıyor. Ölçüm gözle yapılmalı, sayı kâğıtta seçilmeli
 - **Gece seviyesi: ayı bulut belirledi** — sis yeniden yazılınca `MoonIntensity` ve gece
   profili yeniden değerlendirilir; ortam şu an biraz aydınlık, o tur ele alınacak
   → [Gece seviyesi: ayı BULUT belirledi](#gece-seviyesi-ayı-bulut-belirledi-sis-yenilenince-tekrar-bakılacak)
