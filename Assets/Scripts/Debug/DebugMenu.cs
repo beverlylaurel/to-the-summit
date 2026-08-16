@@ -47,6 +47,12 @@ public class DebugMenu : MonoBehaviour
 
     static readonly int TerrainShadowId = Shader.PropertyToID("_TerrainShadowReceive");
 
+    /// TEŞHİS — GEÇİCİ. Bulutu aydınlatan terimi renge çevirir; şafak düzlüğü ölçülünce
+    /// prob da bu satır da silinir.
+    static readonly int CloudLightProbeId = Shader.PropertyToID("_CloudLightProbe");
+    bool cloudLightProbe;
+    bool cloudPhaseProbe;
+
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
     float lockedSnowiness;
@@ -163,6 +169,10 @@ public class DebugMenu : MonoBehaviour
         // yazılmıyor, sıfır kalıyor ve arazi gölgesiz çiziliyordu. Oyunun normal hâli
         // panel kapalı olduğu için bu, oynanışın tamamını etkiliyordu.
         Shader.SetGlobalFloat(TerrainShadowId, 1f);
+
+        // PANELDEN BAĞIMSIZ: prob paneli KAPATIP buluta bakmak için var. Global panel
+        // çizimine konursa panel kapanınca yazılmaz ve prob hiç görünmez.
+        Shader.SetGlobalFloat(CloudLightProbeId, cloudPhaseProbe ? 2f : cloudLightProbe ? 1f : 0f);
 
         var keyboard = Keyboard.current;
         if (keyboard != null && keyboard.f1Key.wasPressedThisFrame) Toggle();
@@ -290,8 +300,51 @@ public class DebugMenu : MonoBehaviour
         clouds.cloudCoverage.value = CloudRow("Kapsama", clouds.cloudCoverage.value,
             coverageDefault, clouds.cloudCoverage.min, clouds.cloudCoverage.max, "F2");
 
+        cloudLightProbe = GUILayout.Toggle(cloudLightProbe,
+            "IŞIK PAYI PROBU (yeşil doğrudan · kırmızı ortam)");
+        cloudPhaseProbe = GUILayout.Toggle(cloudPhaseProbe,
+            "FAZ PROBU (kırmızı tepe · yeşil orta · mavi zayıf)");
+
+        DrawCloudLightRatio();
+
         EndSection();
     }
+
+    /// TEŞHİS — GEÇİCİ. Bulutun aldığı DOĞRUDAN ışık ile ORTAM ışığının oranı.
+    ///
+    /// Belirti: şafak ve batımda güneşe yakın bulutla uzaktaki bulut aynı görünüyor.
+    /// Farkı üretmesi gereken faz fonksiyonu sağlam — kâğıtta güneşe bakarken 1.80,
+    /// yana bakarken 0.028, yani 64 kat. O fark ancak DOĞRUDAN terim ORTAM teriminin
+    /// yanında anlamlıysa görünür; ortam baskınsa faz tepesi gürültüde kaybolur.
+    ///
+    /// Gece için bu oran bir kez ölçülmüştü: 35:1, doğrudan lehine. Şafakta bilinmiyor.
+    ///
+    /// TEK YÖNLÜ TEST. Buradaki doğrudan değer atmosfer sönümünden ÖNCEKİ hâl; shader
+    /// onu ayrıca `EvaluateSunColorAttenuation` ile söndürüyor ve ufukta o sönüm çok
+    /// güçlü. Yani ekrandaki gerçek oran buradakinden DAHA KÖTÜ. Burada bile ortam
+    /// baskınsa dava kapanmıştır.
+    void DrawCloudLightRatio()
+    {
+        Light sun = RenderSettings.sun;
+        Color direct = sun != null ? sun.color.linear * sun.intensity : Color.black;
+
+        // Bulut ortamı SH'den geliyor ve `VolumetricCloudsURP` onu π ile ölçekliyor;
+        // burada da aynı ölçek uygulanmazsa okunan sayı bulutun gördüğü değer olmaz.
+        var probe = RenderSettings.ambientProbe;
+        var dirs = new[] { Vector3.up, Vector3.down };
+        var lit = new Color[2];
+        probe.Evaluate(dirs, lit);
+
+        float ambient = Mathf.PI * 0.5f * (Luminance(lit[0]) + Luminance(lit[1]));
+        float directLum = Luminance(direct);
+
+        GUILayout.Label($"doğrudan {directLum:F5}   ortam {ambient:F5}");
+        GUILayout.Label(ambient > 1e-6f
+            ? $"oran {directLum / ambient:F1}:1  (sönümden ÖNCE — ekranda daha düşük)"
+            : "oran — (ortam sıfır)");
+    }
+
+    static float Luminance(Color c) => 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
 
     static float CloudRow(string label, float value, float original, float min, float max,
         string format)

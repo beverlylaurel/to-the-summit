@@ -765,17 +765,19 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
             {
                 SphericalHarmonicsL2 ambientProbe = RenderSettings.ambientProbe;
 
-                // ÇAKMA. IŞINIM → RADYANS. `RenderSettings.ambientProbe` YÜZEY
-                // AYDINLATMASI birimindedir (irradyans); bulut ise katılımcı bir ortam
-                // ve içeri saçtığı RADYANSI ister. İkisi arasındaki dönüşüm π'dir.
+                // ÇAKMA — GERİ ALINDI. Buraya bir dönem `× π` konmuştu: froxel sisinde
+                // ölçülmüş 3.15 oranı buluta BENZETME yoluyla taşınmıştı. Ölçüm değildi,
+                // varsayımdı ve iki yönden de yanlıştı.
                 //
-                // Bu proje o farkı bir kez ÖLÇTÜ: froxel sisinde probe DC luminansı
-                // 0.156, aynı olguyu tarif eden sis rengi 0.492 — oran 3.15, yani π.
-                // Sis tarafı düzeltildi, bulut tarafı aynı hatayla kaldı: gece bulut
-                // kendi ışımasını π kat eksik alıyor ve sis kapatılınca simsiyah çıkıyor.
-                for (int c = 0; c < 3; c++)
-                    for (int i = 0; i < 9; i++)
-                        ambientProbe[c, i] *= Mathf.PI;
+                // Yön yanlıştı: katılımcı ortam için ışınım → radyans dönüşümü `L = E/π`,
+                // yani bölme. Sisteki 3.15 ise ham SH katsayısı (`sh[c,0] - sh[c,6]`) ile
+                // sis rengi arasında ölçülmüştü; bulutun okuduğu büyüklük o değil.
+                //
+                // Ölçüldü: doğrudan/ortam oranı şafakta 34.2:1, öğlen 6.5:1 (sönüm
+                // öncesi). Işık payı probu her saatte ve her yönde doğrudan terimi
+                // baskın gösterdi — yani ortam terimi fazı boğmuyor, π'nin geri
+                // alınması bir belirtiyi düzeltmek için değil, ölçülmemiş bir
+                // varsayımı kaldırmak için.
 
                 cloudsMaterial.SetVector(shAr, new Vector4(ambientProbe[0, 3], ambientProbe[0, 1], ambientProbe[0, 2], ambientProbe[0, 0] - ambientProbe[0, 6]));
                 cloudsMaterial.SetVector(shAg, new Vector4(ambientProbe[1, 3], ambientProbe[1, 1], ambientProbe[1, 2], ambientProbe[1, 0] - ambientProbe[1, 6]));

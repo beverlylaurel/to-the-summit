@@ -194,8 +194,41 @@ VolumetricRayResult TraceVolumetricRay(CloudRay cloudRay)
             #endif
                 half3 ambient = max(0, lerp(ambientTermBottom, ambientTermTop, relativeHeight) * _AmbientProbeDimmer);
 
-                volumetricRay.scattering = sunColor * volumetricRay.scattering;
-                volumetricRay.scattering += ambient * volumetricRay.ambient;
+                half3 directTerm = sunColor * volumetricRay.scattering;
+                half3 ambientTerm = ambient * volumetricRay.ambient;
+
+                volumetricRay.scattering = directTerm + ambientTerm;
+
+                // PROB 1 — IŞIK PAYI: hangi terim aydınlatıyor. Ölçek doyum değil PAY,
+                // yani pozlamadan bağımsız. ÖLÇÜLDÜ: her saatte, her yönde YEŞİL —
+                // doğrudan terim baskın, ortam boğmuyor. Hipotez çürüdü.
+                if (_CloudLightProbe > 0.5 && _CloudLightProbe < 1.5)
+                {
+                    half d = dot(directTerm, half3(0.2126, 0.7152, 0.0722));
+                    half a = dot(ambientTerm, half3(0.2126, 0.7152, 0.0722));
+                    half share = d / max(d + a, 1e-6);
+
+                    volumetricRay.scattering = lerp(half3(1.0, 0.0, 0.0),
+                                                    half3(0.0, 1.0, 0.0), share);
+                }
+
+                // PROB 2 — FAZ DEĞERİ. Doğrudan terim baskınsa fazın 64 katlık farkı
+                // ekrana çıkmalı. Çıkmıyorsa ya faz girdisi (`cosAngle`) beklendiği gibi
+                // değişmiyor, ya da fark sonradan eziliyor. Bu prob ikisini ayırır.
+                //
+                // Ölçek SINIF, gradyan değil: göz gradyanda "fark var mı" diye tereddüt
+                // eder, üç renkte etmez.
+                if (_CloudLightProbe > 1.5)
+                {
+                    half cosA = dot(cloudRay.direction, sun.direction);
+                    half fw = HenyeyGreensteinPhaseFunction(FORWARD_ECCENTRICITY, cosA);
+                    half bw = HenyeyGreensteinPhaseFunction(BACKWARD_ECCENTRICITY, cosA);
+                    half ph = lerp(fw, bw, PHASE_LOBE_BLEND);
+
+                    volumetricRay.scattering = ph > 0.5  ? half3(1.0, 0.0, 0.0)   // güçlü tepe
+                                             : ph > 0.1  ? half3(0.0, 1.0, 0.0)   // orta
+                                                         : half3(0.0, 0.0, 1.0);  // zayıf
+                }
 
                 // Çakma üçüncü ışık kaynağı: rengi güneşin de ortamın da değil, kendisinin.
                 volumetricRay.scattering += _LightningFlash.rgb * volumetricRay.glow;
