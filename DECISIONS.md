@@ -183,6 +183,37 @@ seçiyor), gökyüzü paketi `_MainLightColor`'ı aydan yazıyor, bulut onu okuy
 
 Ek maliyet yok: doğrudan ışık zaten uygulanıyordu.
 
+## `VolumetricClouds.mat` yerel değişiklikleri izlenmiyor (2026-08-17)
+
+**Karar:** dosya repoda kalıyor ama `git update-index --skip-worktree` ile işaretlendi.
+
+**Gerekçe:** `VolumetricCloudsURP` rüzgâr birikimini (`_WindVector`,
+`_VerticalErosionWindDisplacement`) her karede materyale yazıyor — materyal bu pakette
+rüzgâr durumunun deposu. Her Play sonrası diff çıkıyor ve gerçek değişiklikleri
+gizliyordu. `.gitignore` işe yaramaz: dosya izlendiği için ignore yok sayılır.
+Tamamen çıkarmak da olmaz — renderer feature onu GUID'le arıyor, temiz klonda bulut yok.
+
+**Değerlerin kaybolması sorun değil:** `resetWindOnStart` açılışta rüzgârı sıfırlıyor,
+yani commit'teki sayı zaten kullanılmıyor.
+
+**MALİYET — okunmadan geçilmesin:** `skip-worktree` **yerel bir ayardır, repoda
+taşınmaz.** Başka makinede klonlanınca aynı gürültü geri gelir; orada komut tekrar
+çalıştırılır:
+
+```
+git update-index --skip-worktree Assets/Settings/VolumetricClouds.mat
+```
+
+Materyalde **bilerek** bir değişiklik yapılacaksa (şekil ölçeği, gürültü, kapsama)
+işaret önce kaldırılır, yoksa değişiklik sessizce commit'lenmez:
+
+```
+git update-index --no-skip-worktree Assets/Settings/VolumetricClouds.mat
+```
+
+**Tetikleyici:** materyalde yapılan bir ayar değişikliği commit'e girmiyorsa ya da temiz
+klonda bulut ayarları beklenenden farklıysa buraya bakılır.
+
 ## Paketin sisi kapalı başlıyor
 
 **Karar.** `Fog` override'ı profile eklendi ama `enabled = false`.
