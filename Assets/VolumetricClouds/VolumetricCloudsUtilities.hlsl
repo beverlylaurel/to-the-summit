@@ -28,16 +28,33 @@ half3 EvaluateVolumetricCloudsAmbientProbe(half3 normalWS)
 #define CLOUD_DENSITY_TRESHOLD 0.001
 // Number of steps before we start the large steps
 #define EMPTY_STEPS_BEFORE_LARGE_STEPS 8
-// İKİ LOBLU HENYEY-GREENSTEIN. Değerler Frostbite'ın üretim varsayılanları
-// (`sky brief.md`): g0 = 0.8 ileri saçılım (gümüş kenar), g1 = −0.5 geri saçılım
-// (ters açıdaki bulut ölü görünmesin), karışım 0.5.
+// İKİ LOBLU HENYEY-GREENSTEIN. g0 = 0.8 ileri saçılım (gümüş kenar), g1 = −0.5 geri
+// saçılım (ters açıdaki bulut ölü görünmesin).
 //
 // Portta ikisi TOPLANIYORDU. Her HG küre üzerinde 1'e integre olduğu için toplam 2
 // ediyordu, yani enerji korunmuyordu. Brief normalize birleştirmeyi şart koşuyor;
 // `lerp` iki lobu ağırlıklı ortalıyor ve integral 1'de kalıyor.
+//
+// KARIŞIM 0.5 → 0.15, ÖLÇÜMLE. Belirti: şafakta güneşten uzak bulutlar yeterince
+// kararmıyordu. 0.5, Frostbite'ın brief'teki varsayılanıydı ve bu sahnede hiç
+// doğrulanmamıştı; geri lob 90°'de ileri lobun ÜÇ KATI olduğu için uzak alanı tek
+// başına ayakta tutuyordu. Durak konturuyla ölçüldü: deste 3 durağa sıkışmış,
+// %70'i tek bant içinde.
+//
+//   karışım   15°     90°     oran
+//   0.50      0.503   0.0282  17.8×
+//   0.15      0.842   0.0180  46.8×
+//
+// İleri lobun eksantrikliğine DOKUNULMADI: g düşünce tepe az iner ama lob genişler ve
+// uzak alan yükselir — 0.60'ta 90° değeri 0.0337, yani düzeltmeden önceki hâlinden
+// bile parlak. Kaldıraç orada değil.
+//
+// `lerp` ağırlıklı ortalama olduğu için karışımı düşürmek ileri lobun payını yükseltti
+// ve güneş çevresi 1.7 kat parladı; o taraf `LookSettings`'te bloom eşiğiyle karşılandı
+// (1.10 → 2.00, diğer ön ayarlar aynı oranla).
 #define FORWARD_ECCENTRICITY 0.8
 #define BACKWARD_ECCENTRICITY -0.5
-#define PHASE_LOBE_BLEND 0.5
+#define PHASE_LOBE_BLEND 0.15
 // Gurultu dokularinin cozunurlugu; voxel dunya boyu buradan cikiyor.
 #define SHAPE_NOISE_RESOLUTION 128.0
 #define EROSION_NOISE_RESOLUTION 32.0

@@ -21,7 +21,7 @@ MonoBehaviour:
     tint: 2
     shadowChill: 0.45
     bloom: 0.5
-    bloomThreshold: 1.05
+    bloomThreshold: 1.91
     grain: 0.12
   clearNight:
     exposure: -1.5
@@ -32,7 +32,7 @@ MonoBehaviour:
     tint: 6
     shadowChill: 0.7
     bloom: 0.15
-    bloomThreshold: 1.2
+    bloomThreshold: 2.18
     grain: 0.3
   stormDay:
     exposure: -0.8
@@ -43,7 +43,7 @@ MonoBehaviour:
     tint: 0
     shadowChill: 0.85
     bloom: 0.8
-    bloomThreshold: 0.85
+    bloomThreshold: 1.55
     grain: 0.28
   stormNight:
     exposure: -2.1
@@ -54,7 +54,7 @@ MonoBehaviour:
     tint: 4
     shadowChill: 1
     bloom: 0.55
-    bloomThreshold: 0.95
+    bloomThreshold: 1.73
     grain: 0.45
   goldenHour:
     exposure: -0.8
@@ -65,5 +65,5 @@ MonoBehaviour:
     tint: 4
     shadowChill: 0.25
     bloom: 0.35
-    bloomThreshold: 1.1
+    bloomThreshold: 2
     grain: 0.07
