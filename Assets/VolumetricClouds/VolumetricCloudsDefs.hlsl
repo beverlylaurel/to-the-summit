@@ -54,6 +54,14 @@ half _ImprovedTransmittanceBlend;
 float _PostExposure; // Exposure from the ColorAdjustments override
 half3 _SunColor;
 
+// IŞIK PAYI PROBU — GEÇİCİ. Bulutu, onu AYDINLATAN terime göre boyar:
+//   YEŞİL   doğrudan güneş/ay baskın  → faz fonksiyonu ekranda iş görüyor
+//   KIRMIZI ortam baskın              → faz tepesi boğuluyor, bulut düz görünür
+//   SARI    ikisi denk
+// Belirti: şafak ve batımda güneşe yakın bulutla uzaktaki bulut aynı görünüyor.
+// "Fark var mı" göz kararıdır; bu prob yerine RENK SINIFI soruyor.
+float _CloudLightProbe;
+
 /// ÇAKMA. `LightningFlash` global olarak yazıyor: `_LightningFlash.rgb` o anki parlama,
 /// `_LightningPosition` = (dünya konumu xyz, leke yarıçapı w). Konum çakma başına bir kez
 /// yazılıyor, yani maske kare kare değişmiyor — `[N22 s.180]`'in titreme çaresi bu.
