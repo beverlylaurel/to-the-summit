@@ -35,8 +35,7 @@ Bunlar gerçek dünyanın metreleri. Dağ iki katına çıkınca donma seviyesi 
 
 | ne | değer | neden mutlak |
 |---|---|---|
-| `freezingStormDrop` | 500 m | Soğuk cephenin donma seviyesini indirme mesafesi |
-| `freezingDayRise` | 250 m | Öğle ısınmasının kaldırma mesafesi |
+| `stormCooling` / `daytimeWarming` | 3.25 / 1.63 °C | Donma seviyesini oynatan şey MESAFE değil SICAKLIK. Karşılığı `lapseRate` (6.5 °C/km) üzerinden çıkıyor: 500 m ve 251 m. Dağ büyüyünce sıcaklık farkı değişmez |
 | `permanentSnowRise` | 400 m | Denge çizgisinin donma seviyesi üstündeki payı |
 | `permanentSnowBand` | 350 m | Çizginin yumuşama genişliği |
 | `snowlineSunLift` / `GullyDrop` / `Ragged` | 200 / 150 / 120 m | Bakı, oluk ve düzensizliğin kar çizgisini oynatma mesafesi |
@@ -45,9 +44,9 @@ Bunlar gerçek dünyanın metreleri. Dağ iki katına çıkınca donma seviyesi 
 | Gezegen yarıçapı | 6 360 km | Dünya |
 | Sis hacmi menzili / dilim | 0.5 → 1000 m / 64 | Froxel hacmi gerçek metrelerde; dağ büyüyünce kameranın önündeki hava kalınlaşmaz. Dilim sayısı da sabit — üstel dağılım yakın alanı korur |
 | `SunIntensity` / `MoonIntensity` | 3.030782 / 0.0199 | Gök cisimlerinin aydınlatması; dağ büyüyünce güneş güçlenmez. Oran 8,6 durak — gerçeğin (19 durak) altında ve BİLEREK, gerekçe `DECISIONS.md` |
-| `moraineHeight` / `moraineSpacing` | 12 m / 420 m | Buzul moreni gerçek boyutu; dağ büyüyünce moren büyümez |
-| `channelDepth` | 6 m | Dere yatağı derinliği |
-| `hummockHeight` | 2.5 m | Tümsek yüksekliği |
+| `moraineHeight` / `moraineSpacing` | 20 m / 420 m | Buzul moreni gerçek boyutu; dağ büyüyünce moren büyümez |
+| `channelDepth` | 14 m | Dere yatağı derinliği |
+| `hummockHeight` | 8 m | Tümsek yüksekliği |
 | `snowDisplaceMax` | 3.2 m | Birikintinin gerçek yüksekliği; dağ büyüyünce kar yığını büyümez. Fiili tavan 8.0 m: birikinti alanı ×1.25, arazi ağırlığı ×2.0 |
 | `snowDisplaceStart` | 0.18 m | Geometriye geçme eşiği; insan adımının karşılığı |
 | Birikinti gövdesi | 45 × 16 m | Rüzgârın oluşturduğu yığının gerçek boyu |

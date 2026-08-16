@@ -424,8 +424,11 @@ okuduğu tek eşlemedir.
 
 
 **Okur:** şiddet, karlılık, rüzgârın **sürekli** şiddeti ve yönü, günün saati, ve
-sürücüden yalnızca **açık pencere** sinyali. Sürücüden başka hiçbir değer okunmaz;
-kuşak kotları, yükseklik, ilerleme — hiçbiri buraya girmez.
+sürücüden ÜÇ sinyal: **açık pencere** (kapsama tabanının delinebildiği tek yol),
+**kuru kapsama** (yağış sıfırken göğün kendi ritmiyle kapanıp açılması) ve **bulut
+kütlesi** (katmanın tabanı, sönmüş yağışa değil kendi durumuna bağlı olsun diye).
+Sürücüden başka hiçbir değer okunmaz; kuşak kotları, yükseklik, ilerleme — hiçbiri
+buraya girmez.
 
 Esintiyi bilerek okumaz: görüş mesafesi ve bulut tabanı sekiz saniyelik bir esintiyle
 açılıp kapanmaz. Bulut kayması da öyle — yön gibi hız da ağır yumuşatılır; ham hız
@@ -435,20 +438,15 @@ altında bulut kenarlarını blok blok pikselleştiriyordu.
 Görüş mesafesi tek bir değerden türer: yağış tipi (kar yağmurdan çok daha kapatıcı),
 rüzgârın savurması (yalnızca yağış varken anlamlı), bulut kuşağının içinde olup olmama.
 
-**Bulut gölgesi yere düşer.** Bulutlar tepede geziyordu ama yer bunu bilmiyordu ve ışık
-sabit kaldığı sürece yamaç hep aynı okunuyordu. Gölge, bulutun **kendi yer izi
-fonksiyonundan** okunuyor: `CloudFootprintAt` (`HeightFog.hlsl`) — gökyüzü ışın yürütücüsü
-hangi fonksiyondan yoğunluk alıyorsa yer de ondan gölge alıyor. Fonksiyon eskiden
-`CloudCommon.hlsl`'deydi ve yalnız gökyüzü görüyordu; gölge kendi yaklaşımını kuruyordu
-(warp'sız, evrimsiz, fırtına dolgusuz) ve iki alan hiçbir zaman tutmadı — gökte bulut
-olmayan yerde gölge, gölge olmayan yerde bulut. Fonksiyon ortak dosyaya taşındı, ikinci
-alan silindi. Gölge, uzaklığa göre mip seçiyor: piksel ayak izi metrelerce genişleyince
-LOD 0 çözülemeyen frekansı kaynatıyordu.
-Güneşe doğru geri izleniyor: yüzeyden bulut tabanına kadar olan yükseklik, güneşin
-eğimiyle yatay kaymaya çevriliyor; bu yapılmazsa gölge bulutun tam altında kalır ve alçak
-güneşte manzarayla uyuşmaz. Arazi gölgesiyle **çarpılıyor** — ikisi ayrı olay (sırtın
-arkasında kalmak / üstünden bulut geçmek) ama ikisi de yalnız doğrudan güneşi kesiyor,
-gökten gelen dolaylı ışığa dokunmuyor.
+**Bulut gölgesi yere düşer — ana ışığın cookie dokusundan.** `VolumetricCloudsURP` gölgeyi
+oraya yazıyor, URP de `_LIGHT_COOKIES` açık olan her yüzeye uyguluyor. Gölge böylece
+gökyüzünü çizen yoğunluk alanının TA KENDİSİNDEN türüyor; ikinci bir yaklaşım yok,
+dolayısıyla "gökte bulut yokken yerde gölge" durumu da yok.
+
+Bu bölüm bir dönem `CloudFootprintAt` ve `CloudCommon.hlsl`'i anlatıyordu — o sistem
+söküldü, fonksiyon da dosya da yok. Arazi gölgesiyle **çarpılıyor**: ikisi ayrı olay
+(sırtın arkasında kalmak / üstünden bulut geçmek) ama ikisi de yalnız doğrudan güneşi
+kesiyor, gökten gelen dolaylı ışığa dokunmuyor.
 
 Sis **üç katmanın toplamıdır**, hepsi kendi yarı yüksekliğiyle: sınır tabakası (yağışla
 derinleşir, inversiyonda biter), vadi sis denizi (çok sığ, gece ürünü) ve serbest troposfer

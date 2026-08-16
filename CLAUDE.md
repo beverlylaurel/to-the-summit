@@ -52,7 +52,8 @@ eşik ve katsayı kodda ve ayar asset'lerinde durur.
 ## Bulut sistemi
 
 Hacimsel bulutlar `UnityVolumetricCloudsURP` (MIT) üzerine kurulu, yoğunluk/şekil/aydınlatma
-zinciri Nubis/HZD makalesine göre düzeltildi. Bağların tamamı kuruldu.
+zinciri Nubis/HZD makalesine göre düzeltildi. Bağlar `SYSTEMS.md`'de ve değişmeye
+devam ediyor — son eklenenler: kapsama → optik kalınlık, sis → bulut birleştirme geçişi.
 
 - **Bağlar ve bilinçli kurallar `SYSTEMS.md` → Bulutlar.** Güncel olan orasıdır.
 - **`CLOUDS_REBUILD.md`** teknik kayıt: portun makaleyle sekiz farkı, hangisi nasıl
@@ -81,7 +82,6 @@ gelmez; bu bir kez uygulandı (güneş yaması, `CLOUDS_REBUILD.md` bağ 7).
 - Çöp kod yok. Kullanılmayan dosya, ölü kod, yoruma alınmış kod, template artığı projede durmaz.
 - Bir şey gereksizleşince aynı adımda silinir, sonraya bırakılmaz.
 - Gereksiz paket/modül kurulmaz. Sadece o anki adım için gerekli olan kurulur.
-- Savunmacı `try/catch`, "ne olur ne olmaz" fallback'leri yazılmaz. Hata yutulmaz, açıkça fırlatılır.
 
 ## Klasör yapısı
 
@@ -180,14 +180,13 @@ verilir, istem yeniden yazılmaz.
 
 ## İş akışı
 
-- **Hiçbir işlem onaysız yapılmaz.** Dosya yazma, düzenleme, silme, komut çalıştırma — önce ne yapılacağı söylenir, kullanıcı onay verir, sonra uygulanır. "Küçük değişiklik" istisnası yoktur.
+- **Davranışı değiştiren her şey onaya tabidir.** Kaynak dosya yazma/düzenleme/silme, ayar asset'i değiştirme, geri alınamaz komut — önce ne yapılacağı söylenir, onay alınır, sonra uygulanır. "Küçük değişiklik" istisnası yoktur.
+- **Onaya tabi değil:** okuma, arama, ölçüm, teşhis aracı kurma, belge güncellemesi. Ölçüm için izin istemek ölçümü imkânsız kılar.
+- Kullanıcı "sorma" ya da "onay bekleme" derse o oturum için onay kuralı askıya alınır.
 - Onay bir adım içindir, sonraki adıma taşınmaz. Plan onaylandıysa bu, plandaki her dosyayı arka arkaya yazma yetkisi değildir.
-- Çok dosyalı veya mimari değişiklikten önce kısa plan sunulur, onay beklenir.
 - Kullanıcı Play'e bastığını söylediğinde `Logs/play.log` okunur. Bulunan hata ve uyarılar kullanıcıya düzeltme önerisi olarak sunulur.
-- Değişiklikler diff olarak gösterilir, tam dosya yapıştırılmaz.
 - Değişiklik bitmeden **yan etkileri** kontrol edilir; kullanıcı bariz sonuçları bildirmek zorunda kalmaz:
   UI'ya içerik eklendiyse taşma/kaydırma, bileşene alan eklendiyse sahnedeki eski örneklerin yeniden
   bağlanması, serileştirilmiş varsayılan değiştiyse mevcut asset/sahnenin bundan etkilenmediği,
   imza değiştiyse tüm çağıranlar.
 - "Yaptım, çalışıyor" denmeden önce doğrulanır. Unity'de doğrulama gerekiyorsa kullanıcıdan sonuç istenir.
-- Commit ve push kullanıcı açıkça istemedikçe yapılmaz.
