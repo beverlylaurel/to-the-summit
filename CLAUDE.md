@@ -97,6 +97,17 @@ Assets/
 
 Yeni sistem = yeni klasör. Dosyalar `Assets/Scripts` kökünde birikmez.
 
+## Tasarım otoritesi
+
+Oyunun **ne olduğu** `DESIGN.md`'de: register (absürt/kayıtsızlık, korku değil), yapı
+(iniş yok, iki çıkış), anlatı kuralları (hikâye çevrede, sahibi belirsiz), ton yönetimi
+(mod değil irtifa) ve üç yasak.
+
+Oynanışa, anlatıya veya tona dokunan bir özellik eklenmeden **önce** oraya bakılır. Tek
+soru: *bu hangi kayda hizmet ediyor?* Cevap "hiçbiri" ise özellik yanlış oyuna aittir.
+
+Yeni bir ton/yapı kararı verildiğinde **aynı adımda** oraya yazılır.
+
 ## Belirti kaydı
 
 Ölçülerek bulunmuş belirtiler ve gerçek sebepleri `SYMPTOMS.md`'de. Bir belirtiyle
