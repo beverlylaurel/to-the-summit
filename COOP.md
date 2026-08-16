@@ -63,6 +63,13 @@ mesafeden türediği için gürleme zamanları da tutmaz.
 üretiyor. Tetikleyen tarafı otoriteye bağlamak yetiyor — zincirin gerisi kendiliğinden
 hizalanır. Bu yapı bilerek böyle kuruldu.
 
+**NE ZAMAN ÖDENECEK — kararlaştırıldı (2026-08-17):** ayrı bir iş olarak değil, **şimşek
+spec'i yazılırken**. Şimşek zaten sıfırdan yeniden yazılacak (`specs/lightning/`); o tur
+sırasında rastgeleliğin hangi kısmı paylaşılan durumdan gelecek, hangisi yerel süs kalacak
+baştan kurulur. Sonradan eklenirse tetikleme zinciri ikinci kez elden geçer.
+
+Yani bu madde **ağ katmanını beklemiyor** — şimşek spec'i başlarken açılır.
+
 ---
 
 ## 2. Havayı tek oyuncunun yüksekliği sürüyor
