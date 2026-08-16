@@ -285,6 +285,15 @@ farklı dağlar olsun" isteği yöntemin doğal çıktısı, ek iş değil.
 
 Üç bant aynı alandan örneklendiği için **dikiş sorunu yok**.
 
+**HER YER DAĞ OLMAYACAK.** Uzak bant manzaradır, oynanacak alan değil — 360° zirve duvarı
+tuhaf görünür. Gerçek bir silsilenin etrafı çeşitlidir: bir yönde asıl kütle ve etek
+tepeleri, başka yönde açık ova, bir yönde vadi ve alçak sırtlar, bir yönde neredeyse düz.
+(Everest'in kuzeyi Tibet platosu — kilometrelerce boş yüksek düzlük.)
+
+Argudo kendi başına bırakılırsa istatistiğe uyup **her yere zirve serper**. Yön yön
+karakter dağılımı ona ayrıca söylenecek: dağlık, tepelik, ova, plato. Bu bir ayar değil,
+üretimin girdisi.
+
 ### Sınır doğal olacak
 
 Oyuncu 8.76 km'de arazinin kenarına ulaşabilir ve çarpışmasız banda girmemeli. Sınır
