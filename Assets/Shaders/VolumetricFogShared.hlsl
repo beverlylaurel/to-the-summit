@@ -50,21 +50,6 @@ float4 _FogJitter;
 float4 _FogCameraForward;
 
 
-// TEŞHİS ARAÇLARI — GEÇİCİ. Sis doğrulanınca bunlar ve F1'deki bölüm silinir.
-// Silme tek adımda yapılmalı: bu globaller `HeightFog.hlsl`, `SkyFog.shader`,
-// `VolumetricClouds.shader` ve `VolumetricFog.compute` içinde de okunuyor.
-float _FogAudit;           // ortam tek biçim + tek renk (macenta): kapsama testi
-float _FogLayerProbe;      // yeşil arazi · kırmızı gök · mavi bulut: KİM çiziyor
-float _FogVolumeProbe;     // kırmızı geçirgenlik · yeşil saçılım: froxel hacmi dolu mu
-float _FogSurfaceProbe;    // sis atlanır, yüzeyin ham luminansı logaritmik basılır
-float _FogCloudsDisabled;  // bulut birleştirmesindeki sis uygulamasını kapatır
-
-// Koschmieder: β = 3.912 / görüş. 40 m için 0.0978 /m.
-static const float FogAuditExtinction = 0.0978;
-
-// Ton eşleme parlaklığı oynatır ama TONU oynatmaz; okuma tona dayanıyor.
-static const float3 FogAuditColor = float3(0.5, 0.0, 0.5);
-
 // Birikmiş saçılım hacmi. Compute onu RW olarak bildirdiği için orada bu blok kapalı;
 // aynı isim iki farklı tipte bildirilirse derleyici çakışıyor.
 #ifndef FOG_VOLUME_COMPUTE
@@ -235,9 +220,6 @@ float SpindriftFlow(float2 xz)
 
 float SpindriftAt(float3 pos)
 {
-    // DENETİM: perde kapalı — kendi nötr rengi macentayı beyaza çekerdi.
-    if (_FogAudit > 0.5) return 0.0;
-
 
     if (_SpindriftDensity <= 0.0) return 0.0;
 
@@ -300,9 +282,6 @@ float SpindriftAt(float3 pos)
 /// bakışta otuz kilometredeki sırt tam kontrastla, karton gibi duruyordu.
 float FogDensityAt(float height)
 {
-    // DENETİM: ortam TEK BİÇİMLİ. Görüş 40 m, her kotta aynı.
-    if (_FogAudit > 0.5) return FogAuditExtinction;
-
 
     float lid = 1.0 - smoothstep(_FogInversionHeight - _FogInversionWidth,
                                  _FogInversionHeight + _FogInversionWidth, height);
@@ -324,9 +303,6 @@ float FogDensityAt(float height)
 /// iki tüketici, tek alan — formül değişirse ikisi birlikte değişmeli.
 float FogBankAt(float2 pos)
 {
-    // DENETİM: bank yok — yoğunluğu yerel oynatması tek biçimliliği bozardı.
-    if (_FogAudit > 0.5) return 1.0;
-
 
     float2 p = pos - _FogBankDrift.xz;
 

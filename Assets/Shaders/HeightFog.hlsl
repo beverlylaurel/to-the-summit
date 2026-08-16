@@ -78,12 +78,7 @@ float HeightFogIntegral(float3 cameraPos, float3 worldPos)
     float3 ray = worldPos - cameraPos;
     float distance = length(ray);
 
-    // DENETİM: erken çıkış kapalı. Bu kapı hava BERRAKKEN yoğunlukların sıfır olmasına
-    // bakıyor; denetimde yoğunluğu `FogDensityAt` zorluyor ama bu satır onu görmüyor ve
-    // integral hiç çalışmadan sıfır dönüyordu. Araç berrak havada susar, kullanıcı da
-    // "delik var" diye okurdu. Açık kalınca denetim HER havada çalışıyor.
-    bool hasFog = _FogAudit > 0.5
-               || _HeightFogDensity > 0.0 || _FogSeaDensity > 0.0 || _FogFreeDensity > 0.0;
+    bool hasFog = _HeightFogDensity > 0.0 || _FogSeaDensity > 0.0 || _FogFreeDensity > 0.0;
 
     if (distance < 0.01 || !hasFog) return 0.0;
 
@@ -219,10 +214,6 @@ float SkyFogDepth(float3 cameraPos, float3 dir, float maxPath)
     // gökyüzü tek yerde eski yoğunlukta kalır ve araç "gökte delik var" diye YALAN
     // söylerdi.
     //
-    // Tek biçimli ortamda sonsuz yolun optik derinliği sonsuzdur; büyük bir sayı
-    // `SkyFogAmount`'un saturate'ini 1'e oturtuyor — gök tam macenta.
-    if (_FogAudit > 0.5) return 1e6;
-
     float h0 = cameraPos.y - _HeightFogBase;
 
     // Ufka inen ışın: eğim sıfıra dayandıkça yol yatay kapasiteye oturur (~100 km
@@ -283,8 +274,7 @@ float SkyFogDepth(float3 cameraPos, float3 dir, float maxPath)
 float SkyFogAmount(float3 cameraPos, float3 dir)
 {
     // DENETİM: erken çıkış kapalı — gerekçe `HeightFogIntegral`'dekiyle aynı.
-    if (_FogAudit <= 0.5
-        && _HeightFogDensity <= 0.0 && _FogSeaDensity <= 0.0 && _FogFreeDensity <= 0.0)
+    if (_HeightFogDensity <= 0.0 && _FogSeaDensity <= 0.0 && _FogFreeDensity <= 0.0)
         return 0.0;
 
     // Kameranın önündeki bank boş gökte görünür bir leke bırakır: "vadide gezen sis"
@@ -311,10 +301,6 @@ float SkyFogAmount(float3 cameraPos, float3 dir)
 /// yalnız güneş ufka yakınken. Yükseldikçe tepe rengine kararır.
 float3 AirColor(float3 direction)
 {
-    // DENETİM: havanın rengi tek. Arazi, bulut ve gök kuyruğu saçılımını buradan
-    // alıyor — tek kapı üçünü birden macentaya çeviriyor.
-    if (_FogAudit > 0.5) return FogAuditColor;
-
     float3 sunward = normalize(float3(_SunDirection.x, 0.0, _SunDirection.z) + 0.0001);
     float3 viewFlat = normalize(float3(direction.x, 0.0, direction.z) + 0.0001);
     float towardSun = smoothstep(-0.85, 0.85, dot(viewFlat, sunward));
@@ -478,17 +464,6 @@ void FogPath(float3 cameraPos, float3 worldPos, out float3 scattering, out float
         }
     }
 
-    // HACİM PROBU: hacmin OKUNAN degeri. Kirmizi = gecirgenlik, yesil = sacilim.
-    // Siyah kalirsa doku o froxel'de bos demektir.
-    if (_FogVolumeProbe > 0.5)
-    {
-        scattering = float3(volumeTransmittance,
-                            saturate(dot(volumeScatter, float3(0.2126, 0.7152, 0.0722)) * 4.0),
-                            0.0);
-        transmittance = 0.0;
-        return;
-    }
-
     // KANAL BAŞINA SÖNÜM KALDIRILDI (`_HeightFogChroma`). Rayleigh'in maviyi kırmızıdan
     // önce süpürmesi gerçek ama artık onun SAHİBİ gökyüzü paketinin hava perspektifi:
     // aynı atmosferi iki yerden modellemek çift sayım demek. Bu dosyanın taşıdığı ortam
@@ -534,26 +509,6 @@ void FogPath(float3 cameraPos, float3 worldPos, out float3 scattering, out float
 /// kendi yazmasına gerek yok — o iki satır her yüzeyde birebir aynı olurdu.
 float3 ApplyHeightFog(float3 color, float3 cameraPos, float3 worldPos)
 {
-    // YÜZEY PROBU. `× 8` YETMİYORDU: gökyüzü parlakken ortam ışığıyla aydınlanan zemin
-    // sekiz katıyla da ekranda siyah kalıyor, yani araç "tam sıfır" ile "çok küçük"
-    // arasını ayıramıyordu ve bana yanlış cevap verdi. Ölçek artık LOGARİTMİK ve
-    // sıfırın kendisi ayrı bir durum:
-    //   SİYAH   → luminans tam 0. Yüzeye hiç ışık gelmiyor.
-    //   KIRMIZI → 2^-20 civarı, yani var ama yok denecek kadar az
-    //   SARI    → orta
-    //   BEYAZ   → 1'e yakın, normal aydınlık
-    if (_FogSurfaceProbe > 0.5)
-    {
-        float lum = dot(color, float3(0.2126, 0.7152, 0.0722));
-        if (lum <= 0.0) return float3(0.0, 0.0, 0.0);
-
-        float e = saturate((log2(lum) + 20.0) / 20.0);
-        return float3(1.0, e, e * e);
-    }
-
-    // KATMAN PROBU: bu fonksiyondan geçen her piksel YEŞİL.
-    if (_FogLayerProbe > 0.5) return float3(0.0, 1.0, 0.0);
-
     float3 scattering;
     float transmittance;
     FogPath(cameraPos, worldPos, scattering, transmittance);

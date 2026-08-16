@@ -1,4 +1,4 @@
-// include-rev: 33  (HeightFog.hlsl degisince Unity bu dosyaya dokunulmadikca
+// include-rev: 34  (HeightFog.hlsl degisince Unity bu dosyaya dokunulmadikca
 // yeniden derlemiyor; bu satir degistikce derleme zorlanir)
 Shader "Hidden/Sky/VolumetricClouds"
 {
@@ -240,10 +240,6 @@ Shader "Hidden/Sky/VolumetricClouds"
 
                 // YEREL SİS. 7 numaralı geçiştekiyle birebir aynı kompozisyon: bulut
                 // önceden çarpılmış, sönüm buluta, saçılım bulutun kapsadığı orana.
-                // KATMAN PROBU: bulutun kapsadigi pay MAVI, arkasi hedefte kaliyor.
-                if (_FogLayerProbe > 0.5)
-                    return half4(float3(0.0, 0.0, 1.0) * (1.0 - cloudsColor.w), cloudsColor.w);
-
                 // SİS YALNIZ BULUT VARKEN. `cloudsColor.w` bulutun arkasini geciren pay:
                 // 1 ise o pikselde bulut YOK ve `posInput.positionWS` uzak duzlemden
                 // geliyor — yuz kilometre otede, sisin analitik integrali icin tanimsiz
@@ -290,7 +286,7 @@ Shader "Hidden/Sky/VolumetricClouds"
                 // arkadaki her seyi siliyor. Kenar proxy'si sonlu, sorun degil.
                 bool hasCloud = depth != UNITY_RAW_FAR_CLIP_VALUE;
 
-                if (_FogCloudsDisabled < 0.5 && hasCloud)
+                if (hasCloud)
                 {
                     // MESAFE DOYUMU KALDIRILDI. Derinlik gurultusunu bastirmak icin
                     // `L = tau/beta` ile mesafe doyuma sokulmustu; o terim optik
@@ -774,10 +770,6 @@ Shader "Hidden/Sky/VolumetricClouds"
                 // KAPSADIĞI orana uygulanıyor — arka plan (hedef) kendi yolundaki sisi
                 // zaten aldı, `w` ile geçtiği için ikinci kez almıyor. Bir üstteki hava
                 // perspektifi satırı da birebir bu biçimde.
-                // KATMAN PROBU: bulutun kapsadigi pay MAVI, arkasi hedefte kaliyor.
-                if (_FogLayerProbe > 0.5)
-                    return half4(float3(0.0, 0.0, 1.0) * (1.0 - cloudsColor.w), cloudsColor.w);
-
                 // SİS YALNIZ BULUT VARKEN. `cloudsColor.w` bulutun arkasini geciren pay:
                 // 1 ise o pikselde bulut YOK ve `posInput.positionWS` uzak duzlemden
                 // geliyor — yuz kilometre otede, sisin analitik integrali icin tanimsiz
@@ -824,7 +816,7 @@ Shader "Hidden/Sky/VolumetricClouds"
                 // arkadaki her seyi siliyor. Kenar proxy'si sonlu, sorun degil.
                 bool hasCloud = depth != UNITY_RAW_FAR_CLIP_VALUE;
 
-                if (_FogCloudsDisabled < 0.5 && hasCloud)
+                if (hasCloud)
                 {
                     // MESAFEYE SAYISAL SINIR. Bulut KENARI pikselinde derinlik gercek
                     // degil: paket oraya `CLOUDS_RAW_FAR_CLIP_VALUE` koyuyor ve ters-Z'de
