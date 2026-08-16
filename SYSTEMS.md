@@ -328,6 +328,42 @@ Kanalın nerede biteceğini yamacın kendisi belirler. Değme noktasındaki ış
 ışıktır — yönlü olanın aksine orası gerçekten yakında, menzili birkaç yüz metrede kalıyor
 ve kümelemeyi boğmuyor.
 
+### Volumetrik sis (`VolumetricFogFeature`, `VolumetricFog.compute`, `VolumetricFogShared.hlsl`)
+
+**Okur:** yoğunluk modelini (`AtmosphereController` süre), URP ana ışığını, ortam
+probe'unu, bulut gölgesini (ana ışık cookie'si).
+**Okumaz:** gökyüzü paketinin hava perspektifini — o homojen atmosferin sahibi, bu sistem
+yalnız YEREL ortamı taşır.
+
+Wronski 2014 (SIGGRAPH, AC4) froxel hacmi. Kamera frustum'una hizalı 3B ızgara: x/y ekran
+koordinatı, z üstel derinlik dağılımı `z(s) = near·(far/near)^s`. 160×90×64, RGBA16F,
+0,5 → 1000 m. İki compute kernel — yoğunluk+aydınlatma, ardından Beer-Lambert birikimi.
+
+**TEK YOĞUNLUK MODELİ, İKİ DEĞERLENDİRİCİ.** `VolumetricFogShared.hlsl` sınır tabakası,
+inversiyon, serbest troposfer, vadi sis denizi, bankları ve sürüklenen karı taşıyor;
+hacim içinde compute, hacmin ötesinde `HeightFog.hlsl`'in analitik kuyruğu aynı
+fonksiyonları çağırıyor. Model tek yerde durmasa hacmin sınırında sisin yapısı değişirdi.
+
+Kompozisyon Beer-Lambert gereği: `sonuç = kuyruk × T_hacim + saçılım_hacim`. Geçirgenlikler
+çarpılıyor, in-scattering öndekinin geçirgenliğiyle ağırlıklanıyor — geçiş yapı gereği
+sürekli, ayrıca blend penceresi yok.
+
+**Ortamın SEVİYESİ sis renginden, YÖNÜ SH'den.** Probe'un SH'si yüzey aydınlatması
+birimindedir; ortamın istediği ise ortamın içeri saçtığı radyans. Ölçüldü: probe DC
+luminansı 0.156, sis rengi 0.492 — oran 3.15, ve o farkla ara mesafedeki puslu sırtlar
+kayboluyordu. Seviye zincirin kendi sis renginden alınıyor, SH yalnız yön şekillendirmesi.
+
+**Bulut gölgesi ana ışık cookie'sinden.** `VolumetricCloudsURP` gölgeyi oraya yazıyor,
+gökyüzü paketi de aynı yerden okuyor; üçüncü bir yol açılmadı.
+
+**KOMUT TAMPONU GLOBALLERİ COMPUTE'A ULAŞMIYOR.** `Shader.SetGlobalX` ile yazılanlar
+(sis yoğunluğu, sis rengi) ulaşıyor; URP'nin `cmd.SetGlobal...` ile yazdıkları
+(`_MainLightColor`, `_MainLightPosition`, cookie matrisi) ULAŞMIYOR ve sessizce sıfır
+okunuyor. Ana ışık, cookie matrisi ve ortam SH'si bu yüzden C#'tan açıkça geçiriliyor.
+Dokular da kernel'e elle bağlanıyor — global doku tablosu compute'ta okunmuyor.
+
+---
+
 ### Sis ve hava sinyalleri (`AtmosphereController`)
 
 Bu bölüm sis, görüş mesafesi ve hava sinyallerini anlatır. **Gökyüzü, ortam ışığı ve

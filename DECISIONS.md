@@ -43,12 +43,12 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Güneş 3.03'e çıktıktan sonra yüzeyler** — arazi, kar ve bisiklet 1.5'e göre
   ayarlanmıştı; yeniden ayar gerekip gerekmediğine bakılmadı
   → [Güneş şiddeti pakete kalibre edildi](#güneş-şiddeti-pakete-kalibre-edildi-15--3030782)
+- **Gölge mesafesi 60 m, sis hacmi 1000 m** — arazi huzmesi yalnız ilk 60 metrede
+  oluşabiliyor; keskin ışık kolonu istendiğinde ilk bakılacak yer
+  → [Volumetrik sis](#volumetrik-sis-wronski-froxel-hacmi-geldi-2026-08-16)
 - **Gece seviyesi: ayı bulut belirledi** — sis yeniden yazılınca `MoonIntensity` ve gece
   profili yeniden değerlendirilir; ortam şu an biraz aydınlık, o tur ele alınacak
   → [Gece seviyesi: ayı BULUT belirledi](#gece-seviyesi-ayı-bulut-belirledi-sis-yenilenince-tekrar-bakılacak)
-- **Hava perspektifi + yükseklik sisi birlikte** — paketin atmosferik saçılımı açık,
-  bizim yükseklik sisimiz de duruyor; ikisinin üst üste binip binmediği bakılmadı
-  → [Paketin sisi kapalı başlıyor](#paketin-sisi-kapalı-başlıyor)
 
 - **`DepthNormals` fragman maliyeti** — `SnowDisplacedNormal` fragman başına çağrılıyor
   ve üç `SnowDisplacement` açıyor: piksel başına dokuz doku okuması (birikim ağırlığından
@@ -1266,6 +1266,51 @@ pozlaması ×2 alınarak kadir 2 → sRGB ~0.42, kadir 4 → ~0.19, kadir 6 → 
 **Dönüş yönü DOĞRULANDI (2026-08-16).** Shader arama yönünü döndürdüğü için
 (`mul(-V, _SpaceRotation)`) açı negatif verilmişti; ekranda kontrol edildi, yıldızlar
 doğru yönde akıyor. `SkyWeatherDriver`'daki `-time.Normalized * 360f` işareti doğru.
+
+## Volumetrik sis: Wronski froxel hacmi geldi (2026-08-16)
+
+Sis analitik integralden kamera frustum'una hizalı froxel hacmine taşındı. Spec
+`specs/fog/fog-spec.md` (Wronski 2014 birebir), plan
+`.claude/PRPs/plans/volumetric-fog.plan.md`.
+
+**Spec'in açık bıraktığı dört nokta karara bağlandı:**
+
+1. **Tek hacim + analitik kuyruk.** Hacim 0–1000 m üstel dağılımla, ötesi mevcut analitik
+   integral. Spec'in doğruladığı menzil 50–128 m; kademeli yaklaşımı ADLANDIRIYOR ama
+   TANIMLAMIYOR (§12.1). Üstel dağılım sayesinde ilk 128 metreye 46 dilim düşüyor.
+2. **Homojen atmosferin sahibi gökyüzü paketi.** Sis yalnız yerel ortamı taşıyor.
+   Sonucu: `_HeightFogChroma` (kanal başına sönüm) SÖKÜLDÜ — Rayleigh'i iki yerden
+   modellemek çift sayımdı. Ekranda doğrulandı, ufuk rengi kaymadı.
+3. **Bulut gölgesi hacme giriyor**, ana ışık cookie'sinden — projenin zaten kurulu
+   sözleşmesi, üçüncü bir yol açılmadı.
+4. **Mevcut dört katman + banklar + spindrift korundu.** `VolumetricFogShared.hlsl` tek
+   yoğunluk modeli; hacim ve kuyruk aynı fonksiyonları çağırıyor.
+
+**ÖLÇÜLEN ÜÇ ŞEY:**
+
+- **Ortamın ölçeği.** Probe SH'si yüzey aydınlatması birimindedir, ortam ise içeri saçılan
+  radyans ister. Ölçüldü: probe DC luminansı 0.156, sis rengi 0.492 — oran **3.15**.
+  Kâğıtta: 3 km'deki sırt eski yolda `0.962·air`, yeni yolda `0.509·air`, yani 1.9 kat
+  koyu; ekranda ara mesafedeki puslu sırtlar kayboluyordu. Seviye zincirin kendi sis
+  renginden alındı, SH yalnız yön şekillendirmesi olarak kaldı.
+- **Komut tamponu globalleri compute'a ULAŞMIYOR.** `Shader.SetGlobalX` ile yazılanlar
+  ulaşıyor; URP'nin `cmd.SetGlobal...` ile yazdıkları (`_MainLightColor`,
+  `_MainLightPosition`, cookie matrisi) sessizce sıfır okunuyor. Belirti: hacimde hiç
+  doğrudan ışık yoktu, sahne düz görünüyordu ve hata da vermiyordu. Ana ışık, cookie
+  matrisi ve ortam SH'si C#'tan açıkça geçiyor; dokular kernel'e elle bağlanıyor.
+- **Compute keyword'leri elle yönetilemiyor.** `multi_compile` denendi: bu keyword'ler
+  URP tarafından global olarak da açıldığı için aynı kümedeki iki gölge keyword'ü birden
+  açık kalıyor ve o varyant hiç derlenmemiş oluyor. Varyant `#define` ile sabitlendi;
+  `PC_RPAsset` ayarı değişirse compute başlığı da değişmeli.
+
+**AÇIK KALAN — GÖLGE MESAFESİ 60 m.** Hacim 1000 m ama URP'nin gölge mesafesi 60 m, yani
+arazinin kestiği huzme yalnız ilk 60 metrede oluşabiliyor. Bulut gölgesi cookie'den
+geldiği için o sınıra takılmıyor ama çözünürlüğü 8000 m'ye 256 teksel (31 m/teksel), yani
+büyük ölçekli yapı veriyor, keskin kolon vermiyor. İkisi de ayar meselesi; keskin ışık
+huzmesi istendiğinde ilk bakılacak yer burası.
+
+**YAPILMAYANLAR:** ESM (spec §5.1) yazılmadı — gölge mesafesi 60 m'yken getirisi sınırlı.
+Async compute, point light döngüsü, partikül enjeksiyonu kapsam dışı bırakıldı.
 
 ## Gecedeki "fasulye" kapandı: sebep gökyüzü değil, gece ışık seviyesiydi (2026-08-16)
 

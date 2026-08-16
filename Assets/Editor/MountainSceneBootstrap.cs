@@ -50,6 +50,8 @@ public static class MountainSceneBootstrap
     const string PrecipitationShaderPath = "Assets/Shaders/Precipitation.shader";
     const string SkyShaderPath = "Assets/Shaders/Sky.shader";
     const string SkyMaterialPath = "Assets/Settings/Sky.mat";
+    const string FogComputePath = "Assets/Shaders/VolumetricFog.compute";
+    const string FogSettingsPath = "Assets/Settings/VolumetricFogSettings.asset";
     const string RendererPath = "Assets/Settings/PC_Renderer.asset";
     const string CloudMaterialPath = "Assets/Settings/VolumetricClouds.mat";
     const string CloudWeatherPath = "Assets/Settings/CloudWeatherSettings.asset";
@@ -135,7 +137,8 @@ public static class MountainSceneBootstrap
 
         EnsureSkyFeature();
         EnsureCloudFeature();
-        Phase("gökyüzü ve bulut geçişleri");
+        EnsureFogFeature();
+        Phase("gökyüzü, bulut ve sis geçişleri");
 
         // SIRA ÖNEMLİ: `EnsureCloudVolume` sahnedeki Volume'u bulup `cloudVolume` statiğine
         // yazıyor, gökyüzü de onun profiline yazıyor. Ayrı arama yapılsaydı sahnedeki
@@ -645,6 +648,43 @@ public static class MountainSceneBootstrap
 
         // (bulut dokusu ataması silindi)
         return material;
+    }
+
+    /// SİS RENDER GEÇİŞİ. Froxel hacmini iki compute dispatch'le dolduruyor; sonucu
+    /// `_FogScatteringVolume` olarak global bağlıyor ve `HeightFog.hlsl` her yüzey
+    /// shader'ında onu örnekliyor.
+    ///
+    /// SIRA: gökyüzü ve buluttan SONRA ekleniyor. Hacim aydınlatması bulut gölgesini ana
+    /// ışığın cookie dokusundan okuyor; o doku bulut geçişi tarafından yazılıyor.
+    static void EnsureFogFeature()
+    {
+        var renderer = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.ScriptableRendererData>(RendererPath);
+        if (renderer == null)
+            throw new System.InvalidOperationException($"Renderer bulunamadı: {RendererPath}");
+
+        foreach (var existing in renderer.rendererFeatures)
+            if (existing is VolumetricFogFeature) return;
+
+        var compute = AssetDatabase.LoadAssetAtPath<ComputeShader>(FogComputePath);
+        if (compute == null)
+            throw new System.InvalidOperationException($"Sis compute shader'ı bulunamadı: {FogComputePath}");
+
+        var feature = ScriptableObject.CreateInstance<VolumetricFogFeature>();
+        feature.name = "Volumetrik Sis";
+
+        // Bağlar eklemeden ÖNCE yazılıyor: `Create()` örnek listeye girer girmez Unity
+        // tarafından çağrılıyor ve bağlar boşsa geçiş hiç kuyruğa girmiyor.
+        var serialized = new SerializedObject(feature);
+        serialized.FindProperty("compute").objectReferenceValue = compute;
+        serialized.FindProperty("settings").objectReferenceValue =
+            LoadOrCreate<VolumetricFogSettings>(FogSettingsPath);
+        serialized.ApplyModifiedPropertiesWithoutUndo();
+
+        renderer.rendererFeatures.Add(feature);
+        AssetDatabase.AddObjectToAsset(feature, renderer);
+        EditorUtility.SetDirty(renderer);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.ImportAsset(RendererPath);
     }
 
     /// GÖKYÜZÜ RENDER GEÇİŞİ. `PhysicallyBasedSkyURP` (jiaozi158, MIT — HDRP'nin PBSky'ının
