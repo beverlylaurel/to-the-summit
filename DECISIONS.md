@@ -182,6 +182,120 @@ Mevcut ihlaller zaten envanterde: `COOP.md` madde 1 (şimşek) ve madde 6 (bulut
 
 ---
 
+## Arazi ölçeği: dağ ve oyun alanı korunur, çevre bölge eklenir (2026-08-17)
+
+### Dağın boyu ve oyun alanı DEĞİŞMİYOR
+
+Ölçüldü, mevcut kurulum tasarlandığı gibi çalışıyor:
+
+| ne | ölçüm |
+|---|---|
+| Spawn → zirve | 11 576 m |
+| Spawn → dağın eteği | 3 168 m |
+| Bisikletle (19 km/s) | **10.0 dakika** |
+| `road` | 193 nokta, 11.6–12.0 km bandı (ova yolu) |
+| `branches` | 2804 nokta, 7.7–11.6 km — yoldan dağa çıkan **üç kol** |
+| `camps` | 3 kamp, 7.75–8.91 km (eteğin iki yanı) |
+| `shops` | 1 dükkân, 11.4 km |
+
+Bir ara "arazi 17.5 → 36 km büyütülsün" önerildi; **ölçmeden söylenmişti, geri alındı.**
+Ova dar sanılmıştı — spawn eksende varsayılmış, oysa köşede ve ova orada 3.2 km.
+
+**Zirve kotu korunur** (~5709 m, `terrainHeight` tavanı 6189).
+
+### Asıl sorun ölçek değil YAPI
+
+Kesit ölçüldü — eğri içbükey, yani doğru şekilde:
+
+| zirveden | kot | dilim eğimi |
+|---|---|---|
+| 1 000 m | 4 663 m | 56.8° |
+| 2 000 m | 3 551 m | 48.0° |
+| 4 000 m | 1 994 m | 34.3° |
+| 6 000 m | 952 m | 25.1° |
+| 8 408 m (etek) | 186 m | 21.1° |
+
+Sorun sayıların büyüklüğü değil, **her azimutta aynı olması**. Bu radyal bir koni
+(`secondaryPeaks: 0`): yükseklik yalnız merkeze uzaklığın fonksiyonu. Üst 2 km her yönde
+48–57°, yani sürekli Eiger Kuzey Duvarı — yürünecek hiçbir hat yok.
+
+Gerçek dağda **sırt** 25–30° (rotalar oradan gider), **duvar** 50–60° (bakılır, çıkılmaz).
+Everest'te Güney Kol'dan zirveye ortalama 29°, çünkü sırttan gidiliyor.
+
+**Yapay görünmesinin sebebi de aynı kök.** İki şikâyet, tek sebep: sırt/duvar ayrımı yok.
+Divide Tree tam olarak bu ayrımı üretiyor.
+
+### Üç bantlı mesafe temsili (gezegen boşluğu)
+
+Ölçüm — ufuk küre üzerinde `sqrt(2Rh)`:
+
+| kot | ufuk | arazi (8.76 km) |
+|---|---|---|
+| 186 m (ova) | 48.7 km | 6 kat eksik |
+| 2 000 m | 159.7 km | 18 kat eksik |
+| 5 709 m (zirve) | **269.9 km** | **31 kat eksik** |
+
+Belirti: her kotta ufukta gezegen boşluğu görünüyor, yükseldikçe belirginleşiyor.
+
+| bant | mesafe | temsil | çarpışma |
+|---|---|---|---|
+| oynanan | 0–18 km | Unity Terrain, tam detay, 4.28 m/örnek | var |
+| çevre | 18–60 km | kaba mesh, ~100 m/örnek | yok |
+| ufuk | 60–300 km | çok kaba mesh, ~1 km/örnek | yok |
+
+Çevre + ufuk: tek mesh, tek çizim çağrısı, ~150 bin köşe, gölge yok, tek basit malzeme.
+Bütün bölgenin verisi birkaç MB — **uzak dünya yakın dünyadan kat kat ucuz**, çünkü
+pahalı olan çarpışma, doku ve detay ve uzakta hiçbiri yok.
+
+**Oyuncu oraya asla yaklaşamayacağı için** LOD geçişi, akış ve güncelleme de yok. Bir kez
+pişirilir, bir daha dokunulmaz.
+
+**Ucuzluğun sebebi numara değil FİZİK:** 100 km ötedeki dağ hava perspektifinden dolayı
+zaten mavi bir siluet. O saçılım (PBSky) zaten kurulu. 60 km'de ~200 m, 300 km'de ~1 km
+köşe aralığı piksel altına düşüyor.
+
+**EĞRİLİK ZORUNLU.** Uzak bant küre üzerinde kurulur:
+
+| mesafe | zeminin düştüğü kot |
+|---|---|
+| 20 km | 31 m |
+| 60 km | 282 m |
+| 270 km | **5 715 m** |
+
+Düz kurulursa uzak dağlar ufuk çizgisinin üstünde yüzer, anında sahte görünür.
+(270 km'deki 5715 m düşüş ile zirvenin 5709 m'si örtüşüyor — zirveden tam 270 km görülmesi
+bu yüzden.)
+
+**MESH, GÖKYÜZÜ DOKUSU DEĞİL.** Oyuncu yatayda kısıtlı ama dikeyde 5.5 km yükseliyor;
+ufuk 49 km'den 270 km'ye açılıyor, yani **tırmandıkça ufkun ardından yeni dağlar doğuyor**.
+Boyalı skybox sabittir, bunu yapamaz. Mesh geometriden bedava yapar.
+
+**Uzakta ağaç NESNE DEĞİL RENK.** ~2 km ötesinde orman arazi dokusunun tonudur. Billboard
+ve mesh yalnız yakın alanda. Bu kural konmazsa uzak bantlar ucuz olmaktan çıkar.
+
+### Tek jeneratör, geniş bölge, üç çözünürlük
+
+Üretilecek olan bir dağ değil **bir bölge**: ~540 km kare (270 km yarıçap). Oyun alanı
+onun merkezindeki 17.5 km.
+
+Argudo'nun kendi ölçeği zaten bu — yöntem gerçek silsilelerin (Alpler, Himalaya)
+orometrik istatistiklerinden çalışıyor. 17.5 km verilirse tek dağ üretir; 540 km verilirse
+**silsile** üretir: farklı boyda ve karakterde dağlar, vadiler, etek tepeleri. "Etrafta
+farklı dağlar olsun" isteği yöntemin doğal çıktısı, ek iş değil.
+
+Üç bant aynı alandan örneklendiği için **dikiş sorunu yok**.
+
+### Sınır doğal olacak
+
+Oyuncu 8.76 km'de arazinin kenarına ulaşabilir ve çarpışmasız banda girmemeli. Sınır
+görünmez duvar değil, **arazinin kendisi** olacak: nehir, yarma, buzul çatlak alanı,
+uçurum hattı.
+
+**Tetikleyici:** ufukta boşluk görülürse ya da uzak dağlar ufuk çizgisinin üstünde
+yüzüyorsa buraya bakılır.
+
+---
+
 ## Spec sırası: terrain → snow → rain → lightning (2026-08-17)
 
 **Gerekçe — terrain önce:** `terrain-generation-spec.md` bir ekleme değil, **tam yeniden
