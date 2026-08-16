@@ -784,6 +784,21 @@ Işının güneşi görmediği noktalar da katkı verir — gölgedeki hava kom�
 gökyüzü rengi için, `TimeOfDay` ortam ışığı için) zenit radyansına göre eşitlenir:
 tabloya dokunulduğunda ikisi birlikte ayarlanır, yoksa gök ile ondan gelen ışık ayrışır.
 
+**Sis renginin SEVİYESİ gökten, TONU sabitten.** `AtmosphereSettings`'teki renkler
+(`clearDay`, `clearNight`, yağış/kar varyantları) yalnız ton taşır; parlaklığı ortam
+probunun DC terimi belirler, `× 3.15` ile radyansa çevrilerek. Zincir tek yönlü:
+gök → `SkyAmbientBaker` → probe → sis rengi → froxel hacmi.
+
+Eskiden seviye de sabitten geliyordu ve ölçüldü: gök gündüz–gece arasında ~230 kat
+değişirken sis rengi 9.6 kat değişiyordu. Sabit tek bir hava koşulunda doğru olup geri
+kalan her yerde kayıyordu — gündüz 2.2 kat fazla koyu, gece 11 kat fazla parlak. Gece
+sisin örttüğü her şey 3.5 durak yukarı kalkıyor, "sisi kapatınca gece gerçekçi oluyor"
+belirtisini üretiyordu.
+
+Katsayı ÜÇ RENGE BİRDEN uygulanır (taban, zenit, gölge tarafı): her birini ayrı ayrı
+hedefe oturtmak aralarındaki oranları ezerdi — zenit'in yağışa bağlı payı ve gölge
+tarafının şafak payı o oranların içinde duruyor.
+
 **Hava ve gökyüzü tek fonksiyondur.** `HeightFog.hlsl → AirColor(yön)` havanın rengini
 üretir (güneş tarafı sıcak, karşı ufuk Dünya'nın gölgesinde soğuk ve karanlık, yükseldikçe
 tepe rengine kararır, güneş yönünde ileri saçılım parlaması); gökyüzü gradyanı bu

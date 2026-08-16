@@ -84,10 +84,6 @@ olur.
 - **Gölge mesafesi 60 m, sis hacmi 1000 m** — arazi huzmesi yalnız ilk 60 metrede
   oluşabiliyor; keskin ışık kolonu istendiğinde ilk bakılacak yer
   → [Volumetrik sis](#volumetrik-sis-wronski-froxel-hacmi-geldi-2026-08-16)
-- **Gece seviyesi: ayı bulut belirledi** — sis yeniden yazılınca `MoonIntensity` ve gece
-  profili yeniden değerlendirilir; ortam şu an biraz aydınlık, o tur ele alınacak
-  → [Gece seviyesi: ayı BULUT belirledi](#gece-seviyesi-ayı-bulut-belirledi-sis-yenilenince-tekrar-bakılacak)
-
 - **Kare süresi jitter'ı** — editörde ölçüldü, patoloji çıkmadı; aynı ölçüm bir
   **derlemede** tekrarlanacak. (Ayrıntı kaydı yok: indeks bir kayda bağ veriyordu ama o
   kayıt dosyada hiç yazılmamış. Bağ kaldırıldı, madde kendi kendine yeter.)

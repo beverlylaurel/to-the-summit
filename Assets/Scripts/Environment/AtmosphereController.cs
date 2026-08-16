@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
 /// Sis, ortam ışığı ve gökyüzünü tek bir renkten türetir.
@@ -23,6 +24,10 @@ public class AtmosphereController : MonoBehaviour
     [SerializeField] AtmosphereSettings settings;
 
     [SerializeField] Material skyMaterial;
+
+    /// Yüzey aydınlatması (ışınım) → katılımcı ortam (radyans) dönüşümü. π'dir ve bu
+    /// projede ölçülmüştür: probe DC luminansı 0.156 iken sis rengi 0.492, oran 3.15.
+    const float AmbientToMedium = 3.15f;
 
     static readonly int HeightFogColorId = Shader.PropertyToID("_HeightFogColor");
     static readonly int HeightFogDensityId = Shader.PropertyToID("_HeightFogDensity");
@@ -264,6 +269,29 @@ public class AtmosphereController : MonoBehaviour
         // (AirColor): güneş tarafı altın-kızıl yanar, taban mütevazı kalır.
         // Katsayı Python simülasyonundan (dusk_palette_sim.py, "canlı" varyantı).
         targetColor = Color.Lerp(targetColor, dusk, duskMask * 0.55f);
+
+        // SEVİYE GÖKTEN, TON SABİTTEN. Yukarıdaki sabitler (`clearDay`, `clearNight`,
+        // yağış/kar varyantları, şafak paleti) artık yalnız TON taşıyor; parlaklığı
+        // gökyüzünün kendi ölçüsü belirliyor.
+        //
+        // Eskiden seviye de sabitten geliyordu ve ölçüldü: gök gündüz–gece arasında ~230
+        // kat değişirken sis rengi 9.6 kat değişiyordu. Sonuç, sabitin tek bir hava
+        // koşulunda doğru olup geri kalan her yerde kayması:
+        //   gündüz  probe DC 0.469 → sis 0.672 → oran 1.43  (2.2 kat FAZLA KOYU)
+        //   gece    probe DC 0.0020 → sis 0.0698 → oran 34.6 (11.0 kat FAZLA PARLAK)
+        // Gece sisin örttüğü her şey 3.5 durak yukarı kayıyordu; "sis kapalıyken gördüğüm
+        // gece gerçekçi" gözlemi tam olarak buydu.
+        //
+        // Oran 3.15 bu projenin KENDİ ölçümü (froxel sisinin ortam kaynağı araştırması):
+        // probe yüzey aydınlatması birimindedir, katılımcı ortam radyans ister, dönüşüm π.
+        // TEK KATSAYI, ÜÇ RENGE. Her rengi ayrı ayrı hedefe oturtmak aralarındaki
+        // ORANLARI ezerdi: zenit'in yağışa bağlı payı (berrak havada 0.55, yağışta 1.0)
+        // ve gölge tarafının şafak payı o oranların içinde duruyor.
+        float scale = LevelScale(targetColor, AmbientLevel() * AmbientToMedium);
+
+        targetColor *= scale;
+        targetZenith *= scale;
+        shadowColor *= scale;
 
         if (!initialized)
         {
@@ -798,6 +826,30 @@ public class AtmosphereController : MonoBehaviour
                 + Mathf.Sin(Vector2.Dot(p, new Vector2( 0.005250f, -0.017167f))) * 0.07f;
 
         return Mathf.Clamp01(0.5f + 0.5f * s);
+    }
+
+    /// Gökyüzünden pişen ortam probunun DC terimi. `SkyAmbientBaker` onu her kare
+    /// gökyüzü materyalinden pişiriyor, yani zincir tek yönlü: gök → probe → sis rengi.
+    /// Sis hacminin ortam kaynağıyla AYNI büyüklük (`sh[c,0] - sh[c,6]`) — iki tüketici
+    /// aynı sayıyı görmezse hacim ile analitik kuyruk gece ayrışır.
+    static float AmbientLevel()
+    {
+        SphericalHarmonicsL2 probe = RenderSettings.ambientProbe;
+
+        return Mathf.Max(0f,
+            0.2126f * (probe[0, 0] - probe[0, 6])
+          + 0.7152f * (probe[1, 0] - probe[1, 6])
+          + 0.0722f * (probe[2, 0] - probe[2, 6]));
+    }
+
+    /// Taban rengi hedef parlaklığa oturtan katsayı. Ton kaynaktan, seviye ölçümden —
+    /// projenin "bir değere bağlanmadan önce" kuralının gereği. Katsayı döndürüyor,
+    /// rengi değil: çağıran onu birden çok renge uygulayıp aralarındaki oranı koruyor.
+    static float LevelScale(Color reference, float target)
+    {
+        float current = 0.2126f * reference.r + 0.7152f * reference.g + 0.0722f * reference.b;
+
+        return current < 1e-6f ? 1f : target / current;
     }
 
     static Color Blend(Color clear, Color rain, Color snow, float precipitation, float snowiness)
