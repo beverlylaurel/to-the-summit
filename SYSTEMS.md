@@ -811,6 +811,19 @@ yönde aynı griye gidiyor, iki katman arasında hem renk hem kenar farkı duruy
 Katmanın ufuk sınırı da kesme değil sönmedir — sert eşikte alfa sıfır olmadığı için
 gökte jilet gibi yatay bir çizgi bırakıyordu.
 
+**Güneş diski sisin optik derinliğiyle söner, hâlesi kalmaz.** `AirColor`'ın ileri
+saçılımı iki loblu: geniş pus parlaması ve dar parlak çekirdek. Dar çekirdek diskin
+DOĞRUDAN görüntüsüdür ve yoğun siste sönmüş olmalı; geniş hâle çok saçılmanın işi,
+kalır. İkisi aynı katsayıyla dururken fırtınada güneş, görüş 140 m olmasına rağmen keskin
+bir leke bırakıyordu. Sönüm sisin kendi kolon optik derinliğinden geliyor (`β/k`): berrak
+havada disk 0.91, yağışlıda 0.22, fırtınada 0.00.
+
+**Bulut ortamı IŞINIM değil RADYANS ister.** `RenderSettings.ambientProbe` yüzey
+aydınlatması birimindedir; bulut katılımcı bir ortam ve içeri saçtığı radyansı ister.
+Dönüşüm π. Aynı fark froxel sisinde ölçülmüştü (probe DC 0.156, sis rengi 0.492 — oran
+3.15 ≈ π) ve orada düzeltilmişti; bulut tarafı aynı hatayla kalmıştı, gece bulut kendi
+ışımasını π kat eksik alıyordu.
+
 Sönüm bütçesi Koschmieder'dir (3.9): "görüş X" dendiğinde X metredeki cisim gerçekten
 kaybolur. Önceki 1.6, sisi olduğundan iki kat seyrek gösteriyordu.
 

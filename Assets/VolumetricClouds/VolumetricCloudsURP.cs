@@ -765,6 +765,18 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
             {
                 SphericalHarmonicsL2 ambientProbe = RenderSettings.ambientProbe;
 
+                // ÇAKMA. IŞINIM → RADYANS. `RenderSettings.ambientProbe` YÜZEY
+                // AYDINLATMASI birimindedir (irradyans); bulut ise katılımcı bir ortam
+                // ve içeri saçtığı RADYANSI ister. İkisi arasındaki dönüşüm π'dir.
+                //
+                // Bu proje o farkı bir kez ÖLÇTÜ: froxel sisinde probe DC luminansı
+                // 0.156, aynı olguyu tarif eden sis rengi 0.492 — oran 3.15, yani π.
+                // Sis tarafı düzeltildi, bulut tarafı aynı hatayla kaldı: gece bulut
+                // kendi ışımasını π kat eksik alıyor ve sis kapatılınca simsiyah çıkıyor.
+                for (int c = 0; c < 3; c++)
+                    for (int i = 0; i < 9; i++)
+                        ambientProbe[c, i] *= Mathf.PI;
+
                 cloudsMaterial.SetVector(shAr, new Vector4(ambientProbe[0, 3], ambientProbe[0, 1], ambientProbe[0, 2], ambientProbe[0, 0] - ambientProbe[0, 6]));
                 cloudsMaterial.SetVector(shAg, new Vector4(ambientProbe[1, 3], ambientProbe[1, 1], ambientProbe[1, 2], ambientProbe[1, 0] - ambientProbe[1, 6]));
                 cloudsMaterial.SetVector(shAb, new Vector4(ambientProbe[2, 3], ambientProbe[2, 1], ambientProbe[2, 2], ambientProbe[2, 0] - ambientProbe[2, 6]));
