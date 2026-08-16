@@ -1212,6 +1212,12 @@ yükseltildi, belirti kapandı ama parlak uç da yükselip gece sahnesini aydın
 Karanlık ucun aleti gece profilinin `contrast` değeridir. Gerekçe ve ölçüm
 `DECISIONS.md` → "Gecedeki fasulye kapandı".
 
+**Bloom eşiği bulut faz karışımına BAĞLI.** `PHASE_LOBE_BLEND` 0.5'ten 0.15'e indirilince
+güneş çevresindeki bulut 1.7 kat parladı ve mevcut eşiği (1.10) aşıp bloom'a girmeye
+başladı — deste kendisi hâle üretiyordu. Eşik beş ön ayarda da aynı oranla yükseltildi
+(altın saat 1.10 → 2.00). Faz karışımına bir daha dokunulursa **eşik yeniden bakılır**;
+ölçüm ve gerekçe `SYMPTOMS.md` → "Şafakta güneşten uzak bulutlar yeterince kararmıyor".
+
 ---
 
 ## 5. Bilinçli kurallar

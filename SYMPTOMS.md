@@ -8,8 +8,8 @@ Her kayıt üç şey taşır: belirtinin kullanıcının ağzından hâli, ilk �
 doğar — tahminle çözülen bir şey buraya yazılmaz.
 
 Bu dosyanın kendi dersi: **belirtinin göründüğü yer, belirtinin doğduğu yer değildir.**
-Aşağıdaki sekiz kaydın altısında ilk şüpheli, belirtinin en çok göze çarptığı katmandı ve
-altısında da yanlış çıktı.
+Aşağıdaki dokuz kaydın yedisinde ilk şüpheli, belirtinin en çok göze çarptığı katmandı ve
+yedisinde de yanlış çıktı. Son kayıtta üç ayrı şüpheli sırayla elendi.
 
 ---
 
@@ -131,6 +131,40 @@ Sahnede hiçbir şey uzak düzlemden öteye gidemez.
 
 **Kural:** yüzeyler `SampleSH(normalWS)` ile doğru birimi alır, ortamlar almaz. Yeni bir
 ortam tüketicisi eklenirse π sorulur.
+
+---
+
+## Şafakta güneşten uzak bulutlar yeterince kararmıyor
+
+**İlk şüpheliler — üçü de yanlış çıktı:**
+
+- **Ortam ışığı fazı boğuyor.** Işık payı probu her saatte, her yönde doğrudan terimi
+  baskın gösterdi. Yanlış.
+- **Ton eşleme 24 katı sıkıştırıyor.** Yanlış — faz karışımı düzeltilince fark ekranda
+  göründü, yani görüntüleme zinciri aralığı hiç kırpmıyormuş. *(Bu şüpheli bir ara
+  `GameProfile`'daki `Tonemapping` bileşenine bakılarak "Neutral" sanılıp kâğıtta
+  elendi; ölçüm yanlıştı — `LookController` her karede `TonemappingMode.ACES` yazıyor.
+  Profil asset'i ne yazarsa yazsın, ton eşlemenin sahibi odur.)*
+- **Güneş geçirgenliğinin tabanı** (`SunTransmittanceFloor`, HZD'de çok saçılmanın
+  yerine geçen terim; portta çok saçılım oktavları zaten var, yani çift sayım).
+  Anahtarla kapatıldı — ekranda neredeyse hiçbir şey değişmedi. Yanlış. *Sebebi: optik
+  derinlik kodun yorumundaki örnekten (16) alınmıştı; gerçekte çok daha düşük, taban
+  hiç devreye girmiyor.*
+
+**Gerçek sebep:** `PHASE_LOBE_BLEND` 0.5. `lerp` iki lobu **ağırlıklı ortalıyor** ve
+geri lob (`HG(−0.5)`) 90°'de ileri lobun **üç katı** — uzak alanı tek başına o ayakta
+tutuyordu. Sayı Frostbite'ın brief'teki varsayılanıydı, bu sahnede hiç doğrulanmamıştı.
+
+**Ayırt eden ölçüm:** durak konturu — bulutun kendi radyansını (kapsamaya bölerek) bir
+duraklık bantlara ayırıp döngüsel renge basar. Deste 3 durağa sıkışmış ve **%70'i tek
+bant** içinde çıktı. Aynı kontur birleştirmeden önce/sonra iki kez okundu: hava
+perspektifi orta alanı ~1 durak kaldırıyor, gerisi ışın yürüyüşünün kendisinde.
+
+**Kural:** faz parametreleri **bağlıdır**, tek tek ayarlanamaz. Karışımı düşürmek geri
+lobun payını azaltır ama ileri lobunkini yükseltir — güneş çevresi 1.7 kat parladı ve
+ayrıca karşılanması gerekti. İleri lobun eksantrikliği de kaldıraç değil: g düşünce tepe
+az iner, lob genişler, uzak alan yükselir (0.60'ta 90° değeri düzeltmeden önceki
+hâlinden bile parlak).
 
 ---
 
