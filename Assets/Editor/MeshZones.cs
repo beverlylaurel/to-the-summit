@@ -71,8 +71,4 @@ public static class MeshZones
     /// dosyanın kendi düzeninde geliyor ve o düzende yukarı Z.
     public static float Height(Bounds bounds, Vector3 point) =>
         Mathf.InverseLerp(bounds.min.z, bounds.max.z, point.z);
-
-    /// Noktanın orta düzlemden yanal uzaklığı (0 ortada, 1 kenarda).
-    public static float Lateral(Bounds bounds, Vector3 point) =>
-        Mathf.Abs(point.y - bounds.center.y) / Mathf.Max(1e-6f, bounds.extents.y);
 }

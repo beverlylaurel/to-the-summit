@@ -214,11 +214,4 @@ public class WheelProfile
         return Mathf.Lerp(radii[((low % bins) + bins) % bins],
                           radii[((low + 1) % bins + bins) % bins], t);
     }
-
-    /// Düzlem içi açı: köşenin bu profile göre nerede durduğu.
-    public float AngleOf(Vector3 point)
-    {
-        Vector3 offset = point - Centre;
-        return Mathf.Atan2(Vector3.Dot(offset, Up), Vector3.Dot(offset, Right));
-    }
 }
