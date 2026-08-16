@@ -55,7 +55,6 @@ public class AtmosphereController : MonoBehaviour
     static readonly int HeightFogShadowColorId = Shader.PropertyToID("_HeightFogShadowColor");
     static readonly int HeightFogZenithId = Shader.PropertyToID("_HeightFogZenith");
     static readonly int HeightFogSunColorId = Shader.PropertyToID("_HeightFogSunColor");
-    static readonly int HeightFogChromaId = Shader.PropertyToID("_HeightFogChroma");
     static readonly int SunDirectionId = Shader.PropertyToID("_SunDirection");
     static readonly int SunColorId = Shader.PropertyToID("_SunColor");
     static readonly int MoonColorId = Shader.PropertyToID("_MoonColor");
@@ -718,12 +717,6 @@ public class AtmosphereController : MonoBehaviour
         // arasındaki ayrım da zaten oradan doğuyor.
         skyShade = Color.Lerp(physicalAway, color, overcast);
 
-
-        // Sönümün renk seçiciliği: berrak havada Rayleigh (mavi önce süpürülür),
-        // görüş kapandıkça su damlası baskınlaşır (Mie) ve sönüm nötrleşir.
-        float mie = 1f - Mathf.Clamp01(visibility / 8000f);
-        Shader.SetGlobalVector(HeightFogChromaId,
-            Vector3.Lerp(new Vector3(0.75f, 1f, 1.35f), Vector3.one, mie));
 
         Shader.SetGlobalFloat(HeightFogDensityId, density);
         Shader.SetGlobalFloat(HeightFogFalloffId, falloff);

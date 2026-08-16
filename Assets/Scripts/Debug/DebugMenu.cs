@@ -206,6 +206,7 @@ public class DebugMenu : MonoBehaviour
 
         BeginColumn();
         DrawClouds();
+        DrawFogDiagnostics();
         DrawOverlays();
         DrawSnowCollision();
         EndColumn();
@@ -284,6 +285,31 @@ public class DebugMenu : MonoBehaviour
 
         clouds.cloudCoverage.value = CloudRow("Kapsama", clouds.cloudCoverage.value,
             coverageDefault, clouds.cloudCoverage.min, clouds.cloudCoverage.max, "F2");
+
+        EndSection();
+    }
+
+    /// TEŞHİS — GEÇİCİ. Sis hacmi gerçekten çalışıyor mu. Gözle bakmak yetmiyor: hacim
+    /// hiç dağıtılmasa da sahne "sisli" görünür, çünkü analitik kuyruk zaten çalışıyor.
+    void DrawFogDiagnostics()
+    {
+        BeginSection("Teşhis: sis hacmi");
+
+        Vector4 depth = VolumetricFogFeature.VolumeDepth;
+
+        GUILayout.Label($"dağıtım: {VolumetricFogFeature.DispatchCount}");
+        GUILayout.Label($"hacim {depth.x:F1} → {depth.y:F0} m · {depth.w:F0} dilim");
+        GUILayout.Label($"gölge kodu: {(VolumetricFogFeature.ShadowKeywordOn ? "AÇIK" : "KAPALI")}");
+        GUILayout.Label($"bulut gölgesi dokusu: {(VolumetricFogFeature.CookieBound ? "BAĞLI" : "YOK")}");
+
+        Vector3 sh = VolumetricFogFeature.AmbientDC;
+        Vector4 fc = VolumetricFogFeature.FogColor;
+        GUILayout.Label($"hacim ortamı {sh.x:F4} {sh.y:F4} {sh.z:F4}");
+        GUILayout.Label($"sis rengi    {fc.x:F4} {fc.y:F4} {fc.z:F4}");
+        GUILayout.Label($"cookie matrisi: {(VolumetricFogFeature.CookieMatrixValid ? "GEÇERLİ" : "SIFIR")}");
+
+        VolumetricFogFeature.VolumeDisabled =
+            GUILayout.Toggle(VolumetricFogFeature.VolumeDisabled, "Hacim KAPALI (eski sise dön)");
 
         EndSection();
     }

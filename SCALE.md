@@ -43,6 +43,7 @@ Bunlar gerçek dünyanın metreleri. Dağ iki katına çıkınca donma seviyesi 
 | Sis yarı-yükseklikleri, inversiyon kotu | — | Atmosferin kendi yapısı |
 | Bulut tabanı ve tavanı | — | Aynı |
 | Gezegen yarıçapı | 6 360 km | Dünya |
+| Sis hacmi menzili / dilim | 0.5 → 1000 m / 64 | Froxel hacmi gerçek metrelerde; dağ büyüyünce kameranın önündeki hava kalınlaşmaz. Dilim sayısı da sabit — üstel dağılım yakın alanı korur |
 | `SunIntensity` / `MoonIntensity` | 3.030782 / 0.0199 | Gök cisimlerinin aydınlatması; dağ büyüyünce güneş güçlenmez. Oran 8,6 durak — gerçeğin (19 durak) altında ve BİLEREK, gerekçe `DECISIONS.md` |
 | `moraineHeight` / `moraineSpacing` | 12 m / 420 m | Buzul moreni gerçek boyutu; dağ büyüyünce moren büyümez |
 | `channelDepth` | 6 m | Dere yatağı derinliği |

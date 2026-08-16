@@ -12,33 +12,15 @@
 // ikinci bir yüzey geldiğinde ya kopyalanır ya da o yüzey sissiz kalır — ikisi de
 // aynı havada iki farklı görünürlük demek.
 //
+// Yoğunluk modeli AYRI DOSYADA: froxel hacmini süren compute shader onu include
+// ediyor, bu dosyayı edemiyor. Gerekçe orada yazılı.
+#include "VolumetricFogShared.hlsl"
+
 // Sabit tamponun dışında: AtmosphereController bunları global olarak yazıyor.
 float4 _HeightFogColor;
-float _HeightFogDensity;   // yerleşik havanın taban kotundaki yoğunluğu
-float _HeightFogFalloff;   // metre başına seyrelme katsayısı
-float _HeightFogBase;      // yoğunluğun ölçüldüğü kot (metre)
-float _FogInversionHeight; // sisin kesildiği kot: soğuk havanın tavanı
-float _FogInversionWidth;  // o kesimin yumuşaklığı (metre)
-// Serbest troposfer ÜÇÜNCÜ KATMAN. İnversiyonun üstü "kalıntı oran" ile modelleniyordu
-// (`_FogAboveInversion`): sınır tabakasının kendi sığ profiliyle ÇARPILDIĞI için birkaç
-// bin metrede sıfırlanıyor ve zirveden bakışta uzak sırtlar hiç puslanmıyordu — otuz
-// kilometredeki sırt tam kontrastla, karton gibi. Havanın kendi molekülleri (Rayleigh)
-// oradadır ve kendi ölçek yüksekliği vardır; ayrı katman olarak toplanır, çarpan değil.
-// Hava olayları sınır tabakasında yaşadığı için bu katman yağıştan ETKİLENMEZ.
-float _FogFreeDensity;     // serbest havanın taban kotundaki yoğunluğu
-float _FogFreeFalloff;     // Rayleigh ölçek yüksekliğinden (çok daha yayvan)
-// Vadi sis denizi AYRI KATMAN. Tek kanaldan geçiyordu: CPU onu 120 m'lik kendi
-// profiliyle hesaplayıp `max()` ile yerleşik havanın yoğunluğuna katlıyor, shader ise
-// 1400 m'lik profille yayıyordu. Sığ bir deniz bulut tabanına kadar tırmanıyor, yol
-// boyunca optik derinlik on kat fazla çıkıyor ve şafakta bulutları siliyordu.
-float _FogSeaDensity;      // denizin taban kotundaki yoğunluğu
-float _FogSeaFalloff;      // denizin kendi seyrelme katsayısı (çok daha dik)
-float3 _FogBankDrift;      // bank alanının rüzgârla birikmiş ötelemesi (metre)
-float _FogBankStrength;    // bankların yoğunluğu ne kadar yerel oynattığı, 0-1
 float4 _HeightFogShadowColor; // güneşin karşı ufku: Dünya'nın gölgesi, gökyüzüyle ortak
 float4 _HeightFogZenith;   // göğün tepe rengi: ışın dikleştikçe hava buna kararır
 float4 _HeightFogSunColor; // gök, güneş yönünde, ufkun 2° üstü
-float3 _HeightFogChroma;   // kanal başına sönüm çarpanı: berrakta Rayleigh, siste nötr
 float3 _SunDirection;      // AtmosphereController global yazar; gökyüzü ve bulut da okur
 
 // Şimşek: LightningFlash yazar, bulut ve gökyüzü de aynı değeri okur.
@@ -48,40 +30,12 @@ float4 _LightningFlash;
 /// çakma onun içinde, sis ise ince ve boşalmanın altında kalıyor.
 static const float LightningFogScatter = 0.6;
 
-/// Verilen kottaki MUTLAK sis yoğunluğu. ÜÇ katman toplanır — hepsi kendi yarı
-/// yüksekliğiyle. Ortak profile sıkıştırmak ya da birbirine çarpmak, bu dosyada üç
-/// ayrı belirtinin kaynağı oldu; toplama yapıları gereği ayrık tutar.
-///
-/// SINIR TABAKASI: nem ve toz alçakta toplanır, sığ ve yağışla derinleşir. Üstüne
-/// inversiyon biner: soğuk hava vadide hapsolur, üstünde sıcak hava durur ve ikisi
-/// karışmaz. Sis o sınırda üstel olarak değil, neredeyse bıçakla kesilmiş gibi biter —
-/// dağdan bakınca vadinin dolu, yukarısının pırıl pırıl olmasının sebebi budur.
-///
-/// Arazi yüksekliği. Rüzgârın kaldırdığı kar YERE yapışır; deniz seviyesine göre sönen
-/// bir profil sırtın üstünde hiç görünmez, vadide ise boğar. Doku `SurfaceMapBaker`'da
-/// pişiriliyor: 512 texel / 17.5 km = 34 metre, uzak katman için yeterli.
-TEXTURE2D(_TerrainHeightMap);
-SAMPLER(sampler_TerrainHeightMap);
-float4 _TerrainHeightArea;   // xy köşe konumu, z genişlik, w yükseklik ölçeği
-
 // TimeOfDay yayınlıyor. Burada bildiriliyor çünkü sis dosyası yüzeyden ÖNCE include
 // ediliyor. İkinci bir isim uydurulmuştu; o global gelmediğinde değer sıfır kalıyor,
 // perde "güneş alçak" sanılıp ham gök mavisine boyanıyordu.
 float _SunHeight;
-float _SpindriftDensity;     // rüzgâr eşiği CPU'da uygulanmış hâliyle
-float _SpindriftFalloff;     // 1/yarı-yükseklik
 float _SpindriftBrightness;  // perdenin kendi parlaklığı, gök luminansı çarpanı
 float _SpindriftMaxDepth;    // perdenin optik derinlik tavanı
-float4 _SpindriftCrest;      // x kret kaldırma katı, y kret yükselme katı
-float4 _SpindriftDrift;      // xz taşınan alan kayması (metre)
-float4 _SpindriftWind;       // xz birim yön, w şiddet
-
-float TerrainHeightAt(float2 xz)
-{
-    float2 uv = (xz - _TerrainHeightArea.xy) / max(1.0, _TerrainHeightArea.z);
-    return SAMPLE_TEXTURE2D_LOD(_TerrainHeightMap, sampler_TerrainHeightMap,
-                                saturate(uv), 0).r * _TerrainHeightArea.w;
-}
 
 // BULUT SİSTEMİ SÖKÜLDÜ — burada yalnız iki iz kaldı.
 //
@@ -97,173 +51,6 @@ float TerrainHeightAt(float2 xz)
 // gökyüzünü çizen yoğunluk alanının ta kendisinden türüyor. İkinci bir yaklaşım yok,
 // dolayısıyla "gökte bulut yokken yerde gölge" durumu da yok.
 float _CloudBottom;        // katmanın tabanı (metre)
-
-// Birikmiş taze kar, KOT EKSENİNDE. 128x1 doku: R örtü, G kalınlık deposu. Yüzey
-// rengini de sürüklenen karı da bu belirliyor — yerde kar yoksa rüzgâr kaldıracak bir
-// şey bulamaz. Sis dosyasında duruyor çünkü dünya durumu: yüzey de gökyüzü de okuyor.
-float4 _SnowProfileRange;   // x taban kot, y aralık
-
-TEXTURE2D(_SnowProfile);
-SAMPLER(sampler_SnowProfile);
-
-float2 SampleSnowProfile(float altitude)
-{
-    float t = saturate((altitude - _SnowProfileRange.x) / max(1.0, _SnowProfileRange.y));
-    return SAMPLE_TEXTURE2D_LOD(_SnowProfile, sampler_SnowProfile, float2(t, 0.5), 0).rg;
-}
-
-/// SÜRÜKLENEN KAR (spindrift): rüzgâr eşiği aşınca yerdeki gevşek kar havalanır ve
-/// yüzeye yapışık, sığ, hızlı bir perde oluşturur. Sırtın rüzgâr üstü yüzü kazınır,
-/// arkasına yığılır; uzaktan bakınca sırttan savrulan duman gibi okunur.
-///
-/// Dördüncü sis katmanı olarak duruyor, ayrı bir tanecik sistemi değil: sıfır ek çizim,
-/// ve güneş rengini sisin okuduğu yerden alıyor — ayrı bir renk kaynağı kurulmuyor.
-///
-/// İki koşul birden: RÜZGÂR eşiği aşacak (CPU'da hesaplanıp `_SpindriftDensity`'ye
-/// gömülü) ve YERDE gevşek kar olacak. İkincisi kot profilinden okunuyor — yıllanmış
-/// buzul sürüklenmez, taze toz sürüklenir.
-///
-/// Yükseklik YERDEN ölçülüyor. Deniz seviyesine göre sönen bir profil sırtın üstünde
-/// hiç görünmez, vadide ise boğardı.
-/// Sürüklenen karın AKAN yapısı. Tekdüze bir perde renk değiştirir ama hareket
-/// etmez — göz onu sis sanır. Gerçek spindrift şerit şerit akar: alan rüzgârla
-/// taşınıyor ve dalga boyu yüz metre mertebesinde, sis banklarından çok daha ince.
-///
-/// Alan rüzgâr hızıyla kayıyor (`_SpindriftDrift` CPU'da biriktiriliyor). Bank sisiyle
-/// aynı yapıda ama on kat hızlı: bank dakikalar ölçeğinde gezer, sürüklenen kar
-/// saniyeler ölçeğinde.
-/// Perdenin kütle dağılımı — İNCE YAPI DEĞİL. Işın 8 adımda integre ediliyor; bu
-/// sayıda örnekle taranabilecek en küçük özellik yüzlerce metre. Dalga boyu 70 metreye
-/// indirildiğinde örnekler kamera oynadıkça zıpladı ve perdenin içinde yağmur yağıyor
-/// gibi bir titreme çıktı — ders kitabı undersampling. Literatürdeki çözümü temporal
-/// reprojection + blue noise + TAA; bizde TAA yok (bkz. DECISIONS.md).
-///
-/// Bu yüzden uzak katman PÜRÜZSÜZ kalıyor: kütleyi, rengi ve sönümü o taşıyor.
-/// Şerit şerit akan hareket yakın tanecik katmanının işi — yanlış sistemden istendi.
-/// Perdenin akan yapısı. Dalga boyu ~150 metre: 12 m/s rüzgârda bir desen on saniyede
-/// geçiyor, yani hareket gözle görülüyor. 1570 metredeyken 130 saniye sürüyordu ve
-/// perde duruyormuş gibi okunuyordu.
-///
-/// Bu ölçek ancak perde terimi KENDİ adımlarıyla tarandığı için mümkün (bkz.
-/// `HeightFogIntegral`): sisin sekiz adımıyla taranınca örnekler desenin üstünden
-/// atlıyor ve perdenin içinde yağmur yağıyormuş gibi bir titreme çıkıyordu.
-///
-/// İkinci oktav, oranı tam sayı DEĞİL: tek desen düzenli okunuyor, kapanmayan iki eğri
-/// hiç aynı şekli tekrar etmiyor.
-float SpindriftFlow(float2 xz)
-{
-    float2 p = (xz - _SpindriftDrift.xz) * 0.042;
-    float a = sin(p.x + sin(p.y * 1.7)) * sin(p.y * 0.8 - p.x * 0.6);
-
-    float2 q = (xz - _SpindriftDrift.xz * 1.4) * 0.011;
-    float b = sin(q.x * 1.3 - q.y * 0.9) * sin(q.y * 1.1 + q.x * 0.4);
-
-    return lerp(0.25, 1.75, saturate(0.5 + a * 0.32 + b * 0.26));
-}
-
-float SpindriftAt(float3 pos)
-{
-    if (_SpindriftDensity <= 0.0) return 0.0;
-
-    float ground = TerrainHeightAt(pos.xz);
-    float above = pos.y - ground;
-    if (above < 0.0) return 0.0;
-
-    // Rüzgâr ekseninde üç örnek daha: bir örnek "neredeyiz" sorusunu cevaplayamıyor,
-    // dizi arazinin o eksendeki BİÇİMİNİ veriyor.
-    float2 step = _SpindriftWind.xz * 150.0;
-    float upwind = TerrainHeightAt(pos.xz - step);
-    float downwind = TerrainHeightAt(pos.xz + step);
-    float far = TerrainHeightAt(pos.xz - step * 2.0);
-
-    // SIRT ARKASINDA YIĞILIR. Rüzgâr üstündeki arazi bizden yüksekse rüzgâr altında
-    // kalmışız demektir; tepeyi aşan kar oradaki durgun bölgeye çöker.
-    float lee = saturate((upwind - ground) / 80.0);
-
-    // KRETTEN FIŞKIRIR. Spindrift yamacın tamamından değil sırtın kendisinden kalkar:
-    // rüzgâr tepeyi aşarken hızlanır, gevşek karı havaya fırlatır. Kret, iki yanı da
-    // kendisinden alçak olan nokta.
-    float crest = saturate((ground - max(upwind, downwind)) / 60.0);
-
-    // TÜY RÜZGÂR ALTINA UZANIR. Kretten kalkan kar orada asılı kalmıyor, rüzgârla
-    // taşınıp sırtın arkasına bir kuyruk bırakıyor — "savrulan duman" görüntüsünün
-    // asıl kaynağı o kuyruk. Etki kretin çevresinde simetrik kaldığı sürece hiç
-    // oluşmuyordu.
-    //
-    // Kuyruk, RÜZGÂR ÜSTÜNDEKİ noktanın kret olup olmadığından okunuyor: `upwind`'in
-    // iki komşusu zaten elimizde (`ground` ve `far`), yani tek ek örnekle o noktanın
-    // kret testi yapılabiliyor. Böylece sırtın arkasındaki her nokta "yukarıda kret
-    // var" deyip tüyü devralıyor.
-    float tail = saturate((upwind - max(ground, far)) / 60.0);
-    float plume = max(crest, tail * 0.8);
-
-    // TÜY YÜKSELİR. Tüyün olduğu yerde katman kalınlaşıyor: sönüm zayıflayınca kar
-    // yukarı fışkırıyor, kuyruk bitince tekrar yere yapışıyor.
-    float falloff = _SpindriftFalloff / lerp(1.0, _SpindriftCrest.y, plume);
-
-    // DİKEY PROFİL KUVVET YASASI. Süspansiyon üstel değil Rouse tipi dağılır: dipte
-    // yoğun, yukarı doğru UZUN kuyruk. Üstel sönüm kuyruğu çok erken bitiriyordu ve
-    // tüyler kısa kalıyordu — kret yükseltmesini dört kata çıkarmak zorunda kalmamın
-    // sebebi buydu, yanlış profili katsayıyla telafi ediyordum.
-    float h = above * falloff;
-    float vertical = 1.0 / (1.0 + h * h);
-
-    return _SpindriftDensity * SampleSnowProfile(ground).r
-         * SpindriftFlow(pos.xz)
-         * lerp(0.85, 1.6, lee) * lerp(1.0, _SpindriftCrest.x, plume)
-         * vertical;
-}
-
-/// SİS DENİZİ: gecenin ışınımsal soğumasıyla vadi dibinde biriken çok sığ katman —
-/// yüz metrede biter. Ortak profille yayılınca bulut tabanına kadar tırmanıyor ve yolun
-/// optik derinliğini on kata çıkarıyordu.
-///
-/// SERBEST TROPOSFER: havanın kendi molekülleri. Yayvan (Rayleigh ölçek yüksekliği) ve
-/// yağıştan bağımsız. İnversiyon üstü bir "kalıntı oran" olarak modellenip sınır
-/// tabakasının profiliyle çarpılıyordu; birkaç bin metrede sıfırlanıyor ve zirveden
-/// bakışta otuz kilometredeki sırt tam kontrastla, karton gibi duruyordu.
-float FogDensityAt(float height)
-{
-    float lid = 1.0 - smoothstep(_FogInversionHeight - _FogInversionWidth,
-                                 _FogInversionHeight + _FogInversionWidth, height);
-
-    float boundary = _HeightFogDensity * exp(-_HeightFogFalloff * height) * lid;
-
-    // İkisinin de tavanı yok: biri inversiyonun çok altında biter, öteki çok üstüne çıkar.
-    float sea = _FogSeaDensity * exp(-_FogSeaFalloff * height);
-    float free = _FogFreeDensity * exp(-_FogFreeFalloff * height);
-
-    return boundary + sea + free;
-}
-
-/// Sis bankları: yoğunluğu yerel çarpan alçak frekanslı alan. Gerçek dağ sisi üniform
-/// bir çorba değildir — bank bank gezer: bir yamacı sarar, vadiye dil uzatır, iki
-/// dakika sonra açılır. Alan rüzgârla sürüklenir; iki farklı frekansın çarpımı tekrar
-/// desenini kırar. Dalga boyları yüzlerce metre.
-///
-/// AtmosphereController aynı formülü CPU'da örnekler (kuşak yamaları, görüş nefesi):
-/// iki tüketici, tek alan — formül değişirse ikisi birlikte değişmeli.
-float FogBankAt(float2 pos)
-{
-    float2 p = pos - _FogBankDrift.xz;
-    float a = sin(dot(p, float2(0.0093, 0.0071))) * sin(dot(p, float2(-0.0052, 0.0087)));
-    float b = sin(dot(p, float2(0.0031, -0.0024)));
-    float bank = 0.5 + a * 0.35 + b * 0.15;               // 0..1, ortalama 0.5
-
-    // Tam güçte 0.3-1.7 aralığı: bank sisi yerel olarak üçte birine indirir ama
-    // hiç sıfırlamaz — sisli havada tamamen berrak delik gerçekdışı duruyor.
-    return lerp(1.0, 0.3 + bank * 1.4, _FogBankStrength);
-}
-
-/// Yol boyunca bank çarpanı: üç örnek, öndeki bankla arkadaki ayrışsın diye.
-/// Integral döngüsünün içinde değil — banklar yatayda yüzlerce metre genişken
-/// sekiz kat gürültü maliyeti görünür, üç örnek yeter.
-float FogBankPath(float2 fromXZ, float2 toXZ)
-{
-    return (FogBankAt(lerp(fromXZ, toXZ, 0.2))
-          + FogBankAt(lerp(fromXZ, toXZ, 0.5))
-          + FogBankAt(lerp(fromXZ, toXZ, 0.8))) / 3.0;
-}
 
 /// Yükseklik sisi: ışının kat ettiği yol boyunca yoğunluk integrali.
 ///
@@ -581,13 +368,49 @@ float3 ApplyHeightFog(float3 color, float3 cameraPos, float3 worldPos)
     float3 air = AirColor(normalize(worldPos - cameraPos))
                + _LightningFlash.rgb * LightningFogScatter;
 
-    // Geçirgenlik kanal başına: Rayleigh saçılması maviyi kırmızıdan çok süpürür.
-    // Uzaktaki koyu kaya maviye kayar (araya mavi saçılır), uzak kar hafif ılıklaşır
-    // (mavisi süzülür) — ressamın hava perspektifi. Yoğun sis su damlasıdır (Mie),
-    // renk seçmez; çarpan görüş kapandıkça nötre iner ve bunu CPU belirler.
+    // HACİM VE KUYRUK. Froxel hacmi 0–`far` arasını gölgelenmiş olarak taşıyor; ötesini
+    // analitik integral sürüyor. İkisi de AYNI yoğunluk modelini okuduğu için sınırda
+    // yapı değişmiyor (`VolumetricFogShared.hlsl`).
+    //
+    // Kompozisyon Beer-Lambert gereği: geçirgenlikler çarpılır, in-scattering öndekinin
+    // geçirgenliğiyle ağırlıklanıp toplanır. Bu yüzden ayrıca bir blend penceresi
+    // gerekmiyor — geçiş yapı gereği sürekli.
+    float3 volumeScatter = 0.0;
+    float volumeTransmittance = 1.0;
+    float3 tailStart = cameraPos;
+
+    // Hacim yoksa `_FogVolumeDepth` sıfır kalır; o zaman kuyruk kameradan başlar ve
+    // davranış hacim öncesiyle BİREBİR aynı olur. Doğrulama basamağı bu.
+    if (_FogVolumeDepth.z > 0.0)
+    {
+        float viewDepth = dot(worldPos - cameraPos, _FogCameraForward.xyz);
+
+        if (viewDepth > _FogVolumeDepth.x)
+        {
+            float2 screenUV = ComputeNormalizedDeviceCoordinates(worldPos, UNITY_MATRIX_VP);
+            float sampleDepth = min(viewDepth, _FogVolumeDepth.y);
+
+            float4 volume = SAMPLE_TEXTURE3D_LOD(_FogScatteringVolume, sampler_FogScatteringVolume,
+                                                 FogVolumeUVW(screenUV, sampleDepth), 0);
+
+            volumeScatter = volume.rgb;
+            volumeTransmittance = volume.a;
+
+            // Kuyruk hacmin bittiği yerden başlıyor. Yön ileri eksene izdüşümü 1 olacak
+            // şekilde ölçekli, yani `dir · derinlik` doğrudan o derinlikteki nokta.
+            float3 dir = (worldPos - cameraPos) / max(viewDepth, 1e-4);
+            tailStart = cameraPos + dir * min(viewDepth, _FogVolumeDepth.y);
+        }
+    }
+
+    // KANAL BAŞINA SÖNÜM KALDIRILDI (`_HeightFogChroma`). Rayleigh'in maviyi kırmızıdan
+    // önce süpürmesi gerçek ama artık onun SAHİBİ gökyüzü paketinin hava perspektifi:
+    // aynı atmosferi iki yerden modellemek çift sayım demek. Bu dosyanın taşıdığı ortam
+    // YEREL — vadi sisi, banklar, sürüklenen kar — ve su damlası baskın olduğu için
+    // sönümü zaten nötr (Mie renk seçmez).
     float drift;
-    float integral = HeightFogIntegral(cameraPos, worldPos, drift)
-                   * FogBankPath(cameraPos.xz, worldPos.xz);
+    float integral = HeightFogIntegral(tailStart, worldPos, drift)
+                   * FogBankPath(tailStart.xz, worldPos.xz);
 
     // İKİ KATMAN SIRAYLA, tek karışımda değil. Sürüklenen kar araziye yapışık ve
     // gözün ÖNÜNDE duruyor; sisin mavisi ise yol boyunca dağılmış. Tek karışımda
@@ -596,7 +419,7 @@ float3 ApplyHeightFog(float3 color, float3 cameraPos, float3 worldPos)
     //
     // Önce sis uygulanır (uzak), sonra perde onun üstüne biner (yakın). Perde kendi
     // nötr rengini taşıyor, altındakini boyamıyor.
-    float3 withFog = lerp(air, color, exp(-integral * _HeightFogChroma));
+    float3 withFog = lerp(air, color, exp(-integral));
 
     // PERDE DERİNLEŞTİKÇE SÖNER, gökyüzünün rengine boyanmaz. `AirColor` bakış yönüne
     // bağlı ve gökyüzü gradyanını taşıyor; ona yakınsatınca o gradyan dağın üstüne
@@ -607,7 +430,12 @@ float3 ApplyHeightFog(float3 color, float3 cameraPos, float3 worldPos)
     float3 veil = SpindriftColor()
                 * lerp(1.0, 0.55, saturate(drift / max(0.01, _SpindriftMaxDepth)));
 
-    return lerp(veil, withFog, exp(-drift));
+    float3 tail = lerp(veil, withFog, exp(-drift));
+
+    // Hacim kuyruğun ÖNÜNDE: kuyruğun sonucu hacmin geçirgenliğiyle süzülüp hacmin
+    // kendi saçılımı üstüne biniyor. Spec §5.4'teki `renk × transmittance + inScattering`
+    // formülünün ta kendisi.
+    return tail * volumeTransmittance + volumeScatter;
 }
 
 #endif

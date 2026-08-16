@@ -1,5 +1,20 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-9221600593446770648
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3dc67482438d28148b88155eefe78879, type: 3}
+  m_Name: Volumetrik Sis
+  m_EditorClassIdentifier: Assembly-CSharp::VolumetricFogFeature
+  m_Active: 1
+  compute: {fileID: 7200000, guid: 88ca51449102a044ba2a9e38f7c03042, type: 3}
+  settings: {fileID: 11400000, guid: 68a29c058eebbe64db1190b5c31aa23b, type: 2}
 --- !u!114 &-2366975147878514686
 MonoBehaviour:
   m_ObjectHideFlags: 1
@@ -46,6 +61,7 @@ MonoBehaviour:
   - {fileID: 7833122117494664109}
   - {fileID: 4389833048426162622}
   - {fileID: -2366975147878514686}
+  - {fileID: -9221600593446770648}
   m_RendererFeatureMap: ad6b866f10d7b46c
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
