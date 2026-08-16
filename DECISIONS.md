@@ -111,6 +111,99 @@ huzmesi istendiğinde ilk bakılacak yer burası.
 **YAPILMAYANLAR:** ESM (spec §5.1) yazılmadı — gölge mesafesi 60 m'yken getirisi sınırlı.
 Async compute, point light döngüsü, partikül enjeksiyonu kapsam dışı bırakıldı.
 
+## Arazi mimarisi: dört katman, sembolik çapa (2026-08-17)
+
+Tasarım tarafı `DESIGN.md`'de. Burası **teknik** karşılığı: dağ nasıl üretilecek ve
+içerik ona nasıl tutunacak.
+
+### Dağ pişmiş İÇERİK, çalışma zamanı üretimi değil
+
+Dağ her oyunda yeniden üretilmez; herkeste **aynı dağ**. Editörde bir kez üretilir,
+çıktısı repoya yazılır, çalışma zamanı yalnızca yükler.
+
+**Gerekçe:** co-op senkron probleminin tamamını ortadan kaldırıyor — paylaşılan durum
+yoksa senkronlanacak bir şey de yok. Üretim kodunun hızı da önemsizleşiyor; tek seferlik.
+Önemli olan **çıktının kararlılığı**.
+
+### Dört katman
+
+| katman | ne | değişince |
+|---|---|---|
+| **L0 iskelet** | Divide Tree: zirve/boyun/sırt grafiği | her şey |
+| **L1 yükseklik** | DEM — L0 + gürültü + erozyon | yeniden üretilebilir |
+| **L2 işaretler** | eğim kuşağı, bakı, korunaklılık, düz alan | türetilmiş, önbellek |
+| **L3 yerleşim** | mağara, kamp, konak, mezar, anıt | elle, **kaybolmamalı** |
+
+**L0 SAKLANIR.** Spec'in boru hattı Divide Tree'yi DEM'e çevirip atıyor (§5.6). Biz veri
+olarak tutacağız — içerik ona çapalanacak. Baştan kurulursa bedava, sonradan geri
+çıkarmak imkânsız.
+
+**L3 DÜNYA KOORDİNATI TUTMAZ.** `(düğüm kimliği, yerel ofset, oturma kuralı)` tutar.
+Erozyon değişip L1 baştan üretilse bile kamp yerinde kalır, kendini yeniden oturtur.
+Mutlak koordinat kullanılırsa her yeniden üretim tüm yerleştirme emeğini çöpe atar —
+"ileride değiştirince patlar mı" sorusunun cevabı bu tek karardır.
+
+### Mağara, tırmanış yüzeyi ve zirve MESH; arazi yükseklik haritası kalır
+
+Yükseklik haritası her (x,z) için tek yükseklik tutar: mağara, çıkıntı, tavan **temsil
+edilemez**. Voksel araziye geçmek tüm arazi shader'ını ve çarpışmayı çöpe atardı.
+
+Aynı sınırın ikinci sonucu ölçüldü: `heightmapResolution` 4097 → örnek başına **4.28 m**.
+Tırmanılacak çıkıntı ~1 m, Hillary Step ~12 m — yani **üç örnek**. Tırmanış geometrisi de
+haritaya sığmıyor.
+
+Üç inşa kipi:
+
+| kip | nerede | nasıl | alan payı |
+|---|---|---|---|
+| üretilen | yaklaşma, vadi, alt yamaç | yükseklik haritası | ~%90 |
+| üretilen + modül | orta dağ: tırmanış kesiti, mağara, kamp | harita + gömülü mesh | ~%9 |
+| elle tasarlanan | son kol → zirve | tamamen mesh, bölüm gibi | ~%1 |
+
+Alanın %1'i dramanın yarısını taşıyor. Zirve rastgeleliğe bırakılmaz.
+
+**Sonucu:** tırmanma mekaniği **önce mesh üstünde** kurulur, arazi eğimi ikincildir.
+
+### Zorluk YÜZEYDEN türer, yükseklikten değil
+
+Mekanik eğimi ve zemini okur; yükseklikle korelasyon üretimden gelir. Alçakta dik bir
+duvar bulunursa o da tırmanıştır. Eşik yok, özel durum yok — projenin kendi mimarî
+kuralı (sistemler duruma bakar, sabite değil).
+
+### Co-op: tek oturum tohumu
+
+Dağ pişmiş içerik olunca geriye tek risk kalıyor: çalışma zamanında rastgelelikten
+türeyen her şey. **Bir oturum tohumu, host verir, her şey ondan türer.** Tohumsuz
+`Random` ve birikimli durum yasak.
+
+Mevcut ihlaller zaten envanterde: `COOP.md` madde 1 (şimşek) ve madde 6 (bulut rüzgârı).
+
+**Tetikleyici:** araziye ya da yerleştirmeye dokunan her iş bu kaydı okumadan başlamaz.
+
+---
+
+## Spec sırası: terrain → snow → rain → lightning (2026-08-17)
+
+**Gerekçe — terrain önce:** `terrain-generation-spec.md` bir ekleme değil, **tam yeniden
+üretim** (Divide Tree + orometri + erozyon). Mevcut dağ gidiyor. Kar birikimi, yüzey
+kalibrasyonu, gölge mesafesi, rota, ova — hepsi arazinin üstünde duruyor. Kar önce
+yapılırsa arazi değişince kar işinin iyi kısmı ikinci kez yapılır.
+
+**snow ikinci:** oyunun kimliği. Ölçülmüş açık bir hata da burada kapanıyor — yağış
+partikülleri ışık okumuyor, gece karı öğle karıyla aynı. Bekleyen "cepheyi ne sürecek"
+kararı da bu spec'in içi.
+
+**rain üçüncü:** partikül boru hattı karla ortak, kardan sonra ucuz. Ayrıca oyun alanında
+neredeyse hiç görünmüyor — yağmur −367 m'de bitiyor, oynanan kot 2000–5700 m.
+
+**lightning son:** en yalıtık ve en küçük (488 satır), yalnız fırtınada. Sona kalması bir
+şey kaybettirmiyor. Co-op borcu (`COOP.md` madde 1) o tur sırasında ödenecek.
+
+**Maliyet — açıkça:** terrain en sarsıcı olanı. Atmosfer yeni oturdu; dağ değişince ölçek
+bağımlı sayıların bir kısmı kayacak. Başlamadan **önce `SCALE.md` baştan sona okunacak**.
+
+---
+
 ## Gecedeki "fasulye" kapandı: sebep gökyüzü değil, gece ışık seviyesiydi (2026-08-16)
 
 **Belirti.** Gece gökyüzünde devasa, keskin kenarlı siyah bölge. Zenit merkezli, irtifayla
