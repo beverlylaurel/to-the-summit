@@ -294,6 +294,40 @@ Argudo kendi başına bırakılırsa istatistiğe uyup **her yere zirve serper**
 karakter dağılımı ona ayrıca söylenecek: dağlık, tepelik, ova, plato. Bu bir ayar değil,
 üretimin girdisi.
 
+### Yapı araziye uyar, arazi yapıya değil
+
+Bir ara "kamp ve konak için arazi yerel olarak düzleştirilecek" denmişti. **Yanlış.**
+
+Gerçekte dağ yapıları eğime kurulur: Namche Bazaar dik bir çanağın içinde teraslarla,
+dağ evleri taş sekilere, istinat duvarlarına, kademeli temellere oturur. Kimse dağı
+düzleştirmez.
+
+**Kural:** bina kendi temelini taşır — taş seki, istinat duvarı, kademeli kat, gerekirse
+ayak. Arazi olduğu gibi kalır.
+
+Kazandırdığı: yeniden üretim güvenli (silinecek arazi düzenlemesi yok), daha gerçekçi,
+görsel olarak daha zengin — istinat duvarı ve seki karakter veriyor.
+
+**Yerleştirme kuralı da değişiyor:** "düz yer bul" değil, **"uygun eğim bandı bul"** —
+kabaca 10–30°. Çadır için 3×2 m'lik <15° bir düzlük yeterli, o her yerde var.
+
+**Asıl kısıt eğim değil GÜVENLİK.** Kaya düşme hattına, çığ oluğuna, kar birikme çanağına
+yapı konmaz — gerçekte de konmaz. L2'nin işi: eğim, bakı, korunaklılık, çığ maruziyeti.
+
+### Üretim son söz değil: çapalı düzeltme işlemleri
+
+Üretim her şeyi doğru veremez. Bilinen tek gerçek ihtiyaç: **sırtın yürünebilir
+sürekliliği.** Erozyon sırtın ortasında bir kopukluk bırakabilir ve rota oradan geçemez.
+
+**Düzeltmeler yükseklik haritasına ELLE YAPILMAZ** — dağ yeniden üretildiğinde hepsi
+silinir. L3 ile aynı çözüm: düzeltme de **L0'a çapalanmış bir işlem** olarak saklanır
+("47 numaralı boyunla 48 arasındaki sırtta kopukluğu kapat"), üretimden sonra otomatik
+tekrar uygulanır.
+
+Yani boru hattı tek yönlü değil: **üret → çapalı işlemleri uygula → pişir.**
+
+Kamp ve konak bu listede **yok** — yapı araziye uyduğu için düzeltme gerektirmiyorlar.
+
 ### Sınır doğal olacak
 
 Oyuncu 8.76 km'de arazinin kenarına ulaşabilir ve çarpışmasız banda girmemeli. Sınır
