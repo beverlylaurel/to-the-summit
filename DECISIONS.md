@@ -26,12 +26,6 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 - **Ova ve patika ölçüm araçları** (`ForelandProbe`, F1'deki kurulum süresi logu) — ova
   ve yol dokusu oturunca silinir
-- **Sis teşhis bölümü** (F1 → sis) — "SİS DENETİMİ (40 m · macenta)" kutusu, "Hacim KAPALI"
-  anahtarı, dağıtım/hacim ortamı/sis rengi/cookie matrisi/gök sisi çizim sayacı satırları,
-  yoğunluk-görüş karşılaştırması. Denetim macentası kapsamayı doğrulayıp temiz çıkınca
-  bölümün tamamı silinir; `_FogAudit` globali ve shader'lardaki denetim kapıları da
-  (`FogDensityAt`, `FogBankAt`, `SpindriftAt`, `AirColor`, `SkyFogDepth`, `SkyFogAmount`,
-  `HeightFogIntegral`, `VolumetricFog.compute`) aynı adımda gider
 - **Bisiklet maskesi yeniden seyreltmede silinecek** — malzeme maskesi köşe renginde duruyor;
   model yeniden seyreltilirse topoloji değişir ve boyama kaybolur. Seyreltme yapıldı
   (3.1 M → 200 bin), boyama artık güvenle yapılabilir; bütçe değişirse maske aktarımı

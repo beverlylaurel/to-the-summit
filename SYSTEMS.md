@@ -367,10 +367,28 @@ Kompozisyon Beer-Lambert gereği: `sonuç = kuyruk × T_hacim + saçılım_hacim
 çarpılıyor, in-scattering öndekinin geçirgenliğiyle ağırlıklanıyor — geçiş yapı gereği
 sürekli, ayrıca blend penceresi yok.
 
+**Savrulan kar TEK KAYNAKTAN.** Perde bir dönem hem froxel hacminde (her hücrede
+`SpindriftAt`) hem arazi yolunda (ışın boyunca örnekleme) hesaplanıyordu. İkisi de aynı
+hatayı yapıyordu: alanın içindeki sırt algılayıcı (`crest`/`lee`) 60-80 m'lik keskin
+eşikler taşıyor, froxel ızgarası ve ışın örneklemesi o eşiklerin üstünden atlıyor ve
+kamera kıpırdadıkça yer değiştiren dikey şeritler kalıyordu. Artık tek yer:
+`HeightFog.hlsl → SpindriftPath`, kameradan okunur ve dikey profil kapalı biçimde
+integre edilir — gök yolunun (`SkyFogDepth`) baştan beri yaptığı gibi.
+
+**Alanlar sinüs TOPLAMIDIR, çarpımı değil.** Bank ve akış alanı iki sinüsün çarpımıydı
+ve yorumu "çarpım tekrar desenini kırar" diyordu; kırmıyor — `sin(k₁·p)·sin(k₂·p)`
+ayrıştırılabilir bir ifadedir ve düzenli bir kafes üretir. Rastgele alan modların üst
+üste binmesidir: yönleri paralel olmayan, dalga boyları oransız beş bileşen toplanıyor.
+Sinüs seçildi çünkü CPU ile GPU birebir aynı sonucu veriyor ve `AtmosphereController`
+aynı alanı CPU'da örneklemek zorunda — formül değişirse ikisi birlikte değişir.
+
 **HER KATMAN KENDİ MESAFESİYLE BİR KEZ SİSLENİR.** Ekranda üç şey çiziliyor ve üçü farklı
 uzaklıkta: arazi (kendi shader'ında, `ApplyHeightFog`), hacimsel bulut (birleştirme
 geçişinde, `FogPath` + bulutun kendi derinlik dokusu), gökyüzü (`SkyFog.shader`, sonsuz
-yol). Sırası da bu: gök sisi `AfterRenderingSkybox`, bulutlar `BeforeRenderingTransparents`.
+yol). Sırası da bu: gök sisi `AfterRenderingSkybox + 2`, bulutlar `BeforeRenderingTransparents`.
+`+2` paketin `Opaque Atmospheric Scattering` geçişinden sonraya düşürüyor — aynı anda
+çalışırlarsa siluet pikselini biri "gök" biri "geometri" sayıp çift işliyor ve tek
+piksellik kontur bırakıyorlar.
 Gök sisi bir ara bulutlardan SONRAYA alınmıştı — o zaman bulutu da sisliyordu, ama sonsuz
 mesafeden; bulut 2 km'de duruyor. Bir katmanı komşusunun mesafesiyle sislemek ya çift
 sayım ya yanlış mesafe demek, ikisi de bulut kenarında sınır bırakıyor.

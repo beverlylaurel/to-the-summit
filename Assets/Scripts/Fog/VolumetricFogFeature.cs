@@ -29,57 +29,12 @@ public class VolumetricFogFeature : ScriptableRendererFeature
     SkyFogPass skyPass;
     Material skyFogMaterial;
 
-    /// TEŞHİS — GEÇİCİ. Hacim gerçekten dolduruluyor mu, gölge kodu derlendi mi.
-    /// Sis doğrulanınca bu alanlar ve F1'deki bölüm silinir.
-    public static int DispatchCount;
-    public static bool ShadowKeywordOn;
-    public static bool CookieBound;
-    public static Vector4 VolumeDepth;
-
-    /// TEŞHİS — GEÇİCİ. Kapatınca hacim dağıtılmaya devam ediyor ama `_FogVolumeDepth.z`
-    /// sıfırlanıyor: `HeightFog.hlsl` hacmi atlayıp kuyruğu kameradan başlatıyor, yani
-    /// görüntü hacim ÖNCESİ hâline dönüyor. A/B doğrulamasının tamamı bu.
-    public static bool VolumeDisabled;
-
-    /// TEŞHİS — GEÇİCİ. Hacmin ortam kaynağı ile analitik yolun sis rengi aynı olguyu
-    /// tarif ediyor; ölçekleri ayrışırsa hacim sönümü uygulayıp ışımayı koyamıyor.
-    public static Vector3 AmbientDC;
-    public static Vector4 FogColor;
-    public static bool CookieMatrixValid;
-
-    /// TEŞHİS — GEÇİCİ. Gökyüzü sisi geçişi kuruldu mu, çalışıyor mu.
-    public static bool SkyPassBound;
-    public static int SkyPassCount;
-
-    /// SİS DENETİMİ — GEÇİCİ. Ortam tek biçimli (görüş 40 m) ve tek renk (macenta)
-    /// olmaya zorlanıyor. 40 m ötede macenta olmayan her leke, o pikseli çizen
-    /// shader'ın sisi hiç uygulamadığı anlamına gelir.
-    public static bool FogAudit;
-
-    /// KATMAN PROBU — GEÇİCİ. Her sis yazıcısı kendi düz rengini basıyor:
-    /// yeşil `ApplyHeightFog`, kırmızı gök sisi geçişi, mavi bulut birleştirme.
-    /// Siyah kalan bölgeyi sis zinciri hiç çizmiyor demektir.
-    public static bool FogLayerProbe;
-
-    /// HACİM PROBU — GEÇİCİ. Froxel hacminin OKUNAN değeri ekrana basılıyor:
-    /// kırmızı geçirgenlik, yeşil in-scattering. Siyah kalan yerde hacim boş.
-    public static bool FogVolumeProbe;
-
-    /// YÜZEY PROBU — GEÇİCİ. Sis atlanıp yüzeyin ham rengi 8 ile çarpılıyor.
-    /// Aydınlanırsa sorun seviye, siyah kalırsa yüzeye hiç ışık gelmiyor.
-    public static bool FogSurfaceProbe;
-
-    /// TEŞHİS — GEÇİCİ. Bulut birleştirmesindeki sis uygulaması kapatılıyor.
-    public static bool FogCloudsDisabled;
-
     public override void Create()
     {
         pass = new FogPass(compute, settings)
         {
             renderPassEvent = RenderPassEvent.BeforeRenderingOpaques
         };
-
-        SkyPassBound = skyFogShader != null;
 
         if (skyFogShader != null)
         {
@@ -167,8 +122,6 @@ public class VolumetricFogFeature : ScriptableRendererFeature
 
             builder.SetRenderFunc((PassData data, RasterGraphContext context) =>
             {
-                SkyPassCount++;
-
                 Blitter.BlitTexture(context.cmd, new Vector4(1f, 1f, 0f, 0f), data.material, 0);
             });
         }
@@ -179,11 +132,6 @@ public class VolumetricFogFeature : ScriptableRendererFeature
         static readonly int DensityVolumeId = Shader.PropertyToID("_FogDensityVolume");
         static readonly int DensityVolumeReadId = Shader.PropertyToID("_FogDensityVolumeRead");
         static readonly int ScatteringVolumeId = Shader.PropertyToID("_FogScatteringVolume");
-        static readonly int AuditId = Shader.PropertyToID("_FogAudit");
-        static readonly int LayerProbeId = Shader.PropertyToID("_FogLayerProbe");
-        static readonly int VolumeProbeId = Shader.PropertyToID("_FogVolumeProbe");
-        static readonly int SurfaceProbeId = Shader.PropertyToID("_FogSurfaceProbe");
-        static readonly int CloudsDisabledId = Shader.PropertyToID("_FogCloudsDisabled");
         static readonly int VolumeDepthId = Shader.PropertyToID("_FogVolumeDepth");
         static readonly int VolumeSizeId = Shader.PropertyToID("_FogVolumeSize");
         static readonly int CornerRaysId = Shader.PropertyToID("_FogCornerRays");
@@ -323,7 +271,7 @@ public class VolumetricFogFeature : ScriptableRendererFeature
             int w = settings.Width, h = settings.Height, d = settings.SliceCount;
 
             var depth = new Vector4(near, far,
-                VolumetricFogFeature.VolumeDisabled ? 0f : Mathf.Log(far / near), d);
+                Mathf.Log(far / near), d);
             var size = new Vector4(w, h, 1f / w, 1f / h);
 
             // Zamansal kayma: sekiz kareye yayılan sabit dizi. Wronski jitter'ı
@@ -343,13 +291,6 @@ public class VolumetricFogFeature : ScriptableRendererFeature
             // SİS DENETİMİ. İKİ KEZ YAZILIYOR ve bu zorunlu: `cmd.SetGlobal...` compute'a
             // ULAŞMIYOR (bu dosyanın kendi dersi). Yalnız global yazılsaydı arazi ve gök
             // macentaya döner, hacim eski rengiyle kalır ve araç yalan söylerdi.
-            float audit = VolumetricFogFeature.FogAudit ? 1f : 0f;
-            cmd.SetGlobalFloat(AuditId, audit);
-            cmd.SetComputeFloatParam(compute, AuditId, audit);
-            cmd.SetGlobalFloat(LayerProbeId, VolumetricFogFeature.FogLayerProbe ? 1f : 0f);
-            cmd.SetGlobalFloat(VolumeProbeId, VolumetricFogFeature.FogVolumeProbe ? 1f : 0f);
-            cmd.SetGlobalFloat(SurfaceProbeId, VolumetricFogFeature.FogSurfaceProbe ? 1f : 0f);
-            cmd.SetGlobalFloat(CloudsDisabledId, VolumetricFogFeature.FogCloudsDisabled ? 1f : 0f);
 
             // Uniform'lar KERNEL'E DEĞİL shader'a yazılıyor; iki kernel de aynı değerleri
             // görüyor, tek yazım yeter.
@@ -387,7 +328,6 @@ public class VolumetricFogFeature : ScriptableRendererFeature
             // Cookie matrisi de komut tamponuyla yazılıyor; sıfır okunursa UV sabit
             // kalır ve bulut gölgesi yapı yerine tek bir çarpana düşer.
             Matrix4x4 cookieMatrix = Shader.GetGlobalMatrix(CookieMatrixId);
-            VolumetricFogFeature.CookieMatrixValid = cookieMatrix != Matrix4x4.zero;
             cmd.SetComputeMatrixParam(compute, CookieMatrixId, cookieMatrix);
 
             cmd.SetComputeTextureParam(compute, densityKernel, DensityVolumeId, densityVolume);
@@ -399,12 +339,6 @@ public class VolumetricFogFeature : ScriptableRendererFeature
 
             cmd.SetGlobalTexture(ScatteringVolumeId, scatteringVolume);
 
-            VolumetricFogFeature.DispatchCount++;
-            VolumetricFogFeature.ShadowKeywordOn = true;   // varyant sabit, gölge yolu hep derleniyor
-            VolumetricFogFeature.VolumeDepth = depth;
-            VolumetricFogFeature.CookieBound = Shader.GetGlobalTexture("_MainLightCookieTexture") != null;
-            VolumetricFogFeature.AmbientDC = new Vector3(ambientSH[0].w, ambientSH[1].w, ambientSH[2].w);
-            VolumetricFogFeature.FogColor = Shader.GetGlobalVector("_HeightFogColor");
         }
 
         /// Global doku tablosundan okuyup kernel'e bağlar. Doku henüz üretilmemişse

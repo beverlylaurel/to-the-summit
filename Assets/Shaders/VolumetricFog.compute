@@ -182,10 +182,7 @@ void FogDensityAndLighting(uint3 id : SV_DispatchThreadID)
         float3 direct = _FogMainLightColor.rgb * FogMainLightAttenuation(worldPos)
                       * phase * _FogLightParams.z;
 
-        // DENETİM: hacim de tek renk saçıyor. Güneş ve faz fonksiyonu kapalı — açık
-        // kalırsa güneşe bakan froxel'ler macentayı beyaza doyurur.
-        inScatter = (_FogAudit > 0.5 ? FogAuditColor
-                                     : direct + FogAmbient(viewDir, g)) * density;
+        inScatter = (direct + FogAmbient(viewDir, g)) * density;
     }
 
     _FogDensityVolume[id] = float4(inScatter, density);
