@@ -97,6 +97,16 @@ Assets/
 
 Yeni sistem = yeni klasör. Dosyalar `Assets/Scripts` kökünde birikmez.
 
+## Belirti kaydı
+
+Ölçülerek bulunmuş belirtiler ve gerçek sebepleri `SYMPTOMS.md`'de. Bir belirtiyle
+karşılaşıldığında **önce oraya bakılır** — sekiz kaydın altısında ilk şüpheli yanlış
+çıktı ve her yanlış şüpheli bir tur yaktı.
+
+Yeni bir belirti ölçümle kapandığında aynı adımda oraya yazılır: kullanıcının ağzından
+belirti, yanlış çıkan ilk şüpheli, gerçek sebep, ayırt eden ölçüm. Tahminle çözülen
+bir şey yazılmaz — dosyanın değeri her kaydın ölçülmüş olmasından geliyor.
+
 ## Ölçmeden düzeltme yok
 
 Belirti kodu okuyarak açıklanamıyorsa tahminle düzeltme yapılmaz. Kod her satırında doğru
