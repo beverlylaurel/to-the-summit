@@ -11,11 +11,30 @@ gerekçeler `CLOUDS_REBUILD.md`'de — o dosya artık **teknik kayıt**, bağ li
 | kaynak | ne | nereye |
 |---|---|---|
 | `AtmosphereController.Coverage` | küresel kapsamanın TEK eşlemesi | `cloudCoverage` |
-| `AltitudeWeatherDriver.CloudMass` | yağışın geciken hâli | `densityMultiplier` |
+| `AltitudeWeatherDriver.CloudMass` **veya** `AtmosphereController.Coverage` — hangisi büyükse | örtünün optik kalınlığı | `densityMultiplier` |
 | `WindField.FreeAirSpeed` + `PrevailingDirection` | serbest hava rüzgârı, **arazi maruziyeti uygulanmadan** | `globalSpeed` (km/h), `globalOrientation` |
 | `TimeOfDay` | **dolaylı** — yönlü ışığın yönü/rengi/şiddeti | `GetMainLight()` |
+| `HeightFog.hlsl → FogPath` | kamera ile bulut arasındaki sis | birleştirme geçişi |
 
 Çeviriyi `CloudWeatherDriver` yapıyor; tek yön, bulut geri yazmıyor.
+
+**Kapsama optik kalınlığa da girer.** Yoğunluk bir dönem yalnız `CloudMass`'ten, yani
+yağıştan geliyordu; yağmursuz kapalı havada örtü inceliyor ve kapsama %100 iken bile
+yıldızlar arasından geçiyordu. Bulutun kalınlığı yağışa bağlı değildir — yağışsız stratus
+da yıldızı tamamen keser. İkisinden büyüğü alınır, toplanmaz: fırtına kütlesi ile kapalı
+hava aynı olguyu iki uçtan tarif ediyor.
+
+**Yoğunluk kameradan bağımsızdır.** Paketin `DensityFadeValue`'su bulut yoğunluğunu
+kameraya olan mesafeyle çarpıyor (`saturate(d / fadeInDistance)`). `fadeInDistance`
+5000 m iken bu küresel bir irtifa çarpanına dönüşüyordu: yerde buluta ~2 km (çarpan
+0.40), 20 km'de ~15 km (çarpan 1.00) — 2.5 kat. Bulut yükseldikçe optik olarak
+kalınlaşıp gece simsiyah okunuyordu. Bir bulutun yoğunluğu kameranın yerine bağlı
+olamaz; parametrenin gerçek işi kameranın burnunda yoğun bulut oluşmasını engellemek
+ve o iş birkaç yüz metrede biter. 300 m'ye çekildi.
+
+Sis bağı birleştirme geçişinde, bulutun **kendi derinlik dokusuyla**: bulut da kameradan
+bir mesafede duruyor, önündeki sis onu da söndürmek zorunda. Ayrıntı ve sıra
+**Volumetrik sis** bölümünde ("her katman kendi mesafesiyle bir kez").
 
 **Buluttan ne okunur** — hepsi `CloudLayerProbe` üzerinden, o da aynı Volume ayarlarını
 ve aynı hava haritasını okuyor:
@@ -347,6 +366,20 @@ fonksiyonları çağırıyor. Model tek yerde durmasa hacmin sınırında sisin 
 Kompozisyon Beer-Lambert gereği: `sonuç = kuyruk × T_hacim + saçılım_hacim`. Geçirgenlikler
 çarpılıyor, in-scattering öndekinin geçirgenliğiyle ağırlıklanıyor — geçiş yapı gereği
 sürekli, ayrıca blend penceresi yok.
+
+**HER KATMAN KENDİ MESAFESİYLE BİR KEZ SİSLENİR.** Ekranda üç şey çiziliyor ve üçü farklı
+uzaklıkta: arazi (kendi shader'ında, `ApplyHeightFog`), hacimsel bulut (birleştirme
+geçişinde, `FogPath` + bulutun kendi derinlik dokusu), gökyüzü (`SkyFog.shader`, sonsuz
+yol). Sırası da bu: gök sisi `AfterRenderingSkybox`, bulutlar `BeforeRenderingTransparents`.
+Gök sisi bir ara bulutlardan SONRAYA alınmıştı — o zaman bulutu da sisliyordu, ama sonsuz
+mesafeden; bulut 2 km'de duruyor. Bir katmanı komşusunun mesafesiyle sislemek ya çift
+sayım ya yanlış mesafe demek, ikisi de bulut kenarında sınır bırakıyor.
+
+`FogPath` bu yüzden geçirgenlik ile in-scattering'i AYRI döndürüyor: bulut önceden
+çarpılmış geliyor (`xyz` kapsamayla ağırlıklı, `w` arkasını geçiren pay), saçılım payının
+bulutun kapsadığı orana ölçeklenmesi gerekiyor. `ApplyHeightFog` bu iki parçayı
+`renk × T + saçılım` diye birleştiren ince sarmalayıcı — yol renkte doğrusal olduğu için
+ayrıştırma yaklaştırma değil.
 
 **Ortamın SEVİYESİ sis renginden, YÖNÜ SH'den.** Probe'un SH'si yüzey aydınlatması
 birimindedir; ortamın istediği ise ortamın içeri saçtığı radyans. Ölçüldü: probe DC
@@ -741,7 +774,13 @@ tepe rengine kararır, güneş yönünde ileri saçılım parlaması); gökyüz�
 fonksiyonun kendisidir, sis de aynı fonksiyona sislenir. İki ayrı formül tutulduğu sürece
 her hava/saat köşesinde ayrışıp dağı "parlayan karton" olarak gökten koparıyorlardı —
 eşitlik artık yapısal, elle eşitleme yok. Gökyüzü kendini `SkyFogAmount` ile sisler
-(sonsuz yol, kapalı biçim integral): yıldız, kadranlar ve şimşek lekesi havanın
+(sonsuz yol, kapalı biçim integral). **İnen ışının integrali ayrıdır:** yukarı giden ışın
+kameranın üstünde kalan kolonu geçip sonsuza gider (`exp(-k·h0)`), aşağı inen ışın altta
+kalan kolonu geçip sis tabanında biter (`1 - exp(-k·h0)`); toplamları tüm kolon. Eğim
+kırpması bir ara işareti yutuyordu ve inen ışın "ufka paralel" sayılıp yolu tavana
+yapışıyordu — arazinin bittiği yerde ekranın alt yarısı tam sise, yani karanlık aşağı-hava
+rengine boyanıyordu. Ufkun altında gökyüzü görünmesinin KENDİSİ ayrı bir konu: orayı
+paketin gezegen zemini dolduruyor, `DECISIONS.md`'de. yıldız, kadranlar ve şimşek lekesi havanın
 arkasındaki cisimlerdir, yoğun siste boğulurlar — çorbanın içinde yukarı bakan oyuncu
 süt görür, yıldız değil. Bulut bindirmesi de kameranın önündeki sisin ardındadır:
 geçirgenliği arazi sisiyle aynı integralden alır ama bank çarpanını yalnız kameranın
@@ -1086,9 +1125,15 @@ sırasına kalıyordu.
 
 ### Bisiklet (`BikeController`, `BikeSurface`)
 
-**Okur:** hiçbir şey. Yaklaşma aracı; hava, rüzgâr, sıcaklık ve kar sistemleriyle
-**bağı yok** ve bu bilinçli — bisiklet başka bir projeye taşınabilsin diye tek bağımlılığı
-kendi ayar asset'i.
+**Okur:** yalnız sisi (`ApplyHeightFog`). Davranış tarafında hava, rüzgâr, sıcaklık ve kar
+sistemleriyle **bağı yok** ve bu bilinçli — bisiklet başka bir projeye taşınabilsin diye
+tek bağımlılığı kendi ayar asset'i.
+
+Sis istisnası taşınabilirliği bozmuyor ve zorunlu: ekrana çizilen her şey aynı havanın
+içinde. Bisiklet Unity'nin kendi sisini çağırıyordu (`ComputeFogFactor` / `MixFog`), ama
+sahnede `m_Fog: 0` — çağrı ölüydü, bisiklet hiç sis yemiyordu ve fırtınada dağ beyazlarken
+tek başına net duruyordu. Unity sisi zaten yükseklikten bağımsız olduğu için projede hiç
+kullanılmıyor; ikinci bir sis kaynağı tutmak atmosfer kuralının yasakladığı şey.
 
 Hız fizikten çıkıyor, tablodan değil: `P = v·(Crr·m·g + m·g·sin θ + ½·ρ·CdA·v²)`. Zemin
 eğimi ışının döndürdüğü yüzey normalinden okunuyor, arazi sistemine sorulmuyor.

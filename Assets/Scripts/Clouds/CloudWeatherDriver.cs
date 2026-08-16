@@ -66,8 +66,21 @@ public class CloudWeatherDriver : MonoBehaviour
         // kesilmiş: bulutun üstüne çıkınca sıfırlanıyor ve kapsama → tepe → tavan kesimi →
         // yağış → kapsama döngüsü kurulurdu. `CloudMass` yağışın geciken hâli, kesildiğinde
         // bulut hemen dağılmıyor. Sözleşme `AltitudeWeatherDriver.StormIntensity`'de yazılı.
+        // KAPSAMA DA OPTİK KALINLIĞA GİRER. Yoğunluk yalnız `CloudMass`'ten, yani
+        // yağıştan geliyordu. Yağmursuz kapalı havada örtü optik olarak inceliyor ve
+        // kapsama %100 iken bile YILDIZLAR arasından geçiyordu (ölçüldü: yerden bakışta
+        // görünüyorlar).
+        //
+        // Gerçekte bulutun kalınlığı yağışa bağlı değildir: yağışsız stratus da yıldızı
+        // tamamen keser, tek bir kümülüs de opaktır. Kapsama "gökyüzünün ne kadarı
+        // örtülü" demek; örtülü olan yer opak olmak zorunda.
+        //
+        // İkisinden BÜYÜĞÜ alınıyor, toplanmıyor: fırtına kütlesi ile kapalı hava aynı
+        // olguyu iki uçtan tarif ediyor, ikisi de tek başına örtüyü kalınlaştırır.
+        float opticalDrive = Mathf.Max(weatherDriver.CloudMass, atmosphere.Coverage);
+
         clouds.densityMultiplier.value =
-            Mathf.Lerp(settings.calmDensity, settings.stormDensity, weatherDriver.CloudMass);
+            Mathf.Lerp(settings.calmDensity, settings.stormDensity, opticalDrive);
     }
 
     public void Bind(Volume cloudVolumeRef, WindField windRef,

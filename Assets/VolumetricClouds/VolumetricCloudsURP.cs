@@ -551,7 +551,20 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
 
             cloudsMaterial.SetFloat(numPrimarySteps, cloudsVolume.numPrimarySteps.value);
             cloudsMaterial.SetFloat(numLightSteps, cloudsVolume.numLightSteps.value);
-            cloudsMaterial.SetFloat(maxStepSize, cloudsVolume.altitudeRange.value / 8.0f);
+            // ÇAKMA. Bölen 8 → 4. Adım boyu katman kalınlığından türüyor ve menzil
+            // `numPrimarySteps × adım`. 8'de katman 2781 m için adım 348 m, menzil
+            // 80 × 348 = 27,8 km. Dik bakışta ışın katmanı 2781 m'de geçiyor, yani
+            // bütçenin onda birini kullanıyor; UFKA doğru bakınca katmanın içinde
+            // onlarca kilometre kalıyor ve 27,8 km'yi aşıyor. Aştığı yerde yürüyüş
+            // bitiyor, geçirgenlik son adımda donuyor ve komşu piksellerde bu farklı
+            // yerde olduğu için ekranda yatay kesik bantlar kalıyor.
+            //
+            // Belirti ufka yapışık, kesikli, kapsama 0'da kayboluyor, gece de gündüz de
+            // var — hepsi menzil bitmesiyle tutarlı, aydınlatmayla değil.
+            //
+            // 4'te menzil 55,6 km. ADIM SAYISI DEĞİŞMİYOR, yani kare süresi de
+            // değişmiyor; takas yalnız yakın alandaki adım inceliğinden veriliyor.
+            cloudsMaterial.SetFloat(maxStepSize, cloudsVolume.altitudeRange.value / 4.0f);
 
             // Dikey gorus acisinin tanjanti. Shader bunu `_ScreenSize.w` ile carpip bir
             // ekran pikselinin metre basina dunya boyunu buluyor; gurultu bant siniri

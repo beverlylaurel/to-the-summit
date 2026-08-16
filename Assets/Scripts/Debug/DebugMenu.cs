@@ -47,6 +47,13 @@ public class DebugMenu : MonoBehaviour
 
     static readonly int TerrainShadowId = Shader.PropertyToID("_TerrainShadowReceive");
 
+    /// TEŞHİS — GEÇİCİ. Arazi gölge haritasını okusun mu. Anahtar bir kez silinmişti;
+    /// siyah zemin belirtisi için geri kondu. Ölçüldü: sis zinciri o pikselleri
+    /// `renk × 1 + 0` ile geçiriyor (hacim probu zeminde kırmızı), yani siyah olan
+    /// yüzeyin KENDİ aydınlatması. Gündüz var / gece yok + kamerayla gelen sabit
+    /// mesafeli kenar, yönlü ışık gölgesini ve 60 m'lik gölge mesafesini işaret ediyor.
+    bool terrainShadowReceive = true;
+
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
     float lockedSnowiness;
@@ -61,6 +68,16 @@ public class DebugMenu : MonoBehaviour
     /// başlıyor ve asset'e yazılan değer hiç okunmuyor (ölçüldü: profil 0.71, yığın 0.40).
     /// Açılıştaki değerler geri al düğmeleri için saklanıyor.
     VolumetricClouds clouds;
+
+    /// SİS DENETİMİ — GEÇİCİ. Paketin hava perspektifi. Denetim boyunca kapatılıyor
+    /// çünkü İKİNCİ bir saçılım kaynağı: `AtmosphericScattering.hlsl` onu yalnız
+    /// GEOMETRİYE uyguluyor, göğe uygulamıyor ("This pass only handles geometry").
+    /// Açık kalınca arazi macentanın üstüne paketin pusunu da alıyor ve gökten farklı
+    /// bir değere oturuyor — ölçüldü: dağ soluk mor, gök doygun macenta. Araç "tek
+    /// renk" vaat edip iki renk gösteriyordu; delik mi, ikinci kaynak mı ayırt edilemezdi.
+    PhysicallyBasedSky pbrSky;
+    bool aerialDefault;
+    bool aerialOff;
 
     /// Acilistaki degerler: her satirin ↺'u ve "Bulut ayarlarini geri al" buradan okuyor.
     /// Cizim aninda yakalanamaz — `CloudWeatherDriver` kapsama, yogunluk ve ruzgari her
@@ -138,6 +155,12 @@ public class DebugMenu : MonoBehaviour
         if (!cloudVolume.profile.TryGet(out clouds))
             throw new InvalidOperationException($"{nameof(DebugMenu)}: profilde {nameof(VolumetricClouds)} yok.");
 
+        if (!cloudVolume.profile.TryGet(out pbrSky))
+            throw new InvalidOperationException($"{nameof(DebugMenu)}: profilde {nameof(PhysicallyBasedSky)} yok.");
+
+        aerialDefault = pbrSky.atmosphericScattering.value;
+        pbrSky.atmosphericScattering.overrideState = true;
+
         coverageDefault = clouds.cloudCoverage.value;
 
         // Parametrenin `overrideState`'i kapalıysa harmanlama onu atlıyor: sürgü profile
@@ -158,6 +181,22 @@ public class DebugMenu : MonoBehaviour
 
     void Update()
     {
+        // PANELDEN BAĞIMSIZ. Yorumun kendisi "yazılmazsa sıfır kalır ve arazi hiç gölge
+        // almaz" diyordu ama satır panel çizim kodundaydı: panel KAPALIYKEN global hiç
+        // yazılmıyor, sıfır kalıyor ve arazi gölgesiz çiziliyordu. Oyunun normal hâli
+        // panel kapalı olduğu için bu, oynanışın tamamını etkiliyordu.
+        Shader.SetGlobalFloat(TerrainShadowId, terrainShadowReceive ? 1f : 0f);
+        // PANELDEN BAĞIMSIZ. Bu satır bir dönem panel çizim kodunun içindeydi ve panel
+        // KAPALIYKEN hiç çalışmıyordu: denetim açık olmasına rağmen paketin hava
+        // perspektifi devrede kalıyor, o da yalnız GEOMETRİYE uygulandığı için dağ
+        // macentanın üstüne bir de paketin pusunu alıyordu — gövde arka plandan açık
+        // çıkıyor, siluette tek piksellik kontur kalıyordu. Araç bozuk sanıldı; bozuk
+        // olan aracın çalıştırılma yeriydi.
+        //
+        // Kalıcı ayar değişmiyor: açılıştaki değer saklanıp geri yazılıyor.
+        pbrSky.atmosphericScattering.value =
+            (VolumetricFogFeature.FogAudit || aerialOff) ? false : aerialDefault;
+
         var keyboard = Keyboard.current;
         if (keyboard != null && keyboard.f1Key.wasPressedThisFrame) Toggle();
 
@@ -246,9 +285,8 @@ public class DebugMenu : MonoBehaviour
     /// gölgeyi metrelerce öteliyor — boşluğun büyüklüğü tek başına bir şey söylemiyor.
     void LateUpdate()
     {
-        // Arazi gölge okuması teşhis anahtarıyla kapatılabiliyordu; anahtar silindi ama
-        // global kalmalı — yazılmazsa sıfır kalır ve arazi gölge almaz.
-        Shader.SetGlobalFloat(TerrainShadowId, 1f);
+
+
     }
 
     void BeginSection(string label)
@@ -308,8 +346,43 @@ public class DebugMenu : MonoBehaviour
         GUILayout.Label($"sis rengi    {fc.x:F4} {fc.y:F4} {fc.z:F4}");
         GUILayout.Label($"cookie matrisi: {(VolumetricFogFeature.CookieMatrixValid ? "GEÇERLİ" : "SIFIR")}");
         GUILayout.Label($"gök sisi: {(VolumetricFogFeature.SkyPassBound ? "KURULU" : "SHADER YOK")} · çizim {VolumetricFogFeature.SkyPassCount}");
-        VolumetricFogFeature.SkyFogDebug =
-            GUILayout.Toggle(VolumetricFogFeature.SkyFogDebug, "Gök sisini MACENTA boya");
+        // SİS DENETİMİ — GEÇİCİ. Tek kutu, tek doğru görüntü: işaretliyken 40 m ötedeki
+        // HER piksel dümdüz macenta olmak zorunda. Macenta olmayan leke = o pikseli çizen
+        // shader sisi hiç uygulamıyor. Beğeni payı yok.
+        VolumetricFogFeature.FogAudit =
+            GUILayout.Toggle(VolumetricFogFeature.FogAudit, "SİS DENETİMİ (40 m · macenta)");
+
+        // KATMAN PROBU — GEÇİCİ. "Sis uygulandı mı" değil, "KİM uyguladı" sorusu.
+        VolumetricFogFeature.FogLayerProbe = GUILayout.Toggle(
+            VolumetricFogFeature.FogLayerProbe,
+            "KATMAN PROBU (yeşil arazi · kırmızı gök · mavi bulut)");
+
+        // TEŞHİS — GEÇİCİ. Arazi gölge haritasını okumayı bıraksın. Siyah bölge
+        // buna bağlıysa sorumlu gölge haritası, sis değil.
+        terrainShadowReceive = GUILayout.Toggle(
+            terrainShadowReceive, "Arazi gölge OKUSUN");
+
+        // TEŞHİS — GEÇİCİ. Bulut birleştirmesindeki sis uygulaması.
+        VolumetricFogFeature.FogCloudsDisabled = GUILayout.Toggle(
+            VolumetricFogFeature.FogCloudsDisabled, "BULUT SİSİ KAPALI");
+
+        // YÜZEY PROBU — GEÇİCİ. Sis atlanır, yüzeyin ham rengi 8 ile çarpılır.
+        VolumetricFogFeature.FogSurfaceProbe = GUILayout.Toggle(
+            VolumetricFogFeature.FogSurfaceProbe,
+            "YÜZEY PROBU (sis atlanır · renk ×8)");
+
+        // HACİM PROBU — GEÇİCİ. Hacim dokusunun okunan değeri.
+        VolumetricFogFeature.FogVolumeProbe = GUILayout.Toggle(
+            VolumetricFogFeature.FogVolumeProbe,
+            "HACİM PROBU (kırmızı geçirgenlik · yeşil saçılım · siyah BOŞ)");
+
+        // TEŞHİS — GEÇİCİ. Paketin KENDİ hava perspektifi. Bulut birleştirmesinde
+        // `EvaluateAtmosphericScattering` ile uygulanıyor ve mesafeyle büyüyor; irtifa
+        // arttıkça buluta olan mesafe de büyüdüğü için gece bulutları sıfıra doğru
+        // çarpabiliyor. "Yükseldikçe bulutlar siyahlaşıyor" belirtisinin ilk şüphelisi.
+        aerialOff = GUILayout.Toggle(aerialOff, "PAKET HAVA PERSPEKTİFİ KAPALI");
+
+
 
         // TEŞHİS — GEÇİCİ. HUD "görüş 145 m" derken kilometrelerce ötedeki dağ duruyor.
         // Shader'ın gerçekten kullandığı yoğunluk ile o görüşün gerektirdiği yoğunluk

@@ -1,4 +1,4 @@
-// include-rev: 5
+// include-rev: 29
 //
 // GÖKYÜZÜNE SİS. Sis katılımcı bir ortam: kameraya ulaşan her ışın onun içinden geçer.
 // Arazide biten ışınlar `MountainSurface` içinde sönümleniyordu, ama SONSUZA giden
@@ -48,6 +48,8 @@ Shader "Hidden/ToTheSummit/SkyFog"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
 
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+
             #include "HeightFog.hlsl"
 
             /// Tam ekran üçgeni UZAK DÜZLEMDE. `Blit.hlsl`'in kendi vertex'i üçgeni yakın
@@ -65,7 +67,26 @@ Shader "Hidden/ToTheSummit/SkyFog"
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
+                // KATMAN PROBU: bu geçişin GEÇEN pikselleri KIRMIZI. Alfa 0, yani
+                // hedefi tamamen değiştiriyor — altında ne olduğu görünmesin.
+                if (_FogLayerProbe > 0.5) return half4(1.0, 0.0, 0.0, 0.0);
+
                 float2 uv = input.texcoord;
+
+                // İKİ KAYNAK BİRDEN UZAK DÜZLEM DEMELİ. `ZTest Equal` derinlik
+                // TAMPONUNU okuyor; paketin hava perspektifi ise derinlik DOKUSUNU.
+                // İkisi siluet pikselinde ayrışabiliyor ve o piksel hem "gök" hem
+                // "geometri" sayılıp çift işleniyordu — normal oyunda koyu, sis
+                // denetiminde beyaz tek piksellik kontur. Gövdede çakışma olmadığı için
+                // iz yalnız kenarda çıkıyordu.
+                //
+                // Geçiş sırası da düzeltildi ama tek başına SIRAYA BAĞIMLI kalırdı.
+                // Bu kapı sıradan bağımsız: paketin geometri saydığı hiçbir piksel
+                // buradan geçemez. Doku henüz hazır değilse uzak düzlem okunur ve kapı
+                // şeffaf olur — davranış `ZTest Equal`'ın tek başınaki hâline döner,
+                // yani hiçbir durumda daha kötü olmaz.
+                float sceneDepth = SampleSceneDepth(uv);
+                if (abs(sceneDepth - UNITY_RAW_FAR_CLIP_VALUE) > 1e-6) discard;
 
                 float3 cameraPos = GetCameraPositionWS();
                 float3 far = ComputeWorldSpacePosition(uv, UNITY_RAW_FAR_CLIP_VALUE, UNITY_MATRIX_I_VP);
@@ -94,6 +115,12 @@ Shader "Hidden/ToTheSummit/SkyFog"
                     tailStart = cameraPos + direction * (_FogVolumeDepth.y / forward);
                 }
 
+                // HACİM PROBU: gok yolunun okudugu hacim degeri.
+                if (_FogVolumeProbe > 0.5)
+                    return half4(volumeTransmittance,
+                                 saturate(dot(volumeScatter, float3(0.2126, 0.7152, 0.0722)) * 4.0),
+                                 0.0, 0.0);
+
                 // KUYRUK SONSUZ YOL. Arazi yolu sonluydu ve örnekle integre ediliyordu;
                 // gök yolunun sonu yok, her katmanın üstel profili kapalı biçimde
                 // integre ediliyor. `SkyFogAmount` zaten bunun için duruyordu.
@@ -101,9 +128,6 @@ Shader "Hidden/ToTheSummit/SkyFog"
 
                 float transmittance = volumeTransmittance * (1.0 - tailAmount);
                 float3 scattering = volumeScatter + volumeTransmittance * air * tailAmount;
-
-                if (_SkyFogDebug > 0.5)
-                    return half4(volumeTransmittance, tailAmount, 0.0, 0.0);
 
                 return half4(scattering, transmittance);
             }

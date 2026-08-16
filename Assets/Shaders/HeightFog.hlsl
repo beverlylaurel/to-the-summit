@@ -24,7 +24,13 @@ float4 _HeightFogSunColor; // gök, güneş yönünde, ufkun 2° üstü
 float3 _SunDirection;      // AtmosphereController global yazar; gökyüzü ve bulut da okur
 
 // Şimşek: LightningFlash yazar, bulut ve gökyüzü de aynı değeri okur.
+//
+// Bulut birleştirme geçişi bu dosyayı include ediyor ve `VolumetricCloudsDefs.hlsl`
+// aynı globali kendi bildiriyor. İkisi tek derleme biriminde buluşunca yeniden bildirim
+// hatası çıkar; orada bildirilmişse burada atlanıyor. Değer ve davranış aynı.
+#ifndef URP_VOLUMETRIC_CLOUDS_DEFINES_HLSL
 float4 _LightningFlash;
+#endif
 
 /// Sisin çakmadan aldığı pay. Bulut kadar almaz: bulut kütlesi kilometrelerce derin ve
 /// çakma onun içinde, sis ise ince ve boşalmanın altında kalıyor.
@@ -66,17 +72,20 @@ float _CloudBottom;        // katmanın tabanı (metre)
 /// Sis ve sürüklenen kar TEK TARAMADA. İkisi ayrı döngüdeyken aynı ışın, aynı `t`
 /// değerlerinde iki kez taranıyordu — sonuç birebir aynı, maliyet iki katı.
 /// Sürüklenen kar ayrı dönüyor çünkü rengi ve sönüm eğrisi sisinkinden farklı.
-float HeightFogIntegral(float3 cameraPos, float3 worldPos, out float drift)
+float HeightFogIntegral(float3 cameraPos, float3 worldPos)
 {
-    drift = 0.0;
 
     float3 ray = worldPos - cameraPos;
     float distance = length(ray);
 
-    bool hasFog = _HeightFogDensity > 0.0 || _FogSeaDensity > 0.0 || _FogFreeDensity > 0.0;
-    bool hasDrift = _SpindriftDensity > 0.0;
+    // DENETİM: erken çıkış kapalı. Bu kapı hava BERRAKKEN yoğunlukların sıfır olmasına
+    // bakıyor; denetimde yoğunluğu `FogDensityAt` zorluyor ama bu satır onu görmüyor ve
+    // integral hiç çalışmadan sıfır dönüyordu. Araç berrak havada susar, kullanıcı da
+    // "delik var" diye okurdu. Açık kalınca denetim HER havada çalışıyor.
+    bool hasFog = _FogAudit > 0.5
+               || _HeightFogDensity > 0.0 || _FogSeaDensity > 0.0 || _FogFreeDensity > 0.0;
 
-    if (distance < 0.01 || (!hasFog && !hasDrift)) return 0.0;
+    if (distance < 0.01 || !hasFog) return 0.0;
 
     const int Steps = 8;
 
@@ -84,49 +93,61 @@ float HeightFogIntegral(float3 cameraPos, float3 worldPos, out float drift)
     float endHeight = worldPos.y - _HeightFogBase;
 
     float sum = 0.0;
-    float driftSum = 0.0;
-
-    // PERDE KENDİ ADIMLARIYLA TARANIYOR. Sisin profili yayvan ve pürüzsüz, sekiz adım
-    // fazlasıyla yetiyor. Perde ise yere yapışık, ince ve akan bir yapı taşıyor —
-    // aynı sekiz adım desenin üstünden atlıyor ve titreme bırakıyordu. Adım sayısı
-    // yalnız perde etkinken ve yalnız perde terimi için ikiye katlanıyor.
-    const int DriftSubSteps = 2;
 
     [unroll]
     for (int i = 0; i < Steps; i++)
     {
         float t = (i + 0.5) / Steps;
         sum += FogDensityAt(lerp(startHeight, endHeight, t));
-
-        if (hasDrift)
-        {
-            [unroll]
-            for (int k = 0; k < DriftSubSteps; k++)
-            {
-                float s = (i + (k + 0.5) / DriftSubSteps) / Steps;
-                driftSum += SpindriftAt(lerp(cameraPos, worldPos, s)) / DriftSubSteps;
-            }
-        }
     }
-
-    // PERDE DOYUMA GİTMEZ ama YAPISINI DA KAYBETMEZ. Sert kırpma (`min`) uzakta bütün
-    // değerleri aynı tavana yapıştırıyor ve akış deseninin kontrastı siliniyordu:
-    // "bembeyaz olmasın" isteğiyle "yapısı görünsün" isteği tek sayıda çarpışıyordu.
-    //
-    // Yumuşak doyum tavana asla varmıyor, yalnız yaklaşıyor — iki katı derinlik hâlâ
-    // daha koyu çıkıyor, yani desen uzakta da okunuyor.
-    float raw = distance * driftSum / Steps;
-    drift = _SpindriftMaxDepth * raw / (raw + _SpindriftMaxDepth);
 
     // `FogDensityAt` artık mutlak yoğunluk veriyor: dışarıda ikinci bir çarpım yok,
     // yoksa iki katmandan biri iki kez ölçeklenirdi.
     return distance * sum / Steps;
 }
 
-/// Havada asılı karın rengi. Gökyüzü rengiNDEN türemiyor: `AirColor` bakış yönüne bağlı
-/// ve aşağı bakarken neredeyse siyah dönüyor — sis için doğru (vadiye bakınca sis koyu
-/// okunur), havada asılı kar için yanlış. Savrulan kar yukarıdan güneşle ve altındaki
-/// karın yansımasıyla aydınlanır; hangi yöne bakıldığı onu karartmaz.
+/// SAVRULAN KARIN OPTİK DERİNLİĞİ — tek kaynak, kapalı biçim.
+///
+/// Perde iki yerden birden geliyordu: froxel hacmi her hücrede `SpindriftAt` çağırıyor,
+/// arazi yolu da ışın boyunca örnekliyordu. İkisi de aynı hatayı yapıyordu — alanın
+/// içindeki `crest`/`lee` 60-80 m'lik KESKİN eşikler ve her okumada dört ayrı arazi
+/// yüksekliği. Froxel ızgarası (160×90) uzakta o eşiklerden geniş, ışın örneklemesi de
+/// üstünden atlıyor; ikisi de kamera kıpırdadıkça yer değiştiren dikey şeritler bırakıyor.
+/// Örnek sayısını artırmak çözüm değil, alan keskin kenarlı.
+///
+/// Gök yolu bunu baştan doğru yapıyordu (`SkyFogDepth`): perde yalnız kameranın
+/// çevresinden okunur, dikey profil kapalı biçimde integre edilir. Artık üç yol da
+/// buradan geçiyor.
+///
+/// Dikey profil `exp(-falloff·h)`; ışının eğimi onu sıkıştırır. Menzil katmanın kendi
+/// sönüm katsayısından: üç e-katı kolonun %95'ini taşır.
+float SpindriftPath(float3 cameraPos, float3 worldPos)
+{
+    if (_SpindriftDensity <= 0.0) return 0.0;
+
+    float3 ray = worldPos - cameraPos;
+    float distance = length(ray);
+    if (distance < 0.01) return 0.0;
+
+    float range = min(distance, 3.0 / max(_SpindriftFalloff, 1e-4));
+    float slope = abs(ray.y) / distance;
+    float k = _SpindriftFalloff * slope;
+
+    float path = k > 1e-5 ? (1.0 - exp(-k * range)) / k : range;
+    float raw = SpindriftAt(cameraPos) * path;
+
+    // Doyuma gitmez ama yapısını da kaybetmez: sert kırpma uzakta bütün değerleri aynı
+    // tavana yapıştırıp akış deseninin kontrastını siliyordu.
+    return _SpindriftMaxDepth * raw / (raw + _SpindriftMaxDepth);
+}
+
+/// Havada asılı karın rengi. Gökyüzü rengiNDEN türemiyor: `AirColor` bakış yönüne bağlı,
+/// aşağı bakarken ufuk rengine oturup en çok 0.55 ile çarpılıyor — sis için doğru (vadiye
+/// bakınca sis koyu okunur), havada asılı kar için yanlış. Savrulan kar yukarıdan güneşle
+/// ve altındaki karın yansımasıyla aydınlanır; hangi yöne bakıldığı onu karartmaz.
+///
+/// (Bu satır bir dönem "aşağı bakarken neredeyse siyah dönüyor" diyordu. Koddan
+/// doğrulandı: dönmüyor. Siyah ekran belirtisi aranırken bu yorum yanlış yere baktırdı.)
 ///
 /// Kaynak ufkun hemen üstündeki gök rengi — zaten sisin okuduğu ışık, ayrı bir kaynak
 /// kurulmuyor. Doygunluğu alınıyor (kristal dalga boyu seçmez) ve yukarı ölçekleniyor
@@ -176,8 +197,7 @@ float3 SpindriftColor()
 
 float HeightFogAmount(float3 cameraPos, float3 worldPos)
 {
-    float drift;
-    float integral = HeightFogIntegral(cameraPos, worldPos, drift)
+    float integral = HeightFogIntegral(cameraPos, worldPos)
                    * FogBankPath(cameraPos.xz, worldPos.xz);
     return saturate(1.0 - exp(-integral));
 }
@@ -194,11 +214,36 @@ float HeightFogAmount(float3 cameraPos, float3 worldPos)
 /// yolla söndürülmesin diye (bkz. Sky.shader).
 float SkyFogDepth(float3 cameraPos, float3 dir, float maxPath)
 {
+    // DENETİM: bu fonksiyonun KENDİ kapalı formülü var, `FogDensityAt`'i çağırmıyor —
+    // dolayısıyla oradaki denetim kapısı buraya ULAŞMIYOR. Kapı ayrıca konuluyor, yoksa
+    // gökyüzü tek yerde eski yoğunlukta kalır ve araç "gökte delik var" diye YALAN
+    // söylerdi.
+    //
+    // Tek biçimli ortamda sonsuz yolun optik derinliği sonsuzdur; büyük bir sayı
+    // `SkyFogAmount`'un saturate'ini 1'e oturtuyor — gök tam macenta.
+    if (_FogAudit > 0.5) return 1e6;
+
     float h0 = cameraPos.y - _HeightFogBase;
 
     // Ufka inen ışın: eğim sıfıra dayandıkça yol yatay kapasiteye oturur (~100 km
     // eşdeğeri). Ufuk her havada hava rengine doyar — gerçekte de öyle.
-    float s = max(dir.y, 0.02);
+    //
+    // İNEN IŞIN İÇİN AYRI İNTEGRAL DENENDİ VE GERİ ALINDI. "Aşağı giden ışın altındaki
+    // kolonu geçer" fiziksel olarak doğru ama BURAYA uygulanamaz: bu fonksiyon yalnız
+    // GÖKYÜZÜ pikselleri için çalışıyor ve ufkun altında gökyüzü yok — orada arazi var,
+    // ya da arazinin bittiği boşluk. Terim eklendiğinde sırayla şunlar çıktı: ufukta
+    // 87 kat sıçrama, ince siyah çizgi, alt yarının tamamen hava rengine doyması.
+    // Gerekçesi ortadan kalktığı için terim de kalktı.
+    // SERT KIRPMA YERİNE YUMUŞAK TABAN. `max(dir.y, 0.02)` sürekli ama TÜREVİ ufkun
+    // 1.15° üstünde kırılıyor; göz o kırılmayı Mach bandı olarak okuyor ve ufka yapışık,
+    // kamerayla gelen ince bir çizgi bırakıyor. Gece göğü koyulaşınca görünür oluyor.
+    //
+    // `sqrt(y² + taban²)` aynı tabanı veriyor ama her mertebeden sürekli: y büyükken
+    // y'ye, y sıfırken tabana gidiyor, arada kırılma yok. Ufkun ALTI değişmiyor —
+    // negatif y sıfıra kırpıldığı için orada değer yine tam olarak taban.
+    const float HorizonFloor = 0.02;
+    float up = max(dir.y, 0.0);
+    float s = sqrt(up * up + HorizonFloor * HorizonFloor);
 
     float k = _HeightFogFalloff;
 
@@ -237,11 +282,19 @@ float SkyFogDepth(float3 cameraPos, float3 dir, float maxPath)
 
 float SkyFogAmount(float3 cameraPos, float3 dir)
 {
-    if (_HeightFogDensity <= 0.0 && _FogSeaDensity <= 0.0 && _FogFreeDensity <= 0.0)
+    // DENETİM: erken çıkış kapalı — gerekçe `HeightFogIntegral`'dekiyle aynı.
+    if (_FogAudit <= 0.5
+        && _HeightFogDensity <= 0.0 && _FogSeaDensity <= 0.0 && _FogFreeDensity <= 0.0)
         return 0.0;
 
     // Kameranın önündeki bank boş gökte görünür bir leke bırakır: "vadide gezen sis"
     // ancak gök de sislenince var olabiliyor.
+    //
+    // BU ÇARPAN KALDIRILDI VE GERİ KONDU. "İki örnek sonsuz yolu temsil edemez"
+    // gerekçesi doğru, ama kaldırınca çarpan sabit 1 oluyor ve bankın kıstığı yerlerde
+    // gök sisi artıyor — gece göğünde mavi aydınlık olarak çıktı. Örnekleme sorunu
+    // ayrı bir iş; gerekçesi doğru diye doğrulanmamış bir değişiklik yığının içinde
+    // kalamaz.
     float2 ahead = cameraPos.xz + normalize(dir.xz + 0.0001) * 900.0;
     float bank = (FogBankAt(cameraPos.xz) + FogBankAt(ahead)) * 0.5;
 
@@ -258,6 +311,10 @@ float SkyFogAmount(float3 cameraPos, float3 dir)
 /// yalnız güneş ufka yakınken. Yükseldikçe tepe rengine kararır.
 float3 AirColor(float3 direction)
 {
+    // DENETİM: havanın rengi tek. Arazi, bulut ve gök kuyruğu saçılımını buradan
+    // alıyor — tek kapı üçünü birden macentaya çeviriyor.
+    if (_FogAudit > 0.5) return FogAuditColor;
+
     float3 sunward = normalize(float3(_SunDirection.x, 0.0, _SunDirection.z) + 0.0001);
     float3 viewFlat = normalize(float3(direction.x, 0.0, direction.z) + 0.0001);
     float towardSun = smoothstep(-0.85, 0.85, dot(viewFlat, sunward));
@@ -336,8 +393,17 @@ float3 AirColor(float3 direction)
     //
     // Üs korunur — sıcaklığın ufka yakın kalması ondan geliyor. Yalnız ilk üç derece
     // smoothstep'le C1 sürekli hâle getirilir; 3.4°'nin üstünde eğri birebir aynı.
+    // Üs 0.55 → 0.35: sıcaklık ufka yakın kalmalı. Yüksek üs ufuk rengini göğün
+    // yarısına kadar taşıyıp bandı sanılandan çok geniş gösteriyordu.
+    //
+    // BU EĞRİ DEĞİŞTİRİLDİ VE GERİ ALINDI. Sıfırdaki eğimi sonsuz olduğu için
+    // `y(1+k)/(y+k)` ile değiştirilmişti; sonlu eğim doğru ama eğri göğün geniş bir
+    // bandında daha AZ zenit veriyor (y=0.05'te 0.208, eskisi 0.305). Gece ufuk rengi
+    // parlak mavi olduğu için sonuç "havada mavi aydınlık" oldu ve ufuk bozuldu.
+    // Sonsuz eğimin bıraktığı basamak `smoothstep` ile zaten yumuşatılmış durumda.
     float rise = pow(saturate(direction.y), 0.35)
                * smoothstep(0.0, 0.06, direction.y);
+
     float3 air = lerp(horizon, _HeightFogZenith.rgb, saturate(rise));
 
     // Karşı yarı kararır ama simsiyah değil: gerçek karşı ufuk yumuşak mor-gridir
@@ -356,14 +422,23 @@ float3 AirColor(float3 direction)
     return air;
 }
 
-/// Çizilmiş rengi havanın içine oturtur. Çağıran tarafın miktarı ayrıca alıp lerp'i
-/// kendi yazmasına gerek yok — o iki satır her yüzeyde birebir aynı olurdu.
+/// Kamera ile bir nokta arasındaki sis YOLU: geçirgenlik ve in-scattering ayrı ayrı.
 ///
 /// Sis şimşeği de saçar. Rengi sabit tutulunca fırtınada — yani şimşeğin çaktığı tek
 /// havada — görüş yedi yüz metreye düşüyor ve arazinin büyük kısmı o değişmeyen rengin
 /// altında kalıyordu: yüzey aydınlansa bile üstü örtülü olduğu için hiçbir şey
 /// görünmüyordu. Gerçekte tam tersi olur, çakma anında sisin kendisi içeriden parlar.
-float3 ApplyHeightFog(float3 color, float3 cameraPos, float3 worldPos)
+///
+/// Ayrı durmalarının sebebi, sisi uygulaması gereken tek şeyin opak yüzey olmaması.
+/// Bulut da kameradan bir mesafede duruyor ve önündeki sis onu da söndürmek zorunda —
+/// ama bulut ÖNCEDEN çarpılmış (premultiplied) geliyor, kendi kapsamasını taşıyor.
+/// `renk × T + saçılım` formülü ona olduğu gibi uygulanamaz; saçılım payının bulutun
+/// kapsadığı orana göre ölçeklenmesi gerekiyor. Çağıran bunu ancak iki parçayı ayrı
+/// alırsa yapabilir.
+///
+/// Yol renkte DOĞRUSAL — perde ve sis sırayla binse bile. Bu yüzden ayrıştırma bir
+/// yaklaştırma değil, aynı ifadenin açılmış hâli.
+void FogPath(float3 cameraPos, float3 worldPos, out float3 scattering, out float transmittance)
 {
     float3 air = AirColor(normalize(worldPos - cameraPos))
                + _LightningFlash.rgb * LightningFogScatter;
@@ -403,14 +478,28 @@ float3 ApplyHeightFog(float3 color, float3 cameraPos, float3 worldPos)
         }
     }
 
+    // HACİM PROBU: hacmin OKUNAN degeri. Kirmizi = gecirgenlik, yesil = sacilim.
+    // Siyah kalirsa doku o froxel'de bos demektir.
+    if (_FogVolumeProbe > 0.5)
+    {
+        scattering = float3(volumeTransmittance,
+                            saturate(dot(volumeScatter, float3(0.2126, 0.7152, 0.0722)) * 4.0),
+                            0.0);
+        transmittance = 0.0;
+        return;
+    }
+
     // KANAL BAŞINA SÖNÜM KALDIRILDI (`_HeightFogChroma`). Rayleigh'in maviyi kırmızıdan
     // önce süpürmesi gerçek ama artık onun SAHİBİ gökyüzü paketinin hava perspektifi:
     // aynı atmosferi iki yerden modellemek çift sayım demek. Bu dosyanın taşıdığı ortam
     // YEREL — vadi sisi, banklar, sürüklenen kar — ve su damlası baskın olduğu için
     // sönümü zaten nötr (Mie renk seçmez).
-    float drift;
-    float integral = HeightFogIntegral(tailStart, worldPos, drift)
+    float integral = HeightFogIntegral(tailStart, worldPos)
                    * FogBankPath(tailStart.xz, worldPos.xz);
+
+    // PERDE KAMERADAN, kuyruğun başından değil: katman araziye yapışık ve oyuncunun
+    // çevresinde. Hacim onu artık taşımıyor, tek kaynak burası.
+    float drift = SpindriftPath(cameraPos, worldPos);
 
     // İKİ KATMAN SIRAYLA, tek karışımda değil. Sürüklenen kar araziye yapışık ve
     // gözün ÖNÜNDE duruyor; sisin mavisi ise yol boyunca dağılmış. Tek karışımda
@@ -419,7 +508,7 @@ float3 ApplyHeightFog(float3 color, float3 cameraPos, float3 worldPos)
     //
     // Önce sis uygulanır (uzak), sonra perde onun üstüne biner (yakın). Perde kendi
     // nötr rengini taşıyor, altındakini boyamıyor.
-    float3 withFog = lerp(air, color, exp(-integral));
+    float surfacePass = exp(-integral);
 
     // PERDE DERİNLEŞTİKÇE SÖNER, gökyüzünün rengine boyanmaz. `AirColor` bakış yönüne
     // bağlı ve gökyüzü gradyanını taşıyor; ona yakınsatınca o gradyan dağın üstüne
@@ -430,17 +519,46 @@ float3 ApplyHeightFog(float3 color, float3 cameraPos, float3 worldPos)
     float3 veil = SpindriftColor()
                 * lerp(1.0, 0.55, saturate(drift / max(0.01, _SpindriftMaxDepth)));
 
-    float3 tail = lerp(veil, withFog, exp(-drift));
-
-    // TEŞHİS — GEÇİCİ. `ApplyHeightFog`'dan GEÇEN her piksel MAVİ. Kırmızı denendi ama
-    // sahnenin kendi kahverengisiyle karışıyordu. Mavi kalmayan bölge bu fonksiyona
-    // hiç girmiyor demektir, yani onu başka bir shader çiziyor.
-    if (_SkyFogDebug > 0.5) return float3(0.0, 0.0, 1.0);
+    float veilPass = exp(-drift);
 
     // Hacim kuyruğun ÖNÜNDE: kuyruğun sonucu hacmin geçirgenliğiyle süzülüp hacmin
     // kendi saçılımı üstüne biniyor. Spec §5.4'teki `renk × transmittance + inScattering`
-    // formülünün ta kendisi.
-    return tail * volumeTransmittance + volumeScatter;
+    // formülünün ta kendisi — burada iki katsayı olarak, birleştirilmeden.
+    transmittance = volumeTransmittance * veilPass * surfacePass;
+    scattering = volumeScatter
+               + volumeTransmittance * (veil * (1.0 - veilPass)
+                                      + veilPass * air * (1.0 - surfacePass));
+}
+
+/// Çizilmiş rengi havanın içine oturtur. Çağıran tarafın miktarı ayrıca alıp lerp'i
+/// kendi yazmasına gerek yok — o iki satır her yüzeyde birebir aynı olurdu.
+float3 ApplyHeightFog(float3 color, float3 cameraPos, float3 worldPos)
+{
+    // YÜZEY PROBU. `× 8` YETMİYORDU: gökyüzü parlakken ortam ışığıyla aydınlanan zemin
+    // sekiz katıyla da ekranda siyah kalıyor, yani araç "tam sıfır" ile "çok küçük"
+    // arasını ayıramıyordu ve bana yanlış cevap verdi. Ölçek artık LOGARİTMİK ve
+    // sıfırın kendisi ayrı bir durum:
+    //   SİYAH   → luminans tam 0. Yüzeye hiç ışık gelmiyor.
+    //   KIRMIZI → 2^-20 civarı, yani var ama yok denecek kadar az
+    //   SARI    → orta
+    //   BEYAZ   → 1'e yakın, normal aydınlık
+    if (_FogSurfaceProbe > 0.5)
+    {
+        float lum = dot(color, float3(0.2126, 0.7152, 0.0722));
+        if (lum <= 0.0) return float3(0.0, 0.0, 0.0);
+
+        float e = saturate((log2(lum) + 20.0) / 20.0);
+        return float3(1.0, e, e * e);
+    }
+
+    // KATMAN PROBU: bu fonksiyondan geçen her piksel YEŞİL.
+    if (_FogLayerProbe > 0.5) return float3(0.0, 1.0, 0.0);
+
+    float3 scattering;
+    float transmittance;
+    FogPath(cameraPos, worldPos, scattering, transmittance);
+
+    return color * transmittance + scattering;
 }
 
 #endif

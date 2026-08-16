@@ -747,7 +747,7 @@ MonoBehaviour:
   sunColor: {r: 1, g: 0.96, b: 0.89, a: 1}
   moonColor: {r: 0.586, g: 0.653, b: 0.818, a: 1}
   sunIntensity: 3.030782
-  moonIntensity: 0.204
+  moonIntensity: 0.0199
   moon: {fileID: 787919893}
 --- !u!4 &508855606
 Transform:

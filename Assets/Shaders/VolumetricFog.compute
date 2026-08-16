@@ -159,7 +159,15 @@ void FogDensityAndLighting(uint3 id : SV_DispatchThreadID)
     // YOĞUNLUK PAYLAŞILAN MODELDEN. Analitik kuyruk da aynı fonksiyonları çağırıyor;
     // hacmin sınırında yapı değişmesin diye tek kaynak.
     float height = worldPos.y - _HeightFogBase;
-    float density = FogDensityAt(height) * FogBankAt(worldPos.xz) + SpindriftAt(worldPos);
+    // PERDE HACİMDE DEĞİL. `SpindriftAt` içinde 60-80 m'lik keskin `crest`/`lee`
+    // eşikleri var; 160×90 froxel ızgarasında uzaktaki bir hücre o eşiklerden geniş
+    // olduğu için alan hücreler arasında atlıyor ve ekranda dikey, titreyen şeritler
+    // bırakıyordu (rüzgâr arttıkça belirginleşiyor, katman probu açıkken kayboluyor —
+    // prob hacmi örneklemeden dönüyor).
+    //
+    // Perde artık TEK KAYNAKTAN geliyor: `HeightFog.hlsl → SpindriftPath`, kameradan
+    // kapalı biçimde. İki değerlendirici bir olguyu paylaşamaz.
+    float density = FogDensityAt(height) * FogBankAt(worldPos.xz);
 
     float3 inScatter = 0.0;
 
@@ -174,7 +182,10 @@ void FogDensityAndLighting(uint3 id : SV_DispatchThreadID)
         float3 direct = _FogMainLightColor.rgb * FogMainLightAttenuation(worldPos)
                       * phase * _FogLightParams.z;
 
-        inScatter = (direct + FogAmbient(viewDir, g)) * density;
+        // DENETİM: hacim de tek renk saçıyor. Güneş ve faz fonksiyonu kapalı — açık
+        // kalırsa güneşe bakan froxel'ler macentayı beyaza doyurur.
+        inScatter = (_FogAudit > 0.5 ? FogAuditColor
+                                     : direct + FogAmbient(viewDir, g)) * density;
     }
 
     _FogDensityVolume[id] = float4(inScatter, density);
