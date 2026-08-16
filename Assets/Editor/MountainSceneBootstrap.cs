@@ -52,6 +52,7 @@ public static class MountainSceneBootstrap
     const string SkyMaterialPath = "Assets/Settings/Sky.mat";
     const string FogComputePath = "Assets/Shaders/VolumetricFog.compute";
     const string FogSettingsPath = "Assets/Settings/VolumetricFogSettings.asset";
+    const string SkyFogShaderPath = "Assets/Shaders/SkyFog.shader";
     const string RendererPath = "Assets/Settings/PC_Renderer.asset";
     const string CloudMaterialPath = "Assets/Settings/VolumetricClouds.mat";
     const string CloudWeatherPath = "Assets/Settings/CloudWeatherSettings.asset";
@@ -662,15 +663,23 @@ public static class MountainSceneBootstrap
         if (renderer == null)
             throw new System.InvalidOperationException($"Renderer bulunamadı: {RendererPath}");
 
-        foreach (var existing in renderer.rendererFeatures)
-            if (existing is VolumetricFogFeature) return;
-
         var compute = AssetDatabase.LoadAssetAtPath<ComputeShader>(FogComputePath);
         if (compute == null)
             throw new System.InvalidOperationException($"Sis compute shader'ı bulunamadı: {FogComputePath}");
 
-        var feature = ScriptableObject.CreateInstance<VolumetricFogFeature>();
-        feature.name = "Volumetrik Sis";
+        // VAR OLAN ÖRNEK DE GÜNCELLENİYOR, yalnız yokken kurulmuyor. Feature'a sonradan
+        // alan eklendiğinde erken dönen bir kurulum o alanı boş bırakıyor ve geçiş
+        // sessizce çalışmıyor — sis buradan bir kez kaybedildi.
+        VolumetricFogFeature feature = null;
+        foreach (var existing in renderer.rendererFeatures)
+            if (existing is VolumetricFogFeature found) { feature = found; break; }
+
+        bool isNew = feature == null;
+        if (isNew)
+        {
+            feature = ScriptableObject.CreateInstance<VolumetricFogFeature>();
+            feature.name = "Volumetrik Sis";
+        }
 
         // Bağlar eklemeden ÖNCE yazılıyor: `Create()` örnek listeye girer girmez Unity
         // tarafından çağrılıyor ve bağlar boşsa geçiş hiç kuyruğa girmiyor.
@@ -678,10 +687,20 @@ public static class MountainSceneBootstrap
         serialized.FindProperty("compute").objectReferenceValue = compute;
         serialized.FindProperty("settings").objectReferenceValue =
             LoadOrCreate<VolumetricFogSettings>(FogSettingsPath);
+
+        var skyFogShader = AssetDatabase.LoadAssetAtPath<Shader>(SkyFogShaderPath);
+        if (skyFogShader == null)
+            throw new System.InvalidOperationException($"Gökyüzü sisi shader'ı bulunamadı: {SkyFogShaderPath}");
+
+        serialized.FindProperty("skyFogShader").objectReferenceValue = skyFogShader;
         serialized.ApplyModifiedPropertiesWithoutUndo();
 
-        renderer.rendererFeatures.Add(feature);
-        AssetDatabase.AddObjectToAsset(feature, renderer);
+        if (isNew)
+        {
+            renderer.rendererFeatures.Add(feature);
+            AssetDatabase.AddObjectToAsset(feature, renderer);
+        }
+
         EditorUtility.SetDirty(renderer);
         AssetDatabase.SaveAssets();
         AssetDatabase.ImportAsset(RendererPath);

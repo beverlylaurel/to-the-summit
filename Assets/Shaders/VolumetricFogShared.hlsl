@@ -49,6 +49,11 @@ float4 _FogJitter;
 // platforma göre değişiyor ve sessizce ters dönen bir derinlik hacmi tamamen kaydırırdı.
 float4 _FogCameraForward;
 
+// TEŞHİS — GEÇİCİ. 1 iken sis yerine ARA DEĞER basılıyor: gök geçişinde hacim
+// geçirgenliği ve kuyruk payı, yüzeyde yalnız hacim geçirgenliği. Sis doğrulanınca
+// bu satır, `SkyFog.shader`'daki dal ve `ApplyHeightFog`'daki dal silinecek.
+float _SkyFogDebug;
+
 // Birikmiş saçılım hacmi. Compute onu RW olarak bildirdiği için orada bu blok kapalı;
 // aynı isim iki farklı tipte bildirilirse derleyici çakışıyor.
 #ifndef FOG_VOLUME_COMPUTE

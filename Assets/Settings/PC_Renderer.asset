@@ -15,6 +15,7 @@ MonoBehaviour:
   m_Active: 1
   compute: {fileID: 7200000, guid: 88ca51449102a044ba2a9e38f7c03042, type: 3}
   settings: {fileID: 11400000, guid: 68a29c058eebbe64db1190b5c31aa23b, type: 2}
+  skyFogShader: {fileID: 4800000, guid: a3198c00dbf31f948bb4338706875f58, type: 3}
 --- !u!114 &-2366975147878514686
 MonoBehaviour:
   m_ObjectHideFlags: 1

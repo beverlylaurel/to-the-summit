@@ -19,7 +19,15 @@ public class VolumetricFogFeature : ScriptableRendererFeature
     [SerializeField] ComputeShader compute;
     [SerializeField] VolumetricFogSettings settings;
 
+    /// GÖKYÜZÜNE SİS AYRI GEÇİŞTE. Gökyüzünü PBSky paketi çiziyor ve bizim sisimizden
+    /// haberi yok; pakete çağrı eklemek yama olurdu. Bu geçiş derinliğe bakıp yalnız
+    /// hiçbir şeye çarpmamış pikselleri sisliyor — delik gökyüzüne özel değil,
+    /// `ApplyHeightFog` çağırmayan her şeyde var.
+    [SerializeField] Shader skyFogShader;
+
     FogPass pass;
+    SkyFogPass skyPass;
+    Material skyFogMaterial;
 
     /// TEŞHİS — GEÇİCİ. Hacim gerçekten dolduruluyor mu, gölge kodu derlendi mi.
     /// Sis doğrulanınca bu alanlar ve F1'deki bölüm silinir.
@@ -39,12 +47,39 @@ public class VolumetricFogFeature : ScriptableRendererFeature
     public static Vector4 FogColor;
     public static bool CookieMatrixValid;
 
+    /// TEŞHİS — GEÇİCİ. Gökyüzü sisi geçişi kuruldu mu, çalışıyor mu.
+    public static bool SkyPassBound;
+    public static int SkyPassCount;
+
+    /// TEŞHİS — GEÇİCİ. Gök sisi geçişinin geçen pikselleri macenta boyanıyor.
+    public static bool SkyFogDebug;
+
     public override void Create()
     {
         pass = new FogPass(compute, settings)
         {
             renderPassEvent = RenderPassEvent.BeforeRenderingOpaques
         };
+
+        SkyPassBound = skyFogShader != null;
+
+        if (skyFogShader != null)
+        {
+            skyFogMaterial = CoreUtils.CreateEngineMaterial(skyFogShader);
+
+            // BULUTLARDAN SONRA. Sıra bir kez yanlış kuruldu: geçiş
+            // `AfterRenderingSkybox`taydı, bulutlar ise `BeforeRenderingTransparents`ta
+            // çiziliyor — sis gökyüzüne uygulanıyor, hemen ardından bulutlar üstünü
+            // boyuyordu. Fırtınada gökyüzünün %83'ü bulut olduğu için sisin işi hiç
+            // görünmüyordu; berrak havada bulut olmadığı için doğru görünüyordu.
+            //
+            // Sıra fizikte de böyle: bulut kilometrelerce ötede, sis onunla kamera
+            // arasında. Bulutun da sislenmesi gerekiyor.
+            skyPass = new SkyFogPass(skyFogMaterial)
+            {
+                renderPassEvent = RenderPassEvent.BeforeRenderingTransparents + 1
+            };
+        }
     }
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -53,12 +88,56 @@ public class VolumetricFogFeature : ScriptableRendererFeature
         if (renderingData.cameraData.cameraType == CameraType.Preview) return;
 
         renderer.EnqueuePass(pass);
+
+        if (skyPass != null) renderer.EnqueuePass(skyPass);
     }
 
     protected override void Dispose(bool disposing)
     {
         pass?.Release();
         pass = null;
+        skyPass = null;
+
+        CoreUtils.Destroy(skyFogMaterial);
+        skyFogMaterial = null;
+    }
+
+    /// Gökyüzü piksellerine sisi uygulayan tam ekran geçiş. Karışım shader'da:
+    /// `sonuç = hedef × T + saçılım`.
+    class SkyFogPass : ScriptableRenderPass
+    {
+        readonly Material material;
+
+        class PassData
+        {
+            public Material material;
+            public TextureHandle source;
+        }
+
+        public SkyFogPass(Material fogMaterial) => material = fogMaterial;
+
+        public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
+        {
+            var resources = frameData.Get<UniversalResourceData>();
+
+            using var builder = renderGraph.AddRasterRenderPass<PassData>("Gökyüzü Sisi", out var passData);
+
+            passData.material = material;
+
+            builder.SetRenderAttachment(resources.activeColorTexture, 0);
+
+            // Derinlik EKLENTİ olarak bağlanıyor, doku olarak değil: seçim `ZTest Equal`
+            // ile yapılıyor ve okuma yok, yalnız test.
+            builder.SetRenderAttachmentDepth(resources.activeDepthTexture, AccessFlags.Read);
+            builder.AllowPassCulling(false);
+
+            builder.SetRenderFunc((PassData data, RasterGraphContext context) =>
+            {
+                SkyPassCount++;
+
+                Blitter.BlitTexture(context.cmd, new Vector4(1f, 1f, 0f, 0f), data.material, 0);
+            });
+        }
     }
 
     class FogPass : ScriptableRenderPass
@@ -222,6 +301,7 @@ public class VolumetricFogFeature : ScriptableRendererFeature
             cmd.SetGlobalVectorArray(CornerRaysId, cornerRays);
             cmd.SetGlobalVector(JitterId, jitter);
             cmd.SetGlobalVector(CameraForwardId, data.camera.transform.forward);
+            cmd.SetGlobalFloat("_SkyFogDebug", VolumetricFogFeature.SkyFogDebug ? 1f : 0f);
 
             // Uniform'lar KERNEL'E DEĞİL shader'a yazılıyor; iki kernel de aynı değerleri
             // görüyor, tek yazım yeter.

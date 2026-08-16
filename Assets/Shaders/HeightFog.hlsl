@@ -432,6 +432,11 @@ float3 ApplyHeightFog(float3 color, float3 cameraPos, float3 worldPos)
 
     float3 tail = lerp(veil, withFog, exp(-drift));
 
+    // TEŞHİS — GEÇİCİ. `ApplyHeightFog`'dan GEÇEN her piksel MAVİ. Kırmızı denendi ama
+    // sahnenin kendi kahverengisiyle karışıyordu. Mavi kalmayan bölge bu fonksiyona
+    // hiç girmiyor demektir, yani onu başka bir shader çiziyor.
+    if (_SkyFogDebug > 0.5) return float3(0.0, 0.0, 1.0);
+
     // Hacim kuyruğun ÖNÜNDE: kuyruğun sonucu hacmin geçirgenliğiyle süzülüp hacmin
     // kendi saçılımı üstüne biniyor. Spec §5.4'teki `renk × transmittance + inScattering`
     // formülünün ta kendisi.

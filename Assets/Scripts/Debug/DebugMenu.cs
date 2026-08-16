@@ -307,6 +307,35 @@ public class DebugMenu : MonoBehaviour
         GUILayout.Label($"hacim ortamı {sh.x:F4} {sh.y:F4} {sh.z:F4}");
         GUILayout.Label($"sis rengi    {fc.x:F4} {fc.y:F4} {fc.z:F4}");
         GUILayout.Label($"cookie matrisi: {(VolumetricFogFeature.CookieMatrixValid ? "GEÇERLİ" : "SIFIR")}");
+        GUILayout.Label($"gök sisi: {(VolumetricFogFeature.SkyPassBound ? "KURULU" : "SHADER YOK")} · çizim {VolumetricFogFeature.SkyPassCount}");
+        VolumetricFogFeature.SkyFogDebug =
+            GUILayout.Toggle(VolumetricFogFeature.SkyFogDebug, "Gök sisini MACENTA boya");
+
+        // TEŞHİS — GEÇİCİ. HUD "görüş 145 m" derken kilometrelerce ötedeki dağ duruyor.
+        // Shader'ın gerçekten kullandığı yoğunluk ile o görüşün gerektirdiği yoğunluk
+        // yan yana basılıyor; hangisinin yalan söylediği tek bakışta çıkar.
+        float density = Shader.GetGlobalFloat("_HeightFogDensity");
+        float falloff = Shader.GetGlobalFloat("_HeightFogFalloff");
+        float baseAlt = Shader.GetGlobalFloat("_HeightFogBase");
+        float seaD = Shader.GetGlobalFloat("_FogSeaDensity");
+        float seaF = Shader.GetGlobalFloat("_FogSeaFalloff");
+        float freeD = Shader.GetGlobalFloat("_FogFreeDensity");
+        float freeF = Shader.GetGlobalFloat("_FogFreeFalloff");
+        float invH = Shader.GetGlobalFloat("_FogInversionHeight");
+        float invW = Shader.GetGlobalFloat("_FogInversionWidth");
+
+        float camY = Camera.main != null ? Camera.main.transform.position.y : 0f;
+        float h = camY - baseAlt;
+
+        float t = Mathf.Clamp01((h - (invH - invW)) / Mathf.Max(1f, 2f * invW));
+        float lid = 1f - t * t * (3f - 2f * t);
+        float local = density * Mathf.Exp(-falloff * h) * lid
+                    + seaD * Mathf.Exp(-seaF * h)
+                    + freeD * Mathf.Exp(-freeF * h);
+
+        GUILayout.Label($"taban yoğunluk {density:E2} · sönme {falloff:E2}");
+        GUILayout.Label($"kotta yoğunluk {local:E2}  (kot {h:F0} m)");
+        GUILayout.Label($"bu yoğunluğun görüşü {(local > 1e-9f ? 3.912f / local : 0f):F0} m");
 
         VolumetricFogFeature.VolumeDisabled =
             GUILayout.Toggle(VolumetricFogFeature.VolumeDisabled, "Hacim KAPALI (eski sise dön)");
