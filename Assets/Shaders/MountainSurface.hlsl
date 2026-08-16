@@ -148,6 +148,25 @@ float TerrainSunShadow(float3 worldPos, float3 sunDir)
 
     float2 uv = (worldPos.xz - _TerrainOrigin.xz) / _TerrainSize.xz;
 
+    // PİŞİRİLMİŞ ALANIN DIŞINDA GÖLGE YOK. Ufuk haritası yalnız arazinin kapladığı
+    // kutu için pişiriliyor. Dışarıda uv [0,1]'den çıkıyor ve dokunun sarma kipi ne
+    // verirse o okunuyordu; yüksek bir ufuk okununca `smoothstep` SIFIR dönüyor, yani
+    // doğrudan güneş tamamen kesiliyor.
+    //
+    // Belirti: ovada, gündüz, zemin simsiyah. Ölçüm zinciri sırayla eledi — sis
+    // (hacim probu zeminde kırmızı: `renk × 1 + 0`), froxel hacmi, bulut gölgesi
+    // cookie'si, gölge haritası (`_TerrainShadowReceive` anahtarı hiçbir şey
+    // değiştirmedi çünkü BU yolu kesmiyor). Yüzey probu `renk × 8` ile de siyah kaldı:
+    // yüzeye giren değer zaten sıfırdı.
+    //
+    // Gece/gündüz kapısı da buradan: fonksiyon `sunDir.y < 0` iken 1.0 dönüyor, yani
+    // gölge yalnız güneş ufkun üstündeyken hesaplanıyor. Belirtinin 08:02'de başlayıp
+    // 19:11'de bitmesinin sebebi bu — kullanıcı sınırı dakikasıyla ölçtü.
+    //
+    // Dışarıda doğru cevap "engel yok": pişirilmiş arazi orada bitiyor ve güneşi
+    // kesecek bir kütle de yok. Ufuk sıfır sayılır, yüzey tam aydınlanır.
+    if (any(uv != saturate(uv))) return 1.0;
+
     // Azimut hangi iki pişirilmiş yönün arasında?
     const float TwoPi = 6.2831853;
     float sector = atan2(sunDir.z, sunDir.x) / TwoPi * 16.0;

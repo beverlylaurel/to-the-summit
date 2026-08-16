@@ -51,8 +51,26 @@ public class VolumetricFogFeature : ScriptableRendererFeature
     public static bool SkyPassBound;
     public static int SkyPassCount;
 
-    /// TEŞHİS — GEÇİCİ. Gök sisi geçişinin geçen pikselleri macenta boyanıyor.
-    public static bool SkyFogDebug;
+    /// SİS DENETİMİ — GEÇİCİ. Ortam tek biçimli (görüş 40 m) ve tek renk (macenta)
+    /// olmaya zorlanıyor. 40 m ötede macenta olmayan her leke, o pikseli çizen
+    /// shader'ın sisi hiç uygulamadığı anlamına gelir.
+    public static bool FogAudit;
+
+    /// KATMAN PROBU — GEÇİCİ. Her sis yazıcısı kendi düz rengini basıyor:
+    /// yeşil `ApplyHeightFog`, kırmızı gök sisi geçişi, mavi bulut birleştirme.
+    /// Siyah kalan bölgeyi sis zinciri hiç çizmiyor demektir.
+    public static bool FogLayerProbe;
+
+    /// HACİM PROBU — GEÇİCİ. Froxel hacminin OKUNAN değeri ekrana basılıyor:
+    /// kırmızı geçirgenlik, yeşil in-scattering. Siyah kalan yerde hacim boş.
+    public static bool FogVolumeProbe;
+
+    /// YÜZEY PROBU — GEÇİCİ. Sis atlanıp yüzeyin ham rengi 8 ile çarpılıyor.
+    /// Aydınlanırsa sorun seviye, siyah kalırsa yüzeye hiç ışık gelmiyor.
+    public static bool FogSurfaceProbe;
+
+    /// TEŞHİS — GEÇİCİ. Bulut birleştirmesindeki sis uygulaması kapatılıyor.
+    public static bool FogCloudsDisabled;
 
     public override void Create()
     {
@@ -67,17 +85,33 @@ public class VolumetricFogFeature : ScriptableRendererFeature
         {
             skyFogMaterial = CoreUtils.CreateEngineMaterial(skyFogShader);
 
-            // BULUTLARDAN SONRA. Sıra bir kez yanlış kuruldu: geçiş
-            // `AfterRenderingSkybox`taydı, bulutlar ise `BeforeRenderingTransparents`ta
-            // çiziliyor — sis gökyüzüne uygulanıyor, hemen ardından bulutlar üstünü
-            // boyuyordu. Fırtınada gökyüzünün %83'ü bulut olduğu için sisin işi hiç
-            // görünmüyordu; berrak havada bulut olmadığı için doğru görünüyordu.
+            // BULUTLARDAN ÖNCE. Bu geçiş yalnız GÖĞÜ sisliyor, sonsuz yol için.
             //
-            // Sıra fizikte de böyle: bulut kilometrelerce ötede, sis onunla kamera
-            // arasında. Bulutun da sislenmesi gerekiyor.
+            // Bir ara bulutlardan sonraya alınmıştı: o zaman gökyüzü sisleniyor, hemen
+            // ardından bulutlar üstünü boyuyordu ve fırtınada gök %83 bulut olduğu için
+            // beyazlama hiç görünmüyordu. Geçişi öne almak belirtiyi gideriyordu ama
+            // sebebi değil — bulut sislenmediği için gökyüzüyle birlikte sisleniyordu,
+            // yani SONSUZ mesafeden. Bulut 2 km'de duruyor.
+            //
+            // Doğru kural: her katman KENDİ mesafesiyle bir kez sislenir. Arazi kendi
+            // shader'ında, bulut birleştirme geçişinde (`FogPath`), gök burada. Bu geçiş
+            // bulutun önüne dönünce üçü de tek uygulama alıyor, çift sayım kalmıyor.
             skyPass = new SkyFogPass(skyFogMaterial)
             {
-                renderPassEvent = RenderPassEvent.BeforeRenderingTransparents + 1
+                // PAKETİN OPAK GEÇİŞİNDEN SONRA, BULUTLARDAN ÖNCE.
+                //
+                // `AfterRenderingSkybox`ta bu geçiş paketin `Opaque Atmospheric
+                // Scattering` geçişinin ÖNÜNE düşüyordu. Siluet pikselinde ikisi
+                // çakışıyor: bu geçiş `ZTest Equal` ile o pikseli "gök" sayıp sisliyor,
+                // paket ise derinlik dokusundan "geometri" sayıp kendi hava
+                // perspektifini biniyor. Sonuç tek piksellik bir şeritte çift işlem —
+                // normal oyunda koyu kontur, sis denetiminde macentanın üstüne bindiği
+                // için beyaz kontur. Dağın gövdesi düz kalıyor çünkü orada çakışma yok.
+                //
+                // `+2` paketin geçişinden sonraya düşürüyor ama hâlâ
+                // `BeforeRenderingTransparents`taki bulutlardan önce — her katmanın
+                // kendi mesafesiyle bir kez sislenmesi kuralı korunuyor.
+                renderPassEvent = RenderPassEvent.AfterRenderingSkybox + 2
             };
         }
     }
@@ -145,6 +179,11 @@ public class VolumetricFogFeature : ScriptableRendererFeature
         static readonly int DensityVolumeId = Shader.PropertyToID("_FogDensityVolume");
         static readonly int DensityVolumeReadId = Shader.PropertyToID("_FogDensityVolumeRead");
         static readonly int ScatteringVolumeId = Shader.PropertyToID("_FogScatteringVolume");
+        static readonly int AuditId = Shader.PropertyToID("_FogAudit");
+        static readonly int LayerProbeId = Shader.PropertyToID("_FogLayerProbe");
+        static readonly int VolumeProbeId = Shader.PropertyToID("_FogVolumeProbe");
+        static readonly int SurfaceProbeId = Shader.PropertyToID("_FogSurfaceProbe");
+        static readonly int CloudsDisabledId = Shader.PropertyToID("_FogCloudsDisabled");
         static readonly int VolumeDepthId = Shader.PropertyToID("_FogVolumeDepth");
         static readonly int VolumeSizeId = Shader.PropertyToID("_FogVolumeSize");
         static readonly int CornerRaysId = Shader.PropertyToID("_FogCornerRays");
@@ -301,7 +340,16 @@ public class VolumetricFogFeature : ScriptableRendererFeature
             cmd.SetGlobalVectorArray(CornerRaysId, cornerRays);
             cmd.SetGlobalVector(JitterId, jitter);
             cmd.SetGlobalVector(CameraForwardId, data.camera.transform.forward);
-            cmd.SetGlobalFloat("_SkyFogDebug", VolumetricFogFeature.SkyFogDebug ? 1f : 0f);
+            // SİS DENETİMİ. İKİ KEZ YAZILIYOR ve bu zorunlu: `cmd.SetGlobal...` compute'a
+            // ULAŞMIYOR (bu dosyanın kendi dersi). Yalnız global yazılsaydı arazi ve gök
+            // macentaya döner, hacim eski rengiyle kalır ve araç yalan söylerdi.
+            float audit = VolumetricFogFeature.FogAudit ? 1f : 0f;
+            cmd.SetGlobalFloat(AuditId, audit);
+            cmd.SetComputeFloatParam(compute, AuditId, audit);
+            cmd.SetGlobalFloat(LayerProbeId, VolumetricFogFeature.FogLayerProbe ? 1f : 0f);
+            cmd.SetGlobalFloat(VolumeProbeId, VolumetricFogFeature.FogVolumeProbe ? 1f : 0f);
+            cmd.SetGlobalFloat(SurfaceProbeId, VolumetricFogFeature.FogSurfaceProbe ? 1f : 0f);
+            cmd.SetGlobalFloat(CloudsDisabledId, VolumetricFogFeature.FogCloudsDisabled ? 1f : 0f);
 
             // Uniform'lar KERNEL'E DEĞİL shader'a yazılıyor; iki kernel de aynı değerleri
             // görüyor, tek yazım yeter.

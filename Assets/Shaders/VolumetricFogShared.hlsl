@@ -49,10 +49,21 @@ float4 _FogJitter;
 // platforma göre değişiyor ve sessizce ters dönen bir derinlik hacmi tamamen kaydırırdı.
 float4 _FogCameraForward;
 
-// TEŞHİS — GEÇİCİ. 1 iken sis yerine ARA DEĞER basılıyor: gök geçişinde hacim
-// geçirgenliği ve kuyruk payı, yüzeyde yalnız hacim geçirgenliği. Sis doğrulanınca
-// bu satır, `SkyFog.shader`'daki dal ve `ApplyHeightFog`'daki dal silinecek.
-float _SkyFogDebug;
+
+// TEŞHİS ARAÇLARI — GEÇİCİ. Sis doğrulanınca bunlar ve F1'deki bölüm silinir.
+// Silme tek adımda yapılmalı: bu globaller `HeightFog.hlsl`, `SkyFog.shader`,
+// `VolumetricClouds.shader` ve `VolumetricFog.compute` içinde de okunuyor.
+float _FogAudit;           // ortam tek biçim + tek renk (macenta): kapsama testi
+float _FogLayerProbe;      // yeşil arazi · kırmızı gök · mavi bulut: KİM çiziyor
+float _FogVolumeProbe;     // kırmızı geçirgenlik · yeşil saçılım: froxel hacmi dolu mu
+float _FogSurfaceProbe;    // sis atlanır, yüzeyin ham luminansı logaritmik basılır
+float _FogCloudsDisabled;  // bulut birleştirmesindeki sis uygulamasını kapatır
+
+// Koschmieder: β = 3.912 / görüş. 40 m için 0.0978 /m.
+static const float FogAuditExtinction = 0.0978;
+
+// Ton eşleme parlaklığı oynatır ama TONU oynatmaz; okuma tona dayanıyor.
+static const float3 FogAuditColor = float3(0.5, 0.0, 0.5);
 
 // Birikmiş saçılım hacmi. Compute onu RW olarak bildirdiği için orada bu blok kapalı;
 // aynı isim iki farklı tipte bildirilirse derleyici çakışıyor.
@@ -200,17 +211,34 @@ float4 _SpindriftWind;       // xz birim yön, w şiddet
 /// hiç aynı şekli tekrar etmiyor.
 float SpindriftFlow(float2 xz)
 {
-    float2 p = (xz - _SpindriftDrift.xz) * 0.042;
-    float a = sin(p.x + sin(p.y * 1.7)) * sin(p.y * 0.8 - p.x * 0.6);
+    // ÇARPIM DEĞİL TOPLAM. Gerekçe `FogBankAt` ile birebir aynı: `sin(k1·p)·sin(k2·p)`
+    // ayrıştırılabilir bir ifadedir ve düzenli bir KAFES üretir. Bankta düzeltilmişti,
+    // burası atlanmıştı — aynı sınıfın ikinci kullanım yeri.
+    //
+    // Belirti: rüzgâr arttıkça yukarı uzanan, titreyen dikey şeritler. Ölçüldü —
+    // rüzgâr 0.10'a çekilince kayboluyor, yani kaynak perdenin akış alanı.
+    //
+    // İKİ SÜRÜKLENME HIZI KORUNUYOR: katmanlar arası paralaks perdeye akış hissini
+    // veriyor; tek hızda desen blok hâlinde kayıyor. Dalga boyları 114-646 m,
+    // yönleri paralel değil, oranları tam sayı değil — bileşke tekrar etmiyor.
+    float2 p = xz - _SpindriftDrift.xz;
+    float2 q = xz - _SpindriftDrift.xz * 1.4;
 
-    float2 q = (xz - _SpindriftDrift.xz * 1.4) * 0.011;
-    float b = sin(q.x * 1.3 - q.y * 0.9) * sin(q.y * 1.1 + q.x * 0.4);
+    float s = sin(dot(p, float2( 0.02840,  0.00869))) * 0.30
+            + sin(dot(p, float2(-0.01330,  0.03760))) * 0.24
+            + sin(dot(p, float2( 0.05100, -0.02100))) * 0.14
+            + sin(dot(q, float2( 0.00930,  0.00284))) * 0.20
+            + sin(dot(q, float2(-0.00435,  0.01231))) * 0.12;
 
-    return lerp(0.25, 1.75, saturate(0.5 + a * 0.32 + b * 0.26));
+    return lerp(0.25, 1.75, saturate(0.5 + 0.5 * s));
 }
 
 float SpindriftAt(float3 pos)
 {
+    // DENETİM: perde kapalı — kendi nötr rengi macentayı beyaza çekerdi.
+    if (_FogAudit > 0.5) return 0.0;
+
+
     if (_SpindriftDensity <= 0.0) return 0.0;
 
     float ground = TerrainHeightAt(pos.xz);
@@ -272,6 +300,10 @@ float SpindriftAt(float3 pos)
 /// bakışta otuz kilometredeki sırt tam kontrastla, karton gibi duruyordu.
 float FogDensityAt(float height)
 {
+    // DENETİM: ortam TEK BİÇİMLİ. Görüş 40 m, her kotta aynı.
+    if (_FogAudit > 0.5) return FogAuditExtinction;
+
+
     float lid = 1.0 - smoothstep(_FogInversionHeight - _FogInversionWidth,
                                  _FogInversionHeight + _FogInversionWidth, height);
 
@@ -286,17 +318,38 @@ float FogDensityAt(float height)
 
 /// Sis bankları: yoğunluğu yerel çarpan alçak frekanslı alan. Gerçek dağ sisi üniform
 /// bir çorba değildir — bank bank gezer: bir yamacı sarar, vadiye dil uzatır, iki
-/// dakika sonra açılır. Alan rüzgârla sürüklenir; iki farklı frekansın çarpımı tekrar
-/// desenini kırar. Dalga boyları yüzlerce metre.
+/// dakika sonra açılır. Alan rüzgârla sürüklenir. Dalga boyları yüzlerce metre.
 ///
 /// AtmosphereController aynı formülü CPU'da örnekler (kuşak yamaları, görüş nefesi):
 /// iki tüketici, tek alan — formül değişirse ikisi birlikte değişmeli.
 float FogBankAt(float2 pos)
 {
+    // DENETİM: bank yok — yoğunluğu yerel oynatması tek biçimliliği bozardı.
+    if (_FogAudit > 0.5) return 1.0;
+
+
     float2 p = pos - _FogBankDrift.xz;
-    float a = sin(dot(p, float2(0.0093, 0.0071))) * sin(dot(p, float2(-0.0052, 0.0087)));
-    float b = sin(dot(p, float2(0.0031, -0.0024)));
-    float bank = 0.5 + a * 0.35 + b * 0.15;               // 0..1, ortalama 0.5
+
+    // ÇARPIM DEĞİL TOPLAM. Eskiden iki sinüs ÇARPILIYORDU ve yorumu "iki farklı
+    // frekansın çarpımı tekrar desenini kırar" diyordu — kırmıyor. `sin(k1·p)·sin(k2·p)`
+    // ayrıştırılabilir bir ifadedir ve matematiksel olarak düzenli bir KAFES üretir;
+    // frekans karıştırmak bunu değiştirmez. Belirti: gece, 3700 m'den aşağı bakınca
+    // sisin üstünde çapraz ızgara. Ölçüldü — sis denetimi (ortam tek biçime zorlanınca)
+    // ızgarayı yok ediyordu, hacim ve bulut yolu elenmişti, geriye bu alan kalmıştı.
+    //
+    // Rastgele bir alan modların ÜST ÜSTE BİNMESİDİR; spektral gürültünün tanımı budur.
+    // Beş bileşen, yönleri paralel değil ve dalga boyları oransız — bileşke pratikte
+    // tekrar etmiyor. Sinüs CPU ile GPU'da birebir aynı sonucu veriyor; hash tabanlı
+    // gürültü vermezdi ve `AtmosphereController` aynı alanı CPU'da örneklemek zorunda.
+    //
+    // Dalga boyları 350-1700 m: sis bankı yüzlerce metre genişliğinde bir yapıdır.
+    float s = sin(dot(p, float2( 0.003534,  0.001081))) * 0.34
+            + sin(dot(p, float2( 0.001090,  0.005607))) * 0.26
+            + sin(dot(p, float2(-0.005424,  0.006239))) * 0.20
+            + sin(dot(p, float2(-0.011122, -0.004720))) * 0.13
+            + sin(dot(p, float2( 0.005250, -0.017167))) * 0.07;
+
+    float bank = saturate(0.5 + 0.5 * s);                 // 0..1, ortalama 0.5
 
     // Tam güçte 0.3-1.7 aralığı: bank sisi yerel olarak üçte birine indirir ama
     // hiç sıfırlamaz — sisli havada tamamen berrak delik gerçekdışı duruyor.
@@ -308,9 +361,20 @@ float FogBankAt(float2 pos)
 /// sekiz kat gürültü maliyeti görünür, üç örnek yeter.
 float FogBankPath(float2 fromXZ, float2 toXZ)
 {
-    return (FogBankAt(lerp(fromXZ, toXZ, 0.2))
-          + FogBankAt(lerp(fromXZ, toXZ, 0.5))
-          + FogBankAt(lerp(fromXZ, toXZ, 0.8))) / 3.0;
+    float average = (FogBankAt(lerp(fromXZ, toXZ, 0.2))
+                   + FogBankAt(lerp(fromXZ, toXZ, 0.5))
+                   + FogBankAt(lerp(fromXZ, toXZ, 0.8))) / 3.0;
+
+    // UZUN YOL ORTALAMAYA YAKINSAR. Alanın dalga boyu 350-1700 m; kilometrelerce yol
+    // onlarca bankın içinden geçiyor ve gerçek ortalama alanın ortalamasına (çarpan 1)
+    // oturuyor. Üç örnek o yakınsamayı üretemez, bakış yönüne göre dalgalanıp uzakta
+    // desen bırakır — yakın mesafede doğru, uzakta yalan.
+    //
+    // Yakınsama yolun uzunluğuyla: birkaç yüz metrede bank yapısı tam görünür,
+    // kilometrelerde söner. Sınır alanın kendi dalga boyundan geliyor, uydurma değil.
+    float length2D = distance(fromXZ, toXZ);
+
+    return lerp(1.0, average, exp(-length2D / 900.0));
 }
 
 #endif // TOTHESUMMIT_VOLUMETRIC_FOG_SHARED_INCLUDED

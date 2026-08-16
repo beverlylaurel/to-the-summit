@@ -26,6 +26,12 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 - **Ova ve patika ölçüm araçları** (`ForelandProbe`, F1'deki kurulum süresi logu) — ova
   ve yol dokusu oturunca silinir
+- **Sis teşhis bölümü** (F1 → sis) — "SİS DENETİMİ (40 m · macenta)" kutusu, "Hacim KAPALI"
+  anahtarı, dağıtım/hacim ortamı/sis rengi/cookie matrisi/gök sisi çizim sayacı satırları,
+  yoğunluk-görüş karşılaştırması. Denetim macentası kapsamayı doğrulayıp temiz çıkınca
+  bölümün tamamı silinir; `_FogAudit` globali ve shader'lardaki denetim kapıları da
+  (`FogDensityAt`, `FogBankAt`, `SpindriftAt`, `AirColor`, `SkyFogDepth`, `SkyFogAmount`,
+  `HeightFogIntegral`, `VolumetricFog.compute`) aynı adımda gider
 - **Bisiklet maskesi yeniden seyreltmede silinecek** — malzeme maskesi köşe renginde duruyor;
   model yeniden seyreltilirse topoloji değişir ve boyama kaybolur. Seyreltme yapıldı
   (3.1 M → 200 bin), boyama artık güvenle yapılabilir; bütçe değişirse maske aktarımı
@@ -60,6 +66,30 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Işından bağımsızlık için ödenen kare süresi** — üç ucuzlatma söküldü, bedeli
   ölçülmedi
   → [Geçirgenliğe bağlı üç ucuzlatma söküldü](#geçirgenliğe-bağlı-üç-ucuzlatma-söküldü--bedeli-ölçülmedi)
+
+---
+
+### `Sky.shader` yedek yolda kaldı — sisi kendi uyguluyor
+
+Gökyüzünü PBSky paketi çiziyor. Bizim `Sky.shader`'ımız silinmedi: `PC_Renderer.asset`'te
+paketin `m_FallbackSkyMaterial`'ı olarak duruyor, yani paket çizemezse devreye giren yol.
+Sahnenin `m_SkyboxMaterial`'ı boş (`fileID: 0`), normal işleyişte hiç çizilmiyor.
+
+Dosya kendi içinde `SkyFogAmount`'u uyguluyor (satır 221) — gökyüzü hâlâ onun işiyken
+doğruydu. Sis artık ayrı bir geçişte (`SkyFog.shader`, `AfterRenderingSkybox`), dolayısıyla
+yedek yol devreye girerse gökyüzü **iki kez** sislenir.
+
+**Neden şimdi düzeltilmedi:** yedek yol normal işleyişte hiç çalışmıyor, belirti üretmiyor.
+Düzeltmek `Sky.shader`'ın kendi sis adımını sökmeyi ya da dosyayı tamamen silip
+`AtmosphereController`'ın ona yazdığı güneş/ay renklerini de temizlemeyi gerektiriyor —
+ikisi de bulut sisinden ayrı bir tur.
+
+**Tetikleyici:** PBSky devre dışı kalır ya da yedek sky materyali ekranda görülürse
+(gökyüzü beklenenden çok daha yoğun sisli çıkar). Ayrıca paket kaldırılırsa karar kapanır:
+`Sky.shader` ya tek gökyüzü olur ve sis adımı sökülür, ya da silinir.
+
+**Maliyet:** sökme yarım saat; tamamen silme `AtmosphereController`, bootstrap ve iki asset
+dokunuşu — bir tur.
 
 ---
 

@@ -1,3 +1,5 @@
+// include-rev: 33  (HeightFog.hlsl degisince Unity bu dosyaya dokunulmadikca
+// yeniden derlemiyor; bu satir degistikce derleme zorlanir)
 Shader "Hidden/Sky/VolumetricClouds"
 {
     Properties
@@ -172,8 +174,12 @@ Shader "Hidden/Sky/VolumetricClouds"
             Name "Volumetric Clouds Combine"
 			Tags { "LightMode" = "Volumetric Clouds" }
 
+            // ÇAKMA. İki "Combine" geçişi var; C# `pass: hasAtmosphericScattering ? 7 : 1`
+            // diye seçiyor. Bu 1 numaralı, hava perspektifi KAPALIYKEN çalışan yol.
+            // Sis İKİSİNDE DE var — biri sissiz kalırsa ayarın kapanması bulutları
+            // sessizce hamlaştırır.
             Blend One SrcAlpha, Zero One
-			
+
             HLSLPROGRAM
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             // The Blit.hlsl file provides the vertex shader (Vert),
@@ -195,9 +201,21 @@ Shader "Hidden/Sky/VolumetricClouds"
 
             SAMPLER(s_linear_clamp_sampler);
 
+            // ÇAKMA. Bulutun kendi derinliği — sis onu kendi mesafesiyle söndürsün diye.
+            // 7 numaralı geçiş bunları zaten bildiriyordu; hava perspektifi kapalıyken
+            // çalışan bu yol sissiz kalıyordu.
+            SAMPLER(s_point_clamp_sampler);
+            float4 _ScreenResolution;
+            TEXTURE2D_X_FLOAT(_VolumetricCloudsDepthTexture);
+
             #pragma multi_compile_local_fragment _ _LOW_RESOLUTION_CLOUDS
+            #pragma multi_compile_local_fragment _ _OUTPUT_CLOUDS_DEPTH
+
+            #define RAW_FAR_CLIP_THRESHOLD 1e-6
+            #define CLOUDS_RAW_FAR_CLIP_VALUE  UNITY_RAW_FAR_CLIP_VALUE ? (UNITY_RAW_FAR_CLIP_VALUE - RAW_FAR_CLIP_THRESHOLD) : (UNITY_RAW_FAR_CLIP_VALUE + RAW_FAR_CLIP_THRESHOLD)
 
             #include "./VolumetricCloudsUpscale.hlsl"
+            #include "../Shaders/HeightFog.hlsl"
 
             half4 frag(Varyings input) : SV_Target
             {
@@ -209,6 +227,112 @@ Shader "Hidden/Sky/VolumetricClouds"
             #else
                 half4 cloudsColor = SAMPLE_TEXTURE2D_X_LOD(_VolumetricCloudsLightingTexture, s_linear_clamp_sampler, screenUV, 0).rgba;
             #endif
+
+            #ifdef _OUTPUT_CLOUDS_DEPTH
+                float depth = SAMPLE_TEXTURE2D_X_LOD(_VolumetricCloudsDepthTexture, s_point_clamp_sampler, screenUV, 0).r;
+                bool edgeOfClouds = depth == UNITY_RAW_FAR_CLIP_VALUE && cloudsColor.a < 1.0;
+                depth = edgeOfClouds ? CLOUDS_RAW_FAR_CLIP_VALUE : depth;
+            #else
+                float depth = cloudsColor.a == 1.0 ? UNITY_RAW_FAR_CLIP_VALUE : CLOUDS_RAW_FAR_CLIP_VALUE;
+            #endif
+
+                PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenResolution.zw, depth, UNITY_MATRIX_I_VP, UNITY_MATRIX_V);
+
+                // YEREL SİS. 7 numaralı geçiştekiyle birebir aynı kompozisyon: bulut
+                // önceden çarpılmış, sönüm buluta, saçılım bulutun kapsadığı orana.
+                // KATMAN PROBU: bulutun kapsadigi pay MAVI, arkasi hedefte kaliyor.
+                if (_FogLayerProbe > 0.5)
+                    return half4(float3(0.0, 0.0, 1.0) * (1.0 - cloudsColor.w), cloudsColor.w);
+
+                // SİS YALNIZ BULUT VARKEN. `cloudsColor.w` bulutun arkasini geciren pay:
+                // 1 ise o pikselde bulut YOK ve `posInput.positionWS` uzak duzlemden
+                // geliyor — yuz kilometre otede, sisin analitik integrali icin tanimsiz
+                // bir nokta. Sonucu zaten `(1 - w) = 0` ile carpilip atiliyordu, yani
+                // hesabin FAYDASI yoktu; ZARARI ise olculdu: o pikseller ekrani
+                // siliyordu. Karisim `Blend One SrcAlpha` — kaynak alfasi arkadakini
+                // gecirir, kaynak rengi bozuksa arkadaki yok olur.
+                //
+                // Frame Debugger zinciri: `Opaque Atmospheric Scattering`'e kadar temiz,
+                // bulut birlestirmesinde siyah. Anahtarla dogrulandi (`BULUT SISI KAPALI`
+                // → siyah gitti).
+                // DERINLIK GECERLI MI. `w == 1` pikselinde bulut yok ve derinlik TAM uzak
+                // duzlem; ters-Z'de dunya konumu reconstruction'i orada sonsuza gidiyor,
+                // yani NaN. NaN `Blend One SrcAlpha` uzerinden arkadaki her seyi
+                // siliyordu — ekranin yarisi simsiyah (Frame Debugger ile bulundu).
+                // MESAFE BILINMIYORSA SIS UYGULANMAZ. Iki durum var:
+                //   - bulut yok  → derinlik TAM uzak duzlem; ters-Z'de dunya konumu
+                //     sonsuza gidiyor, yani NaN. NaN `Blend One SrcAlpha` uzerinden
+                //     arkadaki her seyi siliyordu (ekranin yarisi simsiyah).
+                //   - bulut KENARI → paket oraya uzak duzlemin bir tik berisini koyuyor
+                //     (`CLOUDS_RAW_FAR_CLIP_VALUE`). Gercek bir mesafe degil; sisin
+                //     integrali orada doyuma gidip bulutu sonduruyordu.
+                //
+                // Bir donem bunun yerine isinin bulut tabanini kestigi mesafe
+                // konulmustu. O DAHA KOTUYDU: dal `rayDir.y` isaretine gore ayriliyor,
+                // yani tam UFUKTA sert kirilma birakiyor — bulutun ufuk alti seffaf,
+                // ustu simsiyah cikiyordu. Bilinmeyen mesafeye sayi uydurmak yerine
+                // o piksele sis uygulanmiyor.
+                // PARANTEZ ZORUNLU. `CLOUDS_RAW_FAR_CLIP_VALUE` parantezsiz bir makro ve
+                // icinde uclu operator var. Parantezsiz yazilinca `&&` uclu operatorden
+                // siki bagliyor ve kosul tamamen yutuluyor:
+                //   (depth != 0 && depth != 0) ? -1e-6 : 1e-6
+                // Iki dal da sifirdan farkli, yani `hasCloud` DAIMA true oluyordu ve
+                // siyah serit geri geliyordu.
+                // KENAR HALKASI ELENMIYOR ARTIK. `CLOUDS_RAW_FAR_CLIP_VALUE` paketin
+                // bulut KENARI icin koydugu, uzak duzlemin bir tik berisindeki SONLU
+                // proxy. Elenince her bulutun cevresinde bir piksellik halkada sis
+                // uygulanmiyor, hemen iceride uygulaniyordu — bulut sinirinda sert
+                // acma-kapama, yani ARKASINDAKI HER SEYIN uzerinde kontur. Bulut yokken
+                // halka da yoktu, kontur da yoktu; belirti tam olarak boyle tarif edildi.
+                //
+                // Elenmesi gereken tek sey GERCEK uzak duzlem: ters-Z'de orada dunya
+                // konumu sonsuza gidiyor, NaN cikiyor ve `Blend One SrcAlpha` uzerinden
+                // arkadaki her seyi siliyor. Kenar proxy'si sonlu, sorun degil.
+                bool hasCloud = depth != UNITY_RAW_FAR_CLIP_VALUE;
+
+                if (_FogCloudsDisabled < 0.5 && hasCloud)
+                {
+                    // MESAFE DOYUMU KALDIRILDI. Derinlik gurultusunu bastirmak icin
+                    // `L = tau/beta` ile mesafe doyuma sokulmustu; o terim optik
+                    // derinligi TAVANLIYOR, yani bulut asla tam sislenmiyor. Denetimde
+                    // ispatlandi: ortam tek biciimken bile bulut pikselleri
+                    // `macenta*(0.95 + 0.05w) + bulut*0.05` cikiyordu — duz macenta
+                    // degil, `w`'ye gore degisen acik bir sekil. Firtinada da beyazlama
+                    // %95'te takiliyordu.
+                    //
+                    // Bantlarin kaynagi zaten `cloudsColor.w`, yani bulut isin
+                    // yuruyusunun geciirgenligi; sis onu yalnizca gorunur kiliyor.
+                    // Cozum orada (upscale ve adim menzili), burada tavan koymakta degil.
+                    // MESAFEYE SAYISAL SINIR. Bulut KENARI pikselinde derinlik gercek
+                    // degil: paket oraya `CLOUDS_RAW_FAR_CLIP_VALUE` koyuyor ve ters-Z'de
+                    // bu 1e-6, yani uzak duzlemin bir tik berisi. O derinlikten dunya
+                    // konumu geri kurulunca mesafe astronomik cikiyor; NaN degil ama
+                    // float hassasiyeti bitiyor ve sonuc gurultu — ekranda benekli siyah
+                    // serit olarak goruldu.
+                    //
+                    // Pikseli ELEMEK cozum degildi: elenince her bulutun cevresinde bir
+                    // piksellik halka sissiz kaliyor ve arkasindaki her sey KONTUR
+                    // kazaniyordu (olculdu, bulut yokken kontur da yok).
+                    //
+                    // Dogrusu mesafeyi sinirlamak. Sinir uydurma degil: sahnede hicbir
+                    // sey UZAK DUZLEMDEN oteye gidemez. Paket de kendi hava perspektifini
+                    // ayni sekilde `_MaxFogDistance` ile siniriyor. Optik derinlige tavan
+                    // KOYULMUYOR, yalnizca yola — beyazlama ve denetim etkilenmiyor.
+                    float3 camPos = GetCameraPositionWS();
+                    float3 toCloud = posInput.positionWS - camPos;
+                    float cloudDistance = length(toCloud);
+
+                    float3 fogTarget = camPos + toCloud
+                                     * (min(cloudDistance, _ProjectionParams.z)
+                                        / max(cloudDistance, 1e-4));
+
+                    float3 fogScattering;
+                    float fogTransmittance;
+                    FogPath(camPos, fogTarget, fogScattering, fogTransmittance);
+
+                    cloudsColor.xyz = cloudsColor.xyz * fogTransmittance
+                                    + fogScattering * (1.0 - cloudsColor.w);
+                }
 
                 return half4(cloudsColor.xyz, cloudsColor.w);
             }
@@ -597,6 +721,11 @@ Shader "Hidden/Sky/VolumetricClouds"
             #include "./VolumetricCloudsDefs.hlsl"
             #include "./VolumetricCloudsUpscale.hlsl"
 
+            // ÇAKMA. Bulut da kameradan bir mesafede duruyor, önündeki sis onu da
+            // söndürmek zorunda. `VolumetricCloudsDefs.hlsl`'den SONRA include ediliyor:
+            // ikisi `_LightningFlash`'i paylaşıyor, sıra bozulursa yeniden bildirim hatası.
+            #include "../Shaders/HeightFog.hlsl"
+
             half4 frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
@@ -608,20 +737,24 @@ Shader "Hidden/Sky/VolumetricClouds"
                 half4 cloudsColor = SAMPLE_TEXTURE2D_X_LOD(_VolumetricCloudsLightingTexture, s_linear_clamp_sampler, screenUV, 0).rgba;
             #endif
 
+                // ÇAKMA. Derinlik hesabı hava perspektifi dalının içindeydi; sis de aynı
+                // noktayı istediği için dışarı alındı. İki ortamın aynı mesafeden
+                // uygulanması şart — ayrı mesafeler bulut kenarında sınır bırakır.
+                //
+                // We don't force enabling clouds depth, but it's required to achieve physically accurate results
+            #ifdef _OUTPUT_CLOUDS_DEPTH
+                float depth = SAMPLE_TEXTURE2D_X_LOD(_VolumetricCloudsDepthTexture, s_point_clamp_sampler, screenUV, 0).r;
+                bool edgeOfClouds = depth == UNITY_RAW_FAR_CLIP_VALUE && cloudsColor.a < 1.0;
+                depth = edgeOfClouds ? CLOUDS_RAW_FAR_CLIP_VALUE : depth;
+            #else
+                float depth = cloudsColor.a == 1.0 ? UNITY_RAW_FAR_CLIP_VALUE : CLOUDS_RAW_FAR_CLIP_VALUE;
+            #endif
+
+                PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenResolution.zw, depth, UNITY_MATRIX_I_VP, UNITY_MATRIX_V);
+
             #ifdef PHYSICALLY_BASED_SKY
                 if (_EnableAtmosphericScattering)
                 {
-                    // We don't force enabling clouds depth, but it's required to achieve physically accurate results
-                #ifdef _OUTPUT_CLOUDS_DEPTH
-                    float depth = SAMPLE_TEXTURE2D_X_LOD(_VolumetricCloudsDepthTexture, s_point_clamp_sampler, screenUV, 0).r;
-                    bool edgeOfClouds = depth == UNITY_RAW_FAR_CLIP_VALUE && cloudsColor.a < 1.0;
-                    depth = edgeOfClouds ? CLOUDS_RAW_FAR_CLIP_VALUE : depth;
-                #else
-                    float depth = cloudsColor.a == 1.0 ? UNITY_RAW_FAR_CLIP_VALUE : CLOUDS_RAW_FAR_CLIP_VALUE;
-                #endif
-
-                    PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenResolution.zw, depth, UNITY_MATRIX_I_VP, UNITY_MATRIX_V);
-
                     half3 V = normalize(GetCameraPositionWS() - posInput.positionWS);
 
                     half3 volColor, volOpacity = 0.0;
@@ -631,6 +764,98 @@ Shader "Hidden/Sky/VolumetricClouds"
                     cloudsColor.xyz = volColor * (1.0 - cloudsColor.w) + (1.0 - volOpacity) * cloudsColor.xyz;
                 }
             #endif
+
+                // ÇAKMA. YEREL SİS. Üsttekiyle çift sayım değil: paketin uyguladığı
+                // homojen atmosfer, buradaki ise vadi sisi / bank / sürüklenen kar.
+                // Sınır bilinçli (karar 2).
+                //
+                // Bulut ÖNCEDEN ÇARPILMIŞ geliyor: `xyz` kendi kapsamasıyla ağırlıklı,
+                // `w` ise arkasını geçiren pay. Sisin sönümü buluta, saçılımı ise bulutun
+                // KAPSADIĞI orana uygulanıyor — arka plan (hedef) kendi yolundaki sisi
+                // zaten aldı, `w` ile geçtiği için ikinci kez almıyor. Bir üstteki hava
+                // perspektifi satırı da birebir bu biçimde.
+                // KATMAN PROBU: bulutun kapsadigi pay MAVI, arkasi hedefte kaliyor.
+                if (_FogLayerProbe > 0.5)
+                    return half4(float3(0.0, 0.0, 1.0) * (1.0 - cloudsColor.w), cloudsColor.w);
+
+                // SİS YALNIZ BULUT VARKEN. `cloudsColor.w` bulutun arkasini geciren pay:
+                // 1 ise o pikselde bulut YOK ve `posInput.positionWS` uzak duzlemden
+                // geliyor — yuz kilometre otede, sisin analitik integrali icin tanimsiz
+                // bir nokta. Sonucu zaten `(1 - w) = 0` ile carpilip atiliyordu, yani
+                // hesabin FAYDASI yoktu; ZARARI ise olculdu: o pikseller ekrani
+                // siliyordu. Karisim `Blend One SrcAlpha` — kaynak alfasi arkadakini
+                // gecirir, kaynak rengi bozuksa arkadaki yok olur.
+                //
+                // Frame Debugger zinciri: `Opaque Atmospheric Scattering`'e kadar temiz,
+                // bulut birlestirmesinde siyah. Anahtarla dogrulandi (`BULUT SISI KAPALI`
+                // → siyah gitti).
+                // DERINLIK GECERLI MI. `w == 1` pikselinde bulut yok ve derinlik TAM uzak
+                // duzlem; ters-Z'de dunya konumu reconstruction'i orada sonsuza gidiyor,
+                // yani NaN. NaN `Blend One SrcAlpha` uzerinden arkadaki her seyi
+                // siliyordu — ekranin yarisi simsiyah (Frame Debugger ile bulundu).
+                // MESAFE BILINMIYORSA SIS UYGULANMAZ. Iki durum var:
+                //   - bulut yok  → derinlik TAM uzak duzlem; ters-Z'de dunya konumu
+                //     sonsuza gidiyor, yani NaN. NaN `Blend One SrcAlpha` uzerinden
+                //     arkadaki her seyi siliyordu (ekranin yarisi simsiyah).
+                //   - bulut KENARI → paket oraya uzak duzlemin bir tik berisini koyuyor
+                //     (`CLOUDS_RAW_FAR_CLIP_VALUE`). Gercek bir mesafe degil; sisin
+                //     integrali orada doyuma gidip bulutu sonduruyordu.
+                //
+                // Bir donem bunun yerine isinin bulut tabanini kestigi mesafe
+                // konulmustu. O DAHA KOTUYDU: dal `rayDir.y` isaretine gore ayriliyor,
+                // yani tam UFUKTA sert kirilma birakiyor — bulutun ufuk alti seffaf,
+                // ustu simsiyah cikiyordu. Bilinmeyen mesafeye sayi uydurmak yerine
+                // o piksele sis uygulanmiyor.
+                // PARANTEZ ZORUNLU. `CLOUDS_RAW_FAR_CLIP_VALUE` parantezsiz bir makro ve
+                // icinde uclu operator var. Parantezsiz yazilinca `&&` uclu operatorden
+                // siki bagliyor ve kosul tamamen yutuluyor:
+                //   (depth != 0 && depth != 0) ? -1e-6 : 1e-6
+                // Iki dal da sifirdan farkli, yani `hasCloud` DAIMA true oluyordu ve
+                // siyah serit geri geliyordu.
+                // KENAR HALKASI ELENMIYOR ARTIK. `CLOUDS_RAW_FAR_CLIP_VALUE` paketin
+                // bulut KENARI icin koydugu, uzak duzlemin bir tik berisindeki SONLU
+                // proxy. Elenince her bulutun cevresinde bir piksellik halkada sis
+                // uygulanmiyor, hemen iceride uygulaniyordu — bulut sinirinda sert
+                // acma-kapama, yani ARKASINDAKI HER SEYIN uzerinde kontur. Bulut yokken
+                // halka da yoktu, kontur da yoktu; belirti tam olarak boyle tarif edildi.
+                //
+                // Elenmesi gereken tek sey GERCEK uzak duzlem: ters-Z'de orada dunya
+                // konumu sonsuza gidiyor, NaN cikiyor ve `Blend One SrcAlpha` uzerinden
+                // arkadaki her seyi siliyor. Kenar proxy'si sonlu, sorun degil.
+                bool hasCloud = depth != UNITY_RAW_FAR_CLIP_VALUE;
+
+                if (_FogCloudsDisabled < 0.5 && hasCloud)
+                {
+                    // MESAFEYE SAYISAL SINIR. Bulut KENARI pikselinde derinlik gercek
+                    // degil: paket oraya `CLOUDS_RAW_FAR_CLIP_VALUE` koyuyor ve ters-Z'de
+                    // bu 1e-6, yani uzak duzlemin bir tik berisi. O derinlikten dunya
+                    // konumu geri kurulunca mesafe astronomik cikiyor; NaN degil ama
+                    // float hassasiyeti bitiyor ve sonuc gurultu — ekranda benekli siyah
+                    // serit olarak goruldu.
+                    //
+                    // Pikseli ELEMEK cozum degildi: elenince her bulutun cevresinde bir
+                    // piksellik halka sissiz kaliyor ve arkasindaki her sey KONTUR
+                    // kazaniyordu (olculdu, bulut yokken kontur da yok).
+                    //
+                    // Dogrusu mesafeyi sinirlamak. Sinir uydurma degil: sahnede hicbir
+                    // sey UZAK DUZLEMDEN oteye gidemez. Paket de kendi hava perspektifini
+                    // ayni sekilde `_MaxFogDistance` ile siniriyor. Optik derinlige tavan
+                    // KOYULMUYOR, yalnizca yola — beyazlama ve denetim etkilenmiyor.
+                    float3 camPos = GetCameraPositionWS();
+                    float3 toCloud = posInput.positionWS - camPos;
+                    float cloudDistance = length(toCloud);
+
+                    float3 fogTarget = camPos + toCloud
+                                     * (min(cloudDistance, _ProjectionParams.z)
+                                        / max(cloudDistance, 1e-4));
+
+                    float3 fogScattering;
+                    float fogTransmittance;
+                    FogPath(camPos, fogTarget, fogScattering, fogTransmittance);
+
+                    cloudsColor.xyz = cloudsColor.xyz * fogTransmittance
+                                    + fogScattering * (1.0 - cloudsColor.w);
+                }
 
                 return half4(cloudsColor.xyz, cloudsColor.w);
             }

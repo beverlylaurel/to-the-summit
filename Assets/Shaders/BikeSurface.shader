@@ -1,3 +1,5 @@
+// include-rev: 23  (HeightFog.hlsl degisince Unity bu dosyaya dokunulmadikca
+// yeniden derlemiyor; bu satir degistikce derleme zorlanir)
 Shader "ToTheSummit/BikeSurface"
 {
     // PROSEDÜREL YÜZEY. Model doku dosyası olmadan geliyor ve UV'si yok (FBX'te tek bir
@@ -76,6 +78,12 @@ Shader "ToTheSummit/BikeSurface"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
+            // AYNI HAVA. Bisiklet Unity'nin kendi sisini çağırıyordu (`ComputeFogFactor` /
+            // `MixFog`) — sahnede `m_Fog: 0` olduğu için o çağrı ÖLÜYDÜ ve bisiklet hiç
+            // sis yemiyordu: fırtınada dağ beyazlarken bisiklet net duruyordu. Unity sisi
+            // zaten yükseklikten bağımsız, bu yüzden projede hiç kullanılmıyor.
+            #include "HeightFog.hlsl"
+
             CBUFFER_START(UnityPerMaterial)
                 half4 _BaseColor;
                 half _Metallic;
@@ -110,9 +118,8 @@ Shader "ToTheSummit/BikeSurface"
                 float3 positionWS : TEXCOORD0;
                 float3 normalWS   : TEXCOORD1;
                 float3 positionMS : TEXCOORD2;
-                float  fogCoord   : TEXCOORD3;
-                half4  paint      : TEXCOORD4;
-                float2 surface    : TEXCOORD5;
+                half4  paint      : TEXCOORD3;
+                float2 surface    : TEXCOORD4;
             };
 
             /// Metrik nesne uzayı: nesne uzayı, dönüşümün ölçeğiyle çarpılmış. Desen
@@ -137,7 +144,6 @@ Shader "ToTheSummit/BikeSurface"
                 output.positionMS = MetricObject(input.positionOS.xyz);
                 output.paint = input.colour;
                 output.surface = input.surface;
-                output.fogCoord = ComputeFogFactor(position.positionCS.z);
                 return output;
             }
 
@@ -266,7 +272,6 @@ Shader "ToTheSummit/BikeSurface"
                 lighting.normalWS = normalWS;
                 lighting.viewDirectionWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
                 lighting.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
-                lighting.fogCoord = input.fogCoord;
                 lighting.bakedGI = SampleSH(normalWS);
 
                 // Örtüşme gölgesi ekran uzayında hesaplanıyor; hangi pikselden okunacağı
@@ -282,7 +287,7 @@ Shader "ToTheSummit/BikeSurface"
                 surface.alpha = 1.0;
 
                 half4 color = UniversalFragmentPBR(lighting, surface);
-                color.rgb = MixFog(color.rgb, input.fogCoord);
+                color.rgb = ApplyHeightFog(color.rgb, GetCameraPositionWS(), input.positionWS);
                 return color;
             }
             ENDHLSL

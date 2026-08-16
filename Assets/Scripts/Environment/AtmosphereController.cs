@@ -789,10 +789,15 @@ public class AtmosphereController : MonoBehaviour
     /// Formül değişirse ikisi birlikte değişmeli — iki tüketici, tek alan.
     static float BankField(Vector2 p)
     {
-        float a = Mathf.Sin(Vector2.Dot(p, new Vector2(0.0093f, 0.0071f)))
-                * Mathf.Sin(Vector2.Dot(p, new Vector2(-0.0052f, 0.0087f)));
-        float b = Mathf.Sin(Vector2.Dot(p, new Vector2(0.0031f, -0.0024f)));
-        return 0.5f + a * 0.35f + b * 0.15f;
+        // ÇARPIM DEĞİL TOPLAM — gerekçe `VolumetricFogShared.hlsl → FogBankAt` içinde.
+        // Bileşenler oradakiyle BİREBİR aynı olmak zorunda: iki tüketici, tek alan.
+        float s = Mathf.Sin(Vector2.Dot(p, new Vector2( 0.003534f,  0.001081f))) * 0.34f
+                + Mathf.Sin(Vector2.Dot(p, new Vector2( 0.001090f,  0.005607f))) * 0.26f
+                + Mathf.Sin(Vector2.Dot(p, new Vector2(-0.005424f,  0.006239f))) * 0.20f
+                + Mathf.Sin(Vector2.Dot(p, new Vector2(-0.011122f, -0.004720f))) * 0.13f
+                + Mathf.Sin(Vector2.Dot(p, new Vector2( 0.005250f, -0.017167f))) * 0.07f;
+
+        return Mathf.Clamp01(0.5f + 0.5f * s);
     }
 
     static Color Blend(Color clear, Color rain, Color snow, float precipitation, float snowiness)
