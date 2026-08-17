@@ -79,9 +79,25 @@ zirve var mı.
 | `07_l1_bolge.png` | 540 km'lik arazi, hillshade |
 | `09_l1_oyun_alani.png` | Oyun alanı 17.5 km, 4.28 m/örnek |
 
+## Yüzey detayı çözüldü
+
+Referansta erozyon kodu yoktu; spec'ten yazıldı (`Tools/terrain/detail.py`).
+Sonuç: oyun alanı 4.28 m/örnek, **zirve tam 5709 m korunuyor**, düğüm kotlarında ortanca
+kayma 17 m.
+
+Görseller: `gorsel/11_detay_ince.png` (öncesi/sonrası, 3×3 km) ve
+`gorsel/12_oyun_alani_final.png` (bütün alan).
+
+Tarif üç parça: ince taban mesh (`refineDistance` 120 → 30 m), multifraktal gürültü
+(her oktav döndürülmüş, genlik prominence tabanının altında), çok ölçekli kısıtlı erozyon
+(telafi edici uplift). Dersler `DECISIONS.md` → "Yüzey detayı ÇÖZÜLDÜ".
+
+**Asıl kırılma noktası ince mesh'ti**, gürültü değil. Gürültünün genliği prominence
+tavanıyla sınırlı olduğu için 30–50°'lik üçgen yüzeyleri kıramıyor.
+
 ## Açık kalan iki teknik iş
 
 1. **Gerçek plato çıkmıyor** — yoğunluk düşükse ada ada kopuyor, yüksekse dağlıktan
    ayrılmıyor. Sebep vadi oyma derinliği, L1'in işi.
-2. **Yüzey detayı** — yakın planda üçgenler görünüyor. Referansta erozyon kodu yok,
-   Galin 2019'dan yazılacak.
+2. **En kötü düğüm kayması 172 m** — prominence tavanının üstünde. Kaynağı `R_infl`
+   400 m'nin dışında kalan bir düğüm; ölçeğe göre büyümesi gerekebilir. Ölçülmedi.
