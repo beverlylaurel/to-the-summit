@@ -61,6 +61,7 @@ public class DebugMenu : MonoBehaviour
     bool sunCut;
     float ambientGain = 1f;
     bool lightProbe;
+    bool darkProbe;
 
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
@@ -182,7 +183,7 @@ public class DebugMenu : MonoBehaviour
         Shader.SetGlobalFloat(TerrainCookieId, shadowCookie ? 1f : 0f);
         Shader.SetGlobalFloat(TerrainSunGainId, sunCut ? 0f : 1f);
         Shader.SetGlobalFloat(TerrainAmbientGainId, ambientGain);
-        Shader.SetGlobalFloat(TerrainLightProbeId, lightProbe ? 1f : 0f);
+        Shader.SetGlobalFloat(TerrainLightProbeId, darkProbe ? 2f : lightProbe ? 1f : 0f);
 
         var keyboard = Keyboard.current;
         if (keyboard != null && keyboard.f1Key.wasPressedThisFrame) Toggle();
@@ -599,6 +600,17 @@ public class DebugMenu : MonoBehaviour
             GUILayout.Label("beyaz   = tam aydınlık");
         }
 
+        // PROB 2. Gölgenin VARLIĞI değil ŞİDDETİ. Güneşli yüzeyle gölgedeki yüzey
+        // arasındaki diyafram farkı; açık havada kar için gerçek değer 2-3.5 stop.
+        darkProbe = GUILayout.Toggle(darkProbe, "RENK PROBU 2: gölge ne kadar koyu");
+        if (darkProbe)
+        {
+            GUILayout.Label("YEŞİL   = 2-3.5 stop, gerçekçi");
+            GUILayout.Label("SARI    = 3.5-5 stop, fazla koyu");
+            GUILayout.Label("KIRMIZI = 5+ stop, çok fazla koyu");
+            GUILayout.Label("mavi    = 2 stop altı, fazla aydınlık");
+        }
+
         GUILayout.Space(6f);
 
         // ÜÇ GÖLGE ANAHTARI DA SONUÇ VERMEDİ. Lekeler gölge değilse geriye iki büyüklük
@@ -631,6 +643,7 @@ public class DebugMenu : MonoBehaviour
             sunCut = false;
             ambientGain = 1f;
             lightProbe = false;
+            darkProbe = false;
         }
 
         EndSection();

@@ -44,7 +44,10 @@ public static class SurfaceMapBaker
     const string HorizonPath = "Assets/Terrain/MountainHorizon.asset";
 
     /// Ufuk haritasının adında taşınan sürüm.
-    const string HorizonName = "MountainHorizon-r16";
+    /// SÜRÜM ADI PİŞİRME KURALINI TAŞIYOR. Kural değişince ad da değişir, yoksa eski
+    /// harita "güncel" sayılıp diskte kalır ve düzeltme hiç görünmez.
+    /// `nolocal`: noktanın kendi eğimi ufuktan çıkarılıyor (bkz. `BakeHorizon`).
+    const string HorizonName = "MountainHorizon-r16-nolocal";
 
     /// Pusula yönü sayısı. Güneşin azimutu iki komşu yönün arasında harmanlanır.
     public const int HorizonDirections = 16;
@@ -386,12 +389,36 @@ public static class SurfaceMapBaker
                         travelled *= 1.3f;
                     }
 
+                    // NOKTANIN KENDİ EĞİMİ ÇIKARILIYOR. Ufuk yürüyüşü ilk adımda
+                    // komşu texel'i okuyor; eğimli bir yamaçta o komşu zaten yukarıda
+                    // ve "engel" sayılıyor. Ama eğimli bir DÜZLEMDE iki koşul birebir
+                    // aynıdır: "ufuk güneşten yüksek" ile "N·L <= 0". Yani yamacın
+                    // kendisi hem burada hem N·L'de sayılıyordu — iki kez.
+                    //
+                    // Ölçüldü (azimut 200, zirveden 6 km içinde): ufuk ortancası 16.5
+                    // derece, kendi eğimi çıkınca gerçek engel 2.0 derece. Noktaların
+                    // %46'sında ufkun TAMAMI kendi eğimi. Güneş 30 derecedeyken gölgede
+                    // kalan yüzey %36'dan %9'a iniyor.
+                    //
+                    // Belirti: güneş tam karşıda ve yüksekken ayağının dibindeki yamaç
+                    // gölgede. Kullanıcı "gölge oluşması için hiçbir sebep yok" dedi ve
+                    // haklıydı.
+                    //
+                    // Çıkarma AÇI uzayında: eğimler tanjant, tanjant farkı açı farkı
+                    // değil.
+                    int lx0 = Mathf.Max(x - 1, 0), lx1 = Mathf.Min(x + 1, res - 1);
+                    int ly0 = Mathf.Max(y - 1, 0), ly1 = Mathf.Min(y + 1, res - 1);
+                    float gxLocal = (height[y, lx1] - height[y, lx0]) * vertical / ((lx1 - lx0) * spacing);
+                    float gzLocal = (height[ly1, x] - height[ly0, x]) * vertical / ((ly1 - ly0) * spacing);
+                    float localRise = Mathf.Atan(Mathf.Max(gxLocal * dirX + gzLocal * dirZ, 0f));
+                    float occlusion = Mathf.Max(Mathf.Atan(steepest) - localRise, 0f);
+
                     // Açı 0..90 derece aralığında 16 bite sıkışır. R8 denendi ve
                     // yetmedi: 0.35 derecelik kuantalamanın konturları, yakın zeminde
                     // düz çizgi segmentleri olarak görünüyordu — arazi kafesini andıran
                     // "çatlaklar" buydu. 16 bitte kademe 0.0014 derece, göz sınırının
                     // çok altında.
-                    slice[y * res + x] = (ushort)(Mathf.Atan(steepest) / (Mathf.PI * 0.5f) * 65535f);
+                    slice[y * res + x] = (ushort)(occlusion / (Mathf.PI * 0.5f) * 65535f);
                 }
             });
 
