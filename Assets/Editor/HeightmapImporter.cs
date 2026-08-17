@@ -15,7 +15,8 @@ using UnityEngine;
 /// ~165 MB) dışlanmaya devam ediyor — onlar bundan tek adımda pişiyor.
 public static class HeightmapImporter
 {
-    const string HeightmapPath = "Assets/Terrain/MountainHeightmap.png";
+    /// Kurulum bunu imzasına katıyor: PNG değişince arazi yeniden uygulanmalı.
+    public const string AssetPath = "Assets/Terrain/MountainHeightmap.png";
 
     /// Nicemleme ölçeği. `bake_heightmap.py` da bu sayıyı kullanıyor; ikisi ayrılırsa
     /// dağın boyu sessizce kayar.
@@ -31,18 +32,12 @@ public static class HeightmapImporter
     /// Sayilar yeniden hesaplandi, eskisi tasinmadi.
     static readonly Vector2 SpawnUv = new Vector2(0.22920f, 0.22512f);
 
-    [MenuItem("To The Summit/Arazi/Yükseklik Haritasını Uygula", false, 12)]
-    static void Apply()
-    {
-        var generator = UnityEngine.Object.FindAnyObjectByType<MountainGenerator>();
-        if (generator == null)
-            throw new InvalidOperationException(
-                "Sahnede MountainGenerator yok; önce kurulum çalışmalı.");
-
-        Apply(generator.GetComponent<Terrain>());
-    }
-
-    /// Haritayı okur ve araziye yazar. Bootstrap de bunu çağırıyor.
+    /// Haritayı okur ve araziye yazar. TEK ÇAĞIRAN KURULUM.
+    ///
+    /// Ayrı bir menü girişi vardı ve TUZAKTI: tesviyeden sonra elle çalıştırılınca
+    /// rota ve doğuş düzlüğünü siliyordu (ölçüldü: düzlük 4,93 m yerine 16,3 m kot
+    /// farkı). Sıralamayı bilen tek yer kurulum; PNG imzaya girdiği için harita
+    /// değişince kendiliğinden yeniden koşuyor, el yoluna gerek kalmadı.
     public static void Apply(Terrain terrain)
     {
         float[,] heights = Read();
@@ -66,8 +61,7 @@ public static class HeightmapImporter
         // ekranda yüzey eriyen mum gibi akıyor. Sürüm damgası arazinin içeriğini
         // bilmediği için kendiliğinden fark etmiyor — açıkça geçersiz kılınıyor.
         SurfaceMapBaker.Invalidate();
-        ToolLog.Write("Yüzey haritaları bayat ilan edildi; "
-                      + "To The Summit → Arazi → Yüzey Haritaları ile yeniden pişirilecek.");
+        ToolLog.Write("Yüzey haritaları bayat ilan edildi; kurulum aynı koşuda pişirecek.");
     }
 
     /// PNG'yi 16 bit olarak okur ve `[z, x]` düzeninde normalize yükseklik döndürür.
@@ -77,16 +71,16 @@ public static class HeightmapImporter
     /// iki taraf birden çevirirse dağ eski hâline döner ve kimse fark etmez.
     static float[,] Read()
     {
-        if (!File.Exists(HeightmapPath))
+        if (!File.Exists(AssetPath))
             throw new FileNotFoundException(
-                $"Yükseklik haritası yok: {HeightmapPath}. " +
+                $"Yükseklik haritası yok: {AssetPath}. " +
                 "Önce `python Tools/terrain/bake_heightmap.py --verify` çalıştırılır.");
 
         EnsureImportSettings();
 
-        var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(HeightmapPath);
+        var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(AssetPath);
         if (texture == null)
-            throw new InvalidOperationException($"{HeightmapPath} doku olarak yüklenemedi.");
+            throw new InvalidOperationException($"{AssetPath} doku olarak yüklenemedi.");
         if (texture.width != Resolution || texture.height != Resolution)
             throw new InvalidOperationException(
                 $"Çözünürlük {texture.width}x{texture.height}, beklenen {Resolution}x{Resolution}.");
@@ -122,9 +116,9 @@ public static class HeightmapImporter
     /// 256'ya iniyor, yani 24 metrelik basamak.
     static void EnsureImportSettings()
     {
-        var importer = (TextureImporter)AssetImporter.GetAtPath(HeightmapPath);
+        var importer = (TextureImporter)AssetImporter.GetAtPath(AssetPath);
         if (importer == null)
-            throw new InvalidOperationException($"{HeightmapPath} için içe aktarıcı yok.");
+            throw new InvalidOperationException($"{AssetPath} için içe aktarıcı yok.");
 
         bool dirty = false;
 
