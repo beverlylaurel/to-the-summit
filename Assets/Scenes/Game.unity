@@ -1255,7 +1255,7 @@ Transform:
   m_GameObject: {fileID: 848219606}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.38610008, z: 0, w: 0.9224569}
-  m_LocalPosition: {x: -8124.0693, y: 139.89082, z: -8246.434}
+  m_LocalPosition: {x: -8124.0693, y: 621.4079, z: -8246.434}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -2077,12 +2077,12 @@ MonoBehaviour:
   temperature: {fileID: 1805896810}
   settings: {fileID: 11400000, guid: b2c3544750df89a47884920f8b841e75, type: 2}
   groundAltitude: 185.67
-  rainCeiling: 738.0263
-  snowFloor: 958.9688
-  referenceRainCeiling: 738.0263
-  referenceSnowFloor: 958.9688
-  blizzardAltitude: 4709.233
-  summitAltitude: 5709.233
+  rainCeiling: 738.0074
+  snowFloor: 958.9423
+  referenceRainCeiling: 738.0074
+  referenceSnowFloor: 958.9423
+  blizzardAltitude: 4709.044
+  summitAltitude: 5709.044
 --- !u!114 &1805896805
 MonoBehaviour:
   m_ObjectHideFlags: 0

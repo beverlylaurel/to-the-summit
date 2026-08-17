@@ -103,6 +103,28 @@ public static class SurfaceMapBaker
         return importer != null && importer.userData == version;
     }
 
+    /// Beş haritanın da damgasını siler, yani hepsini bayat ilan eder.
+    ///
+    /// SÜRÜM DAMGASI ARAZİNİN İÇERİĞİNİ BİLMİYOR. `MapsCurrent` yalnız bir ad
+    /// karşılaştırıyor (`importer.userData`); yükseklik haritası değişse de haritalar
+    /// "güncel" sayılıyor ve sessizce bayat kalıyorlar. Ölçüldü: L1'de yeni arazi
+    /// uygulandı, haritalar eski araziden kaldı ve yüzey eriyen mum gibi aktı —
+    /// dikey akıntılar, yanlış gölge, yanlış kar çizgisi.
+    ///
+    /// Bu yüzden yükseklik haritasını uygulayan her yol burayı çağırıyor
+    /// (`HeightmapImporter.Apply`). Damga silinince kurulum bir sonraki açılışta
+    /// kendisi pişiriyor.
+    public static void Invalidate()
+    {
+        foreach (string path in new[] { MapPath, NormalPath, HorizonPath, HeightPath, DriftPath })
+        {
+            AssetImporter importer = AssetImporter.GetAtPath(path);
+            if (importer == null || importer.userData.Length == 0) continue;
+            importer.userData = string.Empty;
+            importer.SaveAndReimport();
+        }
+    }
+
     /// Beş haritanın da güncel olup olmadığı. Kurulum betiği tek soru soruyor;
     /// hangi haritanın hangi sürümü taşıdığı burada duruyor.
     public static bool MapsCurrent(float prevailingDegrees)

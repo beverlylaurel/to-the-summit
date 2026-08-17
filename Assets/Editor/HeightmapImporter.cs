@@ -57,6 +57,14 @@ public static class HeightmapImporter
         Verify(heights);
         EditorUtility.SetDirty(data);
         AssetDatabase.SaveAssets();
+
+        // YÜZEY HARİTALARI BAYATLADI. Normal, yükseklik, ufuk, birikinti ve yüzey
+        // haritalarının hepsi ESKİ araziden pişmişti; yenisiyle eşleşmiyorlar ve
+        // ekranda yüzey eriyen mum gibi akıyor. Sürüm damgası arazinin içeriğini
+        // bilmediği için kendiliğinden fark etmiyor — açıkça geçersiz kılınıyor.
+        SurfaceMapBaker.Invalidate();
+        ToolLog.Write("Yüzey haritaları bayat ilan edildi; "
+                      + "To The Summit → Arazi → Yüzey Haritaları ile yeniden pişirilecek.");
     }
 
     /// PNG'yi 16 bit olarak okur ve `[z, x]` düzeninde normalize yükseklik döndürür.
