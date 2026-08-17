@@ -438,8 +438,28 @@ SnowCoverage BuildSnowCoverage(float3 worldPos, float3 normalWS, float altitude,
     // ve çizgi her yerde ~100 metre yukarı kayıyordu. Farkı alınca düz zemin sıfır,
     // güneye bakan yamaç pozitif, kuzey yüzü NEGATİF olur — kuzey yüzünde kar daha
     // aşağı iner, gerçekte de öyle.
+    // BAKI YAMAÇ YÜZÜ ÖLÇEĞİNDEN OKUNUYOR, karo normalinden DEĞİL.
+    //
+    // Ölçüldü: karo normali 14.65 m'de ortanca 4 derece değişiyor, bu `dot`'u ~0.17
+    // kaydırıyor ve `_SnowlineSunLift` 200 m ile çarpılınca kar çizgisi 15 METREDE
+    // 34 METRE oynuyor. Sonuç yumuşak bant değil, her kabartıyı takip eden keskin
+    // kıvrım. Renk probu sınır boyunca kot rampasını suçladı ve tek titreyen girdi
+    // buydu — `wobble` 625 m dalga boylu, `hollowness` pişmiş harita, ikisi yumuşak.
+    //
+    // Fizik: bakının kar çizgisine etkisi MEVSİMLİK IŞINIM üzerinden. O bir yamaç
+    // yüzünün toplamı, tek karonun değil. Mip 4 = 2048/16 = 128 texel = 234 m/texel,
+    // yani yamaç yüzü ölçeği.
+    //
+    // Gölgelendirme normali DEĞİŞMEDİ: o piksel başına kalmalı, kabartı ondan geliyor.
+    float2 faceUv = (worldPos.xz - _TerrainOrigin.xz) / _TerrainSize.xz;
+    float2 facePacked = SAMPLE_TEXTURE2D_LOD(_GroundNormals, sampler_GroundNormals,
+                                             faceUv, 4).rg * 2.0 - 1.0;
+    float3 faceNormal = float3(facePacked.x,
+                               sqrt(saturate(1.0 - dot(facePacked, facePacked))),
+                               facePacked.y);
+
     float flatSun = saturate(_SurfaceSunDir.y);
-    float aspect = saturate(dot(normalWS, _SurfaceSunDir.xyz)) - flatSun;
+    float aspect = saturate(dot(faceNormal, _SurfaceSunDir.xyz)) - flatSun;
 
     // Konkavlık haritası 0-1 normalize (bkz. SurfaceMapBaker.Normalize), ortancası
     // 0.5. Ham haliyle çarpılınca sabit bir aşağı kayma taşıyordu.
@@ -483,7 +503,19 @@ SnowCoverage BuildSnowCoverage(float3 worldPos, float3 normalWS, float altitude,
 
     float supply = max(permanent, fresh);
 
-    float sprinkle = MountainFbm(worldPos * 0.05, 2);
+    // KIRILMA GÜRÜLTÜSÜ ARAZİ ÖLÇEĞİNDE. 0.05 (20 m taban, 2 oktav) yazıyordu ve
+    // ölçüldü: `cover`'ın ORTALAMASI yumuşak — bant probunda yedi bandın hepsi geniş
+    // bir kuşak kaplıyor — ama YEREL VARYANS devasaydı. Bantların içi tuz-biberdi,
+    // komşu iki piksel birkaç bant atlıyordu. Gözün "sert" dediği şey kenarın
+    // genişliği değil DOKUSUYDU.
+    //
+    // Fizik: gerçek kar sınırının düzensizliği arazi ölçeğinde olur — oluk, sırt,
+    // kaya çıkıntısı, onlarca-yüzlerce metre. Piksel ölçeğinde tuz-biber saçılmanın
+    // karşılığı yok.
+    //
+    // 125 m taban, 4 oktav: sınır DOLAŞARAK düzensiz. İnce bileşen duruyor ama genliği
+    // 1/8 — kenara serpilen cılız benekler yaşıyor, dantel gidiyor.
+    float sprinkle = MountainFbm(worldPos * 0.008, 4);
     float edge = (sprinkle - 0.5) * _SnowBreakup * 0.6;
     float cover = saturate(supply * snowFit * shelter + edge);
 
@@ -518,11 +550,25 @@ SnowCoverage BuildSnowCoverage(float3 worldPos, float3 normalWS, float altitude,
     // santim taze kar zemini beyaza çevirir — albedo neredeyse anında doyar, KALINLIK
     // yavaş gelir. İkisi ayrı hızda ve ayrı kanalda (`cover` ile `burial`).
     //
-    // 0.03-0.18: deponun onda biri hafif örtü, beşte biri tam beyaz.
-    // Alt eşik düşük: kenarın çevresine serpilen cılız benekler yaşasın — sınır
-    // tek çizgi değil, serpintili bir geçiş. Üst eşik geniş: yumuşak açılım.
-    // Dar bant denendi ve geri alındı: keskinleştirdi ama serpintiyi öldürdü.
-    cover = smoothstep(0.03, 0.18, cover);
+    // ÜST EŞİK 0.18'DEN 0.45'E AÇILDI. Kusur genişlik değil BENEKTİ ve ölçüldü:
+    //
+    //   geçiş penceresi        0.15
+    //   kırılma gürültüsü      ±0.15   (`_SnowBreakup` 0.5 × 0.6)
+    //   oran                   1.00
+    //
+    // Gürültü pencerenin TAMAMINI süpürünce sonuç ikili oluyor — ya tam kar ya tam
+    // kaya, arada yumuşama yok. Ekranda kenar dantel gibi çıkıyordu. 0.42'lik pencerede
+    // aynı gürültü üçte bire iniyor: kenar düzensiz kalıyor ama yumuşuyor.
+    //
+    // `snowBreakup`'ı kısmak da benek sorununu çözerdi ama serpintiyi öldürürdü; o bir
+    // kez denenip geri alınmıştı. Pencereyi açmak ikisini birden koruyor.
+    //
+    // Alt eşik 0.03'te DURUYOR: "iki santim taze kar zemini beyaza çevirir" kuralı
+    // derinlik için doğru ve bozulmuyor. Değişen yalnız doymanın hızı.
+    //
+    // Bedeli ölçüldü: kalıcı çizgi ±350 m'lik rampadan geliyor, görünür geçiş
+    // 106 m → 226 m'ye çıkıyor. Gerçek kar sınırı da 100-300 m arasında geçer.
+    cover = smoothstep(0.03, 0.45, cover);
 
     // Konkavlık burada büyütülmüyor. Harita akış birikiminden türüyor ve ızgaraya
     // hizalı bir gürültü taşıyor (bkz. DECISIONS.md). Katkısı büyütülünce o gürültü
