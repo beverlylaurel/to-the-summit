@@ -185,6 +185,30 @@ Shader "ToTheSummit/MountainSurface"
                     inputData.normalWS, inputData.viewDirectionWS)
                     * aoFactor.directAmbientOcclusion * _TerrainSunGain;
 
+                // KARDAN YANSIYAN GÜNEŞ. Gölgedeki bir noktanın çevresini güneş vuran
+                // kar sarıyor ve o ışık hiç sayılmıyordu: sahnede GI yok, ortam yalnız
+                // gökyüzü probundan geliyor. Kar albedosu 0.8 olduğu için eksik olan
+                // terim gökyüzünden BÜYÜK.
+                //
+                // Ölçüm (renk probu 2, 15:00): güneş-gölge farkı 3.5-5 diyafram; açık
+                // havada kar için gerçek değer 2-3.5. Fark 1-1.5 stop.
+                //
+                // GÖRÜŞ FAKTÖRÜ DERS KİTABI, UYDURMA KATSAYI YOK. Eğimli bir yüzeyin
+                // gökyüzünü görme oranı (1+cosβ)/2, kalanı zemin: (1-cosβ)/2. cosβ
+                // normalin Y'si. Düz zeminde sıfır — düz zemin başka zemin görmez,
+                // doğrusu da bu.
+                //
+                // GÖLGE ÇARPANI UYGULANMIYOR ve bu bilinçli: yansıyan ışık ÇEVREDEN
+                // geliyor, çevre bu nokta gölgedeyken de güneş alıyor olabilir. Zaten
+                // meselenin tamamı bu.
+                //
+                // Gece kendiliğinden sönüyor: `direction.y` sıfıra iniyor ve güneşin
+                // şiddeti artık hava kütlesi sönümünü taşıyor.
+                float groundView = (1.0 - saturate(shadingNormal.y)) * 0.5;
+                float3 horizontalIrradiance = mainLight.color * saturate(mainLight.direction.y);
+                lit += surface.albedo * horizontalIrradiance * groundView
+                     * brdfData.diffuse * aoFactor.indirectAmbientOcclusion * _TerrainAmbientGain;
+
                 #if defined(_ADDITIONAL_LIGHTS)
                 uint pixelLightCount = GetAdditionalLightsCount();
                 LIGHT_LOOP_BEGIN(pixelLightCount)
@@ -250,7 +274,11 @@ Shader "ToTheSummit/MountainSurface"
                 // ekranda yine yanlış görünür.
                 if (_TerrainLightProbe > 1.5)
                 {
-                    float3 ambientTerm = inputData.bakedGI * brdfData.diffuse;
+                    // ORTAM TERİMİ YANSIMAYI DA İÇERİYOR. İçermezse prob kendi
+                    // düzeltmemizi göremez ve eski sayıyı raporlar.
+                    float3 ambientTerm = (inputData.bakedGI
+                                       + surface.albedo * horizontalIrradiance * groundView)
+                                       * brdfData.diffuse;
                     float ndlFull = saturate(dot(inputData.normalWS, mainLight.direction));
                     float3 sunTerm = mainLight.color * ndlFull * brdfData.diffuse;
 
