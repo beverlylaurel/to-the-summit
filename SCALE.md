@@ -81,6 +81,38 @@ geçirilir.
 
 ---
 
+## Arazi yeniden üretimi: neyin kırılacağı (2026-08-17)
+
+Karar `DECISIONS.md` → "Arazi ölçeği". Değişen **boy değil yapı**: radyal koni yerine
+Divide Tree, artı 300 km'ye uzanan üç bantlı mesafe temsili.
+
+**`terrainSize` ve `terrainHeight` DEĞİŞMİYOR** — oyun alanı 17.5 km, zirve ~5709 m
+kalıyor. Bu yüzden yukarıdaki üç tablonun neredeyse tamamı risk altında değil. Kırılanlar
+tek bir yerde toplanıyor: **oyun alanına göre ölçeklenmiş ama artık 300 km görmesi gereken
+şeyler.**
+
+| ne | şu an | gereken | durum |
+|---|---|---|---|
+| **Kamera far clip** | `terrainSize × FarClipFactor` = **52.5 km** | ≥ 300 km | **KIRILIR** — uzak bant kırpma düzleminin ötesinde, hiç çizilmez |
+| **`maxHazeDistance`** | 55 000 m | ~300 km | **KIRILIR** — 55 km'de pus doyuma gidiyor, uzak bant tek renk lapa çıkar |
+| **`cloudMapSize`** | 40 000 m | görünen bölgeyi kapsamalı | **KIRILIR** — bulutlar uzak dağların üstünde biter, gökyüzü ortadan kesilir |
+| `MAX_SKYBOX_VOLUMETRIC_CLOUDS_DISTANCE` | 200 000 m | 300 km | bakılacak — ufkun %74'ü |
+| Ufuk haritası (`HorizonResolution` 1024, 17.5 km) | oyun alanı | 300 km | **YENİ İŞ** — 100 km ötedeki dağlar şafakta güneşi kapatmalı; şu an modellenmiyor |
+| Bulut gölge mesafesi 8 000 m | oyun alanı | — | sorun yok, yerel |
+
+**Derinlik hassasiyeti:** far clip 52.5 → 300 km, yani 5.7 kat. Ters-Z ile float derinlik
+bunu rahat taşıyor; asıl belirleyici yakın düzlem. Yine de uzak bant geldiğinde z-savaşı
+kontrol edilir.
+
+**Şekil parametreleri gereksizleşiyor.** `MountainSettings` içindeki radyal koni alanları
+(`heightProfile`, `mountainRadius`, `peakSpread`, `ridgeInfluence`, teras ve erozyon
+grubu) yerlerini Argudo parametrelerine bırakacak. `forelandFanDrop` 60 m de öyle — ova
+artık radyal bir yelpaze değil, üretilen bölgenin parçası.
+
+**Değişmeyenler (boy sabit kaldığı için):** kuşak sınırları, tipi kuşağı, kar profili
+bantları, yüzey haritaları, `ConcavityRadius`, `snowTess*`, `TerrainSurface.Bands`,
+"bilerek mutlak" tablosunun tamamı.
+
 ## Onaylanmış dağ
 
 Şu anki değerler `Assets/Settings/MountainSettings.asset` içinde: `terrainSize 17517`,
