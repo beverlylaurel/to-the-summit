@@ -153,3 +153,31 @@ def multiscale_erosion(h, cell_m, uplift, scales_m=(100.0, 50.0, 30.0),
         # telafi: zirve ve boyun cevresinde erozyon geri alinir
         out = out + full * (1.0 - uplift)
     return out
+
+def file_crests(h, cell_m, iters=4, radius=2, talus_deg=72.0, skirt_mask=None):
+    """Fiziksel olarak imkansiz yukselisi keser. Gercek tepeye DOKUNMAZ.
+
+    `MountainGenerator.FileCrests`'in yerini aliyor, ama kor yumusatma DEGIL.
+    Kor surum once yazildi ve olculdu: zirveyi 5709 -> 5696 m'ye indirdi, cunku
+    "pencerede tek basina yuksek olan" tanimina GERCEK zirve de giriyor. Yani o
+    filtre igneyle tepeyi ayirt edemiyor.
+
+    Ayirt eden buyukluk EGIM. Ucgenlestirmeden kalan igneler komsusunun 400-1343 m
+    ustunde duruyor; 4097'lik izgarada iki ornek 14.7 m, yani 88 dereceden dik.
+    Gercek kaya yuzu 72 dereceyi asmiyor -- ondan yukarisi kar tutmaz, zaten
+    duvar olur. Tavan buradan geliyor ve zirvenin kendi yukselisi (14.7 m'de
+    ~20 m, 54 derece) tavanin ALTINDA kaliyor, dokunulmuyor.
+    """
+    import numpy as np
+    from scipy.ndimage import minimum_filter
+
+    out = h.astype(np.float32, copy=True)
+    size = 2 * radius + 1
+    cap = np.tan(np.radians(talus_deg)) * (radius * cell_m)
+    for _ in range(iters):
+        lo = minimum_filter(out, size=size, mode="nearest")
+        excess = np.maximum(out - lo - cap, 0.0)
+        if skirt_mask is not None:
+            excess = excess * skirt_mask
+        out -= excess
+    return out

@@ -20,13 +20,16 @@ public static class HeightmapImporter
     /// Nicemleme ölçeği. `bake_heightmap.py` da bu sayıyı kullanıyor; ikisi ayrılırsa
     /// dağın boyu sessizce kayar.
     const float TerrainHeight = 6189f;
-    const float TerrainSize = 17517f;
+    const float TerrainSize = 30000f;
     const int Resolution = 4097;
 
     /// `MountainRoute.asset`'in spawn'ı, normalize arazi koordinatı. Eksen denetimi
     /// bunu kullanıyor — zirve merkezde olduğu için devriklikten KAÇAR, ayırt eden
     /// nokta gerekiyor.
-    static readonly Vector2 SpawnUv = new Vector2(0.036218f, 0.029233f);
+    /// ARAZI BUYUYUNCE ORAN KAYAR. Spawn METRE olarak merkezden (-8121, -8244);
+    /// 17517'lik karede bu 0.0362/0.0292 idi, 30000'lik karede 0.2293/0.2252.
+    /// Sayilar yeniden hesaplandi, eskisi tasinmadi.
+    static readonly Vector2 SpawnUv = new Vector2(0.22920f, 0.22512f);
 
     [MenuItem("To The Summit/Arazi/Yükseklik Haritasını Uygula", false, 12)]
     static void Apply()

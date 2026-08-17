@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: MountainSettings
   m_EditorClassIdentifier: Assembly-CSharp::MountainSettings
   heightmapResolution: 4097
-  terrainSize: 17517
+  terrainSize: 30000
   terrainHeight: 6189
   seed: 36044
   mountainRadius: 0.48

@@ -86,10 +86,28 @@ geçirilir.
 Karar `DECISIONS.md` → "Arazi ölçeği". Değişen **boy değil yapı**: radyal koni yerine
 Divide Tree, artı 300 km'ye uzanan üç bantlı mesafe temsili.
 
-**`terrainSize` ve `terrainHeight` DEĞİŞMİYOR** — oyun alanı 17.5 km, zirve ~5709 m
-kalıyor. Bu yüzden yukarıdaki üç tablonun neredeyse tamamı risk altında değil. Kırılanlar
-tek bir yerde toplanıyor: **oyun alanına göre ölçeklenmiş ama artık 300 km görmesi gereken
-şeyler.**
+**`terrainHeight` DEĞİŞMİYOR** (zirve 5709 m). **`terrainSize` 17517 → 30000 m OLDU.**
+
+Sebep ölçüldü, tahmin değil: L0 bir SİLSİLE üretiyor ve kütle 1500 m eşiğinde 379 km'ye
+uzanıyor. 17.5 km'lik karede kuzey ve doğu kenarının **tamamı** 3665–3873 m'de kesiliyordu
+— ekranda dikey duvar. Büyütmek tek başına bunu çözmez (her boyutta kesilir); çözüm
+maskedeki **yalıtım halkası**: etekten (8.4 km) kenara kadar her yönde ova. 30 km o
+halkaya yer açıyor — etek 8.4 km, ova 8.4→15 km, yani dağın 360° çevresinde
+yürünebilir kuşak.
+
+`terrainSize` DEĞİŞTİĞİNDE ELLE DÜZELTİLECEKLER (bu turda yapıldı, kayıt sonraki tur için):
+
+| ne | neden kayar | ne yapıldı |
+|---|---|---|
+| `MountainRoute.asset` (3002 nokta) | konumlar **normalize**; aynı oran daha uzağa düşer | hepsi `0.5 + (u−0.5)×(eski/yeni)` ile yeniden ölçeklendi, dünya konumları korundu |
+| `HeightmapImporter.SpawnUv` | aynı sebep | metre cinsinden yeniden hesaplandı |
+| `bake_heightmap.SPAWN_UV` | aynı sebep | aynı |
+| örnek aralığı | 4097² sabit | 4.28 → 7.32 m/örnek kabalaştı; tırmanılan yüzeyler mesh modül olacağı için kabul edildi |
+| `region_profile.PLAY_KM`, `bake_heightmap.CROP_KM` | maske ve kırpma oyun alanına bağlı | 30.0 / 40.0 |
+
+Bu yüzden yukarıdaki üç tablonun bir kısmı risk altında. Kırılanlar iki yerde toplanıyor:
+**oyun alanına göre ölçeklenmiş ama artık 300 km görmesi gereken şeyler**, ve
+**normalize konum tutan her asset**.
 
 | ne | şu an | gereken | durum |
 |---|---|---|---|
@@ -97,7 +115,7 @@ tek bir yerde toplanıyor: **oyun alanına göre ölçeklenmiş ama artık 300 k
 | **`maxHazeDistance`** | 55 000 m | ~300 km | **KIRILIR** — 55 km'de pus doyuma gidiyor, uzak bant tek renk lapa çıkar |
 | **`cloudMapSize`** | 40 000 m | görünen bölgeyi kapsamalı | **KIRILIR** — bulutlar uzak dağların üstünde biter, gökyüzü ortadan kesilir |
 | `MAX_SKYBOX_VOLUMETRIC_CLOUDS_DISTANCE` | 200 000 m | 300 km | bakılacak — ufkun %74'ü |
-| Ufuk haritası (`HorizonResolution` 1024, 17.5 km) | oyun alanı | 300 km | **YENİ İŞ** — 100 km ötedeki dağlar şafakta güneşi kapatmalı; şu an modellenmiyor |
+| Ufuk haritası (`HorizonResolution` 1024, 30 km) | oyun alanı | 300 km | **YENİ İŞ** — 100 km ötedeki dağlar şafakta güneşi kapatmalı; şu an modellenmiyor |
 | Bulut gölge mesafesi 8 000 m | oyun alanı | — | sorun yok, yerel |
 
 **Derinlik hassasiyeti:** far clip 52.5 → 300 km, yani 5.7 kat. Ters-Z ile float derinlik
@@ -139,6 +157,6 @@ zaten yazılı.
 
 ## Onaylanmış dağ
 
-Şu anki değerler `Assets/Settings/MountainSettings.asset` içinde: `terrainSize 17517`,
-`terrainHeight 6189`, gerçek zirve **5686 m**, zemin **186 m**. Dağın onaylanma kaydı
+Şu anki değerler `Assets/Settings/MountainSettings.asset` içinde: `terrainSize 30000`,
+`terrainHeight 6189`, gerçek zirve **5709 m**, zemin **~140 m**. Dağın onaylanma kaydı
 `DECISIONS.md` → "Onaylanmış dağ: v1".
