@@ -420,6 +420,77 @@ ayarlanır; zirve sayısı patlarsa da buraya bakılır.
 
 ---
 
+## Referans boru hattı uçtan uca koşturuldu — bulgular (2026-08-17)
+
+Unity'ye tek satır yazmadan önce yazarların kodu kendi verisiyle çalıştırıldı. Amaç:
+"yaptığımız şey doğru mu" sorusunu tahminle değil **resimle** cevaplamak.
+
+Ortam: Python 3.11.9 + numpy · scipy · scikit-image · POT · pandas · shapely · triangle.
+`noise` paketi Windows'ta derlenmiyor; aynı imzada Perlin yedeği yazıldı (referans
+dosyalarına dokunulmadı, gürültü elevMap'e %5 ağırlıkla giren bir sarsıntı).
+
+**Ölçümler:**
+
+| adım | süre | çıktı |
+|---|---|---|
+| Bölge kesme + birleştirme (Kirmse) | ~1 dk | 7 330 zirve CSV |
+| L0 — `synthDivideTree` | **25 sn** | 949 zirve, 948 boyun, 1809–8562 m |
+| Poisson örnekleme (90×90 km, r=0.18) | 26 sn | 151 093 örnek |
+| L1 — `divideTreeToMesh` | **14 sn** | 172 332 köşe, 344 583 üçgen |
+| DEM rasterleme (30 m/piksel) | 5 sn | 3000×3000, 228–8553 m |
+
+### KANITLANDI
+
+- **Makro yapı doğru.** Dallanan sırtlar, aralarında vadiler, vadi tabanında tutarlı
+  akarsu ağı, doğru drenaj yönü. Radyal koninin veremediği her şey.
+- **`probMap = 0` gerçekten kesiyor.** O bölge kendiliğinden ovaya döndü. "Her yer dağ
+  olmayacak" mekanizması uçtan uca doğrulandı — teori değil.
+- **Sırt sürekliliği var.** Yürünecek hat mevcut.
+- **Mevcut erozyon kodumuz taşınıyor.** `MountainGenerator.Erode` Python'a birebir
+  çevrildi, 3000² × 20 iterasyon **10 sn**.
+
+### KANITLANMADI — ASIL KALAN RİSK
+
+**Yüzey detayı.** Argudo iskeleti ve vadileri veriyor, **yüzeyi vermiyor**; yakın planda
+üçgenler görünüyor. Notebook'un kendi yorumu: erozyon kodu repoda yok. O parça
+Galin 2019'un işi ve yazarlar yayınlamamış.
+
+Bir deneme yapıldı ve **başarısız oldu**: çok oktavlı gürültü + mevcut erozyonumuz.
+Sonuç daha detaylı değil daha pürüzsüz çıktı — 46° talus açısıyla 20 iterasyon, 30 m
+ızgarada eklenen detayın tamamını sildi.
+
+**Ders:** detay katmanı takılan bir şey değil, tasarlanan bir şey. Frekans içeriği,
+genliği ve nereye uygulanacağı Galin 2019'dan çıkarılacak. Yer tutucu gürültüyle
+geçiştirilemez.
+
+### SÖKÜM KÜÇÜLDÜ
+
+`MountainGenerator` komple silinecekti. Ölçüm bunu değiştirdi — dağın **şekli**
+değişiyor, **yüzeyi** değişmiyor:
+
+| mevcut kodda | durum |
+|---|---|
+| `Erode` (talus 46.1°, 20 iterasyon, `erosionRate` 0.1) | **kalıyor** — Argudo'nun üstüne |
+| Teraslar (kaba 26 + ince 50 bant) | **kalıyor** |
+| Çok oktavlı gürültü, warp, `ridgeSharpness` | **kalıyor** |
+| `heightProfile`, `mountainRadius`, radyal koni | **gidiyor** — yerini Divide Tree alıyor |
+| `peakSpread`, `secondaryPeaks`, `radialDistortion` | **gidiyor** |
+
+### OVANIN KUSURU
+
+Ölçümde görüldü: zirve konmayan bölge **fazla düz** çıkıyor — düzlem parçaları, hiç
+kabartı yok. Sebebi biliniyor: orada zirve yok, mesh uzak noktalar arasında düz
+interpolasyon yapıyor.
+
+Kullanıcının tarifi "tepecikli düz ova". Çare: ovaya alçak prominence'lı tepecikler
+koymak (ayrı bir prominence grubu) ve/veya detay katmanını oraya da uygulamak. L1'de
+çözülecek.
+
+**Tetikleyici:** yakın planda üçgen yüzeyler görülüyorsa detay katmanı eksik demektir,
+buraya bakılır.
+
+---
+
 ## Spec sırası: terrain → snow → rain → lightning (2026-08-17)
 
 **Gerekçe — terrain önce:** `terrain-generation-spec.md` bir ekleme değil, **tam yeniden
