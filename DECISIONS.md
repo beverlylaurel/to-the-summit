@@ -546,6 +546,62 @@ haritasını belirliyor. Yanlış kotla üretilirse üçü de tekrar edilir.
 
 ---
 
+## Yüzey detayı ÇÖZÜLDÜ — tarif ve dersler (2026-08-17)
+
+Referans repoda erozyon kodu yok (yazarların iç C++ kütüphanelerine bağlı, yayınlanmamış).
+Spec'ten (`§3.5`, `§3.6`, `§5.7`, `§5.8`) yazıldı: `Tools/terrain/detail.py`.
+
+**Sonuç:** oyun alanı 17.5 km, 4.28 m/örnek, zirve **tam 5709 m korunuyor**, düğüm
+kotlarında ortanca kayma 17 m (prominence tavanı 65 m'nin altında).
+
+### Tarif — üç parça, üçü de gerekli
+
+**1. İnce taban mesh.** `refineDistance` 120 m → **30 m**. Asıl kırılma noktası bu:
+gürültünün genliği prominence tavanıyla sınırlı (65 m) ve 320 m dalga boyunda ancak
+18°'lik eğim üretiyor; yüzeyler 30–50°. **Gürültü yüzeyleri kıramaz, sadece üstünde
+gezer.** Kaba mesh'i gürültüyle kurtarmaya çalışmak boşuna.
+
+**2. Multifraktal gürültü** (`§3.5`), genlik 52 m < prominence tabanı 65 m (`§5.7`).
+Her oktav **döndürülerek** örnekleniyor (`§3.6`) — hizalı oktavlar ızgara artefaktı
+üretir. Gürültü `× (1 − U)` ile çarpılıyor: zirve ve boyunlarda sıfıra gidiyor, kot
+birebir korunuyor.
+
+**3. Çok ölçekli kısıtlı erozyon** (`§5.8`), telafi edici uplift `g(r) = (1−r²)³`,
+`R_infl` 400 m.
+
+### Dört ders — üçü hatadan
+
+**"100 m, 50 m, 30 m" IZGARA ÇÖZÜNÜRLÜĞÜDÜR, iterasyon sayısı değil.** Önce ince
+ızgarada iterasyon sanıldı. Ölçüldü: 46.1° talus × 4.28 m hücre = **4.45 m**'lik
+maksimum adım, yani eklenen detayın tamamı o eşiğin üstünde ve erozyon onu baştan
+yiyordu. Doğrusu: kaba ızgaraya indir, orada aşındır, farkı geri büyüt.
+
+**Farkın geri büyütülmesi PÜRÜZSÜZ olmalı.** `np.repeat` ile blok blok büyütülünce
+dikdörtgen ızgara artefaktı çıktı — `SYMPTOMS.md`'deki "sert kırpma" sınıfı. Kübik
+spline ile büyütülüyor.
+
+**Spec'in uplift işareti yanlış.** Yazılan:
+`H_{i+1} = E_i + U·ΔH_i, ΔH_i = E_i − H_i`. Erozyon alçalttığına göre `ΔH < 0` ve bu
+ifade daha da alçaltıyor — zirvede (U=1) sonuç `2E − H`, yani erozyonun **iki katı**.
+Telafi edici uplift olamaz. Uygulanan: `H_{i+1} = (1−U)·E_i + U·H_i` — U=1'de orijinal
+korunur, U=0'da tam erozyon.
+
+**`α` fonksiyonu makalede YOK** (spec `§9.1` açık nokta olarak işaretli). Seçilen:
+o ana kadar birikmiş değerin `[0,1]`'e normalize hâli. Makalenin tarif ettiği
+**davranışı** veriyor — alçak yerde yüksek frekans bastırılır (vadi düzleşir), yüksek
+yerde güçlendirilir (zirve detay kazanır). Formül değil, seçim; burada kayıtlı.
+
+### Açık kalan
+
+Düğüm kotlarında **en kötü kayma 172 m** — prominence tavanının üstünde. Kaynağı 100 m
+ızgarada aşınan ve `R_infl` 400 m'nin dışında kalan bir düğüm. `R_infl`'in ölçekle
+büyümesi gerekebilir; ölçülmedi.
+
+**Tetikleyici:** yakın planda üçgen yüzey görülüyorsa `refineDistance`'a bakılır,
+gürültüye değil.
+
+---
+
 ## L0 uygulandı — yöntemin ölçülmüş sınırları (2026-08-17)
 
 Plan `.claude/PRPs/plans/terrain-l0-divide-tree.plan.md`, araç zinciri `Tools/terrain/`,
