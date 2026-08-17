@@ -639,6 +639,58 @@ gürültüye değil.
 
 ---
 
+## Yaklaşma koridoru: ova oyun alanına giriyor (2026-08-17)
+
+Ova 186 m'de kalınca maskenin onu oyun alanına sokması gerekti. Güneybatıya (212°) inen
+tek bir **koridor** — azimut sektörü değil, eksene uzaklık; sektör pasta dilimi üretiyor
+(bir kez yaşandı).
+
+**Ölçülen sonuç** (koridor içinde, zirveden uzaklığa göre):
+
+| bant | kot | ortanca eğim | yürünür |
+|---|---|---|---|
+| ova 10–14 km | 407–688 m | **6.3°** | **%91** |
+| etek 8–10 km | 324–1414 m | 10.1° | %72 |
+| yamaç 6–8 km | 355–2051 m | 23.2° | %37 |
+| kütle 0–4 km | 1623–5709 m | 42.7° | %12 |
+
+Ova "hafif tepecikli düz" — istenen buydu. Spawn 186 m'de, bisiklet turu bozulmadı.
+
+### Tırmanılabilirlik: rota VAR
+
+Alan ortalaması 4–6 km bandında 48.7° verdi ve duvar sanıldı. **Yanlış araç.** En-az-maliyetli
+hat arandı (Dijkstra, maliyet `mesafe × (1 + (eğim/25)⁴)`):
+
+| | |
+|---|---|
+| Rota uzunluğu | **17.56 km** (düz mesafe 8.41 km — %109 zikzak) |
+| Ortanca eğim | **18.1°** |
+| %90'lık dilim | 26° |
+| En dik adım | 42.2° |
+| Teknik tırmanış (>45°) | **%0** |
+| Yürünür / dik yürünür / el-ayak | %38 / %58 / %4 |
+
+Gerçek dağ da böyledir: yüzler dik, rota sırttan gider ve iki katı yol yürür.
+
+**Sonuç:** zirve modülü elle tasarlanacağı için gerçek tırmanış oradan gelecek; doğal
+arazi zaten yürünebilir bir hat sunuyor. Bu iyi — oyuncu rotayı **bulmak** zorunda,
+zorlanmak zorunda değil.
+
+### Geri alınan bir deneme
+
+Koridorun tepesi kütleye "otursun" diye doğrusal rampa yazıldı. **Ölçüm kötüleşti,
+geri alındı** — duvar kalkmadı, dışarı itildi:
+
+| bant | sabit tepe | "sürekli birleşme" |
+|---|---|---|
+| etek 8–10 km | 10.1° / %72 | 13.6° / %55 |
+| yamaç 6–8 km | **23.2° / %37** | **52.4° / %8** |
+| rota ortancası | 18.1° | 19.5° |
+
+Sebep: doğrusal rampa `t=3`'ten başlıyor, 6–8 km hâlâ kütle kotunda kalıyor.
+
+---
+
 ## L0 uygulandı — yöntemin ölçülmüş sınırları (2026-08-17)
 
 Plan `.claude/PRPs/plans/terrain-l0-divide-tree.plan.md`, araç zinciri `Tools/terrain/`,

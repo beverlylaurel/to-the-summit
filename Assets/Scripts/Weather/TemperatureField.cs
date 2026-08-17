@@ -29,22 +29,15 @@ public class TemperatureField : MonoBehaviour
     [SerializeField] TimeOfDay time;
 
     [Tooltip("Deniz seviyesindeki temel sıcaklık (°C). Donma seviyesinin nerede " +
-             "olacağını bu belirler.
-
-" +
-             "−3 İDİ: donma seviyesi deniz seviyesinin 462 m ALTINDA kalıyordu, yani " +
-             "dağın tamamı donmuştu ve yağış her kotta kar olarak düşüyordu. Oyunun " +
-             "başında yeşillik ve YAĞMUR istendi; o kurulumda ikisi de imkânsızdı.
-
-" +
-             "+7.8 ile donma seviyesi 1200 m: ova (186 m) öğlen +6.6 °C ve yağmur " +
-             "alıyor, kar etekteki kamptan ~1 km yukarıda başlıyor, zirve −29.3 °C " +
-             "(rüzgârla hissedilen −38 °C). Tam fırtına donma seviyesini 500 m " +
-             "indiriyor, yani kampa da kar yağabiliyor.
-
-" +
-             "Sayı kar çizgisinden türetildi: 1200 m × 6.5 °C/km. Gerekçe " +
-             "DECISIONS.md → 'Ovanın kotu'.")]
+             "olacağını bu belirler. −3 İDİ: donma seviyesi deniz seviyesinin 462 m " +
+             "ALTINDA kalıyordu, yani dağın tamamı donmuştu ve yağış her kotta kar " +
+             "olarak düşüyordu. Oyunun başında yeşillik ve YAĞMUR istendi; o " +
+             "kurulumda ikisi de imkânsızdı. +7.8 ile donma seviyesi 1200 m: ova " +
+             "(186 m) öğlen +6.6 °C ve yağmur alıyor, kar etekteki kamptan ~1 km " +
+             "yukarıda başlıyor, zirve −29.3 °C (rüzgârla hissedilen −38 °C). Tam " +
+             "fırtına donma seviyesini 500 m indiriyor, yani kampa da kar " +
+             "yağabiliyor. Sayı kar çizgisinden türedi: 1200 m × 6.5 °C/km. " +
+             "Gerekçe DECISIONS.md → 'Ovanın kotu'.")]
     [SerializeField] float seaLevelCelsius = 7.8f;
 
     [Tooltip("Yükseklikle düşüş (°C / kilometre). Standart atmosferin oranı 6.5.")]

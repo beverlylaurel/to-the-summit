@@ -115,10 +115,27 @@ def build(res=RES, region_km=REGION_KM, seed=36044):
     ch['foothill'] = (_smooth(-d, 55.0, 90.0) * (1.0 - _smooth(-d, 120.0, 175.0)))
     ch['plain']    = _smooth(-d, 130.0, 200.0)
     ch['plateau']  = _smooth(d, 70.0, 140.0)
-    # yaklasma vadisi: ana kutleden GUNEYE inen tek bir oluk
-    valley_x = 9.0 * np.sin(np.radians(ny * 1.6) + 1.1)
-    ch['approach'] = ((1.0 - _smooth(np.abs(ex - valley_x), 4.0, 13.0))
-                      * _smooth(-d, 2.0, 14.0) * (1.0 - _smooth(-d, 60.0, 95.0)))
+    # YAKLASMA KORIDORU. Ana kutleden GUNEYBATIYA inen tek vadi; oyuncunun
+    # spawn'i, yolu, uc kolu ve kamplari bunun icinde.
+    #
+    # Koridor AZIMUT SEKTORU DEGIL: sektor kullanmak pasta dilimi uretiyor
+    # (bir kez yasandi). Burada eksene uzaklik kullaniliyor -- vadi gercekten
+    # yonlu bir sey, ama siniri isinsal degil.
+    #
+    # Bu bir OYUN ALANI ANOMALISI ve bilincli: 5709 m'den 11 km'de 186 m'ye
+    # inmek gercek dunyada yok. Bolgenin %0.1'i ve ufuk bantlarindan
+    # gorunmuyor; gerekce DECISIONS.md -> "Ovanin kotu KAPANDI".
+    ang = np.radians(212.0)
+    t = ex * np.cos(ang) + ny * np.sin(ang)          # koridor boyunca, km
+    wperp = -ex * np.sin(ang) + ny * np.cos(ang)     # eksene dik uzaklik
+    wperp = wperp + 3.2 * _fbm((res, res), cell, 26.0, 3, seed + 11)  # duz olmasin
+    half_w = 3.4 + 0.060 * np.clip(t, 0.0, 140.0)    # disa dogru genisliyor
+    # KENAR GENIS. Dar tuyle vadi degil dik duvarli kanyon cikiyor; 12 km'lik
+    # gecis vadiyi yamaca baglar.
+    corridor = (1.0 - _smooth(np.abs(wperp) - half_w, 0.0, 12.0)) * _smooth(t, 2.0, 7.0)
+
+    ch['approach'] = corridor * (1.0 - _smooth(t, 9.0, 15.0))
+    ch['plain'] = np.maximum(ch['plain'], corridor * _smooth(t, 9.5, 16.0))
 
     stack = np.stack([ch[k] for k in ch], axis=0)
     w = stack ** 3
@@ -146,6 +163,24 @@ def build(res=RES, region_km=REGION_KM, seed=36044):
             'approach': 1000.0, 'plateau': PLATEAU_M, 'plain': PLAIN_M}
     elevMap = sum(weights[k] * elev[k] for k in ch)
     elevMap += (SUMMIT_M - elevMap) * (1.0 - _smooth(r, 2.0, 13.0))
+
+    # Koridorda kot: 4 km'de kutlenin kenari, 11 km'de ova. Oradan sonra duz.
+    # SABIT TEPE, "kutleye oturan rampa" DEGIL. Bir tur denendi: koridor kendi
+    # ustundeki elevMap'ten baslayip ovaya insin diye dogrusal rampa yazildi.
+    # OLCUM KOTULESTI ve geri alindi -- duvar kalkmadi, disari itildi:
+    #
+    #   bant            sabit tepe     "surekli birlesme"
+    #   ova 10-14 km    6.3 / %91      7.8 / %89
+    #   etek 8-10 km    10.1 / %72     13.6 / %55
+    #   yamac 6-8 km    23.2 / %37     52.4 / %8
+    #   rota ortancasi  18.1           19.5
+    #
+    # Sebep: dogrusal rampa t=3'ten basliyor, yani 6-8 km hala kutle kotunda
+    # kaliyor ve inis daha disarida oluyor.
+    corr_elev = PLAIN_M + (SUMMIT_M * 0.42 - PLAIN_M) * (1.0 - _smooth(t, 4.0, 12.0))
+    # ESIK YOK: once `np.where(corridor > 0.25, ...)` vardi, turevi kirilan bir
+    # sinir, yani vadinin iki yaninda dik duvar (SYMPTOMS.md "sert kirpma").
+    elevMap = elevMap * (1.0 - corridor) + corr_elev * corridor
     elevMap += 210.0 * _fbm((res, res), cell, 95.0, 5, seed + 2) * _smooth(elevMap, 300.0, 1500.0)
     elevMap = np.clip(elevMap, PLAIN_M, SUMMIT_M)
 
