@@ -165,8 +165,11 @@ public static class MountainSceneBootstrap
         // üstüne ikinci kez uygulanamıyor (kesilmiş yamacı yeniden kesmek olurdu).
         // Rota değişince arazi baştan üretilip yeniden şekillendiriliyor.
         var route = AssetDatabase.LoadAssetAtPath<MountainRoute>(RoutePath);
+        // YÜKSEKLİK HARİTASI DA İMZAYA GİRİYOR. Arazinin gerçek kaynağı o; PNG
+        // değişip imza değişmezse kurulum eski araziyi bırakır ve fark edilmez.
         string signature = settings.BuildSignature()
                          + "|s" + RouteTerrainShaper.Version
+                         + "|h" + AssetDatabase.GetAssetDependencyHash(HeightmapImporter.AssetPath)
                          + "|" + RouteSignature(route);
         bool regenerated = gen.lastBuildSignature != signature;
 
@@ -176,6 +179,17 @@ public static class MountainSceneBootstrap
             try
             {
                 gen.Generate();
+
+                // YÜKSEKLİK HARİTASI TESVİYEDEN ÖNCE. Arazinin gerçek kaynağı bu PNG;
+                // `gen.Generate()`'in ürettiği her şeyi eziyor.
+                //
+                // Bir tur ters sırada koştu ve ölçüldü: kurulum tesviyeyi uyguladı,
+                // sonra yükseklik haritası elle uygulanınca tesviye silindi. Doğuş
+                // düzlüğü 45 m yarıçapta 4,93 m yerine 16,3 m kot farkına, %5,3 yerine
+                // 7,3 dereceye çıktı. Sırayı bilen tek yer burası olduğu için elle
+                // uygulama artık gerekmiyor.
+                EditorUtility.DisplayProgressBar("Dağ", "Yükseklik haritası uygulanıyor...", 0.65f);
+                HeightmapImporter.Apply(gen.GetComponent<Terrain>());
 
                 // Tesviye ÜRETİMDEN HEMEN SONRA, yüzey haritaları pişmeden önce:
                 // haritalar araziden türüyor ve sonradan kesilirse eğim, gölge ve kar
