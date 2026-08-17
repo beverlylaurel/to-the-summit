@@ -340,6 +340,35 @@ geçtiği doğrulanmadan ölçüm yapıldı. İki ayrı tuzak var:
 alan seçilir ve görülmemesi imkânsız bir değer verilir. Yol testi için sürülen bir alanı
 seçmek (bu turda `densityMultiplier`) testi baştan geçersiz kılar.
 
+## Yeni dağda eski dağdan birebir aynı yerler
+
+Kullanıcı: *"terrain specinden önceki dağda gördüğüm birebir aynı bir kaç yer var."*
+
+**İlk cevabım yanlıştı** — "tanıdık gelen desendir, şekil değil" dedim. Şekildi.
+
+**Ölçüm.** Araziye yükseklik yazan yalnız üç yer var: `HeightmapImporter` (tamamını ezer),
+`RouteTerrainShaper` (menzil 70 m, yalnız yol ve doğuş düzlüğü), `MountainGenerator`
+(ondan önce çalışır, üstüne yazılır). Yani taban geometri kesin yeni.
+
+**Gerçek sebep:** `SnowDisplacement` de geometri — köşeler fiilen hareket ediyor — ve
+yatay şeklinin TAMAMI `SnowDriftShape(worldPos.xz, …)`'dan geliyor. O fonksiyon dünya
+koordinatına bağlı, sabit hash'li. Yükseklik haritası değişti, bu değişmedi: aynı dünya
+koordinatında aynı birikinti sırtı, aynı dalga, aynı yığın.
+
+Aynısı yüzey deseninde de: `MountainBand`, oksit, liken, tanecik, kırılma — hepsi
+`worldPos` anahtarlı.
+
+**Ölçek:** `snowDisplaceMax` 3.2 m, yani birebir tekrar eden katman 5709 metrelik dağın
+**1/1780'i**. Küçük, ama yüzeye yakından bakılınca ekranın çoğunu kaplıyor — şikâyet
+yerindeydi.
+
+**Düzeltme:** `_PatternSeed`, İKİ HASH KÖKÜNE birden uygulanıyor (`MountainHash`,
+`SnowDriftHash`), tek tek çağrı yerlerine değil. Yeni bir prosedürel katman eklendiğinde
+kaydırmayı unutmak mümkün değil.
+
+**Kural:** dağ baştan üretildiğinde `patternSeed` de artırılır. Geometri yenilenip boya
+eski kalırsa oyuncu yeri tanır.
+
 ## Teşhis aracının kendisi
 
 Bu oturumda araç **iki kez yalan söyledi** ve ikisi de tur kaybettirdi.

@@ -1299,6 +1299,21 @@ kalanı zemindir. Düz zeminde sıfır — düz zemin başka zemin görmez.
 Yansımaya **gölge çarpanı uygulanmaz**: ışık çevreden geliyor ve çevre, bu nokta
 gölgedeyken de güneş alıyor olabilir.
 
+### Prosedürel yüzey tohumu (`_PatternSeed`)
+
+**Okur:** `TerrainMaterialSettings.patternSeed`. **Yazar:** iki hash kökü —
+`MountainHash` (kaya bandı, oksit, liken, tanecik, kırılma) ve `SnowDriftHash`
+(birikinti şekli, yani gerçek geometri).
+
+**Bilinçli kural: tohum çağrı yerlerine değil hash köküne uygulanır.** Yeni bir
+prosedürel katman eklendiğinde kaydırmayı unutmak böylece mümkün değil.
+
+**Dağ baştan üretilirse tohum da artırılır.** Prosedürel yüzeyin tamamı dünya
+koordinatına bağlı; geometri yenilenip tohum sabit kalırsa aynı koordinatta aynı desen ve
+aynı birikinti sırtı çıkar. Bir kez yaşandı, belirti `SYMPTOMS.md`'de.
+
+Aynı tohum → aynı yüzey. Co-op'ta senkronlanacak bir şey yok, paylaşılan durum yok.
+
 ### Arazi yüzeyi (`MountainHeightmap.png` → `HeightmapImporter`)
 
 **Okur:** `DivideTree` (L0 grafiği). Başka hiçbir şeyi okumaz.

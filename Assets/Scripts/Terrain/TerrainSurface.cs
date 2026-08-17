@@ -69,6 +69,7 @@ public class TerrainSurface : MonoBehaviour
     static readonly int ScreeSlopeLimitId = Shader.PropertyToID("_ScreeSlopeLimit");
     static readonly int SnowSlopeLimitId = Shader.PropertyToID("_SnowSlopeLimit");
     static readonly int SnowBreakupId = Shader.PropertyToID("_SnowBreakup");
+    static readonly int PatternSeedId = Shader.PropertyToID("_PatternSeed");
     static readonly int SnowBurialId = Shader.PropertyToID("_SnowBurial");
     static readonly int SnowRoundingId = Shader.PropertyToID("_SnowRounding");
     static readonly int SnowDriftStrengthId = Shader.PropertyToID("_SnowDriftStrength");
@@ -297,6 +298,18 @@ public class TerrainSurface : MonoBehaviour
         // iklim. Şimdi çizgi her zaman kar kuşağının üstünde kalıyor.
         Shader.SetGlobalFloat(PermanentSnowLineId,
             weatherDriver.ReferenceSnowFloor + settings.permanentSnowRise);
+    }
+
+    /// Tohumdan üç eksende kaydırma. Aynı tohum → aynı yüzey; co-op'ta senkronlanacak
+    /// bir şey yok çünkü paylaşılan durum yok.
+    static Vector4 PatternOffset(int seed)
+    {
+        // Küçük tamsayı karıştırıcı; ardışık tohumlar ilişkisiz kaydırma versin diye.
+        uint h = (uint)seed * 2654435761u;
+        float x = (h & 0xFFu) * 2f;
+        float y = ((h >> 8) & 0xFFu) * 2f;
+        float z = ((h >> 16) & 0xFFu) * 2f;
+        return new Vector4(x, y, z, 0f);
     }
 
     /// Her kot bandı kendi havasıyla dolar ve kendi sıcaklığıyla erir.
@@ -587,6 +600,13 @@ public class TerrainSurface : MonoBehaviour
         material.SetFloat(OxideScaleId, settings.oxideScale);
         material.SetFloat(ScreeAmountId, settings.screeAmount);
         material.SetVector(ScreeRangeId, settings.screeRange);
+        // TOHUM GLOBAL, materyal alanı DEĞİL: iki hash kökü iki ayrı dosyada ve biri
+        // yer değiştirme geçişinde okunuyor. Materyale yazılırsa o geçiş göremez.
+        //
+        // Kaydırma tohumdan TÜRETİLİYOR, elle girilmiyor: üç eksen birbirinden bağımsız
+        // ve 512'lik hash sarmasının içinde kalıyor (`MountainHash`'te `fmod(..., 512)`).
+        Shader.SetGlobalVector(PatternSeedId, PatternOffset(settings.patternSeed));
+
         material.SetFloat(ScreeSlopeLimitId, settings.screeSlopeLimit);
         material.SetFloat(SnowSlopeLimitId, settings.snowSlopeLimit);
         material.SetFloat(SnowBreakupId, settings.snowBreakup);

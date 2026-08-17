@@ -20,8 +20,24 @@
 // sessizce ayrışıyordu. Tam sayı karması her yerde bit birebir aynı.
 
 /// Wang karması. Tam sayı içeri, 0-1 arası kesir dışarı.
+/// PROSEDÜREL YÜZEYİN TOHUMU. Kaya bandı, oksit, liken, tanecik, kırılma ve birikinti
+/// şeklinin TAMAMI dünya koordinatına bağlı, sabit hash'li. Arazi baştan üretilse bile
+/// aynı dünya koordinatında aynı desen ve aynı birikinti sırtı çıkıyordu — dağ yeni,
+/// üstündeki kar heykeli eski.
+///
+/// Ölçüldü: `snowDisplaceMax` 3.2 m, yani birebir tekrar eden katman 5709 metrelik dağın
+/// 1/1780'i. Küçük ama yüzeye yakından bakılınca ekranın çoğunu kaplıyor.
+///
+/// Tohum İKİ HASH KÖKÜNE birden giriyor (`SnowDriftHash`, `MountainHash`); tek tek çağrı
+/// yerlerine değil. Böylece yeni bir katman eklendiğinde kaydırmayı unutmak mümkün değil.
+///
+/// `SnowDrift.hlsl` en altta duruyor: `MountainSurfaceInput` de `SnowDisplacement` de
+/// onu dahil ediyor, yani bildirim burada bir kez yapılıyor.
+float4 _PatternSeed;
+
 float SnowDriftHash(uint2 cell)
 {
+    cell += (uint2)abs(_PatternSeed.xy);
     uint h = cell.x * 73856093u ^ cell.y * 19349663u;
     h = (h ^ 61u) ^ (h >> 16);
     h *= 9u;

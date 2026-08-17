@@ -100,6 +100,14 @@ public class TerrainMaterialSettings : ScriptableObject
 
     [Tooltip("En kalın birikintinin yüksekliği (metre). Kar artık GEOMETRİ: kayaların " +
              "dibinde dolgu, sırtta korniş, oyukta yığılma. Fazlası dağı şişiriyor.")]
+    /// Prosedürel yüzeyin tohumu. Kaya bandı, oksit, liken, tanecik, kırılma ve
+    /// birikinti şeklinin tamamı dünya koordinatına bağlı; tohum değişmeden arazi
+    /// baştan üretilse bile aynı koordinatta aynı desen çıkıyor.
+    ///
+    /// Dağ yeniden üretildiğinde bu da artırılır, yoksa eski dağdan yerler tanıdık
+    /// gelir — bir kez yaşandı ve ölçüldü.
+    public int patternSeed = 2;
+
     [Range(0f, 8f)] public float snowDisplaceMax = 3.2f;
     [Tooltip("Bu derinliğin altında geometri hiç oynamıyor. İnce örtü arazi " +
              "ızgarasında zaten çözülemiyor; uygulanınca bütün dağ hafifçe şişiyor.")]
