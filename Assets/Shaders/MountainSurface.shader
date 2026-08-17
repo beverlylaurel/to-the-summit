@@ -208,7 +208,7 @@ Shader "ToTheSummit/MountainSurface"
                 // SİS UYGULANMIYOR ve renkler doygun: prob ışıktan, pozlamadan ve
                 // sisten etkilenirse yalan söyler — bu bir kez yaşandı (SYMPTOMS.md,
                 // "Teşhis aracının kendisi").
-                if (_TerrainLightProbe > 0.5)
+                if (_TerrainLightProbe > 0.5 && _TerrainLightProbe < 1.5)
                 {
                     float ndl = dot(inputData.normalWS, mainLight.direction);
                     float shadow = mainLight.shadowAttenuation;
