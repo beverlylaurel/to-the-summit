@@ -63,6 +63,19 @@ Shader "ToTheSummit/MountainSurface"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             float _TerrainShadowReceive;
+            // TEŞHİS ANAHTARLARI. Araziye güneşi kesen ÜÇ yol var ve üçü de aynı
+            // kanaldan gidiyor: ufuk haritası, gerçek zamanlı gölge haritası, bulut
+            // cookie'si. Ekranda ayırt edilemiyorlar; hangisinin yazdığı ancak tek tek
+            // kapatılarak bilinir. Varsayılan 1, yani hepsi açık.
+            float _TerrainHorizonReceive;
+            float _TerrainCookieReceive;
+            // IŞIK TARAFI. Üç gölge anahtarı da hiçbir şeyi değiştirmedi, yani lekeler
+            // gölge değil. Geriye iki büyüklük kalıyor: doğrudan güneş ve gökten gelen
+            // ortam. Güneş kesilince ekranda kalan ŞEY ortamdır; ortam çarpılınca
+            // kararan yerler açılıyorsa eksik olan ortamdır.
+            float _TerrainSunGain;       // 1 = normal, 0 = güneş kesik
+            float _TerrainAmbientGain;   // 1 = normal
+            float _TerrainLightProbe;    // >0.5: sınıflandırma rengi bas
             #include "MountainSurface.hlsl"
             #include "SnowTessellation.hlsl"
 
@@ -114,10 +127,21 @@ Shader "ToTheSummit/MountainSurface"
                 // Forward+ ışık döngüsü makroları bu değişkeni adıyla okuyor
                 InputData inputData = (InputData)0;
                 inputData.positionWS = IN.positionWS;
-                inputData.normalWS = surface.normalWS;
+                // NORMAL YER DEĞİŞTİRMEYİ BİLMELİ. Örgü domain aşamasında kabarıyor
+                // (`SnowDomainPositionWS`) ama burada pişirilmiş arazi normali
+                // kullanılıyordu: siluet kabarıyor, ışık altındaki düz yüzeyi
+                // aydınlatıyordu. `SnowDisplacedNormal`'ın kendi yorumu tam bunu
+                // söylüyor ve DepthNormals geçişi zaten öyle yapıyor — üç geçişten
+                // yalnız bu ayrıktı.
+                //
+                // Belirti: güneşle dönen, hiçbir gölge anahtarının etkilemediği koyu
+                // lekeler. Renk probu ayırdı — gölgelendirme normali "sırtı dönük"
+                // derken gerçek yüzey güneşi görüyordu (mor sınıf).
+                float3 shadingNormal = SnowDisplacedNormal(IN.positionWS, surface.normalWS);
+                inputData.normalWS = shadingNormal;
                 inputData.viewDirectionWS = GetWorldSpaceNormalizeViewDir(IN.positionWS);
                 inputData.fogCoord = IN.fogFactor;
-                inputData.bakedGI = SampleSH(surface.normalWS);
+                inputData.bakedGI = SampleSH(shadingNormal);
                 inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(IN.positionCS);
                 inputData.shadowMask = half4(1, 1, 1, 1);
 
@@ -133,7 +157,7 @@ Shader "ToTheSummit/MountainSurface"
                 // yürümüyor: katkısı zaten sıfır, kırk adım boşa giderdi.
                 Light mainLight = GetMainLight();
                 mainLight.shadowAttenuation =
-                    dot(inputData.normalWS, mainLight.direction) > 0.0
+                    dot(inputData.normalWS, mainLight.direction) > 0.0 && _TerrainHorizonReceive > 0.5
                         ? TerrainSunShadow(IN.positionWS, mainLight.direction)
                         : 1.0;
 
@@ -151,12 +175,15 @@ Shader "ToTheSummit/MountainSurface"
                 // çizen yoğunluk alanının ta kendisi. Doğrudan güneşi kesiyor, gökten gelen
                 // dolaylı ışığa dokunmuyor — arazi gölgesiyle aynı kanaldan.
             #ifdef _LIGHT_COOKIES
-                mainLight.color *= SampleMainLightCookie(IN.positionWS);
+                if (_TerrainCookieReceive > 0.5)
+                    mainLight.color *= SampleMainLightCookie(IN.positionWS);
             #endif
 
-                half3 lit = inputData.bakedGI * aoFactor.indirectAmbientOcclusion * brdfData.diffuse;
+                half3 lit = inputData.bakedGI * _TerrainAmbientGain
+                          * aoFactor.indirectAmbientOcclusion * brdfData.diffuse;
                 lit += LightingPhysicallyBased(brdfData, mainLight,
-                    inputData.normalWS, inputData.viewDirectionWS) * aoFactor.directAmbientOcclusion;
+                    inputData.normalWS, inputData.viewDirectionWS)
+                    * aoFactor.directAmbientOcclusion * _TerrainSunGain;
 
                 #if defined(_ADDITIONAL_LIGHTS)
                 uint pixelLightCount = GetAdditionalLightsCount();
@@ -168,6 +195,50 @@ Shader "ToTheSummit/MountainSurface"
                 #endif
 
                 lit += surface.emission;
+
+                // ===== TEŞHİS PROBU. Piksel neden karanlık, RENKLE söylüyor. =====
+                // Göz kararı "burası koyu" bir yargıdır; dört sebebi ayırmıyor. Prob
+                // her piksele tek bir sınıf atıyor ve cevabın tek doğrusu var.
+                //
+                //   KIRMIZI  N·L <= 0        yüzey güneşe sırtını dönmüş, geometri
+                //   MAVİ     ufuk haritası   sırt/zirve güneşi kesiyor
+                //   YEŞİL    bulut cookie'si bulut güneşi kesiyor
+                //   BEYAZ    tam aydınlık    kesen bir şey yok
+                //
+                // SİS UYGULANMIYOR ve renkler doygun: prob ışıktan, pozlamadan ve
+                // sisten etkilenirse yalan söyler — bu bir kez yaşandı (SYMPTOMS.md,
+                // "Teşhis aracının kendisi").
+                if (_TerrainLightProbe > 0.5)
+                {
+                    float ndl = dot(inputData.normalWS, mainLight.direction);
+                    float shadow = mainLight.shadowAttenuation;
+                    float cookie = 1.0;
+                #ifdef _LIGHT_COOKIES
+                    cookie = dot(SampleMainLightCookie(IN.positionWS), 0.3333);
+                #endif
+
+                    // GEOMETRIK NORMAL: ekranda GERCEKTEN cizilen ucgenin normali.
+                    // Golgelendirme normali `_SurfaceMaps`'ten geliyor (1024 doku,
+                    // 30 km'de 29.3 m/texel) ve orgunun 7.32 m'lik geometrisiyle ayni
+                    // sey degil. Ikisi ayrisirsa isik yuzeyin gercek yonunu degil
+                    // dokunun soyledigini gorur.
+                    //
+                    // Yukseklik alani oldugu icin gercek normalin Y'si POZITIF olmak
+                    // zorunda; isaret buradan sabitleniyor, el kurali tahminine
+                    // birakilmiyor.
+                    float3 geoN = normalize(cross(ddy(IN.positionWS), ddx(IN.positionWS)));
+                    geoN *= (geoN.y < 0.0) ? -1.0 : 1.0;
+                    float geoNdl = dot(geoN, mainLight.direction);
+
+                    // MOR: golgelendirme normali "sirti donuk" diyor ama GERCEK yuzey
+                    //      gunesi goruyor -- yalan soyleyen normal.
+                    if (ndl <= 0.0 && geoNdl >  0.0) return half4(1.0, 0.0, 1.0, 1.0);
+                    // KIRMIZI: ikisi de sirti donuk -- geometri, dogru davranis.
+                    if (ndl <= 0.0)                  return half4(1.0, 0.0, 0.0, 1.0);
+                    if (shadow < 0.5)                return half4(0.0, 0.2, 1.0, 1.0);
+                    if (cookie < 0.5)                return half4(0.0, 1.0, 0.0, 1.0);
+                    return half4(1.0, 1.0, 1.0, 1.0);
+                }
 
                 half4 color = half4(lit, 1.0);
 

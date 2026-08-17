@@ -46,6 +46,21 @@ public class DebugMenu : MonoBehaviour
     bool freeFly;
 
     static readonly int TerrainShadowId = Shader.PropertyToID("_TerrainShadowReceive");
+    static readonly int TerrainHorizonId = Shader.PropertyToID("_TerrainHorizonReceive");
+    static readonly int TerrainCookieId = Shader.PropertyToID("_TerrainCookieReceive");
+    static readonly int TerrainSunGainId = Shader.PropertyToID("_TerrainSunGain");
+    static readonly int TerrainAmbientGainId = Shader.PropertyToID("_TerrainAmbientGain");
+    static readonly int TerrainLightProbeId = Shader.PropertyToID("_TerrainLightProbe");
+
+    /// GEÇİCİ TEŞHİS DURUMU. Araziye güneşi kesen üç yol var; hangisinin ekrandaki
+    /// lekeleri yazdığı ancak tek tek kapatılarak bilinir. Sorumlu bulunup düzeltilince
+    /// bu üç alan, `DrawShadowSource` ve shader'daki iki anahtar birlikte silinir.
+    bool shadowHorizon = true;
+    bool shadowRealtime = true;
+    bool shadowCookie = true;
+    bool sunCut;
+    float ambientGain = 1f;
+    bool lightProbe;
 
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
@@ -162,7 +177,12 @@ public class DebugMenu : MonoBehaviour
         // almaz" diyordu ama satır panel çizim kodundaydı: panel KAPALIYKEN global hiç
         // yazılmıyor, sıfır kalıyor ve arazi gölgesiz çiziliyordu. Oyunun normal hâli
         // panel kapalı olduğu için bu, oynanışın tamamını etkiliyordu.
-        Shader.SetGlobalFloat(TerrainShadowId, 1f);
+        Shader.SetGlobalFloat(TerrainShadowId, shadowRealtime ? 1f : 0f);
+        Shader.SetGlobalFloat(TerrainHorizonId, shadowHorizon ? 1f : 0f);
+        Shader.SetGlobalFloat(TerrainCookieId, shadowCookie ? 1f : 0f);
+        Shader.SetGlobalFloat(TerrainSunGainId, sunCut ? 0f : 1f);
+        Shader.SetGlobalFloat(TerrainAmbientGainId, ambientGain);
+        Shader.SetGlobalFloat(TerrainLightProbeId, lightProbe ? 1f : 0f);
 
         var keyboard = Keyboard.current;
         if (keyboard != null && keyboard.f1Key.wasPressedThisFrame) Toggle();
@@ -214,6 +234,7 @@ public class DebugMenu : MonoBehaviour
         DrawClouds();
         DrawOverlays();
         DrawSnowCollision();
+        DrawShadowSource();
         EndColumn();
 
         GUILayout.EndHorizontal();
@@ -541,6 +562,76 @@ public class DebugMenu : MonoBehaviour
         }
 
         if (GUILayout.Button("Ayarları geri al")) host.SetActive(false);
+
+        EndSection();
+    }
+
+    /// GEÇİCİ ÖLÇÜM BÖLÜMÜ. Araziye güneşi kesen ÜÇ yol var ve üçü de aynı kanaldan
+    /// gidiyor, yani ekranda ayırt edilemiyorlar:
+    ///   ufuk haritası   — arazinin kendi gölgesi, `SurfaceMapBaker` pişiriyor
+    ///   gölge haritası  — hareketli nesneler, URP cascade (menzil 60 m)
+    ///   bulut cookie'si — bulut yoğunluğu, 256 doku 8000 m'ye yayılıyor
+    ///
+    /// Üçü tek seferde konuldu: teker teker eklemek her turda bir şüpheli eliyor ve
+    /// kullanıcıya üç ayrı Play koşusu yaptırıyor.
+    ///
+    /// Sorumlu bulunup düzeltilince bu bölüm, üç alan ve shader'daki iki anahtar
+    /// birlikte silinir.
+    void DrawShadowSource()
+    {
+        BeginSection("Teşhis: gölge kaynağı");
+
+        shadowHorizon = GUILayout.Toggle(shadowHorizon, "Ufuk haritası (arazinin kendi gölgesi)");
+        shadowRealtime = GUILayout.Toggle(shadowRealtime, "Gölge haritası (60 m menzil)");
+        shadowCookie = GUILayout.Toggle(shadowCookie, "Bulut gölgesi (cookie)");
+
+        GUILayout.Space(6f);
+
+        // RENK PROBU. "Burası koyu" göz kararıdır ve dört sebebi ayırmaz; prob her
+        // piksele tek sınıf atıyor, cevabın tek doğrusu oluyor.
+        lightProbe = GUILayout.Toggle(lightProbe, "RENK PROBU: piksel neden karanlık");
+        if (lightProbe)
+        {
+            GUILayout.Label("MOR     = normal yalan (gerçek yüzey güneşi görüyor)");
+            GUILayout.Label("kırmızı = gerçekten sırtı dönük (geometri)");
+            GUILayout.Label("mavi    = ufuk haritası kesiyor");
+            GUILayout.Label("yeşil   = bulut cookie'si kesiyor");
+            GUILayout.Label("beyaz   = tam aydınlık");
+        }
+
+        GUILayout.Space(6f);
+
+        // ÜÇ GÖLGE ANAHTARI DA SONUÇ VERMEDİ. Lekeler gölge değilse geriye iki büyüklük
+        // kalıyor. Güneş kesilince ekranda kalan ŞEY ortamdır; ortam çarpılınca kararan
+        // yerler açılıyorsa eksik olan ortamdır. İkisi tek bakışta ayrılıyor.
+        sunCut = GUILayout.Toggle(sunCut, "Güneşi kes (yalnız ortam ışığı)");
+
+        using (new GUILayout.HorizontalScope())
+        {
+            GUILayout.Label($"Ortam ışığı ×{ambientGain:F1}");
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("↺", GUILayout.Width(26f))) ambientGain = 1f;
+        }
+        ambientGain = GUILayout.HorizontalSlider(ambientGain, 0f, 16f);
+
+        // SAYI OLMADAN "koyu" bir yargıdır. Probun DC terimi gökten pişen ortamın
+        // ta kendisi; güneş şiddetiyle oranı, yüzeyin ne kadarının gökten geldiğini
+        // söylüyor.
+        SphericalHarmonicsL2 probe = RenderSettings.ambientProbe;
+        float ambient = 0.2126f * probe[0, 0] + 0.7152f * probe[1, 0] + 0.0722f * probe[2, 0];
+        GUILayout.Label($"Ortam probu {ambient:F4}");
+        GUILayout.Label($"Güneş {(RenderSettings.sun != null ? RenderSettings.sun.intensity : 0f):F3}");
+        GUILayout.Label($"Oran ortam/güneş {(RenderSettings.sun != null && RenderSettings.sun.intensity > 1e-4f ? ambient / RenderSettings.sun.intensity : 0f):F4}");
+
+        if (GUILayout.Button("Ayarları geri al"))
+        {
+            shadowHorizon = true;
+            shadowRealtime = true;
+            shadowCookie = true;
+            sunCut = false;
+            ambientGain = 1f;
+            lightProbe = false;
+        }
 
         EndSection();
     }
