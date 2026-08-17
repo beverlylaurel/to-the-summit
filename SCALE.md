@@ -113,6 +113,30 @@ artık radyal bir yelpaze değil, üretilen bölgenin parçası.
 bantları, yüzey haritaları, `ConcavityRadius`, `snowTess*`, `TerrainSurface.Bands`,
 "bilerek mutlak" tablosunun tamamı.
 
+## L0 (Divide Tree) sayıları — 2026-08-17
+
+Üretim `Tools/terrain/`, çıktı `Assets/Terrain/DivideTree.txt`.
+
+| ne | değer | dağın boyuna bağlı mı |
+|---|---|---|
+| Bölge kenarı | 540 km | **Hayır** — ufuk mesafesinden (`sqrt(2Rh)`), gezegen yarıçapına bağlı |
+| Oyun alanı | 17 517 m | **Evet** — `terrainSize` |
+| Zirve kotu | 5 709 m | **Evet** — `terrainHeight` |
+| Rakip tavanı | 5 500 m | **Evet** — zirveden türer, 209 m altında |
+| Prominence tabanı | 100 m | **Hayır** — gerçek metre, orometrik tanım |
+| Analiz kutusu yarıçapı | 120 km | Hayır — gerçek dünyada, Everest merkezli |
+| Kot ölçeği | 0.6222 | **Evet** — rakip tavanı ÷ Everest 8840 m |
+| Maske çözünürlüğü | 1024² | Hayır — 527 m/piksel, zirve aralığından (~11 km) çok ince |
+| Zirve sayısı | 7 268 | Hayır — gerçek bölgenin yoğunluğu × alan × maske ortalaması |
+
+**Dağın boyu değişirse:** zirve kotu, rakip tavanı ve kot ölçeği birlikte kayar; bölge
+kenarı ve prominence tabanı **kaymaz**. Bölge kenarı ancak gezegen yarıçapı ya da
+oyuncunun çıkabileceği en yüksek kot değişirse yeniden hesaplanır.
+
+**`heightmapResolution` 4097 ile ilişki:** L0 grafik, ızgara değil — çözünürlükten
+bağımsız. Izgaraya L1'de dönüşüyor; oradaki 4.28 m/örnek sınırı yukarıdaki tabloda
+zaten yazılı.
+
 ## Onaylanmış dağ
 
 Şu anki değerler `Assets/Settings/MountainSettings.asset` içinde: `terrainSize 17517`,

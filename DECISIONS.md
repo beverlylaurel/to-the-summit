@@ -491,6 +491,71 @@ buraya bakılır.
 
 ---
 
+## L0 uygulandı — yöntemin ölçülmüş sınırları (2026-08-17)
+
+Plan `.claude/PRPs/plans/terrain-l0-divide-tree.plan.md`, araç zinciri `Tools/terrain/`,
+çıktı `Assets/Terrain/DivideTree.txt` (7268 zirve, 7267 boyun, tohum 36044).
+
+Aşağıdakiler **ölçülerek** bulundu. Dördü düzeltildi, biri açık kaldı.
+
+### Yükseklik ZİRVELERDEN gelir, `elevMap`'ten değil
+
+`elevMap` yalnız zirvenin **nereye** konacağını söylüyor. L1 yüksekliği divide tree'den
+kuruyor; zirvesiz bölgede yükseklik bilgisi yok ve arazi tabana çöküyor.
+
+**Ölçüm:** plato 3600 m tasarlandı, yoğunluk 0.06 verilince arazide ortanca **103 m**
+çıktı. Yoğunluk yükseltilince 1894 m'ye geldi.
+
+**Kural:** bir bölgenin belli bir kotta durmasını istiyorsan oraya **zirve koymak
+zorundasın**. Yoğunluk sıfıra yakınsa o bölge çöker.
+
+### `probMap`'in ilk indeksi X'tir
+
+`divtree_synthesis.py:24` → `probMap[normCoords[:,0]*shape[0], normCoords[:,1]*shape[1]]`
+ve `normCoords[:,0]` X'tir. Diziler `[kuzey, doğu]` kurulursa silsile **90° dönük** çıkar
+— doğu-batı zincir kuzey-güney şerit olur. Bir kez yaşandı.
+
+### Histogram eşlemesi UYGULANMIYOR
+
+Yazarların `mapToPDF` adımı zorunlu, çünkü kontrol görselleri **birimsiz** gri tonlama.
+Bizim `elevMap`'imiz **metre** ve tasarımdan geliyor (ova 186, plato 3600, zirve 5709).
+Eşlemek onu bozuyor: bir turda plato 3600 → **1127 m**'ye düştü.
+
+### Dağılımın tavanı zirvenin ALTINDA olmalı
+
+Tavan zirveyle eşit olunca prominence/dominance eşleme adımı sentezlenmiş bir zirveyi
+**5789 m**'ye çıkardı ve bizimki üçüncü sıraya düştü. Tavan 5500 m'ye çekildi; zirve artık
+**inşaat gereği** 209 m üstte. Fark uydurma değil — Everest 8840 ile Lhotse 8516
+arasındaki 324 m'nin bu ölçekteki karşılığı.
+
+### AÇIK: gerçek bir plato bu yöntemle çıkmıyor
+
+Yoğunluk düşükse plato ada ada kopuyor; yüksekse dağlıktan ayırt edilemiyor. Sebep: vadi
+oyma derinliği `maxSlopeCoeff` ve sırt–akarsu mesafesinden geliyor, yoğunluktan değil.
+Düşük kabartılı yüksek düzlük için L1'de ayrı bir müdahale gerekiyor.
+
+Şimdilik yoğunluk 0.60 ile "yüksek tepelik" olarak duruyor. Manzara olduğu için (120 km+
+ötede) kabul edilebilir, ama **çözülmüş değil**.
+
+**Tetikleyici:** kuzey ufkunda plato yerine sıradan dağ görülüyorsa buraya bakılır.
+
+### Referans kodunun iki sınırı — dışarıdan aşıldı, kaynağa dokunulmadı
+
+- `noise` paketi Windows'ta C uzantısı derlemiyor. Aynı imzalı Perlin yedeği yazıldı
+  (`Tools/terrain/noise.py`). Gürültü `elevMap`'e **%5 ağırlıkla** giren bir sarsıntı,
+  türü sonucu belirlemiyor.
+- `fixedPeaks` **tek satırda** `squeeze()` ile sıfır boyuta düşüyor ve `concatenate`
+  patlıyor (yazarların örneği dört sabit zirveyle yazılmış). İkinci sabit zirve konuldu —
+  zaten doğrusu: Everest'in yanında Lhotse var, tek koni tam da kaçtığımız şey.
+
+### Kimlik = dizi indeksi; `readDivideTree` KULLANILMAZ
+
+Referansın kendi okuyucusu kırpma sınırında düğümleri yeniden sıralıyor (`peakReorder`,
+`saddleReorder`). İçerik çapalarının tamamı kimliklere bağlı olduğu için o okuyucu
+kullanılmıyor; diziler doğrudan yazılıp doğrudan okunuyor.
+
+---
+
 ## Spec sırası: terrain → snow → rain → lightning (2026-08-17)
 
 **Gerekçe — terrain önce:** `terrain-generation-spec.md` bir ekleme değil, **tam yeniden

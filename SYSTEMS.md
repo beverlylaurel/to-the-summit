@@ -1220,6 +1220,32 @@ başladı — deste kendisi hâle üretiyordu. Eşik beş ön ayarda da aynı or
 
 ---
 
+### Arazi iskeleti (`DivideTree`)
+
+**Okur:** hiçbir şey. Pişmiş içerik — `Tools/terrain/` editör dışında bir kez üretiyor,
+çıktı repoda duruyor, çalışma zamanı yalnız yüklüyor.
+
+**Yazar:** hiçbir şey. Bir veri asset'i; onu tüketen sistemler L1 (yükseklik haritası),
+L2 (işaretler) ve içerik yerleştirmesi.
+
+Zirve/boyun/sırt grafiği. Zirve ile key saddle arasında **bijektif** eşleme var, yani
+yapı grafik değil **ağaç**: boyun sayısı = zirve sayısı − 1. İçe aktarma bunu denetliyor.
+
+**KİMLİK = DİZİ İNDEKSİ.** İçerik — kamp, konak, mağara, anıt, zirve modülü — dünya
+koordinatı değil `(düğüm kimliği, yerel ofset, oturma kuralı)` tutuyor. Erozyon veya
+yükseklik haritası yeniden üretilse bile kamp yerinde kalıyor. Bu, "ileride değiştirince
+patlar mı" sorusunun tek gerçek cevabı; kimlik kararlılığı bozulursa yerleştirme emeğinin
+tamamı gider.
+
+Aynı tohum → aynı grafik → aynı kimlikler. Co-op'ta senkronlanacak bir şey yok, çünkü
+paylaşılan durum yok.
+
+**Yükseklik bu grafikten türer.** Zirvesiz bölgede yükseklik bilgisi de yoktur ve arazi
+tabana çöker — bir bölgenin belli bir kotta durması isteniyorsa oraya zirve konur.
+Ölçüm ve gerekçe `DECISIONS.md` → "L0 uygulandı".
+
+---
+
 ## 5. Bilinçli kurallar
 
 Bunlar hata değil, karar. Yanlışlıkla "düzeltilmemeli".
