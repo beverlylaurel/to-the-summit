@@ -86,3 +86,10 @@ Assets/Models/Bike/Generated/*
 
 # Arka plan yenileme tetikleyicisi. Icerigi onemsiz, yalniz zaman damgasi okunuyor.
 Logs/refresh.trigger
+
+# Arazi uretiminin ARA ciktilari. Repoya giren sey Assets/Terrain/DivideTree.txt;
+# npz ve dogrulama gorselleri ondan yeniden uretilebilir.
+Tools/terrain/*.npz
+Tools/terrain/*.npy
+Tools/terrain/*.png
+Tools/terrain/data/
