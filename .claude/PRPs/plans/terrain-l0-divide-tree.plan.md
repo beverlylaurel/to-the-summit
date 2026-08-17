@@ -276,7 +276,12 @@ doğrulaması**na dönüşür (`CLAUDE.md` skill kuralı: proje kuralı kazanır
   sayısını doğrudan etkiliyor.
 - **GOTCHA:** `probMap == 0` olan yerde zirve **hiç** çıkmaz — ova ve plato buradan kurulur,
   sonradan silinerek değil.
-- **DOĞRULA:** Maske PNG olarak yazılır, gözle bakılır: dört karakter bölgesi ayırt edilir.
+- **DOĞRULA — KULLANICI ONAYI KAPISI:** Maske PNG olarak yazılır ve **kullanıcıya
+  gösterilir**. Arazi bu onay alınmadan üretilmez. Beğenilmezse maske değişir, dağ
+  üretilmeden. Bakılacak tek şey: her yön dağ mı, yoksa ova/plato/tepelik ayrımı görünüyor
+  mu.
+- **ÖLÇÜ:** ~2450 zirve 291 600 km²'ye yayılıyor — zirve başına 119 km², ortalama 11 km
+  aralık. Tam yoğunlukta bile duvar değil; ova ve plato sektörleri bunu daha da seyreltir.
 
 ### Görev 5: Ana zirveyi çakmak
 - **EYLEM:** `fixedPeaks` ile merkeze 5709 m'lik zirveyi koy.

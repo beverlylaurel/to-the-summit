@@ -339,6 +339,87 @@ yüzüyorsa buraya bakılır.
 
 ---
 
+## L0 girdisi: Everest bölgesi, mesafeye göre prominence eşiği (2026-08-17)
+
+Plan: `.claude/PRPs/plans/terrain-l0-divide-tree.plan.md`. Bu kayıt planın iki kapısını
+kapatıyor.
+
+### Kaynak veri: Kirmse veritabanı, masaüstünde
+
+`orometry-terrains-master/data/` içindeki `prominence-p100.txt` ve `alliso-sorted.txt`
+repoda **sahte** — yalnız Google Drive bağlantısı taşıyorlar. Gerçekleri indirildi:
+
+| dosya | boyut | satır |
+|---|---|---|
+| `alliso-sorted.txt` | 1.1 GB | 24 749 538 |
+| `prominence-p100.txt` | 331 MB | 7 798 709 |
+
+Konum: `C:\Users\musta\Desktop\tts\specs\terrain` — **repoya girmiyorlar**, proje dizini dışında kalıyorlar.
+Sarmalayıcı script yolu parametre alacak, kopya tutulmayacak.
+
+Doğrulandı: `prominence-p100.txt`'in ilk satırı `27.9883, 86.9250, 29002 ft` — Everest'in
+kendisi, dosya prominence'a göre sıralı. Sütunlar: enlem, boylam, kot(ft), key saddle
+enlem/boylam, prominence(ft).
+
+### Bölge karakteri: `himalaya-everest`
+
+Merkez `[27.8575, 86.8267]` (`Synthesis.ipynb` hücre 5'in kendi ön ayarı).
+
+**Ölçüldü** — 100 km yarıçap, 40 000 km²:
+
+| | |
+|---|---|
+| Zirve | 5 230 |
+| Yoğunluk | 0.131 /km² |
+| En yüksek beş | 8 840 · 8 480 · 8 440 · 8 370 · 8 348 m |
+| Prominence ortancası | 70 m |
+
+**Gerekçe:** oyunun kurgusu Everest ölçeğinde ve orometrisi "bir baskın dev + kademeli
+daha küçük komşular + bir yanda yüksek plato (Tibet)" karakterini taşıyor —
+"her yer dağ olmayacak" kuralına doğal uyum.
+
+Ayrıca kullanıcının **yeşil→kar** isteğini karşılayan tek aday: Khumbu vadisi 2500–4000 m
+arası rododendron ormanı ve teraslı tarla, ağaç sınırı ~4000 m, kar çizgisi ~5200 m.
+Karakurum aşağıdan itibaren çıplak kaya ve moloz; Alpler hem alçak (Mont Blanc 4808) hem
+baştan sona yeşil.
+
+**Sınır:** bölge seçimi buraya yalnız **şeklin istatistiğini** veriyor. Bitki örtüsü ve
+kar çizgisi L2 ile yüzey malzemelerinin işi, L0 çıktısında görünmez.
+
+### Prominence eşiği MESAFEYE GÖRE kademeli
+
+Ham yoğunluk 540 km'lik bölgeye taşınınca **38 127 zirve** çıkıyor; sentez saatler sürer.
+Ölçüldü:
+
+| eşik | 100 km'de zirve | 540 km bölgede |
+|---|---|---|
+| 0 m | 5 230 | 38 127 |
+| 100 m | 1 781 | 12 983 |
+| 200 m | 688 | 5 016 |
+| 300 m | 351 | 2 559 |
+| 500 m | 132 | 962 |
+
+**Karar** — eşik banda göre değişir:
+
+| bant | alan | eşik | zirve |
+|---|---|---|---|
+| oyun alanı 17.5 km | 306 km² | 0 m (tam detay) | ~40 |
+| çevre 18–60 km | 11 000 km² | 100 m | ~490 |
+| ufuk 60–270 km | 217 700 km² | 300 m | ~1 920 |
+| | | **toplam** | **~2 450** |
+
+**Gerekçe fizik, kısayol değil:** 100 km'de bir ekran pikseli ≈ 47 m. 300 m'den alçak bir
+tümsek o mesafede zaten çözülmüyor. 15 kat azalma, görsel kayıp yok.
+
+**Ölçek bağımlılığı:** eşikler **mutlak metre** — gerçek dünyanın prominence tanımı, dağın
+boyuna bağlı değil. Bant sınırları (18/60/270 km) ise **ufuk mesafesinden** türüyor, yani
+gezegen yarıçapına bağlı, dağın boyuna değil.
+
+**Tetikleyici:** ufukta dağlar seyrek ya da kalabalık görünüyorsa eşikler buradan
+ayarlanır; zirve sayısı patlarsa da buraya bakılır.
+
+---
+
 ## Spec sırası: terrain → snow → rain → lightning (2026-08-17)
 
 **Gerekçe — terrain önce:** `terrain-generation-spec.md` bir ekleme değil, **tam yeniden
