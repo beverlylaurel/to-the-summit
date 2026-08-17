@@ -240,6 +240,30 @@ Shader "ToTheSummit/MountainSurface"
                     return half4(1.0, 1.0, 1.0, 1.0);
                 }
 
+                // ===== PROB 2: GÖLGE NE KADAR KOYU =====
+                // Fiziksel referansı olan tek soru: güneşli yüzey ile gölgedeki yüzey
+                // arasında kaç diyafram var? Açık havada kar için gerçek değer 2-3.5
+                // stop. "Koyu görünüyor" yargısını sayıya çeviren şey bu.
+                //
+                // Gölgenin VARLIĞI değil ŞİDDETİ ölçülüyor: ufuk haritası doğru
+                // çalıştığı ölçüldü, ama doğru yerde oluşan gölge fazla karanlıksa
+                // ekranda yine yanlış görünür.
+                if (_TerrainLightProbe > 1.5)
+                {
+                    float3 ambientTerm = inputData.bakedGI * brdfData.diffuse;
+                    float ndlFull = saturate(dot(inputData.normalWS, mainLight.direction));
+                    float3 sunTerm = mainLight.color * ndlFull * brdfData.diffuse;
+
+                    float a = max(dot(ambientTerm, float3(0.2126, 0.7152, 0.0722)), 1e-6);
+                    float d = max(dot(sunTerm,     float3(0.2126, 0.7152, 0.0722)), 0.0);
+                    float stops = log2((a + d) / a);
+
+                    if (stops < 2.0)  return half4(0.0, 0.4, 1.0, 1.0);   // MAVİ  fazla aydınlık
+                    if (stops < 3.5)  return half4(0.0, 1.0, 0.0, 1.0);   // YEŞİL doğru
+                    if (stops < 5.0)  return half4(1.0, 0.9, 0.0, 1.0);   // SARI  fazla koyu
+                    return half4(1.0, 0.0, 0.0, 1.0);                     // KIRMIZI çok fazla
+                }
+
                 half4 color = half4(lit, 1.0);
 
                 // Unity'nin sisi yerine yükseklik sisi: yoğunluk alçakta toplanır,
