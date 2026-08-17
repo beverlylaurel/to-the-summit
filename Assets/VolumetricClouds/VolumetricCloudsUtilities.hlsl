@@ -572,7 +572,20 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
         half erosionNoise = DetailModifier(detail, properties.height);
         erosionNoise = lerp(0.0, erosionNoise, erosionFactor);
         properties.ambientOcclusion = saturate(properties.ambientOcclusion - sqrt(erosionNoise * _ErosionOcclusion));
-        base_cloud = DensityRemap(base_cloud, erosionNoise, 1.0, 0.0, 1.0);
+        // ÇIKARMA, BÖLME DEĞİL `[N22 s.34]`:
+        //     saturate(cloud_noise_composite - (1.0 - dimensional_profile))
+        //
+        // `DensityRemap(x, n, 1, 0, 1)` = `(x − n) / (1 − n)`. Pay doğruydu, bölme
+        // fazlaydı: kenar bandını normalize edip yoğunluğu hızla 1'e çıkarıyor.
+        // `NUBIS_NOTES.md` bunu kapsama zinciri için zaten yazmıştı — "keskin kenarların
+        // matematiksel kaynağı bu" — ama düzeltme yalnız kapsamaya uygulanmıştı,
+        // erozyon tarafında bölme kalmıştı.
+        //
+        // Belirti: ince bulutta piksel ölçeğinde benek. Taban yoğunluk küçükken bölme
+        // sonucu ikiliye çeviriyor — `erosionNoise > base_cloud` olan yer 0, olmayan yer
+        // dolu, ara değer yok. Çözünürlükle ilgisi olmadığı ölçüldü: `resolutionScale`
+        // 0.5 ve 1.0'da, `upscaleMode` Bilinear ve Bilateral'da ekran birebir aynı.
+        base_cloud = saturate(base_cloud - erosionNoise);
 
         #if defined(_CLOUDS_MICRO_EROSION)
         // Mikro erozyonun makalede karşılığı yok, portun kendi eklemesi. Aynı yükseklik ve
@@ -580,7 +593,8 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
         float3 fineCoords = AnimateErosionNoisePosition(positionPS) / (NOISE_TEXTURE_NORMALIZATION_FACTOR) * _MicroErosionScale;
         half fine = SAMPLE_TEXTURE3D_LOD(_ErosionNoise, s_linear_repeat_sampler, fineCoords, CLOUD_DETAIL_MIP_OFFSET + erosionMipOffset).x;
         half fineNoise = lerp(0.0, DetailModifier(fine, properties.height), microDetailFactor);
-        base_cloud = DensityRemap(base_cloud, fineNoise, 1.0, 0.0, 1.0);
+        // Mikro katman da çıkarma: iki detay katmanı aynı cebirle çalışmalı.
+        base_cloud = saturate(base_cloud - fineNoise);
         #endif
     }
 
