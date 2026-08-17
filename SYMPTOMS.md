@@ -301,6 +301,45 @@ bileşen 1/8 genlikte duruyor.
 **Kural:** "sert görünüyor" iki ayrı şey olabilir — dar geçiş ya da yüksek varyans.
 İkisi ayrı ölçülür, yoksa doğru olan genişletilir ve belirti kalır.
 
+## İnce bulut kenarında piksel ölçeğinde benek — AÇIK
+
+**Çözülmedi.** Beş şüpheli ölçümle elendi; kayıt aynı turların tekrarlanmaması için.
+
+| şüpheli | ölçüm | sonuç |
+|---|---|---|
+| yarı çözünürlük (`resolutionScale` 0.5) | 1.0'a çekildi | ekran **birebir aynı** |
+| büyütme kipi (Bilinear) | Bilateral'a çevrildi | aynı |
+| erozyonda bölme (`DensityRemap`) | çıkarmaya çevrildi `[N22 s.34]` | aynı |
+| mikro erozyon | kapatıldı | aynı |
+| ana erozyon | `erosionFactor` 0'a indirildi | **bulut gövdesi pürüzsüzleşti, benek KALDI** |
+
+**En değerli bulgu:** çözünürlük 0.5 ile 1.0 arasında ekran birebir aynı. Desen ekran
+uzayında DEĞİL — dither, mavi gürültü, upscale, TAA hepsi eleniyor. Benek dünya
+uzayında, yani yoğunluk alanının kendisinde ya da ışın yürüyüşünün adımlarında.
+
+Ve `erosionFactor = 0`'da bile kaldığı için detay gürültüsü de değil. Geriye **taban
+şekil/kapsama alanı** ile **yürüyüşün adım yapısı** kalıyor.
+
+**Sıradaki araç:** adım sayısını değiştirip bakmak (`numPrimarySteps` 80 → 20 ve → 160).
+Benek adım sayısıyla değişiyorsa yürüyüş, değişmiyorsa şekil alanı. Tek ölçüm, iki
+hipotezi ayırıyor.
+
+### Ayar dosyası düzenlemesi oyuna ulaşmıyor
+
+Bu belirtinin dört turu **boşa gitti** çünkü `.asset` düzenlemelerinin çalışma zamanına
+geçtiği doğrulanmadan ölçüm yapıldı. İki ayrı tuzak var:
+
+- **Volume alanları çalışma zamanı KOPYASINDAN okunuyor.** `DebugMenu.cs` bunu zaten
+  yazmış: `cloudVolume.profile` asset'in kendisi değil. Ayrıca `CloudWeatherDriver`
+  `globalSpeed`, `globalOrientation`, `cloudCoverage` ve `densityMultiplier`'ı **her kare
+  yazıyor** — o dördüne asset'ten dokunmak tamamen ölü.
+- **`.hlsl` geçer, `.asset` geçmez.** Shader düzenlemeleri kendiliğinden derleniyor;
+  asset düzenlemeleri Unity yeniden okumadan (Ctrl+R) görünmüyor.
+
+**Kural:** ayar üzerinden ölçüm yapmadan önce YOL DOĞRULANIR — sürücünün dokunmadığı bir
+alan seçilir ve görülmemesi imkânsız bir değer verilir. Yol testi için sürülen bir alanı
+seçmek (bu turda `densityMultiplier`) testi baştan geçersiz kılar.
+
 ## Teşhis aracının kendisi
 
 Bu oturumda araç **iki kez yalan söyledi** ve ikisi de tur kaybettirdi.
