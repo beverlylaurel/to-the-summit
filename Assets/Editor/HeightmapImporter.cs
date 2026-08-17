@@ -88,11 +88,18 @@ public static class HeightmapImporter
         if (raw.Length != Resolution * Resolution)
             throw new InvalidOperationException($"Ham veri {raw.Length} örnek, beklenen {Resolution * Resolution}.");
 
+        // KUZEY TERS ÇEVRİLİYOR. Unity dokuları ALTTAN YUKARI saklıyor; PNG satırları
+        // yukarıdan aşağı. `GetRawTextureData`'nın 0. satırı görüntünün EN ALT satırı,
+        // yani kuzey ucu. `SetHeights` ise `z = 0`'da arazinin GÜNEY kenarını bekliyor.
+        //
+        // Ölçüldü: düzeltmesiz spawn 3877 m okunuyordu (olması gereken 621 m). Beş aday
+        // çevrim tek tek denendi, yalnız "kuzey devrik" 3875 m ile örtüştü — doğu ekseni
+        // ve eksen takası tutmadı. Tahminle değil ölçümle bulundu.
         var heights = new float[Resolution, Resolution];
         const float Inv = 1f / 65535f;
         for (int z = 0; z < Resolution; z++)
         {
-            int row = z * Resolution;
+            int row = (Resolution - 1 - z) * Resolution;
             for (int x = 0; x < Resolution; x++)
                 heights[z, x] = raw[row + x] * Inv;
         }
