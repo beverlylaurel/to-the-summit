@@ -63,19 +63,6 @@ Shader "ToTheSummit/MountainSurface"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             float _TerrainShadowReceive;
-            // TEŞHİS ANAHTARLARI. Araziye güneşi kesen ÜÇ yol var ve üçü de aynı
-            // kanaldan gidiyor: ufuk haritası, gerçek zamanlı gölge haritası, bulut
-            // cookie'si. Ekranda ayırt edilemiyorlar; hangisinin yazdığı ancak tek tek
-            // kapatılarak bilinir. Varsayılan 1, yani hepsi açık.
-            float _TerrainHorizonReceive;
-            float _TerrainCookieReceive;
-            // IŞIK TARAFI. Üç gölge anahtarı da hiçbir şeyi değiştirmedi, yani lekeler
-            // gölge değil. Geriye iki büyüklük kalıyor: doğrudan güneş ve gökten gelen
-            // ortam. Güneş kesilince ekranda kalan ŞEY ortamdır; ortam çarpılınca
-            // kararan yerler açılıyorsa eksik olan ortamdır.
-            float _TerrainSunGain;       // 1 = normal, 0 = güneş kesik
-            float _TerrainAmbientGain;   // 1 = normal
-            float _TerrainLightProbe;    // >0.5: sınıflandırma rengi bas
             #include "MountainSurface.hlsl"
             #include "SnowTessellation.hlsl"
 
@@ -157,7 +144,7 @@ Shader "ToTheSummit/MountainSurface"
                 // yürümüyor: katkısı zaten sıfır, kırk adım boşa giderdi.
                 Light mainLight = GetMainLight();
                 mainLight.shadowAttenuation =
-                    dot(inputData.normalWS, mainLight.direction) > 0.0 && _TerrainHorizonReceive > 0.5
+                    dot(inputData.normalWS, mainLight.direction) > 0.0
                         ? TerrainSunShadow(IN.positionWS, mainLight.direction)
                         : 1.0;
 
@@ -175,15 +162,12 @@ Shader "ToTheSummit/MountainSurface"
                 // çizen yoğunluk alanının ta kendisi. Doğrudan güneşi kesiyor, gökten gelen
                 // dolaylı ışığa dokunmuyor — arazi gölgesiyle aynı kanaldan.
             #ifdef _LIGHT_COOKIES
-                if (_TerrainCookieReceive > 0.5)
-                    mainLight.color *= SampleMainLightCookie(IN.positionWS);
+                mainLight.color *= SampleMainLightCookie(IN.positionWS);
             #endif
 
-                half3 lit = inputData.bakedGI * _TerrainAmbientGain
-                          * aoFactor.indirectAmbientOcclusion * brdfData.diffuse;
+                half3 lit = inputData.bakedGI * aoFactor.indirectAmbientOcclusion * brdfData.diffuse;
                 lit += LightingPhysicallyBased(brdfData, mainLight,
-                    inputData.normalWS, inputData.viewDirectionWS)
-                    * aoFactor.directAmbientOcclusion * _TerrainSunGain;
+                    inputData.normalWS, inputData.viewDirectionWS) * aoFactor.directAmbientOcclusion;
 
                 // KARDAN YANSIYAN GÜNEŞ. Gölgedeki bir noktanın çevresini güneş vuran
                 // kar sarıyor ve o ışık hiç sayılmıyordu: sahnede GI yok, ortam yalnız
@@ -207,7 +191,7 @@ Shader "ToTheSummit/MountainSurface"
                 float groundView = (1.0 - saturate(shadingNormal.y)) * 0.5;
                 float3 horizontalIrradiance = mainLight.color * saturate(mainLight.direction.y);
                 lit += surface.albedo * horizontalIrradiance * groundView
-                     * brdfData.diffuse * aoFactor.indirectAmbientOcclusion * _TerrainAmbientGain;
+                     * brdfData.diffuse * aoFactor.indirectAmbientOcclusion;
 
                 #if defined(_ADDITIONAL_LIGHTS)
                 uint pixelLightCount = GetAdditionalLightsCount();
@@ -219,78 +203,6 @@ Shader "ToTheSummit/MountainSurface"
                 #endif
 
                 lit += surface.emission;
-
-                // ===== TEŞHİS PROBU. Piksel neden karanlık, RENKLE söylüyor. =====
-                // Göz kararı "burası koyu" bir yargıdır; dört sebebi ayırmıyor. Prob
-                // her piksele tek bir sınıf atıyor ve cevabın tek doğrusu var.
-                //
-                //   KIRMIZI  N·L <= 0        yüzey güneşe sırtını dönmüş, geometri
-                //   MAVİ     ufuk haritası   sırt/zirve güneşi kesiyor
-                //   YEŞİL    bulut cookie'si bulut güneşi kesiyor
-                //   BEYAZ    tam aydınlık    kesen bir şey yok
-                //
-                // SİS UYGULANMIYOR ve renkler doygun: prob ışıktan, pozlamadan ve
-                // sisten etkilenirse yalan söyler — bu bir kez yaşandı (SYMPTOMS.md,
-                // "Teşhis aracının kendisi").
-                if (_TerrainLightProbe > 0.5 && _TerrainLightProbe < 1.5)
-                {
-                    float ndl = dot(inputData.normalWS, mainLight.direction);
-                    float shadow = mainLight.shadowAttenuation;
-                    float cookie = 1.0;
-                #ifdef _LIGHT_COOKIES
-                    cookie = dot(SampleMainLightCookie(IN.positionWS), 0.3333);
-                #endif
-
-                    // GEOMETRIK NORMAL: ekranda GERCEKTEN cizilen ucgenin normali.
-                    // Golgelendirme normali `_SurfaceMaps`'ten geliyor (1024 doku,
-                    // 30 km'de 29.3 m/texel) ve orgunun 7.32 m'lik geometrisiyle ayni
-                    // sey degil. Ikisi ayrisirsa isik yuzeyin gercek yonunu degil
-                    // dokunun soyledigini gorur.
-                    //
-                    // Yukseklik alani oldugu icin gercek normalin Y'si POZITIF olmak
-                    // zorunda; isaret buradan sabitleniyor, el kurali tahminine
-                    // birakilmiyor.
-                    float3 geoN = normalize(cross(ddy(IN.positionWS), ddx(IN.positionWS)));
-                    geoN *= (geoN.y < 0.0) ? -1.0 : 1.0;
-                    float geoNdl = dot(geoN, mainLight.direction);
-
-                    // MOR: golgelendirme normali "sirti donuk" diyor ama GERCEK yuzey
-                    //      gunesi goruyor -- yalan soyleyen normal.
-                    if (ndl <= 0.0 && geoNdl >  0.0) return half4(1.0, 0.0, 1.0, 1.0);
-                    // KIRMIZI: ikisi de sirti donuk -- geometri, dogru davranis.
-                    if (ndl <= 0.0)                  return half4(1.0, 0.0, 0.0, 1.0);
-                    if (shadow < 0.5)                return half4(0.0, 0.2, 1.0, 1.0);
-                    if (cookie < 0.5)                return half4(0.0, 1.0, 0.0, 1.0);
-                    return half4(1.0, 1.0, 1.0, 1.0);
-                }
-
-                // ===== PROB 2: GÖLGE NE KADAR KOYU =====
-                // Fiziksel referansı olan tek soru: güneşli yüzey ile gölgedeki yüzey
-                // arasında kaç diyafram var? Açık havada kar için gerçek değer 2-3.5
-                // stop. "Koyu görünüyor" yargısını sayıya çeviren şey bu.
-                //
-                // Gölgenin VARLIĞI değil ŞİDDETİ ölçülüyor: ufuk haritası doğru
-                // çalıştığı ölçüldü, ama doğru yerde oluşan gölge fazla karanlıksa
-                // ekranda yine yanlış görünür.
-                if (_TerrainLightProbe > 1.5)
-                {
-                    // ORTAM TERİMİ YANSIMAYI DA İÇERİYOR. İçermezse prob kendi
-                    // düzeltmemizi göremez ve eski sayıyı raporlar.
-                    float3 ambientTerm = (inputData.bakedGI
-                                       + surface.albedo * horizontalIrradiance * groundView)
-                                       * brdfData.diffuse;
-                    float ndlFull = saturate(dot(inputData.normalWS, mainLight.direction));
-                    float3 sunTerm = mainLight.color * ndlFull * brdfData.diffuse;
-
-                    float a = max(dot(ambientTerm, float3(0.2126, 0.7152, 0.0722)), 1e-6);
-                    float d = max(dot(sunTerm,     float3(0.2126, 0.7152, 0.0722)), 0.0);
-                    float stops = log2((a + d) / a);
-
-                    if (stops < 2.0)  return half4(0.0, 0.4, 1.0, 1.0);   // MAVİ  fazla aydınlık
-                    if (stops < 3.5)  return half4(0.0, 1.0, 0.0, 1.0);   // YEŞİL doğru
-                    if (stops < 5.0)  return half4(1.0, 0.9, 0.0, 1.0);   // SARI  fazla koyu
-                    return half4(1.0, 0.0, 0.0, 1.0);                     // KIRMIZI çok fazla
-                }
 
                 half4 color = half4(lit, 1.0);
 

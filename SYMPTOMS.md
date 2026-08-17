@@ -218,6 +218,63 @@ Işının **son 150 m'si** dışarıda bırakılınca gerçek sonuç: açıklık
 **Kural:** görüş hattı probunda hedefin kendi hücresi engel listesine girmemeli. Bu üçüncü
 kez aracın yalan söylemesi; aşağıdaki bölüme bakılır.
 
+## Güneşle dönen, hiçbir gölge anahtarının etkilemediği koyu lekeler
+
+Kullanıcı: *"bu gölgeler ne ayak? havada bulut yok"*, sonra *"gölge olmaması gereken
+yerde gölge var"*.
+
+**Üç şüpheli de ölçümle elendi**, hiçbiri değildi:
+
+| şüpheli | ölçüm |
+|---|---|
+| ufuk haritası kabalığı | 1024 vs 4097 uyuşmazlık %0.6–2 |
+| ufuk haritası açısal (16 yön) | %0.5–0.8, alçak güneş dahil |
+| normal dokusu kabalığı | 2048'de taraf değiştiren piksel %0.2–1.2 |
+| bulut cookie'si | anahtar kapatılınca ekran değişmedi |
+
+**Gerçek sebep:** örgü domain aşamasında kabarıyor (`SnowDomainPositionWS`) ama ileri
+ışıklandırma geçişi pişirilmiş arazi normalini kullanıyordu. `SnowDisplacedNormal`
+DepthNormals geçişinde vardı, ileri geçişte yoktu — üç geçişten yalnız biri ayrıktı.
+Fonksiyonun kendi yorumu doğru davranışı zaten yazıyordu: *"harmanlamazsa siluet kabarır
+ama ışık düz yüzeyi aydınlatır."*
+
+**Ayırt eden ölçüm:** renk probu. Gölgelendirme normali "sırtı dönük" derken `ddx/ddy`
+ile alınan gerçek yüzey normali güneşi görüyordu — o piksellere ayrı bir renk (mor)
+verilince sınıf tek bakışta ayrıldı.
+
+## Güneş tam karşıda ve yüksekken ayağının dibindeki yamaç gölgede
+
+Kullanıcı: *"08:23'te gölge oluşması için hiçbir sebep yok ki."* Haklıydı.
+
+**Sebep:** ufuk yürüyüşü ilk adımda komşu texel'i okuyor; eğimli yamaçta o komşu zaten
+yukarıda ve engel sayılıyor. Ama **eğimli bir düzlemde iki koşul birebir aynıdır** —
+"ufuk güneşten yüksek" ile "N·L ≤ 0". Yani yamacın kendisi hem ufuk haritasında hem
+N·L'de sayılıyordu.
+
+**Ölçüm** (azimut 200°, zirveden 6 km içinde):
+
+| | değer |
+|---|---|
+| ufuk açısı ortancası | 16.5° |
+| kendi eğimi çıkınca gerçek engel | **2.0°** |
+| ufkun TAMAMI kendi eğimi olan nokta | **%46** |
+| güneş 30°'de gölgede kalan yüzey | **%36 → %9** |
+
+Çıkarma **açı uzayında** yapılır: eğimler tanjant, tanjant farkı açı farkı değil.
+
+## Batımda sahne kahverengi-siyah, kontrast patlıyor
+
+**Sebep:** `SunBlend`'in üst eşiği `sin(3°)`. Güneş 3°'nin üstündeyken ışık **hep tam
+şiddette** — hava kütlesi sönümü yok. Gerçekte 3°'de doğrudan huzme zenit değerinin
+%5–10'u, 10°'de %30, 40°'de %75.
+
+`CurrentSunColor` sönümü zaten hesaplıyordu ama ışığa yazılmıyordu; gerekçe "soğurmanın
+sahibi gökyüzü paketi"ydi. **Paket bir Unity directional light'ını söndüremez** — soğurma
+göğe uygulanıyor, güneşe uygulanmıyordu. Gök sönerken arazi tam güneş almaya devam
+ediyordu.
+
+Düzeltmeden sonra 17:49'da güneş şiddeti 3.020 → **0.258**.
+
 ## Teşhis aracının kendisi
 
 Bu oturumda araç **iki kez yalan söyledi** ve ikisi de tur kaybettirdi.
@@ -244,6 +301,19 @@ bir **alan** mı? Yol soruluyorsa yol aranır.
 Ve aynı turda dördüncü kez: ölçüm **koridorun içinde** yapılmalıydı, "zirveden >10 km"
 diye yapıldı ve bütün yönleri kapsadı. Ova 20.8° çıktı; koridorla sınırlanınca 6.3°.
 Yanlış maske, yanlış sayı.
+
+
+Beşinci ve altıncı, aynı oturumda, ikisi de **ölçüm turu yaktı**:
+
+- **İki prob arasında öncelik hatası.** Prob 1'in koşulu `> 0.5`, prob 2'ninki `> 1.5`
+  ve prob 1 kodda önce geliyordu. Değer 2 olunca prob 1 de doğru çıkıp önce dönüyor,
+  prob 2'ye hiç sıra gelmiyordu. Kullanıcı doğru kutuyu işaretledi, ekrana yanlış prob
+  çıktı — ve ben iki tur "yanlış kutudasın" dedim. **Kural:** mod seçen bir anahtar
+  aralıkla test edilir, eşikle değil.
+- **Prob 2'nin bantları deniz seviyesine göre yazılmıştı.** "Kar için güneş-gölge farkı
+  2–3.5 diyafram" doğru bir sayı, ama 4900 m'de değil; orada gerçek değer ~3.8. Alet
+  doğru araziye "fazla koyu" dedi. **Kural:** fiziksel referans alınırken hangi koşulda
+  ölçüldüğü de yazılır — irtifa, hava, yüzey.
 
 Prob sonuç vermiyorsa sıradaki araç **Unity Frame Debugger**: hangi geçişin ekrana ne
 yazdığını kesin gösterir. Yalnız kamera renk tamponuna yazan adımlara bakılır; motion

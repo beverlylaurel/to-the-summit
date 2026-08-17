@@ -1244,6 +1244,43 @@ paylaşılan durum yok.
 tabana çöker — bir bölgenin belli bir kotta durması isteniyorsa oraya zirve konur.
 Ölçüm ve gerekçe `DECISIONS.md` → "L0 uygulandı".
 
+### Arazi ışığı (`MountainSurface.shader`)
+
+**Okur:** `TimeOfDay` (güneş yönü ve şiddeti), ortam probu (`SkyAmbientBaker` → Unity
+`DynamicGI`), `SurfaceMapBaker`'ın ufuk ve normal haritaları.
+
+Araziye ulaşan güneşi **üç yol** kesiyor ve üçü de aynı kanaldan gidiyor, yani ekranda
+ayırt edilemezler:
+
+| yol | kaynak | menzil |
+|---|---|---|
+| ufuk haritası | `SurfaceMapBaker.BakeHorizon`, 1024², 16 yön | tüm arazi |
+| gölge haritası | URP cascade | 60 m |
+| bulut cookie'si | `VolumetricClouds`, 256², opaklık 1 | 8 km |
+
+**Bilinçli kural: her harita yalnız kendi sorusunu cevaplar.** Bu iki kez bozuldu ve
+ikisi de aynı sınıftandı — *iki harita aynı yüzeyi tarif etmiyordu*:
+
+- **Ufuk haritası "sırtın arkasında mıyım" der, "yamaçta mıyım" demez.** Noktanın kendi
+  eğimi pişirirken çıkarılıyor; eğimli düzlemde "ufuk güneşten yüksek" ile "N·L ≤ 0"
+  birebir aynı koşuldur, ikisi birden sayılırsa gölge iki kez uygulanır.
+- **Işıklandırma normali yer değiştirmeyi bilir.** Örgü domain aşamasında kabarıyor;
+  ileri geçiş de DepthNormals geçişi de `SnowDisplacedNormal` kullanıyor. Biri
+  kullanmazsa siluet kabarır ama ışık altındaki düz yüzeyi aydınlatır.
+
+**Güneş hava kütlesiyle söner.** `sun.intensity` `BeamTransmittance`'ın en parlak
+kanalını taşıyor. En parlak kanal alınıyor çünkü `Tint()` rengi aynı kanala göre
+normalize ediyor — böylece `CurrentSunColor × intensity` gerçek huzmeye eşit kalıyor,
+renk ve şiddet aynı eğriyi izliyor.
+
+**Kardan yansıyan güneş ortama ekleniyor.** Sahnede GI yok; gölgedeki bir noktanın
+çevresini güneş vuran kar sarıyor ve kar albedosu 0.8 olduğu için o terim gökyüzünden
+büyük. Görüş faktörü ders kitabı: eğimli yüzey gökyüzünü `(1+cosβ)/2` oranında görür,
+kalanı zemindir. Düz zeminde sıfır — düz zemin başka zemin görmez.
+
+Yansımaya **gölge çarpanı uygulanmaz**: ışık çevreden geliyor ve çevre, bu nokta
+gölgedeyken de güneş alıyor olabilir.
+
 ### Arazi yüzeyi (`MountainHeightmap.png` → `HeightmapImporter`)
 
 **Okur:** `DivideTree` (L0 grafiği). Başka hiçbir şeyi okumaz.

@@ -10,6 +10,26 @@ aşağıda ayrı listelenir — "şu an neyi bekliyoruz" sorusunun cevabı büt�
 alınabilsin diye. **Yeni kayıt bu üç türden birine giriyorsa aynı adımda buraya da yazılır;
 iş bitince buradan silinir.**
 
+## Ova kontrastı düzeltilmiyor — irtifadan geliyor
+
+**Karar.** Düz zeminde güneş-gölge farkı ~4 diyafram kalıyor. Dokunulmadı.
+
+**Gerekçe.** İlk okuma "fazla koyu"ydu, çünkü referans olarak **deniz seviyesi** sayısı
+alınmıştı (kar için 2–3.5 diyafram). Oyuncu 4900 m'de. O irtifada gerçek ölçüm: doğrudan
+huzme ~1050 W/m², yayınık gök ~60–80 W/m² → **~3.8 diyafram**. Okuduğumuz değer doğru.
+
+Yüksekte gölgenin sert olması gerçek bir şey; ince atmosfer daha az saçıyor.
+
+**`sunIntensity` ile düzeltilemez, yapısal olarak.** Gökyüzü paketi göğü güneş
+şiddetinden hesaplıyor: güneş kısılınca gök de kısılır, oran değişmez. Sayı zaten paketin
+kendi önerisi (`MountainSceneBootstrap`), bizim seçimimiz değil. Bir kez 1.5 denendi ve
+gök sahneye göre sönük kaldı.
+
+**Tetikleyici — geri dönülecek belirti:** ovada gölge hâlâ okunamayacak kadar koyuysa
+çözüm güneş sabiti değil, gökyüzü paketinin aerosol/bulanıklık parametresidir — yayınık
+payı oradan gelir.
+
+
 ## Oyun alanı 17.5 → 30 km, ve yalıtım halkası
 
 **Karar.** `terrainSize` 30000 m. Dağın eteği 8.4 km'de bitiyor, oradan arazi kenarına
