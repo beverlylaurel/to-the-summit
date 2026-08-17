@@ -12,7 +12,10 @@
 // bir periyoda katlanır, tekrar kilometrelerce ötede kalır.
 float MountainHash(float3 p)
 {
-    p = fmod(abs(p), 512.0);
+    // Tohum burada uygulanıyor, çağrı yerlerinde değil — bkz. `SnowDrift.hlsl`,
+    // `_PatternSeed`. Ölçekli koordinata eklendiği için her katman farklı dünya
+    // mesafesi kadar kayıyor; katmanlar birbirinden bağımsız yenileniyor.
+    p = fmod(abs(p + _PatternSeed.xyz), 512.0);
     p = frac(p * 0.1031);
     p += dot(p, p.yzx + 33.33);
     return frac((p.x + p.y) * p.z);
