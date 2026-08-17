@@ -1244,6 +1244,24 @@ paylaşılan durum yok.
 tabana çöker — bir bölgenin belli bir kotta durması isteniyorsa oraya zirve konur.
 Ölçüm ve gerekçe `DECISIONS.md` → "L0 uygulandı".
 
+### Kar sınırı (`BuildSnowCoverage`)
+
+**Okur:** kot, `WeatherDriver`'ın kar kuşağı, pişmiş konkavlık ve birikinti ağırlığı,
+`_GroundNormals` (bakı için **kaba mip**).
+
+**Bilinçli kural: her terim kendi ölçeğinden okunur.**
+
+- **Bakı yamaç yüzü ölçeğinden** (mip 4, ~234 m). Mevsimlik ışınım bir yüzün toplamıdır;
+  karo normalinden okunursa kar çizgisi 15 metrede 34 metre oynar.
+- **Kırılma gürültüsü arazi ölçeğinde** (125 m taban, 4 oktav). Gerçek kar sınırının
+  düzensizliği oluk ve sırt ölçeğindedir; piksel ölçeğinde tuz-biber saçılmanın fiziksel
+  karşılığı yok.
+- **Kayma bandın yarısını geçemez.** Üç terim mutlak metre; yağış bandı dardır ve kayma
+  bandın kendisinden büyük olunca maskeyi tamamen kapatabilir.
+
+Örtü ile kalınlık **ayrı kanal**: albedo iki santim karda doyar, kalınlık arkadan gelir.
+Eşik bu yüzden alçak (0.03) tutuluyor — üst eşik (0.45) geçişin genişliğini veriyor.
+
 ### Arazi ışığı (`MountainSurface.shader`)
 
 **Okur:** `TimeOfDay` (güneş yönü ve şiddeti), ortam probu (`SkyAmbientBaker` → Unity

@@ -275,6 +275,32 @@ ediyordu.
 
 Düzeltmeden sonra 17:49'da güneş şiddeti 3.020 → **0.258**.
 
+## Kar sınırı sert, kenarda dantel gibi bir dokuya dönüyor
+
+**İki yanlış düzeltme.** Sırayla:
+
+1. **Eşik penceresi** `smoothstep(0.03, 0.18)` → `(0.03, 0.45)`. Gerekçe: kırılma
+   gürültüsünün genliği (±0.15) pencerenin tamamı kadardı, yani ikili sonuç üretiyordu.
+   Ölçüm doğruydu ama sebep bu değildi. **Yerinde bırakıldı**, geçişi genişletiyor.
+2. **Bakı terimi kaba mip'ten okundu.** Karo normali 14.65 m'de ortanca 4° değişiyor,
+   `dot`'u 0.17 kaydırıyor, `_SnowlineSunLift` 200 m ile çarpılınca kar çizgisi 15
+   metrede 34 metre oynuyordu. Fizik olarak da doğru düzeltme: bakının kar çizgisine
+   etkisi mevsimlik ışınım üzerinden ve o bir yamaç yüzü büyüklüğü, tek karonun değil.
+   **Yerinde bırakıldı**, ama sebep bu da değildi.
+
+**Gerçek sebep bant probuyla bulundu:** `cover`'ın **ORTALAMASI zaten yumuşaktı** —
+yedi bandın hepsi geniş bir kuşak kaplıyordu. Sert olan **yerel varyanstı**: bantların
+içi tuz-biberdi, komşu iki piksel birkaç bant atlıyordu.
+
+`sprinkle = MountainFbm(worldPos * 0.05, 2)` — 20 m taban. Geçiş kuşağı boyunca her karo
+bağımsız zar atıyordu. Gözün "sert" dediği şey kenarın **genişliği değil DOKUSU**.
+
+Düzeltme: `worldPos * 0.008, 4` — 125 m taban, 4 oktav. Sınır dolaşarak düzensiz, ince
+bileşen 1/8 genlikte duruyor.
+
+**Kural:** "sert görünüyor" iki ayrı şey olabilir — dar geçiş ya da yüksek varyans.
+İkisi ayrı ölçülür, yoksa doğru olan genişletilir ve belirti kalır.
+
 ## Teşhis aracının kendisi
 
 Bu oturumda araç **iki kez yalan söyledi** ve ikisi de tur kaybettirdi.
@@ -314,6 +340,16 @@ Beşinci ve altıncı, aynı oturumda, ikisi de **ölçüm turu yaktı**:
   2–3.5 diyafram" doğru bir sayı, ama 4900 m'de değil; orada gerçek değer ~3.8. Alet
   doğru araziye "fazla koyu" dedi. **Kural:** fiziksel referans alınırken hangi koşulda
   ölçüldüğü de yazılır — irtifa, hava, yüzey.
+
+
+Yedinci, kar sınırında: **gradyan KARŞILAŞTIRAN prob hiçbir şey söylemez.** Dört girdinin
+ekran üstü değişim hızını karşılaştırıp en hızlısını basan bir prob yazıldı; sınırda
+"kot rampası" çıktı ve bu trivial olarak doğruydu — geçişte zaten değişen büyüklük her
+zaman kazanır. Cevap mutlak bantlardan geldi: `cover` eşit aralıklı renklere bölününce
+ortalamanın yumuşak, varyansın yüksek olduğu tek bakışta görüldü.
+
+**Kural:** "hangisi" sorusu karşılaştırmayla, "ne kadar" sorusu mutlak ölçekle sorulur.
+Sertlik bir *ne kadar* sorusudur.
 
 Prob sonuç vermiyorsa sıradaki araç **Unity Frame Debugger**: hangi geçişin ekrana ne
 yazdığını kesin gösterir. Yalnız kamera renk tamponuna yazan adımlara bakılır; motion
