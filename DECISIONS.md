@@ -20,9 +20,6 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Tırmanma ayrıntıları** — tutamak üretimi hangi veriden beslenir, düşüş hasarının
   eğrisi, ip fizik olarak mı kural olarak mı
   → [Tırmanma üç modlu, modu ZEMİN belirler](#tırmanma-üç-modlu-modu-zemin-belirler)
-- **Ovanın kotu 186 m mi kalacak** — yeni arazi oyun alanında ova üretmiyor; 5709 m'den
-  9 km'de 186 m'ye inmek jeolojik olarak yok. L1 uygulanmadan cevaplanmalı
-  → [Ovanın kotu: 186 m mi, 2400 m mi](#ovanin-kotu-186-m-mi-2400-m-mi)
 
 ## Silinecek geçiciler
 
@@ -494,7 +491,7 @@ buraya bakılır.
 
 ---
 
-## Ovanın kotu: 186 m mi, 2400 m mi — BLOKE EDEN AÇIK SORU (2026-08-17)
+## Ovanın kotu KAPANDI: 186 m kalıyor, sıcaklık değişti (2026-08-17)
 
 **Ölçüm.** Yeni arazi oyun alanında (merkez 17.5 km) üretildi: 4097², 4.28 m/örnek,
 kot **517–5709 m**. Eğim dağılımı:
@@ -538,11 +535,51 @@ tipi kuşağı) zeminden türediği için **yeniden ölçülür**. `SCALE.md`'ni
 ölçeklenir" tablosu bunu zaten kapsıyor, yani otomatik — ama gece parlaklığı gibi elle
 kalibre edilmiş şeyler kontrol edilir.
 
-**Önerim B.** Kullanıcının söylediği her şeyi karşılıyor, tek değişen sayı ovanın kotu ve
-o sayı hiç tasarlanmamıştı. Ayrıca "gerçekçilik tek esas" kuralına A'dan çok daha uygun.
+### KARAR: A — ova 186 m kalıyor. Değişen sıcaklık.
 
-**Karar verilmeden L1 uygulanmaz** — ova kotu maskeyi, maske sentezi, sentez de yükseklik
-haritasını belirliyor. Yanlış kotla üretilirse üçü de tekrar edilir.
+Öneri önce B idi ve **değişti**, çünkü bir kısıt yanlış varsayılmıştı: sıcaklık modeli
+sabit sanılıyordu. Değilmiş — `seaLevelCelsius` tek bir sayı ve serbest.
+
+Ölçüldü. İkisinde de ovada +6.5 °C (yağmur, yeşillik) olacak şekilde ayarlanırsa:
+
+| | ova 186 m | ova 2400 m |
+|---|---|---|
+| Gereken `seaLevelCelsius` | **+7.8** | +22.1 |
+| Ovada sıcaklık | +6.6 °C | +6.5 °C |
+| Kar çizgisi | 1 200 m | 3 400 m |
+| **Zirvede** | **−29.3 °C** | −15.0 °C |
+| **Tırmanılacak dikey** | **5 523 m** | 3 309 m |
+| Ortalama eğim | 33.3° | 21.5° |
+| Bisiklet turu | 10 dk | 10 dk |
+
+**186 m'nin kazandırdığı:** tırmanış %67 daha uzun (oyunun adı bu), zirve gerçekten
+öldürücü (−29 °C, rüzgârla −38 °C hissedilen), ve mevcut hiçbir şey bozulmuyor — spawn,
+yol, üç kol, kamplar, `SCALE.md` sayıları yerinde kalıyor.
+
+**Ödenen:** oyun alanının ortalama eğimi 33°, Argudo'nun kendiliğinden üretmeyeceği bir
+diklik. Ama oyun alanı bölgenin **%0.1'i** ve zirve bloğu zaten elle tasarlanacaktı;
+ufuk bantlarından o anomali görünmez.
+
+### Uygulanan: `seaLevelCelsius` −3 → +7.8
+
+**−3 neydi:** donma seviyesi deniz seviyesinin 462 m ALTINDA, yani dağın tamamı donmuş,
+yağış her kotta kar. Kodun kendi yorumu bunu bilinçli bir seçim olarak yazıyordu.
+"Başlangıçta yeşillik ve yağmur" isteği o kurulumda **imkânsızdı**.
+
+**+7.8 ne veriyor:** donma seviyesi 1200 m. Ova (186 m) öğlen +6.6 °C ve **yağmur**
+alıyor; sulu kar 1200–1422 m; saf kar üstünde, yani etekteki kamptan ~1 km yukarıda.
+Tam fırtına donma seviyesini 500 m indiriyor — kampa kar yağabiliyor.
+
+Sayı kar çizgisinden türedi: 1200 m × 6.5 °C/km.
+
+**Sahne dosyası da güncellendi.** `Game.unity:2166` serileştirilmiş `-3` taşıyordu; C#
+varsayılanını değiştirmek mevcut sahneyi etkilemezdi.
+
+**Mimari değişiklik gerekmedi.** `AltitudeWeatherDriver.UpdateFreezingLevel` zaten
+`temperature.FreezingLevel`'ı okuyor ve `snowFloor`'u sabit bant genişliğiyle türetiyor.
+
+**DOĞRULANMAMIŞ — yağmur yolu bugüne kadar hiç çalışmadı.** Yağmur tavanı −368 m'ydi,
+yani oyunda hiç yağmur yağmamış. Sabah ilk bakılacak şeylerden biri.
 
 ---
 
