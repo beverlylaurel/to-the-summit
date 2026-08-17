@@ -10,6 +10,40 @@ aşağıda ayrı listelenir — "şu an neyi bekliyoruz" sorusunun cevabı büt�
 alınabilsin diye. **Yeni kayıt bu üç türden birine giriyorsa aynı adımda buraya da yazılır;
 iş bitince buradan silinir.**
 
+## Oyun alanı 17.5 → 30 km, ve yalıtım halkası
+
+**Karar.** `terrainSize` 30000 m. Dağın eteği 8.4 km'de bitiyor, oradan arazi kenarına
+(15 km) kadar her yönde ova zorlanıyor.
+
+**Gerekçe — ölçüm.** İlk şüpheli "arazi küçük"tü ve yanlıştı. L0 bir SİLSİLE üretiyor:
+kütle 1500 m eşiğinde 379 km'ye uzanıyor, yani arazi ne kadar büyük olursa olsun kenarda
+kesilir. 17.5 km'lik karede kuzey ve doğu kenarının **tamamı** 3665–3873 m'deydi.
+
+Kesilmeyi kaldıran şey boyut değil **maske**. Boyut yalnız halkaya yer açıyor: 8.4 km
+etek + 6.6 km ova = 15 km yarı genişlik.
+
+**İki şart da ölçüldü ve karşılandı:**
+
+| şart | ölçüm |
+|---|---|
+| kenarda kesilme yok | dört kenar ortancası 214–389 m, en yüksek 915 m (tavan 1200 m, üretim denetliyor) |
+| 360° yürünebilir kuşak | her azimutta 8–14.9 km halkasında 687 m altı zemin var, ortanca 209 m; turun %0'ı 1000 m üzerine çıkmıyor |
+| kapalı tur | 67.2 km, ortanca 8.4°, %92 yürünür, teknik %0.3 |
+| zirve spawn'dan görünür | 24 m açıklık (önce 124 m kapalı) |
+
+**Maliyet.** Örnek aralığı 4.28 → 7.32 m kabalaştı (4097² sabit, PNG 14.3 MB, repo boyutu
+değişmedi). Tırmanılan yüzeyler mesh modül olacağı için kabul edildi — arazi onların
+oturduğu zemin.
+
+**Yan etki, aynı adımda ödendi.** `terrainSize` normalize konum tutan her şeyi kaydırıyor:
+`MountainRoute.asset`'in 3002 noktası `0.5 + (u−0.5)×(17517/30000)` ile yeniden
+ölçeklendi, dünya konumları korundu (spawn zirveden 11576 m'de kaldı, bisiklet turu
+bozulmadı). Tam liste `SCALE.md` → "terrainSize değişince elle düzeltilecekler".
+
+**Tetikleyici — geri dönülecek belirti:** uzak bantlar (18–60 km) gelince 15 km'deki
+ova/silsile geçişi görünür bir dikiş yaratırsa halkanın dış sönümü o banda taşınır.
+
+
 ## Bloke eden açık sorular
 
 Cevaplanmadan ilgili sisteme kod yazılmaz.
