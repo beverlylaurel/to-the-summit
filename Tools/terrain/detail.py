@@ -154,30 +154,34 @@ def multiscale_erosion(h, cell_m, uplift, scales_m=(100.0, 50.0, 30.0),
         out = out + full * (1.0 - uplift)
     return out
 
-def file_crests(h, cell_m, iters=4, radius=2, talus_deg=72.0, skirt_mask=None):
-    """Fiziksel olarak imkansiz yukselisi keser. Gercek tepeye DOKUNMAZ.
+def file_crests(h, cell_m, talus_deg=72.0, sigma_cells=1.6, band_deg=10.0,
+                skirt_mask=None):
+    """Fiziksel olarak imkansiz dikligi puruzsuze HARMANLAR. Gercek tepeye dokunmaz.
 
-    `MountainGenerator.FileCrests`'in yerini aliyor, ama kor yumusatma DEGIL.
-    Kor surum once yazildi ve olculdu: zirveyi 5709 -> 5696 m'ye indirdi, cunku
-    "pencerede tek basina yuksek olan" tanimina GERCEK zirve de giriyor. Yani o
-    filtre igneyle tepeyi ayirt edemiyor.
+    ONCEKI SURUM KENDI TESTERESINI URETTI. `minimum_filter` ile fazlaligi CIKARIYORDU:
+    sivri gidiyordu ama yerine filtre yaricapi boyunda DUZ FASET kaliyordu. Olculdu --
+    2B guc spektrumunda 14.7 m'de (iki hucre) taban fraktal seviyenin 3.42 katina
+    yigilma; torpu kapatilinca 1.87'ye iniyor. Ekranda yamaclarda duzenli testere.
 
-    Ayirt eden buyukluk EGIM. Ucgenlestirmeden kalan igneler komsusunun 400-1343 m
-    ustunde duruyor; 4097'lik izgarada iki ornek 14.7 m, yani 88 dereceden dik.
-    Gercek kaya yuzu 72 dereceyi asmiyor -- ondan yukarisi kar tutmaz, zaten
-    duvar olur. Tavan buradan geliyor ve zirvenin kendi yukselisi (14.7 m'de
-    ~20 m, 54 derece) tavanin ALTINDA kaliyor, dokunulmuyor.
+    Cikarma yerine harmanlama: asiri dik piksel Gauss ile puruzsuzlestirilmis yuzeye
+    dogru cekiliyor. Gauss izgara frekansina enerji KOYMAZ, o yuzden faset olusmuyor.
+
+    Ayirt eden buyukluk yine EGIM: ucgenlestirmeden kalan igneler 14.7 m'de 400-1343 m
+    yukseliyor (88 dereceden dik), gercek kaya yuzu 72 dereceyi asmiyor. Zirve konisi
+    72'nin altinda kaliyor, agirlik sifir, dokunulmuyor.
+
+    `band_deg` gecisi yumusatiyor: sert esik kendi kenarinda yeni bir basamak birakir.
     """
     import numpy as np
-    from scipy.ndimage import minimum_filter
+    from scipy.ndimage import gaussian_filter
 
-    out = h.astype(np.float32, copy=True)
-    size = 2 * radius + 1
-    cap = np.tan(np.radians(talus_deg)) * (radius * cell_m)
-    for _ in range(iters):
-        lo = minimum_filter(out, size=size, mode="nearest")
-        excess = np.maximum(out - lo - cap, 0.0)
-        if skirt_mask is not None:
-            excess = excess * skirt_mask
-        out -= excess
-    return out
+    smooth = gaussian_filter(h.astype(np.float32), sigma_cells, mode="nearest")
+
+    gy, gx = np.gradient(h, cell_m)
+    slope = np.degrees(np.arctan(np.hypot(gy, gx)))
+
+    weight = np.clip((slope - talus_deg) / max(band_deg, 1e-3), 0.0, 1.0)
+    if skirt_mask is not None:
+        weight = weight * skirt_mask
+
+    return (h * (1.0 - weight) + smooth * weight).astype(np.float32)
