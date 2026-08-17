@@ -1244,6 +1244,35 @@ paylaşılan durum yok.
 tabana çöker — bir bölgenin belli bir kotta durması isteniyorsa oraya zirve konur.
 Ölçüm ve gerekçe `DECISIONS.md` → "L0 uygulandı".
 
+### Arazi yüzeyi (`MountainHeightmap.png` → `HeightmapImporter`)
+
+**Okur:** `DivideTree` (L0 grafiği). Başka hiçbir şeyi okumaz.
+
+**Yazar:** `TerrainData.heights`. Uygulandığında `SurfaceMapBaker.Invalidate()` çağırıyor
+— normal/yükseklik/ufuk/birikinti haritalarının hepsi eski araziden pişmiş oluyor ve
+sürüm damgası arazinin İÇERİĞİNİ bilmediği için kendiliğinden fark etmiyor.
+
+Zincir: L0 grafiği → üçgenleştirme (`divideTreeToMesh`) → 4097² raster → multifraktal
+gürültü + kısıtlı erozyon → sivri törpüsü → 16 bit PNG.
+
+**Yalıtım halkası bilinçli bir kural.** L0 bir silsile üretiyor ve kütle 379 km'ye
+uzanıyor; oyun alanı ne kadar büyük olursa olsun kenarda kesilir. Maskede etekten
+(8.4 km) oyun alanının kenarına kadar her yönde ova zorlanıyor. İki sonucu var ve
+ikisi de istenen: dağ hiçbir kenarda kesilmiyor, ve dağın **360° çevresinde yürünebilir
+kuşak** var (8.4 → 15 km). Silsile ancak oyun alanının ötesinde geri geliyor — o da
+uzak bantların işi.
+
+Halkanın dış sönümü **kareye** göre (Chebyshev), yarıçapa göre değil: arazi kare, köşe
+15√2 = 21.2 km'de ve yarıçap sönümü orada silsileyi geri getirirdi.
+
+**Sivri törpüsü zirveleri koruyor.** Eğim tavanı (72°) tek başına gerçek zirveyi de
+kesiyor; törpü, gürültünün ve erozyonun zirveleri korumak için zaten kullandığı
+`uplift` alanıyla çarpılıyor. Üçüncü bir ölçüt yok.
+
+**Üretim üç şeyi denetliyor ve geçmezse durur:** geri okuma hatası (< 0.1 m), her kenarın
+en yüksek kotu (< 1200 m), ve zirvenin spawn'dan görünürlüğü. Üçü de bir kez sessizce
+bozuldu; belirtiler `SYMPTOMS.md`'de.
+
 ---
 
 ## 5. Bilinçli kurallar

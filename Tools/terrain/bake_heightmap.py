@@ -34,10 +34,22 @@ sys.path.insert(1, REPO)
 
 # --- olcek sabitleri. Ucu de MountainSettings.asset'ten; degistirilirse
 #     SCALE.md ile birlikte degisir.
-PLAY_M = 17517.0          # oyun alaninin bir kenari
+#
+# OYUN ALANI 17.5 -> 30 km. Olculdu: 17.5 km'de arazinin KUZEY VE DOGU
+# KENARININ TAMAMI 3000-4000 m'de kesiliyordu (kenar kotu ortancasi 3665 ve
+# 3873 m) ve dikey duvar olarak kaliyordu. Kutle o kareye sigmiyor.
+#
+# Not: buyutmek kesigi TAMAMEN kaldirmiyor. Olculdu -- 1500 m esiginde kutle
+# 379 km'ye kadar uzaniyor, cunku bu bir SILSILE. Kesigi asil kapatan yakin
+# bant (18-60 km) olacak; buyutme kutlenin govdesini iceri aliyor.
+#
+# 4097 ornekte aralik 4.28 -> 7.32 m. Tirmanilan yuzeyler mesh modul olacagi
+# icin (karar DECISIONS.md'de) yukseklik haritasinin isi yurunen zemin.
+PLAY_M = 30000.0
+HEIGHT_SUMMIT_M = 5709.0          # oyun alaninin bir kenari
 HEIGHT_M = 6189.0         # terrainHeight -- NICEMLEME BUNA GORE
 RES = 4097                # heightmapResolution
-CROP_KM = 26.0            # mesh uretim penceresi; oyun alanindan genis olmali
+CROP_KM = 40.0            # mesh uretim penceresi; oyun alanindan genis olmali
 REFINE_KM = 0.030         # mesh ucgen boyu
 POISSON_KM = 0.045
 R_INFL_M = 400.0          # zirve/boyun koruma yaricapi
@@ -45,7 +57,7 @@ NOISE_AMP_M = 52.0        # < prominence tabani (100 m, olcekli 65 m) -- spec §
 NOISE_BASE_M = 320.0
 # `MountainRoute.asset` spawn'i, normalize arazi koordinati. Eksen probu
 # bunu kullaniyor -- kutupsal yaklasim degil.
-SPAWN_UV = (0.036218, 0.029233)
+SPAWN_UV = (0.229200, 0.225120)
 
 
 def bake(npz_path, seed, out_path, verify):
@@ -107,6 +119,23 @@ def bake(npz_path, seed, out_path, verify):
     u = detail.uplift_field(hf.shape, cell, (0.0, 0.0), nodes, R_INFL_M)
     noise = detail.multifractal(hf.shape, cell, NOISE_BASE_M, 8, NOISE_AMP_M, seed=seed)
     h = detail.multiscale_erosion(hf + noise * (1.0 - u), cell, u)
+
+    # SIVRI TORPUSU. Ucgenlestirme + gurultu, izgaraya capraz sirtlarda tek
+    # hucrelik igneler birakiyor: torpusuz olculdu, 5249 hucre komsularinin
+    # 400 m ustunde, en kotusu 1343 m. Ekranda siyah sivri olarak gorunuyor.
+    #
+    # Torpu YALNIZ DAGA uygulaniyor. Ovada pencere 2 ornek = 14.7 m, yani ovanin
+    # en ince tepeciginin boyu; dort turda %4'e inip duzlugu cam gibi yapiyor.
+    yy, xx = np.meshgrid(np.arange(RES), np.arange(RES), indexing="ij")
+    rr = np.hypot(yy - (RES - 1) * 0.5, xx - (RES - 1) * 0.5) * cell
+    #
+    # DUGUMLER KORUNUYOR. Egim tavani tek basina birakilinca zirveyi 5709 -> 5608 m'ye
+    # indirdi: zirve konisi son 15 metrede 70 m dusuyor, yani 78 derece, tavanin
+    # ustunde. Ama o GERCEK -- L0'dan gelen bir dugum, ucgenlestirme artigi degil.
+    # Ayirt eden sey zaten elimizde: `u`, gurultunun ve erozyonun zirveleri korumak
+    # icin kullandigi ayni alan. Ucuncu bir olcut uydurulmuyor.
+    skirt = np.clip((9500.0 - rr) / 1500.0, 0.0, 1.0).astype(np.float32) * (1.0 - u)
+    h = detail.file_crests(h, cell, skirt_mask=skirt)
     print("detay  %.0f..%.0f m" % (h.min(), h.max()))
 
     # --- 16 bit. NICEMLEME `terrainHeight`E GORE, h.max()'a gore DEGIL:
@@ -153,6 +182,44 @@ def bake(npz_path, seed, out_path, verify):
             raise SystemExit("HATA: kuzeydogu kosesi guneybatidan alcak -- eksen devrik.")
         if err.max() > 0.1:
             raise SystemExit("HATA: geri okuma farki 0.1 m'yi asiyor.")
+
+        # KENAR DENETIMI -- SERT. Sart: dag arazi sinirinda KESILMEYECEK ve
+        # dagin 360 derece cevresinde yurunebilir ova olacak.
+        #
+        # Bir tur bu denetim yoktu ve 17.5 km'lik karede kuzey/dogu kenarinin
+        # TAMAMI 3665-3873 m'de kesildi; ekranda dikey duvar olarak kaldi.
+        # Bir daha sessizce olmasin diye uretim burada duruyor.
+        EDGE_MAX_M = 1200.0
+        for name, strip in (("bati", back[0, :]), ("dogu", back[-1, :]),
+                            ("guney", back[:, 0]), ("kuzey", back[:, -1])):
+            print("  kenar %-6s ortanca %5.0f m  max %5.0f m" % (name, np.median(strip), strip.max()))
+            if strip.max() > EDGE_MAX_M:
+                raise SystemExit(
+                    "HATA: %s kenarinda kot %.0f m (tavan %.0f m). Dag sinirda kesiliyor; "
+                    "maskedeki yalitim halkasi yetmiyor ya da arazi kucuk."
+                    % (name, strip.max(), EDGE_MAX_M))
+
+        # ZIRVE SPAWN'DAN GORUNMELI. Gidilecek yer o; gorunmezse oyunun hedefi yok.
+        # Bir tur 124 m ile kapaliydi ve ekranda "dikdortgen dag" olarak okundu.
+        # Aciklik su an 24 m -- ince. Gurultu tohumu degisince sessizce kapanabilir,
+        # onun icin uretim burada duruyor.
+        #
+        # ALET ONCE YANILTTI: zirvenin KENDI hucresi engel sayiliyordu (dunya
+        # egriligi gorus hattini son metrelerde zirvenin altina indiriyor) ve
+        # "+12 m KAPALI" okunuyordu. Isinin son 150 m'si disarida.
+        p0 = np.array([SPAWN_UV[0] * (RES - 1), SPAWN_UV[1] * (RES - 1)])
+        p1 = np.array([(RES - 1) * 0.5, (RES - 1) * 0.5])
+        tt = np.linspace(0.0, 1.0, 4000)
+        pp = p0[None, :] + (p1 - p0)[None, :] * tt[:, None]
+        zz = back[np.round(pp[:, 0]).astype(int), np.round(pp[:, 1]).astype(int)]
+        dd = np.hypot(*(p1 - p0)) * cell * tt
+        los = (zz[0] + 1.7) + (HEIGHT_SUMMIT_M - zz[0] - 1.7) * tt - dd * dd / (2.0 * 6371000.0)
+        seg = (dd > 50.0) & (dd < dd[-1] - 150.0)
+        clear = -(zz - los)[seg].max()
+        print("  zirve spawn'dan: aciklik %+.0f m (%.1f km)" % (clear, dd[-1] / 1000.0))
+        if clear <= 0.0:
+            raise SystemExit(
+                "HATA: zirve spawn'dan gorunmuyor, %.0f m ile kapali." % -clear)
     return h
 
 

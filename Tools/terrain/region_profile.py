@@ -28,7 +28,7 @@ import numpy as np
 
 REGION_KM = 540.0
 RES       = 1024
-PLAY_KM   = 17.517
+PLAY_KM   = 30.0
 SUMMIT_M  = 5709.0
 PLAIN_M   = 186.0
 PLATEAU_M = 3600.0
@@ -137,6 +137,33 @@ def build(res=RES, region_km=REGION_KM, seed=36044):
     ch['approach'] = corridor * (1.0 - _smooth(t, 9.0, 15.0))
     ch['plain'] = np.maximum(ch['plain'], corridor * _smooth(t, 9.5, 16.0))
 
+    # ---- YALITIM HALKASI --------------------------------------------------
+    # OYUN ALANI ICINDE DAG YALITILMIS OLMALI. Sart: oyuncu tirmanmadan dagin
+    # 360 derece cevresini dolasabilsin, ve arazi kenarinda dag KESILMESIN.
+    #
+    # Olculdu ve kotu cikti: silsile karakteri oyun alanina kadar giriyordu ve
+    # 17.5 km'lik karede kuzey/dogu kenarinin TAMAMI 3665-3873 m'de kesiliyordu.
+    # Buyutmek tek basina yetmez -- kutle bir SILSILE, 1500 m esiginde 379 km'ye
+    # uzaniyor, yani her boyutta kenar kesilir.
+    #
+    # Cozum: etekten (8.4 km) oyun alaninin kenarina kadar her yonde OVA. Silsile
+    # ancak oyun alaninin otesinde geri geliyor.
+    FOOT_KM = 8.4                      # kampların bulundugu etek
+    EDGE_KM = PLAY_KM / 2.0            # oyun alaninin yari genisligi
+    #
+    # Dis sonum YARICAPA DEGIL KAREYE gore. Arazi kare; yaricap 15 km'de sonumlenirse
+    # karenin kosesi (15*sqrt2 = 21.2 km) halkanin disinda kalir ve orada silsile
+    # geri gelir -- yani kose kenarlari yine kesilirdi. Chebyshev mesafe kareyi izler.
+    cheb = np.maximum(np.abs(ex), np.abs(ny))
+    ring = _smooth(r, FOOT_KM, FOOT_KM + 3.0) * (1.0 - _smooth(cheb, EDGE_KM + 1.0, EDGE_KM + 8.0))
+    # `massif` DE LISTEDE. Ilk yazimda disarida birakildi ve olculdu: dogu yonunde
+    # 9-14 km bandinda kot 3015 m'de kaldi, yani halka karakteri kirdi ama kotu
+    # kirmadi -- massif elev'i 5709*0.62 = 3540 m. Halka zaten 8.4 km'den sonra
+    # basliyor, kutlenin kendisi (r < 8.4 km) etkilenmiyor.
+    for k in ('massif', 'range', 'plateau', 'foothill'):
+        ch[k] = ch[k] * (1.0 - ring)
+    ch['plain'] = np.maximum(ch['plain'], ring)
+
     stack = np.stack([ch[k] for k in ch], axis=0)
     w = stack ** 3
     w /= np.maximum(w.sum(axis=0), 1e-6)
@@ -159,10 +186,23 @@ def build(res=RES, region_km=REGION_KM, seed=36044):
     probMap = np.clip(probMap, 0.04, 1.0)
 
     # --- KABA YUKSEKLIK
-    elev = {'massif': SUMMIT_M * 0.80, 'range': SUMMIT_M * 0.60, 'foothill': 1500.0,
+    # ZIRVE HALKADAN AYRILMALI. Olculdu: 4-8 km bandinda 14 zirve, ortanca
+    # 4987 m, en yuksegi 5518 m -- zirveden yalniz 191 m asagida. Disaridan
+    # bakinca silueti O HALKA belirliyor ve dag DIKDORTGEN bir duvar gibi
+    # okunuyor; zirve de arkasinda kalip 124 m ile kapaniyor.
+    #
+    # Gercek Everest'te halka 300-1300 m asagida ama orada da zirve Nuptse
+    # duvarinin arkasindan gorunmuyor. Oyun icin zirve GORUNMEK zorunda:
+    # gidilecek yer o. Cevre kotlari indirildi, hedef ~1800 m fark.
+    elev = {'massif': SUMMIT_M * 0.62, 'range': SUMMIT_M * 0.50, 'foothill': 1500.0,
             'approach': 1000.0, 'plateau': PLATEAU_M, 'plain': PLAIN_M}
     elevMap = sum(weights[k] * elev[k] for k in ch)
-    elevMap += (SUMMIT_M - elevMap) * (1.0 - _smooth(r, 2.0, 13.0))
+    # KUBBE DAR. Once `_smooth(r, 2.0, 13.0)` yaziliyordu: 13 km'ye kadar
+    # yumusak, yani 6 km'de hala yari yukseklikte. Sonucu her azimutta ayni
+    # kota dusen bir zirve halkasiydi -- bastan kactigimiz radyal simetrinin
+    # maskeye sizmis hali. Kubbe artik 4 km'de bitiyor, gerisini karakterler
+    # belirliyor.
+    elevMap += (SUMMIT_M - elevMap) * (1.0 - _smooth(r, 0.6, 4.0))
 
     # Koridorda kot: 4 km'de kutlenin kenari, 11 km'de ova. Oradan sonra duz.
     # SABIT TEPE, "kutleye oturan rampa" DEGIL. Bir tur denendi: koridor kendi

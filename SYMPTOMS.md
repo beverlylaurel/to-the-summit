@@ -168,6 +168,56 @@ hâlinden bile parlak).
 
 ---
 
+## "Dikdörtgen dağ", "kenarlar zirveyle neredeyse aynı yükseklikte"
+
+**İlk şüpheli yanlıştı.** Sanılan: arazi küçük, dağ sığmıyor. Ölçüldü: kütle 1500 m
+eşiğinde **379 km**'ye uzanıyor — bu bir SİLSİLE, hiçbir boyutta sığmaz. Büyütmek tek
+başına kenar kesilmesini çözmüyor.
+
+**Gerçek sebep iki katmanlı.** Birincisi maskedeki radyal kubbe 13 km'ye kadar açıktı,
+yani 6 km'de hâlâ yarı yükseklikteydi; her azimutta aynı kota düşen bir zirve halkası
+üretiyordu (4–8 km bandı zirveden yalnız **191 m** aşağıda). Kubbe 4 km'de bitirildi.
+İkincisi ve asıl olan: karakter maskesine yalıtım halkası eklendi ama **`massif` listeye
+alınmamıştı** — halka karakteri kırdı, kotu kırmadı, çünkü `massif` elev'i 3540 m.
+Doğu yönünde 9–14 km bandı 3015 m'de kaldı. `massif` listeye alınınca kapandı.
+
+**Ayırt eden ölçüm:** bant bant "zirveden kaç metre aşağıda". 4–6 km bandı 191 m → **1090 m**.
+
+**Ve dış sönüm yarıçapa göre yapılmamalı.** Arazi kare; halka 15 km'de sönerse karenin
+köşesi (15√2 = 21.2 km) halkanın dışında kalır ve orada silsile geri gelir. Chebyshev
+mesafe (`max(|x|,|y|)`) kareyi izler.
+
+Dört kenarın ortancası: 3873/3665 m → **214–389 m**. Kenar denetimi artık üretimde,
+1200 m tavanı aşan kenar hata fırlatıyor.
+
+## Ekranın ortasında siyah sivri iğne
+
+**Sebep:** `MountainGenerator.FileCrests()` L1'e taşınırken alınmamıştı. Üçgenleştirme
++ gürültü, ızgaraya çapraz sırtlarda tek hücrelik iğneler bırakıyor: **5249 hücre**
+komşusunun 400 m üstünde, en kötüsü 1343 m.
+
+**İlk düzeltme yanlıştı ve ölçüm yakaladı.** C#'ın kör yumuşatması ("pencerede tek başına
+yüksek olanı indir") aynen taşındı ve **zirveyi 5709 → 5696 m**'ye indirdi: o tanıma
+GERÇEK zirve de giriyor. Filtre iğneyle tepeyi ayırt edemiyor.
+
+**Ayırt eden büyüklük eğim.** İğneler 14.7 m'de 400–1343 m yükseliyor, yani 88°'den dik;
+gerçek kaya yüzü 72°'yi aşmıyor. Ama eğim tavanı da tek başına yetmedi — zirve konisi son
+15 metrede 70 m düşüyor (78°) ve **5608 m**'ye indi. Üçüncü ölçüt uydurulmadı: gürültünün
+ve erozyonun zirveleri korumak için zaten kullandığı `uplift` alanına bağlandı.
+
+Sonuç: sivri **5249 → 0**, zirve **5709.0 m tam**.
+
+## Zirve spawn'dan görünmüyor — ama ölçüm yalan söylüyordu
+
+Görüş hattı probu "+12 m KAPALI" dedi. Engelin yeri sorulunca **zirvenin kendisi** çıktı
+(zirveden 0.00 km). Dünya eğriliği görüş hattını son metrelerde zirvenin kendi kotunun
+altına indiriyor, prob da onu engel sayıyor.
+
+Işının **son 150 m'si** dışarıda bırakılınca gerçek sonuç: açıklık **−24 m, GÖRÜNÜYOR**.
+
+**Kural:** görüş hattı probunda hedefin kendi hücresi engel listesine girmemeli. Bu üçüncü
+kez aracın yalan söylemesi; aşağıdaki bölüme bakılır.
+
 ## Teşhis aracının kendisi
 
 Bu oturumda araç **iki kez yalan söyledi** ve ikisi de tur kaybettirdi.
