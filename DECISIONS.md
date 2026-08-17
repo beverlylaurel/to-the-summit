@@ -20,6 +20,9 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Tırmanma ayrıntıları** — tutamak üretimi hangi veriden beslenir, düşüş hasarının
   eğrisi, ip fizik olarak mı kural olarak mı
   → [Tırmanma üç modlu, modu ZEMİN belirler](#tırmanma-üç-modlu-modu-zemin-belirler)
+- **Ovanın kotu 186 m mi kalacak** — yeni arazi oyun alanında ova üretmiyor; 5709 m'den
+  9 km'de 186 m'ye inmek jeolojik olarak yok. L1 uygulanmadan cevaplanmalı
+  → [Ovanın kotu: 186 m mi, 2400 m mi](#ovanin-kotu-186-m-mi-2400-m-mi)
 
 ## Silinecek geçiciler
 
@@ -488,6 +491,58 @@ koymak (ayrı bir prominence grubu) ve/veya detay katmanını oraya da uygulamak
 
 **Tetikleyici:** yakın planda üçgen yüzeyler görülüyorsa detay katmanı eksik demektir,
 buraya bakılır.
+
+---
+
+## Ovanın kotu: 186 m mi, 2400 m mi — BLOKE EDEN AÇIK SORU (2026-08-17)
+
+**Ölçüm.** Yeni arazi oyun alanında (merkez 17.5 km) üretildi: 4097², 4.28 m/örnek,
+kot **517–5709 m**. Eğim dağılımı:
+
+| kuşak | pay |
+|---|---|
+| yürünür (0–15°) | %6.7 |
+| dik yürünür (15–30°) | %24.5 |
+| el-ayak (30–45°) | %35.6 |
+| tırmanış (45–90°) | %33.2 |
+
+Ortanca eğim **38.2°**. Oyun alanında **ova yok**.
+
+**Çelişki.** Mevcut tasarım zirveyi 5709 m'ye, ovayı 186 m'ye, ikisini **9 km** araya
+koyuyor. Ortalama iniş 32°. Gerçek dünyada böyle bir şey yok ve Argudo'nun istatistiği
+onu üretemiyor — çünkü istatistik gerçek dağlardan geliyor. Everest'te Base Camp
+**5364 m**, en yakın ova 100+ km ötede.
+
+**Ama kullanıcının tarifi 186 m'yi gerektirmiyor olabilir.** Söylenenler:
+
+- "oyun tepecikli düz ovada başlayacak"
+- "dağın yamacına doğru ilerleyip kamp kurulacak"
+- "oyunun ilk anlarında yeşillik baskın olacak, kamptan sonra kar başlayacak"
+- bisikletle ~10 dakika (ölçüldü: 3168 m)
+
+Hiçbiri **kot** söylemiyor. 186 m mevcut arazinin sayısı, tasarım kararı değil.
+
+### İki seçenek
+
+**A — 186 m korunur.** Bölge maskesine güneybatıdan içeri sokulan alçak bir sektör
+eklenir; ova 11 km'de başlar. Oyun akışı aynen korunur.
+*Bedeli:* o bölge jeolojik olarak tutarsız kalır — 50 km ötede 3000 m'lik dağlar varken
+11 km'de 186 m. Ufuk bandından bakınca fark edilebilir.
+
+**B — ova ~2400 m'ye çıkarılır.** Khumbu vadisi karşılığı.
+*Kazandırdığı:* zirveden vadiye iniş 5709 − 2400 = 3300 m / 9 km = **20°**, doğal.
+Yeşillik gerçeğe uyar (Khumbu'da rododendron ormanı 2500–4000 m, ağaç sınırı ~4000 m).
+Kar kamptan sonra başlar (kar çizgisi ~5000 m, kamp ~4000 m). Bölge tutarlı kalır.
+*Bedeli:* `baseHeight` 0.03 → ~0.39 değişir; hava kuşakları (donma seviyesi, kar çizgisi,
+tipi kuşağı) zeminden türediği için **yeniden ölçülür**. `SCALE.md`'nin "kendiliğinden
+ölçeklenir" tablosu bunu zaten kapsıyor, yani otomatik — ama gece parlaklığı gibi elle
+kalibre edilmiş şeyler kontrol edilir.
+
+**Önerim B.** Kullanıcının söylediği her şeyi karşılıyor, tek değişen sayı ovanın kotu ve
+o sayı hiç tasarlanmamıştı. Ayrıca "gerçekçilik tek esas" kuralına A'dan çok daha uygun.
+
+**Karar verilmeden L1 uygulanmaz** — ova kotu maskeyi, maske sentezi, sentez de yükseklik
+haritasını belirliyor. Yanlış kotla üretilirse üçü de tekrar edilir.
 
 ---
 
