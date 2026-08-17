@@ -61,9 +61,19 @@ Thumbs.db
 # gerçek kancalar .git/hooks'ta. Her LFS işleminde yeniden beliriyorlar.
 /dev/
 
-# ÜRETİLEN ARAZİ VARLIKLARI. Hepsi tohum ve ayarlardan birebir yeniden üretiliyor;
-# kurulum betiği açılışta kendisi pişiriyor. Depoda tutmanın tek sonucu her üretimde
-# LFS'e yetmiş megabayt daha yazmaktı — 3.8 GB oraya gitti.
+# TÜRETİLEN ARAZİ VARLIKLARI. Kurulum betiği açılışta kendisi pişiriyor. Depoda
+# tutmanın tek sonucu her üretimde LFS'e yetmiş megabayt daha yazmaktı — 3.8 GB
+# oraya gitti.
+#
+# GEREKÇE L1'DE DEĞİŞTİ. Eskiden buradaki cümle "hepsi tohum ve ayarlardan birebir
+# yeniden üretiliyor" idi ve DOĞRUYDU: `MountainGenerator` radyal koniyi
+# `MountainSettings`'ten hesaplıyordu. Artık arazi Argudo boru hattından geliyor ve
+# onu üretmek için Python, `orometry-terrains` ve 1.4 GB'lık Kirmse veritabanı
+# gerekiyor — hiçbiri repoda değil, olamaz da.
+#
+# Bu yüzden `Assets/Terrain/MountainHeightmap.png` (13.7 MB) BURADA DEĞİL: o artık
+# türetilmiş değil KAYNAK. Aşağıdakiler ondan tek adımda pişiyor ve dışlanmaya
+# devam ediyor (toplam ~165 MB).
 #
 # Elle alınan doku setleri (SnowPowder, SnowPacked) BURADA DEĞİL: onlar üretilemiyor.
 Assets/Terrain/MountainTerrainData.asset*
@@ -93,3 +103,8 @@ Tools/terrain/*.npz
 Tools/terrain/*.npy
 Tools/terrain/*.png
 Tools/terrain/data/
+
+# Divide Tree ASSET'i turetilmis: kaynagi Assets/Terrain/DivideTree.txt ve
+# ice aktarma araci onu tek adimda uretiyor.
+Assets/Terrain/DivideTree.asset*
+Tools/terrain/__pycache__/
