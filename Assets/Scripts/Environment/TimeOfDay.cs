@@ -297,7 +297,24 @@ public class TimeOfDay : MonoBehaviour
         {
             sun.transform.rotation = Quaternion.LookRotation(-SunDirection);
             sun.color = sunColor;
-            sun.intensity = sunIntensity * SunBlend(SunDirection.y);
+
+            // HAVA KÜTLESİ SÖNÜMÜ IŞIĞA DA UYGULANIYOR. Bir dönem uygulanmıyordu ve
+            // gerekçe "soğurmanın sahibi gökyüzü paketi"ydi — ama paket bir Unity
+            // directional light'ını söndüremez. Sonuç: gök batımda sönerken arazi tam
+            // güneş almaya devam ediyordu.
+            //
+            // `SunBlend` sönüm değil KAPI: `SunHorizonTop` sin(3°), yani 3°'nin üstünde
+            // hep 1 dönüyor. Gerçekte 3°'de doğrudan huzme zenit değerinin %5-10'u,
+            // 10°'de %30, 40°'de %75.
+            //
+            // Ölçüldü (renk probu 2, güneşli düz zemin): güneş-gölge farkı 5+ diyafram,
+            // açık havada kar için gerçek değer 2.5-3. Kontrastın patlaması buradandı.
+            //
+            // EN PARLAK KANAL alınıyor, parlaklık değil: `Tint()` rengi aynı kanala
+            // göre normalize ediyor. Böylece `CurrentSunColor × intensity` gerçek
+            // huzmeye eşit kalıyor — renk ve şiddet aynı eğriyi izliyor.
+            float extinction = Mathf.Max(beam.x, Mathf.Max(beam.y, beam.z)) * sunFade;
+            sun.intensity = sunIntensity * SunBlend(SunDirection.y) * extinction;
         }
 
         if (moon != null)
