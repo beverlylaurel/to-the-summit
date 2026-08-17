@@ -369,6 +369,54 @@ kaydırmayı unutmak mümkün değil.
 **Kural:** dağ baştan üretildiğinde `patternSeed` de artırılır. Geometri yenilenip boya
 eski kalırsa oyuncu yeri tanır.
 
+## Arazide düzenli testere — ince olan çözüldü, büyük olan yöntemin kendisi
+
+Kullanıcı: *"dağdaki bu düzenli testereleri törpüler misin"*, sonra *"gölge değil, arazi
+testereli, dağ böyle oluşmuş."* İkisi de doğruydu ve **iki ayrı testere** vardı.
+
+**İlk iki hipotezim yanlış çıktı, ikisi de ölçümle elendi:**
+
+| hipotez | ölçüm | sonuç |
+|---|---|---|
+| hücre ölçeğinde teras | 44639 farklı yükseklik, düz komşu %1.11, ikinci fark 0.58 m | yok |
+| L0 zirveleri düzenli aralıklı | en yakın komşu değişim katsayısı **0.641** (tam rastgele 0.523) | düzensiz |
+
+**Doğru araç 2B güç spektrumu oldu.** Fraktal taban `dalgaboyu^4.74`; ondan sapan iki
+dalga boyu var ve ikisi ayrı sorumlu:
+
+**14.7 m (iki hücre) — %242 fazla. SORUMLU BENİM TÖRPÜM.**
+`file_crests` `minimum_filter` ile fazlalığı çıkarıyordu: sivri gidiyordu ama yerine
+filtre yarıçapı boyunda **düz faset** kalıyordu.
+
+| | 14.7 m enerji | sivri >400 m |
+|---|---|---|
+| eski törpü (çıkarma) | 3.42× | 0 |
+| törpüsüz (taban) | 1.87× | 29 |
+| **yeni törpü (Gauss harmanlama)** | **2.02×** | **14** |
+
+Çıkarma yerine harmanlama: aşırı dik piksel Gauss ile pürüzsüzleştirilmiş yüzeye çekiliyor.
+Gauss ızgara frekansına enerji koymaz, faset oluşmuyor.
+
+**~937 m — %200 fazla. YÖNTEMİN KENDİSİ, ÇÖZÜLMEDİ.**
+Divide tree'nin ilkel birimi zirve; aradaki sırt düz çadır, siluet üçgen. Üç kaldıraç da
+kapalı:
+
+- **Zirve sayısı serbest değil**: `scalingFactor` gerçek Kirmse yoğunluğundan. 30×30 km'de
+  83 zirve = 10.8 km²'de bir, Himalaya için gerçekçi.
+- **Sırt kaydırması referansın kendi değeri** (`ridgesPerturbation 0.15`) ve **düzlemsel** —
+  yandan kıvrılıyor, kot profili düz kalıyor.
+- **Gürültü genliği spec sınırında** (§5.7, prominence tabanının altı). Taban 320 → 800 m
+  denendi: 937 m fazlası 3.02 → 2.86, yani işe yaramadı. Genliği büyütmek uydurma zirve
+  doğurur.
+
+Gerçek sırtlarda ara tümsekler var ama onlar prominence tabanının (100 m) altında olduğu
+için veritabanında yok. Kapatmanın yolu L2/L3 mesh modülleri — tırmanılan yüzeyler zaten
+oraya devredilecek.
+
+**Kural:** "düzenli tekrar" şikâyetinde ölçek sorulur, çünkü aynı belirti farklı ölçeklerde
+farklı sorumludan gelir. Araç 2B güç spektrumu: fraktal taban düz bir doğru, sapan dalga
+boyu sorumluyu adıyla söyler.
+
 ## Teşhis aracının kendisi
 
 Bu oturumda araç **iki kez yalan söyledi** ve ikisi de tur kaybettirdi.

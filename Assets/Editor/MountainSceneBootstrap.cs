@@ -21,6 +21,9 @@ public static class MountainSceneBootstrap
     /// değer yalnızca sahnede yaşıyordu. Gölgeyi düşüren mesh de bu LOD'dan çiziliyor:
     /// kaba siluetin ışık yönünden izdüşümü, gölge kenarına üçgen dişler olarak
     /// vuruyordu — yaklaşınca beliriyordu çünkü gölge mesafesi 150 metre.
+    /// SİLUET DİŞİ İLE KARE SÜRESİ ARASINDAKİ DENGE. 1 denendi ve ÖLÇÜLDÜ: FPS 150-200'den
+    /// 60'a düştü. 30 km'lik arazide LOD'u bir kademe geç sadeleştirmek üçgen sayısını
+    /// katlıyor; ödenecek bir bedel değil. Diş için başka kaldıraç aranır.
     const float TerrainPixelError = 2f;
 
     /// Basemap fiilen kapalı: Unity bu mesafenin ötesindeki araziyi malzemeyle değil,

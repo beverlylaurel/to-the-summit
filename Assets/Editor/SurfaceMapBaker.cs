@@ -20,10 +20,19 @@ public static class SurfaceMapBaker
     /// Zemin normalinin çözünürlüğü. Köşe ızgarasının iki katı genişlikte texel:
     /// üçgen deseni taşıyamayacak kadar geniş, dağın formunu taşıyacak kadar dar.
     /// Aradaki incelik prosedürel kabartının işi.
-    public const int NormalResolution = 2048;
+    /// ÖRGÜYLE EŞİT. 2048'di ve arazi 17.5 km'yken 8.55 m/texel veriyordu; 30 km'de
+    /// 14.65 m'ye çıktı, örgü ise 7.32 m. Aradaki fark ekranda zikzak olarak görünüyor:
+    /// aydınlık-gölge sınırı doku ızgarasına çapraz düştüğünde bilinear okuma keskin
+    /// geçişi texel sınırları boyunca basamaklara çeviriyor (bkz. `BakeNormals`'taki
+    /// bulanıklaştırma yorumu — o yumuşatma 8.55 m için ayarlanmıştı).
+    ///
+    /// 4096'da texel 7.33 m, yani yükseklik ızgarasının kendisi. Maliyet: RGBA32
+    /// 4096² = 67 MB, `.gitignore` dışında zaten.
+    public const int NormalResolution = 4096;
 
     /// Normal dokusunun adında taşınan sürüm; pişirme değişince eskisi elenir.
-    const string NormalName = "MountainNormals-blur2";
+    /// Ad çözünürlüğü de taşıyor: 2048'den 4096'ya çıkıldı, eski harita bayat sayılmalı.
+    const string NormalName = "MountainNormals-blur2-4096";
 
     const string HeightPath = "Assets/Terrain/MountainHeight.asset";
 
