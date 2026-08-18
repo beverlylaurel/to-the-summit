@@ -77,6 +77,11 @@ gelmez; bu bir kez uygulandı (güneş yaması, `CLOUDS_REBUILD.md` bağ 7).
 **koddan doğrulanır**. İkisi çeliştiğinde kod haklıdır ve belge aynı adımda düzeltilir.
 "Belgede öyle yazıyor" bir gerekçe değildir; hafızadan konuşmak da değildir.
 
+`SYSTEMS.md` **bağ haritasıdır**: ne neyi okur, ne neyi okumaz, kural ne. Sayı ve gerekçe
+tutmaz. Bir kuralın **neden** öyle olduğu — ölçüm, denenip başarısız olan yol, ürettiği
+belirti — `RATIONALE.md`'de. Kural değişirse **ikisi birden** değişir; gerekçesini yitiren
+kayıt silinir.
+
 ## Temizlik
 
 - Çöp kod yok. Kullanılmayan dosya, ölü kod, yoruma alınmış kod, template artığı projede durmaz.

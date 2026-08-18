@@ -134,6 +134,10 @@ public class ClimbHud : MonoBehaviour
         float top = cloudLayer.TopAt(observer.position);
         float bottom = cloudLayer.Bottom;
 
+        // "BULUNDUGUN SUTUNDA" ACIKCA YAZILI. F1 panelindeki kapsama KURESEL surgu;
+        // bu ise hava haritasinin senin XZ'nde verdigi YEREL deger. Ikisi farkli sayi.
+        // Ayni ada sahip olmalari bir kez yanlis teshise goturdu: HUD %0 gosterirken
+        // ekranda bulut vardi ve "bulut olmayan yerde cizgi var" sanildi.
         builder.AppendFormat("  Bulut kapsaması        %{0:F0}\n",
             cloudLayer.CoverageAt(observer.position) * 100f);
 

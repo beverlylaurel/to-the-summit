@@ -519,8 +519,27 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
     positionPS.xz += _WorldSpaceCameraPos.xz;
 #endif
 
+    // DOSEME KIRICI. Taban gurultusu dunyada birkac kilometrede aynen tekrar ediyor:
+    // yakindan bir-iki tekrar gorunur ve goz secmez, zirveden yuzlercesi ayni anda
+    // gorunur ve kafes okunur.
+    //
+    // KIRICININ PERIYODU GORUS MENZILINDEN UZUN OLMAK ZORUNDA. Kucuk periyotlu bir
+    // bukum tekrari gizlemiyor, kendi kafesini ekliyor. 48 km hava haritasinin
+    // periyoduyla ayni; ikisi hizali olmazsa iki ayri desen ust uste biniyor.
+    //
+    // Genlik dosemenin yarisi: daha buyugu ornekleme koordinatini katliyor ve gurultu
+    // kendi uzerine biniyor. Gradyan 0.23'te kaliyor, yani uzay katlanmiyor.
+    const float TILE_BREAK_PERIOD = 48000.0;
+    const float TILE_BREAK_AMPLITUDE = 1400.0;
+    float2 tileBreakPhase = positionPS.xz * (6.2831853 / TILE_BREAK_PERIOD);
+    float2 tileBreak = float2(sin(tileBreakPhase.y) + 0.5 * sin(2.31 * tileBreakPhase.y + 1.7),
+                              sin(tileBreakPhase.x) + 0.5 * sin(2.31 * tileBreakPhase.x + 0.4))
+                     * (TILE_BREAK_AMPLITUDE / 1.5);
+    float3 shapePositionPS = positionPS;
+    shapePositionPS.xz += tileBreak;
+
     // Evaluate the generic sampling coordinates
-    float3 baseNoiseSamplingCoordinates = float3(AnimateShapeNoisePosition(positionPS).xzy / NOISE_TEXTURE_NORMALIZATION_FACTOR) * _ShapeScale - float3(_ShapeNoiseOffset.x, _ShapeNoiseOffset.y, _VerticalShapeNoiseOffset);
+    float3 baseNoiseSamplingCoordinates = float3(AnimateShapeNoisePosition(shapePositionPS).xzy / NOISE_TEXTURE_NORMALIZATION_FACTOR) * _ShapeScale - float3(_ShapeNoiseOffset.x, _ShapeNoiseOffset.y, _VerticalShapeNoiseOffset);
 
     // Evaluate the coordinates at which the noise will be sampled and apply wind displacement
     baseNoiseSamplingCoordinates += properties.height * float3(_WindDirection.x, _WindDirection.y, 0.0f) * _AltitudeDistortion;

@@ -29,6 +29,7 @@ public class MountainGenerator : MonoBehaviour
     [System.NonSerialized] public float meanSlopeDegrees;
     /// Üretilen arazinin gerçek zirvesi (metre). terrainHeight yalnızca tavandır.
     [System.NonSerialized] public float peakAltitude;
+    [System.NonSerialized] public float groundAltitude;
     [HideInInspector] public string lastBuildSignature;
 
     struct Peak
@@ -806,7 +807,7 @@ public class MountainGenerator : MonoBehaviour
 
         double allSum = 0;
         int allCount = 0;
-        float highest = 0f;
+        float highest = 0f, lowest = 1f;
 
         for (int z = 0; z < res - 1; z++)
         {
@@ -824,6 +825,7 @@ public class MountainGenerator : MonoBehaviour
                 float deg = Mathf.Atan(grad) * Mathf.Rad2Deg;
 
                 if (heights[z, x] > highest) highest = heights[z, x];
+                if (heights[z, x] < lowest) lowest = heights[z, x];
 
                 int band = Mathf.Clamp(
                     (int)(heights[z, x] * AltitudeBandCount), 0, AltitudeBandCount - 1);
@@ -860,6 +862,12 @@ public class MountainGenerator : MonoBehaviour
         }
 
         meanSlopeDegrees = allCount > 0 ? (float)(allSum / allCount) : 0f;
-        peakAltitude = highest * settings.terrainHeight;
+        // ÖLÇEK ARAZİDEN OKUNUYOR, AYARDAN DEĞİL. `settings.terrainHeight` eski
+        // prosedürel kurulumun sayısıydı (6189); arazi elle yapılmaya başlayınca tavan
+        // 8000'e çıktı ve ikisi ayrıştı. Zirve 6001 m yerine 4642 m okunuyor, hava
+        // kuşakları o yanlış boydan türüyor ve dağ baştan aşağı karla kaplanıyordu.
+        float top = GetComponent<Terrain>().terrainData.size.y;
+        peakAltitude = highest * top;
+        groundAltitude = lowest * top;
     }
 }

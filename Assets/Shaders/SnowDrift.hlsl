@@ -96,6 +96,21 @@ float SnowDriftShape(float2 worldXZ, float2 windAxis)
                          SnowDriftNoise(aligned / 62.0 + 37.7)) - 0.5;
     aligned += warp * 24.0;
 
+    // İKİNCİ BÜKÜM, GÖVDE ÖLÇEĞİNDE. Yukarıdaki büküm 62 metreden örnekleniyor ve
+    // gövdenin rüzgâra dik hücresi 16 metre: 62 metrelik bir yamanın içindeki bütün
+    // hücreler AYNI yöne kayıyor, yani ızgara kırılmıyor, sadece topluca ötelenip
+    // duruyor. Ölçüldü: terminatör bandı boyunca birebir aynı boyda, eşit aralıklı
+    // dişler — sırt hattında testere ağzı.
+    //
+    // Kural (`SYMPTOMS.md`, "Düzenli kafes deseni"): büküm KAYNAK ÖZELLİK ÖLÇEĞİNDE
+    // örneklenir. 21 m dalga boyu 16 m hücreyi kırar.
+    //
+    // Genlik 7 m, hücrenin yarısından küçük: büyük olsaydı alan kendi içine katlanır
+    // ve birikinti kopuk lekelere dağılırdı (üstteki bükümde aynı sınır 24/45).
+    float2 fineWarp = float2(SnowDriftNoise(aligned / 21.0 + 11.3),
+                             SnowDriftNoise(aligned / 21.0 + 57.1)) - 0.5;
+    aligned += fineWarp * 7.0;
+
     // GÖVDE: rüzgâr boyunca uzun, ona dik geniş. Oran 2.8:1 — daha keskin uzatma
     // (önceki 4:1) birikinti değil çizgi üretiyordu.
     float2 body = float2(aligned.x / 45.0, aligned.y / 16.0);

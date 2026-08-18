@@ -108,3 +108,8 @@ Tools/terrain/data/
 # ice aktarma araci onu tek adimda uretiyor.
 Assets/Terrain/DivideTree.asset*
 Tools/terrain/__pycache__/
+
+# Yontma araci yedekleri: rotasyon autosave + kurtarma kopyalari transient.
+# Repoya giren deliverable yalniz guncel dag (_son.bytes) ve adli kayitlar.
+Assets/Terrain/Sculpts/*.yedek*.bytes*
+Assets/Terrain/Sculpts/_kurtarma.bytes*
