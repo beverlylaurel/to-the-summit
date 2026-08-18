@@ -8,8 +8,9 @@ Her kayıt üç şey taşır: belirtinin kullanıcının ağzından hâli, ilk �
 doğar — tahminle çözülen bir şey buraya yazılmaz.
 
 Bu dosyanın kendi dersi: **belirtinin göründüğü yer, belirtinin doğduğu yer değildir.**
-Aşağıdaki dokuz kaydın yedisinde ilk şüpheli, belirtinin en çok göze çarptığı katmandı ve
-yedisinde de yanlış çıktı. Son kayıtta üç ayrı şüpheli sırayla elendi.
+İlk şüphelisi kayda geçmiş dokuz belirtinin **dokuzunda da** ilk şüpheli yanlış çıktı —
+her seferinde belirtinin en çok göze çarptığı katman seçilmişti. Bulut kontüründe üç ayrı
+şüpheli (ışın yürüyüşü, zamansal birikim, mesafe sınırı) sırayla elendi; sebep dördüncüdeydi.
 
 ---
 
@@ -314,32 +315,9 @@ bileşen 1/8 genlikte duruyor.
 **Kural:** "sert görünüyor" iki ayrı şey olabilir — dar geçiş ya da yüksek varyans.
 İkisi ayrı ölçülür, yoksa doğru olan genişletilir ve belirti kalır.
 
-## İnce bulut kenarında piksel ölçeğinde benek — AÇIK
+## Ayar dosyası düzenlemesi oyuna ulaşmıyor
 
-**Çözülmedi.** Beş şüpheli ölçümle elendi; kayıt aynı turların tekrarlanmaması için.
-
-| şüpheli | ölçüm | sonuç |
-|---|---|---|
-| yarı çözünürlük (`resolutionScale` 0.5) | 1.0'a çekildi | ekran **birebir aynı** |
-| büyütme kipi (Bilinear) | Bilateral'a çevrildi | aynı |
-| erozyonda bölme (`DensityRemap`) | çıkarmaya çevrildi `[N22 s.34]` | aynı |
-| mikro erozyon | kapatıldı | aynı |
-| ana erozyon | `erosionFactor` 0'a indirildi | **bulut gövdesi pürüzsüzleşti, benek KALDI** |
-
-**En değerli bulgu:** çözünürlük 0.5 ile 1.0 arasında ekran birebir aynı. Desen ekran
-uzayında DEĞİL — dither, mavi gürültü, upscale, TAA hepsi eleniyor. Benek dünya
-uzayında, yani yoğunluk alanının kendisinde ya da ışın yürüyüşünün adımlarında.
-
-Ve `erosionFactor = 0`'da bile kaldığı için detay gürültüsü de değil. Geriye **taban
-şekil/kapsama alanı** ile **yürüyüşün adım yapısı** kalıyor.
-
-**Sıradaki araç:** adım sayısını değiştirip bakmak (`numPrimarySteps` 80 → 20 ve → 160).
-Benek adım sayısıyla değişiyorsa yürüyüş, değişmiyorsa şekil alanı. Tek ölçüm, iki
-hipotezi ayırıyor.
-
-### Ayar dosyası düzenlemesi oyuna ulaşmıyor
-
-Bu belirtinin dört turu **boşa gitti** çünkü `.asset` düzenlemelerinin çalışma zamanına
+Bir belirtinin **dört turu** boşa gitti çünkü `.asset` düzenlemelerinin çalışma zamanına
 geçtiği doğrulanmadan ölçüm yapıldı. İki ayrı tuzak var:
 
 - **Volume alanları çalışma zamanı KOPYASINDAN okunuyor.** `DebugMenu.cs` bunu zaten
