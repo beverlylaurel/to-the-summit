@@ -562,9 +562,21 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
             // Belirti ufka yapışık, kesikli, kapsama 0'da kayboluyor, gece de gündüz de
             // var — hepsi menzil bitmesiyle tutarlı, aydınlatmayla değil.
             //
-            // 4'te menzil 55,6 km. ADIM SAYISI DEĞİŞMİYOR, yani kare süresi de
-            // değişmiyor; takas yalnız yakın alandaki adım inceliğinden veriliyor.
-            cloudsMaterial.SetFloat(maxStepSize, cloudsVolume.altitudeRange.value / 4.0f);
+            // ÇAKMA (ikinci tur). Bölen 4 → 6 ve adım sayısı 80 → 128.
+            //
+            // 4'te adım inceliği katman kalınlığına bağlıydı ve katman kalınlaşınca
+            // (hava/dağdan sürülüyor, 2000 → 3298 m) adım 500 m'den 824 m'ye çıktı. Boş
+            // alanda yürüyüş adımı İKİYE KATLADIĞI için sıçrama 1.6 km'ye ulaştı ve ince
+            // bulutların içinden atlamaya başladı: uzaktakiler hiç örneklenmiyor, yalnız
+            // yaklaşınca beliriyorlardı.
+            //
+            // PROBLA ÖLÇÜLDÜ: 3618 m'de, kapsama %99 iken gökyüzünün tamamı MAVİ —
+            // yani ışın hacmin içinden geçiyor ama hiçbir yerde yoğunluk bulmuyor.
+            // Kırmızı (kesişme yok) ya da turuncu (geometri engeli) değil.
+            //
+            // 6'da adım 550 m, 128 adımla menzil 70 km: hem eskisinden ince hem
+            // uzağa gidiyor. Bedeli kare süresi — adım sayısı %60 arttı.
+            cloudsMaterial.SetFloat(maxStepSize, cloudsVolume.altitudeRange.value / 6.0f);
 
             // Dikey gorus acisinin tanjanti. Shader bunu `_ScreenSize.w` ile carpip bir
             // ekran pikselinin metre basina dunya boyunu buluyor; gurultu bant siniri

@@ -347,7 +347,7 @@ MonoBehaviour:
     dimension: 1
   cloudMapSize:
     m_OverrideState: 1
-    m_Value: 40000
+    m_Value: 48000
   cloudCoverage:
     m_OverrideState: 1
     m_Value: 0.65
@@ -507,10 +507,10 @@ MonoBehaviour:
     m_Value: 1
   shadowResolution:
     m_OverrideState: 1
-    m_Value: 256
+    m_Value: 1024
   shadowDistance:
     m_OverrideState: 1
-    m_Value: 8000
+    m_Value: 12000
   shadowOpacity:
     m_OverrideState: 1
     m_Value: 1
@@ -525,7 +525,7 @@ MonoBehaviour:
     m_Value: 1
   numPrimarySteps:
     m_OverrideState: 1
-    m_Value: 80
+    m_Value: 128
   numLightSteps:
     m_OverrideState: 1
     m_Value: 8
@@ -537,4 +537,4 @@ MonoBehaviour:
     m_Value: 0
   fadeInDistance:
     m_OverrideState: 1
-    m_Value: 5000
+    m_Value: 300

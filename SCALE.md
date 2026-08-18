@@ -6,6 +6,19 @@ neyin elle düzeltilmesi gerektiği. **Dağ büyütülüp küçültülmeden önc
 Yeni bir özellik eklerken sorulacak tek soru: *bu sayı dağın boyuna bağlı mı?* Cevap evet
 ise buraya yazılır — hangi kategoriye girdiği ve büyüdüğünde ne olacağıyla birlikte.
 
+**ÖLÇEK ARTIK ARAZİDEN OKUNUYOR.** Dağ elle yapılıyor (`Dağ Yapımı` penceresi) ve
+taban/zirve her kurulumda `TerrainData`'dan ölçülüyor — bir ayar dosyasından değil.
+Yani dağın boyunu değiştirmek için burayı okumak gerekmiyor; kuşaklar, kar çizgisi ve
+zirve fırtınası kendiliğinden kayıyor.
+
+Bu bir kez bozuldu ve ölçüldü: `peakAltitude` normalize kotu `MountainSettings.terrainHeight`
+(6189 m) ile çarpıyordu ama arazinin gerçek tavanı 8000 m'ye çıkmıştı. Zirve 6001 m yerine
+**4642 m** okunuyor, taban da ayardan **186 m** geliyordu; kar çizgisi o yanlış boydan
+türeyip dağı baştan aşağı beyaza boyuyordu. İkisi de artık araziden.
+
+Aşağıdaki tablolar hâlâ geçerli — ama **elle bakılacak** sütunu artık yalnız araziden
+türetilemeyen sayılar için.
+
 Üç kategori var:
 
 - **Kendiliğinden ölçeklenir** — orana bağlı, dokunmaya gerek yok
@@ -116,7 +129,7 @@ Bu yüzden yukarıdaki üç tablonun bir kısmı risk altında. Kırılanlar iki
 | **`cloudMapSize`** | 40 000 m | görünen bölgeyi kapsamalı | **KIRILIR** — bulutlar uzak dağların üstünde biter, gökyüzü ortadan kesilir |
 | `MAX_SKYBOX_VOLUMETRIC_CLOUDS_DISTANCE` | 200 000 m | 300 km | bakılacak — ufkun %74'ü |
 | Ufuk haritası (`HorizonResolution` 1024, 30 km) | oyun alanı | 300 km | **YENİ İŞ** — 100 km ötedeki dağlar şafakta güneşi kapatmalı; şu an modellenmiyor |
-| Bulut gölge mesafesi 8 000 m | oyun alanı | — | sorun yok, yerel |
+| Bulut gölge mesafesi 12 000 m + çözünürlük 1024 | arena yatay | — | cookie kamera-merkezli, oyuncuyu takip eder; texel = bölge/çözünürlük ≈ 27 m. Arena genişlerse texel büyür (lapa) — çözünürlük birlikte artmalı. Dağın **boyuna** bağlı DEĞİL |
 
 **Derinlik hassasiyeti:** far clip 52.5 → 300 km, yani 5.7 kat. Ters-Z ile float derinlik
 bunu rahat taşıyor; asıl belirleyici yakın düzlem. Yine de uzak bant geldiğinde z-savaşı
@@ -155,8 +168,31 @@ oyuncunun çıkabileceği en yüksek kot değişirse yeniden hesaplanır.
 bağımsız. Izgaraya L1'de dönüşüyor; oradaki 4.28 m/örnek sınırı yukarıdaki tabloda
 zaten yazılı.
 
-## Onaylanmış dağ
+## Şu anki dağ
 
-Şu anki değerler `Assets/Settings/MountainSettings.asset` içinde: `terrainSize 30000`,
-`terrainHeight 6189`, gerçek zirve **5709 m**, zemin **~140 m**. Dağın onaylanma kaydı
-`DECISIONS.md` → "Onaylanmış dağ: v1".
+Arazi `Assets/Terrain/MountainTerrainData.asset`; düzenlenebilir asıl
+`Assets/Terrain/Sculpts/_son.bytes` (1025², float32). Ayar dosyası DEĞİL — dağ elle
+yapılıyor.
+
+| ne | değer | nereden |
+|---|---|---|
+| Oyun alanı | 30 000 m | `TerrainData.size.x` |
+| Dikey tavan | 8 000 m | `TerrainData.size.y` |
+| Ölçülen zirve | ~6 001 m | `MountainGenerator.peakAltitude` (araziden) |
+| Ölçülen taban | ~0 m | `MountainGenerator.groundAltitude` (araziden) |
+| Izgara | 4097² | 7.32 m/örnek |
+| Yapım ızgarası | 1025² | 29.3 m/hücre |
+
+**Bunlardan türeyen hava kuşakları** (`AltitudeWeatherDriver`, oranlar sabit):
+
+| kuşak | formül | şu anki değer |
+|---|---|---|
+| Yağmur tavanı | taban + boy × 0.10 | 600 m |
+| Kar tabanı | yağmur tavanı + boy × 0.04 | 840 m |
+| Kalıcı kar çizgisi | kar tabanı + `permanentSnowRise` | 1 240 m |
+| Zirve fırtınası | zirve − 1000 m | 5 001 m |
+
+Dağ yeniden yontulunca dördü de kendiliğinden kayıyor. Karsız kalan pay şu an **%57**;
+dağ kısalırsa kar aşağı iner ve çıplak kaya azalır — kar çizgisi mutlak metre değil
+**boyun oranı** olduğu için (`RATIONALE.md` → Kuşaklar).
+

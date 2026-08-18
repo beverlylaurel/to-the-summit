@@ -167,19 +167,12 @@ Async compute, point light döngüsü, partikül enjeksiyonu kapsam dışı bır
 
 ## Arazi mimarisi: dört katman, sembolik çapa (2026-08-17)
 
-Tasarım tarafı `DESIGN.md`'de. Burası **teknik** karşılığı: dağ nasıl üretilecek ve
-içerik ona nasıl tutunacak.
+Tasarım tarafı `DESIGN.md`'de; burası teknik karşılığı.
 
-### Dağ pişmiş İÇERİK, çalışma zamanı üretimi değil
-
-Dağ her oyunda yeniden üretilmez; herkeste **aynı dağ**. Editörde bir kez üretilir,
-çıktısı repoya yazılır, çalışma zamanı yalnızca yükler.
-
-**Gerekçe:** co-op senkron probleminin tamamını ortadan kaldırıyor — paylaşılan durum
-yoksa senkronlanacak bir şey de yok. Üretim kodunun hızı da önemsizleşiyor; tek seferlik.
-Önemli olan **çıktının kararlılığı**.
-
-### Dört katman
+**Dağ pişmiş İÇERİK.** Editörde bir kez üretilir, çıktı repoya yazılır, çalışma zamanı
+yalnız yükler; herkeste aynı dağ. Co-op senkron probleminin tamamını ortadan kaldırıyor —
+paylaşılan durum yoksa senkronlanacak şey de yok. Üretim hızı önemsiz, **çıktının
+kararlılığı** önemli.
 
 | katman | ne | değişince |
 |---|---|---|
@@ -188,49 +181,33 @@ yoksa senkronlanacak bir şey de yok. Üretim kodunun hızı da önemsizleşiyor
 | **L2 işaretler** | eğim kuşağı, bakı, korunaklılık, düz alan | türetilmiş, önbellek |
 | **L3 yerleşim** | mağara, kamp, konak, mezar, anıt | elle, **kaybolmamalı** |
 
-**L0 SAKLANIR.** Spec'in boru hattı Divide Tree'yi DEM'e çevirip atıyor (§5.6). Biz veri
-olarak tutacağız — içerik ona çapalanacak. Baştan kurulursa bedava, sonradan geri
-çıkarmak imkânsız.
+**L0 SAKLANIR.** Spec Divide Tree'yi DEM'e çevirip atıyor (§5.6); biz veri olarak
+tutuyoruz, içerik ona çapalanıyor. Baştan kurulursa bedava, sonradan geri çıkarmak
+imkânsız.
 
-**L3 DÜNYA KOORDİNATI TUTMAZ.** `(düğüm kimliği, yerel ofset, oturma kuralı)` tutar.
-Erozyon değişip L1 baştan üretilse bile kamp yerinde kalır, kendini yeniden oturtur.
-Mutlak koordinat kullanılırsa her yeniden üretim tüm yerleştirme emeğini çöpe atar —
-"ileride değiştirince patlar mı" sorusunun cevabı bu tek karardır.
+**L3 DÜNYA KOORDİNATI TUTMAZ** — `(düğüm kimliği, yerel ofset, oturma kuralı)` tutar.
+L1 baştan üretilse bile kamp yerinde kalır. Mutlak koordinat her yeniden üretimde tüm
+yerleştirme emeğini çöpe atardı; "ileride değiştirince patlar mı" sorusunun cevabı bu.
 
-### Mağara, tırmanış yüzeyi ve zirve MESH; arazi yükseklik haritası kalır
-
-Yükseklik haritası her (x,z) için tek yükseklik tutar: mağara, çıkıntı, tavan **temsil
-edilemez**. Voksel araziye geçmek tüm arazi shader'ını ve çarpışmayı çöpe atardı.
-
-Aynı sınırın ikinci sonucu ölçüldü: `heightmapResolution` 4097 → örnek başına **4.28 m**.
-Tırmanılacak çıkıntı ~1 m, Hillary Step ~12 m — yani **üç örnek**. Tırmanış geometrisi de
-haritaya sığmıyor.
-
-Üç inşa kipi:
+**Mağara, tırmanış yüzeyi ve zirve MESH.** Yükseklik haritası her (x,z) için tek yükseklik
+tutar: mağara, çıkıntı, tavan temsil edilemez. Voksele geçmek arazi shader'ını ve
+çarpışmayı çöpe atardı. İkinci sonuç ölçüldü: 4097 çözünürlükte örnek başına 4.28 m;
+tırmanılacak çıkıntı ~1 m, Hillary Step ~12 m — **üç örnek**.
 
 | kip | nerede | nasıl | alan payı |
 |---|---|---|---|
 | üretilen | yaklaşma, vadi, alt yamaç | yükseklik haritası | ~%90 |
 | üretilen + modül | orta dağ: tırmanış kesiti, mağara, kamp | harita + gömülü mesh | ~%9 |
-| elle tasarlanan | son kol → zirve | tamamen mesh, bölüm gibi | ~%1 |
+| elle tasarlanan | son kol → zirve | tamamen mesh | ~%1 |
 
-Alanın %1'i dramanın yarısını taşıyor. Zirve rastgeleliğe bırakılmaz.
+Alanın %1'i dramanın yarısını taşıyor; zirve rastgeleliğe bırakılmaz. Tırmanma mekaniği
+**önce mesh üstünde** kurulur, arazi eğimi ikincildir.
 
-**Sonucu:** tırmanma mekaniği **önce mesh üstünde** kurulur, arazi eğimi ikincildir.
+**Zorluk yüzeyden türer, yükseklikten değil.** Mekanik eğimi ve zemini okur; alçakta dik
+bir duvar bulunursa o da tırmanıştır. Eşik yok, özel durum yok.
 
-### Zorluk YÜZEYDEN türer, yükseklikten değil
-
-Mekanik eğimi ve zemini okur; yükseklikle korelasyon üretimden gelir. Alçakta dik bir
-duvar bulunursa o da tırmanıştır. Eşik yok, özel durum yok — projenin kendi mimarî
-kuralı (sistemler duruma bakar, sabite değil).
-
-### Co-op: tek oturum tohumu
-
-Dağ pişmiş içerik olunca geriye tek risk kalıyor: çalışma zamanında rastgelelikten
-türeyen her şey. **Bir oturum tohumu, host verir, her şey ondan türer.** Tohumsuz
-`Random` ve birikimli durum yasak.
-
-Mevcut ihlaller zaten envanterde: `COOP.md` madde 1 (şimşek) ve madde 6 (bulut rüzgârı).
+**Co-op: tek oturum tohumu.** Host verir, çalışma zamanındaki her rastgelelik ondan türer.
+Tohumsuz `Random` ve birikimli durum yasak. Mevcut ihlaller `COOP.md` madde 1 ve 6.
 
 **Tetikleyici:** araziye ya da yerleştirmeye dokunan her iş bu kaydı okumadan başlamaz.
 
@@ -240,26 +217,20 @@ Mevcut ihlaller zaten envanterde: `COOP.md` madde 1 (şimşek) ve madde 6 (bulut
 
 ### Dağın boyu ve oyun alanı DEĞİŞMİYOR
 
-Ölçüldü, mevcut kurulum tasarlandığı gibi çalışıyor:
-
 | ne | ölçüm |
 |---|---|
 | Spawn → zirve | 11 576 m |
 | Spawn → dağın eteği | 3 168 m |
 | Bisikletle (19 km/s) | **10.0 dakika** |
-| `road` | 193 nokta, 11.6–12.0 km bandı (ova yolu) |
-| `branches` | 2804 nokta, 7.7–11.6 km — yoldan dağa çıkan **üç kol** |
-| `camps` | 3 kamp, 7.75–8.91 km (eteğin iki yanı) |
+| `road` | 193 nokta, 11.6–12.0 km (ova yolu) |
+| `branches` | 2804 nokta, 7.7–11.6 km — yoldan dağa **üç kol** |
+| `camps` | 3 kamp, 7.75–8.91 km | 
 | `shops` | 1 dükkân, 11.4 km |
 
-Bir ara "arazi 17.5 → 36 km büyütülsün" önerildi; **ölçmeden söylenmişti, geri alındı.**
-Ova dar sanılmıştı — spawn eksende varsayılmış, oysa köşede ve ova orada 3.2 km.
-
-**Zirve kotu korunur** (~5709 m, `terrainHeight` tavanı 6189).
+Zirve kotu korunur (~5709 m, `terrainHeight` tavanı 6189). "Arazi 36 km'ye büyütülsün"
+önerisi **ölçmeden** söylenmişti, geri alındı — spawn eksende sanılmıştı, oysa köşede.
 
 ### Asıl sorun ölçek değil YAPI
-
-Kesit ölçüldü — eğri içbükey, yani doğru şekilde:
 
 | zirveden | kot | dilim eğimi |
 |---|---|---|
@@ -269,124 +240,77 @@ Kesit ölçüldü — eğri içbükey, yani doğru şekilde:
 | 6 000 m | 952 m | 25.1° |
 | 8 408 m (etek) | 186 m | 21.1° |
 
-Sorun sayıların büyüklüğü değil, **her azimutta aynı olması**. Bu radyal bir koni
-(`secondaryPeaks: 0`): yükseklik yalnız merkeze uzaklığın fonksiyonu. Üst 2 km her yönde
-48–57°, yani sürekli Eiger Kuzey Duvarı — yürünecek hiçbir hat yok.
+Eğri içbükey, yani doğru. Sorun sayılar değil **her azimutta aynı olmaları** — radyal koni
+(`secondaryPeaks: 0`), yükseklik yalnız merkeze uzaklığın fonksiyonu. Üst 2 km her yönde
+48–57°: sürekli Eiger Kuzey Duvarı, yürünecek hat yok.
 
-Gerçek dağda **sırt** 25–30° (rotalar oradan gider), **duvar** 50–60° (bakılır, çıkılmaz).
-Everest'te Güney Kol'dan zirveye ortalama 29°, çünkü sırttan gidiliyor.
-
-**Yapay görünmesinin sebebi de aynı kök.** İki şikâyet, tek sebep: sırt/duvar ayrımı yok.
-Divide Tree tam olarak bu ayrımı üretiyor.
+Gerçekte **sırt** 25–30° (rotalar oradan), **duvar** 50–60° (bakılır, çıkılmaz); Everest'te
+Güney Kol'dan zirveye ortalama 29°. "Yapay görünüyor" ve "yürünmüyor" tek kökten: sırt/duvar
+ayrımı yok. Divide Tree tam olarak bu ayrımı üretiyor.
 
 ### Üç bantlı mesafe temsili (gezegen boşluğu)
 
-Ölçüm — ufuk küre üzerinde `sqrt(2Rh)`:
-
-| kot | ufuk | arazi (8.76 km) |
-|---|---|---|
-| 186 m (ova) | 48.7 km | 6 kat eksik |
-| 2 000 m | 159.7 km | 18 kat eksik |
-| 5 709 m (zirve) | **269.9 km** | **31 kat eksik** |
-
-Belirti: her kotta ufukta gezegen boşluğu görünüyor, yükseldikçe belirginleşiyor.
+Ufuk `sqrt(2Rh)`: ova 186 m → 48.7 km, 2000 m → 159.7 km, zirve 5709 m → **269.9 km**.
+Arazi 8.76 km, yani zirvede **31 kat** eksik — belirti her kotta ufukta gezegen boşluğu.
 
 | bant | mesafe | temsil | çarpışma |
 |---|---|---|---|
-| oynanan | 0–18 km | Unity Terrain, tam detay, 4.28 m/örnek | var |
+| oynanan | 0–18 km | Unity Terrain, 4.28 m/örnek | var |
 | çevre | 18–60 km | kaba mesh, ~100 m/örnek | yok |
 | ufuk | 60–300 km | çok kaba mesh, ~1 km/örnek | yok |
 
-Çevre + ufuk: tek mesh, tek çizim çağrısı, ~150 bin köşe, gölge yok, tek basit malzeme.
-Bütün bölgenin verisi birkaç MB — **uzak dünya yakın dünyadan kat kat ucuz**, çünkü
-pahalı olan çarpışma, doku ve detay ve uzakta hiçbiri yok.
+Çevre + ufuk tek mesh, tek çizim çağrısı, ~150 bin köşe, gölge yok. Bir kez pişirilir,
+oyuncu yaklaşamayacağı için LOD/akış yok.
 
-**Oyuncu oraya asla yaklaşamayacağı için** LOD geçişi, akış ve güncelleme de yok. Bir kez
-pişirilir, bir daha dokunulmaz.
+**Ucuzluğun sebebi numara değil fizik:** 100 km ötedeki dağ hava perspektifinden zaten mavi
+siluet (PBSky kurulu), 60 km'de ~200 m / 300 km'de ~1 km köşe aralığı piksel altına düşüyor.
 
-**Ucuzluğun sebebi numara değil FİZİK:** 100 km ötedeki dağ hava perspektifinden dolayı
-zaten mavi bir siluet. O saçılım (PBSky) zaten kurulu. 60 km'de ~200 m, 300 km'de ~1 km
-köşe aralığı piksel altına düşüyor.
+**Eğrilik zorunlu.** Zemin düşüşü: 20 km → 31 m, 60 km → 282 m, 270 km → **5 715 m**. Düz
+kurulursa uzak dağlar ufuk çizgisinin üstünde yüzer. (270 km'deki 5715 m ile zirvenin
+5709 m'si örtüşüyor — zirveden tam 270 km görülmesi bu yüzden.)
 
-**EĞRİLİK ZORUNLU.** Uzak bant küre üzerinde kurulur:
+**Mesh, gökyüzü dokusu değil.** Oyuncu dikeyde 5.5 km yükseliyor, ufuk 49 → 270 km açılıyor;
+tırmandıkça ufkun ardından yeni dağlar doğuyor. Boyalı skybox bunu yapamaz.
 
-| mesafe | zeminin düştüğü kot |
-|---|---|
-| 20 km | 31 m |
-| 60 km | 282 m |
-| 270 km | **5 715 m** |
-
-Düz kurulursa uzak dağlar ufuk çizgisinin üstünde yüzer, anında sahte görünür.
-(270 km'deki 5715 m düşüş ile zirvenin 5709 m'si örtüşüyor — zirveden tam 270 km görülmesi
-bu yüzden.)
-
-**MESH, GÖKYÜZÜ DOKUSU DEĞİL.** Oyuncu yatayda kısıtlı ama dikeyde 5.5 km yükseliyor;
-ufuk 49 km'den 270 km'ye açılıyor, yani **tırmandıkça ufkun ardından yeni dağlar doğuyor**.
-Boyalı skybox sabittir, bunu yapamaz. Mesh geometriden bedava yapar.
-
-**Uzakta ağaç NESNE DEĞİL RENK.** ~2 km ötesinde orman arazi dokusunun tonudur. Billboard
-ve mesh yalnız yakın alanda. Bu kural konmazsa uzak bantlar ucuz olmaktan çıkar.
+**Uzakta ağaç nesne değil renk** — ~2 km ötesinde orman arazi dokusunun tonudur. Bu kural
+konmazsa uzak bantlar ucuz olmaktan çıkar.
 
 ### Tek jeneratör, geniş bölge, üç çözünürlük
 
-Üretilecek olan bir dağ değil **bir bölge**: ~540 km kare (270 km yarıçap). Oyun alanı
-onun merkezindeki 17.5 km.
+Üretilen bir dağ değil **bir bölge**: ~540 km kare, oyun alanı merkezdeki 17.5 km. Argudo'nun
+ölçeği zaten bu; 540 km verilirse silsile üretir — "etrafta farklı dağlar olsun" isteği
+yöntemin doğal çıktısı. Üç bant aynı alandan örneklendiği için dikiş yok.
 
-Argudo'nun kendi ölçeği zaten bu — yöntem gerçek silsilelerin (Alpler, Himalaya)
-orometrik istatistiklerinden çalışıyor. 17.5 km verilirse tek dağ üretir; 540 km verilirse
-**silsile** üretir: farklı boyda ve karakterde dağlar, vadiler, etek tepeleri. "Etrafta
-farklı dağlar olsun" isteği yöntemin doğal çıktısı, ek iş değil.
-
-Üç bant aynı alandan örneklendiği için **dikiş sorunu yok**.
-
-**HER YER DAĞ OLMAYACAK.** Uzak bant manzaradır, oynanacak alan değil — 360° zirve duvarı
-tuhaf görünür. Gerçek bir silsilenin etrafı çeşitlidir: bir yönde asıl kütle ve etek
-tepeleri, başka yönde açık ova, bir yönde vadi ve alçak sırtlar, bir yönde neredeyse düz.
-(Everest'in kuzeyi Tibet platosu — kilometrelerce boş yüksek düzlük.)
-
-Argudo kendi başına bırakılırsa istatistiğe uyup **her yere zirve serper**. Yön yön
-karakter dağılımı ona ayrıca söylenecek: dağlık, tepelik, ova, plato. Bu bir ayar değil,
+**Her yer dağ olmayacak.** 360° zirve duvarı tuhaf görünür; gerçek silsilenin etrafı çeşitli
+(Everest'in kuzeyi Tibet platosu). Argudo kendi başına istatistiğe uyup her yere zirve
+serper — yön yön karakter dağılımı (dağlık/tepelik/ova/plato) ona ayrıca verilir. Ayar değil,
 üretimin girdisi.
 
 ### Yapı araziye uyar, arazi yapıya değil
 
-Bir ara "kamp ve konak için arazi yerel olarak düzleştirilecek" denmişti. **Yanlış.**
+"Kamp ve konak için arazi düzleştirilecek" denmişti, **yanlış**. Dağ yapıları eğime kurulur:
+Namche Bazaar teraslarla, dağ evleri taş sekilere ve istinat duvarlarına.
 
-Gerçekte dağ yapıları eğime kurulur: Namche Bazaar dik bir çanağın içinde teraslarla,
-dağ evleri taş sekilere, istinat duvarlarına, kademeli temellere oturur. Kimse dağı
-düzleştirmez.
+**Kural:** bina kendi temelini taşır, arazi olduğu gibi kalır. Kazandırdığı: yeniden üretim
+güvenli, daha gerçekçi, seki/istinat duvarı karakter veriyor.
 
-**Kural:** bina kendi temelini taşır — taş seki, istinat duvarı, kademeli kat, gerekirse
-ayak. Arazi olduğu gibi kalır.
-
-Kazandırdığı: yeniden üretim güvenli (silinecek arazi düzenlemesi yok), daha gerçekçi,
-görsel olarak daha zengin — istinat duvarı ve seki karakter veriyor.
-
-**Yerleştirme kuralı da değişiyor:** "düz yer bul" değil, **"uygun eğim bandı bul"** —
-kabaca 10–30°. Çadır için 3×2 m'lik <15° bir düzlük yeterli, o her yerde var.
-
-**Asıl kısıt eğim değil GÜVENLİK.** Kaya düşme hattına, çığ oluğuna, kar birikme çanağına
-yapı konmaz — gerçekte de konmaz. L2'nin işi: eğim, bakı, korunaklılık, çığ maruziyeti.
+Yerleştirme ölçütü "düz yer bul" değil **"uygun eğim bandı bul"** (~10–30°); çadır için
+3×2 m'lik <15° her yerde var. **Asıl kısıt eğim değil güvenlik** — kaya düşme hattına, çığ
+oluğuna, kar birikme çanağına yapı konmaz. L2'nin işi: eğim, bakı, korunaklılık, çığ.
 
 ### Üretim son söz değil: çapalı düzeltme işlemleri
 
-Üretim her şeyi doğru veremez. Bilinen tek gerçek ihtiyaç: **sırtın yürünebilir
-sürekliliği.** Erozyon sırtın ortasında bir kopukluk bırakabilir ve rota oradan geçemez.
+Bilinen tek gerçek ihtiyaç **sırtın yürünebilir sürekliliği** — erozyon sırtta kopukluk
+bırakabilir. Düzeltmeler yükseklik haritasına **elle yapılmaz** (yeniden üretimde silinir);
+L0'a çapalanmış işlem olarak saklanır ("47–48 boyunları arasındaki kopukluğu kapat") ve
+üretimden sonra otomatik uygulanır. Boru hattı: **üret → çapalı işlemleri uygula → pişir.**
 
-**Düzeltmeler yükseklik haritasına ELLE YAPILMAZ** — dağ yeniden üretildiğinde hepsi
-silinir. L3 ile aynı çözüm: düzeltme de **L0'a çapalanmış bir işlem** olarak saklanır
-("47 numaralı boyunla 48 arasındaki sırtta kopukluğu kapat"), üretimden sonra otomatik
-tekrar uygulanır.
-
-Yani boru hattı tek yönlü değil: **üret → çapalı işlemleri uygula → pişir.**
-
-Kamp ve konak bu listede **yok** — yapı araziye uyduğu için düzeltme gerektirmiyorlar.
+Kamp ve konak bu listede yok — yapı araziye uyduğu için düzeltme gerektirmiyorlar.
 
 ### Sınır doğal olacak
 
-Oyuncu 8.76 km'de arazinin kenarına ulaşabilir ve çarpışmasız banda girmemeli. Sınır
-görünmez duvar değil, **arazinin kendisi** olacak: nehir, yarma, buzul çatlak alanı,
-uçurum hattı.
+Oyuncu arazinin kenarına ulaşıp çarpışmasız banda girmemeli. Sınır görünmez duvar değil
+**arazinin kendisi**: nehir, yarma, buzul çatlak alanı, uçurum hattı.
 
 **Tetikleyici:** ufukta boşluk görülürse ya da uzak dağlar ufuk çizgisinin üstünde
 yüzüyorsa buraya bakılır.
@@ -395,65 +319,25 @@ yüzüyorsa buraya bakılır.
 
 ## L0 girdisi: Everest bölgesi, mesafeye göre prominence eşiği (2026-08-17)
 
-Plan: `.claude/PRPs/plans/terrain-l0-divide-tree.plan.md`. Bu kayıt planın iki kapısını
-kapatıyor.
+Plan: `.claude/PRPs/plans/terrain-l0-divide-tree.plan.md`.
 
-### Kaynak veri: Kirmse veritabanı, masaüstünde
+**Kaynak veri.** `orometry-terrains-master/data/` içindeki dosyalar repoda **sahte** (yalnız
+Drive bağlantısı). Gerçekleri `Desktop/tts/specs/terrain`'de, **repoya girmiyorlar**:
+`alliso-sorted.txt` 1.1 GB / 24 749 538 satır, `prominence-p100.txt` 331 MB / 7 798 709
+satır. Sütunlar: enlem, boylam, kot(ft), key saddle enlem/boylam, prominence(ft).
 
-`orometry-terrains-master/data/` içindeki `prominence-p100.txt` ve `alliso-sorted.txt`
-repoda **sahte** — yalnız Google Drive bağlantısı taşıyorlar. Gerçekleri indirildi:
+**Bölge: `himalaya-everest`**, merkez `[27.8575, 86.8267]`. 100 km yarıçapta 5 230 zirve,
+0.131/km², en yüksek beş 8840·8480·8440·8370·8348 m, prominence ortancası 70 m.
 
-| dosya | boyut | satır |
-|---|---|---|
-| `alliso-sorted.txt` | 1.1 GB | 24 749 538 |
-| `prominence-p100.txt` | 331 MB | 7 798 709 |
+Gerekçe: orometrisi "bir baskın dev + kademeli komşular + bir yanda yüksek plato (Tibet)"
+karakterinde — "her yer dağ olmayacak" kuralına doğal uyum. Ayrıca **yeşil→kar** isteğini
+karşılayan tek aday: Khumbu'da 2500–4000 m rododendron ormanı, ağaç sınırı ~4000 m, kar
+çizgisi ~5200 m. (Karakurum baştan çıplak; Alpler hem alçak hem baştan sona yeşil.)
+**Sınır:** bölge seçimi yalnız şeklin istatistiğini veriyor; bitki örtüsü ve kar çizgisi
+L2 ile yüzey malzemelerinin işi.
 
-Konum: `C:\Users\musta\Desktop\tts\specs\terrain` — **repoya girmiyorlar**, proje dizini dışında kalıyorlar.
-Sarmalayıcı script yolu parametre alacak, kopya tutulmayacak.
-
-Doğrulandı: `prominence-p100.txt`'in ilk satırı `27.9883, 86.9250, 29002 ft` — Everest'in
-kendisi, dosya prominence'a göre sıralı. Sütunlar: enlem, boylam, kot(ft), key saddle
-enlem/boylam, prominence(ft).
-
-### Bölge karakteri: `himalaya-everest`
-
-Merkez `[27.8575, 86.8267]` (`Synthesis.ipynb` hücre 5'in kendi ön ayarı).
-
-**Ölçüldü** — 100 km yarıçap, 40 000 km²:
-
-| | |
-|---|---|
-| Zirve | 5 230 |
-| Yoğunluk | 0.131 /km² |
-| En yüksek beş | 8 840 · 8 480 · 8 440 · 8 370 · 8 348 m |
-| Prominence ortancası | 70 m |
-
-**Gerekçe:** oyunun kurgusu Everest ölçeğinde ve orometrisi "bir baskın dev + kademeli
-daha küçük komşular + bir yanda yüksek plato (Tibet)" karakterini taşıyor —
-"her yer dağ olmayacak" kuralına doğal uyum.
-
-Ayrıca kullanıcının **yeşil→kar** isteğini karşılayan tek aday: Khumbu vadisi 2500–4000 m
-arası rododendron ormanı ve teraslı tarla, ağaç sınırı ~4000 m, kar çizgisi ~5200 m.
-Karakurum aşağıdan itibaren çıplak kaya ve moloz; Alpler hem alçak (Mont Blanc 4808) hem
-baştan sona yeşil.
-
-**Sınır:** bölge seçimi buraya yalnız **şeklin istatistiğini** veriyor. Bitki örtüsü ve
-kar çizgisi L2 ile yüzey malzemelerinin işi, L0 çıktısında görünmez.
-
-### Prominence eşiği MESAFEYE GÖRE kademeli
-
-Ham yoğunluk 540 km'lik bölgeye taşınınca **38 127 zirve** çıkıyor; sentez saatler sürer.
-Ölçüldü:
-
-| eşik | 100 km'de zirve | 540 km bölgede |
-|---|---|---|
-| 0 m | 5 230 | 38 127 |
-| 100 m | 1 781 | 12 983 |
-| 200 m | 688 | 5 016 |
-| 300 m | 351 | 2 559 |
-| 500 m | 132 | 962 |
-
-**Karar** — eşik banda göre değişir:
+**Prominence eşiği mesafeye göre kademeli.** Ham yoğunluk 540 km'ye taşınınca 38 127 zirve
+çıkıyor, sentez saatler sürüyor.
 
 | bant | alan | eşik | zirve |
 |---|---|---|---|
@@ -462,230 +346,132 @@ Ham yoğunluk 540 km'lik bölgeye taşınınca **38 127 zirve** çıkıyor; sent
 | ufuk 60–270 km | 217 700 km² | 300 m | ~1 920 |
 | | | **toplam** | **~2 450** |
 
-**Gerekçe fizik, kısayol değil:** 100 km'de bir ekran pikseli ≈ 47 m. 300 m'den alçak bir
-tümsek o mesafede zaten çözülmüyor. 15 kat azalma, görsel kayıp yok.
+Gerekçe fizik: 100 km'de bir ekran pikseli ≈ 47 m, 300 m'den alçak tümsek zaten
+çözülmüyor. 15 kat azalma, görsel kayıp yok.
 
-**Ölçek bağımlılığı:** eşikler **mutlak metre** — gerçek dünyanın prominence tanımı, dağın
-boyuna bağlı değil. Bant sınırları (18/60/270 km) ise **ufuk mesafesinden** türüyor, yani
-gezegen yarıçapına bağlı, dağın boyuna değil.
+**Ölçek bağımlılığı:** eşikler mutlak metre (prominence tanımı dağın boyuna bağlı değil);
+bant sınırları ufuk mesafesinden, yani gezegen yarıçapından türüyor.
 
-**Tetikleyici:** ufukta dağlar seyrek ya da kalabalık görünüyorsa eşikler buradan
-ayarlanır; zirve sayısı patlarsa da buraya bakılır.
+**Tetikleyici:** ufukta dağlar seyrek ya da kalabalık görünüyorsa, ya da zirve sayısı
+patlarsa buraya bakılır.
 
 ---
 
 ## Referans boru hattı uçtan uca koşturuldu — bulgular (2026-08-17)
 
-Unity'ye tek satır yazmadan önce yazarların kodu kendi verisiyle çalıştırıldı. Amaç:
-"yaptığımız şey doğru mu" sorusunu tahminle değil **resimle** cevaplamak.
-
-Ortam: Python 3.11.9 + numpy · scipy · scikit-image · POT · pandas · shapely · triangle.
-`noise` paketi Windows'ta derlenmiyor; aynı imzada Perlin yedeği yazıldı (referans
-dosyalarına dokunulmadı, gürültü elevMap'e %5 ağırlıkla giren bir sarsıntı).
-
-**Ölçümler:**
+Unity'ye tek satır yazmadan önce yazarların kodu kendi verisiyle koşturuldu. Ortam:
+Python 3.11.9 + numpy · scipy · scikit-image · POT · pandas · shapely · triangle. `noise`
+paketi Windows'ta derlenmiyor; aynı imzada Perlin yedeği yazıldı.
 
 | adım | süre | çıktı |
 |---|---|---|
-| Bölge kesme + birleştirme (Kirmse) | ~1 dk | 7 330 zirve CSV |
-| L0 — `synthDivideTree` | **25 sn** | 949 zirve, 948 boyun, 1809–8562 m |
-| Poisson örnekleme (90×90 km, r=0.18) | 26 sn | 151 093 örnek |
-| L1 — `divideTreeToMesh` | **14 sn** | 172 332 köşe, 344 583 üçgen |
-| DEM rasterleme (30 m/piksel) | 5 sn | 3000×3000, 228–8553 m |
+| Bölge kesme + birleştirme | ~1 dk | 7 330 zirve |
+| L0 `synthDivideTree` | **25 sn** | 949 zirve, 948 boyun, 1809–8562 m |
+| Poisson (90×90 km, r=0.18) | 26 sn | 151 093 örnek |
+| L1 `divideTreeToMesh` | **14 sn** | 172 332 köşe, 344 583 üçgen |
+| DEM rasterleme (30 m/px) | 5 sn | 3000×3000, 228–8553 m |
 
-### KANITLANDI
+**Kanıtlandı:** makro yapı doğru (dallanan sırtlar, vadiler, tutarlı akarsu ağı, doğru
+drenaj) · `probMap = 0` gerçekten kesiyor, o bölge ovaya döndü — "her yer dağ olmayacak"
+mekanizması uçtan uca doğrulandı · sırt sürekliliği var · `MountainGenerator.Erode`
+Python'a birebir çevrildi, 3000²×20 iterasyon 10 sn.
 
-- **Makro yapı doğru.** Dallanan sırtlar, aralarında vadiler, vadi tabanında tutarlı
-  akarsu ağı, doğru drenaj yönü. Radyal koninin veremediği her şey.
-- **`probMap = 0` gerçekten kesiyor.** O bölge kendiliğinden ovaya döndü. "Her yer dağ
-  olmayacak" mekanizması uçtan uca doğrulandı — teori değil.
-- **Sırt sürekliliği var.** Yürünecek hat mevcut.
-- **Mevcut erozyon kodumuz taşınıyor.** `MountainGenerator.Erode` Python'a birebir
-  çevrildi, 3000² × 20 iterasyon **10 sn**.
+**Kanıtlanmadı — asıl risk: yüzey detayı.** Argudo iskeleti ve vadileri veriyor, yüzeyi
+vermiyor; erozyon kodu repoda yok, o parça Galin 2019'un işi ve yayınlanmamış. Bir deneme
+başarısız oldu: çok oktavlı gürültü + mevcut erozyon, sonuç daha pürüzsüz çıktı — 46°
+talus × 20 iterasyon 30 m ızgarada eklenen detayın tamamını sildi.
 
-### KANITLANMADI — ASIL KALAN RİSK
+**Ders:** detay katmanı takılan değil **tasarlanan** bir şey. Frekans içeriği, genliği ve
+nereye uygulanacağı hesaplanır; yer tutucu gürültüyle geçiştirilemez.
+(Sonradan doğrulandı — bkz. `SYMPTOMS.md`, Nyquist alias.)
 
-**Yüzey detayı.** Argudo iskeleti ve vadileri veriyor, **yüzeyi vermiyor**; yakın planda
-üçgenler görünüyor. Notebook'un kendi yorumu: erozyon kodu repoda yok. O parça
-Galin 2019'un işi ve yazarlar yayınlamamış.
+**Ovanın kusuru:** zirve konmayan bölge fazla düz çıkıyor, mesh uzak noktalar arasında düz
+interpolasyon yapıyor. Kullanıcının tarifi "tepecikli düz ova"; çare alçak prominence'lı
+tepecikler ve/veya detay katmanını oraya da uygulamak.
 
-Bir deneme yapıldı ve **başarısız oldu**: çok oktavlı gürültü + mevcut erozyonumuz.
-Sonuç daha detaylı değil daha pürüzsüz çıktı — 46° talus açısıyla 20 iterasyon, 30 m
-ızgarada eklenen detayın tamamını sildi.
+**Not — söküm tablosu geçersiz.** Bu kayıtta `Erode`, teraslar ve çok oktavlı gürültünün
+`MountainGenerator`'da kalacağı yazıyordu. Sonradan arazi içeriğinin tamamı pişirilmiş
+yükseklik haritasından geliyor; jeneratörün prosedürel çıktısı araziye hiç girmiyor
+(`SYMPTOMS.md`, "menü düğmesi haritayı hiç uygulamıyordu").
 
-**Ders:** detay katmanı takılan bir şey değil, tasarlanan bir şey. Frekans içeriği,
-genliği ve nereye uygulanacağı Galin 2019'dan çıkarılacak. Yer tutucu gürültüyle
-geçiştirilemez.
-
-### SÖKÜM KÜÇÜLDÜ
-
-`MountainGenerator` komple silinecekti. Ölçüm bunu değiştirdi — dağın **şekli**
-değişiyor, **yüzeyi** değişmiyor:
-
-| mevcut kodda | durum |
-|---|---|
-| `Erode` (talus 46.1°, 20 iterasyon, `erosionRate` 0.1) | **kalıyor** — Argudo'nun üstüne |
-| Teraslar (kaba 26 + ince 50 bant) | **kalıyor** |
-| Çok oktavlı gürültü, warp, `ridgeSharpness` | **kalıyor** |
-| `heightProfile`, `mountainRadius`, radyal koni | **gidiyor** — yerini Divide Tree alıyor |
-| `peakSpread`, `secondaryPeaks`, `radialDistortion` | **gidiyor** |
-
-### OVANIN KUSURU
-
-Ölçümde görüldü: zirve konmayan bölge **fazla düz** çıkıyor — düzlem parçaları, hiç
-kabartı yok. Sebebi biliniyor: orada zirve yok, mesh uzak noktalar arasında düz
-interpolasyon yapıyor.
-
-Kullanıcının tarifi "tepecikli düz ova". Çare: ovaya alçak prominence'lı tepecikler
-koymak (ayrı bir prominence grubu) ve/veya detay katmanını oraya da uygulamak. L1'de
-çözülecek.
-
-**Tetikleyici:** yakın planda üçgen yüzeyler görülüyorsa detay katmanı eksik demektir,
-buraya bakılır.
+**Tetikleyici:** yakın planda üçgen yüzeyler görülüyorsa detay katmanı eksik demektir.
 
 ---
 
 ## Ovanın kotu KAPANDI: 186 m kalıyor, sıcaklık değişti (2026-08-17)
 
-**Ölçüm.** Yeni arazi oyun alanında (merkez 17.5 km) üretildi: 4097², 4.28 m/örnek,
-kot **517–5709 m**. Eğim dağılımı:
+**Ölçüm.** Oyun alanı 4097², kot 517–5709 m, ortanca eğim **38.2°**, ova yok.
+Eğim payları: yürünür (0–15°) %6.7, dik yürünür %24.5, el-ayak %35.6, tırmanış %33.2.
 
-| kuşak | pay |
-|---|---|
-| yürünür (0–15°) | %6.7 |
-| dik yürünür (15–30°) | %24.5 |
-| el-ayak (30–45°) | %35.6 |
-| tırmanış (45–90°) | %33.2 |
+**Çelişki.** Zirve 5709 m, ova 186 m, arası 9 km → ortalama iniş 32°. Gerçekte yok ve
+Argudo üretemez (istatistik gerçek dağlardan). Everest'te Base Camp 5364 m, en yakın ova
+100+ km ötede. Ama kullanıcının tarifi ("tepecikli düz ovada başla", "yeşillik, sonra
+kar", bisikletle 10 dk) **kot söylemiyor** — 186 m arazinin sayısı, tasarım kararı değil.
 
-Ortanca eğim **38.2°**. Oyun alanında **ova yok**.
+**KARAR: A — ova 186 m kalıyor, sıcaklık değişiyor.** Önce B (ova 2400 m, Khumbu vadisi
+karşılığı) öneriliyordu; **bir kısıt yanlış varsayıldığı için değişti** — sıcaklık modeli
+sabit sanılmıştı, oysa `seaLevelCelsius` tek bir serbest sayı.
 
-**Çelişki.** Mevcut tasarım zirveyi 5709 m'ye, ovayı 186 m'ye, ikisini **9 km** araya
-koyuyor. Ortalama iniş 32°. Gerçek dünyada böyle bir şey yok ve Argudo'nun istatistiği
-onu üretemiyor — çünkü istatistik gerçek dağlardan geliyor. Everest'te Base Camp
-**5364 m**, en yakın ova 100+ km ötede.
-
-**Ama kullanıcının tarifi 186 m'yi gerektirmiyor olabilir.** Söylenenler:
-
-- "oyun tepecikli düz ovada başlayacak"
-- "dağın yamacına doğru ilerleyip kamp kurulacak"
-- "oyunun ilk anlarında yeşillik baskın olacak, kamptan sonra kar başlayacak"
-- bisikletle ~10 dakika (ölçüldü: 3168 m)
-
-Hiçbiri **kot** söylemiyor. 186 m mevcut arazinin sayısı, tasarım kararı değil.
-
-### İki seçenek
-
-**A — 186 m korunur.** Bölge maskesine güneybatıdan içeri sokulan alçak bir sektör
-eklenir; ova 11 km'de başlar. Oyun akışı aynen korunur.
-*Bedeli:* o bölge jeolojik olarak tutarsız kalır — 50 km ötede 3000 m'lik dağlar varken
-11 km'de 186 m. Ufuk bandından bakınca fark edilebilir.
-
-**B — ova ~2400 m'ye çıkarılır.** Khumbu vadisi karşılığı.
-*Kazandırdığı:* zirveden vadiye iniş 5709 − 2400 = 3300 m / 9 km = **20°**, doğal.
-Yeşillik gerçeğe uyar (Khumbu'da rododendron ormanı 2500–4000 m, ağaç sınırı ~4000 m).
-Kar kamptan sonra başlar (kar çizgisi ~5000 m, kamp ~4000 m). Bölge tutarlı kalır.
-*Bedeli:* `baseHeight` 0.03 → ~0.39 değişir; hava kuşakları (donma seviyesi, kar çizgisi,
-tipi kuşağı) zeminden türediği için **yeniden ölçülür**. `SCALE.md`'nin "kendiliğinden
-ölçeklenir" tablosu bunu zaten kapsıyor, yani otomatik — ama gece parlaklığı gibi elle
-kalibre edilmiş şeyler kontrol edilir.
-
-### KARAR: A — ova 186 m kalıyor. Değişen sıcaklık.
-
-Öneri önce B idi ve **değişti**, çünkü bir kısıt yanlış varsayılmıştı: sıcaklık modeli
-sabit sanılıyordu. Değilmiş — `seaLevelCelsius` tek bir sayı ve serbest.
-
-Ölçüldü. İkisinde de ovada +6.5 °C (yağmur, yeşillik) olacak şekilde ayarlanırsa:
+İkisinde de ovada +6.5 °C olacak şekilde ayarlanırsa:
 
 | | ova 186 m | ova 2400 m |
 |---|---|---|
 | Gereken `seaLevelCelsius` | **+7.8** | +22.1 |
-| Ovada sıcaklık | +6.6 °C | +6.5 °C |
 | Kar çizgisi | 1 200 m | 3 400 m |
 | **Zirvede** | **−29.3 °C** | −15.0 °C |
 | **Tırmanılacak dikey** | **5 523 m** | 3 309 m |
 | Ortalama eğim | 33.3° | 21.5° |
-| Bisiklet turu | 10 dk | 10 dk |
 
-**186 m'nin kazandırdığı:** tırmanış %67 daha uzun (oyunun adı bu), zirve gerçekten
-öldürücü (−29 °C, rüzgârla −38 °C hissedilen), ve mevcut hiçbir şey bozulmuyor — spawn,
-yol, üç kol, kamplar, `SCALE.md` sayıları yerinde kalıyor.
+186 m tırmanışı %67 uzatıyor (oyunun adı bu), zirveyi gerçekten öldürücü yapıyor
+(−29 °C, rüzgârla −38 °C hissedilen) ve mevcut hiçbir şeyi bozmuyor — spawn, yol, üç kol,
+kamplar, `SCALE.md` yerinde. **Ödenen:** oyun alanı ortalama 33°, Argudo'nun kendiliğinden
+üretmeyeceği bir diklik; ama oyun alanı bölgenin %0.1'i ve uzak bantlardan görünmez.
 
-**Ödenen:** oyun alanının ortalama eğimi 33°, Argudo'nun kendiliğinden üretmeyeceği bir
-diklik. Ama oyun alanı bölgenin **%0.1'i** ve zirve bloğu zaten elle tasarlanacaktı;
-ufuk bantlarından o anomali görünmez.
+**Uygulanan: `seaLevelCelsius` −3 → +7.8.** −3 donma seviyesini deniz seviyesinin 462 m
+ALTINA koyuyordu: dağın tamamı donmuş, her kotta kar, "başlangıçta yeşillik ve yağmur"
+**imkânsız**. +7.8 → donma seviyesi 1200 m (= 1200 × 6.5 °C/km); ova +6.6 °C ve yağmur,
+sulu kar 1200–1422 m, saf kar üstünde. Tam fırtına donma seviyesini 500 m indiriyor.
 
-### Uygulanan: `seaLevelCelsius` −3 → +7.8
+`Game.unity:2166` serileştirilmiş −3 taşıyordu, o da güncellendi. Mimari değişiklik
+gerekmedi (`AltitudeWeatherDriver.UpdateFreezingLevel` zaten `FreezingLevel` okuyor).
 
-**−3 neydi:** donma seviyesi deniz seviyesinin 462 m ALTINDA, yani dağın tamamı donmuş,
-yağış her kotta kar. Kodun kendi yorumu bunu bilinçli bir seçim olarak yazıyordu.
-"Başlangıçta yeşillik ve yağmur" isteği o kurulumda **imkânsızdı**.
-
-**+7.8 ne veriyor:** donma seviyesi 1200 m. Ova (186 m) öğlen +6.6 °C ve **yağmur**
-alıyor; sulu kar 1200–1422 m; saf kar üstünde, yani etekteki kamptan ~1 km yukarıda.
-Tam fırtına donma seviyesini 500 m indiriyor — kampa kar yağabiliyor.
-
-Sayı kar çizgisinden türedi: 1200 m × 6.5 °C/km.
-
-**Sahne dosyası da güncellendi.** `Game.unity:2166` serileştirilmiş `-3` taşıyordu; C#
-varsayılanını değiştirmek mevcut sahneyi etkilemezdi.
-
-**Mimari değişiklik gerekmedi.** `AltitudeWeatherDriver.UpdateFreezingLevel` zaten
-`temperature.FreezingLevel`'ı okuyor ve `snowFloor`'u sabit bant genişliğiyle türetiyor.
-
-**DOĞRULANMAMIŞ — yağmur yolu bugüne kadar hiç çalışmadı.** Yağmur tavanı −368 m'ydi,
-yani oyunda hiç yağmur yağmamış. Sabah ilk bakılacak şeylerden biri.
+**DOĞRULANMAMIŞ:** yağmur tavanı −368 m'ydi, yani oyunda bugüne kadar hiç yağmur yağmadı.
 
 ---
 
 ## Yüzey detayı ÇÖZÜLDÜ — tarif ve dersler (2026-08-17)
 
-Referans repoda erozyon kodu yok (yazarların iç C++ kütüphanelerine bağlı, yayınlanmamış).
-Spec'ten (`§3.5`, `§3.6`, `§5.7`, `§5.8`) yazıldı: `Tools/terrain/detail.py`.
+Referans repoda erozyon kodu yok (yayınlanmamış). Spec'ten yazıldı: `Tools/terrain/detail.py`.
+Sonuç: 4.28 m/örnek, zirve **tam 5709 m** korunuyor, düğüm kotlarında ortanca kayma 17 m
+(prominence tavanı 65 m'nin altında).
 
-**Sonuç:** oyun alanı 17.5 km, 4.28 m/örnek, zirve **tam 5709 m korunuyor**, düğüm
-kotlarında ortanca kayma 17 m (prominence tavanı 65 m'nin altında).
+**Tarif — üç parça, üçü de gerekli:**
 
-### Tarif — üç parça, üçü de gerekli
+1. **İnce taban mesh**, `refineDistance` 120 → **30 m**. Asıl kırılma noktası: gürültü
+   genliği prominence tavanıyla sınırlı (65 m) ve 320 m dalga boyunda ancak 18° eğim
+   üretiyor, yüzeyler 30–50°. **Gürültü yüzeyleri kıramaz, üstünde gezer.**
+2. **Multifraktal gürültü** (§3.5), genlik 52 m < prominence tabanı 65 m (§5.7). Her oktav
+   **döndürülerek** örnekleniyor (§3.6) — hizalı oktavlar ızgara artefaktı üretir.
+   `× (1 − U)` ile çarpılıyor: zirve ve boyunlarda sıfır, kot birebir korunuyor.
+3. **Çok ölçekli kısıtlı erozyon** (§5.8), telafi edici uplift `g(r) = (1−r²)³`,
+   `R_infl` 400 m.
 
-**1. İnce taban mesh.** `refineDistance` 120 m → **30 m**. Asıl kırılma noktası bu:
-gürültünün genliği prominence tavanıyla sınırlı (65 m) ve 320 m dalga boyunda ancak
-18°'lik eğim üretiyor; yüzeyler 30–50°. **Gürültü yüzeyleri kıramaz, sadece üstünde
-gezer.** Kaba mesh'i gürültüyle kurtarmaya çalışmak boşuna.
+**Dört ders — üçü hatadan:**
 
-**2. Multifraktal gürültü** (`§3.5`), genlik 52 m < prominence tabanı 65 m (`§5.7`).
-Her oktav **döndürülerek** örnekleniyor (`§3.6`) — hizalı oktavlar ızgara artefaktı
-üretir. Gürültü `× (1 − U)` ile çarpılıyor: zirve ve boyunlarda sıfıra gidiyor, kot
-birebir korunuyor.
+- **"100/50/30 m" IZGARA ÇÖZÜNÜRLÜĞÜDÜR**, iterasyon sayısı değil. Ölçüldü: 46.1° talus ×
+  4.28 m hücre = 4.45 m'lik maksimum adım, eklenen detayın tamamı o eşiğin üstünde ve
+  erozyon onu baştan yiyordu. Doğrusu: kaba ızgaraya indir, aşındır, farkı geri büyüt.
+- **Farkın geri büyütülmesi pürüzsüz olmalı.** `np.repeat` dikdörtgen ızgara artefaktı
+  çıkardı (`SYMPTOMS.md` "sert kırpma" sınıfı); kübik spline kullanılıyor.
+- **Spec'in uplift işareti yanlış.** `H_{i+1} = E_i + U·ΔH_i, ΔH_i = E_i − H_i` — erozyon
+  alçalttığına göre `ΔH < 0` ve bu daha da alçaltıyor; zirvede (U=1) sonuç `2E − H`, yani
+  erozyonun iki katı. Uygulanan: `H_{i+1} = (1−U)·E_i + U·H_i`.
+- **`α` fonksiyonu makalede YOK** (spec §9.1 açık nokta). Seçilen: o ana kadar birikmiş
+  değerin `[0,1]`'e normalize hâli — makalenin tarif ettiği **davranışı** veriyor (vadi
+  düzleşir, zirve detay kazanır). Formül değil, seçim; burada kayıtlı.
 
-**3. Çok ölçekli kısıtlı erozyon** (`§5.8`), telafi edici uplift `g(r) = (1−r²)³`,
-`R_infl` 400 m.
-
-### Dört ders — üçü hatadan
-
-**"100 m, 50 m, 30 m" IZGARA ÇÖZÜNÜRLÜĞÜDÜR, iterasyon sayısı değil.** Önce ince
-ızgarada iterasyon sanıldı. Ölçüldü: 46.1° talus × 4.28 m hücre = **4.45 m**'lik
-maksimum adım, yani eklenen detayın tamamı o eşiğin üstünde ve erozyon onu baştan
-yiyordu. Doğrusu: kaba ızgaraya indir, orada aşındır, farkı geri büyüt.
-
-**Farkın geri büyütülmesi PÜRÜZSÜZ olmalı.** `np.repeat` ile blok blok büyütülünce
-dikdörtgen ızgara artefaktı çıktı — `SYMPTOMS.md`'deki "sert kırpma" sınıfı. Kübik
-spline ile büyütülüyor.
-
-**Spec'in uplift işareti yanlış.** Yazılan:
-`H_{i+1} = E_i + U·ΔH_i, ΔH_i = E_i − H_i`. Erozyon alçalttığına göre `ΔH < 0` ve bu
-ifade daha da alçaltıyor — zirvede (U=1) sonuç `2E − H`, yani erozyonun **iki katı**.
-Telafi edici uplift olamaz. Uygulanan: `H_{i+1} = (1−U)·E_i + U·H_i` — U=1'de orijinal
-korunur, U=0'da tam erozyon.
-
-**`α` fonksiyonu makalede YOK** (spec `§9.1` açık nokta olarak işaretli). Seçilen:
-o ana kadar birikmiş değerin `[0,1]`'e normalize hâli. Makalenin tarif ettiği
-**davranışı** veriyor — alçak yerde yüksek frekans bastırılır (vadi düzleşir), yüksek
-yerde güçlendirilir (zirve detay kazanır). Formül değil, seçim; burada kayıtlı.
-
-### Açık kalan
-
-Düğüm kotlarında **en kötü kayma 172 m** — prominence tavanının üstünde. Kaynağı 100 m
-ızgarada aşınan ve `R_infl` 400 m'nin dışında kalan bir düğüm. `R_infl`'in ölçekle
+**Açık:** düğüm kotlarında en kötü kayma **172 m**, prominence tavanının üstünde. Kaynağı
+100 m ızgarada aşınan ve `R_infl` 400 m'nin dışında kalan bir düğüm. `R_infl`'in ölçekle
 büyümesi gerekebilir; ölçülmedi.
 
 **Tetikleyici:** yakın planda üçgen yüzey görülüyorsa `refineDistance`'a bakılır,
@@ -695,11 +481,9 @@ gürültüye değil.
 
 ## Yaklaşma koridoru: ova oyun alanına giriyor (2026-08-17)
 
-Ova 186 m'de kalınca maskenin onu oyun alanına sokması gerekti. Güneybatıya (212°) inen
-tek bir **koridor** — azimut sektörü değil, eksene uzaklık; sektör pasta dilimi üretiyor
+Ova 186 m'de kalınca maskenin onu oyun alanına sokması gerekti. Güneybatıya (212°) inen tek
+bir **koridor** — azimut sektörü değil, eksene uzaklık; sektör pasta dilimi üretiyor
 (bir kez yaşandı).
-
-**Ölçülen sonuç** (koridor içinde, zirveden uzaklığa göre):
 
 | bant | kot | ortanca eğim | yürünür |
 |---|---|---|---|
@@ -708,105 +492,59 @@ tek bir **koridor** — azimut sektörü değil, eksene uzaklık; sektör pasta 
 | yamaç 6–8 km | 355–2051 m | 23.2° | %37 |
 | kütle 0–4 km | 1623–5709 m | 42.7° | %12 |
 
-Ova "hafif tepecikli düz" — istenen buydu. Spawn 186 m'de, bisiklet turu bozulmadı.
+Ova "hafif tepecikli düz" — istenen buydu; spawn 186 m'de, bisiklet turu bozulmadı.
 
-### Tırmanılabilirlik: rota VAR
+**Tırmanılabilirlik: rota VAR.** Alan ortalaması 4–6 km bandında 48.7° verip duvar
+sandırdı — **yanlış araç**. En-az-maliyetli hat (Dijkstra, maliyet `mesafe × (1+(eğim/25)⁴)`):
+17.56 km yol (düz mesafe 8.41 km, %109 zikzak), ortanca **18.1°**, %90'lık dilim 26°, en dik
+adım 42.2°, teknik tırmanış (>45°) **%0**. Gerçek dağ da böyledir: yüzler dik, rota sırttan
+gider ve iki katı yol yürür. Oyuncu rotayı **bulmak** zorunda, zorlanmak zorunda değil.
 
-Alan ortalaması 4–6 km bandında 48.7° verdi ve duvar sanıldı. **Yanlış araç.** En-az-maliyetli
-hat arandı (Dijkstra, maliyet `mesafe × (1 + (eğim/25)⁴)`):
-
-| | |
-|---|---|
-| Rota uzunluğu | **17.56 km** (düz mesafe 8.41 km — %109 zikzak) |
-| Ortanca eğim | **18.1°** |
-| %90'lık dilim | 26° |
-| En dik adım | 42.2° |
-| Teknik tırmanış (>45°) | **%0** |
-| Yürünür / dik yürünür / el-ayak | %38 / %58 / %4 |
-
-Gerçek dağ da böyledir: yüzler dik, rota sırttan gider ve iki katı yol yürür.
-
-**Sonuç:** zirve modülü elle tasarlanacağı için gerçek tırmanış oradan gelecek; doğal
-arazi zaten yürünebilir bir hat sunuyor. Bu iyi — oyuncu rotayı **bulmak** zorunda,
-zorlanmak zorunda değil.
-
-### Geri alınan bir deneme
-
-Koridorun tepesi kütleye "otursun" diye doğrusal rampa yazıldı. **Ölçüm kötüleşti,
-geri alındı** — duvar kalkmadı, dışarı itildi:
-
-| bant | sabit tepe | "sürekli birleşme" |
-|---|---|---|
-| etek 8–10 km | 10.1° / %72 | 13.6° / %55 |
-| yamaç 6–8 km | **23.2° / %37** | **52.4° / %8** |
-| rota ortancası | 18.1° | 19.5° |
-
-Sebep: doğrusal rampa `t=3`'ten başlıyor, 6–8 km hâlâ kütle kotunda kalıyor.
+**Geri alınan deneme.** Koridorun tepesi kütleye "otursun" diye doğrusal rampa yazıldı;
+ölçüm kötüleşti, geri alındı — duvar kalkmadı, dışarı itildi (yamaç 6–8 km: 23.2°/%37 →
+**52.4°/%8**). Sebep: rampa `t=3`'ten başlıyor, 6–8 km hâlâ kütle kotunda kalıyor.
 
 ---
 
 ## L0 uygulandı — yöntemin ölçülmüş sınırları (2026-08-17)
 
 Plan `.claude/PRPs/plans/terrain-l0-divide-tree.plan.md`, araç zinciri `Tools/terrain/`,
-çıktı `Assets/Terrain/DivideTree.txt` (7268 zirve, 7267 boyun, tohum 36044).
+çıktı `Assets/Terrain/DivideTree.txt` (7268 zirve, 7267 boyun, tohum 36044). Dördü
+düzeltildi, biri açık.
 
-Aşağıdakiler **ölçülerek** bulundu. Dördü düzeltildi, biri açık kaldı.
+**Yükseklik ZİRVELERDEN gelir, `elevMap`'ten değil.** `elevMap` yalnız zirvenin **nereye**
+konacağını söylüyor; zirvesiz bölgede yükseklik bilgisi yok ve arazi tabana çöküyor.
+Ölçüm: plato 3600 m tasarlandı, yoğunluk 0.06 verilince arazide ortanca **103 m** çıktı;
+yoğunluk yükseltilince 1894 m'ye geldi. **Kural:** bir bölgenin belli kotta durmasını
+istiyorsan oraya zirve koymak zorundasın.
 
-### Yükseklik ZİRVELERDEN gelir, `elevMap`'ten değil
+**`probMap`'in ilk indeksi X'tir.** `divtree_synthesis.py:24` → `normCoords[:,0]` X.
+`[kuzey, doğu]` kurulursa silsile **90° dönük** çıkar. Bir kez yaşandı.
 
-`elevMap` yalnız zirvenin **nereye** konacağını söylüyor. L1 yüksekliği divide tree'den
-kuruyor; zirvesiz bölgede yükseklik bilgisi yok ve arazi tabana çöküyor.
+**Histogram eşlemesi uygulanmıyor.** Yazarların `mapToPDF` adımı kontrol görselleri
+birimsiz olduğu için zorunlu; bizim `elevMap`'imiz **metre** ve tasarımdan geliyor
+(ova 186, plato 3600, zirve 5709). Eşlemek bozuyor — bir turda plato 3600 → **1127 m**.
 
-**Ölçüm:** plato 3600 m tasarlandı, yoğunluk 0.06 verilince arazide ortanca **103 m**
-çıktı. Yoğunluk yükseltilince 1894 m'ye geldi.
+**Dağılımın tavanı zirvenin ALTINDA olmalı.** Tavan zirveyle eşit olunca prominence/
+dominance adımı sentezlenmiş bir zirveyi **5789 m**'ye çıkardı ve bizimki üçüncü sıraya
+düştü. Tavan 5500 m'ye çekildi; zirve artık inşaat gereği 209 m üstte — Everest 8840 ile
+Lhotse 8516 arasındaki 324 m'nin bu ölçekteki karşılığı.
 
-**Kural:** bir bölgenin belli bir kotta durmasını istiyorsan oraya **zirve koymak
-zorundasın**. Yoğunluk sıfıra yakınsa o bölge çöker.
-
-### `probMap`'in ilk indeksi X'tir
-
-`divtree_synthesis.py:24` → `probMap[normCoords[:,0]*shape[0], normCoords[:,1]*shape[1]]`
-ve `normCoords[:,0]` X'tir. Diziler `[kuzey, doğu]` kurulursa silsile **90° dönük** çıkar
-— doğu-batı zincir kuzey-güney şerit olur. Bir kez yaşandı.
-
-### Histogram eşlemesi UYGULANMIYOR
-
-Yazarların `mapToPDF` adımı zorunlu, çünkü kontrol görselleri **birimsiz** gri tonlama.
-Bizim `elevMap`'imiz **metre** ve tasarımdan geliyor (ova 186, plato 3600, zirve 5709).
-Eşlemek onu bozuyor: bir turda plato 3600 → **1127 m**'ye düştü.
-
-### Dağılımın tavanı zirvenin ALTINDA olmalı
-
-Tavan zirveyle eşit olunca prominence/dominance eşleme adımı sentezlenmiş bir zirveyi
-**5789 m**'ye çıkardı ve bizimki üçüncü sıraya düştü. Tavan 5500 m'ye çekildi; zirve artık
-**inşaat gereği** 209 m üstte. Fark uydurma değil — Everest 8840 ile Lhotse 8516
-arasındaki 324 m'nin bu ölçekteki karşılığı.
-
-### AÇIK: gerçek bir plato bu yöntemle çıkmıyor
-
-Yoğunluk düşükse plato ada ada kopuyor; yüksekse dağlıktan ayırt edilemiyor. Sebep: vadi
-oyma derinliği `maxSlopeCoeff` ve sırt–akarsu mesafesinden geliyor, yoğunluktan değil.
-Düşük kabartılı yüksek düzlük için L1'de ayrı bir müdahale gerekiyor.
-
-Şimdilik yoğunluk 0.60 ile "yüksek tepelik" olarak duruyor. Manzara olduğu için (120 km+
-ötede) kabul edilebilir, ama **çözülmüş değil**.
-
+**AÇIK: gerçek bir plato bu yöntemle çıkmıyor.** Yoğunluk düşükse ada ada kopuyor, yüksekse
+dağlıktan ayırt edilemiyor. Sebep vadi oyma derinliği (`maxSlopeCoeff`) ve sırt–akarsu
+mesafesi, yoğunluk değil. Şimdilik yoğunluk 0.60 ile "yüksek tepelik"; manzara olduğu için
+(120 km+) kabul edilebilir ama **çözülmüş değil**.
 **Tetikleyici:** kuzey ufkunda plato yerine sıradan dağ görülüyorsa buraya bakılır.
 
-### Referans kodunun iki sınırı — dışarıdan aşıldı, kaynağa dokunulmadı
+**Referans kodunun iki sınırı — dışarıdan aşıldı, kaynağa dokunulmadı:**
+- `noise` paketi Windows'ta derlemiyor; aynı imzalı Perlin yedeği (`Tools/terrain/noise.py`).
+  Gürültü `elevMap`'e %5 ağırlıkla giren bir sarsıntı, türü sonucu belirlemiyor.
+- `fixedPeaks` tek satırda `squeeze()` ile sıfır boyuta düşüp `concatenate`'i patlatıyor.
+  İkinci sabit zirve konuldu — zaten doğrusu: Everest'in yanında Lhotse var.
 
-- `noise` paketi Windows'ta C uzantısı derlemiyor. Aynı imzalı Perlin yedeği yazıldı
-  (`Tools/terrain/noise.py`). Gürültü `elevMap`'e **%5 ağırlıkla** giren bir sarsıntı,
-  türü sonucu belirlemiyor.
-- `fixedPeaks` **tek satırda** `squeeze()` ile sıfır boyuta düşüyor ve `concatenate`
-  patlıyor (yazarların örneği dört sabit zirveyle yazılmış). İkinci sabit zirve konuldu —
-  zaten doğrusu: Everest'in yanında Lhotse var, tek koni tam da kaçtığımız şey.
-
-### Kimlik = dizi indeksi; `readDivideTree` KULLANILMAZ
-
-Referansın kendi okuyucusu kırpma sınırında düğümleri yeniden sıralıyor (`peakReorder`,
-`saddleReorder`). İçerik çapalarının tamamı kimliklere bağlı olduğu için o okuyucu
-kullanılmıyor; diziler doğrudan yazılıp doğrudan okunuyor.
+**Kimlik = dizi indeksi; `readDivideTree` KULLANILMAZ.** Referansın okuyucusu kırpma
+sınırında düğümleri yeniden sıralıyor (`peakReorder`, `saddleReorder`); içerik çapaları
+kimliklere bağlı olduğu için diziler doğrudan yazılıp doğrudan okunuyor.
 
 ---
 

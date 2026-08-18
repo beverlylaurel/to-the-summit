@@ -107,17 +107,29 @@ arazi yolu ondan öğrendi.
 
 ---
 
-## Bulutların çevresinde halka / bulut kenarında kontur
+## Bulut kenarında siyah kontur (arazi arkadayken görünür, gök arkadayken görünmez)
 
-**İlk şüpheli:** bulut ışın yürüyüşü. *(Yanlış — kapsama 0'da kontur da yoktu.)*
+**İlk şüpheli:** bulut ışın yürüyüşü, sonra zamansal birikim, sonra mesafe sınırı.
+*(Üçü de yanlış — kontur bunlar değişmeden duruyordu.)*
 
-**Sebep:** bulut **kenarı** pikselinde derinlik gerçek değil; paket oraya uzak düzlemin
-bir tık berisini koyuyor (`CLOUDS_RAW_FAR_CLIP_VALUE`). O pikseli **elemek** çözüm değil:
-elenince her bulutun çevresinde bir piksellik sissiz halka kalıyor ve arkasındaki her şey
-kontur kazanıyor.
+**Ayırt eden ölçüm:** F1 "Bulut sisini KAPAT" anahtarı. Kapatınca kontur gidiyor,
+yükseklik sisi arazide/gökte açık kalsa bile. Yani sebep birleştirme geçişinin sis bloğu.
 
-**Kural:** bilinmeyen mesafeye sayı uydurma, pikseli de eleme — **mesafeyi sınırla**.
-Sahnede hiçbir şey uzak düzlemden öteye gidemez.
+**Sebep:** bulut yarı çözünürlükte çiziliyor, renk **bilinear** büyütülüyor ama derinlik
+**nokta** örnekleniyor. Uyuşmadıkları bleed halkasında `edgeOfClouds` tetikleniyor ve
+derinliğe uzak düzlemin bir tık berisi (`CLOUDS_RAW_FAR_CLIP_VALUE`) **uyduruluyordu**.
+Sis o sahte mesafeyle (~70 km) hesaplanınca doyuyor → halka hava rengine boyanıyor.
+Arazi arkadayken (koyu) fark okunuyor, gök arkadayken (hava rengi≈gök) görünmüyor.
+Derinlik çıkışı kapatılınca **her** bulut pikseli uydurma alıyor → ince kontur yerine
+kocaman siyah lekeler. Aynı hata iki ölçekte.
+
+**Çözüm:** kombine geçişi derinlik **yazmıyor** (`Blend One SrcAlpha`), yani uydurmanın
+hiçbir işlevi yoktu. Kaldırıldı: halka pikseli uzak düzlem derinliğini korur → `hasCloud`
+false → sissiz geçer (opaklık≈0, görünmez). Gövde gerçek `meanDistance` türevli derinlikle
+sislenir. Eski "mesafeyi sınırla" telafisi (clamp) de silindi — gerekçesi kalktı.
+
+**Not:** "pikseli elemek 1px sissiz halka bırakır, o da kontur" korkusu ölçümle çürüdü
+(sis-tamamen-kapalı = temiz). Eleme değil, uydurmayı kesmek doğru olanmış.
 
 ---
 
@@ -369,53 +381,124 @@ kaydırmayı unutmak mümkün değil.
 **Kural:** dağ baştan üretildiğinde `patternSeed` de artırılır. Geometri yenilenip boya
 eski kalırsa oyuncu yeri tanır.
 
-## Arazide düzenli testere — ince olan çözüldü, büyük olan yöntemin kendisi
+## Kod diskte doğru, ekranda eski — sessiz bayatlık ailesi
 
-Kullanıcı: *"dağdaki bu düzenli testereleri törpüler misin"*, sonra *"gölge değil, arazi
-testereli, dağ böyle oluşmuş."* İkisi de doğruydu ve **iki ayrı testere** vardı.
+Aynı sınıftan **dört** tuzak ölçüldü. Belirti hep aynı ve aldatıcı: ölçüm doğru,
+düzeltme doğru, ekran değişmiyor. Sonra düzeltme "işe yaramadı" sanılıp geri alınıyor
+ve gerçek sebep bir tur daha kaçıyor.
 
-**İlk iki hipotezim yanlış çıktı, ikisi de ölçümle elendi:**
-
-| hipotez | ölçüm | sonuç |
+| ne bayatlıyor | neden | çözüm |
 |---|---|---|
-| hücre ölçeğinde teras | 44639 farklı yükseklik, düz komşu %1.11, ikinci fark 0.58 m | yok |
-| L0 zirveleri düzenli aralıklı | en yakın komşu değişim katsayısı **0.641** (tam rastgele 0.523) | düzensiz |
+| Yükseklik haritası PNG'si | `AssetDatabase` önbelleği, dışarıdan yazılan dosyayı fark etmiyor | zorla yeniden içe aktarma |
+| `.asset` ayarları | Volume çalışma-zamanı kopyası; dışarıdan düzenleme sessizce geri alınıyor | değerleri KODDAN asset'e yazmak (`ApplyCloudQuality`) |
+| Arazi menüsü | düğme yanlış işi yapıyordu, harita hiç uygulanmıyordu | düğmenin tam zinciri koşması |
+| **`.hlsl` include'ları** | Unity shader'ın hangi include'u kullandığını **takip etmiyor** | `ShaderIncludeWatcher` — include değişince shader'ları yeniden içe aktarır |
 
-**Doğru araç 2B güç spektrumu oldu.** Fraktal taban `dalgaboyu^4.74`; ondan sapan iki
-dalga boyu var ve ikisi ayrı sorumlu:
+**Kural:** bir düzeltme ekranda görünmediğinde ilk soru "yanlış mı yaptım" değil,
+**"çalışan sürüm gerçekten yeni mi"**. Yol testi önce: görülmemesi imkânsız bir değer
+ver, ekranda gör, sonra gerçek ölçüme geç.
 
-**14.7 m (iki hücre) — %242 fazla. SORUMLU BENİM TÖRPÜM.**
-`file_crests` `minimum_filter` ile fazlalığı çıkarıyordu: sivri gidiyordu ama yerine
-filtre yarıçapı boyunda **düz faset** kalıyordu.
+---
 
-| | 14.7 m enerji | sivri >400 m |
-|---|---|---|
-| eski törpü (çıkarma) | 3.42× | 0 |
-| törpüsüz (taban) | 1.87× | 29 |
-| **yeni törpü (Gauss harmanlama)** | **2.02×** | **14** |
+## Arazide düzenli testere — ÜÇ ayrı sebep, üçü de ölçümle bulundu
 
-Çıkarma yerine harmanlama: aşırı dik piksel Gauss ile pürüzsüzleştirilmiş yüzeye çekiliyor.
-Gauss ızgara frekansına enerji koymaz, faset oluşmuyor.
+Kullanıcı: *"dağdaki bu düzenli testereleri törpüler misin"*, *"gölge değil, arazi
+testereli"*, *"bazıları büyük bazıları ufak, aralarında metre farkı var"*, *"88 metreye
+ayarladığında bile var"*, ve ayrıca *"mikro çıkıntılar hiç yok, detaylar çok düz"*.
 
-**~937 m — %200 fazla. YÖNTEMİN KENDİSİ, ÇÖZÜLMEDİ.**
+Hepsi doğruydu. Aynı görüntünün arkasında üç ayrı sebep vardı; ikisi kapandı, biri
+yöntemin sınırı.
+
+### 1 — Menü düğmesi haritayı hiç uygulamıyordu (bir gün yaktı)
+
+`Araziyi Yeniden Üret` yalnız `gen.Generate()` çağırıyordu: araziyi
+`MountainGenerator`'ın kendi prosedürel çıktısıyla — eski radyal koni, terasları ve
+gürültüsüyle — dolduruyordu. Yükseklik haritası uygulanmıyordu.
+
+`Logs/tools.log`: harita araziye en son **13:44:53**'te ulaştı. Sonraki dokuz saatte altı
+pişirme yapıldı (8.8 m, 22 m, 58 m, 88 m, törpü, koruma maskesi) ve **hiçbiri ekrana
+çıkmadı**. Testere de zaten o jeneratörün terasıydı.
+
+**Kullanıcı iki kez doğruyu söyledi, ikisinde de dinlenmedi:**
+- *"eski dağ gibi birebir aynı yerleri görüyorum"* — prosedürel üretim aynı tohumla aynı
+  sonucu verir, pişen harita her turda değişiyordu. Tek başına kanıttı.
+- *"terrain fırçasıyla 10 saniyede düzeltirim"* — fırça **canlı araziye** yazıyor, yani
+  o an çalışan tek yol oydu.
+
+Düğme artık tam zinciri koşuyor: PNG zorla okunur → imza sıfırlanır → kurulum baştan üretir.
+
+### 2 — Nyquist alias: asıl testere (14.7 m, her irtifada)
+
+Hücre 7.324 m → ızgaranın taşıyabildiği en kısa dalga 14.65 m. `detail.multifractal`
+320 m tabandan **8 oktav** istiyordu: 320, 160, 80, 40, 20, **10, 5, 2.5** m. Son üç
+oktav sınırın altında ve geri katlanıyor — katlandıkları yer tam 2 hücre.
+
+```
+pismis haritada          80 m     14.7 m
+  ZIRVE                  1.72x     3.48x
+  ALT 11 km              1.02x     3.41x
+
+sentetik, oktav sayisina gore (cell 7.324 m, taban 320 m)
+  oktav 8 (en kisa 2.5 m)   2-hucre 1.57x
+  oktav 7 (5.0 m)                   1.49x
+  oktav 6 (10.0 m)                  1.09x
+  oktav 5 (20.0 m)                  0.23x   <- ucurum burada
+```
+
+**Alias yumuşatılamaz** — pürüz değil, ızgaranın taşıyamadığı bir dalganın görünüşü.
+Denenen üç filtre (eğim tavanı, Gauss harmanlama, tepe yuvarlama) hep *sonucu* siliyordu.
+Sınır `detail.multifractal` içine kondu; çağıranın doğru sayıyı bilmesine güvenilmiyor.
+
+**"Detay yok" şikâyeti aynı mekanizmadan.** Aliası bastırmak için konan `file_crests`
+(koşulsuz Gauss, σ = 2 hücre = 14.6 m) tam o dalga boyunda çalışıyordu. Ölçüldü: sınır
+açıkken torpu OLMADAN 2 hücre zaten 0.03x; torpu eklenince 25 m bandı 0.58x → **0.03x**.
+Telafi terimi silindi (`file_crests`, `despike`, `round_crests`).
+
+Bundan önceki törpü sürümü de kendi testeresini üretiyordu: `minimum_filter` ile çıkarma
+yapıyordu, sivri gidiyor ama yerine filtre yarıçapı boyunda **düz faset** kalıyordu
+(14.7 m enerjisi 3.42× — taban 1.87×).
+
+### 3 — ~937 m, %200 fazla: YÖNTEMİN KENDİSİ, ÇÖZÜLMEDİ
+
 Divide tree'nin ilkel birimi zirve; aradaki sırt düz çadır, siluet üçgen. Üç kaldıraç da
 kapalı:
 
-- **Zirve sayısı serbest değil**: `scalingFactor` gerçek Kirmse yoğunluğundan. 30×30 km'de
+- **Zirve sayısı serbest değil** — `scalingFactor` gerçek Kirmse yoğunluğundan; 30×30 km'de
   83 zirve = 10.8 km²'de bir, Himalaya için gerçekçi.
-- **Sırt kaydırması referansın kendi değeri** (`ridgesPerturbation 0.15`) ve **düzlemsel** —
-  yandan kıvrılıyor, kot profili düz kalıyor.
-- **Gürültü genliği spec sınırında** (§5.7, prominence tabanının altı). Taban 320 → 800 m
-  denendi: 937 m fazlası 3.02 → 2.86, yani işe yaramadı. Genliği büyütmek uydurma zirve
-  doğurur.
+- **Sırt kaydırması düzlemsel** (`ridgesPerturbation 0.15`) — yandan kıvrılıyor, kot düz.
+- **Gürültü genliği spec sınırında** (§5.7). Taban 320 → 800 m denendi: 937 m fazlası
+  3.02 → 2.86. Genliği büyütmek uydurma zirve doğurur.
 
-Gerçek sırtlarda ara tümsekler var ama onlar prominence tabanının (100 m) altında olduğu
-için veritabanında yok. Kapatmanın yolu L2/L3 mesh modülleri — tırmanılan yüzeyler zaten
-oraya devredilecek.
+Gerçek sırtlardaki ara tümsekler prominence tabanının (100 m) altında olduğu için
+veritabanında yok. Kapatmanın yolu L2/L3 mesh modülleri.
 
-**Kural:** "düzenli tekrar" şikâyetinde ölçek sorulur, çünkü aynı belirti farklı ölçeklerde
-farklı sorumludan gelir. Araç 2B güç spektrumu: fraktal taban düz bir doğru, sapan dalga
-boyu sorumluyu adıyla söyler.
+### Yanlış elenen şüpheliler — hepsi ölçüldü, hepsi masumdu
+
+| şüpheli | ölçüm |
+|---|---|
+| hücre ölçeğinde teras | 44639 farklı kot, düz komşu %1.11, ikinci fark 0.58 m |
+| L0 zirveleri düzenli aralıklı | en yakın komşu değişim katsayısı 0.641 (rastgele 0.523) |
+| üçgenleştirme fasetleri | düzlemsel hücre oranı %5-7 |
+| kar yer değiştirmesi | kapatıldı, testere kaldı |
+| üçgen ağı sıklığı | 45 → 25 m, crease metriği aynı |
+| normal dokusu çözünürlüğü | 2048 → 4096 → 2048 |
+| arazi LOD'u / `heightmapPixelError` | `maxLOD` 1, 88 m — değişmedi |
+| gölge / aydınlatma | kullanıcı ölçtü: arazi testereli, gölge onu takip ediyor |
+
+### Kurallar
+
+- **"Düzenli tekrar" şikâyetinde ölçek sorulur** — aynı belirti farklı ölçeklerde farklı
+  sorumludan gelir. Araç 2B güç spektrumu: fraktal taban düz bir doğru, sapan dalga boyu
+  sorumluyu adıyla söyler.
+- **Spektrumda taban doğrusu kesim bölgesini DIŞARIDA bırakan banda uydurulur.** İlk
+  ölçüm tüm banda uydurdu; sonlu oktavlı gürültünün roll-off'u uydurmayı aşağı çekti ve
+  olmayan bir tepe gösterdi ("zirvede 73-90 m'de 2.3x"). 30-600 m'ye sınırlanınca 1.72x'e
+  düştü, alçakta 1.02x — yani yoktu.
+- **Değişikliğin ekrana ulaştığı doğrulanmadan ölçüm yapılmaz.** Bu oturumda üç katmanda
+  aynı tuzak: `.asset` (Volume çalışma zamanı kopyası), PNG (`AssetDatabase` önbelleği),
+  menü (yanlış işi yapıyor). Yol testi önce: görülmemesi imkânsız bir değer verilir,
+  ekranda görülür, sonra gerçek ölçüme geçilir.
+
 
 ## Teşhis aracının kendisi
 
@@ -470,3 +553,4 @@ Sertlik bir *ne kadar* sorusudur.
 Prob sonuç vermiyorsa sıradaki araç **Unity Frame Debugger**: hangi geçişin ekrana ne
 yazdığını kesin gösterir. Yalnız kamera renk tamponuna yazan adımlara bakılır; motion
 vector, gölge haritası ve ara doku adımları tuhaf görünür, normaldir.
+

@@ -46,6 +46,28 @@ public class DebugMenu : MonoBehaviour
     bool freeFly;
 
     static readonly int TerrainShadowId = Shader.PropertyToID("_TerrainShadowReceive");
+    static readonly int TerminatorProbeId = Shader.PropertyToID("_TerminatorProbe");
+    static readonly int WorldRulerId = Shader.PropertyToID("_WorldRuler");
+    static readonly int CloudFogOffId = Shader.PropertyToID("_CloudFogOff");
+
+    bool worldRuler;
+
+    /// GEÇİCİ ÖLÇÜM DURUMU. Gölge kenarındaki zikzak parlaklıkla algılanamıyor; prob
+    /// soruyu "şerit mi blok mu"ya çeviriyor. Bileşim tutunca prob da bu alan da silinir.
+    bool terminatorProbe;
+
+    // İZOLASYON ANAHTARI: bulutların derinlik yazması. Bulut kenarındaki siyah kontur
+    // için şüpheli — kenar pikseline uydurma bir derinlik giriyor ve sis onu o
+    // mesafeden hesaplıyor. Elle Inspector'da kutu aramak yerine buradan.
+    VolumetricCloudsURP cloudsFeature;
+    bool cloudsDepthOff;
+
+    // İZOLASYON: zamansal birikim. Varsayılan 0.95, yani her karenin %95'i geçmişten
+    // geliyor. Kapsama %0 iken bile kontur görülüyor — bulut olmayan yerde çizgi,
+    // bayat geçmiş imzası.
+    bool temporalOff;
+    bool cloudFogOff;
+    VolumetricClouds cloudsVolume;
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
     float lockedSnowiness;
@@ -162,6 +184,31 @@ public class DebugMenu : MonoBehaviour
         // yazılmıyor, sıfır kalıyor ve arazi gölgesiz çiziliyordu. Oyunun normal hâli
         // panel kapalı olduğu için bu, oynanışın tamamını etkiliyordu.
         Shader.SetGlobalFloat(TerrainShadowId, 1f);
+        Shader.SetGlobalFloat(TerminatorProbeId, terminatorProbe ? 1f : 0f);
+        Shader.SetGlobalFloat(WorldRulerId, worldRuler ? 1f : 0f);
+
+        // BULUT SISINI TEK BASINA KAPATIR. Yukseklik sisi arazide ve gokte acik kalir.
+        // Kontur bu kapaliyken de duruyorsa sebep bulut birlestirme gecisi degildir.
+        Shader.SetGlobalFloat(CloudFogOffId, cloudFogOff ? 1f : 0f);
+
+        if (cloudsFeature == null)
+        {
+            var found = Resources.FindObjectsOfTypeAll<VolumetricCloudsURP>();
+            if (found.Length > 0) cloudsFeature = found[0];
+        }
+        if (cloudsFeature != null && cloudsFeature.OutputCloudsDepth == cloudsDepthOff)
+            cloudsFeature.OutputCloudsDepth = !cloudsDepthOff;
+
+        if (cloudsVolume == null)
+        {
+            var vol = UnityEngine.Object.FindAnyObjectByType<UnityEngine.Rendering.Volume>();
+            if (vol != null && vol.profile != null) vol.profile.TryGet(out cloudsVolume);
+        }
+        if (cloudsVolume != null)
+        {
+            cloudsVolume.temporalAccumulationFactor.overrideState = true;
+            cloudsVolume.temporalAccumulationFactor.value = temporalOff ? 0f : 0.95f;
+        }
 
         var keyboard = Keyboard.current;
         if (keyboard != null && keyboard.f1Key.wasPressedThisFrame) Toggle();
@@ -213,6 +260,7 @@ public class DebugMenu : MonoBehaviour
         DrawClouds();
         DrawOverlays();
         DrawSnowCollision();
+        DrawTerminatorProbe();
         EndColumn();
 
         GUILayout.EndHorizontal();
@@ -540,6 +588,48 @@ public class DebugMenu : MonoBehaviour
         }
 
         if (GUILayout.Button("Ayarları geri al")) host.SetActive(false);
+
+        EndSection();
+    }
+
+    /// GEÇİCİ ÖLÇÜM BÖLÜMÜ. Aydınlık-gölge sınırının biçimi.
+    void DrawTerminatorProbe()
+    {
+        BeginSection("Teşhis: gölge kenarı");
+
+        terminatorProbe = GUILayout.Toggle(terminatorProbe, "Sınır şeritleri");
+
+        worldRuler = GUILayout.Toggle(worldRuler, "CETVEL: dünya ızgarası");
+
+        using (new GUILayout.HorizontalScope())
+        {
+            cloudsDepthOff = GUILayout.Toggle(cloudsDepthOff, "Bulut derinliğini KAPAT");
+            temporalOff = GUILayout.Toggle(temporalOff, "Zamansal birikimi KAPAT");
+            cloudFogOff = GUILayout.Toggle(cloudFogOff, "Bulut sisini KAPAT");
+            GUILayout.Label(cloudsFeature == null ? "(feature bulunamadı)" : "",
+                            GUILayout.Width(140f));
+        }
+
+        if (worldRuler)
+        {
+            GUILayout.Label("camgöbeği = 10 m");
+            GUILayout.Label("kırmızı   = 100 m");
+            GUILayout.Label("sarı      = 1000 m");
+        }
+
+        if (terminatorProbe)
+        {
+            GUILayout.Label("İNCE AKICI ŞERİT = normal alanı düzgün");
+            GUILayout.Label("DİKDÖRTGEN BLOK  = ızgaraya oturmuş, zikzak var");
+            GUILayout.Label("gri gölge · mor mavi camgöbeği");
+            GUILayout.Label("yeşil sarı turuncu · açık gri aydınlık");
+        }
+
+        if (GUILayout.Button("Ayarları geri al"))
+        {
+            terminatorProbe = false;
+            worldRuler = false;
+        }
 
         EndSection();
     }

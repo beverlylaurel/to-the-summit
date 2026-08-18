@@ -21,10 +21,28 @@ public static class MountainSceneBootstrap
     /// değer yalnızca sahnede yaşıyordu. Gölgeyi düşüren mesh de bu LOD'dan çiziliyor:
     /// kaba siluetin ışık yönünden izdüşümü, gölge kenarına üçgen dişler olarak
     /// vuruyordu — yaklaşınca beliriyordu çünkü gölge mesafesi 150 metre.
-    /// SİLUET DİŞİ İLE KARE SÜRESİ ARASINDAKİ DENGE. 1 denendi ve ÖLÇÜLDÜ: FPS 150-200'den
-    /// 60'a düştü. 30 km'lik arazide LOD'u bir kademe geç sadeleştirmek üçgen sayısını
-    /// katlıyor; ödenecek bir bedel değil. Diş için başka kaldıraç aranır.
+    /// LOD ne zaman seyreltmeye başlasın (ekran pikseli). 1'e indirmenin bedeli
+    /// ölçüldü: FPS 170 -> 60. Seyreltmenin NE KADAR kabalaşacağını bu değil
+    /// `TerrainMaxLod` sınırlıyor.
     const float TerrainPixelError = 2f;
+
+    /// EN KABA LOD KADEMESI. Testere belirtisinin sebebi buydu ve analitik olarak
+    /// olculdu: her kademe ornekleri atliyor, ara nokta dogrusal kuruluyor ve aradaki
+    /// fark siluete basamak olarak cikiyor.
+    ///
+    ///   LOD 1  adim 14.6 m   ortanca hata  2.15 m   %95   8.7 m
+    ///   LOD 2  adim 29.3 m   ortanca hata  6.44 m   %95  25.9 m
+    ///   LOD 3  adim 58.6 m   ortanca hata 15.0 m    %95  60.1 m
+    ///   LOD 4  adim 117 m    ortanca hata 31.9 m    %95  126 m
+    ///
+    /// Bu, belirtinin her yanini aciklıyor: farkli yamalar farkli kademede oldugu icin
+    /// testerelerin boyu metrelerce degisiyor; en kaba kademede yama iki ucgene inince
+    /// duz yuzlu piramit cikiyor; ve yukseklik haritasini bulaniklastirmak ise yaramiyor
+    /// cunku hata veride degil, veriden ATLANAN orneklerde.
+    ///
+    /// 1'de en kaba adim 14.6 m, yani ortanca hata 2.15 m. Sifir tam detay demek ve
+    /// 30 km'de odenemez.
+    const int TerrainMaxLod = 1;
 
     /// Basemap fiilen kapalı: Unity bu mesafenin ötesindeki araziyi malzemeyle değil,
     /// malzemenin bir kez pişirilmiş 1024'lük fotoğrafıyla çizer. O fotoğraf canlı
@@ -79,15 +97,24 @@ public static class MountainSceneBootstrap
             EditorApplication.delayCall += Run;
     }
 
-    /// Yükseklik haritasını ayarlardan SIFIRDAN kurar. Kurulum normalde yalnız ayar
-    /// imzası değişince üretiyor; sahnede araziye elle dokunulduğunda (fırça, yükseltme)
-    /// imza aynı kaldığı için o değişiklik kalıcı oluyordu.
+    /// TAM ZİNCİR. Eskiden yalnız `gen.Generate()` çağırıyordu ve bu, arazinin
+    /// içeriğini `MountainGenerator`'ın KENDİ prosedürel çıktısıyla dolduruyordu —
+    /// eski radyal koni, terasları ve çok oktavlı gürültüsüyle. Yükseklik haritası
+    /// uygulanmıyor, tesviye yapılmıyor, yüzey haritaları pişirilmiyordu.
     ///
-    /// Üretim deterministik — bütün rastgelelik `settings.seed`'den türüyor — yani sonuç
-    /// eskisinin birebir aynısı, eksik olan yalnız elle yapılan değişiklik.
+    /// BU BİR GÜN YAKTI. Kullanıcı testere belirtisini kovalarken bu düğmeye onlarca
+    /// kez bastı; her basış benim ürettiğim yükseklik haritasını eski jeneratörün
+    /// çıktısıyla EZDİ. `Logs/tools.log`: yükseklik haritası araziye en son 13:44:53'te
+    /// uygulanmış, aradaki dokuz saatte altı kez yeniden pişirildi ve hiçbiri ulaşmadı.
+    /// Testere de zaten eski jeneratörün terasıydı.
     ///
-    /// Yüzey haritaları araziden türüyor: bundan sonra "Yüzey Haritaları" penceresinden
-    /// yeniden pişirilmezse eski arazinin gölgesi ve karı hayalet olarak kalır.
+    /// İmza da sıfırlanıyor: `GetAssetDependencyHash` PNG dışarıdan yazıldığında
+    /// güncellenmeyebiliyor ve kurulum "değişmemiş" deyip üretimi atlıyor.
+    /// Kurulumu dışarıdan koşturur. `Dağ Yapımı` penceresi kaydettikten sonra çağırıyor:
+    /// pencere yüzey haritalarını bayat ilan ediyor ama tazeleyen bir şey yoktu ve
+    /// kullanıcı doğru gölgelendirmeyi ancak Play'e girip çıkınca görüyordu.
+    public static void Rebuild() => RegenerateTerrain();
+
     [MenuItem("To The Summit/Arazi/Araziyi Yeniden Üret", false, 20)]
     static void RegenerateTerrain()
     {
@@ -96,14 +123,11 @@ public static class MountainSceneBootstrap
             throw new System.InvalidOperationException(
                 "Sahnede MountainGenerator yok; önce kurulum çalışmalı.");
 
-        EditorUtility.DisplayProgressBar("Dağ", "Yükseklik haritası üretiliyor...", 0.5f);
-        try { gen.Generate(); }
-        finally { EditorUtility.ClearProgressBar(); }
+        gen.lastBuildSignature = string.Empty;
+        SurfaceMapBaker.Invalidate();
 
         EditorUtility.SetDirty(gen);
-        EditorUtility.SetDirty(gen.GetComponent<Terrain>().terrainData);
-        AssetDatabase.SaveAssets();
-        EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+        Run();
     }
 
     /// Run sırasında yüklenen ayarlar; yardımcı metotlar ölçüyü buradan okur
@@ -164,44 +188,21 @@ public static class MountainSceneBootstrap
 
         Phase("dağ bileşeni");
 
-        // ROTA DA İMZAYA GİRİYOR. Tesviye araziyi üretimden hemen sonra kesiyor ve
-        // üstüne ikinci kez uygulanamıyor (kesilmiş yamacı yeniden kesmek olurdu).
-        // Rota değişince arazi baştan üretilip yeniden şekillendiriliyor.
-        var route = AssetDatabase.LoadAssetAtPath<MountainRoute>(RoutePath);
-        // YÜKSEKLİK HARİTASI DA İMZAYA GİRİYOR. Arazinin gerçek kaynağı o; PNG
-        // değişip imza değişmezse kurulum eski araziyi bırakır ve fark edilmez.
-        string signature = settings.BuildSignature()
-                         + "|s" + RouteTerrainShaper.Version
-                         + "|h" + AssetDatabase.GetAssetDependencyHash(HeightmapImporter.AssetPath)
-                         + "|" + RouteSignature(route);
+        // ARAZİNİN KAYNAĞI `Dağ YapımI` PENCERESİ. Dağ elle yapılıyor ve pencere
+        // yükseklik alanını doğrudan `TerrainData`'ya yazıyor. Kurulum araziyi ÜRETMİYOR,
+        // yalnız ona bağlı olan her şeyi (yüzey haritaları, doğuş, bileşenler) tazeliyor.
+        //
+        // Düzenlenebilir asıl: `Assets/Terrain/Sculpts/*.bytes` (1025², float32).
+        // Üretilmiş sonuç: `MountainTerrainData.asset`.
+        //
+        // `regenerated` yalnız AYAR imzasına bakıyor; yüzey haritalarının tazeliğini
+        // `SurfaceMapBaker.MapsCurrent` ayrı karar veriyor ve pencere kaydederken
+        // `Invalidate()` çağırdığı için harita orada bayat ilan ediliyor.
+        string signature = settings.BuildSignature();
         bool regenerated = gen.lastBuildSignature != signature;
 
         if (regenerated)
         {
-            EditorUtility.DisplayProgressBar("Dağ", "Yükseklik haritası üretiliyor...", 0.5f);
-            try
-            {
-                gen.Generate();
-
-                // YÜKSEKLİK HARİTASI TESVİYEDEN ÖNCE. Arazinin gerçek kaynağı bu PNG;
-                // `gen.Generate()`'in ürettiği her şeyi eziyor.
-                //
-                // Bir tur ters sırada koştu ve ölçüldü: kurulum tesviyeyi uyguladı,
-                // sonra yükseklik haritası elle uygulanınca tesviye silindi. Doğuş
-                // düzlüğü 45 m yarıçapta 4,93 m yerine 16,3 m kot farkına, %5,3 yerine
-                // 7,3 dereceye çıktı. Sırayı bilen tek yer burası olduğu için elle
-                // uygulama artık gerekmiyor.
-                EditorUtility.DisplayProgressBar("Dağ", "Yükseklik haritası uygulanıyor...", 0.65f);
-                HeightmapImporter.Apply(gen.GetComponent<Terrain>());
-
-                // Tesviye ÜRETİMDEN HEMEN SONRA, yüzey haritaları pişmeden önce:
-                // haritalar araziden türüyor ve sonradan kesilirse eğim, gölge ve kar
-                // hesapları eski araziye ait kalır.
-                EditorUtility.DisplayProgressBar("Dağ", "Rota araziye işleniyor...", 0.8f);
-                RouteTerrainShaper.Shape(gen.GetComponent<Terrain>(), route);
-            }
-            finally { EditorUtility.ClearProgressBar(); }
-
             gen.lastBuildSignature = signature;
             EditorUtility.SetDirty(gen);
             EditorUtility.SetDirty(gen.GetComponent<Terrain>().terrainData);
@@ -209,7 +210,7 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
-        if (!regenerated) gen.Measure();
+        gen.Measure();
         WriteMountainReport(gen);
 
         var player = Object.FindAnyObjectByType<FirstPersonController>();
@@ -283,11 +284,13 @@ public static class MountainSceneBootstrap
         }
 
         var terrainComponent = gen.GetComponent<Terrain>();
-        if (!Mathf.Approximately(terrainComponent.heightmapPixelError, TerrainPixelError)
+        if (terrainComponent.heightmapMaximumLOD != TerrainMaxLod
+            || !Mathf.Approximately(terrainComponent.heightmapPixelError, TerrainPixelError)
             || !Mathf.Approximately(terrainComponent.basemapDistance, TerrainBasemapDistance)
             || terrainComponent.shadowCastingMode != ShadowCastingMode.Off)
         {
             terrainComponent.heightmapPixelError = TerrainPixelError;
+            terrainComponent.heightmapMaximumLOD = TerrainMaxLod;
             terrainComponent.basemapDistance = TerrainBasemapDistance;
 
             // ARAZİ GÖLGE HARİTASINA YAZMIYOR. Kendi gölgesini yükseklik alanından
@@ -342,11 +345,16 @@ public static class MountainSceneBootstrap
         thermometer.Bind(weatherState, windField, Object.FindAnyObjectByType<TimeOfDay>());
         EditorUtility.SetDirty(thermometer);
 
+        // KUŞAKLAR ÖLÇÜLEN ARAZİDEN. Taban eskiden `baseHeight × terrainHeight` ile
+        // ayardan geliyordu (186 m) ve elle yapılan dağın gerçek ovası 0 m olunca hava
+        // kuşakları kayıyordu. `gen.Measure()` ikisini de araziden okuyor.
+        gen.Measure();
+
         var driver = Object.FindAnyObjectByType<AltitudeWeatherDriver>();
         driver.Bind(weatherState, windField, player.transform,
             Object.FindAnyObjectByType<TimeOfDay>(), thermometer,
             LoadOrCreate<WeatherDriverSettings>(WeatherDriverPath),
-            gen.Settings.baseHeight * gen.Settings.terrainHeight, gen.peakAltitude);
+            gen.groundAltitude, gen.peakAltitude);
         EditorUtility.SetDirty(driver);
 
         // Arazi maruziyeti: rüzgâr sırtta hızlanır, oyukta kesilir. Rüzgâr araziyi
@@ -817,6 +825,7 @@ public static class MountainSceneBootstrap
                 "Gökyüzü hacmi bulut hacminden sonra kurulmalı: `cloudVolume` yazılmamış.");
 
         ApplySkyOverrides(cloudVolume.sharedProfile);
+        ApplyCloudQuality(cloudVolume.sharedProfile);
 
         // ORTAM KİPİ SKYBOX OLMAK ZORUNDA. Sahnede `Flat` kalmıştı: `AtmosphereController`
         // eskiden hem kipi hem rengi yazıyordu, yazan kod kaldırıldı ama sahnedeki kip
@@ -839,6 +848,55 @@ public static class MountainSceneBootstrap
         if (ambientChanged)
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
     #endif
+    }
+
+    /// BULUT KALİTE AYARLARI KODDAN YAZILIYOR, elle değil.
+    ///
+    /// NEDEN: `.asset` dosyasına dışarıdan yapılan düzenleme Unity açıkken sessizce
+    /// geri alınıyor — profil bellekte tutuluyor ve bir sonraki serileştirmede eski
+    /// değer dosyaya geri yazılıyor. `numPrimarySteps` 128'e çekildi, dosyada 80 olarak
+    /// bulundu; iyileşme sanılan şey yalnız koddaki adım boyu değişikliğinden gelmişti.
+    ///
+    /// Buradan yazılınca her kurulum koşusu değerleri geri koyuyor ve kaynak TEK.
+    static void ApplyCloudQuality(UnityEngine.Rendering.VolumeProfile profile)
+    {
+        if (profile == null || !profile.TryGet(out VolumetricClouds clouds)) return;
+
+        bool changed = false;
+
+        // ADIM SAYISI. Menzil = adım boyu × adım sayısı ve adım boyu katman
+        // kalınlığından türüyor (`altitudeRange / 6`). 80 adımda menzil 44 km; ufka
+        // doğru bakışta ışın katmanın içinde daha uzun kalıyor ve yürüyüş erken bitiyor.
+        changed |= SetCloudValue(clouds.numPrimarySteps, 128);
+
+        // HARİTA PERİYODU 48 KM. Döşeme kırıcı bu periyoda göre tasarlandı; harita
+        // 40 km'de kalınca ikisi hizalanmıyor ve kırıcı kendi kafesini bırakıyor.
+        changed |= SetCloudValue(clouds.cloudMapSize, 48000f);
+
+        // YAKIN SÖNÜM 300 M. 5000'de `saturate(d / fadeInDistance)` küresel bir irtifa
+        // çarpanına dönüşüyor: yerde buluta ~2 km (çarpan 0.40), 20 km'de ~15 km (1.00)
+        // — 2.5 kat, ve bulut yükseldikçe optik olarak kalınlaşıp gece simsiyah
+        // okunuyor. Parametrenin gerçek işi kameranın burnunda yoğun bulut oluşmasını
+        // engellemek ve o iş birkaç yüz metrede biter.
+        changed |= SetCloudValue(clouds.fadeInDistance, 300f);
+
+        if (!changed) return;
+        EditorUtility.SetDirty(profile);
+        AssetDatabase.SaveAssets();
+    }
+
+    static bool SetCloudValue(UnityEngine.Rendering.VolumeParameter<int> p, int value)
+    {
+        if (p.overrideState && p.value == value) return false;
+        p.overrideState = true; p.value = value;
+        return true;
+    }
+
+    static bool SetCloudValue(UnityEngine.Rendering.VolumeParameter<float> p, float value)
+    {
+        if (p.overrideState && Mathf.Approximately(p.value, value)) return false;
+        p.overrideState = true; p.value = value;
+        return true;
     }
 
 #if URP_PBSKY
@@ -1144,7 +1202,16 @@ public static class MountainSceneBootstrap
         SetCloud(clouds.sunLightDimmer, 1.00f);
         SetCloud(clouds.shadowOpacity, 1.00f);
         SetCloud(clouds.shadowOpacityFallback, 0.00f);
-        SetCloud(clouds.shadowDistance, 8000f);
+        // BULUT GOLGESI KESKINLIGI. Golge ayri bir cookie dokusundan geliyor (URP'nin 60 m
+        // kaskad golgesiyle ilgisi yok). Keskinlik = texel boyu = bolge / cozunurluk.
+        //   - shadowDistance: cookie kamera-merkezli ve oyuncuyu takip ediyor; 30 km arenayi
+        //     statik kaplamasi gerekmiyor. 12 km yaricap uzaktaki golgeleri de yakalar.
+        //   - Ultra1024: 12 km icin texel ~27 m (arazi yontma hucresiyle ayni). Iki 3x3
+        //     bulanik gecisi bu ince texelde dar penumbra birakir: BELIRGIN ama dogal
+        //     yumusak, ezik degil. 256'da texel ~70 m'ydi ve gecisler onu lapaya ceviriyordu.
+        // Ikisi de arena YATAY olcegine bagli, dagin boyuna DEGIL (SCALE.md).
+        SetCloud(clouds.shadowResolution, VolumetricClouds.CloudShadowResolution.Ultra1024);
+        SetCloud(clouds.shadowDistance, 12000f);
 
         SetCloud(clouds.numPrimarySteps, 80);
         SetCloud(clouds.numLightSteps, 8);
@@ -1173,6 +1240,12 @@ public static class MountainSceneBootstrap
     }
 
     static void SetCloud(BoolParameter parameter, bool value)
+    {
+        parameter.value = value;
+        parameter.overrideState = true;
+    }
+
+    static void SetCloud(VolumetricClouds.CloudShadowResolutionParameter parameter, VolumetricClouds.CloudShadowResolution value)
     {
         parameter.value = value;
         parameter.overrideState = true;
@@ -1539,6 +1612,19 @@ public static class MountainSceneBootstrap
             Object.FindAnyObjectByType<CloudWeatherDriver>());
 
         EditorUtility.SetDirty(menu);
+
+        // GEÇİCİ: tırtık işaretleyici. Kullanıcı ekran ortasını tırtıklı yere
+        // doğrultup M'ye basıyor, koordinat `Logs/notches.log`'a yazılıyor. Belirti
+        // çözülünce bileşen de bu blok da silinir.
+        var marker = Object.FindAnyObjectByType<NotchMarker>();
+        if (marker == null)
+        {
+            marker = menu.gameObject.AddComponent<NotchMarker>();
+            changed = true;
+        }
+
+        marker.Bind(player.GetComponentInChildren<Camera>());
+        EditorUtility.SetDirty(marker);
     }
 
     /// Script'i silinmiş bileşenler sahnede boş kabuk olarak kalır: Unity uyarı basar,

@@ -32,7 +32,7 @@ public static class SurfaceMapBaker
 
     /// Normal dokusunun adında taşınan sürüm; pişirme değişince eskisi elenir.
     /// Ad çözünürlüğü de taşıyor: 2048'den 4096'ya çıkıldı, eski harita bayat sayılmalı.
-    const string NormalName = "MountainNormals-blur2-4096";
+    const string NormalName = "MountainNormals-4096-blur4";
 
     const string HeightPath = "Assets/Terrain/MountainHeight.asset";
 
@@ -124,7 +124,7 @@ public static class SurfaceMapBaker
     /// dikey akıntılar, yanlış gölge, yanlış kar çizgisi.
     ///
     /// Bu yüzden yükseklik haritasını uygulayan her yol burayı çağırıyor
-    /// (`HeightmapImporter.Apply`). Damga silinince kurulum bir sonraki açılışta
+    /// (`Dağ Yapımı` penceresi). Damga silinince kurulum bir sonraki açılışta
     /// kendisi pişiriyor.
     public static void Invalidate()
     {
@@ -269,8 +269,19 @@ public static class SurfaceMapBaker
             gz[y, x] = (height[y1, x] - height[y0, x]) * vertical / ((y1 - y0) * spacing);
         }
 
-        BoxBlur(gx, res);
-        BoxBlur(gz, res);
+        // YUMUŞATMA DÜNYA ÖLÇEĞİNDE SABİT KALMALI. Pencere TEXEL cinsinden; çözünürlük
+        // iki katına çıkınca aynı pencere yarı dünya mesafesini kapsıyor. 4096'ya
+        // çıkarıldığında bu atlandı ve ÖLÇÜLDÜ: zikzak azaldı ama dağın büyük ölçekli
+        // formu kayboldu, kullanıcı "spec sonrası ilk hâline döndü" dedi. 2048'e geri
+        // dönülünce form geldi, zikzak da geri geldi.
+        //
+        // İki geçiş = 2 kat yarıçap: 4096'da dünya ölçeği 2048'in tek geçişiyle aynı,
+        // ama ızgara iki kat ince — aynı yumuşaklıkta daha az zikzak. Aranan bileşim bu.
+        for (int pass = 0; pass < 2; pass++)
+        {
+            BoxBlur(gx, res);
+            BoxBlur(gz, res);
+        }
 
         var pixels = new Color32[res * res];
 
@@ -303,9 +314,9 @@ public static class SurfaceMapBaker
     /// Arazi yüksekliği doku olarak. Değer 0-1 normalize: metre karşılığı shader'da
     /// `_TerrainHeightArea.w` ile çarpılıyor, yani ölçek tek yerde duruyor.
     ///
-    /// RHalf: yükseklik 6189 metreye kadar çıkıyor ve half'in 11 bitlik mantisi bu
-    /// aralıkta 3 metre çözünürlük veriyor — 34 metrelik texel adımının yanında ihmal
-    /// edilebilir. RGBA32'ye sıkıştırmak 24 metrelik basamaklar bırakırdı.
+    /// RHalf: değer 0-1 normalize saklanıyor ve `half`'in 1.0 civarındaki adımı 2^-11.
+    /// Dikey tavan 8000 m olduğu için karşılığı 3.9 metre — 34 metrelik texel adımının
+    /// yanında ihmal edilebilir. RGBA32'ye sıkıştırmak 31 metrelik basamaklar bırakırdı.
     static void BakeHeight(TerrainData data)
     {
         int res = HeightResolution;
