@@ -48,7 +48,6 @@ public class DebugMenu : MonoBehaviour
     static readonly int TerrainShadowId = Shader.PropertyToID("_TerrainShadowReceive");
     static readonly int TerminatorProbeId = Shader.PropertyToID("_TerminatorProbe");
     static readonly int WorldRulerId = Shader.PropertyToID("_WorldRuler");
-    static readonly int CloudFogOffId = Shader.PropertyToID("_CloudFogOff");
 
     bool worldRuler;
 
@@ -66,7 +65,6 @@ public class DebugMenu : MonoBehaviour
     // geliyor. Kapsama %0 iken bile kontur görülüyor — bulut olmayan yerde çizgi,
     // bayat geçmiş imzası.
     bool temporalOff;
-    bool cloudFogOff;
     VolumetricClouds cloudsVolume;
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
@@ -186,10 +184,6 @@ public class DebugMenu : MonoBehaviour
         Shader.SetGlobalFloat(TerrainShadowId, 1f);
         Shader.SetGlobalFloat(TerminatorProbeId, terminatorProbe ? 1f : 0f);
         Shader.SetGlobalFloat(WorldRulerId, worldRuler ? 1f : 0f);
-
-        // BULUT SISINI TEK BASINA KAPATIR. Yukseklik sisi arazide ve gokte acik kalir.
-        // Kontur bu kapaliyken de duruyorsa sebep bulut birlestirme gecisi degildir.
-        Shader.SetGlobalFloat(CloudFogOffId, cloudFogOff ? 1f : 0f);
 
         if (cloudsFeature == null)
         {
@@ -605,7 +599,6 @@ public class DebugMenu : MonoBehaviour
         {
             cloudsDepthOff = GUILayout.Toggle(cloudsDepthOff, "Bulut derinliğini KAPAT");
             temporalOff = GUILayout.Toggle(temporalOff, "Zamansal birikimi KAPAT");
-            cloudFogOff = GUILayout.Toggle(cloudFogOff, "Bulut sisini KAPAT");
             GUILayout.Label(cloudsFeature == null ? "(feature bulunamadı)" : "",
                             GUILayout.Width(140f));
         }
