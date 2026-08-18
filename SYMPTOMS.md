@@ -112,8 +112,9 @@ arazi yolu ondan öğrendi.
 **İlk şüpheli:** bulut ışın yürüyüşü, sonra zamansal birikim, sonra mesafe sınırı.
 *(Üçü de yanlış — kontur bunlar değişmeden duruyordu.)*
 
-**Ayırt eden ölçüm:** F1 "Bulut sisini KAPAT" anahtarı. Kapatınca kontur gidiyor,
-yükseklik sisi arazide/gökte açık kalsa bile. Yani sebep birleştirme geçişinin sis bloğu.
+**Ayırt eden ölçüm:** F1 "Bulut sisini KAPAT" anahtarı (`_CloudFogOff`). Kapatınca kontur
+gidiyor, yükseklik sisi arazide/gökte açık kalsa bile — yani sebep birleştirme geçişinin sis
+bloğu. *(Anahtar teşhis bitince kaldırıldı; sebep kesin bulundu, ölçüm aracı yerinde bırakılmadı.)*
 
 **Sebep:** bulut yarı çözünürlükte çiziliyor, renk **bilinear** büyütülüyor ama derinlik
 **nokta** örnekleniyor. Uyuşmadıkları bleed halkasında `edgeOfClouds` tetikleniyor ve
@@ -390,7 +391,7 @@ ve gerçek sebep bir tur daha kaçıyor.
 | ne bayatlıyor | neden | çözüm |
 |---|---|---|
 | Yükseklik haritası PNG'si | `AssetDatabase` önbelleği, dışarıdan yazılan dosyayı fark etmiyor | zorla yeniden içe aktarma |
-| `.asset` ayarları | Volume çalışma-zamanı kopyası; dışarıdan düzenleme sessizce geri alınıyor | değerleri KODDAN asset'e yazmak (`ApplyCloudQuality`) |
+| `.asset` ayarları | Volume çalışma-zamanı kopyası; dışarıdan düzenleme sessizce geri alınıyor | değerleri KODDAN asset'e yazmak (`MountainSceneBootstrap.EnsureCloudVolume`) |
 | Arazi menüsü | düğme yanlış işi yapıyordu, harita hiç uygulanmıyordu | düğmenin tam zinciri koşması |
 | **`.hlsl` include'ları** | Unity shader'ın hangi include'u kullandığını **takip etmiyor** | `ShaderIncludeWatcher` — include değişince shader'ları yeniden içe aktarır |
 

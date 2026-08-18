@@ -1,4 +1,4 @@
-// include-rev: 41  (HeightFog.hlsl degisince Unity bu dosyaya dokunulmadikca
+// include-rev: 42  (HeightFog.hlsl degisince Unity bu dosyaya dokunulmadikca
 // yeniden derlemiyor; bu satir degistikce derleme zorlanir)
 Shader "Hidden/Sky/VolumetricClouds"
 {
@@ -219,10 +219,6 @@ Shader "Hidden/Sky/VolumetricClouds"
             #include "./VolumetricCloudsUpscale.hlsl"
             #include "../Shaders/HeightFog.hlsl"
 
-            // TESHIS ANAHTARI. 1 olunca bu gecis sisi HIC uygulamiyor; yukseklik sisi
-            // arazide ve gokte acik kaliyor. Kontur hala varsa sebep bu dosyada DEGIL.
-            // Anahtar bir kez vardi, silinmisti; ayni belirti geri geldigi icin geri kondu.
-            float _CloudFogOff;
 
             half4 frag(Varyings input) : SV_Target
             {
@@ -260,7 +256,7 @@ Shader "Hidden/Sky/VolumetricClouds"
                 // ve sissiz gecer; govdede gercek mesafeyle sislenir.
                 bool hasCloud = depth != UNITY_RAW_FAR_CLIP_VALUE;
 
-                if (hasCloud && _CloudFogOff < 0.5)
+                if (hasCloud)
                 {
                     float3 camPos = GetCameraPositionWS();
 
@@ -670,10 +666,6 @@ Shader "Hidden/Sky/VolumetricClouds"
             // ikisi `_LightningFlash`'i paylaşıyor, sıra bozulursa yeniden bildirim hatası.
             #include "../Shaders/HeightFog.hlsl"
 
-            // TESHIS ANAHTARI. 1 olunca bu gecis sisi HIC uygulamiyor; yukseklik sisi
-            // arazide ve gokte acik kaliyor. Kontur hala varsa sebep bu dosyada DEGIL.
-            // Anahtar bir kez vardi, silinmisti; ayni belirti geri geldigi icin geri kondu.
-            float _CloudFogOff;
 
             half4 frag(Varyings input) : SV_Target
             {
@@ -731,7 +723,7 @@ Shader "Hidden/Sky/VolumetricClouds"
                 // (vadi / bank / suruklenen kar), sinir bilincli (karar 2).
                 bool hasCloud = depth != UNITY_RAW_FAR_CLIP_VALUE;
 
-                if (hasCloud && _CloudFogOff < 0.5)
+                if (hasCloud)
                 {
                     float3 camPos = GetCameraPositionWS();
 

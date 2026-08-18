@@ -825,7 +825,6 @@ public static class MountainSceneBootstrap
                 "Gökyüzü hacmi bulut hacminden sonra kurulmalı: `cloudVolume` yazılmamış.");
 
         ApplySkyOverrides(cloudVolume.sharedProfile);
-        ApplyCloudQuality(cloudVolume.sharedProfile);
 
         // ORTAM KİPİ SKYBOX OLMAK ZORUNDA. Sahnede `Flat` kalmıştı: `AtmosphereController`
         // eskiden hem kipi hem rengi yazıyordu, yazan kod kaldırıldı ama sahnedeki kip
@@ -848,55 +847,6 @@ public static class MountainSceneBootstrap
         if (ambientChanged)
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
     #endif
-    }
-
-    /// BULUT KALİTE AYARLARI KODDAN YAZILIYOR, elle değil.
-    ///
-    /// NEDEN: `.asset` dosyasına dışarıdan yapılan düzenleme Unity açıkken sessizce
-    /// geri alınıyor — profil bellekte tutuluyor ve bir sonraki serileştirmede eski
-    /// değer dosyaya geri yazılıyor. `numPrimarySteps` 128'e çekildi, dosyada 80 olarak
-    /// bulundu; iyileşme sanılan şey yalnız koddaki adım boyu değişikliğinden gelmişti.
-    ///
-    /// Buradan yazılınca her kurulum koşusu değerleri geri koyuyor ve kaynak TEK.
-    static void ApplyCloudQuality(UnityEngine.Rendering.VolumeProfile profile)
-    {
-        if (profile == null || !profile.TryGet(out VolumetricClouds clouds)) return;
-
-        bool changed = false;
-
-        // ADIM SAYISI. Menzil = adım boyu × adım sayısı ve adım boyu katman
-        // kalınlığından türüyor (`altitudeRange / 6`). 80 adımda menzil 44 km; ufka
-        // doğru bakışta ışın katmanın içinde daha uzun kalıyor ve yürüyüş erken bitiyor.
-        changed |= SetCloudValue(clouds.numPrimarySteps, 128);
-
-        // HARİTA PERİYODU 48 KM. Döşeme kırıcı bu periyoda göre tasarlandı; harita
-        // 40 km'de kalınca ikisi hizalanmıyor ve kırıcı kendi kafesini bırakıyor.
-        changed |= SetCloudValue(clouds.cloudMapSize, 48000f);
-
-        // YAKIN SÖNÜM 300 M. 5000'de `saturate(d / fadeInDistance)` küresel bir irtifa
-        // çarpanına dönüşüyor: yerde buluta ~2 km (çarpan 0.40), 20 km'de ~15 km (1.00)
-        // — 2.5 kat, ve bulut yükseldikçe optik olarak kalınlaşıp gece simsiyah
-        // okunuyor. Parametrenin gerçek işi kameranın burnunda yoğun bulut oluşmasını
-        // engellemek ve o iş birkaç yüz metrede biter.
-        changed |= SetCloudValue(clouds.fadeInDistance, 300f);
-
-        if (!changed) return;
-        EditorUtility.SetDirty(profile);
-        AssetDatabase.SaveAssets();
-    }
-
-    static bool SetCloudValue(UnityEngine.Rendering.VolumeParameter<int> p, int value)
-    {
-        if (p.overrideState && p.value == value) return false;
-        p.overrideState = true; p.value = value;
-        return true;
-    }
-
-    static bool SetCloudValue(UnityEngine.Rendering.VolumeParameter<float> p, float value)
-    {
-        if (p.overrideState && Mathf.Approximately(p.value, value)) return false;
-        p.overrideState = true; p.value = value;
-        return true;
     }
 
 #if URP_PBSKY
@@ -1185,7 +1135,9 @@ public static class MountainSceneBootstrap
         SetCloud(clouds.bottomAltitude, 2086f);
         SetCloud(clouds.altitudeRange, 3298f);
         SetCloud(clouds.altitudeDistortion, 0.25f);
-        SetCloud(clouds.cloudMapSize, 40000f);
+        // HARITA PERIYODU 48 KM. Doseme kirici bu periyoda gore tasarlandi; harita
+        // 40 km'de kalinca ikisi hizalanmiyor ve kirici kendi kafesini birakiyor.
+        SetCloud(clouds.cloudMapSize, 48000f);
         SetCloud(clouds.earthCurvature, 0.00f);
 
         SetCloud(clouds.erosionFactor, 1.00f);
@@ -1213,12 +1165,18 @@ public static class MountainSceneBootstrap
         SetCloud(clouds.shadowResolution, VolumetricClouds.CloudShadowResolution.Ultra1024);
         SetCloud(clouds.shadowDistance, 12000f);
 
-        SetCloud(clouds.numPrimarySteps, 80);
+        // ADIM SAYISI. Menzil = adim boyu x adim sayisi, adim boyu altitudeRange/6'dan.
+        // 80'de menzil 44 km; ufka bakista isin katmanda uzun kalip yuruyus erken bitiyordu.
+        SetCloud(clouds.numPrimarySteps, 128);
         SetCloud(clouds.numLightSteps, 8);
         SetCloud(clouds.temporalAccumulationFactor, 0.95f);
         SetCloud(clouds.perceptualBlending, 1.00f);
         SetCloud(clouds.fadeInStart, 0f);
-        SetCloud(clouds.fadeInDistance, 5000f);
+        // YAKIN SONUM 300 M. 5000'de saturate(d/fadeInDistance) kuresel bir irtifa
+        // carpanina donusuyor (yerde ~2 km, 20 km'de ~15 km) ve bulut yukseldikce gece
+        // simsiyah okunuyordu. Gercek isi kameranin burnunda yogun bulut olusmasini
+        // engellemek; o is birkac yuz metrede biter.
+        SetCloud(clouds.fadeInDistance, 300f);
 
         EditorUtility.SetDirty(profile);
         AssetDatabase.SaveAssets();
