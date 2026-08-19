@@ -815,3 +815,32 @@ değerlendirilecek. O noktada bilinen tek sapma adayı: perdeyi görüş mesafes
 kodu (`_CurtainProbe`, `ProbeRamp`, üç dal) — perde kapalıyken hiçbiri erişilebilir
 değildi. Geri açılırsa yeniden yazılır.
 
+
+## Yağmur izi veritabanı: üst çözünürlük size16, size32 ertelendi (2026-08-19)
+
+**Karar.** Garg-Nayar iz veritabanından `size4`, `size8`, `size16` paketlendi; `size32`
+paketlenmedi.
+
+**Gerekçe.** Kâğıtta hesaplandı: 1.6 mm damla 0.5 m mesafede, 60° FOV ve 1920 px ekranda
+**5.9 piksel** genişliğinde iz bırakıyor; 0.2 m'de 15 piksel. `size32` ancak 25 cm'den
+yakın damla için gerekiyor. Maliyeti de küçük değil: `size32` tek başına 302 MB.
+
+**Tetikleyici.** Çok yakın damlaların izi bulanık ya da kademeli görünürse. O noktada
+`Tools/rain/pack_streaks.py` içindeki boyut listesine 32 eklenip yeniden koşulur.
+
+**Maliyet.** Paketleme bir komut. Blok boyutu 65.8 MB'den ~368 MB'ye çıkar.
+
+## Yağmur veritabanı yerleşimi (2026-08-19)
+
+**Karar.** Ham PNG'ler (15 000 dosya) repoya girmiyor, masaüstündeki spec klasöründe
+kalıyor. Paketlenmiş bloklar `Tools/rain/packed/` altında — proje ağacında ama
+**`Assets/` dışında**.
+
+**Gerekçe.** `Assets/` içindeki `.bytes` dosyalarını Unity `TextAsset` olarak import
+eder; 67 MB editöre ve build'e girerdi. Oysa bloklar yalnız içe aktarma anında
+okunuyor (`File.ReadAllBytes`). Ham veri kuralı Kirmse arazi verisiyle aynı.
+
+**Tetikleyici.** Başka bir makinede çalışılacaksa ham veritabanının yolu
+`RainStreakImporter` üzerinden verilmeli — şu an paketleyiciye komut satırından
+geçiliyor.
+

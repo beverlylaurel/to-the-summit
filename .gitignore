@@ -113,3 +113,7 @@ Tools/terrain/__pycache__/
 # Repoya giren deliverable yalniz guncel dag (_son.bytes) ve adli kayitlar.
 Assets/Terrain/Sculpts/*.yedek*.bytes*
 Assets/Terrain/Sculpts/_kurtarma.bytes*
+
+# Yagmur izi ara urunu: masaustundeki ham veritabanindan uretiliyor.
+# Pismis olan Assets/Rain/RainStreakDatabase.asset, o repoda duruyor.
+Tools/rain/packed/
