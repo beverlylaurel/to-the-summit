@@ -107,6 +107,11 @@ public class ThunderPlayer : MonoBehaviour
         // Eşikten sonra hızlı tırmanır. Doğrusal eğri eşiğin hemen üstünde neredeyse
         // sıfır kalıyordu: 0.65'te kırkta bir. Oysa fırtına eşiği geçtiyse yakın çakma
         // artık istisna değil. Karekök eğriyi başta dikleştirip uçta doyuruyor.
+        // EŞİK SERT KESME. Altında olasılık "az" değil TAM SIFIR — dinginde yakın çakma
+        // hiç olmaz, tasarım da bunu istiyor: sakin yağmurda uzaktan gürleme duyulur,
+        // kol görünmez. Ama eşik 0.6'dayken 0.56'lık şiddetli yağmur da sıfır alıyordu
+        // ve kol pratikte hiç görünmüyordu (kırk çakma denendi, kırkı da uzak).
+        // 0.45'e indi: 0.56'da yakın çakma %38, 0.85'te %72.
         float closeChance = Mathf.Sqrt(Mathf.InverseLerp(settings.closeThreshold, 1f, weather.Precipitation))
                             * settings.closeChanceAtPeak;
         bool isClose = UnityEngine.Random.value < closeChance;
