@@ -844,3 +844,28 @@ okunuyor (`File.ReadAllBytes`). Ham veri kuralı Kirmse arazi verisiyle aynı.
 `RainStreakImporter` üzerinden verilmeli — şu an paketleyiciye komut satırından
 geçiliyor.
 
+
+## Atmosfer katmanının taşınabilirliği ertelendi (2026-08-19)
+
+**Karar.** Yağış, sis, bulut ve hava zinciri şimdilik bu projeye gömülü kalıyor. Ayrı
+paket haline getirilmiyor.
+
+**Gerekçe.** C# tarafı zaten taşınabilir biçimde: `PrecipitationRenderer` her
+bağımlılığını `[SerializeField]` ile alıyor, singleton ve `FindObjectOfType` yok. İki
+şey bozuyor:
+
+- **`SpectralPrecipitationState` bir `public static class`.** `ScriptableRendererFeature`
+  renderer asset'inde yaşadığı için sahne nesnesine referans veremiyor; köprü statik
+  kuruldu. Enjeksiyon kuralını çiğniyor.
+- **Shader'lar `HeightFog.hlsl`'i include ediyor.** `Precipitation.shader` ve perde,
+  projenin sis uygulamasından `SpindriftColor` / `AirColor` çağırıyor. Yağmuru taşımak
+  sis dosyasının tamamını sürüklüyor.
+
+**Tetikleyici.** İkinci bir projeye taşıma ihtiyacı doğduğunda — ya da co-op başladığında
+(statik köprü orada zaten kırılıyor, bkz. `COOP.md`).
+
+**Maliyet.** Kendi klasörü + `asmdef`; sisten gelen "şu yöndeki havanın rengi" bir arayüz
+ya da ayar asset'i üzerinden verilir; statik köprü feature'a elden geçirilen bir nesneye
+dönüşür. Shader tarafı daha pahalı: `HeightFog.hlsl` çağrıları ya bir arayüz include'una
+ya da uniform'a bağlanmalı.
+

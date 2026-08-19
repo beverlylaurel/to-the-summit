@@ -182,3 +182,11 @@ Bunlar ağ eklendiğinde olduğu gibi kalabilir; listeye tekrar girmesinler:
 - **Yüzey haritaları** — terrain'den türüyor, ayrıca taşınmaları gerekmez
 - **Gölgelendiriciler, tanecik biçimi, ses karışımı, post-process** — tamamı yerel görüntü
 - **Ayar asset'leri** — build'in parçası, çalışma zamanında değişmiyorlar
+
+- **`SpectralPrecipitationState` statik.** Perde ve yağış durumu tek bir `public static
+  class` üzerinden taşınıyor (`Assets/Scripts/Weather/SpectralPrecipitationFeature.cs`).
+  İki oyuncu iki kamera demek; ikisi aynı statiğe yazınca sonuncusu kazanır. Olması
+  gereken: durum kamera/oyuncu başına, feature'a elden verilen bir nesne. Maliyet küçük
+  ama render feature imzasını değiştiriyor. Aynı borç taşınabilirlik tarafında da var
+  (`DECISIONS.md`).
+
