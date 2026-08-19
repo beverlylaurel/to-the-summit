@@ -34,7 +34,7 @@ public class ThunderSettings : ScriptableObject
     [Range(0f, 1f)] public float closeChanceAtPeak = 0.85f;
     [Tooltip("Yakın çakmanın başladığı yağış şiddeti. Altında yalnızca uzak, sakin " +
              "gürültüler çalar — dağ eteğindeki dingin açılışı bozmasın.")]
-    [Range(0f, 1f)] public float closeThreshold = 0.6f;
+    [Range(0f, 1f)] public float closeThreshold = 0.45f;
 
     [Header("Varyasyon")]
     [Range(0f, 0.5f)] public float volumeVariation = 0.25f;
