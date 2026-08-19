@@ -168,6 +168,11 @@ MonoBehaviour:
   shader: {fileID: 4800000, guid: 64a1760316d80e84e8a8e4b127c3bca9, type: 3}
   cloudLayer: {fileID: 1147612205}
   observer: {fileID: 848219609}
+  streaks: {fileID: 0}
+  timeOfDay: {fileID: 508855605}
+  exposureTime: 0.016666668
+  databasePeriod: 0.016666668
+  sourceScale: 1
   curtainPattern: {fileID: 11700000, guid: c68667420cb94ce4fa5f1716bd487309, type: 2}
 --- !u!1 &263682441
 GameObject:

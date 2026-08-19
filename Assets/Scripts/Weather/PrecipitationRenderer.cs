@@ -232,6 +232,16 @@ public class PrecipitationRenderer : MonoBehaviour
     ///                      damla başına, çünkü ekranın her yerinde farklı)
     void UpdateStreaks(Vector3 rainVelocity, float snowiness)
     {
+        // TEK SEFERLİK DURUM RAPORU. Üç bağ da sessizce eksik olabiliyordu ve belirti
+        // "yağmur hiç görünmüyor" — hangisinin eksik olduğu ekrandan anlaşılmıyor.
+        if (!streakStateReported)
+        {
+            streakStateReported = true;
+            Debug.Log($"Yağmur izi bağları: çalışma kümesi {(streaks != null ? "var" : "YOK")}"
+                      + $", saat {(timeOfDay != null ? "var" : "YOK")}"
+                      + $", ana kamera {(Camera.main != null ? "var" : "YOK")}");
+        }
+
         if (streaks == null || timeOfDay == null) return;
 
         var camera = Camera.main;
@@ -256,7 +266,18 @@ public class PrecipitationRenderer : MonoBehaviour
         material.SetFloat(StreakExposureId, exposureTime);
         material.SetFloat(StreakDbPeriodId, databasePeriod);
         material.SetFloat(StreakSourceScaleId, sourceScale);
+
+        if (!streakTextureReported)
+        {
+            streakTextureReported = true;
+            Debug.Log($"İz dokuları bağlandı: yönlü {streaks.Point.width}×{streaks.Point.height}"
+                      + $"×{streaks.Point.depth}, ambient {streaks.Ambient.depth} dilim, "
+                      + $"köşe varlık {streaks.CornerPresent}, "
+                      + $"dcam payları [{string.Join(", ", streaks.DcamHeightFraction)}]");
+        }
     }
+
+    bool streakStateReported, streakTextureReported;
 
     void OnDisable()
     {

@@ -397,8 +397,14 @@ public static class MountainSceneBootstrap
                 $"İz veritabanı yok: {RainStreakDatabasePath}. Yağmur izleri eski " +
                 "prosedürel yoldan çizilecek. Menü: To The Summit/Yağmur/İz veritabanını kur");
 
-        var streakSet = Object.FindAnyObjectByType<RainStreakWorkingSet>();
-        if (streakSet != null) streakSet.Bind(streakDatabase);
+        // HER KOŞUDA VARLIĞI GARANTİ EDİLİYOR, yalnız sahne yaratılırken değil.
+        // Bileşen `CreateWeather` içinde ekleniyordu; sahne zaten varsa o blok hiç
+        // çalışmıyor ve `FindAnyObjectByType` null dönüyordu. Belirti: yağmur izleri
+        // hiç görünmüyor, hata da yok.
+        var streakSet = precipitationRenderer.GetComponent<RainStreakWorkingSet>();
+        if (streakSet == null)
+            streakSet = precipitationRenderer.gameObject.AddComponent<RainStreakWorkingSet>();
+        streakSet.Bind(streakDatabase);
 
         precipitationRenderer.Bind(weatherState, windField, precipitationShader, curtainPattern,
             Object.FindAnyObjectByType<CloudLayerProbe>(), player.transform,
@@ -1362,10 +1368,8 @@ public static class MountainSceneBootstrap
         precipitation.transform.SetParent(go.transform, false);
         precipitation.AddComponent<PrecipitationRenderer>();
 
-        // Garg-Nayar iz veritabanının kare başına çalışma kümesi. Yağışla AYNI nesnede:
-        // ikisi de yağışın düşüş ekseninden besleniyor ve ayrı yerlerde durmaları
-        // birinin diğerinden önce/sonra güncellenmesi riskini açardı.
-        precipitation.AddComponent<RainStreakWorkingSet>();
+        // `RainStreakWorkingSet` BURADA EKLENMİYOR: bağlama bloğunda her koşuda
+        // garanti ediliyor. İki yerde eklemek, sahne varken birinin atlanması demek.
     }
 
     /// Ses: katman harmanı ve gök gürültüsü. WeatherState/WindField ile aynı ağaçta durur.
