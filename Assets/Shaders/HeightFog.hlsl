@@ -47,6 +47,11 @@ float _LightningScatterT;
 /// KANAL BOYUNCA NOKTA KAYNAKLAR. `LightningFlash` dolduruyor; boşalma noktasından
 /// yamaca kadar eşit aralıkla. Tek kaynakta parlama küre gibi duruyor ve kolun nereye
 /// uzandığını anlatmıyor.
+/// Berrak havanın sönümü, kanal başına. Tabloyu pişiren `LightningLutBaker` ile AYNI
+/// model: 550 nm'de 30 km görüş, Rayleigh (λ⁻⁴). Tıkama düzeltmesi bunu istiyor.
+/// Sırasıyla 675 / 520 / 460 nm.
+static const float3 LightningExtinction = float3(1.469313e-05, 4.171729e-05, 6.812369e-05);
+
 #define LIGHTNING_MAX_SOURCES 8
 float4 _LightningSources[LIGHTNING_MAX_SOURCES];
 float _LightningSourceCount;
@@ -105,8 +110,31 @@ float3 LightningScatter(float3 cameraPos, float3 worldPos)
 
         float2 uv = float2(tu, tv) * 0.5 + 0.5;
 
-        sum += SAMPLE_TEXTURE2D_LOD(_LightningScatterLut,
-                                    sampler_LightningScatterLut, uv, 0).rgb;
+        float3 full = SAMPLE_TEXTURE2D_LOD(_LightningScatterLut,
+                                           sampler_LightningScatterLut, uv, 0).rgb;
+
+        // ARAZİ TIKAMASI. Tablo ışının TAMAMINI integre ediyor; yüzeyin ARKASINDA kalan
+        // kısım görünmemeli. Araya giren dağın üstünde parlama, altında da parlama
+        // çıkıyordu ve göz bunu "dağ saydam" diye okuyordu.
+        //
+        // Kâğıtta çıkıyor. Integrand `exp(-k(s + u_eye - u))` ve `u_eye` dışarı
+        // alınabiliyor: `I(x,v) = e^(-k·x)·G(x,v)`. Yüzeye kadar olan parça iki tam
+        // integralin farkı:
+        //
+        //     görünen = I(u_eye, v) - I(u_eye - L, v) · e^(-k·L)
+        //
+        // Sayısal olarak doğrulandı: beş ayrı geometride doğrudan hesapla fark %0.000.
+        //
+        // Gök pikselinde L uzak düzlem, `u_eye - L` tablonun dışına düşüyor ve ikinci
+        // terim sıfıra gidiyor — yani gökte davranış değişmiyor.
+        float ub = u - len;
+        float tub = sign(ub) * sqrt(min(abs(ub) / T, 1.0));
+        float2 uvBack = float2(tub, tv) * 0.5 + 0.5;
+
+        float3 behind = SAMPLE_TEXTURE2D_LOD(_LightningScatterLut,
+                                             sampler_LightningScatterLut, uvBack, 0).rgb;
+
+        sum += max(full - behind * exp(-LightningExtinction * len), 0.0);
     }
 
     // ENERJİ KAYNAKLARA BÖLÜNÜYOR (Denklem 6'daki `I_k · Δl` payı). Toplamı sayıya

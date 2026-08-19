@@ -25,7 +25,7 @@ MonoBehaviour:
   closeDecay: 0.18
   distantDecay: 0.35
   strokeGap: {x: 0.04, y: 0.13}
-  boltDistance: 2500
+  boltDistance: 7000
   boltSegments: 28
   boltWaviness: 0.045
   boltKink: 0.35

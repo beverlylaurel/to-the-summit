@@ -42,6 +42,7 @@ public class LightningBolt : MonoBehaviour
         public int generation;
     }
     float elapsed;
+    float distanceFade;
     float life;
     bool active;
 
@@ -145,6 +146,12 @@ public class LightningBolt : MonoBehaviour
         contact.transform.position = foot;
         contact.range = settings.groundRange;
 
+        // MESAFE SÖNÜMÜ. Kolun görünmesi mesafe bilgisi taşıyor; sert kesme yerine
+        // sönerek kaybolması hem gerçekçi hem sınırın nerede olduğunu belli etmiyor.
+        distanceFade = 1f - Mathf.SmoothStep(0f, 1f,
+            Mathf.InverseLerp(settings.boltFullDistance, settings.boltDistance,
+                              strike.Distance));
+
         elapsed = 0f;
         life = strike.Duration;
         active = true;
@@ -246,11 +253,11 @@ public class LightningBolt : MonoBehaviour
         float flicker = flash.Held ? 1f : remaining * remaining * Random.Range(0.55f, 1f);
 
         SetVisible(true);
-        contact.intensity = settings.groundIntensity * flicker;
+        contact.intensity = settings.groundIntensity * flicker * distanceFade;
 
         // Ana kanal en parlak, her kuşak sönük. Boşalmanın gücü dallandıkça azalıyor;
         // hepsini aynı parlaklıkta çizmek ağacı düz bir tel yumağına çeviriyordu.
-        var tint = settings.flashColor * flicker;
+        var tint = settings.flashColor * (flicker * distanceFade);
         for (int i = 0; i < usedLines; i++)
             lines[i].startColor = lines[i].endColor = tint * lineTint[i];
     }

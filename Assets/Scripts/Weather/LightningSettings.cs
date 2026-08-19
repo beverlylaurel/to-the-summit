@@ -59,9 +59,14 @@ public class LightningSettings : ScriptableObject
     public Vector2 strokeGap = new(0.04f, 0.13f);
 
     [Header("Görünür kol")]
-    [Tooltip("Kolun çizileceği en uzak mesafe (metre). Ötesinde yalnızca bulut parlar — " +
-             "gerçekte de uzak şimşek kolunu göstermez, denizi aydınlatır.")]
-    public float boltDistance = 2500f;
+    [Tooltip("Kolun çizileceği en uzak mesafe (metre). Ötesinde yalnızca bulut parlar.")]
+    public float boltDistance = 7000f;
+    [Tooltip("Kolun tam parlaklıkta göründüğü mesafe (metre). Buradan `boltDistance`'a " +
+             "kadar sönerek kaybolur.\n\n" +
+             "SERT KESME YERİNE SÖNÜM: eskiden tek sınır vardı ve 2499 m'de kol tamamen " +
+             "görünüyor, 2501 m'de hiç görünmüyordu. Gerçekte uzak şimşek görünür, " +
+             "yalnızca ince ve sönük olur; araya giren yağmur ve hava kanalı yutar.")]
+    public float boltFullDistance = 1800f;
     [Tooltip("Kanalın kaç parçaya bölüneceği. Azı köşeli, fazlası ince kıvrım.")]
     [Range(4, 64)] public int boltSegments = 28;
     [Tooltip("Kanalın geniş salınımı, kendi uzunluğunun oranı olarak. Bu bir yürüyüş: " +
