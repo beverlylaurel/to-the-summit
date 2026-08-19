@@ -60,6 +60,12 @@ half3 _SunColor;
 float4 _LightningFlash;
 float4 _LightningPosition;
 
+/// KANAL BOYUNCA NOKTA KAYNAKLAR. Sis (`HeightFog.hlsl`) ile AYNI dizi: iki sistem aynı
+/// çakmayı farklı yerde görmemeli. `LightningFlash` çakma başına bir kez yazıyor.
+#define LIGHTNING_MAX_SOURCES 8
+float4 _LightningSources[LIGHTNING_MAX_SOURCES];
+float _LightningSourceCount;
+
 #ifndef URP_PHYSICALLY_BASED_SKY_DEFINES_INCLUDED
 float4 _PlanetCenterRadius;
 #endif

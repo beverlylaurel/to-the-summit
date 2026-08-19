@@ -52,9 +52,11 @@ float _LightningScatterT;
 /// Sırasıyla 675 / 520 / 460 nm.
 static const float3 LightningExtinction = float3(1.469313e-05, 4.171729e-05, 6.812369e-05);
 
+#ifndef URP_VOLUMETRIC_CLOUDS_DEFINES_HLSL
 #define LIGHTNING_MAX_SOURCES 8
 float4 _LightningSources[LIGHTNING_MAX_SOURCES];
 float _LightningSourceCount;
+#endif
 
 /// Çakmanın çevresindeki parlama: ışık havadaki partiküllerden saçılıp göze ulaşıyor.
 ///
