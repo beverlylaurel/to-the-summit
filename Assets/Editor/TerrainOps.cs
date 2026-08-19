@@ -130,6 +130,34 @@ public static class TerrainOps
         float span = Mathf.Max(hi - lo, 1f);
         for (int i = 0; i < h.Length; i++) h[i] = (h[i] - lo) / span;
 
+        // EGIM TABANI ARAZIDEN TURUYOR, SABIT DEGIL.
+        //
+        // Referans uygulamada taban 0.01'di ve o uzayda tipik hucre egimleriyle ayni
+        // buyuklukteydi. Bizim alanimizda 30 derecelik yamacta bile hucre basina dusus
+        // 16.9 m / span 6028 m = 0.0028, yani tabanin ucte biri. `Max` her zaman tabani
+        // seciyor ve TASIMA KAPASITESI EGIMDEN BAGIMSIZ SABIT kaliyor.
+        //
+        // Sabit kapasite asinma degil DIFUZYONDUR: damla dik yamacta da duzlukte de ayni
+        // miktari tasir, vadi oymaz, kabartiyi duzler. Olculdu (asama asama bant raporu):
+        // tohum 2250 m bandini 84'e cikardi, asinma 57'ye dusurdu; 300 m bandi 30'dan
+        // 8'e indi. Vadi acmasi gereken adim orta olcegin %70-80'ini siliyordu.
+        //
+        // Taban artik alanin KENDI ortalama egiminin kucuk bir payi: yalnizca duz
+        // zeminde sifira bolmeyi engelliyor, yamacta kapasiteyi egim suruyor. Boylece
+        // dagin boyu ya da izgara sikligi degisince yeniden ayar gerekmiyor.
+        double slopeSum = 0.0; int slopeCnt = 0;
+        for (int z = 1; z < n - 1; z += 4)
+        for (int x = 1; x < n - 1; x += 4)
+        {
+            int i = z * n + x;
+            float sx = h[i + 1] - h[i - 1], sz = h[i + n] - h[i - n];
+            slopeSum += Mathf.Sqrt(sx * sx + sz * sz) * 0.5f;
+            slopeCnt++;
+        }
+        float slopeFloor = slopeCnt > 0
+            ? Mathf.Max((float)(slopeSum / slopeCnt) * 0.05f, 1e-7f)
+            : 0.01f;
+
         for (int k = 0; k < droplets; k++)
         {
             float px = (float)(rnd.NextDouble() * (n - 2)) + 1f;
@@ -163,11 +191,19 @@ public static class TerrainOps
                 int nx = (int)px, nz = (int)pz;
                 if (nx < 1 || nz < 1 || nx >= n - 2 || nz >= n - 2) break;
 
-                float hNew = h[nz * n + nx];
+                // IKI DOGRUSAL, TAM SAYI DEGIL. Referans uygulama iki yuksekligi de
+                // ayni sekilde ornekliyor; burada eski yukseklik iki dogrusal, yenisi
+                // tam sayi konumdan okunuyordu. Fark `dh`'ye hucre ici varyasyon kadar
+                // RASTGELE bilesen katiyor ve damla rastgele karar veriyor: olculdu,
+                // kapali cukur orani %3.13 iken duzeltmeyle %1.36'ya indi.
+                float fnx = px - nx, fnz = pz - nz;
+                int jn = nz * n + nx;
+                float hNew = h[jn] * (1 - fnx) * (1 - fnz) + h[jn + 1] * fnx * (1 - fnz)
+                           + h[jn + n] * (1 - fnx) * fnz + h[jn + n + 1] * fnx * fnz;
                 float dh = hNew - hOld;
 
                 // Taşıma kapasitesi hıza ve eğime bağlı; yokuş yukarı giderse sıfır.
-                float cap = Mathf.Max(-dh, 0.01f) * speed * water * capacity;
+                float cap = Mathf.Max(-dh, slopeFloor) * speed * water * capacity;
 
                 if (sediment > cap || dh > 0f)
                 {
@@ -441,6 +477,96 @@ public static class TerrainOps
         }
     }
 
+    /// AKARSU OYMASI — akarsu gucu yasasi dz = -K * A^m * S^n, artı yamac difuzyonu.
+    ///
+    /// NEDEN DAMLA ASINMASI DEGIL: damla yontemi bu olcekte vadi OYMUYOR, DUZLUYOR.
+    /// Asama asama olculdu — tohum 2250 m bandini 84'e cikardi, damla asinmasi 56'ya
+    /// dusurdu; 300 m bandi 30'dan 6'ya indi ve kapali cukur %1.8'den %3.1'e CIKTI
+    /// (izole delik aciyor, kanal degil). Firca yaricapi, kapasite, cokelme orani,
+    /// atalet ve damla sayisi tek tek tarandi; hicbir rejim oymadi. Yontem bu hucre
+    /// boyunda yapisal olarak difuzif.
+    ///
+    /// Bu yontem vadiyi suyun TOPLANDIGI yere acar: once akis yonu (D8), sonra yukaridan
+    /// asagiya tek gecisle drenaj alani, sonra alan ve egimle orantili oyma. Dendritik
+    /// ag kendiliginden cikar; egrilik carpikligi negatiften +3'e gecer (vadi tabani
+    /// icbukey, dar ve derin oldugu icin laplasyen dagilimi pozitife carpilir).
+    ///
+    /// DIFUZYON ZORUNLU ESLIK: yalniz oyma tek hucre genisliginde yariklar birakiyor,
+    /// p90 egim 64 dereceye ciktiyor (gercek alp arazisi 50-58). Yamac difuzyonu
+    /// kanali genisletip omuzu yuvarliyor — gercek arazi evrimi modeli de zaten bu
+    /// ikisinin birlesimidir.
+    ///
+    /// TERMAL ASINMA BU ADIMDAN SONRA CALISTIRILMAZ. Olculdu: 38 derece talusla 40 tur
+    /// carpikligi +2.58'den -0.14'e dusuruyor, yani butun vadi yapisini siliyor, ve
+    /// en dik egimi 88'den ancak 81 dereceye indiriyor. Isini yapmadan yapiyi yikiyor.
+    public static void FlowIncise(float[] h, int n, float cell, float k, float m,
+                                  float slopeExp, int iterations, float diffuse,
+                                  float[] mask = null)
+    {
+        int total = n * n;
+        var rec = new int[total];
+        var slope = new float[total];
+        var area = new float[total];
+        var order = new int[total];
+        var key = new float[total];
+        float cellArea = cell * cell;
+
+        int[] dz = { -1, -1, -1, 0, 0, 1, 1, 1 };
+        int[] dx = { -1, 0, 1, -1, 1, -1, 0, 1 };
+        var dist = new float[8];
+        for (int q = 0; q < 8; q++) dist[q] = Mathf.Sqrt(dz[q] * dz[q] + dx[q] * dx[q]) * cell;
+
+        for (int it = 0; it < iterations; it++)
+        {
+            // 1) EN DIK ASAGI KOMSU. Kenar disina bakan yon elenir; alici yoksa hucre
+            //    havza cikisidir ve oyulmaz (aksi halde kenar sonsuza kadar kazilir).
+            for (int z = 0; z < n; z++)
+            for (int x = 0; x < n; x++)
+            {
+                int i = z * n + x;
+                float best = 0f; int bestIdx = -1;
+                for (int q = 0; q < 8; q++)
+                {
+                    int z2 = z + dz[q], x2 = x + dx[q];
+                    if (z2 < 0 || z2 >= n || x2 < 0 || x2 >= n) continue;
+                    int j = z2 * n + x2;
+                    float d = (h[i] - h[j]) / dist[q];
+                    if (d > best) { best = d; bestIdx = j; }
+                }
+                rec[i] = bestIdx; slope[i] = best;
+                area[i] = cellArea;
+                order[i] = i; key[i] = -h[i];
+            }
+
+            // 2) DRENAJ ALANI. Yuksekten alcaga tek gecis yeterli: bir hucre islenirken
+            //    ustundeki her sey zaten toplanmis olur.
+            System.Array.Sort(key, order);
+            for (int q = 0; q < total; q++)
+            {
+                int i = order[q];
+                int r = rec[i];
+                if (r >= 0) area[r] += area[i];
+            }
+
+            // 3) OYMA.
+            for (int i = 0; i < total; i++)
+            {
+                if (rec[i] < 0) continue;
+                float inc = k * Mathf.Pow(area[i], m) * Mathf.Pow(slope[i], slopeExp);
+                h[i] -= inc * (mask == null ? 1f : mask[i]);
+            }
+
+            // 4) YAMAC DIFUZYONU.
+            if (diffuse > 0f)
+            {
+                var smooth = (float[])h.Clone();
+                Blur(smooth, n, 1);
+                for (int i = 0; i < total; i++)
+                    h[i] += diffuse * (smooth[i] - h[i]) * (mask == null ? 1f : mask[i]);
+            }
+        }
+    }
+
     // ============================================================ maskeler
 
     /// Kot bandı maskesi. Kenarlar yumuşak: sert eşik arazide kontur çizgisi bırakıyor.
@@ -449,8 +575,17 @@ public static class TerrainOps
         var m = new float[n * n];
         for (int i = 0; i < h.Length; i++)
         {
-            float a = Mathf.SmoothStep(lo - feather, lo + feather, h[i]);
-            float b = 1f - Mathf.SmoothStep(hi - feather, hi + feather, h[i]);
+            // UNITY'NIN SmoothStep'i GLSL'inki DEGIL: `Mathf.SmoothStep(from, to, t)`
+            // from-to arasinda interpolasyon yapar ve t'yi 0-1'e KIRPAR. Esik olarak
+            // kullanilinca 3000 m'lik hucre icin a=350, b=-8249 cikiyor ve Clamp01
+            // sonucu SIFIR — maske her yerde olu kaliyordu. Kot/egim maskeli her islem
+            // sessizce hicbir sey yapmiyordu (olculdu: "Dogallastir" dugmesi bant
+            // tablosunu degistirmedi, yalniz maskesiz termal asama iz birakti).
+            //
+            // Dogru kalip ayni dosyada zaten var (`Apron`, `CalmLowland`): once
+            // InverseLerp ile 0-1'e indir, sonra SmoothStep(0,1,t).
+            float a = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(lo - feather, lo + feather, h[i]));
+            float b = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(hi - feather, hi + feather, h[i]));
             m[i] = Mathf.Clamp01(Mathf.Min(a, b));
         }
         return m;
@@ -470,8 +605,9 @@ public static class TerrainOps
             float gz = (h[zp * n + x] - h[zm * n + x]) / ((zp - zm) * cell);
             float deg = Mathf.Atan(Mathf.Sqrt(gx * gx + gz * gz)) * Mathf.Rad2Deg;
 
-            float a = Mathf.SmoothStep(lo - feather, lo + feather, deg);
-            float b = 1f - Mathf.SmoothStep(hi - feather, hi + feather, deg);
+            // Ayni hata (bkz. `MaskByHeight`): Unity SmoothStep esik fonksiyonu degil.
+            float a = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(lo - feather, lo + feather, deg));
+            float b = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(hi - feather, hi + feather, deg));
             m[z * n + x] = Mathf.Clamp01(Mathf.Min(a, b));
         }
         return m;

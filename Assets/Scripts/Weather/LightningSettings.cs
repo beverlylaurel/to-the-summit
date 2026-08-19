@@ -76,10 +76,44 @@ public class LightningSettings : ScriptableObject
     [Range(0f, 1f)] public float boltKink = 0.35f;
     [Tooltip("Kanalın kalınlığı (metre).")]
     public float boltWidth = 14f;
-    [Tooltip("Ana kanaldan ayrılan çatal sayısı.")]
-    [Range(0, 8)] public int boltBranches = 5;
-    [Tooltip("Çatalın ana kanala oranla uzunluğu.")]
+    // ---- DALLANMA: Reed & Wyvill 1994 ----
+    //
+    // Makalenin tek gerçek fiziksel gözlemi: dallar ana koldan ortalama 16 derece sapar
+    // ve açılar bu değer etrafında NORMAL dağılır. Sabit bir açı kullanmak (eski hâl,
+    // ~35 derece) her çatalı aynı yöne savuruyordu.
+    //
+    // Dallanma ÖZYİNELEMELİ: dalın dalı olur. Eski hâl tek kademeydi ve ana kanal
+    // gövdeden çıkan beş çubuk gibi duruyordu; gerçek boşalma her kuşakta incelerek
+    // ağaçlanıyor.
+    [Tooltip("Dalın ana koldan sapma açısı — ortalama (derece). Reed & Wyvill'in " +
+             "gözlemi 16 derece; bu makalenin tek ampirik sabiti.")]
+    [Range(2f, 40f)] public float boltBranchAngle = 16f;
+    [Tooltip("Sapma açısının dağılımı (derece). Normal dağılımın standart sapması.")]
+    [Range(0f, 20f)] public float boltBranchSpread = 7f;
+    [Tooltip("Sapmanın tavanı (derece). Kuyruktaki uç değerler kolu geri yukarı " +
+             "savurmasın diye.")]
+    [Range(10f, 80f)] public float boltBranchAngleMax = 50f;
+
+    [Tooltip("Bir düğümde dal doğma olasılığı (ana kanal için).")]
+    [Range(0f, 1f)] public float boltBranchChance = 0.2f;
+    [Tooltip("Her kuşakta olasılığın çarpanı. 1'in altında olmalı, yoksa ağaç " +
+             "patlar ve alt kuşaklar üst kuşaktan sık dallanır.")]
+    [Range(0.3f, 1f)] public float boltBranchChanceDecay = 0.8f;
+    [Tooltip("Çatalın ana kanala oranla uzunluğu (ilk kuşak).")]
     [Range(0.1f, 0.8f)] public float boltBranchLength = 0.6f;
+    [Tooltip("Her kuşakta uzunluğun çarpanı. Ağacın sonlanmasını bu sağlıyor.")]
+    [Range(0.2f, 0.9f)] public float boltBranchLengthDecay = 0.5f;
+    [Tooltip("Her kuşakta kalınlığın çarpanı.")]
+    [Range(0.2f, 0.9f)] public float boltWidthDecay = 0.5f;
+    [Tooltip("Her kuşakta kıvrımlılığın çarpanı. Reed & Wyvill'de dal ebeveyninden " +
+             "DAHA kıvrımlı: gücü azaldıkça yol daha çok savruluyor.")]
+    [Range(0.5f, 2f)] public float boltWavinessGrowth = 1.3f;
+
+    [Tooltip("En fazla kaç kuşak dal. 0 = yalnız ana kanal.")]
+    [Range(0, 5)] public int boltGenerations = 3;
+    [Tooltip("Aynı anda çizilebilecek en fazla çizgi. Ağacın bütçe tavanı; " +
+             "aşılırsa dallanma kesilir.")]
+    [Range(1, 64)] public int boltMaxLines = 24;
 
     [Header("Değme noktası")]
     [Tooltip("Kolun yere değdiği yerdeki nokta ışığın şiddeti. Yönlü ışıktan farklı " +

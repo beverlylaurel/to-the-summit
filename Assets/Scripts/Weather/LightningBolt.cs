@@ -15,13 +15,32 @@ public class LightningBolt : MonoBehaviour
     [SerializeField] LightningSettings settings;
     [SerializeField] Material material;
 
-    /// Ana kanal artı çatallar. Her biri kendi çizgisini taşıyor.
-    LineRenderer channel;
-    LineRenderer[] branches;
+    /// Kol bir AĞAÇ: ana kanal ve ondan doğan kuşaklar. Kaç çizgi gerekeceği çakmaya
+    /// göre değişiyor (dallanma olasılıksal), o yüzden havuz — her çakmada nesne
+    /// yaratmak çöp üretirdi.
+    readonly System.Collections.Generic.List<LineRenderer> lines = new();
+    int usedLines;
     Light contact;
 
+    /// TEK TAMPON YETİYOR. Dal, ebeveyninin İZLENMİŞ noktalarından doğuyor; ama doğum
+    /// noktası tamponu yeniden kullanmadan önce Vector3 olarak KOPYALANIP kuyruğa
+    /// yazılıyor. Kuyruk değer taşıyor, tampona referans değil.
     Vector3[] points;
-    Vector3[] branchPoints;
+
+    readonly System.Collections.Generic.Queue<Branch> pending = new();
+
+    /// Bir dalın doğum bilgisi. Ebeveyninden türeyen her şey burada; izleme sırası
+    /// geldiğinde bunlardan geometri üretiliyor.
+    struct Branch
+    {
+        public Vector3 from;
+        public Vector3 direction;
+        public float distance;
+        public float width;
+        public float waviness;
+        public float chance;
+        public int generation;
+    }
     float elapsed;
     float life;
     bool active;
@@ -61,19 +80,9 @@ public class LightningBolt : MonoBehaviour
     {
         int count = settings.boltSegments + 1;
 
-        if (points == null || points.Length != count)
-        {
-            points = new Vector3[count];
-            branchPoints = new Vector3[count];
-        }
+        if (points == null || points.Length != count) points = new Vector3[count];
 
-        if (channel != null) return;
-
-        channel = CreateLine("Channel", settings.boltWidth);
-
-        branches = new LineRenderer[settings.boltBranches];
-        for (int i = 0; i < branches.Length; i++)
-            branches[i] = CreateLine($"Branch{i}", settings.boltWidth * 0.45f);
+        if (lines.Count > 0) return;
 
         // Değme noktasındaki ışık nokta ışık olabiliyor: yönlü olanın aksine burası
         // gerçekten yakında, menzili birkaç yüz metrede kalıyor ve kümelemeyi boğmuyor.
@@ -85,6 +94,18 @@ public class LightningBolt : MonoBehaviour
         contact.color = settings.flashColor;
         contact.range = settings.groundRange;
         contact.intensity = 0f;
+    }
+
+    /// Havuzdan çizgi verir, yoksa yaratır. Tavan `boltMaxLines`.
+    LineRenderer TakeLine()
+    {
+        if (usedLines < lines.Count) return lines[usedLines++];
+        if (lines.Count >= settings.boltMaxLines) return null;
+
+        var line = CreateLine($"Bolt{lines.Count}", settings.boltWidth);
+        lines.Add(line);
+        usedLines++;
+        return line;
     }
 
     LineRenderer CreateLine(string name, float width)
@@ -119,30 +140,7 @@ public class LightningBolt : MonoBehaviour
         Vector3 top = new(strike.Origin.x, strike.CloudBase, strike.Origin.z);
         Vector3 foot = new(top.x, terrain.SampleHeight(top) + terrain.transform.position.y, top.z);
 
-        Trace(channel, top, foot, settings.boltWaviness, points);
-
-        for (int i = 0; i < branches.Length; i++)
-        {
-            // Çatal ana kanaldan ayrılır ve **aşağı doğru** gider. Rastgele bir küre
-            // yönüne göndermek onları yukarı da savurup düğüme çeviriyordu; boşalma yere
-            // iniyor, dallar da onu izliyor.
-            //
-            // Ayrılma noktası kanalın her yerinden olabilir, yalnızca üst yarısından
-            // değil: gerçek boşalma aşağı indikçe de dallanıyor ve tek bölgede toplanan
-            // çatallar tepede bir düğüm, altta çıplak bir çizgi bırakıyordu.
-            int from = Random.Range(1, points.Length - 3);
-            Vector3 start = points[from];
-
-            Vector3 down = (foot - start).normalized;
-            Vector3 aside = Vector3.Normalize(Vector3.Cross(down, Random.onUnitSphere));
-            Vector3 heading = Vector3.Normalize(down + aside * 0.7f);
-
-            Vector3 end = start + heading * (Vector3.Distance(start, foot)
-                                             * settings.boltBranchLength);
-
-            // Çatal ana kanaldan daha düz iner: boşalmanın gücü orada azalmış oluyor
-            Trace(branches[i], start, end, settings.boltWaviness * 0.7f, branchPoints);
-        }
+        GrowTree(top, foot);
 
         contact.transform.position = foot;
         contact.range = settings.groundRange;
@@ -250,11 +248,11 @@ public class LightningBolt : MonoBehaviour
         SetVisible(true);
         contact.intensity = settings.groundIntensity * flicker;
 
+        // Ana kanal en parlak, her kuşak sönük. Boşalmanın gücü dallandıkça azalıyor;
+        // hepsini aynı parlaklıkta çizmek ağacı düz bir tel yumağına çeviriyordu.
         var tint = settings.flashColor * flicker;
-        channel.startColor = channel.endColor = tint;
-
-        foreach (var branch in branches)
-            branch.startColor = branch.endColor = tint * 0.7f;
+        for (int i = 0; i < usedLines; i++)
+            lines[i].startColor = lines[i].endColor = tint * lineTint[i];
     }
 
     void Hide()
@@ -267,9 +265,114 @@ public class LightningBolt : MonoBehaviour
 
     void SetVisible(bool visible)
     {
-        if (channel == null) return;
+        for (int i = 0; i < lines.Count; i++)
+            lines[i].enabled = visible && i < usedLines;
+    }
 
-        channel.enabled = visible;
-        foreach (var branch in branches) branch.enabled = visible;
+    /// AĞACI ÜRETİR. Reed & Wyvill: dal ebeveyninden ortalama 16 derece sapar (normal
+    /// dağılım), her kuşakta kalınlık/olasılık/uzunluk azalır, kıvrımlılık ARTAR.
+    ///
+    /// Genişlik-öncelikli kuyruk, özyineleme değil: ağacın büyüklüğü olasılıksal ve
+    /// yığın derinliği önceden bilinmiyor. Kuyruk aynı zamanda bütçe tavanını doğal
+    /// yerde uyguluyor — tavan dolunca kalan dallar hiç doğmuyor, yarım kalmış bir dal
+    /// kalmıyor.
+    void GrowTree(Vector3 top, Vector3 foot)
+    {
+        usedLines = 0;
+        pending.Clear();
+
+        pending.Enqueue(new Branch
+        {
+            from = top,
+            direction = (foot - top).normalized,
+            distance = Vector3.Distance(top, foot),
+            width = settings.boltWidth,
+            waviness = settings.boltWaviness,
+            chance = settings.boltBranchChance,
+            generation = 0,
+        });
+
+        while (pending.Count > 0)
+        {
+            var branch = pending.Dequeue();
+
+            var line = TakeLine();
+            if (line == null) break;              // bütçe doldu
+
+            line.widthMultiplier = branch.width;
+            EnsureTintCapacity();
+            lineTint[usedLines - 1] = Mathf.Pow(0.7f, branch.generation);
+
+            // ANA KANAL YERE DEĞER, dallar havada biter. Kanalın bitiş noktası yamacın
+            // kendisi; dalın bitişi yönü ve boyu.
+            Vector3 target = branch.generation == 0
+                ? foot
+                : branch.from + branch.direction * branch.distance;
+
+            Trace(line, branch.from, target, branch.waviness, points);
+
+            if (branch.generation >= settings.boltGenerations) continue;
+
+            // ÇOCUKLAR EBEVEYNİN İZLENMİŞ NOKTALARINDAN doğuyor — düz çizgiden değil.
+            // Düz çizgiden doğarlarsa kıvrımlı kanalın yanında havada asılı kalıyorlar.
+            // Noktalar KOPYALANIYOR: tampon bir sonraki dalda yeniden yazılacak.
+            for (int i = 1; i < points.Length - 1; i++)
+            {
+                if (Random.value >= branch.chance) continue;
+
+                Vector3 heading = ChildDirection(branch.direction);
+
+                pending.Enqueue(new Branch
+                {
+                    from = points[i],
+                    direction = heading,
+                    distance = branch.distance * settings.boltBranchLength,
+                    width = branch.width * settings.boltWidthDecay,
+                    waviness = branch.waviness * settings.boltWavinessGrowth,
+                    chance = branch.chance * settings.boltBranchChanceDecay,
+                    generation = branch.generation + 1,
+                });
+            }
+        }
+
+        SetVisible(true);
+    }
+
+    /// Dalın yönü: ebeveyninden ORTALAMA 16 derece sapar, sapma normal dağılır.
+    ///
+    /// Sabit açı (eski hâl) her çatalı aynı koniye diziyordu ve ağaç şemsiye gibi
+    /// duruyordu. Normal dağılım Reed & Wyvill'in tek ampirik gözlemi: doğadaki dallar
+    /// bu değer etrafında toplanıyor, kuyrukta nadiren sert sapanlar var.
+    ///
+    /// Tavan var çünkü normal dağılımın kuyruğu sınırsız: kırpılmazsa bir dal geri
+    /// yukarı, bulutun içine dönebiliyor.
+    Vector3 ChildDirection(Vector3 parent)
+    {
+        float deg = settings.boltBranchAngle + Gaussian() * settings.boltBranchSpread;
+        deg = Mathf.Clamp(Mathf.Abs(deg), 1f, settings.boltBranchAngleMax);
+
+        // Sapma ekseni: ebeveyne dik, azimutu rastgele.
+        Vector3 axis = Vector3.Cross(parent, Random.onUnitSphere);
+        if (axis.sqrMagnitude < 1e-6f) axis = Vector3.Cross(parent, Vector3.right);
+
+        return (Quaternion.AngleAxis(deg, axis.normalized) * parent).normalized;
+    }
+
+    /// Box-Muller. Unity'de normal dağılım yok; `Random.value` düzgün dağılıyor ve
+    /// düzgün dağılımla 16 derece "ortalama" kurulamaz — ortalama etrafında toplanma
+    /// olmaz, bant olur.
+    static float Gaussian()
+    {
+        float u1 = Mathf.Max(Random.value, 1e-6f);
+        float u2 = Random.value;
+        return Mathf.Sqrt(-2f * Mathf.Log(u1)) * Mathf.Cos(2f * Mathf.PI * u2);
+    }
+
+    float[] lineTint = new float[8];
+
+    void EnsureTintCapacity()
+    {
+        if (lineTint.Length >= lines.Count) return;
+        System.Array.Resize(ref lineTint, Mathf.Max(lines.Count, lineTint.Length * 2));
     }
 }

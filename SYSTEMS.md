@@ -243,6 +243,26 @@ değerlendirildi.
 - **Yalnız yakın çakmalarda çizilir**; kolun görünmesi mesafe hakkında bilgi taşıyor.
 - Kanalın nerede biteceğini yamacın kendisi belirler. Değme noktasındaki ışık **nokta**
   ışıktır.
+- **Kol bir AĞAÇ** (Reed & Wyvill 1994): dallar ana koldan ortalama **16°** sapar, açı
+  normal dağılır, dallanma özyinelemelidir. Her kuşakta kalınlık ×0.5, olasılık ×0.8,
+  uzunluk ×0.5, kıvrımlılık ×1.3 — dal ebeveyninden daha kıvrımlıdır. Çizgiler havuzdan
+  gelir, bütçe tavanı `boltMaxLines`.
+
+### Şimşek saçılma tablosu (`LightningLutBaker`) — HENÜZ TÜKETİLMİYOR
+
+Dobashi 2001 §4'ün lookup table'ı: `Assets/Settings/LightningScatterLut.asset`,
+128×128 RGBAFloat, T = 1.5 km. Asset yoksa yükleme anında kendiliğinden pişer.
+
+**Statik.** Sahne, hava ve çakma konumu değişse de değişmez — makalenin bütün numarası
+bu (Denklem 4: kaynağın şiddeti integralin dışında kalıyor).
+
+**Berrak hava için pişiyor**, yerel sis için değil: tablo üniform yoğunluk varsayıyor,
+bizim sisimiz üniform değil. Yerel sis kendi yolundan geçmeye devam eder, çift sayım yok.
+
+**Referans yapılandırmada 1.0 verecek şekilde normalize** (800 m, 30° sapma) — bağlandığı
+gün bugünkü parlaklık o noktada korunsun, yalnız mesafe/açı sönümü düzelsin diye.
+
+**Henüz kimse okumuyor.** Sis hâlâ `_LightningFlash.rgb * 0.6` sabitini kullanıyor.
 
 ### Volumetrik sis (`VolumetricFogFeature`, `VolumetricFog.compute`, `VolumetricFogShared.hlsl`)
 
