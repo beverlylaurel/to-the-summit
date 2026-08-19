@@ -40,8 +40,25 @@ Shader "Hidden/ToTheSummit/SpectralPrecipitation"
             SAMPLER(sampler_CurtainPattern);
 
             float4 _CurtainParams;   // x: döşeme boyu (px), y: desen ölçeği (px), z: yoğunluk, w: zaman
-            float4 _CurtainDepth;    // x: yakın kesme (m), y: akış hızı, z: karlılık, w: boş
-            float4 _CurtainFoe;      // xy: yağışın ekran yönü (birim), zw: ekran boyu
+            float4 _CurtainDepth;    // x: yakın kesme (m), y: akış hızı, z: karlılık, w: ışınsallık
+            float4 _CurtainFlow;     // xy: tek yönlü akışın ekran yönü, z: boş, w: boş
+            float4 _CurtainFoe;
+
+            /// DÖŞEME KARIŞTIRICISI. Makale her döşemeyi AYRI sentezliyor (`§7`), yani
+            /// komşu döşemelerin gürültüsü bağımsız. Biz tek doku pişirip tekrar
+            /// kullanıyoruz — kaydırma küçük olursa komşular desenin neredeyse aynı
+            /// yerini okur ve ekran tek lekenin ızgarasına döner. Kullanıcı bunu
+            /// "niye bu kadar düzenliler" diye bildirdi.
+            ///
+            /// Hash döşeme başına `[0,1)²` kaydırma üretiyor; doku Repeat olduğu için
+            /// her kaydırma geçerli. Bağımsız sentezin ucuz karşılığı: aynı gürültünün
+            /// ilişkisiz bölgeleri.
+            float2 TileHash(float2 t)
+            {
+                float3 h = frac(t.xyx * float3(0.1031, 0.1030, 0.0973));
+                h += dot(h, h.yzx + 33.33);
+                return frac((h.xx + h.yz) * h.zy);
+            }      // xy: yağışın ekran yönü (birim), zw: ekran boyu
 
             /// TEŞHİS. 0 kapalı · 1 bant · 2 opaklık · 3 perde yok.
             /// Göz kararı yerine AYRIK renk bandı: her renk bir SAYI aralığı, ara ton yok.
@@ -176,13 +193,34 @@ Shader "Hidden/ToTheSummit/SpectralPrecipitation"
                     float2 tileIndex = baseTile + float2(tx, ty);
                     float2 center = (tileIndex + 0.5) * tileSize;
 
+                    // IŞINSAL VE TEK YÖNLÜ AKIŞ ARASINDA SÜREKLİ GEÇİŞ.
+                    //
+                    // Genleşme odağı yalnız akış görüş eksenine YAKINSA ekranda bir
+                    // noktadır. Akış eksene dikleşince odak sonsuza gider ve akış
+                    // paralelleşir — o sınırda odağın yeri anlamsızdır.
+                    //
+                    // Eski kod bunu görmüyordu: odağı 1000 m öteki bir dünya noktasının
+                    // izdüşümünden buluyor, nokta kameranın arkasına düşünce ekran
+                    // MERKEZİNE sıçrıyordu. Kar dik düştüğü için odak başucundadır ve
+                    // yaw'da tam o kararsız bölgede gezer; sonuç, kamera çevrilince
+                    // desenin 360° dönmesiydi (kullanıcı bildirdi).
+                    //
+                    // `_CurtainDepth.w` ışınsallık: 1 tam ışınsal, 0 tam paralel.
+                    float radial = _CurtainDepth.w;
+
                     float2 fromFoe = center - foe;
                     float radius = length(fromFoe);
-                    float2 dir = radius > 1e-3 ? fromFoe / radius : float2(1.0, 0.0);
+                    float2 radialDir = radius > 1e-3 ? fromFoe / radius : _CurtainFlow.xy;
+
+                    float2 mixed = lerp(_CurtainFlow.xy, radialDir, radial);
+                    float mixedLen = length(mixed);
+                    float2 dir = mixedLen > 1e-3 ? mixed / mixedLen : float2(1.0, 0.0);
 
                     // HIZ ODAĞA UZAKLIKLA LİNEER (C_ij = C₀·|p_ij − FOE|). Odağın
                     // dibindeki döşemeler neredeyse durgun — makalenin kendi gözlemi.
-                    float speed = _CurtainDepth.y * saturate(radius / halfDiagonal);
+                    // Paralel sınırda böyle bir odak yok, hız ekran boyunca sabit.
+                    float speed = _CurtainDepth.y
+                                * lerp(1.0, saturate(radius / halfDiagonal), radial);
 
                     // Dönme DÖŞEME MERKEZİ etrafında; döşeme içinde sabit olduğu için
                     // burulma yok, katı dönme var.
@@ -190,14 +228,18 @@ Shader "Hidden/ToTheSummit/SpectralPrecipitation"
                     float2 rot = float2(local.x * dir.x + local.y * dir.y,
                                        -local.x * dir.y + local.y * dir.x);
 
-                    // Her döşeme desenin BAŞKA bir yerinden okusun; aynı yerden okurlarsa
-                    // ekran aynı lekenin ızgarasına dönüyor.
-                    float2 q = rot + tileIndex * 0.37;
+                    float2 q = rot + TileHash(tileIndex);
 
                     float w = (0.35 + speed) * _CurtainParams.w;
 
-                    float a = SAMPLE_TEXTURE3D(_CurtainPattern, sampler_CurtainPattern,
-                                               float3(q, w)).r;
+                    // R KAR, G YAĞMUR. İki desen ayrı pişiyor: yağmurun halkası bir
+                    // oktav yukarıda (damla taneden küçük) ve zamansal frekansı 2.5×
+                    // (daha hızlı, dolayısıyla daha bulanık). Karlılık ikisini
+                    // harmanlıyor — sulu kar ikisinin bir arada bulunması, tıpkı
+                    // tanelerde olduğu gibi (`SYSTEMS.md`).
+                    float2 rg = SAMPLE_TEXTURE3D(_CurtainPattern, sampler_CurtainPattern,
+                                                 float3(q, w)).rg;
+                    float a = lerp(rg.g, rg.r, _CurtainDepth.z);
 
                     // Bilineer harmanlama: kenarda iki komşunun payı eşitleniyor, dikiş
                     // görünmüyor. Makale 10 piksellik örtüşmede lineer harmanlıyor.

@@ -212,10 +212,23 @@ Gökyüzü rengini de okumaz.
   temsil ediyorlar. Derinlik yalnız çok yakın cismin önüne geçmemek için okunuyor.
 - **Perde kendi rengini seçmez ve gökyüzünden de boyanmaz** — `SpindriftColor`, havada
   asılı tanenin rengi. Aynı ayrım savrulan karda da geçerli.
+- **Kar ve yağmur AYRI desen.** Tek doku, iki kanal: `R` kar, `G` yağmur; karlılık
+  harmanlıyor. Yağmurun halkası bir oktav yukarıda (damla taneden küçük) ve zamansal
+  frekansı ~2× (ölçüldü: kare farkı 65.5'e karşı 34.2). Yalnız opaklığın değişmesi
+  yetmiyordu — ikisi aynı görünüyordu.
+- **Dikey yağmur izi bu katmanın işi DEĞİL.** Langer'da `ω_t` yalnız ω'nın yönüne bağlı;
+  iz üretmek için spektrumu hareket ekseninde daraltmak gerekir, o modlar da durgundur.
+  İz taneyi tek tek çizen katmana ait (Garg-Nayar).
 - **Akış odağı kameranın ve yağışın bileşkesinden.** Kamera dururken de kar düşüyor;
   o zaman eksen rüzgârın ekseni.
+- **Odak kaybolan noktadan bulunur, uzak bir noktanın izdüşümünden değil.** Yön vektörü
+  `w = 0` ile izdüşüm matrisinden geçiyor; çıkan `w` yönün görüş eksenine yatkınlığı.
+  Sıfıra giderken odak sonsuza gider ve akış **paralelleşir** — ışınsal ve paralel kip
+  arasında sürekli geçiş var, sıçrama yok.
 - **Ekran döşemelere bölünür**, her döşemenin kendi yönü ve hızı var (odağa uzaklıktan),
   komşular bilineer harmanlanır. Tek yönlü perde ekranı topluca kaydırıyordu.
+- **Her döşeme desenin İLİŞKİSİZ bir yerinden okur** (döşeme indisinden hash). Makale her
+  döşemeyi ayrı sentezliyor; tek doku paylaşıldığında bağımsızlığı hash sağlıyor.
 
 ### Hava sesi (`WeatherAudio`, `AudioBand`)
 

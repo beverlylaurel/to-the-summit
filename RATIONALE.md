@@ -670,3 +670,43 @@ uzanıyor; oyun alanı ne kadar büyük olursa olsun kenarda kesilir. Silsile an
 oktav istenince son üçü (10, 5, 2.5 m) sınırın altında kalıp 2 hücrelik zikzak olarak geri
 katlanıyordu; pişmiş haritada anomali 14.7 m'de, tabanın 3.5 katı. Ayrıntı `SYMPTOMS.md` →
 "Arazide düzenli testere".
+
+
+## Yağış perdesi — makaleden sapılan üç yer
+
+Perde `[Langer 2004]`'ten port edildi. Portun üç yerinde makalenin yaptığı şey yerine
+kendi kısayolum duruyordu; üçü de ekranda göründü ve kullanıcı bildirdi.
+
+**Döşeme başına bağımsız sentez.** Makale her ekran döşemesi için AYRI IFFT alıyor
+(`§7`), yani komşu döşemelerin gürültüsü ilişkisiz. Ben tek doku pişirip döşemeler
+arasında küçük bir kaydırmayla (`tileIndex * 0.37`) paylaştırdım ve bunu dosya başlığına
+"θ saf dönmedir, C saf zaman ölçeğidir" diye çözülmüş gibi yazdım. İki iddia da doğru,
+ama üçüncüsü — bağımsızlık — hiç ele alınmamıştı. Komşular desenin neredeyse aynı yerini
+okuyunca ekran tek lekenin ızgarasına döndü. Kullanıcı: *"niye bu kadar düzenliler"*.
+Karşılığı döşeme indisinden hash: bağımsız sentezin ucuz karşılığı, aynı gürültünün
+ilişkisiz bölgeleri.
+
+**Genleşme odağı.** Odağı, akış yönünde 1000 m öteye konan bir dünya noktasının ekran
+izdüşümünden buluyordum. Kar dik düştüğü için o nokta BAŞUCUNDA; kamerayı çevirince
+izdüşümü kararsız bölgede geziyor, arkaya düşünce de kod ekran merkezine sıçrıyordu.
+Kullanıcı: *"kamerayı hareket ettirince 360 derece dönüyorlar"*. Doğrusu kaybolan nokta —
+yön vektörünü `w = 0` ile izdüşümden geçirmek. Çıkan `w`, yönün görüş eksenine yatkınlığı;
+sıfıra giderken odak sonsuza gider ve akış ekranda paralelleşir. Sınır durum artık
+tanımlı, geçiş sürekli.
+
+**Yağmur.** Perdeyi baştan "kar perdesi" diye kurdum; yağmur yalnız opaklık çarpanıyla
+ayrılıyordu, desen aynıydı. Ayrışması gereken iki şey var ve ikisi de pişirmede: bant
+(damla taneden küçük, bir oktav yukarı) ve zamansal frekans (daha hızlı, dolayısıyla
+Nyquist kesmesi daha çok bulanıklık üretir). Hız kanal başına PİŞMEK zorunda — döngüyü
+çalışma zamanında hızlı oynatmak hızı artırır ama bulanıklığı artırmaz, sonuç strobe olur.
+
+**Dikey iz denenmedi, çünkü kâğıtta çıkmıyor.** `ω_t = C·(ω·v̂)/|ω|` yalnız ω'nın YÖNÜNE
+bağlı. İz üretmek spektrumu hareket ekseninde daraltmak demek; o modların `ω_t`'si sıfıra
+gider ve desen durur. Yani bu çerçevede "hareketli iz" diye bir şey yok. İz, taneyi tek
+tek çizen katmanın işi.
+
+**Kare alma silindi.** Pişiricide `v *= v` vardı, gerekçesi "opaklığı aralığın altına
+sıkıştırmak". Shader ortalamayı çıkarmaya başlayınca ikisi aynı işi yapar oldu — üstelik
+kare alma saklanan ortalamayı 0.29'a kaydırdığı için shader'ın çıkardığı 0.5 ölçülenle
+tutmuyordu. Telafi terimi geri eklenmez kuralının aynısı: gerekçesi kalmayan terim gider.
+
