@@ -1,4 +1,4 @@
-// include-rev: 42  (HeightFog.hlsl degisince Unity bu dosyaya dokunulmadikca
+// include-rev: 43  (HeightFog.hlsl degisince Unity bu dosyaya dokunulmadikca
 // yeniden derlemeyebiliyor; bu satir degisince derleme zorlanir)
 Shader "ToTheSummit/Precipitation"
 {
@@ -16,6 +16,16 @@ Shader "ToTheSummit/Precipitation"
         {
             Name "Precipitation"
 
+            // OCCLUSION  `[Garg 2006, §5]` son adım: "we use the user-specified depth
+            // map of the scene to find the pixels for which the rain streak is not
+            // occluded by the scene. The streak is rendered only over those pixels."
+            //
+            // Makale bunu ayrı bir adım olarak yapmak zorunda çünkü girdisi bir fotoğraf
+            // ve elinde yalnız KABA bir derinlik haritası var. Bizde derinlik tamponu
+            // zaten var ve piksel başına kesin: `ZTest` varsayılan `LEqual` olduğu için
+            // arazinin arkasına düşen iz parçaları rasterizer'da eleniyor.
+            //
+            // `ZWrite Off` — izler birbirini örtmemeli, saydamlar toplanmalı.
             Blend SrcAlpha OneMinusSrcAlpha
             ZWrite Off
             Cull Off
@@ -49,13 +59,65 @@ Shader "ToTheSummit/Precipitation"
             float _Density;          // görsel yoğunluk, şiddetin bükülmüş hali
             float _Precipitation;    // ham şiddet, damla boyutu dağılımı için
             float _SnowDensityScale;
-            float _RainSize;
-            float _RainStretch;
             float _SnowSize;
             float _SnowTurbulence;  // kar tanesinin girdaba kapılma genliği, metre
             float _RainTurbulence;  // damlanın girdaba kapılma genliği, metre
             float _SnowSpin;        // dönme hızı, rüzgârla ölçeklenir
             float3 _WindSweep;      // girdap alanının rüzgârla birikmiş ötelemesi, metre
+
+            // ---- GARG-NAYAR İZ VERİTABANI  `[Garg 2006, §5]`, `rain-spec.md` §6 ----
+            //
+            // Damlanın görüntü izi sabit parlaklıkta bir çubuk değil: salınan damla
+            // ışığı benekler, yayılmış highlight'lar ve eğri konturlar hâlinde kırıyor.
+            // Desen ray-tracing gerektirdiği için offline pişirilmiş, burada aranıyor.
+            TEXTURE2D_ARRAY(_StreakPoint);      SAMPLER(sampler_StreakPoint);
+            TEXTURE2D_ARRAY(_StreakAmbient);    SAMPLER(sampler_StreakAmbient);
+
+            // Çalışma kümesindeki dilim düzeni: ((köşe * 5) + dcam) * 10 + osc.
+            // Köşe sırası (vLow,hLow) (vLow,hHigh) (vHigh,hLow) (vHigh,hHigh).
+            float2 _StreakCellBlend;      // (v, h) hücresi içindeki pay
+            float4 _StreakCornerPresent;  // köşe veritabanında var mı (0/1)
+            float  _StreakMirror;         // azimut 180° üstündeyse doku yatay çevrilir
+            float  _StreakDcamFraction[5];// dizi en uzun `dcam`'e göre dolduruldu
+            float  _StreakExposure;       // kameranın pozlama süresi, saniye
+            float  _StreakDbPeriod;       // veritabanının pişirildiği salınım periyodu
+            float  _StreakSourceScale;    // veritabanı kaynağının bizim güneşimize oranı
+
+            // KAYNAK RENKLERİ AYRICA GEÇMİYOR. İkisi de `HeightFog.hlsl`'de global:
+            //   `_HeightFogSunColor` — süzülmüş güneş radyansı, yönlü kanalın kaynağı
+            //   `_HeightFogColor`    — gökten içeri saçılan radyans, ambient kanalın
+            // Aynı büyüklükleri ikinci kez taşımak atmosfer zincirini ikiye bölerdi.
+
+            #define STREAK_DCAM_COUNT 5
+            #define STREAK_OSC_COUNT 10
+
+            /// Damlanın gerçek yarıçapı (metre). Sınıf oranından Marshall-Palmer
+            /// aralığına eşleniyor: 0.25 mm ince serpinti, 2.5 mm iri damla.
+            ///
+            /// Quad'ın genişliği de buradan geliyor (çap = 2r₀) ve şeffaflık formülü
+            /// de bunu istiyor. Tek kaynak: ikisi ayrı sayılardan gelseydi alfa ile
+            /// ekrandaki kalınlık birbirinden bağımsız kayabilirdi.
+            float DropRadius(float dropSize)
+            {
+                return lerp(0.00025, 0.0025, dropSize);
+            }
+
+            /// Terminal hız (m/s), Gunn & Kinzer ölçümlerinin Atlas bağıntısı:
+            ///   v(D) = 9.65 − 10.3·exp(−0.6·D),  D = çap (mm)
+            ///
+            /// MAKALEDE YOK. `[Garg 2006]` `α = 2r₀/(vT_exp)` formülünde `v`'yi
+            /// kullanıyor ama modelini vermiyor; `rain-spec.md` §11.2-2 bu boşluğu
+            /// işaretleyip Gunn & Kinzer'e yönlendiriyor.
+            ///
+            /// TANECİKLERİN GÖRSEL DÜŞÜŞ HIZI BU DEĞİL. `_RainDirections` 16 m/s
+            /// taşıyor çünkü tanecikler 16-24 m uzakta ve açısal hız gerçek 9 m/s ile
+            /// fazla yavaş okunuyordu. O bilinçli sapma yerinde duruyor; şeffaflık ise
+            /// fiziksel hızı istiyor, yoksa alfa görsel bir ayara bağlanmış olur.
+            float TerminalVelocity(float radius)
+            {
+                float diameterMm = radius * 2000.0;
+                return 9.65 - 10.3 * exp(-0.6 * diameterMm);
+            }
 
             // Arazi yüksekliği, yerdeki kar profili ve perdenin rengi burada. Yakın
             // tanecikler uzak perdeyle AYNI kaynaklardan besleniyor: ikisi ayrı kural
@@ -80,6 +142,8 @@ Shader "ToTheSummit/Precipitation"
                 float4 lobes      : TEXCOORD4;    // tutamın iki yan lobunun kayması
                 float  shape      : TEXCOORD5;    // tanenin iskelet çeşidi, 0-1
                 float  isDrift    : TEXCOORD6;    // sürüklenen kar mı, yağan kar mı
+                float3 streak     : TEXCOORD7;    // (osc, dcam alt indeks, dcam payı)
+                float2 streakCrop : TEXCOORD8;    // (v ölçeği, birleştirme yapıldı mı)
             };
 
             // Havanın rengi. AtmosphereController global olarak yazıyor; sis, bulut,
@@ -282,8 +346,27 @@ Shader "ToTheSummit/Precipitation"
                 // Gerçek kar tanesi 1 mm ile 15 mm arasında değişir. Dar bir dağılım
                 // hepsini aynı boyda gösterip misket hissi yaratıyordu.
                 // Damlada kalınlık hızla aynı sınıftan gelir: iri damla hem hızlı hem kalın
-                float sizeSpread = lerp(0.45 + 1.15 * dropSize, 0.4 + 1.4 * variation, isSnow);
-                float size = lerp(_RainSize, _SnowSize, isSnow) * sizeSpread;
+                // ---- YAĞMUR QUAD'I FİZİKSEL  `[Garg 2006, §5]` ----
+                //
+                // "Based on the drop's distance from the camera and the angle that
+                // drop's velocity vector makes with the camera's optical axis, we scale
+                // the final streak texture to its projected size in the image."
+                //
+                // İzdüşüm boyutu ayrı hesaplanmıyor: quad DÜNYA ölçüsünde kuruluyor ve
+                // perspektif izdüşümü ölçeklemeyi kendisi yapıyor. Boy pozlama süresinde
+                // kat edilen yol, genişlik damlanın çapı.
+                //
+                // ESKİ HÂLİ `_RainSize` × `_RainStretch` idi, yani görsel ayardan
+                // geliyordu. O ayar iz görünümünü veritabanından almayan bir modele
+                // aitti; doku artık gerçek bir damlanın izini taşıyor ve ölçeği de
+                // gerçek olmalı, yoksa desenin frekansı ekranda yanlış boyda çıkar.
+                float radius = DropRadius(dropSize);
+                float physicalSpeed = TerminalVelocity(radius);
+                float rainWidth = 2.0 * radius;
+                float rainLength = physicalSpeed * _StreakExposure;
+
+                float sizeSpread = 0.4 + 1.4 * variation;
+                float size = lerp(rainWidth, _SnowSize * sizeSpread, isSnow);
 
                 // Yoğunluk eşiğinin üstünde kalan tanecikler sıfır boyutla elenir.
                 // Damlalar ayrıca karlılıkla seyrelir: geçişte sayıları da azalsın.
@@ -336,15 +419,47 @@ Shader "ToTheSummit/Precipitation"
                 float3 right = lerp(streakRight, cameraRight, isSnow);
                 float3 up = lerp(fallAxis, cameraUp, isSnow);
 
-                // Uzama damlaya özel. Hızlı düşen damla kare başına daha çok yol alır,
-                // yani daha uzun bir iz bırakır — çizgi boyu hız sınıfını izlemeli
-                float rainStretch = _RainStretch * lerp(0.45, 1.25, dropSize) * (0.85 + 0.3 * variation);
-                float stretch = lerp(rainStretch, 1.0, isSnow);
+                // Uzama artık serbest bir ayar değil: boy/genişlik oranı damlanın
+                // pozlama süresince kat ettiği yolun çapına oranı. Hızlı düşen iri damla
+                // kendiliğinden daha uzun iz bırakıyor.
+                float stretch = lerp(rainLength / max(rainWidth, 1e-6), 1.0, isSnow);
 
                 // Bir pikselden ince quad'ı rasterizer ya tek piksel çizer ya tamamen
                 // atlar; kalınlık farkı ekrana ulaşmadan yok olur ve tanecikler piksel
                 // ızgarasına girip çıktıkça kaynar. Genişliği tabana sabitleyip taşınan
                 // ışığı alfadan düşürmek ikisini birden çözer: ince olan soluk kalır.
+                // ---- İZ VERİTABANI İNDEKSLERİ (yalnız yağmur) ----
+                //
+                // `osc` damla başına RASTGELE. Makale `§5`: "Each drop is also randomly
+                // assigned oscillation parameters Osc from the set of parameters used
+                // to create our streak database." Hangi indeksin hangi genlik çiftine
+                // karşılık geldiği ne makalede ne arşivde yazıyor (`rain-spec.md`
+                // §11.2-7); rastgele seçim bunu gerektirmiyor.
+                float oscIndex = min(floor(Hash(seed.zyw) * STREAK_OSC_COUNT),
+                                     STREAK_OSC_COUNT - 1.0);
+
+                // `θ_v` kameranın bakış yönüyle damlanın DÜŞÜŞ yönü arasındaki açı.
+                // Veritabanı klasörü diklikten sapmayı tutuyor: `dcam = |90° − θ_v|`.
+                // Ölçüldü: iz boyu oranı `cos(dcam)` (makale dipnot 10 — "the lengths
+                // of the streaks for θ_v ≠ 90° are smaller since the viewing direction
+                // is not orthogonal to the fall direction").
+                float thetaV = degrees(acos(clamp(dot(viewDirection, fallAxis), -1.0, 1.0)));
+                float dcamPos = clamp(abs(90.0 - thetaV) / 20.0, 0.0,
+                                      STREAK_DCAM_COUNT - 1.0);
+
+                // ---- DAMLA BOYUTU: KIRPMA / BİRLEŞTİRME  `[Garg 2006, §5]` ----
+                //
+                // Denklem 2'ye göre damla boyutu yalnız salınım FREKANSINI değiştiriyor,
+                // deseni değil. Yani farklı boyuttaki damla aynı desenden geçiyor, ama
+                // periyodu farklı: `ω_n ∝ r₀^{-3/2}` → `T_new = 2π/ω₂ ∝ r₀^{3/2}`.
+                //
+                // Pozlama süresi içinde dokunun ancak `T_exp/T_new` kadarı görünüyor.
+                // Oran 1'in altındaysa doku KIRPILIYOR, üstündeyse kopyaları
+                // BİRLEŞTİRİLİP kırpılıyor — makale dipnot 13: "For long exposure times,
+                // the streak texture repeats itself with the time period of oscillation."
+                float newPeriod = _StreakDbPeriod * pow(radius / 0.0016, 1.5);
+                float vScale = _StreakExposure / max(newPeriod, 1e-6);
+
                 float centerDistance = length(worldPos - cameraPos);
                 float pixelWidth = size * PixelsPerRadian() / max(centerDistance, 0.01);
                 float widen = max(1.0, MinPixelWidth / max(pixelWidth, 1e-4));
@@ -362,6 +477,8 @@ Shader "ToTheSummit/Precipitation"
 
                 OUT.positionCS = TransformWorldToHClip(worldPos);
                 OUT.corner = IN.corner;
+                OUT.streak = float3(oscIndex, floor(dcamPos), frac(dcamPos));
+                OUT.streakCrop = float2(vScale, vScale > 1.0 ? 1.0 : 0.0);
                 OUT.isSnow = isSnow;
                 OUT.isDrift = isDrift;
 
@@ -419,9 +536,19 @@ Shader "ToTheSummit/Precipitation"
                 // çeşitlendirir. Tek tip merkez, her taneyi aynı silüete mahkûm ediyordu.
                 OUT.shape = Hash(seed.xwy);
 
-                // Kalan damlalar da sönükleşsin; geçişte belirgin durmasınlar.
-                // İri damla daha çok ışık taşır, ince serpinti silik kalır
-                float rainAlpha = _RainColor.a * (1.0 - _Snowiness) * lerp(0.7, 1.2, dropSize);
+                // ---- ŞEFFAFLIK  `[Garg 2006, §5]`, `[Garg & Nayar 2005]` ----
+                //
+                //   I_r = (1−α)·I_b + α·I_streak,     α = 2r₀ / (v·T_exp)
+                //
+                // Damla pozlama süresince yol alıyor; tek pikselde geçirdiği süre
+                // çapının kat ettiği yola oranı kadar. Kısa pozlamada iz DAHA OPAK
+                // olur — makalenin kendi vurgusu.
+                //
+                // Hız FİZİKSEL terminal hız, taneciğin görsel düşüş hızı değil
+                // (gerekçe `TerminalVelocity` başında). Yarıçap ve hız quad kurulurken
+                // zaten hesaplandı.
+                float rainAlpha = saturate(2.0 * radius / max(physicalSpeed * _StreakExposure, 1e-6))
+                                * (1.0 - _Snowiness);
 
                 // Taneye özel opaklık: hepsi aynı yoğunlukta olunca derinlik kayboluyordu.
                 // Aralıklar dar; iki çarpan üst üste bindiği için geniş bantlar karı
@@ -439,14 +566,99 @@ Shader "ToTheSummit/Precipitation"
                 return OUT;
             }
 
+            /// Dört `(v,h)` köşesinin ağırlığı. Sıra pişiricideki dilim sırasıyla
+            /// aynı: (vLow,hLow) (vLow,hHigh) (vHigh,hLow) (vHigh,hHigh).
+            float4 StreakCornerWeights()
+            {
+                float vT = _StreakCellBlend.x, hT = _StreakCellBlend.y;
+                float4 w = float4((1.0 - vT) * (1.0 - hT), (1.0 - vT) * hT,
+                                  vT * (1.0 - hT), vT * hT);
+
+                // EKSİK KOMBİNASYON: veritabanında yok (uç dikey açıda iz dejenere,
+                // `rain-spec.md` §5.4.5 — ölçüldü, yalnız `v = ±90` kutuplarında ve
+                // orada da `h170` dışındakiler). Ağırlığı sıfırlanıp kalanlar yeniden
+                // normalize ediliyor, yoksa iz o hücrede sönüyor.
+                return w * _StreakCornerPresent;
+            }
+
+            /// Tek `dcam` seviyesinde dört köşenin harmanı.
+            float SampleStreakAtDcam(float2 uv, float osc, int dcam, float4 weights)
+            {
+                float sum = 0.0, total = 0.0;
+
+                // Dizi en uzun `dcam`'e göre dolduruldu; kısa olanların altı boş.
+                float2 st = float2(uv.x, uv.y * _StreakDcamFraction[dcam]);
+
+                [unroll]
+                for (int c = 0; c < 4; c++)
+                {
+                    float w = weights[c];
+                    if (w <= 0.0) continue;
+                    float slice = (c * STREAK_DCAM_COUNT + dcam) * STREAK_OSC_COUNT + osc;
+                    sum += w * SAMPLE_TEXTURE2D_ARRAY(_StreakPoint, sampler_StreakPoint,
+                                                      st, slice).r;
+                    total += w;
+                }
+
+                return total > 0.0 ? sum / total : 0.0;
+            }
+
             half4 frag(Varyings IN) : SV_Target
             {
                 float2 centered = IN.corner - 0.5;
 
-                // Damla: ince bir çizgi, uçlara doğru sönerek biter — çubuk gibi durmasın
-                float acrossRain = saturate(1.0 - abs(centered.x) * 2.0);
-                float alongRain = saturate(1.0 - abs(centered.y) * 2.0);
-                float rainMask = pow(acrossRain, 0.6) * smoothstep(0.0, 0.45, alongRain);
+                // ---- YAĞMUR İZİ: VERİTABANINDAN  `[Garg 2006, §5]` ----
+                //
+                // Prosedürel çizgi SİLİNDİ. Makalenin kendi ölçümü (`§3`): "a spherical
+                // drop model is simply not adequate when rendering close-up rain
+                // streaks" — sabit parlaklıklı çubuk benekleri, yayılmış highlight'ları
+                // ve eğri konturları üretemiyor.
+                //
+                // Sekiz komşu, üç açısal boyutta ikişer: `(θ_l, φ_l)` dört köşe ×
+                // `θ_v` iki komşu. Makale buna "bilinear" diyor ama üç boyutta iki
+                // komşu, yani trilineer.
+                float streakU = _StreakMirror > 0.5 ? 1.0 - IN.corner.x : IN.corner.x;
+
+                // Kırpma / birleştirme: oran 1'in üstündeyse doku kendini tekrar ediyor.
+                float streakV = IN.corner.y * IN.streakCrop.x;
+                streakV = IN.streakCrop.y > 0.5 ? frac(streakV) : streakV;
+                float2 streakUV = float2(streakU, streakV);
+
+                float4 cornerWeights = StreakCornerWeights();
+                int dcamLow = (int)IN.streak.y;
+                int dcamHigh = min(dcamLow + 1, STREAK_DCAM_COUNT - 1);
+
+                float pointStreak = lerp(
+                    SampleStreakAtDcam(streakUV, IN.streak.x, dcamLow, cornerWeights),
+                    SampleStreakAtDcam(streakUV, IN.streak.x, dcamHigh, cornerWeights),
+                    IN.streak.z);
+
+                // AMBIENT AYRI ÖRNEKLENİYOR ve toplanıyor (`§5`: "we scale each of these
+                // textures individually with the corresponding source intensity and
+                // color. These scaled textures are added"). Işık yönü olmadığı için
+                // yalnız `(θ_v, Osc)` ile indeksleniyor.
+                float ambientStreak = lerp(
+                    SAMPLE_TEXTURE2D_ARRAY(_StreakAmbient, sampler_StreakAmbient,
+                        float2(streakU, streakV * _StreakDcamFraction[dcamLow]),
+                        dcamLow * STREAK_OSC_COUNT + IN.streak.x).r,
+                    SAMPLE_TEXTURE2D_ARRAY(_StreakAmbient, sampler_StreakAmbient,
+                        float2(streakU, streakV * _StreakDcamFraction[dcamHigh]),
+                        dcamHigh * STREAK_OSC_COUNT + IN.streak.x).r,
+                    IN.streak.z);
+
+                // KIRPMA UÇLARI YUMUŞATILIYOR (`§5`: "The streaks ends are then blurred
+                // to smooth out the sharp edges due to cropping"). Yarıçap makalede yok
+                // (`rain-spec.md` §11.2-5); dokunun kendi çözünürlüğünde bir bant
+                // seçildi — iki teksel, `size16`'da 1/262.
+                float endFade = smoothstep(0.0, 0.008, IN.corner.y)
+                              * smoothstep(0.0, 0.008, 1.0 - IN.corner.y);
+
+                // Her kaynak KENDİ rengiyle ölçeklenip toplanıyor (`§5` sonu).
+                float3 rainRadiance = (pointStreak * _HeightFogSunColor.rgb
+                                     + ambientStreak * _HeightFogColor.rgb)
+                                    * _StreakSourceScale;
+
+                float rainMask = endFade;
 
                 // Kar tanesi: üç yumuşak lobun birleşimi.
                 //
@@ -493,7 +705,11 @@ Shader "ToTheSummit/Precipitation"
                 // dolu göbek kenardan bir tık parlak (kalın yer çok saçar). İkisi
                 // birlikte topağı küreye çevirir. Yağmur damlasına uygulanmaz.
                 float ballLight = (0.84 + 0.32 * IN.corner.y) * (0.88 + 0.18 * snowMask);
-                float3 color = IN.color * lerp(1.0, ballLight, IN.isSnow * (1.0 - IN.isDrift));
+                float3 snowColor = IN.color * lerp(1.0, ballLight, IN.isSnow * (1.0 - IN.isDrift));
+
+                // Yağmurun rengi veritabanından + kaynak renklerinden; karınki mevcut
+                // zincirden. Karlılık ikisini seçiyor.
+                float3 color = lerp(rainRadiance, snowColor, max(IN.isSnow, IN.isDrift));
 
                 return half4(color, IN.alpha * mask);
             }

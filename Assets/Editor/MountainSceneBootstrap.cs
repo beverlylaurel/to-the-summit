@@ -69,6 +69,7 @@ public static class MountainSceneBootstrap
     const string BoltMaterialPath = "Assets/Settings/LightningBolt.mat";
     const string SurfaceShaderPath = "Assets/Shaders/MountainSurface.shader";
     const string PrecipitationShaderPath = "Assets/Shaders/Precipitation.shader";
+    const string RainStreakDatabasePath = "Assets/Rain/RainStreakDatabase.asset";
     const string SkyShaderPath = "Assets/Shaders/Sky.shader";
     const string SkyMaterialPath = "Assets/Settings/Sky.mat";
     const string FogComputePath = "Assets/Shaders/VolumetricFog.compute";
@@ -388,8 +389,20 @@ public static class MountainSceneBootstrap
             throw new System.InvalidOperationException(
                 "Spektral yağış deseni üretilemedi: Assets/Settings/SpectralPrecipitation.asset");
 
+        // GARG-NAYAR İZ VERİTABANI. Yoksa yağmur izleri veritabanından çizilemez;
+        // pişirmek dış veri gerektirdiği için burada üretilmiyor, eksikse uyarılıyor.
+        var streakDatabase = AssetDatabase.LoadAssetAtPath<RainStreakDatabase>(RainStreakDatabasePath);
+        if (streakDatabase == null)
+            Debug.LogWarning(
+                $"İz veritabanı yok: {RainStreakDatabasePath}. Yağmur izleri eski " +
+                "prosedürel yoldan çizilecek. Menü: To The Summit/Yağmur/İz veritabanını kur");
+
+        var streakSet = Object.FindAnyObjectByType<RainStreakWorkingSet>();
+        if (streakSet != null) streakSet.Bind(streakDatabase);
+
         precipitationRenderer.Bind(weatherState, windField, precipitationShader, curtainPattern,
-            Object.FindAnyObjectByType<CloudLayerProbe>(), player.transform);
+            Object.FindAnyObjectByType<CloudLayerProbe>(), player.transform,
+            streakSet, Object.FindAnyObjectByType<TimeOfDay>());
         EditorUtility.SetDirty(precipitationRenderer);
 
         // Eski kurulumdan kalan çizim bileşenleri: yağış artık doğrudan çiziliyor
@@ -1348,6 +1361,11 @@ public static class MountainSceneBootstrap
         var precipitation = new GameObject("Precipitation");
         precipitation.transform.SetParent(go.transform, false);
         precipitation.AddComponent<PrecipitationRenderer>();
+
+        // Garg-Nayar iz veritabanının kare başına çalışma kümesi. Yağışla AYNI nesnede:
+        // ikisi de yağışın düşüş ekseninden besleniyor ve ayrı yerlerde durmaları
+        // birinin diğerinden önce/sonra güncellenmesi riskini açardı.
+        precipitation.AddComponent<RainStreakWorkingSet>();
     }
 
     /// Ses: katman harmanı ve gök gürültüsü. WeatherState/WindField ile aynı ağaçta durur.

@@ -18,6 +18,30 @@ public class PrecipitationRenderer : MonoBehaviour
     [Tooltip("Yağışın örnekleneceği nokta — oyuncu.")]
     [SerializeField] Transform observer;
 
+    [Tooltip("Garg-Nayar iz veritabanının kare başına çalışma kümesi. Boşsa yağmur " +
+             "izleri veritabanından değil eski prosedürel yoldan çizilir.")]
+    [SerializeField] RainStreakWorkingSet streaks;
+
+    [Tooltip("Güneş yönünün kaynağı. İz görünümü ışık yönüne güçlü bağlı — makalenin " +
+             "Senaryo 1'i aynı sahneyi 60° ve 10° azimutta belirgin farklı gösteriyor.")]
+    [SerializeField] TimeOfDay timeOfDay;
+
+    [Tooltip("Kameranın pozlama süresi (saniye). Hem izin BOYUNU (veritabanı kırpması) " +
+             "hem ŞEFFAFLIĞINI belirliyor: α = 2r₀/(v·T_exp), kısa pozlamada iz daha " +
+             "opak. Kare süresinden TÜREMİYOR — türeseydi yağmurun görüntüsü fps ile " +
+             "değişirdi.")]
+    [SerializeField] float exposureTime = 1f / 60f;
+
+    [Tooltip("Veritabanının pişirildiği salınım periyodu (saniye). `T_db = 1/60`, " +
+             "r₀ = 1.6 mm damlanın 2π/ω₂'si (`rain-spec.md` §5.3).")]
+    [SerializeField] float databasePeriod = 1f / 60f;
+
+    [Tooltip("KALİBRASYON. Veritabanı izleri kendi render kurulumunun radyansında " +
+             "(kaynak 10 m'de, ~14 sr); bizim güneşimiz o kaynak değil, yani mutlak " +
+             "seviye taşınmıyor. `rain-spec.md` §11.3.5 bu katsayıyı zorunlu kılıyor. " +
+             "1.0 kalibre edilmemiş demek — ölçümle belirlenecek.")]
+    [SerializeField] float sourceScale = 1f;
+
     // Ayarlar bilerek serileştirilmiyor: Inspector'a girince sahnedeki bileşen eski
     // değerlerle donuyor ve koddaki değişiklik etkisiz kalıyor.
 
@@ -76,10 +100,6 @@ public class PrecipitationRenderer : MonoBehaviour
     const float RainSlowFactor = 0.45f;   // en ince damlanın hız oranı
     const float RainWindFactor = 0.85f;   // iri damlanın yediği rüzgâr oranı
     const float RainWindLightFactor = 1f; // ince damla rüzgârı tam yer
-    const float RainSize = 0.012f;        // genişlik, metre
-    // Bir karede alınan yol ~0.27 m; iz bundan uzun olursa damla yavaş kayan bir çubuğa
-    // dönüşür. Gerçek yağmur kısa ve hızlı kayan çizgilerden oluşur
-    const float RainStretch = 32f;        // hız yönünde uzama
     // Hız sürekli olsaydı her damla kaymayı farklı ölçekle çarpardı ve sarma noktası
     // kutunun katı olmaktan çıkıp damlaları zıplatırdı. Sınıf başına ayrı kayma tutulur.
     const int RainSpeedClasses = 8;
@@ -106,6 +126,16 @@ public class PrecipitationRenderer : MonoBehaviour
 
     static readonly int BoxSizeId = Shader.PropertyToID("_BoxSize");
     static readonly int SnowBoxSizeId = Shader.PropertyToID("_SnowBoxSize");
+    static readonly int StreakPointId = Shader.PropertyToID("_StreakPoint");
+    static readonly int StreakAmbientId = Shader.PropertyToID("_StreakAmbient");
+    static readonly int StreakCellBlendId = Shader.PropertyToID("_StreakCellBlend");
+    static readonly int StreakCornerPresentId = Shader.PropertyToID("_StreakCornerPresent");
+    static readonly int StreakMirrorId = Shader.PropertyToID("_StreakMirror");
+    static readonly int StreakDcamFractionId = Shader.PropertyToID("_StreakDcamFraction");
+    static readonly int StreakExposureId = Shader.PropertyToID("_StreakExposure");
+    static readonly int StreakDbPeriodId = Shader.PropertyToID("_StreakDbPeriod");
+    static readonly int StreakSourceScaleId = Shader.PropertyToID("_StreakSourceScale");
+
     static readonly int RainDriftsId = Shader.PropertyToID("_RainDrifts");
     static readonly int RainDirectionsId = Shader.PropertyToID("_RainDirections");
     static readonly int SnowDriftId = Shader.PropertyToID("_SnowDrift");
@@ -122,8 +152,6 @@ public class PrecipitationRenderer : MonoBehaviour
     static readonly int DensityId = Shader.PropertyToID("_Density");
     static readonly int PrecipitationId = Shader.PropertyToID("_Precipitation");
     static readonly int SnowDensityScaleId = Shader.PropertyToID("_SnowDensityScale");
-    static readonly int RainSizeId = Shader.PropertyToID("_RainSize");
-    static readonly int RainStretchId = Shader.PropertyToID("_RainStretch");
     static readonly int SnowSizeId = Shader.PropertyToID("_SnowSize");
     static readonly int SnowTurbulenceId = Shader.PropertyToID("_SnowTurbulence");
     static readonly int RainTurbulenceId = Shader.PropertyToID("_RainTurbulence");
@@ -157,8 +185,8 @@ public class PrecipitationRenderer : MonoBehaviour
     /// Bulut sistemine tek yönlü, salt okunur bir bağ — yağış hangi bulutun yağdığını
     /// sormaz, yalnız "şu an başımın üstünde ne kadar var" değerini okur.
     public void Bind(WeatherState state, WindField windField, Shader precipitationShader,
-        Texture3D curtain,
-                     CloudLayerProbe layer, Transform eye)
+                     Texture3D curtain, CloudLayerProbe layer, Transform eye,
+                     RainStreakWorkingSet streakSet, TimeOfDay clock)
     {
         curtainPattern = curtain;
         weather = state;
@@ -166,6 +194,8 @@ public class PrecipitationRenderer : MonoBehaviour
         shader = precipitationShader;
         cloudLayer = layer;
         observer = eye;
+        streaks = streakSet;
+        timeOfDay = clock;
     }
 
     void OnEnable()
@@ -191,6 +221,41 @@ public class PrecipitationRenderer : MonoBehaviour
             float t = i / (RainSpeedClasses - 1f);
             rainVelocities[i] = Vector3.down * (RainFallSpeed * Mathf.Lerp(RainSlowFactor, 1f, t));
         }
+    }
+
+    /// İZ VERİTABANINI KARE BAŞINA HAZIRLAR — `[Garg 2006, §5]`.
+    ///
+    /// Üç açı da burada belirleniyor ve üçü de FARKLI şeye bağlı:
+    ///   ışığın yüksekliği — güneşin damlanın düşüş eksenine göre açısı
+    ///   ışığın azimutu   — aynı açının kameranın eksenine göre bileşeni
+    ///   `θ_v`            — kameranın bakışıyla düşüş yönü arasındaki açı (shader'da,
+    ///                      damla başına, çünkü ekranın her yerinde farklı)
+    void UpdateStreaks(Vector3 rainVelocity, float snowiness)
+    {
+        if (streaks == null || timeOfDay == null) return;
+
+        var camera = Camera.main;
+        if (camera == null) return;
+
+        // Yağışın DÜNYA yönü — rüzgârla eğilmiş düşüş ekseni. Kar payı yüksekken de
+        // hesaplanıyor: karlılık geçişinde damlalar hâlâ çiziliyor.
+        Vector3 fall = rainVelocity.sqrMagnitude > 1e-8f
+            ? rainVelocity.normalized
+            : Vector3.down;
+
+        streaks.Refresh(timeOfDay.SunDirection, fall, camera.transform.forward);
+
+        if (streaks.Point == null || streaks.Ambient == null) return;
+
+        material.SetTexture(StreakPointId, streaks.Point);
+        material.SetTexture(StreakAmbientId, streaks.Ambient);
+        material.SetVector(StreakCellBlendId, streaks.CellBlend);
+        material.SetVector(StreakCornerPresentId, streaks.CornerPresent);
+        material.SetFloat(StreakMirrorId, streaks.MirroredAzimuth ? 1f : 0f);
+        material.SetFloatArray(StreakDcamFractionId, streaks.DcamHeightFraction);
+        material.SetFloat(StreakExposureId, exposureTime);
+        material.SetFloat(StreakDbPeriodId, databasePeriod);
+        material.SetFloat(StreakSourceScaleId, sourceScale);
     }
 
     void OnDisable()
@@ -287,6 +352,8 @@ public class PrecipitationRenderer : MonoBehaviour
         material.SetFloat(DensityId, density * localFactor);
         material.SetFloat(PrecipitationId, precipitation * localFactor);
 
+        UpdateStreaks(snowVelocity, snowiness);
+
         // SPEKTRAL PERDEYE DURUM. Perde ayrı bir renderer feature'ı ve sahneye
         // bağlanamıyor; yağışın kendisi burada hesaplanıyor, perde oradan okuyor.
         // Tek yön: burası yazar, perde okur.
@@ -303,8 +370,6 @@ public class PrecipitationRenderer : MonoBehaviour
         // zaman yavaşlatılınca taneler yavaşlar, perde yavaşlamazdı.
         SpectralPrecipitationState.Time += Time.deltaTime * CurtainRate;
         material.SetFloat(SnowDensityScaleId, SnowDensityScale);
-        material.SetFloat(RainSizeId, RainSize);
-        material.SetFloat(RainStretchId, RainStretch);
         material.SetFloat(SnowSizeId, SnowSize);
         material.SetFloat(SnowTurbulenceId,
             Mathf.Lerp(SnowTurbulenceCalm, SnowTurbulenceStorm, felt));

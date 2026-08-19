@@ -50,6 +50,15 @@ public class RainStreakWorkingSet : MonoBehaviour
     /// `(v,h)` hücresinin köşe ağırlıkları — shader bilineer harmanlamada kullanacak.
     public Vector2 CellBlend { get; private set; }
 
+    /// Dört köşe veritabanında var mı (1) yok mu (0). Sıra shader'ın beklediğiyle aynı:
+    /// (vLow,hLow) (vLow,hHigh) (vHigh,hLow) (vHigh,hHigh).
+    ///
+    /// EKSİKLİK `osc`'DEN BAĞIMSIZ — ölçüldü: `dcam` başına 740 mevcut ve
+    /// 8 v × 9 h × 10 + 2 v × 1 h × 10 = 740, yani eksik olan yalnız `v = ±90`
+    /// kutuplarındaki `h ≠ 170` hücreleri ve orada on `osc`'nin hepsi birden yok.
+    /// Bu yüzden köşe başına tek değer yetiyor, dilim başına tablo gerekmiyor.
+    public Vector4 CornerPresent { get; private set; }
+
     /// Her `dcam` diliminin kaç satırı geçerli (0-1), `dcam` artan sırada. İz boyu
     /// kamera açısıyla kısalıyor ve çalışma kümesi en uzununa göre dolduruluyor;
     /// shader bu payın ötesini örneklememeli.
@@ -60,6 +69,9 @@ public class RainStreakWorkingSet : MonoBehaviour
     public float[] DcamHeightFraction { get; private set; }
 
     int Level => level >= 0 ? level : database.Sizes.Length - 1;
+
+    /// Sahne kurulumu koddan yapılıyor; veritabanı elle sürüklenmiyor.
+    public void Bind(RainStreakDatabase streakDatabase) => database = streakDatabase;
 
     void OnEnable()
     {
@@ -173,6 +185,14 @@ public class RainStreakWorkingSet : MonoBehaviour
         int vHigh = Mathf.Min(vLow + 1, database.Vertical.Length - 1);
         int hHigh = Mathf.Min(hLow + 1, database.Horizontal.Length - 1);
         var corners = new[] { (vLow, hLow), (vLow, hHigh), (vHigh, hLow), (vHigh, hHigh) };
+
+        var present = Vector4.zero;
+        for (int c = 0; c < Corners; c++)
+        {
+            var (cv, ch) = corners[c];
+            present[c] = angles[0].Present[RainStreakDatabase.SliceIndex(cv, ch, 0)];
+        }
+        CornerPresent = present;
 
         for (int c = 0; c < Corners; c++)
         {
