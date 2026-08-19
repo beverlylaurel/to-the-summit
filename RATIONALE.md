@@ -686,13 +686,35 @@ okuyunca ekran tek lekenin ızgarasına döndü. Kullanıcı: *"niye bu kadar d�
 Karşılığı döşeme indisinden hash: bağımsız sentezin ucuz karşılığı, aynı gürültünün
 ilişkisiz bölgeleri.
 
-**Genleşme odağı.** Odağı, akış yönünde 1000 m öteye konan bir dünya noktasının ekran
-izdüşümünden buluyordum. Kar dik düştüğü için o nokta BAŞUCUNDA; kamerayı çevirince
-izdüşümü kararsız bölgede geziyor, arkaya düşünce de kod ekran merkezine sıçrıyordu.
-Kullanıcı: *"kamerayı hareket ettirince 360 derece dönüyorlar"*. Doğrusu kaybolan nokta —
-yön vektörünü `w = 0` ile izdüşümden geçirmek. Çıkan `w`, yönün görüş eksenine yatkınlığı;
-sıfıra giderken odak sonsuza gider ve akış ekranda paralelleşir. Sınır durum artık
-tanımlı, geçiş sürekli.
+**Genleşme odağı — sonunda tamamen söküldü.** Önce odağı, akış yönünde 1000 m öteye
+konan bir dünya noktasının izdüşümünden buluyordum; nokta kameranın arkasına düşünce kod
+ekran merkezine sıçrıyordu. Onu kaybolan noktayla düzelttim (yön vektörünü `w = 0` ile
+izdüşümden geçirmek), ışınsal ve paralel kip arasına sürekli geçiş koydum. Dönme
+GEÇMEDİ: *"sağ sol yaptıkça bazıları saat yönünde, bazıları tersine tam tur atıyorlar."*
+
+Makaleyi satır satır okuyunca sebep çıktı ve odağın hiçbir suçu yokmuş.
+
+**Yöntem döndürmeye uygun değil.** `§5.2`, faz kare kare ARTIMLI güncelleniyor:
+
+    φ(ωx,ωy,t+1) := C(t)·(cosθ(t)·ωx + sinθ(t)·ωy)/√(ωx²+ωy²) · φ(ωx,ωy,t)
+
+Genlik alanı `|α̂|` sabit; θ yalnız TAŞINMA yönünü değiştiriyor. Ben θ=0 pişirip UV
+döndürüyordum. Cebiri açınca bu `α̂(R₋θ ω)` demek — zamansal kısım birebir aynı, ama
+rastgele faz alanı da dönüyor. Yani desen katı cisim gibi dönüyor. Odağın iki yanındaki
+döşemeler ters yönlerde dönüyordu; belirti tam buydu.
+
+**Makale θ'yı zamanla zaten değiştirmiyor.** `§7.2`, birebir: *"the parameters C and θ
+varied from one image tile to the next, but did not vary over time."* Zamanla değişen tek
+örnekleri odağı sinüzoidal kaydırmak. `§8` de "θ her döşeme içinde sabitti" diye
+kaydediyor. Serbest bakan birinci şahıs kamera makalenin doğruladığı alanın DIŞINDA.
+
+Çözüm makalenin kendi ilk yapılandırması (`§6.2`, `human_condition`): tek doku, tüm
+katmana dikişsiz döşenmiş, döşeme başına θ yok. Örnek sayısı 4'ten 1'e indi, döşeme
+ızgarası ve hash gereksizleşti, dönme ekran geneline indi.
+
+**Kalan kusur bilinçli:** θ değişince ekranın tamamı rijit döner. Ekran geneli olduğu için
+yavaş ve sınırlı. Tam çözümü θ'yı da pişirmek (16 yön, M=64 → 3.9 MB, iki yön arası
+harmanlama, 8 örnek); kalan dönme görünür olursa oraya bakılır — `DECISIONS.md`.
 
 **Yağmur.** Perdeyi baştan "kar perdesi" diye kurdum; yağmur yalnız opaklık çarpanıyla
 ayrılıyordu, desen aynıydı. Ayrışması gereken iki şey var ve ikisi de pişirmede: bant
@@ -705,8 +727,14 @@ bağlı. İz üretmek spektrumu hareket ekseninde daraltmak demek; o modların `
 gider ve desen durur. Yani bu çerçevede "hareketli iz" diye bir şey yok. İz, taneyi tek
 tek çizen katmanın işi.
 
-**Kare alma silindi.** Pişiricide `v *= v` vardı, gerekçesi "opaklığı aralığın altına
-sıkıştırmak". Shader ortalamayı çıkarmaya başlayınca ikisi aynı işi yapar oldu — üstelik
-kare alma saklanan ortalamayı 0.29'a kaydırdığı için shader'ın çıkardığı 0.5 ölçülenle
-tutmuyordu. Telafi terimi geri eklenmez kuralının aynısı: gerekçesi kalmayan terim gider.
+**Kare alma silindi — ama bu makaleden SAPMA, düzeltme değil.** Pişiricide `v *= v`
+vardı ve ben onu "iki mekanizma aynı işi yapıyor" diye sildim. Sonradan makalede
+buldum: `§5.6` gerçekten kareyi alıyor ("we apply a non-linear transformation, namely we
+square the α values"), `§5.7` de beyaz bir ön planla bileştiriyor: `I = 250·α + (1−α)·I_bg`.
+Yani makalede perde ekranın tamamına yayılan beyazımsı bir tüldür — orada kar fırtınasının
+TEK katmanı o.
+
+Bizde o işi sis yapıyor, perde onun üstüne biniyor. Ölçüldü: tam karda ~0.45 sabit gri,
+gökyüzü dahil. O yüzden ortalama çıkarılıyor ve kare alınmıyor. Sapma bilinçli; "makale
+böyle yapıyor" diye savunulamaz, "bizde sisin işini ikinci kez yapıyordu" diye savunulur.
 

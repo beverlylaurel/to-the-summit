@@ -20,11 +20,6 @@ public class SpectralPrecipitationFeature : ScriptableRendererFeature
              "tırmanış duvarı ve el hep bu mesafenin berisinde kalıyor.")]
     [SerializeField] float nearCutoff = 40f;
 
-    [Tooltip("Döşeme boyu (piksel). AÇISAL ÇÖZÜNÜRLÜK: her döşemenin kendi akış yönü ve " +
-             "hızı var, küçük olursa genleşme odağı çevresinde yön daha yumuşak değişir. " +
-             "Ekran genişliğinin sekizde biri civarı iyi.")]
-    [SerializeField] float tileSize = 240f;
-
     [Tooltip("Desen ölçeği (piksel). ÖZELLİK BOYU: pişmiş doku boyuna eşit olmalı (512), " +
              "yoksa halka ölçeği kayıyor ve desen kar değil mermer gibi görünüyor. " +
              "Döşeme boyundan AYRI tutuluyor çünkü ikisi çelişen şeyler istiyor.")]
@@ -46,7 +41,6 @@ public class SpectralPrecipitationFeature : ScriptableRendererFeature
         {
             renderPassEvent = RenderPassEvent.AfterRenderingTransparents,
             near = nearCutoff,
-            tile = tileSize,
             flow = flowSpeed,
             patternScale = patternScale,
         };
@@ -59,7 +53,6 @@ public class SpectralPrecipitationFeature : ScriptableRendererFeature
         if (data.cameraData.cameraType == CameraType.Preview) return;
 
         pass.near = nearCutoff;
-        pass.tile = tileSize;
         pass.flow = flowSpeed;
         pass.patternScale = patternScale;
 
@@ -77,12 +70,11 @@ public class SpectralPrecipitationFeature : ScriptableRendererFeature
         static readonly int PatternId = Shader.PropertyToID("_CurtainPattern");
         static readonly int ParamsId = Shader.PropertyToID("_CurtainParams");
         static readonly int DepthId = Shader.PropertyToID("_CurtainDepth");
-        static readonly int FoeId = Shader.PropertyToID("_CurtainFoe");
         static readonly int FlowId = Shader.PropertyToID("_CurtainFlow");
 
         readonly Material material;
 
-        public float near, tile, flow, patternScale;
+        public float near, flow, patternScale;
 
         /// Kameranın önceki konumu — odak, kameranın ve yağışın bileşke akışından çıkıyor.
         Vector3 previousPosition;
@@ -103,24 +95,15 @@ public class SpectralPrecipitationFeature : ScriptableRendererFeature
             float intensity = SpectralPrecipitationState.Intensity;
             if (intensity <= 1e-4f) return;
 
-            // GENLEŞME ODAĞI (FOE) — KAYBOLAN NOKTADAN, İZDÜŞÜMDEN DEĞİL.
+            // TEK AKIŞ YÖNÜ, EKRAN GENELİNDE.
             //
-            // Kamera ilerlerken görüntü hareketi bir noktadan dışa açılıyor; o nokta
-            // akış YÖNÜNÜN kaybolan noktası `[Langer 2004, §7]`.
+            // Genleşme odağı ve döşeme başına θ SÖKÜLDÜ. Gerekçe shader'da uzun uzun
+            // yazılı; özeti: yöntem θ'nın zamanla değişmesine uygun değil (makale θ'yı
+            // faza artımlı işliyor, biz pişmiş dokuyu döndürüyoruz) ve makalenin kendisi
+            // de θ'yı zamanla değiştirmiyor (`§7.2`).
             //
-            // Eski hâli 1000 m öteye bir dünya noktası koyup `WorldToScreenPoint`
-            // çağırıyordu. İki kusuru vardı ve ikisi de ekranda göründü: nokta
-            // kameranın arkasına düşünce kod ekran MERKEZİNE sıçrıyordu (süreksiz), ve
-            // dik düşen kar için odak başucunda olduğundan yaw sırasında tam o kararsız
-            // bölgede geziyordu. Sonuç: kamera çevrilince desen 360° dönüyordu.
-            //
-            // Doğrusu kaybolan nokta: yön vektörünü (w = 0) izdüşüm matrisinden
-            // geçirmek. Çıkan `w` bileşeni yönün görüş eksenine ne kadar YATKIN
-            // olduğunu veriyor — sıfıra giderken kaybolan nokta sonsuza gidiyor ve akış
-            // ekranda PARALELLEŞİYOR. O sınırda odağın yeri değil, akışın ekran yönü
-            // anlamlı.
-            //
-            // İkisi arasında sürekli geçiş yapılıyor (ışınsallık), sıçrama yok.
+            // Kalan tek büyüklük: yağışın ekrandaki akış yönü. Kameranın hareketi de
+            // yağışın hareketi de bunu sürüyor, bileşkeleri alınıyor.
             var camera = cameraData.camera;
 
             float width = cameraData.cameraTargetDescriptor.width;
@@ -131,46 +114,19 @@ public class SpectralPrecipitationFeature : ScriptableRendererFeature
             previousPosition = position;
             hasPrevious = true;
 
-            // Kameranın hareketi mi yağışın hareketi mi baskın: ikisi de görüntü akışını
-            // sürüyor ve odağın yeri bileşkelerinden çıkıyor.
             Vector3 drift = SpectralPrecipitationState.Velocity * Time.deltaTime - motion;
 
-            Vector2 foe = new Vector2(width * 0.5f, height * 0.5f);
+            // Varsayılan aşağı: yağış her zaman düşüyor, rüzgâr sıfırsa bile.
             Vector2 flowDir = new Vector2(0f, -1f);
-            float radial = 0f;
 
             if (drift.sqrMagnitude > 1e-10f)
             {
-                Vector3 dirWS = drift.normalized;
-                Vector3 dirVS = camera.worldToCameraMatrix.MultiplyVector(dirWS);
-
-                // Görüntüdeki akış yönü: kamera uzayındaki yönün görüntü düzlemine
-                // izdüşümü. Kamera uzayında x sağa, y yukarı — ekranla aynı.
+                // Kamera uzayında x sağa, y yukarı — ekranla aynı. Görüş eksenindeki
+                // bileşen atılıyor: ekranda akışın yönü yalnız görüntü düzlemine düşen
+                // paydan çıkıyor.
+                Vector3 dirVS = camera.worldToCameraMatrix.MultiplyVector(drift.normalized);
                 Vector2 image = new Vector2(dirVS.x, dirVS.y);
                 if (image.sqrMagnitude > 1e-12f) flowDir = image.normalized;
-
-                // YATKINLIK: yönün görüş eksenindeki payı. 1'e yakınsa akış ekrandan
-                // dışa açılıyor (ışınsal), 0'a yakınsa ekrana paralel akıyor.
-                radial = Mathf.Abs(dirVS.z);
-
-                // Odak, akışın GELDİĞİ yönün kaybolan noktası: taneler oradan gelip
-                // dışa açılıyor.
-                Vector4 clip = camera.projectionMatrix
-                             * new Vector4(-dirVS.x, -dirVS.y, -dirVS.z, 0f);
-
-                if (clip.w > 1e-4f)
-                {
-                    Vector2 ndc = new Vector2(clip.x, clip.y) / clip.w;
-                    foe = new Vector2((ndc.x * 0.5f + 0.5f) * width,
-                                      (ndc.y * 0.5f + 0.5f) * height);
-                }
-                else
-                {
-                    // Kaybolan nokta kameranın arkasında: ışınsal kip anlamsız, tamamen
-                    // paralel akışa düşülüyor. Sıçrama yok çünkü bu durumda `radial`
-                    // zaten yalnız `clip.w` küçükken oluşabiliyor.
-                    radial = 0f;
-                }
             }
 
             using var builder = renderGraph.AddRasterRenderPass<PassData>(
@@ -184,11 +140,11 @@ public class SpectralPrecipitationFeature : ScriptableRendererFeature
 
             material.SetTexture(PatternId, texture);
             material.SetVector(ParamsId, new Vector4(
-                tile, patternScale, intensity, SpectralPrecipitationState.Time));
+                width, height, intensity, SpectralPrecipitationState.Time));
+            material.SetVector(FlowId, new Vector4(
+                flowDir.x, flowDir.y, flow, patternScale));
             material.SetVector(DepthId, new Vector4(
-                near, flow, SpectralPrecipitationState.Snowiness, radial));
-            material.SetVector(FoeId, new Vector4(foe.x, foe.y, width, height));
-            material.SetVector(FlowId, new Vector4(flowDir.x, flowDir.y, 0f, 0f));
+                near, SpectralPrecipitationState.Snowiness, 0f, 0f));
 
             builder.SetRenderFunc((PassData data, RasterGraphContext context) =>
             {

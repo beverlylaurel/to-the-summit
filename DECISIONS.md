@@ -774,3 +774,21 @@ sürerdi. Kaynak tek olmalı.
 **Açık kalan.** 1.5 sayısının üstüne arazi, kar, bisiklet ve ACES tonemap oturmuştu.
 Yüzeylerin yeniden ayarlanması gerekip gerekmediği BAKILMADI — belirti fazla parlak arazi,
 patlamış kar ya da sönmüş kontrast olur. `LookController` pozlaması ilk bakılacak yer.
+
+
+## Perde yönü tek, θ pişirilmedi
+
+**Karar.** Yağış perdesi ekran geneline tek akış yönü uyguluyor. Langer'ın döşeme başına
+θ'sı sökülü.
+
+**Gerekçe.** Yöntem θ'nın zamanla değişmesine uygun değil: makale θ'yı faza artımlı
+işliyor (`§5.2`) ve alan yerinde kalıyor, biz pişmiş dokuyu döndürdüğümüz için desen katı
+cisim gibi dönüyor. Makale de θ'yı zamanla değiştirmiyor (`§7.2`). Tek yön makalenin ilk
+yapılandırması (`§6.2`) ve dört kat ucuz.
+
+**Tetikleyici.** Kamerayı çevirirken perdenin TAMAMININ döndüğü fark edilirse.
+
+**Maliyet.** 16 yön × M=64 × 30 kare × 2 kanal = 3.9 MB doku; iki yön arası harmanlama
+için örnek sayısı 1'den 2'ye çıkar. Pişirici `Synthesize`'ı θ parametresiyle çağırmak
+yeterli, dispersiyon bağıntısı zaten θ'lı.
+

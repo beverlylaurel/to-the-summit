@@ -39,29 +39,10 @@ Shader "Hidden/ToTheSummit/SpectralPrecipitation"
             TEXTURE3D(_CurtainPattern);
             SAMPLER(sampler_CurtainPattern);
 
-            float4 _CurtainParams;   // x: döşeme boyu (px), y: desen ölçeği (px), z: yoğunluk, w: zaman
-            float4 _CurtainDepth;    // x: yakın kesme (m), y: akış hızı, z: karlılık, w: ışınsallık
-            float4 _CurtainFlow;     // xy: tek yönlü akışın ekran yönü, z: boş, w: boş
-            float4 _CurtainFoe;
+            float4 _CurtainParams;   // xy: ekran boyu (px), z: yoğunluk, w: zaman
+            float4 _CurtainFlow;     // xy: akışın ekran yönü, z: hız, w: desen ölçeği (px)
+            float4 _CurtainDepth;    // x: yakın kesme (m), y: karlılık, zw: boş
 
-            /// DÖŞEME KARIŞTIRICISI. Makale her döşemeyi AYRI sentezliyor (`§7`), yani
-            /// komşu döşemelerin gürültüsü bağımsız. Biz tek doku pişirip tekrar
-            /// kullanıyoruz — kaydırma küçük olursa komşular desenin neredeyse aynı
-            /// yerini okur ve ekran tek lekenin ızgarasına döner. Kullanıcı bunu
-            /// "niye bu kadar düzenliler" diye bildirdi.
-            ///
-            /// Hash döşeme başına `[0,1)²` kaydırma üretiyor; doku Repeat olduğu için
-            /// her kaydırma geçerli. Bağımsız sentezin ucuz karşılığı: aynı gürültünün
-            /// ilişkisiz bölgeleri.
-            float2 TileHash(float2 t)
-            {
-                float3 h = frac(t.xyx * float3(0.1031, 0.1030, 0.0973));
-                h += dot(h, h.yzx + 33.33);
-                return frac((h.xx + h.yz) * h.zy);
-            }      // xy: yağışın ekran yönü (birim), zw: ekran boyu
-
-            /// TEŞHİS. 0 kapalı · 1 bant · 2 opaklık · 3 perde yok.
-            /// Göz kararı yerine AYRIK renk bandı: her renk bir SAYI aralığı, ara ton yok.
             float _CurtainProbe;
 
             /// Sürekli bir değeri okunabilir renge çevirir. Gradyan DEĞİL: gradyanda
@@ -144,121 +125,64 @@ Shader "Hidden/ToTheSummit/SpectralPrecipitation"
 
                 if (depthGate <= 1e-4) return 0;
 
-                // YÖN EKRAN GENELİNDE SABİT — piksel başına DEĞİL.
+                // TEK YÖN, TEK ÖRNEK — MAKALENİN KENDİ İLK YAPILANDIRMASI (`§6.2`).
                 //
-                // Makale her döşemeye kendi yönünü veriyor (genleşme odağından türeyen
-                // θ_ij) ve döşeme içinde SABİT tutuyor. Ben piksel başına sürekli
-                // değiştirdim; sonuç dokunun dönmesi değil koordinat alanının BURULMASI
-                // oldu — ekranda odağın çevresinde ışınsal bir girdap (kullanıcı sahne
-                // görünümünde yakaladı).
+                // Perde bir dönem ekranı döşemelere bölüyor, her döşemeye genleşme
+                // odağından türeyen kendi θ'sını veriyordu (`§7`). Bu SÖKÜLDÜ; sebebi
+                // ölçülmüş bir belirti ve makalenin kendi sınırı:
                 //
-                // Döşeme + kenar harmanlaması yerine tek yön seçildi. Gerekçe: odak
-                // makinesi kameranın ÖTELENMESİNİ modelliyor, tırmanışçı ise yavaş
-                // hareket ediyor. Baskın görsel ipucu yağışın kendi yönü — düşüş artı
-                // rüzgâr. Perspektif genleşmesi bilinçli olarak alınmadı.
-                // DÖŞEMELİ KURULUM — `[Langer 2004, §7]`'nin gerçek hâli.
+                //   YÖNTEM DÖNDÜRMEYE UYGUN DEĞİL. Makale θ'yı faza kare kare ARTIMLI
+                //   işliyor (`§5.2`): `φ(t+1) := C(t)·(cosθ(t)ωx + sinθ(t)ωy)/|ω| · φ(t)`.
+                //   Genlik alanı `|α̂|` sabit kalıyor, yani θ değişince alan yerinde
+                //   durur, yalnız TAŞINMA yönü döner. Biz θ=0 pişirip UV döndürüyoruz;
+                //   cebri açınca bu `α̂(R₋θ ω)` demek — zamansal kısım aynı ama rastgele
+                //   faz alanı da dönüyor, yani desen KATI CİSİM gibi dönüyor. Kullanıcı
+                //   bunu "sağ sol yaptıkça bazıları saat yönünde, bazıları tersine tam
+                //   tur atıyor" diye bildirdi: odağın iki yanındaki döşemeler ters
+                //   yönlerde dönüyordu.
                 //
-                // Perdenin içindeki her şey aynı derinlikteymiş gibi hareket ediyordu:
-                // ekrana bağlarsan cama yapışıyor, dünyaya bağlarsan dağa. Doğrusu
-                // arada — yağan kar farklı derinliklerde, farklı hızlarda.
+                //   MAKALE ZATEN θ'YI ZAMANLA DEĞİŞTİRMİYOR. `§7.2`, birebir: "the
+                //   parameters C and θ varied from one image tile to the next, but did
+                //   not vary over time." Serbest bakan birinci şahıs kamera makalenin
+                //   doğruladığı alanın dışında.
                 //
-                // Parallax'ı veren şey GENLEŞME ODAĞI: kamera ilerlerken görüntü hareketi
-                // odaktan dışa açılıyor, hız odağa uzaklıkla lineer artıyor. Bunu PİKSEL
-                // başına uygulamak koordinat alanını buruyor ve ışınsal girdap bırakıyor
-                // (ölçüldü). Makalenin çözümü: yön ve hız DÖŞEME içinde SABİT, komşu
-                // döşemeler kenarda harmanlanıyor.
+                // Geriye makalenin ilk örneğinin yapılandırması kalıyor: tek doku, tüm
+                // ekrana dikişsiz döşenmiş, tek yön. Dikiş yok çünkü opaklık fonksiyonu
+                // `(x,y)`'de toroidal. Örnek sayısı 4'ten 1'e indi.
                 //
-                // İki ölçek AYRI: döşeme boyu açısal çözünürlüğü belirliyor (küçük olsun
-                // ki odak çevresinde yön yumuşak değişsin), desen ölçeği ekrandaki
-                // özellik boyunu (büyük olsun ki 4-32 piksel aralığı korunsun). Tek
-                // parametreye bağlanınca ikisi çelişiyor.
-                float2 pixel = uv * _CurtainFoe.zw;
-                float2 foe = _CurtainFoe.xy;
-                float tileSize = max(_CurtainParams.x, 1.0);
-                float patternScale = max(_CurtainParams.y, 1.0);
-                float halfDiagonal = 0.5 * length(_CurtainFoe.zw);
+                // KALAN KUSUR, BİLİNÇLİ: θ değişince ekranın TAMAMI rijit döner. Yönü
+                // ekran geneli olduğu için dönme yavaş ve sınırlı — döşeme başına tam
+                // tur değil. Tam çözümü θ'yı da pişirmek (16 yön, M=64, 3.9 MB) ve iki
+                // yön arasında harmanlamak; kalan dönme görünür olursa oraya bakılır.
+                float2 pixel = uv * _CurtainParams.xy;
+                float patternScale = max(_CurtainFlow.w, 1.0);
+                float2 dir = _CurtainFlow.xy;
 
-                float2 tileF = pixel / tileSize;
-                float2 baseTile = floor(tileF - 0.5);
-                float2 blend = tileF - 0.5 - baseTile;
+                float2 local = pixel / patternScale;
+                float2 rot = float2(local.x * dir.x + local.y * dir.y,
+                                   -local.x * dir.y + local.y * dir.x);
 
-                float alphaSum = 0.0;
-                float weightSum = 0.0;
+                float w = _CurtainFlow.z * _CurtainParams.w;
 
-                [unroll]
-                for (int ty = 0; ty < 2; ty++)
-                [unroll]
-                for (int tx = 0; tx < 2; tx++)
-                {
-                    float2 tileIndex = baseTile + float2(tx, ty);
-                    float2 center = (tileIndex + 0.5) * tileSize;
-
-                    // IŞINSAL VE TEK YÖNLÜ AKIŞ ARASINDA SÜREKLİ GEÇİŞ.
-                    //
-                    // Genleşme odağı yalnız akış görüş eksenine YAKINSA ekranda bir
-                    // noktadır. Akış eksene dikleşince odak sonsuza gider ve akış
-                    // paralelleşir — o sınırda odağın yeri anlamsızdır.
-                    //
-                    // Eski kod bunu görmüyordu: odağı 1000 m öteki bir dünya noktasının
-                    // izdüşümünden buluyor, nokta kameranın arkasına düşünce ekran
-                    // MERKEZİNE sıçrıyordu. Kar dik düştüğü için odak başucundadır ve
-                    // yaw'da tam o kararsız bölgede gezer; sonuç, kamera çevrilince
-                    // desenin 360° dönmesiydi (kullanıcı bildirdi).
-                    //
-                    // `_CurtainDepth.w` ışınsallık: 1 tam ışınsal, 0 tam paralel.
-                    float radial = _CurtainDepth.w;
-
-                    float2 fromFoe = center - foe;
-                    float radius = length(fromFoe);
-                    float2 radialDir = radius > 1e-3 ? fromFoe / radius : _CurtainFlow.xy;
-
-                    float2 mixed = lerp(_CurtainFlow.xy, radialDir, radial);
-                    float mixedLen = length(mixed);
-                    float2 dir = mixedLen > 1e-3 ? mixed / mixedLen : float2(1.0, 0.0);
-
-                    // HIZ ODAĞA UZAKLIKLA LİNEER (C_ij = C₀·|p_ij − FOE|). Odağın
-                    // dibindeki döşemeler neredeyse durgun — makalenin kendi gözlemi.
-                    // Paralel sınırda böyle bir odak yok, hız ekran boyunca sabit.
-                    float speed = _CurtainDepth.y
-                                * lerp(1.0, saturate(radius / halfDiagonal), radial);
-
-                    // Dönme DÖŞEME MERKEZİ etrafında; döşeme içinde sabit olduğu için
-                    // burulma yok, katı dönme var.
-                    float2 local = (pixel - center) / patternScale;
-                    float2 rot = float2(local.x * dir.x + local.y * dir.y,
-                                       -local.x * dir.y + local.y * dir.x);
-
-                    float2 q = rot + TileHash(tileIndex);
-
-                    float w = (0.35 + speed) * _CurtainParams.w;
-
-                    // R KAR, G YAĞMUR. İki desen ayrı pişiyor: yağmurun halkası bir
-                    // oktav yukarıda (damla taneden küçük) ve zamansal frekansı 2.5×
-                    // (daha hızlı, dolayısıyla daha bulanık). Karlılık ikisini
-                    // harmanlıyor — sulu kar ikisinin bir arada bulunması, tıpkı
-                    // tanelerde olduğu gibi (`SYSTEMS.md`).
-                    float2 rg = SAMPLE_TEXTURE3D(_CurtainPattern, sampler_CurtainPattern,
-                                                 float3(q, w)).rg;
-                    float a = lerp(rg.g, rg.r, _CurtainDepth.z);
-
-                    // Bilineer harmanlama: kenarda iki komşunun payı eşitleniyor, dikiş
-                    // görünmüyor. Makale 10 piksellik örtüşmede lineer harmanlıyor.
-                    float weight = (tx == 0 ? 1.0 - blend.x : blend.x)
-                                 * (ty == 0 ? 1.0 - blend.y : blend.y);
-
-                    alphaSum += a * weight;
-                    weightSum += weight;
-                }
-
-                float alpha = weightSum > 1e-5 ? alphaSum / weightSum : 0.0;
+                // R KAR, G YAĞMUR. İki desen ayrı pişiyor: yağmurun halkası bir oktav
+                // yukarıda (damla taneden küçük) ve zamansal frekansı ~2× (daha hızlı,
+                // dolayısıyla daha bulanık). Karlılık ikisini harmanlıyor — sulu kar
+                // ikisinin bir arada bulunması, tıpkı tanelerde olduğu gibi.
+                float2 rg = SAMPLE_TEXTURE3D(_CurtainPattern, sampler_CurtainPattern,
+                                             float3(rot, w)).rg;
+                float alpha = lerp(rg.g, rg.r, _CurtainDepth.y);
 
                 // ORTALAMA HAVADIR, TEPELER TANEDİR.
                 //
-                // Pişirici deseni ortalaması 0.5 olacak şekilde [0,1]'e eşliyor
-                // (`SpectralPrecipitationBaker`, `[Langer 2004, §7.7]`). Bu ortalama
-                // doğrudan opaklık olarak kullanılınca ekranın TAMAMINA sabit bir gri
-                // sürülüyordu — ölçüldü: tam karda ~0.45. Kullanıcının "gren" dediği şey
-                // desenin DC bileşeniydi, taneleri değil.
+                // BU MAKALEDEN BİLİNÇLİ SAPMA. `§5.6`'da ortalama 0.5'e taşınıyor,
+                // sonra KARESİ alınıyor (ortalama ~0.29'a iner) ve `§5.7`'de beyaz bir
+                // ön planla bileşiyor: `I = 250·α + (1−α)·I_bg`. Yani makalede perde
+                // gerçekten ekranın tamamına yayılan beyazımsı bir tüldür — orada kar
+                // fırtınasının TEK katmanı o.
+                //
+                // Bizde o işi sis yapıyor. Perde sisin üstüne binince ölçüldü: tam karda
+                // ~0.45 sabit gri, gökyüzü dahil. Kullanıcının "gren" dediği şey desenin
+                // DC bileşeniydi, taneleri değil.
                 //
                 // Tane seyrek ve ayrıktır: aradaki hava saydam. Ortalamanın altı sıfıra
                 // iniyor, üstü [0,1]'e geriliyor. Sihirli katsayı yok — 0.5 pişiricinin

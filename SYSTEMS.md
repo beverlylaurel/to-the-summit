@@ -219,16 +219,11 @@ Gökyüzü rengini de okumaz.
 - **Dikey yağmur izi bu katmanın işi DEĞİL.** Langer'da `ω_t` yalnız ω'nın yönüne bağlı;
   iz üretmek için spektrumu hareket ekseninde daraltmak gerekir, o modlar da durgundur.
   İz taneyi tek tek çizen katmana ait (Garg-Nayar).
-- **Akış odağı kameranın ve yağışın bileşkesinden.** Kamera dururken de kar düşüyor;
-  o zaman eksen rüzgârın ekseni.
-- **Odak kaybolan noktadan bulunur, uzak bir noktanın izdüşümünden değil.** Yön vektörü
-  `w = 0` ile izdüşüm matrisinden geçiyor; çıkan `w` yönün görüş eksenine yatkınlığı.
-  Sıfıra giderken odak sonsuza gider ve akış **paralelleşir** — ışınsal ve paralel kip
-  arasında sürekli geçiş var, sıçrama yok.
-- **Ekran döşemelere bölünür**, her döşemenin kendi yönü ve hızı var (odağa uzaklıktan),
-  komşular bilineer harmanlanır. Tek yönlü perde ekranı topluca kaydırıyordu.
-- **Her döşeme desenin İLİŞKİSİZ bir yerinden okur** (döşeme indisinden hash). Makale her
-  döşemeyi ayrı sentezliyor; tek doku paylaşıldığında bağımsızlığı hash sağlıyor.
+- **Tek akış yönü, ekran geneli.** Yön, yağışın dünya hızıyla kameranın hareketinin
+  bileşkesinin görüntü düzlemine düşen payı. Doku dikişsiz döşeniyor (opaklık fonksiyonu
+  `(x,y)`'de toroidal), piksel başına **tek örnek**.
+- **Genleşme odağı ve döşeme başına θ YOK.** Sökülme gerekçesi `RATIONALE.md`'de: yöntem
+  θ'nın zamanla değişmesine uygun değil ve makale de değiştirmiyor (`§7.2`).
 
 ### Hava sesi (`WeatherAudio`, `AudioBand`)
 
