@@ -190,6 +190,33 @@ görünüyorlar. **Bilinen eksik.**
   bulunmasıdır.
 - **Damla boyutu hem düşme hızını hem rüzgâra direncini belirler**; dağılım şiddetle kayar.
 
+### Yağış perdesi (`SpectralPrecipitationFeature`, `SpectralPrecipitation.shader`)
+
+Taneler arasını dolduran ekran uzayı dokusu `[Langer 2004]`. Doku editörde pişiyor
+(`SpectralPrecipitationBaker` → `Assets/Settings/SpectralPrecipitation.asset`), çalışma
+zamanı yalnız örnekliyor.
+
+**Okur:** yağış şiddeti × yerel bulut payı (yoğunluk), karlılık (taban ağırlık), yağışın
+**dünya hızı** (akış ekseni), kameranın hareketi (genleşme odağı), sahne derinliği
+(yalnız yakın nesne koruması), **savrulan karın rengi** (`SpindriftColor`).
+**Okumaz:** görüş mesafesini — perde sisin yerini tutmuyor, sis kendi işini yapıyor.
+Gökyüzü rengini de okumaz.
+
+- **Perde veil değil doku.** Uzağı sis, yakını taneler taşıyor; perde ikisinin arasındaki
+  ölçekte kalıyor. Taban ağırlık bu yüzden düşük (0.40 yağmur → 0.90 kar).
+- **Desenin ortalaması havadır, tepeleri tanedir.** Pişirici ortalamayı 0.5'e eşliyor;
+  o ortalama doğrudan opaklık olursa ekrana sabit gri sürülür. Ortalamanın altı sıfıra
+  iniyor, üstü geriliyor.
+- **Sahne derinliğine göre kapı yok.** Dispersiyon bağıntısı derinliği ZATEN taşıyor:
+  farklı uzamsal frekanslar farklı hızda akıyor çünkü farklı derinlikteki taneleri
+  temsil ediyorlar. Derinlik yalnız çok yakın cismin önüne geçmemek için okunuyor.
+- **Perde kendi rengini seçmez ve gökyüzünden de boyanmaz** — `SpindriftColor`, havada
+  asılı tanenin rengi. Aynı ayrım savrulan karda da geçerli.
+- **Akış odağı kameranın ve yağışın bileşkesinden.** Kamera dururken de kar düşüyor;
+  o zaman eksen rüzgârın ekseni.
+- **Ekran döşemelere bölünür**, her döşemenin kendi yönü ve hızı var (odağa uzaklıktan),
+  komşular bilineer harmanlanır. Tek yönlü perde ekranı topluca kaydırıyordu.
+
 ### Hava sesi (`WeatherAudio`, `AudioBand`)
 
 **Okur:** şiddet, karlılık, rüzgârın sürekli şiddeti **ve** esintisi.

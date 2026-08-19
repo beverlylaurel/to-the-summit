@@ -39,8 +39,8 @@ Shader "Hidden/ToTheSummit/SpectralPrecipitation"
             TEXTURE3D(_CurtainPattern);
             SAMPLER(sampler_CurtainPattern);
 
-            float4 _CurtainParams;   // x: döşeme boyu (piksel), y: hız, z: yoğunluk, w: zaman
-            float4 _CurtainDepth;    // x: yakın kesme, y: yatay görüş açısı (rad), z: karlılık, w: görüş mesafesi
+            float4 _CurtainParams;   // x: döşeme boyu (px), y: desen ölçeği (px), z: yoğunluk, w: zaman
+            float4 _CurtainDepth;    // x: yakın kesme (m), y: akış hızı, z: karlılık, w: boş
             float4 _CurtainFoe;      // xy: yağışın ekran yönü (birim), zw: ekran boyu
 
             /// TEŞHİS. 0 kapalı · 1 bant · 2 opaklık · 3 perde yok.
@@ -102,23 +102,23 @@ Shader "Hidden/ToTheSummit/SpectralPrecipitation"
                 //
                 // Sisin opaklığıyla çarpınca ikisi aynı yerde güçleniyor: tipide arazinin
                 // önü kalın ve KÜMELİ, berrak havada perde kendiliğinden yok oluyor.
-                // SİS OPAKLIĞI TEK ÜSTELDEN, 8 ÖRNEKLİ İNTEGRALDEN DEĞİL.
+                // SAHNE DERİNLİĞİNE GÖRE KAPI YOK — DESEN ZATEN DERİNLİĞİ TAŞIYOR.
                 //
-                // `HeightFogAmount` ışın boyunca sekiz örnek alıyor; tam ekranda piksel
-                // başına o kadar iş 3.5 ms tutuyordu (ölçüldü: perde kapalı 131 FPS /
-                // 7.6 ms, açık 90 FPS / 11.1 ms). Görünmeyen bir katman için çok.
+                // Dispersiyon bağıntısının bütün amacı bu: farklı uzamsal frekanslar
+                // farklı hızda akıyor çünkü farklı DERİNLİKTEKİ taneleri temsil ediyorlar
+                // (yakın tane büyük ve hızlı, uzak tane küçük ve yavaş, hepsi üst üste).
+                // Üstüne bir de sahne derinliğine göre kapı koymak aynı bilgiyi iki kez
+                // uygulamaktı.
                 //
-                // Sisin kendi yasası zaten üstel. Görüş mesafesi, kontrastın %2'ye
-                // düştüğü uzaklık — yani optik derinlik ~3.9. Aynı eğri tek `exp` ile
-                // çıkıyor ve perdenin ihtiyacı olan doğruluk bu.
-                float visibility = max(_CurtainDepth.w, 1.0);
-                float fogOpacity = 1.0 - exp(-3.9 * sceneDepth / visibility);
-
-                // YAKIN KORUMASI. Elin ve tırmanış duvarının önüne perde gelmemeli.
-                float nearGuard = saturate((sceneDepth - _CurtainDepth.x)
+                // Ölçüldü: mesafe kapısıyla perde ufka yapışık İNCE BİR ŞERİDE düşüyordu.
+                // Geometrik olarak doğru — düz ovada 50-600 m aralığı ekranda dar bir
+                // kuşağa sıkışır, perspektif mesafeyi ezer — ama işe yaramaz. Yağan kar
+                // her yöne dolu, arkasında ne olduğuna bakmaz.
+                //
+                // Geriye tek koşul kalıyor: çok yakındaki cismin ÖNÜNE geçmemek. El ve
+                // tırmanış duvarı perdenin berisinde durmalı.
+                float depthGate = saturate((sceneDepth - _CurtainDepth.x)
                                            / max(_CurtainDepth.x, 1.0));
-
-                float depthGate = fogOpacity * nearGuard;
 
                 // BANT PROBU: deseni hiç örneklemeden, perdenin NEREDE etkili olduğunu
                 // gösterir. Desen karıştığında bandın kendisi okunamıyor.
@@ -139,41 +139,89 @@ Shader "Hidden/ToTheSummit/SpectralPrecipitation"
                 // makinesi kameranın ÖTELENMESİNİ modelliyor, tırmanışçı ise yavaş
                 // hareket ediyor. Baskın görsel ipucu yağışın kendi yönü — düşüş artı
                 // rüzgâr. Perspektif genleşmesi bilinçli olarak alınmadı.
-                float2 dir = _CurtainFoe.xy;
-
-                // DESEN DÜNYAYA BAĞLI, EKRANA DEĞİL.
+                // DÖŞEMELİ KURULUM — `[Langer 2004, §7]`'nin gerçek hâli.
                 //
-                // Ekran pikselinden örneklenirken desen başını çevirdiğinde ekranla
-                // birlikte geliyordu — camdaki toz gibi. Kullanıcı "silüetler bir tuhaf
-                // hareket ediyor" diye bildirdi; sebebi buydu.
+                // Perdenin içindeki her şey aynı derinlikteymiş gibi hareket ediyordu:
+                // ekrana bağlarsan cama yapışıyor, dünyaya bağlarsan dağa. Doğrusu
+                // arada — yağan kar farklı derinliklerde, farklı hızlarda.
                 //
-                // Bakış yönünün açısal koordinatı (azimut, yükseliş) kullanılınca desen
-                // dünyada duruyor: başını çevirince içinden geçiyorsun, sürüklemiyorsun.
-                // Langer bunu genleşme odağı makinesiyle çözüyor; açısal koordinat aynı
-                // işi tek satırda yapıyor ve kameranın DÖNMESİ için doğru olan da bu.
+                // Parallax'ı veren şey GENLEŞME ODAĞI: kamera ilerlerken görüntü hareketi
+                // odaktan dışa açılıyor, hız odağa uzaklıkla lineer artıyor. Bunu PİKSEL
+                // başına uygulamak koordinat alanını buruyor ve ışınsal girdap bırakıyor
+                // (ölçüldü). Makalenin çözümü: yön ve hız DÖŞEME içinde SABİT, komşu
+                // döşemeler kenarda harmanlanıyor.
                 //
-                // Tepe ve dip noktasında azimut tanımsızlaşıyor; tırmanışçı çoğunlukla
-                // yataya bakıyor ve orada sorun yok.
-                float3 viewDir = normalize(ComputeWorldSpacePosition(
-                    uv, UNITY_RAW_FAR_CLIP_VALUE, UNITY_MATRIX_I_VP) - GetCameraPositionWS());
+                // İki ölçek AYRI: döşeme boyu açısal çözünürlüğü belirliyor (küçük olsun
+                // ki odak çevresinde yön yumuşak değişsin), desen ölçeği ekrandaki
+                // özellik boyunu (büyük olsun ki 4-32 piksel aralığı korunsun). Tek
+                // parametreye bağlanınca ikisi çelişiyor.
+                float2 pixel = uv * _CurtainFoe.zw;
+                float2 foe = _CurtainFoe.xy;
+                float tileSize = max(_CurtainParams.x, 1.0);
+                float patternScale = max(_CurtainParams.y, 1.0);
+                float halfDiagonal = 0.5 * length(_CurtainFoe.zw);
 
-                float azimuth = atan2(viewDir.x, viewDir.z);
-                float elevation = asin(clamp(viewDir.y, -1.0, 1.0));
+                float2 tileF = pixel / tileSize;
+                float2 baseTile = floor(tileF - 0.5);
+                float2 blend = tileF - 0.5 - baseTile;
 
-                // Açısal ölçek, döşemenin EKRANDA istenen boyunu koruyacak şekilde:
-                // piksel başına radyan × döşeme boyu.
-                float radiansPerPixel = _CurtainParams.x > 0.0
-                    ? _CurtainDepth.y / max(_CurtainFoe.z, 1.0) : 1.0;
+                float alphaSum = 0.0;
+                float weightSum = 0.0;
 
-                float2 q = float2(azimuth, elevation)
-                         / max(_CurtainParams.x * radiansPerPixel, 1e-5);
-                float2 rotated = float2(q.x * dir.x + q.y * dir.y,
-                                       -q.x * dir.y + q.y * dir.x);
+                [unroll]
+                for (int ty = 0; ty < 2; ty++)
+                [unroll]
+                for (int tx = 0; tx < 2; tx++)
+                {
+                    float2 tileIndex = baseTile + float2(tx, ty);
+                    float2 center = (tileIndex + 0.5) * tileSize;
 
-                float w = _CurtainParams.y * _CurtainParams.w;
+                    float2 fromFoe = center - foe;
+                    float radius = length(fromFoe);
+                    float2 dir = radius > 1e-3 ? fromFoe / radius : float2(1.0, 0.0);
 
-                float alpha = SAMPLE_TEXTURE3D(_CurtainPattern, sampler_CurtainPattern,
-                                               float3(rotated, w)).r;
+                    // HIZ ODAĞA UZAKLIKLA LİNEER (C_ij = C₀·|p_ij − FOE|). Odağın
+                    // dibindeki döşemeler neredeyse durgun — makalenin kendi gözlemi.
+                    float speed = _CurtainDepth.y * saturate(radius / halfDiagonal);
+
+                    // Dönme DÖŞEME MERKEZİ etrafında; döşeme içinde sabit olduğu için
+                    // burulma yok, katı dönme var.
+                    float2 local = (pixel - center) / patternScale;
+                    float2 rot = float2(local.x * dir.x + local.y * dir.y,
+                                       -local.x * dir.y + local.y * dir.x);
+
+                    // Her döşeme desenin BAŞKA bir yerinden okusun; aynı yerden okurlarsa
+                    // ekran aynı lekenin ızgarasına dönüyor.
+                    float2 q = rot + tileIndex * 0.37;
+
+                    float w = (0.35 + speed) * _CurtainParams.w;
+
+                    float a = SAMPLE_TEXTURE3D(_CurtainPattern, sampler_CurtainPattern,
+                                               float3(q, w)).r;
+
+                    // Bilineer harmanlama: kenarda iki komşunun payı eşitleniyor, dikiş
+                    // görünmüyor. Makale 10 piksellik örtüşmede lineer harmanlıyor.
+                    float weight = (tx == 0 ? 1.0 - blend.x : blend.x)
+                                 * (ty == 0 ? 1.0 - blend.y : blend.y);
+
+                    alphaSum += a * weight;
+                    weightSum += weight;
+                }
+
+                float alpha = weightSum > 1e-5 ? alphaSum / weightSum : 0.0;
+
+                // ORTALAMA HAVADIR, TEPELER TANEDİR.
+                //
+                // Pişirici deseni ortalaması 0.5 olacak şekilde [0,1]'e eşliyor
+                // (`SpectralPrecipitationBaker`, `[Langer 2004, §7.7]`). Bu ortalama
+                // doğrudan opaklık olarak kullanılınca ekranın TAMAMINA sabit bir gri
+                // sürülüyordu — ölçüldü: tam karda ~0.45. Kullanıcının "gren" dediği şey
+                // desenin DC bileşeniydi, taneleri değil.
+                //
+                // Tane seyrek ve ayrıktır: aradaki hava saydam. Ortalamanın altı sıfıra
+                // iniyor, üstü [0,1]'e geriliyor. Sihirli katsayı yok — 0.5 pişiricinin
+                // yazdığı ortalama, bölen de aralığın üst yarısı.
+                alpha = saturate((alpha - 0.5) / 0.5);
 
                 // KAR VE YAĞMUR AYNI DESEN, FARKLI ÇARPAN. Yağmur izleri ince ve seyrek
                 // okunur; kar perdesi kalın.
@@ -184,18 +232,23 @@ Shader "Hidden/ToTheSummit/SpectralPrecipitation"
 
                 alpha = saturate(alpha * intensity * depthGate * weight);
 
-                // PERDE KENDİ RENGİNİ SEÇMEZ — havanın rengini alıyor, tıpkı taneler gibi
-                // (`SYSTEMS.md`: "tane kendi rengini seçmez"). Sabit beyaz, kapalı göğün
-                // önünde patlıyor ve gece fosforlu duruyordu.
-                float3 direction = normalize(ComputeWorldSpacePosition(
-                    uv, UNITY_RAW_FAR_CLIP_VALUE, UNITY_MATRIX_I_VP) - GetCameraPositionWS());
-
                 // OPAKLIK PROBU: son alfa. Bant doğru olsa bile katkı çok güçlü ya da
                 // görünmeyecek kadar zayıf olabilir; bu ikisini ayırır.
                 if (_CurtainProbe > 1.5 && _CurtainProbe < 2.5)
                     return half4(ProbeRamp(alpha), 1.0);
 
-                float3 tint = AirColor(direction);
+                // PERDE KENDİ RENGİNİ SEÇMEZ — ama gökyüzünden de boyanmaz.
+                //
+                // `AirColor` bakış yönüne bağlı ve gök gradyanını taşıyor. Perdeye onu
+                // bağlayınca benekler gökten KOYU düştü (ölçüldü: 235 m görüşte gök sis
+                // rengindeyken tanecikler kirli koyu okunuyordu).
+                //
+                // Aynı ayrım `HeightFog.hlsl`'de iki kez yazılmış: satır 248 (savrulan
+                // karın rengi) ve satır 611 (perde gök rengine boyanmaz). Havada asılı
+                // tane yukarıdan güneşle ve altındaki karın yansımasıyla aydınlanır;
+                // hangi yöne bakıldığı onu karartmaz. `SpindriftColor` tam bu büyüklük —
+                // ayrı bir kaynak kurulmuyor.
+                float3 tint = SpindriftColor();
 
                 return half4(tint, alpha);
             }

@@ -20,15 +20,15 @@ public class SpectralPrecipitationFeature : ScriptableRendererFeature
              "tırmanış duvarı ve el hep bu mesafenin berisinde kalıyor.")]
     [SerializeField] float nearCutoff = 40f;
 
-    [Tooltip("Perdenin dolma mesafesi (metre). Bu kadar yolda perdenin %63'ü birikir; " +
-             "üstel yasa, doğrusal rampa değil. Küçük olursa yakın yamaç da perde alır " +
-             "ve desen araziye yapışmış gibi görünür.")]
-    [SerializeField] float fillDistance = 1400f;
+    [Tooltip("Döşeme boyu (piksel). AÇISAL ÇÖZÜNÜRLÜK: her döşemenin kendi akış yönü ve " +
+             "hızı var, küçük olursa genleşme odağı çevresinde yön daha yumuşak değişir. " +
+             "Ekran genişliğinin sekizde biri civarı iyi.")]
+    [SerializeField] float tileSize = 240f;
 
-    [Tooltip("Desenin ekrandaki döşeme boyu (piksel). PİŞMİŞ DOKU BOYUNA EŞİT OLMALI " +
-             "(512): halka döşeme birimi cinsinden tanımlı, oran bozulunca özellik boyu " +
-             "kayıyor ve desen kar değil mermer gibi görünüyor.")]
-    [SerializeField] float tileSize = 512f;
+    [Tooltip("Desen ölçeği (piksel). ÖZELLİK BOYU: pişmiş doku boyuna eşit olmalı (512), " +
+             "yoksa halka ölçeği kayıyor ve desen kar değil mermer gibi görünüyor. " +
+             "Döşeme boyundan AYRI tutuluyor çünkü ikisi çelişen şeyler istiyor.")]
+    [SerializeField] float patternScale = 512f;
 
     [Tooltip("Kameranın hareketinin akışa katkısı.")]
     [SerializeField] float flowSpeed = 1.4f;
@@ -46,9 +46,9 @@ public class SpectralPrecipitationFeature : ScriptableRendererFeature
         {
             renderPassEvent = RenderPassEvent.AfterRenderingTransparents,
             near = nearCutoff,
-            far = fillDistance,
             tile = tileSize,
             flow = flowSpeed,
+            patternScale = patternScale,
         };
     }
 
@@ -59,9 +59,9 @@ public class SpectralPrecipitationFeature : ScriptableRendererFeature
         if (data.cameraData.cameraType == CameraType.Preview) return;
 
         pass.near = nearCutoff;
-        pass.far = fillDistance;
         pass.tile = tileSize;
         pass.flow = flowSpeed;
+        pass.patternScale = patternScale;
 
         renderer.EnqueuePass(pass);
     }
@@ -81,7 +81,11 @@ public class SpectralPrecipitationFeature : ScriptableRendererFeature
 
         readonly Material material;
 
-        public float near, far, tile, flow;
+        public float near, tile, flow, patternScale;
+
+        /// Kameranın önceki konumu — odak, kameranın ve yağışın bileşke akışından çıkıyor.
+        Vector3 previousPosition;
+        bool hasPrevious;
 
         public CurtainPass(Material curtainMaterial) => material = curtainMaterial;
 
@@ -98,27 +102,39 @@ public class SpectralPrecipitationFeature : ScriptableRendererFeature
             float intensity = SpectralPrecipitationState.Intensity;
             if (intensity <= 1e-4f) return;
 
-            // YAĞIŞIN EKRAN YÖNÜ. Perdenin akış ekseni bu — düşüş artı rüzgâr,
-            // kameranın görüşüne izdüşürülmüş.
+            // GENLEŞME ODAĞI (FOE). Kamera ilerlerken görüntü hareketi bir noktadan
+            // dışa açılıyor; o nokta hareket yönünün ekrana izdüşümü `[Langer 2004, §7]`.
+            // Perdenin parallax'ı buradan geliyor — döşeme başına yön ve hız bununla
+            // hesaplanıyor.
             //
-            // Genleşme odağı (makale §7) BİLİNÇLİ OLARAK ALINMADI: yön piksel başına
-            // değişince desen dönmüyor, koordinat alanı buruluyor ve odağın çevresinde
-            // ışınsal bir girdap kalıyor (ölçüldü, sahne görünümünde net). Makale bunu
-            // döşemeyle çözüyor — döşeme içinde yön sabit, kenarlarda harmanlama. O
-            // makine kameranın ÖTELENMESİNİ modelliyor ve tırmanışçı yavaş hareket
-            // ediyor; tek yön hem doğru hem ucuz.
+            // Kamera durgunken odak, yağışın KENDİ yönünün izdüşümü oluyor: kar dururken
+            // de düşüyor ve akış ekseni o zaman rüzgârın ekseni.
             var camera = cameraData.camera;
 
             float width = cameraData.cameraTargetDescriptor.width;
             float height = cameraData.cameraTargetDescriptor.height;
 
-            Vector3 velocity = SpectralPrecipitationState.Velocity;
-            Vector3 viewVelocity = camera.worldToCameraMatrix.MultiplyVector(velocity);
+            Vector3 position = camera.transform.position;
+            Vector3 motion = hasPrevious ? position - previousPosition : Vector3.zero;
+            previousPosition = position;
+            hasPrevious = true;
 
-            Vector2 screenDir = new Vector2(viewVelocity.x, viewVelocity.y);
-            screenDir = screenDir.sqrMagnitude > 1e-8f
-                ? screenDir.normalized
-                : new Vector2(0f, -1f);
+            // Kameranın hareketi mi yağışın hareketi mi baskın: ikisi de görüntü akışını
+            // sürüyor ve odağın yeri bileşkelerinden çıkıyor.
+            Vector3 drift = SpectralPrecipitationState.Velocity * Time.deltaTime - motion;
+
+            Vector2 foe = new Vector2(width * 0.5f, height * 0.5f);
+
+            if (drift.sqrMagnitude > 1e-10f)
+            {
+                // Akışın GELDİĞİ yön odaktır: taneler oradan gelip dışa açılıyor.
+                Vector3 source = position - drift.normalized * 1000f;
+                Vector3 projected = camera.WorldToScreenPoint(source);
+
+                // İzdüşüm kameranın gerisindeyse odak ekranın dışında ve işaret ters;
+                // merkezde bırakmak ters akıştan iyi.
+                if (projected.z > 0f) foe = new Vector2(projected.x, projected.y);
+            }
 
             using var builder = renderGraph.AddRasterRenderPass<PassData>(
                 "Spektral Yağış Perdesi", out var passData);
@@ -131,15 +147,10 @@ public class SpectralPrecipitationFeature : ScriptableRendererFeature
 
             material.SetTexture(PatternId, texture);
             material.SetVector(ParamsId, new Vector4(
-                tile, flow, intensity, SpectralPrecipitationState.Time));
+                tile, patternScale, intensity, SpectralPrecipitationState.Time));
             material.SetVector(DepthId, new Vector4(
-                near,
-                // Yatay görüş açısı (radyan): desenin açısal ölçeği buradan, ekranda
-                // istenen döşeme boyu korunsun diye.
-                camera.fieldOfView * Mathf.Deg2Rad * camera.aspect,
-                SpectralPrecipitationState.Snowiness,
-                SpectralPrecipitationState.Visibility));
-            material.SetVector(FoeId, new Vector4(screenDir.x, screenDir.y, width, height));
+                near, flow, SpectralPrecipitationState.Snowiness, 0f));
+            material.SetVector(FoeId, new Vector4(foe.x, foe.y, width, height));
 
             builder.SetRenderFunc((PassData data, RasterGraphContext context) =>
             {
@@ -161,10 +172,6 @@ public static class SpectralPrecipitationState
 
     /// 0 yağmur, 1 kar.
     public static float Snowiness;
-
-    /// Görüş mesafesi (metre). Perde sisin opaklığını buradan türetiyor — ışın boyunca
-    /// integral almak yerine tek üstel, çünkü tam ekranda sekiz örnek 3.5 ms tutuyordu.
-    public static float Visibility = 10000f;
 
     /// Yağışın DÜNYA hızı (düşüş + rüzgâr). Perde akış eksenini buradan alıyor;
     /// taneler de aynı hızla düşüyor, iki katman ayrışmasın diye.

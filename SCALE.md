@@ -63,6 +63,7 @@ Bunlar gerçek dünyanın metreleri. Dağ iki katına çıkınca donma seviyesi 
 | `snowDisplaceMax` | 3.2 m | Birikintinin gerçek yüksekliği; dağ büyüyünce kar yığını büyümez. Fiili tavan 8.0 m: birikinti alanı ×1.25, arazi ağırlığı ×2.0 |
 | `snowDisplaceStart` | 0.18 m | Geometriye geçme eşiği; insan adımının karşılığı |
 | Birikinti gövdesi | 45 × 16 m | Rüzgârın oluşturduğu yığının gerçek boyu |
+| Perde `nearCutoff` | 40 m | Yağış perdesinin başladığı mesafe. Bundan yakınını taneler taşıyor; sınır tanenin ekranda ayrı görüldüğü mesafe, dağın boyu değil. Döşeme ve desen ölçeği PİKSEL cinsinden — ekranın işi, arazinin değil |
 
 **Kural:** bunlardan biri dağın boyuna oranlanırsa atmosfer dağın büyüklüğüne göre farklı
 fizik uygular ve tutarlılık zinciri kopar (`SYSTEMS.md`).

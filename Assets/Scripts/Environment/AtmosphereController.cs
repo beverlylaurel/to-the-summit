@@ -647,7 +647,6 @@ public class AtmosphereController : MonoBehaviour
 
         // PERDE GÖRÜŞ MESAFESİNİ BURADAN OKUR. Sisin opaklığını ışın boyunca integre
         // etmek yerine tek üstelle türetiyor; sahibi burası, ikinci bir kaynak yok.
-        SpectralPrecipitationState.Visibility = effectiveVisibility;
 
         // Bulut menzilinin ölçüsü: vadi denizi HARİÇ. Deniz 120 m'de biter, bulut 2.6 km
         // yukarıdadır; onun menzilini vadi dibindeki sis belirleyemez.

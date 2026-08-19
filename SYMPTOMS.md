@@ -534,3 +534,37 @@ Prob sonuç vermiyorsa sıradaki araç **Unity Frame Debugger**: hangi geçişin
 yazdığını kesin gösterir. Yalnız kamera renk tamponuna yazan adımlara bakılır; motion
 vector, gölge haritası ve ara doku adımları tuhaf görünür, normaldir.
 
+
+## "Ekranın tamamı grenli, gökyüzü dahil" — desenin DC bileşeni
+
+Kullanıcı yağış perdesini yalnız başına görmek için tanecikleri kapattı ve şunu dedi:
+*"bu görüntü normal mi? f1'den yağmur ve karı kapattım net olarak görebilmek için."*
+Ekranın her yeri — gökyüzü dahil — ince, düzgün bir grenle kaplıydı.
+
+**Yanlış çıkan ilk şüpheli: mesafe.** "Uzaktaki tane piksel altı kalır, perde mesafeyle
+sönmeli" diye üstel bir mesafe kapısı kondu (`textureRange = 260 m`). Sonuç: perde ufka
+yapışık İNCE BİR ŞERİDE düştü. Geometrik olarak doğruydu — düz ovada 50–600 m aralığı
+ekranda dar bir kuşağa sıkışır, perspektif mesafeyi ezer — ama işe yaramazdı, ve asıl
+sorunu hiç ele almıyordu.
+
+**Gerçek sebep: desenin ortalaması.** Pişirici deseni ortalaması 0.5 olacak şekilde
+`[0,1]`'e eşliyor (`[Langer 2004, §7.7]`). O ortalama DOĞRUDAN opaklık olarak
+kullanılıyordu, yani perde ekranın tamamına sabit bir gri sürüyordu — tam karda ~0.45.
+Kullanıcının "gren" dediği şey tanelerin dokusu değil, desenin **DC bileşeniydi**.
+
+Tane seyrek ve ayrıktır, aradaki hava saydamdır. Ortalamanın altı sıfıra iniyor, üstü
+geriliyor: `alpha = saturate((a - 0.5) / 0.5)`. Sihirli katsayı yok — 0.5 pişiricinin
+yazdığı ortalama.
+
+**Ayırt eden ölçüm: opaklık probu** (son alfayı ayrık renk bantlarına basan görünüm).
+Önce ekranın tamamı 0.32–0.50 bandındaydı; sonra 0.00–0.02 tabanı üstünde seyrek
+0.08–0.32 tepeleri. Göz kararıyla "biraz azalttım" ile "doğru yere oturdu" ayrılamazdı.
+
+**Aynı turda ikinci belirti: benekler kirli koyu okunuyordu.** 235 m görüşte gök tamamen
+sis rengindeyken tanecikler gökten belirgin koyu düşüyordu. Sebep: perde `AirColor`'a
+bağlanmıştı — o bakış yönüne bağlı ve gök gradyanını taşıyor. Doğrusu `SpindriftColor`.
+
+Bunun şüpheli araması hiç gerekmedi: kural **zaten yazılıydı**, `HeightFog.hlsl:248` ve
+`:611`, ikisi de "havada asılı tane gök rengine boyanmaz" diyor. Yeni bir görsel mevcut
+bir büyüklüğe bağlanırken o büyüklüğün fiziksel karşılığı okunmadı.
+
