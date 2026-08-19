@@ -654,6 +654,15 @@ Shader "ToTheSummit/Precipitation"
                               * smoothstep(0.0, 0.008, 1.0 - IN.corner.y);
 
                 // Her kaynak KENDİ rengiyle ölçeklenip toplanıyor (`§5` sonu).
+                // HALE MASKESİ UYGULANMIYOR — gerekçesi geometri, kolaylık değil.
+                // `§5`: "we use a mask whose intensity at a pixel i is equal to 1/d_i²,
+                // where d_i is the distance in 3D of the falling drop from the light
+                // source". Güneş sonsuzda; `d_i` her damla için aynı, yani maske sabit
+                // bir çarpana iniyor ve zaten kaynağın şiddetinde taşınıyor. Hale de
+                // ışık konisi de SONLU mesafedeki kaynağın işi. Sahneye lamba, fener ya
+                // da şimşek eklendiğinde bu maske gerekecek — `DECISIONS.md`.
+                //
+                // Anizotropik maske de aynı sebeple yok: güneş izotrop.
                 float3 rainRadiance = (pointStreak * _HeightFogSunColor.rgb
                                      + ambientStreak * _HeightFogColor.rgb)
                                     * _StreakSourceScale;

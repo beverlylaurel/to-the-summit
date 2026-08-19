@@ -227,6 +227,34 @@ Gökyüzü rengini de okumaz.
 - **Genleşme odağı ve döşeme başına θ YOK.** Sökülme gerekçesi `RATIONALE.md`'de: yöntem
   θ'nın zamanla değişmesine uygun değil ve makale de değiştirmiyor (`§7.2`).
 
+### Yağmur izi görünümü (`RainStreakDatabase`, `RainStreakWorkingSet`)
+
+Damlanın görüntü izi sabit parlaklıkta bir çubuk değil: salınan damla ışığı benekler,
+yayılmış highlight'lar ve eğri konturlar hâlinde kırıyor `[Garg 2006]`. Desen ray-tracing
+gerektirdiği için offline pişmiş; çalışma zamanı arıyor.
+
+**Okur:** güneşin yönü (`TimeOfDay.SunDirection`), yağışın düşüş ekseni (rüzgârla
+eğilmiş), kameranın optik ekseni, damla boyutu sınıfı, **süzülmüş güneş radyansı**
+(`_HeightFogSunColor`) ve **gökten içeri saçılan radyans** (`_HeightFogColor`).
+**Okumaz:** karlılığı — kar tanesi kendi prosedürel yolunda kalıyor, iz veritabanı
+yağmura ait.
+
+- **Üç açısal eksen, üçü farklı şeye bağlı.** Işığın yüksekliği damlanın düşüş eksenine
+  göre (kameradan bağımsız); azimutu kameranın eksenine göre (kamera dönünce değişir);
+  `θ_v` kameranın bakışıyla düşüş yönü arasında (ekranın her yerinde farklı, damla
+  başına).
+- **Kare başına yalnız gerekli dilim GPU'da.** Tek yönlü kaynak var, yani 4 açısal komşu
+  × 5 kamera açısı × 10 salınım = 200 dilim. Güneşin hücresi değişmedikçe kopyalama yok.
+- **Her kaynak kendi rengiyle ölçeklenip toplanıyor** — yönlü kanal güneşin, ambient
+  kanal göğün radyansıyla. Kapalı havada iz yumuşak, güneş açtığında yüksek frekanslı
+  desen çıkıyor; makalenin Senaryo 4'ü bu.
+- **Quad fiziksel:** genişlik damlanın çapı, boy pozlama süresinde kat edilen yol.
+  Görsel bir boyut ayarı yok — doku gerçek bir izin deseni, ölçeği de gerçek olmalı.
+- **Şeffaflık `α = 2r₀/(v·T_exp)`** — kısa pozlamada iz daha opak. Hız fiziksel terminal
+  hız; taneciğin görsel düşüş hızı (16 m/s) ayrı ve bilinçli.
+- **Pozlama süresi kare süresinden TÜREMİYOR.** Türeseydi yağmurun görüntüsü fps ile
+  değişirdi.
+
 ### Hava sesi (`WeatherAudio`, `AudioBand`)
 
 **Okur:** şiddet, karlılık, rüzgârın sürekli şiddeti **ve** esintisi.

@@ -869,3 +869,43 @@ ya da ayar asset'i üzerinden verilir; statik köprü feature'a elden geçirilen
 dönüşür. Shader tarafı daha pahalı: `HeightFog.hlsl` çağrıları ya bir arayüz include'una
 ya da uniform'a bağlanmalı.
 
+
+## Garg-Nayar: üç adım TABANI DOĞRULANDIKTAN SONRA (2026-08-20)
+
+**Karar.** İz görünüm modeli uygulandı; makalenin `§5`'indeki üç adım henüz yazılmadı.
+Ucuza kaçmak değil, SIRALAMA: taban ekranda doğrulanmadan üstüne üç doğrulanmamış
+katman daha binmesin. Perde fazında tam bu oldu — üç sapma aynı anda durunca hangisinin
+ne bozduğu ölçülemedi.
+
+**1 — Çözünürlük seviyesi seçimi.** `§5`: "we first find the appropriate texture
+resolution level – it is the resolution level with textures of widths just larger than
+the width of the projected rain streak." Şu an her zaman en yüksek seviye (`size16`)
+kullanılıyor; `size8` ve `size4` veritabanında duruyor ama bağlı değil.
+*Neden var:* makale dipnotu — "to avoid artifacts due to severe down-sampling when
+rendering streaks far from the camera". Yani uzak damlada iz titrer.
+*Maliyet:* üç seviye birden bağlanmalı (Texture2DArray'ler arasında dinamik indeks yok,
+üç dal gerekiyor). Çalışma kümesi 3.4 → ~4.5 MB.
+*Tetikleyici:* uzak damlalar titriyor ya da kaynıyorsa.
+
+**2 — Kameraya yakın damlada iki doku.** `§5`: damla kaynağa ya da kameraya yakınsa
+`(θ_l, φ_l, θ_v)` iz BOYUNCA değişiyor; izin üst ve alt ucuna karşılık gelen açılarla
+iki doku hesaplanıp `I = I₁ᵈ·M + (1−M)·I₂ᵈ` ile harmanlanıyor, `M` üstte 1 alttan 0.
+*Bizim durumda kısmen geçerli:* güneş sonsuzda olduğu için `(θ_l, φ_l)` iz boyunca
+değişmiyor; `θ_v` değişiyor — 0.5 m'deki damlanın 0.108 m'lik izinde bakış açısı
+belirgin kayıyor. Yani gereken yalnız `θ_v` ucu.
+*Maliyet:* örnek sayısı 8'den 16'ya çıkar.
+*Tetikleyici:* çok yakın damlaların izi boyunca aydınlanma yanlış duruyorsa.
+
+**3 — Defocus.** `§5`: iz kameranın alan derinliği dışındaysa derinliğe bağlı sigma ile
+Gaussian blur. Formül makalede yok (`rain-spec.md` §11.2-6, standart CoC önerisi).
+*Tetikleyici:* alan derinliği efekti eklendiğinde; şu an oyunda yok.
+
+**Ayrıca ölçülmemiş:** `sourceScale` kalibrasyonu 1.0'da duruyor. Veritabanı izleri kendi
+render kurulumunun radyansında (kaynak 10 m'de) ve bizim güneşimiz o kaynak değil;
+`rain-spec.md` §11.3.5 bu katsayıyı zorunlu kılıyor. Ölçümle belirlenecek.
+
+**Uygulanmayan ama GEREKMEYEN iki adım** (gerekçesi kodda da yazılı): hale maskesi
+`1/d_i²` ve anizotropik maske. İkisi de SONLU mesafedeki kaynağın işi; güneş sonsuzda,
+`d_i` her damlada aynı ve izotrop. Sahneye lamba, fener ya da şimşek eklendiğinde
+gerekecek — şimşek zaten bekleyen kararlar listesinde.
+
