@@ -40,7 +40,11 @@ static class LightningLutBaker
     /// parlamayı taşımaya yetiyor çünkü parlama 1/s² ile sönüyor — 1.5 km'de katkı
     /// merkezdekinin milyonda biri. Uzak çakmanın "denizi aydınlatması" bu tablonun
     /// işi değil, ışığın kendisinin işi.
-    const float CutoffDistance = 1500f;
+    ///
+    /// MAKALEDEN SAPMA — 1.5 km DEĞİL 9 km. Makalenin sahnesinde kaynak hep yakındı;
+    /// bizde çakma 200 m ile 8 km arasında (`ThunderSettings`). T kaynak mesafesinden
+    /// küçük olursa integralin aralığı boş kalıyor ve uzak çakma HİÇ parlamıyor.
+    const float CutoffDistance = 9000f;
 
     /// Işın boyunca kaç örnek. 256 ile 512 arasındaki fark ölçüldü: en büyük hücrede
     /// %0.2, yani görünmez. 256 kalıyor.
@@ -64,7 +68,7 @@ static class LightningLutBaker
     ///
     /// Yeşil kanal referans alınıyor (göz ona en duyarlı); kırmızı/mavi arasındaki fark
     /// Rayleigh'in kendi rengi olarak duruyor.
-    const float ReferenceValue = 4.935460e-05f;
+    const float ReferenceValue = 8.342492e-05f;
 
     /// RGB'ye karşılık gelen dalga boyları `[Dobashi 2001, §4.4]`: 675, 520, 460 nm.
     static readonly float[] Wavelengths = { 675f, 520f, 460f };
@@ -135,10 +139,22 @@ static class LightningLutBaker
         Report(tex);
     }
 
-    /// Hücre merkezinden koordinat. Kenardan değil merkezden: kenar örneklenirse
-    /// bilineer okuma tablonun dışına taşıyor ve u=−T sınırında sıfıra düşüyor.
+    /// EKSENLER İŞARETLİ KAREKÖK — makale doğrusal kullanıyor, biz kullanamıyoruz.
+    ///
+    /// T'yi 9 km'ye çıkarmak gerekti (uzak çakmalar) ama doğrusal eksende 128 hücre
+    /// 18 km'ye yayılınca hücre başına 140 m düşüyor. Parlamanın tamamı kaynağın ilk
+    /// birkaç yüz metresinde (1/s² ile sönüyor); o bölge tek hücreye sıkışırdı.
+    ///
+    /// `değer = işaret(t) · t² · T` ile çözünürlük merkeze toplanıyor: sıfırın yanında
+    /// hücre ~1 m, uçta ~280 m. Sönümün kendisi de aynı yerde yoğun, yani örnekleme
+    /// fonksiyonun şekline uyuyor.
+    ///
+    /// Shader aynı eşlemeyi TERS uygulamak zorunda; ikisi ayrışırsa tablo kayar.
     static float Coord(int index)
-        => Mathf.Lerp(-CutoffDistance, CutoffDistance, (index + 0.5f) / Resolution);
+    {
+        float t = (index + 0.5f) / Resolution * 2f - 1f;
+        return Mathf.Sign(t) * t * t * CutoffDistance;
+    }
 
     /// Denklem 5. `u` ve `v` bakış noktasının, kaynağın orijininde duran yerel
     /// sistemdeki koordinatları.

@@ -248,7 +248,7 @@ değerlendirildi.
   uzunluk ×0.5, kıvrımlılık ×1.3 — dal ebeveyninden daha kıvrımlıdır. Çizgiler havuzdan
   gelir, bütçe tavanı `boltMaxLines`.
 
-### Şimşek saçılma tablosu (`LightningLutBaker`) — HENÜZ TÜKETİLMİYOR
+### Şimşek saçılma tablosu (`LightningLutBaker`)
 
 Dobashi 2001 §4'ün lookup table'ı: `Assets/Settings/LightningScatterLut.asset`,
 128×128 RGBAFloat, T = 1.5 km. Asset yoksa yükleme anında kendiliğinden pişer.
@@ -259,10 +259,25 @@ bu (Denklem 4: kaynağın şiddeti integralin dışında kalıyor).
 **Berrak hava için pişiyor**, yerel sis için değil: tablo üniform yoğunluk varsayıyor,
 bizim sisimiz üniform değil. Yerel sis kendi yolundan geçmeye devam eder, çift sayım yok.
 
-**Referans yapılandırmada 1.0 verecek şekilde normalize** (800 m, 30° sapma) — bağlandığı
-gün bugünkü parlaklık o noktada korunsun, yalnız mesafe/açı sönümü düzelsin diye.
+**Referans yapılandırmada 1.0 verecek şekilde normalize** (800 m, 30° sapma) — bugünkü
+parlaklık o noktada korunuyor, değişen yalnız mesafe/açı sönümü.
 
-**Henüz kimse okumuyor.** Sis hâlâ `_LightningFlash.rgb * 0.6` sabitini kullanıyor.
+**Eksenler işaretli karekök**, makaledeki doğrusal değil: T 9 km'ye çıkmak zorundaydı
+(çakma 8 km'ye gidiyor, kaynak tablonun dışında kalırsa parlama sıfır olur) ve doğrusal
+eksende 128 hücre 18 km'ye yayılınca hücre 140 m'ye çıkıyordu. Parlamanın tamamı ilk
+birkaç yüz metrede; karekök eksende hücre merkezde ~1 m. **Shader ters eşlemeyi birebir
+uygulamak zorunda.**
+
+**ÜÇ TÜKETİCİ, TEK KAYNAK:** `HeightFog.hlsl → FogPath` (arazi ve cisimler),
+`SkyFog.shader` (gök pikselleri), `Sky.shader` (yedek gök materyali). Üçü de
+`LightningScatter()` çağırıyor.
+
+**Terim ÇARPILMAZ, EKLENİR.** Eskiden üçünde de `_LightningFlash.rgb * 0.6` sisin
+opaklığıyla ağırlıklanıyordu — berrak havada parlama sıfırdı. Saçılan şey her zaman var
+olan hava; yerel sis ayrı ortam, kendi yolundan geçiyor, çift sayım yok.
+
+**Bilinçli sınır: arazi tıkaması yok.** Kaynağın önündeki yamaç parlamayı kesmiyor.
+Makale de kesmiyor (§4.5 doğrudan toplam).
 
 ### Volumetrik sis (`VolumetricFogFeature`, `VolumetricFog.compute`, `VolumetricFogShared.hlsl`)
 

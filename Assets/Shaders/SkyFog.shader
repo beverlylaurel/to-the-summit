@@ -1,4 +1,4 @@
-// include-rev: 31
+// include-rev: 32
 //
 // GÖKYÜZÜNE SİS. Sis katılımcı bir ortam: kameraya ulaşan her ışın onun içinden geçer.
 // Arazide biten ışınlar `MountainSurface` içinde sönümleniyordu, ama SONSUZA giden
@@ -88,7 +88,9 @@ Shader "Hidden/ToTheSummit/SkyFog"
                 float3 far = ComputeWorldSpacePosition(uv, UNITY_RAW_FAR_CLIP_VALUE, UNITY_MATRIX_I_VP);
                 float3 direction = normalize(far - cameraPos);
 
-                float3 air = AirColor(direction) + _LightningFlash.rgb * LightningFogScatter;
+                // Çakma buradan ÇIKARILDI: sis miktarıyla çarpılıyordu, yani berrak
+                // gökte parlama yok oluyordu. Aşağıda `LightningScatter` ile toplanıyor.
+                float3 air = AirColor(direction);
 
                 // HACİM ÖNCE. Gökyüzü ışını hacmi baştan sona geçiyor, yani hacmin SON
                 // dilimi: orada geçirgenlik birikmiş, in-scattering de öyle.
@@ -117,7 +119,8 @@ Shader "Hidden/ToTheSummit/SkyFog"
                 float tailAmount = SkyFogAmount(tailStart, direction);
 
                 float transmittance = volumeTransmittance * (1.0 - tailAmount);
-                float3 scattering = volumeScatter + volumeTransmittance * air * tailAmount;
+                float3 scattering = volumeScatter + volumeTransmittance * air * tailAmount
+                                  + LightningScatter(cameraPos, far);
 
                 return half4(scattering, transmittance);
             }

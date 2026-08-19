@@ -20,6 +20,8 @@ public class LightningFlash : MonoBehaviour
 {
     static readonly int FlashId = Shader.PropertyToID("_LightningFlash");
     static readonly int PositionId = Shader.PropertyToID("_LightningPosition");
+    static readonly int ScatterLutId = Shader.PropertyToID("_LightningScatterLut");
+    static readonly int ScatterTId = Shader.PropertyToID("_LightningScatterT");
 
     /// Bir çakmanın taşıyabileceği en fazla geri vuruş sayısı
     const int MaxStrokes = 3;
@@ -29,6 +31,11 @@ public class LightningFlash : MonoBehaviour
     [SerializeField] CloudLayerProbe cloudLayer;
     [SerializeField] Transform observer;
     [SerializeField] LightningSettings settings;
+
+    /// Atmosferik saçılma tablosu (`LightningLutBaker` pişiriyor). Sis ve gök buradan
+    /// okuyor; tablo statik olduğu için bir kez yazılıyor, kare kare değil.
+    [SerializeField] Texture2D scatterLut;
+    [SerializeField] float scatterCutoff = 9000f;
 
     /// Çakmanın dünyadaki yeri ve ne kadar sürdüğü. Kolu çizen taraf buradan besleniyor:
     /// konumu ikinci kez seçseydi ışık bir yerde, kol başka bir yerde olurdu.
@@ -64,13 +71,17 @@ public class LightningFlash : MonoBehaviour
     /// Sahne kurulumu ışığı da buradan yapılandırır: biçimi bileşenin kendi işi,
     /// kurulum betiğine dağılmamalı.
     public void Bind(ThunderPlayer source, AtmosphereController air, Transform eye,
-        LightningSettings tuning, CloudLayerProbe layer)
+        LightningSettings tuning, CloudLayerProbe layer, Texture2D lut, float cutoff)
     {
         thunder = source;
         atmosphere = air;
         cloudLayer = layer;
         observer = eye;
         settings = tuning;
+        scatterLut = lut;
+        scatterCutoff = cutoff;
+
+        PublishLut();
 
         var light = GetComponent<Light>();
         light.type = LightType.Directional;
@@ -94,6 +105,7 @@ public class LightningFlash : MonoBehaviour
 
         thunder.Struck += OnStruck;
 
+        PublishLut();
         Apply(0f);
     }
 
@@ -205,6 +217,16 @@ public class LightningFlash : MonoBehaviour
         }
 
         return value;
+    }
+
+    /// TABLO BİR KEZ YAZILIYOR. Statik bir asset; her karede global yazmak boşuna.
+    /// Yazılmazsa sis örneklemesi boş dokudan okur ve parlama tamamen kaybolur — bu
+    /// yüzden `Bind` ve `OnEnable` ikisinden de çağrılıyor (bileşen sahnede hazır
+    /// dururken `Bind` çalışmayabiliyor).
+    void PublishLut()
+    {
+        if (scatterLut != null) Shader.SetGlobalTexture(ScatterLutId, scatterLut);
+        Shader.SetGlobalFloat(ScatterTId, scatterCutoff);
     }
 
     void Apply(float value)

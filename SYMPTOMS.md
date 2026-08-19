@@ -372,6 +372,7 @@ ve gerçek sebep bir tur daha kaçıyor.
 | `.asset` ayarları | Volume çalışma-zamanı kopyası; dışarıdan düzenleme sessizce geri alınıyor | değerleri KODDAN asset'e yazmak (`MountainSceneBootstrap.EnsureCloudVolume`) |
 | Arazi menüsü | düğme yanlış işi yapıyordu, harita hiç uygulanmıyordu | düğmenin tam zinciri koşması |
 | **`.hlsl` include'ları** | Unity shader'ın hangi include'u kullandığını **takip etmiyor** | `ShaderIncludeWatcher` — include değişince shader'ları yeniden içe aktarır |
+| **Shader hatası log'da yok** | hata İÇE AKTARMADA değil, varyant ilk derlenirken çıkıyor; `Editor.log`'a bakıp "temiz" demek yanıltıyor | Play'e girip materyali kullandır ya da kullanıcıdan konsolu iste |
 
 **Kural:** bir düzeltme ekranda görünmediğinde ilk soru "yanlış mı yaptım" değil,
 **"çalışan sürüm gerçekten yeni mi"**. Yol testi önce: görülmemesi imkânsız bir değer

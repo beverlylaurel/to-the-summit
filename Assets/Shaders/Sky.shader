@@ -40,7 +40,6 @@ Shader "ToTheSummit/Sky"
             /// Sondanın küpüne güneş/ay diski girmesin diye (`VolumetricCloudsURP`).
             float _DisableSunDisk;
 
-            float4 _LightningPosition;   // xyz çakmanın dünya konumu, w leke yarıçapı
 
             struct Attributes { float4 positionOS : POSITION; };
             struct Varyings { float4 positionCS : SV_POSITION; float3 direction : TEXCOORD0; };
@@ -205,22 +204,17 @@ Shader "ToTheSummit/Sky"
                 // Gökyüzü sonsuzda olduğu için mesafe doğrudan kullanılamıyor; lekenin
                 // **açısal** boyutu hesaplanıyor. Yakın çakma geniş bir alanı kaplar,
                 // uzak olan aynı yarıçapta ama dar bir leke bırakır — perspektif budur.
-                float3 toStrike = _LightningPosition.xyz - _WorldSpaceCameraPos;
-                float reach = max(1.0, length(toStrike));
-
-                float cosine = dot(direction, toStrike / reach);
-                float angle = sqrt(max(0.0, 2.0 - 2.0 * cosine));
-                float spread = angle / max(0.001, _LightningPosition.w / reach);
-
-                extras += _LightningFlash.rgb * 0.35
-                          * lerp(0.08, 1.0, 1.0 / (1.0 + spread * spread));
-
-                // Hava ile arkasındaki cisimler ayrı sislenir: yıldız ve şimşek lekesi
-                // sisin ardında kalır, sisin kendisi şimşeği arazi sisiyle aynı payla
-                // saçar. Yoğun çorbada yukarı bakınca süt görünür — yıldız değil.
+                // ÇAKMA PARLAMASI TABLODAN. Burada bir dönem iki sezgisel terim vardı:
+                // açısal bir leke (`0.35 * 1/(1+spread²)`) ve sis payıyla ağırlıklanmış
+                // düz bir katkı. İkisi de mesafeyi ve faz açısını bilmiyordu; Dobashi'nin
+                // eleştirdiği "gerçek fiziksel fenomenden farklı" parlama tam buydu.
+                //
+                // Artık `HeightFog.hlsl → LightningScatter` — sis ve arazi ile AYNI
+                // kaynak. Ayrı hesaplasaydı gökyüzü bir yerde, sis başka yerde parlardı.
                 float fogAmount = SkyFogAmount(_WorldSpaceCameraPos, direction);
-                sky += _LightningFlash.rgb * (LightningFogScatter * fogAmount);
                 sky += extras * (1.0 - fogAmount);
+                sky += LightningScatter(_WorldSpaceCameraPos,
+                                        _WorldSpaceCameraPos + direction * 100000.0);
 
                 float diskFade = exp(-SkyFogDepth(_WorldSpaceCameraPos, direction, 8000.0));
                 sky += disks * diskFade;
