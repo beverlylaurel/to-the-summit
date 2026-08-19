@@ -288,7 +288,7 @@ public class LightningBolt : MonoBehaviour
             distance = Vector3.Distance(top, foot),
             width = settings.boltWidth,
             waviness = settings.boltWaviness,
-            chance = settings.boltBranchChance,
+            chance = settings.boltBranchCount,
             generation = 0,
         });
 
@@ -316,9 +316,15 @@ public class LightningBolt : MonoBehaviour
             // ÇOCUKLAR EBEVEYNİN İZLENMİŞ NOKTALARINDAN doğuyor — düz çizgiden değil.
             // Düz çizgiden doğarlarsa kıvrımlı kanalın yanında havada asılı kalıyorlar.
             // Noktalar KOPYALANIYOR: tampon bir sonraki dalda yeniden yazılacak.
+            // BEKLENEN SAYI düğüm başına olasılığa çevriliyor. Aday düğüm sayısı
+            // `boltSegments`'e bağlı; olasılığı doğrudan vermek dal sayısını çözünürlüğe
+            // bağlıyordu.
+            int candidates = points.Length - 2;
+            float perNode = candidates > 0 ? branch.chance / candidates : 0f;
+
             for (int i = 1; i < points.Length - 1; i++)
             {
-                if (Random.value >= branch.chance) continue;
+                if (Random.value >= perNode) continue;
 
                 Vector3 heading = ChildDirection(branch.direction);
 
@@ -329,7 +335,7 @@ public class LightningBolt : MonoBehaviour
                     distance = branch.distance * settings.boltBranchLength,
                     width = branch.width * settings.boltWidthDecay,
                     waviness = branch.waviness * settings.boltWavinessGrowth,
-                    chance = branch.chance * settings.boltBranchChanceDecay,
+                    chance = branch.chance * settings.boltBranchCountDecay,
                     generation = branch.generation + 1,
                 });
             }

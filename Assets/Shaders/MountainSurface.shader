@@ -67,20 +67,11 @@ Shader "ToTheSummit/MountainSurface"
             /// Soru "zikzak var mı" ve cevabı parlaklıkla değil BİÇİMLE veriliyor:
             /// normal alanı düzgünse şeritler ince ve akıcı, doku ızgarasına oturmuşsa
             /// dikdörtgen bloklar. Blok mu şerit mi -- tek bakışta ayrılıyor.
-            float _TerminatorProbe;
             /// GEÇİCİ CETVEL. Dünya koordinatında ızgara çizgileri basıyor: 10 m
             /// camgöbeği, 100 m kırmızı, 1000 m sarı. Testerenin KAÇ METRE olduğunu
             /// tahminle değil sayarak bulmak için — beş tur katman tahmin edildi ve
             /// hepsi yanlış çıktı, çünkü eksik olan tek sayı diş boyuydu.
-            float _WorldRuler;
 
-            /// Ekran genişliği sabit ızgara çizgisi. `fwidth` ile ölçeklendiği için
-            /// mesafeden bağımsız bir piksel kalınlığında kalıyor.
-            float RulerLine(float2 p)
-            {
-                float2 d = abs(frac(p) - 0.5) / max(fwidth(p), 1e-6);
-                return 1.0 - min(min(d.x, d.y), 1.0);
-            }
             #include "MountainSurface.hlsl"
             #include "SnowTessellation.hlsl"
 
@@ -221,36 +212,6 @@ Shader "ToTheSummit/MountainSurface"
                 #endif
 
                 lit += surface.emission;
-
-                // ===== GEÇİCİ SINIR PROBU. Şerit mi blok mu. =====
-                if (_TerminatorProbe > 0.5)
-                {
-                    float ndl = dot(shadingNormal, mainLight.direction);
-                    if (ndl < -0.06) return half4(0.10, 0.10, 0.12, 1.0);  // gri: gölge
-                    if (ndl >  0.18) return half4(0.85, 0.85, 0.85, 1.0);  // açık gri: aydınlık
-                    // Sınırın etrafında 0.04 genişlikte altı şerit.
-                    int band = (int)floor((ndl + 0.06) / 0.04);
-                    if (band == 0) return half4(0.6, 0.0, 0.8, 1.0);
-                    if (band == 1) return half4(0.0, 0.2, 1.0, 1.0);
-                    if (band == 2) return half4(0.0, 0.9, 1.0, 1.0);
-                    if (band == 3) return half4(0.0, 1.0, 0.0, 1.0);
-                    if (band == 4) return half4(1.0, 0.9, 0.0, 1.0);
-                    return half4(1.0, 0.3, 0.0, 1.0);
-                }
-
-                // ===== GEÇİCİ CETVEL =====
-                if (_WorldRuler > 0.5)
-                {
-                    float2 w = IN.positionWS.xz;
-                    float l1000 = RulerLine(w / 1000.0);
-                    float l100  = RulerLine(w / 100.0);
-                    float l10   = RulerLine(w / 10.0);
-
-                    // Kalın olan üstte: 1000 sarı, 100 kırmızı, 10 camgöbeği.
-                    lit = lerp(lit, half3(0.0, 1.0, 1.0), l10  * 0.85);
-                    lit = lerp(lit, half3(1.0, 0.0, 0.0), l100 * 0.95);
-                    lit = lerp(lit, half3(1.0, 0.9, 0.0), l1000);
-                }
 
                 half4 color = half4(lit, 1.0);
 

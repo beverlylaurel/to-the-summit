@@ -94,15 +94,22 @@ public class LightningSettings : ScriptableObject
              "savurmasın diye.")]
     [Range(10f, 80f)] public float boltBranchAngleMax = 50f;
 
-    [Tooltip("Bir düğümde dal doğma olasılığı (ana kanal için).")]
-    [Range(0f, 1f)] public float boltBranchChance = 0.2f;
-    [Tooltip("Her kuşakta olasılığın çarpanı. 1'in altında olmalı, yoksa ağaç " +
-             "patlar ve alt kuşaklar üst kuşaktan sık dallanır.")]
-    [Range(0.3f, 1f)] public float boltBranchChanceDecay = 0.8f;
-    [Tooltip("Çatalın ana kanala oranla uzunluğu (ilk kuşak).")]
-    [Range(0.1f, 0.8f)] public float boltBranchLength = 0.6f;
-    [Tooltip("Her kuşakta uzunluğun çarpanı. Ağacın sonlanmasını bu sağlıyor.")]
-    [Range(0.2f, 0.9f)] public float boltBranchLengthDecay = 0.5f;
+    // DÜĞÜM BAŞINA OLASILIK DEĞİL, BEKLENEN DAL SAYISI.
+    //
+    // Olasılık düğüm sayısına bağlıydı ve ölçek tutmuyordu: 27 aday düğüm × 0.2 = ana
+    // kanaldan 5.4 dal, her biri 4.3 tane daha → ikinci kuşakta 23 dal. Ağaç bütçe
+    // tavanına dayanıyordu ve ekranda kök gibi görünüyordu (ölçüldü).
+    //
+    // Beklenen sayı verilince `boltSegments` değişse de dal sayısı sabit kalıyor.
+    [Tooltip("Ana kanaldan doğması BEKLENEN dal sayısı. Düğüm sayısından bağımsız.")]
+    [Range(0f, 8f)] public float boltBranchCount = 2.2f;
+    [Tooltip("Her kuşakta beklenen sayının çarpanı. Ağacın patlamamasını bu sağlıyor.")]
+    [Range(0.1f, 0.9f)] public float boltBranchCountDecay = 0.45f;
+    [Tooltip("Dalın ebeveynine oranla uzunluğu. Her kuşakta tekrar uygulanıyor, yani " +
+             "0.3'te ikinci kuşak ebeveynin onda biri — ağacın sonlanmasını bu sağlıyor. " +
+             "Yüksek değerde dallar ana kanalla birlikte yere iniyor ve kol kök gibi " +
+             "görünüyor; gerçek dal havada biter.")]
+    [Range(0.1f, 0.6f)] public float boltBranchLength = 0.3f;
     [Tooltip("Her kuşakta kalınlığın çarpanı.")]
     [Range(0.2f, 0.9f)] public float boltWidthDecay = 0.5f;
     [Tooltip("Her kuşakta kıvrımlılığın çarpanı. Reed & Wyvill'de dal ebeveyninden " +
