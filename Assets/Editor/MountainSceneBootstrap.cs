@@ -166,6 +166,7 @@ public static class MountainSceneBootstrap
         EnsureSkyFeature();
         EnsureCloudFeature();
         EnsureFogFeature();
+        EnsureCurtainFeature();
         Phase("gökyüzü, bulut ve sis geçişleri");
 
         // SIRA ÖNEMLİ: `EnsureCloudVolume` sahnedeki Volume'u bulup `cloudVolume` statiğine
@@ -379,7 +380,15 @@ public static class MountainSceneBootstrap
         var precipitationShader = AssetDatabase.LoadAssetAtPath<Shader>(PrecipitationShaderPath);
         if (precipitationShader == null)
             throw new System.InvalidOperationException($"Shader bulunamadı: {PrecipitationShaderPath}");
-        precipitationRenderer.Bind(weatherState, windField, precipitationShader,
+        // SPEKTRAL PERDE DESENİ. Yoksa burada pişiyor — yalnız yüklemek yarışa açıktı:
+        // fırıncının `InitializeOnLoadMethod`'u ile bootstrap'ın `delayCall`'ı sıralanmıyor
+        // ve doku silinmişse bootstrap önce koşup patlıyordu.
+        var curtainPattern = SpectralPrecipitationBaker.EnsureExists();
+        if (curtainPattern == null)
+            throw new System.InvalidOperationException(
+                "Spektral yağış deseni üretilemedi: Assets/Settings/SpectralPrecipitation.asset");
+
+        precipitationRenderer.Bind(weatherState, windField, precipitationShader, curtainPattern,
             Object.FindAnyObjectByType<CloudLayerProbe>(), player.transform);
         EditorUtility.SetDirty(precipitationRenderer);
 
@@ -682,6 +691,46 @@ public static class MountainSceneBootstrap
     ///
     /// SIRA: gökyüzü ve buluttan SONRA ekleniyor. Hacim aydınlatması bulut gölgesini ana
     /// ışığın cookie dokusundan okuyor; o doku bulut geçişi tarafından yazılıyor.
+    /// SPEKTRAL YAĞIŞ PERDESİ FEATURE'I. Sis feature'ıyla aynı kalıp: var olan örnek de
+    /// güncelleniyor, yalnız yokken kurulmuyor — sonradan alan eklenince eski örnek boş
+    /// kalıp geçişi sessizce susturuyor.
+    static void EnsureCurtainFeature()
+    {
+        var renderer = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(RendererPath);
+        if (renderer == null)
+            throw new System.InvalidOperationException($"Renderer bulunamadı: {RendererPath}");
+
+        const string ShaderPath = "Assets/Shaders/SpectralPrecipitation.shader";
+        var shader = AssetDatabase.LoadAssetAtPath<Shader>(ShaderPath);
+        if (shader == null)
+            throw new System.InvalidOperationException($"Perde shader'ı bulunamadı: {ShaderPath}");
+
+        SpectralPrecipitationFeature feature = null;
+        foreach (var existing in renderer.rendererFeatures)
+            if (existing is SpectralPrecipitationFeature found) { feature = found; break; }
+
+        bool isNew = feature == null;
+        if (isNew)
+        {
+            feature = ScriptableObject.CreateInstance<SpectralPrecipitationFeature>();
+            feature.name = "Spektral Yağış Perdesi";
+        }
+
+        var serialized = new SerializedObject(feature);
+        serialized.FindProperty("curtainShader").objectReferenceValue = shader;
+        serialized.ApplyModifiedPropertiesWithoutUndo();
+
+        if (isNew)
+        {
+            renderer.rendererFeatures.Add(feature);
+            AssetDatabase.AddObjectToAsset(feature, renderer);
+        }
+
+        EditorUtility.SetDirty(renderer);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.ImportAsset(RendererPath);
+    }
+
     static void EnsureFogFeature()
     {
         var renderer = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.ScriptableRendererData>(RendererPath);
