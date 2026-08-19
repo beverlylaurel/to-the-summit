@@ -43,27 +43,10 @@ Shader "Hidden/ToTheSummit/SpectralPrecipitation"
             float4 _CurtainFlow;     // xy: akışın ekran yönü, z: hız, w: desen ölçeği (px)
             float4 _CurtainDepth;    // x: yakın kesme (m), y: karlılık, zw: boş
 
-            float _CurtainProbe;
-
-            /// Sürekli bir değeri okunabilir renge çevirir. Gradyan DEĞİL: gradyanda
-            /// "biraz açık yeşil" kaç eder sorusunun cevabı yok, bantta var.
-            float3 ProbeRamp(float v)
-            {
-                if (v < 0.02) return float3(0.05, 0.05, 0.05);   // koyu gri: yok
-                if (v < 0.08) return float3(0.0, 0.0, 1.0);      // mavi:      0.02-0.08
-                if (v < 0.18) return float3(0.0, 1.0, 1.0);      // camgöbeği: 0.08-0.18
-                if (v < 0.32) return float3(0.0, 1.0, 0.0);      // yeşil:     0.18-0.32
-                if (v < 0.50) return float3(1.0, 1.0, 0.0);      // sarı:      0.32-0.50
-                if (v < 0.70) return float3(1.0, 0.5, 0.0);      // turuncu:   0.50-0.70
-                return float3(1.0, 0.0, 0.0);                    // kırmızı:   0.70+
-            }
 
             half4 frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-
-                // Perde tamamen kapalı: sahne dokunulmadan geçiyor.
-                if (_CurtainProbe > 2.5) return 0;
 
                 float intensity = _CurtainParams.z;
                 if (intensity <= 1e-4) return 0;
@@ -117,11 +100,6 @@ Shader "Hidden/ToTheSummit/SpectralPrecipitation"
                 // tırmanış duvarı perdenin berisinde durmalı.
                 float depthGate = saturate((sceneDepth - _CurtainDepth.x)
                                            / max(_CurtainDepth.x, 1.0));
-
-                // BANT PROBU: deseni hiç örneklemeden, perdenin NEREDE etkili olduğunu
-                // gösterir. Desen karıştığında bandın kendisi okunamıyor.
-                if (_CurtainProbe > 0.5 && _CurtainProbe < 1.5)
-                    return half4(ProbeRamp(depthGate), 1.0);
 
                 if (depthGate <= 1e-4) return 0;
 
@@ -182,11 +160,6 @@ Shader "Hidden/ToTheSummit/SpectralPrecipitation"
                 // `Blend SrcAlpha OneMinusSrcAlpha` ile birebir aynı. Shader'ın işi
                 // yalnız α'yı ve I_snow'u vermek.
                 alpha = saturate(alpha * intensity * depthGate);
-
-                // OPAKLIK PROBU: son alfa. Bant doğru olsa bile katkı çok güçlü ya da
-                // görünmeyecek kadar zayıf olabilir; bu ikisini ayırır.
-                if (_CurtainProbe > 1.5 && _CurtainProbe < 2.5)
-                    return half4(ProbeRamp(alpha), 1.0);
 
                 // PERDE KENDİ RENGİNİ SEÇMEZ — ama gökyüzünden de boyanmaz.
                 //

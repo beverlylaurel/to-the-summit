@@ -792,3 +792,26 @@ yapılandırması (`§6.2`) ve dört kat ucuz.
 için örnek sayısı 1'den 2'ye çıkar. Pişirici `Synthesize`'ı θ parametresiyle çağırmak
 yeterli, dispersiyon bağıntısı zaten θ'lı.
 
+
+## Yağış perdesi kapatıldı (2026-08-19)
+
+**Karar.** `SpectralPrecipitationFeature` renderer'da pasif (`m_Active: 0`). Kod, pişirici,
+doku ve belgeler duruyor. Kar ve yağmur bitince geri dönülecek.
+
+**Gerekçe.** Zincir sonunda `[Langer 2004]`'ün birebir hâline getirildi ve ölçümle
+doğrulandı — opaklık probu ekranın her yerinde 0.18-0.32, yani α ≈ 0.29, makalenin kare
+almadan sonra beklediği değer. Sorun uygulamada değil: **makalenin arkasında sis yok,
+bizde var.** Perde tüm ekrana sabit bir tül sürüyor, sis zaten aynı işi yapıyor, ikisi
+üst üste biniyor. Makalenin örnekleri düz arka plan görüntüleri; bizimki hacimsel sisli
+bir dağ.
+
+**Tetikleyici.** Kar ve yağmur (Faz B, Faz C) bittikten sonra geri açılıp yeniden
+değerlendirilecek. O noktada bilinen tek sapma adayı: perdeyi görüş mesafesine bağlamak
+(sis kalınken sönsün).
+
+**Maliyet.** Geri açmak tek bayrak. Kapalıyken çalışma zamanı maliyeti sıfır.
+
+**Kapatılırken silinenler.** F1'deki "Teşhis: yağış perdesi" bölümü ve shader'daki prob
+kodu (`_CurtainProbe`, `ProbeRamp`, üç dal) — perde kapalıyken hiçbiri erişilebilir
+değildi. Geri açılırsa yeniden yazılır.
+

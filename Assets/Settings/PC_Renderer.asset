@@ -105,7 +105,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 993b62eb9110fea4ca5840b95350f12c, type: 3}
   m_Name: "Spektral Ya\u011F\u0131\u015F Perdesi"
   m_EditorClassIdentifier: Assembly-CSharp::SpectralPrecipitationFeature
-  m_Active: 1
+  m_Active: 0
   curtainShader: {fileID: 4800000, guid: 6bbeb79d97059ef4abf285f67807ddcd, type: 3}
   nearCutoff: 25
   patternScale: 512

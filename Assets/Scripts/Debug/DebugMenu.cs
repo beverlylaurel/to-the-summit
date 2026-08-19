@@ -46,12 +46,10 @@ public class DebugMenu : MonoBehaviour
     bool freeFly;
 
     static readonly int TerrainShadowId = Shader.PropertyToID("_TerrainShadowReceive");
-    static readonly int CurtainProbeId = Shader.PropertyToID("_CurtainProbe");
 
     /// 0 kapalı · 1 bant · 2 opaklık · 3 perde yok. Şüphelilerin tamamı tek yerde:
     /// "perde bir şey yapıyor mu", "doğru yerde mi", "gücü doğru mu" üç ayrı soru ve
     /// üçü dışarıdan aynı görünüyor.
-    int curtainProbe;
 
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
@@ -169,7 +167,6 @@ public class DebugMenu : MonoBehaviour
         // yazılmıyor, sıfır kalıyor ve arazi gölgesiz çiziliyordu. Oyunun normal hâli
         // panel kapalı olduğu için bu, oynanışın tamamını etkiliyordu.
         Shader.SetGlobalFloat(TerrainShadowId, 1f);
-        Shader.SetGlobalFloat(CurtainProbeId, curtainProbe);
         var keyboard = Keyboard.current;
         if (keyboard != null && keyboard.f1Key.wasPressedThisFrame) Toggle();
 
@@ -526,39 +523,6 @@ public class DebugMenu : MonoBehaviour
     /// 8b doğrulanınca bu bölüm ve `SnowCollisionProbe` silinir.
     void DrawSnowCollision()
     {
-        BeginSection("Teşhis: yağış perdesi");
-
-        GUILayout.Label(curtainProbe switch
-        {
-            1 => "BANT: perde nerede etkili",
-            2 => "OPAKLIK: son katkı ne kadar",
-            3 => "PERDE KAPALI",
-            _ => "kapalı",
-        });
-
-        using (new GUILayout.HorizontalScope())
-        {
-            if (GUILayout.Button("kapat")) curtainProbe = 0;
-            if (GUILayout.Button("bant")) curtainProbe = 1;
-            if (GUILayout.Button("opaklık")) curtainProbe = 2;
-            if (GUILayout.Button("perdesiz")) curtainProbe = 3;
-        }
-
-        if (curtainProbe == 1 || curtainProbe == 2)
-        {
-            GUILayout.Label("koyu gri  0.00 - 0.02   (yok)");
-            GUILayout.Label("mavi      0.02 - 0.08");
-            GUILayout.Label("camgöbeği 0.08 - 0.18");
-            GUILayout.Label("yeşil     0.18 - 0.32");
-            GUILayout.Label("sarı      0.32 - 0.50");
-            GUILayout.Label("turuncu   0.50 - 0.70");
-            GUILayout.Label("kırmızı   0.70 +");
-        }
-
-        if (GUILayout.Button("Ayarları geri al")) curtainProbe = 0;
-
-        EndSection();
-
         BeginSection("Teşhis: kar çarpışması");
 
         // Bileşen değil NESNE açılıyor: prob kapalı bir nesnede duruyor (kurulum

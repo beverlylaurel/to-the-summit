@@ -192,6 +192,8 @@ görünüyorlar. **Bilinen eksik.**
 
 ### Yağış perdesi (`SpectralPrecipitationFeature`, `SpectralPrecipitation.shader`)
 
+**ŞU AN KAPALI** (renderer'da pasif). Gerekçe ve tetikleyici `DECISIONS.md`'de.
+
 Taneler arasını dolduran ekran uzayı dokusu `[Langer 2004]`. Doku editörde pişiyor
 (`SpectralPrecipitationBaker` → `Assets/Settings/SpectralPrecipitation.asset`), çalışma
 zamanı yalnız örnekliyor.
