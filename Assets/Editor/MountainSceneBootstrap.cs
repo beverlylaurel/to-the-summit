@@ -1352,8 +1352,16 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
+        // SAÇILMA TABLOSU. `LightningLutBaker` yoksa pişiriyor; burada yalnız
+        // bağlanıyor. Bulunamazsa parlama sessizce kaybolurdu, o yüzden yüksek sesle.
+        var scatterLut = AssetDatabase.LoadAssetAtPath<Texture2D>(
+            "Assets/Settings/LightningScatterLut.asset");
+        if (scatterLut == null)
+            throw new System.InvalidOperationException(
+                "Şimşek saçılma tablosu yok: Assets/Settings/LightningScatterLut.asset");
+
         flash.Bind(thunder, atmosphere, observer, tuning,
-            Object.FindAnyObjectByType<CloudLayerProbe>());
+            Object.FindAnyObjectByType<CloudLayerProbe>(), scatterLut, 9000f);
         EditorUtility.SetDirty(flash);
 
         // Kol ışıkla aynı nesnede durabilir: ikisi de aynı çakmayı çiziyor ve kol

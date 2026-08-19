@@ -30,11 +30,62 @@ float3 _SunDirection;      // AtmosphereController global yazar; gökyüzü ve b
 // hatası çıkar; orada bildirilmişse burada atlanıyor. Değer ve davranış aynı.
 #ifndef URP_VOLUMETRIC_CLOUDS_DEFINES_HLSL
 float4 _LightningFlash;
+float4 _LightningPosition;   // xyz çakmanın dünya konumu, w leke yarıçapı
 #endif
 
 /// Sisin çakmadan aldığı pay. Bulut kadar almaz: bulut kütlesi kilometrelerce derin ve
 /// çakma onun içinde, sis ise ince ve boşalmanın altında kalıyor.
 static const float LightningFogScatter = 0.6;
+
+/// ŞİMŞEK SAÇILMA TABLOSU — `[Dobashi 2001, §4.4]`. `LightningLutBaker` pişiriyor.
+/// Eksenler İŞARETLİ KAREKÖK; fırıncıdaki eşlemenin TERSİ burada, ikisi ayrışırsa
+/// tablo kayar.
+TEXTURE2D(_LightningScatterLut);
+SAMPLER(sampler_LightningScatterLut);
+float _LightningScatterT;
+
+/// Çakmanın çevresindeki parlama: ışık havadaki partiküllerden saçılıp göze ulaşıyor.
+///
+/// BU TERİM YEREL SİSLE ÇARPILMAZ, EKLENİR. Eskiden `_LightningFlash.rgb * 0.6` olarak
+/// `AirColor`'ın içine giriyordu ve sisin opaklığıyla ağırlıklanıyordu — yani berrak
+/// havada parlama SIFIRDI. Oysa saçılan şey her zaman var olan HAVA; makalenin bütün
+/// konusu bu (§3.2, atmosfer partikülleri). Sis ayrı bir ortam ve kendi yolundan geçiyor.
+///
+/// `u` ve `v` bakış noktasının, kaynağın orijininde duran yerel sistemdeki koordinatları
+/// (Denklem 7): `u = -d (g·e)`, `v = √(d²-u²)`.
+///
+/// SINIRI: makale gibi burada da ARAZİ TIKAMASI yok. Kaynağın önündeki yamaç parlamayı
+/// kesmiyor. Makale de kesmiyor (§4.5 piksel yoğunluğu doğrudan toplam). Belirti
+/// görülürse ışın mesafesine göre kırpma eklenir.
+float3 LightningScatter(float3 cameraPos, float3 worldPos)
+{
+    if (_LightningFlash.a <= 1e-5) return 0.0;
+
+    float3 toSource = _LightningPosition.xyz - cameraPos;
+    float d = length(toSource);
+    if (d < 1.0) return 0.0;
+
+    float3 e = worldPos - cameraPos;
+    float len = length(e);
+    if (len < 1e-3) return 0.0;
+    e /= len;
+
+    float u = -d * dot(toSource / d, e);
+    float v = sqrt(max(d * d - u * u, 0.0));
+
+    float T = max(_LightningScatterT, 1.0);
+
+    // Fırıncının `işaret(t)·t²·T` eşlemesinin tersi.
+    float tu = sign(u) * sqrt(min(abs(u) / T, 1.0));
+    float tv = sqrt(min(v / T, 1.0));
+
+    float2 uv = float2(tu, tv) * 0.5 + 0.5;
+
+    float3 lut = SAMPLE_TEXTURE2D_LOD(_LightningScatterLut,
+                                      sampler_LightningScatterLut, uv, 0).rgb;
+
+    return _LightningFlash.rgb * lut * LightningFogScatter;
+}
 
 // TimeOfDay yayınlıyor. Burada bildiriliyor çünkü sis dosyası yüzeyden ÖNCE include
 // ediliyor. İkinci bir isim uydurulmuştu; o global gelmediğinde değer sıfır kalıyor,
@@ -439,8 +490,9 @@ float3 AirColor(float3 direction)
 /// yaklaştırma değil, aynı ifadenin açılmış hâli.
 void FogPath(float3 cameraPos, float3 worldPos, out float3 scattering, out float transmittance)
 {
-    float3 air = AirColor(normalize(worldPos - cameraPos))
-               + _LightningFlash.rgb * LightningFogScatter;
+    // Çakma buradan ÇIKARILDI: sisin opaklığıyla çarpılıyordu ve berrak havada
+    // parlama yok oluyordu. Artık `LightningScatter` ile toplama giriyor.
+    float3 air = AirColor(normalize(worldPos - cameraPos));
 
     // HACİM VE KUYRUK. Froxel hacmi 0–`far` arasını gölgelenmiş olarak taşıyor; ötesini
     // analitik integral sürüyor. İkisi de AYNI yoğunluk modelini okuduğu için sınırda
@@ -515,7 +567,8 @@ void FogPath(float3 cameraPos, float3 worldPos, out float3 scattering, out float
     transmittance = volumeTransmittance * veilPass * surfacePass;
     scattering = volumeScatter
                + volumeTransmittance * (veil * (1.0 - veilPass)
-                                      + veilPass * air * (1.0 - surfacePass));
+                                      + veilPass * air * (1.0 - surfacePass))
+               + LightningScatter(cameraPos, worldPos);
 }
 
 /// Çizilmiş rengi havanın içine oturtur. Çağıran tarafın miktarı ayrıca alıp lerp'i
