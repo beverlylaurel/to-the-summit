@@ -212,7 +212,6 @@ public class DebugMenu : MonoBehaviour
         DrawClouds();
         DrawOverlays();
         DrawSnowCollision();
-        DrawTerminatorProbe();
         EndColumn();
 
         GUILayout.EndHorizontal();
@@ -541,12 +540,6 @@ public class DebugMenu : MonoBehaviour
 
         if (GUILayout.Button("Ayarları geri al")) host.SetActive(false);
 
-        EndSection();
-    }
-
-    /// GEÇİCİ ÖLÇÜM BÖLÜMÜ. Aydınlık-gölge sınırının biçimi.
-    void DrawTerminatorProbe()
-    {
         EndSection();
     }
 
