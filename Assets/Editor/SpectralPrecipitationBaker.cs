@@ -48,37 +48,34 @@ public static class SpectralPrecipitationBaker
     /// Döngü uzunluğu (kare). Makale 30 fps'te 30 kare = 1 saniye.
     const int Frames = 30;
 
-    /// HALKA — KAR. Güç yalnız `[M/32, M/4]` bandındaki uzamsal frekanslara veriliyor
-    /// `[Langer 2004, §6.1]`. Altında desen tek bir lekeye, üstünde kum tanesine dönüyor.
-    /// 512'lik dokuda 16-128 çevrim, yani ekranda 32-4 piksel dalga boyu — makalenin
-    /// M=64 döşemesindeki 2-16 çevrimle AYNI özellik boyu (`T = N` bağıntısı).
-    const float SnowMinFreq = Size / 32f;   // 16 çevrim -> 32 piksel
-    const float SnowMaxFreq = Size / 4f;    // 128 çevrim -> 4 piksel
+    /// HALKA. Güç yalnız `[M/32, M/4]` bandındaki uzamsal frekanslara veriliyor
+    /// `[Langer 2004, §5.3]` — ÜÇ OKTAV, yani sekiz kat hız aralığı. Altında desen tek
+    /// bir lekeye, üstünde kum tanesine dönüyor; makale ikisini de denemiş.
+    ///
+    /// 512'lik dokuda 16-128 çevrim, ekranda 32-4 piksel dalga boyu — makalenin M=64
+    /// döşemesindeki 2-16 çevrimle AYNI özellik boyu (`T = N` bağıntısı).
+    ///
+    /// YAĞMUR AYNI BANDI KULLANIYOR. Bir dönem bandı bir oktav yukarı kaydırmıştım
+    /// ("damla taneden küçük"); makale öyle yapmıyor ve iki oktava düşüyordu.
+    const float MinFreq = Size / 32f;   // 16 çevrim -> 32 piksel
+    const float MaxFreq = Size / 4f;    // 128 çevrim -> 4 piksel
 
-    /// HALKA — YAĞMUR. Bant bir oktav YUKARI kayıyor: damla taneden küçük (~1-2 mm'ye
-    /// karşı ~5 mm), ekranda daha ince okunmalı. Üst uç aynı; oradan yukarısı zaten
-    /// piksel altı.
+    /// TEMEL ZAMANSAL FREKANS (döngü başına çevrim). `ω_t ∈ [-C, C]`.
     ///
-    /// DİKEY İZ BURADA ÜRETİLMİYOR. Denenmedi çünkü kâğıtta çıkmıyor: Langer'da
-    /// `ω_t = C·(ω·v̂)/|ω|`, yani zamansal frekans ω'nın YÖNÜNE bağlı. İz üretmek için
-    /// spektrumu hareket ekseninde daraltmak gerekir; o modların ω_t'si sıfıra gider ve
-    /// desen DURUR. İz, taneyi tek tek çizen katmanın işi (`rain-spec.md`, Garg-Nayar).
-    const float RainMinFreq = Size / 16f;   // 32 çevrim -> 16 piksel
-    const float RainMaxFreq = Size / 4f;    // 128 çevrim -> 4 piksel
-
-    /// TEMEL ZAMANSAL FREKANS (döngü başına çevrim). `ω_t ∈ [-C, C]` olduğu için bu
-    /// aynı zamanda en hızlı bileşenin hızı.
+    /// YAĞMURUN İZİ BURADAN ÇIKIYOR, ayrı bir anizotropiden değil `[Langer 2004, §7]`:
+    /// "We used vertical motion direction and a high value of C, such that the only
+    /// spatial frequency components that contributed to the spectral sum were those in
+    /// which |ωy| was near zero, that is, only long wavelengths in the y direction."
     ///
-    /// İKİSİ AYRI PİŞİYOR, çünkü hareket bulanıklığı zamansal Nyquist'te KESİLEREK
-    /// üretiliyor (`§6.2`) — yani bulanıklık pişirme anındaki hıza bağlı. Döngüyü
-    /// çalışma zamanında hızlı oynatmak hızı artırır, bulanıklığı artırmaz; sonuç
-    /// strobe olur.
+    /// Mekanizma: `ω_t = C·ωx/ω`, zamansal Nyquist kesmesi `|ω_t| > T/2` olanı
+    /// sıfırlıyor. C büyürse yalnız `|ωx|/ω < T/(2C)` olan modlar kalıyor — hareket
+    /// eksenine DİK modlar, yani hareket yönünde uzun dalga boyları. Sonuç: hareket
+    /// yönü boyunca uzamış izler.
     ///
-    /// Kar 6: Nyquist döngü/2 = 15, bol pay var. Yağmur 15: tam Nyquist'te, yani
-    /// hareket eksenine en yatkın modlar kesiliyor. Bu KAYIP DEĞİL, hızlı yağmurun
-    /// bulanıklığının ta kendisi.
+    /// Kar 6: Nyquist döngü/2 = 15, bol pay var, desen izotrop kalıyor.
+    /// Yağmur 60: `|ωx|/ω < 0.25`, yani en boy oranı ~4:1 izler.
     const float SnowC = 6f;
-    const float RainC = 15f;
+    const float RainC = 60f;
 
     /// `[0,1]`'e eşlemede kaç standart sapma aralığa sığacak. 5 σ'da kırpılan pay
     /// ölçüldü: %1.7. Shader ortalamayı 0.5 kabul ediyor; bu sabit değişirse orası
@@ -110,8 +107,8 @@ public static class SpectralPrecipitationBaker
         // İKİ KANAL, TEK DOKU. R kar, G yağmur; shader karlılıkla harmanlıyor. Ayrı doku
         // ikinci bir örnekleme demekti — perde tam ekran, örnek sayısı doğrudan kare
         // süresine yazılıyor (bir dönem sekiz örnek 3.5 ms tutmuştu).
-        var snow = Synthesize(n, frames, SnowMinFreq, SnowMaxFreq, SnowC, 20260819, "kar");
-        var rain = Synthesize(n, frames, RainMinFreq, RainMaxFreq, RainC, 20260820, "yagmur");
+        var snow = Synthesize(n, frames, MinFreq, MaxFreq, SnowC, 20260819, "kar");
+        var rain = Synthesize(n, frames, MinFreq, MaxFreq, RainC, 20260820, "yagmur");
 
         var tex = new Texture3D(n, n, frames, TextureFormat.RG16, false)
         {
@@ -240,16 +237,21 @@ public static class SpectralPrecipitationBaker
         // sapma neredeyse her değer aralıkta kalacak kadar küçültülüyor, aykırılar
         // kırpılıyor.
         //
-        // KARE ALMA KALDIRILDI. Bir dönem burada `v *= v` vardı, gerekçesi "opaklığı
-        // aralığın altına sıkıştırmak"tı. Ama shader zaten ortalamayı çıkarıyor
-        // (ortalama hava, tepeler tane) — ikisi AYNI işi yapıyordu. Üstelik kare alma
-        // saklanan ortalamayı 0.29'a kaydırıyordu, yani shader'ın çıkardığı 0.5 ölçülen
-        // ortalamayla tutmuyordu. Tek mekanizma kaldı.
+        // SONRA KARESİ ALINIYOR `[Langer 2004, §5.6]`: "we apply a non-linear
+        // transformation, namely we square the α(x,y,t) values. This compresses the
+        // opacity values to the lower part of the interval [0,1]. Thus, after the
+        // compositing step, the variations in opacity are more visible."
+        //
+        // Bir dönem bunu silmiştim ve yerine shader'da ortalamayı çıkarıyordum. İkisi
+        // AYNI işi yapmıyor: kare alma her yerde gradyan bırakıp tepeleri öne çıkarıyor,
+        // ortalama çıkarma ekranın yarısını tam sıfıra kırpıp ikili maske üretiyor.
+        // Makalenin çıktısı ayrık beyaz lekeler; kırpma onu gürültüye çeviriyordu.
         var outBytes = new byte[total];
         for (int t = 0; t < frames; t++)
         for (int i = 0; i < n * n; i++)
         {
             float v = Mathf.Clamp01((slices[t][i] - mean) / (Spread * sd) + 0.5f);
+            v *= v;
             outBytes[t * n * n + i] = (byte)Mathf.RoundToInt(v * 255f);
         }
 

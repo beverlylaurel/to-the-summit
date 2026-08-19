@@ -172,31 +172,16 @@ Shader "Hidden/ToTheSummit/SpectralPrecipitation"
                                              float3(rot, w)).rg;
                 float alpha = lerp(rg.g, rg.r, _CurtainDepth.y);
 
-                // ORTALAMA HAVADIR, TEPELER TANEDİR.
+                // BURADA BAŞKA EĞRİ YOK. Opaklık eğrisi PİŞİRİCİDE, makalenin koyduğu
+                // yerde (`§5.6`, kare alma). Bir dönem burada ayrıca ortalama çıkarılıyor
+                // ve `lerp(0.40, 0.90, karlılık)` ağırlığıyla çarpılıyordu; üç eğri üst
+                // üste binince çıktının makaleyle ilgisi kalmamıştı.
                 //
-                // BU MAKALEDEN BİLİNÇLİ SAPMA. `§5.6`'da ortalama 0.5'e taşınıyor,
-                // sonra KARESİ alınıyor (ortalama ~0.29'a iner) ve `§5.7`'de beyaz bir
-                // ön planla bileşiyor: `I = 250·α + (1−α)·I_bg`. Yani makalede perde
-                // gerçekten ekranın tamamına yayılan beyazımsı bir tüldür — orada kar
-                // fırtınasının TEK katmanı o.
-                //
-                // Bizde o işi sis yapıyor. Perde sisin üstüne binince ölçüldü: tam karda
-                // ~0.45 sabit gri, gökyüzü dahil. Kullanıcının "gren" dediği şey desenin
-                // DC bileşeniydi, taneleri değil.
-                //
-                // Tane seyrek ve ayrıktır: aradaki hava saydam. Ortalamanın altı sıfıra
-                // iniyor, üstü [0,1]'e geriliyor. Sihirli katsayı yok — 0.5 pişiricinin
-                // yazdığı ortalama, bölen de aralığın üst yarısı.
-                alpha = saturate((alpha - 0.5) / 0.5);
-
-                // KAR VE YAĞMUR AYNI DESEN, FARKLI ÇARPAN. Yağmur izleri ince ve seyrek
-                // okunur; kar perdesi kalın.
-                // TABAN AĞIRLIK DÜŞÜK. Perde asıl veil DEĞİL — sis o işi yapıyor; bu
-                // katman yalnız tanelerin dokusunu taşıyor. Bir dönem 1.0'daydı ve
-                // ekran grenli bir tüle dönüyordu.
-                float weight = lerp(0.40, 0.90, _CurtainDepth.z);
-
-                alpha = saturate(alpha * intensity * depthGate * weight);
+                // Makalenin bileşimi (`§5.7`, Denklem 7):
+                //   I = I_snow·α + (1−α)·I_bg
+                // `Blend SrcAlpha OneMinusSrcAlpha` ile birebir aynı. Shader'ın işi
+                // yalnız α'yı ve I_snow'u vermek.
+                alpha = saturate(alpha * intensity * depthGate);
 
                 // OPAKLIK PROBU: son alfa. Bant doğru olsa bile katkı çok güçlü ya da
                 // görünmeyecek kadar zayıf olabilir; bu ikisini ayırır.

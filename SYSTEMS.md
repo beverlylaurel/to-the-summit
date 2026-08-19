@@ -202,23 +202,23 @@ zamanı yalnız örnekliyor.
 **Okumaz:** görüş mesafesini — perde sisin yerini tutmuyor, sis kendi işini yapıyor.
 Gökyüzü rengini de okumaz.
 
-- **Perde veil değil doku.** Uzağı sis, yakını taneler taşıyor; perde ikisinin arasındaki
-  ölçekte kalıyor. Taban ağırlık bu yüzden düşük (0.40 yağmur → 0.90 kar).
-- **Desenin ortalaması havadır, tepeleri tanedir.** Pişirici ortalamayı 0.5'e eşliyor;
-  o ortalama doğrudan opaklık olursa ekrana sabit gri sürülür. Ortalamanın altı sıfıra
-  iniyor, üstü geriliyor.
+- **Opaklık eğrisi tek ve pişiricide.** Ortalama 0.5'e taşınıyor, σ küçültülüyor,
+  aykırılar kırpılıyor, sonra **karesi alınıyor** (`§5.6`). Ölçülen sonuç: ortalama 0.289,
+  σ 0.204. Shader'da ikinci bir eğri veya ağırlık **yok** — bir dönem üç eğri üst üste
+  binmişti ve çıktının makaleyle ilgisi kalmamıştı.
+- **Bileşim `Blend SrcAlpha OneMinusSrcAlpha`** — makalenin Denklem 7'si birebir
+  (`I = I_snow·α + (1−α)·I_bg`).
 - **Sahne derinliğine göre kapı yok.** Dispersiyon bağıntısı derinliği ZATEN taşıyor:
   farklı uzamsal frekanslar farklı hızda akıyor çünkü farklı derinlikteki taneleri
   temsil ediyorlar. Derinlik yalnız çok yakın cismin önüne geçmemek için okunuyor.
 - **Perde kendi rengini seçmez ve gökyüzünden de boyanmaz** — `SpindriftColor`, havada
   asılı tanenin rengi. Aynı ayrım savrulan karda da geçerli.
-- **Kar ve yağmur AYRI desen.** Tek doku, iki kanal: `R` kar, `G` yağmur; karlılık
-  harmanlıyor. Yağmurun halkası bir oktav yukarıda (damla taneden küçük) ve zamansal
-  frekansı ~2× (ölçüldü: kare farkı 65.5'e karşı 34.2). Yalnız opaklığın değişmesi
-  yetmiyordu — ikisi aynı görünüyordu.
-- **Dikey yağmur izi bu katmanın işi DEĞİL.** Langer'da `ω_t` yalnız ω'nın yönüne bağlı;
-  iz üretmek için spektrumu hareket ekseninde daraltmak gerekir, o modlar da durgundur.
-  İz taneyi tek tek çizen katmana ait (Garg-Nayar).
+- **Kar ve yağmur AYRI desen, farkı tek sayı: `C`.** Tek doku, iki kanal (`R` kar,
+  `G` yağmur), karlılık harmanlıyor. Bant ikisinde de aynı (`M/32..M/4`, üç oktav).
+- **Yağmurun izi yüksek `C`'den çıkıyor** (`§7`, Ventana). `ω_t = C·ωx/ω` ve zamansal
+  Nyquist kesmesi `|ω_t| > T/2` olanı sıfırlıyor; C büyürse yalnız hareket eksenine DİK
+  modlar kalıyor, yani hareket yönünde uzun dalga boyları → o yönde uzamış izler.
+  Kar 6, yağmur 60. Ölçüldü: yağmurun varyansı karın %16'sı, kare farkı 57.4'e karşı 34.2.
 - **Tek akış yönü, ekran geneli.** Yön, yağışın dünya hızıyla kameranın hareketinin
   bileşkesinin görüntü düzlemine düşen payı. Doku dikişsiz döşeniyor (opaklık fonksiyonu
   `(x,y)`'de toroidal), piksel başına **tek örnek**.

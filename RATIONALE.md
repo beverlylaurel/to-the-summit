@@ -716,25 +716,36 @@ katmana dikişsiz döşenmiş, döşeme başına θ yok. Örnek sayısı 4'ten 1
 yavaş ve sınırlı. Tam çözümü θ'yı da pişirmek (16 yön, M=64 → 3.9 MB, iki yön arası
 harmanlama, 8 örnek); kalan dönme görünür olursa oraya bakılır — `DECISIONS.md`.
 
-**Yağmur.** Perdeyi baştan "kar perdesi" diye kurdum; yağmur yalnız opaklık çarpanıyla
-ayrılıyordu, desen aynıydı. Ayrışması gereken iki şey var ve ikisi de pişirmede: bant
-(damla taneden küçük, bir oktav yukarı) ve zamansal frekans (daha hızlı, dolayısıyla
-Nyquist kesmesi daha çok bulanıklık üretir). Hız kanal başına PİŞMEK zorunda — döngüyü
-çalışma zamanında hızlı oynatmak hızı artırır ama bulanıklığı artırmaz, sonuç strobe olur.
+**Yağmur — makale çözmüş, ben yanlış okumuştum.** Perdeyi baştan "kar perdesi" diye
+kurdum. Sonra "dikey iz bu çerçevede üretilemez, çünkü `ω_t` yalnız ω'nın yönüne bağlı ve
+iz üreten modlar durgun" diye yazdım. Doğruydu ama sonuç yanlıştı: makale `§7`'de tam
+bunu yapıyor —
 
-**Dikey iz denenmedi, çünkü kâğıtta çıkmıyor.** `ω_t = C·(ω·v̂)/|ω|` yalnız ω'nın YÖNÜNE
-bağlı. İz üretmek spektrumu hareket ekseninde daraltmak demek; o modların `ω_t`'si sıfıra
-gider ve desen durur. Yani bu çerçevede "hareketli iz" diye bir şey yok. İz, taneyi tek
-tek çizen katmanın işi.
+> "We used vertical motion direction and a high value of C, such that the only spatial
+> frequency components that contributed to the spectral sum were those in which |ωy| was
+> near zero, that is, only long wavelengths in the y direction."
 
-**Kare alma silindi — ama bu makaleden SAPMA, düzeltme değil.** Pişiricide `v *= v`
-vardı ve ben onu "iki mekanizma aynı işi yapıyor" diye sildim. Sonradan makalede
+Mekanizma zamansal Nyquist kesmesi: `C` büyürse `|ω_t| > T/2` olan modlar sıfırlanıyor ve
+geriye yalnız hareket eksenine dik modlar kalıyor. Onlar gerçekten durgun — ve **iz zaten
+odur**, hareket bulanıklığına uğramış bir damla. Kar 6, yağmur 60. Bandı kaydırmaya gerek
+yok; kaydırmıştım, üstelik yağmuru üç oktavdan ikiye düşürüyordu.
+
+**Kare alma iki kez yanlış ele alındı.** Pişiricide `v *= v` vardı; onu "iki mekanizma
+aynı işi yapıyor" diye sildim ve yerine shader'da ortalama çıkarma koydum. Sonra makalede
 buldum: `§5.6` gerçekten kareyi alıyor ("we apply a non-linear transformation, namely we
-square the α values"), `§5.7` de beyaz bir ön planla bileştiriyor: `I = 250·α + (1−α)·I_bg`.
-Yani makalede perde ekranın tamamına yayılan beyazımsı bir tüldür — orada kar fırtınasının
-TEK katmanı o.
+square the α values"). O aşamada "bizde sisin işini ikinci kez yapıyordu" diye sapmayı
+savundum. O da yanlıştı.
 
-Bizde o işi sis yapıyor, perde onun üstüne biniyor. Ölçüldü: tam karda ~0.45 sabit gri,
-gökyüzü dahil. O yüzden ortalama çıkarılıyor ve kare alınmıyor. Sapma bilinçli; "makale
-böyle yapıyor" diye savunulamaz, "bizde sisin işini ikinci kez yapıyordu" diye savunulur.
+İkisi AYNI işi yapmıyor. Kare alma her yerde gradyan bırakıp tepeleri öne çıkarıyor;
+ortalama çıkarma ekranın yarısını tam sıfıra kırpıp ikili maske üretiyor. Makalenin
+çıktısı ayrık beyaz lekeler, bizimki gürültüydü — kullanıcı "bizdekinin bununla alakası
+yok" dedi ve haklıydı.
+
+Üstelik üç eğri üst üste biniyordu: kare (silinmişti), ortalama çıkarma, ve
+`lerp(0.40, 0.90, karlılık)` ağırlığı. Her biri tek başına savunulabilirdi; üçü çarpımsal
+olunca çıktının makaleyle ilgisi kalmadı. Şimdi tek eğri var ve makalenin koyduğu yerde.
+
+**Ders:** referanstan sapmalar tek tek savunulur ama BİRİKİR. Üç sapmanın hangisinin ne
+bozduğu, üçü aynı anda dururken bilinemez. Önce referans birebir üretilir, sonra tek tek
+sapılır.
 
