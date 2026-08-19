@@ -132,6 +132,13 @@ public class PrecipitationRenderer : MonoBehaviour
     static readonly int RainColorId = Shader.PropertyToID("_RainColor");
     static readonly int SnowColorId = Shader.PropertyToID("_SnowColor");
 
+    /// Perdenin döngü hızı (döngü/saniye). Pişmiş doku bir saniyelik; bunun altında
+    /// ağır, üstünde telaşlı akıyor.
+    const float CurtainRate = 0.6f;
+
+    [Tooltip("Spektral perde deseni. `SpectralPrecipitationBaker` pişiriyor.")]
+    [SerializeField] Texture3D curtainPattern;
+
     Mesh mesh;
     Material material;
     readonly Vector4[] rainDrifts = new Vector4[RainSpeedClasses];
@@ -150,8 +157,10 @@ public class PrecipitationRenderer : MonoBehaviour
     /// Bulut sistemine tek yönlü, salt okunur bir bağ — yağış hangi bulutun yağdığını
     /// sormaz, yalnız "şu an başımın üstünde ne kadar var" değerini okur.
     public void Bind(WeatherState state, WindField windField, Shader precipitationShader,
+        Texture3D curtain,
                      CloudLayerProbe layer, Transform eye)
     {
+        curtainPattern = curtain;
         weather = state;
         wind = windField;
         shader = precipitationShader;
@@ -277,6 +286,22 @@ public class PrecipitationRenderer : MonoBehaviour
         material.SetFloat(SnowinessId, snowiness);
         material.SetFloat(DensityId, density * localFactor);
         material.SetFloat(PrecipitationId, precipitation * localFactor);
+
+        // SPEKTRAL PERDEYE DURUM. Perde ayrı bir renderer feature'ı ve sahneye
+        // bağlanamıyor; yağışın kendisi burada hesaplanıyor, perde oradan okuyor.
+        // Tek yön: burası yazar, perde okur.
+        SpectralPrecipitationState.Intensity = precipitation * localFactor;
+        SpectralPrecipitationState.Snowiness = snowiness;
+        SpectralPrecipitationState.Pattern = curtainPattern;
+
+        // PERDE TANELERLE AYNI EKSENDE AKAR. Ayrı bir yön verilseydi iki katman
+        // ayrışır, perde bir yöne taneler başka yöne giderdi.
+        SpectralPrecipitationState.Velocity =
+            Vector3.Lerp(rainDirections[0] * RainFallSpeed, snowVelocity, snowiness);
+
+        // Oyun hızı çarpanıyla ilerliyor. `Time.time` doğrudan okunsaydı test panelinde
+        // zaman yavaşlatılınca taneler yavaşlar, perde yavaşlamazdı.
+        SpectralPrecipitationState.Time += Time.deltaTime * CurtainRate;
         material.SetFloat(SnowDensityScaleId, SnowDensityScale);
         material.SetFloat(RainSizeId, RainSize);
         material.SetFloat(RainStretchId, RainStretch);
