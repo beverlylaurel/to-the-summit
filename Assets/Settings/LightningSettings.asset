@@ -30,7 +30,6 @@ MonoBehaviour:
   boltWaviness: 0.045
   boltKink: 0.35
   boltWidth: 14
-  boltBranches: 5
-  boltBranchLength: 0.6
+  boltBranchLength: 0.3
   groundIntensity: 600
   groundRange: 700

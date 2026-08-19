@@ -72,10 +72,20 @@ static class LightningLutBaker
     /// TABLO KENDİLİĞİNDEN PİŞİYOR. Statik bir asset ve elle üretilmesi gereken bir şey
     /// değil; yoksa yükleme anında üretiliyor. Menüye tıklamayı beklemek, tablosu
     /// olmayan bir projede şimşeğin sessizce sönük çakması demekti.
+    /// VARLIK DİSKTEN SORULUYOR, `AssetDatabase`'den DEĞİL.
+    ///
+    /// `InitializeOnLoadMethod` domain reload'ın içinde çalışıyor ve o an veritabanı
+    /// hazır değil: `LoadAssetAtPath` asset diskte dururken bile null dönüyor. Sonuç,
+    /// HER derlemede tablonun baştan pişmesiydi — 128×128×3×256 = 12.6 milyon integrand
+    /// değerlendirmesi, her seferinde, boşuna (ölçüldü: kullanıcı log'da tekrar tekrar
+    /// "tablo pişti" satırını gördü).
+    ///
+    /// `File.Exists` zamanlamadan bağımsız. Tablo statik olduğu için bir kez pişmesi
+    /// yeterli; yeniden üretmek gerekirse menüden zorlanıyor.
     [InitializeOnLoadMethod]
     static void BakeIfMissing()
     {
-        if (AssetDatabase.LoadAssetAtPath<Texture2D>(AssetPath) == null) Bake();
+        if (!File.Exists(AssetPath)) Bake();
     }
 
     [MenuItem("To The Summit/Şimşek/Saçılma tablosunu pişir")]
