@@ -855,19 +855,50 @@ void EvaluateCloud(CloudProperties cloudProperties, half3 rayDirection,
     // Compute the powder effect
     half powderEffect = PowderEffect(cloudProperties.density, cosAngle, _PowderEffectIntensity);
 
-    // ÇAKMA IŞIN YÜRÜYÜŞÜNÜN İÇİNDE, üçüncü bir enerji terimi `[N22 s.170-172]`:
-    //   potential_energy   = pow(1 - d/yarıçap, 12)    — çakmaya uzaklık
-    //   height_gradient    = p_h                        — bulut tabanından yükseklik
-    //   pseudo_attenuation = 1 - SAT(yoğunluk × 5)      — yoğun yer daha az geçirir
+    // ÇAKMA IŞIN YÜRÜYÜŞÜNÜN İÇİNDE. Bindirme geçişinde değil burada: orada parlama
+    // kütlenin İÇİNDEN değil üstünden biniyordu. Titreme kaygısı yok çünkü kaynak
+    // konumları çakma başına bir kez yazılıyor, kare kare değişmiyor `[N22 s.180]`.
     //
-    // Bindirme geçişinde değil burada: orada parlama kütlenin İÇİNDEN değil üstünden
-    // biniyordu. Titreme kaygısı yok çünkü çakma konumu çakma başına bir kez yazılıyor,
-    // maske kare kare değişmiyor `[N22 s.180]`.
+    // DÜŞÜŞ 1/r², SEZGİSEL ÜS DEĞİL. Eskiden `pow(1 - d/R, 12)` vardı: on ikinin
+    // fiziksel bir karşılığı yok, uydurma bir eğriydi. `[Dobashi 2001]` Denklem 9
+    // kaynaktan metaball'a ulaşan ışığı `I·exp(-τ)/r²` veriyor.
+    //
+    // Kullanılan biçim `R²/(r² + R²)`: uzakta 1/r²'ye gidiyor, r=0'da ıraksamıyor
+    // (nokta kaynak idealleştirmesi orada geçersiz), ve R'de tam olarak YARIYA iniyor —
+    // `glowRadius` ayarının zaten belgelenmiş anlamı bu ("çakma noktasından bu kadar
+    // uzakta parlama yarıya iner").
+    //
+    // KAYNAKLARIN TAMAMI, tek nokta değil. Sis sekiz kaynağa bakıyordu, bulut tek
+    // noktaya; iki sistem aynı çakmayı farklı yerde görüyordu.
+    //
+    // YÜKSEKLİK GRADYANI KALDIRILDI. Nubis'in sanat tercihiydi (üstteki bulut daha çok
+    // parlasın); artık dikey yapı GEOMETRİDEN geliyor — kaynaklar buluttan yere dizili.
+    //
+    // OPTİK DERİNLİK τ YAKLAŞIK. Denklem 10 kaynakla nokta arasındaki yoğunluk
+    // integralini istiyor; makale onu küp-ekran yöntemiyle çözüyor ve o yöntem
+    // metaball'a özgü, buraya taşınamıyor (spec §8.1). Yerine yerel yoğunluk vekil
+    // alınıyor: yoğun yer daha az geçirir. Makale de τ hesabının pahalılığını kabul
+    // edip LOD seçiminde ondan vazgeçmişti (Koşul 11 yerine 12).
     float3 currentPositionWS = currentPositionPS + _PlanetCenterPosition;
-    half strikeDistance = length(currentPositionWS - _LightningPosition.xyz);
-    half potentialEnergy = PositivePow(saturate(1.0 - strikeDistance / _LightningPosition.w), 12.0);
+
+    half radius = max(_LightningPosition.w, 1.0);
+    half radiusSq = radius * radius;
+
+    int strikeCount = (int)min(_LightningSourceCount, (float)LIGHTNING_MAX_SOURCES);
+    half reach = 0.0;
+
+    [loop]
+    for (int sIdx = 0; sIdx < strikeCount; sIdx++)
+    {
+        float3 delta = currentPositionWS - _LightningSources[sIdx].xyz;
+        half rSq = dot(delta, delta);
+        reach += radiusSq / (rSq + radiusSq);
+    }
+
+    reach = strikeCount > 0 ? reach / strikeCount : 0.0;
+
     half pseudoAttenuation = 1.0 - saturate(cloudProperties.density * 5.0);
-    half glowEnergy = potentialEnergy * cloudProperties.height * pseudoAttenuation;
+    half glowEnergy = reach * pseudoAttenuation;
 
     // Evaluate the sun visibility
     half3 sunTransmittance = EvaluateSunTransmittance(currentPositionPS, sun.direction, cosAngle, phaseFunction);

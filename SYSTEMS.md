@@ -268,9 +268,22 @@ eksende 128 hücre 18 km'ye yayılınca hücre 140 m'ye çıkıyordu. Parlamanı
 birkaç yüz metrede; karekök eksende hücre merkezde ~1 m. **Shader ters eşlemeyi birebir
 uygulamak zorunda.**
 
-**ÜÇ TÜKETİCİ, TEK KAYNAK:** `HeightFog.hlsl → FogPath` (arazi ve cisimler),
-`SkyFog.shader` (gök pikselleri), `Sky.shader` (yedek gök materyali). Üçü de
-`LightningScatter()` çağırıyor.
+**DÖRT TÜKETİCİ, TEK KAYNAK DİZİSİ:** `HeightFog.hlsl → FogPath` (arazi ve cisimler),
+`SkyFog.shader` (gök pikselleri), `Sky.shader` (yedek gök materyali) ve bulut ışın
+yürüyüşü. İlk üçü `LightningScatter()` çağırıyor; bulut kendi yürüyüşünün içinde aynı
+`_LightningSources` dizisini okuyor.
+
+**KANAL BOYUNCA SEKİZ NOKTA KAYNAK**, tek nokta değil: boşalma noktasından yamaca kadar
+eşit aralıkla, uç arazi örneklenerek. Tek kaynakta parlama küre gibi duruyordu. Enerji
+kaynaklara bölünüyor, yani sayı değişince toplam parlaklık değişmiyor.
+
+**ARAZİ TIKAMASI VAR.** Yüzeyin arkasında kalan integral parçası çıkarılıyor:
+`görünen = I(u_eye,v) − I(u_eye−L,v)·e^(−κL)`. Makale bunu yapmıyor; dağın altında da
+hâle çıkıyor ve dağ saydam okunuyordu.
+
+**Bulut parlamasının düşüşü `R²/(r²+R²)`** — uzakta 1/r² (Denklem 9), r=0'da ıraksamıyor,
+R'de yarıya iniyor. Eski `pow(1−d/R,12)` sezgiseldi. Optik derinlik τ hâlâ yaklaşık:
+makalenin küp-ekran çözümü metaball'a özgü, yerel yoğunluk vekil alınıyor.
 
 **Terim ÇARPILMAZ, EKLENİR.** Eskiden üçünde de `_LightningFlash.rgb * 0.6` sisin
 opaklığıyla ağırlıklanıyordu — berrak havada parlama sıfırdı. Saçılan şey her zaman var
