@@ -1361,7 +1361,7 @@ public static class MountainSceneBootstrap
                 "Şimşek saçılma tablosu yok: Assets/Settings/LightningScatterLut.asset");
 
         flash.Bind(thunder, atmosphere, observer, tuning,
-            Object.FindAnyObjectByType<CloudLayerProbe>(), scatterLut, 9000f);
+            Object.FindAnyObjectByType<CloudLayerProbe>(), scatterLut, 9000f, terrain);
         EditorUtility.SetDirty(flash);
 
         // Kol ışıkla aynı nesnede durabilir: ikisi de aynı çakmayı çiziyor ve kol

@@ -44,6 +44,13 @@ TEXTURE2D(_LightningScatterLut);
 SAMPLER(sampler_LightningScatterLut);
 float _LightningScatterT;
 
+/// KANAL BOYUNCA NOKTA KAYNAKLAR. `LightningFlash` dolduruyor; boşalma noktasından
+/// yamaca kadar eşit aralıkla. Tek kaynakta parlama küre gibi duruyor ve kolun nereye
+/// uzandığını anlatmıyor.
+#define LIGHTNING_MAX_SOURCES 8
+float4 _LightningSources[LIGHTNING_MAX_SOURCES];
+float _LightningSourceCount;
+
 /// Çakmanın çevresindeki parlama: ışık havadaki partiküllerden saçılıp göze ulaşıyor.
 ///
 /// BU TERİM YEREL SİSLE ÇARPILMAZ, EKLENİR. Eskiden `_LightningFlash.rgb * 0.6` olarak
@@ -61,41 +68,51 @@ float3 LightningScatter(float3 cameraPos, float3 worldPos)
 {
     if (_LightningFlash.a <= 1e-5) return 0.0;
 
-    float3 toSource = _LightningPosition.xyz - cameraPos;
-    float d = length(toSource);
-    if (d < 1.0) return 0.0;
+    int count = (int)min(_LightningSourceCount, (float)LIGHTNING_MAX_SOURCES);
+    if (count <= 0) return 0.0;
 
     float3 e = worldPos - cameraPos;
     float len = length(e);
     if (len < 1e-3) return 0.0;
     e /= len;
 
-    // İŞARET: `u = +d (g·e)`, eksisi DEĞİL.
-    //
-    // Makalenin Denklem 7'si iki biçim veriyor — `d cos θ` ve `-d (g·e)` — ve ikisi
-    // çelişiyor. Hangisinin doğru olduğu Denklem 5'in integral sınırından çıkıyor:
-    // integral `-T`'den `u_eye`'a gidiyor ve `t = u_eye - u` gözle P arasındaki mesafe,
-    // yani NEGATİF OLAMAZ. Demek ki ışın üzerindeki noktalar `u < u_eye` tarafında ve
-    // kaynak (u=0) gözün ÖNÜNDEYSE `u_eye > 0` olmak zorunda.
-    //
-    // Eksili biçim kullanılınca işaret tersine dönüyordu ve parlama çakmanın olduğu
-    // yerde değil TAM TERSİ yönde beliriyordu: çakma bulutta, oyuncu aşağı bakınca
-    // ayağının dibinde kocaman bir leke (ölçüldü — o yönde tablo 348x, doğru yönde 0.1x).
-    float u = d * dot(toSource / d, e);
-    float v = sqrt(max(d * d - u * u, 0.0));
-
     float T = max(_LightningScatterT, 1.0);
+    float3 sum = 0.0;
 
-    // Fırıncının `işaret(t)·t²·T` eşlemesinin tersi.
-    float tu = sign(u) * sqrt(min(abs(u) / T, 1.0));
-    float tv = sqrt(min(v / T, 1.0));
+    [loop]
+    for (int i = 0; i < count; i++)
+    {
+        float3 toSource = _LightningSources[i].xyz - cameraPos;
+        float d = length(toSource);
+        if (d < 1.0) continue;
 
-    float2 uv = float2(tu, tv) * 0.5 + 0.5;
+        // İŞARET: `u = +d (g·e)`, eksisi DEĞİL.
+        //
+        // Makalenin Denklem 7'si iki biçim veriyor — `d cos θ` ve `-d (g·e)` — ve ikisi
+        // çelişiyor. Hangisinin doğru olduğu Denklem 5'in integral sınırından çıkıyor:
+        // integral `-T`'den `u_eye`'a gidiyor ve `t = u_eye - u` gözle P arasındaki
+        // mesafe, yani NEGATİF OLAMAZ. Demek ki kaynak (u=0) gözün ÖNÜNDEYSE
+        // `u_eye > 0` olmak zorunda.
+        //
+        // Eksili biçimde parlama çakmanın olduğu yerde değil TAM TERSİ yönde beliriyordu
+        // (ölçüldü: yanlış yönde tablo 348x, doğru yönde 0.1x).
+        float u = d * dot(toSource / d, e);
+        float v = sqrt(max(d * d - u * u, 0.0));
 
-    float3 lut = SAMPLE_TEXTURE2D_LOD(_LightningScatterLut,
-                                      sampler_LightningScatterLut, uv, 0).rgb;
+        // Fırıncının `işaret(t)·t²·T` eşlemesinin tersi.
+        float tu = sign(u) * sqrt(min(abs(u) / T, 1.0));
+        float tv = sqrt(min(v / T, 1.0));
 
-    return _LightningFlash.rgb * lut * LightningFogScatter;
+        float2 uv = float2(tu, tv) * 0.5 + 0.5;
+
+        sum += SAMPLE_TEXTURE2D_LOD(_LightningScatterLut,
+                                    sampler_LightningScatterLut, uv, 0).rgb;
+    }
+
+    // ENERJİ KAYNAKLARA BÖLÜNÜYOR (Denklem 6'daki `I_k · Δl` payı). Toplamı sayıya
+    // bölmek toplam parlaklığı sabit tutuyor: kaynak sayısı değişince sahne aydınlanıp
+    // kararmıyor, yalnız parlamanın DAĞILIMI değişiyor.
+    return _LightningFlash.rgb * (sum / count) * LightningFogScatter;
 }
 
 // TimeOfDay yayınlıyor. Burada bildiriliyor çünkü sis dosyası yüzeyden ÖNCE include

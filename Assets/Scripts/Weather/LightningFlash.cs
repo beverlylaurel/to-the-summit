@@ -22,6 +22,16 @@ public class LightningFlash : MonoBehaviour
     static readonly int PositionId = Shader.PropertyToID("_LightningPosition");
     static readonly int ScatterLutId = Shader.PropertyToID("_LightningScatterLut");
     static readonly int ScatterTId = Shader.PropertyToID("_LightningScatterT");
+    static readonly int SourcesId = Shader.PropertyToID("_LightningSources");
+    static readonly int SourceCountId = Shader.PropertyToID("_LightningSourceCount");
+
+    /// KANAL BOYUNCA KAÇ NOKTA KAYNAK. Makale 50 kullanıyor ama çevrimdışı render için
+    /// `[Dobashi 2001, §5.1]`; bizde piksel başına o kadar tablo örneklemesi pahalı.
+    ///
+    /// Sekiz, kanalın şeklini taşımaya yetiyor: tek kaynakta parlama küre gibi duruyor
+    /// ve kolun nereye uzandığını anlatmıyor. Sayı arttıkça kazanç hızla azalıyor çünkü
+    /// tablo zaten yumuşak.
+    const int SourceCount = 8;
 
     /// Bir çakmanın taşıyabileceği en fazla geri vuruş sayısı
     const int MaxStrokes = 3;
@@ -34,6 +44,10 @@ public class LightningFlash : MonoBehaviour
 
     /// Atmosferik saçılma tablosu (`LightningLutBaker` pişiriyor). Sis ve gök buradan
     /// okuyor; tablo statik olduğu için bir kez yazılıyor, kare kare değil.
+    /// Kanalın nerede bittiğini bilmek için: kaynaklar buluttan YERE dağılıyor.
+    /// Sabit bir boy kullanmak, dik yamaçta kanalı arazinin içine gömüyordu.
+    [SerializeField] Terrain terrain;
+
     [SerializeField] Texture2D scatterLut;
     [SerializeField] float scatterCutoff = 9000f;
 
@@ -67,12 +81,15 @@ public class LightningFlash : MonoBehaviour
     float peakIntensity;
     float peakGlow;
     Vector3 origin;
+    readonly Vector4[] sources = new Vector4[SourceCount];
 
     /// Sahne kurulumu ışığı da buradan yapılandırır: biçimi bileşenin kendi işi,
     /// kurulum betiğine dağılmamalı.
     public void Bind(ThunderPlayer source, AtmosphereController air, Transform eye,
-        LightningSettings tuning, CloudLayerProbe layer, Texture2D lut, float cutoff)
+        LightningSettings tuning, CloudLayerProbe layer, Texture2D lut, float cutoff,
+        Terrain ground)
     {
+        terrain = ground;
         thunder = source;
         atmosphere = air;
         cloudLayer = layer;
@@ -164,6 +181,30 @@ public class LightningFlash : MonoBehaviour
         strike.y = Mathf.Lerp(cloudLayer.Bottom, top, 0.25f);
         origin = strike;
 
+        // KAYNAKLAR KANAL BOYUNCA. Tek kaynak bütün kolu temsil edince parlama küre
+        // gibi duruyor ve kolun nereye uzandığını anlatmıyor; makalenin yöntemi zaten
+        // kolları nokta kaynak dizisine çevirmek (§3.2).
+        //
+        // Uç noktalar: boşalma noktası (bulutun alt çeyreği) ve yamacın kendisi.
+        // Enerji kaynaklara BÖLÜNÜYOR (shader toplamı sayıya bölüyor), yani toplam
+        // parlaklık değişmiyor — değişen yalnız nereye dağıldığı.
+        float groundY = terrain != null
+            ? terrain.SampleHeight(strike) + terrain.transform.position.y
+            : cloudLayer.Bottom - 1000f;
+
+        Vector3 foot = new Vector3(strike.x, groundY, strike.z);
+
+        for (int i = 0; i < SourceCount; i++)
+        {
+            Vector3 p = Vector3.Lerp(origin, foot, (i + 0.5f) / SourceCount);
+            sources[i] = new Vector4(p.x, p.y, p.z, 0f);
+        }
+
+        // ÇAKMA BAŞINA BİR KEZ. Konum çakma boyunca değişmiyor; her karede sekiz vektör
+        // yazmak boşuna. `Apply` kare kare yalnız ŞİDDETİ güncelliyor.
+        Shader.SetGlobalVectorArray(SourcesId, sources);
+        Shader.SetGlobalFloat(SourceCountId, SourceCount);
+
         // Ters kare sönüm: şiddet referans mesafede verilmiş, gerçek mesafeye taşınıyor.
         // Yakınında patlayan şimşeğin gözü kamaştırması bundan — ton eşleme orada beyaza
         // doyuyor, ki bakan göz de öyle yapıyor.
@@ -245,6 +286,7 @@ public class LightningFlash : MonoBehaviour
         // aydınlanıyor, bir yön değil.
         Shader.SetGlobalVector(PositionId,
             new Vector4(origin.x, origin.y, origin.z, Mathf.Max(1f, settings.glowRadius)));
+
     }
 }
 
