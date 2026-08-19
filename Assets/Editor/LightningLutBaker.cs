@@ -68,7 +68,10 @@ static class LightningLutBaker
     ///
     /// Yeşil kanal referans alınıyor (göz ona en duyarlı); kırmızı/mavi arasındaki fark
     /// Rayleigh'in kendi rengi olarak duruyor.
-    const float ReferenceValue = 8.342492e-05f;
+    ///
+    /// DÜZELTİLDİ: bu değer bir dönem YANLIŞ İŞARETLE hesaplanmıştı (u = -693) ve tablo
+    /// 5.7 kat fazla parlaktı.
+    const float ReferenceValue = 4.751153e-04f;
 
     /// RGB'ye karşılık gelen dalga boyları `[Dobashi 2001, §4.4]`: 675, 520, 460 nm.
     static readonly float[] Wavelengths = { 675f, 520f, 460f };
@@ -159,12 +162,22 @@ static class LightningLutBaker
     /// Denklem 5. `u` ve `v` bakış noktasının, kaynağın orijininde duran yerel
     /// sistemdeki koordinatları.
     ///
-    /// `v` SIFIRA İNEMEZ: ışın tam kaynağın üstünden geçerse s → 0 ve integrand
-    /// ıraksıyor. Fizikte de öyle — nokta kaynak bir idealleştirme. Alt sınır bir
-    /// metre: şimşek kanalının kendi yarıçapı zaten bundan büyük.
+    /// `v` TABANI 250 m — bir metre DEĞİL.
+    ///
+    /// Işın tam kaynağın üstünden geçerse s → 0 ve integrand ıraksıyor. Bir metrelik
+    /// taban bunu durdurmuyordu: kaynağa doğrudan bakışta tablo referansın 452 KATINI
+    /// veriyordu ve ekranda her şeyi yutan bir leke çıkıyordu (ölçüldü).
+    ///
+    /// Doğru taban, kaynağın ETKİN BOYU. Şu an çakmanın tamamı TEK nokta kaynakla
+    /// temsil ediliyor; oysa gerçek kanal buluttan yere birkaç yüz metre uzanıyor.
+    /// Yani "nokta" aslında o boyda bir cisim ve ışın ona 250 m'den fazla yaklaşamaz.
+    /// Bu tabanla tepe değer 1.8x'e iniyor, mesafeden bağımsız olarak.
+    ///
+    /// Çoklu nokta kaynağa geçilince (makale n=50 kullanıyor) taban kaynaklar arası
+    /// aralığa (Δl) inebilir — o zaman kanalın boyu geometriden gelir, tabandan değil.
     static float Integrate(float uEye, float vEye, float wavelength)
     {
-        float v = Mathf.Max(Mathf.Abs(vEye), 1f);
+        float v = Mathf.Max(Mathf.Abs(vEye), 250f);
 
         // Rayleigh: sönüm λ⁻⁴ ile artıyor.
         float scale = Mathf.Pow(wavelength / 550f, 4f);
