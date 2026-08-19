@@ -161,6 +161,30 @@ public class MountainBuilderWindow : EditorWindow
     int hydBrush = 5;
     float noiseWl = 1200f, noiseAmp = 120f, noisePers = 0.5f, noiseLac = 2f; int noiseOct = 6;
     float warpWl = 3000f, warpAmp = 400f;
+
+    // DOĞALLAŞTIR — ölçümden türetilmiş değerler. `_son.bytes` üzerinde yapılan bant
+    // analizi: dağ 4 km üstünde doğru, altında giderek boşalıyordu (2.2 km'de 2 kat,
+    // 575 m'de 5.3 kat, 150 m'de 13 kat eksik kabartı). Spektral eğim β 4.6 çıktı;
+    // gerçek arazi 2.0-2.5. Eğrilik çarpıklığı -0.23 (gerçek akarsu arazisi -0.5..-2),
+    // yani vadiler oyulmamıştı. Sebep araçta görünüyordu: 120 bin damla = hücre başına
+    // 0.11 damla (kanal ağı için 1-5 gerekir) ve 30 adım = damlanın menzili 880 m.
+    float natSeedWl = 2000f, natSeedAmp = 1200f, natSeedPers = 0.75f;
+    int natSeedOct = 7;
+    // AKARSU OYMASI: K 0.15, 6 tur, difuzyon 0.20. Olcut EGIM DAGILIMI oldu; bant
+    // hedefi tek basina yaniltti (beta=2.2'yi 9 km'den 150 m'ye uzatmak kagitta bile
+    // 53 derece ortanca egim veriyor, gercek alp arazisi 30-38). Bu ucluyle olculen
+    // sonuc: ortanca 34.7, p90 60.6, >60 derece %10.7, egrilik carpikligi +3.24.
+    float natFlowK = 0.15f, natFlowDiffuse = 0.20f;
+    int natFlowIters = 6;
+
+    // BUZUL IMZASI: 3800 m ustunde mevcut egriligi abartir — icbukey canak derinlesir,
+    // disbukey sirt incelir. Uydurma canak yerlestirmiyor, arazinin kendi bicimini
+    // keskinlestiriyor. 6000 m'lik dagin ust yarisini akarsu degil buz sekillendirir.
+    float natGlacierFrom = 3800f, natGlacierGain = 0.5f, natGlacierRadius = 700f;
+
+    /// ETKI: butun asamalari birlikte olcekler. Tek doz dayatmak yanlisti — sayilar
+    /// hedefe gelse de sonucu begenmek kullanicinin karari.
+    float natStrength = 0.4f;
     float terraceStep = 120f, terraceSharp = 0.6f;
     float sharpRadius = 200f, sharpGain = 1.6f;
     float remapMin = 0f, remapMax = 5709f;
@@ -450,6 +474,39 @@ public class MountainBuilderWindow : EditorWindow
         opSeed = EditorGUILayout.IntField(
             new GUIContent("Tohum", "Gürültü ve aşınmanın rastgeleliği. Aynı tohum aynı "
             + "sonucu verir; beğenmediğini değiştirip tekrar dene."), opSeed);
+
+        EditorGUILayout.Space(8f);
+        Section("★ Doğallaştır — tek tıkla",
+            "Dağın ÖLÇÜLEN eksiğini kapatır: kütle biçimi doğru ama vadi yok, "
+            + "orta ölçek boş. Başlangıçta eğim ortancası 23°, 60° üstü pay %0, eğrilik "
+            + "çarpıklığı -0,14 (yani hiç vadi oyulmamış).\n\n"
+            + "ÜÇ AŞAMA:\n"
+            + "1. TOHUM — 60-2000 m arası kırışıklık. Amacı kendisi değil; aşınmanın "
+            + "ısıracağı yapıyı vermek.\n"
+            + "2. AKARSU OYMASI — vadiyi suyun TOPLANDIĞI yere açar (drenaj alanı + "
+            + "eğim), yanında yamaç düzülmesi. Dendritik ağ kendiliğinden çıkar.\n"
+            + "3. BUZUL İMZASI — 3800 m üstünde çanakları derinleştirir, sırtları inceltir. "
+            + "6000 m’lik dağın üst yarısını akarsu değil buz şekillendirir.\n\n"
+            + "DAMLA AŞINMASI KULLANILMIYOR: ölçüldü, bu hücre boyunda vadi OYMUYOR, "
+            + "DÜZLÜYOR (2250 m bandını 84’ten 56’ya düşürdü, kapalı çukuru artırdı). "
+            + "Fırça, kapasite, çökelme, atalet tek tek taranda; hiçbir rejim oymadı.\n"
+            + "TERMAL DE YOK: 38° talusla bütün vadi yapısını siliyor (çarpıklık +2,6 → "
+            + "-0,1) ve en dik eğimi ancak 88°’den 81°’ye indiriyor.\n\n"
+            + "Ova korunur (450 m altına dokunulmaz). Geri alınabilir (Ctrl+Z).");
+
+
+        natStrength = Slider("Etki",
+            "0 = hiç dokunma, 1 = tam doz. Sayılar tam dozda hedefe geliyor ama "
+            + "beğenmek senin kararın: azıyla başla, beğenmezsen Ctrl+Z, artırıp tekrar dene.",
+            natStrength, 0f, 1f);
+
+        using (new EditorGUI.DisabledScope(h == null))
+        if (GUILayout.Button("★ Doğallaştır", GUILayout.Height(34f)))
+            Naturalize();
+
+        // ASAMA RAPORU DUGMENIN ALTINDA: sifir yazan asama olu demektir.
+        if (!string.IsNullOrEmpty(natDiag))
+            EditorGUILayout.TextArea(natDiag, EditorStyles.label);
 
         EditorGUILayout.Space(6f);
         Section("Termal aşınma",
@@ -748,6 +805,139 @@ public class MountainBuilderWindow : EditorWindow
 
         if (GUILayout.Button("Ölç", GUILayout.Height(26f))) Measure();
         if (!string.IsNullOrEmpty(report)) EditorGUILayout.TextArea(report, EditorStyles.label);
+
+        EditorGUILayout.Space(10f);
+        Section("Doğallık — gerçek arazi ölçütleri",
+            "Ölçüt EGIM DAĞILIMI: doğrudan ölçülür ve gerçek dağ verileriyle "
+            + "karşılaştırılabilir.\n\n"
+            + "Bir dönem burada 'spektral eğim 2,2' hedefi vardı ve YANLIŞTI: o eğriyi "
+            + "9 km’den 150 m’ye uzatmak kâğıtta 53 derece ortanca eğim veriyor, gerçek "
+            + "alp arazisi 30-38. Gerçek arazi spektrumu küçük ölçekte düzleşir.\n\n"
+            + "EĞRİLİK ÇARPIKLIĞI vadinin izidir ve POZİTİF olmalıdır: vadi tabanı "
+            + "içbükeydir (laplasyen +), dar ve derindir; yamaçlar geniş ve hafif dışbükeydir. "
+            + "Yapay V vadisiyle sınandı: +5,79 verdi, sırt -5,79. Dokunulmamış dağ -0,14 "
+            + "(vadi yok), oyulmuş hali +3,2.\n\n"
+            + "Kabartı tablosu mutlak hedef taşımaz; düğmeden ÖNCE ve SONRA bakıp neyin "
+            + "ne kadar değiştiğini görmek içindir.");
+
+
+        if (GUILayout.Button("Doğallığı ölç", GUILayout.Height(26f))) MeasureNaturalness();
+        if (!string.IsNullOrEmpty(natReport))
+            EditorGUILayout.TextArea(natReport, EditorStyles.label);
+    }
+
+    string natReport, natDiag;
+
+    /// Dağın hangi ÖLÇEKTE eksik olduğunu sayıya indirir.
+    ///
+    /// Yöntem: alanı iki farklı yarıçapla bulanıklaştırıp farkını almak o dalga boyu
+    /// bandını ayırır (band-pass). Her bandın RMS'i o ölçekteki kabartıdır.
+    ///
+    /// Ölçüm YALNIZ DAĞDA (kot > 300 m): ova düz olduğu için ortalamayı aşağı çekip
+    /// eksiği olduğundan küçük gösteriyordu.
+    void MeasureNaturalness()
+    {
+        if (h == null) { natReport = "ızgara yok"; return; }
+
+        // OLCUT EGIM DAGILIMI, spektral yasa DEGIL.
+        //
+        // Once "beta = 2.2, kabarti ~ lambda^0.6" hedefi kondu ve YANLIS cikti: o egriyi
+        // 9 km'den 150 m'ye uzatmak kagitta 53 derece ortanca egim veriyor, oysa gercek
+        // alp arazisi 30-38. Gercek arazi spektrumu kucuk olcekte duzlesir, iki dekat
+        // boyunca tek guc yasasi degildir. Egim dagilimi dogrudan olculebilir ve
+        // gercek arazi degerleriyle karsilastirilabilir; ondan sasmiyoruz.
+        float[] mids = { 9000f, 4500f, 2250f, 1125f, 575f, 300f, 150f };
+        var sb = new System.Text.StringBuilder();
+
+        sb.AppendLine("kabartı (RMS m) — önce/sonra karşılaştırmak için");
+        for (int b = 0; b < mids.Length; b++)
+            sb.AppendLine($"  {mids[b],6:F0} m   {BandRms(mids[b]),6:F1}");
+
+        var slopes = new System.Collections.Generic.List<float>(Grid * Grid / 4);
+        for (int z = 1; z < Grid - 1; z++)
+        for (int x = 1; x < Grid - 1; x++)
+        {
+            int i = z * Grid + x;
+            if (h[i] <= 300f) continue;
+            float gx = (h[i + 1] - h[i - 1]) / (2f * CellM);
+            float gz = (h[i + Grid] - h[i - Grid]) / (2f * CellM);
+            slopes.Add(Mathf.Atan(Mathf.Sqrt(gx * gx + gz * gz)) * Mathf.Rad2Deg);
+        }
+        slopes.Sort();
+
+        float med = slopes.Count > 0 ? slopes[slopes.Count / 2] : 0f;
+        float p90 = slopes.Count > 0 ? slopes[(int)(slopes.Count * 0.9f)] : 0f;
+        int over60 = 0;
+        for (int i = 0; i < slopes.Count; i++) if (slopes[i] > 60f) over60++;
+        float pct60 = slopes.Count > 0 ? 100f * over60 / slopes.Count : 0f;
+
+        sb.AppendLine();
+        sb.AppendLine($"eğim ortanca   {med,5:F1}°     (gerçek alp 30-38)");
+        sb.AppendLine($"eğim p90       {p90,5:F1}°     (gerçek alp 50-58)");
+        sb.AppendLine($"60° üstü pay   %{pct60,4:F1}      (gerçek alp %5-12)");
+        sb.AppendLine($"eğrilik çarpıklığı {CurvatureSkew(),5:F2}  (POZİTİF = vadi oyulmuş)");
+        sb.AppendLine($"kapalı çukur      %{PitFraction() * 100f,5:F2}  (düşük olmalı)");
+        natReport = sb.ToString();
+    }
+
+    /// Kutu bulanıklığı Gauss değil; eşdeğer yarıçap σ·√3. Bant kenarları bu yüzden
+    /// yumuşak, ama ölçüm ÖNCE-SONRA karşılaştırması olduğu için sapma iki tarafta aynı.
+    int BlurRadiusFor(float wavelengthM)
+    {
+        float sigmaCells = wavelengthM / (2f * Mathf.PI * CellM);
+        return Mathf.Max(1, Mathf.RoundToInt(sigmaCells * 1.732f));
+    }
+
+    /// Laplasyenin çarpıklığı. Akarsu aşınmış arazide vadiler dar ve keskin, sırtlar
+    /// geniş ve yayvan — dağılım negatife kayar. Yapay/pürüzsüz arazide simetriktir.
+    float CurvatureSkew()
+    {
+        int n = Grid;
+        var lap = new System.Collections.Generic.List<float>(n * n / 4);
+        for (int z = 1; z < n - 1; z++)
+        for (int x = 1; x < n - 1; x++)
+        {
+            int i = z * n + x;
+            if (h[i] <= 300f) continue;
+            lap.Add(h[i - 1] + h[i + 1] + h[i - n] + h[i + n] - 4f * h[i]);
+        }
+        if (lap.Count < 16) return 0f;
+
+        double mean = 0.0;
+        for (int i = 0; i < lap.Count; i++) mean += lap[i];
+        mean /= lap.Count;
+
+        double m2 = 0.0, m3 = 0.0;
+        for (int i = 0; i < lap.Count; i++)
+        {
+            double d = lap[i] - mean;
+            m2 += d * d; m3 += d * d * d;
+        }
+        m2 /= lap.Count; m3 /= lap.Count;
+        return m2 <= 1e-9 ? 0f : (float)(m3 / System.Math.Pow(m2, 1.5));
+    }
+
+    /// Sekiz komşusunun hepsinden alçak olan hücrelerin payı. Su böyle bir hücreden
+    /// çıkamaz; gerçek arazide bu yüzden neredeyse yoktur.
+    float PitFraction()
+    {
+        int n = Grid, pits = 0, cnt = 0;
+        for (int z = 1; z < n - 1; z++)
+        for (int x = 1; x < n - 1; x++)
+        {
+            int i = z * n + x;
+            if (h[i] <= 300f) continue;
+            cnt++;
+            bool pit = true;
+            for (int dz = -1; dz <= 1 && pit; dz++)
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                if (dx == 0 && dz == 0) continue;
+                if (h[i + dz * n + dx] < h[i]) { pit = false; break; }
+            }
+            if (pit) pits++;
+        }
+        return cnt > 0 ? (float)pits / cnt : 0f;
     }
 
     void Measure()
@@ -888,6 +1078,119 @@ public class MountainBuilderWindow : EditorWindow
 
     /// Her toplu işlem geri alınabilir ve süresi ölçülüyor: hangi vidanın pahalı
     /// olduğunu bilmeden ayarlanmıyor.
+    /// DÖRT AŞAMA TEK DÜĞMEDE. Sıra jeomorfolojik: yükselti/gürültü → akarsu → buzul →
+    /// kütle hareketi. Sıra değişirse sonuç yanlış olur; örneğin buzul çanağı akarsu
+    /// vadisinin üstüne oyulur, tersi değil.
+    ///
+    /// Değerlerin hepsi `_son.bytes` üzerinde yapılan bant ölçümünden geliyor, göz
+    /// kararı değil. Ölçüm sekmesindeki "Doğallık" bölümü aynı sayıları üretiyor —
+    /// düğmeden önce ve sonra bakılıp kapanan açık görülebilir.
+    void Naturalize()
+    {
+        if (h == null) return;
+
+        var snap = (float[])h.Clone();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            // Ova korunuyor: bütün aşamalar taban kotunun üstündeki kütleye uygulanır.
+            // Ovaya gürültü ekmek kullanıcının bilerek düzleştirdiği alanı bozar.
+            // TABAN 450 m, GECIS 350: ova TAM korunmali. 100 m tabanla ovaya gurultunun
+            // dortte biri siziyordu (olculdu: kot<50 m hucrelerde maske ortalamasi 0.254).
+            // Bu esikle ayni olcum 0.000 veriyor; etek 100-800 m arasinda yumusak giriyor.
+            float[] land = TerrainOps.MaskByHeight(h, Grid, plainM + 450f, MaxM, 350f);
+
+            // ASAMA ASAMA OLCUM. Iki tur "dugmeye bastim, sayilar degismedi" yasandi;
+            // ucuncude tahmin degil olcum yaziliyor. Her asamadan sonra o asamanin
+            // araziye ne KADAR dokundugu (RMS metre) rapora giriyor. Sifir yazan asama
+            // olu demektir ve hangisi oldugu tek tikta gorunur.
+            var before = (float[])h.Clone();
+            var diag = new System.Text.StringBuilder();
+            double maskMean = 0.0; int maskCnt = 0;
+            for (int i = 0; i < land.Length; i++) { if (h[i] > 300f) { maskMean += land[i]; maskCnt++; } }
+            diag.AppendLine($"maske ortalamasi (dagda)  {(maskCnt > 0 ? maskMean / maskCnt : 0):F3}   (1.000 olmali)");
+            diag.AppendLine($"etki                      {natStrength:F2}");
+            diag.AppendLine($"akarsu K / tur / difuzyon {natFlowK} / {natFlowIters} / {natFlowDiffuse}");
+
+            EditorUtility.DisplayProgressBar("Doğallaştır", "1/3 — orta bant tohumu", 0.05f);
+            TerrainOps.FractalNoise(h, Grid, CellM, natSeedWl, natSeedOct,
+                                    natSeedAmp * natStrength,
+                                    natSeedPers, 2f, opSeed, land);
+            diag.AppendLine($"1 tohum ekledi            {DeltaRms(before):F1} m");
+            diag.AppendLine($"   -> {Bands()}");
+
+            // AKARSU OYMASI TUR TUR: her turda ilerleme, pencere donuk kalmasin.
+            for (int c = 0; c < natFlowIters; c++)
+            {
+                EditorUtility.DisplayProgressBar("Doğallaştır",
+                    $"2/3 — akarsu oyması ({c + 1}/{natFlowIters})",
+                    0.10f + 0.70f * c / natFlowIters);
+                TerrainOps.FlowIncise(h, Grid, CellM, natFlowK * natStrength, 0.5f, 1f, 1,
+                                      natFlowDiffuse, land);
+            }
+            diag.AppendLine($"2 akarsu oymasi           {DeltaRms(before):F1} m (kumulatif)");
+            diag.AppendLine($"   -> {Bands()}");
+
+            // BUZUL: mevcut eğriliği abartmak. Çanak zaten içbükeyse derinleşir, sırt
+            // zaten dışbükeyse incelir — sirk ve arête ikisi tek işlemden çıkar.
+            // Uydurma bir çanak yerleştirilmiyor; arazinin kendi biçimi keskinleşiyor.
+            EditorUtility.DisplayProgressBar("Doğallaştır", "3/3 — buzul imzası", 0.85f);
+            float[] high = TerrainOps.MaskByHeight(h, Grid, natGlacierFrom, MaxM, 400f);
+            TerrainOps.Sharpen(h, Grid, CellM, natGlacierRadius,
+                               natGlacierGain * natStrength, high);
+            diag.AppendLine($"3 buzul sonrasi           {DeltaRms(before):F1} m (kumulatif)");
+            diag.AppendLine($"   -> {Bands()}");
+
+            natDiag = diag.ToString();
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+        }
+
+        for (int i = 0; i < h.Length; i++) h[i] = Mathf.Clamp(h[i], 0f, MaxM);
+        PushEdit(0, 0, Grid - 1, Grid - 1, snap);
+        maskCache = null;
+        meshDirty = true;
+        info = $"doğallaştırma bitti — {sw.ElapsedMilliseconds / 1000f:F1} sn";
+        Repaint();
+    }
+
+    /// Tek dalga boyu bandinin RMS'i — asama asama nerede enerji kaldigini gorur.
+    float BandRms(float wavelengthM)
+    {
+        var a = (float[])h.Clone();
+        var c = (float[])h.Clone();
+        TerrainOps.Blur(a, Grid, BlurRadiusFor(wavelengthM * 0.7071f));
+        TerrainOps.Blur(c, Grid, BlurRadiusFor(wavelengthM * 1.4142f));
+
+        double sum = 0.0; int cnt = 0;
+        for (int i = 0; i < h.Length; i++)
+        {
+            if (h[i] <= 300f) continue;
+            double d = a[i] - c[i];
+            sum += d * d; cnt++;
+        }
+        return cnt > 0 ? Mathf.Sqrt((float)(sum / cnt)) : 0f;
+    }
+
+    string Bands() => $"2250m {BandRms(2250f):F0} · 1125m {BandRms(1125f):F0} · "
+                    + $"575m {BandRms(575f):F0} · 300m {BandRms(300f):F0}";
+
+    /// Iki alan arasindaki farkin RMS'i — bir asamanin araziye ne kadar dokundugu.
+    float DeltaRms(float[] before)
+    {
+        double sum = 0.0; int cnt = 0;
+        for (int i = 0; i < h.Length; i++)
+        {
+            if (before[i] <= 300f && h[i] <= 300f) continue;
+            double d = h[i] - before[i];
+            sum += d * d; cnt++;
+        }
+        return cnt > 0 ? Mathf.Sqrt((float)(sum / cnt)) : 0f;
+    }
+
     void RunOp(System.Action<float[]> op)
     {
         var snap = (float[])h.Clone();

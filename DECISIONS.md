@@ -88,6 +88,9 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ## Bekleyen kararlar
 
+- **Şimşek yağan kar ve yağmuru aydınlatmalı** — kar/yağmur spec'lerine geçildiğinde
+  ışık kaynağı listesine şimşek eklenecek
+  → [Şimşek–yağış etkileşimi ERTELENDİ](#şimşek-yağış-etkileşimi-ertelendi)
 - **Cepheyi ne sürecek** — yaklaşmanın yarısında kar başlaması isteniyor; şiddet şu an
   yalnız rakımdan geliyor ve ovada minimum
   → [Yaklaşmada kar bir CEPHEDEN gelir](#yaklaşmada-kar-bir-cepheden-gelir)
@@ -547,6 +550,73 @@ sınırında düğümleri yeniden sıralıyor (`peakReorder`, `saddleReorder`); 
 kimliklere bağlı olduğu için diziler doğrudan yazılıp doğrudan okunuyor.
 
 ---
+
+## Şimşek kolu: R&W yükseltilir, DBM ERTELENDİ (2026-08-19)
+
+**Karar.** Kol üretimi Reed & Wyvill istatistiklerine çekilecek; dielektrik kırılma
+modeli (DBM) yazılmayacak.
+
+**Araştırma — DBM ne veriyor.** `[Kim & Lin 2004, Pacific Graphics]` hedeflemeyi ayrı
+bir özellik olarak değil modelin doğal parçası olarak veriyor: ızgarada elektrik
+potansiyeli φ tutulur, başlangıç (bulut) φ=0 negatif, hedef (zirve) φ=1 pozitif sınır
+koşuludur, ara Laplace'tan (∇²φ=0) çözülür, büyüme `p_i = φ_i^η / Σφ_j^η` olasılığıyla
+ilerler. Makalenin sözü: ark herhangi bir negatif bölgeden başlayıp herhangi bir pozitif
+nesnede sonlanabilir. Bedava gelenler: η dallanmayı sürer (1 yoğun, 3 düz, kullanışlı
+aralık 1-4), engel içi φ=0 yapılınca ark iter, geri vuruşlar Poisson'a (∇²φ=−4πρ) geçip
+önceki kanala artık yük bırakarak aynı yolu izler.
+
+**Neden yazılmıyor — TALEP YOK.** `DESIGN.md`'de şimşek hiç geçmiyor: tehlike mekaniği
+yok, belirli bir zirveye vurması oynanışın istediği bir şey değil. §9.1.4 makalenin
+kendi eksik listesinden geliyor, bizim ihtiyacımızdan değil.
+
+İkinci sırada maliyet/görünürlük: kol YALNIZ yakın çakmalarda ve <0.5 sn çiziliyor;
+DBM ise 3B ızgara + Laplace/Poisson çözücü + pişirme hattı + her çakmada hedefe uydurma
+demek. R&W yükseltmesi birkaç düzine satır C#. Ayrıca port ettiğimiz makale (Dobashi)
+üç problemini AYDINLATMA üzerine kuruyor ve kol geometrisini bilerek R&W'ye devrediyor.
+
+**"Gerçek zamanlı değil" TEK BAŞINA gerekçe DEĞİL** — bu kayıt bir dönem öyle diyordu ve
+yanlıştı: proje zaten içerik pişiriyor (bkz. "Dağ pişmiş İÇERİK"). Kollar da editörde
+üretilip asset olarak saklanabilirdi. Eleme sebebi hız değil, talebin olmaması.
+
+**Yerine ne yapılacak.** Hedefleme için Laplace çözmek şart değil: lider hedefe
+doğrultulur ve maksimum segment açısı küçültülür, böylece istenen mesafeyi istenen yönde
+kat eder. Kol üretimi R&W'ye çekilir — dallar ana koldan ortalama **16°** sapar (normal
+dağılım), dallanma ÖZYİNELEMELİdir ve her kuşakta özellikler çarpanla azalır:
+yarıçap ×0.5, dallanma olasılığı ×0.8, dal uzunluğu ×0.5, maksimum segment açısı ×1.3
+(dal ebeveynden daha kıvrımlı olur). Mevcut `LightningBolt` bunların üçünü de yapmıyor.
+
+**R&W'nin PARLAMASI alınmıyor** — `G = Σ g·l·e^(−(d/W)²)` Gauss, faz açısı yok; Dobashi
+"sezgisel, gerçek fizikten farklı" diye tam bunu eleştiriyor. R&W'den geometri alınır,
+parlama alınmaz.
+
+**Tetikleyici.** Şimşeğin belirli bir zirveye vurması OYNANIŞ gereği olursa (anlatı
+çapası, tehlike mekaniği) DBM yeniden açılır — ama önce ucuz hedefleme denenir. Hız
+gerekirse devam çalışması var: Kim & Lin 2007, *Fast Animation of Lightning Using an
+Adaptive Mesh*, TVCG 13:390-402.
+
+**Maliyet.** R&W yükseltmesi küçük: yalnız C# geometri, shader yok, bütçe riski yok.
+DBM büyük: ızgara, Laplace çözücü, ve gerçek zamanlı olmadığı için pişirme altyapısı.
+
+## Şimşek–yağış etkileşimi ERTELENDİ (2026-08-19)
+
+**Karar.** Şimşek flaşı şu an yağan kar tanelerini ve yağmur izlerini aydınlatmıyor.
+Bilerek bırakıldı.
+
+**Gerekçe.** `lightning-spec.md` §9.3.5 bunu açık nokta olarak işaretliyor ve Dobashi
+makalesinde hiç ele alınmamış. Kar ve yağmur spec'leri yeniden yazılacak; şimdi
+bağlanırsa o yazımda ikinci kez sökülecek.
+
+**Nereye bağlanacak.** `snow-spec.md` §7 ve `rain-spec.md` §6.3.3'te tane başına ışık
+kaynağı işleme yeri var — şimşek oraya ÜÇÜNCÜ kaynak olarak girer (güneş ve gök zaten
+var). Tane kendi rengini seçmiyor, üstüne düşen ışığı saçıyor; bu yüzden `_LightningFlash`
+globalini okumak yeterli, ayrı bir renk ayarı açılmayacak (`RATIONALE.md` → Yağış: "tane
+kendi rengini seçmez").
+
+**Tetikleyici.** Kar veya yağmur spec'ine geçildiği an. Fırtınada şimşek çakarken
+tanelerin kararması ya da flaşa hiç tepki vermemesi belirtisi de aynı kaydı açar.
+
+**Maliyet.** Küçük: tane aydınlatması zaten bir ışık toplamı, dördüncü terim eklemek.
+Asıl iş şimşeğin çakma anının o sistemlere ulaştırılması — global zaten yazılıyor.
 
 ## Spec sırası: terrain → snow → rain → lightning (2026-08-17)
 
