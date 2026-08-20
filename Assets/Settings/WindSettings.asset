@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: WindSettings
   m_EditorClassIdentifier: Assembly-CSharp::WindSettings
   calmSpeed: 2
-  stormSpeed: 20
+  stormSpeed: 14
   baseFrequency: 0.011
   baseVariation: 0.25
   gustAmount: 0.4

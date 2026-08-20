@@ -39,18 +39,33 @@ public class PrecipitationRenderer : MonoBehaviour
     /// (kaynak 10 m'de); bizim güneşimiz o kaynak değil, mutlak seviye taşınmıyor.
     /// `rain-spec.md` §11.3.5 bu katsayıyı zorunlu kılıyor.
     ///
-    /// F1'deki "oran" probuyla İKİ TURDA ölçüldü. Damla ışık üretmiyor, gökten geleni
-    /// kırıyor; hedefi ardındaki gökle eşitlenmek, yani oran 1.
-    ///   ×1 → oran 0.16-0.36 (camgöbeği), damla gökten sönük
-    ///   ×4 → oran 1.4 üstü (kırmızı), damla gökten parlak
-    /// İkisinin arası: 4 / 1.4 ≈ 3.
-    const float SourceScale = 3f;
+    /// HEDEF ORAN 1 DEĞİL — İLK KALİBRASYON MANTIK HATASIYDI.
+    ///
+    /// Oran ardındaki gökle eşitlenecek diye 3'e ayarlanmıştı. Ama arka planıyla aynı
+    /// parlaklıktaki bir şey tanım gereği GÖRÜNMEZ: göğe bakınca arka plan gök, damla da
+    /// gök parlaklığında, kontrast sıfır. Kullanıcı "havaya bakarken damlalar
+    /// gözükmüyor" dedi.
+    ///
+    /// Damla ışık üretmiyor ama arka planından parlak OLABİLİR ve olur: geniş bir katı
+    /// açıdan (gök kubbesinin tamamı dahil) topladığı ışığı kameraya kırıyor, oysa
+    /// örttüğü arka plan çok daha küçük bir katı açı. `[Tatarchuk 2006, §3.6.1]`:
+    /// "a drop tends to be much brighter than its background".
+    ///
+    /// Kâğıtta kontrast `α × (oran − 1)`, α ortanca 0.377:
+    ///   oran 1.0 → 0.00  görünmez
+    ///   oran 1.5 → 0.19  zayıf
+    ///   oran 2.0 → 0.38  net
+    ///   oran 3.0 → 0.75  güçlü
+    ///
+    /// Ölçülen: ×1'de oran 0.16-0.36, ×3'te ortanca 0.8. Oranı 2.0'a taşımak için
+    /// 3 × 2.0/0.8 = 7.5.
+    const float SourceScale = 7.5f;
 
     /// Bir taneciğin temsil ettiği damla kümesinin ekran payı. Yoğunluğumuz 0.8
     /// damla/m³, gerçek şiddetli yağmur ~1000/m³ — bin kat eksik ve o yoğunluğa çıkmak
     /// 90 milyon tanecik demek. Tanecik kendi hacmindeki kümenin payını taşıyor.
-    /// KUTUDAN TÜREYEN DEĞER: 32 m kutuda 250 000 tanecik = 7.6 damla/m³; şiddetli
-    /// yağmurun gerçeği ~1000/m³, yani oran 131. Bir tanecik 131 damlayı temsil ediyor.
+    /// KUTUDAN TÜREYEN DEĞER: 48 m kutuda 250 000 tanecik = 2.3 damla/m³; şiddetli
+    /// yağmurun gerçeği ~1000/m³, yani oran 442. Bir tanecik 442 damlayı temsil ediyor.
     ///
     /// Sabit yazılmıyor, kutudan hesaplanıyor — ikisi elle tutulunca ayrışıyor ve
     /// yoğunluk sessizce yanlış oluyor.
@@ -71,40 +86,38 @@ public class PrecipitationRenderer : MonoBehaviour
 
     // Alan. Kar kendi kutusunda sarılır: nokta biçimli tane, uzayan damla kadar ekran
     // alanı kaplamadığı için aynı bütçenin kameraya daha sıkı paketlenmesi gerekir.
-    /// Yağış kutusu. 48 m'den indirildi.
+    /// Yağış kutusu 48 m; kamera merkezde sarılıyor, yani görünür yarıçap 24 m.
     ///
-    /// Ölçüldü: 48 m küp = 110 592 m³, 250 000 tanecik → 2.26 damla/m³. Şiddetli
-    /// yağmurun gerçek yoğunluğu ~1000/m³, yani 442 kat eksik. O açığı temsil payıyla
-    /// kapatmak imkânsız: alfa en fazla 50 kat artabilir, kalan 9 kat geometriye biner
-    /// ve izler gerçek boyunun kat kat üstüne çıkar (bir dönem 1.8 m uzunluğunda
-    /// "damla" çıktı).
+    /// TARİH: 48 → 20 → 12 → 19 → 24 → 32 → 48. Her adım ölçümle, ama ilk beş adım
+    /// `widen` üssü 0.5 iken ölçülmüştü. Üs 0.35'e inince (bkz. `Precipitation.shader`,
+    /// kalınlık telafisi) tablo değişti ve daralmanın gerekçesi ortadan kalktı.
     ///
-    /// Kutu 20 m: hacim 8000 m³, yoğunluk 31/m³, açık 32 kata iniyor. Uzak damla zaten
-    /// piksel altı ve görünmüyor — bütçeyi oraya harcamanın karşılığı yok. Uzağı
-    /// yoğunluk katmanı taşımalı (`DECISIONS.md`, perde şu an kapalı).
-    /// Kutu 32 m. 48 → 20 → 12 → 19 → 24 → 32; hepsi ölçümle.
+    /// ÜS 0.35 İLE TARANDI (şiddet 0.4, 250 000 tanecik, 20 000 örnek):
     ///
-    /// Son daraltmanın sebebi KALINLIK: damlanın gerçek kalınlığı ancak quad 1.2
-    /// piksellik raster tabanını aştığında ekrana ulaşıyor. 3 mm'lik damla için o sınır
-    /// 2.6 metre. 20 m'lik kutuda o kadar yakın damla yok denecek kadar azdı ve bütün
-    /// izler aynı kalınlıkta çiziliyordu (kullanıcı bildirdi) — fark yalnız parlaklıkta
-    /// kalıyordu.
+    ///    32 m → yarıçap 16 m, ortanca alfa 0.352, görünmez %7.2
+    ///    48 m → yarıçap 24 m, ortanca alfa 0.352, görünmez %7.2   ← seçilen
+    ///    64 m → yarıçap 32 m, ortanca alfa 0.318, görünmez %7.7
+    ///   100 m → yarıçap 50 m, ortanca alfa 0.272, görünmez %8.3
     ///
-    /// 12 m'de hacmin %4.3'ü 2.6 m'nin içinde, yani ~11 000 damla gerçek kalınlığıyla
-    /// çiziliyor.
+    /// 32 → 48 BEDAVA: opaklık hiç değişmiyor, yarıçap 1.5 kat artıyor. Sebep temsil
+    /// payının doyuma girmiş olması — kutu büyüyünce hem mesafe cezası hem doyum payı
+    /// artıyor ve ikisi 48'e kadar birbirini götürüyor. Bedel 64 m'de başlıyor.
     ///
-    /// SONRA 19 m'YE ÇIKARILDI. Kutu kameranın etrafına sarılıyor, yani görünür yarıçap
-    /// yarı genişlik: 12 m kutuda yağmur 3 metrede sönmeye başlayıp 6 metrede bitiyordu
-    /// ("sadece etrafıma yağıyor", kullanıcı bildirdi).
+    /// Dolgu maliyeti de artmıyor: tanecik sayısı sabit, taneler uzaklaştıkça ekranda
+    /// küçülüyor.
     ///
-    /// Tavanı doyum belirliyor, bütçe değil: temsil payı alfaya giriyor ve
-    /// `α_eff = 1−(1−α)^N` doyduğunda bütün damlalar aynı opaklığa gelip kalınlık farkı
-    /// siliniyor. Kademelenmeyi koruyan sınır N ≤ 27 (en opak damla 0.60'ta kalır,
-    /// aralık 1.8 kat) → yoğunluk 37/m³ → 250 000 tanecikle hacim 6757 m³ → kenar 19 m,
-    /// görünür yarıçap 9.5 m.
+    /// KALINLIK ARTIK KUTUYU BELİRLEMİYOR. Bir dönem kutu bunun için daraltılmıştı:
+    /// damlanın gerçek kalınlığı ancak quad 1.2 piksellik raster tabanını aştığında
+    /// ekrana ulaşıyor ve 3 mm'lik damla için o sınır 2.6 m. Ama hacim r³ ile büyüdüğü
+    /// için o yakınlıkta 32 m'de zaten damlaların yalnız %0.2'si vardı (48 m'de %0.07)
+    /// — ikisi de sıfır sayılır. Ekrandaki kalınlık kademelenmesini gerçek genişlik
+    /// değil, `pow(widen, -0.35)` parlaklık telafisi taşıyor ve o mesafeden bağımsız
+    /// çalışıyor.
     ///
-    /// 15 metre istenirse tek yol tanecik sayısı: 1 M gerekir.
-    static readonly Vector3 BoxSize = new(32f, 32f, 32f);
+    /// YARIÇAPI BÜYÜTMENİN TEK GERÇEK SINIRI 64 m'de: orada opaklık %10 düşüyor.
+    /// Daha uzağı tanecikle değil, sisin yağıştan gelen görüş mesafesi taşıyor
+    /// (`AtmosphereController`, 18000·R^−0.70).
+    static readonly Vector3 BoxSize = new(48f, 48f, 48f);
     static readonly Vector3 SnowBoxSize = new(40f, 40f, 40f);
 
     /// Sürüklenen kar kutusu. Yatayda dar tutuluyor: aynı tanecik sayısı küçük alana
@@ -184,6 +197,17 @@ public class PrecipitationRenderer : MonoBehaviour
         float diameterMm = 0.5f + 4.5f * t;
         return 9.65f - 10.3f * Mathf.Exp(-0.6f * diameterMm);
     }
+    /// RÜZGÂRIN SINIR TABAKASI SHADER'DA, BURADA DEĞİL.
+    ///
+    /// Kayma sınıf başına burada integre ediliyor ve tek vektör yüksekliğe göre
+    /// değişemez. Bir denemede sınıf başına dört yükseklik bandı kuruldu; ÖLÇÜMLE
+    /// ELENDİ: bantların kaymaları zamanla sınırsız ayrışıyor (30 sn'de 101 m) ve
+    /// kutuya sarılınca aradaki fark rastgele bir sayıya dönüşüyor. Düşen damla
+    /// bantlar arasında geçerken o fark ona 21 m/s'ye kadar sahte yatay hız olarak
+    /// biniyordu.
+    ///
+    /// Doğrusu kapalı biçimde ve damla başına: `Precipitation.shader`, `WIND_LAG_TOP`
+    /// çevresi. Burada yalnız SERBEST AKIŞ kayması durur.
     const float RainWindFactor = 0.85f;   // iri damlanın yediği rüzgâr oranı
     const float RainWindLightFactor = 1f; // ince damla rüzgârı tam yer
     // Hız sürekli olsaydı her damla kaymayı farklı ölçekle çarpardı ve sarma noktası
@@ -303,7 +327,21 @@ public class PrecipitationRenderer : MonoBehaviour
         {
             float t = i / (RainSpeedClasses - 1f);
             rainVelocities[i] = Vector3.down * TerminalVelocity(t);
+            rainDirections[i] = WithSpeed(rainVelocities[i]);
         }
+    }
+
+    /// Yön ve BÜYÜKLÜK tek vektörde: `xyz` birim yön, `w` bileşke hız (m/s).
+    ///
+    /// Büyüklük shader'a lazım çünkü damla başına yön sapması bir ORAN: türbülans
+    /// hız dalgalanmasının bileşke hıza oranı. Normalize edilmiş yön tek başına o
+    /// oranı kuramaz — payda kaybolur ve sapma dingin havada da fırtınadaki kadar
+    /// büyük çıkar.
+    static Vector4 WithSpeed(Vector3 velocity)
+    {
+        float speed = velocity.magnitude;
+        Vector3 direction = speed > 1e-4f ? velocity / speed : Vector3.down;
+        return new Vector4(direction.x, direction.y, direction.z, speed);
     }
 
     /// İZ VERİTABANINI KARE BAŞINA HAZIRLAR — `[Garg 2006, §5]`.
@@ -427,9 +465,10 @@ public class PrecipitationRenderer : MonoBehaviour
             rainVelocities[i] = Vector3.Lerp(rainVelocities[i], target, blend);
 
             rainDrifts[i] = Advance(rainDrifts[i], rainVelocities[i], BoxSize);
-            rainDirections[i] = rainVelocities[i].normalized;
+            rainDirections[i] = WithSpeed(rainVelocities[i]);
         }
 
+        // Kar da sınır tabakasını okur; yasa shader'da, damla ve tane için ortak.
         Vector3 snowVelocity = Vector3.down * SnowFallSpeed + wind.Velocity * SnowWindFactor;
         snowDrift = Advance(snowDrift, snowVelocity, SnowBoxSize);
 
@@ -466,7 +505,7 @@ public class PrecipitationRenderer : MonoBehaviour
         material.SetVectorArray(RainDriftsId, rainDrifts);
         material.SetVectorArray(RainDirectionsId, rainDirections);
         material.SetVector(SnowDriftId, snowDrift);
-        material.SetVector(SnowDirectionId, snowVelocity.normalized);
+        material.SetVector(SnowDirectionId, WithSpeed(snowVelocity));
         material.SetVector(SpindriftBoxId, SpindriftBoxSize);
         material.SetVector(SpindriftDriftId, spindriftDrift);
         material.SetFloat(SpindriftSizeId, SpindriftSize);

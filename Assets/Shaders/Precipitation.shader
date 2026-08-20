@@ -50,10 +50,27 @@ Shader "ToTheSummit/Precipitation"
             // Yağmur ayrıca sekiz hız sınıfına bölünür: damla boyutu hem düşme hızını
             // hem rüzgâra direncini belirlediği için her sınıf başka açıda iner.
             #define RAIN_SPEED_CLASSES 8
+
+            // RÜZGÂRIN SINIR TABAKASI. Gerekçe `vert` içinde, kullanıldığı yerde.
+            #define WIND_Z0          0.1      // pürüzlülük boyu, metre (kayalık arazi)
+            #define WIND_REF_HEIGHT  24.0     // serbest akış kotu = görünür hacmin tepesi
+            #define WIND_MIN_HEIGHT  0.1      // = z₀; burada profil tam sıfır, rüzgâr yerde durur
+            #define WIND_PROFILE_L   5.4806   // ln(24/0.1)
+            #define WIND_LAG_TOP     4.3791   // G(24), gecikme integralinin üst ucu
+            #define SNOW_FALL_SPEED  1.4      // `PrecipitationRenderer.SnowFallSpeed`'in aynası
+            #define SPINDRIFT_FALL_SPEED 0.5  // kırık taneciğin çökme hızı, atalet için
+
+            // Girdap oktavlarının uzamsal dalga sayısı ve kendi zaman frekansı.
+            // `Turbulence` içindeki katsayıların aynası; atalet süzgeci bunları okuyor.
+            #define TURB_COARSE_K    0.60
+            #define TURB_COARSE_W    1.30
+            #define TURB_FINE_K      1.80
+            #define TURB_FINE_W      2.60
+
             float4 _RainDrifts[RAIN_SPEED_CLASSES];
             float4 _RainDirections[RAIN_SPEED_CLASSES];
             float3 _SnowDrift;
-            float3 _SnowDirection;
+            float4 _SnowDirection;   // xyz birim yön, w bileşke hız (m/s)
 
             float _Snowiness;
             float _Density;          // görsel yoğunluk, şiddetin bükülmüş hali
@@ -279,22 +296,36 @@ Shader "ToTheSummit/Precipitation"
             //
             // Dikey bileşen bilerek zayıf: gerçek türbülans yatay baskındır, dikeyde
             // güçlü olursa tanecikler yükselip fiziği bozar.
-            float3 Turbulence(float3 worldPos, float t)
+            /// `gainCoarse` / `gainFine`: taneciğin ATALET SÜZGECİ, oktav başına.
+            /// Gerekçe ve sayılar çağrıldığı yerde.
+            float3 Turbulence(float3 worldPos, float t, float gainCoarse, float gainFine)
             {
-                float3 p = (worldPos - _WindSweep) * 0.15;
+                // ÖLÇEK GÖRÜNÜR HACİMDEN KÜÇÜK OLMAK ZORUNDA.
+                //
+                // Eskiden 0.15 idi, yani dalga boyu 42 m. Görünür yağmur hacmi 32 m;
+                // alan tüm hacim boyunca bir periyodunu bile tamamlamıyordu ve 1 metre
+                // arayla iki damla arasında yalnız 9 derece faz farkı kalıyordu. Sonuç
+                // girdap değil, hacmin TOPLUCA salınmasıydı — kullanıcı "girdaplar çok
+                // tek standart, çalışıyor mu emin değilim" dedi. Çalışıyordu, ama
+                // komşu damlalar arasında fark üretmiyordu.
+                //
+                // 0.60 → dalga boyu 10.5 m, kutuda 3.1 periyot, 1 metrede 34 derece.
+                float3 p = (worldPos - _WindSweep) * 0.60;
                 float3 coarse = float3(
                     sin(p.y + t * 1.3) * cos(p.z * 0.7 + t * 0.9),
                     sin(p.z + t * 1.1) * 0.35,
                     cos(p.x + t * 1.7) * sin(p.y * 0.8 + t * 1.2));
 
-                // İkinci oktav: küçük girdaplar, üç kat frekans, üçte bir genlik
-                float3 q = (worldPos - _WindSweep * 0.55) * 0.45;
+                // İkinci oktav: küçük girdaplar, üç kat frekans, üçte bir genlik.
+                // 1.80 → dalga boyu 3.5 m, kutuda 9.2 periyot, 1 metrede 103 derece —
+                // komşu damlalar farklı girdabın içinde.
+                float3 q = (worldPos - _WindSweep * 0.55) * 1.80;
                 float3 fine = float3(
                     sin(q.z + t * 2.6) * cos(q.x * 0.8 + t * 2.1),
                     cos(q.x + t * 2.3) * 0.35,
                     sin(q.y + t * 3.1) * cos(q.z * 0.9 + t * 2.4));
 
-                return coarse + fine * 0.33;
+                return coarse * gainCoarse + fine * (0.33 * gainFine);
             }
 
             Varyings vert(Attributes IN)
@@ -341,8 +372,67 @@ Shader "ToTheSummit/Precipitation"
                 int dropClass = (int)min(dropSize * RAIN_SPEED_CLASSES,
                                          RAIN_SPEED_CLASSES - 1);
 
+                float physicalSpeed = TerminalVelocity(dropRadius);
+                // ATALET SÜZGECİNİN GEVŞEME SÜRESİ ÇÖKME HIZINDAN: `τ = v_t/g`. Üç
+                // popülasyonun üçü de ayrı: damla 2-9 m/s, kar tanesi 1.4, yerden
+                // kalkan kırık tanecik ~0.5 (küçük ve düzensiz, havaya anında oturur).
+                // Sürüklenen tanenin `isSnow`'u aşağıdaki blokta 1 oluyor, burada hâlâ
+                // 0 — o yüzden `isDrift` ayrı okunuyor.
+                float fallSpeed = lerp(lerp(physicalSpeed, SNOW_FALL_SPEED, isSnow),
+                                       SPINDRIFT_FALL_SPEED, isDrift);
+
                 float3 box = lerp(_BoxSize, _SnowBoxSize, isSnow);
                 float3 drift = lerp(_RainDrifts[dropClass].xyz, _SnowDrift, isSnow);
+
+                // ---- RÜZGÂRIN SINIR TABAKASI ----
+                //
+                // Rüzgâr yerde sıfıra iner ve yükseldikçe logaritmik açılır:
+                // `f(z) = ln(z/z₀)/ln(z_ref/z₀)`, `z₀ = 0.1 m` (kayalık). Sürüklenen
+                // karda bu vardı, yağan yağışta yoktu — damla serbest akışı her kotta
+                // tam yiyordu, yani yere yakın rüzgâr olması gerekenin iki katıydı.
+                //
+                // BANT DENENDİ VE ÖLÇÜMLE ELENDİ. Sınıf başına dört yükseklik bandına
+                // ayrı kayma integre edilmişti. Bantların kaymaları zamanla SINIRSIZ
+                // ayrışıyor (30 sn'de 101 m) ve kutuya sarılınca aradaki fark rastgele
+                // bir sayıya dönüşüyor (±24 m). Damla düşerken bantlar arasında geçtiği
+                // için o rastgele fark ona 21 m/s'ye kadar SAHTE YATAY HIZ olarak
+                // biniyordu — rüzgârın kendisinden büyük. Belirti: "yağmur havada kar
+                // gibi sürükleniyor".
+                //
+                // DOĞRUSU KAPALI BİÇİM. Damla yavaş havada geçirdiği süre boyunca
+                // serbest akışın gerisinde kalır; bu GECİKME sınırlı bir integraldir:
+                //
+                //     Λ(z) = (U/v_t) · ∫_z^{z_ref} (1 − f(z')) dz'
+                //
+                // İntegralin analitik hâli `G(z) = z − z·(ln(z/z₀) − 1)/L`,
+                // `L = ln(z_ref/z₀)`. Λ tek değişkenli, düzgün ve MONOTON — türevi
+                // `dΛ/dt = U(1 − f(z))`, yani damlanın yatay hızı tam olarak `U·f(z)`.
+                // Ne rastgele sıçrama var ne de sınırsız birikim.
+                float3 probe = WrapAroundCamera(seed.xyz * box + drift, cameraPos, box);
+                float aboveGround = clamp(probe.y - TerrainHeightAt(probe.xz),
+                                          WIND_MIN_HEIGHT, WIND_REF_HEIGHT);
+
+                float profile = log(aboveGround / WIND_Z0) / WIND_PROFILE_L;
+
+                // `G(z_ref)` sabit: 24 − 24·(ln240 − 1)/ln240 = 4.3789
+                float integral = WIND_LAG_TOP
+                               - (aboveGround - aboveGround
+                                  * (log(aboveGround / WIND_Z0) - 1.0) / WIND_PROFILE_L);
+
+                // Yatay rüzgâr yönü ve büyüklüğü sınıf vektöründen; dikey bileşen
+                // terminal hız olduğu için `.xz` rüzgârın kendisi.
+                // BÜYÜKLÜK ŞART, birim yön yetmez: hem gecikme hem atalet süzgeci
+                // ORAN hesaplıyor. Normalize edilmiş vektörle kar 1.4 m/s gidiyormuş
+                // gibi okunur, rüzgâr payı kaybolur ve tane sınır tabakasını hiç
+                // görmez.
+                float3 classVelocity = lerp(_RainDirections[dropClass].xyz * _RainDirections[dropClass].w,
+                                            _SnowDirection.xyz * _SnowDirection.w, isSnow);
+                float2 windFlat = classVelocity.xz;
+                float windSpeed = length(windFlat);
+                float2 windUnit = windSpeed > 1e-4 ? windFlat / windSpeed : float2(0.0, 0.0);
+
+                float lag = (windSpeed / max(fallSpeed, 0.1)) * integral;
+                drift.xz -= windUnit * lag;
                 float3 worldPos = WrapAroundCamera(seed.xyz * box + drift, cameraPos, box);
 
                 float variation = Hash(seed.xyz);
@@ -385,10 +475,45 @@ Shader "ToTheSummit/Precipitation"
                     driftHeight = lift;   // 0 yerde, 1 katmanın tepesinde
                 }
 
-                // Kar tanesi hafif, girdaba tamamen kapılır. Damla ağır, direnir —
-                // ve ince serpinti iri damladan çok daha fazla sapar
-                float dropResponse = _RainTurbulence * lerp(1.5, 0.4, dropSize);
-                float response = lerp(dropResponse, _SnowTurbulence, isSnow);
+                // ---- TANECİĞİN GİRDABA TEPKİSİ: ATALET SÜZGECİ ----
+                //
+                // Tanecik havanın her kıvrımını takip edemez. Sürüklenme denklemi
+                // birinci mertebedendir, yani tanecik alçak geçiren bir süzgeçtir:
+                // gevşeme süresi `τ = v_t/g`, `ω` frekanslı bir zorlamaya genlik oranı
+                // `1/√(1+(ωτ)²)` ile cevap verir. Hızlı kıvrımları ORTALAR, yemez.
+                //
+                // Damla alanın içinden GEÇTİĞİ için gördüğü frekans uzamsal ölçekten
+                // doğuyor: `ω ≈ k·|V| + ω_zaman`. Girdap ölçeği bir adım önce dört kat
+                // sıklaştırılmıştı ve ince oktav 13.85 m/s'de 27.5 rad/s ≈ 4 Hz'e
+                // çıkmıştı — damlanın τ'su 0.21 sn, 4 Hz'i takip edemez. Model tam
+                // genliği uyguladığı için damla yaprak gibi çırpıyordu: "yağmur havada
+                // kar gibi sürükleniyor".
+                //
+                // ÖLÇÜLDÜ (rüzgâr 13.7 m/s):
+                //
+                //   0.5 mm damla  τ 0.206  kaba 0.451  ince 0.174
+                //   1.1 mm damla  τ 0.455  kaba 0.223  ince 0.080
+                //   5.0 mm damla  τ 0.932  kaba 0.111  ince 0.039
+                //   kar tanesi    τ 0.102  kaba 0.714  ince 0.336
+                //
+                // YAĞMURU KARDAN AYIRAN ŞEY BU. Kar en ince damladan 1.6 kat, iri
+                // damladan 9 kat fazla takip ediyor — kar süzülür, damla iner. Eskiden
+                // ikisi de aynı alanı aynı genlikte yiyordu; fark elle konmuş bir
+                // `lerp(1.5, 0.4, dropSize)` katsayısıyla taklit ediliyordu. O TELAFİ
+                // TERİMİ SİLİNDİ; farkı artık fizik veriyor.
+                float3 meanVelocity = classVelocity;
+                meanVelocity.xz *= profile;
+
+                float3 dropVelocity = float3(meanVelocity.x, -fallSpeed, meanVelocity.z);
+                float dropSpeed = length(dropVelocity);
+
+                float tau = fallSpeed / 9.81;
+                float wCoarse = TURB_COARSE_K * dropSpeed + TURB_COARSE_W;
+                float wFine   = TURB_FINE_K   * dropSpeed + TURB_FINE_W;
+                float gainCoarse = rsqrt(1.0 + wCoarse * tau * wCoarse * tau);
+                float gainFine   = rsqrt(1.0 + wFine   * tau * wFine   * tau);
+
+                float response = lerp(_RainTurbulence, _SnowTurbulence, isSnow);
 
                 // Sürüklenen tanenin girdap payı RÜZGÂRLA ölçekli: dingin havada
                 // sürüklenme zaten yok, türbülans da yok. Sabit payla düşük rüzgârda
@@ -404,7 +529,28 @@ Shader "ToTheSummit/Precipitation"
                             * (sin(dot(gustPos.xz, float2(-0.013, 0.024)) + _Time.y * 0.23) * 0.5 + 0.5);
                 response *= 0.5 + patch * 1.5;
 
-                worldPos += Turbulence(worldPos, _Time.y) * response;
+                // DAMLA BAŞINA YÖN SAPMASI — girdap alanının kendi türevinden.
+                //
+                // Sınıf ayrık kalmak zorunda (rüzgâr sürüklenmesi CPU'da sınıf başına
+                // integre ediliyor), yani bir sınıftaki bütün damlalar birebir aynı
+                // yönde iniyordu: ekranda yalnız sekiz iz açısı vardı.
+                //
+                // SAPMA UYDURULMUYOR, ZATEN VAR OLANDAN TÜRETİLİYOR. Damlanın çizilen
+                // konumu `x + response·T(x,t)`; o konumun gerçek hızı bileşke hızın TAM
+                // TÜREVİ, yani `V + response·(∂T/∂t + (V·∇)T)`. Tam türev tek ek örnekle
+                // alınıyor: damlanın `dt` sonra bulunacağı yerde alan yeniden
+                // örnekleniyor. Adım fırtınada 0.28 m — ince oktavın 3.5 m'lik dalga
+                // boyunun çok altında (kh = 0.45 rad, sonlu fark hatası %0.8).
+                //
+                // Süzgeç buraya da giriyor: takip edilmeyen kıvrım yön de saptıramaz.
+                float3 turbHere = Turbulence(worldPos, _Time.y, gainCoarse, gainFine);
+
+                const float dt = 0.02;   // saniye
+                float3 turbNext = Turbulence(worldPos + meanVelocity * dt, _Time.y + dt,
+                                             gainCoarse, gainFine);
+                float3 velocityFluctuation = (turbNext - turbHere) * (response / dt);
+
+                worldPos += turbHere * response;
 
                 // Çırpıntı: düşen tanenin ardındaki girdap kopması onu yaprak gibi iki
                 // yana süzdürür. Faz ve frekans taneye özel; damla çırpmaz.
@@ -450,11 +596,17 @@ Shader "ToTheSummit/Precipitation"
                 // aitti; doku artık gerçek bir damlanın izini taşıyor ve ölçeği de
                 // gerçek olmalı, yoksa desenin frekansı ekranda yanlış boyda çıkar.
                 float radius = dropRadius;
-                float physicalSpeed = TerminalVelocity(radius);
-                float debugScale = _StreakDebug > 0.5 ? max(_StreakDebugScale, 1.0) : 1.0;
+
+                // BÜYÜTME YALNIZ "BÜYÜT" KİPİNDE. Bir süre bütün prob kiplerinde
+                // açıktı ve "tür" probu 40× büyütülmüş şeritler gösterdi: araç
+                // ölçtüğü geometriyi bozuyordu. Desen okumak için büyütme gerekiyor
+                // (kip 1-2), tür/mesafe/çap için gerekmiyor — orada quad'ın gerçek
+                // boyu sorunun kendisi.
+                float debugScale = (_StreakDebug > 0.5 && _StreakDebug < 2.5)
+                                 ? max(_StreakDebugScale, 1.0) : 1.0;
 
                 float rainWidth = 2.0 * radius * debugScale;
-                float rainLength = physicalSpeed * _StreakExposure * debugScale;
+                float rainLength = dropSpeed * _StreakExposure * debugScale;
 
                 float sizeSpread = 0.4 + 1.4 * variation;
                 float size = lerp(rainWidth, _SnowSize * sizeSpread, isSnow);
@@ -503,8 +655,10 @@ Shader "ToTheSummit/Precipitation"
                 float3 cameraRight = normalize(UNITY_MATRIX_I_V._m00_m10_m20);
                 float3 cameraUp = normalize(UNITY_MATRIX_I_V._m01_m11_m21);
 
-                // Damla bileşke hız yönünde uzar, tane kameraya döner
-                float3 fallAxis = normalize(lerp(_RainDirections[dropClass].xyz, _SnowDirection, isSnow));
+                // Damla bileşke hız + türbülans dalgalanması yönünde uzar (yukarıda
+                // türetildi); tane kameraya döner, yön okumaz.
+                float3 rainAxis = normalize(dropVelocity + velocityFluctuation);
+                float3 fallAxis = normalize(lerp(rainAxis, _SnowDirection.xyz, isSnow));
                 float3 streakRight = normalize(cross(fallAxis, viewDirection));
 
                 float3 right = lerp(streakRight, cameraRight, isSnow);
@@ -582,6 +736,8 @@ Shader "ToTheSummit/Precipitation"
                 OUT.positionCS = TransformWorldToHClip(worldPos);
                 OUT.corner = IN.corner;
                 OUT.streak = float3(oscIndex, floor(dcamPos), frac(dcamPos));
+                // Yataydan eğim: damlanın GERÇEK yörünge açısı, girdap sapması dahil.
+                // `fallAxis` yağmurda `dropVelocity + velocityFluctuation`'ın birimi.
                 OUT.dropMm = radius * 2000.0;
                 OUT.dropDist = camDistance;
                 OUT.streakCrop = float2(vScale, vScale > 1.0 ? 1.0 : 0.0);
@@ -689,8 +845,12 @@ Shader "ToTheSummit/Precipitation"
                 // Tanecik N damlayı temsil ediyorsa N kat BÜYÜK değil N kat OPAK olmalı:
                 // üst üste binen N damlanın kapaması `1 − (1−α)^N`. Boyut fiziksel
                 // kalıyor, iz görünür oluyor. α 0.02 → 0.21.
+                // Hız `dropSpeed`, terminal hız DEĞİL: `[Garg 2006]`'nın α'sı damlanın
+                // pozlama boyunca süpürdüğü yolun kaçta kaçını kapattığı. Boy da aynı
+                // yoldan çıkıyor; ikisi ayrı hız okursa iz uzayıp saydamlığı sabit
+                // kalır, yani enerji yoktan var olur.
                 float singleDrop = saturate(2.0 * radius
-                                            / max(physicalSpeed * _StreakExposure, 1e-6));
+                                            / max(dropSpeed * _StreakExposure, 1e-6));
                 float rainAlpha = (1.0 - pow(1.0 - singleDrop, _StreakRepresentation))
                                 * (1.0 - _Snowiness);
 

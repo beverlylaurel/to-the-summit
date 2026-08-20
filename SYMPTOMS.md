@@ -568,3 +568,60 @@ Bunun şüpheli araması hiç gerekmedi: kural **zaten yazılıydı**, `HeightFo
 `:611`, ikisi de "havada asılı tane gök rengine boyanmaz" diyor. Yeni bir görsel mevcut
 bir büyüklüğe bağlanırken o büyüklüğün fiziksel karşılığı okunmadı.
 
+
+## "Damlalar yere çarpıp sekiyor sanki dolu yağıyor gibi" / "yatayda hareket eden damlalar var"
+
+**İlk şüpheliler — üçü de yanlış çıktı.** Yere yakın, küçük ve hareketli üç şey vardı ve
+üçü de doluya benziyordu: girdap (ölçeği bir adım önce 4 kat sıkılmıştı), sürüklenen kar
+(tanecikleri tam zeminde, yatay akıyor), yağan kar (çırpınıyor). Hepsi tek seferde F1
+anahtarı olarak kondu; **üçü de kapatıldığında sekme sürdü.**
+
+**Gerçek sebep iki katmanlıydı.**
+
+Birincisi iz boyu: `rainLength` ve saydamlık `TerminalVelocity(r)` okuyordu, yani rüzgârı
+hiç görmüyordu. İkisi de pozlama boyunca SÜPÜRÜLEN YOLDAN çıkar. Rüzgâr 8.5 m/s'de ince
+damla 3.4 cm çiziliyordu, gerçek yol 14.6 cm — 4.3 kat kısa. Kısa + yatık = çizgi değil
+tanecik, yani "dolu".
+
+İkincisi rüzgârın kendisi: şiddet → hız eşlemesi doğrusaldı ve 0.57 şiddet doğrudan
+8.5 m/s (Beaufort 5) veriyordu. O rüzgârda 1 mm damla yataydan 25° iner — fizik doğru,
+rüzgâr fazla. Eşleme kareye alındı (`WindField.ShapeSeverity`), uçlar sabit kaldı.
+
+**Ayırt eden ölçüm: ELEME, renk değil.** Yörünge açısı önce yedi renk bandına basıldı ve
+kullanıcı ayıramadı ("gözüm seçmiyor, hepsi birbirine benziyor"). Renk bırakılıp eleme
+kondu — ekranda yalnız 20°'den yatık, sonra yalnız 20°'den dik damlalar çizildi. Cevap tek
+turda geldi. Ardından CPU tarafında hız vektörünün iki bileşeni (rüzgâr sürüklenmesi /
+düşme) ayrı ayrı kapatıldı: **rüzgâr kapatılınca yatay hareket bitti.**
+
+**Aracın kendisi iki kez yalan söyleyecekti.** (1) İzolasyon anahtarı `UpdateStreaks`
+içinde bağlanıyordu, o metodun önünde dört erken çıkış var — biri tutsa uniform hiç
+yazılmayacak, HLSL varsayılanı (0,0,0), yani "hepsi kapalı" görünecekti. (2) `debugScale`
+BÜTÜN prob kiplerinde 40× büyütüyordu; "tür" probu 40 kat büyütülmüş şeritler gösterdi ve
+ölçtüğü geometriyi bozdu. Teşhis aracı önce doğrulanır.
+
+
+## "Yağmur havada kar gibi sürükleniyor"
+
+**Belirti sıralaması önemli:** aynı oturumda yağmura altı değişiklik üst üste bindi (kutu
+48 m, girdap ölçeği 4 kat, damla başına yön sapması, iz boyunun bileşke hıza geçmesi,
+rüzgâr eğrisinin kareye alınması, sınır tabakası). Kullanıcı "her şey çok abartı oldu,
+yağmur kar gibi hareket ediyor" dedi. Şüpheli listesi çıkarmak yerine **son eklenen ve en
+az doğrulanmış iki şey ölçüldü**; ikisi de bozuk çıktı.
+
+**Sebep 1 — yükseklik bantları sahte yatay hız üretiyordu.** Bant kaymaları sınırsız
+ayrışıyor (30 sn'de 101 m), kutuya sarılınca fark rastgeleye dönüşüyor (±24 m), ve düşen
+damla bantlar arasında geçerken o fark ona **21 m/s'ye kadar** yatay hız olarak biniyordu —
+rüzgârın kendisinden büyük. Kapalı biçimli gecikmeyle değiştirildi; türevi analitik
+karşılığıyla 4e-9 farkla örtüşüyor.
+
+**Sebep 2 — girdapta atalet süzgeci yoktu.** Ölçek dört kat sıklaştırılınca damla ince
+oktavdan 4 Hz'lik bir zorlama görmeye başladı; tau = 0.21 sn olan damla onu takip edemez
+ama model tam genliği uyguluyordu. Damla yaprak gibi çırpıyordu — yani kar gibi.
+
+**Ayırt eden ölçüm sayıydı, ekran değil.** İki bant kaymasının zamana göre ayrışması ile
+damlanın bant eksenindeki inme hızı çarpıldı; çıkan 21 m/s rüzgârdan büyüktü ve tek başına
+hükmü verdi. Ekranda "biraz fazla sürükleniyor" ile "sahte hız var" ayrılamazdı.
+
+**Ders:** üst üste altı değişiklik bindiğinde şüpheli listesi işe yaramaz — hepsi aynı anda
+duruyor ve hangisinin ne bozduğu ölçülemiyor. En son eklenen ve en az doğrulanan iki şey
+tek tek sayıyla sınanır.

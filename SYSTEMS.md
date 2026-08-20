@@ -189,6 +189,26 @@ görünüyorlar. **Bilinen eksik.**
 - **Damla ve tane ayrı popülasyondur**; karlılık oranı belirler. Sulu kar ikisinin bir arada
   bulunmasıdır.
 - **Damla boyutu hem düşme hızını hem rüzgâra direncini belirler**; dağılım şiddetle kayar.
+- **Yağış rüzgârın SINIR TABAKASINI okur** — yani `TerrainHeightAt`'ı, arazi yüzeyini.
+  Rüzgâr yerde sıfıra iner, yükseldikçe logaritmik açılır; damla da tane de kendi kotunun
+  payını yer. CPU yalnız SERBEST AKIŞ kaymasını integre eder; kotun getirdiği yavaşlama
+  shader'da, tanecik başına, **kapalı biçimli sınırlı bir gecikme** olarak eklenir. Kar da
+  aynı yasayı okur — yalnız damla düzeltilseydi aynı rüzgârda damla yavaşlar, tane
+  yavaşlamazdı.
+- **Tanecik girdabın her kıvrımını yemez: ATALET SÜZGECİ var.** Sürüklenme denklemi birinci
+  mertebeden, yani tanecik alçak geçiren bir süzgeç: gevşeme süresi `τ = v_t/g`, `ω`
+  frekanslı zorlamaya `1/√(1+(ωτ)²)` ile cevap verir. Frekans taneciğin alanın içinden
+  GEÇME hızından doğar (`ω ≈ k·|V| + ω_zaman`), o yüzden girdap oktavı başına ayrı hesaplanır.
+  **Yağmurla karı ayıran şey budur** — kar aynı alanda damladan altı kat fazla sapar. Eskiden
+  fark elle konmuş bir katsayıyla taklit ediliyordu; o telafi terimi silindi.
+- **İzin boyu, saydamlığı ve yönü tek bir hızdan türer: bileşke hız** (sınıftan gelen yatay
+  rüzgâr sürüklenmesi + damlanın kendi terminal hızı). Üçü ayrı hız okuyamaz — boy uzayıp
+  saydamlık sabit kalırsa enerji yoktan var olur. Dolayısıyla **iz geometrisi rüzgârı
+  okur**: rüzgâr sertleştikçe izler hem uzar hem yatar hem soluklaşır.
+- **Yön sekiz sınıfa kilitli değildir.** Rüzgâr sürüklenmesi CPU'da sınıf başına integre
+  edilir (konum ayrık kalmak zorunda), ama izin yönü damlanın kendi yarıçapından gelen
+  dikey bileşenle kurulur ve üstüne **girdap alanının kendi türevinden** çıkan damla başına
+  sapma binder. Sapma uydurulmaz: çizilen konumun tam türevi alınır.
 
 ### Hava sesi (`WeatherAudio`, `AudioBand`)
 

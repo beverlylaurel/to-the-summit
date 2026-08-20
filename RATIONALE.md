@@ -820,3 +820,107 @@ kurulamıyor. Sütunların ön koşulu **uzayda değişen yağış**, ve o ayrı
   neredeyse her oran bir kesire %2 içinde düşüyor; ayırt etmiyor. Kullanılabilir test
   görsel + otokorelasyon.
 
+
+## Rüzgâr şiddeti → hız eşlemesi kare, doğrusal değil
+
+Şiddet Perlin'den geliyor ve zamanın çoğunu orta bantta geçiriyor. Doğrusal eşlemede
+`Lerp(2, 14, 0.5)` = 8 m/s, yani "yarı yarıya rüzgâr" Beaufort 5 demekti. Oyun sürekli
+sert esintide geçiyordu.
+
+Belirti yağmurda okundu, rüzgârda değil. Kullanıcı "yatayda hareket eden damlalar var"
+dedi. Ölçüm zinciri:
+
+- Yörünge açıları hesaplandı: 8.5 m/s'de 0.5 mm damla yataydan **13.4°**, 1 mm damla 25°.
+  Damlaların %63'ü 28°'nin altında. Fizik doğru — damla rüzgârın yatay hızını tam yer.
+- Şüpheliler tek tek elendi (F1 anahtarları): girdap değil, sürüklenen kar değil, yağan
+  kar değil. **Rüzgâr sürüklenmesi kapatılınca yatay hareket bitti.**
+- Yani hata damlada değil, rüzgârın büyüklüğündeydi.
+
+Kare eşleme uçları korur (0 → calmSpeed, 1 → stormSpeed) ve yalnız orta bandı indirir.
+Bu bir fizik yasası DEĞİL, dağılım kararıdır; öyle olduğu `WindField.ShapeSeverity`
+başında da yazılı.
+
+**Tek yerde uygulanıyor.** `Strength` aynı hızdan türediği için sis kapanması, sürüklenen
+kar eşiği, girdap genliği, ses ve bulut hızı birlikte iniyor. Ayrı ayrı ayarlansaydı hava
+kendi içinde çelişirdi.
+
+**Yol boyunca kapanan iki gerçek hata:**
+
+- İz boyu ve saydamlığı `TerminalVelocity(r)` okuyordu, yani rüzgârı hiç görmüyordu.
+  Oysa ikisi de pozlama boyunca SÜPÜRÜLEN YOLDAN çıkar. İnce damlada iz 4.3× kısa
+  çiziliyordu (3.4 cm yerine 14.6 cm olmalıydı) ve kısa yatay çizik "dolu sekiyor" gibi
+  okunuyordu. Bileşke hıza geçildi: ortanca alfa 0.363 → 0.347, damla başına ekran alanı
+  2.68 → 4.74 px² (+%77).
+- Teşhis anahtarı `UpdateStreaks` içinde bağlanıyordu ve o metodun önünde dört erken
+  çıkış var. Biri tutsa uniform hiç yazılmayacak, HLSL varsayılanı (0,0,0) — yani "hepsi
+  kapalı" — kalacaktı. **Teşhis aracının kendisi sessizce yalan söyler.** Koşulsuz
+  bağlamaya taşındı.
+
+**Aracın çözünürlüğü hipotezi ayırmalı.** Yörünge açısı önce yedi renk bandına basıldı;
+kullanıcı ayıramadı ("gözüm seçmiyor, hepsi birbirine benziyor"). Renk sorusu bırakılıp
+ELEME kondu: ekranda yalnız bir grup çizildi, soru "yatay olanlar hangisinde kalıyor"
+oldu ve tek turda kapandı.
+
+
+## Yükseklik bantları ÖLÇÜMLE ELENDİ; sınır tabakası kapalı biçimde
+
+Rüzgârın sınır tabakası (yerde sıfır, yükseldikçe logaritmik) yağan yağışa eklenecekti.
+Sürüklenme sınıf başına CPU'da integre ediliyor ve tek vektör yüksekliğe göre değişemez,
+o yüzden ilk çözüm **sınıf başına dört yükseklik bandı** oldu: her banda ayrı kayma
+integre edilir, tanecik kendi kotuna göre iki bandın arasında harmanlanır.
+
+**Ölçüm bunu yıktı.** Bantların kaymaları zamanla SINIRSIZ ayrışıyor — 13.7 m/s rüzgârda
+30 saniyede 101 m. Kutuya sarıldıktan sonra aradaki fark rastgele bir sayıya dönüşüyor
+(±24 m). Alan periyodik olduğu için "en kısa temsilci" seçmek görüntüyü sürekli tutuyor,
+ama TANECİĞİN YÖRÜNGESİNİ tutmuyor: damla düşerken bantlar arasında geçtiği için o
+rastgele fark ona yatay hız olarak biniyor.
+
+    en kötü: 24 m x 0.88 bant/sn = 21 m/s sahte yatay hız  (rüzgârın kendisi 13.7 m/s)
+
+Belirti tam olarak buydu: "yağmur havada kar gibi sürükleniyor".
+
+**Doğrusu kapalı biçim.** Damla yavaş havada geçirdiği süre boyunca serbest akışın
+gerisinde kalır; bu gecikme SINIRLI bir integraldir:
+
+    L(z) = (U/v_t) * INTEGRAL_z^{z_ref} (1 - f(z')) dz',   f(z) = ln(z/z0)/ln(z_ref/z0)
+
+Analitik hâli `G(z) = z - z*(ln(z/z0) - 1)/L`. Gecikme tek değişkenli, düzgün ve monoton;
+türevi `dL/dt = U(1 - f(z))`, yani damlanın yatay hızı tam olarak `U*f(z)`. Sayısal olarak
+doğrulandı: iki ifade arasındaki fark 4e-9.
+
+**Ders:** periyodik bir alanda "sarma güvenli harman" ALANIN sürekliliğini korur, ama
+harmanlanan şey bir taneciğin YÖRÜNGESİYSE yetmez. Sınırsız biriken iki büyüklüğün farkı
+alınacaksa fark kapalı biçimde ve sınırlı olarak kurulmalıdır.
+
+
+## Tanecik girdabın her kıvrımını yemez — atalet süzgeci
+
+Sürüklenme denklemi birinci mertebeden: tanecik alçak geçiren bir süzgeçtir. Gevşeme
+süresi `tau = v_t/g`, `omega` frekanslı zorlamaya genlik oranı `1/sqrt(1+(omega*tau)^2)`
+— birinci mertebe kutbun frekans cevabı, Stokes sayısı literatürünün standart hâli.
+
+Tanecik alanın İÇİNDEN GEÇTİĞİ için gördüğü frekans uzamsal ölçekten doğuyor:
+`omega ~ k*|V| + omega_zaman`. Girdap ölçeği bir adım önce dört kat sıklaştırılmıştı ve
+ince oktav 13.85 m/s'de 27.5 rad/s ~ 4 Hz'e çıkmıştı. Damlanın tau'su 0.21 sn — 4 Hz'i
+takip edemez, ortalar. Model tam genliği uyguluyordu, damla yaprak gibi çırpıyordu.
+
+Ölçülen kazançlar (rüzgâr 13.7 m/s):
+
+    0.5 mm damla  tau 0.206  kaba 0.504  ince 0.201
+    1.1 mm damla  tau 0.455  kaba 0.245  ince 0.088
+    5.0 mm damla  tau 0.932  kaba 0.105  ince 0.037
+    kar tanesi    tau 0.143  kaba 0.647  ince 0.286
+
+**YAĞMURU KARDAN AYIRAN ŞEY BU.** Sapma genliğinin iz boyuna oranı:
+
+    yağmur 0.5 mm   5.6 cm / 19.5 cm = 0.29   -> çizgi okunur
+    yağmur 5.0 mm   1.2 cm / 24.5 cm = 0.05
+    kar tanesi     34.3 cm / 19.3 cm = 1.78   -> süzülür, çırpınır
+
+Oran 1'i geçince yol bir çizgi değil bir kıvrım olarak okunuyor. Eskiden yağmur da o
+tarafta duruyordu.
+
+**Telafi terimi silindi.** Fark daha önce elle konmuş bir `lerp(1.5, 0.4, dropSize)`
+katsayısıyla taklit ediliyordu. Fiziği koyunca gerekçesi kalmadı; terim geri gelmez.
+Yağmurun sapması 3-4 kat, karınki 1.6 kat azaldı — aradaki makas budur.
+

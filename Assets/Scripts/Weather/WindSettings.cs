@@ -16,7 +16,7 @@ public class WindSettings : ScriptableObject
     [Tooltip("Severity 0 iken hız (m/s). Sıfır olmamalı.")]
     public float calmSpeed = 2f;
     [Tooltip("Severity 1 iken hız (m/s). Tam fırtına.")]
-    public float stormSpeed = 20f;
+    public float stormSpeed = 14f;
 
     [Header("Arazi maruziyeti")]
     [Tooltip("Korunaklı oyukta sürekli hızın kaç katına indiği. Dağda hissedilen en " +

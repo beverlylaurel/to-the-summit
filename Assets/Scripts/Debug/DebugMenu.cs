@@ -532,7 +532,7 @@ public class DebugMenu : MonoBehaviour
             3 => "ALFA: son şeffaflık",
             4 => "AMBIENT: radyansın ikinci terimi",
             5 => "RADYANS: iki terim toplanmış, luminans",
-            6 => "ORAN: radyans / gök — TURUNCU = doğru",
+            6 => "ORAN: radyans / gök — KIRMIZI = damla gökten parlak",
             7 => "ÇAP: damla çapı 0.5-5 mm — karışık renk = farklı boy",
             8 => "MESAFE: 0 - kutu yarısı — tek renk = derinlik yok",
             _ => "kapalı",

@@ -54,7 +54,45 @@ public class WindField : MonoBehaviour
     /// Bulut katmanı bunu okur. `Strength` maruziyetle ölçekleniyor; onu okusaydı oyuncu
     /// kayanın arkasına geçtiğinde iki kilometre yukarıdaki bulut yavaşlardı.
     public float FreeAirSpeed => Mathf.Lerp(settings.calmSpeed, settings.stormSpeed,
-        overrideActive ? overrideSeverity : Mathf.Clamp01(Severity));
+        ShapeSeverity(overrideActive ? overrideSeverity : Mathf.Clamp01(Severity)));
+
+    /// ŞİDDET → HIZ EĞRİSİ. Doğrusal değil, kare.
+    ///
+    /// Bu bir fizik yasası değil, DAĞILIM kararı — açıkça öyle. Şiddetin kendisi
+    /// Perlin'den geliyor ve zamanın çoğunu orta bantta geçiriyor. Doğrusal eşlemede
+    /// "yarı yarıya rüzgâr" doğrudan 8 m/s, yani Beaufort 5 demekti ve oyun sürekli
+    /// sert esintide geçiyordu.
+    ///
+    /// Belirti yağmurda okundu: 0.57 şiddette rüzgâr 8.5 m/s ve 1 mm'lik damla
+    /// yataydan 25° iniyordu — fizik doğru, rüzgâr fazlaydı. Kullanıcı "yatayda
+    /// hareket eden damlalar var" dedi; ölçüm sürüklenmeyi doğruladı (F1 → rüzgâr
+    /// sürüklenmesi kapatılınca bitti).
+    ///
+    /// UÇLAR SABİT: 0 → calmSpeed, 1 → stormSpeed. Yalnız orta bant iniyor:
+    ///
+    ///   şiddet 0.25 → 5.0 yerine 2.0 m/s
+    ///   şiddet 0.50 → 8.0 yerine 2.8 m/s
+    ///   şiddet 0.75 → 11.0 yerine 5.8 m/s
+    ///   şiddet 0.90 → 12.8 yerine 9.9 m/s
+    ///
+    /// ÜS 4 SÜRGÜYLE BULUNDU, hesapla değil — doğru değer tercih. Sürgü F1'deydi,
+    /// değer bulununca silindi.
+    ///
+    /// EŞİKLER KORUNUYOR: `Strength` de bu hızdan türüyor, yani sürüklenen karın rüzgâr
+    /// eşiği (0.22) artık şiddet ~0.56'da açılıyor, tam blizzard ~0.87'de. Fırtına
+    /// olay oluyor, kural değil.
+    ///
+    /// Dingin hava kural, fırtına olay olur.
+    ///
+    /// TEK YERDE UYGULANIR. `Strength` de bu hızdan türüyor, yani rüzgâra bağlı bütün
+    /// sistemler (sis kapanması, sürüklenen kar eşiği, girdap genliği, ses, bulut
+    /// hızı) birlikte iniyor. Ayrı ayrı ayarlanırsa hava kendi içinde çelişir.
+    static float ShapeSeverity(float severity)
+    {
+        float s = Mathf.Clamp01(severity);
+        float sq = s * s;
+        return sq * sq;
+    }
 
     /// Sürekli şiddetin üstüne binen anlık sapma, -1..1. Duyulan ve görülen şey budur.
     ///
@@ -97,7 +135,8 @@ public class WindField : MonoBehaviour
 
         // Sürekli hız yalnızca Severity'den gelir. Gürültü artık bu değeri üretmiyor,
         // üstüne binen sapmayı üretiyor: tam fırtına Perlin'in ne verdiğinden bağımsız
-        float severity = overrideActive ? overrideSeverity : Mathf.Clamp01(Severity);
+        float severity = ShapeSeverity(
+            overrideActive ? overrideSeverity : Mathf.Clamp01(Severity));
         float sustained = Mathf.Lerp(settings.calmSpeed, settings.stormSpeed, severity);
 
         // MARUZİYET SÜREKLİ HIZI ÖLÇEKLER, hamleyi değil: sırt rüzgârı hızlandırır,
