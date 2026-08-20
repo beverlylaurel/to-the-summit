@@ -788,6 +788,12 @@ yakın damla için gerekiyor. Maliyeti de küçük değil: `size32` tek başına
 **Tetikleyici.** Çok yakın damlaların izi bulanık ya da kademeli görünürse. O noktada
 `Tools/rain/pack_streaks.py` içindeki boyut listesine 32 eklenip yeniden koşulur.
 
+**2026-08-21'de yeniden bakıldı, KAPALI KALIYOR — ve gerekçesi güçlendi.** Çalışma kümesi
+`size16`'dan `size4`'e indirildi (ölçüm aşağıda, Garg-Nayar §5 kaydında): izlerimiz
+ekranda 1.2 piksel geniş, `size16` bile dört kat fazla çözünürlüklüydü. `size32` ters
+yönde bir adım olurdu. Ayrıca depo bir kez 100 MB'lik GitHub sınırına takıldı ve LFS'e
+taşınmak zorunda kalındı; 302 MB'lik bir blok o dersin üstüne konmaz.
+
 **Maliyet.** Paketleme bir komut. Blok boyutu 65.8 MB'den ~368 MB'ye çıkar.
 
 ## Yağmur veritabanı yerleşimi (2026-08-19)
@@ -837,15 +843,24 @@ Ucuza kaçmak değil, SIRALAMA: taban ekranda doğrulanmadan üstüne üç doğr
 katman daha binmesin. Perde fazında tam bu oldu — üç sapma aynı anda durunca hangisinin
 ne bozduğu ölçülemedi.
 
-**1 — Çözünürlük seviyesi seçimi.** `§5`: "we first find the appropriate texture
-resolution level – it is the resolution level with textures of widths just larger than
-the width of the projected rain streak." Şu an her zaman en yüksek seviye (`size16`)
-kullanılıyor; `size8` ve `size4` veritabanında duruyor ama bağlı değil.
-*Neden var:* makale dipnotu — "to avoid artifacts due to severe down-sampling when
-rendering streaks far from the camera". Yani uzak damlada iz titrer.
-*Maliyet:* üç seviye birden bağlanmalı (Texture2DArray'ler arasında dinamik indeks yok,
-üç dal gerekiyor). Çalışma kümesi 3.4 → ~4.5 MB.
-*Tetikleyici:* uzak damlalar titriyor ya da kaynıyorsa.
+**1 — Çözünürlük seviyesi seçimi — KAPANDI (2026-08-21), ama beklenenden farklı yerde.**
+`§5`: "the resolution level with textures of widths just larger than the width of the
+projected rain streak." Kural uygulandı ve **bütün sahne için tek bir seviye çıktı**:
+
+    izlerimizin ekran genişliği   1.2 px (MinPixelWidth tabanı)
+    gerçek genişlik, 1.4 mm @ 1 m 1.4 px      @ 5 m  0.28 px
+    4 px'i aşan tek durum         4 mm'den iri damla, 1 m'den yakın -> karede 1-2 tanecik
+
+Yani `size4` (4×132) doğru seviye; `size16` (16×525) dört kat fazlaydı ve asıl bedeli
+**alt örnekleme**: 525 piksellik iz uzak damlada 9 piksele iniyor (58 kat) ve dizilerde
+mipmap YOK, yani donanım da düzeltemiyor. Tam olarak makalenin dipnotunun uyardığı şey.
+`size4`'te oran 14 kata iniyor. Çalışma kümesi 3.4 MB → 0.21 MB.
+
+Bedeli yakın damlada: 228 piksel boyundaki iz 132 pikselden geliyor, 1.7 kat büyütme,
+hafif yumuşama. Etkilenen tanecik yüzde birin altında.
+
+*Üç seviyeyi birden bağlamaya GEREK KALMADI* — dinamik seçim yalnız o %1 için işe
+yarardı. Gerekirse tetikleyici: çok yakın damlaların izi yumuşak görünürse.
 
 **2 — Kameraya yakın damlada iki doku.** `§5`: damla kaynağa ya da kameraya yakınsa
 `(θ_l, φ_l, θ_v)` iz BOYUNCA değişiyor; izin üst ve alt ucuna karşılık gelen açılarla
@@ -892,32 +907,3 @@ tek yasada birleştirilir.
 
 **Maliyet:** birleştirme yarım gün; `speedFactor`'ın ölçülmüş uçlarının log profille
 yeniden doğrulanması gerekir.
-
-
-## Tanecikler kutuya TEKDÜZE dağılıyor — radyal dağılım ertelendi (2026-08-21)
-
-**Karar.** 250 000 tanecik 48 m'lik kutuya tekdüze serpiliyor. Radyal (`yoğunluk ~ 1/r²`)
-dağılıma geçilmedi.
-
-**Ölçüm — sorun gerçek.** Hacim `r³` ile büyüdüğü için tanecik bütçesinin neredeyse
-tamamı uzağa gidiyor:
-
-    5 m içinde  : hacmin %0.47'si ->   1 183 tanecik
-    10 m içinde : %3.8            ->   9 469
-    24 m içinde : %52             -> 130 899
-
-Yani oyuncunun **tek tek damla olarak okuduğu** yakın hacimde bütçenin binde beşi var.
-Radyal dağılımda (kabuk başına sabit sayı, temsil payı `r²` ile ölçekli) 5 m içinde
-47 872 tanecik olurdu — **40 kat**.
-
-**Neden şimdi değil.** Temsil payı `α_eff = 1−(1−α)^N` üzerinden alfaya giriyor ve N
-mesafeye bağlı hâle gelince şu an ölçülmüş olan bütün alfa zinciri (kutu boyu taraması,
-`widen` üssü, `SourceScale` kalibrasyonu) yeniden ölçülmek zorunda. Bu oturumda yağmura
-altı değişiklik bindi ve sonuncusu ölçümle bozuk çıktı; yedinciyi doğrulanmamış bir
-zeminin üstüne koymak aynı hatadır.
-
-**Tetikleyici.** Yakındaki yağmur "tek tek damla" yerine seyrek nokta gibi okunuyorsa,
-ya da yağış 1.0'da bile yoğunluk yetmiyorsa.
-
-**Maliyet.** Yerleşim shader'da birkaç satır; asıl iş temsil payının mesafeye bağlanması
-ve alfa zincirinin baştan ölçülmesi. Yarım gün.

@@ -61,18 +61,23 @@ public class PrecipitationRenderer : MonoBehaviour
     /// 3 × 2.0/0.8 = 7.5.
     const float SourceScale = 7.5f;
 
-    /// Bir taneciğin temsil ettiği damla kümesinin ekran payı. Yoğunluğumuz 0.8
-    /// damla/m³, gerçek şiddetli yağmur ~1000/m³ — bin kat eksik ve o yoğunluğa çıkmak
-    /// 90 milyon tanecik demek. Tanecik kendi hacmindeki kümenin payını taşıyor.
-    /// KUTUDAN TÜREYEN DEĞER: 48 m kutuda 250 000 tanecik = 2.3 damla/m³; şiddetli
-    /// yağmurun gerçeği ~1000/m³, yani oran 442. Bir tanecik 442 damlayı temsil ediyor.
+    /// TANECİK YOĞUNLUKLARI, damla/m³. Shader temsil payını KONUMDAN türetiyor:
+    /// `N(r) = 1000 / yoğunluk(r)`, yoğunluk = dış + (iç kutunun kapsadığı yerde) iç.
     ///
-    /// Sabit yazılmıyor, kutudan hesaplanıyor — ikisi elle tutulunca ayrışıyor ve
-    /// yoğunluk sessizce yanlış oluyor.
+    /// Payın konumdan türemesi zorunlu: aynı noktadaki iki tanecik hangi kutudan
+    /// geldiğine bakılmaksızın AYNI sayıda gerçek damlayı temsil etmeli, yoksa aynı
+    /// yerde iki farklı opaklık çıkar.
     ///
-    /// Kaplamaya giriyor, geometriye değil: `α_eff = 1 − (1−α)^N`. Tek damlanın
-    /// α'sı 0.02 → 0.47.
-    static float Representation => 1000f / (PrecipitationParticles / (BoxSize.x * BoxSize.y * BoxSize.z));
+    /// Şiddetli yağmurun gerçek yoğunluğu ~1000/m³. Dış kutuda 2.03, iç kutunun
+    /// içinde 2.03 + 14.47 = 16.5 → temsil payı 491'den 61'e iniyor. Yani yakın damla
+    /// gerçeğe çok daha yakın bir kümeyi taşıyor.
+    ///
+    /// Kaplamaya giriyor, geometriye değil: `α_eff = 1 − (1−α)^N`.
+    static float OuterDensity =>
+        (PrecipitationParticles - NearParticles) / (BoxSize.x * BoxSize.y * BoxSize.z);
+
+    static float NearDensity =>
+        NearParticles / (NearBoxSize.x * NearBoxSize.y * NearBoxSize.z);
 
     /// Teşhis kipi F1 panelinden sürülüyor, Inspector'dan değil.
     public static int StreakProbe;
@@ -118,6 +123,31 @@ public class PrecipitationRenderer : MonoBehaviour
     /// Daha uzağı tanecikle değil, sisin yağıştan gelen görüş mesafesi taşıyor
     /// (`AtmosphereController`, 18000·R^−0.70).
     static readonly Vector3 BoxSize = new(48f, 48f, 48f);
+
+    /// İÇ KUTU. Yağış kutusu kameranın etrafında PERİYODİK olarak sarıyor ve periyodik
+    /// bir döşeme yoğunluk gradyanı taşıyamaz — yani tek kutuyla "yakında sık, uzakta
+    /// seyrek" kurulamaz. Hacim `r³` ile büyüdüğü için bütçenin neredeyse tamamı uzağa
+    /// gidiyordu: 48 m'lik tek kutuda 5 metrenin içinde 1 188 tanecik vardı, yani
+    /// binde beş. Oysa oyuncunun TEK TEK DAMLA olarak okuduğu hacim orası.
+    ///
+    /// Çözüm iç içe kutu: ikisi de kamerada merkezli, ikisi de kendi içinde tekdüze ve
+    /// kendi kutusuna sarıyor. İç kutunun kapsadığı yerde yoğunluklar TOPLANIYOR, yani
+    /// yakın alan kendiliğinden sıklaşıyor. Hareket her iki kutuda da tam doğru kalıyor
+    /// çünkü her biri kendi kaymasıyla integre ediliyor.
+    ///
+    /// ÜS TARANDI. Önce sürekli radyal dağılım (`yoğunluk ∝ r^-p`) ölçüldü; en iyi
+    /// `p = 1`, yani `1/r`. Sonra kutu şemasıyla ne kadarının yakalandığı ölçüldü
+    /// (şiddet 1.0, ekran kaplaması kilopiksel):
+    ///
+    ///   tek kutu 48          5 m içi  87   toplam  934
+    ///   48 + 12, iç %5       5 m içi 194   toplam 1027
+    ///   48 + 12, iç %10      5 m içi 227   toplam 1033   ← seçilen
+    ///   48 + 12, iç %20      5 m içi 265   toplam 1003   (ortanca alfa düşüyor)
+    ///   48 + 16 + 6          5 m içi 221   toplam 1061   (üçüncü kutu kayda değmiyor)
+    ///
+    /// %10'da yakın alan kaplaması İKİ BUÇUK KAT, toplam %11 artıyor ve ortanca alfa
+    /// değişmiyor. %20'de yakın biraz daha artıyor ama toplam ve ortanca düşüyor.
+    static readonly Vector3 NearBoxSize = new(12f, 12f, 12f);
     static readonly Vector3 SnowBoxSize = new(40f, 40f, 40f);
 
     /// Sürüklenen kar kutusu. Yatayda dar tutuluyor: aynı tanecik sayısı küçük alana
@@ -147,6 +177,10 @@ public class PrecipitationRenderer : MonoBehaviour
     /// Damlayı şişirmek yerine sayı artırıldı: temsil payını büyütmek izi kalınlaştırıp
     /// gerçekçiliği bozuyor, sayı ise doğrudan eksik olan büyüklük.
     const int PrecipitationParticles = 250000;
+
+    /// İç kutuya düşen pay. Mesh'te İLK `NearParticles` tanecik iç kutuda, kalanı dış
+    /// kutuda; bayrak vertex konumunun `y`'sinde taşınıyor.
+    const int NearParticles = 25000;
 
     /// Sürüklenen kar tanecikleri. Yağıştan FAZLA: ince toz ancak taneler tek tek
     /// seçilemeyecek kadar sıkışınca okunuyor. 40.000'de metrekareye ~70 tane düşüyordu
@@ -246,11 +280,14 @@ public class PrecipitationRenderer : MonoBehaviour
     static readonly int StreakDbPeriodId = Shader.PropertyToID("_StreakDbPeriod");
     static readonly int StreakSourceScaleId = Shader.PropertyToID("_StreakSourceScale");
     static readonly int StreakSunRadianceId = Shader.PropertyToID("_StreakSunRadiance");
-    static readonly int StreakRepresentationId = Shader.PropertyToID("_StreakRepresentation");
+    static readonly int RainDensityId = Shader.PropertyToID("_RainDensity");
     static readonly int StreakDebugId = Shader.PropertyToID("_StreakDebug");
     static readonly int StreakDebugScaleId = Shader.PropertyToID("_StreakDebugScale");
 
     static readonly int RainDriftsId = Shader.PropertyToID("_RainDrifts");
+    static readonly int RainDriftsNearId = Shader.PropertyToID("_RainDriftsNear");
+    static readonly int NearBoxSizeId = Shader.PropertyToID("_NearBoxSize");
+    static readonly int SnowDriftNearId = Shader.PropertyToID("_SnowDriftNear");
     static readonly int RainDirectionsId = Shader.PropertyToID("_RainDirections");
     static readonly int SnowDriftId = Shader.PropertyToID("_SnowDrift");
     static readonly int SnowDirectionId = Shader.PropertyToID("_SnowDirection");
@@ -278,9 +315,11 @@ public class PrecipitationRenderer : MonoBehaviour
     Mesh mesh;
     Material material;
     readonly Vector4[] rainDrifts = new Vector4[RainSpeedClasses];
+    readonly Vector4[] rainDriftsNear = new Vector4[RainSpeedClasses];
     readonly Vector4[] rainDirections = new Vector4[RainSpeedClasses];
     readonly Vector3[] rainVelocities = new Vector3[RainSpeedClasses];
     Vector3 snowDrift;
+    Vector3 snowDriftNear;
     Vector3 spindriftDrift;
     Vector3 windSweep;
     float snowSpin;
@@ -391,7 +430,6 @@ public class PrecipitationRenderer : MonoBehaviour
         Color sun = timeOfDay.CurrentSunColor * timeOfDay.SunIntensity;
         material.SetVector(StreakSunRadianceId, new Vector4(sun.r, sun.g, sun.b, 1f));
 
-        material.SetFloat(StreakRepresentationId, Representation);
         material.SetFloat(StreakSourceScaleId, SourceScale);
         material.SetFloat(StreakDebugId, StreakProbe);
         material.SetFloat(StreakDebugScaleId, StreakProbeScale);
@@ -465,12 +503,14 @@ public class PrecipitationRenderer : MonoBehaviour
             rainVelocities[i] = Vector3.Lerp(rainVelocities[i], target, blend);
 
             rainDrifts[i] = Advance(rainDrifts[i], rainVelocities[i], BoxSize);
+            rainDriftsNear[i] = Advance(rainDriftsNear[i], rainVelocities[i], NearBoxSize);
             rainDirections[i] = WithSpeed(rainVelocities[i]);
         }
 
         // Kar da sınır tabakasını okur; yasa shader'da, damla ve tane için ortak.
         Vector3 snowVelocity = Vector3.down * SnowFallSpeed + wind.Velocity * SnowWindFactor;
         snowDrift = Advance(snowDrift, snowVelocity, SnowBoxSize);
+        snowDriftNear = Advance(snowDriftNear, snowVelocity, NearBoxSize);
 
         // SÜRÜKLENEN KAR YALNIZ YATAY GİDER: yerden kalkan tane düşmüyor, rüzgârla
         // taşınıyor. Rüzgârı tam yiyor — kırık kar taneciği yağan kar tanesinden çok
@@ -502,7 +542,14 @@ public class PrecipitationRenderer : MonoBehaviour
 
         material.SetVector(BoxSizeId, BoxSize);
         material.SetVector(SnowBoxSizeId, SnowBoxSize);
+        // KOŞULSUZ: temsil payı buradan türüyor ve `UpdateStreaks`'in önünde dört erken
+        // çıkış var. Uniform yazılmazsa HLSL varsayılanı sıfır olur, yoğunluk tabana
+        // düşer ve bütün damlalar tam opak çıkar.
+        material.SetVector(RainDensityId, new Vector4(OuterDensity, NearDensity, 0f, 0f));
+        material.SetVector(NearBoxSizeId, NearBoxSize);
         material.SetVectorArray(RainDriftsId, rainDrifts);
+        material.SetVectorArray(RainDriftsNearId, rainDriftsNear);
+        material.SetVector(SnowDriftNearId, snowDriftNear);
         material.SetVectorArray(RainDirectionsId, rainDirections);
         material.SetVector(SnowDriftId, snowDrift);
         material.SetVector(SnowDirectionId, WithSpeed(snowVelocity));
@@ -605,6 +652,9 @@ public class PrecipitationRenderer : MonoBehaviour
             // açmadan bayrak taşınabiliyor.
             float kind = i < PrecipitationParticles ? 0f : 1f;
 
+            // İç kutu bayrağı `y`'de. `x` zaten tür için kullanılıyor, `z` boş kalıyor.
+            float near = i < NearParticles ? 1f : 0f;
+
             int v = i * 4;
             corners[v + 0] = new Vector2(0f, 0f);
             corners[v + 1] = new Vector2(1f, 0f);
@@ -613,7 +663,7 @@ public class PrecipitationRenderer : MonoBehaviour
 
             for (int c = 0; c < 4; c++)
             {
-                positions[v + c] = new Vector3(kind, 0f, 0f);
+                positions[v + c] = new Vector3(kind, near, 0f);
                 seedXY[v + c] = xy;
                 seedZW[v + c] = zw;
             }

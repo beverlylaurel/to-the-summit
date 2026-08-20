@@ -27,9 +27,32 @@ public class RainStreakWorkingSet : MonoBehaviour
     [Tooltip("Pişmiş iz veritabanı. `To The Summit/Yağmur/İz veritabanını kur` üretiyor.")]
     [SerializeField] RainStreakDatabase database;
 
-    [Tooltip("Çözünürlük seviyesi indeksi (0 en kaba). Mesafeye göre seçim henüz yok; " +
-             "şimdilik en yüksek seviye kullanılıyor.")]
-    [SerializeField] int level = -1;
+    /// ÇÖZÜNÜRLÜK SEVİYESİ — `[Garg 2006, §5]`: "the resolution level with textures of
+    /// widths just larger than the width of the projected rain streak".
+    ///
+    /// Seviyeler artan sırada: `size4` (4×132), `size8` (8×263), `size16` (16×525).
+    /// Bir dönem hep en yükseği (`size16`) kullanılıyordu; ÖLÇÜM onun yanlış olduğunu
+    /// gösterdi.
+    ///
+    /// Bizim izlerimiz ekranda 1.2 piksel geniş (`MinPixelWidth` tabanı) ve gerçek
+    /// genişlikleri daha da ince: 1.4 mm'lik damla 1 metrede 1.4 px, 5 metrede 0.28 px.
+    /// 4 pikseli aşan tek durum 4 mm'den iri damlanın 1 metreden yakın olması — kâğıtta
+    /// hesaplandı, karede BİR İKİ tanecik. Yani makalenin kuralı bütün sahne için
+    /// `size4` diyor.
+    ///
+    /// `size16` kullanmanın bedeli boştan büyük doku değil, ALT ÖRNEKLEME: 525 piksel
+    /// yüksekliğindeki iz uzak damlada 9 piksele iniyor (58 kat) ve dizilerde mipmap
+    /// YOK, yani donanım da düzeltemiyor. Makalenin dipnotu tam bunu söylüyor —
+    /// "to avoid artifacts due to severe down-sampling when rendering streaks far from
+    /// the camera". `size4`'te oran 14 kata iniyor.
+    ///
+    /// Bedeli yakın damlada: ekranda 228 piksel boyundaki iz 132 pikselden geliyor,
+    /// yani 1.7 kat büyütme — hafif yumuşama. Etkilenen tanecik sayısı yüzde birin
+    /// altında.
+    ///
+    /// Serileştirilmiyor: Inspector'a girince sahnedeki bileşen eski değerle donar ve
+    /// koddaki değişiklik etkisiz kalır.
+    const int level = 0;
 
     /// Kare başına kopyalanan dilim düzeni. Sıra SABİT — shader indeksi buradan
     /// hesaplıyor, arama yapmıyor.
@@ -68,7 +91,7 @@ public class RainStreakWorkingSet : MonoBehaviour
     /// Değer dokunun kendisinden okunuyor.
     public float[] DcamHeightFraction { get; private set; }
 
-    int Level => level >= 0 ? level : database.Sizes.Length - 1;
+    int Level => Mathf.Min(level, database.Sizes.Length - 1);
 
     /// Sahne kurulumu koddan yapılıyor; veritabanı elle sürüklenmiyor.
     public void Bind(RainStreakDatabase streakDatabase) => database = streakDatabase;

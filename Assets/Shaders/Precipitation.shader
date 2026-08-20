@@ -70,6 +70,9 @@ Shader "ToTheSummit/Precipitation"
             #define KARMAN           0.4        // von Karman; yüzey tabakasında l = KARMAN*z
 
             float4 _RainDrifts[RAIN_SPEED_CLASSES];
+            float4 _RainDriftsNear[RAIN_SPEED_CLASSES];   // iç kutunun kendi kayması
+            float3 _NearBoxSize;
+            float3 _SnowDriftNear;
             float4 _RainDirections[RAIN_SPEED_CLASSES];
             float3 _SnowDrift;
             float4 _SnowDirection;   // xyz birim yön, w bileşke hız (m/s)
@@ -140,7 +143,9 @@ Shader "ToTheSummit/Precipitation"
 
             /// Bir taneciğin temsil ettiği damla kümesinin ekran payı. Gerekçesi
             /// kullanıldığı yerde: yoğunluğumuz gerçeğin binde biri.
-            float  _StreakRepresentation;
+            /// (dış kutu yoğunluğu, iç kutu yoğunluğu) damla/m³. Temsil payı buradan
+            /// KONUMA göre türetiliyor; sabit değil.
+            float4 _RainDensity;
 
             #define STREAK_DCAM_COUNT 5
             #define STREAK_OSC_COUNT 10
@@ -217,7 +222,7 @@ Shader "ToTheSummit/Precipitation"
 
             struct Attributes
             {
-                float4 positionOS : POSITION;   // x: 0 yağış, 1 sürüklenen kar
+                float4 positionOS : POSITION;   // x: 0 yağış / 1 sürüklenen kar, y: iç kutu
                 float2 corner     : TEXCOORD0;
                 float2 seedXY     : TEXCOORD1;
                 float2 seedZW     : TEXCOORD2;
@@ -338,6 +343,7 @@ Shader "ToTheSummit/Precipitation"
                 float4 seed = float4(IN.seedXY, IN.seedZW);
 
                 float isDrift = IN.positionOS.x;
+                float isNear = IN.positionOS.y;   // iç kutuya mı ait
                 float driftHeight = 0.0;
 
                 // Tür seçimi yoğunluk elemesinden bağımsız olmalı: ayrı karma.
@@ -383,8 +389,16 @@ Shader "ToTheSummit/Precipitation"
                 float fallSpeed = lerp(lerp(physicalSpeed, SNOW_FALL_SPEED, isSnow),
                                        SPINDRIFT_FALL_SPEED, isDrift);
 
-                float3 box = lerp(_BoxSize, _SnowBoxSize, isSnow);
-                float3 drift = lerp(_RainDrifts[dropClass].xyz, _SnowDrift, isSnow);
+                // İÇ KUTU. Ayrı bir tanecik popülasyonu; kendi kutusuna, kendi
+                // kaymasıyla sarıyor. Kar da iç kutuya girebiliyor — orada temsil payı
+                // yok, tanecikler bire bir çiziliyor, yani sıklaşma kendiliğinden
+                // doğru sonucu veriyor.
+                float3 box = isNear > 0.5
+                           ? _NearBoxSize
+                           : lerp(_BoxSize, _SnowBoxSize, isSnow);
+                float3 drift = isNear > 0.5
+                             ? lerp(_RainDriftsNear[dropClass].xyz, _SnowDriftNear, isSnow)
+                             : lerp(_RainDrifts[dropClass].xyz, _SnowDrift, isSnow);
 
                 // ---- RÜZGÂRIN SINIR TABAKASI ----
                 //
@@ -882,7 +896,21 @@ Shader "ToTheSummit/Precipitation"
                 // kalır, yani enerji yoktan var olur.
                 float singleDrop = saturate(2.0 * radius
                                             / max(dropSpeed * _StreakExposure, 1e-6));
-                float rainAlpha = (1.0 - pow(1.0 - singleDrop, _StreakRepresentation))
+                // TEMSİL PAYI KONUMDAN TÜRÜYOR, kutudan değil.
+                //
+                // Aynı noktadaki iki tanecik hangi kutudan geldiğine bakılmaksızın aynı
+                // sayıda gerçek damlayı temsil etmeli; kutuya bağlansaydı aynı yerde iki
+                // farklı opaklık çıkardı.
+                //
+                // İç kutunun payı KENDİ SÖNÜMÜYLE aynı eğriyle giriyor: iç tanecikler
+                // 0.45·12 = 5.4 m'de sönmeye başlayıp 6 m'de bitiyor, yani ötesinde
+                // yoğunluğa katkıları da yok. İkisi ayrışsaydı sınırda opaklık sıçrardı.
+                float nearShare = 1.0 - smoothstep(_NearBoxSize.x * 0.45,
+                                                   _NearBoxSize.x * 0.5, centerDistance);
+                float localDensity = _RainDensity.x + _RainDensity.y * nearShare;
+                float representation = 1000.0 / max(localDensity, 1e-4);
+
+                float rainAlpha = (1.0 - pow(1.0 - singleDrop, representation))
                                 * (1.0 - _Snowiness);
 
                 // Taneye özel opaklık: hepsi aynı yoğunlukta olunca derinlik kayboluyordu.

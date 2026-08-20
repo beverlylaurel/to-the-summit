@@ -960,3 +960,66 @@ Taban 50/50 seçildi çünkü mevcut alanın oktav ağırlıkları (0.5 / 0.165)
 
 **Ders:** "sığmayan ölçeği kes" sezgisi bir enerji spektrumunda yanlıştır. Kesilen
 enerjinin nereye gittiği yazılmadan hiçbir bant kapatılmaz.
+
+
+## Yakın yağmur: periyodik döşeme yoğunluk gradyanı taşıyamaz
+
+Hacim `r³` ile büyüdüğü için tanecik bütçesinin neredeyse tamamı uzağa gidiyordu: 48 m'lik
+tek kutuda 5 metrenin içinde 1 188 tanecik, yani binde beş. Oysa oyuncunun TEK TEK DAMLA
+olarak okuduğu hacim orası.
+
+**Önce sürekli radyal dağılım ölçüldü.** `yoğunluk ∝ r^-p`, temsil payı `r^p` ile ölçekli
+(toplam damla sayısı korunacak şekilde). Ekran kaplaması, kilopiksel, yağış 1.0:
+
+    p     ortanca alfa   5 m içi            16-24 m    toplam
+    0     0.265          124  ( 2 215 tanecik)   657     1482
+    1     0.270          242  (10 708)           576     1696
+    1.5   0.255          265  (22 885)           506     1696
+    2     0.222          276  (47 571)           409     1609
+
+`p = 1` her ölçütte kazanıyor: toplam +%14, yakın alan +%95, ortanca alfa değişmiyor.
+`p = 2`'de uzak kabuk seyreliyor ve ortanca %16 düşüyor.
+
+**Ama radyal dağılım DOĞRUDAN UYGULANAMIYOR.** Tanecikler kameranın etrafında periyodik
+olarak sarılıyor ve periyodik bir döşeme yoğunluk gradyanı taşıyamaz — periyodiklik
+tekdüzelik demektir. Konumu radyal olarak BÜKMEK de denenmedi çünkü kâğıtta çürüdü:
+büküm Jacobian'ı hızı da ölçekler, yakın damlalar sürünmeye başlar. Aynı sınıftan bir hata
+bir gün önce ölçülmüştü (yükseklik bantları).
+
+**Uygulanabilir biçim iç içe kutu.** Her kutu kendi içinde tekdüze, kendi kaymasıyla
+integre ediliyor, kendi kutusuna sarıyor — yani hareket her yerde tam doğru. İç kutunun
+kapsadığı yerde yoğunluklar toplanıyor. Ölçüldü (yağış 1.0):
+
+    tek kutu 48          5 m içi  87   toplam  934
+    48 + 12, iç %5       5 m içi 194   toplam 1027
+    48 + 12, iç %10      5 m içi 227   toplam 1033   <- seçilen
+    48 + 12, iç %20      5 m içi 265   toplam 1003
+    48 + 16 + 6          5 m içi 221   toplam 1061
+
+İç %10 (25 000 tanecik, 12 m kutu) sürekli dağılımın kazancını yakalıyor: yakın alan iki
+buçuk kat, toplam +%11, ortanca alfa sabit. Üçüncü kutu kayda değer bir şey eklemiyor.
+
+**Temsil payı konumdan türetildi.** Kutuya bağlansaydı aynı noktadaki iki tanecik farklı
+opaklıkta çıkardı. İç kutunun yoğunluk katkısı kendi sönüm eğrisiyle giriyor, yoksa
+sınırda opaklık sıçrardı.
+
+
+## İz dokusunun çözünürlük seviyesi: makalenin kuralı tek seviye veriyor
+
+`[Garg 2006, §5]` "projeksiyon genişliğinden az büyük" seviyeyi seçmeyi söylüyor. Kural
+uygulandı ve sahnenin tamamı için tek cevap çıktı:
+
+    ekran genişliği (MinPixelWidth tabanı)   1.2 px
+    gerçek genişlik, 1.4 mm damla @ 1 m      1.4 px      @ 5 m  0.28 px
+    4 px'i aşan tek durum                    4 mm'den iri damla, 1 m'den yakın
+
+Karede bir iki tanecik. Yani `size4` doğru; `size16` dört kat fazlaydı.
+
+Asıl bedel boşa giden doku değil, **alt örnekleme**: 525 piksel yüksekliğindeki iz uzak
+damlada 9 piksele iniyor (58 kat) ve dizilerde mipmap yok, donanım düzeltemiyor.
+Makalenin dipnotu tam bunu söylüyor. `size4`'te oran 14 kata iniyor, çalışma kümesi
+3.4 MB → 0.21 MB.
+
+**Üç seviyeyi birden bağlamaya gerek kalmadı** — dinamik seçim yalnız o %1'lik yakın
+kuyruk için işe yarardı. Ertelenmiş bir işin doğru cevabı bazen "gerekmiyormuş" oluyor;
+kural uygulanmadan bilinmiyordu.
