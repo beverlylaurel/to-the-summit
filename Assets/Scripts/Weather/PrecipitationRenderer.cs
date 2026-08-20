@@ -49,15 +49,15 @@ public class PrecipitationRenderer : MonoBehaviour
     /// Bir taneciğin temsil ettiği damla kümesinin ekran payı. Yoğunluğumuz 0.8
     /// damla/m³, gerçek şiddetli yağmur ~1000/m³ — bin kat eksik ve o yoğunluğa çıkmak
     /// 90 milyon tanecik demek. Tanecik kendi hacmindeki kümenin payını taşıyor.
-    /// ÖLÇÜLDÜ, KEYFÎ DEĞİL: 19 m kutuda 250 000 tanecik = 36 damla/m³; şiddetli
-    /// yağmurun gerçeği ~1000/m³, yani oran 27. Bir tanecik 27 damlayı temsil ediyor.
+    /// KUTUDAN TÜREYEN DEĞER: 32 m kutuda 250 000 tanecik = 7.6 damla/m³; şiddetli
+    /// yağmurun gerçeği ~1000/m³, yani oran 131. Bir tanecik 131 damlayı temsil ediyor.
     ///
-    /// TAVAN DOYUMDAN: 27'nin üstünde `α_eff` 0.6'yı aşıp doyuma gidiyor ve damlalar
-    /// arasındaki opaklık farkı — yani kalınlık algısı — siliniyor.
+    /// Sabit yazılmıyor, kutudan hesaplanıyor — ikisi elle tutulunca ayrışıyor ve
+    /// yoğunluk sessizce yanlış oluyor.
     ///
     /// Kaplamaya giriyor, geometriye değil: `α_eff = 1 − (1−α)^N`. Tek damlanın
     /// α'sı 0.02 → 0.47.
-    const float Representation = 27f;
+    static float Representation => 1000f / (PrecipitationParticles / (BoxSize.x * BoxSize.y * BoxSize.z));
 
     /// Teşhis kipi F1 panelinden sürülüyor, Inspector'dan değil.
     public static int StreakProbe;
@@ -82,7 +82,7 @@ public class PrecipitationRenderer : MonoBehaviour
     /// Kutu 20 m: hacim 8000 m³, yoğunluk 31/m³, açık 32 kata iniyor. Uzak damla zaten
     /// piksel altı ve görünmüyor — bütçeyi oraya harcamanın karşılığı yok. Uzağı
     /// yoğunluk katmanı taşımalı (`DECISIONS.md`, perde şu an kapalı).
-    /// Kutu 19 m. 48 → 20 → 12 → 19; hepsi ölçümle.
+    /// Kutu 32 m. 48 → 20 → 12 → 19 → 24 → 32; hepsi ölçümle.
     ///
     /// Son daraltmanın sebebi KALINLIK: damlanın gerçek kalınlığı ancak quad 1.2
     /// piksellik raster tabanını aştığında ekrana ulaşıyor. 3 mm'lik damla için o sınır
@@ -104,7 +104,7 @@ public class PrecipitationRenderer : MonoBehaviour
     /// görünür yarıçap 9.5 m.
     ///
     /// 15 metre istenirse tek yol tanecik sayısı: 1 M gerekir.
-    static readonly Vector3 BoxSize = new(19f, 19f, 19f);
+    static readonly Vector3 BoxSize = new(32f, 32f, 32f);
     static readonly Vector3 SnowBoxSize = new(40f, 40f, 40f);
 
     /// Sürüklenen kar kutusu. Yatayda dar tutuluyor: aynı tanecik sayısı küçük alana

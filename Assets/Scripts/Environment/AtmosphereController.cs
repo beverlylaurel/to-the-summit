@@ -202,7 +202,23 @@ public class AtmosphereController : MonoBehaviour
 
         // YAĞMURUN GÖRÜŞÜ SABİT DEĞİL, YAĞIŞ ORANINDAN TÜRÜYOR.
         //
-        // Meteorolojik bağıntı: `V(km) ≈ 1.9 · R^(−0.63)`, R yağış oranı (mm/sa).
+        // `V(m) = 18000 · R^(−0.70)`, R yağış oranı (mm/sa).
+        //
+        // KATSAYI ÖLÇÜLEN VERİYE UYDURULDU. Bir dönem `1900 · R^(−0.63)` yazıyordu ve
+        // yedi kat fazla kapatıyordu — büyük ihtimalle birim karışıklığı, "1.9 km"
+        // katsayısı 1900 m diye alınmış. Milano'da ölçülen optik sönümleme değerleri
+        // (Hameed ve diğ., FSO çalışması) bunu çürütüyor:
+        //
+        //   R =  25 mm/sa → 7.3 dB/km  → görüş 2330 m   (eski formül 387 m diyordu)
+        //   R =  50 mm/sa → 14.6 dB/km → görüş 1160 m   (eski formül 162 m)
+        //   R = 100 mm/sa → 23.8 dB/km → görüş  714 m
+        //
+        // Dönüşüm `σ = A/4.343`, `V = 3.912/σ` (Koschmieder). Uydurma R = 50 ve 100'de
+        // %0, R = 25'te %19 sapıyor.
+        //
+        // BU YALNIZ YAĞMURUN KENDİ SÖNÜMLEMESİ. Yağmurlu havanın puslu HİSSİ alçak
+        // bulut ve nemden geliyor; onlar bulut/tavan zincirinde ayrıca var. İkisini
+        // burada toplamak yağmuru sis yerine koymak olurdu.
         // Oran `PrecipitationRenderer`ın damla dağılımıyla AYNI eşlemeden geliyor
         // (şiddet 1.0 = 50 mm/sa), yoksa damlalar bir yoğunluğu, hava başka bir
         // yoğunluğu anlatırdı.
@@ -216,7 +232,7 @@ public class AtmosphereController : MonoBehaviour
         // sağanak sert kapatır. Doğrusal harman ikisini de yanlış veriyordu.
         float rainRate = 50f * precipitation;                      // mm/sa
         float rainVisibility = rainRate > 0.01f
-            ? 1900f * Mathf.Pow(rainRate, -0.63f)
+            ? 18000f * Mathf.Pow(rainRate, -0.70f)
             : settings.clearVisibility;
 
         // Kar yağmurdan çok daha kapatıcı; onun sabiti yerinde kalıyor.
@@ -224,9 +240,19 @@ public class AtmosphereController : MonoBehaviour
         float targetVisibility = Mathf.Min(settings.clearVisibility,
             Mathf.Lerp(settings.clearVisibility, wet, Mathf.Min(1f, precipitation * 4f)));
 
-        // Rüzgâr savurdukça görüş daha da kapanır — tipinin asıl etkisi budur.
-        // Yalnızca yağış varken anlamlı: açık havada rüzgâr görüşü kapatmaz.
-        float closure = wind.Strength * settings.windClosure * precipitation;
+        // Rüzgâr savurdukça görüş kapanır — tipinin asıl etkisi budur. Yalnızca yağış
+        // varken anlamlı: açık havada rüzgâr görüşü kapatmaz.
+        //
+        // KARLILIKLA AĞIRLIKLI. Savrulan kar gerçekten görüşü öldürür: taneler yerden
+        // kalkıp havada asılı kalır ve sönümleme yağışın kendi katkısının kat kat üstüne
+        // çıkar. Yağmurda böyle bir mekanizma yok — rüzgâr damlayı eğer ve hızlandırır,
+        // ama havada asılı su miktarını artırmaz; sönümleme yağış oranından gelir.
+        //
+        // Ölçüldü: ağırlıksız hâlde rüzgâr 0.95 ve yağış 1.0'da kapanma 0.62, yani görüş
+        // 1164 m'den 445 m'ye düşüyordu — yağmurun kendi sönümlemesinin iki buçuk katı
+        // bir kesinti, kaynağı da yalnızca rüzgâr.
+        float closure = wind.Strength * settings.windClosure * precipitation
+                      * Mathf.Lerp(0.2f, 1f, snowiness);
         targetVisibility *= 1f - closure;
 
         // Sis bankları rüzgârla sürüklenir; yüzey sürtünmesi yüzünden bulut kadar

@@ -706,20 +706,36 @@ Shader "ToTheSummit/Precipitation"
                 // parlak görünür. Tam ışık korunumu (bölü widen) ince damlaları
                 // görünmezliğe itiyor — karekök, kalınlık farkını taşırken taneciği
                 // ayakta bırakan denge
-                // PİKSEL ALTI İNCELİK BOYUTTA DEĞİL PARLAKLIKTA TAŞINIR.
+                // YARIM KORUNUM — ÖLÇÜLEREK GERİ ALINDI.
                 //
-                // Quad bir pikselden inceyse rasterizer ya tek piksel çizer ya atlar;
-                // `widen` onu tabana şişiriyor. Taşınan ışığın korunması için alfa AYNI
-                // oranda düşmeli — `÷widen`. Bir dönem `÷sqrt(widen)` yazıyordu, gerekçesi
-                // "ince damlalar görünmezliğe itiliyor"du.
+                // Bir dönem tam korunum (`÷widen`) yazıldı, gerekçesi "kalınlık farkı
+                // parlaklığa geçsin"di. Ölçüldü ve gerekçe çürüdü: kalınlık farkı ZATEN
+                // ekrana ulaşamıyor, damlaların eni 0.1-1.0 piksel ve hepsi 1.2 piksel
+                // raster tabanına oturuyor. Tam korunum hiçbir şey kazandırmadı, yalnız
+                // her damlayı `widen` kadar böldü — 5 m'deki tipik damlanın alfası 0.45'ten
+                // 0.17'ye düştü ve kullanıcı "çok şeffaflar" dedi.
                 //
-                // O gerekçe artık geçersiz: temsil payı ölçülüp 32'ye çıkınca alfa
-                // 0.02'den 0.48'e geldi, yani korunuma yer var. Yarım korunumun bedeli
-                // ölçüldü: en 0.1-1.0 piksel aralığında değişiyor ama hepsi 1.2 piksele
-                // şişiyor ve kalınlık farkı EKRANA HİÇ ULAŞMIYOR — kullanıcı "izlerin
-                // hepsi aynı kalınlıkta" diye bildirdi. Tam korunumla fark parlaklığa
-                // geçiyor: ince damla soluk, iri damla belirgin.
-                float rainThin = lerp(1.0 / widen, 1.0 / sqrt(widen), isSnow);
+                // Yarım korunumda kademelenme de DAHA İYİ: `widen` damla boyuyla ters
+                // orantılı olduğu için bölen de damlayla değişiyor. İnce damla ÷3.46,
+                // kalın damla ÷1.1 — son alfa 0.17 ile 0.79 arası, 4.6 kat fark.
+                // Tam korunumda bu fark 2.4 kattı.
+                // ÜS BİLİNÇLİ OLARAK 0.35 — tam korunum 0.5 olurdu.
+                //
+                // Bağlayıcı kısıt temsil payı değil, `widen` bölmesi: ortanca `widen` 11,
+                // yani tam korunumda alfa 3.3'e bölünüyor ve damlalar şeffaf kalıyor.
+                // Üs taraması (kutu 32 m, şiddet 0.4, 20 000 örnek):
+                //
+                //   üs 0.50 → ortanca alfa 0.262, ince/kalın farkı 2.49x
+                //   üs 0.35 → ortanca alfa 0.377, farkı 1.94x
+                //   üs 0.25 → ortanca alfa 0.479, farkı 1.64x
+                //   üs 0.00 → ortanca alfa 0.873, farkı 1.09x   (fark yok olur)
+                //
+                // 0.35: alfa 1.44 kat artıyor, kademelenmenin dörtte üçü duruyor.
+                //
+                // Bu makalenin de yaptığı sapma. `[Tatarchuk 2006, §3.6.1]`: "Realistic
+                // rain is very faint in bright regions... While this may be physically
+                // accurate, it doesn't create a perception of strong rainfall."
+                float rainThin = pow(widen, -0.35);
                 OUT.alpha = lerp(rainAlpha, snowAlpha, isSnow) * fade * rainThin;
                 return OUT;
             }
