@@ -129,6 +129,7 @@ GameObject:
   m_Component:
   - component: {fileID: 75784307}
   - component: {fileID: 75784308}
+  - component: {fileID: 75784309}
   m_Layer: 0
   m_Name: Precipitation
   m_TagString: Untagged
@@ -168,12 +169,22 @@ MonoBehaviour:
   shader: {fileID: 4800000, guid: 64a1760316d80e84e8a8e4b127c3bca9, type: 3}
   cloudLayer: {fileID: 1147612205}
   observer: {fileID: 848219609}
-  streaks: {fileID: 0}
+  streaks: {fileID: 75784309}
   timeOfDay: {fileID: 508855605}
-  exposureTime: 0.016666668
-  databasePeriod: 0.016666668
-  sourceScale: 1
-  curtainPattern: {fileID: 11700000, guid: c68667420cb94ce4fa5f1716bd487309, type: 2}
+--- !u!114 &75784309
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 75784306}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fbed6ef5a3f1c384596003ed838e2c3a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RainStreakWorkingSet
+  database: {fileID: 11400000, guid: 9954b9123f12105428cba71a4b009e02, type: 2}
+  level: -1
 --- !u!1 &263682441
 GameObject:
   m_ObjectHideFlags: 0

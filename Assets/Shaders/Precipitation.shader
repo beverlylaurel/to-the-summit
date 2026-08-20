@@ -216,6 +216,7 @@ Shader "ToTheSummit/Precipitation"
                 float  isDrift    : TEXCOORD6;    // sürüklenen kar mı, yağan kar mı
                 float3 streak     : TEXCOORD7;    // (osc, dcam alt indeks, dcam payı)
                 float  dropMm     : TEXCOORD10;   // damlanın çapı (mm), teşhis için
+                float  dropDist   : TEXCOORD11;   // kameraya uzaklık (m), teşhis için
                 float2 streakCrop : TEXCOORD8;    // (v ölçeği, birleştirme yapıldı mı)
                 float3 airColor   : TEXCOORD9;    // damlanın ARDINDAKİ göğün radyansı
             };
@@ -558,7 +559,20 @@ Shader "ToTheSummit/Precipitation"
                 worldPos += right * offset.x * size * widen + up * offset.y * size * stretch;
 
                 float camDistance = length(worldPos - cameraPos);
-                float fade = 1.0 - smoothstep(box.x * 0.25, box.x * 0.5, camDistance);
+                // SÖNÜM KUTU YÜZEYİNE SIKIŞIK.
+                //
+                // Sönümün tek işi sarma sınırında patlamayı gizlemek: tanecikler
+                // kameranın etrafındaki küpte sarılıyor ve yüzeyde (0.5·kutu) alfa
+                // sıfır olmalı, yoksa damla birden belirip kayboluyor.
+                //
+                // Eskiden 0.25'te başlıyordu ve bedeli ölçüldü: küresel kabuk dağılımına
+                // göre taneciklerin %87.5'i sönüm bölgesinde kalıyor, yani bütçenin
+                // ancak sekizde biri tam güçte çiziliyordu. Kullanıcı "yağış 1'de
+                // istediğim yoğunluğu hissedemiyorum" dedi.
+                //
+                // 0.45'te başlayınca tam güçlü pay %12.5'ten %73'e çıkıyor. Sönüm bandı
+                // hâlâ 0.95 m kalınlığında ve sarma yüzeyinde alfa sıfır — patlama yok.
+                float fade = 1.0 - smoothstep(box.x * 0.45, box.x * 0.5, camDistance);
 
                 // Kristal düz yüzeyleri döndükçe ışığı yakalayıp bırakır. Kar yağışının
                 // parıldaması silüetten değil buradan gelir.
@@ -569,6 +583,7 @@ Shader "ToTheSummit/Precipitation"
                 OUT.corner = IN.corner;
                 OUT.streak = float3(oscIndex, floor(dcamPos), frac(dcamPos));
                 OUT.dropMm = radius * 2000.0;
+                OUT.dropDist = camDistance;
                 OUT.streakCrop = float2(vScale, vScale > 1.0 ? 1.0 : 0.0);
 
                 // DAMLANIN ARDINDAKİ GÖK. Damla ışık üretmiyor, arkadan geleni kırıyor;
@@ -902,6 +917,13 @@ Shader "ToTheSummit/Precipitation"
                     //     sonraki luminans. Arka planla karşılaştırılacak büyüklük bu.
                     if (_StreakDebug < 5.5)
                         return half4(ProbeRamp(dot(rainRadiance, float3(0.2126, 0.7152, 0.0722))), 1.0);
+
+                    // 8 — MESAFE: damlanın kameraya uzaklığı, kutunun yarı genişliğine
+                    //     göre. Derinlik algısı boy gradyanı ve hareket paralaksından
+                    //     gelir; ikisi de mesafe DAĞILIMINA bağlı. Ekran tek renkse
+                    //     damlalar fiilen tek mesafede demektir ve derinlik imkânsızdır.
+                    if (_StreakDebug > 7.5)
+                        return half4(ProbeRamp(saturate(IN.dropDist / (_BoxSize.x * 0.5))), 1.0);
 
                     // 7 — ÇAP: damlanın çapı renk bandı olarak. Kalınlık farkı
                     //     ekranda piksel altı olduğu için gözle ayrılamıyor; bu prob

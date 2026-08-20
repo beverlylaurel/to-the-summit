@@ -383,7 +383,18 @@ public class PrecipitationRenderer : MonoBehaviour
 
     void OnWeatherChanged(WeatherState state)
     {
-        density = Mathf.Pow(state.Precipitation, DensityExponent);
+        // MARSHALL-PALMER SIFIRDA GEÇERSİZ, KAPI ŞART.
+        //
+        // `N ∝ R^0.21` eğrisi sıfıra yakın çok dik: şiddet 0.001'de bile yoğunluk 0.234
+        // çıkıyor, yani taneciklerin dörtte biri çiziliyor. Hava yumuşatmayla sıfıra
+        // YAKLAŞIYOR ama oturmuyor; sonuç, panel "yağış 0,00" gösterirken ekranda
+        // yağmur olması (kullanıcı bildirdi, çap probuyla görüldü).
+        //
+        // Bağıntı R > 0 için doğru ama R → 0'da yağış OLAYININ kendisi bitmeli. Kapı
+        // şiddetin en alt diliminde: 0.05 altı çiseleme bile değil (R < 2.5 mm/sa),
+        // orada damla sayısı sıfıra iniyor.
+        density = Mathf.Pow(state.Precipitation, DensityExponent)
+                * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.05f, state.Precipitation));
         precipitation = state.Precipitation;
         snowiness = state.Snowiness;
     }
