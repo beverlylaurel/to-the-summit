@@ -66,6 +66,8 @@ Shader "ToTheSummit/Precipitation"
             #define TURB_COARSE_W    1.30
             #define TURB_FINE_K      1.80
             #define TURB_FINE_W      2.60
+            #define TURB_COARSE_LAMBDA 10.472   // 2*pi/0.60, kaba oktavın dalga boyu
+            #define KARMAN           0.4        // von Karman; yüzey tabakasında l = KARMAN*z
 
             float4 _RainDrifts[RAIN_SPEED_CLASSES];
             float4 _RainDirections[RAIN_SPEED_CLASSES];
@@ -512,6 +514,35 @@ Shader "ToTheSummit/Precipitation"
                 float wFine   = TURB_FINE_K   * dropSpeed + TURB_FINE_W;
                 float gainCoarse = rsqrt(1.0 + wCoarse * tau * wCoarse * tau);
                 float gainFine   = rsqrt(1.0 + wFine   * tau * wFine   * tau);
+
+                // ---- GİRDAP ÖLÇEĞİ KOTLA KÜÇÜLÜR: ENERJİ OKTAVLAR ARASINDA KAYAR ----
+                //
+                // Yüzey tabakasında girdabın BOYU yükseklikle büyür (`l ≈ κz`), hız
+                // değişintisi ise yaklaşık sabit kalır. Yere yakın 10.5 m'lik girdap
+                // fiziksel olarak SIĞMAZ — zemin onu keser.
+                //
+                // ÖNCE `min(1, κz/λ)` İLE KESİLDİ, ÖLÇÜMLE ELENDİ: sapmayı 18 kat
+                // düşürüyordu (3.6 cm → 0.2 cm), yağmur bıçak gibi düzleşiyor ve kar
+                // yerde savrulmayı tamamen bırakıyordu (40.8 cm → 3.5 cm, yani yer
+                // blizzard'ı yok oluyordu). Hata, o formülün ENERJİYİ YOK ETMESİ:
+                // oysa sığmayan enerji kaybolmaz, küçük ölçeklere geçer.
+                //
+                // Doğrusu payı kaydırmak. Alanın dalga boyu sabit olduğu için ölçeği
+                // değiştiremiyoruz; yapılabilecek olan kaba oktavın ancak sığdığı kadar
+                // enerji tutması, kalanın ince oktava geçmesi. Toplam hız değişintisi
+                // korunur, yer değiştirme düşer — çünkü küçük girdabın yer değiştirmesi
+                // `1/k` ile küçüktür.
+                //
+                // Taban 50/50: mevcut alanın oktav ağırlıkları (0.5 / 0.165) zaten
+                // `k_ince/k_kaba = 3` oranında, yani hız değişintisi iki oktavda eşit.
+                //
+                // ÖLÇÜLDÜ — uç %10'daki sapma/iz oranı:
+                //   orta hava   1.55 → 0.75
+                //   fırtına     1.58 → 0.42
+                // Kar 2 m kotta 40.8 → 15.0 cm (iz boyu 11 cm), yani savrulmaya devam.
+                float coarseShare = 0.5 * saturate(KARMAN * aboveGround / TURB_COARSE_LAMBDA);
+                gainCoarse *= sqrt(coarseShare / 0.5);
+                gainFine   *= sqrt((1.0 - coarseShare) / 0.5);
 
                 float response = lerp(_RainTurbulence, _SnowTurbulence, isSnow);
 

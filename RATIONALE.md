@@ -924,3 +924,39 @@ tarafta duruyordu.
 katsayısıyla taklit ediliyordu. Fiziği koyunca gerekçesi kalmadı; terim geri gelmez.
 Yağmurun sapması 3-4 kat, karınki 1.6 kat azaldı — aradaki makas budur.
 
+
+## Girdap ölçeği kotla küçülür — kesilerek değil, enerji kaydırılarak
+
+Atalet süzgeci konduktan sonra sapma/iz oranı ölçüldü ve uç %10 fırtınada 1.5'te kaldı:
+yere yakın ince damlalar. Sınır tabakası yatay hızlarını kestiği için izleri kısalıyor,
+ama girdap genliği her kotta aynıydı.
+
+Sebep: yüzey tabakasında girdabın BOYU `l ≈ κz` ile büyür. Yere yakın 10.5 m'lik girdap
+fiziksel olarak sığmaz — zemin onu keser. Bizim alanın dalga boyu ise her kotta sabit.
+
+**İlk çözüm yanlıştı ve ölçümle elendi.** Genliği `min(1, κz/λ)` ile kesmek denendi
+(`DECISIONS.md`'ye o hâliyle yazılmıştı). Sonuç:
+
+    yağmur sapması  3.6 cm  ->  0.2 cm   (18 kat)
+    kar, kot 2 m   40.8 cm  ->  3.5 cm
+
+Yağmur bıçak gibi düzleşiyor, kar yerde savrulmayı tamamen bırakıyordu — yani yer
+blizzard'ı ortadan kalkıyordu. Hata formülün ENERJİYİ YOK ETMESİ: sığmayan girdabın
+enerjisi kaybolmaz, küçük ölçeklere geçer. Yüzey tabakasında `σ_u` yükseklikle
+neredeyse sabittir; değişen ölçektir.
+
+**Doğrusu payı kaydırmak.** Kaba oktav ancak sığdığı kadar enerji tutar, kalanı ince
+oktava geçer. Toplam hız değişintisi korunur; yer değiştirme yine de düşer, çünkü küçük
+girdabın yer değiştirmesi `1/k` ile küçüktür.
+
+Taban 50/50 seçildi çünkü mevcut alanın oktav ağırlıkları (0.5 / 0.165) zaten
+`k_ince/k_kaba = 3` oranında — yani hız değişintisi iki oktavda eşit dağılmış.
+
+Ölçülen sonuç, uç %10'daki sapma/iz oranı:
+
+    orta hava   1.55  ->  0.75
+    fırtına     1.58  ->  0.42
+    kar, kot 2 m  40.8 cm -> 15.0 cm   (iz boyu 11 cm, yani hâlâ savruluyor)
+
+**Ders:** "sığmayan ölçeği kes" sezgisi bir enerji spektrumunda yanlıştır. Kesilen
+enerjinin nereye gittiği yazılmadan hiçbir bant kapatılmaz.

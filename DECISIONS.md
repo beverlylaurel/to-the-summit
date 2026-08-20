@@ -890,35 +890,3 @@ tek yasada birleştirilir.
 
 **Maliyet:** birleştirme yarım gün; `speedFactor`'ın ölçülmüş uçlarının log profille
 yeniden doğrulanması gerekir.
-
-
-## Girdap genliği yerden yükseklikle azalmıyor — bilerek bırakıldı
-
-Atalet süzgeci konduktan sonra sapma/iz oranı ölçüldü (40 000 örnek, uçtan uca zincir):
-
-    dingin  ortanca 0.26   %90  0.93
-    orta    ortanca 0.33   %90  1.24
-    fırtına ortanca 0.27   %90  1.53
-
-Oran 1'i geçen tanecik yolunu çizgi değil kıvrım olarak gösteriyor. Ortanca her koşulda
-güvenli; **uç %10 fırtınada 1.5'e çıkıyor.** O uç, yere yakın ince damlalar: sınır tabakası
-yatay hızlarını kestiği için izleri kısalıyor, ama girdap genliği aynı kalıyor.
-
-**Gerekçe — genlik ölçümle doğrulandı, uydurma değil.** Atmosferik sınır tabakasında
-`σ_u ≈ 0.15·U`, `ε = σ_u³/L` (L = 100 m). 10.5 m'lik girdabın hız ölçeği
-`u'(λ) = (ελ)^(1/3) = 0.91 m/s`, taneciğin ondan aldığı yer değiştirme `u'/(k·|V|)`.
-Fırtınada gereken genlik **0.234 m**; kodda duran değer **0.25 m**. Yani sabit doğru yerde.
-
-Uç değerin gerçek sebebi, girdap ÖLÇEĞİNİN yerden yüksekliğe bağlı olmaması: yüzey
-tabakasında girdap boyu `ℓ ≈ κz` ile küçülür, bizim alanın dalga boyu her kotta sabit
-(10.5 / 3.5 m). Doğrusu genliği `ℓ(z)/λ` ile ölçeklemek.
-
-**Neden şimdi yapılmadı:** aynı belirtinin üstüne bu oturumda altı değişiklik bindi ve
-sonuncusu ölçümle bozuk çıktı. Yedinci terim, doğrulanmamış bir yüzde dilimi için
-eklenecekti. Ayrıca uç değer bile başlangıç noktasından **3.4 kat iyi**: oturum öncesi
-tipik oran 5.1'di (süzgeç yok, iz boyu terminal hızdan).
-
-**Tetikleyici:** yere yakın ince damlalarda hâlâ kıvrım okunuyorsa — özellikle aşağı
-bakarken, fırtınada — genlik `min(1, κz/λ)` ile ölçeklenir. `κ = 0.4`.
-
-**Maliyet:** birkaç satır; `profile`'ın hesaplandığı yerde `aboveGround` zaten elde.
