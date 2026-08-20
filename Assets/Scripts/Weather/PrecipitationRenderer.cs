@@ -49,12 +49,12 @@ public class PrecipitationRenderer : MonoBehaviour
     /// Bir taneciğin temsil ettiği damla kümesinin ekran payı. Yoğunluğumuz 0.8
     /// damla/m³, gerçek şiddetli yağmur ~1000/m³ — bin kat eksik ve o yoğunluğa çıkmak
     /// 90 milyon tanecik demek. Tanecik kendi hacmindeki kümenin payını taşıyor.
-    /// ÖLÇÜLDÜ, KEYFÎ DEĞİL: 20 m kutuda 250 000 tanecik = 31 damla/m³; şiddetli
-    /// yağmurun gerçeği ~1000/m³, yani oran 32. Bir tanecik 32 damlayı temsil ediyor.
+    /// ÖLÇÜLDÜ, KEYFÎ DEĞİL: 12 m kutuda 250 000 tanecik = 145 damla/m³; şiddetli
+    /// yağmurun gerçeği ~1000/m³, yani oran 7. Bir tanecik 7 damlayı temsil ediyor.
     ///
     /// Kaplamaya giriyor, geometriye değil: `α_eff = 1 − (1−α)^N`. Tek damlanın
     /// α'sı 0.02 → 0.47.
-    const float Representation = 32f;
+    const float Representation = 7f;
 
     /// Teşhis kipi F1 panelinden sürülüyor, Inspector'dan değil.
     public static int StreakProbe;
@@ -79,7 +79,17 @@ public class PrecipitationRenderer : MonoBehaviour
     /// Kutu 20 m: hacim 8000 m³, yoğunluk 31/m³, açık 32 kata iniyor. Uzak damla zaten
     /// piksel altı ve görünmüyor — bütçeyi oraya harcamanın karşılığı yok. Uzağı
     /// yoğunluk katmanı taşımalı (`DECISIONS.md`, perde şu an kapalı).
-    static readonly Vector3 BoxSize = new(20f, 20f, 20f);
+    /// Kutu 12 m. 48 → 20 → 12; üçü de ölçümle.
+    ///
+    /// Son daraltmanın sebebi KALINLIK: damlanın gerçek kalınlığı ancak quad 1.2
+    /// piksellik raster tabanını aştığında ekrana ulaşıyor. 3 mm'lik damla için o sınır
+    /// 2.6 metre. 20 m'lik kutuda o kadar yakın damla yok denecek kadar azdı ve bütün
+    /// izler aynı kalınlıkta çiziliyordu (kullanıcı bildirdi) — fark yalnız parlaklıkta
+    /// kalıyordu.
+    ///
+    /// 12 m'de hacmin %4.3'ü 2.6 m'nin içinde, yani ~11 000 damla gerçek kalınlığıyla
+    /// çiziliyor. Uzağı sis taşıyor: yağmurda görüş zaten 143 m.
+    static readonly Vector3 BoxSize = new(12f, 12f, 12f);
     static readonly Vector3 SnowBoxSize = new(40f, 40f, 40f);
 
     /// Sürüklenen kar kutusu. Yatayda dar tutuluyor: aynı tanecik sayısı küçük alana

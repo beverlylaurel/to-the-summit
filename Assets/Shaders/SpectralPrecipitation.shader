@@ -41,7 +41,7 @@ Shader "Hidden/ToTheSummit/SpectralPrecipitation"
 
             float4 _CurtainParams;   // xy: ekran boyu (px), z: yoğunluk, w: zaman
             float4 _CurtainFlow;     // xy: akışın ekran yönü, z: hız, w: desen ölçeği (px)
-            float4 _CurtainDepth;    // x: yakın kesme (m), y: karlılık, zw: boş
+            float4 _CurtainDepth;    // x: yakın kesme (m), y: karlılık, z: boş, w: görüş (m)
 
 
             half4 frag(Varyings input) : SV_Target
@@ -98,8 +98,23 @@ Shader "Hidden/ToTheSummit/SpectralPrecipitation"
                 //
                 // Geriye tek koşul kalıyor: çok yakındaki cismin ÖNÜNE geçmemek. El ve
                 // tırmanış duvarı perdenin berisinde durmalı.
-                float depthGate = saturate((sceneDepth - _CurtainDepth.x)
-                                           / max(_CurtainDepth.x, 1.0));
+                // PERDE ORTA BANTTA — ÜÇ KATMANIN ORTASI.
+                //
+                // `rain-spec.md` §10.3/§10.4 bunu açıkça söylüyor: yakını Garg-Nayar
+                // taneleri çizer, uzağı Langer perdesi doldurur, ikisi çakışmaz.
+                //
+                // ALT SINIR tanecik kutusunun kenarı: orada damlalar tek tek çiziliyor,
+                // perde üstlerine binerse aynı yağış iki kez sayılır.
+                //
+                // ÜST SINIR görüşten: sis oranın ötesini zaten siliyor ve orada perde
+                // sisin işini ikinci kez yapar. Perdenin bir dönem kapatılma sebebi tam
+                // buydu (`DECISIONS.md`) — tüm ekrana tül sürüyordu. Bant, sisin hâlâ
+                // içinden görülebildiği aralık.
+                float nearEdge = max(_CurtainDepth.x, 1.0);
+                float far = max(_CurtainDepth.w, 1.0);
+
+                float depthGate = smoothstep(nearEdge, nearEdge * 2.5, sceneDepth)
+                                * (1.0 - smoothstep(far * 0.25, far * 0.8, sceneDepth));
 
                 if (depthGate <= 1e-4) return 0;
 

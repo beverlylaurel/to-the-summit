@@ -107,7 +107,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SpectralPrecipitationFeature
   m_Active: 0
   curtainShader: {fileID: 4800000, guid: 6bbeb79d97059ef4abf285f67807ddcd, type: 3}
-  nearCutoff: 25
+  nearCutoff: 12
   patternScale: 512
   flowSpeed: 1.4
 --- !u!114 &4389833048426162622

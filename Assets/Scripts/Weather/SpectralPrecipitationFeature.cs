@@ -18,7 +18,7 @@ public class SpectralPrecipitationFeature : ScriptableRendererFeature
 
     [Tooltip("Perdenin görünmeye başladığı mesafe (metre). Bundan yakını taneler taşıyor; " +
              "tırmanış duvarı ve el hep bu mesafenin berisinde kalıyor.")]
-    [SerializeField] float nearCutoff = 40f;
+    [SerializeField] float nearCutoff = 12f;
 
     [Tooltip("Desen ölçeği (piksel). ÖZELLİK BOYU: pişmiş doku boyuna eşit olmalı (512), " +
              "yoksa halka ölçeği kayıyor ve desen kar değil mermer gibi görünüyor. " +
@@ -90,6 +90,7 @@ public class SpectralPrecipitationFeature : ScriptableRendererFeature
             var cameraData = frameData.Get<UniversalCameraData>();
 
             var texture = SpectralPrecipitationState.Pattern;
+
             if (texture == null) return;
 
             float intensity = SpectralPrecipitationState.Intensity;
@@ -166,6 +167,10 @@ public static class SpectralPrecipitationState
 
     /// 0 yağmur, 1 kar.
     public static float Snowiness;
+
+    /// Görüş mesafesi (metre). Perde YALNIZ orta bantta çalışıyor: yakını taneler
+    /// çiziyor, uzağı sis zaten siliyor. Üst sınır buradan türüyor.
+    public static float Visibility = 10000f;
 
     /// Yağışın DÜNYA hızı (düşüş + rüzgâr). Perde akış eksenini buradan alıyor;
     /// taneler de aynı hızla düşüyor, iki katman ayrışmasın diye.

@@ -805,9 +805,25 @@ bizde var.** Perde tüm ekrana sabit bir tül sürüyor, sis zaten aynı işi ya
 üst üste biniyor. Makalenin örnekleri düz arka plan görüntüleri; bizimki hacimsel sisli
 bir dağ.
 
-**Tetikleyici.** Kar ve yağmur (Faz B, Faz C) bittikten sonra geri açılıp yeniden
-değerlendirilecek. O noktada bilinen tek sapma adayı: perdeyi görüş mesafesine bağlamak
-(sis kalınken sönsün).
+**İKİNCİ DENEME (2026-08-20) — ORTA BANTTA DA KARŞILIĞI YOK.**
+
+Yağmur oturduktan sonra tetikleyici işletildi ve perde bu kez `rain-spec.md` §10.4'ün
+tarif ettiği yere kondu: tüm ekrana tül değil, YALNIZ orta bant. Alt sınır tanecik
+kutusunun kenarı (12 m), üst sınır yağışın KENDİ görüşü (`1900·R^(−0.63)`, sisin birleşik
+rakamı değil — o yer seviyesinde 68 m okuyup perdeyi sisin zaten sildiği bölgeye
+sıkıştırıyordu).
+
+Ölçüldü: bant 12-129 m, yoğunluk 0.88, en güçlü 30-40 m. Kullanıcı F1'den aç/kapa
+yaptı — **görünür fark yok.**
+
+Sebep anlaşılabilir: yağmur görüşü 162 m'ye indiği için 129 m'nin ötesi zaten sis, 12
+m'nin berisini zaten taneler dolduruyor. Aradaki bant ekranda küçük bir şerit ve orada
+da sis perdeyle aynı işi yapıyor. Langer'ın hibriti, sisi olmayan bir sahne için
+tasarlanmış.
+
+**Tetikleyici.** Yeni bir sebep doğmadıkça açılmayacak. Açılacaksa önce şu ölçülmeli:
+perdenin bandında sis ne kadar opak — sis orada %50'nin üstündeyse perdenin katkısı
+tanım gereği görünmez.
 
 **Maliyet.** Geri açmak tek bayrak. Kapalıyken çalışma zamanı maliyeti sıfır.
 

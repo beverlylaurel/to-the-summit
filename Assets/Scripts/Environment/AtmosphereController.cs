@@ -200,9 +200,38 @@ public class AtmosphereController : MonoBehaviour
             activeCloudBottom = Mathf.Lerp(activeCloudBottom, targetBottom,
                 1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(1f, settings.cloudBottomSmoothing)));
 
-        // Yağış tipine göre hedef görüş; kar yağmurdan çok daha kapatıcı
-        float wet = Mathf.Lerp(settings.rainVisibility, settings.snowVisibility, snowiness);
-        float targetVisibility = Mathf.Lerp(settings.clearVisibility, wet, precipitation);
+        // YAĞMURUN GÖRÜŞÜ SABİT DEĞİL, YAĞIŞ ORANINDAN TÜRÜYOR.
+        //
+        // Meteorolojik bağıntı: `V(km) ≈ 1.9 · R^(−0.63)`, R yağış oranı (mm/sa).
+        // Oran `PrecipitationRenderer`ın damla dağılımıyla AYNI eşlemeden geliyor
+        // (şiddet 1.0 = 50 mm/sa), yoksa damlalar bir yoğunluğu, hava başka bir
+        // yoğunluğu anlatırdı.
+        //
+        // Eskiden `rainVisibility = 900 m` sabitti ve şiddetle DOĞRUSAL harmanlanıyordu.
+        // Ölçüldü: tam yağmurda ekranda 2063 m görüş vardı, fizik 167 m diyor — yağmur
+        // havayı neredeyse hiç puslandırmıyordu ve yağmurun DERİNLİĞİ yoktu (yakındaki
+        // izler doğru, uzağı bomboş). Kullanıcı bildirdi.
+        //
+        // Üstel bağıntı şeklin kendisini de düzeltiyor: hafif yağmur görüşü az kapatır,
+        // sağanak sert kapatır. Doğrusal harman ikisini de yanlış veriyordu.
+        float rainRate = 50f * precipitation;                      // mm/sa
+        float rainVisibility = rainRate > 0.01f
+            ? 1900f * Mathf.Pow(rainRate, -0.63f)
+            : settings.clearVisibility;
+
+        // PERDENİN ÜST SINIRI YAĞIŞIN KENDİ GÖRÜŞÜ — sisin birleşik rakamı değil.
+        //
+        // Ölçüldü: yer seviyesinde birleşik görüş 68 m çıkıyordu ve perde 12-54 m'ye
+        // sıkışıyordu, yani sisin zaten sildiği bölgeye. Oysa ekranda dağ kilometrelerce
+        // ötede görünüyor — sis YÜKSEKLİK sisi, oyuncu içinde, dağ üstünde. Perdenin
+        // işi yağışın kendi puslanması, sisin değil.
+        SpectralPrecipitationState.Visibility =
+            Mathf.Lerp(rainVisibility, settings.snowVisibility, snowiness);
+
+        // Kar yağmurdan çok daha kapatıcı; onun sabiti yerinde kalıyor.
+        float wet = Mathf.Lerp(rainVisibility, settings.snowVisibility, snowiness);
+        float targetVisibility = Mathf.Min(settings.clearVisibility,
+            Mathf.Lerp(settings.clearVisibility, wet, Mathf.Min(1f, precipitation * 4f)));
 
         // Rüzgâr savurdukça görüş daha da kapanır — tipinin asıl etkisi budur.
         // Yalnızca yağış varken anlamlı: açık havada rüzgâr görüşü kapatmaz.
@@ -672,6 +701,7 @@ public class AtmosphereController : MonoBehaviour
         float bankStrength = Mathf.Lerp(settings.fogBankClear, settings.fogBankStorm,
             weather.Precipitation);
         bankStrength = Mathf.Max(bankStrength, 0.7f * (1f - burnOff));
+
 
         Shader.SetGlobalColor(HeightFogColorId, color);
         // Sisin gölge tarafı gökyüzününkiyle aynı renk: ikisi ayrışırsa alacakaranlıkta

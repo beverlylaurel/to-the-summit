@@ -689,7 +689,21 @@ Shader "ToTheSummit/Precipitation"
                 // parlak görünür. Tam ışık korunumu (bölü widen) ince damlaları
                 // görünmezliğe itiyor — karekök, kalınlık farkını taşırken taneciği
                 // ayakta bırakan denge
-                OUT.alpha = lerp(rainAlpha, snowAlpha, isSnow) * fade / sqrt(widen);
+                // PİKSEL ALTI İNCELİK BOYUTTA DEĞİL PARLAKLIKTA TAŞINIR.
+                //
+                // Quad bir pikselden inceyse rasterizer ya tek piksel çizer ya atlar;
+                // `widen` onu tabana şişiriyor. Taşınan ışığın korunması için alfa AYNI
+                // oranda düşmeli — `÷widen`. Bir dönem `÷sqrt(widen)` yazıyordu, gerekçesi
+                // "ince damlalar görünmezliğe itiliyor"du.
+                //
+                // O gerekçe artık geçersiz: temsil payı ölçülüp 32'ye çıkınca alfa
+                // 0.02'den 0.48'e geldi, yani korunuma yer var. Yarım korunumun bedeli
+                // ölçüldü: en 0.1-1.0 piksel aralığında değişiyor ama hepsi 1.2 piksele
+                // şişiyor ve kalınlık farkı EKRANA HİÇ ULAŞMIYOR — kullanıcı "izlerin
+                // hepsi aynı kalınlıkta" diye bildirdi. Tam korunumla fark parlaklığa
+                // geçiyor: ince damla soluk, iri damla belirgin.
+                float rainThin = lerp(1.0 / widen, 1.0 / sqrt(widen), isSnow);
+                OUT.alpha = lerp(rainAlpha, snowAlpha, isSnow) * fade * rainThin;
                 return OUT;
             }
 
