@@ -26,27 +26,35 @@ public class PrecipitationRenderer : MonoBehaviour
              "Senaryo 1'i aynı sahneyi 60° ve 10° azimutta belirgin farklı gösteriyor.")]
     [SerializeField] TimeOfDay timeOfDay;
 
-    [Tooltip("Kameranın pozlama süresi (saniye). Hem izin BOYUNU (veritabanı kırpması) " +
-             "hem ŞEFFAFLIĞINI belirliyor: α = 2r₀/(v·T_exp), kısa pozlamada iz daha " +
-             "opak. Kare süresinden TÜREMİYOR — türeseydi yağmurun görüntüsü fps ile " +
-             "değişirdi.")]
-    [SerializeField] float exposureTime = 1f / 60f;
+    /// Kameranın pozlama süresi (saniye). Hem izin BOYUNU (veritabanı kırpması) hem
+    /// ŞEFFAFLIĞINI belirliyor: `α = 2r₀/(v·T_exp)`, kısa pozlamada iz daha opak.
+    /// Kare süresinden TÜREMİYOR — türeseydi yağmurun görüntüsü fps ile değişirdi.
+    const float ExposureTime = 1f / 60f;
 
-    [Tooltip("Veritabanının pişirildiği salınım periyodu (saniye). `T_db = 1/60`, " +
-             "r₀ = 1.6 mm damlanın 2π/ω₂'si (`rain-spec.md` §5.3).")]
-    [SerializeField] float databasePeriod = 1f / 60f;
+    /// Veritabanının pişirildiği salınım periyodu. `T_db = 1/60`, r₀ = 1.6 mm damlanın
+    /// `2π/ω₂`'si (`rain-spec.md` §5.3).
+    const float DatabasePeriod = 1f / 60f;
 
-    [Tooltip("KALİBRASYON. Veritabanı izleri kendi render kurulumunun radyansında " +
-             "(kaynak 10 m'de, ~14 sr); bizim güneşimiz o kaynak değil, yani mutlak " +
-             "seviye taşınmıyor. `rain-spec.md` §11.3.5 bu katsayıyı zorunlu kılıyor. " +
-             "1.0 kalibre edilmemiş demek — ölçümle belirlenecek.")]
-    [SerializeField] float sourceScale = 1f;
+    /// KALİBRASYON — ÖLÇÜLDÜ. Veritabanı izleri kendi render kurulumunun radyansında
+    /// (kaynak 10 m'de); bizim güneşimiz o kaynak değil, mutlak seviye taşınmıyor.
+    /// `rain-spec.md` §11.3.5 bu katsayıyı zorunlu kılıyor.
+    ///
+    /// F1'deki "oran" probuyla İKİ TURDA ölçüldü. Damla ışık üretmiyor, gökten geleni
+    /// kırıyor; hedefi ardındaki gökle eşitlenmek, yani oran 1.
+    ///   ×1 → oran 0.16-0.36 (camgöbeği), damla gökten sönük
+    ///   ×4 → oran 1.4 üstü (kırmızı), damla gökten parlak
+    /// İkisinin arası: 4 / 1.4 ≈ 3.
+    const float SourceScale = 3f;
 
-    [Tooltip("Bir taneciğin kaç gerçek damlayı temsil ettiğinin ekran payı. Yoğunluğumuz " +
-             "0.8 damla/m³, gerçek şiddetli yağmur ~1000/m³ — bin kat eksik ve o " +
-             "yoğunluğa çıkmak 90 milyon tanecik demek. 1 = saf fiziksel boyut, " +
-             "ölçüldü: ekranda görünmüyor.")]
-    [SerializeField] float representation = 12f;
+    /// Bir taneciğin temsil ettiği damla kümesinin ekran payı. Yoğunluğumuz 0.8
+    /// damla/m³, gerçek şiddetli yağmur ~1000/m³ — bin kat eksik ve o yoğunluğa çıkmak
+    /// 90 milyon tanecik demek. Tanecik kendi hacmindeki kümenin payını taşıyor.
+    /// ÖLÇÜLDÜ, KEYFÎ DEĞİL: 20 m kutuda 250 000 tanecik = 31 damla/m³; şiddetli
+    /// yağmurun gerçeği ~1000/m³, yani oran 32. Bir tanecik 32 damlayı temsil ediyor.
+    ///
+    /// Kaplamaya giriyor, geometriye değil: `α_eff = 1 − (1−α)^N`. Tek damlanın
+    /// α'sı 0.02 → 0.47.
+    const float Representation = 32f;
 
     /// Teşhis kipi F1 panelinden sürülüyor, Inspector'dan değil.
     public static int StreakProbe;
@@ -60,7 +68,18 @@ public class PrecipitationRenderer : MonoBehaviour
 
     // Alan. Kar kendi kutusunda sarılır: nokta biçimli tane, uzayan damla kadar ekran
     // alanı kaplamadığı için aynı bütçenin kameraya daha sıkı paketlenmesi gerekir.
-    static readonly Vector3 BoxSize = new(48f, 48f, 48f);
+    /// Yağış kutusu. 48 m'den indirildi.
+    ///
+    /// Ölçüldü: 48 m küp = 110 592 m³, 250 000 tanecik → 2.26 damla/m³. Şiddetli
+    /// yağmurun gerçek yoğunluğu ~1000/m³, yani 442 kat eksik. O açığı temsil payıyla
+    /// kapatmak imkânsız: alfa en fazla 50 kat artabilir, kalan 9 kat geometriye biner
+    /// ve izler gerçek boyunun kat kat üstüne çıkar (bir dönem 1.8 m uzunluğunda
+    /// "damla" çıktı).
+    ///
+    /// Kutu 20 m: hacim 8000 m³, yoğunluk 31/m³, açık 32 kata iniyor. Uzak damla zaten
+    /// piksel altı ve görünmüyor — bütçeyi oraya harcamanın karşılığı yok. Uzağı
+    /// yoğunluk katmanı taşımalı (`DECISIONS.md`, perde şu an kapalı).
+    static readonly Vector3 BoxSize = new(20f, 20f, 20f);
     static readonly Vector3 SnowBoxSize = new(40f, 40f, 40f);
 
     /// Sürüklenen kar kutusu. Yatayda dar tutuluyor: aynı tanecik sayısı küçük alana
@@ -82,7 +101,14 @@ public class PrecipitationRenderer : MonoBehaviour
     /// Yağış tanecikleri. Bütçe bölünüyor: ilk blok yağış, kalanı sürüklenen kar.
     /// Ayrı bir mesh yerine tek mesh büyütüldü — iki sistem aynı anda çalışabilsin diye.
     /// Gerçekte kar yağarken de yerden kar kalkar; paylaşımlı bütçe bunu yasaklardı.
-    const int PrecipitationParticles = 90000;
+    /// 90 000'den çıkarıldı. Ölçüldü: 48 m küp kutuda 90 000 tanecik 0.8 damla/m³
+    /// demek; şiddetli yağmurun gerçek yoğunluğu Marshall-Palmer'a göre ~1000/m³.
+    /// Yani eski tavan gerçekte orta şiddetin bile altındaydı ve %50 ÇİSELTİ gibi
+    /// okunuyordu (kullanıcı bildirdi).
+    ///
+    /// Damlayı şişirmek yerine sayı artırıldı: temsil payını büyütmek izi kalınlaştırıp
+    /// gerçekçiliği bozuyor, sayı ise doğrudan eksik olan büyüklük.
+    const int PrecipitationParticles = 250000;
 
     /// Sürüklenen kar tanecikleri. Yağıştan FAZLA: ince toz ancak taneler tek tek
     /// seçilemeyecek kadar sıkışınca okunuyor. 40.000'de metrekareye ~70 tane düşüyordu
@@ -95,7 +121,16 @@ public class PrecipitationRenderer : MonoBehaviour
 
     const int PrecipitationSubMesh = 0;
     const int SpindriftSubMesh = 1;
-    const float DensityExponent = 1.6f;   // şiddetin görsel yoğunluğa dönüşüm eğrisi
+    /// Şiddetin çizilen tanecik sayısına dönüşüm eğrisi — MARSHALL-PALMER'DAN.
+    ///
+    /// Dağılımda `N₀` sabit ve `Λ = 4.1·R^(−0.21)`, yani toplam damla sayısı
+    /// `N = N₀/Λ ∝ R^0.21`. Yağış şiddetlenince damla SAYISI neredeyse hiç artmıyor;
+    /// artan şey damla BOYU. Sağanağı sağanak yapan iri ve hızlı damlalardır.
+    ///
+    /// Eskiden 1.6'ydı, yani sayı şiddetle sert büküyordu. Şiddet zaten Λ üzerinden
+    /// boyu da sürüyor — çifte sayım. Ölçüldü: şiddet 0.30'da yalnız %14 tanecik
+    /// çiziliyordu (36k) ve hafif yağmur ekranda yok oluyordu.
+    const float DensityExponent = 0.21f;
     // Karın tanecik bütçesindeki payı. Yağmurla kar bir aradayken ikisini bölmek için
     // var; saf kar fırtınasında ise yağmur payı zaten sıfır olduğundan kısıtlamanın
     // karşılığı yok. 0.45'te bütçenin yarısından fazlası hiçbir işe yaramadan eleniyor
@@ -106,11 +141,24 @@ public class PrecipitationRenderer : MonoBehaviour
     // Yağmur. Damla boyutu hem düşme hızını hem rüzgâra direncini belirler:
     // ince serpinti yanlamasına uçar, iri damla dik iner. Ölçekler shader'da
     // damla başına uygulanır, buradaki değerler bandın uçlarıdır.
-    // Terminal hız gerçekte 9 m/s ama tanecikler 16-24 m uzakta olduğundan açısal hız
-    // düşük kalıyor. Gerçek yağmurda damlalar birkaç metreden geçtiği için hızlı görünür;
-    // o algıyı yakalamak için hız bilerek abartılır
-    const float RainFallSpeed = 16f;      // en iri damlanın düşme hızı
-    const float RainSlowFactor = 0.45f;   // en ince damlanın hız oranı
+    /// Terminal hız — Gunn & Kinzer ölçümlerinin Atlas bağıntısı:
+    ///   `v(D) = 9.65 − 10.3·exp(−0.6·D)`,  D = çap (mm)
+    ///
+    /// Çap bandı 0.5-5 mm, yani hız 2.02-9.14 m/s.
+    ///
+    /// ESKİDEN 16 m/s'YE ABARTILIYORDU ve gerekçesi yazılıydı: "tanecikler 16-24 m
+    /// uzakta olduğundan açısal hız düşük kalıyor". O abartı eski görsel modele aitti.
+    /// Artık İZİN BOYU fiziksel terminal hızdan çiziliyor (`v·T_exp`); hareket başka
+    /// hızda olursa damla kat ettiği yoldan kısa iz bırakır — ölçüldü, 16'ya karşı 9.14,
+    /// yani iz gerçek yolun %57'si kadardı.
+    ///
+    /// Hız damla başına hesaplanamıyor: rüzgâr sürüklenmesi CPU'da sınıf başına integre
+    /// ediliyor. Sınıfın temsilci yarıçapından türüyor, shader'daki formülün aynısı.
+    static float TerminalVelocity(float t)
+    {
+        float diameterMm = 0.5f + 4.5f * t;
+        return 9.65f - 10.3f * Mathf.Exp(-0.6f * diameterMm);
+    }
     const float RainWindFactor = 0.85f;   // iri damlanın yediği rüzgâr oranı
     const float RainWindLightFactor = 1f; // ince damla rüzgârı tam yer
     // Hız sürekli olsaydı her damla kaymayı farklı ölçekle çarpardı ve sarma noktası
@@ -236,7 +284,7 @@ public class PrecipitationRenderer : MonoBehaviour
         for (int i = 0; i < RainSpeedClasses; i++)
         {
             float t = i / (RainSpeedClasses - 1f);
-            rainVelocities[i] = Vector3.down * (RainFallSpeed * Mathf.Lerp(RainSlowFactor, 1f, t));
+            rainVelocities[i] = Vector3.down * TerminalVelocity(t);
         }
     }
 
@@ -280,15 +328,15 @@ public class PrecipitationRenderer : MonoBehaviour
         material.SetVector(StreakCornerPresentId, streaks.CornerPresent);
         material.SetFloat(StreakMirrorId, streaks.MirroredAzimuth ? 1f : 0f);
         material.SetFloatArray(StreakDcamFractionId, streaks.DcamHeightFraction);
-        material.SetFloat(StreakExposureId, exposureTime);
-        material.SetFloat(StreakDbPeriodId, databasePeriod);
+        material.SetFloat(StreakExposureId, ExposureTime);
+        material.SetFloat(StreakDbPeriodId, DatabasePeriod);
         // GÜNEŞ DİSKİNİN RADYANSI. `TimeOfDay` rengi 1'e normalize tutuyor ve şiddeti
         // ayrı taşıyor; çarpımları gerçek büyüklük (`TimeOfDay` içinde yazılı).
         Color sun = timeOfDay.CurrentSunColor * timeOfDay.SunIntensity;
         material.SetVector(StreakSunRadianceId, new Vector4(sun.r, sun.g, sun.b, 1f));
 
-        material.SetFloat(StreakRepresentationId, representation);
-        material.SetFloat(StreakSourceScaleId, sourceScale);
+        material.SetFloat(StreakRepresentationId, Representation);
+        material.SetFloat(StreakSourceScaleId, SourceScale);
         material.SetFloat(StreakDebugId, StreakProbe);
         material.SetFloat(StreakDebugScaleId, StreakProbeScale);
 
@@ -342,7 +390,7 @@ public class PrecipitationRenderer : MonoBehaviour
         for (int i = 0; i < RainSpeedClasses; i++)
         {
             float t = i / (RainSpeedClasses - 1f);
-            float fallSpeed = RainFallSpeed * Mathf.Lerp(RainSlowFactor, 1f, t);
+            float fallSpeed = TerminalVelocity(t);
             Vector3 target = Vector3.down * fallSpeed
                              + wind.Velocity * Mathf.Lerp(RainWindLightFactor, RainWindFactor, t);
 
@@ -410,7 +458,7 @@ public class PrecipitationRenderer : MonoBehaviour
         // PERDE TANELERLE AYNI EKSENDE AKAR. Ayrı bir yön verilseydi iki katman
         // ayrışır, perde bir yöne taneler başka yöne giderdi.
         SpectralPrecipitationState.Velocity =
-            Vector3.Lerp(rainDirections[0] * RainFallSpeed, snowVelocity, snowiness);
+            Vector3.Lerp(rainDirections[0] * TerminalVelocity(1f), snowVelocity, snowiness);
 
         // Oyun hızı çarpanıyla ilerliyor. `Time.time` doğrudan okunsaydı test panelinde
         // zaman yavaşlatılınca taneler yavaşlar, perde yavaşlamazdı.

@@ -132,9 +132,46 @@ Shader "ToTheSummit/Precipitation"
             /// Quad'ın genişliği de buradan geliyor (çap = 2r₀) ve şeffaflık formülü
             /// de bunu istiyor. Tek kaynak: ikisi ayrı sayılardan gelseydi alfa ile
             /// ekrandaki kalınlık birbirinden bağımsız kayabilirdi.
-            float DropRadius(float dropSize)
+            /// MARSHALL-PALMER'DAN SÜREKLİ ÖRNEKLEME.
+            ///
+            /// `N(D) = N₀·exp(−ΛD)`,  `Λ = 4.1·R^(−0.21)` mm⁻¹, `R` yağış oranı (mm/sa).
+            /// Üstel dağılımdan örnek: `D = −ln(u)/Λ`.
+            ///
+            /// ESKİDEN 8 AYRIK DEĞERDİ. Yarıçap hız sınıfı indeksinden türüyordu
+            /// (`dropClass/7`), yani boy ve kalınlık sekiz kademeye kilitliydi ve
+            /// damlalar gözle "hepsi aynı" okunuyordu (kullanıcı bildirdi). Hız sınıfı
+            /// ayrık KALMALI — rüzgâr tepkisi sınıf başına dizide tutuluyor — ama
+            /// yarıçapın ayrık olması için sebep yok; makale de sürekli dağılım istiyor
+            /// (`[Garg 2006, §5]`, dipnot 11).
+            ///
+            /// Çap 0.5-5 mm'ye kırpılıyor: altı sisin işi, üstü düşerken parçalanır.
+            float DropRadius(float3 u, float intensity)
             {
-                return lerp(0.00025, 0.0025, dropSize);
+                float rate = lerp(0.5, 50.0, intensity);          // mm/sa
+                float lambda = 4.1 * pow(rate, -0.21);            // mm⁻¹
+
+                // KAPLAMAYA GÖRE ÖRNEKLEME — sayıya göre değil.
+                //
+                // Marshall-Palmer sayı dağılımı: damlaların ezici çoğunluğu minik.
+                // Ölçüldü: R = 50 mm/sa'te Λ = 1.82, ORTANCA ÇAP 0.38 mm. Sayıya göre
+                // örneklenince tanecik bütçesinin neredeyse tamamı ekranda görünmeyen
+                // damlalara gidiyor ve yağmur kayboluyor (kullanıcı bildirdi).
+                //
+                // Gerçek yağmurda o minik damlalar da var, ama görüntüyü iri olanlar
+                // taşıyor ve bizim damla sayımız gerçeğin binde biri — bütçe görünür
+                // olana harcanmalı.
+                //
+                // Ekran payı ≈ çap × hız ≈ D². Üstel dağılımın D²-ağırlıklı hâli
+                // Gamma(3): üç üstel örneğin toplamı. Ortalama çap 3/Λ = 1.65 mm.
+                //
+                // Makale de bu esnekliği kendi dipnotunda veriyor (`[Garg 2006]`,
+                // dipnot 11): "The size distribution can also be customized to include
+                // larger drop sizes to create more dramatic rain effects."
+                float sum = -(log(max(u.x, 1e-4)) + log(max(u.y, 1e-4)) + log(max(u.z, 1e-4)));
+                float diameter = sum / lambda;                    // mm
+
+                // 0.5-5 mm: altı sisin işi, üstü düşerken parçalanır.
+                return clamp(diameter, 0.5, 5.0) * 0.0005;        // yarıçap, metre
             }
 
             /// Terminal hız (m/s), Gunn & Kinzer ölçümlerinin Atlas bağıntısı:
@@ -283,10 +320,24 @@ Shader "ToTheSummit/Precipitation"
                 // kayar. Çiseleme ince ve yavaş süzülür, sağanak iri ve hızlı iner.
                 // Şiddet zaten iki Perlin katmanıyla dalgalandığı için yağışın temposu
                 // rüzgâr sıfırken bile kendiliğinden değişir — ayrı bir gürültü gerekmez
-                float dropSpread = lerp(3.6, 1.3, _Precipitation);
-                int dropClass = (int)min(pow(Hash(seed.yxw), dropSpread) * RAIN_SPEED_CLASSES,
+                // TEK KAYNAK: ÖNCE YARIÇAP, SINIF ONDAN TÜRER.
+                //
+                // Bir dönem tersiydi: sınıf bağımsız bir hash'ten çıkıyor, yarıçap da
+                // ayrı bir hash'ten. Sonuç tutarsızdı — damla en yavaş sınıfta olup en
+                // uzun izi bırakabiliyordu, çünkü HAREKET sınıftan, İZ BOYU yarıçaptan
+                // geliyordu. Rüzgâr ve girdap tepkisi de sınıfa bağlı olduğu için aynı
+                // kopukluk oradaydı.
+                //
+                // Şimdi yarıçap sürekli dağılımdan örnekleniyor, sınıf onun kovası.
+                // Sınıf AYRIK KALMAK ZORUNDA: rüzgâr sürüklenmesi CPU'da sınıf başına
+                // integre ediliyor (`_RainDrifts`), damla başına yapılamıyor.
+                float dropRadius = DropRadius(
+                    float3(Hash(seed.yxw), Hash(seed.wxy), Hash(seed.xwz)), _Precipitation);
+
+                // 0.25-2.5 mm yarıçap aralığını sınıf ekseni olarak kullan.
+                float dropSize = saturate((dropRadius - 0.00025) / 0.00225);
+                int dropClass = (int)min(dropSize * RAIN_SPEED_CLASSES,
                                          RAIN_SPEED_CLASSES - 1);
-                float dropSize = dropClass / (RAIN_SPEED_CLASSES - 1.0);
 
                 float3 box = lerp(_BoxSize, _SnowBoxSize, isSnow);
                 float3 drift = lerp(_RainDrifts[dropClass].xyz, _SnowDrift, isSnow);
@@ -396,28 +447,12 @@ Shader "ToTheSummit/Precipitation"
                 // geliyordu. O ayar iz görünümünü veritabanından almayan bir modele
                 // aitti; doku artık gerçek bir damlanın izini taşıyor ve ölçeği de
                 // gerçek olmalı, yoksa desenin frekansı ekranda yanlış boyda çıkar.
-                float radius = DropRadius(dropSize);
+                float radius = dropRadius;
                 float physicalSpeed = TerminalVelocity(radius);
                 float debugScale = _StreakDebug > 0.5 ? max(_StreakDebugScale, 1.0) : 1.0;
 
-                // HER TANECİK BİRÇOK DAMLAYI TEMSİL EDİYOR — ölçülmüş bir eksikliğin
-                // karşılığı, keyfî bir büyütme değil.
-                //
-                // Kutu 48 m küp = 110 000 m³, tanecik 90 000 → 0.8 damla/m³. Şiddetli
-                // yağmurun gerçek yoğunluğu Marshall-Palmer'a göre ~1000/m³, yani BİN
-                // KAT fazla; o yoğunluğa çıkmak 90 milyon tanecik demek.
-                //
-                // Saf fiziksel boyutta sonuç ÖLÇÜLDÜ: 5 m'de 31 × 1 piksel, α 0.03,
-                // ekranda hiçbir şey görünmüyor. Doğru olan boyut değil TEMSİL —
-                // tanecik kendi hacmindeki damla kümesinin ekran payını taşımalı.
-                //
-                // Langer hibritinin var oluş sebebi de bu (`snow-spec.md` §7.1): yakını
-                // tane çizer, uzağı yoğunluk katmanı taşır. O katman şu an kapalı
-                // (`DECISIONS.md`), yani temsil payının tamamı taneye biniyor.
-                float representation = _StreakRepresentation;
-
-                float rainWidth = 2.0 * radius * representation * debugScale;
-                float rainLength = physicalSpeed * _StreakExposure * representation * debugScale;
+                float rainWidth = 2.0 * radius * debugScale;
+                float rainLength = physicalSpeed * _StreakExposure * debugScale;
 
                 float sizeSpread = 0.4 + 1.4 * variation;
                 float size = lerp(rainWidth, _SnowSize * sizeSpread, isSnow);
@@ -541,7 +576,25 @@ Shader "ToTheSummit/Precipitation"
                 // Ölçüldü — onunla radyans 0.08-0.32 bandında kalıyor ve damlalar
                 // gökten koyu düşüp SİYAH LEKE gibi okunuyordu. Göğü çizen fonksiyon
                 // `AirColor` (`Sky.shader` da onu çağırıyor), tek kaynak o.
-                OUT.airColor = AirColor(-viewDirection);
+                // TON İLE PARLAKLIK AYRI — `SpindriftColor`'ın kuralının aynısı.
+                //
+                // Damla dalga boyu seçmiyor; rengi üstüne düşen ışıktan. Ama gündüz tek
+                // bir yönün rengini alamaz: onu aydınlatan gök kubbenin TAMAMI ve sonuç
+                // nötre yakın. Ham `AirColor` olduğu gibi geçirilince damlalar mavi
+                // okunuyordu — projede aynı hata savrulan karda da yapılmış ve kuralı
+                // `HeightFog.hlsl`'e yazılmış ("ufuk mavisini taşımak yamacı fosforlu
+                // maviye çeviriyordu").
+                //
+                // Ayrım güneşin yüksekliğinden: alçakken ışık yönlü ve renkli, şafakta
+                // yağmur kızıl olmalı; yükseldikçe dağınık ve nötr.
+                //
+                // LUMİNANS KORUNUYOR — yalnız ton nötre çekiliyor. Parlaklık ayrı
+                // ölçülmüş bir büyüklük (`SourceScale`), ona dokunulmuyor.
+                float3 sky = AirColor(-viewDirection);
+                float skyLuma = dot(sky, float3(0.2126, 0.7152, 0.0722));
+                float3 skyHue = sky / max(1e-4, skyLuma);
+                float lowSun = 1.0 - smoothstep(0.02, 0.28, _SunHeight);
+                OUT.airColor = lerp(1.0, skyHue, lowSun * 0.9) * skyLuma;
                 OUT.isSnow = isSnow;
                 OUT.isDrift = isDrift;
 
@@ -610,7 +663,18 @@ Shader "ToTheSummit/Precipitation"
                 // Hız FİZİKSEL terminal hız, taneciğin görsel düşüş hızı değil
                 // (gerekçe `TerminalVelocity` başında). Yarıçap ve hız quad kurulurken
                 // zaten hesaplandı.
-                float rainAlpha = saturate(2.0 * radius / max(physicalSpeed * _StreakExposure, 1e-6))
+                // TEMSİL PAYI GEOMETRİYE DEĞİL KAPLAMAYA GİRİYOR.
+                //
+                // Bir dönem quad'ın enini ve boyunu çarpıyordu. Kâğıtta çıktı: iz boyu
+                // 40-183 cm oluyordu, oysa gerçek damla 1/60 s'de 3.4-15 cm yol alır.
+                // 1.8 metrelik "damla" yağmur değil çubuk.
+                //
+                // Tanecik N damlayı temsil ediyorsa N kat BÜYÜK değil N kat OPAK olmalı:
+                // üst üste binen N damlanın kapaması `1 − (1−α)^N`. Boyut fiziksel
+                // kalıyor, iz görünür oluyor. α 0.02 → 0.21.
+                float singleDrop = saturate(2.0 * radius
+                                            / max(physicalSpeed * _StreakExposure, 1e-6));
+                float rainAlpha = (1.0 - pow(1.0 - singleDrop, _StreakRepresentation))
                                 * (1.0 - _Snowiness);
 
                 // Taneye özel opaklık: hepsi aynı yoğunlukta olunca derinlik kayboluyordu.
