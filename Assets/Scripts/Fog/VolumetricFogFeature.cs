@@ -145,6 +145,21 @@ public class VolumetricFogFeature : ScriptableRendererFeature
         static readonly int LightDirectionId = Shader.PropertyToID("_FogMainLightDirection");
         static readonly int LightColorId = Shader.PropertyToID("_FogMainLightColor");
         static readonly int CookieTextureId = Shader.PropertyToID("_MainLightCookieTexture");
+        static readonly int ShadowmapId = Shader.PropertyToID("_MainLightShadowmapTexture");
+        static readonly int WorldToShadowId = Shader.PropertyToID("_MainLightWorldToShadow");
+        static readonly int ShadowParamsId = Shader.PropertyToID("_MainLightShadowParams");
+        static readonly int ShadowmapSizeId = Shader.PropertyToID("_MainLightShadowmapSize");
+        static readonly int CascadeRadiiId = Shader.PropertyToID("_CascadeShadowSplitSphereRadii");
+
+        /// Kademe bölme küreleri. Kademeli gölgede hangi kademenin okunacağı bunlardan
+        /// çıkıyor; geçilmezse hepsi sıfır olur ve her nokta ilk kademeye düşer.
+        static readonly int[] CascadeSphereIds =
+        {
+            Shader.PropertyToID("_CascadeShadowSplitSpheres0"),
+            Shader.PropertyToID("_CascadeShadowSplitSpheres1"),
+            Shader.PropertyToID("_CascadeShadowSplitSpheres2"),
+            Shader.PropertyToID("_CascadeShadowSplitSpheres3"),
+        };
         static readonly int CookieMatrixId = Shader.PropertyToID("_MainLightWorldToLight");
 
         const int GroupSize = 8;
@@ -324,6 +339,35 @@ public class VolumetricFogFeature : ScriptableRendererFeature
             BindGlobalTexture(cmd, densityKernel, TerrainHeightMapId, "_TerrainHeightMap");
             BindGlobalTexture(cmd, densityKernel, SnowProfileId, "_SnowProfile");
             BindGlobalTexture(cmd, densityKernel, CookieTextureId, "_MainLightCookieTexture");
+
+            // ANA IŞIĞIN GÖLGESİ. `MainLightRealtimeShadow` compute içinde çağrılıyor
+            // (varyant `_MAIN_LIGHT_SHADOWS_CASCADE` sabit) ama gölge haritası kernel'e
+            // BAĞLANMIYORDU: Unity "Property (_MainLightShadowmapTexture) at kernel
+            // index (0) is not set" basıyordu ve sis, arazinin kestiği ışığı hiç
+            // görmüyordu — hacimde huzme yoktu, sadece cookie'den gelen bulut gölgesi
+            // vardı.
+            //
+            // Doku tek başına yetmiyor: kademeli gölgede doğru kademeyi seçmek için
+            // bölme küreleri, örnekleme için de matris dizisi ve parametreler gerekiyor.
+            // Hepsi URP tarafından KOMUT TAMPONUYLA yazılıyor, yani compute onları
+            // kendiliğinden görmüyor — bu dosyanın kendi dersi, ışık rengi ve cookie
+            // matrisi için de aynısı yapılmıştı.
+            BindGlobalTexture(cmd, densityKernel, ShadowmapId, "_MainLightShadowmapTexture");
+
+            Matrix4x4[] worldToShadow = Shader.GetGlobalMatrixArray(WorldToShadowId);
+            if (worldToShadow != null && worldToShadow.Length > 0)
+                cmd.SetComputeMatrixArrayParam(compute, WorldToShadowId, worldToShadow);
+
+            cmd.SetComputeVectorParam(compute, ShadowParamsId,
+                Shader.GetGlobalVector(ShadowParamsId));
+            cmd.SetComputeVectorParam(compute, ShadowmapSizeId,
+                Shader.GetGlobalVector(ShadowmapSizeId));
+            cmd.SetComputeVectorParam(compute, CascadeRadiiId,
+                Shader.GetGlobalVector(CascadeRadiiId));
+
+            for (int i = 0; i < CascadeSphereIds.Length; i++)
+                cmd.SetComputeVectorParam(compute, CascadeSphereIds[i],
+                    Shader.GetGlobalVector(CascadeSphereIds[i]));
 
             // Cookie matrisi de komut tamponuyla yazılıyor; sıfır okunursa UV sabit
             // kalır ve bulut gölgesi yapı yerine tek bir çarpana düşer.
