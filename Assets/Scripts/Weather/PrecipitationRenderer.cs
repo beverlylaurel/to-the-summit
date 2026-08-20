@@ -42,6 +42,19 @@ public class PrecipitationRenderer : MonoBehaviour
              "1.0 kalibre edilmemiş demek — ölçümle belirlenecek.")]
     [SerializeField] float sourceScale = 1f;
 
+    [Tooltip("Bir taneciğin kaç gerçek damlayı temsil ettiğinin ekran payı. Yoğunluğumuz " +
+             "0.8 damla/m³, gerçek şiddetli yağmur ~1000/m³ — bin kat eksik ve o " +
+             "yoğunluğa çıkmak 90 milyon tanecik demek. 1 = saf fiziksel boyut, " +
+             "ölçüldü: ekranda görünmüyor.")]
+    [SerializeField] float representation = 12f;
+
+    /// Teşhis kipi F1 panelinden sürülüyor, Inspector'dan değil.
+    public static int StreakProbe;
+
+    /// Teşhiste quad'ın büyütme katsayısı. 24 m'deki iz fiziksel ölçekte 0.4 × 12
+    /// piksel; 40 kat büyütme onu 16 × 480'e çıkarıyor, yani desen okunur oluyor.
+    const float StreakProbeScale = 40f;
+
     // Ayarlar bilerek serileştirilmiyor: Inspector'a girince sahnedeki bileşen eski
     // değerlerle donuyor ve koddaki değişiklik etkisiz kalıyor.
 
@@ -135,6 +148,10 @@ public class PrecipitationRenderer : MonoBehaviour
     static readonly int StreakExposureId = Shader.PropertyToID("_StreakExposure");
     static readonly int StreakDbPeriodId = Shader.PropertyToID("_StreakDbPeriod");
     static readonly int StreakSourceScaleId = Shader.PropertyToID("_StreakSourceScale");
+    static readonly int StreakSunRadianceId = Shader.PropertyToID("_StreakSunRadiance");
+    static readonly int StreakRepresentationId = Shader.PropertyToID("_StreakRepresentation");
+    static readonly int StreakDebugId = Shader.PropertyToID("_StreakDebug");
+    static readonly int StreakDebugScaleId = Shader.PropertyToID("_StreakDebugScale");
 
     static readonly int RainDriftsId = Shader.PropertyToID("_RainDrifts");
     static readonly int RainDirectionsId = Shader.PropertyToID("_RainDirections");
@@ -265,7 +282,15 @@ public class PrecipitationRenderer : MonoBehaviour
         material.SetFloatArray(StreakDcamFractionId, streaks.DcamHeightFraction);
         material.SetFloat(StreakExposureId, exposureTime);
         material.SetFloat(StreakDbPeriodId, databasePeriod);
+        // GÜNEŞ DİSKİNİN RADYANSI. `TimeOfDay` rengi 1'e normalize tutuyor ve şiddeti
+        // ayrı taşıyor; çarpımları gerçek büyüklük (`TimeOfDay` içinde yazılı).
+        Color sun = timeOfDay.CurrentSunColor * timeOfDay.SunIntensity;
+        material.SetVector(StreakSunRadianceId, new Vector4(sun.r, sun.g, sun.b, 1f));
+
+        material.SetFloat(StreakRepresentationId, representation);
         material.SetFloat(StreakSourceScaleId, sourceScale);
+        material.SetFloat(StreakDebugId, StreakProbe);
+        material.SetFloat(StreakDebugScaleId, StreakProbeScale);
 
         if (!streakTextureReported)
         {

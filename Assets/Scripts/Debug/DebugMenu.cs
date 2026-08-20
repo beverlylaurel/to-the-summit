@@ -523,6 +523,49 @@ public class DebugMenu : MonoBehaviour
     /// 8b doğrulanınca bu bölüm ve `SnowCollisionProbe` silinir.
     void DrawSnowCollision()
     {
+        BeginSection("Teşhis: yağmur izi");
+
+        GUILayout.Label(PrecipitationRenderer.StreakProbe switch
+        {
+            1 => "BÜYÜT: izler 40× büyük, gölgeleme normal",
+            2 => "HAM DESEN: veritabanının döndürdüğü değer",
+            3 => "ALFA: son şeffaflık",
+            4 => "AMBIENT: radyansın ikinci terimi",
+            5 => "RADYANS: iki terim toplanmış, luminans",
+            6 => "ORAN: radyans / gök — TURUNCU = doğru",
+            _ => "kapalı",
+        });
+
+        using (new GUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("kapat")) PrecipitationRenderer.StreakProbe = 0;
+            if (GUILayout.Button("büyüt")) PrecipitationRenderer.StreakProbe = 1;
+            if (GUILayout.Button("ham desen")) PrecipitationRenderer.StreakProbe = 2;
+            if (GUILayout.Button("alfa")) PrecipitationRenderer.StreakProbe = 3;
+        }
+
+        using (new GUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("ambient")) PrecipitationRenderer.StreakProbe = 4;
+            if (GUILayout.Button("radyans")) PrecipitationRenderer.StreakProbe = 5;
+            if (GUILayout.Button("oran")) PrecipitationRenderer.StreakProbe = 6;
+        }
+
+        if (PrecipitationRenderer.StreakProbe >= 2)
+        {
+            GUILayout.Label("koyu gri  0.00 - 0.02   (yok)");
+            GUILayout.Label("mavi      0.02 - 0.08");
+            GUILayout.Label("camgöbeği 0.08 - 0.18");
+            GUILayout.Label("yeşil     0.18 - 0.32");
+            GUILayout.Label("sarı      0.32 - 0.50");
+            GUILayout.Label("turuncu   0.50 - 0.70");
+            GUILayout.Label("kırmızı   0.70 +");
+        }
+
+        if (GUILayout.Button("Ayarları geri al")) PrecipitationRenderer.StreakProbe = 0;
+
+        EndSection();
+
         BeginSection("Teşhis: kar çarpışması");
 
         // Bileşen değil NESNE açılıyor: prob kapalı bir nesnede duruyor (kurulum

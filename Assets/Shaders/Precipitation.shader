@@ -83,10 +83,45 @@ Shader "ToTheSummit/Precipitation"
             float  _StreakDbPeriod;       // veritabanının pişirildiği salınım periyodu
             float  _StreakSourceScale;    // veritabanı kaynağının bizim güneşimize oranı
 
-            // KAYNAK RENKLERİ AYRICA GEÇMİYOR. İkisi de `HeightFog.hlsl`'de global:
-            //   `_HeightFogSunColor` — süzülmüş güneş radyansı, yönlü kanalın kaynağı
-            //   `_HeightFogColor`    — gökten içeri saçılan radyans, ambient kanalın
-            // Aynı büyüklükleri ikinci kez taşımak atmosfer zincirini ikiye bölerdi.
+            /// TEŞHİS KİPİ. 0 kapalı, 1 büyüt, 2 ham desen, 3 alfa.
+            ///
+            /// Fiziksel ölçekte iz 24 m'de 0.4 × 12 piksel ve α ≈ 0.02 — gözle
+            /// "var mı yok mu" ayrılamıyor. Üç kip üç ayrı soruyu ayırıyor:
+            /// boyut mu küçük, desen mi boş, alfa mı düşük.
+            float  _StreakDebug;
+
+            /// Teşhiste quad'ın büyütme katsayısı. Fiziksel boy korunmuyor; amaç
+            /// deseni GÖRMEK.
+            float  _StreakDebugScale;
+
+            /// Ayrık renk bantları. Göz "biraz koyu" ile "yarısı kadar"ı ayıramıyor;
+            /// bant sınırı tek doğru cevap üretiyor.
+            float3 ProbeRamp(float v)
+            {
+                if (v < 0.02) return float3(0.10, 0.10, 0.12);
+                if (v < 0.08) return float3(0.10, 0.20, 0.90);
+                if (v < 0.18) return float3(0.10, 0.80, 0.85);
+                if (v < 0.32) return float3(0.15, 0.85, 0.25);
+                if (v < 0.50) return float3(0.95, 0.90, 0.20);
+                if (v < 0.70) return float3(0.98, 0.55, 0.10);
+                return float3(0.95, 0.15, 0.10);
+            }
+
+            /// GÜNEŞ DİSKİNİN RADYANSI — yönlü kanalın kaynağı.
+            ///
+            /// `_HeightFogSunColor` KULLANILAMIYOR, adı yanıltıcı: kendi yorumu
+            /// "gök, güneş yönünde, ufkun 2° üstü" diyor, yani GÖK rengi. Yönlü kanal
+            /// güneşin kendisini istiyor ve disk, gökten mertebelerce parlak.
+            /// Ölçüldü: o globalle radyans 0.08-0.32 bandında kalıyor ve damlalar
+            /// gökten koyu düşüyordu.
+            ///
+            /// Ambient kanal `_HeightFogColor`'ı kullanmaya devam ediyor — o gerçekten
+            /// gök rengi, damlanın kubbeden aldığı aydınlatma o.
+            float3 _StreakSunRadiance;
+
+            /// Bir taneciğin temsil ettiği damla kümesinin ekran payı. Gerekçesi
+            /// kullanıldığı yerde: yoğunluğumuz gerçeğin binde biri.
+            float  _StreakRepresentation;
 
             #define STREAK_DCAM_COUNT 5
             #define STREAK_OSC_COUNT 10
@@ -144,6 +179,7 @@ Shader "ToTheSummit/Precipitation"
                 float  isDrift    : TEXCOORD6;    // sürüklenen kar mı, yağan kar mı
                 float3 streak     : TEXCOORD7;    // (osc, dcam alt indeks, dcam payı)
                 float2 streakCrop : TEXCOORD8;    // (v ölçeği, birleştirme yapıldı mı)
+                float3 airColor   : TEXCOORD9;    // damlanın ARDINDAKİ göğün radyansı
             };
 
             // Havanın rengi. AtmosphereController global olarak yazıyor; sis, bulut,
@@ -362,8 +398,26 @@ Shader "ToTheSummit/Precipitation"
                 // gerçek olmalı, yoksa desenin frekansı ekranda yanlış boyda çıkar.
                 float radius = DropRadius(dropSize);
                 float physicalSpeed = TerminalVelocity(radius);
-                float rainWidth = 2.0 * radius;
-                float rainLength = physicalSpeed * _StreakExposure;
+                float debugScale = _StreakDebug > 0.5 ? max(_StreakDebugScale, 1.0) : 1.0;
+
+                // HER TANECİK BİRÇOK DAMLAYI TEMSİL EDİYOR — ölçülmüş bir eksikliğin
+                // karşılığı, keyfî bir büyütme değil.
+                //
+                // Kutu 48 m küp = 110 000 m³, tanecik 90 000 → 0.8 damla/m³. Şiddetli
+                // yağmurun gerçek yoğunluğu Marshall-Palmer'a göre ~1000/m³, yani BİN
+                // KAT fazla; o yoğunluğa çıkmak 90 milyon tanecik demek.
+                //
+                // Saf fiziksel boyutta sonuç ÖLÇÜLDÜ: 5 m'de 31 × 1 piksel, α 0.03,
+                // ekranda hiçbir şey görünmüyor. Doğru olan boyut değil TEMSİL —
+                // tanecik kendi hacmindeki damla kümesinin ekran payını taşımalı.
+                //
+                // Langer hibritinin var oluş sebebi de bu (`snow-spec.md` §7.1): yakını
+                // tane çizer, uzağı yoğunluk katmanı taşır. O katman şu an kapalı
+                // (`DECISIONS.md`), yani temsil payının tamamı taneye biniyor.
+                float representation = _StreakRepresentation;
+
+                float rainWidth = 2.0 * radius * representation * debugScale;
+                float rainLength = physicalSpeed * _StreakExposure * representation * debugScale;
 
                 float sizeSpread = 0.4 + 1.4 * variation;
                 float size = lerp(rainWidth, _SnowSize * sizeSpread, isSnow);
@@ -479,6 +533,15 @@ Shader "ToTheSummit/Precipitation"
                 OUT.corner = IN.corner;
                 OUT.streak = float3(oscIndex, floor(dcamPos), frac(dcamPos));
                 OUT.streakCrop = float2(vScale, vScale > 1.0 ? 1.0 : 0.0);
+
+                // DAMLANIN ARDINDAKİ GÖK. Damla ışık üretmiyor, arkadan geleni kırıyor;
+                // ambient kanalın kaynağı bu yüzden göğün O YÖNDEKİ radyansı.
+                //
+                // `_HeightFogColor` KULLANILAMIYOR: o sisin rengi, gökten sönük.
+                // Ölçüldü — onunla radyans 0.08-0.32 bandında kalıyor ve damlalar
+                // gökten koyu düşüp SİYAH LEKE gibi okunuyordu. Göğü çizen fonksiyon
+                // `AirColor` (`Sky.shader` da onu çağırıyor), tek kaynak o.
+                OUT.airColor = AirColor(-viewDirection);
                 OUT.isSnow = isSnow;
                 OUT.isDrift = isDrift;
 
@@ -663,11 +726,25 @@ Shader "ToTheSummit/Precipitation"
                 // da şimşek eklendiğinde bu maske gerekecek — `DECISIONS.md`.
                 //
                 // Anizotropik maske de aynı sebeple yok: güneş izotrop.
-                float3 rainRadiance = (pointStreak * _HeightFogSunColor.rgb
-                                     + ambientStreak * _HeightFogColor.rgb)
+                float3 rainRadiance = (pointStreak * _StreakSunRadiance
+                                     + ambientStreak * IN.airColor)
                                     * _StreakSourceScale;
 
-                float rainMask = endFade;
+                // DAMLANIN KAPLADIĞI ALAN. Alfa quad'ın TAMAMINDA sabit olamaz.
+                //
+                // Makalede `α` sabit çünkü doku damlanın görüntüsünün TA KENDİSİ —
+                // quad ile iz aynı şey. Bizde quad temsil payıyla büyütülmüş bir
+                // dikdörtgen; damla onun tamamını kaplamıyor. Sabit alfa bırakılınca
+                // her damla ince bir iz yerine DOLU BİR DİKDÖRTGEN basıyordu ve gökten
+                // sönük olduğu için siyah leke gibi okunuyordu (kullanıcı bildirdi).
+                //
+                // Kaplama dokunun kendisinden geliyor: ambient kanal damlanın görüntü
+                // izini tüm genişliğinde taşıyor, yönlü kanal onun üstündeki parlak
+                // filament. İkisinin büyüğü, damlanın o pikseli kaplayıp kaplamadığını
+                // söylüyor.
+                float coverage = saturate(max(ambientStreak, pointStreak));
+
+                float rainMask = coverage * endFade;
 
                 // Kar tanesi: üç yumuşak lobun birleşimi.
                 //
@@ -719,6 +796,42 @@ Shader "ToTheSummit/Precipitation"
                 // Yağmurun rengi veritabanından + kaynak renklerinden; karınki mevcut
                 // zincirden. Karlılık ikisini seçiyor.
                 float3 color = lerp(rainRadiance, snowColor, max(IN.isSnow, IN.isDrift));
+
+                // TEŞHİS: yalnız yağmur damlaları. Kar kendi yolunda kalıyor ki
+                // sahnede referans kalsın.
+                if (_StreakDebug > 0.5 && IN.isSnow < 0.5 && IN.isDrift < 0.5)
+                {
+                    // 1 — BÜYÜT: normal gölgeleme, yalnız boyut büyük. Sorun boyutsa
+                    //     izler burada normal görünür.
+                    if (_StreakDebug < 1.5) return half4(color, IN.alpha * mask);
+
+                    // 2 — HAM DESEN: yönlü kanalın örneklediği değer, opak. Zincir
+                    //     kopuksa burası düz siyah kalır.
+                    if (_StreakDebug < 2.5) return half4(ProbeRamp(pointStreak), 1.0);
+
+                    // 3 — ALFA: son şeffaflık. Desen doğru olsa bile alfa görünmeyecek
+                    //     kadar küçük olabilir; bu ikisini ayırır.
+                    if (_StreakDebug < 3.5) return half4(ProbeRamp(IN.alpha * mask), 1.0);
+
+                    // 4 — AMBIENT DESEN: radyansın ikinci terimi. Yönlü kanal ince bir
+                    //     filament, izin geri kalanını ambient taşıyor; ikisini ayrı
+                    //     görmeden "renk neden sıfır" sorusu cevaplanamıyor.
+                    if (_StreakDebug < 4.5) return half4(ProbeRamp(ambientStreak), 1.0);
+
+                    // 5 — RADYANS: iki terim toplandıktan ve kalibrasyonla çarpıldıktan
+                    //     sonraki luminans. Arka planla karşılaştırılacak büyüklük bu.
+                    if (_StreakDebug < 5.5)
+                        return half4(ProbeRamp(dot(rainRadiance, float3(0.2126, 0.7152, 0.0722))), 1.0);
+
+                    // 6 — ORAN: radyans / ardındaki göğün radyansı. TEK DOĞRU CEVAPLI
+                    //     test. Damla ışık üretmiyor, gökten geleni kırıyor; oran 1
+                    //     olmalı. Yarısı basılıyor ki 1 TURUNCU banda (0.50-0.70)
+                    //     düşsün — koyu gri/mavi çok sönük, kırmızı çok parlak demek.
+                    float3 sky = max(IN.airColor, 1e-6);
+                    float ratio = dot(rainRadiance, float3(0.2126, 0.7152, 0.0722))
+                                / max(dot(sky, float3(0.2126, 0.7152, 0.0722)), 1e-6);
+                    return half4(ProbeRamp(ratio * 0.5), 1.0);
+                }
 
                 return half4(color, IN.alpha * mask);
             }
