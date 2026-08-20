@@ -215,6 +215,7 @@ Shader "ToTheSummit/Precipitation"
                 float  shape      : TEXCOORD5;    // tanenin iskelet çeşidi, 0-1
                 float  isDrift    : TEXCOORD6;    // sürüklenen kar mı, yağan kar mı
                 float3 streak     : TEXCOORD7;    // (osc, dcam alt indeks, dcam payı)
+                float  dropMm     : TEXCOORD10;   // damlanın çapı (mm), teşhis için
                 float2 streakCrop : TEXCOORD8;    // (v ölçeği, birleştirme yapıldı mı)
                 float3 airColor   : TEXCOORD9;    // damlanın ARDINDAKİ göğün radyansı
             };
@@ -567,6 +568,7 @@ Shader "ToTheSummit/Precipitation"
                 OUT.positionCS = TransformWorldToHClip(worldPos);
                 OUT.corner = IN.corner;
                 OUT.streak = float3(oscIndex, floor(dcamPos), frac(dcamPos));
+                OUT.dropMm = radius * 2000.0;
                 OUT.streakCrop = float2(vScale, vScale > 1.0 ? 1.0 : 0.0);
 
                 // DAMLANIN ARDINDAKİ GÖK. Damla ışık üretmiyor, arkadan geleni kırıyor;
@@ -900,6 +902,14 @@ Shader "ToTheSummit/Precipitation"
                     //     sonraki luminans. Arka planla karşılaştırılacak büyüklük bu.
                     if (_StreakDebug < 5.5)
                         return half4(ProbeRamp(dot(rainRadiance, float3(0.2126, 0.7152, 0.0722))), 1.0);
+
+                    // 7 — ÇAP: damlanın çapı renk bandı olarak. Kalınlık farkı
+                    //     ekranda piksel altı olduğu için gözle ayrılamıyor; bu prob
+                    //     "damlalar gerçekten farklı boyda mı" sorusunu tek doğru
+                    //     cevapla kapatıyor. Tek renk = hepsi aynı, karışık renk = farklı.
+                    //     0.5-5 mm bandı [0,1]'e eşleniyor.
+                    if (_StreakDebug > 6.5)
+                        return half4(ProbeRamp(saturate((IN.dropMm - 0.5) / 4.5)), 1.0);
 
                     // 6 — ORAN: radyans / ardındaki göğün radyansı. TEK DOĞRU CEVAPLI
                     //     test. Damla ışık üretmiyor, gökten geleni kırıyor; oran 1

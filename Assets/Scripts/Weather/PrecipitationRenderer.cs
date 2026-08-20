@@ -49,12 +49,15 @@ public class PrecipitationRenderer : MonoBehaviour
     /// Bir taneciğin temsil ettiği damla kümesinin ekran payı. Yoğunluğumuz 0.8
     /// damla/m³, gerçek şiddetli yağmur ~1000/m³ — bin kat eksik ve o yoğunluğa çıkmak
     /// 90 milyon tanecik demek. Tanecik kendi hacmindeki kümenin payını taşıyor.
-    /// ÖLÇÜLDÜ, KEYFÎ DEĞİL: 12 m kutuda 250 000 tanecik = 145 damla/m³; şiddetli
-    /// yağmurun gerçeği ~1000/m³, yani oran 7. Bir tanecik 7 damlayı temsil ediyor.
+    /// ÖLÇÜLDÜ, KEYFÎ DEĞİL: 19 m kutuda 250 000 tanecik = 36 damla/m³; şiddetli
+    /// yağmurun gerçeği ~1000/m³, yani oran 27. Bir tanecik 27 damlayı temsil ediyor.
+    ///
+    /// TAVAN DOYUMDAN: 27'nin üstünde `α_eff` 0.6'yı aşıp doyuma gidiyor ve damlalar
+    /// arasındaki opaklık farkı — yani kalınlık algısı — siliniyor.
     ///
     /// Kaplamaya giriyor, geometriye değil: `α_eff = 1 − (1−α)^N`. Tek damlanın
     /// α'sı 0.02 → 0.47.
-    const float Representation = 7f;
+    const float Representation = 27f;
 
     /// Teşhis kipi F1 panelinden sürülüyor, Inspector'dan değil.
     public static int StreakProbe;
@@ -79,7 +82,7 @@ public class PrecipitationRenderer : MonoBehaviour
     /// Kutu 20 m: hacim 8000 m³, yoğunluk 31/m³, açık 32 kata iniyor. Uzak damla zaten
     /// piksel altı ve görünmüyor — bütçeyi oraya harcamanın karşılığı yok. Uzağı
     /// yoğunluk katmanı taşımalı (`DECISIONS.md`, perde şu an kapalı).
-    /// Kutu 12 m. 48 → 20 → 12; üçü de ölçümle.
+    /// Kutu 19 m. 48 → 20 → 12 → 19; hepsi ölçümle.
     ///
     /// Son daraltmanın sebebi KALINLIK: damlanın gerçek kalınlığı ancak quad 1.2
     /// piksellik raster tabanını aştığında ekrana ulaşıyor. 3 mm'lik damla için o sınır
@@ -88,8 +91,20 @@ public class PrecipitationRenderer : MonoBehaviour
     /// kalıyordu.
     ///
     /// 12 m'de hacmin %4.3'ü 2.6 m'nin içinde, yani ~11 000 damla gerçek kalınlığıyla
-    /// çiziliyor. Uzağı sis taşıyor: yağmurda görüş zaten 143 m.
-    static readonly Vector3 BoxSize = new(12f, 12f, 12f);
+    /// çiziliyor.
+    ///
+    /// SONRA 19 m'YE ÇIKARILDI. Kutu kameranın etrafına sarılıyor, yani görünür yarıçap
+    /// yarı genişlik: 12 m kutuda yağmur 3 metrede sönmeye başlayıp 6 metrede bitiyordu
+    /// ("sadece etrafıma yağıyor", kullanıcı bildirdi).
+    ///
+    /// Tavanı doyum belirliyor, bütçe değil: temsil payı alfaya giriyor ve
+    /// `α_eff = 1−(1−α)^N` doyduğunda bütün damlalar aynı opaklığa gelip kalınlık farkı
+    /// siliniyor. Kademelenmeyi koruyan sınır N ≤ 27 (en opak damla 0.60'ta kalır,
+    /// aralık 1.8 kat) → yoğunluk 37/m³ → 250 000 tanecikle hacim 6757 m³ → kenar 19 m,
+    /// görünür yarıçap 9.5 m.
+    ///
+    /// 15 metre istenirse tek yol tanecik sayısı: 1 M gerekir.
+    static readonly Vector3 BoxSize = new(19f, 19f, 19f);
     static readonly Vector3 SnowBoxSize = new(40f, 40f, 40f);
 
     /// Sürüklenen kar kutusu. Yatayda dar tutuluyor: aynı tanecik sayısı küçük alana

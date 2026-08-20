@@ -782,3 +782,41 @@ için tasarlanmış — makalenin bütün örnekleri düz arka plan görüntüle
   çıkarma, ağırlık). Üçü aynı anda dururken hangisinin ne bozduğu ölçülemiyor. Önce
   referans birebir üretilir, sonra tek tek sapılır.
 
+
+## Yağış sütunları DENENDİ VE ELENDİ — sisin içinden uzak sis yapısı görünmez
+
+Uzakta "orada yağmur yağıyor" hissi için sisin yoğunluğuna yağışla açılan büyük ölçekli
+kolonlar eklendi (froxel hacminde, üç oktav değer gürültüsü, 60-240 m). Kod yazıldı,
+derlendi, sonra ölçümle elendi ve silindi.
+
+**Ölçüm.** Yağmurda görüş 162 m, sönümleme 0.0242 /m. 360 farklı yatay bakış yönü için
+ışın boyunca optik derinlik integre edildi:
+
+| yol | optik derinlik sapması | komşu ışınlar arası geçirgenlik farkı |
+|---|---|---|
+| 100 m | ±%3.0 | 0.0008 |
+| 200 m | ±%3.6 | 0.0003 |
+| 400 m | ±%4.3 | 0.0000 |
+
+Her yağış şiddetinde aynı sonuç. Görünmez.
+
+**Sebep.** Optik derinliğin çoğu ilk elli metrede birikiyor ve orası BÜTÜN yönler için
+aynı. Uzaktaki kolonun katkısı, yakındaki ortak sisin altında kalıyor. Alanın kendi
+genliği ±%38 olmasına rağmen yol integrali ±%3'e iniyor.
+
+**Ve bu fiziksel olarak doğru.** Sağanağın İÇİNDEYKEN uzaktaki sütunları göremezsin;
+sütun ancak sağanağın DIŞINDAN, göreli berrak havadan bakınca görünür. Bizde yağış
+global (tek `weather.Precipitation`), yani "orada yağıyor burada yağmıyor" durumu
+kurulamıyor. Sütunların ön koşulu **uzayda değişen yağış**, ve o ayrı bir iş.
+
+**Yol boyunca ölçülen iki şey saklanmaya değer:**
+
+- **Sinüs toplamı sütun ölçeğinde ızgara verir.** Bank beş sinüs ve 350-1700 m; ekranda
+  nadiren birkaç periyot göründüğü için düzenliliği fark edilmiyor. Aynı yapı 60-240 m'ye
+  indirilince ekranda onlarca periyot görünüyor ve ÇAPRAZ IZGARA çıkıyor — Python'da
+  üretilip bakıldı, birebir kodda kayıtlı belirti. Değer gürültüsü bunu çözüyor (ızgara
+  skoru 0.42, bankınki 0.73).
+- **"Basit kesire yakınlık" ızgara testi işe yaramıyor.** `limit_denominator(6)` ile
+  neredeyse her oran bir kesire %2 içinde düşüyor; ayırt etmiyor. Kullanılabilir test
+  görsel + otokorelasyon.
+

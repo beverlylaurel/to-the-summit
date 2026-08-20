@@ -533,6 +533,7 @@ public class DebugMenu : MonoBehaviour
             4 => "AMBIENT: radyansın ikinci terimi",
             5 => "RADYANS: iki terim toplanmış, luminans",
             6 => "ORAN: radyans / gök — TURUNCU = doğru",
+            7 => "ÇAP: damla çapı 0.5-5 mm — karışık renk = farklı boy",
             _ => "kapalı",
         });
 
@@ -549,6 +550,7 @@ public class DebugMenu : MonoBehaviour
             if (GUILayout.Button("ambient")) PrecipitationRenderer.StreakProbe = 4;
             if (GUILayout.Button("radyans")) PrecipitationRenderer.StreakProbe = 5;
             if (GUILayout.Button("oran")) PrecipitationRenderer.StreakProbe = 6;
+            if (GUILayout.Button("çap")) PrecipitationRenderer.StreakProbe = 7;
         }
 
         if (PrecipitationRenderer.StreakProbe >= 2)

@@ -782,6 +782,7 @@ public class AtmosphereController : MonoBehaviour
         Shader.SetGlobalVector(FogBankDriftId, fogDrift);
         Shader.SetGlobalFloat(FogBankStrengthId, bankStrength);
 
+
         // SÜRÜKLENEN KAR. Rüzgâr eşiği burada uygulanıyor, shader'da değil: kaldırmanın
         // olup olmadığı tek bir dünya durumu, piksel başına sorulacak bir şey değil.
         // Yerde kar olup olmadığını shader kot profilinden kendisi okuyor — orası
