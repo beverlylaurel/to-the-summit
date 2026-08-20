@@ -171,9 +171,17 @@ Gerekçeler: `RATIONALE.md` → Kuşaklar ve hava dalgalanması.
 **Okur:** şiddet (yoğunluk ve damla boyutu dağılımı), **tepedeki bulut kolonunun yağış payı**
 (`AtmosphereController.LocalRain`), karlılık (damla/tane oranı), rüzgâr vektörü (savrulma
 **ve girdap alanının sürüklenmesi**), rüzgârın **esintili** şiddeti (girdap genliği, tanenin
-dönme hızı), **havanın rengi** (`_HeightFogColor`).
-**Okumaz:** günün saatini — tanecikler kendi rengini ışıktan almıyor, gece ve gündüz aynı
-görünüyorlar. **Bilinen eksik.**
+dönme hızı), **arazi yüzeyini** (`TerrainHeightAt` — rüzgârın sınır tabakası), **günün
+saatini** (`TimeOfDay.CurrentSunColor × SunIntensity`, izin yönlü terimi) ve **göğün o
+yöndeki rengini** (`AirColor`, izin ambient terimi).
+**Okumaz:** hiçbir ışık kaynağını güneşten başka. Şimşek, fener ve lamba iz görünümüne
+girmiyor — Garg-Nayar'ın hale maskesi (`1/d²`) sonlu mesafedeki kaynağın işi ve şu an
+sahnede öyle bir kaynak yok. Şimşek eklendiğinde gerekecek (`DECISIONS.md`).
+
+- **İzin rengi iki terimden gelir:** güneşin radyansı (yönlü, veritabanının `point`
+  dokusu) + göğün radyansı (izotrop, `ambient` dokusu). İkisi ayrı örneklenip toplanır.
+  Gök terimi ALÇAK GÜNEŞTE tonundan arındırılır — `AirColor` tek bir bakış yönünün
+  rengini taşır ve şafakta damlaları maviye boyuyordu.
 
 - **Yağış gökten tek parça düşmez, kaynağı tepedeki buluttur.** `CloudLayerProbe` hava
   haritasını oyuncunun konumunda CPU'dan okur; kapsama × kabarıklık (tip) yağış payını

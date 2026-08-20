@@ -860,9 +860,11 @@ belirgin kayıyor. Yani gereken yalnız `θ_v` ucu.
 Gaussian blur. Formül makalede yok (`rain-spec.md` §11.2-6, standart CoC önerisi).
 *Tetikleyici:* alan derinliği efekti eklendiğinde; şu an oyunda yok.
 
-**Ayrıca ölçülmemiş:** `sourceScale` kalibrasyonu 1.0'da duruyor. Veritabanı izleri kendi
-render kurulumunun radyansında (kaynak 10 m'de) ve bizim güneşimiz o kaynak değil;
-`rain-spec.md` §11.3.5 bu katsayıyı zorunlu kılıyor. Ölçümle belirlenecek.
+**`sourceScale` ÖLÇÜLDÜ, kapandı (2026-08-20).** Veritabanı izleri kendi render
+kurulumunun radyansında (kaynak 10 m'de) ve bizim güneşimiz o kaynak değil. F1'deki "oran"
+probuyla ölçüldü: iz radyansının ardındaki göğün radyansına oranı ×1'de 0.16-0.36, ×3'te
+ortanca 0.8. Hedef 2.0 (damla gökten belirgin parlak; oran 1.0 tanım gereği görünmez
+demek), yani `3 × 2.0/0.8 = 7.5`. Kodda `SourceScale = 7.5f`.
 
 **Uygulanmayan ama GEREKMEYEN iki adım** (gerekçesi kodda da yazılı): hale maskesi
 `1/d_i²` ve anizotropik maske. İkisi de SONLU mesafedeki kaynağın işi; güneş sonsuzda,
@@ -890,3 +892,32 @@ tek yasada birleştirilir.
 
 **Maliyet:** birleştirme yarım gün; `speedFactor`'ın ölçülmüş uçlarının log profille
 yeniden doğrulanması gerekir.
+
+
+## Tanecikler kutuya TEKDÜZE dağılıyor — radyal dağılım ertelendi (2026-08-21)
+
+**Karar.** 250 000 tanecik 48 m'lik kutuya tekdüze serpiliyor. Radyal (`yoğunluk ~ 1/r²`)
+dağılıma geçilmedi.
+
+**Ölçüm — sorun gerçek.** Hacim `r³` ile büyüdüğü için tanecik bütçesinin neredeyse
+tamamı uzağa gidiyor:
+
+    5 m içinde  : hacmin %0.47'si ->   1 183 tanecik
+    10 m içinde : %3.8            ->   9 469
+    24 m içinde : %52             -> 130 899
+
+Yani oyuncunun **tek tek damla olarak okuduğu** yakın hacimde bütçenin binde beşi var.
+Radyal dağılımda (kabuk başına sabit sayı, temsil payı `r²` ile ölçekli) 5 m içinde
+47 872 tanecik olurdu — **40 kat**.
+
+**Neden şimdi değil.** Temsil payı `α_eff = 1−(1−α)^N` üzerinden alfaya giriyor ve N
+mesafeye bağlı hâle gelince şu an ölçülmüş olan bütün alfa zinciri (kutu boyu taraması,
+`widen` üssü, `SourceScale` kalibrasyonu) yeniden ölçülmek zorunda. Bu oturumda yağmura
+altı değişiklik bindi ve sonuncusu ölçümle bozuk çıktı; yedinciyi doğrulanmamış bir
+zeminin üstüne koymak aynı hatadır.
+
+**Tetikleyici.** Yakındaki yağmur "tek tek damla" yerine seyrek nokta gibi okunuyorsa,
+ya da yağış 1.0'da bile yoğunluk yetmiyorsa.
+
+**Maliyet.** Yerleşim shader'da birkaç satır; asıl iş temsil payının mesafeye bağlanması
+ve alfa zincirinin baştan ölçülmesi. Yarım gün.
