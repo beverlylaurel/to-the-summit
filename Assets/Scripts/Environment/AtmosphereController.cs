@@ -219,15 +219,6 @@ public class AtmosphereController : MonoBehaviour
             ? 1900f * Mathf.Pow(rainRate, -0.63f)
             : settings.clearVisibility;
 
-        // PERDENİN ÜST SINIRI YAĞIŞIN KENDİ GÖRÜŞÜ — sisin birleşik rakamı değil.
-        //
-        // Ölçüldü: yer seviyesinde birleşik görüş 68 m çıkıyordu ve perde 12-54 m'ye
-        // sıkışıyordu, yani sisin zaten sildiği bölgeye. Oysa ekranda dağ kilometrelerce
-        // ötede görünüyor — sis YÜKSEKLİK sisi, oyuncu içinde, dağ üstünde. Perdenin
-        // işi yağışın kendi puslanması, sisin değil.
-        SpectralPrecipitationState.Visibility =
-            Mathf.Lerp(rainVisibility, settings.snowVisibility, snowiness);
-
         // Kar yağmurdan çok daha kapatıcı; onun sabiti yerinde kalıyor.
         float wet = Mathf.Lerp(rainVisibility, settings.snowVisibility, snowiness);
         float targetVisibility = Mathf.Min(settings.clearVisibility,

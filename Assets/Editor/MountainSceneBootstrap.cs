@@ -167,7 +167,6 @@ public static class MountainSceneBootstrap
         EnsureSkyFeature();
         EnsureCloudFeature();
         EnsureFogFeature();
-        EnsureCurtainFeature();
         Phase("gökyüzü, bulut ve sis geçişleri");
 
         // SIRA ÖNEMLİ: `EnsureCloudVolume` sahnedeki Volume'u bulup `cloudVolume` statiğine
@@ -381,32 +380,24 @@ public static class MountainSceneBootstrap
         var precipitationShader = AssetDatabase.LoadAssetAtPath<Shader>(PrecipitationShaderPath);
         if (precipitationShader == null)
             throw new System.InvalidOperationException($"Shader bulunamadı: {PrecipitationShaderPath}");
-        // SPEKTRAL PERDE DESENİ. Yoksa burada pişiyor — yalnız yüklemek yarışa açıktı:
-        // fırıncının `InitializeOnLoadMethod`'u ile bootstrap'ın `delayCall`'ı sıralanmıyor
-        // ve doku silinmişse bootstrap önce koşup patlıyordu.
-        var curtainPattern = SpectralPrecipitationBaker.EnsureExists();
-        if (curtainPattern == null)
-            throw new System.InvalidOperationException(
-                "Spektral yağış deseni üretilemedi: Assets/Settings/SpectralPrecipitation.asset");
 
         // GARG-NAYAR İZ VERİTABANI. Yoksa yağmur izleri veritabanından çizilemez;
         // pişirmek dış veri gerektirdiği için burada üretilmiyor, eksikse uyarılıyor.
         var streakDatabase = AssetDatabase.LoadAssetAtPath<RainStreakDatabase>(RainStreakDatabasePath);
         if (streakDatabase == null)
             Debug.LogWarning(
-                $"İz veritabanı yok: {RainStreakDatabasePath}. Yağmur izleri eski " +
-                "prosedürel yoldan çizilecek. Menü: To The Summit/Yağmur/İz veritabanını kur");
+                $"İz veritabanı yok: {RainStreakDatabasePath}. Menü: " +
+                "To The Summit/Yağmur/İz veritabanını kur");
 
         // HER KOŞUDA VARLIĞI GARANTİ EDİLİYOR, yalnız sahne yaratılırken değil.
-        // Bileşen `CreateWeather` içinde ekleniyordu; sahne zaten varsa o blok hiç
-        // çalışmıyor ve `FindAnyObjectByType` null dönüyordu. Belirti: yağmur izleri
-        // hiç görünmüyor, hata da yok.
+        // Sahne zaten varsa yaratma bloğu hiç çalışmıyor ve arama null dönüyordu.
+        // Belirti: yağmur izleri hiç görünmüyor, hata da yok.
         var streakSet = precipitationRenderer.GetComponent<RainStreakWorkingSet>();
         if (streakSet == null)
             streakSet = precipitationRenderer.gameObject.AddComponent<RainStreakWorkingSet>();
         streakSet.Bind(streakDatabase);
 
-        precipitationRenderer.Bind(weatherState, windField, precipitationShader, curtainPattern,
+        precipitationRenderer.Bind(weatherState, windField, precipitationShader,
             Object.FindAnyObjectByType<CloudLayerProbe>(), player.transform,
             streakSet, Object.FindAnyObjectByType<TimeOfDay>());
         EditorUtility.SetDirty(precipitationRenderer);
@@ -702,52 +693,6 @@ public static class MountainSceneBootstrap
 
         // (bulut dokusu ataması silindi)
         return material;
-    }
-
-    /// SİS RENDER GEÇİŞİ. Froxel hacmini iki compute dispatch'le dolduruyor; sonucu
-    /// `_FogScatteringVolume` olarak global bağlıyor ve `HeightFog.hlsl` her yüzey
-    /// shader'ında onu örnekliyor.
-    ///
-    /// SIRA: gökyüzü ve buluttan SONRA ekleniyor. Hacim aydınlatması bulut gölgesini ana
-    /// ışığın cookie dokusundan okuyor; o doku bulut geçişi tarafından yazılıyor.
-    /// SPEKTRAL YAĞIŞ PERDESİ FEATURE'I. Sis feature'ıyla aynı kalıp: var olan örnek de
-    /// güncelleniyor, yalnız yokken kurulmuyor — sonradan alan eklenince eski örnek boş
-    /// kalıp geçişi sessizce susturuyor.
-    static void EnsureCurtainFeature()
-    {
-        var renderer = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(RendererPath);
-        if (renderer == null)
-            throw new System.InvalidOperationException($"Renderer bulunamadı: {RendererPath}");
-
-        const string ShaderPath = "Assets/Shaders/SpectralPrecipitation.shader";
-        var shader = AssetDatabase.LoadAssetAtPath<Shader>(ShaderPath);
-        if (shader == null)
-            throw new System.InvalidOperationException($"Perde shader'ı bulunamadı: {ShaderPath}");
-
-        SpectralPrecipitationFeature feature = null;
-        foreach (var existing in renderer.rendererFeatures)
-            if (existing is SpectralPrecipitationFeature found) { feature = found; break; }
-
-        bool isNew = feature == null;
-        if (isNew)
-        {
-            feature = ScriptableObject.CreateInstance<SpectralPrecipitationFeature>();
-            feature.name = "Spektral Yağış Perdesi";
-        }
-
-        var serialized = new SerializedObject(feature);
-        serialized.FindProperty("curtainShader").objectReferenceValue = shader;
-        serialized.ApplyModifiedPropertiesWithoutUndo();
-
-        if (isNew)
-        {
-            renderer.rendererFeatures.Add(feature);
-            AssetDatabase.AddObjectToAsset(feature, renderer);
-        }
-
-        EditorUtility.SetDirty(renderer);
-        AssetDatabase.SaveAssets();
-        AssetDatabase.ImportAsset(RendererPath);
     }
 
     static void EnsureFogFeature()

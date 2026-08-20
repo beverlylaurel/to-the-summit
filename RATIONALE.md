@@ -749,3 +749,36 @@ olunca çıktının makaleyle ilgisi kalmadı. Şimdi tek eğri var ve makalenin
 bozduğu, üçü aynı anda dururken bilinemez. Önce referans birebir üretilir, sonra tek tek
 sapılır.
 
+
+## Langer spektral perdesi SİLİNDİ — iki kez denendi, ölçüldü
+
+`[Langer 2004]`'ün spektral yağış perdesi uygulandı, makalenin birebir hâline getirildi,
+iki farklı yapılandırmada denendi ve ikisinde de karşılığı çıkmadı. Kod silindi; kalan
+şey burada yazılı ders.
+
+**Birinci deneme — tüm ekran.** Makalenin kendi bileşimi: `I = 250·α + (1−α)·I_bg`,
+opaklık ortalaması 0.29. Ölçüldü, ekranın tamamına sabit bir tül sürüyordu. Makalede
+doğru, çünkü orada perde kar fırtınasının TEK katmanı ve arka plan düz bir resim.
+Bizde sis zaten o işi yapıyor; iki tül üst üste biniyordu.
+
+**İkinci deneme — orta bant.** `rain-spec.md` §10.4'ün tarif ettiği yer: yakını taneler,
+uzağı sis, arası perde. Alt sınır tanecik kutusu (12 m), üst sınır yağışın kendi görüşü
+(`1900·R^(−0.63)` = 162 m). Ölçüldü: bant 12-129 m, yoğunluk 0.88, en güçlü 30-40 m.
+Görünür fark yok.
+
+**Sebep tek cümlede:** yağmurda görüş 162 m'ye indiği için perdenin bandı ekranda dar bir
+şeride sıkışıyor ve o şeritte sis zaten opak. Langer'ın hibriti SİSİ OLMAYAN bir sahne
+için tasarlanmış — makalenin bütün örnekleri düz arka plan görüntüleri.
+
+**Yol boyunca ölçülen ve saklanmaya değer üç şey:**
+
+- **Yöntem θ'nın zamanla değişmesine uygun değil.** Makale fazı kare kare artımlı
+  işliyor (`§5.2`) ve genlik alanı sabit kalıyor; pişmiş dokuyu döndürmek faz alanını da
+  döndürüyor ve desen katı cisim gibi dönüyor. Makale de θ'yı zamanla değiştirmiyor
+  (`§7.2`). Serbest bakan birinci şahıs kamera yöntemin doğrulanmış alanının dışında.
+- **Desenin ortalaması havadır.** Pişirici ortalamayı 0.5'e eşliyor; o ortalama doğrudan
+  opaklık olursa ekrana sabit gri sürülür.
+- **Sapmalar çarpımsal birikir.** Bir dönem üç eğri üst üste binmişti (kare alma, ortalama
+  çıkarma, ağırlık). Üçü aynı anda dururken hangisinin ne bozduğu ölçülemiyor. Önce
+  referans birebir üretilir, sonra tek tek sapılır.
+

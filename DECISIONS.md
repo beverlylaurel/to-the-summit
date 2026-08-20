@@ -776,62 +776,6 @@ Yüzeylerin yeniden ayarlanması gerekip gerekmediği BAKILMADI — belirti fazl
 patlamış kar ya da sönmüş kontrast olur. `LookController` pozlaması ilk bakılacak yer.
 
 
-## Perde yönü tek, θ pişirilmedi
-
-**Karar.** Yağış perdesi ekran geneline tek akış yönü uyguluyor. Langer'ın döşeme başına
-θ'sı sökülü.
-
-**Gerekçe.** Yöntem θ'nın zamanla değişmesine uygun değil: makale θ'yı faza artımlı
-işliyor (`§5.2`) ve alan yerinde kalıyor, biz pişmiş dokuyu döndürdüğümüz için desen katı
-cisim gibi dönüyor. Makale de θ'yı zamanla değiştirmiyor (`§7.2`). Tek yön makalenin ilk
-yapılandırması (`§6.2`) ve dört kat ucuz.
-
-**Tetikleyici.** Kamerayı çevirirken perdenin TAMAMININ döndüğü fark edilirse.
-
-**Maliyet.** 16 yön × M=64 × 30 kare × 2 kanal = 3.9 MB doku; iki yön arası harmanlama
-için örnek sayısı 1'den 2'ye çıkar. Pişirici `Synthesize`'ı θ parametresiyle çağırmak
-yeterli, dispersiyon bağıntısı zaten θ'lı.
-
-
-## Yağış perdesi kapatıldı (2026-08-19)
-
-**Karar.** `SpectralPrecipitationFeature` renderer'da pasif (`m_Active: 0`). Kod, pişirici,
-doku ve belgeler duruyor. Kar ve yağmur bitince geri dönülecek.
-
-**Gerekçe.** Zincir sonunda `[Langer 2004]`'ün birebir hâline getirildi ve ölçümle
-doğrulandı — opaklık probu ekranın her yerinde 0.18-0.32, yani α ≈ 0.29, makalenin kare
-almadan sonra beklediği değer. Sorun uygulamada değil: **makalenin arkasında sis yok,
-bizde var.** Perde tüm ekrana sabit bir tül sürüyor, sis zaten aynı işi yapıyor, ikisi
-üst üste biniyor. Makalenin örnekleri düz arka plan görüntüleri; bizimki hacimsel sisli
-bir dağ.
-
-**İKİNCİ DENEME (2026-08-20) — ORTA BANTTA DA KARŞILIĞI YOK.**
-
-Yağmur oturduktan sonra tetikleyici işletildi ve perde bu kez `rain-spec.md` §10.4'ün
-tarif ettiği yere kondu: tüm ekrana tül değil, YALNIZ orta bant. Alt sınır tanecik
-kutusunun kenarı (12 m), üst sınır yağışın KENDİ görüşü (`1900·R^(−0.63)`, sisin birleşik
-rakamı değil — o yer seviyesinde 68 m okuyup perdeyi sisin zaten sildiği bölgeye
-sıkıştırıyordu).
-
-Ölçüldü: bant 12-129 m, yoğunluk 0.88, en güçlü 30-40 m. Kullanıcı F1'den aç/kapa
-yaptı — **görünür fark yok.**
-
-Sebep anlaşılabilir: yağmur görüşü 162 m'ye indiği için 129 m'nin ötesi zaten sis, 12
-m'nin berisini zaten taneler dolduruyor. Aradaki bant ekranda küçük bir şerit ve orada
-da sis perdeyle aynı işi yapıyor. Langer'ın hibriti, sisi olmayan bir sahne için
-tasarlanmış.
-
-**Tetikleyici.** Yeni bir sebep doğmadıkça açılmayacak. Açılacaksa önce şu ölçülmeli:
-perdenin bandında sis ne kadar opak — sis orada %50'nin üstündeyse perdenin katkısı
-tanım gereği görünmez.
-
-**Maliyet.** Geri açmak tek bayrak. Kapalıyken çalışma zamanı maliyeti sıfır.
-
-**Kapatılırken silinenler.** F1'deki "Teşhis: yağış perdesi" bölümü ve shader'daki prob
-kodu (`_CurtainProbe`, `ProbeRamp`, üç dal) — perde kapalıyken hiçbiri erişilebilir
-değildi. Geri açılırsa yeniden yazılır.
-
-
 ## Yağmur izi veritabanı: üst çözünürlük size16, size32 ertelendi (2026-08-19)
 
 **Karar.** Garg-Nayar iz veritabanından `size4`, `size8`, `size16` paketlendi; `size32`
