@@ -71,6 +71,14 @@ public class SnowfallController : MonoBehaviour
 
     float looseFraction;
     bool looseRequestPending;
+
+    /// Rüzgârın taşıdığı birikmiş yol. Türbülans alanı bununla kaydırılıyor.
+    Vector3 advect;
+
+    /// Gök ortamı. Prosedürel çizimde küresel harmonik sabitleri yazılmıyor, bu
+    /// yüzden CPU'da hesaplanıp materyale veriliyor.
+    readonly Vector3[] ambientDirections = { Vector3.up };
+    readonly Color[] ambientResults = new Color[1];
     bool needsInit;
     bool alive;
 
@@ -184,10 +192,11 @@ public class SnowfallController : MonoBehaviour
         flakeCompute.SetVector(SnowShaderIDs.FlakeBoxSize, SpawnBoxSize);
         flakeCompute.SetVector(SnowShaderIDs.FlakeWind, windWS);
         flakeCompute.SetFloat(SnowShaderIDs.FlakeWindSpeed, weather.WindSpeed);
-        flakeCompute.SetFloat(SnowShaderIDs.FlakeWetness, weather.SnowWetness);
+        flakeCompute.SetFloat(SnowShaderIDs.FlakeWetness, weather.FlakeWetness);
         flakeCompute.SetFloat(SnowShaderIDs.FlutterFreq, flutterFrequency);
         flakeCompute.SetFloat(SnowShaderIDs.FlutterAmp, flutterAmplitude);
         flakeCompute.SetFloat(SnowShaderIDs.FlakeTime, Time.time);
+        flakeCompute.SetVector(SnowShaderIDs.FlakeAdvect, advect);
 
         BindEnvironment();
     }
@@ -238,6 +247,9 @@ public class SnowfallController : MonoBehaviour
             InitBuffer(flakes, flakeCapacity, false);
             InitBuffer(spindrift, spindriftCapacity, true);
         }
+
+        // Advekte ofset burada birikiyor; rüzgâr değişse bile alan sürekli kalıyor.
+        advect += weather.WindWS * Time.deltaTime;
 
         UpdateLooseFraction();
 
@@ -316,6 +328,9 @@ public class SnowfallController : MonoBehaviour
         target.SetColor(SnowShaderIDs.FlakeTint, flakeTint);
         target.SetFloat(SnowShaderIDs.FlakeEmissive, flakeEmissive);
         target.SetFloat(SnowShaderIDs.SoftFadeDistance, softFadeDistance);
+
+        RenderSettings.ambientProbe.Evaluate(ambientDirections, ambientResults);
+        target.SetColor(SnowShaderIDs.FlakeAmbient, ambientResults[0]);
         target.SetFloat(SnowShaderIDs.WindStretch, stretch);
         target.SetBuffer(SnowShaderIDs.Flakes, buffer);
     }

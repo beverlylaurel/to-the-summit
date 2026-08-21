@@ -37,6 +37,9 @@ public class SnowOcclusionCapture : MonoBehaviour
     /// Teşhis: kaç kez yenilendi. §4.2'nin "her frame değil" kuralının kanıtı.
     public int CaptureCount { get; private set; }
 
+    /// Teşhis: haritanın hangi yolla çizildiği.
+    public string RenderPath { get; private set; } = "henüz çizilmedi";
+
     public RenderTexture OcclusionTexture => occlusion;
     public Vector2 LastCaptureCenter => lastCaptureCenter;
     public bool HasCaptured => hasCaptured;
@@ -179,7 +182,26 @@ public class SnowOcclusionCapture : MonoBehaviour
 
         WriteGlobals();
 
-        captureCamera.Render();
+        // ÇIKTI HEDEFİ AÇIKÇA VERİLİYOR.
+        //
+        // `Camera.Render()` eski yol; URP'de kameranın son blit'i bazı karelerde ekrana
+        // düşüyor ve engel haritasının -9999 temizliği bir kare boyunca ekranı
+        // patlatıyor. Kullanıcı "yürürken flash yiyip duruyorum" dedi — harita da
+        // zaten yalnız yürürken yenileniyor.
+        var request = new UniversalRenderPipeline.SingleCameraRequest { destination = occlusion };
+
+        if (RenderPipeline.SupportsRenderRequest(captureCamera, request))
+        {
+            RenderPath = "SubmitRenderRequest";
+            RenderPipeline.SubmitRenderRequest(captureCamera, request);
+        }
+        else
+        {
+            // Eski yol. URP'de son blit bazı karelerde ekrana düşüyor ve haritanın
+            // -9999 temizliği bir kare beyaz patlama yapıyor.
+            RenderPath = "Camera.Render (ESKİ YOL)";
+            captureCamera.Render();
+        }
     }
 
     void WriteGlobals()

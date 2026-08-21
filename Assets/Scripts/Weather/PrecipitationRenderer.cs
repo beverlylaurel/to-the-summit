@@ -325,6 +325,11 @@ public class PrecipitationRenderer : MonoBehaviour
     float snowSpin;
     float density;
     float precipitation;
+
+    /// Teşhis: bu bileşen o an ne çiziyor. Kar sistemi v2 ile aynı anda ekranda
+    /// bir şey varsa hangisinin olduğu başka türlü ayrılamıyor.
+    public float DebugRainIntensity => precipitation;
+    public float DebugDensity => density;
     float snowiness;
     float localFactor = 1f;
 

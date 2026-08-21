@@ -65,6 +65,7 @@ public class SnowWeather : MonoBehaviour
     float coverage;
     float gustTime;
     float baseSWE;
+    float flakeWetness;
 
     /// Presetlerin en yükseği. Bir kez hesaplanıyor — Update'te dizi taramak yasak.
     float maxSWERate;
@@ -73,6 +74,14 @@ public class SnowWeather : MonoBehaviour
     public float WindSpeed => windSpeed;
     public Vector3 WindWS => windWS;
     public float SnowWetness => snowWetness;
+
+    /// DÜŞEN TANENİN ıslaklığı. Yerdeki örtününkinden AYRI bir büyüklük.
+    ///
+    /// Hava zinciri "bu yağış kar" diyorsa tane yükseklerde oluşmuş ve kurudur;
+    /// yerdeki örtü +4.8 C'de ıslanır ama tane hâlâ kar tanesidir. Ayrılmayınca
+    /// tane 3 m/s ile dik iniyor, takla atmıyor ve yağmurdan ayrılmıyordu —
+    /// kullanıcı "yağmur ve kar arasında fark yok" dedi.
+    public float FlakeWetness => flakeWetness;
     public float TemperatureC => temperatureC;
     public float Coverage => coverage;
 
@@ -236,6 +245,10 @@ public class SnowWeather : MonoBehaviour
 
         // Taze karın ıslaklığı sıcaklıkla artıyor: 0 C'nin altı kuru, +3 C tamamen ıslak.
         snowWetness = Mathf.Clamp01(temperatureC / 3f);
+
+        // Yağışın karlılığı ne kadar yüksekse düşen tane o kadar kuru.
+        float snowShare = weatherState != null ? weatherState.Snowiness : 1f;
+        flakeWetness = snowWetness * (1f - snowShare);
 
 
         // Kaplama yağış şiddetiyle yükseliyor; nesneler gözle görülür şekilde kaplanır (§9).

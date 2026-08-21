@@ -81,6 +81,8 @@ public static class SnowShaderIDs
     public static readonly int FlakeBoxSize = Shader.PropertyToID("_FlakeBoxSize");
     public static readonly int FlakeDeltaTime = Shader.PropertyToID("_FlakeDeltaTime");
     public static readonly int FlakeTime = Shader.PropertyToID("_FlakeTime");
+    public static readonly int FlakeAdvect = Shader.PropertyToID("_FlakeAdvect");
+    public static readonly int FlakeAmbient = Shader.PropertyToID("_FlakeAmbient");
     public static readonly int FlakeWind = Shader.PropertyToID("_FlakeWind");
     public static readonly int FlakeWindSpeed = Shader.PropertyToID("_FlakeWindSpeed");
     public static readonly int FlakeWetness = Shader.PropertyToID("_FlakeWetness");

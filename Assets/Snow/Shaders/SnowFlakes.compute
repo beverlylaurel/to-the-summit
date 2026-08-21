@@ -37,6 +37,7 @@ float3 _FlakeBoxSize;
 
 float  _FlakeDeltaTime;
 float  _FlakeTime;
+float3 _FlakeAdvect;      // rüzgârın taşıdığı birikmiş yol, metre
 
 float3 _FlakeWind;
 float  _FlakeWindSpeed;
@@ -183,25 +184,39 @@ void KFlakeSimulate(uint3 id : SV_DispatchThreadID)
         return;
     }
 
-    // TÜRBÜLANS SÜREKLİ OLMAK ZORUNDA.
+    // TÜRBÜLANS ALANI RÜZGÂRLA BİRLİKTE TAŞINIYOR (Taylor'ın donmuş türbülans
+    // varsayımı). Gürültü koordinatından rüzgârın taşıdığı yol çıkarılıyor.
     //
-    // Önce hücre hash'i kullanılıyordu: gürültü her 8 metrede ve her 1.1 saniyede
-    // BİRDEN değişiyor, tane anında yön değiştiriyor ve yolu zikzak çiziyordu.
-    // Ölçüldü — kullanıcı "karlar zikzak çiziyor" dedi.
+    // Önce alan uzayda SABİTTİ: 15 m/s'de tane 8 metrelik bir hücreyi yarım saniyede
+    // geçiyor ve girdap yönü yarım saniyede bir değişiyordu — zikzak buydu.
+    // Rüzgârla taşınan alanda, rüzgârla sürüklenen tane aynı girdabın içinde kalıyor
+    // ve yolu yumuşak eğriliyor.
+    // ADVEKSİYON OFSETİ DIŞARIDAN GELİYOR, `rüzgâr x zaman` ÇARPIMIYLA DEĞİL.
     //
-    // Şimdi hem uzayda hem zamanda aradеğerlenmiş: yön yumuşak dönüyor.
-    float3 noise = SnowSmoothNoise3(f.position * 0.12, _FlakeTime * 0.35) * 2.0 - 1.0;
+    // Çarpım biçimi kendi soktuğum hataydı: zaman binlerce saniyeye çıkıyor ve
+    // rüzgârdaki 0.01 m/s'lik bir esinti değişimi alanı anında 30 metre kaydırıyor.
+    // Rüzgâr sürekli gustlanıyor, yani alan her karede ışınlanıyor ve zikzak
+    // ÖNCEKİNDEN KÖTÜ oluyordu.
+    //
+    // Ofset CPU'da `+= rüzgâr * dt` ile birikiyor: esinti değişince alan sürekli
+    // kalıyor, yalnız bundan sonraki kayması değişiyor.
+    float3 advected = f.position - _FlakeAdvect;
+    float3 noise = SnowSmoothNoise3(advected * 0.12, _FlakeTime * 0.12) * 2.0 - 1.0;
+
+    // TÜRBÜLANS İVMEDİR, HIZ DEĞİL. Hız hedefine eklenince tane 5 m/s'lik yanal
+    // sıçramalar yapıyordu. İvme olarak sürüklenme süresiyle çarpılıp makul bir
+    // sapmaya oturuyor: 5.4 m/s2 x 0.35 s = 1.9 m/s, rüzgârın ~%13'ü.
     float turbulence = 0.35 * _FlakeWindSpeed + 0.15;
 
-    float3 target = _FlakeWind + float3(0.0, f.velocity.y, 0.0) + noise * turbulence;
-    // SÜRTÜNME ÜSTEL. `dt * 0.9` kare hızına bağlıydı ve 60 fps'te kat sayısı 0.015
-    // çıkıyordu: tane rüzgâra saniyeler boyunca yetişemiyor, yağış dik iniyordu.
-    // Kullanıcı "kar rüzgârdan etkilenmiyor" dedi.
-    //
-    // 1 - exp(-dt/tau) kare hızından bağımsız. tau = 0.35 s: kar tanesinin gerçek
-    // eylemsizlik zamanı (v_t/g = 1.0/9.81 = 0.1 s ile aynı mertebe, taklaları
-    // hesaba katan biraz büyük değer).
-    f.velocity = lerp(f.velocity, target, 1.0 - exp(-dt / 0.35));
+    // SÜRTÜNME ÜSTEL, kare hızından bağımsız. tau = 0.35 s: kar tanesinin gerçek
+    // eylemsizliği (v_t/g yaklaşık 0.1 s) mertebesinde, taklaları hesaba katan biraz
+    // büyük değer.
+    const float dragTau = 0.35;
+
+    float3 target = _FlakeWind + float3(0.0, f.velocity.y, 0.0);
+
+    f.velocity = lerp(f.velocity, target, 1.0 - exp(-dt / dragTau));
+    f.velocity += noise * (turbulence * dt);
 
     f.position += f.velocity * dt;
 
@@ -245,6 +260,22 @@ void KFlakeSimulate(uint3 id : SV_DispatchThreadID)
             _Flakes[id.x] = f;
             return;
         }
+    }
+
+    // YATAY SARMA. Rüzgâr 15 m/s iken tane 6.5 saniyelik ömründe 100 metre yol alıyor
+    // ve 40 metrelik kutunun çok dışına çıkıyor; kutu boşalıyor ve rüzgâr arttıkça kar
+    // AZALIYOR gibi görünüyordu — kullanıcı bildirdi.
+    //
+    // Yalnız X ve Z sarılıyor: kutunun yan kenarı 20 metrede ve orada zaten sönüm var,
+    // sıçrama görünmüyor. Y sarılmıyor çünkü kutunun altı kameranın yalnız iki metre
+    // altında; orada sıçrama gözüne çarpardı.
+    if (_FlakeSpindrift == 0)
+    {
+        float2 boxHalf = _FlakeBoxSize.xz * 0.5;
+        float2 rel = f.position.xz - _FlakeBoxCenter.xz;
+
+        rel -= _FlakeBoxSize.xz * floor((rel + boxHalf) / _FlakeBoxSize.xz);
+        f.position.xz = _FlakeBoxCenter.xz + rel;
     }
 
     // ZEMİN KESME.

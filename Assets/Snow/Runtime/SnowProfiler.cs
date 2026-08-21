@@ -117,7 +117,8 @@ public class SnowProfiler : MonoBehaviour
         Line("rüzgâr yönü", weather.WindWS.normalized.ToString("0.00"));
         Line("sıcaklık C", weather.TemperatureC.ToString("0.0"));
         Line("taban kar swe", weather.BaseSWE.ToString("0.00000"));
-        Line("ıslaklık", weather.SnowWetness.ToString("0.00"));
+        Line("örtü ıslaklığı", weather.SnowWetness.ToString("0.00"));
+        Line("tane ıslaklığı", weather.FlakeWetness.ToString("0.00"));
 
         SnowOcclusionCapture occlusion = manager.Occlusion;
         report.AppendLine();
@@ -125,6 +126,7 @@ public class SnowProfiler : MonoBehaviour
         Line("katman", LayerMask.NameToLayer(SnowOcclusionCapture.OccluderLayerName).ToString());
         Line("yenileme", occlusion.CaptureCount.ToString());
         Line("kayma m", Vector2.Distance(manager.AreaCenter, occlusion.LastCaptureCenter).ToString("0.00"));
+        Line("çizim yolu", occlusion.RenderPath);
 
         var clipmap = manager.GetComponent<SnowClipmap>();
         if (clipmap != null)
@@ -166,6 +168,17 @@ public class SnowProfiler : MonoBehaviour
             Line("kapasite", snowfall.FlakeCapacity.ToString());
             Line("etkin savrulma", snowfall.ActiveSpindrift.ToString());
             Line("gevşek oran", snowfall.LooseSnowFraction.ToString("0.000"));
+        }
+
+        // ESKİ YAĞIŞ SİSTEMİ. Ekranda bir şey varsa hangisinin çizdiği başka türlü
+        // ayrılamıyor; ikisi de aynı anda sahnede.
+        var oldRain = Object.FindAnyObjectByType<PrecipitationRenderer>();
+        if (oldRain != null)
+        {
+            report.AppendLine();
+            report.AppendLine("## Eski yağış (v1)");
+            Line("yağmur şiddeti", oldRain.DebugRainIntensity.ToString("0.0000"));
+            Line("yoğunluk", oldRain.DebugDensity.ToString("0.0000"));
         }
 
         var movement = Object.FindAnyObjectByType<SnowMovementModifier>();

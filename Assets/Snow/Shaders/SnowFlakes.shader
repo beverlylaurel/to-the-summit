@@ -50,10 +50,14 @@ Shader "Hidden/Snow/Flakes"
             float  _WindStretch;      // 0..1, güçlü rüzgârda hız yönünde uzama
             half3  _FlakeTint;
             half   _FlakeEmissive;
+            half4  _FlakeAmbient;   // gök ortamı, C#'tan
             float  _SoftFadeDistance;
 
             TEXTURE2D_X_FLOAT(_CameraDepthTexture);
             SAMPLER(sampler_CameraDepthTexture);
+
+            TEXTURE2D_X(_CameraOpaqueTexture);
+            SAMPLER(sampler_CameraOpaqueTexture);
 
             struct Varyings
             {
@@ -85,7 +89,17 @@ Shader "Hidden/Snow/Flakes"
                 // pikselin altına düşüp kayboluyor ve TAA'da titriyor.
                 float minWorldSize = distance * (_MinPixelSize / max(_ScreenHeight, 1.0))
                                    * 2.0 * _TanHalfFov;
-                float size = max(f.size, minWorldSize);
+
+                // ASGARİ BOY TANE BAŞINA ÖLÇEKLENİYOR.
+                //
+                // Düz `max(f.size, minWorldSize)` uzaktaki BÜTÜN taneleri aynı boya
+                // eşitliyordu: 20 metrede asgari boy 4.2 cm, en büyük tane 3.1 cm —
+                // hepsi tek tip görünüyordu. Kullanıcı "taneler irili ufaklı değil" dedi.
+                //
+                // Tanenin kendi çarpanı (0.6–1.7) asgari boya da uygulanınca uzakta
+                // 0.8–2.2 piksel arası değişiyor ve çeşitlilik kalıyor.
+                float sizeFactor = f.size / 0.018;
+                float size = max(f.size, minWorldSize * sizeFactor);
 
                 // BÜYÜTME KADAR ALFA DÜŞÜYOR. Tane bir pikselden küçükken boyu zorla
                 // büyütülüyor; alfa aynı kalırsa kapladığı alan gerçeğinden kat kat büyük
@@ -134,7 +148,14 @@ Shader "Hidden/Snow/Flakes"
                     {
                         float3 alongScreen = lateral / lateralLength;
 
-                        float stretch = 1.0 + _WindStretch * 2.0;
+                        // UZATMA YALNIZ TABAN BOYA. Uzaktaki tane asgari piksel
+                        // kuralıyla zaten büyütülmüş; onu bir de üçe katlamak ekranı
+                        // çizgilerle dolduruyor. sizeRatio uzakta küçüldüğü için uzatma
+                        // orada kendiliğinden sönüyor.
+                        // UZATMA 1→2. Spec 3 kat diyor ama 12 m/s rüzgârda hız 6:1
+                        // yatay ve tane ekranda çizgiye dönüşüyor; 2 kat hareketi
+                        // okutuyor ama tane olmaktan çıkarmıyor.
+                        float stretch = 1.0 + _WindStretch * sizeRatio;
                         offset += alongScreen * (dot(offset, alongScreen) * (stretch - 1.0));
                     }
                 }
@@ -163,8 +184,11 @@ Shader "Hidden/Snow/Flakes"
                 float2 d = input.uv - 0.5;
                 float r = length(d) * 2.0;
 
-                half mask = (half)saturate(1.0 - smoothstep(0.55, 1.0, r));
-                if (mask <= 0.004) discard;
+                // YUMUŞAK TANE. Önce `smoothstep(0.55, 1.0, r)` vardı: ortası düz beyaz
+                // bir disk, kenarı belirgin bir halka — tane değil pul gibi görünüyordu.
+                // Gauss düşüşü merkezden kenara kesintisiz iniyor.
+                half mask = (half)exp(-r * r * 3.2);
+                if (mask <= 0.01) discard;
 
                 // YUMUŞAK PARÇACIK: yüzeye yaklaşınca sönüyor, kesişme çizgisi olmuyor.
                 float2 screenUV = input.screenPos.xy / max(input.screenPos.w, 1e-4);
@@ -177,10 +201,44 @@ Shader "Hidden/Snow/Flakes"
 
                 Light mainLight = GetMainLight();
 
-                // Tane ince ve saçılmalı: yönden bağımsız aydınlanıyor, üstüne gece
-                // lambaların altında görünsün diye küçük bir yayınım biniyor.
-                half3 color = _FlakeTint * (mainLight.color * 0.6h + _FlakeEmissive * mainLight.color * 0.04h);
-                color += SampleSH(float3(0, 1, 0)) * 0.4h;
+                // TANE ZEMİN KARIYLA AYNI PARLAKLIKTA olmak zorunda — ikisi de aynı
+                // malzeme. Önceki hâlde ortam ışığı 0.4 ile kısılıyordu ve tane parlak
+                // gökyüzünün önünde KOYU kalıyordu; kullanıcı "siyah çizgiler" diye
+                // bildirdi. Alfa harmanlamada renk arka plandan koyuysa leke koyu olur.
+                //
+                // Rastgele yönelen bir tanede N.L'nin yönler üzerinden ortalaması 0.5;
+                // ortam terimi zemindeki gibi TAM alınıyor.
+                const half3 flakeAlbedo = half3(0.92, 0.94, 0.97);
+
+                // ORTAM IŞIĞI DIŞARIDAN VERİLİYOR, SampleSH İLE DEĞİL.
+                //
+                // SampleSH küresel harmonik sabitlerini okuyor ve o sabitler UNITY
+                // TARAFINDAN RENDERER BAŞINA yazılıyor. Bu çizim prosedürel — ortada
+                // renderer yok, sabitler sıfır kalıyor ve tane yalnız güneş payıyla
+                // aydınlanıyordu. Parlak göğün önünde bu KOYU demek.
+                //
+                // Belirti: yakındaki (neredeyse opak) taneler siyah çizgi, uzaktaki
+                // (saydam) taneler beyaz görünüyordu — ekran görüntüsünde ölçüldü.
+                half3 color = flakeAlbedo * (0.5h * mainLight.color + _FlakeAmbient.rgb);
+
+                // Gece lambaların altında görünsünler diye küçük bir yayınım.
+                color += _FlakeTint * (_FlakeEmissive * mainLight.color * 0.04h);
+
+                // TANE ARKA PLANDAN KOYU OLAMAZ.
+                //
+                // Kar tanesi hem güneşi saçıyor hem gök ışığını geçiriyor; gökyüzünün
+                // önünde en az gökyüzü kadar parlaktır. Hesaplanan değer sahnenin HDR
+                // göğünden küçük kalınca alfa harmanlamada tane KOYU bir leke oluyordu —
+                // kullanıcı "siyah yatay çizgiler" diye bildirdi, eski yağış sisteminin
+                // sıfır çizdiği ölçülerek doğrulandı.
+                //
+                // Arkadaki renk taban alınıyor: proje göğü nasıl aydınlatırsa aydınlatsın
+                // tane ondan koyu kalmıyor. Çıplak arazinin önünde saçılma terimi zaten
+                // daha büyük olduğu için tane parlak görünüyor.
+                half3 behind = SAMPLE_TEXTURE2D_X(_CameraOpaqueTexture,
+                                                  sampler_CameraOpaqueTexture, screenUV).rgb;
+
+                color = max(color, behind * 1.03h);
 
                 return half4(color, mask * (half)input.alpha * soft);
             }
