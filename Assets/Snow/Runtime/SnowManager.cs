@@ -260,8 +260,9 @@ public class SnowManager : MonoBehaviour
         Shader.SetGlobalFloat(SnowShaderIDs.SnowResolution, q.Resolution);
         Shader.SetGlobalTexture(SnowShaderIDs.SnowStateTex, state);
 
-        // Bölge dışında deformasyon yok ama kar var (§7.2).
-        Shader.SetGlobalFloat(SnowShaderIDs.FallbackSWE, settings.DefaultSWE);
+        // Bölge dışında deformasyon yok ama kar var (§7.2). Taban HAVA ZINCIRINDEN:
+        // kar çizgisinin altında sıfır, üstünde kalıcı kar.
+        Shader.SetGlobalFloat(SnowShaderIDs.FallbackSWE, weather.BaseSWE);
         Shader.SetGlobalFloat(SnowShaderIDs.FallbackRhoN, settings.DefaultRhoN);
 
         // Zemin yüksekliği — fragment shader'ları için global (§3).
@@ -338,7 +339,7 @@ public class SnowManager : MonoBehaviour
         int groups = Mathf.CeilToInt(q.Resolution / (float)SnowConstants.GroupSize);
 
         cmd.SetComputeIntParam(simCompute, SnowShaderIDs.Resolution, q.Resolution);
-        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.DefaultSWE, settings.DefaultSWE);
+        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.DefaultSWE, weather.BaseSWE);
         cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.DefaultRhoN, settings.DefaultRhoN);
         cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.DefaultWet, settings.DefaultWet);
 

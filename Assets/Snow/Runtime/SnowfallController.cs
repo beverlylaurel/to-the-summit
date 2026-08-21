@@ -46,9 +46,6 @@ public class SnowfallController : MonoBehaviour
     [SerializeField] float flakeEmissive = 1f;
     [SerializeField] float softFadeDistance = 0.4f;
 
-    [Tooltip("Yer savrulmasının kar tanesine göre doğum çarpanı.")]
-    [SerializeField] float spindriftRate = 6000f;
-
     // İKİ AYRI MATERYAL. DrawProcedural çizim anına erteleniyor; tek materyal
     // kullanılsaydı ikinci SetBuffer birincinin çizimini de değiştirir ve savrulma
     // tamponu iki kez çizilirdi.
@@ -244,13 +241,17 @@ public class SnowfallController : MonoBehaviour
         UpdateLooseFraction();
 
         SnowWeatherPreset preset = weather.GetPreset(weather.ActivePreset);
-        float rate = preset != null ? preset.FlakeRate : 0f;
 
-        // ETKİN TANE SAYISI = doğum hızı x ortalama ömür. VFX Graph'ın spawn rate'i
-        // ile aynı sonuç: hacimde o anda kaç tane bulunacağı.
-        const float averageLifetime = 6.5f;
-        ActiveFlakes = Mathf.Clamp(Mathf.RoundToInt(rate * averageLifetime * 0.001f * flakeCapacity / 24f),
-                                   0, flakeCapacity);
+        // ETKİN TANE SAYISI YAĞIŞ HIZIYLA ORANTILI.
+        //
+        // Önceki formül (doğum hızı x ömür) Moderate'ten itibaren tavana çarpıyordu:
+        // Moderate, Heavy ve Blizzard'ın üçü de 40 000 tane çiziyordu, yani şiddetin
+        // görüntüye hiç etkisi yoktu. Ölçüldü.
+        //
+        // Oran §10.3 tablosuyla örtüşüyor: Heavy 3/5 x 40 000 = 24 000, tablodaki
+        // kapasitenin ta kendisi.
+        ActiveFlakes = Mathf.Clamp(
+            Mathf.RoundToInt(flakeCapacity * weather.Coverage), 0, flakeCapacity);
 
         Simulate(flakes, flakeCapacity, ActiveFlakes, false);
 
@@ -260,8 +261,11 @@ public class SnowfallController : MonoBehaviour
         bool spindriftOn = preset != null && preset.Spindrift
                            && windFactor > 0f && looseFraction > SpindriftLooseFloor;
 
+        // SAVRULMA ÇOK SAYIDA OLMAK ZORUNDA (§10.1): tek tek seçilebilen taneler perde
+        // hissi vermiyor. Sayı kapasitenin oranı olarak veriliyor, mutlak bir doğum
+        // hızı olarak değil.
         ActiveSpindrift = spindriftOn
-            ? Mathf.Clamp(Mathf.RoundToInt(spindriftRate * windFactor * looseFraction * 0.01f),
+            ? Mathf.Clamp(Mathf.RoundToInt(spindriftCapacity * windFactor * looseFraction),
                           0, spindriftCapacity)
             : 0;
 

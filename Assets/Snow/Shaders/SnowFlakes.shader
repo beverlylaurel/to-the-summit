@@ -87,10 +87,27 @@ Shader "Hidden/Snow/Flakes"
                                    * 2.0 * _TanHalfFov;
                 float size = max(f.size, minWorldSize);
 
+                // BÜYÜTME KADAR ALFA DÜŞÜYOR. Tane bir pikselden küçükken boyu zorla
+                // büyütülüyor; alfa aynı kalırsa kapladığı alan gerçeğinden kat kat büyük
+                // görünüyor ve ekran televizyon karı gibi doluyor — ölçüldü, 40 000 tane
+                // 20 m'de tamamen opak bir perde yapıyordu.
+                //
+                // Alan oranıyla bölününce toplam örtü korunuyor: uzaktaki tane görünür
+                // ama solük.
+                float sizeRatio = f.size / max(size, 1e-6);
+                float coverageScale = saturate(sizeRatio * sizeRatio);
+
                 // Kameraya bakan düzlem + rastgele dönüş. Güçlü rüzgârda hız yönünde
                 // uzatılıyor: fırtınada tane değil çizgi görünüyor.
                 float3 forward = distance > 1e-4 ? toCamera / distance : float3(0, 0, 1);
-                float3 right = normalize(cross(float3(0, 1, 0), forward));
+
+                // DİKEY EKSENLE ÇAPRAZ ÇARPIM SIFIR OLABİLİR. Tane tam kameranın üstünde
+                // ya da altındayken forward = (0,1,0) ve cross sıfır; normalize NaN
+                // üretiyor, quad ekran boyu uzuyor. Belirti: yatay siyah çizgiler.
+                //
+                // Doğum kutusu kameranın 11 m ÜSTÜNDE, yani bu durum sürekli oluşuyor.
+                float3 axis = abs(forward.y) > 0.99 ? float3(0, 0, 1) : float3(0, 1, 0);
+                float3 right = normalize(cross(axis, forward));
                 float3 up = cross(forward, right);
 
                 float s, c;
@@ -127,7 +144,12 @@ Shader "Hidden/Snow/Flakes"
                 Varyings output;
                 output.positionCS = TransformWorldToHClip(positionWS);
                 output.uv = q + 0.5;
-                output.alpha = f.alpha;
+                // DOĞUM KUTUSUNUN KENARI YUMUŞATILIYOR. Kutu 40 m; kenarında kar birden
+                // bitiyor ve ekranda yuvarlak bir kar bulutu görünüyor. Son çeyrekte
+                // söndürülünce sınır okunmuyor.
+                float boxFade = 1.0 - smoothstep(14.0, 20.0, distance);
+
+                output.alpha = f.alpha * coverageScale * boxFade;
                 output.normalWS = forward;
                 output.screenPos = ComputeScreenPos(output.positionCS);
 

@@ -227,7 +227,7 @@ public class SnowFarCascade : MonoBehaviour
         int groups = Mathf.CeilToInt(Resolution / (float)SnowConstants.GroupSize);
 
         cmd.SetComputeIntParam(simCompute, SnowShaderIDs.CascadeResolution, Resolution);
-        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.DefaultSWE, manager.Settings.DefaultSWE);
+        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.DefaultSWE, manager.Weather.BaseSWE);
         cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.DefaultRhoN, manager.Settings.DefaultRhoN);
 
         if (pendingClear)

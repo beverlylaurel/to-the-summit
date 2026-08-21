@@ -29,6 +29,13 @@ public class SnowWeather : MonoBehaviour
 
     [SerializeField] int activePreset;
 
+    [Header("Taban kar")]
+    [Tooltip("Saf kar kuşağındaki kalıcı karın su eşdeğeri, metre.")]
+    [SerializeField, Range(0f, 0.60f)] float baseSWEAtSnowLine = 0.02f;
+
+    [Tooltip("Yağmurdan saf kara geçiş bantı, metre. Arazinin kendi bandıyla aynı.")]
+    [SerializeField] float snowLineBand = 241f;
+
     [Header("Sıcaklık")]
     [Tooltip("Hava sıcaklığı, Celsius. Erime ve ıslaklık bundan türer.")]
     [SerializeField] float temperatureC = -6f;
@@ -53,6 +60,7 @@ public class SnowWeather : MonoBehaviour
     float snowWetness;
     float coverage;
     float gustTime;
+    float baseSWE;
 
     /// Presetlerin en yükseği. Bir kez hesaplanıyor — Update'te dizi taramak yasak.
     float maxSWERate;
@@ -63,6 +71,14 @@ public class SnowWeather : MonoBehaviour
     public float SnowWetness => snowWetness;
     public float TemperatureC => temperatureC;
     public float Coverage => coverage;
+
+    /// DÜNYANIN O KOTTAKİ TABAN KARI, m SWE.
+    ///
+    /// Kar çizgisinin altında SIFIR. Sabit bir taban değer verilirse 400 m'de çıplak
+    /// araziye 18 cm kar seriliyor ve ortada beyaz bir kare kalıyor — ölçüldü.
+    /// Geçiş bantı arazinin kendi kar çizgisiyle AYNI: donma seviyesinden başlayıp
+    /// 241 m sonra saf kara varıyor.
+    public float BaseSWE => baseSWE;
     public int PresetCount => presets.Length;
     public int ActivePreset => activePreset;
 
@@ -147,11 +163,28 @@ public class SnowWeather : MonoBehaviour
             temperatureC = temperature.At(altitudeSource.position.y);
     }
 
+    /// Taban karı kotla ölçüyor. Sıcaklık zinciri bağlı değilse taban sabit kalıyor.
+    void EvaluateBaseSnow()
+    {
+        if (temperature == null || altitudeSource == null)
+        {
+            baseSWE = baseSWEAtSnowLine;
+            return;
+        }
+
+        float altitude = altitudeSource.position.y;
+        float freezing = temperature.FreezingLevel;
+
+        baseSWE = baseSWEAtSnowLine
+                * Mathf.Clamp01((altitude - freezing) / Mathf.Max(snowLineBand, 1f));
+    }
+
     void Evaluate(float deltaTime)
     {
         gustTime += deltaTime;
 
         ReadExternalWeather();
+        EvaluateBaseSnow();
 
         // BÜTÜN MENZİL 45 SANİYEDE. Preset başına değil: Clear'dan Blizzard'a
         // geçiş dört adım ve her birine 45 saniye vermek üç dakika ederdi.

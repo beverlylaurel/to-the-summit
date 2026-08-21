@@ -68,8 +68,17 @@ float3 SnowGeometryNormal(float3 positionWS, out float spacing)
     return normalize(lerp(groundNormal, snowNormal, saturate(here / 0.08)));
 }
 
+/// KAR YOKSA ÇİZİLMİYOR.
+///
+/// Taban kar kar çizgisinin altında sıfır; derinlik sıfırken yüzey araziyle TAM AYNI
+/// kotta duruyor ve z-fighting yapıyor. Eşik 5 mm: altındaki örtü zaten arazinin
+/// kendi kar gölgelendirmesiyle çiziliyor, ayrı bir yüzeye gerek yok.
+#define SNOW_MIN_VISIBLE_DEPTH 0.005
+
 half4 SnowFragment(Varyings input) : SV_Target
 {
+    if (SnowHeightAt(SnowWorldToUV(input.positionWS)) < SNOW_MIN_VISIBLE_DEPTH) discard;
+
     float spacing;
     float3 geometryNormal = SnowGeometryNormal(input.positionWS, spacing);
 
@@ -124,13 +133,25 @@ half4 SnowFragment(Varyings input) : SV_Target
 
 // --- derinlik geçişleri ---
 
-float4 SnowDepthVertex(Attributes input) : SV_POSITION
+struct DepthVaryings
 {
-    return TransformWorldToHClip(SnowSurfacePosition(input.positionOS.xyz));
+    float4 positionCS : SV_POSITION;
+    float3 positionWS : TEXCOORD0;
+};
+
+DepthVaryings SnowDepthVertex(Attributes input)
+{
+    DepthVaryings output;
+    output.positionWS = SnowSurfacePosition(input.positionOS.xyz);
+    output.positionCS = TransformWorldToHClip(output.positionWS);
+    return output;
 }
 
-half4 SnowDepthFragment() : SV_Target
+half4 SnowDepthFragment(DepthVaryings input) : SV_Target
 {
+    // DERİNLİK GEÇİŞİ AYNI KAPIYI UYGULUYOR. Uygulamazsa karın olmadığı yerde
+    // derinlik tamponuna yazılıyor ve arazi arkasında kalıyor.
+    if (SnowHeightAt(SnowWorldToUV(input.positionWS)) < SNOW_MIN_VISIBLE_DEPTH) discard;
     return 0;
 }
 
@@ -141,6 +162,8 @@ Varyings SnowDepthNormalsVertex(Attributes input)
 
 half4 SnowDepthNormalsFragment(Varyings input) : SV_Target
 {
+    if (SnowHeightAt(SnowWorldToUV(input.positionWS)) < SNOW_MIN_VISIBLE_DEPTH) discard;
+
     // DERİNLİK GEÇİŞİ AYNI YER DEĞİŞTİRMEYİ UYGULAMAK ZORUNDA. Biri atlanırsa SSAO
     // yüzeyin altından okur ve hayalet gölge basar.
     float spacing;

@@ -31,6 +31,9 @@ public class SnowDeformerRegistry : MonoBehaviour
 
     public int Capacity => slots != null ? slots.Length : 0;
 
+    /// Teşhis: kapasitenin nereden geldiği. Rapora yazılıyor.
+    public static string LastCapacityReading = "okunmadı";
+
     void OnEnable() => EnsureInitialized();
 
     /// GEÇ BAŞLATMA. Deformer'lar BAŞKA nesnelerde (oyuncunun ayaklarında) ve onların
@@ -45,6 +48,14 @@ public class SnowDeformerRegistry : MonoBehaviour
             throw new System.InvalidOperationException("SnowDeformerRegistry: SnowSettings atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
 
         int capacity = settings.QualityData.MaxDeformers;
+
+        // ÖLÇÜM: kapasite sıfır çıkıyor ve sorumlu ayar asset'i mi kalite tablosu mu
+        // koddan ayrılamıyor. İkisi de yazılıyor.
+        LastCapacityReading = settings.name + " / " + settings.Quality + " / " + capacity;
+
+        if (capacity <= 0)
+            throw new System.InvalidOperationException(
+                "SnowDeformerRegistry: kalite tablosu sıfır kapasite verdi — " + LastCapacityReading);
 
         slots = new SnowDeformer[capacity];
         freeSlots = new int[capacity];

@@ -226,6 +226,7 @@ public class SnowDebugWindow : EditorWindow
             report.AppendLine();
             report.AppendLine("## Deformasyon");
             report.AppendLine("etkin deformer " + registry.ActiveCount + " / " + registry.Capacity);
+            report.AppendLine("kapasite kayna\u011f\u0131 " + SnowDeformerRegistry.LastCapacityReading);
             report.AppendLine("en büyük temas  "
                 + (registry.MaxContactExtent * 100f).ToString("0.0") + " cm");
             report.AppendLine("damga atlası   "
@@ -1110,16 +1111,6 @@ public class SnowDebugWindow : EditorWindow
         var weather = manager.GetComponent<SnowWeather>();
         if (weather == null) weather = manager.gameObject.AddComponent<SnowWeather>();
 
-        // HAVA ZINCIRI BAGLANIYOR. F1'deki tek sürgü artık kar sistemini de sürüyor;
-        // iki ayrı panelden hava ayarlamak bitti.
-        var weatherChainSerialized = new SerializedObject(weather);
-        weatherChainSerialized.FindProperty("weatherState").objectReferenceValue =
-            Object.FindAnyObjectByType<WeatherState>();
-        weatherChainSerialized.FindProperty("temperature").objectReferenceValue =
-            Object.FindAnyObjectByType<TemperatureField>();
-        weatherChainSerialized.FindProperty("altitudeSource").objectReferenceValue = player.transform;
-        weatherChainSerialized.ApplyModifiedProperties();
-
         SnowWeatherPreset[] presets = LoadOrCreateWeatherPresets();
 
         var weatherSerialized = new SerializedObject(weather);
@@ -1132,6 +1123,16 @@ public class SnowDebugWindow : EditorWindow
         var player = Object.FindAnyObjectByType<FirstPersonController>();
         if (player == null)
             throw new System.InvalidOperationException("Sahnede FirstPersonController yok; takip hedefi bağlanamadı.");
+
+        // HAVA ZINCIRI BAGLANIYOR. F1'deki tek sürgü artık kar sistemini de sürüyor;
+        // iki ayrı panelden hava ayarlamak bitti.
+        var weatherChainSerialized = new SerializedObject(weather);
+        weatherChainSerialized.FindProperty("weatherState").objectReferenceValue =
+            Object.FindAnyObjectByType<WeatherState>();
+        weatherChainSerialized.FindProperty("temperature").objectReferenceValue =
+            Object.FindAnyObjectByType<TemperatureField>();
+        weatherChainSerialized.FindProperty("altitudeSource").objectReferenceValue = player.transform;
+        weatherChainSerialized.ApplyModifiedProperties();
 
 
         var coverage = manager.GetComponent<SnowCoverageDriver>();
@@ -1164,6 +1165,7 @@ public class SnowDebugWindow : EditorWindow
         clipmapSerialized.FindProperty("settings").objectReferenceValue = settings;
         clipmapSerialized.FindProperty("material").objectReferenceValue = LoadOrCreateSnowMaterial();
         clipmapSerialized.FindProperty("followTarget").objectReferenceValue = player.transform;
+        clipmapSerialized.FindProperty("groundHeight").objectReferenceValue = ground;
         clipmapSerialized.ApplyModifiedProperties();
 
         // --- Faz 10: uzak kaskad ve kalıcılık ---
@@ -1176,7 +1178,10 @@ public class SnowDebugWindow : EditorWindow
         var cascadeSerialized = new SerializedObject(cascadeComponent);
         cascadeSerialized.FindProperty("manager").objectReferenceValue = manager;
         cascadeSerialized.FindProperty("simCompute").objectReferenceValue = compute;
-        cascadeSerialized.FindProperty("persistence").objectReferenceValue = persistence;
+        // KALICILIK VARSAYILAN KAPALI. Gezinen yakalama ile geri yükleme henüz
+        // doğrulanmadı ve depo taşınca (LRU) kaskada eski blok yazıp uzak alanda
+        // siyah lekeler bırakıyor. Kaydı DECISIONS.md'de.
+        cascadeSerialized.FindProperty("persistence").objectReferenceValue = null;
         cascadeSerialized.ApplyModifiedProperties();
 
         var persistenceSerialized = new SerializedObject(persistence);

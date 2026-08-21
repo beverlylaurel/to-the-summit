@@ -469,17 +469,33 @@ public class PrecipitationRenderer : MonoBehaviour
         // Bağıntı R > 0 için doğru ama R → 0'da yağış OLAYININ kendisi bitmeli. Kapı
         // şiddetin en alt diliminde: 0.05 altı çiseleme bile değil (R < 2.5 mm/sa),
         // orada damla sayısı sıfıra iniyor.
-        density = Mathf.Pow(state.Precipitation, DensityExponent)
-                * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.05f, state.Precipitation));
-        precipitation = state.Precipitation;
         // KAR ARTIK BU SİSTEMDE DEĞİL. Kar sistemi v2 karı kendi çiziyor; bu bileşen
-        // yalnız YAĞMUR taşıyor. Karlılık sıfırlanınca ne kar tanesi ne sürüklenen kar
-        // çiziliyor.
+        // yalnız YAĞMUR taşıyor.
         //
+        // ŞİDDETİN YALNIZ YAĞMUR PAYI ALINIYOR. Kar oranı 1 iken bu bileşen hiçbir
+        // şey çizmiyor. Hem tanecik SAYISI hem şiddet aynı payı görmek zorunda —
+        // yalnız şiddeti kısmak tanecikleri yerinde bırakıyor.
+        float rainIntensity = state.Precipitation * (1f - state.Snowiness);
+
+        // MARSHALL-PALMER SIFIRDA GEÇERSİZ, KAPI ŞART.
+        //
+        // `N ∝ R^0.21` eğrisi sıfıra yakın çok dik: şiddet 0.001'de bile yoğunluk 0.234
+        // çıkıyor, yani taneciklerin dörtte biri çiziliyor. Hava yumuşatmayla sıfıra
+        // YAKLAŞIYOR ama oturmuyor; sonuç, panel "yağış 0,00" gösterirken ekranda
+        // yağmur olması (kullanıcı bildirdi, çap probuyla görüldü).
+        //
+        // Bağıntı R > 0 için doğru ama R → 0'da yağış OLAYININ kendisi bitmeli. Kapı
+        // şiddetin en alt diliminde: 0.05 altı çiseleme bile değil (R < 2.5 mm/sa),
+        // orada damla sayısı sıfıra iniyor.
+        density = Mathf.Pow(rainIntensity, DensityExponent)
+                * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.05f, rainIntensity));
+
+        precipitation = rainIntensity;
+        snowiness = 0f;
+
         // Kar tarafına ait ölü kod bu dosyada duruyor ve AYRI BİR ADIMDA silinecek:
         // bütçe bölüşümü ve tampon düzeni yağmurla iç içe; kör ameliyat yağmuru da
         // bozar. Kayıt DECISIONS.md'de.
-        snowiness = 0f;
     }
 
     void Update()

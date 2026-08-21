@@ -23,6 +23,9 @@ public class SnowClipmap : MonoBehaviour
     [Tooltip("Halkaların merkezinde duracak nesne. Normalde oyuncu.")]
     [SerializeField] Transform followTarget;
 
+    [Tooltip("Zemin yüksekliği. Pişmeden çizim yapılmıyor.")]
+    [SerializeField] SnowGroundHeight groundHeight;
+
     Mesh[] meshes;
     float[] quadSizes;
     int ringCount;
@@ -109,6 +112,11 @@ public class SnowClipmap : MonoBehaviour
     void LateUpdate()
     {
         if (meshes == null) return;
+
+        // ZEMİN PIŞMEDEN ÇİZİLMİYOR. İlk karelerde yükseklik dokusu boş ve yüzey
+        // Y = 0'a düşüyor; oyuncu 400 m'deyken ayaklarının çok altında beyaz bir kare
+        // asılı kalıyor.
+        if (groundHeight != null && groundHeight.HeightTexture == null) return;
 
         Vector3 follow = followTarget.position;
 
