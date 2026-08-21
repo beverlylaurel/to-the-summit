@@ -14,8 +14,8 @@
 // Çember kareye içten teğet olduğu için döşemenin komşu kopyası hiçbir zaman
 // görünmüyor — sönüm 12 m'de bitiyor, kare köşesi 17 m'de.
 //
-// DEĞER İŞARETLİ: pozitif = yüzey ÇÖKMÜŞ (iz tabanı), negatif = KABARMIŞ (izin
-// kenarına itilen kar). Geri dolma ikisini de sıfıra çekiyor.
+// DEĞER İŞARETLİ: pozitif = yüzey ÇÖKMÜŞ (oluğun tabanı), negatif = KABARMIŞ
+// (oluğun kenarına itilen kar). Geri dolma ikisini de sıfıra çekiyor.
 
 #pragma kernel Stamp
 #pragma kernel ClearStrip
@@ -27,12 +27,13 @@ uint  _Resolution;
 uint  _ResolutionMask;   // _Resolution - 1, ikinin kuvveti olduğu C# tarafında doğrulanıyor
 float _TexelSize;        // metre / texel
 
-// --- damga ---
-float2 _StampCenter;     // dünya xz
-float2 _StampAxis;       // yürüyüş yönü (birim)
-float  _StampLength;     // ayak uzunluğu, metre
-float  _StampWidth;      // ayak genişliği, metre
-float  _StampDepth;      // taban çökmesi, metre
+// --- iz parçası (süpürülmüş kapsül) ---
+float2 _StampFrom;       // dünya xz, parçanın başı
+float2 _StampTo;         // dünya xz, parçanın sonu
+float  _StampHalfWidth;  // oluğun yarı genişliği, metre
+float  _StampDepth;      // oluk tabanının çökmesi, metre
+int2   _StampOrigin;     // işlenecek kutunun mutlak texel köşesi
+int2   _StampSize;       // kutunun texel boyu
 
 // --- şerit temizleme ---
 int2 _ClearOrigin;       // mutlak texel indeksi
@@ -55,40 +56,34 @@ uint2 Slot(int2 absolute)
 [numthreads(8, 8, 1)]
 void Stamp(uint3 id : SV_DispatchThreadID)
 {
-    // Damga kutusu izin etrafına kurulu; kenar tümseği için yarım ayak boyu pay var.
-    float reach = max(_StampLength, _StampWidth) * 1.5;
-    int half = (int)ceil(reach / _TexelSize);
-    int side = half * 2;
-    if ((int)id.x >= side || (int)id.y >= side) return;
+    if ((int)id.x >= _StampSize.x || (int)id.y >= _StampSize.y) return;
 
-    int2 centerTexel = (int2)floor(_StampCenter / _TexelSize);
-    int2 absolute = centerTexel + int2((int)id.x - half, (int)id.y - half);
-
-    // Texel merkezinin dünya konumu.
+    int2 absolute = _StampOrigin + int2(id.xy);
     float2 world = ((float2)absolute + 0.5) * _TexelSize;
-    float2 delta = world - _StampCenter;
 
-    // Ayak ekseni yürüyüş yönü: iz uzun ekseni ilerleme yönünde.
-    float2 axis = _StampAxis;
-    float2 side2 = float2(-axis.y, axis.x);
-    float along = dot(delta, axis) / max(_StampLength * 0.5, 1e-4);
-    float across = dot(delta, side2) / max(_StampWidth * 0.5, 1e-4);
+    // NOKTAYA DEĞİL PARÇAYA UZAKLIK. İz ayrık ayak basımı değil, gövdenin karı
+    // yararak açtığı SÜREKLİ OLUK: her karede kat edilen yol bir doğru parçası
+    // olarak süpürülüyor. Ayrık damga bırakılsaydı hızlı giderken oluk kopardı.
+    float2 seg = _StampTo - _StampFrom;
+    float len2 = dot(seg, seg);
+    float t = len2 > 1e-8 ? saturate(dot(world - _StampFrom, seg) / len2) : 0.0;
+    float dist = distance(world, _StampFrom + seg * t);
 
-    float r = sqrt(along * along + across * across);
+    float r = dist / max(_StampHalfWidth, 1e-4);
 
-    // TABAN + KENAR TÜMSEĞİ. Gerçek izde kar yok olmuyor, yana itiliyor: çukurun
-    // hemen dışında bir bilezik kabarıyor. Hacim kabaca korunuyor — tümseğin
-    // genliği tabanın dörtte biri, alanı ise yaklaşık dört katı.
-    float floorMask = 1.0 - smoothstep(0.75, 1.0, r);
-    float rimMask = (1.0 - smoothstep(1.0, 1.9, r)) * smoothstep(0.85, 1.15, r);
+    // TABAN + İKİ YANDA SET. Karın hacmi yok olmuyor, yana itiliyor: oluğun iki
+    // kenarında yığılıyor. Setin genliği tabanın dörtte biri, bandı ise daha geniş —
+    // itilen kar daha büyük bir alana yayılıyor.
+    float floorMask = 1.0 - smoothstep(0.7, 1.0, r);
+    float rimMask = (1.0 - smoothstep(1.05, 2.1, r)) * smoothstep(0.95, 1.25, r);
 
     float value = _StampDepth * floorMask - _StampDepth * 0.25 * rimMask;
     if (abs(value) < 1e-5) return;
 
     uint2 slot = Slot(absolute);
 
-    // ÜST ÜSTE BİNEN İZLER: derin olan kazanıyor. Toplamak ikinci adımda çukuru iki
-    // katına indirirdi; gerçek karda ikinci adım zaten sıkışmış tabana basıyor.
+    // ÜST ÜSTE BİNEN İZLER: derin olan kazanıyor. Toplamak aynı yerden ikinci geçişte
+    // oluğu iki katına indirirdi; gerçekte ikinci geçiş zaten açılmış oluğa basıyor.
     float previous = _Deform[slot];
     _Deform[slot] = value >= 0.0 ? max(previous, value) : min(previous, value);
 }

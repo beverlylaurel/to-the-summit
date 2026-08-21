@@ -461,11 +461,30 @@ public class TerrainSurface : MonoBehaviour
         profileFloor = floor;
         profileCeiling = ceiling;
 
-        // Aralık değiştiyse (dağ yeniden üretildi, boyu değişti) biriken değerler artık
-        // başka kotlara ait. Taşımak yerine sıfırlanır: yanlış kota yapışmış kar, hiç
-        // kar olmamasından daha yanlış.
-        Array.Clear(bandCover, 0, Bands);
-        Array.Clear(bandPack, 0, Bands);
+        // BAŞLANGIÇ DURUMU SIFIR DEĞİL, KUŞAKTAN TÜRÜYOR.
+        //
+        // Bir dönem `Array.Clear` idi: dağ çıplak doğuyor ve karını oyun sırasında
+        // gerçek zamanda biriktiriyordu. Belirti kullanıcıdan geldi — "kar tutmuyor ki
+        // arazide". Tutuyordu, ama sıfırdan başlayıp dakikalar sürüyordu ve 5700
+        // metrelik bir dağın KALICI karı da o kuyruğa giriyordu.
+        //
+        // Kalıcı kar birikimin değil İKLİMİN sonucudur: kar çizgisinin üstünde kar
+        // her zaman vardır, oyun başladığı için birikmeye başlamaz. Başlangıç durumu
+        // bu yüzden yağış kuşağından okunuyor — `SnowinessAt` zaten yağmurun bittiği
+        // ve saf karın başladığı kotlar arasında yumuşak geçiş veriyor, HUD'un
+        // gösterdiği kuşakların ta kendisi.
+        //
+        // Aynı çağrı sürüm döngüsünde de kullanılıyor (`SnowfallRateAt` içinde), yani
+        // başlangıç ile evrim aynı kot uzayını okuyor; ayrışamazlar.
+        //
+        // Aralık değiştiğinde (dağ yeniden üretildi) yeniden kuruluyor: biriken değerler
+        // başka kotlara aitti, taşımak yanlış kota kar yapıştırırdı.
+        for (int i = 0; i < Bands; i++)
+        {
+            float settled = weatherDriver.SnowinessAt(BandAltitude(i));
+            bandCover[i] = settled;
+            bandPack[i] = settled;
+        }
 
         if (snowProfile != null) return;
 

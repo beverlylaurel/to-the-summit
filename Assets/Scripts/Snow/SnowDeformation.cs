@@ -1,7 +1,12 @@
 using System;
 using UnityEngine;
 
-/// KARDA AYAK İZİ. Oyuncuyu izleyen yerel deformasyon tamponunu yönetir.
+/// KARDA AÇILAN OLUK. Oyuncuyu izleyen yerel deformasyon tamponunu yönetir.
+///
+/// AYRIK AYAK İZİ DEĞİL. Derin karda insan bot izi bırakmaz; gövdesiyle karı
+/// YARARAK sürekli bir oluk açar ve kar iki yana set olarak yığılır. Her karede
+/// kat edilen yol bir doğru parçası olarak süpürülüyor, yani oluk hızdan bağımsız
+/// olarak sürekli kalıyor.
 ///
 /// NEDEN KAR ÖRTÜSÜ SİMÜLASYONUNDAN AYRI. Örtü simülasyonunun hücresi arazi
 /// ızgarasıyla aynı olacak (7.32 m); ayak izi 0.3 m, yani hücrenin yirmi dörtte biri.
@@ -15,8 +20,8 @@ using UnityEngine;
 /// Pencere `Extent` kenarlı kare, görünür bölge yarıçapı `Extent/2` olan çember.
 /// Çember kareye içten teğet: döşemenin komşu kopyası hiçbir zaman görünmüyor.
 ///
-/// ÇARPIŞMA İLK SÜRÜMDE BAĞLI DEĞİL — bilerek. Oyuncu kendi izinin üstünde iz
-/// derinliği kadar (≤ 12 cm) havada kalıyor. Bunun okunup okunmadığı ÖLÇÜLECEK;
+/// ÇARPIŞMA İLK SÜRÜMDE BAĞLI DEĞİL — bilerek. Oyuncu kendi oluğunun üstünde
+/// oluk derinliği kadar (≤ 35 cm) havada kalıyor. Bunun okunup okunmadığı ÖLÇÜLECEK;
 /// okunuyorsa CPU tarafı eklenir. Peşinen ikinci bir CPU/GPU ikizi yazmak `SnowDrift`
 /// borcunu ikiye katlardı (bkz. `SnowDriftField` başlığı).
 public class SnowDeformation : MonoBehaviour
@@ -31,24 +36,21 @@ public class SnowDeformation : MonoBehaviour
 
     const float TexelSize = Extent / Resolution;
 
-    /// Adım aralığı, metre. İnsan adımı 0.65-0.80 m; yürüyüş hızından bağımsız
-    /// olması için MESAFEYE bağlı, zamana değil — koşarken izler seyrelmiyor.
-    const float StepDistance = 0.72f;
+    /// İz parçasının en kısa boyu, metre. Bundan kısa hareket biriktiriliyor: her
+    /// karede dispatch açmak dururken bile GPU'yu meşgul ederdi. 0.15 m, texel'in üç
+    /// katı — parçalar üst üste biniyor, oluk kopmuyor.
+    const float SegmentDistance = 0.15f;
 
-    /// Ayak izinin ölçüleri, metre. Dağ botu 0.31 × 0.12; iz kardaki çökme olduğu
-    /// için tabandan biraz geniş.
-    const float FootLength = 0.34f;
-    const float FootWidth = 0.15f;
+    /// Oluğun yarı genişliği, metre. Karı yaran şey ayak değil GÖVDE: bacaklar,
+    /// kalça, sallanan kollar. Yürüyen bir insanın derin karda açtığı oluk 0.5-0.6 m.
+    const float TrailHalfWidth = 0.28f;
 
-    /// İz ekseninden yana kayma, metre. İki ayak arası genişlik.
-    const float Stride = 0.11f;
-
-    /// Azami iz derinliği, metre. Bundan derini için kar da yetmiyor: derinlik
-    /// oradaki kar kalınlığıyla ayrıca sınırlanıyor.
-    const float MaxDepth = 0.12f;
+    /// Azami oluk derinliği, metre. Derin karda insan baldıra kadar batar; bundan
+    /// derini için kar da yetmiyor, derinlik oradaki kalınlıkla ayrıca sınırlanıyor.
+    const float MaxDepth = 0.35f;
 
     /// Karın izi kapatma hızı, metre/saniye. Dingin havada pratikte sıfır; yağış ve
-    /// rüzgâr açtıkça iz kapanıyor. 12 cm'lik iz tam fırtınada ~2 dakikada siliniyor.
+    /// rüzgâr açtıkça oluk kapanıyor. 35 cm'lik oluk tam fırtınada ~6 dakikada siliniyor.
     const float RefillCalm = 0.0f;
     const float RefillStorm = 0.001f;
 
@@ -81,9 +83,8 @@ public class SnowDeformation : MonoBehaviour
     Vector2Int windowMin;
     bool windowValid;
 
-    Vector3 lastStep;
-    bool hasLastStep;
-    bool rightFoot;
+    Vector3 lastStamp;
+    bool hasLastStamp;
 
     static readonly int DeformTexId = Shader.PropertyToID("_SnowDeformTex");
     static readonly int DeformId = Shader.PropertyToID("_SnowDeform");
@@ -91,11 +92,12 @@ public class SnowDeformation : MonoBehaviour
     static readonly int ResolutionId = Shader.PropertyToID("_Resolution");
     static readonly int ResolutionMaskId = Shader.PropertyToID("_ResolutionMask");
     static readonly int TexelSizeId = Shader.PropertyToID("_TexelSize");
-    static readonly int StampCenterId = Shader.PropertyToID("_StampCenter");
-    static readonly int StampAxisId = Shader.PropertyToID("_StampAxis");
-    static readonly int StampLengthId = Shader.PropertyToID("_StampLength");
-    static readonly int StampWidthId = Shader.PropertyToID("_StampWidth");
+    static readonly int StampFromId = Shader.PropertyToID("_StampFrom");
+    static readonly int StampToId = Shader.PropertyToID("_StampTo");
+    static readonly int StampHalfWidthId = Shader.PropertyToID("_StampHalfWidth");
     static readonly int StampDepthId = Shader.PropertyToID("_StampDepth");
+    static readonly int StampOriginId = Shader.PropertyToID("_StampOrigin");
+    static readonly int StampSizeId = Shader.PropertyToID("_StampSize");
     static readonly int ClearOriginId = Shader.PropertyToID("_ClearOrigin");
     static readonly int ClearSizeId = Shader.PropertyToID("_ClearSize");
     static readonly int RefillAmountId = Shader.PropertyToID("_RefillAmount");
@@ -129,7 +131,7 @@ public class SnowDeformation : MonoBehaviour
         deform.Create();
 
         windowValid = false;
-        hasLastStep = false;
+        hasLastStamp = false;
     }
 
     void OnDisable()
@@ -146,7 +148,7 @@ public class SnowDeformation : MonoBehaviour
         Vector2 center = new(position.x, position.z);
 
         AdvanceWindow(center);
-        StampSteps(position);
+        StampTrail(position);
         RefillStep();
 
         Shader.SetGlobalTexture(DeformTexId, deform);
@@ -214,65 +216,60 @@ public class SnowDeformation : MonoBehaviour
                          Mathf.CeilToInt(size.x / 8f), Mathf.CeilToInt(size.y / 8f), 1);
     }
 
-    /// Adımlar MESAFEYE göre atılıyor. Zamana bağlansaydı koşarken izler seyrelir,
-    /// dururken üst üste binerdi.
-    void StampSteps(Vector3 position)
+    /// İz PARÇA PARÇA süpürülüyor. Biriken hareket `SegmentDistance`'ı geçince o
+    /// parça tek dispatch'le basılıyor; parçalar uçlarından bindiği için oluk sürekli.
+    void StampTrail(Vector3 position)
     {
-        if (!hasLastStep)
+        if (!hasLastStamp)
         {
-            lastStep = position;
-            hasLastStep = true;
+            lastStamp = position;
+            hasLastStamp = true;
             return;
         }
 
-        Vector3 delta = position - lastStep;
+        Vector3 delta = position - lastStamp;
         delta.y = 0f;
+        if (delta.sqrMagnitude < SegmentDistance * SegmentDistance) return;
 
-        float travelled = delta.magnitude;
-        if (travelled < StepDistance) return;
+        Vector2 from = new(lastStamp.x, lastStamp.z);
+        Vector2 to = new(position.x, position.z);
 
-        Vector2 axis = new Vector2(delta.x, delta.z) / travelled;
-
-        // Kaç adım atlandıysa hepsi basılıyor: kare düşerse iz zinciri kopmamalı.
-        int steps = Mathf.Min(Mathf.FloorToInt(travelled / StepDistance), 8);
-        for (int i = 1; i <= steps; i++)
+        // DERİNLİK ORADAKİ KARDAN FAZLA OLAMAZ. Çıplak kayada oluk yok; ince örtüde
+        // sığ. Parçanın ortası örnekleniyor — parça 0.15 m, kar kalınlığı o mesafede
+        // ölçülebilir biçimde değişmiyor.
+        Vector3 middle = lastStamp + delta * 0.5f;
+        float depth = Mathf.Min(MaxDepth, snow.DepthAt(middle));
+        if (depth < 0.01f)
         {
-            float t = i * StepDistance / travelled;
-            Vector3 foot = lastStep + delta * t;
-
-            rightFoot = !rightFoot;
-            Vector2 side = new(-axis.y, axis.x);
-            Vector2 at = new Vector2(foot.x, foot.z) + side * (rightFoot ? Stride : -Stride);
-
-            Stamp(at, axis, new Vector3(at.x, foot.y, at.y));
+            lastStamp = position;
+            return;
         }
 
-        lastStep += delta * (steps * StepDistance / travelled);
-    }
+        // İŞLENECEK KUTU parçanın kendi sınırlarından çıkıyor: sabit kutu, uzun
+        // parçada oluğun ucunu keser, kısa parçada boş texel işler.
+        float reach = TrailHalfWidth * 2.2f;
+        Vector2 min = Vector2.Min(from, to) - new Vector2(reach, reach);
+        Vector2 max = Vector2.Max(from, to) + new Vector2(reach, reach);
 
-    void Stamp(Vector2 at, Vector2 axis, Vector3 sample)
-    {
-        // DERİNLİK ORADAKİ KARDAN FAZLA OLAMAZ. Çıplak kayada iz yok; ince örtüde
-        // sığ iz. `DepthAt` görsel yüzeyle aynı hesabı yapıyor.
-        float available = snow.DepthAt(sample);
-        float depth = Mathf.Min(MaxDepth, available);
-        if (depth < 0.01f) return;
+        Vector2Int originTexel = new(Mathf.FloorToInt(min.x / TexelSize),
+                                     Mathf.FloorToInt(min.y / TexelSize));
+        Vector2Int sizeTexel = new(Mathf.CeilToInt(max.x / TexelSize) - originTexel.x + 1,
+                                   Mathf.CeilToInt(max.y / TexelSize) - originTexel.y + 1);
 
         compute.SetTexture(stampKernel, DeformTargetId, deform);
         compute.SetInt(ResolutionId, Resolution);
         compute.SetInt(ResolutionMaskId, Resolution - 1);
         compute.SetFloat(TexelSizeId, TexelSize);
-        compute.SetVector(StampCenterId, new Vector4(at.x, at.y, 0f, 0f));
-        compute.SetVector(StampAxisId, new Vector4(axis.x, axis.y, 0f, 0f));
-        compute.SetFloat(StampLengthId, FootLength);
-        compute.SetFloat(StampWidthId, FootWidth);
+        compute.SetVector(StampFromId, new Vector4(from.x, from.y, 0f, 0f));
+        compute.SetVector(StampToId, new Vector4(to.x, to.y, 0f, 0f));
+        compute.SetFloat(StampHalfWidthId, TrailHalfWidth);
         compute.SetFloat(StampDepthId, depth);
+        compute.SetInts(StampOriginId, originTexel.x, originTexel.y);
+        compute.SetInts(StampSizeId, sizeTexel.x, sizeTexel.y);
+        compute.Dispatch(stampKernel,
+                         Mathf.CeilToInt(sizeTexel.x / 8f), Mathf.CeilToInt(sizeTexel.y / 8f), 1);
 
-        // Damga kutusu compute içindeki `reach` ile aynı: en uzun eksenin 1.5 katı,
-        // iki yana.
-        int half = Mathf.CeilToInt(Mathf.Max(FootLength, FootWidth) * 1.5f / TexelSize);
-        int side = half * 2;
-        compute.Dispatch(stampKernel, Mathf.CeilToInt(side / 8f), Mathf.CeilToInt(side / 8f), 1);
+        lastStamp = position;
     }
 
     /// İzin kapanması yağıştan ve rüzgârdan geliyor — ayrı bir zamanlayıcı yok.

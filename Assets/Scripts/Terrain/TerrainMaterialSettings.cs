@@ -175,7 +175,12 @@ public class TerrainMaterialSettings : ScriptableObject
     public float permanentSnowBand = 350f;
     [Tooltip("Tam şiddetteki kar yağışında örtünün tamamlanma süresi (saniye). Birikme hızı " +
              "yağışın şiddetiyle orantılı: yarı şiddette iki katı sürer.")]
-    public float snowAccumulationSeconds = 90f;
+    /// OYUNUN KENDİ SAATİNDEN TÜRÜYOR. `TimeOfDay.dayLengthMinutes = 40`, yani gün
+    /// 40 gerçek dakika: zaman 36 kat sıkışık. Şiddetli kar 5 cm/sa yağar ve zeminin
+    /// görünür biçimde beyazlaması ~2 cm ister — gerçek dünyada 24 dakika, oyunun
+    /// saatinde 40 saniye. Eski değer 90'dı, yani oyunun kendi zamanından iki kat
+    /// yavaştı ve geçip giden bir kar fırtınası zemine hiç dokunamıyordu.
+    public float snowAccumulationSeconds = 40f;
     [Tooltip("Rüzgârın gevşek karı süpürüp bitirme süresi (saniye), tam kaldırmada. " +
              "Sürüklenme kaynağını TÜKETİR: rüzgâr yerdeki karı alıp götürür ve yeni " +
              "kar yağmadıkça sürüklenecek bir şey kalmaz. Bu olmadan perde sonsuza " +
