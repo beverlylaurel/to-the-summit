@@ -73,6 +73,7 @@ public static class MountainSceneBootstrap
     const string SkyShaderPath = "Assets/Shaders/Sky.shader";
     const string SkyMaterialPath = "Assets/Settings/Sky.mat";
     const string FogComputePath = "Assets/Shaders/VolumetricFog.compute";
+    const string SnowDeformComputePath = "Assets/Shaders/SnowDeformation.compute";
     const string FogSettingsPath = "Assets/Settings/VolumetricFogSettings.asset";
     const string SkyFogShaderPath = "Assets/Shaders/SkyFog.shader";
     const string RendererPath = "Assets/Settings/PC_Renderer.asset";
@@ -1773,6 +1774,8 @@ public static class MountainSceneBootstrap
         }
 
         probe.Bind(snow, player.transform);
+
+        EnsureSnowDeformation(player, snow, ref changed);
         EditorUtility.SetDirty(probe);
     }
 
@@ -1812,6 +1815,35 @@ public static class MountainSceneBootstrap
         AssetDatabase.SaveAssets();
 
         return settings;
+    }
+
+    /// AYAK İZİ DEFORMASYONU. Oyuncunun üstünde duruyor — tampon oyuncuyu izliyor ve
+    /// izi bırakan da o.
+    ///
+    /// EKLE-SONRA-BAĞLA GÜVENLİ, çünkü bileşende `ExecuteAlways` yok: Unity edit
+    /// mode'da `OnEnable`'ı çağırmıyor, ilk çağrı Play'e basıldığında oluyor ve o ana
+    /// kadar `Bind` serileştirilmiş oluyor. `SnowSurface` de aynı deseni kullanıyor.
+    /// (`SnowCollisionProbe` kapalı nesnede duruyor ama sebebi ayrı: o F1'den açılan
+    /// bir ölçüm aracı, sürekli çalışan bir sistem değil.)
+    static void EnsureSnowDeformation(FirstPersonController player, SnowSurface snow,
+        ref bool changed)
+    {
+        var compute = AssetDatabase.LoadAssetAtPath<ComputeShader>(SnowDeformComputePath);
+        if (compute == null)
+            throw new System.InvalidOperationException(
+                $"Kar deformasyon compute shader'ı bulunamadı: {SnowDeformComputePath}");
+
+        var deformation = player.GetComponent<SnowDeformation>();
+        if (deformation == null)
+        {
+            deformation = player.gameObject.AddComponent<SnowDeformation>();
+            changed = true;
+        }
+
+        deformation.Bind(compute, player.transform, snow,
+                         Object.FindAnyObjectByType<WeatherState>(),
+                         Object.FindAnyObjectByType<WindField>());
+        EditorUtility.SetDirty(deformation);
     }
 
     static TerrainMaterialSettings LoadOrCreateTerrainMaterialSettings()

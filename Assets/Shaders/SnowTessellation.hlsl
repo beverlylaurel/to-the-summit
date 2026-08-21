@@ -56,7 +56,22 @@ float SnowTessEdgeFactor(float3 worldPos)
     float depth = SnowMacroDepth(worldPos);
     float thick = smoothstep(_SnowDisplaceStart * 0.4, _SnowDisplaceStart, depth);
 
-    return lerp(1.0, _SnowTessFactor, near * thick);
+    float macro = lerp(1.0, _SnowTessFactor, near * thick);
+
+    // AYAK İZİ KENDİ BANDINI İSTİYOR. Arazi üçgeni 7.32 m; makro katsayı 6 ile kenar
+    // 1.22 metreye iniyor, oysa iz 0.34 m. İz bandında katsayı 64 → kenar 0.114 m.
+    // Bant dar (8-14 m) tutuluyor: 14 m yarıçapta ~23 arazi üçgeni var, 64 katsayıyla
+    // ~94 bin alt üçgen eder.
+    float foot = 1.0 - smoothstep(_SnowFootNear, _SnowFootFar, toCamera);
+    if (foot > 0.001)
+    {
+        // İz olmayan yerde bölünmeye gerek yok: tampon boşsa katsayı yükselmiyor.
+        float print = abs(SnowFootprint(worldPos));
+        float hasPrint = smoothstep(0.0, 0.01, print);
+        macro = max(macro, lerp(1.0, _SnowFootTess, foot * hasPrint));
+    }
+
+    return macro;
 }
 
 /// Kenar faktörü İKİ UCUN ORTALAMASI. Yamanın merkezinden hesaplansaydı komşu
@@ -103,7 +118,7 @@ float3 SnowDomainPositionWS(InputPatch<TessellationControlPoint, 3> patch,
                       + patch[2].positionOS.xyz * barycentric.z;
 
     float3 positionWS = TransformObjectToWorld(positionOS);
-    positionWS.y += SnowDisplacement(positionWS);
+    positionWS.y += SnowTotalDisplacement(positionWS);
     return positionWS;
 }
 

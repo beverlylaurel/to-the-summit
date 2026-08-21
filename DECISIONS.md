@@ -907,3 +907,50 @@ tek yasada birleştirilir.
 
 **Maliyet:** birleştirme yarım gün; `speedFactor`'ın ölçülmüş uçlarının log profille
 yeniden doğrulanması gerekir.
+
+
+## Çığ oyuna girmiyor — kar modeli üç katmana iniyor (2026-08-21)
+
+**Karar.** Kullanıcı kararı: çığ yok. Gerekçe `DESIGN.md` §1'de, registerden türüyor.
+
+**Teknik sonucu bugün ödeniyor** — `snow-spec.md`'nin (Cordonnier 2018) hangi parçası
+düşüyor:
+
+| düşen | neden |
+|---|---|
+| `U` (kararsız) katmanı | Yalnız çığı beslemek için var. Makalede başka tüketicisi yok. |
+| Stabilite geçişleri (§5.2 tablosu) | `S ↔ U` arasında karar veriyordu; `U` yoksa konusu yok. |
+| `x_U` — yağıştan kararsız pay (§5.1) | Aynı sebep. |
+| Snow-Moving boolean katmanı (§6.1) | Çığın kendi durum bitine ait. |
+| Pipe model, Moore komşuluğu, yield kriteri, viskoz terim (§6.1) | Çığın kendisi. |
+| `α` sıcaklık karışımı | Granüler/viskoz çığ ayrımı içindi. |
+
+**Makalenin eksik bıraktığı altı formülün dördü konusuz kaldı** (`snow-spec.md` §11.2):
+`α`'nın sıcaklıkla eşlemesi (3), stabilite interpolasyonunun tam biçimi (4), eğimin
+stabiliteye etkisi (5), rüzgârın stabiliteyi azaltma sabiti (6). Ölçülüp seçilecek şey
+kalmadı; tahmin riski de.
+
+**Kalan katman yığını: `B` + `S` + `P`.** `C` (sıkışmış) da şimdilik yazılmıyor: makalede
+tek kaynağı kayak/tırmanışçı izleri (`S -> C`) ve çığ. İkisi de yoksa katman hep sıfır
+kalır — ölü kod olur.
+
+Oyuncunun ayak izi bu katmanı DİRİLTMİYOR: simülasyon hücresi 7.3 m, ayak izi 0.3 m —
+iz hücrenin altında kalıyor, katman onu gösteremez. Ayak izi ayrı bir sistem (yerel
+yüksek çözünürlüklü deformasyon dokusu, mevcut `SnowDisplacement`/`SnowTessellation`
+zincirine bağlanır) ve Cordonnier'den bağımsızdır.
+
+**KORNİŞLER KAYBOLMUYOR.** Onları üreten mekanizma çığ değil, rüzgâr taşınımı (§5.4) ve
+wind-effect surface'ın parabolik kapağı (§3.3). İkisi de duruyor.
+
+**Kaybedilen ne:** çığın süpürdüğü temiz kuloarlar ve etekteki moloz konileri. Ama toz kar
+difüzyonu (§5.3) zaten "sürekli küçük dökülme" süreci — dik yüzleri soyup eğim kırığında
+biriktiriyor. Yani etkinin yumuşak hâli bedavaya kalıyor.
+
+**Poisson çerçevesi de küçülüyor.** §4'ün asıl değeri temporal zoom'du ve o yalnız
+interaktif fenomenler (çığ 0.1 s, kayakçı 0.1 s) için gerekiyordu. Kalan olayların hepsi
+gün ölçeğinde. Yerine stokastik gün zamanlayıcısı: fırtına başlangıcı ~haftada 1, süresi
+~3 gün, günde 2 adım. Kümelenme korunuyor, olay kuyruğu makinesi gerekmiyor.
+
+**Tetikleyici — karar geri alınırsa:** `U` katmanı ve §5.2 tablosu geri gelir, üstüne §6.1
+yazılır. `S`/`P` ayrımı ve rüzgâr taşınımı olduğu gibi kalır, yani geri dönüş yıkıcı değil.
+

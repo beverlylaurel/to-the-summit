@@ -196,3 +196,19 @@ Dağ yeniden yontulunca dördü de kendiliğinden kayıyor. Karsız kalan pay ş
 dağ kısalırsa kar aşağı iner ve çıplak kaya azalır — kar çizgisi mutlak metre değil
 **boyun oranı** olduğu için (`RATIONALE.md` → Kuşaklar).
 
+## Ayak izi bölünmesi — ELLE BAKILACAK
+
+`snowFootTess` (64) doğrudan arazi üçgeninin boyuna göre seçildi:
+
+    üçgen kenarı = terrainSize / (heightmapResolution − 1) = 30000 / 4096 = 7.32 m
+    bölünmüş kenar = 7.32 / 64 = 0.114 m
+    ayak izi = 0.34 m  ->  iz üç bölünmüş üçgene oturuyor
+
+`terrainSize` ya da `heightmapResolution` değişirse bu oran kayar. İz çözülmüyorsa
+katsayı, üçgen kenarının izin üçte birine inmesini sağlayacak şekilde ayarlanır.
+Donanım tavanı 64; üçgen 7.32 m'nin üstüne çıkarsa bölünmeyle çözülemez ve iz için
+başka bir yol (ayrı yakın-plan mesh'i) gerekir.
+
+**Kendiliğinden ölçeklenmeyen ama ölçekten BAĞIMSIZ olanlar:** deformasyon penceresi
+(24 m), texel boyu (4.7 cm), ayak ölçüleri, adım aralığı, iz derinliği. Hepsi gerçek
+dünya büyüklüğü; dağın boyuyla ilgileri yok.

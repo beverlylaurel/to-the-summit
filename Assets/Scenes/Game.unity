@@ -184,7 +184,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RainStreakWorkingSet
   database: {fileID: 11400000, guid: 9954b9123f12105428cba71a4b009e02, type: 2}
-  level: -1
 --- !u!1 &263682441
 GameObject:
   m_ObjectHideFlags: 0
@@ -1225,6 +1224,7 @@ GameObject:
   - component: {fileID: 848219612}
   - component: {fileID: 848219613}
   - component: {fileID: 848219614}
+  - component: {fileID: 848219615}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1378,6 +1378,23 @@ MonoBehaviour:
   headYawLimit: 80
   headPitchLimit: 65
   sensitivity: 0.12
+--- !u!114 &848219615
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 848219606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d701aa8cc7dddfa4185ed22bac570253, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SnowDeformation
+  compute: {fileID: 7200000, guid: cbe46801e1e10cd4590420334fe85d3e, type: 3}
+  walker: {fileID: 848219609}
+  snow: {fileID: 1738276036}
+  weather: {fileID: 1805896806}
+  wind: {fileID: 1805896805}
 --- !u!1 &1147612204
 GameObject:
   m_ObjectHideFlags: 0

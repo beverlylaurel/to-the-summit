@@ -231,6 +231,36 @@ sahnede öyle bir kaynak yok. Şimşek eklendiğinde gerekecek (`DECISIONS.md`).
   dikey bileşenle kurulur ve üstüne **girdap alanının kendi türevinden** çıkan damla başına
   sapma binder. Sapma uydurulmaz: çizilen konumun tam türevi alınır.
 
+### Kar deformasyonu — ayak izi (`SnowDeformation`, `SnowDeformation.compute`)
+
+**Okur:** oyuncunun konumunu, **kar kalınlığını** (`SnowSurface.DepthAt` — iz oradaki
+kardan derin olamaz), yağış şiddetini ve rüzgâr gücünü (izin kapanma hızı).
+**Okumaz:** kar örtüsü simülasyonunu. Örtünün hücresi arazi ızgarasıyla aynı olacak
+(7.32 m), ayak izi 0.3 m — iz o ızgaraya yazılamaz. `[Cordonnier 2018, §6.2]` bunu
+kendisi söylüyor: "10m per cell only allows a consideration of the general direction
+of the skiers".
+
+- **Doku dünyaya DÖŞENİYOR, kaydırılmıyor.** `uv = worldPos.xz / 24 m`, Repeat sarımlı.
+  Oyuncu yürürken kopyalama yok; yalnız pencereye yeni giren texel şeritleri sıfırlanıyor.
+  Kaydır-kopyala her karede bir tam doku kopyası demekti.
+- **Pencere kare, görünür bölge çember.** Kenar 24 m, sönüm yarıçapı 12 m. Çember kareye
+  içten teğet olduğu için döşemenin komşu kopyası hiçbir zaman görünmüyor (kare köşesi
+  17 m'de).
+- **Adım MESAFEYE bağlı, zamana değil** — koşarken izler seyrelmez, dururken üst üste
+  binmez.
+- **Değer işaretli:** pozitif yüzeyin çökmesi, negatif izin kenarına itilen karın
+  kabarması. Kar yok olmuyor, yana gidiyor.
+- **Üst üste binen izde derin olan kazanıyor**, toplanmıyor: gerçek karda ikinci adım
+  zaten sıkışmış tabana basar.
+- **İzin kapanması yağıştan ve rüzgârdan geliyor**, ayrı bir zamanlayıcı yok. Kar örtüsü
+  simülasyonu gelince kaynağı gerçek rüzgâr taşınımı olur; sistem değişmez.
+- **ÇARPIŞMA BAĞLI DEĞİL** — bilinçli. Oyuncu kendi izinin üstünde iz derinliği kadar
+  (≤ 12 cm) havada kalıyor. Okunup okunmadığı ölçülecek; peşinen ikinci bir CPU/GPU
+  ikizi yazmak `SnowDriftField` borcunu ikiye katlardı.
+- **Bölünme izin kendi bandını istiyor.** Arazi üçgeni 7.32 m, makro katsayı 6 ile kenar
+  1.22 m — iz 0.34 m, çözülmez. İz bandında (8-14 m) katsayı 64 → kenar 0.114 m. Kural
+  makrodakiyle aynı: yer değiştirme, bölünme bitmeden sıfıra iner.
+
 ### Hava sesi (`WeatherAudio`, `AudioBand`)
 
 **Okur:** şiddet, karlılık, rüzgârın sürekli şiddeti **ve** esintisi.

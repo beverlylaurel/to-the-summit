@@ -24,6 +24,9 @@ Soru "başarabilecek miyim" değil, **"neden hâlâ gidiyorum"**.
 **Bundan türeyen yasaklar:**
 
 - Dağ oyuncuyu hedef almaz. Fırtına oyuncu orada olduğu için çıkmaz.
+- **Çığ yok.** Kar sistemi çığ simülasyonu taşımayacak. Çığ bir olaydır ve olayın bir
+  hedefi olur; dağın kayıtsızlığı tam da olay üretmemesinde. "Az kalsın" anı bu oyunun
+  registerinde değil — burada ölüm bir sahne değil, birikmiş bir sonuç.
 - Sıçratma (jump scare), takip eden şey, tehditkâr ses tasarımı yok.
 - Estetize edilmiş acı yok. Depresyon dramatik değil — **sıradan, düz**. Karanlık palet,
   ağır müzik, şiirsel monolog ne kadar azsa o kadar gerçek.

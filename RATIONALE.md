@@ -1023,3 +1023,29 @@ Makalenin dipnotu tam bunu söylüyor. `size4`'te oran 14 kata iniyor, çalışm
 **Üç seviyeyi birden bağlamaya gerek kalmadı** — dinamik seçim yalnız o %1'lik yakın
 kuyruk için işe yarardı. Ertelenmiş bir işin doğru cevabı bazen "gerekmiyormuş" oluyor;
 kural uygulanmadan bilinmiyordu.
+
+
+## Langer'ın kendi makalesi "shower door" diyor — silme kararı yazarlarca doğrulandı
+
+Spektral perde ölçülüp silindikten sonra makale baştan sona okundu. §6.2'de yazarlar
+yöntemin kusurunu kendileri adlandırıyor: spektral kar tek başına "atmosferik dokusal
+etki" veriyor ama bireysel taneden yoksun ve **"shower door" etkisine düşebiliyor** —
+yani ekrana yapışmış bir duş camı gibi okunuyor. Bizim iki turda ölçtüğümüz belirti
+birebir buydu.
+
+Makalenin çözümü perdeyi tanecikle BİRLİKTE kullanmak. Bizde o birleşim çalışmadı çünkü
+üçüncü bir katman var: yağışın kendi görüş mesafesi. Perdenin bandı sise sıkışıyor.
+
+**Spec'in atladığı bir şey de bulundu:** Langer §6.2'de yöntemin YAĞMUR uzantısını da
+veriyor (`ventana.avi`) — dikey yön ve yüksek `C` ile yalnız `|ω_y| ≈ 0` bileşenleri
+katkı veriyor, uzun dalga boylu dikey çizgiler kalıyor. `snow-spec.md` bunu hiç yazmamış.
+Bizde konusu yok: yağmur Garg-Nayar iz veritabanından geliyor ve o çok daha fiziksel.
+
+**Cordonnier tarafında spec sadık.** Tam okumada doğrulanan üç madde:
+- §9: "cell widths from 2 to 10 meters ... robust to scale changes" — bizim 7.32 m içeride,
+  yani spec'in "88 m/hücre" uyarısı 90 km varsayımından geliyordu ve bizde geçersiz.
+- §6.2: "10m per cell only allows a consideration of the general direction of the skiers"
+  — ayak izi simülasyon ızgarasına sığmaz, ayrı sistem olmak zorunda.
+- §5.4'teki `max(D, -k_erosion·curv_W)` makalede birebir öyle. Aşındırılan miktarın mevcut
+  karı aşmaması için `min` olması gerektiği şüphesi yerinde; uygulamada `min` alınacak ve
+  sapma burada yazılı.

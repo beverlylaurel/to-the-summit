@@ -77,6 +77,9 @@ public class TerrainSurface : MonoBehaviour
     static readonly int SnowDisplaceMaxId = Shader.PropertyToID("_SnowDisplaceMax");
     static readonly int SnowDisplaceStartId = Shader.PropertyToID("_SnowDisplaceStart");
     static readonly int SnowTessFactorId = Shader.PropertyToID("_SnowTessFactor");
+    static readonly int SnowFootNearId = Shader.PropertyToID("_SnowFootNear");
+    static readonly int SnowFootFarId = Shader.PropertyToID("_SnowFootFar");
+    static readonly int SnowFootTessId = Shader.PropertyToID("_SnowFootTess");
     static readonly int SnowTessNearId = Shader.PropertyToID("_SnowTessNear");
     static readonly int SnowTessFarId = Shader.PropertyToID("_SnowTessFar");
     /// Yüzey başına altı doku. Son ekler shader'daki DECLARE_SURFACE_DETAIL
@@ -617,6 +620,9 @@ public class TerrainSurface : MonoBehaviour
         material.SetFloat(SnowDisplaceMaxId, settings.snowDisplaceMax);
         material.SetFloat(SnowDisplaceStartId, settings.snowDisplaceStart);
         material.SetFloat(SnowTessFactorId, settings.snowTessFactor);
+        material.SetFloat(SnowFootNearId, settings.snowFootNear);
+        material.SetFloat(SnowFootFarId, settings.snowFootFar);
+        material.SetFloat(SnowFootTessId, settings.snowFootTess);
         material.SetFloat(SnowTessNearId, settings.snowTessNear);
         material.SetFloat(SnowTessFarId, settings.snowTessFar);
 

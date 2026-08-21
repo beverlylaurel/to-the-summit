@@ -1,0 +1,116 @@
+// KAR DEFORMASYON TAMPONU. Oyuncunun etrafındaki yerel yüksek çözünürlüklü izler.
+//
+// NEDEN AYRI SİSTEM. Kar örtüsü simülasyonunun hücresi arazi ızgarasıyla aynı
+// (7.32 m); ayak izi 0.3 m. Cordonnier makalesi bunu kendisi söylüyor: "10m per cell
+// only allows a consideration of the general direction of the skiers" (§6.2). İz o
+// ızgaraya sığmaz, kendi dokusunda yaşar.
+//
+// DOKU DÜNYAYA DÖŞENİYOR, KAYDIRILMIYOR. `uv = worldPos.xz / Extent` ve doku Repeat
+// sarımlı: doku dünyayı `Extent` periyoduyla döşüyor. Oyuncu yürürken hiçbir kopyalama
+// yapılmıyor, yalnız pencereye YENİ GİREN şeritler sıfırlanıyor. Klasik "kaydır ve
+// kopyala" yönteminin her kare bir tam doku kopyası vardı.
+//
+// Pencere `Extent` kenarlı kare, görünür bölge ise yarıçapı `Extent/2` olan çember.
+// Çember kareye içten teğet olduğu için döşemenin komşu kopyası hiçbir zaman
+// görünmüyor — sönüm 12 m'de bitiyor, kare köşesi 17 m'de.
+//
+// DEĞER İŞARETLİ: pozitif = yüzey ÇÖKMÜŞ (iz tabanı), negatif = KABARMIŞ (izin
+// kenarına itilen kar). Geri dolma ikisini de sıfıra çekiyor.
+
+#pragma kernel Stamp
+#pragma kernel ClearStrip
+#pragma kernel Refill
+
+RWTexture2D<float> _Deform;
+
+uint  _Resolution;
+uint  _ResolutionMask;   // _Resolution - 1, ikinin kuvveti olduğu C# tarafında doğrulanıyor
+float _TexelSize;        // metre / texel
+
+// --- damga ---
+float2 _StampCenter;     // dünya xz
+float2 _StampAxis;       // yürüyüş yönü (birim)
+float  _StampLength;     // ayak uzunluğu, metre
+float  _StampWidth;      // ayak genişliği, metre
+float  _StampDepth;      // taban çökmesi, metre
+
+// --- şerit temizleme ---
+int2 _ClearOrigin;       // mutlak texel indeksi
+int2 _ClearSize;
+
+// --- geri dolma ---
+float _RefillAmount;     // metre, bu adımda sıfıra doğru kapanan miktar
+
+uint2 Slot(int2 absolute)
+{
+    // Toroidal yuva. Tam sayı modülü yerine BİT MASKESİ: çözünürlük ikinin kuvveti
+    // ve `%` derleyicinin uyardığı kadar yavaş. Kuvvet olmadığı durum C# tarafında
+    // fırlatılıyor (`SnowDeformation.OnEnable`), yani burada sessiz bozulma yok.
+    //
+    // Maske negatif indekste de doğru: ikinin tümleyeninde `-1 & 511 == 511`, yani
+    // sarma kendiliğinden pozitife düşüyor.
+    return (uint2)(absolute & (int)_ResolutionMask);
+}
+
+[numthreads(8, 8, 1)]
+void Stamp(uint3 id : SV_DispatchThreadID)
+{
+    // Damga kutusu izin etrafına kurulu; kenar tümseği için yarım ayak boyu pay var.
+    float reach = max(_StampLength, _StampWidth) * 1.5;
+    int half = (int)ceil(reach / _TexelSize);
+    int side = half * 2;
+    if ((int)id.x >= side || (int)id.y >= side) return;
+
+    int2 centerTexel = (int2)floor(_StampCenter / _TexelSize);
+    int2 absolute = centerTexel + int2((int)id.x - half, (int)id.y - half);
+
+    // Texel merkezinin dünya konumu.
+    float2 world = ((float2)absolute + 0.5) * _TexelSize;
+    float2 delta = world - _StampCenter;
+
+    // Ayak ekseni yürüyüş yönü: iz uzun ekseni ilerleme yönünde.
+    float2 axis = _StampAxis;
+    float2 side2 = float2(-axis.y, axis.x);
+    float along = dot(delta, axis) / max(_StampLength * 0.5, 1e-4);
+    float across = dot(delta, side2) / max(_StampWidth * 0.5, 1e-4);
+
+    float r = sqrt(along * along + across * across);
+
+    // TABAN + KENAR TÜMSEĞİ. Gerçek izde kar yok olmuyor, yana itiliyor: çukurun
+    // hemen dışında bir bilezik kabarıyor. Hacim kabaca korunuyor — tümseğin
+    // genliği tabanın dörtte biri, alanı ise yaklaşık dört katı.
+    float floorMask = 1.0 - smoothstep(0.75, 1.0, r);
+    float rimMask = (1.0 - smoothstep(1.0, 1.9, r)) * smoothstep(0.85, 1.15, r);
+
+    float value = _StampDepth * floorMask - _StampDepth * 0.25 * rimMask;
+    if (abs(value) < 1e-5) return;
+
+    uint2 slot = Slot(absolute);
+
+    // ÜST ÜSTE BİNEN İZLER: derin olan kazanıyor. Toplamak ikinci adımda çukuru iki
+    // katına indirirdi; gerçek karda ikinci adım zaten sıkışmış tabana basıyor.
+    float previous = _Deform[slot];
+    _Deform[slot] = value >= 0.0 ? max(previous, value) : min(previous, value);
+}
+
+[numthreads(8, 8, 1)]
+void ClearStrip(uint3 id : SV_DispatchThreadID)
+{
+    if ((int)id.x >= _ClearSize.x || (int)id.y >= _ClearSize.y) return;
+    _Deform[Slot(_ClearOrigin + int2(id.xy))] = 0.0;
+}
+
+[numthreads(8, 8, 1)]
+void Refill(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+
+    float v = _Deform[id.xy];
+    if (v == 0.0) return;
+
+    // Sıfıra doğru sabit hızla kapanma. Çarpımsal sönüm derin izi sığ izden hızlı
+    // kapatırdı; gerçekte dolan şey hacim, oran değil.
+    float closed = v > 0.0 ? max(0.0, v - _RefillAmount)
+                           : min(0.0, v + _RefillAmount);
+    _Deform[id.xy] = closed;
+}
