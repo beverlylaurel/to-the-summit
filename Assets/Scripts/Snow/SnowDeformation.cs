@@ -51,7 +51,7 @@ public class SnowDeformation : MonoBehaviour
     /// adım genişliği. Yürüyen bir insanın bıraktığı oluk 38-42 cm; 50 cm denendi ve
     /// geniş çıktı (kullanıcı bildirdi) — saçılma bandıyla birlikte bozulan şerit bir
     /// buçuk metreye varıyordu, patika gibi okunuyordu.
-    const float TrailHalfWidth = 0.20f;
+    const float TrailHalfWidth = 0.18f;
 
     /// Azami batma, metre. İz derinliği `min(oradaki kar, bu)`.
     ///
@@ -67,7 +67,7 @@ public class SnowDeformation : MonoBehaviour
     /// tessellation'la (iz bandındaki bölünme kapısı hep kapalıydı) çekilmiş bir
     /// ekran görüntüsüne bakılarak düşürülmüştü — bozukluk düzeldi, tavan yerinde
     /// kalmıştı.
-    const float MaxDepth = 0.45f;
+    const float MaxDepth = 0.15f;
 
     /// İZİN KAPANMA HIZI, metre/saniye.
     ///
@@ -80,6 +80,14 @@ public class SnowDeformation : MonoBehaviour
     /// oysa oluk çukur, üstüne yağan kar önce yanlarını dolduruyor. Ölçü: tam yağışta
     /// ~4 dakika.
     const float RefillFull = 0.002f;
+
+    /// Yumuşatma yarıçapı, texel. 4 texel = 19 cm.
+    ///
+    /// İzin yarı genişliği 18 cm, yani yumuşama izin KENDİ ölçeğinde. Daha genişi izi
+    /// silerdi, daha darı keskinliği bırakırdı. Damganın en ince gürültüsü 7 cm
+    /// (bir buçuk texel) ve bu yarıçap onu tamamen eritiyor — kafes deseninin kaynağı
+    /// oydu.
+    const int BlurRadius = 4;
 
     [Tooltip("Deformasyon compute shader'ı.")]
     [SerializeField] ComputeShader compute;
@@ -102,8 +110,16 @@ public class SnowDeformation : MonoBehaviour
         wind = windRef;
     }
 
+    /// KESKİN tampon: damga buraya yazıyor.
     RenderTexture deform;
-    int stampKernel, clearKernel, refillKernel;
+
+    /// BULANIK tampon: gölgelendirme bunu okuyor. Damga keskin bir maskeyle yazılıyor
+    /// ve o maske doğrudan geometriye verilince ekranda sert duvar, kafes deseni ve
+    /// tarak dişi çıkıyordu. Kar kendi kendini yumuşatan bir malzeme — kenar göçüyor,
+    /// tane dolduruyor — ve bu adım o fiziğin karşılığı.
+    RenderTexture smooth;
+
+    int stampKernel, clearKernel, refillKernel, blurKernel;
 
     /// Pencerenin sol-alt köşesinin MUTLAK texel indeksi. Şerit temizleme bunun
     /// değişiminden çıkıyor.
@@ -116,6 +132,10 @@ public class SnowDeformation : MonoBehaviour
     static readonly int DeformTexId = Shader.PropertyToID("_SnowDeformTex");
     static readonly int DeformId = Shader.PropertyToID("_SnowDeform");
     static readonly int DeformTargetId = Shader.PropertyToID("_Deform");
+    static readonly int SmoothTargetId = Shader.PropertyToID("_Smooth");
+    static readonly int BlurOriginId = Shader.PropertyToID("_BlurOrigin");
+    static readonly int BlurSizeId = Shader.PropertyToID("_BlurSize");
+    static readonly int BlurRadiusId = Shader.PropertyToID("_BlurRadius");
     static readonly int ResolutionId = Shader.PropertyToID("_Resolution");
     static readonly int ResolutionMaskId = Shader.PropertyToID("_ResolutionMask");
     static readonly int TexelSizeId = Shader.PropertyToID("_TexelSize");
@@ -143,30 +163,42 @@ public class SnowDeformation : MonoBehaviour
         stampKernel = compute.FindKernel("Stamp");
         clearKernel = compute.FindKernel("ClearStrip");
         refillKernel = compute.FindKernel("Refill");
+        blurKernel = compute.FindKernel("Blur");
 
         // RFloat DEĞİL RHalf: değer aralığı ±0.12 m ve texel başına 2 bayt yeterli
         // (yarım hassasiyet o aralıkta ~6e-5 m çözüyor, izin binde biri). RFloat
         // tamponu 1 MB'den 0.5 MB'ye iniyor.
-        deform = new RenderTexture(Resolution, Resolution, 0, RenderTextureFormat.RHalf)
-        {
-            name = "Snow Deformation",
-            enableRandomWrite = true,
-            filterMode = FilterMode.Bilinear,
-            wrapMode = TextureWrapMode.Repeat,
-            useMipMap = false,
-        };
+        deform = CreateBuffer("Snow Deformation");
+        smooth = CreateBuffer("Snow Deformation Smooth");
         deform.Create();
+        smooth.Create();
 
         windowValid = false;
         hasLastStamp = false;
     }
 
+    static RenderTexture CreateBuffer(string name) =>
+        new RenderTexture(Resolution, Resolution, 0, RenderTextureFormat.RHalf)
+        {
+            name = name,
+            enableRandomWrite = true,
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Repeat,
+            useMipMap = false,
+        };
+
     void OnDisable()
     {
-        if (deform == null) return;
-        deform.Release();
-        Destroy(deform);
-        deform = null;
+        Release(ref deform);
+        Release(ref smooth);
+    }
+
+    static void Release(ref RenderTexture texture)
+    {
+        if (texture == null) return;
+        texture.Release();
+        Destroy(texture);
+        texture = null;
     }
 
     void Update()
@@ -178,7 +210,9 @@ public class SnowDeformation : MonoBehaviour
         StampTrail(position);
         RefillStep();
 
-        Shader.SetGlobalTexture(DeformTexId, deform);
+        // Gölgelendirme BULANIK tamponu okuyor; keskin olan yalnız damganın
+        // biriktiği yer.
+        Shader.SetGlobalTexture(DeformTexId, smooth);
         Shader.SetGlobalVector(DeformId,
             new Vector4(Extent, center.x, center.y, Extent * 0.5f));
     }
@@ -235,6 +269,7 @@ public class SnowDeformation : MonoBehaviour
         if (size.x <= 0 || size.y <= 0) return;
 
         compute.SetTexture(clearKernel, DeformTargetId, deform);
+        compute.SetTexture(clearKernel, SmoothTargetId, smooth);
         compute.SetInt(ResolutionId, Resolution);
         compute.SetInt(ResolutionMaskId, Resolution - 1);
         compute.SetInts(ClearOriginId, origin.x, origin.y);
@@ -305,7 +340,28 @@ public class SnowDeformation : MonoBehaviour
         compute.Dispatch(stampKernel,
                          Mathf.CeilToInt(sizeTexel.x / 8f), Mathf.CeilToInt(sizeTexel.y / 8f), 1);
 
+        // YUMUŞATMA HEMEN ARDINDAN, yalnız damganın kutusunda. Bütün dokuyu her karede
+        // bulanıklaştırmak 4.2 milyon texel eder; damga kutusu birkaç bin.
+        //
+        // Kutu yarıçap kadar genişletiliyor: kenardaki texel'in komşuları da işlenmeli,
+        // yoksa damganın sınırında yumuşamamış bir çerçeve kalır.
+        Blur(originTexel - new Vector2Int(BlurRadius, BlurRadius),
+             sizeTexel + new Vector2Int(BlurRadius * 2, BlurRadius * 2));
+
         lastStamp = position;
+    }
+
+    void Blur(Vector2Int origin, Vector2Int size)
+    {
+        compute.SetTexture(blurKernel, DeformTargetId, deform);
+        compute.SetTexture(blurKernel, SmoothTargetId, smooth);
+        compute.SetInt(ResolutionId, Resolution);
+        compute.SetInt(ResolutionMaskId, Resolution - 1);
+        compute.SetInts(BlurOriginId, origin.x, origin.y);
+        compute.SetInts(BlurSizeId, size.x, size.y);
+        compute.SetInt(BlurRadiusId, BlurRadius);
+        compute.Dispatch(blurKernel,
+                         Mathf.CeilToInt(size.x / 8f), Mathf.CeilToInt(size.y / 8f), 1);
     }
 
     /// İzin kapanması YAĞIŞTAN geliyor, ayrı bir zamanlayıcı yok. Yağmazsa iz durur.
@@ -322,6 +378,7 @@ public class SnowDeformation : MonoBehaviour
         if (amount <= 0f) return;
 
         compute.SetTexture(refillKernel, DeformTargetId, deform);
+        compute.SetTexture(refillKernel, SmoothTargetId, smooth);
         compute.SetInt(ResolutionId, Resolution);
         compute.SetInt(ResolutionMaskId, Resolution - 1);
         compute.SetFloat(RefillAmountId, amount);

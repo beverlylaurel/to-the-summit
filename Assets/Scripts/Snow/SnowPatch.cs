@@ -76,6 +76,13 @@ public class SnowPatch : MonoBehaviour
         inner = isInner;
     }
 
+    /// TEŞHİS: yamayı tamamen kapatır. Kapalıyken arazi de kendini kesmiyor, yani
+    /// sahne yama hiç yokmuş gibi çiziliyor.
+    ///
+    /// Ekranda beliren bir kusurun yamadan mı arazi tarafından mı geldiği gözle
+    /// ayrılamıyor; anahtar tek bakışta ayırıyor.
+    public static bool Enabled = true;
+
     Mesh mesh;
 
     /// Arazi malzemesinin özellikleri kopyalandı mı. Yama arazinin gölgelendirme
@@ -118,6 +125,13 @@ public class SnowPatch : MonoBehaviour
 
     void Update()
     {
+        if (!Enabled)
+        {
+            // Arazi kesmeyi bıraksın, yoksa zeminde delik kalır.
+            if (inner) Shader.SetGlobalFloat(PatchHalfId, 0f);
+            return;
+        }
+
         Vector3 p = follow.position;
 
         // Snap: texel ızgarasının katına yuvarla. Yuvarlanmazsa köşeler arazi
@@ -131,6 +145,8 @@ public class SnowPatch : MonoBehaviour
         // çizilmeden yazılsaydı arazi kendini keser ama üstünü örtecek yama olmazdı:
         // ilk karelerde zeminde delik. Arazi malzemesi çalışma zamanında kuruluyor,
         // yani bu erken çıkış gerçekten oluyor.
+        var data = terrain.terrainData;
+
         var source = terrain.materialTemplate;
         if (source == null) return;
 
@@ -142,10 +158,16 @@ public class SnowPatch : MonoBehaviour
             copied = true;
         }
 
-        // Arazi köşesi ve boyu HER KARE tazeleniyor: kopya bir kezlik ve dağ yeniden
-        // üretilirse bu ikisi kayar, yama araziden kopar.
-        material.SetVector(TerrainOriginId, source.GetVector(TerrainOriginId));
-        material.SetVector(TerrainSizeId, source.GetVector(TerrainSizeId));
+        // ARAZİ KÖŞESİ VE BOYU DOĞRUDAN `Terrain`'DEN, malzemeden değil.
+        //
+        // Bir dönem arazi malzemesinden okunuyordu (`source.GetVector`) ve sıfır
+        // dönüyordu: `_TerrainSize.x` sıfırken UV taşıyor, `saturate` onu sabitliyor ve
+        // yükseklik her köşede aynı çıkıyor — yama havada DÜZ BİR KARE olarak
+        // çiziliyordu. Kullanıcı bildirdi.
+        //
+        // Kaynak zaten elimizde; malzeme üzerinden dolaşmanın hiçbir kazancı yoktu.
+        material.SetVector(TerrainOriginId, terrain.transform.position);
+        material.SetVector(TerrainSizeId, data.size);
 
         // Global'i YALNIZ İÇ HALKA yazıyor: arazi onun kapsadığı yerde kesiliyor.
         // Dış halka da aynı değeri okuyup kendini kesiyor.
@@ -161,8 +183,6 @@ public class SnowPatch : MonoBehaviour
         material.SetFloat(RingInnerId, inner ? 0f : 1f);
 
         material.SetFloat(PatchCellId, CellSize);
-
-        var data = terrain.terrainData;
         material.SetTexture(TerrainHeightmapId, data.heightmapTexture);
 
         // YÜKSEKLİK ÖLÇEĞİ AÇIKÇA GEÇİYOR. Unity heightmap dokusunu 0-0.5 aralığında

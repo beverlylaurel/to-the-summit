@@ -20,8 +20,15 @@
 #pragma kernel Stamp
 #pragma kernel ClearStrip
 #pragma kernel Refill
+#pragma kernel Blur
 
-RWTexture2D<float> _Deform;
+RWTexture2D<float> _Deform;      // KESKİN tampon: damga buraya yazıyor
+RWTexture2D<float> _Smooth;      // BULANIK tampon: gölgelendirme bunu okuyor
+
+// --- bulanıklaştırma ---
+int2 _BlurOrigin;    // işlenecek kutunun mutlak texel köşesi
+int2 _BlurSize;
+int  _BlurRadius;    // texel
 
 uint  _Resolution;
 uint  _ResolutionMask;   // _Resolution - 1, ikinin kuvveti olduğu C# tarafında doğrulanıyor
@@ -94,10 +101,22 @@ float DeformFbm(float2 pos, float cellSize, int octaves)
     float amplitude = 1.0;
     float scale = cellSize;
 
+    // HER OKTAV DÖNDÜRÜLÜYOR. Değer gürültüsü kendi ızgarasına hizalı ve oktavlar aynı
+    // yöne bakarsa kafes birbirini güçlendiriyor: ekranda düzenli BAKLAVA deseni
+    // çıkıyor (kullanıcı bildirdi). Aynı ders arazi detayında zaten öğrenilmişti.
+    //
+    // 37 derece: 90'ın tam böleni değil, yani dört oktavda bile hizalanma tekrar
+    // etmiyor.
+    const float c = 0.7986355;   // cos 37°
+    const float sn = 0.6018150;  // sin 37°
+
+    float2 p = pos;
     for (int i = 0; i < octaves; i++)
     {
-        sum += DeformNoise(pos + (float)i * 41.7, scale) * amplitude;
+        sum += DeformNoise(p + (float)i * 41.7, scale) * amplitude;
         weight += amplitude;
+
+        p = float2(p.x * c - p.y * sn, p.x * sn + p.y * c);
         scale /= 2.17;
         amplitude *= 0.55;
     }
@@ -113,9 +132,15 @@ float DeformFbm(float2 pos, float cellSize, int octaves)
 /// Büküm ölçeği izden büyük (1.6 m): küçük olsaydı deseni bozmak yerine titretirdi.
 float2 DeformWarp(float2 world)
 {
-    float2 offset = float2(DeformFbm(world + 5.0, 1.6, 2),
+    // BÜKÜM İKİ ÖLÇEKTE. Tek ölçekli büküm yalnız o ölçekteki kafesi kırıyordu;
+    // ince oktavların ızgarası ayakta kalıyordu. Kaba büküm deseni yerinden oynatıyor,
+    // ince büküm kafesin kendisini bozuyor.
+    float2 coarse = float2(DeformFbm(world + 5.0, 1.6, 2),
                            DeformFbm(world - 8.0, 1.6, 2)) - 0.5;
-    return world + offset * 0.9;
+    float2 fine = float2(DeformFbm(world + 71.0, 0.30, 2),
+                         DeformFbm(world - 23.0, 0.30, 2)) - 0.5;
+
+    return world + coarse * 0.9 + fine * 0.22;
 }
 
 uint2 Slot(int2 absolute)
@@ -164,9 +189,9 @@ void Stamp(uint3 id : SV_DispatchThreadID)
     // Hücre 4.7 cm, yani bundan incesi geometriye ulaşmaz.
     // Ölçekler oluğun genişliğine göre: 40 cm'lik oluğun kenarında 40 cm'lik bir lob
     // "düzensizlik" değil, oluğun kendisinin eğrilmesi olur.
-    float edge = (DeformFbm(warped, 0.22, 3) - 0.5) * 0.30
-               + (DeformFbm(warped + 37.0, 0.09, 2) - 0.5) * 0.16
-               + (DeformFbm(warped - 61.0, 0.05, 2) - 0.5) * 0.08;
+    float edge = (DeformFbm(warped, 0.30, 3) - 0.5) * 0.22
+               + (DeformFbm(warped + 37.0, 0.13, 2) - 0.5) * 0.10
+               + (DeformFbm(warped - 61.0, 0.07, 2) - 0.5) * 0.05;
     r *= 1.0 + edge;
 
     // ---- TABAN: DÜZ DEĞİL, KIRIK ----
@@ -179,11 +204,24 @@ void Stamp(uint3 id : SV_DispatchThreadID)
     //
     // Hepsi BÜKÜLMÜŞ koordinatta ve çok oktavlı: tek oktav + düz koordinat "aynı desen
     // her yerde" veriyordu.
-    float stride = 0.72 + 0.5 * DeformFbm(warped + 17.0, 0.55, 2);
-    float broken = 0.78 + 0.44 * DeformFbm(warped - 29.0, 0.12, 3);
+    // GENLİKLER KISILDI. 12 cm ölçekte %44 derinlik oynaması, dik duvarla birleşince
+    // ekranda TARAK DİŞİ okunuyordu (kullanıcı bildirdi): komşu köşeler arasında
+    // derinlik neredeyse iki kat değişiyordu. Ölçek büyütülüp genlik yarıya indirildi;
+    // sonuç dalgalanma, diş değil.
+    float stride = 0.84 + 0.28 * DeformFbm(warped + 17.0, 0.70, 2);
+    float broken = 0.90 + 0.18 * DeformFbm(warped - 29.0, 0.26, 2);
     float depth = _StampDepth * stride * broken;
 
-    float floorMask = 1.0 - smoothstep(0.25, 1.1, r);
+    // DUVAR DİK DEĞİL. `smoothstep(0.25, 1.1)` neredeyse dikey bir duvar bırakıyordu:
+    // duvar güneşi hiç görmüyor ve oluğun içi SİMSİYAH çıkıyordu. Gerçek karda duvar
+    // ayakta durmaz, içeri göçüp çanak olur — geçiş merkeze kadar yayılıyor.
+    // ÇANAK, HENDEK DEĞİL — ama izi GENİŞLETMEDEN.
+    //
+    // Bir denemede geçiş 1.7 yarıçapa yayıldı ve iz gözle görülür biçimde genişledi
+    // (kullanıcı bildirdi). Yumuşaklık genişlikten değil DERİNLİK/YARIÇAP oranından
+    // geliyor: derinlik 25'ten 15 santime inince aynı yarıçapta duvar eğimi 51'den
+    // 31 dereceye düşüyor ve ışık giriyor.
+    float floorMask = 1.0 - smoothstep(0.1, 1.05, r);
 
     // ---- YANA SAÇILAN KAR ----
     //
@@ -233,7 +271,10 @@ void Stamp(uint3 id : SV_DispatchThreadID)
 void ClearStrip(uint3 id : SV_DispatchThreadID)
 {
     if ((int)id.x >= _ClearSize.x || (int)id.y >= _ClearSize.y) return;
-    _Deform[Slot(_ClearOrigin + int2(id.xy))] = 0.0;
+
+    uint2 slot = Slot(_ClearOrigin + int2(id.xy));
+    _Deform[slot] = 0.0;
+    _Smooth[slot] = 0.0;
 }
 
 [numthreads(8, 8, 1)]
@@ -241,12 +282,62 @@ void Refill(uint3 id : SV_DispatchThreadID)
 {
     if (id.x >= _Resolution || id.y >= _Resolution) return;
 
+    // İKİ TAMPON DA KAPANIYOR. Yalnız keskin tampon kapansaydı bulanık olan eski
+    // hâlinde kalır ve iz hiç silinmezdi; yalnız bulanık olan kapansaydı bir sonraki
+    // bulanıklaştırma onu keskin tampondan geri getirirdi.
+    //
+    // Kapanma texel başına sabit bir azaltma; bulanıklaştırma doğrusal, yani ikisinin
+    // sırası sonucu değiştirmiyor.
     float v = _Deform[id.xy];
-    if (v == 0.0) return;
+    float b = _Smooth[id.xy];
+    if (v == 0.0 && b == 0.0) return;
 
-    // Sıfıra doğru sabit hızla kapanma. Çarpımsal sönüm derin izi sığ izden hızlı
-    // kapatırdı; gerçekte dolan şey hacim, oran değil.
-    float closed = v > 0.0 ? max(0.0, v - _RefillAmount)
-                           : min(0.0, v + _RefillAmount);
-    _Deform[id.xy] = closed;
+    _Deform[id.xy] = v > 0.0 ? max(0.0, v - _RefillAmount)
+                             : min(0.0, v + _RefillAmount);
+    _Smooth[id.xy] = b > 0.0 ? max(0.0, b - _RefillAmount)
+                             : min(0.0, b + _RefillAmount);
+}
+
+/// BULANIKLAŞTIRMA — eksik olan parçaydı.
+///
+/// Damga keskin yazılıyor: taban maskesi, kenar gürültüsü ve saçılma öbekleri texel
+/// ızgarasında sert sınırlar bırakıyor. O tampon doğrudan geometriye verilince ekranda
+/// keskin duvar, kafes deseni ve tarak dişi çıkıyor — hepsi kullanıcı tarafından
+/// bildirildi ve hiçbiri parametre oynatarak kapanmadı.
+///
+/// Her gerçek uygulama bu adımı yapıyor ("blurs deformation with neighbours"); bizde
+/// yoktu. Kar zaten kendi kendini yumuşatan bir malzeme: kenarlar göçüyor, taneler
+/// dolduruyor. Bulanıklaştırma o fiziğin ta kendisi, kozmetik bir düzeltme değil.
+///
+/// AYRI TAMPONA yazılıyor. Yerinde bulanıklaştırma komşuyu zaten bulanmış hâliyle
+/// okuyup her karede biraz daha yayardı; iz zamanla kendiliğinden erirdi.
+///
+/// Yarıçap texel cinsinden ve C#'tan geliyor: 4 texel = 19 cm. İzin yarı genişliği
+/// 18 cm, yani yumuşama izin kendi ölçeğinde — daha genişi izi silerdi.
+[numthreads(8, 8, 1)]
+void Blur(uint3 id : SV_DispatchThreadID)
+{
+    if ((int)id.x >= _BlurSize.x || (int)id.y >= _BlurSize.y) return;
+
+    int2 center = _BlurOrigin + int2(id.xy);
+
+    // Gauss ağırlığı: sigma yarıçapın yarısı. Kutu bulanıklaştırma daha ucuz ama
+    // kendi kenarını bırakıyor — yumuşatmak isterken ikinci bir sertlik ekliyor.
+    float sigma = max(1.0, (float)_BlurRadius * 0.5);
+    float twoSigmaSq = 2.0 * sigma * sigma;
+
+    float sum = 0.0;
+    float weight = 0.0;
+
+    for (int dy = -_BlurRadius; dy <= _BlurRadius; dy++)
+    for (int dx = -_BlurRadius; dx <= _BlurRadius; dx++)
+    {
+        float d2 = (float)(dx * dx + dy * dy);
+        float w = exp(-d2 / twoSigmaSq);
+
+        sum += _Deform[Slot(center + int2(dx, dy))] * w;
+        weight += w;
+    }
+
+    _Smooth[Slot(center)] = sum / max(weight, 1e-4);
 }

@@ -32,8 +32,21 @@ Shader "ToTheSummit/SnowPatch"
             #pragma fragment frag
             #pragma target 4.5
 
+            // ANAHTARLAR ARAZİYLE BİREBİR AYNI OLMAK ZORUNDA.
+            //
+            // Eksik olduğunda belirti: yamanın kapladığı alan KAPKARANLIK çıkıyor ve
+            // oyuncuyla birlikte hareket eden koyu bir kare gibi okunuyor. Sebep
+            // `MountainSurface.shader`'da zaten yazılı — renderer Forward+ modunda ve
+            // `_CLUSTER_LIGHT_LOOP` bildirilmezse `GetMainLight()` eski dala düşüp
+            // doldurulmamış `unity_LightData`'yı okuyor, güneş tamamen kesiliyor.
+            //
+            // Aynı hata iki kez yaşandı; ikisinde de belirti "yüzey siyah".
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
-            #pragma multi_compile _ _SHADOWS_SOFT
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile_fragment _ _CLUSTER_LIGHT_LOOP
+            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile_fragment _ _LIGHT_COOKIES
             #pragma multi_compile_fog
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
