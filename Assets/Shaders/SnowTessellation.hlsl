@@ -62,14 +62,17 @@ float SnowTessEdgeFactor(float3 worldPos)
     // 1.22 metreye iniyor, oysa iz 0.34 m. İz bandında katsayı 64 → kenar 0.114 m.
     // Bant dar (8-14 m) tutuluyor: 14 m yarıçapta ~23 arazi üçgeni var, 64 katsayıyla
     // ~94 bin alt üçgen eder.
+    // İZ BANDINDA BÖLÜNME KOŞULSUZ AÇILIR.
+    //
+    // Bir dönem tamponun içeriğine bakıyordu (`hasPrint`) ve İZ HİÇ ÇÖZÜLMÜYORDU:
+    // katsayı yamanın KÖŞELERİNDE hesaplanıyor, 7.32 metrelik yamanın ortasından geçen
+    // 0.42 metrelik iz köşelere değmiyor. Kapı hep kapalı kalıyor, iz 1.22 metrelik
+    // üçgenlere basılıyor ve ekranda lapa oluyordu.
+    //
+    // İçeriğe bakmanın tek kazancı boş alanda üçgen tasarrufuydu; bedeli izin hiç
+    // görünmemesi. Bant zaten dar (8-14 m), 14 metre yarıçapta ~23 arazi üçgeni var.
     float foot = 1.0 - smoothstep(_SnowFootNear, _SnowFootFar, toCamera);
-    if (foot > 0.001)
-    {
-        // İz olmayan yerde bölünmeye gerek yok: tampon boşsa katsayı yükselmiyor.
-        float print = abs(SnowFootprint(worldPos));
-        float hasPrint = smoothstep(0.0, 0.01, print);
-        macro = max(macro, lerp(1.0, _SnowFootTess, foot * hasPrint));
-    }
+    macro = max(macro, lerp(1.0, _SnowFootTess, foot));
 
     return macro;
 }

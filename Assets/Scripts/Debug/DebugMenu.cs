@@ -26,6 +26,8 @@ public class DebugMenu : MonoBehaviour
     [SerializeField] SnowCollisionProbe snowProbe;
     [Tooltip("Rota çizgilerinin oyun görünümü katmanı.")]
     [SerializeField] RouteOverlay routeOverlay;
+    [Tooltip("Kar zinciri teşhisi. Belirti kapanınca bu alan ve bölüm silinir.")]
+    [SerializeField] TerrainSurface surface;
     [Tooltip("Bulut ayarlarını taşıyan Volume bileşeni.")]
     [SerializeField] Volume cloudVolume;
 
@@ -89,8 +91,10 @@ public class DebugMenu : MonoBehaviour
         AtmosphereController atmosphereRef, PrecipitationRenderer precipitationRef,
         PerformanceHud hudRef, ClimbHud climbHudRef,
         CursorLock cursorLockRef, SnowCollisionProbe snowProbeRef,
-        RouteOverlay routeOverlayRef, Volume cloudVolumeRef, CloudWeatherDriver cloudDriverRef)
+        RouteOverlay routeOverlayRef, Volume cloudVolumeRef, CloudWeatherDriver cloudDriverRef,
+        TerrainSurface surfaceRef)
     {
+        surface = surfaceRef;
         cloudVolume = cloudVolumeRef;
         cloudDriver = cloudDriverRef;
         cursorLock = cursorLockRef;
@@ -210,6 +214,7 @@ public class DebugMenu : MonoBehaviour
 
         BeginColumn();
         DrawWeather();
+        DrawSnowChain();
         DrawWind();
         EndColumn();
 
@@ -464,6 +469,106 @@ public class DebugMenu : MonoBehaviour
 
         EndSection();
     }
+
+    /// TEŞHİS: KAR ZİNCİRİ. Kar kilitliyken bile tutmuyorsa zincir bir yerde kopuyor;
+    /// hangi halkada olduğu ekrandan anlaşılmıyor, sayı gerekiyor.
+    ///
+    /// Sıra zincirin kendi sırası. İlk sıfırlanan satır sorumludur.
+    ///
+    /// Belirti kapanınca bu bölüm ve `TerrainSurface`'daki teşhis bloğu silinir.
+    void DrawSnowChain()
+    {
+        BeginSection("Teşhis: kar zinciri");
+
+        if (surface == null || weatherDriver == null || walker == null)
+        {
+            GUILayout.Label("bağ eksik — surface/driver/walker");
+            EndSection();
+            return;
+        }
+
+        float world = walker.transform.position.y;
+        float altitude = world - surface.TerrainOriginY;
+
+        GUILayout.Label($"kot: dünya {world:F0} m   profil ekseninde {altitude:F0} m");
+        GUILayout.Label($"profil aralığı: {surface.ProfileFloor:F0} - {surface.ProfileCeiling:F0} m"
+                        + $"   bant {surface.BandIndexAt(altitude)}/{surface.ProfileBands}");
+
+        GUILayout.Label($"1 KİLİT      şiddet {weatherDriver.IntensityOverride:F2}"
+                        + $"   karlılık {weatherDriver.SnowinessOverride:F2}   (-1 = kilit yok)");
+        GUILayout.Label($"2 SnowfallRateAt(kot)  {weatherDriver.SnowfallRateAt(altitude):F3}"
+                        + "   <- 0 ise kar yağmıyor sayılıyor");
+        GUILayout.Label($"   SnowinessAt {weatherDriver.SnowinessAt(altitude):F3}"
+                        + $"   CeilingAt {weatherDriver.CeilingAt(altitude):F3}");
+        GUILayout.Label($"3 bandCover {surface.CoverAt(altitude):F3}"
+                        + $"   bandPack {surface.PackAt(altitude):F3}   <- CPU birikimi");
+        GUILayout.Label($"4 dokudaki cover {surface.UploadedCoverAt(altitude):F3}"
+                        + "   <- 3'ten farklıysa yükleme kopuk");
+        // Değerler önce yerele alınıyor: enterpolasyonlu dizgenin içinde tırnaklı
+        // çağrı yazılamıyor.
+        float permLine = Shader.GetGlobalFloat("_PermanentSnowLine");
+        float permBand = Shader.GetGlobalFloat("_PermanentSnowBand");
+        float fallFloor = Shader.GetGlobalFloat("_SnowfallFloor");
+        float fallCeil = Shader.GetGlobalFloat("_SnowfallCeiling");
+
+        GUILayout.Label($"5 kalıcı kar çizgisi {permLine:F0} m   bant +-{permBand:F0} m");
+        GUILayout.Label($"   _SnowfallFloor {fallFloor:F0}   _SnowfallCeiling {fallCeil:F0}");
+
+        // supply'dan SONRAKİ çarpanlar. Örtü `supply * snowFit * shelter` ile kuruluyor;
+        // ikisinden biri sıfırsa profil dolu olsa da zemin çıplak kalır.
+        Vector3 at = walker.transform.position;
+        float slope = surface.SlopeAt(at);
+        float shelter = surface.DriftWeightAt(at);
+
+        // Shader'daki eşiğin aynısı: smoothstep(cos(65)-0.16, cos(65)+0.10, slope).
+        float limit = Mathf.Cos(65f * Mathf.Deg2Rad);
+        float snowFit = Mathf.SmoothStep(0f, 1f,
+            Mathf.InverseLerp(limit - 0.16f, limit + 0.10f, slope));
+
+        GUILayout.Label($"6 slope {slope:F3} (1 = düz)   snowFit {snowFit:F3}"
+                        + "   <- 0 ise yamaç çok dik");
+        GUILayout.Label($"7 shelter {shelter:F3}   <- 0 ise pişmiş birikinti haritası boş");
+        GUILayout.Label($"   örtü = supply x snowFit x shelter = "
+                        + $"{surface.UploadedCoverAt(altitude) * snowFit * shelter:F3}");
+
+        // EKRAN PROBU. Sayılar örtüyü dolu gösterirken zemin çıplak kalıyorsa hesap ile
+        // ekran çelişiyor demektir; değer doğrudan zemine basılıyor.
+        // DERİNLİK ZİNCİRİ. "Kar sığ kalıyor" belirtisi için: hangi çarpanın
+        // kestiği ancak hepsi ayrı ayrı görülünce anlaşılıyor.
+        // depth = pack x slopeFit^2 x lerp(0.35,1.4,drift) x shelter x snowDisplaceMax
+        float slopeFit2 = Mathf.Clamp01((slope - 0.72f) / 0.28f);
+        slopeFit2 *= slopeFit2;
+
+        Vector3 pw = surface.PrevailingWind;
+        Vector2 windAxis = new Vector2(pw.x, pw.z).normalized;
+        float drift = SnowDriftField.Shape(new Vector2(at.x, at.z), windAxis);
+        float driftFit = Mathf.Lerp(0.35f, 1.4f, drift);
+        float pack = surface.PackAt(altitude);
+        float depth = pack * slopeFit2 * driftFit * shelter * surface.SnowDisplaceMax;
+
+        GUILayout.Label($"8 DERİNLİK  pack {pack:F2} x slopeFit {slopeFit2:F2}"
+                        + $" x drift {driftFit:F2} x shelter {shelter:F2}"
+                        + $" x max {surface.SnowDisplaceMax:F1} = {depth:F2} m");
+
+        GUILayout.Label("EKRAN PROBU — zemin: KIRMIZI 0, MAVİ ara, YEŞİL 1");
+        using (new GUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("kapat")) Shader.SetGlobalFloat(SnowDebugId, 0f);
+            if (GUILayout.Button("örtü")) Shader.SetGlobalFloat(SnowDebugId, 1f);
+            if (GUILayout.Button("taze")) Shader.SetGlobalFloat(SnowDebugId, 2f);
+            if (GUILayout.Button("gömülme")) Shader.SetGlobalFloat(SnowDebugId, 3f);
+        }
+        GUILayout.Label("metre bantları: KIRMIZI <0.2, MAVİ 0.2-1, YEŞİL >1");
+        using (new GUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("makro derinlik")) Shader.SetGlobalFloat(SnowDebugId, 4f);
+            if (GUILayout.Button("yer değiştirme")) Shader.SetGlobalFloat(SnowDebugId, 5f);
+        }
+
+        EndSection();
+    }
+
+    static readonly int SnowDebugId = Shader.PropertyToID("_SnowDebug");
 
     void DrawWind()
     {

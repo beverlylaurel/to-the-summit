@@ -122,15 +122,16 @@ public class TerrainMaterialSettings : ScriptableObject
              "köşeleri taşımıyor ve bölünme oraya kadar sürerse çatlak açılıyor.")]
     [Range(20f, 400f)] public float snowTessFar = 80f;
 
-    [Tooltip("Ayak izi tam güçte bu mesafeye kadar (metre). Deformasyon penceresi " +
-             "24 m kenarlı; görünür yarıçapı 12 m, yani bant onun içinde kalmalı.")]
-    [Range(2f, 20f)] public float snowFootNear = 8f;
-    [Tooltip("Ayak izi bölünmesi bu mesafede kapanır (metre). Yer değiştirme ondan " +
-             "önce sıfıra iner — bölünmesiz üçgen yer değiştirmiş olmamalı.")]
-    [Range(4f, 40f)] public float snowFootFar = 14f;
-    [Tooltip("Ayak izi bandındaki bölünme katsayısı. Arazi üçgeni 7.32 m; 64 ile " +
-             "kenar 0.114 m olur ve 0.34 m'lik iz çözülür.")]
-    [Range(1f, 64f)] public float snowFootTess = 64f;
+    [Tooltip("UZAK izin arazide tam güçte olduğu mesafe (metre). Yakını `SnowPatch` " +
+             "taşıyor (24 m); arazi ondan sonra devralıyor.")]
+    [Range(2f, 60f)] public float snowFootNear = 22f;
+    [Tooltip("Uzak iz bu mesafede kapanır (metre). Deformasyon penceresinin görünür " +
+             "yarıçapı 48 m; bant onun içinde bitmeli.")]
+    [Range(4f, 90f)] public float snowFootFar = 46f;
+    [Tooltip("Uzak iz bandındaki bölünme katsayısı. Yakın plandaki iz yamada " +
+             "çözülüyor; burada iz zaten birkaç piksel, 16 yetiyor ve 64 boşuna " +
+             "dört kat üçgen yakıyor.")]
+    [Range(1f, 64f)] public float snowFootTess = 16f;
 
     [Tooltip("Kar mikro doku periyodu (metre). Kar taneleri ve rüzgâr kabuğu bu " +
              "ölçekte tekrarlar. Büyük değer deseni belli eder, küçük değer " +

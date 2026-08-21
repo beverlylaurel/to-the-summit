@@ -42,6 +42,33 @@ int2 _ClearSize;
 // --- geri dolma ---
 float _RefillAmount;     // metre, bu adımda sıfıra doğru kapanan miktar
 
+/// DÜNYA UZAYINDA DEĞER GÜRÜLTÜSÜ. Desen ize değil dünyaya bağlı: iz uzarken kayma
+/// olmuyor, aynı yerden ikinci geçişte aynı düzensizlik çıkıyor.
+///
+/// SİNÜS DEĞİL HASH — bu projede ÖLÇÜLMÜŞ bir ders. Sinüs toplamları çapraz ızgara
+/// veriyor ve göz düzenliliği yakalıyor (`VolumetricFogShared.hlsl`, yağış sütunları
+/// kaydı). Kenar bir dönem sinüs çarpımıyla bozuluyordu ve "çok düzenli" okunuyordu.
+float DeformHash(float2 cell)
+{
+    float n = sin(cell.x * 127.1 + cell.y * 311.7) * 43758.5453;
+    return n - floor(n);
+}
+
+float DeformNoise(float2 pos, float cellSize)
+{
+    float2 g = pos / cellSize;
+    float2 i = floor(g);
+    float2 f = g - i;
+    float2 u = f * f * (3.0 - 2.0 * f);
+
+    float a = DeformHash(i);
+    float b = DeformHash(i + float2(1.0, 0.0));
+    float c = DeformHash(i + float2(0.0, 1.0));
+    float d = DeformHash(i + float2(1.0, 1.0));
+
+    return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
+}
+
 uint2 Slot(int2 absolute)
 {
     // Toroidal yuva. Tam sayı modülü yerine BİT MASKESİ: çözünürlük ikinin kuvveti
@@ -71,31 +98,73 @@ void Stamp(uint3 id : SV_DispatchThreadID)
 
     float r = dist / max(_StampHalfWidth, 1e-4);
 
-    // TABAN + İKİ YANDA SET. Karın hacmi yok olmuyor, yana itiliyor: oluğun iki
-    // kenarında yığılıyor. Set dar ve alçak — itilen kar oluğun hemen kıyısında durur,
-    // geniş bir tümsek yapmaz.
-    float floorMask = 1.0 - smoothstep(0.6, 1.0, r);
-    float rimMask = (1.0 - smoothstep(1.0, 1.45, r)) * smoothstep(0.95, 1.1, r);
+    // KENAR DÜZENSİZ. Matematiksel kapsül ekranda kalıptan çıkmış gibi duruyordu:
+    // gerçek izin kıyısı granüler, kar öbek öbek kopuyor. Kenar dünya uzayında bir
+    // gürültüyle bozuluyor — desen ize değil DÜNYAYA bağlı, yani iz uzarken kayma
+    // olmuyor.
+    //
+    // Ölçek 12 cm: texel 4.7 cm ve bölünmüş üçgen 11.4 cm, yani bundan ince bir
+    // düzensizlik geometriye ulaşamaz. Genlik yarıçapın beşte biri.
+    // KENAR ÜÇ OKTAVLA DAĞILIYOR. Tek ölçekli bir bozulma "düzensiz" değil
+    // "dalgalı" okunuyordu; gerçek izde kar öbek öbek kopuyor ve öbeklerin boyu bir
+    // değil.
+    //
+    //   40 cm — duvarın göçtüğü büyük loblar
+    //   15 cm — kopan öbekler
+    //    6 cm — tane. Hücre 4.7 cm, yani bundan incesi geometriye ulaşmaz.
+    float edge = (DeformNoise(world, 0.40) - 0.5) * 0.30
+               + (DeformNoise(world + 37.0, 0.15) - 0.5) * 0.16
+               + (DeformNoise(world - 61.0, 0.06) - 0.5) * 0.08;
+    r *= 1.0 + edge;
 
-    float floorValue = _StampDepth * floorMask;
-    float rimValue = _StampDepth * 0.18 * rimMask;
+    // ---- TABAN: DÜZ DEĞİL, KIRIK ----
+    //
+    // Oluk sabit derinlikte bir kanal olarak okunuyordu — "iz hep aynı, çok yapay"
+    // (kullanıcı bildirdi). Gerçek izde iki şey değişiyor:
+    //
+    //   ADIM NABZI (55 cm) — her basış farklı sıkıştırıyor, derinlik yol boyunca
+    //     dalgalanıyor. Sabit derinlik yürüme izi değil kazı izi gibi duruyor.
+    //   KIRIK TABAN (12 cm) — kar öbek öbek çöküyor, taban pürüzlü kalıyor.
+    //
+    // İkisi de DÜNYA uzayında: aynı yerden ikinci kez geçince aynı desen çıkıyor ve
+    // iz uzarken desen kaymıyor.
+    float stride = 0.72 + 0.5 * DeformNoise(world + 17.0, 0.55);
+    float broken = 0.78 + 0.44 * DeformNoise(world - 29.0, 0.12);
+    float depth = _StampDepth * stride * broken;
+
+    float floorMask = 1.0 - smoothstep(0.25, 1.1, r);
+
+    // ---- YANA SAÇILAN KAR ----
+    //
+    // Bir dönem burada düzgün bir BİLEZİK vardı ve iz kalıptan çıkmış gibi duruyordu.
+    // Kar yana itilirken eşit yayılmıyor: öbekler halinde savruluyor, bir yerde yığın
+    // bir yerde hiç yok. Bant da dar değil — öbekler oluğun iki katı uzağa düşüyor.
+    //
+    // KAPI EŞİKLİ: gürültü eşiği geçmediği yerde saçılma YOK. Eşiksiz olsaydı yine
+    // sürekli bir set çıkardı, yalnız yüksekliği dalgalı.
+    float scatterBand = (1.0 - smoothstep(1.0, 2.6, r)) * smoothstep(0.88, 1.06, r);
+    float clumpGate = smoothstep(0.52, 0.82, DeformNoise(world + 211.0, 0.18));
+    float grainGate = 0.55 + 0.9 * DeformNoise(world - 97.0, 0.07);
+
+    float scatterValue = depth * 0.26 * scatterBand * clumpGate * grainGate;
+    float floorValue = depth * floorMask;
 
     uint2 slot = Slot(absolute);
     float previous = _Deform[slot];
 
-    // SET, AÇILMIŞ OLUĞU SİLEMEZ.
+    // SAÇILAN KAR, AÇILMIŞ OLUĞU SİLEMEZ.
     //
     // Bir dönem tek bir işaretli değer yazılıyordu ve negatifler `min` dalına
     // düşüyordu: yeni parçanın seti, bir önceki parçanın TABANINI (pozitif) görüp
-    // yerine kabarma yazıyordu. Ekranda düzenli tırtıklı bir dizi çıkıyordu —
-    // parçaların üst üste bindiği her yerde bir kabarma. Kullanıcı bildirdi.
+    // yerine kabarma yazıyordu. Ekranda düzenli tırtıklı bir dizi çıkıyordu.
     //
-    // Doğru kural: taban her zaman kazanır, set yalnız DOKUNULMAMIŞ kara yığılır.
+    // Doğru kural: taban her zaman kazanır, saçılan kar yalnız DOKUNULMAMIŞ kara
+    // yığılır.
     float value;
     if (floorValue > 1e-5)
         value = max(previous, floorValue);
-    else if (rimValue > 1e-5)
-        value = previous > 1e-5 ? previous : min(previous, -rimValue);
+    else if (scatterValue > 1e-5)
+        value = previous > 1e-5 ? previous : min(previous, -scatterValue);
     else
         return;
 

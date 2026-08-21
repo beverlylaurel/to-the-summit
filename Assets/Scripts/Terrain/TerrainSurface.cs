@@ -432,16 +432,24 @@ public class TerrainSurface : MonoBehaviour
             new Vector4(profileFloor, profileCeiling - profileFloor, 0f, 0f));
     }
 
-    /// Kar profilini O ANKİ HAVAYA göre kurar.
+    /// Kar profilini o anki havaya göre kurar.
     ///
     /// Kalıcı kar birikimin değil iklimin sonucudur: kar çizgisinin üstünde kar zaten
-    /// vardır, oyun başladığı için birikmeye başlamaz. Profil sıfırdan doğduğu sürece
-    /// 5700 metrelik dağın kalıcı karı da gerçek zamanda birikmeyi bekliyordu.
+    /// vardır, oyun başladığı için birikmeye başlamaz.
     ///
-    /// `SnowfallRateAt` KİLİTLERİ OKUYOR (şiddet ve karlılık kilidi, `AltitudeWeatherDriver`),
-    /// yani F1'den zorlanan hava burada da geçerli. Kilit 1/1 iken her bant doluyor —
-    /// yükseklik sınırı yok.
-    void Prime()
+    /// `SnowfallRateAt` KİLİTLERİ OKUYOR (`AltitudeWeatherDriver`), yani F1'den
+    /// zorlanan hava burada da geçerli. Kar tutmasının ayrı bir yükseklik sınırı yok.
+    ///
+    /// `raiseOnly` — YALNIZ YÜKSELTİR, ASLA SİLMEZ.
+    ///
+    /// Bir dönem her çağrıda atama yapıyordu ve kilit değişimine bağlıydı: kullanıcı
+    /// kar yağışını kapattığı an bantlar `max(0, 0)` ile sıfırlanıyor, biriken kar
+    /// yok oluyordu. Belirti "kar yalnız yağarken var, dinince anında gidiyor" —
+    /// ekran probu yağarken YEŞİL, dinince KIRMIZI gösterdi.
+    ///
+    /// Karı azaltan tek yol erimedir ve o zamanla işler. Hava kilidi kar EKLEYEBİLİR,
+    /// var olanı kaldıramaz.
+    void Prime(bool raiseOnly)
     {
         for (int i = 0; i < Bands; i++)
         {
@@ -451,8 +459,8 @@ public class TerrainSurface : MonoBehaviour
             float settled = Mathf.Max(weatherDriver.SnowfallRateAt(altitude),
                                       weatherDriver.SnowinessAt(altitude));
 
-            bandCover[i] = settled;
-            bandPack[i] = settled;
+            bandCover[i] = raiseOnly ? Mathf.Max(bandCover[i], settled) : settled;
+            bandPack[i] = raiseOnly ? Mathf.Max(bandPack[i], settled) : settled;
         }
     }
 
@@ -473,8 +481,43 @@ public class TerrainSurface : MonoBehaviour
         lastSnowinessOverride = snowiness;
 
         if (snowProfile == null) return;
-        Prime();
+
+        // Yalnız yükseltir: kilit kar ekleyebilir, biriken karı silemez.
+        Prime(raiseOnly: true);
     }
+
+    // ---- TEŞHİS: KAR ZİNCİRİ ----
+    //
+    // "F1'de yağış 1 kar 1 yapıyorum, kar tutmuyor" belirtisi dört tur sürdü ve üç
+    // şüphelim de yanlış çıktı. Zincirin hangi halkasında koptuğu ekrandan
+    // anlaşılmıyor; her halka sayı olarak dışarı açılıyor.
+    //
+    // Belirti kapanınca bu blok ve F1'deki bölüm silinir.
+
+    public float ProfileFloor => profileFloor;
+    public float ProfileCeiling => profileCeiling;
+    public int ProfileBands => Bands;
+
+    public int BandIndexAt(float altitude) => Mathf.Clamp(
+        Mathf.FloorToInt(Mathf.InverseLerp(profileFloor, profileCeiling, altitude) * Bands),
+        0, Bands - 1);
+
+    public float CoverAt(float altitude) => bandCover[BandIndexAt(altitude)];
+    public float PackAt(float altitude) => bandPack[BandIndexAt(altitude)];
+
+    /// Profil dokusunun O AN İÇİNDEKİ değer — CPU dizisi değil. İkisi ayrışıyorsa
+    /// yükleme kopmuş demektir.
+    public float UploadedCoverAt(float altitude)
+    {
+        if (snowProfile == null) return -1f;
+        return snowProfile.GetPixel(BandIndexAt(altitude), 0).r;
+    }
+
+    /// Arazi kökeni. Dünya kotu ile profil kotu arasındaki fark buradan.
+    public float TerrainOriginY => transform.position.y;
+
+    public float SnowDisplaceMax => settings.snowDisplaceMax;
+    public Vector3 PrevailingWind => wind != null ? wind.PrevailingDirection : Vector3.right;
 
     float BandAltitude(int index) =>
         Mathf.Lerp(profileFloor, profileCeiling, (index + 0.5f) / Bands);
@@ -526,7 +569,7 @@ public class TerrainSurface : MonoBehaviour
         // kuşağından. Kilit açıkken bile alçak kotları çıplak bırakıyordu: kullanıcı
         // F1'de yağış 1 / kar 1 yapıyor, dağ hâlâ çıplak duruyordu. `SnowfallRateAt`
         // kilitleri okuyor, `SnowinessAt` okumuyor — yanlış olan çağrıydı.
-        Prime();
+        Prime(raiseOnly: false);
 
         if (snowProfile != null) return;
 

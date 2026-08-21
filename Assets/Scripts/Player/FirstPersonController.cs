@@ -40,6 +40,12 @@ public class FirstPersonController : MonoBehaviour
     /// filtrelenmezse ilk çarptığı şey kendi çarpışma hacmi oluyor.
     readonly RaycastHit[] groundHits = new RaycastHit[4];
 
+    /// ZEMİNE BASIYOR MU. Kar deformasyonu bunu okuyor: havadayken iz bırakılmamalı.
+    ///
+    /// İki koşulun BİRLEŞİMİ, tek başına `isGrounded` değil — kapsül karın üstünde
+    /// asılıyken `isGrounded` yanlış dönüyor ve zıplamadan yürürken iz kesilirdi.
+    public bool OnGround => controller != null && (controller.isGrounded || onSnow);
+
     /// Test amaçlı hız çarpanı. Normal oyunda 1.
     public float SpeedMultiplier { get; set; } = 1f;
 

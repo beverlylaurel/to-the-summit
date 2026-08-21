@@ -726,6 +726,34 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!21 &447522200
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Snow Patch
+  m_Shader: {fileID: 4800000, guid: 5855cdd96762b3a4487b5e2251586d0b, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats: []
+    m_Colors: []
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &508855604
 GameObject:
   m_ObjectHideFlags: 0
@@ -1107,6 +1135,7 @@ MonoBehaviour:
   cursorLock: {fileID: 848219610}
   snowProbe: {fileID: 798857321}
   routeOverlay: {fileID: 2018777761}
+  surface: {fileID: 1738276035}
   cloudVolume: {fileID: 832575518}
   cloudDriver: {fileID: 1147612207}
 --- !u!4 &813786006
@@ -1225,6 +1254,7 @@ GameObject:
   - component: {fileID: 848219613}
   - component: {fileID: 848219614}
   - component: {fileID: 848219615}
+  - component: {fileID: 848219616}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1395,6 +1425,21 @@ MonoBehaviour:
   snow: {fileID: 1738276036}
   weather: {fileID: 1805896806}
   wind: {fileID: 1805896805}
+--- !u!114 &848219616
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 848219606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1c0ac3dc235983548a8232066486cd86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SnowPatch
+  material: {fileID: 447522200}
+  terrain: {fileID: 1738276033}
+  follow: {fileID: 848219609}
 --- !u!1 &1147612204
 GameObject:
   m_ObjectHideFlags: 0

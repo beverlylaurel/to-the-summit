@@ -21,18 +21,24 @@ using UnityEngine;
 /// Çember kareye içten teğet: döşemenin komşu kopyası hiçbir zaman görünmüyor.
 ///
 /// ÇARPIŞMA İLK SÜRÜMDE BAĞLI DEĞİL — bilerek. Oyuncu kendi oluğunun üstünde
-/// oluk derinliği kadar (≤ 18 cm) havada kalıyor. Bunun okunup okunmadığı ÖLÇÜLECEK;
+/// oluk derinliği kadar (≤ 80 cm) havada kalıyor. Bunun okunup okunmadığı ÖLÇÜLECEK;
 /// okunuyorsa CPU tarafı eklenir. Peşinen ikinci bir CPU/GPU ikizi yazmak `SnowDrift`
 /// borcunu ikiye katlardı (bkz. `SnowDriftField` başlığı).
 public class SnowDeformation : MonoBehaviour
 {
     /// Pencere kenarı, metre. Görünür yarıçap bunun yarısı.
-    const float Extent = 24f;
+    ///
+    /// 24 m denendi ve YETMEDİ: arkanda on iki metreden fazla kalan iz siliniyordu,
+    /// dönüp baktığında yol yoktu (kullanıcı bildirdi). 96 m'de iz kırk sekiz metre
+    /// geride duruyor — bir yamacı çıkıp arkana bakmaya yeter.
+    ///
+    /// Bedel yalnız bellek: texel boyu korunduğu için doku 2048² R16 = 8 MB.
+    const float Extent = 96f;
 
-    /// 512 texel / 24 m = 4.7 cm. Ayak izi 0.3 m, yani iz altı yedi texel geniş —
-    /// biçimi taşımaya yeter. 1024'e çıkmak 2.3 cm verirdi ama bölünmüş geometri
-    /// zaten 11.4 cm'de kalıyor, doku ondan ince olması boşa gider.
-    const int Resolution = 512;
+    /// 2048 texel / 96 m = 4.7 cm. Texel boyu `SnowPatch`'in hücresiyle BİREBİR aynı
+    /// olmak zorunda: geometri dokudan kaba olursa iz basamaklanır, ince olursa boşa
+    /// üçgen yakar. İkisi de ölçüldü.
+    const int Resolution = 2048;
 
     const float TexelSize = Extent / Resolution;
 
@@ -42,26 +48,34 @@ public class SnowDeformation : MonoBehaviour
     const float SegmentDistance = 0.15f;
 
     /// Oluğun yarı genişliği, metre. Karı yaran şey ayak değil GÖVDE: bacaklar,
-    /// kalça, sallanan kollar. Yürüyen bir insanın açtığı iz 0.4-0.45 m geniştir —
-    /// 0.56 m denendi, ekranda yol gibi okundu.
-    const float TrailHalfWidth = 0.21f;
+    /// kalça, sallanan kollar. Bele kadar batan bir insanın açtığı oluk 0.5 m.
+    const float TrailHalfWidth = 0.25f;
 
-    /// Azami oluk derinliği, metre. 0.35 denendi ve ÇOK DERİNDİ: ekranda iz değil
-    /// kazılmış bir hendek okunuyordu (kullanıcı bildirdi). Yürüyen bir insan sert
-    /// kabuklu karda 5-10 cm, gevşek karda baldıra kadar batar; oyunda okunması gereken
-    /// şey hendek değil İZ, o yüzden üst uç 0.18 m. Derinlik ayrıca oradaki kar
-    /// kalınlığıyla sınırlanıyor.
-    const float MaxDepth = 0.18f;
+    /// Azami batma, metre. İz derinliği `min(oradaki kar, bu)`.
+    ///
+    /// TAVAN OLMAK ZORUNDA ÇÜNKÜ İNSAN DİBE BATMAZ: kar kendi ağırlığıyla sıkışır ve
+    /// bir noktada taşır. Gevşek karda yetişkin bele kadar batar — 0.7-0.8 m. İki
+    /// metrelik karda oluk iki metre derin olmaz, 0.8 metre olur.
+    ///
+    /// SIĞ KARDA TAVAN DEVREDE DEĞİL: 10 santimlik örtüde `min` karı seçer, iz 10 cm
+    /// olur ve altındaki zemine oturur.
+    ///
+    /// Bir dönem 0.18 idi ve ölçümle yanlış çıktı: kar 1.99 m ölçülürken iz 18 cm
+    /// kalıyordu, yani karın yüzde dokuzu. Kullanıcı bildirdi. O tavan, bozuk
+    /// tessellation'la (iz bandındaki bölünme kapısı hep kapalıydı) çekilmiş bir
+    /// ekran görüntüsüne bakılarak düşürülmüştü — bozukluk düzeldi, tavan yerinde
+    /// kalmıştı.
+    const float MaxDepth = 0.45f;
 
     /// Karın izi kapatma hızı, metre/saniye. Dingin havada pratikte sıfır; yağış ve
-    /// rüzgâr açtıkça oluk kapanıyor. 18 cm'lik oluk tam fırtınada ~3 dakikada siliniyor.
+    /// rüzgâr açtıkça oluk kapanıyor. 80 cm'lik oluk tam fırtınada ~13 dakikada siliniyor.
     const float RefillCalm = 0.0f;
     const float RefillStorm = 0.001f;
 
     [Tooltip("Deformasyon compute shader'ı.")]
     [SerializeField] ComputeShader compute;
     [Tooltip("İzi bırakan gövde. Konumu ve yere basıp basmadığı buradan.")]
-    [SerializeField] Transform walker;
+    [SerializeField] FirstPersonController walker;
     [Tooltip("Kar kalınlığı. İz derinliği oradaki kardan fazla olamaz.")]
     [SerializeField] SnowSurface snow;
     [Tooltip("Yağış şiddeti — izin kapanma hızını sürüyor.")]
@@ -69,7 +83,7 @@ public class SnowDeformation : MonoBehaviour
     [Tooltip("Rüzgâr — izin kapanma hızını sürüyor.")]
     [SerializeField] WindField wind;
 
-    public void Bind(ComputeShader computeRef, Transform walkerRef, SnowSurface snowRef,
+    public void Bind(ComputeShader computeRef, FirstPersonController walkerRef, SnowSurface snowRef,
                      WeatherState weatherRef, WindField windRef)
     {
         compute = computeRef;
@@ -148,7 +162,7 @@ public class SnowDeformation : MonoBehaviour
 
     void Update()
     {
-        Vector3 position = walker.position;
+        Vector3 position = walker.transform.position;
         Vector2 center = new(position.x, position.z);
 
         AdvanceWindow(center);
@@ -228,6 +242,15 @@ public class SnowDeformation : MonoBehaviour
         {
             lastStamp = position;
             hasLastStamp = true;
+            return;
+        }
+
+        // HAVADAYKEN İZ YOK. Zıplayarak ilerlerken kar bozulmamalı; ayak değmiyor.
+        // Konum yine de güncelleniyor, yoksa iniş anında havada kat edilen bütün yol
+        // tek bir uzun oluk olarak basılırdı.
+        if (!walker.OnGround)
+        {
+            lastStamp = position;
             return;
         }
 

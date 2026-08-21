@@ -74,6 +74,7 @@ public static class MountainSceneBootstrap
     const string SkyMaterialPath = "Assets/Settings/Sky.mat";
     const string FogComputePath = "Assets/Shaders/VolumetricFog.compute";
     const string SnowDeformComputePath = "Assets/Shaders/SnowDeformation.compute";
+    const string SnowPatchShaderPath = "Assets/Shaders/SnowPatch.shader";
     const string FogSettingsPath = "Assets/Settings/VolumetricFogSettings.asset";
     const string SkyFogShaderPath = "Assets/Shaders/SkyFog.shader";
     const string RendererPath = "Assets/Settings/PC_Renderer.asset";
@@ -1592,7 +1593,8 @@ public static class MountainSceneBootstrap
             player.GetComponentInChildren<SnowCollisionProbe>(true),
             Object.FindAnyObjectByType<RouteOverlay>(FindObjectsInactive.Include),
             cloudVolume,
-            Object.FindAnyObjectByType<CloudWeatherDriver>());
+            Object.FindAnyObjectByType<CloudWeatherDriver>(),
+            Object.FindAnyObjectByType<TerrainSurface>());
 
         EditorUtility.SetDirty(menu);
 
@@ -1840,10 +1842,42 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
-        deformation.Bind(compute, player.transform, snow,
+        deformation.Bind(compute, player, snow,
                          Object.FindAnyObjectByType<WeatherState>(),
                          Object.FindAnyObjectByType<WindField>());
         EditorUtility.SetDirty(deformation);
+
+        EnsureSnowPatch(player, ref changed);
+    }
+
+    /// DERİN KAR YÜZEYİ. Arazi mesh'i izi çözemiyor (üçgen 7.32 m, tessellation tavanı
+    /// 64 → 11.4 cm); yama kendi ızgarasında 9.4 cm veriyor.
+    static void EnsureSnowPatch(FirstPersonController player, ref bool changed)
+    {
+        var shader = AssetDatabase.LoadAssetAtPath<Shader>(SnowPatchShaderPath);
+        if (shader == null)
+            throw new System.InvalidOperationException(
+                $"Kar yaması shader'ı bulunamadı: {SnowPatchShaderPath}");
+
+        // İKİ HALKA. Yakın halka ize yakın plan çözünürlüğü veriyor, uzak halka izin
+        // geride kalan kısmını taşıyor. Tek halkayla ya iz kayboluyordu ya köşe sayısı
+        // dört milyona çıkıyordu.
+        var patches = player.GetComponents<SnowPatch>();
+        while (patches.Length < 2)
+        {
+            player.gameObject.AddComponent<SnowPatch>();
+            patches = player.GetComponents<SnowPatch>();
+            changed = true;
+        }
+
+        var terrainRef = Object.FindAnyObjectByType<Terrain>();
+
+        patches[0].Bind(new Material(shader) { name = "Snow Patch Near" },
+                        terrainRef, player.transform, 24f, 512, true);
+        patches[1].Bind(new Material(shader) { name = "Snow Patch Far" },
+                        terrainRef, player.transform, 96f, 512, false);
+
+        foreach (var p in patches) EditorUtility.SetDirty(p);
     }
 
     static TerrainMaterialSettings LoadOrCreateTerrainMaterialSettings()

@@ -118,6 +118,24 @@ Shader "ToTheSummit/MountainSurface"
             /// küresi örneklemesi — sahnede yansıma küresi yok, yüzey de mat.
             half4 Fragment(Varyings IN) : SV_Target
             {
+                // YAMANIN ALTINDA ARAZİ ÇİZİLMİYOR. Derin kar yüzeyini `SnowPatch`
+                // taşıyor; arazi de aynı yükseklikte çizilseydi izin kazıldığı oyuğun
+                // üstünü örter ve iz hiç görünmezdi.
+                //
+                // Koşul yamanınkiyle BİREBİR aynı olmak zorunda (`SnowMacroDepth` >
+                // eşik), yoksa sınırda ya delik ya çift yüzey kalır.
+                //
+                // Kenardan bir metre pay: yamanın dörtgeni 9.4 cm, arazininki 1.2 m.
+                // İki yüzey sınırda aradeğerleme farkıyla ayrışıyor; pay bırakılınca
+                // yama araziyi bir metre örtüyor ve çatlak açılmıyor.
+                if (_PatchHalf > 0.0)
+                {
+                    float2 toPatch = abs(IN.positionWS.xz - _PatchCenter.xz);
+                    if (max(toPatch.x, toPatch.y) < _PatchHalf - 1.0
+                        && SnowMacroDepth(IN.positionWS) > _SnowDisplaceStart)
+                        discard;
+                }
+
                 MountainSurface surface = BuildMountainSurface(IN.positionWS);
 
                 // Forward+ ışık döngüsü makroları bu değişkeni adıyla okuyor
