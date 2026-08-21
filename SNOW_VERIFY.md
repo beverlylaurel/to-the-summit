@@ -117,6 +117,7 @@ Seçim mantığı çalışıyor, çalacak ses yok.
 | Kalıcılık gezinerek yakalıyor | Geri okuma asenkron, blok çıkarken yakalanamaz | `RATIONALE.md` |
 | `SnowBearing` silindi | Spec tanımlıyor, hiçbir yer çağırmıyor | `SnowCommon.hlsl` |
 | `RT_Pending` yaratılmadı | §2.2 sayıyor ama son tasarımda hiçbir kernel kullanmıyor | burada |
+| Kaskad indirgemesi 8 karede bir | Her karede 16.7 M teksel okuma; bütçenin tamamını yerdi | `SnowFarCascade.cs` |
 
 ## Eksik kalanlar
 

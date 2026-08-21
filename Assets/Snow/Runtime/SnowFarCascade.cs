@@ -15,6 +15,16 @@ public class SnowFarCascade : MonoBehaviour
     /// Kaskad çözünürlüğü (§10).
     public const int Resolution = 1024;
 
+    /// İndirgeme kaç karede bir koşuyor.
+    ///
+    /// Kağıtta hesap: 128x128 kaskad tekseli x 16x16 yakın teksel = 16.7 milyon okuma.
+    /// Bu, tam çözünürlüklü bir geçişin DÖRT KATI — her karede koşturmak §11.2'nin
+    /// bütün deformasyon bütçesini tek başına yerdi.
+    ///
+    /// Sekiz kare tazelik yeterli: kaskad yalnız 12 m'den uzakta okunuyor ve orada
+    /// bir kaskad tekseli ekranda bir pikselin altında kalıyor.
+    const int WriteInterval = 8;
+
     [Header("Bağımlılıklar")]
     [SerializeField] SnowManager manager;
     [SerializeField] ComputeShader simCompute;
@@ -245,7 +255,7 @@ public class SnowFarCascade : MonoBehaviour
             pendingScrollTexels = Vector2Int.zero;
         }
 
-        DispatchWrite(cmd, nearState);
+        if (Time.frameCount % WriteInterval == 0) DispatchWrite(cmd, nearState);
     }
 
     /// Yakın bölgeyi kaskada indirger. Yakın doku 24 m / 2048; kaskad 192 m / 1024 →
