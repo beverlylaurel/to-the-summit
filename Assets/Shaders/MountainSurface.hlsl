@@ -492,17 +492,30 @@ SnowCoverage BuildSnowCoverage(float3 worldPos, float3 normalWS, float altitude,
                                  _PermanentSnowLine + _PermanentSnowBand,
                                  altitude - permanentShift);
 
-    // Taze kar yalnızca yağışın kar olarak düştüğü kotlarda birikir: aşağıda aynı
-    // bulut yağmur bırakır, zemin ıslanır ama beyazlamaz. Eşikler hava sürücüsünden
-    // geliyor, ikinci bir yerde tanımlanmıyor; yerel kayma iki çizgiye de aynı
-    // uygulanıyor ki taze örtüyle kalıcı örtü ayrı yerlerden başlamasın.
+    // TAZE ÖRTÜNÜN TEK KAYNAĞI PROFİL.
+    //
+    // Burada bir dönem İKİNCİ BİR KAR ÇİZGİSİ vardı: profil ayrıca
+    // `smoothstep(_SnowfallFloor, _SnowfallCeiling, altitude)` ile çarpılıyordu.
+    // Aynı bilgi iki yerden geliyordu ve ikisi ayrışıyordu — profil "bu kotta kar
+    // birikti" derken çarpan "bu kotta kar yağmaz" diyip siliyordu.
+    //
+    // Belirti: F1'den yağış 1 / kar 1 kilitlenip 206 metrede beklenince zemin çıplak
+    // kalıyordu. Profil doluyordu (birikim `SnowfallRateAt` üzerinden kilidi okuyor),
+    // ama çarpan kilidi GÖRMEYEN `_SnowfallFloor/_Ceiling` eşiğinden geliyordu.
+    // Kullanıcı üç turda bildirdi; ilk iki şüphelim (birikim hızı, başlangıç durumu)
+    // yanlıştı.
+    //
+    // Profil zaten kot ekseninde tutulan bir dizi: "hangi kotta ne kadar kar var".
+    // Kar tutmasının AYRI bir yükseklik sınırı yok — sınır yağışın kendisinde.
+    //
+    // Yerel düzensizlik kayboluyor değil, YERİ DEĞİŞİYOR: kayma artık profilin
+    // örneklendiği kota uygulanıyor. Güneşe bakan yüz profili yukarıdan, oluk
+    // aşağıdan okuyor; kar sınırı yine dolaşarak düzensiz, ama tek kaynaktan.
     float snowBand = max(1.0, _SnowfallCeiling - _SnowfallFloor);
     float snowfallShift = clamp(lineShift, -snowBand * 0.5, snowBand * 0.5);
-    float snowfall = smoothstep(_SnowfallFloor, _SnowfallCeiling, altitude - snowfallShift);
 
-    // Taze örtü kendi kotundan okunuyor: kar sınırı fırtınada iner, dinince çekilir.
-    float2 profile = SampleSnowProfile(altitude);
-    float fresh = profile.r * snowfall;
+    float2 profile = SampleSnowProfile(altitude - snowfallShift);
+    float fresh = profile.r;
 
     float supply = max(permanent, fresh);
 
@@ -590,7 +603,10 @@ SnowCoverage BuildSnowCoverage(float3 worldPos, float3 normalWS, float altitude,
     // aynıydı, birikme gözle görülmüyordu. Toplandığında kalıcı kar tek başına
     // kayaları yarı gömülü bırakıyor, üstüne taze kar gelince gömülüyorlar — çıkıntının
     // kaybolması birikmenin en okunaklı işareti.
-    float packSupply = saturate(permanent * 0.7 + profile.g * snowfall);
+    // `snowfall` çarpanı KALKTI: taze örtüyle aynı sebep, profil zaten kot ekseninde
+    // ve ikinci bir kar çizgisi onu siliyordu. Profil de üstteki `snowfallShift` ile
+    // örneklendiği için düzensizlik kalınlıkta da duruyor.
+    float packSupply = saturate(permanent * 0.7 + profile.g);
 
     // Derinliğe ÇARPAN olarak giriyor, toplanmıyor: karın olmadığı yerde birikinti
     // de olmaz. Kazınan yerde yarıya iner, yığılan yerde bir buçuk katına çıkar.

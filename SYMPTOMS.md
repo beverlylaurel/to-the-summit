@@ -625,3 +625,32 @@ hükmü verdi. Ekranda "biraz fazla sürükleniyor" ile "sahte hız var" ayrıla
 **Ders:** üst üste altı değişiklik bindiğinde şüpheli listesi işe yaramaz — hepsi aynı anda
 duruyor ve hangisinin ne bozduğu ölçülemiyor. En son eklenen ve en az doğrulanan iki şey
 tek tek sayıyla sınanır.
+
+
+## "F1'de yağış 1 kar 1 yapıyorum, 206 metrede kar tutmuyor"
+
+**İki şüphelim de yanlış çıktı ve iki tur yaktı.**
+
+1. *Birikim çok yavaş.* `snowAccumulationSeconds` 90 → 40 yapıldı. Belirti sürdü.
+2. *Profil sıfırdan başlıyor.* Başlangıç durumu iklim kuşağından kuruldu. Belirti sürdü.
+
+**Gerçek sebep: İKİNCİ BİR KAR ÇİZGİSİ.** `MountainSurface.hlsl` profili kendi altitude
+eşiğiyle çarpıyordu:
+
+    float snowfall = smoothstep(_SnowfallFloor, _SnowfallCeiling, altitude - shift);
+    float fresh    = profile.r * snowfall;      // profil 1 olsa bile 0 ile çarpılıyor
+
+206 metrede `snowfall = 0`. Birikim tarafını doldurmak hiçbir işe yaramıyordu; shader
+sonucu ayrı bir eşikle siliyordu. Üstelik o eşik `_SnowfallFloor/_Ceiling`'den geliyor ve
+F1 KİLİDİNİ GÖRMÜYOR — birikim tarafı ise `SnowfallRateAt` üzerinden görüyor. Aynı olgu
+iki kaynaktan, ikisi ayrışıyor.
+
+**Ayırt eden ölçüm ekran değil KOD OKUMASIYDI:** "profil doluyor mu" sorusuna takılmak
+yerine profilin tüketildiği yere kadar zincir satır satır izlendi. Çarpan orada duruyordu.
+
+**Düzeltme tek satır değil, kaynak birleştirme:** çarpan silindi, yerel düzensizlik
+(güneş yüzü, oluk, dolambaç) profilin ÖRNEKLENDİĞİ KOTA taşındı —
+`SampleSnowProfile(altitude - snowfallShift)`. Kar sınırı hâlâ düzensiz, ama tek kaynaktan.
+
+**Ders:** bir değer "doğru hesaplanıyor ama ekranda yok" ise, hesaplandığı yere değil
+TÜKETİLDİĞİ yere bakılır. Aynı olgunun ikinci bir kaynağı varsa belirti hep budur.
