@@ -18,6 +18,10 @@ MonoBehaviour:
   occlusionCameraDepth: 800
   occlusionRendererIndex: 1
   driftBias: 0.45
+  stampAtlas: {fileID: 18700000, guid: 7feeace223d33d74eac520abbc901e70, type: 2}
+  rimVelocityBias: 0.045
+  relaxRate: 3
+  forceRelaxWindSpeed: 6
   defaultSWE: 0.02
   defaultRhoN: 0.12
   defaultWet: 0

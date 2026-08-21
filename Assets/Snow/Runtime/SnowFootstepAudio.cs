@@ -71,7 +71,7 @@ public class SnowFootstepAudio : MonoBehaviour
     void OnEnable()
     {
         if (sampler == null)
-            throw new System.InvalidOperationException("SnowFootstepAudio: SnowSampler atanmadı.");
+            throw new System.InvalidOperationException("SnowFootstepAudio: SnowSampler atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
     }
 
     /// Ayak yere bastığında çağrılıyor.

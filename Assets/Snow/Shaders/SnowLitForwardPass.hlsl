@@ -99,6 +99,15 @@ half4 SnowFragment(Varyings input) : SV_Target
     color += SnowAmbient(N, surface, mainLight.shadowAttenuation, _ShadowTint.rgb);
 
 #if defined(_ADDITIONAL_LIGHTS)
+    // LIGHT_LOOP_BEGIN makrosu `inputData`yı ADIYLA okuyor (_CLUSTER_LIGHT_LOOP açıkken
+    // ekran uzayı UV'sinden küme indeksini çıkarıyor). Kendi ışık döngümüzü
+    // yazıyoruz ama makronun beklediği değişken yine de kurulmak zorunda.
+    InputData inputData = (InputData)0;
+    inputData.positionWS = input.positionWS;
+    inputData.normalWS = N;
+    inputData.viewDirectionWS = V;
+    inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
+
     uint lightCount = GetAdditionalLightsCount();
 
     LIGHT_LOOP_BEGIN(lightCount)

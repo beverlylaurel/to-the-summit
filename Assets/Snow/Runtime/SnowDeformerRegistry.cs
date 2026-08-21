@@ -31,10 +31,18 @@ public class SnowDeformerRegistry : MonoBehaviour
 
     public int Capacity => slots != null ? slots.Length : 0;
 
-    void OnEnable()
+    void OnEnable() => EnsureInitialized();
+
+    /// GEÇ BAŞLATMA. Deformer'lar BAŞKA nesnelerde (oyuncunun ayaklarında) ve onların
+    /// OnEnable'sı bu bileşenden ÖNCE koşabiliyor — Unity ayrı nesneler arasında sıra
+    /// garanti etmiyor. Kayıt sırasında da çağrılıyor, böylece hangisi önce gelirse
+    /// gelsin yuvalar hazır oluyor.
+    void EnsureInitialized()
     {
+        if (slots != null) return;
+
         if (settings == null)
-            throw new System.InvalidOperationException("SnowDeformerRegistry: SnowSettings atanmadı.");
+            throw new System.InvalidOperationException("SnowDeformerRegistry: SnowSettings atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
 
         int capacity = settings.QualityData.MaxDeformers;
 
@@ -66,10 +74,13 @@ public class SnowDeformerRegistry : MonoBehaviour
         freeSlots = null;
         freeCount = 0;
         ActiveCount = 0;
+        MaxContactExtent = 0f;
     }
 
     public int Register(SnowDeformer deformer)
     {
+        EnsureInitialized();
+
         if (freeCount == 0)
             throw new System.InvalidOperationException(
                 "SnowDeformerRegistry: yuva kalmadı (" + Capacity + "). Kalite seviyesi " +

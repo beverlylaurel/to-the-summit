@@ -55,9 +55,9 @@ public class SnowOcclusionCapture : MonoBehaviour
     void OnEnable()
     {
         if (settings == null)
-            throw new System.InvalidOperationException("SnowOcclusionCapture: SnowSettings atanmadı.");
+            throw new System.InvalidOperationException("SnowOcclusionCapture: SnowSettings atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (occlusionShader == null)
-            throw new System.InvalidOperationException("SnowOcclusionCapture: Hidden/Snow/OcclusionDepth atanmadı.");
+            throw new System.InvalidOperationException("SnowOcclusionCapture: Hidden/Snow/OcclusionDepth atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
 
         int layer = LayerMask.NameToLayer(OccluderLayerName);
         if (layer < 0)

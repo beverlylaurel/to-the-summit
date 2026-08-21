@@ -110,19 +110,19 @@ public class SnowManager : MonoBehaviour
     void OnEnable()
     {
         if (settings == null)
-            throw new System.InvalidOperationException("SnowManager: SnowSettings atanmadı.");
+            throw new System.InvalidOperationException("SnowManager: SnowSettings atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (simCompute == null)
-            throw new System.InvalidOperationException("SnowManager: SnowSim.compute atanmadı.");
+            throw new System.InvalidOperationException("SnowManager: SnowSim.compute atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (followTarget == null)
-            throw new System.InvalidOperationException("SnowManager: takip hedefi atanmadı.");
+            throw new System.InvalidOperationException("SnowManager: takip hedefi atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (occlusion == null)
-            throw new System.InvalidOperationException("SnowManager: SnowOcclusionCapture atanmadı.");
+            throw new System.InvalidOperationException("SnowManager: SnowOcclusionCapture atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (groundHeight == null)
-            throw new System.InvalidOperationException("SnowManager: SnowGroundHeight atanmadı.");
+            throw new System.InvalidOperationException("SnowManager: SnowGroundHeight atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (weather == null)
-            throw new System.InvalidOperationException("SnowManager: SnowWeather atanmadı.");
+            throw new System.InvalidOperationException("SnowManager: SnowWeather atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (deformers == null)
-            throw new System.InvalidOperationException("SnowManager: SnowDeformerRegistry atanmadı.");
+            throw new System.InvalidOperationException("SnowManager: SnowDeformerRegistry atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
 
         Active = this;
 

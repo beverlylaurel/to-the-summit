@@ -44,19 +44,27 @@ public class SnowSampler : MonoBehaviour
     bool hasRegion;
     bool requestPending;
 
+    /// YOK EDİLMİŞ NESNE KONTROLÜ. Geri okuma geri döndüğünde bileşen çoktan
+    /// yok edilmiş olabiliyor ve `isActiveAndEnabled` o durumda istisna atıyor.
+    /// Düz bir alan okumak güvenli: C# nesnesi yaşıyor, yok olan yerel taraf.
+    bool alive;
+
     public bool HasData => hasRegion;
 
     void OnEnable()
     {
         if (manager == null)
-            throw new System.InvalidOperationException("SnowSampler: SnowManager atanmadı.");
+            throw new System.InvalidOperationException("SnowSampler: SnowManager atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (followTarget == null)
-            throw new System.InvalidOperationException("SnowSampler: takip hedefi atanmadı.");
+            throw new System.InvalidOperationException("SnowSampler: takip hedefi atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
 
         region = new Vector4[RegionTexels * RegionTexels];
         hasRegion = false;
         requestPending = false;
+        alive = true;
     }
+
+    void OnDisable() => alive = false;
 
     void LateUpdate()
     {
@@ -94,7 +102,7 @@ public class SnowSampler : MonoBehaviour
 
         // Hata YUTULMUYOR ama istisna da atılmıyor: geri okuma oyun kapanırken
         // düzenli olarak iptal ediliyor ve bu bir hata değil.
-        if (request.hasError || !isActiveAndEnabled) return;
+        if (!alive || request.hasError) return;
 
         NativeArray<Vector4> data = request.GetData<Vector4>();
         if (data.Length < region.Length) return;

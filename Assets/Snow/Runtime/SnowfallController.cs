@@ -75,6 +75,7 @@ public class SnowfallController : MonoBehaviour
     float looseFraction;
     bool looseRequestPending;
     bool needsInit;
+    bool alive;
 
     public float LooseSnowFraction => looseFraction;
     public int ActiveFlakes { get; private set; }
@@ -83,15 +84,15 @@ public class SnowfallController : MonoBehaviour
     void OnEnable()
     {
         if (manager == null)
-            throw new System.InvalidOperationException("SnowfallController: SnowManager atanmadı.");
+            throw new System.InvalidOperationException("SnowfallController: SnowManager atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (weather == null)
-            throw new System.InvalidOperationException("SnowfallController: SnowWeather atanmadı.");
+            throw new System.InvalidOperationException("SnowfallController: SnowWeather atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (flakeCompute == null)
-            throw new System.InvalidOperationException("SnowfallController: SnowFlakes.compute atanmadı.");
+            throw new System.InvalidOperationException("SnowfallController: SnowFlakes.compute atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (flakeShader == null)
-            throw new System.InvalidOperationException("SnowfallController: Hidden/Snow/Flakes atanmadı.");
+            throw new System.InvalidOperationException("SnowfallController: Hidden/Snow/Flakes atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (followCamera == null)
-            throw new System.InvalidOperationException("SnowfallController: kamera atanmadı.");
+            throw new System.InvalidOperationException("SnowfallController: kamera atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
 
         flakeMaterial = CoreUtils.CreateEngineMaterial(flakeShader);
         spindriftMaterial = CoreUtils.CreateEngineMaterial(flakeShader);
@@ -109,6 +110,8 @@ public class SnowfallController : MonoBehaviour
 
         ResolveKernels();
 
+        alive = true;
+
         // KURULUM İLK LateUpdate'E ERTELENDİ. Doldurma zemin yükseklik dokusunu
         // istiyor; aynı nesnedeki bileşenlerin OnEnable sırası garanti değil ve o
         // doku henüz pişmemiş olabiliyor.
@@ -117,6 +120,8 @@ public class SnowfallController : MonoBehaviour
 
     void OnDisable()
     {
+        alive = false;
+
         flakes?.Release();
         spindrift?.Release();
         looseBuffer?.Release();
@@ -331,7 +336,9 @@ public class SnowfallController : MonoBehaviour
         AsyncGPUReadback.Request(looseBuffer, request =>
         {
             looseRequestPending = false;
-            if (request.hasError) return;
+
+            // Yok edilmiş nesne kontrolü — bkz. SnowSampler.
+            if (!alive || request.hasError) return;
 
             uint total = request.GetData<uint>()[0];
             float texels = resolution * (float)resolution;

@@ -79,9 +79,9 @@ public class SnowFootstepDriver : MonoBehaviour
     void OnEnable()
     {
         if (registry == null)
-            throw new System.InvalidOperationException("SnowFootstepDriver: kayıt defteri atanmadı.");
+            throw new System.InvalidOperationException("SnowFootstepDriver: kayıt defteri atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (followTarget == null)
-            throw new System.InvalidOperationException("SnowFootstepDriver: takip hedefi atanmadı.");
+            throw new System.InvalidOperationException("SnowFootstepDriver: takip hedefi atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
 
         feet = new SnowDeformer[2];
         contactTimers = new float[2];

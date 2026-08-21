@@ -24,6 +24,18 @@ float SnowValueNoise(float2 p)
     return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
 }
 
+/// KABARTI GENLİĞİ DALGA BOYUNA ORANLI. Bu katmanın tepe yüksekliği
+/// `tile * SNOW_DETAIL_AMPLITUDE` metre.
+///
+/// BİR KEZ YANLIŞ YAPILDI ve ekranda dijital kamuflaj deseni çıktı: gürültünün
+/// çıktısı birimsiz [0,1] iken fiziksel mesafeye bölünüyordu. Mikro katmanda
+/// 0.3 / 0.005 m = eğim 60, yani 89 derece; normal her hücrede yatay düzleme
+/// savruluyor ve ışık hücre hücre ters dönüyordu.
+///
+/// Kural: büküm genliği kaynak özellik boyundan KÜÇÜK olmalı. 0.25 dalga boyunun
+/// dörtte biri — tipik eğim 10-15 derece çıkıyor.
+#define SNOW_DETAIL_AMPLITUDE 0.25
+
 /// Bir katmanın Y-yukarı normali. `tile` metre cinsinden dalga boyu.
 float3 SnowDetailLayer(float2 worldXZ, float tile, float strength)
 {
@@ -39,8 +51,10 @@ float3 SnowDetailLayer(float2 worldXZ, float tile, float strength)
     float hx = SnowValueNoise(p + float2(e, 0));
     float hy = SnowValueNoise(p + float2(0, e));
 
-    // Eğim = yükseklik farkı / mesafe. Mesafe metre cinsinden: e * tile.
-    float2 slope = float2(hx - h, hy - h) / (e * tile) * strength;
+    // Eğim = (gürültü farkı x genlik) / (örnek aralığı x dalga boyu). `tile` pay ve
+    // paydada sadeleşiyor, yani eğim dalga boyundan BAĞIMSIZ — 8 m'lik dalga da
+    // 5 cm'lik kristal de aynı dikliğe sahip, yalnız ölçekleri farklı.
+    float2 slope = float2(hx - h, hy - h) * (SNOW_DETAIL_AMPLITUDE * strength / e);
 
     return normalize(float3(-slope.x, 1.0, -slope.y));
 }

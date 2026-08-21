@@ -42,9 +42,9 @@ public class SnowMovementModifier : MonoBehaviour
     void OnEnable()
     {
         if (sampler == null)
-            throw new System.InvalidOperationException("SnowMovementModifier: SnowSampler atanmadı.");
+            throw new System.InvalidOperationException("SnowMovementModifier: SnowSampler atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (player == null)
-            throw new System.InvalidOperationException("SnowMovementModifier: oyuncu atanmadı.");
+            throw new System.InvalidOperationException("SnowMovementModifier: oyuncu atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
 
         current = 1f;
     }

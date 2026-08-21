@@ -57,9 +57,9 @@ public class SnowFarCascade : MonoBehaviour
     void OnEnable()
     {
         if (manager == null)
-            throw new System.InvalidOperationException("SnowFarCascade: SnowManager atanmadı.");
+            throw new System.InvalidOperationException("SnowFarCascade: SnowManager atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (simCompute == null)
-            throw new System.InvalidOperationException("SnowFarCascade: SnowSim.compute atanmadı.");
+            throw new System.InvalidOperationException("SnowFarCascade: SnowSim.compute atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
 
         // RGHalf: yalnız swe ve rhoN. Islaklık ve tazelik uzakta okunmuyor.
         //

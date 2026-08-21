@@ -50,11 +50,11 @@ public class SnowClipmap : MonoBehaviour
     void OnEnable()
     {
         if (settings == null)
-            throw new System.InvalidOperationException("SnowClipmap: SnowSettings atanmadı.");
+            throw new System.InvalidOperationException("SnowClipmap: SnowSettings atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (material == null)
-            throw new System.InvalidOperationException("SnowClipmap: materyal atanmadı.");
+            throw new System.InvalidOperationException("SnowClipmap: materyal atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
         if (followTarget == null)
-            throw new System.InvalidOperationException("SnowClipmap: takip hedefi atanmadı.");
+            throw new System.InvalidOperationException("SnowClipmap: takip hedefi atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
 
         BuildRings();
     }

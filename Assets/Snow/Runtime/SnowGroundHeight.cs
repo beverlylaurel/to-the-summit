@@ -27,7 +27,7 @@ public class SnowGroundHeight : MonoBehaviour
     void OnEnable()
     {
         if (settings == null)
-            throw new System.InvalidOperationException("SnowGroundHeight: SnowSettings atanmadı.");
+            throw new System.InvalidOperationException("SnowGroundHeight: SnowSettings atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
 
         if (settings.GroundSource != SnowGroundSource.UnityTerrain)
             throw new System.NotImplementedException(
@@ -49,7 +49,7 @@ public class SnowGroundHeight : MonoBehaviour
     public void RefreshGroundHeight()
     {
         if (terrain == null)
-            throw new System.InvalidOperationException("SnowGroundHeight: Terrain atanmadı.");
+            throw new System.InvalidOperationException("SnowGroundHeight: Terrain atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
 
         TerrainData data = terrain.terrainData;
         int resolution = data.heightmapResolution;

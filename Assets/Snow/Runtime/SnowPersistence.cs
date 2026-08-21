@@ -32,6 +32,9 @@ public class SnowPersistence : MonoBehaviour
     Texture2D staging;
     bool requestPending;
 
+    /// YOK EDİLMİŞ NESNE KONTROLÜ — bkz. SnowSampler.
+    bool alive;
+
     /// Gezinen yakalama imleci. Her karede bir blok saklanıyor; bütün kaskadı
     /// taramak 1024 kare (~17 s) sürüyor.
     ///
@@ -56,17 +59,21 @@ public class SnowPersistence : MonoBehaviour
     void OnEnable()
     {
         if (cascade == null)
-            throw new System.InvalidOperationException("SnowPersistence: SnowFarCascade atanmadı.");
+            throw new System.InvalidOperationException("SnowPersistence: SnowFarCascade atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
 
         staging = new Texture2D(BlockTexels, BlockTexels, TextureFormat.RGHalf, false, true)
         {
             name = "Snow Persistence Staging",
             hideFlags = HideFlags.HideAndDontSave,
         };
+
+        alive = true;
     }
 
     void OnDisable()
     {
+        alive = false;
+
         if (staging != null) DestroyImmediate(staging);
         staging = null;
 
@@ -86,7 +93,7 @@ public class SnowPersistence : MonoBehaviour
                                  0, 1, TextureFormat.RGHalf, request =>
         {
             requestPending = false;
-            if (request.hasError || !isActiveAndEnabled) return;
+            if (!alive || request.hasError) return;
 
             var data = request.GetData<half2>();
             if (data.Length < BlockTexels * BlockTexels) return;

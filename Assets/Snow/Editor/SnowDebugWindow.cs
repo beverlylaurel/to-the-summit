@@ -71,6 +71,12 @@ public class SnowDebugWindow : EditorWindow
     float rateStartOpenSWE;
     bool rateRunning;
 
+    /// Rapor dosyası. Pencerede kaydirarak okumak yerine her şey buraya yazılıyor.
+    const string LogPath = "Logs/snow.log";
+
+    bool writeLog = true;
+    double lastLogTime;
+
     string parityReport;
     bool parityOk;
 
@@ -100,7 +106,185 @@ public class SnowDebugWindow : EditorWindow
     void OnInspectorUpdate()
     {
         UpdatePreview();
+        WriteLogFile();
         Repaint();
+    }
+
+    /// BÜTÜN ÖLÇÜMLERİ DOSYAYA yazıyor, iki saniyede bir.
+    ///
+    /// Pencere uzun ve kaydırmalı; ekran görüntüsüyle okumak hem kullanıcıya iş
+    /// çıkarıyor hem yarısını göstermiyor. Dosya tek parça ve doğrudan okunabiliyor.
+    void WriteLogFile()
+    {
+        if (!writeLog) return;
+        if (EditorApplication.timeSinceStartup - lastLogTime < 2.0) return;
+
+        lastLogTime = EditorApplication.timeSinceStartup;
+
+        try
+        {
+            System.IO.File.WriteAllText(LogPath, BuildReport());
+        }
+        catch (System.IO.IOException)
+        {
+            // Dosya o an başkası tarafından açıksa bir sonraki turda yazılır.
+            // Yutulmuyor: rapor bir ölçüm aracı, yazılamaması sistemi etkilemiyor.
+        }
+    }
+
+    string BuildReport()
+    {
+        var report = new System.Text.StringBuilder(4096);
+
+        report.AppendLine("# Kar sistemi raporu  " + System.DateTime.Now.ToString("HH:mm:ss"));
+        report.AppendLine("Play: " + EditorApplication.isPlaying);
+
+        SnowManager manager = SnowManager.Active;
+        if (manager == null || !manager.IsReady)
+        {
+            report.AppendLine("SnowManager ETKİN DEĞİL.");
+            return report.ToString();
+        }
+
+        SnowQualityData quality = manager.Settings.QualityData;
+
+        report.AppendLine();
+        report.AppendLine("## Bölge");
+        report.AppendLine("kalite         " + manager.Settings.Quality);
+        report.AppendLine("çözünürlük     " + quality.Resolution);
+        report.AppendLine("teksel         " + (manager.TexelSize * 100f).ToString("0.###") + " cm");
+        report.AppendLine("snap adımı      " + manager.SnapTexels + " teksel");
+        report.AppendLine("merkez teksel  " + manager.CenterTexel.x + " , " + manager.CenterTexel.y);
+        report.AppendLine("snap kalan     " + Mathf.Abs(manager.CenterTexel.x % manager.SnapTexels)
+                          + " , " + Mathf.Abs(manager.CenterTexel.y % manager.SnapTexels));
+        report.AppendLine("son kaydırma   " + manager.LastScrollTexels.x + " , " + manager.LastScrollTexels.y);
+
+        SnowOcclusionCapture capture = manager.Occlusion;
+        report.AppendLine();
+        report.AppendLine("## Engel haritası");
+        report.AppendLine("katman         " + LayerMask.NameToLayer(SnowOcclusionCapture.OccluderLayerName));
+        report.AppendLine("yenileme       " + capture.CaptureCount + "  (kare " + Time.frameCount + ")");
+        report.AppendLine("kayma          "
+            + Vector2.Distance(manager.AreaCenter, capture.LastCaptureCenter).ToString("0.00") + " m");
+
+        SnowWeather weather = manager.Weather;
+        report.AppendLine();
+        report.AppendLine("## Hava");
+        report.AppendLine("preset         " + weather.ActivePresetName);
+        report.AppendLine("yağış          "
+            + (weather.SnowfallSWERate * 1000f * 3600f).ToString("0.###") + " mm SWE/saat");
+        report.AppendLine("rüzgâr         " + weather.WindSpeed.ToString("0.0") + " m/s");
+        report.AppendLine("sıcaklık        " + weather.TemperatureC.ToString("0.0") + " C");
+        report.AppendLine("kaplama        " + weather.Coverage.ToString("0.00"));
+        report.AppendLine("zaman hızı      " + SnowManager.SimulationSpeed.ToString("0"));
+
+        if (centerValid)
+        {
+            report.AppendLine();
+            report.AppendLine("## Prob");
+            report.AppendLine("merkez  swe " + centerValue.r.ToString("0.00000")
+                              + "  rhoN " + centerValue.g.ToString("0.000")
+                              + "  wet " + centerValue.b.ToString("0.00")
+                              + "  disturb " + centerValue.a.ToString("0.00")
+                              + "  h " + (HeightOf(centerValue) * 100f).ToString("0.00") + " cm");
+            report.AppendLine("8m yan  swe " + openValue.r.ToString("0.00000")
+                              + "  rhoN " + openValue.g.ToString("0.000")
+                              + "  wet " + openValue.b.ToString("0.00")
+                              + "  disturb " + openValue.a.ToString("0.00")
+                              + "  h " + (HeightOf(openValue) * 100f).ToString("0.00") + " cm");
+
+            double elapsed = EditorApplication.timeSinceStartup - rateStartTime;
+            if (elapsed > 1.0)
+            {
+                float hours = (float)(elapsed * SnowManager.SimulationSpeed / 3600.0);
+                report.AppendLine("geçen          " + elapsed.ToString("0") + " s gerçek");
+                report.AppendLine("merkez hızı    "
+                    + ((centerValue.r - rateStartCenterSWE) * 1000f / hours).ToString("0.00") + " mm/saat");
+                report.AppendLine("açık hızı      "
+                    + ((openValue.r - rateStartOpenSWE) * 1000f / hours).ToString("0.00") + " mm/saat");
+            }
+
+            report.AppendLine("Σ swe          " + massTotal.ToString("0.000")
+                              + "   başlangıç " + massBaseline.ToString("0.000")
+                              + "   sapma "
+                              + (massBaseline > 1e-6 ? (massTotal - massBaseline) / massBaseline * 100.0 : 0.0)
+                                    .ToString("0.000") + " %");
+        }
+
+        var clipmap = manager.GetComponent<SnowClipmap>();
+        if (clipmap != null)
+        {
+            report.AppendLine();
+            report.AppendLine("## Clipmap");
+            report.AppendLine("halka          " + clipmap.RingCount);
+            report.AppendLine("üçgen          " + clipmap.TriangleCount);
+        }
+
+        SnowDeformerRegistry registry = manager.Deformers;
+        if (registry != null)
+        {
+            report.AppendLine();
+            report.AppendLine("## Deformasyon");
+            report.AppendLine("etkin deformer " + registry.ActiveCount + " / " + registry.Capacity);
+            report.AppendLine("en büyük temas  "
+                + (registry.MaxContactExtent * 100f).ToString("0.0") + " cm");
+            report.AppendLine("damga atlası   "
+                + (manager.Settings.StampAtlas != null ? manager.Settings.StampAtlas.name : "YOK"));
+        }
+
+        var snowfall = manager.GetComponent<SnowfallController>();
+        if (snowfall != null)
+        {
+            report.AppendLine();
+            report.AppendLine("## Yağış parçacıkları");
+            report.AppendLine("etkin tane     " + snowfall.ActiveFlakes);
+            report.AppendLine("etkin savrulma " + snowfall.ActiveSpindrift);
+            report.AppendLine("gevşek oran     " + snowfall.LooseSnowFraction.ToString("0.000"));
+        }
+
+        var persistence = manager.GetComponent<SnowPersistence>();
+        if (persistence != null)
+        {
+            report.AppendLine();
+            report.AppendLine("## Kalıcılık");
+            report.AppendLine("saklanan blok  " + persistence.BlockCount);
+            report.AppendLine("atılan blok    " + persistence.EvictedBlocks);
+        }
+
+        var movement = Object.FindAnyObjectByType<SnowMovementModifier>();
+        if (movement != null)
+        {
+            report.AppendLine();
+            report.AppendLine("## Oyun tarafı");
+            report.AppendLine("örnek var mı    " + movement.HasSample);
+            report.AppendLine("derinlik       " + (movement.Depth * 100f).ToString("0.0") + " cm");
+            report.AppendLine("yoğunluk       " + movement.Density01.ToString("0.00"));
+            report.AppendLine("hız çarpanı     " + movement.SpeedMultiplier.ToString("0.000"));
+        }
+
+        var profiler = manager.GetComponent<SnowProfiler>();
+        if (profiler != null)
+        {
+            report.AppendLine();
+            report.AppendLine("## Profil");
+
+            float total = 0f;
+            for (int i = 0; i < SnowProfiler.PassNames.Length; i++)
+            {
+                float gpu = profiler.GpuMilliseconds(i);
+                float cpu = profiler.CpuMilliseconds(i);
+                float shown = gpu > 0f ? gpu : cpu;
+                total += shown;
+
+                report.AppendLine(SnowProfiler.PassNames[i].PadRight(18)
+                    + shown.ToString("0.000") + " ms " + (gpu > 0f ? "GPU" : "CPU"));
+            }
+
+            report.AppendLine("TOPLAM            " + total.ToString("0.000") + " ms  / hedef "
+                + SnowProfiler.BudgetMilliseconds(manager.Settings.Quality).ToString("0.00"));
+        }
+
+        return report.ToString();
     }
 
     void UpdatePreview()
@@ -817,6 +1001,8 @@ public class SnowDebugWindow : EditorWindow
     {
         EditorGUILayout.LabelField("Kurulum", EditorStyles.boldLabel);
 
+        writeLog = GUILayout.Toggle(writeLog, "Raporu Logs/snow.log'a yaz (2 s'de bir)");
+
         if (GUILayout.Button("Sahneyi kur")) SetupScene();
 
         EditorGUILayout.Space();
@@ -923,6 +1109,16 @@ public class SnowDebugWindow : EditorWindow
 
         var weather = manager.GetComponent<SnowWeather>();
         if (weather == null) weather = manager.gameObject.AddComponent<SnowWeather>();
+
+        // HAVA ZINCIRI BAGLANIYOR. F1'deki tek sürgü artık kar sistemini de sürüyor;
+        // iki ayrı panelden hava ayarlamak bitti.
+        var weatherChainSerialized = new SerializedObject(weather);
+        weatherChainSerialized.FindProperty("weatherState").objectReferenceValue =
+            Object.FindAnyObjectByType<WeatherState>();
+        weatherChainSerialized.FindProperty("temperature").objectReferenceValue =
+            Object.FindAnyObjectByType<TemperatureField>();
+        weatherChainSerialized.FindProperty("altitudeSource").objectReferenceValue = player.transform;
+        weatherChainSerialized.ApplyModifiedProperties();
 
         SnowWeatherPreset[] presets = LoadOrCreateWeatherPresets();
 

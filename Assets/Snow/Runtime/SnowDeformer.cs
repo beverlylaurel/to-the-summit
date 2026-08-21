@@ -82,7 +82,7 @@ public class SnowDeformer : MonoBehaviour
     void OnEnable()
     {
         if (registry == null)
-            throw new System.InvalidOperationException("SnowDeformer: kayıt defteri atanmadı.");
+            throw new System.InvalidOperationException("SnowDeformer: kayıt defteri atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
 
         handle = registry.Register(this);
     }

@@ -33,7 +33,7 @@ public class SnowCoverageDriver : MonoBehaviour
     void OnEnable()
     {
         if (weather == null)
-            throw new System.InvalidOperationException("SnowCoverageDriver: SnowWeather atanmadı.");
+            throw new System.InvalidOperationException("SnowCoverageDriver: SnowWeather atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
 
         coverage = weather.Coverage;
         Apply();

@@ -472,7 +472,14 @@ public class PrecipitationRenderer : MonoBehaviour
         density = Mathf.Pow(state.Precipitation, DensityExponent)
                 * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.05f, state.Precipitation));
         precipitation = state.Precipitation;
-        snowiness = state.Snowiness;
+        // KAR ARTIK BU SİSTEMDE DEĞİL. Kar sistemi v2 karı kendi çiziyor; bu bileşen
+        // yalnız YAĞMUR taşıyor. Karlılık sıfırlanınca ne kar tanesi ne sürüklenen kar
+        // çiziliyor.
+        //
+        // Kar tarafına ait ölü kod bu dosyada duruyor ve AYRI BİR ADIMDA silinecek:
+        // bütçe bölüşümü ve tampon düzeni yağmurla iç içe; kör ameliyat yağmuru da
+        // bozar. Kayıt DECISIONS.md'de.
+        snowiness = 0f;
     }
 
     void Update()

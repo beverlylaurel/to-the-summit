@@ -105,10 +105,21 @@ Shader "Hidden/Snow/Flakes"
                 if (speed > 1e-3)
                 {
                     float3 velocityDir = f.velocity / speed;
-                    float3 alongScreen = normalize(velocityDir - forward * dot(velocityDir, forward));
 
-                    float stretch = 1.0 + _WindStretch * 2.0;
-                    offset += alongScreen * (dot(offset, alongScreen) * (stretch - 1.0));
+                    // EKRAN DÜZLEMİNDEKİ BİLEŞENİ NORMALİZE ETMEDEN ÖNCE ÖLÇÜLÜYOR.
+                    // Tane doğrudan kameraya ya da kameradan uzağa gidiyorsa bu bileşen
+                    // sıfır; normalize edilince NaN çıkıyor ve quad ekran boyu uzuyor.
+                    // Belirti: görüntünün üzerinde yatay siyah çizgiler.
+                    float3 lateral = velocityDir - forward * dot(velocityDir, forward);
+                    float lateralLength = length(lateral);
+
+                    if (lateralLength > 1e-3)
+                    {
+                        float3 alongScreen = lateral / lateralLength;
+
+                        float stretch = 1.0 + _WindStretch * 2.0;
+                        offset += alongScreen * (dot(offset, alongScreen) * (stretch - 1.0));
+                    }
                 }
 
                 float3 positionWS = f.position + offset;

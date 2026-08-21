@@ -17,6 +17,16 @@ public class SnowWeather : MonoBehaviour
     [Tooltip("Sırasıyla Clear, Light, Moderate, Heavy, Blizzard.")]
     [SerializeField] SnowWeatherPreset[] presets = new SnowWeatherPreset[0];
 
+    [Header("Projenin hava zinciri")]
+    [Tooltip("Bağlanırsa yağış şiddeti ve sıcaklık BURADAN geliyor; preset seçimi elle " +
+             "yapılmıyor. Boşsa kar sistemi kendi presetini sürüyor.")]
+    [SerializeField] WeatherState weatherState;
+
+    [SerializeField] TemperatureField temperature;
+
+    [Tooltip("Sıcaklığın okunacağı kot. Normalde oyuncu.")]
+    [SerializeField] Transform altitudeSource;
+
     [SerializeField] int activePreset;
 
     [Header("Sıcaklık")]
@@ -27,9 +37,14 @@ public class SnowWeather : MonoBehaviour
     [Tooltip("Rüzgârın yatay yönü, derece.")]
     [SerializeField] float windDirectionDegrees;
 
-    // Geçiş durumu: iki presetin arasında nerede olduğumuz.
-    int fromPreset;
-    float transition = 1f;
+    /// PRESET KONUMU SÜREKLİ. 0 = Clear, 4 = Blizzard, aradaki her değer iki presetin
+    /// karışımı.
+    ///
+    /// Ayrık preset + geçiş sayılacı yerine tek bir konum tutuluyor çünkü dış hava
+    /// zinciri sürekli bir şiddet veriyor (0..1). Ayrık olsaydı şiddet salınırken
+    /// preset iki değer arasında zıplar ve geçiş hiç bitmezdi.
+    float presetPosition;
+    float targetPosition;
 
     float snowfallSWERate;
     float windSpeedBase;
@@ -70,8 +85,8 @@ public class SnowWeather : MonoBehaviour
             throw new System.InvalidOperationException("SnowWeather: preset listesi boş.");
 
         activePreset = Mathf.Clamp(activePreset, 0, presets.Length - 1);
-        fromPreset = activePreset;
-        transition = 1f;
+        presetPosition = activePreset;
+        targetPosition = activePreset;
 
         maxSWERate = 0f;
         for (int i = 0; i < presets.Length; i++)
@@ -89,35 +104,72 @@ public class SnowWeather : MonoBehaviour
     }
 
     /// Yeni bir yağış seviyesine geçer. Geçiş 45 saniye sürer.
+    /// Dış hava zinciri bağlıyken bu çağrı yok sayılıyor — iki kaynak olmaz.
     public void SetPreset(int index)
     {
-        index = Mathf.Clamp(index, 0, presets.Length - 1);
-        if (index == activePreset) return;
+        if (weatherState != null) return;
 
-        fromPreset = activePreset;
-        activePreset = index;
-        transition = 0f;
+        targetPosition = Mathf.Clamp(index, 0, presets.Length - 1);
     }
 
-    public void SetTemperature(float celsius) => temperatureC = celsius;
+    /// Dış zincirin sürdüğü sürekli şiddet. 0 = Clear, 1 = Blizzard.
+    public void SetIntensity(float intensity01)
+    {
+        targetPosition = Mathf.Clamp01(intensity01) * (presets.Length - 1);
+    }
+
+    /// Dış zincir bağlıyken yok sayılıyor — sıcaklık oradan geliyor.
+    public void SetTemperature(float celsius)
+    {
+        if (weatherState != null) return;
+        temperatureC = celsius;
+    }
+
+    /// Dış hava zinciri bağlı mı. Teşhis penceresi sürgüleri buna göre kilitliyor.
+    public bool DrivenExternally => weatherState != null;
 
     // TEŞHİS KOLU: preset geçişi ve esinti de kar zamanıyla akıyor. Aksi halde 600x
     // hızda birikme saatler ilerlerken geçiş hâlâ 45 GERÇEK saniye bekletiyor ve
     // ölçüm rampanın ortasında alınıyor. Hız 1 iken hiçbir şey değişmiyor.
     void Update() => Evaluate(Time.deltaTime * Mathf.Max(SnowManager.SimulationSpeed, 0f));
 
+    /// Projenin hava zincirinden okur. Bağlı değilse hiçbir şey yapmıyor.
+    ///
+    /// ŞİDDET = yağış x karlılık. Yağmur yollarını v2 taşımıyor; karın payı neyse
+    /// kar sistemi o kadar çalışıyor.
+    void ReadExternalWeather()
+    {
+        if (weatherState == null) return;
+
+        SetIntensity(weatherState.Precipitation * weatherState.Snowiness);
+
+        if (temperature != null && altitudeSource != null)
+            temperatureC = temperature.At(altitudeSource.position.y);
+    }
+
     void Evaluate(float deltaTime)
     {
-        transition = Mathf.Min(1f, transition + deltaTime / TransitionDuration);
         gustTime += deltaTime;
 
-        SnowWeatherPreset from = presets[Mathf.Clamp(fromPreset, 0, presets.Length - 1)];
-        SnowWeatherPreset to = presets[Mathf.Clamp(activePreset, 0, presets.Length - 1)];
+        ReadExternalWeather();
+
+        // BÜTÜN MENZİL 45 SANİYEDE. Preset başına değil: Clear'dan Blizzard'a
+        // geçiş dört adım ve her birine 45 saniye vermek üç dakika ederdi.
+        float speed = (presets.Length - 1) / TransitionDuration;
+        presetPosition = Mathf.MoveTowards(presetPosition, targetPosition, deltaTime * speed);
+
+        int fromIndex = Mathf.Clamp(Mathf.FloorToInt(presetPosition), 0, presets.Length - 1);
+        int toIndex = Mathf.Clamp(fromIndex + 1, 0, presets.Length - 1);
+
+        activePreset = Mathf.Clamp(Mathf.RoundToInt(presetPosition), 0, presets.Length - 1);
+
+        SnowWeatherPreset from = presets[fromIndex];
+        SnowWeatherPreset to = presets[toIndex];
 
         if (from == null || to == null)
             throw new System.InvalidOperationException("SnowWeather: preset listesinde boş girdi var.");
 
-        float blend = Mathf.SmoothStep(0f, 1f, transition);
+        float blend = presetPosition - fromIndex;
 
         snowfallSWERate = Mathf.Lerp(from.SnowfallSWERate, to.SnowfallSWERate, blend);
 
@@ -134,6 +186,7 @@ public class SnowWeather : MonoBehaviour
 
         // Taze karın ıslaklığı sıcaklıkla artıyor: 0 C'nin altı kuru, +3 C tamamen ıslak.
         snowWetness = Mathf.Clamp01(temperatureC / 3f);
+
 
         // Kaplama yağış şiddetiyle yükseliyor; nesneler gözle görülür şekilde kaplanır (§9).
         coverage = maxSWERate > 0f ? Mathf.Clamp01(snowfallSWERate / maxSWERate) : 0f;

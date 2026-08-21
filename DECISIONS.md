@@ -943,23 +943,6 @@ gün ölçeğinde. Yerine stokastik gün zamanlayıcısı: fırtına başlangıc
 **Tetikleyici — karar geri alınırsa:** `U` katmanı ve §5.2 tablosu geri gelir, üstüne §6.1
 yazılır. `S`/`P` ayrımı ve rüzgâr taşınımı olduğu gibi kalır, yani geri dönüş yıkıcı değil.
 
-## Kar v2 kendi hava kaynağını sürüyor
-
-**Karar.** `SnowWeather` yağış şiddetini ve sıcaklığı kendi presetlerinden üretiyor;
-projenin `WeatherState` / `WindField` / `TemperatureField` zincirine **henüz** bağlı değil.
-
-**Gerekçe.** Spec kendi hava modelini tanımlıyor (§10.3 presetleri, §6 derece-gün erimesi).
-Faz 0–3 boyunca iki kaynak aynı anda yaşarsa hangi sayının nereden geldiği ölçülemez
-hale gelir. Önce v2 kendi içinde doğrulanıyor, sonra tek yönlü bağlanıyor:
-`AltitudeWeatherDriver` → `SnowWeather.SetPreset/SetTemperature`.
-
-**Tetikleyici — geri dönülecek belirti:** oyunda "fırtına var ama kar birikmiyor" ya da
-"F1'den yağış açtım, v2 karı tepki vermedi" görülür görülmez. Atmosfer tutarlılığı
-kuralı (CLAUDE.md) bunu zaten yasaklıyor.
-
-**Maliyet.** Bağlama işi küçük: iki setter çağrısı. Asıl iş, iki modelin şiddet
-ölçeklerini eşlemek.
-
 ## Kar yağışı VFX Graph yerine compute parçacığı
 
 **Karar.** §10'un `VFX_Snowfall.vfx` / `VFX_Spindrift.vfx` / `VFX_SnowPuff.vfx`
@@ -1002,3 +985,33 @@ her yağışta ekranı lekeleyen bir efekt kullanıcının haberi olmadan devrey
 
 **Tetikleyici:** istenirse `PC_Renderer` asset'ine elle eklenir ve `lensShader`
 alanına `Hidden/Snow/Lens` bağlanır.
+
+## Eski yağış sistemi yalnız yağmur taşıyor
+
+**Karar.** `PrecipitationRenderer` içinde karlılık sabit sıfır. Karı kar sistemi v2
+çiziyor; eski sistemde kalan kar kodu ÖLÜ.
+
+**Gerekçe.** İki sistem aynı anda kar çizince gökyüzünde iki farklı kar oluyor ve
+hangisinin ne yaptığı ayrılamıyor. Ölçüldü: kullanıcı ekranda yalnız v1'i gördü,
+v2'nin preseti Clear'daydı ve hiç tane üretmiyordu.
+
+**Ölü kod neden hemen silinmedi.** `PrecipitationRenderer`'da kar ve yağmur aynı
+tanecik bütçesini, aynı tamponu ve aynı çizim yolunu paylaşıyor. Kör ameliyat
+çalışan yağmuru da bozar; yağmurun kendi kabulü olmadan kesilmez.
+
+**Tetikleyici:** v2 karı Unity'de doğrulandıktan sonra. O adımda `SnowBoxSize`,
+sürüklenen kar tanecikleri, karlılık oranı ve ilgili shader dalları tek seferde
+çıkarılır.
+
+## Kar v2 projenin hava zincirine BAĞLANDI
+
+**Karar.** `SnowWeather` artık `WeatherState` ve `TemperatureField`'dan okuyor.
+Kendi preset seçimi dış zincir bağlıyken devre dışı.
+
+**Gerekçe.** Önceki karar ("Kar v2 kendi hava kaynağını sürüyor") tetikleyicisini
+verdi: F1'den yağış açıldı, v2 karı tepki vermedi. Atmosfer tutarlılığı kuralı
+iki kaynağı yasaklıyor.
+
+Şiddet = `Precipitation x Snowiness`. Yağmur payı v2'yi hiç ilgilendirmiyor.
+Preset konumu artık SÜREKLİ (0..4); ayrık olsaydı şiddet salınırken preset iki değer
+arasında zıplar ve 45 saniyelik geçiş hiç bitmezdi.
