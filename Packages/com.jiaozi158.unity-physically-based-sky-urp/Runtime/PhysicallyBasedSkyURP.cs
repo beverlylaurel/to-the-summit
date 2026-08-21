@@ -196,9 +196,17 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
 
     public override void Create()
     {
+        // Yigin edit modunda HENUZ YOK olabiliyor. Unity, renderer listesi degisince
+        // Create()'i inspector cizerken de kosturuyor ve orada VolumeManager
+        // baslatilmamis oluyor. Korumasiz okuma NullReference atiyor, atinca
+        // ScriptableRenderer kurulumu yarida kaliyor: kalici yerel ayirmalar sizdi
+        // ve renderer bir daha kurulamiyor.
+        //
+        // Yigin yoksa hacim degerleri varsayilan sayiliyor; Create() oyun baslarken
+        // yigin hazirken zaten tekrar kosuyor.
         var stack = VolumeManager.instance.stack;
-        PhysicallyBasedSky pbrSkyVolume = stack.GetComponent<PhysicallyBasedSky>();
-        VisualEnvironment visualEnvVolume = stack.GetComponent<VisualEnvironment>();
+        PhysicallyBasedSky pbrSkyVolume = stack != null ? stack.GetComponent<PhysicallyBasedSky>() : null;
+        VisualEnvironment visualEnvVolume = stack != null ? stack.GetComponent<VisualEnvironment>() : null;
 
         // Validate sky shaders
         bool shadersValid = true;

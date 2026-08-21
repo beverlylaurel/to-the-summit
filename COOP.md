@@ -183,4 +183,12 @@ Bunlar ağ eklendiğinde olduğu gibi kalabilir; listeye tekrar girmesinler:
 - **Gölgelendiriciler, tanecik biçimi, ses karışımı, post-process** — tamamı yerel görüntü
 - **Ayar asset'leri** — build'in parçası, çalışma zamanında değişmiyorlar
 
-
+- **Kar deformasyonu İSTEMCİ-YEREL.** `SnowManager` durum dokusunu yalnız yerel
+  oyuncunun etrafında tutuyor ve `SnowDeformerRegistry` yalnız yerel temasları
+  topluyor. Ağ gelince: uzak oyuncuların ayak temasları da deformer olarak
+  yayınlanmalı (konum, yön, yük, güç), yoksa herkes kendi izini görür.
+  Maliyet: küçük — `SnowDeformerGPU` zaten 64 bayt ve kare başına en fazla iki
+  temas var. Spec §14 bunu kapsam dışı bırakıyor, bu satır yalnız envanter.
+- **Hava preseti yerel.** `SnowWeather` presetini kim değiştirirse yalnız onda
+  değişiyor. Ağ gelince preset ve geçiş zamanı sunucudan gelmeli; birikme hesabı
+  deterministik olduğu için başka bir şey senkronlanması gerekmiyor.

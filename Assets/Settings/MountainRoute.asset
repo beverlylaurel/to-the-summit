@@ -19,6 +19,14 @@ MonoBehaviour:
   branches:
   - name: "T\u0131rman\u0131\u015F rotas\u0131"
     marks: []
+  - name: Hat 1
+    marks: []
+  - name: Hat 2
+    marks: []
+  - name: Hat 3
+    marks: []
+  - name: Ana hat
+    marks: []
   camps:
   - position: {x: 0.299492, y: 0.2808}
     radius: 10

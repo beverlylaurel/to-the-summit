@@ -35,55 +35,9 @@ float _SnowDisplaceStart;      // bu derinliğin altında geometri hiç oynamıy
 float _SnowTessNear;
 float _SnowTessFar;
 
-/// Makro kar derinliği, metre. Dört girdi — dördü de CPU'da birebir hesaplanabiliyor.
-// ---- AYAK İZİ DEFORMASYONU ----
-//
-// Yerel, yüksek çözünürlüklü tampon; `SnowDeformation.cs` sürüyor. Kar örtüsünden
-// AYRI bir sistem çünkü örtü ızgarası arazininkiyle aynı (7.32 m) ve ayak izi 0.3 m.
-//
-// Doku dünyaya DÖŞENİYOR: `uv = worldPos.xz / _SnowDeform.x`, Repeat sarımlı. Yani
-// kaydırma/kopyalama yok. Döşemenin komşu kopyası görünmesin diye değer pencerenin
-// içteğet çemberinde sönüyor: kare yarı kenarı 12 m, köşesi 17 m, sönüm 12 m'de biter.
-//
-// İşaret: pozitif = yüzey çökmüş, negatif = kenara itilmiş kar kabarmış.
-TEXTURE2D(_SnowDeformTex);
-SAMPLER(sampler_SnowDeformTex);
-float4 _SnowDeform;   // x pencere kenarı (m), yz pencere merkezi (dünya xz), w sönüm yarıçapı
-
-float SnowFootprint(float3 worldPos);
-
-/// İZİN BULANIK OKUNMASI — kaba geometri için.
-///
-/// Deformasyon dokusunun texel'i 4.7 cm. Geometri ondan kabaysa (dış halkada 37.5 cm)
-/// kenar hücrelere basamaklanıyor: ekranda izin kıyısında DÜZENLİ MERDİVEN çıkıyor,
-/// kullanıcı bildirdi. Tek örnek, sekiz texel'lik bir aralığı temsil edemiyor.
-///
-/// Dört köşe örneği hücrenin yarı boyunda alınıp ortalanıyor — kutu bulanıklaştırma.
-/// Dokuda mip zinciri yok (her kare yazılıyor, mip üretmek pahalı), o yüzden elle.
-float SnowFootprintWide(float3 worldPos, float radius)
-{
-    float sum = SnowFootprint(worldPos + float3(-radius, 0.0, -radius))
-              + SnowFootprint(worldPos + float3( radius, 0.0, -radius))
-              + SnowFootprint(worldPos + float3(-radius, 0.0,  radius))
-              + SnowFootprint(worldPos + float3( radius, 0.0,  radius));
-    return sum * 0.25;
-}
-
-float SnowFootprint(float3 worldPos)
-{
-    if (_SnowDeform.x < 0.001) return 0.0;
-
-    float2 uv = worldPos.xz / _SnowDeform.x;
-    float value = SAMPLE_TEXTURE2D_LOD(_SnowDeformTex, sampler_SnowDeformTex, uv, 0).r;
-    if (abs(value) < 1e-5) return 0.0;
-
-    float toCenter = distance(worldPos.xz, _SnowDeform.yz);
-    return value * (1.0 - smoothstep(_SnowDeform.w * 0.8, _SnowDeform.w, toCenter));
-}
-
 /// KARIN MİKRO KABARTISI — SASTRUGİ.
 ///
-/// YALNIZ `SnowPatch` KULLANIYOR, arazi kullanmıyor. Arazi üçgeni 7.32 m ve
+/// YALNIZ KULLANILMIYOR (v1 yaması silindi). Arazi üçgeni 7.32 m ve
 /// bölünmeyle en iyi 11.4 cm; 30 santimlik bir dalgacığı oraya yazmak aliasing
 /// üretiyordu ve bu yüzden mikro kabartı bir dönem yalnız normal haritasına
 /// bırakılmıştı (`SnowDisplacement.hlsl` başındaki ölçek ayrımı). Sonuç: yüzey ışıkta
@@ -121,8 +75,29 @@ float SnowMicroRelief(float2 worldXZ, float depth)
     return body * carved * ((ridge - 0.5) * 0.06 + (grain - 0.5) * 0.02);
 }
 
+/// Kar sistemi v2'nin clipmap'i. xy merkez (dünya xz), z sönüm başlangıcı, w dış kenar.
+float4 _SnowClipRegion;
+
+/// Clipmap'in kapsadığı yerde ARAZİ KABARMIYOR.
+///
+/// v2 kar yüzeyini ayrı bir mesh olarak çiziyor. Arazi de kendi birikintisiyle
+/// kabarsaydı iki yüzey kesişirdi: arazinin birikintisi metre mertebesine çıkabiliyor,
+/// v2'nin karı santimetre. Arazi kesilmiyor — kesmek sınırda çatlak açar; yalnız
+/// kabarması sönüyor, böylece her zaman kar yüzeyinin ALTINDA kalıyor ve sınırda
+/// basamak oluşmuyor.
+float SnowClipmapFade(float2 worldXZ)
+{
+    if (_SnowClipRegion.w < 0.001) return 1.0;
+
+    float d = max(abs(worldXZ.x - _SnowClipRegion.x), abs(worldXZ.y - _SnowClipRegion.y));
+    return smoothstep(_SnowClipRegion.z, _SnowClipRegion.w, d);
+}
+
 float SnowMacroDepth(float3 worldPos)
 {
+    float clipFade = SnowClipmapFade(worldPos.xz);
+    if (clipFade < 0.001) return 0.0;
+
     float altitude = worldPos.y - _TerrainOrigin.y;
 
     // Kalınlık DEPOSU (g), örtü (r) değil: örtü yüzeyin beyazlığı, depo altındaki
@@ -148,7 +123,7 @@ float SnowMacroDepth(float3 worldPos)
     // arazinin nerede kar TUTTUĞUNU: sırtın rüzgâraltı 0.67'den 2.0'a kadar. Uçlar
     // arası 3.0 kat — saha ölçümü rüzgâraltı yamaçta iki kat (taze karda dörde kadar).
     return supply * slopeFit * lerp(0.35, 1.4, drift)
-         * SampleDriftWeight(worldPos) * _SnowDisplaceMax;
+         * SampleDriftWeight(worldPos) * _SnowDisplaceMax * clipFade;
 }
 
 /// Geometriye uygulanacak yükseklik. Eşiğin altındaki ince örtü hiç oynamıyor:
@@ -174,7 +149,7 @@ float SnowDisplacement(float3 worldPos)
 /// Geometriye uygulanan toplam.
 ///
 /// İZ ARTIK BURADA DEĞİL. Arazi üçgeni 7.32 m ve izi çözemiyor; kazımak için gereken
-/// bölünme kare başına üç milyon üçgen ediyordu. İzi `SnowPatch` taşıyor — kendi
+/// bölünme kare başına üç milyon üçgen ediyordu. İzi kar sistemi v2 taşıyor — kendi
 /// ızgarası 4.7 cm ve arazi onun kapsadığı yerde zaten çiziliyor bile değil.
 float SnowTotalDisplacement(float3 worldPos)
 {
@@ -194,7 +169,7 @@ float2 SnowDisplacementGradient(float3 worldPos)
     float dx = SnowDisplacement(worldPos + float3(Step, 0.0, 0.0)) - here;
     float dz = SnowDisplacement(worldPos + float3(0.0, 0.0, Step)) - here;
 
-    // İZİN TÜREVİ ARTIK BURADA DEĞİL. Arazi izi hiç çizmiyor; onu `SnowPatch` taşıyor
+    // İZİN TÜREVİ ARTIK BURADA DEĞİL. Arazi izi hiç çizmiyor; onu kar sistemi v2 taşıyor
     // ve kendi normalini kendi ızgarasında (4.7 cm) kuruyor.
     return float2(dx, dz) / Step;
 }

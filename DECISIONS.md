@@ -29,7 +29,6 @@ gök sahneye göre sönük kaldı.
 çözüm güneş sabiti değil, gökyüzü paketinin aerosol/bulanıklık parametresidir — yayınık
 payı oradan gelir.
 
-
 ## Oyun alanı 17.5 → 30 km, ve yalıtım halkası
 
 **Karar.** `terrainSize` 30000 m. Dağın eteği 8.4 km'de bitiyor, oradan arazi kenarına
@@ -63,11 +62,9 @@ bozulmadı). Tam liste `SCALE.md` → "terrainSize değişince elle düzeltilece
 **Tetikleyici — geri dönülecek belirti:** uzak bantlar (18–60 km) gelince 15 km'deki
 ova/silsile geçişi görünür bir dikiş yaratırsa halkanın dış sönümü o banda taşınır.
 
-
 ## Bloke eden açık sorular
 
 Cevaplanmadan ilgili sisteme kod yazılmaz.
-
 
 - **Ekipman ve kamp** — ekipmanın envanterde nasıl durduğu, kamp/sığınakta ne yapıldığı
   → [Oynanış mekaniği netleşmeden koda başlanmaz](#oynanış-mekaniği-netleşmeden-koda-başlanmaz)
@@ -77,14 +74,12 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ## Silinecek geçiciler
 
-
 - **Ova ve patika ölçüm araçları** (`ForelandProbe`, F1'deki kurulum süresi logu) — ova
   ve yol dokusu oturunca silinir
 - **Bisiklet maskesi yeniden seyreltmede silinecek** — malzeme maskesi köşe renginde duruyor;
   model yeniden seyreltilirse topoloji değişir ve boyama kaybolur. Seyreltme yapıldı
   (3.1 M → 200 bin), boyama artık güvenle yapılabilir; bütçe değişirse maske aktarımı
   yazmak gerekir
-
 
 ## Bekleyen kararlar
 
@@ -94,7 +89,6 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Cepheyi ne sürecek** — yaklaşmanın yarısında kar başlaması isteniyor; şiddet şu an
   yalnız rakımdan geliyor ve ovada minimum
   → [Yaklaşmada kar bir CEPHEDEN gelir](#yaklaşmada-kar-bir-cepheden-gelir)
-
 
 ### `DepthNormals` fragman maliyeti KABUL EDİLDİ
 
@@ -775,7 +769,6 @@ sürerdi. Kaynak tek olmalı.
 Yüzeylerin yeniden ayarlanması gerekip gerekmediği BAKILMADI — belirti fazla parlak arazi,
 patlamış kar ya da sönmüş kontrast olur. `LookController` pozlaması ilk bakılacak yer.
 
-
 ## Yağmur izi veritabanı: üst çözünürlük size16, size32 ertelendi (2026-08-19)
 
 **Karar.** Garg-Nayar iz veritabanından `size4`, `size8`, `size16` paketlendi; `size32`
@@ -810,7 +803,6 @@ okunuyor (`File.ReadAllBytes`). Ham veri kuralı Kirmse arazi verisiyle aynı.
 `RainStreakImporter` üzerinden verilmeli — şu an paketleyiciye komut satırından
 geçiliyor.
 
-
 ## Atmosfer katmanının taşınabilirliği ertelendi (2026-08-19)
 
 **Karar.** Yağış, sis, bulut ve hava zinciri şimdilik bu projeye gömülü kalıyor. Ayrı
@@ -834,7 +826,6 @@ bağımlılığını `[SerializeField]` ile alıyor, singleton ve `FindObjectOfT
 ya da ayar asset'i üzerinden verilir; statik köprü feature'a elden geçirilen bir nesneye
 dönüşür. Shader tarafı daha pahalı: `HeightFog.hlsl` çağrıları ya bir arayüz include'una
 ya da uniform'a bağlanmalı.
-
 
 ## Garg-Nayar: üç adım TABANI DOĞRULANDIKTAN SONRA (2026-08-20)
 
@@ -886,7 +877,6 @@ demek), yani `3 × 2.0/0.8 = 7.5`. Kodda `SourceScale = 7.5f`.
 `d_i` her damlada aynı ve izotrop. Sahneye lamba, fener ya da şimşek eklendiğinde
 gerekecek — şimşek zaten bekleyen kararlar listesinde.
 
-
 ## Sürüklenen kar kendi sınır tabakası yasasını koruyor
 
 Yağan yağışa logaritmik rüzgâr profili verildi (`PrecipitationRenderer.WindBandFactor`,
@@ -907,7 +897,6 @@ tek yasada birleştirilir.
 
 **Maliyet:** birleştirme yarım gün; `speedFactor`'ın ölçülmüş uçlarının log profille
 yeniden doğrulanması gerekir.
-
 
 ## Çığ oyuna girmiyor — kar modeli üç katmana iniyor (2026-08-21)
 
@@ -954,3 +943,62 @@ gün ölçeğinde. Yerine stokastik gün zamanlayıcısı: fırtına başlangıc
 **Tetikleyici — karar geri alınırsa:** `U` katmanı ve §5.2 tablosu geri gelir, üstüne §6.1
 yazılır. `S`/`P` ayrımı ve rüzgâr taşınımı olduğu gibi kalır, yani geri dönüş yıkıcı değil.
 
+## Kar v2 kendi hava kaynağını sürüyor
+
+**Karar.** `SnowWeather` yağış şiddetini ve sıcaklığı kendi presetlerinden üretiyor;
+projenin `WeatherState` / `WindField` / `TemperatureField` zincirine **henüz** bağlı değil.
+
+**Gerekçe.** Spec kendi hava modelini tanımlıyor (§10.3 presetleri, §6 derece-gün erimesi).
+Faz 0–3 boyunca iki kaynak aynı anda yaşarsa hangi sayının nereden geldiği ölçülemez
+hale gelir. Önce v2 kendi içinde doğrulanıyor, sonra tek yönlü bağlanıyor:
+`AltitudeWeatherDriver` → `SnowWeather.SetPreset/SetTemperature`.
+
+**Tetikleyici — geri dönülecek belirti:** oyunda "fırtına var ama kar birikmiyor" ya da
+"F1'den yağış açtım, v2 karı tepki vermedi" görülür görülmez. Atmosfer tutarlılığı
+kuralı (CLAUDE.md) bunu zaten yasaklıyor.
+
+**Maliyet.** Bağlama işi küçük: iki setter çağrısı. Asıl iş, iki modelin şiddet
+ölçeklerini eşlemek.
+
+## Kar yağışı VFX Graph yerine compute parçacığı
+
+**Karar.** §10'un `VFX_Snowfall.vfx` / `VFX_Spindrift.vfx` / `VFX_SnowPuff.vfx`
+varlıkları ÜRETİLMEDİ. Yerine `SnowFlakes.compute` + `SnowFlakes.shader` ile
+GPU parçacığı, toz bulutu için de Unity'nin kendi parçacık sistemi.
+
+**Gerekçe.** İki ayrı engel. Birincisi: `com.unity.visualeffectgraph` paketi projede
+kurulu değil. İkincisi ve asıl olan: `.vfx` bir düğüm grafiği, metin olarak
+yazılamıyor — elle üretilen dosya bozuk asset olur. Paket kurulsa bile grafiğin
+kendisi Unity'nin VFX Graph editöründe çizilmek zorunda.
+
+Fizik ve sayılar §10.1'den birebir alındı: doğum kutusu 40x26x40, 1 m snap, ömür
+4–9 s, düşme hızı kuru 0.6–1.4 / ıslak 1.4–3.0, salınım 5.5 Hz / 0.35 m, asgari ekran
+boyutu 1.3 piksel, örtü kesme, zemin kesme, savrulma 30 m şerit / ömür 1.2–3.0.
+
+**Tetikleyici — geri dönülecek belirti:** VFX Graph paketi kurulup grafik editörde
+çizilmek istenirse. O zaman `SnowfallController` aynı preset değerlerini
+`VisualEffect.SetFloat` ile sürer; arayan taraf değişmez.
+
+**Maliyet.** Geçiş küçük: denetleyici zaten preset okuyup sayı üretiyor. Asıl iş
+grafiğin kendisini çizmek.
+
+## Kar atmosfer sürücüsü VARSAYILAN KAPALI
+
+**Karar.** `SnowAtmosphereDriver`'ın sis / güneş / ortam anahtarları kapalı kuruluyor.
+
+**Gerekçe.** Projenin kendi atmosfer zinciri var (`AtmosphereController`, `TimeOfDay`,
+`SkyWeatherDriver`). İkisi aynı anda açıkken sis ve güneş iki kaynaktan sürülür ve
+CLAUDE.md'nin atmosfer tutarlılığı kuralı bunu yasaklıyor.
+
+**Tetikleyici:** kar v2 projenin hava zincirine bağlandığında. O adımda ya bu sürücü
+silinir ya mevcut sürücülere fırtına katsayısı verilir.
+
+## Lens karı renderer'a EKLENMEDİ
+
+**Karar.** `SnowLensFeature` yazıldı ama URP renderer'ına otomatik eklenmiyor.
+
+**Gerekçe.** §10.2 onu "opsiyonel, en son" diye işaretliyor. Otomatik açılsaydı
+her yağışta ekranı lekeleyen bir efekt kullanıcının haberi olmadan devreye girerdi.
+
+**Tetikleyici:** istenirse `PC_Renderer` asset'ine elle eklenir ve `lensShader`
+alanına `Hidden/Snow/Lens` bağlanır.

@@ -320,7 +320,6 @@ olmadığı için gökte jilet gibi yatay bir çizgi bırakıyordu.
 donuyor ama okunmaya devam ediyordu: F1 sürgüsü yağışı, görüşü, sisi ve rengi sürerken
 bulutlar kilitlenme anındaki hâlde kalıyor, tek hava durumu iki kanala ayrılıyordu.
 
-
 ---
 
 ## Dağ yüzeyi
@@ -442,7 +441,6 @@ düşürüldü ve ton lineer uzayda eski ışımaya ölçeklendi (Y = 0.3844): 1
 **Güneşin yönü/rengi hava sürücüsünden geçmez.** İkinci bir yol "gökyüzü kızardı ama
 gölgeler öğle yönünde" çelişkisini üretirdi.
 
-
 ---
 
 ## Bilinçli kuralların gerekçeleri
@@ -520,7 +518,6 @@ döşemenin yarısı; gradyan 0.23, uzay katlanmaz) ve **ikinci örnekleme de ay
 
 **Tanecik yoğunluğu bükülmüş eğriden.** Doğrusal olsa hafif yağışta ekran tanecikle
 doluyor.
-
 
 ---
 
@@ -600,7 +597,6 @@ ağırlıklı, `w` arkasını geçiren pay) ve saçılım payının bulutun kaps
 istediği ortamın içeri saçtığı radyans. Ölçüldü: probe DC luminansı **0.156**, sis rengi
 **0.492** — oran **3.15** (≈ π), ve o farkla ara mesafedeki puslu sırtlar kayboluyordu.
 
-
 ---
 
 ## Işığın rengi
@@ -670,7 +666,6 @@ uzanıyor; oyun alanı ne kadar büyük olursa olsun kenarda kesilir. Silsile an
 oktav istenince son üçü (10, 5, 2.5 m) sınırın altında kalıp 2 hücrelik zikzak olarak geri
 katlanıyordu; pişmiş haritada anomali 14.7 m'de, tabanın 3.5 katı. Ayrıntı `SYMPTOMS.md` →
 "Arazide düzenli testere".
-
 
 ## Yağış perdesi — makaleden sapılan üç yer
 
@@ -749,7 +744,6 @@ olunca çıktının makaleyle ilgisi kalmadı. Şimdi tek eğri var ve makalenin
 bozduğu, üçü aynı anda dururken bilinemez. Önce referans birebir üretilir, sonra tek tek
 sapılır.
 
-
 ## Langer spektral perdesi SİLİNDİ — iki kez denendi, ölçüldü
 
 `[Langer 2004]`'ün spektral yağış perdesi uygulandı, makalenin birebir hâline getirildi,
@@ -781,7 +775,6 @@ için tasarlanmış — makalenin bütün örnekleri düz arka plan görüntüle
 - **Sapmalar çarpımsal birikir.** Bir dönem üç eğri üst üste binmişti (kare alma, ortalama
   çıkarma, ağırlık). Üçü aynı anda dururken hangisinin ne bozduğu ölçülemiyor. Önce
   referans birebir üretilir, sonra tek tek sapılır.
-
 
 ## Yağış sütunları DENENDİ VE ELENDİ — sisin içinden uzak sis yapısı görünmez
 
@@ -819,7 +812,6 @@ kurulamıyor. Sütunların ön koşulu **uzayda değişen yağış**, ve o ayrı
 - **"Basit kesire yakınlık" ızgara testi işe yaramıyor.** `limit_denominator(6)` ile
   neredeyse her oran bir kesire %2 içinde düşüyor; ayırt etmiyor. Kullanılabilir test
   görsel + otokorelasyon.
-
 
 ## Rüzgâr şiddeti → hız eşlemesi kare, doğrusal değil
 
@@ -861,7 +853,6 @@ kullanıcı ayıramadı ("gözüm seçmiyor, hepsi birbirine benziyor"). Renk so
 ELEME kondu: ekranda yalnız bir grup çizildi, soru "yatay olanlar hangisinde kalıyor"
 oldu ve tek turda kapandı.
 
-
 ## Yükseklik bantları ÖLÇÜMLE ELENDİ; sınır tabakası kapalı biçimde
 
 Rüzgârın sınır tabakası (yerde sıfır, yükseldikçe logaritmik) yağan yağışa eklenecekti.
@@ -891,7 +882,6 @@ doğrulandı: iki ifade arasındaki fark 4e-9.
 **Ders:** periyodik bir alanda "sarma güvenli harman" ALANIN sürekliliğini korur, ama
 harmanlanan şey bir taneciğin YÖRÜNGESİYSE yetmez. Sınırsız biriken iki büyüklüğün farkı
 alınacaksa fark kapalı biçimde ve sınırlı olarak kurulmalıdır.
-
 
 ## Tanecik girdabın her kıvrımını yemez — atalet süzgeci
 
@@ -923,7 +913,6 @@ tarafta duruyordu.
 **Telafi terimi silindi.** Fark daha önce elle konmuş bir `lerp(1.5, 0.4, dropSize)`
 katsayısıyla taklit ediliyordu. Fiziği koyunca gerekçesi kalmadı; terim geri gelmez.
 Yağmurun sapması 3-4 kat, karınki 1.6 kat azaldı — aradaki makas budur.
-
 
 ## Girdap ölçeği kotla küçülür — kesilerek değil, enerji kaydırılarak
 
@@ -960,7 +949,6 @@ Taban 50/50 seçildi çünkü mevcut alanın oktav ağırlıkları (0.5 / 0.165)
 
 **Ders:** "sığmayan ölçeği kes" sezgisi bir enerji spektrumunda yanlıştır. Kesilen
 enerjinin nereye gittiği yazılmadan hiçbir bant kapatılmaz.
-
 
 ## Yakın yağmur: periyodik döşeme yoğunluk gradyanı taşıyamaz
 
@@ -1003,7 +991,6 @@ buçuk kat, toplam +%11, ortanca alfa sabit. Üçüncü kutu kayda değer bir ş
 opaklıkta çıkardı. İç kutunun yoğunluk katkısı kendi sönüm eğrisiyle giriyor, yoksa
 sınırda opaklık sıçrardı.
 
-
 ## İz dokusunun çözünürlük seviyesi: makalenin kuralı tek seviye veriyor
 
 `[Garg 2006, §5]` "projeksiyon genişliğinden az büyük" seviyeyi seçmeyi söylüyor. Kural
@@ -1023,7 +1010,6 @@ Makalenin dipnotu tam bunu söylüyor. `size4`'te oran 14 kata iniyor, çalışm
 **Üç seviyeyi birden bağlamaya gerek kalmadı** — dinamik seçim yalnız o %1'lik yakın
 kuyruk için işe yarardı. Ertelenmiş bir işin doğru cevabı bazen "gerekmiyormuş" oluyor;
 kural uygulanmadan bilinmiyordu.
-
 
 ## Langer'ın kendi makalesi "shower door" diyor — silme kararı yazarlarca doğrulandı
 
@@ -1049,3 +1035,97 @@ Bizde konusu yok: yağmur Garg-Nayar iz veritabanından geliyor ve o çok daha f
 - §5.4'teki `max(D, -k_erosion·curv_W)` makalede birebir öyle. Aşındırılan miktarın mevcut
   karı aşmaması için `min` olması gerektiği şüphesi yerinde; uygulamada `min` alınacak ve
   sapma burada yazılı.
+
+---
+
+## Kar v2: snap adımı tam sayI teksele yuvarlanıyor
+
+**Kural.** Bölge merkezi 0.25 m'ye değil, 0.25 m'ye **en yakın tam sayı teksele**
+snap'leniyor.
+
+**Gerektıren hesap.** Spec 0.25 m diyor ve kaydırmanın tam sayı teksel olmasını şart
+koşuyor. İkisi aynı anda mümkün değil: 24 m / 2048 = 1.172 cm tekselde 0.25 m tam
+21.33 teksel eder. Kesirli kaydırma her adımda içeriği yeniden örnekler — spec'in
+kendi tuzak listesinde "izler yürüdükçe titriyor" diye geçen belirtinin ta kendisi.
+
+Yuvarlama sonucu: High 21 teksel (24.6 cm), Medium 16 (tam 25.0 cm), Low 11 (25.8 cm).
+Niçin önemsiz: 0.25 m'nin kendisi bir yuvarlak sayı, fiziksel bir eşik değil.
+
+## Kar v2: zemin yüksekliği R16, RHalf değil
+
+**Kural.** `Tex_GroundHeight` R16 UNorm.
+
+**Kağıtta hesap.** Spec RHalf diyor. Half'in 0.5–1.0 aralığındaki adımı 2^-11; dağın
+6189 m'lik yükseklik menzilinde bu **3.0 metre** eder. Kar derinliği santimetre
+mertebesinde — zemin 3 m oynarsa kar yüzeyi zeminin içine girer ya da havada kalır.
+
+R16 tam olarak Unity Terrain'in kendi hassasiyeti: 65536 adım / 6189 m = 9.4 cm. Yani
+kaynağın üstüne **hiç** hata eklemiyor. Half eklerdi.
+
+## Kar v2: engel kamerasının kendi renderer'ı
+
+**Kural.** `SnowOcclusionCamera` `SnowOcclusionRenderer.asset` kullanıyor.
+
+**Ölçüm.** Ana renderer'la başlatıldığında `PhysicallyBasedSkyURP` çöktü:
+`CalculateActualScreenResolution` bizim tek kanallı RHalf hedefimizde `cameraTargetHandle`
+null buluyor. Render graph düşünce oyun ekranı da bozuluyordu (tüm ekran turkuaz).
+
+Hatayı kaçınmakla düzeltmek yetmezdi: gökyüzü, bulut ve sis geçişlerinin bir engel
+haritasında işi yok, koşmaları saf israf.
+
+## Kar v2: replacement shader yerine override materyal
+
+**Kural.** Engel çizimi `SetReplacementShader` ile değil, renderer listesi + override
+materyalle yapılıyor.
+
+**Gerekçe.** `Camera.SetReplacementShader` built-in pipeline özelliği; SRP'de
+desteklenmiyor. Spec URP'yi zorunlu kılıyor, yani spec'in yazdığı yöntem bu boru
+hattında yok. Shader ve çıktı birebir aynı, yalnız bağlanma şekli değişti.
+
+## Kar v2: durum dokusu float, half değil
+
+**Kural.** `RT_State` ve `RT_StateTemp` ARGBFloat.
+
+**Ölçüm.** Half ile 90 saniye Heavy yağışta `swe` **hiç** değişmedi — tam olarak
+0.0199890'da kaldı.
+
+**Kağıtta sebebi.** swe = 0.02 civarında half'in adımı 2^-6 x 2^-10 = 1.53e-5. Bir
+birikme adımında eklenen miktar 8.33e-7 m/s x 0.067 s = 5.6e-8, yani adımın
+**273'te biri**. Her yazma aynı sayıya geri yuvarlanıyor.
+
+Bu kanalın özeli değil: §6'nın bütün kanalları yavaş üstel yaklaşım. rhoN oturması
+adım başına 6e-7 (half adımı 6.1e-5), wet gevşemesi sınırda. Ölçek değiştirmek
+çözmez — half'in hassasiyeti GÖRECELİ, milimetreye geçmek aynı oranı verir.
+
+**Maliyet.** High'ta 67 + 67 MB; toplam VRAM 77.5 → ~145 MB. Medium (1536) yarıya
+indiriyor. Elenen alternatifler: 16-bit UNorm adımı 9.2e-6 ile hâlâ 164 kat büyük;
+uzun sim adımı (18 s) tile rotasyonuyla görünür şerit dikisi üretiyor.
+
+## Kar v2: clipmap halkaları tek adıma snap'leniyor
+
+**Kural.** Bütün halkalar en kaba halkanın quad'ının iki katına snap'leniyor.
+
+**Kağıtta hesap.** §7.1 her halkanın kendi quad boyuna snap'lenmesini söylüyor.
+Halka 0 adımı 5 cm, halka 1 adımı 15 cm; ikisi ayrı yuvarlanınca merkezleri 7.5 cm'ye
+kadar ayrışıyor ve halka 1'in deliği halka 0'ın kenarına oturmuyor.
+
+Tek adım ikisini birden çözüyor çünkü 1.35 m her halkanın quad'ının tam katı:
+54 x 2.5 cm = 18 x 7.5 cm = 6 x 22.5 cm = 2 x 67.5 cm. Hem merkezler aynı hem her
+halkanın ızgarası dünyaya çapalı kalıyor.
+
+## Kar v2: kaskad blok ızgarasına snap'leniyor
+
+**Kural.** Uzak kaskad tek teksele değil 32 tekselliğine (6 m) bloklara snap'leniyor.
+
+**Gerekçe.** Kalıcılık blok hâlinde saklanıyor. Tek teksellik kaydırmada blok sınırı
+hiç hizalanmaz ve geri yükleme bir bloğun 31 tekselini eski veriyle ezerdi. 18.75 cm
+tekselde 4 m tam sayı blok etmiyor (21.33), o yüzden blok 32 teksele yuvarlandı.
+
+## Kar v2: kalıcılık gezinerek yakalıyor
+
+**Kural.** Her karede bir blok saklanıyor; blok pencereden çıkarken değil.
+
+**Gerekçe.** §10 "bölgeden çıkan şeritler `AsyncGPUReadback` ile alınır" diyor ama
+geri okuma asenkron: istek döndüğünde şerit çoktan kaymış oluyor ve okunan veri
+yeni içerik. Sürekli tarama deponun blok çıkarken zaten sıcak olmasını sağlıyor.
+Bedeli: saklanan veri en fazla 1024 kare (~17 s) eski.

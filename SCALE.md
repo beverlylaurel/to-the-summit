@@ -212,3 +212,25 @@ başka bir yol (ayrı yakın-plan mesh'i) gerekir.
 **Kendiliğinden ölçeklenmeyen ama ölçekten BAĞIMSIZ olanlar:** deformasyon penceresi
 (24 m), texel boyu (4.7 cm), ayak ölçüleri, adım aralığı, iz derinliği. Hepsi gerçek
 dünya büyüklüğü; dağın boyuyla ilgileri yok.
+
+## Kar sistemi v2
+
+**Kendiliğinden ölçeklenir**
+- Bir şey yok. Kar sisteminin bütün uzunlukları OYUNCU ölçeğinde, dağ ölçeğinde değil.
+
+**Bilerek mutlak** — dağ büyüse de küçülse de aynı kalmalı
+- Deformasyon bölgesi 24 m, çözünürlük 2048 (teksel 1.17 cm). Botun genişliği
+  boyunca en az sekiz teksel gerekiyor; bot dağla büyümüyor.
+- Clipmap halkaları 6 / 18 / 54 / 162 m.
+- Engel haritası 96 m, yenileme eşiği 4 m.
+- Uzak kaskad 192 m / 1024.
+- Doğum kutusu 40x26x40 m, kamera üstü 11 m.
+- Adım uzunluğu 0.75 m, temas kutusu 0.30x0.11 m, azami batma 0.45 m.
+
+**Elle bakılacak**
+- `SnowGroundHeight` R16 seçimi dağın Y MENZİLİNE bağlı. 6189 m'de adım 9.4 cm ve
+  bu Unity Terrain'in kendi hassasiyeti. Menzil büyürse adım da büyür; 12 km'de
+  19 cm olur ve kar derinliğiyle aynı mertebeye çıkar. O noktada zemin dokusu
+  RFloat'a çıkarılmalı.
+- Engel kamerasının 400 m yükseklik / 800 m derinlik değerleri oyuncunun etrafındaki
+  dilimi kapsıyor. Sahnede 400 m'den yüksek bir çatı varsa gölgesi haritaya girmez.

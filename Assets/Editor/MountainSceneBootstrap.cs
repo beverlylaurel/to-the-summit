@@ -73,8 +73,6 @@ public static class MountainSceneBootstrap
     const string SkyShaderPath = "Assets/Shaders/Sky.shader";
     const string SkyMaterialPath = "Assets/Settings/Sky.mat";
     const string FogComputePath = "Assets/Shaders/VolumetricFog.compute";
-    const string SnowDeformComputePath = "Assets/Shaders/SnowDeformation.compute";
-    const string SnowPatchShaderPath = "Assets/Shaders/SnowPatch.shader";
     const string FogSettingsPath = "Assets/Settings/VolumetricFogSettings.asset";
     const string SkyFogShaderPath = "Assets/Shaders/SkyFog.shader";
     const string RendererPath = "Assets/Settings/PC_Renderer.asset";
@@ -443,7 +441,6 @@ public static class MountainSceneBootstrap
             CreateDebugTools();
             changed = true;
         }
-
 
         // Bakış hareketten ayrı: serbest uçuşa geçince yürüyüş kapanıyor,
         // bakış oradaysa fare de ölüyordu
@@ -1776,7 +1773,6 @@ public static class MountainSceneBootstrap
 
         probe.Bind(snow, player.transform);
 
-        EnsureSnowDeformation(player, snow, ref changed);
         EditorUtility.SetDirty(probe);
     }
 
@@ -1816,67 +1812,6 @@ public static class MountainSceneBootstrap
         AssetDatabase.SaveAssets();
 
         return settings;
-    }
-
-    /// AYAK İZİ DEFORMASYONU. Oyuncunun üstünde duruyor — tampon oyuncuyu izliyor ve
-    /// izi bırakan da o.
-    ///
-    /// EKLE-SONRA-BAĞLA GÜVENLİ, çünkü bileşende `ExecuteAlways` yok: Unity edit
-    /// mode'da `OnEnable`'ı çağırmıyor, ilk çağrı Play'e basıldığında oluyor ve o ana
-    /// kadar `Bind` serileştirilmiş oluyor. `SnowSurface` de aynı deseni kullanıyor.
-    /// (`SnowCollisionProbe` kapalı nesnede duruyor ama sebebi ayrı: o F1'den açılan
-    /// bir ölçüm aracı, sürekli çalışan bir sistem değil.)
-    static void EnsureSnowDeformation(FirstPersonController player, SnowSurface snow,
-        ref bool changed)
-    {
-        var compute = AssetDatabase.LoadAssetAtPath<ComputeShader>(SnowDeformComputePath);
-        if (compute == null)
-            throw new System.InvalidOperationException(
-                $"Kar deformasyon compute shader'ı bulunamadı: {SnowDeformComputePath}");
-
-        var deformation = player.GetComponent<SnowDeformation>();
-        if (deformation == null)
-        {
-            deformation = player.gameObject.AddComponent<SnowDeformation>();
-            changed = true;
-        }
-
-        deformation.Bind(compute, player, snow,
-                         Object.FindAnyObjectByType<WeatherState>(),
-                         Object.FindAnyObjectByType<WindField>());
-        EditorUtility.SetDirty(deformation);
-
-        EnsureSnowPatch(player, ref changed);
-    }
-
-    /// DERİN KAR YÜZEYİ. Arazi mesh'i izi çözemiyor (üçgen 7.32 m, tessellation tavanı
-    /// 64 → 11.4 cm); yama kendi ızgarasında 9.4 cm veriyor.
-    static void EnsureSnowPatch(FirstPersonController player, ref bool changed)
-    {
-        var shader = AssetDatabase.LoadAssetAtPath<Shader>(SnowPatchShaderPath);
-        if (shader == null)
-            throw new System.InvalidOperationException(
-                $"Kar yaması shader'ı bulunamadı: {SnowPatchShaderPath}");
-
-        // İKİ HALKA. Yakın halka ize yakın plan çözünürlüğü veriyor, uzak halka izin
-        // geride kalan kısmını taşıyor. Tek halkayla ya iz kayboluyordu ya köşe sayısı
-        // dört milyona çıkıyordu.
-        var patches = player.GetComponents<SnowPatch>();
-        while (patches.Length < 2)
-        {
-            player.gameObject.AddComponent<SnowPatch>();
-            patches = player.GetComponents<SnowPatch>();
-            changed = true;
-        }
-
-        var terrainRef = Object.FindAnyObjectByType<Terrain>();
-
-        patches[0].Bind(new Material(shader) { name = "Snow Patch Near" },
-                        terrainRef, player.transform, true);
-        patches[1].Bind(new Material(shader) { name = "Snow Patch Far" },
-                        terrainRef, player.transform, false);
-
-        foreach (var p in patches) EditorUtility.SetDirty(p);
     }
 
     static TerrainMaterialSettings LoadOrCreateTerrainMaterialSettings()

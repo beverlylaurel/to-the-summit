@@ -237,8 +237,16 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
 
         // Store the current enable state of volumetric clouds in a global shader keyword
         bool isDebugger = DebugManager.instance.isAnyDebugUIActive;
+        // Yigin edit modunda HENUZ YOK olabiliyor. Create() renderer yeniden
+        // yaratildiginda inspector cizerken de kosuyor; orada VolumeManager
+        // baslatilmamis oluyor ve bu satir NullReference atiyordu. Atinca
+        // ScriptableRenderer kurulumu yarida kaliyor: kalici yerel ayirmalar sizdi
+        // ve renderer yarim kurulu kaldi.
+        //
+        // Yigin yoksa hacim kapali sayiliyor; gecis yine de kuruluyor, Create()
+        // oyun basladiginda yigin hazirken tekrar kosuyor.
         var stack = VolumeManager.instance.stack;
-        VolumetricClouds cloudsVolume = stack.GetComponent<VolumetricClouds>();
+        VolumetricClouds cloudsVolume = stack != null ? stack.GetComponent<VolumetricClouds>() : null;
         bool isVolumeActive = cloudsVolume != null && cloudsVolume.IsActive() && (!isDebugger || renderingDebugger);
 
         if (!isActive || !isVolumeActive)

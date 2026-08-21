@@ -65,7 +65,7 @@ float SnowTessEdgeFactor(float3 worldPos)
     // ARAZİ İZ İÇİN BÖLÜNMÜYOR.
     //
     // Bir dönem 22-46 metre bandında katsayı 16'ya çıkıyordu ve kare başına ÜÇ MİLYON
-    // üçgen ediyordu (ölçüldü, ekrandan okundu). İzin yakın planını `SnowPatch` taşıyor
+    // üçgen ediyordu (ölçüldü, ekrandan okundu). İzin yakın planını kar sistemi v2 taşıyor
     // ve iki halkası 48 metreyi zaten örtüyor — deformasyon penceresinin görünür
     // yarıçapının tamamı. Arazinin izle işi kalmadı.
 

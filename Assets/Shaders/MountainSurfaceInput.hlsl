@@ -124,12 +124,6 @@ float _SnowDetailFade;       // bu mesafede tamamen söner (metre)
 float _SnowfallFloor, _SnowfallCeiling;
 float _PermanentSnowLine;
 
-/// DERİN KAR YAMASI. `SnowPatch` sürüyor. Arazi shader'ı da okuyor: yamanın kapsadığı
-/// yerde arazi çizilmiyor, çünkü arazinin yüzeyi izin kazıldığı oyuğun ÜSTÜNÜ örterdi.
-/// `w` yarım kenar; 0 ise yama yok.
-float4 _PatchCenter;
-float  _PatchHalf;
-
 // Ufuk haritası: on altı pusula yönü için ufku kapatan açı (0-1 = 0-90 derece).
 // Güneş gölgesi buradan okunuyor; gölge haritası arazi için hiç okunmuyor.
 TEXTURE2D_ARRAY(_HorizonMap);

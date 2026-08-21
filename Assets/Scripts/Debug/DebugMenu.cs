@@ -210,7 +210,6 @@ public class DebugMenu : MonoBehaviour
 
         BeginColumn();
         DrawWeather();
-        DrawSnowPatch();
         DrawWind();
         EndColumn();
 
@@ -255,7 +254,6 @@ public class DebugMenu : MonoBehaviour
     /// gölgeyi metrelerce öteliyor — boşluğun büyüklüğü tek başına bir şey söylemiyor.
     void LateUpdate()
     {
-
 
     }
 
@@ -462,20 +460,6 @@ public class DebugMenu : MonoBehaviour
               $"ışık {lightning.Intensity:F2}   parlama {lightning.Glow:F2}");
 
         lightning.Held = GUILayout.Toggle(lightning.Held, "Çakmayı sabit yak");
-
-        EndSection();
-    }
-
-    /// TEŞHİS: kar yaması. Ekrandaki bir kusurun yamadan mı arazi tarafından mı
-    /// geldiği gözle ayrılamıyor. Kusur bulununca bu bölüm silinir.
-    void DrawSnowPatch()
-    {
-        BeginSection("Teşhis: kar yaması");
-
-        SnowPatch.Enabled = GUILayout.Toggle(SnowPatch.Enabled, "kar yaması açık");
-        GUILayout.Label("kapalıyken sahne yama hiç yokmuş gibi çizilir");
-
-        if (GUILayout.Button("Ayarları geri al")) SnowPatch.Enabled = true;
 
         EndSection();
     }

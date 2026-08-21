@@ -47,7 +47,6 @@ sis**, "her katman kendi mesafesiyle bir kez").
 **Açık:** bulut rengi ufuk altı gök renginden besleniyor ve sıcağa çalıyor; düzeltmesi
 ertelenen atmosfer işinde (`DECISIONS.md`).
 
-
 Atmosferin **şu an nasıl çalıştığı**: ne neyden beslenir, ne neyi etkiler.
 
 **Bu dosya sayı ve gerekçe tutmaz.** Eşikler, katsayılar ve renkler kodda ve ayar
@@ -231,35 +230,81 @@ sahnede öyle bir kaynak yok. Şimşek eklendiğinde gerekecek (`DECISIONS.md`).
   dikey bileşenle kurulur ve üstüne **girdap alanının kendi türevinden** çıkan damla başına
   sapma binder. Sapma uydurulmaz: çizilen konumun tam türevi alınır.
 
-### Kar deformasyonu — ayak izi (`SnowDeformation`, `SnowDeformation.compute`)
+### Kar sistemi v2 (`Assets/Snow/`)
 
-**Okur:** oyuncunun konumunu, **kar kalınlığını** (`SnowSurface.DepthAt` — iz oradaki
-kardan derin olamaz), yağış şiddetini ve rüzgâr gücünü (izin kapanma hızı).
-**Okumaz:** kar örtüsü simülasyonunu. Örtünün hücresi arazi ızgarasıyla aynı olacak
-(7.32 m), ayak izi 0.3 m — iz o ızgaraya yazılamaz. `[Cordonnier 2018, §6.2]` bunu
-kendisi söylüyor: "10m per cell only allows a consideration of the general direction
-of the skiers".
+Yeni kar sistemi. `unity-kar-sistemi-spec-v2.md` uygulanıyor, Faz 0–3 bitti.
+Eski iz/yama sistemi **silindi** (Faz 4). Arazinin kendi kar birikintisi görüntüsü
+(`SnowMacroDepth`, bölünme) duruyor: clipmap'in kapsadığı 162 m'nin dışını o çiziyor.
 
-- **Doku dünyaya DÖŞENİYOR, kaydırılmıyor.** `uv = worldPos.xz / 24 m`, Repeat sarımlı.
-  Oyuncu yürürken kopyalama yok; yalnız pencereye yeni giren texel şeritleri sıfırlanıyor.
-  Kaydır-kopyala her karede bir tam doku kopyası demekti.
-- **Pencere kare, görünür bölge çember.** Kenar 24 m, sönüm yarıçapı 12 m. Çember kareye
-  içten teğet olduğu için döşemenin komşu kopyası hiçbir zaman görünmüyor (kare köşesi
-  17 m'de).
-- **Adım MESAFEYE bağlı, zamana değil** — koşarken izler seyrelmez, dururken üst üste
-  binmez.
-- **Değer işaretli:** pozitif yüzeyin çökmesi, negatif izin kenarına itilen karın
-  kabarması. Kar yok olmuyor, yana gidiyor.
-- **Üst üste binen izde derin olan kazanıyor**, toplanmıyor: gerçek karda ikinci adım
-  zaten sıkışmış tabana basar.
-- **İzin kapanması yağıştan ve rüzgârdan geliyor**, ayrı bir zamanlayıcı yok. Kar örtüsü
-  simülasyonu gelince kaynağı gerçek rüzgâr taşınımı olur; sistem değişmez.
-- **ÇARPIŞMA BAĞLI DEĞİL** — bilinçli. Oyuncu kendi izinin üstünde iz derinliği kadar
-  (≤ 12 cm) havada kalıyor. Okunup okunmadığı ölçülecek; peşinen ikinci bir CPU/GPU
-  ikizi yazmak `SnowDriftField` borcunu ikiye katlardı.
-- **Bölünme izin kendi bandını istiyor.** Arazi üçgeni 7.32 m, makro katsayı 6 ile kenar
-  1.22 m — iz 0.34 m, çözülmez. İz bandında (8-14 m) katsayı 64 → kenar 0.114 m. Kural
-  makrodakiyle aynı: yer değiştirme, bölünme bitmeden sıfıra iner.
+Kar bir yükseklik değil bir **madde**: her teksel kar su eşdeğeri (SWE) ve yoğunluk
+tutuyor, görünür derinlik ikisinden türetiliyor. Batış, patika oluşması, izlerin
+dolması ayrı ayrı kodlanmıyor — hepsi bu tek modelden çıkıyor.
+
+**`SnowWeather` okur:** yağış preseti, sıcaklık.
+**Okumaz:** projenin `WeatherState`, `WindField`, `TemperatureField` zincirini. Bu bilinçli
+ve **geçici**: spec kendi hava kaynağını tanımlıyor, iki kaynak aynı anda yaşamaz.
+Bağlama kararı `DECISIONS.md` → "Kar v2 kendi hava kaynağını sürüyor".
+
+**`SnowOcclusionCapture` okur:** `SnowOccluder` katmanındaki nesneleri, bölge merkezini.
+**Okumaz:** karakterleri ve hareketli nesneleri — onlar o katmanda olmayacak, yoksa
+oyuncunun altına kar yağmaz.
+
+**`SnowGroundHeight` okur:** Unity Terrain'in yükseklik haritasını.
+**Okumaz:** `MountainHeight.asset`'i. O bölge ölçeğinde (30 km) ve karla aynı hassasiyette
+değil.
+
+**`SnowManager` okur:** takip hedefinin konumu, `SnowWeather`, `SnowGroundHeight`,
+`SnowOcclusionCapture`. Hepsi `[SerializeField]` ile enjekte.
+**Okumaz:** hiçbir sistemi arayarak bulmuyor. Tek istisna `SnowManager.Active` —
+renderer varlığı sahneye bağlanamıyor, başka köprü yok.
+
+- **Bölge merkezi TAM SAYI TEKSELE snap'leniyor.** Kesirli snap, snap yapmamakla aynı
+  belirtiyi üretiyor: izler yürüdükçe teksel altı kayıyor ve titriyor.
+- **Izgara dünya orijinine çapalı.** Aynı dünya noktası her zaman aynı teksele düşüyor,
+  oyuncu oraya nereden gelirse gelsin.
+- **Engel haritası her karede değil**, merkez eşikten fazla kayınca ya da elle
+  kirletilince yenileniyor. Yerinden oynayan nesneler `MarkOcclusionDirty()` çağırır.
+- **Engel kamerasının kendi renderer'ı var** (`SnowOcclusionRenderer.asset`). Ana
+  renderer'daki gökyüzü/bulut/sis geçişleri onun tek kanallı hedefinde çöküyordu.
+- **Birikme gökyüzü görünürlüğüyle çarpılıyor.** Çatı altına kar yağmıyor; saçak
+  altında kademeli azalıyor, keskin çizgi oluşmuyor.
+- **Ayak izlerinin dolması için ayrı kod YOK.** Sıkışmış teksele taze kar biniyor,
+  karışım yoğunluğu düşüyor, derinlik iki koldan da artıyor. Patika izi uzun süre
+  görünür kalıyor çünkü yoğunluğu yüksek.
+- **Simulasyon karede bir kez koşuyor.** İş CPU'da birikiyor, ilk kamera tüketiyor;
+  sahne görünümü ikinci kez koşturmuyor.
+
+**`SnowClipmap` okur:** durum dokusu, uzak kaskad, zemin yüksekliği.
+**Okumaz:** araziyi. Kar yüzeyi ayrı bir mesh; arazi yalnız YÜKSEKLİK kaynağı.
+
+**`SnowDeformerRegistry` okur:** etkin `SnowDeformer` bileşenlerini.
+**Okumaz:** oyuncuyu, karakteri, hiçbir oyun sınıfını. Temas noktaları kendilerini
+kaydediyor; sistem kimin bastığını bilmiyor.
+
+**`SnowfallController` okur:** hava preseti, rüzgâr, engel haritası, zemin yüksekliği,
+yüzeydeki gevşek kar oranı.
+**Okumaz:** projenin `PrecipitationRenderer`'ını. İki yağış sistemi aynı anda
+çalışırsa gökyüzünde iki kar olur — biri kapatılacak.
+
+**`SnowSampler` okur:** durum dokusunu, 64x64 bölge hâlinde, bloklamayan geri okumayla.
+**Okumaz:** her karede tam doku. Geçilen süre iki kare; ayak sesi ve hız cezası için
+yeterli.
+
+- **Clipmap halkaları TEK adıma snap'leniyor**, halka başına değil. Ayrı adımlar
+  merkezleri ayırıyor ve halkalar arasında çatlak açılıyor.
+- **Arazi clipmap'in içinde KABARMIYOR.** Kesilmiyor — kesmek sınırda çatlak açar;
+  yalnız kendi kar birikintisi sönüyor, böylece her zaman kar yüzeyinin altında kalıyor.
+- **Patika oluşması için ayrı kod yok.** Yüzey yükü zaten taşıyorsa batılmıyor; aynı
+  hattan geçildikçe yoğunluk artıyor ve taşıma kapasitesi yükseliyor.
+- **Kütle deformasyonda TAM korunuyor.** Ekstrüde edilen kütle halka ağırlıklarının
+  toplamına bölünüp kenara dağıtılıyor; gevşeme gather formülasyonunda.
+- **İzler rüzgârda doluyor**, zamanlayıcıyla değil: rüzgâr arttıkça duruş açısı düşüyor
+  ve çukur kendiliğinden akıyor.
+- **Havadayken iz yok.** Zıplayarak ilerlerken arkada iz kalmıyor.
+- **Uzak kaskad 192 m.** Clipmap'in dış halkaları düz yedek yerine onu okuyor; at ve
+  araba izleri uzaktan görünür kalıyor.
+- **Kalıcılık gezinerek yakalıyor**, blok çıkarken değil: geri okuma asenkron ve blok
+  o ana kadar gitmiş olurdu. Saklanan veri en fazla 17 saniye eski.
 
 ### Hava sesi (`WeatherAudio`, `AudioBand`)
 
@@ -402,7 +447,6 @@ kernel: yoğunluk+aydınlatma, sonra Beer-Lambert birikimi.
 Gerekçeler: `RATIONALE.md` → Yağış, ses ve şimşek · Volumetrik sis.
 
 ---
-
 
 ### Sis ve hava sinyalleri (`AtmosphereController`)
 
@@ -547,7 +591,6 @@ canlı "yeniden pişir" düğmesi (`AtmosphereController.SetWeatherMap`). Kanall
 
 Gerekçeler: `RATIONALE.md` → Sis, görüş ve hava sinyalleri.
 
-
 ### Işığın rengi (`TimeOfDay`)
 
 Şafak/batış rengini üretir ve **dört yeri birden** besler: dağ yüzeyi, bulutlar, sis,
@@ -587,7 +630,6 @@ pişmeden önce.
 - **Rota imzaya girer** — hat değişince arazi baştan üretilip yeniden şekillenir. Tesviye
   şekillenmiş arazinin üstüne ikinci kez uygulanamaz.
 - Yolun **görünürlüğü** buradan gelmez (`DECISIONS.md`, doku işi).
-
 
 ### Dağ yüzeyi (`TerrainSurface`, `MountainSurface.hlsl`)
 
@@ -674,7 +716,6 @@ Katmanların **nerede** olduğu gürültüyle değil dağın kendi biçimiyle be
 
 Gerekçeler: `RATIONALE.md` → Dağ yüzeyi.
 
-
 ### Gökyüzü ve atmosfer (`PhysicallyBasedSkyURP` paketi, `SkyWeatherDriver`)
 
 **Okur:** ana ışığın yönü ve rengi (`TimeOfDay` sürüyor), yağış şiddeti (`WeatherState`).
@@ -722,7 +763,6 @@ ve hava perspektifini gökyüzünden alır. Gök yansıması bulut materyalini d
   **geçmez**.
 
 Gerekçeler: `RATIONALE.md` → Gökyüzü ve gök cisimleri.
-
 
 ### Bisiklet (`BikeController`, `BikeSurface`)
 
@@ -862,7 +902,6 @@ Gerekçeler: `RATIONALE.md` → Arazi.
 
 ---
 
-
 ## 5. Bilinçli kurallar
 
 Bunlar hata değil, karar. Yanlışlıkla "düzeltilmemeli". Her birinin gerekçesi
@@ -914,7 +953,6 @@ Bunlar hata değil, karar. Yanlışlıkla "düzeltilmemeli". Her birinin gerekç
   **yerleşimi** tekrar eder ve bunu büküm çözmez, harita büyür.
 
 ---
-
 
 ## 6. Çelişki kontrolü
 

@@ -1,0 +1,530 @@
+// ROL: kar durum dokusunun simülasyon kernel'leri.
+// Faz 1'de iki tane: KClear (dokuyu dünyanın temel kar durumuyla doldur) ve
+// KScroll (bölge merkezi kayınca içeriği TAM SAYI teksel kadar kaydır).
+// Çağıran: SnowManager, tek bir CommandBuffer üzerinden (§11.1).
+
+#pragma kernel KClear
+#pragma kernel KScroll
+#pragma kernel KAccumulate
+#pragma kernel KClearPending
+#pragma kernel KCompress
+#pragma kernel KRingSum
+#pragma kernel KDeposit
+#pragma kernel KRelax
+#pragma kernel KSumSWE
+#pragma kernel KCascadeClear
+#pragma kernel KCascadeScroll
+#pragma kernel KCascadeWrite
+
+#include "SnowCommon.hlsl"
+
+RWTexture2D<float4> _Dst;
+Texture2D<float4>   _Src;
+
+uint  _Resolution;
+
+// Kaydırma miktarı, teksel. TAM SAYI olmak zorunda: kesirli kaydırma her adımda
+// içeriği yeniden örnekler ve iz birkaç saniyede bulanıklaşır (§2.4).
+int2  _ScrollTexels;
+
+// Bölgeye yeni giren şeridin durumu. Boş değil — dünyanın genel kar seviyesi.
+float _DefaultSWE;
+float _DefaultRhoN;
+float _DefaultWet;
+
+// --- KAccumulate (§6) ---
+
+RWTexture2D<float4> _State;
+
+// Etkin geçen zaman. Tile rotasyonu yüzünden gerçek deltaTime'ın katı (§11.1).
+float _DeltaTimeEff;
+
+// Dokunun kaçıncı dikey şeridi işleniyor ve şerit genişliği.
+uint _TileIndex;
+uint _TileWidth;
+
+float  _SnowfallSWERate;   // m SWE / s
+float3 _WindWS;            // m/s, dünya
+float  _WindSpeed;         // m/s
+float  _SnowWetness;       // 0..1, taze karın ıslaklığı
+float  _TemperatureC;      // Celsius
+float  _DriftBias;         // rüzgâr yeniden dağıtım şiddeti
+float  _SettleTau;         // s
+float  _DisturbTau;        // s
+float  _MeltDDF;           // m/(C.s)
+
+/// Dokunun tamamını temel kar durumuna çeker. Başlangıçta bir kez.
+[numthreads(8, 8, 1)]
+void KClear(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+
+    // A (disturb) sıfır: hiçbir yer henüz bozulmadı.
+    _Dst[id.xy] = float4(_DefaultSWE, _DefaultRhoN, _DefaultWet, 0.0);
+}
+
+/// Bölge merkezi kayınca içeriği kaydırır. Ping-pong: _Src okunur, _Dst yazılır.
+/// Dışarı çıkan kenar atılır, yeni açılan şerit temel kar durumuyla dolar.
+[numthreads(8, 8, 1)]
+void KScroll(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+
+    int2 src = int2(id.xy) + _ScrollTexels;
+
+    if (any(src < 0) || any(src >= (int)_Resolution))
+    {
+        _Dst[id.xy] = float4(_DefaultSWE, _DefaultRhoN, _DefaultWet, 0.0);
+    }
+    else
+    {
+        _Dst[id.xy] = _Src[src];
+    }
+}
+
+/// Kar yüzeyinin eğimi, (dh/dx, dh/dz), metre/metre.
+///
+/// Merkezi fark. Rüzgâr yeniden dağıtımı için yüzey normali buradan çıkıyor:
+/// rüzgâra bakan yamaçta kar birikmesi azalır, arkasında artar.
+float2 SnowHeightGradient(uint2 id)
+{
+    int2 p = int2(id);
+    int  m = (int)_Resolution - 1;
+
+    float4 l = _State[uint2(clamp(p + int2(-1, 0), 0, m))];
+    float4 r = _State[uint2(clamp(p + int2( 1, 0), 0, m))];
+    float4 d = _State[uint2(clamp(p + int2(0, -1), 0, m))];
+    float4 u = _State[uint2(clamp(p + int2(0,  1), 0, m))];
+
+    float ts = SnowTexelSize();
+
+    return float2(SnowHeight(r.r, r.g) - SnowHeight(l.r, l.g),
+                  SnowHeight(u.r, u.g) - SnowHeight(d.r, d.g)) / (2.0 * ts);
+}
+
+/// Birikme, oturma, erime, ıslaklık ve tazelik sönümü (§6).
+///
+/// AYAK İZLERİ BURADA DOLUYOR ve bunun için ayrı bir kod yok: sıkışmış teksele
+/// (rho=300) taze kar (rho=70) biniyor, karışım yoğunluğu düşüyor, h = SWE*1000/rho
+/// iki koldan da artıyor. Patika izi (yüksek rho) uzun süre görünür kalıyor.
+[numthreads(8, 8, 1)]
+void KAccumulate(uint3 id : SV_DispatchThreadID)
+{
+    uint2 texel = uint2(id.x + _TileIndex * _TileWidth, id.y);
+    if (texel.x >= _Resolution || texel.y >= _Resolution) return;
+
+    float4 s   = _State[texel];
+    float  rho = SnowDensity(s.g);
+    float  dt  = _DeltaTimeEff;
+
+    // ---- 1. Kar yağışı ----
+    float3 posWS = float3(SnowTexelToWorld(texel), 0).xzy;
+    posWS.y = SampleGroundHeight(posWS.xz) + SnowHeight(s.r, s.g);
+
+    float skyVis = SampleSkyVisibility(posWS);
+    float fall = _SnowfallSWERate * dt * skyVis;
+
+    float2 grad    = SnowHeightGradient(texel);
+    float3 nrm     = normalize(float3(-grad.x, 1.0, -grad.y));
+    float  windDot = dot(nrm, normalize(float3(_WindWS.x, 0.35, _WindWS.z)));
+    fall *= lerp(1.0, 1.0 - _DriftBias * windDot, saturate(_WindSpeed / 12.0));
+    fall  = max(fall, 0.0);
+
+    // Taze karın yoğunluğu: soğuk ve sakin = hafif, ıslak ve rüzgârlı = ağır.
+    float rhoNew = lerp(55.0, 145.0, _SnowWetness) + _WindSpeed * 7.5;
+    rhoNew = clamp(rhoNew, 50.0, 320.0);
+
+    float sweAfterFall = s.r + fall;
+    rho = (rho * s.r + rhoNew * fall) / max(sweAfterFall, 1e-6);
+    s.r = sweAfterFall;
+
+    // ---- 2. Oturma / yoğunlaşma ----
+    float rhoTarget = lerp(190.0, 400.0, s.b);
+    if (rho < rhoTarget)
+        rho += (rhoTarget - rho) * (1.0 - exp(-dt / _SettleTau));
+
+    // ---- 3. Erime (derece-gün modeli) ----
+    float meltRate = _MeltDDF * max(0.0, _TemperatureC - 0.0);
+    s.r = max(s.r - meltRate * dt, 0.0);
+
+    // ---- 4. Islaklık ----
+    float wetTarget = saturate(_TemperatureC / 3.0);
+    s.b += (wetTarget - s.b) * (1.0 - exp(-dt / SNOW_WET_TAU));
+
+    // ---- 5. Tazelik sönümü ----
+    s.a *= exp(-dt / _DisturbTau);
+
+    s.g = SnowDensityN(rho);
+    s.r = clamp(s.r, 0.0, SNOW_SWE_MAX);
+
+    _State[texel] = s;
+}
+
+// --- deformasyon (§5) ---
+
+/// 64 bayt. C# tarafındaki SnowDeformerGPU ile BİREBİR aynı düzen.
+struct SnowDeformer
+{
+    float2 posXZ;      //  0  dünya XZ
+    float2 sizeXZ;     //  8  temas kutusu, metre
+    float2 dirXZ;      // 16  (cos yaw, sin yaw)
+    float2 velXZ;      // 24  m/s
+    float  loadN;      // 32  bu temasa binen kuvvet
+    float  posY;       // 36  temas noktası dünya Y'si
+    float  maxSink;    // 40  azami batma, m
+    float  strength;   // 44  0..1 kalkış/iniş yumuşatması
+    uint   shapeId;    // 48  damga atlası dilimi
+    uint   flags;      // 52  bit0 sürekli, bit1 eritir
+    float2 pad;        // 56
+};
+
+StructuredBuffer<SnowDeformer> _Deformers;
+RWStructuredBuffer<uint> _DeformerMassOut;
+RWStructuredBuffer<uint> _DeformerRingSum;
+
+Texture2DArray<float2> _StampAtlas;
+
+uint  _DeformerCount;
+uint  _DeformerBoxTexels;   // her deformer için taranan kare kutunun kenarı
+float _RimVelocityBias;     // saniye
+
+// KRelax
+Texture2D<float4> _RelaxSrc;
+RWTexture2D<float4> _RelaxDst;
+float _ReposeTan;
+float _RelaxRate;
+uint  _ForceRelaxAll;
+
+/// Deformer'ın taranan kutusundaki teksel. Kutu dışı ve doku dışı elenir.
+bool SnowDeformerTexel(uint3 id, out SnowDeformer d, out int2 texel, out float2 worldXZ)
+{
+    d = (SnowDeformer)0;
+    texel = 0;
+    worldXZ = 0;
+
+    if (id.z >= _DeformerCount) return false;
+    if (id.x >= _DeformerBoxTexels || id.y >= _DeformerBoxTexels) return false;
+
+    d = _Deformers[id.z];
+    if (d.strength <= 0.0) return false;
+
+    int halfBox = (int)(_DeformerBoxTexels / 2);
+    texel = SnowWorldToTexel(d.posXZ) + int2(id.xy) - halfBox;
+
+    if (any(texel < 0) || any(texel >= (int)_Resolution)) return false;
+
+    worldXZ = SnowTexelToWorld(uint2(texel));
+    return true;
+}
+
+/// Deformer'ın yerel uzayındaki damga koordinatı. Kutu dışında false.
+bool SnowStampUV(SnowDeformer d, float2 worldXZ, out float2 luv)
+{
+    float2 rel = worldXZ - d.posXZ;
+
+    float2 local = float2( rel.x * d.dirXZ.x + rel.y * d.dirXZ.y,
+                          -rel.x * d.dirXZ.y + rel.y * d.dirXZ.x);
+
+    luv = local / d.sizeXZ + 0.5;
+    return !(any(luv < 0.0) || any(luv > 1.0));
+}
+
+float2 SnowSampleStamp(float2 luv, uint shapeId)
+{
+    return _StampAtlas.SampleLevel(snow_linear_clamp_sampler, float3(luv, (float)shapeId), 0);
+}
+
+/// Deformer başına biriken sabit noktalı toplamları sıfırlar.
+[numthreads(64, 1, 1)]
+void KClearPending(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _DeformerCount) return;
+
+    _DeformerMassOut[id.x] = 0;
+    _DeformerRingSum[id.x] = 0;
+}
+
+/// SIKIŞMA VE EKSTRÜZYON (§5.4).
+///
+/// Yüzey yükü zaten taşıyorsa batma YOK, yalnız yüzey izi kalır. Bu erken çıkış
+/// PATİKA DAVRANIŞI: aynı hattan tekrar geçildikçe yoğunluk artıyor, taşıma kapasitesi
+/// yükseliyor ve bir noktadan sonra hiç batılmıyor. Atlanırsa model bozulur.
+[numthreads(8, 8, 1)]
+void KCompress(uint3 id : SV_DispatchThreadID)
+{
+    SnowDeformer d;
+    int2 texel;
+    float2 worldXZ;
+    if (!SnowDeformerTexel(id, d, texel, worldXZ)) return;
+
+    float2 luv;
+    if (!SnowStampUV(d, worldXZ, luv)) return;
+
+    float2 stamp = SnowSampleStamp(luv, d.shapeId);
+    if (stamp.r <= 0.004) return;
+
+    float4 state = _State[uint2(texel)];
+
+    float contactArea = d.sizeXZ.x * d.sizeXZ.y * kStampAreaFrac[d.shapeId];   // m2
+    float P = (d.loadN / max(contactArea, 1e-4)) * stamp.r * d.strength;       // Pascal
+
+    float rho    = SnowDensity(state.g);
+    float rhoReq = SnowRequiredDensity(P, state.b);
+
+    if (rhoReq <= rho + 1.0)
+    {
+        state.a = max(state.a, stamp.r * 0.7);
+        _State[uint2(texel)] = state;
+        return;
+    }
+
+    rhoReq = min(rhoReq, SNOW_RHO_MAX);
+
+    float h     = SnowHeight(state.r, state.g);
+    float hComp = state.r * SNOW_RHO_WATER / rhoReq;
+    float sink  = h - hComp;
+
+    // Bacak/gövde sınırı: sonsuz batma yok.
+    if (sink > d.maxSink)
+    {
+        sink   = d.maxSink;
+        hComp  = h - sink;
+        rhoReq = state.r * SNOW_RHO_WATER / max(hComp, 1e-4);
+        rhoReq = min(rhoReq, SNOW_RHO_MAX);
+    }
+
+    // Sıkışamayan kütlenin bir kısmı kenara taşıyor. Islak kar daha çok taşıyor.
+    float kExt        = lerp(0.18, 0.35, state.b);
+    float extrudeFrac = kExt * saturate(sink / max(h, 1e-4));
+    float massOut     = state.r * extrudeFrac;
+
+    state.r = max(state.r - massOut, 0.0);
+    state.g = SnowDensityN(rhoReq);
+    state.a = 1.0;
+
+    _State[uint2(texel)] = state;
+
+    // BATMA DERİNLİĞİ HİÇBİR YERE YAZILMIYOR. h zaten küçüldüğü için görünür hale
+    // geliyor; ayrı bir "carve" kanalı yok.
+    InterlockedAdd(_DeformerMassOut[id.z], (uint)(massOut * SNOW_MASS_FIXED_SCALE));
+}
+
+/// Halka ağırlıklarının toplamı (§5.5). Kütlenin TAM korunması için önce toplam lazım.
+[numthreads(8, 8, 1)]
+void KRingSum(uint3 id : SV_DispatchThreadID)
+{
+    SnowDeformer d;
+    int2 texel;
+    float2 worldXZ;
+    if (!SnowDeformerTexel(id, d, texel, worldXZ)) return;
+
+    float2 luv;
+    if (!SnowStampUV(d, worldXZ, luv)) return;
+
+    // Mevduat hız yönünde kaydırılıyor; toplam AYNI kaydırmayla alınmalı, yoksa
+    // bölen ve pay farklı kümelerden gelir ve kütle korunmaz.
+    float2 bias = d.velXZ * _RimVelocityBias;
+    float2 biasLocal = float2( bias.x * d.dirXZ.x + bias.y * d.dirXZ.y,
+                              -bias.x * d.dirXZ.y + bias.y * d.dirXZ.x);
+    float2 luvB = luv - biasLocal / d.sizeXZ;
+
+    if (any(luvB < 0.0) || any(luvB > 1.0)) return;
+
+    float ringW = SnowSampleStamp(luvB, d.shapeId).g;
+    if (ringW > 0.001)
+        InterlockedAdd(_DeformerRingSum[id.z], (uint)(ringW * SNOW_RING_SUM_SCALE));
+}
+
+/// KENAR MEVDUATI (§5.5). Sigma deposit = totalMass, kütle TAM korunur.
+[numthreads(8, 8, 1)]
+void KDeposit(uint3 id : SV_DispatchThreadID)
+{
+    SnowDeformer d;
+    int2 texel;
+    float2 worldXZ;
+    if (!SnowDeformerTexel(id, d, texel, worldXZ)) return;
+
+    float totalMass = _DeformerMassOut[id.z] / SNOW_MASS_FIXED_SCALE;
+    float ringSum   = _DeformerRingSum[id.z] / SNOW_RING_SUM_SCALE;
+    if (totalMass <= 0.0 || ringSum < 1e-4) return;
+
+    float2 luv;
+    if (!SnowStampUV(d, worldXZ, luv)) return;
+
+    float2 bias = d.velXZ * _RimVelocityBias;
+    float2 biasLocal = float2( bias.x * d.dirXZ.x + bias.y * d.dirXZ.y,
+                              -bias.x * d.dirXZ.y + bias.y * d.dirXZ.x);
+    float2 luvB = luv - biasLocal / d.sizeXZ;
+
+    if (any(luvB < 0.0) || any(luvB > 1.0)) return;
+
+    float ringW = SnowSampleStamp(luvB, d.shapeId).g;
+    if (ringW <= 0.001) return;
+
+    float deposit = totalMass * (ringW / ringSum);
+    float rhoDep  = SNOW_RHO_MIN * 1.4;   // taşan kar gevşektir, ~70 kg/m3
+
+    float4 state = _State[uint2(texel)];
+
+    float sweNew = state.r + deposit;
+    state.g = SnowDensityN((SnowDensity(state.g) * state.r + rhoDep * deposit) / max(sweNew, 1e-6));
+    state.r = sweNew;
+    state.a = max(state.a, 0.85);
+
+    _State[uint2(texel)] = state;
+}
+
+/// DURUŞ AÇISI VE RÜZGÂR YAYILMASI (§5.6).
+///
+/// GATHER formülasyonu. Scatter yazılsaydı iki teksel aynı komşuya ayrı ayrı yazar ve
+/// kütle kaybolurdu — spec'in tuzak listesinde "kütle testi tutmuyor" maddesi bu.
+///
+/// İZLERİN RÜZGÂRDA DOLMASI BURADAN GELİYOR: rüzgâr arttıkça duruş açısı düşüyor ve
+/// çukur kendiliğinden akıyor. v1'deki keyfi "RefillRate" parametresinin yerini alan
+/// fiziksel mekanizma bu.
+[numthreads(8, 8, 1)]
+void KRelax(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+
+    float4 s = _RelaxSrc[id.xy];
+
+    // Erken çıkış: yalnız bozulmuş bölgelerde tam hesap.
+    if (s.a < 0.002 && _ForceRelaxAll == 0)
+    {
+        _RelaxDst[id.xy] = s;
+        return;
+    }
+
+    float h  = SnowHeight(s.r, s.g);
+    float ts = SnowTexelSize();
+
+    float reposeTan = _ReposeTan * lerp(1.0, 0.42, saturate(_WindSpeed / 15.0));
+    float rate      = _RelaxRate * _DeltaTimeEff;
+
+    float netMass = 0;
+
+    [unroll] for (int k = 0; k < 4; ++k)
+    {
+        int2 o   = kOffsets4[k];
+        int2 nId = clamp(int2(id.xy) + o, 0, (int)_Resolution - 1);
+
+        float4 ns = _RelaxSrc[nId];
+        float  nh = SnowHeight(ns.r, ns.g);
+
+        // Bu çifti HER İKİ teksel de aynı şekilde hesaplıyor: simetrik, kütle korunur.
+        float dh   = h - nh;
+        float over = abs(dh) - reposeTan * ts;
+        if (over <= 0) continue;
+
+        float donorRhoN = (dh > 0) ? s.g : ns.g;
+        float moveH     = over * 0.25 * saturate(rate);
+        float moveSWE   = moveH * SnowDensity(donorRhoN) / SNOW_RHO_WATER;
+        moveSWE         = min(moveSWE, (dh > 0 ? s.r : ns.r) * 0.5);
+
+        netMass += (dh > 0) ? -moveSWE : +moveSWE;
+    }
+
+    s.r = max(s.r + netMass, 0.0);
+    _RelaxDst[id.xy] = s;
+}
+
+// --- ölçüm ---
+
+RWStructuredBuffer<uint> _SumOut;
+groupshared float gSumSWE[64];
+
+/// Dokunun TAMAMINDAKİ swe toplamı. Faz 5 kabul kriteri: deformasyon sırasında bu
+/// toplam değişmemeli (yağış ve erime kapalıyken).
+///
+/// İki aşamalı: önce grup içinde paylaşılan bellekte toplanıyor, sonra grup başına TEK
+/// atomik ekleme. Teksel başına atomik ekleme yapılsaydı 4.2 milyon çakışma olurdu;
+/// ayrıca sabit noktalı yuvarlama teksel başına değil grup başına düşüyor ve hata
+/// binde bire iniyor.
+[numthreads(8, 8, 1)]
+void KSumSWE(uint3 id : SV_DispatchThreadID, uint gi : SV_GroupIndex)
+{
+    float value = (id.x < _Resolution && id.y < _Resolution) ? _State[id.xy].r : 0.0;
+
+    gSumSWE[gi] = value;
+    GroupMemoryBarrierWithGroupSync();
+
+    [unroll] for (uint stride = 32; stride > 0; stride >>= 1)
+    {
+        if (gi < stride) gSumSWE[gi] += gSumSWE[gi + stride];
+        GroupMemoryBarrierWithGroupSync();
+    }
+
+    if (gi == 0) InterlockedAdd(_SumOut[0], (uint)(gSumSWE[0] * 1000.0));
+}
+
+// --- uzak kaskad (§10, Faz 10) ---
+
+RWTexture2D<float2> _Cascade;      // yalniz swe ve rhoN
+Texture2D<float2>   _CascadeSrc;
+RWTexture2D<float2> _CascadeDst;
+
+uint  _CascadeResolution;
+int2  _CascadeScrollTexels;
+
+/// Yakın bölgenin kaskad içindeki sol alt köşesi ve kenarı, kaskad tekseli.
+int2  _CascadeWriteOrigin;
+uint  _CascadeWriteSize;
+
+/// Yakın tekselin kaskad tekseline oranı (16 = 24m/2048 -> 192m/1024).
+uint  _CascadeRatio;
+
+[numthreads(8, 8, 1)]
+void KCascadeClear(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _CascadeResolution || id.y >= _CascadeResolution) return;
+    _Cascade[id.xy] = float2(_DefaultSWE, _DefaultRhoN);
+}
+
+[numthreads(8, 8, 1)]
+void KCascadeScroll(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _CascadeResolution || id.y >= _CascadeResolution) return;
+
+    int2 src = int2(id.xy) + _CascadeScrollTexels;
+
+    if (any(src < 0) || any(src >= (int)_CascadeResolution))
+        _CascadeDst[id.xy] = float2(_DefaultSWE, _DefaultRhoN);
+    else
+        _CascadeDst[id.xy] = _CascadeSrc[src];
+}
+
+/// YAKIN BÖLGEYİ KASKADA İNDİRGE. Her kaskad tekseli yakın dokudan _CascadeRatio
+/// kare teksel okuyup ortalıyor.
+///
+/// Neden ortalama: kaskad aynı KARI taşıyor, başka bir kar değil. Tek teksel
+/// örneklense at ya da araba izinin çukuru bütün bloka yayılırdı.
+[numthreads(8, 8, 1)]
+void KCascadeWrite(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _CascadeWriteSize || id.y >= _CascadeWriteSize) return;
+
+    uint2 nearBase = id.xy * _CascadeRatio;
+
+    float2 sum = 0;
+    uint count = 0;
+
+    for (uint y = 0; y < _CascadeRatio; ++y)
+    for (uint x = 0; x < _CascadeRatio; ++x)
+    {
+        uint2 t = nearBase + uint2(x, y);
+        if (t.x >= _Resolution || t.y >= _Resolution) continue;
+
+        float4 state = _State[t];
+        sum += float2(state.r, state.g);
+        count++;
+    }
+
+    if (count == 0) return;
+
+    int2 target = _CascadeWriteOrigin + int2(id.xy);
+    if (any(target < 0) || any(target >= (int)_CascadeResolution)) return;
+
+    _Cascade[uint2(target)] = sum / count;
+}
+
