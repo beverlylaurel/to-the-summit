@@ -75,6 +75,7 @@ public class SnowfallController : MonoBehaviour
     bool alive;
 
     public float LooseSnowFraction => looseFraction;
+    public int FlakeCapacity => flakeCapacity;
     public int ActiveFlakes { get; private set; }
     public int ActiveSpindrift { get; private set; }
 

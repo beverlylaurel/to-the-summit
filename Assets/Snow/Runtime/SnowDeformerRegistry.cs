@@ -42,7 +42,13 @@ public class SnowDeformerRegistry : MonoBehaviour
     /// gelsin yuvalar hazır oluyor.
     void EnsureInitialized()
     {
-        if (slots != null) return;
+        // SIFIR UZUNLUKLU DİZİ KURULMUŞ SAYILMIYOR.
+        //
+        // Play mode'da domain reload kapalı: eski bir oturumdan kalan boş dizi burada
+        // "zaten kurulu" sayılıyor ve kayıt sonsuza kadar "yuva kalmadı" atıyordu.
+        // Ölçüldü: rapor "kapasite kaynağı okunmadı" diyordu, yani bu metot erken
+        // çıkıyordu.
+        if (slots != null && slots.Length > 0) return;
 
         if (settings == null)
             throw new System.InvalidOperationException("SnowDeformerRegistry: SnowSettings atanmadı. Kar Teşhisi > Sahneyi kur çalıştır.");
@@ -94,8 +100,8 @@ public class SnowDeformerRegistry : MonoBehaviour
 
         if (freeCount == 0)
             throw new System.InvalidOperationException(
-                "SnowDeformerRegistry: yuva kalmadı (" + Capacity + "). Kalite seviyesi " +
-                "MAX_DEFORMERS'ı belirliyor.");
+                "SnowDeformerRegistry: yuva kalmadı. Kapasite " + Capacity
+                + ", kaynak: " + LastCapacityReading);
 
         int handle = freeSlots[--freeCount];
         slots[handle] = deformer;

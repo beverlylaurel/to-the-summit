@@ -24,6 +24,10 @@ public class SnowWeather : MonoBehaviour
 
     [SerializeField] TemperatureField temperature;
 
+    [Tooltip("Bağlanırsa rüzgâr yönü ve hızı BURADAN geliyor. Preset yalnız yağışı " +
+             "belirliyor — iki ayrı rüzgâr olamaz.")]
+    [SerializeField] WindField wind;
+
     [Tooltip("Sıcaklığın okunacağı kot. Normalde oyuncu.")]
     [SerializeField] Transform altitudeSource;
 
@@ -210,12 +214,25 @@ public class SnowWeather : MonoBehaviour
         float speedMax = Mathf.Lerp(from.WindSpeedMax, to.WindSpeedMax, blend);
         windSpeedBase = Mathf.Lerp(speedMin, speedMax, 0.5f);
 
-        // Esinti: taban hızın 0.75–1.25 katı arasında yavaş salınım (§10.3).
-        float gust = 0.75f + 0.5f * Mathf.PerlinNoise(gustTime * GustFrequency, 0.37f);
-        windSpeed = windSpeedBase * gust;
+        if (wind != null)
+        {
+            // RÜZGÂR PROJENİN KENDİ ALANINDAN. Presetin rüzgâr aralığı kullanılmıyor:
+            // gökyüzü, bulut, sis ve kar aynı rüzgârı görmek zorunda. İki kaynak olunca
+            // kar bir yöne, bulut başka yöne gidiyordu.
+            Vector3 velocity = wind.Velocity;
 
-        float radians = windDirectionDegrees * Mathf.Deg2Rad;
-        windWS = new Vector3(Mathf.Sin(radians), 0f, Mathf.Cos(radians)) * windSpeed;
+            windWS = new Vector3(velocity.x, 0f, velocity.z);
+            windSpeed = windWS.magnitude;
+        }
+        else
+        {
+            // Esinti: taban hızın 0.75–1.25 katı arasında yavaş salınım (§10.3).
+            float gust = 0.75f + 0.5f * Mathf.PerlinNoise(gustTime * GustFrequency, 0.37f);
+            windSpeed = windSpeedBase * gust;
+
+            float radians = windDirectionDegrees * Mathf.Deg2Rad;
+            windWS = new Vector3(Mathf.Sin(radians), 0f, Mathf.Cos(radians)) * windSpeed;
+        }
 
         // Taze karın ıslaklığı sıcaklıkla artıyor: 0 C'nin altı kuru, +3 C tamamen ıslak.
         snowWetness = Mathf.Clamp01(temperatureC / 3f);

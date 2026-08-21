@@ -47,6 +47,47 @@ float  _FlutterAmp;
 
 // Rastgele sayı ÜRETİLMİYOR, hash'leniyor: her tanenin kendi tohumu var ve
 // yeniden doğduğunda tohum ilerliyor. Böylece kare hızından bağımsız.
+/// Uzayda ve zamanda aradeğerlenmiş değer gürültüsü, [0,1].
+///
+/// Sekiz köşe iki zaman diliminde örnekleniyor; kübik yumuşatmayla geçiş
+/// türevi de sürekli oluyor. Adım fonksiyonu tanenin hızını birden çeviriyordu.
+float3 SnowSmoothNoise3(float3 p, float t)
+{
+    float3 i = floor(p);
+    float3 f = p - i;
+    f = f * f * (3.0 - 2.0 * f);
+
+    float ti = floor(t);
+    float tf = t - ti;
+    tf = tf * tf * (3.0 - 2.0 * tf);
+
+    float3 result = 0;
+
+    [unroll] for (int slice = 0; slice < 2; ++slice)
+    {
+        float3 c000 = SnowHash33(i + float3(0, 0, 0) + (ti + slice) * 37.0);
+        float3 c100 = SnowHash33(i + float3(1, 0, 0) + (ti + slice) * 37.0);
+        float3 c010 = SnowHash33(i + float3(0, 1, 0) + (ti + slice) * 37.0);
+        float3 c110 = SnowHash33(i + float3(1, 1, 0) + (ti + slice) * 37.0);
+        float3 c001 = SnowHash33(i + float3(0, 0, 1) + (ti + slice) * 37.0);
+        float3 c101 = SnowHash33(i + float3(1, 0, 1) + (ti + slice) * 37.0);
+        float3 c011 = SnowHash33(i + float3(0, 1, 1) + (ti + slice) * 37.0);
+        float3 c111 = SnowHash33(i + float3(1, 1, 1) + (ti + slice) * 37.0);
+
+        float3 x00 = lerp(c000, c100, f.x);
+        float3 x10 = lerp(c010, c110, f.x);
+        float3 x01 = lerp(c001, c101, f.x);
+        float3 x11 = lerp(c011, c111, f.x);
+
+        float3 y0 = lerp(x00, x10, f.y);
+        float3 y1 = lerp(x01, x11, f.y);
+
+        result += lerp(y0, y1, f.z) * (slice == 0 ? (1.0 - tf) : tf);
+    }
+
+    return result;
+}
+
 float3 FlakeRandom(float seed, float salt)
 {
     return SnowHash33(float3(seed * 977.13, salt * 131.7, seed * 0.37 + salt));
@@ -142,12 +183,25 @@ void KFlakeSimulate(uint3 id : SV_DispatchThreadID)
         return;
     }
 
-    // TÜRBÜLANS. Şiddet rüzgârla artıyor; sürtünme taneyi rüzgâr hızına çekiyor.
-    float3 noise = SnowHash33(floor(f.position * 0.12) + floor(_FlakeTime * 0.9)) * 2.0 - 1.0;
+    // TÜRBÜLANS SÜREKLİ OLMAK ZORUNDA.
+    //
+    // Önce hücre hash'i kullanılıyordu: gürültü her 8 metrede ve her 1.1 saniyede
+    // BİRDEN değişiyor, tane anında yön değiştiriyor ve yolu zikzak çiziyordu.
+    // Ölçüldü — kullanıcı "karlar zikzak çiziyor" dedi.
+    //
+    // Şimdi hem uzayda hem zamanda aradеğerlenmiş: yön yumuşak dönüyor.
+    float3 noise = SnowSmoothNoise3(f.position * 0.12, _FlakeTime * 0.35) * 2.0 - 1.0;
     float turbulence = 0.35 * _FlakeWindSpeed + 0.15;
 
     float3 target = _FlakeWind + float3(0.0, f.velocity.y, 0.0) + noise * turbulence;
-    f.velocity = lerp(f.velocity, target, saturate(dt * 0.9));
+    // SÜRTÜNME ÜSTEL. `dt * 0.9` kare hızına bağlıydı ve 60 fps'te kat sayısı 0.015
+    // çıkıyordu: tane rüzgâra saniyeler boyunca yetişemiyor, yağış dik iniyordu.
+    // Kullanıcı "kar rüzgârdan etkilenmiyor" dedi.
+    //
+    // 1 - exp(-dt/tau) kare hızından bağımsız. tau = 0.35 s: kar tanesinin gerçek
+    // eylemsizlik zamanı (v_t/g = 1.0/9.81 = 0.1 s ile aynı mertebe, taklaları
+    // hesaba katan biraz büyük değer).
+    f.velocity = lerp(f.velocity, target, 1.0 - exp(-dt / 0.35));
 
     f.position += f.velocity * dt;
 
