@@ -66,12 +66,36 @@ Shader "ToTheSummit/SnowPatch"
                 return _TerrainHeightScale.y + raw * _TerrainHeightScale.x;
             }
 
-            /// Karın yüzeyi: arazi + kar − iz. Zemin dışarıdan veriliyor ki aynı
-            /// örnek hem burada hem arazi normalinde kullanılabilsin.
-            float SnowTop(float2 worldXZ, float ground)
+            /// Karın yüzeyi: arazi + kar + mikro kabartı − iz.
+            ///
+            /// MAKRO DERİNLİK DIŞARIDAN VERİLİYOR, köşe başına BİR kez hesaplanıyor.
+            ///
+            /// Normal üç komşu örnekle kuruluyor ve `SnowMacroDepth` her birinde
+            /// yeniden çağrılsaydı köşe başına üç kez koşardı — içinde çok oktavlı
+            /// bükümlü birikinti gürültüsü var ve iki halkada 1.6 milyon çağrı ediyordu
+            /// (gölge geçişiyle iki katı). Ölçüldü: kare süresinin baskın kalemi.
+            ///
+            /// Sabit almanın bedeli yok: makro derinlik ~2.6 metrelik birikinti
+            /// gövdesiyle değişiyor, hücre ise 4.7 cm. O ölçekteki eğim katkısı yüzde
+            /// ikinin altında ve normale girmiyor. Normale giren şey zaten mikro
+            /// kabartı ve iz — ikisi de burada, hücre ölçeğinde.
+            float SnowTop(float2 worldXZ, float ground, float depth)
             {
                 float3 at = float3(worldXZ.x, ground, worldXZ.y);
-                return ground + SnowMacroDepth(at) - SnowFootprint(at);
+
+                // MİKRO KABARTI YALNIZ İÇ HALKADA. Dış halkanın hücresi 37.5 cm ve
+                // mesafesi 12-48 m: 35 santimlik sastrugi sırtı orada bir pikselin
+                // altında kalıyor, hesaplanması boşa.
+                float micro = _RingIsOuter > 0.5 ? 0.0 : SnowMicroRelief(worldXZ, depth);
+
+                // DIŞ HALKA İZİ BULANIK OKUYOR: hücresi 37.5 cm, doku texel'i 4.7 cm.
+                // Tek örnekle kenar hücrelere basamaklanıyor ve ekranda düzenli merdiven
+                // çıkıyor.
+                float trail = _RingIsOuter > 0.5
+                            ? SnowFootprintWide(at, _PatchCell * 0.5)
+                            : SnowFootprint(at);
+
+                return ground + depth + micro - trail;
             }
 
             struct Attributes { float3 positionOS : POSITION; };
@@ -108,9 +132,12 @@ Shader "ToTheSummit/SnowPatch"
                 float gx = TerrainHeight(atX);
                 float gz = TerrainHeight(atZ);
 
-                float y = SnowTop(worldXZ, g);
-                float hx = SnowTop(atX, gx);
-                float hz = SnowTop(atZ, gz);
+                // Makro derinlik BİR kez; gerekçe `SnowTop` başında.
+                float depth = SnowMacroDepth(float3(worldXZ.x, g, worldXZ.y));
+
+                float y = SnowTop(worldXZ, g, depth);
+                float hx = SnowTop(atX, gx, depth);
+                float hz = SnowTop(atZ, gz, depth);
 
                 OUT.normalWS = normalize(float3(y - hx, e, y - hz));
 
@@ -122,7 +149,7 @@ Shader "ToTheSummit/SnowPatch"
                 float3 positionWS = float3(worldXZ.x, y, worldXZ.y);
                 OUT.positionWS = positionWS;
                 OUT.positionCS = TransformWorldToHClip(positionWS);
-                OUT.depth = SnowMacroDepth(float3(worldXZ.x, y, worldXZ.y));
+                OUT.depth = depth;
                 OUT.fogCoord = ComputeFogFactor(OUT.positionCS.z);
                 return OUT;
             }
@@ -220,6 +247,9 @@ Shader "ToTheSummit/SnowPatch"
                 return _TerrainHeightScale.y + raw * _TerrainHeightScale.x;
             }
 
+            /// GÖLGE GEÇİŞİNDE MİKRO KABARTI YOK. Gölge haritasının texel'i metre
+            /// ölçeğinde; santimetrelik sırtlar oraya hiç ulaşmıyor ama hesabı iki kat
+            /// köşe işi ediyordu.
             float SnowTopShadow(float3 at, float ground)
             {
                 return ground + SnowMacroDepth(at) - SnowFootprint(at);

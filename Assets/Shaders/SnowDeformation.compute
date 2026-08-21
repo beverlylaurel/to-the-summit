@@ -42,16 +42,28 @@ int2 _ClearSize;
 // --- geri dolma ---
 float _RefillAmount;     // metre, bu adımda sıfıra doğru kapanan miktar
 
-/// DÜNYA UZAYINDA DEĞER GÜRÜLTÜSÜ. Desen ize değil dünyaya bağlı: iz uzarken kayma
-/// olmuyor, aynı yerden ikinci geçişte aynı düzensizlik çıkıyor.
+/// DÜNYA UZAYINDA GÜRÜLTÜ. Desen ize değil dünyaya bağlı: iz uzarken kayma olmuyor,
+/// aynı yerden ikinci geçişte aynı düzensizlik çıkıyor.
 ///
-/// SİNÜS DEĞİL HASH — bu projede ÖLÇÜLMÜŞ bir ders. Sinüs toplamları çapraz ızgara
-/// veriyor ve göz düzenliliği yakalıyor (`VolumetricFogShared.hlsl`, yağış sütunları
-/// kaydı). Kenar bir dönem sinüs çarpımıyla bozuluyordu ve "çok düzenli" okunuyordu.
+/// KARMA TAM SAYI ARİTMETİĞİYLE. `sin(dot(...))*43758` biçimi platformdan platforma,
+/// hatta derleyiciden derleyiciye kayıyor ve ızgaraya hizalı yapı bırakıyor — bu
+/// projede bir kez ölçüldü (`SnowDriftField` başlığı). Tam sayı karması her yerde aynı
+/// ve ızgara izi bırakmıyor.
+uint DeformWang(uint seed)
+{
+    seed = (seed ^ 61u) ^ (seed >> 16);
+    seed *= 9u;
+    seed = seed ^ (seed >> 4);
+    seed *= 0x27d4eb2du;
+    seed = seed ^ (seed >> 15);
+    return seed;
+}
+
 float DeformHash(float2 cell)
 {
-    float n = sin(cell.x * 127.1 + cell.y * 311.7) * 43758.5453;
-    return n - floor(n);
+    int2 c = (int2)cell;
+    uint seed = DeformWang((uint)(c.x * 73856093) ^ (uint)(c.y * 19349663));
+    return (seed & 0xFFFFFFu) / 16777215.0;
 }
 
 float DeformNoise(float2 pos, float cellSize)
@@ -67,6 +79,43 @@ float DeformNoise(float2 pos, float cellSize)
     float d = DeformHash(i + float2(1.0, 1.0));
 
     return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
+}
+
+/// ÇOK OKTAV. Tek oktavlı değer gürültüsünün KARAKTERİSTİK BİR BOYU var ve göz onu
+/// "aynı desen" diye yakalıyor — kullanıcı "sürekli aynı dağılmayı görüyorum, her
+/// yerde aynı bulutlar gibi" dedi. Oktavlar o tek boyu siliyor.
+///
+/// Her oktav 2.17 kat sıklaşıyor, tam iki değil: tam sayı oranlarında oktavların
+/// sıfırları üst üste biniyor ve ızgara geri geliyor.
+float DeformFbm(float2 pos, float cellSize, int octaves)
+{
+    float sum = 0.0;
+    float weight = 0.0;
+    float amplitude = 1.0;
+    float scale = cellSize;
+
+    for (int i = 0; i < octaves; i++)
+    {
+        sum += DeformNoise(pos + (float)i * 41.7, scale) * amplitude;
+        weight += amplitude;
+        scale /= 2.17;
+        amplitude *= 0.55;
+    }
+
+    return sum / max(weight, 1e-4);
+}
+
+/// ALAN BÜKÜMÜ. Gürültü kendi ızgarasında örnekleniyor ve o ızgara ne kadar iyi
+/// gizlense de düzenli; örnekleme KONUMU başka bir gürültüyle kaydırılınca desen
+/// kendi ızgarasından kopuyor. Projede aynı yöntem birikinti alanında da var
+/// (`SnowDrift.hlsl`, `warp` ve `fineWarp`).
+///
+/// Büküm ölçeği izden büyük (1.6 m): küçük olsaydı deseni bozmak yerine titretirdi.
+float2 DeformWarp(float2 world)
+{
+    float2 offset = float2(DeformFbm(world + 5.0, 1.6, 2),
+                           DeformFbm(world - 8.0, 1.6, 2)) - 0.5;
+    return world + offset * 0.9;
 }
 
 uint2 Slot(int2 absolute)
@@ -98,6 +147,10 @@ void Stamp(uint3 id : SV_DispatchThreadID)
 
     float r = dist / max(_StampHalfWidth, 1e-4);
 
+    // Bütün düzensizlik BÜKÜLMÜŞ koordinatta okunuyor: gürültünün kendi ızgarası
+    // böylece deseni ele vermiyor.
+    float2 warped = DeformWarp(world);
+
     // KENAR DÜZENSİZ. Matematiksel kapsül ekranda kalıptan çıkmış gibi duruyordu:
     // gerçek izin kıyısı granüler, kar öbek öbek kopuyor. Kenar dünya uzayında bir
     // gürültüyle bozuluyor — desen ize değil DÜNYAYA bağlı, yani iz uzarken kayma
@@ -105,46 +158,51 @@ void Stamp(uint3 id : SV_DispatchThreadID)
     //
     // Ölçek 12 cm: texel 4.7 cm ve bölünmüş üçgen 11.4 cm, yani bundan ince bir
     // düzensizlik geometriye ulaşamaz. Genlik yarıçapın beşte biri.
-    // KENAR ÜÇ OKTAVLA DAĞILIYOR. Tek ölçekli bir bozulma "düzensiz" değil
-    // "dalgalı" okunuyordu; gerçek izde kar öbek öbek kopuyor ve öbeklerin boyu bir
-    // değil.
+    // KENAR DAĞILIYOR — bükülmüş koordinatta, çok oktavlı.
     //
-    //   40 cm — duvarın göçtüğü büyük loblar
-    //   15 cm — kopan öbekler
-    //    6 cm — tane. Hücre 4.7 cm, yani bundan incesi geometriye ulaşmaz.
-    float edge = (DeformNoise(world, 0.40) - 0.5) * 0.30
-               + (DeformNoise(world + 37.0, 0.15) - 0.5) * 0.16
-               + (DeformNoise(world - 61.0, 0.06) - 0.5) * 0.08;
+    // Üç ölçek: 40 cm duvarın göçtüğü büyük loblar, 15 cm kopan öbekler, 6 cm tane.
+    // Hücre 4.7 cm, yani bundan incesi geometriye ulaşmaz.
+    // Ölçekler oluğun genişliğine göre: 40 cm'lik oluğun kenarında 40 cm'lik bir lob
+    // "düzensizlik" değil, oluğun kendisinin eğrilmesi olur.
+    float edge = (DeformFbm(warped, 0.22, 3) - 0.5) * 0.30
+               + (DeformFbm(warped + 37.0, 0.09, 2) - 0.5) * 0.16
+               + (DeformFbm(warped - 61.0, 0.05, 2) - 0.5) * 0.08;
     r *= 1.0 + edge;
 
     // ---- TABAN: DÜZ DEĞİL, KIRIK ----
     //
-    // Oluk sabit derinlikte bir kanal olarak okunuyordu — "iz hep aynı, çok yapay"
-    // (kullanıcı bildirdi). Gerçek izde iki şey değişiyor:
+    // Oluk sabit derinlikte bir kanal olarak okunuyordu. Gerçek izde iki şey değişiyor:
     //
     //   ADIM NABZI (55 cm) — her basış farklı sıkıştırıyor, derinlik yol boyunca
-    //     dalgalanıyor. Sabit derinlik yürüme izi değil kazı izi gibi duruyor.
+    //     dalgalanıyor.
     //   KIRIK TABAN (12 cm) — kar öbek öbek çöküyor, taban pürüzlü kalıyor.
     //
-    // İkisi de DÜNYA uzayında: aynı yerden ikinci kez geçince aynı desen çıkıyor ve
-    // iz uzarken desen kaymıyor.
-    float stride = 0.72 + 0.5 * DeformNoise(world + 17.0, 0.55);
-    float broken = 0.78 + 0.44 * DeformNoise(world - 29.0, 0.12);
+    // Hepsi BÜKÜLMÜŞ koordinatta ve çok oktavlı: tek oktav + düz koordinat "aynı desen
+    // her yerde" veriyordu.
+    float stride = 0.72 + 0.5 * DeformFbm(warped + 17.0, 0.55, 2);
+    float broken = 0.78 + 0.44 * DeformFbm(warped - 29.0, 0.12, 3);
     float depth = _StampDepth * stride * broken;
 
     float floorMask = 1.0 - smoothstep(0.25, 1.1, r);
 
     // ---- YANA SAÇILAN KAR ----
     //
-    // Bir dönem burada düzgün bir BİLEZİK vardı ve iz kalıptan çıkmış gibi duruyordu.
-    // Kar yana itilirken eşit yayılmıyor: öbekler halinde savruluyor, bir yerde yığın
-    // bir yerde hiç yok. Bant da dar değil — öbekler oluğun iki katı uzağa düşüyor.
+    // Kar yana itilirken eşit yayılmıyor: öbekler halinde savruluyor.
     //
-    // KAPI EŞİKLİ: gürültü eşiği geçmediği yerde saçılma YOK. Eşiksiz olsaydı yine
-    // sürekli bir set çıkardı, yalnız yüksekliği dalgalı.
-    float scatterBand = (1.0 - smoothstep(1.0, 2.6, r)) * smoothstep(0.88, 1.06, r);
-    float clumpGate = smoothstep(0.52, 0.82, DeformNoise(world + 211.0, 0.18));
-    float grainGate = 0.55 + 0.9 * DeformNoise(world - 97.0, 0.07);
+    // BANT 2.2 KAT, ÖBEK ÖLÇEĞİ BANDA GÖRE.
+    //
+    // Gürültü ölçekleri METRE cinsinden sabit; bant daraltılınca öbek gürültüsünün
+    // hücresi (34 cm) bandın kendisinden (18 cm) büyük kaldı ve bant boyunca değeri
+    // neredeyse sabit çıktı: öbek yerine düz şerit. Kullanıcı "dağılma bozuldu" dedi.
+    //
+    // Kural: öbek hücresi bandın genişliğinin yarısı kadar olmalı, yoksa bandın içine
+    // birkaç öbek sığmaz.
+    //
+    // KAPI YUMUŞAK. Dar bir eşik (0.52-0.82) öbeklerin kenarını keskin kesiyordu ve
+    // hepsi aynı boyda çıkıyordu; geniş eşik hem yumuşak kenar hem değişken boy veriyor.
+    float scatterBand = (1.0 - smoothstep(1.0, 2.2, r)) * smoothstep(0.86, 1.08, r);
+    float clumpGate = smoothstep(0.38, 0.92, DeformFbm(warped + 211.0, 0.13, 3));
+    float grainGate = 0.5 + 1.0 * DeformFbm(warped - 97.0, 0.05, 2);
 
     float scatterValue = depth * 0.26 * scatterBand * clumpGate * grainGate;
     float floorValue = depth * floorMask;

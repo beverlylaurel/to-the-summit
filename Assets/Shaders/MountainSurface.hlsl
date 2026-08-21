@@ -766,53 +766,6 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     half3 powder = lerp(albedo, _SnowColor.rgb, 0.6);
     albedo = lerp(albedo, lerp(powder, _SnowColor.rgb, buried), snow.cover);
 
-    // ---- TEŞHİS ----
-    //
-    // "Kar tutmuyor" belirtisi dört tur sürdü. CPU zinciri baştan sona ÖLÇÜLDÜ ve
-    // dolu çıktı (örtü 0.955), yani hesap beyaz veriyor ama ekran vermiyor. Kod ile
-    // ekran çeliştiğinde ölçüm haklıdır: değer doğrudan ekrana basılıyor.
-    //
-    // Renk TON tabanlı, parlaklık tabanlı değil — ışık, pozlama ve tonemap parlaklığı
-    // ezer ama tonu bırakır.
-    //
-    //   1 ÖRTÜ    kırmızı = 0, mavi = ara, yeşil = 1
-    //   2 ARZ     aynı bantlar, `supply` (profil × çarpanlar öncesi)
-    //   3 GÖMÜLME aynı bantlar, `burial`
-    if (_SnowDebug > 0.5)
-    {
-        // 1-3: gölgelendirme payları, 0-1 aralığında.
-        // 4-5: GEOMETRİK derinlik, METRE. Bantlar farklı çünkü büyüklük farklı —
-        //      kırmızı 0.2 m altı (yok sayılır), mavi 0.2-1 m, yeşil 1 m üstü.
-        //
-        //   4 MAKRO DERİNLİK  `SnowMacroDepth` — karın hesaplanan kalınlığı
-        //   5 YER DEĞİŞTİRME  `SnowDisplacement` — köşeye gerçekten uygulanan
-        //
-        // 4 yeşil ama 5 kırmızıysa kalınlık hesaplanıyor ama geometriye ulaşmıyor:
-        // suçlu mesafe sönümü ya da eşik.
-        half3 color;
-        if (_SnowDebug < 3.5)
-        {
-            float probe = _SnowDebug < 1.5 ? snow.cover
-                        : _SnowDebug < 2.5 ? snow.fresh
-                                           : snow.burial;
-
-            color = probe < 0.05 ? half3(1.0, 0.0, 0.0)
-                  : probe > 0.95 ? half3(0.0, 1.0, 0.0)
-                                 : half3(0.0, 0.3, 1.0);
-        }
-        else
-        {
-            float metres = _SnowDebug < 4.5 ? SnowMacroDepth(worldPos)
-                                            : SnowDisplacement(worldPos);
-
-            color = metres < 0.2 ? half3(1.0, 0.0, 0.0)
-                  : metres > 1.0 ? half3(0.0, 1.0, 0.0)
-                                 : half3(0.0, 0.3, 1.0);
-        }
-
-        albedo = color;
-    }
-
     // Kabartıyı gömen şey kapsama değil kalınlık: bir parmak kar altındaki taşı
     // gösterir, yarım metre kar göstermez.
     float rockRelief = _BumpStrength * (1.0 - snow.burial * _SnowBurial) * (1.0 + wet * 0.3);

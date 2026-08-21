@@ -77,9 +77,6 @@ public class TerrainSurface : MonoBehaviour
     static readonly int SnowDisplaceMaxId = Shader.PropertyToID("_SnowDisplaceMax");
     static readonly int SnowDisplaceStartId = Shader.PropertyToID("_SnowDisplaceStart");
     static readonly int SnowTessFactorId = Shader.PropertyToID("_SnowTessFactor");
-    static readonly int SnowFootNearId = Shader.PropertyToID("_SnowFootNear");
-    static readonly int SnowFootFarId = Shader.PropertyToID("_SnowFootFar");
-    static readonly int SnowFootTessId = Shader.PropertyToID("_SnowFootTess");
     static readonly int SnowTessNearId = Shader.PropertyToID("_SnowTessNear");
     static readonly int SnowTessFarId = Shader.PropertyToID("_SnowTessFar");
     /// Yüzey başına altı doku. Son ekler shader'daki DECLARE_SURFACE_DETAIL
@@ -455,20 +452,29 @@ public class TerrainSurface : MonoBehaviour
         {
             float altitude = BandAltitude(i);
 
-            // Yağan kar tutar; yağmıyorsa iklimin bıraktığı kalıcı örtü kalır.
-            float settled = Mathf.Max(weatherDriver.SnowfallRateAt(altitude),
-                                      weatherDriver.SnowinessAt(altitude));
+            // BAŞLANGIÇ YALNIZ İKLİMDEN. `SnowfallRateAt` de okunsaydı oyunun ilk
+            // karesinde yağan kar anında birikmiş sayılırdı; oysa yağış zamanla
+            // biriken bir şey ve oyuncunun onu birikirken görmesi isteniyor.
+            //
+            // Kalıcı kar başka: kar çizgisinin üstündeki örtü birikimin değil iklimin
+            // sonucu, oyun başladığı için birikmeye başlamaz.
+            float settled = weatherDriver.SnowinessAt(altitude);
 
             bandCover[i] = raiseOnly ? Mathf.Max(bandCover[i], settled) : settled;
             bandPack[i] = raiseOnly ? Mathf.Max(bandPack[i], settled) : settled;
         }
     }
 
-    /// Hava KİLİDİ değiştiğinde profil anında oturuyor, birikmesi beklenmiyor.
+    /// Hava kilidi değişimini izler.
     ///
-    /// Kilit bir ölçüm aracı: "yağış 1, kar 1" dendiğinde görülmek istenen şey o havanın
-    /// SONUCU, kırk saniyelik bir geçiş değil. Doğal havada bu yol hiç çalışmıyor —
-    /// kilit yokken iki değer de -1 kalıyor ve karşılaştırma hiç tetiklenmiyor.
+    /// KİLİT ARTIK PROFİLİ ATLATMIYOR. Bir dönem kilit değişince bantlar o havanın
+    /// sonucuna anında zıplıyordu; kar bir karede beliriyordu ve "adım adım yükselen"
+    /// bir birikim görünmüyordu. Kullanıcı yağışın zamanla birikmesini istedi:
+    /// örtü `snowAccumulationSeconds` ile, kalınlık `snowPackSeconds` ile doluyor.
+    ///
+    /// Kilit yine de bir şey yapıyor: profil BİR KEZ, kilit ilk kurulduğunda o havanın
+    /// KALICI payına yükseltiliyor. Yoksa kar çizgisinin üstünde bile dağ çıplak
+    /// başlıyor ve kalıcı kar birikmeyi bekliyordu.
     void SyncWeatherOverride()
     {
         float intensity = weatherDriver.IntensityOverride;
@@ -479,45 +485,7 @@ public class TerrainSurface : MonoBehaviour
 
         lastIntensityOverride = intensity;
         lastSnowinessOverride = snowiness;
-
-        if (snowProfile == null) return;
-
-        // Yalnız yükseltir: kilit kar ekleyebilir, biriken karı silemez.
-        Prime(raiseOnly: true);
     }
-
-    // ---- TEŞHİS: KAR ZİNCİRİ ----
-    //
-    // "F1'de yağış 1 kar 1 yapıyorum, kar tutmuyor" belirtisi dört tur sürdü ve üç
-    // şüphelim de yanlış çıktı. Zincirin hangi halkasında koptuğu ekrandan
-    // anlaşılmıyor; her halka sayı olarak dışarı açılıyor.
-    //
-    // Belirti kapanınca bu blok ve F1'deki bölüm silinir.
-
-    public float ProfileFloor => profileFloor;
-    public float ProfileCeiling => profileCeiling;
-    public int ProfileBands => Bands;
-
-    public int BandIndexAt(float altitude) => Mathf.Clamp(
-        Mathf.FloorToInt(Mathf.InverseLerp(profileFloor, profileCeiling, altitude) * Bands),
-        0, Bands - 1);
-
-    public float CoverAt(float altitude) => bandCover[BandIndexAt(altitude)];
-    public float PackAt(float altitude) => bandPack[BandIndexAt(altitude)];
-
-    /// Profil dokusunun O AN İÇİNDEKİ değer — CPU dizisi değil. İkisi ayrışıyorsa
-    /// yükleme kopmuş demektir.
-    public float UploadedCoverAt(float altitude)
-    {
-        if (snowProfile == null) return -1f;
-        return snowProfile.GetPixel(BandIndexAt(altitude), 0).r;
-    }
-
-    /// Arazi kökeni. Dünya kotu ile profil kotu arasındaki fark buradan.
-    public float TerrainOriginY => transform.position.y;
-
-    public float SnowDisplaceMax => settings.snowDisplaceMax;
-    public Vector3 PrevailingWind => wind != null ? wind.PrevailingDirection : Vector3.right;
 
     float BandAltitude(int index) =>
         Mathf.Lerp(profileFloor, profileCeiling, (index + 0.5f) / Bands);
@@ -724,9 +692,6 @@ public class TerrainSurface : MonoBehaviour
         material.SetFloat(SnowDisplaceMaxId, settings.snowDisplaceMax);
         material.SetFloat(SnowDisplaceStartId, settings.snowDisplaceStart);
         material.SetFloat(SnowTessFactorId, settings.snowTessFactor);
-        material.SetFloat(SnowFootNearId, settings.snowFootNear);
-        material.SetFloat(SnowFootFarId, settings.snowFootFar);
-        material.SetFloat(SnowFootTessId, settings.snowFootTess);
         material.SetFloat(SnowTessNearId, settings.snowTessNear);
         material.SetFloat(SnowTessFarId, settings.snowTessFar);
 

@@ -33,12 +33,23 @@ public class SnowPatch : MonoBehaviour
     ///
     /// Uzak halka yakının kapsadığı yerde kendini kesiyor, yoksa iki yüzey aynı kotta
     /// çakışırdı.
-    [Tooltip("Yamanın kenarı, metre.")]
-    [SerializeField] float extent = 24f;
-    [Tooltip("Kenar başına hücre. Deformasyon dokusuyla hizalı olmalı.")]
-    [SerializeField] int cells = 512;
+    /// ÖLÇÜLER SABİT, SERİLEŞTİRİLMİYOR. Bir dönem `[SerializeField]`'di ve sahnedeki
+    /// bileşen eski değerlerde dondu: koddaki değişiklik hiç etkili olmadı, kare süresi
+    /// düzeltmesi sessizce yok sayıldı. Projenin kendi kuralı bunu zaten söylüyor
+    /// (`PrecipitationRenderer` başlığı) — bir kez daha aynı tuzağa düşüldü.
+    ///
+    /// Halkayı ayıran tek şey `inner`; ölçüler ondan türüyor.
+    const float InnerExtent = 24f;
+    const int InnerCells = 512;      // 4.7 cm — deformasyon texel'iyle birebir
+
+    const float OuterExtent = 96f;
+    const int OuterCells = 256;      // 37.5 cm — 12-48 m'de fark görünmüyor
+
     [Tooltip("İç halka mı? İç halka `_PatchHalf`'ı yazar, dış halka onu okuyup keser.")]
     [SerializeField] bool inner = true;
+
+    float extent => inner ? InnerExtent : OuterExtent;
+    int cells => inner ? InnerCells : OuterCells;
 
     float CellSize => extent / cells;
 
@@ -57,13 +68,11 @@ public class SnowPatch : MonoBehaviour
     [SerializeField] Transform follow;
 
     public void Bind(Material materialRef, Terrain terrainRef, Transform followRef,
-                     float extentMetres, int cellCount, bool isInner)
+                     bool isInner)
     {
         material = materialRef;
         terrain = terrainRef;
         follow = followRef;
-        extent = extentMetres;
-        cells = cellCount;
         inner = isInner;
     }
 
@@ -176,8 +185,20 @@ public class SnowPatch : MonoBehaviour
         // hacminden eliyordu — yama hiç çizilmiyordu.
         var transformMatrix = Matrix4x4.Translate(new Vector3(cx, 0f, cz));
 
+        // YAMA GÖLGE DÜŞÜRMÜYOR — ikisi de.
+        //
+        // Yamanın yüzeyi arazinin kar yüzeyiyle AYNI kotta (ikisi de `SnowMacroDepth`
+        // okuyor). İkisi birden gölge haritasına yazınca gölge uzayında çakışıyorlar ve
+        // ekranda ışığa dik, düzenli koyu şeritler çıkıyor — klasik gölge kusuru,
+        // kullanıcı bildirdi.
+        //
+        // Kaybedilen bir şey yok: arazi zaten kar yüzeyinin gölgesini düşürüyor. İzin
+        // oyuğunun kendi gölgesi kayboluyor ama oyuk 45 cm ve gölge haritası texel'i
+        // metre ölçeğinde — zaten hiç ulaşmıyordu.
+        //
+        // Gölge geçişinin kalkması aynı zamanda köşe işini yarıya indiriyor.
         Graphics.DrawMesh(mesh, transformMatrix, material, gameObject.layer,
-                          null, 0, null, true, true);
+                          null, 0, null, false, true);
     }
 
     /// Izgara YEREL uzayda kuruluyor: köşe konumu (-12..12, 0, -12..12). Dünya konumu

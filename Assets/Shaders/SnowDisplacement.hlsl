@@ -34,9 +34,6 @@ float _SnowDisplaceStart;      // bu derinliğin altında geometri hiç oynamıy
 // açılıyordu. Yer değiştirme bölünmeden ÖNCE bitmek zorunda.
 float _SnowTessNear;
 float _SnowTessFar;
-float _SnowFootNear;   // ayak izi tam güçte, metre
-float _SnowFootFar;    // ayak izi bölünmesi kapanır, metre
-float _SnowFootTess;   // ayak izi bandındaki bölünme katsayısı
 
 /// Makro kar derinliği, metre. Dört girdi — dördü de CPU'da birebir hesaplanabiliyor.
 // ---- AYAK İZİ DEFORMASYONU ----
@@ -53,6 +50,25 @@ TEXTURE2D(_SnowDeformTex);
 SAMPLER(sampler_SnowDeformTex);
 float4 _SnowDeform;   // x pencere kenarı (m), yz pencere merkezi (dünya xz), w sönüm yarıçapı
 
+float SnowFootprint(float3 worldPos);
+
+/// İZİN BULANIK OKUNMASI — kaba geometri için.
+///
+/// Deformasyon dokusunun texel'i 4.7 cm. Geometri ondan kabaysa (dış halkada 37.5 cm)
+/// kenar hücrelere basamaklanıyor: ekranda izin kıyısında DÜZENLİ MERDİVEN çıkıyor,
+/// kullanıcı bildirdi. Tek örnek, sekiz texel'lik bir aralığı temsil edemiyor.
+///
+/// Dört köşe örneği hücrenin yarı boyunda alınıp ortalanıyor — kutu bulanıklaştırma.
+/// Dokuda mip zinciri yok (her kare yazılıyor, mip üretmek pahalı), o yüzden elle.
+float SnowFootprintWide(float3 worldPos, float radius)
+{
+    float sum = SnowFootprint(worldPos + float3(-radius, 0.0, -radius))
+              + SnowFootprint(worldPos + float3( radius, 0.0, -radius))
+              + SnowFootprint(worldPos + float3(-radius, 0.0,  radius))
+              + SnowFootprint(worldPos + float3( radius, 0.0,  radius));
+    return sum * 0.25;
+}
+
 float SnowFootprint(float3 worldPos)
 {
     if (_SnowDeform.x < 0.001) return 0.0;
@@ -63,6 +79,46 @@ float SnowFootprint(float3 worldPos)
 
     float toCenter = distance(worldPos.xz, _SnowDeform.yz);
     return value * (1.0 - smoothstep(_SnowDeform.w * 0.8, _SnowDeform.w, toCenter));
+}
+
+/// KARIN MİKRO KABARTISI — SASTRUGİ.
+///
+/// YALNIZ `SnowPatch` KULLANIYOR, arazi kullanmıyor. Arazi üçgeni 7.32 m ve
+/// bölünmeyle en iyi 11.4 cm; 30 santimlik bir dalgacığı oraya yazmak aliasing
+/// üretiyordu ve bu yüzden mikro kabartı bir dönem yalnız normal haritasına
+/// bırakılmıştı (`SnowDisplacement.hlsl` başındaki ölçek ayrımı). Sonuç: yüzey ışıkta
+/// pütürlü, siluette dümdüz — kullanıcı "kar tutması çok düzenli, minik dalgacıklar
+/// yok" dedi. Yamanın hücresi 4.7 cm olduğu için kısıt orada yok.
+///
+/// FİZİK: sastrugi rüzgârın oyduğu sırtlardır. Rüzgâr yönünde UZUN, ona dik YAKIN
+/// aralıklı; saha ölçümlerinde dalga boyu 0.2-2 m, yükseklik 2-20 cm. Rüzgârsız havada
+/// oluşmazlar — genlik rüzgâr şiddetiyle ölçekleniyor.
+///
+/// İki bileşen:
+///   SIRT   — rüzgâra dik 0.35 m, rüzgâr boyunca 2.5 m. Anizotropi sastruginin
+///            kendisi; izotrop gürültü "kar" değil "kum" veriyor.
+///   TANE   — 0.12 m, izotrop. Yüzeyin granüler dokusu. Hücre 4.7 cm olduğu için
+///            bundan incesi geometriye ulaşmaz.
+float SnowMicroRelief(float2 worldXZ, float depth)
+{
+    // Kar yoksa kabartı da yok; ince örtüde de sönük.
+    float body = smoothstep(0.0, 0.25, depth);
+    if (body <= 0.001) return 0.0;
+
+    float2 windAxis = normalize(_SurfaceWindDir.xz + float2(0.0001, 0.0));
+    float2 perpendicular = float2(-windAxis.y, windAxis.x);
+
+    float along = dot(worldXZ, windAxis);
+    float across = dot(worldXZ, perpendicular);
+
+    // Rüzgâr boyunca uzatılmış koordinat: aynı gürültü, farklı ölçek.
+    float ridge = SnowDriftNoise(float2(along / 2.5, across / 0.35));
+    float grain = SnowDriftNoise(float2(along, across) / 0.12);
+
+    // Rüzgâr sırtları oyuyor: dingin havada yüzey düz, fırtınada çizgili.
+    float carved = lerp(0.25, 1.0, saturate(_SurfaceWindDir.w));
+
+    return body * carved * ((ridge - 0.5) * 0.06 + (grain - 0.5) * 0.02);
 }
 
 float SnowMacroDepth(float3 worldPos)
@@ -115,29 +171,14 @@ float SnowDisplacement(float3 worldPos)
     return depth * above * near;
 }
 
-/// AYAK İZİNİN YER DEĞİŞTİRMESİ, kendi sönümüyle. Makro birikinti 35-80 m bandında,
-/// iz 8-14 m'lik kendi bandında yaşıyor; ikisi aynı sönümü paylaşsaydı iz ya çok
-/// erken biterdi ya bölünmesiz üçgene düşerdi. Kural ikisinde de aynı: yer değiştirme,
-/// bölünme bitmeden sıfıra iner.
+/// Geometriye uygulanan toplam.
 ///
-/// AYRI FONKSİYON OLMASI ŞART — türev yüzünden. Makro türevi 3 metrelik adımla
-/// alınıyor ve o adım 0.34 metrelik izin üstünden atlıyor: iki örnek arasında iz
-/// ilişkisiz çıkıyor ve gradyana gürültü olarak giriyor. İkisi tek fonksiyonda
-/// kalsaydı iz hem kaba adımda yanlış, hem ince adımda tekrar sayılırdı.
-float SnowFootDisplacement(float3 worldPos)
-{
-    float toCamera = distance(worldPos, _WorldSpaceCameraPos);
-    float footEnd = lerp(_SnowFootNear, _SnowFootFar, 0.75);
-    float fade = 1.0 - smoothstep(_SnowFootNear, footEnd, toCamera);
-    if (fade <= 0.001) return 0.0;
-
-    return SnowFootprint(worldPos) * fade;
-}
-
-/// Geometriye uygulanan toplam: birikinti kabarır, iz çöker.
+/// İZ ARTIK BURADA DEĞİL. Arazi üçgeni 7.32 m ve izi çözemiyor; kazımak için gereken
+/// bölünme kare başına üç milyon üçgen ediyordu. İzi `SnowPatch` taşıyor — kendi
+/// ızgarası 4.7 cm ve arazi onun kapsadığı yerde zaten çiziliyor bile değil.
 float SnowTotalDisplacement(float3 worldPos)
 {
-    return SnowDisplacement(worldPos) - SnowFootDisplacement(worldPos);
+    return SnowDisplacement(worldPos);
 }
 
 /// Yer değiştirmenin EĞİMİ (d/dx, d/dz). Yüzey kabarıyorsa gölgelendirme normali de
@@ -153,21 +194,9 @@ float2 SnowDisplacementGradient(float3 worldPos)
     float dx = SnowDisplacement(worldPos + float3(Step, 0.0, 0.0)) - here;
     float dz = SnowDisplacement(worldPos + float3(0.0, 0.0, Step)) - here;
 
-    float2 gradient = float2(dx, dz) / Step;
-
-    // AYAK İZİNİN TÜREVİ KENDİ ADIMIYLA. 3 metrelik adım izin üstünden atlar ve
-    // çukurun kenarını hiç görmez: siluet çöker ama ışık düz yüzeyi aydınlatır.
-    // Adım izin dörtte biri (0.08 m); deformasyon dokusunun texel'i 4.7 cm, yani
-    // adım texel'den büyük — daha küçüğü kendi texel'inin içinde kalıp sıfır verir.
-    const float FootStep = 0.08;
-    float footHere = SnowFootDisplacement(worldPos);
-    float fdx = SnowFootDisplacement(worldPos + float3(FootStep, 0.0, 0.0)) - footHere;
-    float fdz = SnowFootDisplacement(worldPos + float3(0.0, 0.0, FootStep)) - footHere;
-
-    // İz ÇÖKME olduğu için işareti eksi.
-    gradient -= float2(fdx, fdz) / FootStep;
-
-    return gradient;
+    // İZİN TÜREVİ ARTIK BURADA DEĞİL. Arazi izi hiç çizmiyor; onu `SnowPatch` taşıyor
+    // ve kendi normalini kendi ızgarasında (4.7 cm) kuruyor.
+    return float2(dx, dz) / Step;
 }
 
 #endif

@@ -1593,8 +1593,7 @@ public static class MountainSceneBootstrap
             player.GetComponentInChildren<SnowCollisionProbe>(true),
             Object.FindAnyObjectByType<RouteOverlay>(FindObjectsInactive.Include),
             cloudVolume,
-            Object.FindAnyObjectByType<CloudWeatherDriver>(),
-            Object.FindAnyObjectByType<TerrainSurface>());
+            Object.FindAnyObjectByType<CloudWeatherDriver>());
 
         EditorUtility.SetDirty(menu);
 
@@ -1873,9 +1872,9 @@ public static class MountainSceneBootstrap
         var terrainRef = Object.FindAnyObjectByType<Terrain>();
 
         patches[0].Bind(new Material(shader) { name = "Snow Patch Near" },
-                        terrainRef, player.transform, 24f, 512, true);
+                        terrainRef, player.transform, true);
         patches[1].Bind(new Material(shader) { name = "Snow Patch Far" },
-                        terrainRef, player.transform, 96f, 512, false);
+                        terrainRef, player.transform, false);
 
         foreach (var p in patches) EditorUtility.SetDirty(p);
     }

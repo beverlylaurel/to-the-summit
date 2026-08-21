@@ -124,10 +124,6 @@ float _SnowDetailFade;       // bu mesafede tamamen söner (metre)
 float _SnowfallFloor, _SnowfallCeiling;
 float _PermanentSnowLine;
 
-/// TEŞHİS: kar örtüsünü doğrudan ekrana basar. 0 kapalı.
-/// Belirti kapanınca bu değişken, `MountainSurface.hlsl`'deki dal ve F1 bölümü silinir.
-float _SnowDebug;
-
 /// DERİN KAR YAMASI. `SnowPatch` sürüyor. Arazi shader'ı da okuyor: yamanın kapsadığı
 /// yerde arazi çizilmiyor, çünkü arazinin yüzeyi izin kazıldığı oyuğun ÜSTÜNÜ örterdi.
 /// `w` yarım kenar; 0 ise yama yok.

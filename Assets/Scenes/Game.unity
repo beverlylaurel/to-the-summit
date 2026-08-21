@@ -599,6 +599,34 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!21 &402624080
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Snow Patch Near
+  m_Shader: {fileID: 4800000, guid: 5855cdd96762b3a4487b5e2251586d0b, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats: []
+    m_Colors: []
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -726,34 +754,6 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
---- !u!21 &447522200
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Snow Patch
-  m_Shader: {fileID: 4800000, guid: 5855cdd96762b3a4487b5e2251586d0b, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs: []
-    m_Ints: []
-    m_Floats: []
-    m_Colors: []
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &508855604
 GameObject:
   m_ObjectHideFlags: 0
@@ -1255,6 +1255,7 @@ GameObject:
   - component: {fileID: 848219614}
   - component: {fileID: 848219615}
   - component: {fileID: 848219616}
+  - component: {fileID: 848219617}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1421,7 +1422,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SnowDeformation
   compute: {fileID: 7200000, guid: cbe46801e1e10cd4590420334fe85d3e, type: 3}
-  walker: {fileID: 848219609}
+  walker: {fileID: 848219607}
   snow: {fileID: 1738276036}
   weather: {fileID: 1805896806}
   wind: {fileID: 1805896805}
@@ -1437,7 +1438,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1c0ac3dc235983548a8232066486cd86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SnowPatch
-  material: {fileID: 447522200}
+  extent: 24
+  cells: 512
+  inner: 1
+  material: {fileID: 402624080}
+  terrain: {fileID: 1738276033}
+  follow: {fileID: 848219609}
+--- !u!114 &848219617
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 848219606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1c0ac3dc235983548a8232066486cd86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SnowPatch
+  extent: 96
+  cells: 512
+  inner: 0
+  material: {fileID: 1343381941}
   terrain: {fileID: 1738276033}
   follow: {fileID: 848219609}
 --- !u!1 &1147612204
@@ -1693,6 +1715,34 @@ Transform:
   - {fileID: 9035993439250858401}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!21 &1343381941
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Snow Patch Far
+  m_Shader: {fileID: 4800000, guid: 5855cdd96762b3a4487b5e2251586d0b, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats: []
+    m_Colors: []
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &1544747434
 GameObject:
   m_ObjectHideFlags: 0

@@ -47,9 +47,11 @@ public class SnowDeformation : MonoBehaviour
     /// katı — parçalar üst üste biniyor, oluk kopmuyor.
     const float SegmentDistance = 0.15f;
 
-    /// Oluğun yarı genişliği, metre. Karı yaran şey ayak değil GÖVDE: bacaklar,
-    /// kalça, sallanan kollar. Bele kadar batan bir insanın açtığı oluk 0.5 m.
-    const float TrailHalfWidth = 0.25f;
+    /// Oluğun yarı genişliği, metre. Karı yaran şey ayak değil GÖVDE: bacaklar ve
+    /// adım genişliği. Yürüyen bir insanın bıraktığı oluk 38-42 cm; 50 cm denendi ve
+    /// geniş çıktı (kullanıcı bildirdi) — saçılma bandıyla birlikte bozulan şerit bir
+    /// buçuk metreye varıyordu, patika gibi okunuyordu.
+    const float TrailHalfWidth = 0.20f;
 
     /// Azami batma, metre. İz derinliği `min(oradaki kar, bu)`.
     ///
@@ -67,10 +69,17 @@ public class SnowDeformation : MonoBehaviour
     /// kalmıştı.
     const float MaxDepth = 0.45f;
 
-    /// Karın izi kapatma hızı, metre/saniye. Dingin havada pratikte sıfır; yağış ve
-    /// rüzgâr açtıkça oluk kapanıyor. 80 cm'lik oluk tam fırtınada ~13 dakikada siliniyor.
-    const float RefillCalm = 0.0f;
-    const float RefillStorm = 0.001f;
+    /// İZİN KAPANMA HIZI, metre/saniye.
+    ///
+    /// İZ KALICI. Dingin havada hiç kapanmıyor — geri dönüp baktığında yolun duruyor.
+    /// Kapatan tek şey ÜSTÜNE YAĞAN KAR; rüzgâr da savurup dolduruyor ama yalnız
+    /// yağışla birlikte, çünkü savuracak gevşek kar yağıştan geliyor.
+    ///
+    /// Sayı yağıştan türüyor: `snowAccumulationSeconds` (40 sn) tam yağışta yüzeyin
+    /// beyazlaması. 45 santimlik bir oluk aynı hızla dolsa 45 saniyede kapanırdı —
+    /// oysa oluk çukur, üstüne yağan kar önce yanlarını dolduruyor. Ölçü: tam yağışta
+    /// ~4 dakika.
+    const float RefillFull = 0.002f;
 
     [Tooltip("Deformasyon compute shader'ı.")]
     [SerializeField] ComputeShader compute;
@@ -299,19 +308,23 @@ public class SnowDeformation : MonoBehaviour
         lastStamp = position;
     }
 
-    /// İzin kapanması yağıştan ve rüzgârdan geliyor — ayrı bir zamanlayıcı yok.
-    /// Kar örtüsü simülasyonu gelince kaynağı gerçek rüzgâr taşınımı olacak; bu
-    /// fonksiyon o zaman girdisini değiştirir, sistem değişmez.
+    /// İzin kapanması YAĞIŞTAN geliyor, ayrı bir zamanlayıcı yok. Yağmazsa iz durur.
+    ///
+    /// Rüzgâr yalnız ÇARPAN: fırtınada savrulan kar oluğu daha çabuk dolduruyor, ama
+    /// yağış yoksa savuracak gevşek kar da yok — o yüzden çarpım, toplam değil.
     void RefillStep()
     {
-        float driven = Mathf.Max(weather.Precipitation * weather.Snowiness, wind.Strength * 0.5f);
-        float rate = Mathf.Lerp(RefillCalm, RefillStorm, Mathf.Clamp01(driven));
-        if (rate <= 0f) return;
+        float falling = weather.Precipitation * weather.Snowiness;
+        if (falling < 0.001f) return;
+
+        float driven = falling * Mathf.Lerp(1f, 2f, wind.Strength);
+        float amount = RefillFull * driven * Time.deltaTime;
+        if (amount <= 0f) return;
 
         compute.SetTexture(refillKernel, DeformTargetId, deform);
         compute.SetInt(ResolutionId, Resolution);
         compute.SetInt(ResolutionMaskId, Resolution - 1);
-        compute.SetFloat(RefillAmountId, rate * Time.deltaTime);
+        compute.SetFloat(RefillAmountId, amount);
         compute.Dispatch(refillKernel, Resolution / 8, Resolution / 8, 1);
     }
 }

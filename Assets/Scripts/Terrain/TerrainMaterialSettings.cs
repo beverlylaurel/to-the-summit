@@ -122,17 +122,6 @@ public class TerrainMaterialSettings : ScriptableObject
              "köşeleri taşımıyor ve bölünme oraya kadar sürerse çatlak açılıyor.")]
     [Range(20f, 400f)] public float snowTessFar = 80f;
 
-    [Tooltip("UZAK izin arazide tam güçte olduğu mesafe (metre). Yakını `SnowPatch` " +
-             "taşıyor (24 m); arazi ondan sonra devralıyor.")]
-    [Range(2f, 60f)] public float snowFootNear = 22f;
-    [Tooltip("Uzak iz bu mesafede kapanır (metre). Deformasyon penceresinin görünür " +
-             "yarıçapı 48 m; bant onun içinde bitmeli.")]
-    [Range(4f, 90f)] public float snowFootFar = 46f;
-    [Tooltip("Uzak iz bandındaki bölünme katsayısı. Yakın plandaki iz yamada " +
-             "çözülüyor; burada iz zaten birkaç piksel, 16 yetiyor ve 64 boşuna " +
-             "dört kat üçgen yakıyor.")]
-    [Range(1f, 64f)] public float snowFootTess = 16f;
-
     [Tooltip("Kar mikro doku periyodu (metre). Kar taneleri ve rüzgâr kabuğu bu " +
              "ölçekte tekrarlar. Büyük değer deseni belli eder, küçük değer " +
              "uzaklaşınca kaynar.")]
