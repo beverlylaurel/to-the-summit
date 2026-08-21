@@ -136,6 +136,10 @@ public class TerrainSurface : MonoBehaviour
 
     readonly float[] bandCover = new float[Bands];
     readonly float[] bandPack = new float[Bands];
+
+    /// Hava kilidinin son görülen değeri. Kilit değişince profil yeniden kuruluyor.
+    float lastIntensityOverride = -1f;
+    float lastSnowinessOverride = -1f;
     readonly Color[] bandPixels = new Color[Bands];
 
     /// Profilin yenilenme aralığı (saniye). Bakınız IntegrateSnowBands: bu aralıkta
@@ -341,6 +345,8 @@ public class TerrainSurface : MonoBehaviour
         // ikisi de birleşmeli, yani 50 milisaniyelik tek adım kare kare atmakla aynı
         // sayıyı veriyor. 128 bandın döngüsü ve dokunun yüklenmesi böylece kare başına
         // değil aralık başına bir kez oluyor.
+        SyncWeatherOverride();
+
         profileAge += Time.deltaTime;
         if (profileAge < ProfileUploadSeconds) return;
 
@@ -426,6 +432,50 @@ public class TerrainSurface : MonoBehaviour
             new Vector4(profileFloor, profileCeiling - profileFloor, 0f, 0f));
     }
 
+    /// Kar profilini O ANKİ HAVAYA göre kurar.
+    ///
+    /// Kalıcı kar birikimin değil iklimin sonucudur: kar çizgisinin üstünde kar zaten
+    /// vardır, oyun başladığı için birikmeye başlamaz. Profil sıfırdan doğduğu sürece
+    /// 5700 metrelik dağın kalıcı karı da gerçek zamanda birikmeyi bekliyordu.
+    ///
+    /// `SnowfallRateAt` KİLİTLERİ OKUYOR (şiddet ve karlılık kilidi, `AltitudeWeatherDriver`),
+    /// yani F1'den zorlanan hava burada da geçerli. Kilit 1/1 iken her bant doluyor —
+    /// yükseklik sınırı yok.
+    void Prime()
+    {
+        for (int i = 0; i < Bands; i++)
+        {
+            float altitude = BandAltitude(i);
+
+            // Yağan kar tutar; yağmıyorsa iklimin bıraktığı kalıcı örtü kalır.
+            float settled = Mathf.Max(weatherDriver.SnowfallRateAt(altitude),
+                                      weatherDriver.SnowinessAt(altitude));
+
+            bandCover[i] = settled;
+            bandPack[i] = settled;
+        }
+    }
+
+    /// Hava KİLİDİ değiştiğinde profil anında oturuyor, birikmesi beklenmiyor.
+    ///
+    /// Kilit bir ölçüm aracı: "yağış 1, kar 1" dendiğinde görülmek istenen şey o havanın
+    /// SONUCU, kırk saniyelik bir geçiş değil. Doğal havada bu yol hiç çalışmıyor —
+    /// kilit yokken iki değer de -1 kalıyor ve karşılaştırma hiç tetiklenmiyor.
+    void SyncWeatherOverride()
+    {
+        float intensity = weatherDriver.IntensityOverride;
+        float snowiness = weatherDriver.SnowinessOverride;
+
+        if (Mathf.Approximately(intensity, lastIntensityOverride)
+            && Mathf.Approximately(snowiness, lastSnowinessOverride)) return;
+
+        lastIntensityOverride = intensity;
+        lastSnowinessOverride = snowiness;
+
+        if (snowProfile == null) return;
+        Prime();
+    }
+
     float BandAltitude(int index) =>
         Mathf.Lerp(profileFloor, profileCeiling, (index + 0.5f) / Bands);
 
@@ -468,23 +518,15 @@ public class TerrainSurface : MonoBehaviour
         // arazide". Tutuyordu, ama sıfırdan başlayıp dakikalar sürüyordu ve 5700
         // metrelik bir dağın KALICI karı da o kuyruğa giriyordu.
         //
-        // Kalıcı kar birikimin değil İKLİMİN sonucudur: kar çizgisinin üstünde kar
-        // her zaman vardır, oyun başladığı için birikmeye başlamaz. Başlangıç durumu
-        // bu yüzden yağış kuşağından okunuyor — `SnowinessAt` zaten yağmurun bittiği
-        // ve saf karın başladığı kotlar arasında yumuşak geçiş veriyor, HUD'un
-        // gösterdiği kuşakların ta kendisi.
+        // KAR TUTMASI İÇİN AYRI BİR YÜKSEKLİK SINIRI YOK. Tek koşul o kotta karın
+        // YAĞIYOR olması; yağıyorsa tutar. Kot bağımlılığı zaten yağışın kendisinde
+        // (yağmur mu kar mı) ve kilit varken o da devre dışı.
         //
-        // Aynı çağrı sürüm döngüsünde de kullanılıyor (`SnowfallRateAt` içinde), yani
-        // başlangıç ile evrim aynı kot uzayını okuyor; ayrışamazlar.
-        //
-        // Aralık değiştiğinde (dağ yeniden üretildi) yeniden kuruluyor: biriken değerler
-        // başka kotlara aitti, taşımak yanlış kota kar yapıştırırdı.
-        for (int i = 0; i < Bands; i++)
-        {
-            float settled = weatherDriver.SnowinessAt(BandAltitude(i));
-            bandCover[i] = settled;
-            bandPack[i] = settled;
-        }
+        // Bir dönem başlangıç durumu `SnowinessAt`'ten okunuyordu, yani iklim
+        // kuşağından. Kilit açıkken bile alçak kotları çıplak bırakıyordu: kullanıcı
+        // F1'de yağış 1 / kar 1 yapıyor, dağ hâlâ çıplak duruyordu. `SnowfallRateAt`
+        // kilitleri okuyor, `SnowinessAt` okumuyor — yanlış olan çağrıydı.
+        Prime();
 
         if (snowProfile != null) return;
 

@@ -21,7 +21,7 @@ using UnityEngine;
 /// Çember kareye içten teğet: döşemenin komşu kopyası hiçbir zaman görünmüyor.
 ///
 /// ÇARPIŞMA İLK SÜRÜMDE BAĞLI DEĞİL — bilerek. Oyuncu kendi oluğunun üstünde
-/// oluk derinliği kadar (≤ 35 cm) havada kalıyor. Bunun okunup okunmadığı ÖLÇÜLECEK;
+/// oluk derinliği kadar (≤ 18 cm) havada kalıyor. Bunun okunup okunmadığı ÖLÇÜLECEK;
 /// okunuyorsa CPU tarafı eklenir. Peşinen ikinci bir CPU/GPU ikizi yazmak `SnowDrift`
 /// borcunu ikiye katlardı (bkz. `SnowDriftField` başlığı).
 public class SnowDeformation : MonoBehaviour
@@ -42,15 +42,19 @@ public class SnowDeformation : MonoBehaviour
     const float SegmentDistance = 0.15f;
 
     /// Oluğun yarı genişliği, metre. Karı yaran şey ayak değil GÖVDE: bacaklar,
-    /// kalça, sallanan kollar. Yürüyen bir insanın derin karda açtığı oluk 0.5-0.6 m.
-    const float TrailHalfWidth = 0.28f;
+    /// kalça, sallanan kollar. Yürüyen bir insanın açtığı iz 0.4-0.45 m geniştir —
+    /// 0.56 m denendi, ekranda yol gibi okundu.
+    const float TrailHalfWidth = 0.21f;
 
-    /// Azami oluk derinliği, metre. Derin karda insan baldıra kadar batar; bundan
-    /// derini için kar da yetmiyor, derinlik oradaki kalınlıkla ayrıca sınırlanıyor.
-    const float MaxDepth = 0.35f;
+    /// Azami oluk derinliği, metre. 0.35 denendi ve ÇOK DERİNDİ: ekranda iz değil
+    /// kazılmış bir hendek okunuyordu (kullanıcı bildirdi). Yürüyen bir insan sert
+    /// kabuklu karda 5-10 cm, gevşek karda baldıra kadar batar; oyunda okunması gereken
+    /// şey hendek değil İZ, o yüzden üst uç 0.18 m. Derinlik ayrıca oradaki kar
+    /// kalınlığıyla sınırlanıyor.
+    const float MaxDepth = 0.18f;
 
     /// Karın izi kapatma hızı, metre/saniye. Dingin havada pratikte sıfır; yağış ve
-    /// rüzgâr açtıkça oluk kapanıyor. 35 cm'lik oluk tam fırtınada ~6 dakikada siliniyor.
+    /// rüzgâr açtıkça oluk kapanıyor. 18 cm'lik oluk tam fırtınada ~3 dakikada siliniyor.
     const float RefillCalm = 0.0f;
     const float RefillStorm = 0.001f;
 

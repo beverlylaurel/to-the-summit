@@ -72,20 +72,34 @@ void Stamp(uint3 id : SV_DispatchThreadID)
     float r = dist / max(_StampHalfWidth, 1e-4);
 
     // TABAN + İKİ YANDA SET. Karın hacmi yok olmuyor, yana itiliyor: oluğun iki
-    // kenarında yığılıyor. Setin genliği tabanın dörtte biri, bandı ise daha geniş —
-    // itilen kar daha büyük bir alana yayılıyor.
-    float floorMask = 1.0 - smoothstep(0.7, 1.0, r);
-    float rimMask = (1.0 - smoothstep(1.05, 2.1, r)) * smoothstep(0.95, 1.25, r);
+    // kenarında yığılıyor. Set dar ve alçak — itilen kar oluğun hemen kıyısında durur,
+    // geniş bir tümsek yapmaz.
+    float floorMask = 1.0 - smoothstep(0.6, 1.0, r);
+    float rimMask = (1.0 - smoothstep(1.0, 1.45, r)) * smoothstep(0.95, 1.1, r);
 
-    float value = _StampDepth * floorMask - _StampDepth * 0.25 * rimMask;
-    if (abs(value) < 1e-5) return;
+    float floorValue = _StampDepth * floorMask;
+    float rimValue = _StampDepth * 0.18 * rimMask;
 
     uint2 slot = Slot(absolute);
-
-    // ÜST ÜSTE BİNEN İZLER: derin olan kazanıyor. Toplamak aynı yerden ikinci geçişte
-    // oluğu iki katına indirirdi; gerçekte ikinci geçiş zaten açılmış oluğa basıyor.
     float previous = _Deform[slot];
-    _Deform[slot] = value >= 0.0 ? max(previous, value) : min(previous, value);
+
+    // SET, AÇILMIŞ OLUĞU SİLEMEZ.
+    //
+    // Bir dönem tek bir işaretli değer yazılıyordu ve negatifler `min` dalına
+    // düşüyordu: yeni parçanın seti, bir önceki parçanın TABANINI (pozitif) görüp
+    // yerine kabarma yazıyordu. Ekranda düzenli tırtıklı bir dizi çıkıyordu —
+    // parçaların üst üste bindiği her yerde bir kabarma. Kullanıcı bildirdi.
+    //
+    // Doğru kural: taban her zaman kazanır, set yalnız DOKUNULMAMIŞ kara yığılır.
+    float value;
+    if (floorValue > 1e-5)
+        value = max(previous, floorValue);
+    else if (rimValue > 1e-5)
+        value = previous > 1e-5 ? previous : min(previous, -rimValue);
+    else
+        return;
+
+    _Deform[slot] = value;
 }
 
 [numthreads(8, 8, 1)]
