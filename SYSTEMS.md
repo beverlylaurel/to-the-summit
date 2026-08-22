@@ -782,6 +782,13 @@ yayınlıyor; `PrecipitationRenderer` şiddetini bununla çarpıyor. Kar şiddet
 binme matematiksel olarak imkânsız. Bağ TEK YÖNLÜ — kar sistemi yağmurdan bir şey
 okumuyor.
 
+**Dağın karı ile kar mesh'inin karı tek durumdan.** Kar mesh'i (clipmap)
+oyuncunun çevresindeki 128 m'yi kaplıyor; dağın geri kalanının karını
+`MountainSurface` çiziyor. İkisi de `SnowStateAt` okuyor — yakın bölge → uzak
+kaskad → kar çizgisi. Ayrı bir "arazi karı" sayısı YOK, o yüzden sınırda
+çelişemezler. Dağ tarafında yerinden oynatma yok (gölgeleme katmanı); deforme
+olan gerçek kar yalnız yakın bölgede.
+
 **Kar çizgisi donma seviyesinden.** Dağın belli bir kottan yukarısı doğuştan karlı.
 Kot `TemperatureField.FreezingLevel` → `ISnowEnvironmentSource.FreezingLevelY`;
 ayrı bir "kar çizgisi" sayısı YOK. Bant kalınlığı ve üstteki SWE `SnowSettings`'te.

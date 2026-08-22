@@ -121,6 +121,15 @@ float MountainBand(float3 worldPos)
     return abs(frac(band) * 2.0 - 1.0);
 }
 
+// KAR DURUMU BURADAN OKUNUYOR. Dağın karı ile kar mesh'inin karı AYNI
+// zincirden geliyor (yakın bölge → uzak kaskad → kar çizgisi); ayrı bir
+// "arazi karı" sayısı yok, o yüzden sınırda çelişemezler.
+//
+// Kar sistemi sahnede yoksa bu globaller sıfır kalıyor ve katman
+// kendiliğinden kapanıyor — ek bir anahtar gerekmiyor.
+#include "../Snow/Shaders/SnowCommon.hlsl"
+
+
 struct MountainSurface
 {
     half3 albedo;
@@ -410,6 +419,51 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // Diplere toz ve kırıntı birikir: çukur yalnız loş değil, MAT da. Aynı dip
     // değeri pürüzlülüğe çevrilir — bedava.
     surface.smoothness *= 1.0 - cavityDip * 1.2;
+
+    // ------------------------------------------------------------------ kar
+    //
+    // DAĞIN KARI, KAR MESH'İYLE AYNI DURUMDAN.
+    //
+    // Kar mesh'i (clipmap) yalnız oyuncunun çevresindeki 128 m'yi kaplıyor.
+    // Dağın geri kalanı bu katmanla karlanıyor. İkisi de `SnowStateAt`
+    // okuduğu için sınırda kalınlık ve yoğunluk aynı sayıdan geliyor.
+    //
+    // YERİNDEN OYNATMA YOK, bu bir gölgeleme katmanı. Clipmap'in dışı en yakın
+    // 128 m'de başlıyor; orada 30 cm'lik kabarmanın ekrandaki karşılığı alt
+    // piksel. Deforme olan gerçek kar zaten yakın bölgede.
+    float4 snowState = SnowStateAt(SnowWorldToUV(worldPos));
+    float  snowDepth = SnowBaseHeight(snowState.r, snowState.g);
+
+    // EĞİM: dik kayada kar durmaz. 0.45 ≈ 63° yatıklık.
+    float snowSlope = saturate((normalWS.y - 0.45) / 0.35);
+
+    // KALINLIK: 5 cm'de tam örtü; altında kaya arasından görünüyor.
+    float snowFill = saturate(snowDepth / 0.05);
+
+    // KENAR KIRILMASI DAĞIN KENDİ GÜRÜLTÜSÜNDEN. Yeni doku eklenmiyor —
+    // kayanın kabartısı zaten orada ve kar sınırı ona oturunca düz kesilmiş
+    // bir çizgi gibi durmuyor.
+    float snowBreak = MountainFbm(worldPos * _BumpScale * 0.35, 2) * 0.5 + 0.5;
+    float snowMask = saturate((snowSlope * snowFill - snowBreak * 0.35) * 3.0);
+
+    if (snowMask > 0.001)
+    {
+        // Spec §14.1: albedo ve pürüzlülük TAZELİKTEN, tazelik de yoğunluktan.
+        float freshness = 1.0 - saturate((SnowDensity(snowState.g) - 100.0) / 350.0);
+
+        half3 snowAlbedo = lerp(half3(0.70, 0.73, 0.79), half3(0.90, 0.92, 0.95), freshness);
+        half  snowRough  = lerp(0.26, 0.48, freshness);
+
+        surface.albedo     = lerp(surface.albedo, snowAlbedo, snowMask);
+        surface.smoothness = lerp(surface.smoothness, 1.0 - snowRough, snowMask);
+
+        // Kar kayanın kabartısını GÖMÜYOR: normal düzleşip geometrik normale
+        // dönüyor. Kar altındaki çatlağı göstermek kar değil, ıslak kaya olur.
+        surface.normalWS = normalize(lerp(surface.normalWS, normalWS, snowMask));
+
+        // Mikro-oyuk karın altında kalıyor.
+        surface.occlusion = lerp(surface.occlusion, 1.0, snowMask * 0.7);
+    }
 
     return surface;
 }

@@ -129,7 +129,8 @@ public static class SnowTestRunner
                 r.AppendLine("  " + m.file + "(" + m.line + "): " + m.message);
         }
 
-        foreach (string path in AssetDatabase.FindAssets("t:Shader", new[] { "Assets/Snow/Shaders" }))
+        foreach (string path in AssetDatabase.FindAssets("t:Shader",
+                     new[] { "Assets/Snow/Shaders", "Assets/Shaders" }))
         {
             string file = AssetDatabase.GUIDToAssetPath(path);
             var sh = AssetDatabase.LoadAssetAtPath<Shader>(file);

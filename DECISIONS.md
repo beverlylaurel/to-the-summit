@@ -1017,6 +1017,25 @@ Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olma
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
 
+## Arazi kar katmanı geri geldi — ama tek kaynaktan (2026-08-22)
+
+`741e6b7` "Kar tamamen söküldü: v1, v2 ve arazi kar katmanı" ile dağın kendi kar
+katmanı bilerek silinmişti; yerini yeni kar sistemi alacaktı. Almadı: kar mesh'i
+yalnız oyuncunun çevresindeki **128 m**'yi kaplıyor (Medium: 16 m × 2³) ve dağın
+geri kalanı çıplak kalıyordu. Belirti "ayaklarımın altında benimle hareket eden
+beyaz kare".
+
+`MountainSurface` yeniden kar taşıyor, ama v1'deki gibi kendi sayısıyla değil:
+`SnowStateAt` okuyor — kar mesh'iyle aynı zincir. Eğim eşiği 0.45 (≈63°), tam
+örtü 5 cm'de, kenar kırılması dağın KENDİ kabartı gürültüsünden (yeni doku yok).
+
+**Bilinçli sınır:** dağ tarafında yerinden oynatma yok. Clipmap'in dışı en yakın
+128 m'de başlıyor; orada 30 cm'lik kabarmanın ekrandaki karşılığı alt piksel.
+**Tetikleyici:** clipmap sınırında görünür bir basamak fark edilirse yeniden
+bakılır.
+
+---
+
 ## Yağmur→kar geçişinde rampa yok (2026-08-22)
 
 Yağmur soluyup kar sonra başlasın diye 0.8 s'lik bir rampa yazıldı ve geri alındı:
