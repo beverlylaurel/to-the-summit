@@ -1007,6 +1007,31 @@ Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olma
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
 
+## Kar Faz 7: yağmur koşulu spec'ten farklı — ölçümle bulundu (2026-08-22)
+
+Spec §16.1 karakterin üstündeki karı `env.PrecipKind == Rain` iken siliyor.
+Bu projede yağışın **türü yok**: köprü yağış varken hep `Rain` döndürüyor, kar
+kararını `SnowfallController`'ın sıcaklık histerezisi veriyor (§3.4).
+
+Spec'in koşulu uygulandığında kar yağarken de karakter sürekli temizleniyordu —
+ölçüldü, yirmi saniyede birikme **0.000**'da kaldı.
+
+**Koşul:** yağış VAR ama kar DEĞİL (`PrecipKind != None && !IsSnowing`).
+Kullanıcının "aynı anda hem yağmur hem kar görünmez" kararıyla da uyumlu.
+
+### `SnowCoverMask` ikiye bölündü
+
+`SAMPLE_TEXTURE2D` örtük türev kullanıyor ve compute shader'da derlenmiyor
+(ölçüldü). Gürültü örneklemesi dışarı alındı; maskenin mantığı hem
+fragman'dan hem sınamadan aynen çağrılabiliyor.
+
+### Eğim eşiği ile EFEKTİF eşik farklı şeyler
+
+`_SnowSlopeThreshold` 0.25, ama maske gürültüyü ÇIKARIYOR ve karın gerçekten
+tuttuğu eğim daha dik. Ölçüldü: kaplama 1.00'de `dot(N,up) = 0.651` (49°
+yatıklık), kaplama 0.60'ta 0.802. İkisini karıştırmak "eşik çalışmıyor"
+yanılgısı üretir.
+
 ## Kar Faz 5: iki spec içi tutarsızlık ve bir format değişimi (2026-08-22)
 
 ### `RT_SkyVis` RHalf değil RFloat

@@ -286,6 +286,9 @@ public class SnowDebugWindow : EditorWindow
         var clipmap = go.GetComponent<SnowClipmap>();
         if (clipmap == null) clipmap = go.AddComponent<SnowClipmap>();
 
+        if (go.GetComponent<SnowCoverageDriver>() == null)
+            go.AddComponent<SnowCoverageDriver>();
+
         var player = Object.FindAnyObjectByType<FirstPersonController>();
 
         var bridgeSerialized = new SerializedObject(bridge);

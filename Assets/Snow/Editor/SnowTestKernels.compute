@@ -78,3 +78,30 @@ void KTestRnm(uint3 id : SV_DispatchThreadID)
 
     _TestOut[id.xy] = float4(result, 1.0);
 }
+
+// --------------------------------------------------------------- Faz 7 sinamasi
+
+#pragma kernel KTestCoverMask
+
+float _SnowSlopeThreshold;
+float _SnowSlopeSharpness;
+float _SnowBreakupScale;
+float _SnowBreakupStrength;
+float _SnowEdgeSharpness;
+
+#include "../Shaders/SnowCover.hlsl"
+
+float3 _TestNormal;
+float  _TestAo;
+float3 _TestPosition;
+
+/// Tek deger: verilen normal, AO ve konum icin kaplama maskesi.
+/// CPU tarafi bunu farkli normallerle cagirip esik davranisini olcuyor.
+[numthreads(1, 1, 1)]
+void KTestCoverMask(uint3 id : SV_DispatchThreadID)
+{
+    _TestOut[uint2(0, 0)] = SnowCoverMaskWithNoise(_TestPosition, normalize(_TestNormal),
+                                                   _TestAo, 0.5,
+                                                   _SnowSlopeThreshold, _SnowSlopeSharpness,
+                                                   _SnowBreakupStrength, _SnowEdgeSharpness);
+}

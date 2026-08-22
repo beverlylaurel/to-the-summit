@@ -33,6 +33,8 @@ public static class SnowShaderIDs
     public static readonly int SnowfallSWERate = Shader.PropertyToID("_SnowfallSWERate");
     public static readonly int SnowWetness = Shader.PropertyToID("_SnowWetness");
     public static readonly int SnowCoverage = Shader.PropertyToID("_SnowCoverage");
+    public static readonly int SnowAccum = Shader.PropertyToID("_SnowAccum");
+    public static readonly int SnowLineY = Shader.PropertyToID("_SnowLineY");
 
     // --- Durum dokuları ---
     public static readonly int SnowStateTex = Shader.PropertyToID("_SnowStateTex");

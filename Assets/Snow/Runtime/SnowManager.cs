@@ -344,7 +344,6 @@ public class SnowManager : MonoBehaviour
         Shader.SetGlobalFloat(SnowShaderIDs.TemperatureC, env.TemperatureC);
         Shader.SetGlobalFloat(SnowShaderIDs.SunElevation01, env.SunElevation01);
         Shader.SetGlobalFloat(SnowShaderIDs.FogDensity01, env.FogDensity01);
-        Shader.SetGlobalVector(SnowShaderIDs.SnowUpDirection, Vector3.up);
 
         float rainOnSnow = env.PrecipKind == PrecipitationKind.Rain ? env.PrecipIntensity01 : 0f;
         Shader.SetGlobalFloat(SnowShaderIDs.RainOnSnow01, rainOnSnow);
@@ -372,7 +371,9 @@ public class SnowManager : MonoBehaviour
                 Mathf.Clamp01(fallbackHeight / SnowConstants.MinVisibleHeight);
         }
 
-        Shader.SetGlobalFloat(SnowShaderIDs.SnowCoverage, SnowRuntimeState.GroundCoverage01);
+        // `_SnowCoverage` ve `_SnowUpDirection` BURADAN YAZILMIYOR.
+        // Sahibi `SnowCoverageDriver` (spec §16); iki yerden yazılsaydı
+        // hangisinin kazandığı bileşen sırasına kalırdı.
 
         // Gökyüzü haritasının kapsamı — üç tüketici de bunu okuyor (spec §12).
         Vector2 skyCenter = skyCamera.Center;
