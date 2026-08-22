@@ -33,6 +33,10 @@ public class SnowManager : MonoBehaviour
     [Tooltip("Uzak kaskad. Boş bırakılırsa bölge dışı sabit kar durumuna düşer.")]
     [SerializeField] SnowFarCascade farCascade;
 
+    [Tooltip("Kar detay normali (spec §14.2). Global yayınlanıyor: kar mesh'i " +
+             "ile dağın kar katmanı AYNI dokuyu kullanıyor.")]
+    [SerializeField] Texture2D detailNormal;
+
     [Tooltip("İzlerin bölgeden çıkınca saklanması. Boş bırakılırsa izler kaybolur.")]
     [SerializeField] SnowPersistence persistence;
 
@@ -404,6 +408,11 @@ public class SnowManager : MonoBehaviour
         Shader.SetGlobalFloat(SnowShaderIDs.RainOnSnow01, rainOnSnow);
 
         if (farCascade != null) farCascade.WriteGlobals();
+
+        // DETAY NORMALİ GLOBAL. Materyalde de duruyor ama dağın kar katmanı
+        // ayrı bir materyal; ikisinin aynı dokuyu kullanması için tek yer bu.
+        if (detailNormal != null)
+            Shader.SetGlobalTexture(SnowShaderIDs.SnowDetailNormal, detailNormal);
 
         Shader.SetGlobalFloat(SnowShaderIDs.FallbackSWE, settings.DefaultSwe);
         Shader.SetGlobalFloat(SnowShaderIDs.FallbackRhoN, settings.DefaultRhoN);

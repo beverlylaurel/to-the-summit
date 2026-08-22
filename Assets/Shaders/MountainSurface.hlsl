@@ -129,6 +129,18 @@ float MountainBand(float3 worldPos)
 // kendiliğinden kapanıyor — ek bir anahtar gerekmiyor.
 #include "../Snow/Shaders/SnowCommon.hlsl"
 
+// Detay normalleri spec §14.2'nin kendi tablosundan. Dağ tarafında yalnız
+// MACRO katmanı (8 m tile, rüzgâr dalgaları) açılıyor: kalite keyword'leri
+// burada tanımlı değil, o yüzden Meso/Micro blokları derlenmiyor.
+//
+// Bu bir kısıtlama değil, doğru yer: Meso 0.6 m ve Micro 0.05 m yakın alan
+// detayı ve o alanı zaten kar mesh'i (clipmap, 128 m) tam katmanla çiziyor.
+// Dağ katmanı 128 m'nin ötesinde başlıyor, orada ikisi de alt piksel.
+//
+// Macro'nun tile'ı 8 m — arazi heightmap'inin tekseli 7.32 m. Düz beyaz karın
+// teşhir ettiği o basamak ölçeğini kıran katman tam bu.
+#include "../Snow/Shaders/SnowDetailNormals.hlsl"
+
 
 struct MountainSurface
 {
@@ -459,7 +471,14 @@ MountainSurface BuildMountainSurface(float3 worldPos)
 
         // Kar kayanın kabartısını GÖMÜYOR: normal düzleşip geometrik normale
         // dönüyor. Kar altındaki çatlağı göstermek kar değil, ıslak kaya olur.
-        surface.normalWS = normalize(lerp(surface.normalWS, normalWS, snowMask));
+        float3 snowNormal = normalWS;
+
+        // Spec §14.2 Macro katmanı. `disturb` sıfır: dağda iz yok, ezilmiş kar
+        // katmanının burada karşılığı da yok.
+        snowNormal = SnowApplyDetailNormals(snowNormal, worldPos, freshness, 0.0,
+                                            length(_WorldSpaceCameraPos - worldPos));
+
+        surface.normalWS = normalize(lerp(surface.normalWS, snowNormal, snowMask));
 
         // Mikro-oyuk karın altında kalıyor.
         surface.occlusion = lerp(surface.occlusion, 1.0, snowMask * 0.7);

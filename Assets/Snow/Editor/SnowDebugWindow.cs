@@ -475,6 +475,8 @@ public class SnowDebugWindow : EditorWindow
         groundSerialized.ApplyModifiedProperties();
 
         var managerSerialized = new SerializedObject(manager);
+        managerSerialized.FindProperty("detailNormal").objectReferenceValue =
+            SnowTextureBaker.EnsureDetailNormal();
         managerSerialized.FindProperty("settings").objectReferenceValue = settings;
         managerSerialized.FindProperty("environmentSource").objectReferenceValue = bridge;
         managerSerialized.FindProperty("followTarget").objectReferenceValue =

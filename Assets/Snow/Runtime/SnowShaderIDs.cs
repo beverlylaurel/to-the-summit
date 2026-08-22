@@ -85,8 +85,6 @@ public static class SnowShaderIDs
     // --- Sastrugi (spec §18.4) ---
     public static readonly int SastrugiWindDir = Shader.PropertyToID("_SastrugiWindDir");
     public static readonly int SastrugiNoise = Shader.PropertyToID("_SastrugiNoise");
-    public static readonly int SastrugiLength = Shader.PropertyToID("_SastrugiLength");
-    public static readonly int SastrugiWidth = Shader.PropertyToID("_SastrugiWidth");
 
     // --- Kar yüzeyi materyali ---
     public static readonly int FallbackSWE = Shader.PropertyToID("_FallbackSWE");
