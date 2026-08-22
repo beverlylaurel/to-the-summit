@@ -1,0 +1,92 @@
+// ROL: kar sisteminin sahne kurulumunu kendiliğinden koşturur.
+// Çağıran: Unity (domain reload ve Play'e girişte).
+
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+
+/// KURULUMA TIKLAMAK KULLANICININ İŞİ DEĞİL.
+///
+/// `CLAUDE.md`: "Claude bir şeyi otomatikleştirebiliyorsa otomatikleştirir.
+/// Kullanıcıya 'şu menüye tıkla' demek son çaredir." Kar sistemine her yeni
+/// referans eklendiğinde kullanıcıdan düğmeye basması istendi ve bir kez
+/// unutuldu: `detailNormal` boş kaldı, bağlanmamış sampler NaN üretti, dağın
+/// tamamı siyah çıktı. Hiçbir yerde hata mesajı yoktu.
+///
+/// Bu araç domain reload'dan sonra ve Play'e girmeden önce sahneyi denetliyor;
+/// eksik referans varsa kurulumu koşturup tek satır bildiriyor.
+///
+/// EKSİK YOKSA HİÇBİR ŞEY YAPMIYOR: sahne kirletilmiyor, log basılmıyor.
+[InitializeOnLoad]
+public static class SnowAutoWire
+{
+    /// Boş olması kurulumu tetikleyen alanlar. Hepsi `SnowManager` üzerinde ve
+    /// hepsi kurulumun bağlayabildiği şeyler — kullanıcı kararı olan alanlar
+    /// (karakterin ayak kemiği, ateşin ısı kaynağı) burada YOK.
+    static readonly string[] Required =
+    {
+        "settings", "simCompute", "captureShader", "skyShader",
+        "groundHeight", "environmentSource", "followTarget", "detailNormal",
+    };
+
+    static SnowAutoWire()
+    {
+        // TEK ATIŞLIK `delayCall` YETMİYOR. Domain reload'dan hemen sonra
+        // derleme veya asset import sürüyor olabiliyor; o an çıkılırsa bir
+        // daha çağrılan olmuyor ve denetim sessizce atlanıyor (ölçüldü:
+        // `detailNormal` boş kaldı, kurulum hiç koşmadı).
+        //
+        // Koşullar oluşana kadar `update`'te bekleniyor, bir kez koşup
+        // kendini söküyor.
+        EditorApplication.update += Tick;
+        EditorApplication.playModeStateChanged += OnPlayMode;
+    }
+
+    static void OnPlayMode(PlayModeStateChange state)
+    {
+        // Play'e girerken bir kez daha bakılıyor: sahne bu arada değişmiş
+        // olabilir.
+        if (state == PlayModeStateChange.ExitingEditMode) Check();
+    }
+
+    static void Tick()
+    {
+        if (EditorApplication.isCompiling || EditorApplication.isUpdating
+            || EditorApplication.isPlayingOrWillChangePlaymode)
+            return;
+
+        EditorApplication.update -= Tick;
+        Check();
+    }
+
+    static void Check()
+    {
+        if (EditorApplication.isPlaying) return;
+
+        var manager = Object.FindAnyObjectByType<SnowManager>();
+        if (manager == null) return;   // Kar sistemi kurulmamış: karışmıyoruz.
+
+        var so = new SerializedObject(manager);
+
+        int missing = 0;
+        string first = null;
+
+        foreach (string name in Required)
+        {
+            SerializedProperty prop = so.FindProperty(name);
+            if (prop != null && prop.objectReferenceValue != null) continue;
+
+            missing++;
+            first ??= name;
+        }
+
+        if (missing == 0) return;
+
+        SnowDebugWindow.SetupScene();
+
+        EditorSceneManager.MarkSceneDirty(manager.gameObject.scene);
+
+        Debug.Log($"[Kar] {missing} referans boştu (ilki `{first}`), sahne kurulumu " +
+                  "kendiliğinden koşturuldu.");
+    }
+}

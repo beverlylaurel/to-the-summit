@@ -387,7 +387,12 @@ public class SnowDebugWindow : EditorWindow
 
     /// SAHNE ELLE DÜZENLENMİYOR. Proje kuralı: bileşen ekleme, referans bağlama ve
     /// layer açma kodda yapılıyor; kullanıcı yalnız düğmeye basıyor.
-    static void SetupScene()
+    /// KURULUM TEK YERDE, İKİ TETİKLEYİCİ.
+    ///
+    /// `SnowAutoWire` bunu eksik referans gördüğünde kendiliğinden çağırıyor;
+    /// düğme de yerinde duruyor. Ayrı bir sınıfa çıkarmak denendi ve on üç
+    /// sabit, altı yardımcı metot peşinden sürüklendi — kazancı yoktu.
+    public static void SetupScene()
     {
         EnsureLayer(SnowProjectCheck.DeformerLayer);
         EnsureLayer(SnowProjectCheck.OccluderLayer);

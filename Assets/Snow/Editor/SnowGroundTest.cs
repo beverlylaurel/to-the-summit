@@ -301,7 +301,7 @@ public static class SnowGroundTest
         }
         else
         {
-            var so = new UnityEditor.SerializedObject(manager);
+            UnityEditor.SerializedObject so = new(manager);
 
             string[] required = { "settings", "simCompute", "captureShader", "skyShader",
                                   "groundHeight", "environmentSource", "followTarget",
@@ -322,9 +322,44 @@ public static class SnowGroundTest
 
             if (empty > 0)
             {
+                // KURULUMU BURADA KOŞTURUP TEKRAR BAKIYORUZ. Böylece "otomatik
+                // kurulum çalışmıyor" ile "kurulum çalışıyor ama bu alanı
+                // dolduramıyor" ayrışıyor — ikisi dışarıdan aynı görünüyor.
                 r.AppendLine();
-                r.AppendLine("      " + empty + " referans boş. Kar Teşhisi'nde \"Sahneyi kur\".");
-                sourceIsVisible = false;
+                r.AppendLine("      " + empty + " referans boştu; kurulum koşturuluyor…");
+
+                string failure = null;
+
+                try { SnowDebugWindow.SetupScene(); }
+                catch (System.Exception e) { failure = e.GetType().Name + ": " + e.Message; }
+
+                if (failure != null)
+                {
+                    r.AppendLine("      [-] KURULUM ÇÖKTÜ — " + failure);
+                    sourceIsVisible = false;
+                }
+                else
+                {
+                    so = new UnityEditor.SerializedObject(manager);
+                    int stillEmpty = 0;
+
+                    foreach (string name in required)
+                    {
+                        var prop = so.FindProperty(name);
+                        bool ok = prop != null && prop.objectReferenceValue != null;
+
+                        if (!ok)
+                        {
+                            stillEmpty++;
+                            r.AppendLine("      [-] " + name + " kurulumdan SONRA da boş");
+                        }
+                    }
+
+                    if (stillEmpty == 0)
+                        r.AppendLine("      [+] Kurulum tamamladı; eksik kalmadı.");
+                    else
+                        sourceIsVisible = false;
+                }
             }
         }
 

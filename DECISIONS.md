@@ -1017,6 +1017,31 @@ Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olma
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
 
+## Sahne kurulumu artık kendiliğinden koşuyor (2026-08-22)
+
+Kar sistemine her yeni referans eklendiğinde kullanıcıdan "Sahneyi kur"a
+basması istendi. Bir kez unutuldu ve bedeli görünmezdi: `detailNormal` boş
+kaldı, bağlanmamış sampler `UnpackNormal(beyaz)` → `sqrt(1-1-1)` → NaN üretti,
+dağın tamamı siyah çıktı. Hiçbir yerde hata mesajı yok.
+
+`CLAUDE.md` zaten "Claude otomatikleştirebiliyorsa otomatikleştirir, kullanıcıya
+menü tıklatmak son çaredir" diyordu; kural çiğnenmişti.
+
+`SnowAutoWire` domain reload'dan sonra ve Play'e girmeden önce `SnowManager`'ın
+sekiz referansına bakıyor, eksik varsa `SnowDebugWindow.SetupScene()`'i
+koşturup tek satır bildiriyor. Eksik yoksa hiçbir şey yapmıyor.
+
+**Denenip geri alındı:** kurulumu ayrı bir `SnowSceneSetup` sınıfına çıkarmak.
+On üç sabit ve altı yardımcı metot peşinden sürükledi, kazancı yoktu; metot
+pencerede `public` yapıldı.
+
+**Ayrıca harness düzeltildi.** Derleme hatası `snow-test.log`'a GİRMİYOR: editör
+assembly'si bozulunca sınamayı ESKİ assembly koşturuyor ve rapor taze ama bayat
+çıkıyor. İki tur bu yüzden yandı. Koşucu betiği artık `Logs/Editor.log`'un
+yalnız o koşuda büyüyen kısmını tarıyor.
+
+---
+
 ## Spec baştan sona tarandı: dört boşluk, hepsi düzmetinde (2026-08-22)
 
 Kullanıcı "sürekli bir şeyler atladığımızı fark ediyorsun" deyince tek tek
