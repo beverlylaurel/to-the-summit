@@ -79,6 +79,11 @@
 #define SNOW_CRUST_BREAK_PEN         0.05
 #define SNOW_CRUST_SINK_SCALE        0.04
 
+/// Kar mesh'inin kenarı bu kadar arazinin altına iniyor. Terrain tekseli
+/// 7.32 m; iki yüzeyin arasındaki fark bu değerin altında kalırsa kenar yine
+/// görünür. 10 cm ölçülmüş güvenli değer.
+#define SNOW_MESH_EDGE_SINK          0.10
+
 // --- Sastrugi (spec §18.4) ---
 #define SNOW_SASTRUGI_TAU          900.0
 #define SNOW_SASTRUGI_BURY         260.0

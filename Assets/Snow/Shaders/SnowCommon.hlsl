@@ -415,19 +415,19 @@ float SnowSurfaceAt(float2 uv)
     // §18.4'ün "en sık atlanan adım" dediği yer burası.
     h += SnowSastrugiOffset(SnowUVToWorld(uv), t.a * inside);
 
-    // KENAR SÖNÜMÜ BURADA, KÖŞE SHADER'INDA DEĞİL.
+    // KENAR SÖNÜMÜ BURADA, KÖŞE SHADER'INDA DEĞİL: fragment normali bu
+    // fonksiyondan merkezi farkla hesaplanıyor, sönüm yalnız vertex'te
+    // olursa geometri ile normal aynı yüzeyi tarif etmiyor.
     //
-    // Sönüm bir süre yalnız vertex'te uygulandı ve HİÇBİR ŞEY DÜZELMEDİ:
-    // fragment normali bu fonksiyondan merkezi farkla hesaplanıyor, yani
-    // geometri ile normal AYNI yüzeyi tarif etmiyordu. `SnowInsideMask`'in
-    // basamağını merkezi fark büyütüyor ve bölge sınırında dikey çizgilerle
-    // dolu parlak bir şerit bırakıyordu (ölçüldü: yer değiştirme tamamen
-    // kapatılınca şerit KALDI — yani geometri değil, gölgeleme).
-    //
-    // Yükseklik tek yerden geliyor: köşe de normal de aynı sayıyı okuyor.
-    h *= SnowMeshEdgeFade(SnowUVToWorld(uv));
+    // KENAR KESİLMİYOR, GÖMÜLÜYOR. Sönümün kalınlığı sıfıra indirdiği bantta
+    // yükseklik 4 mm eşiğinden geçiyor ve `clip(edgeFade − breakup*0.6)`
+    // kenarı testere gibi kemiriyordu — bandı genişletmek testereyi de
+    // genişletti (ölçüldü, üç tur). Kenar artık arazinin ALTINA iniyor:
+    // gömülü kenarı arazi örtüyor, kırpmanın tırtığı görünmüyor ve
+    // z-fighting de kalmıyor.
+    float fade = SnowMeshEdgeFade(SnowUVToWorld(uv));
 
-    return max(h, 0.0);
+    return h * fade - (1.0 - fade) * SNOW_MESH_EDGE_SINK;
 }
 
 #endif
