@@ -26,6 +26,9 @@ public class SnowManager : MonoBehaviour
 
     [Tooltip("Kar yağışı. Boş bırakılırsa yağış çizilmez, gerisi çalışır.")]
     [SerializeField] SnowfallRenderer snowfallRenderer;
+
+    [Tooltip("Ayak tozu ve püskürtme havuzu. Boş bırakılırsa çizilmez.")]
+    [SerializeField] SnowBurstParticles burstParticles;
     [SerializeField] ComputeShader simCompute;
 
     [Tooltip("Hidden/Snow/CaptureDepth — deformer'ların alt yüzeyini yazar.")]
@@ -435,13 +438,29 @@ public class SnowManager : MonoBehaviour
             pendingScrollTexels = Vector2Int.zero;
         }
 
+        // HER GEÇİŞ AYRI ÖRNEKLEYİCİDE (spec §15.1). `SnowProfiler` bunları
+        // okuyup ms cinsinden yayınlıyor; ölçülmeden kabul edilmiyor.
+        cmd.BeginSample(SnowProfiler.MarkerNames[0]);
         DispatchSky(cmd, restoreView, restoreProj);
+        cmd.EndSample(SnowProfiler.MarkerNames[0]);
+
+        cmd.BeginSample(SnowProfiler.MarkerNames[1]);
         DispatchCapture(cmd, groups, restoreView, restoreProj);
+        cmd.EndSample(SnowProfiler.MarkerNames[1]);
+
+        cmd.BeginSample(SnowProfiler.MarkerNames[2]);
         DispatchTrail(cmd, groups);
+        cmd.EndSample(SnowProfiler.MarkerNames[2]);
+
+        cmd.BeginSample(SnowProfiler.MarkerNames[3]);
         DispatchAccumulate(cmd, groups);
+        cmd.EndSample(SnowProfiler.MarkerNames[3]);
 
         // Yağış simülasyonu da AYNI tamponda (spec §15.2).
+        cmd.BeginSample(SnowProfiler.MarkerNames[4]);
         if (snowfallRenderer != null) snowfallRenderer.Dispatch(cmd);
+        if (burstParticles != null) burstParticles.Dispatch(cmd);
+        cmd.EndSample(SnowProfiler.MarkerNames[4]);
 
         // Ping-pong sonrası hangi dokunun güncel olduğu değişti; aynı karenin
         // geometrisi eskisini okumasın diye globaller burada tazeleniyor.

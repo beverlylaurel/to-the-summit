@@ -190,6 +190,21 @@ public class SnowDebugWindow : EditorWindow
             (manager.CaptureActive ? "aktif" : "boşta") +
             "   deformer " + SnowDeformerRegistry.Count);
 
+        var profiler = Object.FindAnyObjectByType<SnowProfiler>();
+
+        if (profiler != null)
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField("Geçiş süreleri (spec §15.1)", EditorStyles.boldLabel);
+
+            for (int i = 0; i < SnowProfiler.MarkerNames.Length; i++)
+                EditorGUILayout.LabelField(SnowProfiler.MarkerNames[i],
+                    profiler.MillisecondsFor(i).ToString("0.000") + " ms");
+
+            EditorGUILayout.LabelField("TOPLAM",
+                profiler.TotalMilliseconds.ToString("0.000") + " ms   (hedef < 1.500)");
+        }
+
         ISnowEnvironmentSource env = manager.Environment;
 
         if (env != null)
@@ -260,6 +275,7 @@ public class SnowDebugWindow : EditorWindow
     const string ParticleShaderPath = "Assets/Snow/Shaders/SnowfallParticle.shader";
     const string FlakeMaterialPath = "Assets/Snow/Settings/M_SnowFlake.mat";
     const string DriftMaterialPath = "Assets/Snow/Settings/M_SnowDrift.mat";
+    const string PuffMaterialPath = "Assets/Snow/Settings/M_SnowPuff.mat";
     const string SnowLitMaterialPath = "Assets/Snow/Settings/M_SnowLit.mat";
 
     /// SAHNE ELLE DÜZENLENMİYOR. Proje kuralı: bileşen ekleme, referans bağlama ve
@@ -295,6 +311,15 @@ public class SnowDebugWindow : EditorWindow
 
         var snowfall = go.GetComponent<SnowfallRenderer>();
         if (snowfall == null) snowfall = go.AddComponent<SnowfallRenderer>();
+
+        var burst = go.GetComponent<SnowBurstParticles>();
+        if (burst == null) burst = go.AddComponent<SnowBurstParticles>();
+
+        var sampler = go.GetComponent<SnowSampler>();
+        if (sampler == null) sampler = go.AddComponent<SnowSampler>();
+
+        if (go.GetComponent<SnowProfiler>() == null)
+            go.AddComponent<SnowProfiler>();
 
         var player = Object.FindAnyObjectByType<FirstPersonController>();
 
@@ -348,8 +373,26 @@ public class SnowDebugWindow : EditorWindow
         snowfallSerialized.FindProperty("environmentSource").objectReferenceValue = bridge;
         snowfallSerialized.ApplyModifiedProperties();
 
+        Material puffMat = LoadOrCreateParticleMaterial(PuffMaterialPath, stretch: false, alpha: 0.7f);
+
+        var burstSerialized = new SerializedObject(burst);
+        burstSerialized.FindProperty("snowfallCompute").objectReferenceValue =
+            AssetDatabase.LoadAssetAtPath<ComputeShader>(SnowfallComputePath);
+        burstSerialized.FindProperty("material").objectReferenceValue = puffMat;
+        burstSerialized.ApplyModifiedProperties();
+
+        var samplerSerialized = new SerializedObject(sampler);
+        samplerSerialized.FindProperty("manager").objectReferenceValue = manager;
+        samplerSerialized.FindProperty("followTarget").objectReferenceValue =
+            player != null ? player.transform : null;
+        samplerSerialized.ApplyModifiedProperties();
+
         managerSerialized.FindProperty("snowfallRenderer").objectReferenceValue = snowfall;
+        managerSerialized.FindProperty("burstParticles").objectReferenceValue = burst;
         managerSerialized.ApplyModifiedProperties();
+
+        EditorUtility.SetDirty(burst);
+        EditorUtility.SetDirty(sampler);
 
         EditorUtility.SetDirty(snowfall);
         EditorUtility.SetDirty(clipmap);

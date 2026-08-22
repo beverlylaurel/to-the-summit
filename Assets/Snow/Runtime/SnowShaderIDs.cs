@@ -122,6 +122,10 @@ public static class SnowShaderIDs
     public static readonly int DriftStripWidth = Shader.PropertyToID("_DriftStripWidth");
     public static readonly int StretchAlongVelocity = Shader.PropertyToID("_StretchAlongVelocity");
     public static readonly int AlphaScale = Shader.PropertyToID("_AlphaScale");
+    public static readonly int BurstGravity = Shader.PropertyToID("_BurstGravity");
+    public static readonly int BurstDrag = Shader.PropertyToID("_BurstDrag");
+    public static readonly int BurstWindPull = Shader.PropertyToID("_BurstWindPull");
+    public static readonly int BurstGrowth = Shader.PropertyToID("_BurstGrowth");
 
     // --- Teşhis penceresi ---
     public static readonly int DebugMode = Shader.PropertyToID("_DebugMode");

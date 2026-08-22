@@ -280,3 +280,57 @@ void KDriftUpdate(uint3 id : SV_DispatchThreadID)
 
     _Flakes[idx] = f;
 }
+
+// ------------------------------------------------------------------ patlamalar
+
+#pragma kernel KBurstUpdate
+
+/// Patlama tipi parcaciklar: ayak tozu (spec 19.3) ve kar puskurtme
+/// (spec 18.6). Ikisi de kisa omurlu, yercekimiyle dusen, ruzgarla
+/// suruklenen ve dagilarak buyuyen tanelerdir; tek kernel yetiyor.
+float _BurstGravity;
+float _BurstDrag;
+float _BurstWindPull;
+float _BurstGrowth;
+
+[numthreads(64, 1, 1)]
+void KBurstUpdate(uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+    if (idx >= _FlakeCapacity) return;
+
+    SnowFlake f = _Flakes[idx];
+
+    // Olu yuva: hicbir sey yapilmiyor. Doguran taraf CPU (SnowBurstParticles).
+    if (f.lifetime <= 0.0) return;
+
+    float dt = _SnowDeltaTime;
+
+    f.age += dt;
+
+    if (f.age >= f.lifetime)
+    {
+        f.lifetime = 0.0;
+        f.alpha = 0.0;
+        _Flakes[idx] = f;
+        return;
+    }
+
+    // KAR TANESI HAFIF: yercekimi kisilmis, suruklenme baskin (spec 18.6).
+    f.velocity.y += _BurstGravity * dt;
+    f.velocity += _WindWS * _BurstWindPull * dt;
+    f.velocity *= exp(-_BurstDrag * dt);
+
+    f.position += f.velocity * dt;
+
+    // Zemine carpinca sonuyor; sekmiyor - omur zaten kisa.
+    float groundY = SampleGroundHeight(f.position.xz);
+    if (f.position.y < groundY) f.position.y = groundY;
+
+    float t = saturate(f.age / max(f.lifetime, 1e-3));
+
+    f.size *= 1.0 + _BurstGrowth * dt;
+    f.alpha = saturate(t / 0.10) * saturate((1.0 - t) / 0.50);
+
+    _Flakes[idx] = f;
+}
