@@ -30,7 +30,7 @@ public class SnowFarCascade : MonoBehaviour
     RenderTexture far;
     RenderTexture farTemp;
 
-    int scrollKernel = -1;
+    int scrollStateKernel = -1;
     int accumulateKernel = -1;
 
     Vector2Int centerTexel;
@@ -54,7 +54,7 @@ public class SnowFarCascade : MonoBehaviour
         far = Create("RT_SnowFar");
         farTemp = Create("RT_SnowFarTemp");
 
-        scrollKernel = simCompute.FindKernel("KFarScroll");
+        scrollStateKernel = simCompute.FindKernel("KFarScrollState");
         accumulateKernel = simCompute.FindKernel("KFarAccumulate");
 
         centerTexel = Snap(followTarget.position);
@@ -133,7 +133,7 @@ public class SnowFarCascade : MonoBehaviour
         {
             cmd.SetComputeVectorParam(simCompute, SnowShaderIDs.FarScrollTexels, Vector4.zero);
             cmd.SetComputeVectorParam(simCompute, SnowShaderIDs.FarNewEdgeValue,
-                new Vector4(settings.DefaultSwe, settings.DefaultRhoN, 0f, 0f));
+                new Vector4(0f, settings.DefaultRhoN, 0f, 0f));
 
             // Kaydırmayı sıfır deltayla koşturmak dokuyu kenar değeriyle
             // doldurmuyor; temizlik için delta dokunun tamamı kadar veriliyor.
@@ -149,9 +149,9 @@ public class SnowFarCascade : MonoBehaviour
             cmd.SetComputeVectorParam(simCompute, SnowShaderIDs.FarScrollTexels,
                 new Vector4(pendingScrollTexels.x, pendingScrollTexels.y, 0f, 0f));
 
-            // Yeni açılan şerit dünyanın genel durumuyla doluyor.
+            // Yeni açılan şerit kar çizgisi eğrisinden doluyor (KFarScrollState).
             cmd.SetComputeVectorParam(simCompute, SnowShaderIDs.FarNewEdgeValue,
-                new Vector4(settings.DefaultSwe, settings.DefaultRhoN, 0f, 0f));
+                new Vector4(0f, settings.DefaultRhoN, 0f, 0f));
 
             Scroll(cmd, groups);
 
@@ -171,9 +171,10 @@ public class SnowFarCascade : MonoBehaviour
 
     void Scroll(CommandBuffer cmd, int groups)
     {
-        cmd.SetComputeTextureParam(simCompute, scrollKernel, SnowShaderIDs.FarSrc, far);
-        cmd.SetComputeTextureParam(simCompute, scrollKernel, SnowShaderIDs.FarDst, farTemp);
-        cmd.DispatchCompute(simCompute, scrollKernel, groups, groups, 1);
+        // Kaskad HER ZAMAN durum dokusu; yeni şerit kar çizgisinden doluyor.
+        cmd.SetComputeTextureParam(simCompute, scrollStateKernel, SnowShaderIDs.FarSrc, far);
+        cmd.SetComputeTextureParam(simCompute, scrollStateKernel, SnowShaderIDs.FarDst, farTemp);
+        cmd.DispatchCompute(simCompute, scrollStateKernel, groups, groups, 1);
 
         (far, farTemp) = (farTemp, far);
     }

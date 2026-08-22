@@ -19,6 +19,8 @@ public class DebugMenu : MonoBehaviour
     [SerializeField] TimeOfDay time;
     [SerializeField] AtmosphereController atmosphere;
     [SerializeField] PrecipitationRenderer precipitation;
+    [SerializeField] SnowEnvironmentBridge snowBridge;
+    [SerializeField] SnowfallRenderer snowfall;
     [SerializeField] PerformanceHud hud;
     [SerializeField] ClimbHud climbHud;
     [SerializeField] CursorLock cursorLock;
@@ -50,6 +52,12 @@ public class DebugMenu : MonoBehaviour
     /// üçü dışarıdan aynı görünüyor.
 
     bool weatherLocked;
+
+    bool snowLocked;
+    float lockedSnowIntensity = 1f;
+    float lockedSnowTempC = -6f;
+    float snowDensityMul = 1f;
+    float snowSizeMul = 1f;
     float lockedPrecipitation = 0.6f;
 
     bool windLocked;
@@ -206,6 +214,7 @@ public class DebugMenu : MonoBehaviour
         BeginColumn();
         DrawWeather();
         DrawWind();
+        DrawSnow();
         EndColumn();
 
         BeginColumn();
@@ -449,6 +458,92 @@ public class DebugMenu : MonoBehaviour
               $"ışık {lightning.Intensity:F2}   parlama {lightning.Glow:F2}");
 
         lightning.Held = GUILayout.Toggle(lightning.Held, "Çakmayı sabit yak");
+
+        EndSection();
+    }
+
+    /// KAR. Sürgüler köprünün `NonSerialized` geçersiz kılmalarına yazıyor:
+    /// sahneye de ayar dosyasına da dokunulmuyor, Play'den çıkınca sıfırlanıyor.
+    void DrawSnow()
+    {
+        BeginSection("Kar");
+
+        if (snowBridge == null)
+        {
+            GUILayout.Label("Kar köprüsü atanmadı — Kar Teşhisi'nde \"Sahneyi kur\".");
+            EndSection();
+            return;
+        }
+
+        GUILayout.Label($"Yağıyor {(SnowRuntimeState.IsSnowing ? "evet" : "hayır")}   " +
+                        $"şiddet {SnowRuntimeState.SnowfallIntensity01:F2}   " +
+                        $"yağmur payı {SnowRuntimeState.RainWeight01:F2}");
+
+        GUILayout.Label($"Zemin kaplaması {SnowRuntimeState.GroundCoverage01:F2}   " +
+                        $"gevşek kar {SnowRuntimeState.LooseSnowFraction:F2}");
+
+        if (snowfall != null)
+            GUILayout.Label($"Canlı tane {snowfall.AliveFlakes}   " +
+                            $"savrulma {snowfall.AliveDrift}");
+
+        // Sıcaklık ve şiddet KÖPRÜDEN geçiyor; kar sistemi kendi kararını
+        // yine kendi histerezisiyle veriyor. Sürgü kararı atlamıyor.
+        bool next = GUILayout.Toggle(snowLocked, "Karı elle ayarla");
+        if (next != snowLocked)
+        {
+            snowLocked = next;
+            if (!snowLocked) snowBridge.ClearOverrides();
+        }
+
+        using (new Disabled(!snowLocked))
+        {
+            GUILayout.Label($"Yağış şiddeti {lockedSnowIntensity:F2}");
+            lockedSnowIntensity = GUILayout.HorizontalSlider(lockedSnowIntensity, 0f, 1f);
+
+            GUILayout.Label($"Sıcaklık {lockedSnowTempC:F1} °C   " +
+                            "(0,5 altında kar, 2,0 üstünde yağmur)");
+            lockedSnowTempC = GUILayout.HorizontalSlider(lockedSnowTempC, -25f, 10f);
+        }
+
+        if (snowLocked)
+        {
+            snowBridge.OverridePrecip01 = lockedSnowIntensity;
+            snowBridge.OverrideTemperatureC = lockedSnowTempC;
+        }
+
+        GUILayout.Space(6f);
+
+        using (new Disabled(snowfall == null))
+        {
+            GUILayout.Label($"Tane yoğunluğu ×{snowDensityMul:F2}");
+            snowDensityMul = GUILayout.HorizontalSlider(snowDensityMul, 0.1f, 4f);
+
+            GUILayout.Label($"Tane boyu ×{snowSizeMul:F2}");
+            snowSizeMul = GUILayout.HorizontalSlider(snowSizeMul, 0.25f, 6f);
+        }
+
+        if (snowfall != null)
+        {
+            snowfall.DensityMultiplier = snowDensityMul;
+            snowfall.SizeMultiplier = snowSizeMul;
+        }
+
+        if (GUILayout.Button("Ayarları geri al"))
+        {
+            snowLocked = false;
+            snowBridge.ClearOverrides();
+
+            lockedSnowIntensity = 1f;
+            lockedSnowTempC = -6f;
+            snowDensityMul = 1f;
+            snowSizeMul = 1f;
+
+            if (snowfall != null)
+            {
+                snowfall.DensityMultiplier = 1f;
+                snowfall.SizeMultiplier = 1f;
+            }
+        }
 
         EndSection();
     }

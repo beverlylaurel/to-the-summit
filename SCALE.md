@@ -58,6 +58,7 @@ Bunlar gerçek dünyanın metreleri. Dağ iki katına çıkınca donma seviyesi 
 | Kar `SnapStep` | 0.25 m | Bölgenin oturduğu ızgara. Teksel boyuna değil oyuncunun hareketine ölçülü; üç presette de tam sayı teksele denk gelmeli (8 / 16 / 24) |
 | Kar halka 0 kapsamı | 8 m | Oyuncunun çevresindeki yoğun geometri; ölçüsü adım ve ayak izi, dağın boyu değil |
 | Kar halka oranı | ×3 | Clipmap kademesi; dağ büyüyünce kademe sayısı değişmez |
+| Kar çizgisi bandı | 450 m | Donma seviyesinin üstünde karın tam kalınlığa ulaştığı kot farkı. Kotun KENDİSİ dağın boyuyla kaymaz — sıcaklık alanından geliyor, o da deniz seviyesi + lapse rate |
 | Kar uzak kaskadı | 192 m / 512 teksel | Yakın bölgenin dışındaki kar durumu. Ölçüsü görüş mesafesi değil, karın kot bazında değiştiği mesafe |
 | Kar kalıcılık bloğu | 4 m | Saklanan parçanın boyu; ayak izi ölçeğine göre seçildi, dağın boyuna değil |
 | Perde doğum mesafesi | 35 m | Savrulan kar tabakasının kameraya ulaşma mesafesi |

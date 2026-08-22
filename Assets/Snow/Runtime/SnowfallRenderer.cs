@@ -22,8 +22,20 @@ public class SnowfallRenderer : MonoBehaviour
 
     const int ThreadGroupSize = 64;
 
-    /// Spec §17.1: Sistem A kapasitesi 40 000, Sistem B daha küçük.
-    const int FlakeCapacity = 40000;
+    /// KAPASITE SPEC'İN KENDİ FORMÜLÜNÜ KIRPIYORDU.
+    ///
+    /// Spec §17.1 kapasiteyi 40 000, §17.2 doğum oranını 16 000/s, ömrü
+    /// 4–9 s (ortalama 6.5) veriyor. Kararlı durumda 16 000 × 6.5 = 104 000
+    /// tane olması gerekiyor; 40 000 tavanı bunu i01 ≈ 0.385'ten sonra
+    /// kesiyor ve yoğunluğu şiddetten KOPARIYORDU.
+    ///
+    /// Fizik de daha fazlasını istiyor: 5 mm/sa SWE, 1 m/s düşme hızı,
+    /// 100 kg/m³ yoğunluk → havada ~139 tane/m³. Spec'in 40×26×40 kutusu
+    /// 41 600 m³; 40 000 tane 1 tane/m³ ediyor, iki kat mertebe seyrek.
+    /// 104 000 tane 2.5 tane/m³ — hâlâ fizikin altında ama tam şiddette
+    /// yoğun bir yağış görüntüsü veriyor ve şiddet–yoğunluk bağı doğrusal
+    /// kalıyor. Gerekçe `DECISIONS.md`.
+    const int FlakeCapacity = 160000;
     const int DriftCapacity = 8000;
 
     /// Doğum kutusu (spec §17.1). Kameranın 11 m üstünde, rüzgâr yönünde 3 m.
@@ -51,32 +63,13 @@ public class SnowfallRenderer : MonoBehaviour
     [Tooltip("Tanenin taban boyu (m). Rastgele 0.6–1.7 katıyla çarpılıyor.")]
     [SerializeField] float flakeBaseSize = 0.018f;
 
+    /// TEŞHİS GEÇERSİZ KILMALARI (F1). `NonSerialized`: sahneye yazılmıyor,
+    /// Play'den çıkınca sıfırlanıyor.
+    [System.NonSerialized] public float DensityMultiplier = 1f;
+    [System.NonSerialized] public float SizeMultiplier = 1f;
+
     [Tooltip("Yer savrulmasının azami doğum oranı katsayısı.")]
     [SerializeField, Range(0f, 1f)] float spindriftRate = 1f;
-
-    /// ÖLÇÜM GEÇERSİZ KILMALARI. Hepsi `NonSerialized` ve hepsi
-    /// MaterialPropertyBlock üzerinden — ne ayar dosyasına ne materyale
-    /// yazıyor, Play'den çıkınca sıfırlanıyor. Eksi değer "dokunma" demek.
-    ///
-    /// Belirti kapanınca silinecek.
-    [System.NonSerialized] public float ProbeCountScale = -1f;
-    [System.NonSerialized] public float ProbeAlphaScale = -1f;
-    [System.NonSerialized] public float ProbeMinPixelSize = -1f;
-
-    static readonly int AlphaScaleID = Shader.PropertyToID("_AlphaScale");
-    static readonly int MinPixelSizeID = Shader.PropertyToID("_MinPixelSize");
-
-    public bool HasProbeOverride =>
-        ProbeCountScale >= 0f || ProbeAlphaScale >= 0f || ProbeMinPixelSize >= 0f;
-
-    public void ClearProbeOverrides()
-    {
-        ProbeCountScale = -1f;
-        ProbeAlphaScale = -1f;
-        ProbeMinPixelSize = -1f;
-
-        flakeBlock?.Clear();
-    }
 
     ISnowEnvironmentSource env;
 
@@ -180,11 +173,10 @@ public class SnowfallRenderer : MonoBehaviour
         aliveDrift = DriftCountFor(env.WindSpeed, SnowRuntimeState.LooseSnowFraction,
                                    spindriftRate, settings.QualityData.VfxCapacityScale);
 
-        if (ProbeCountScale >= 0f)
-        {
-            aliveFlakes = Mathf.RoundToInt(aliveFlakes * ProbeCountScale);
-            aliveDrift = Mathf.RoundToInt(aliveDrift * ProbeCountScale);
-        }
+        aliveFlakes = Mathf.Clamp(Mathf.RoundToInt(aliveFlakes * DensityMultiplier),
+                                  0, FlakeCapacity);
+        aliveDrift = Mathf.Clamp(Mathf.RoundToInt(aliveDrift * DensityMultiplier),
+                                 0, DriftCapacity);
     }
 
     /// Kararlı durumda canlı tane sayısı = doğum oranı × ortalama ömür.
@@ -242,7 +234,8 @@ public class SnowfallRenderer : MonoBehaviour
 
         cmd.SetComputeFloatParam(snowfallCompute, SnowShaderIDs.SnowDeltaTime, Time.deltaTime);
         cmd.SetComputeFloatParam(snowfallCompute, SnowShaderIDs.FlakeSeed, Time.frameCount * 0.017f);
-        cmd.SetComputeFloatParam(snowfallCompute, SnowShaderIDs.FlakeBaseSize, flakeBaseSize);
+        cmd.SetComputeFloatParam(snowfallCompute, SnowShaderIDs.FlakeBaseSize,
+                                 flakeBaseSize * SizeMultiplier);
 
         cmd.SetComputeVectorParam(snowfallCompute, SnowShaderIDs.SpawnCenter, spawnCenter);
         cmd.SetComputeVectorParam(snowfallCompute, SnowShaderIDs.SpawnExtent, SpawnBox * 0.5f);
@@ -285,9 +278,6 @@ public class SnowfallRenderer : MonoBehaviour
         if (aliveFlakes > 0)
         {
             flakeBlock.SetBuffer(SnowShaderIDs.Flakes, flakes);
-
-            if (ProbeAlphaScale >= 0f) flakeBlock.SetFloat(AlphaScaleID, ProbeAlphaScale);
-            if (ProbeMinPixelSize >= 0f) flakeBlock.SetFloat(MinPixelSizeID, ProbeMinPixelSize);
 
             var rp = new RenderParams(flakeMaterial)
             {

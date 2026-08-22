@@ -89,12 +89,14 @@ public static class SnowfallTest
         // "referans" tablosu 1200 diyor. SWE sütunu doğrusal, tane sütunu
         // değil. Kod bloğu normatif, tablo referans — formül uygulandı.
         bool lowMatchesSpec = Mathf.Abs(low - 0.06f * 16000f * 6.5f) < 2f;
-        bool saturates = high == 40000;
-        bool monotone = low > 0 && low < mid && mid <= high && lowMatchesSpec && saturates;
+        // Tavan artık spec'in kendi formülünü kırpmıyor: tam şiddette
+        // 16000 × 6.5 = 104000 tane, kapasite 160000.
+        bool notClipped = high == Mathf.RoundToInt(16000f * 6.5f);
+        bool monotone = low > 0 && low < mid && mid < high && lowMatchesSpec && notClipped;
 
         all &= monotone;
         r.AppendLine("  [" + M(monotone) + "] Şiddet → tane     0.06 → " + low +
-                     ",  0.24 → " + mid + ",  1.00 → " + high + "  (kapasite tavanı 40000)");
+                     ",  0.24 → " + mid + ",  1.00 → " + high + "  (kırpılmıyor)");
 
         // Kalite preseti kapasiteyi ölçekliyor (spec §15.3).
         int lowQuality = SnowfallRenderer.FlakeCountFor(0.24f, 0.35f);

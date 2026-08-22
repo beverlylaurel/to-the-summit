@@ -98,9 +98,6 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
      adım olayına bağlanacak (klipler de atanacak)
   5. `SnowMovementModifier.SpeedMultiplier` hareket koduna bağlanacak
   → [Kar sistemi: spec'ten bilinçli sapmalar](#kar-sistemi-specten-bilinçli-sapmalar-ve-iki-assumption-2026-08-22)
-- **Köprünün iki TODO'su** — `PrecipKind` ve `FogDensity01` hâlâ elle girilen
-  değerlerden geliyor. Gerçek sistemlere bağlanması `SnowEnvironmentBridge`'de
-  yorum olarak hazır
 
 - **Şimşek yağan kar ve yağmuru aydınlatmalı** — kar/yağmur spec'lerine geçildiğinde
   ışık kaynağı listesine şimşek eklenecek
@@ -1019,6 +1016,70 @@ noktada saniyelerce durursa görünür.
 Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olmadan
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
+
+## Kar yoğunluğu: kapasite tavanı spec'in kendi formülünü kırpıyordu (2026-08-22)
+
+Kullanıcı "yağış 1 iken yoğun bir kar yağışı görmek istiyorum" dedi. Ölçüldü:
+
+- Spec §17.2 doğum oranı 16 000/s, §17.1 ömür 4–9 s (ortalama 6.5) → kararlı
+  durumda **104 000** tane olması gerekiyor.
+- Spec §17.1 kapasitesi **40 000**. Tavan, i01 ≈ 0.385'ten sonra yoğunluğu
+  şiddetten KOPARIYORDU.
+- Fizik: 5 mm/sa SWE, 1 m/s düşme hızı, 100 kg/m³ → havada **~139 tane/m³**.
+  Spec'in 40×26×40 kutusu 41 600 m³; 40 000 tane 1 tane/m³ ediyor.
+
+**Karar:** kapasite 160 000. Formül aynen spec'in; artık kırpılmıyor. 104 000
+tane 2.5 tane/m³ — hâlâ fizikin altında ama tam şiddette yoğun bir yağış
+veriyor ve şiddet–yoğunluk bağı doğrusal kalıyor. Bellek 160 000 × 48 B = 7.7 MB.
+
+**Tetikleyici:** yoğunluk hâlâ az geliyorsa F1 → Kar → "Tane yoğunluğu" ve
+"Tane boyu" sürgüleriyle beğenilen sayı bulunur, sonra varsayılan olur.
+
+---
+
+## Alt piksel tane: boy farkı parlaklık farkına çevrildi (2026-08-22)
+
+Belirti: "kar tanecikleri irili ufaklı değil". Ölçümde tanelerin **%92'si**
+asgari ekran boyu tabanına dayanmıştı — gerçek boyları 1.1–3.1 cm ama ekranda
+hepsi aynı 1.3 piksel.
+
+Asgari ekran boyu (spec §17.1) tanenin boyunu büyütüyor ama ışığını
+artırmıyordu. Alan oranı kadar soldurmak alt piksel bir yayıcının doğru
+integrali; boy farkı artık parlaklık farkı olarak taşınıyor. Spec'te bu adım
+yok ama spec'in dayattığı kenetlemenin doğru tamamlayıcısı.
+
+---
+
+## `ISnowEnvironmentSource`'a `FreezingLevelY` eklendi (2026-08-22)
+
+Spec §3.1 arayüzünde yok. Kar çizgisi (dağın hangi kottan yukarısının doğuştan
+karlı olduğu) bir sayıya ihtiyaç duyuyordu ve iki seçenek vardı: ayarlarda ayrı
+bir "kar çizgisi kotu" tutmak, ya da mevcut donma seviyesini okumak.
+
+Ayrı sayı **ikinci bir kaynak** olurdu: sıcaklık +8 °C iken bile tepe karlı,
+ya da tersi. `CLAUDE.md` → Atmosfer tutarlılığı bunu yasaklıyor. Donma seviyesi
+zaten `TemperatureField.FreezingLevel`'de var ve HUD'da gösteriliyor.
+
+**Maliyet:** arayüzü uygulayan her sınıf (köprü + iki sınama sahtesi) bir alan
+daha taşıyor.
+
+---
+
+## Kar çizgisi ayrı kernelde: bayrak sızdı, işaret çakıştı (2026-08-22)
+
+"Yeni açılan teksel kar çizgisinden dolsun" bilgisini taşımak için üç yol
+denendi:
+
+1. **`uint _EdgeUseSnowLine` bayrağı.** Compute nesnesinde kalıyor; sınama
+   rigleri sıfırlamadığı için bir önceki dispatch'in değeri iz dokusuna da
+   uygulandı. Altı kaydırma sınaması birden düştü.
+2. **Negatif SWE işareti.** `SnowScrollTest` kenar değeri olarak zaten
+   `(-1, -2, -3, -4)` kullanıyor; çakıştı.
+3. **Ayrı kernel** (`KClearState`, `KScrollState`, `KFarScrollState`).
+   Paylaşılan durum da işaret alanı da yok. Bu uygulandı.
+
+**Ders:** dispatch'ler arası taşınan bayrak, sıfırlamayı unutan HER çağıranı
+bozar. Sınama rigleri de çağıran sayılır.
 
 ## Kar sistemi spec'e karşı denetlendi (2026-08-22)
 

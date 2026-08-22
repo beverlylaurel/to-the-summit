@@ -102,6 +102,8 @@ public class SnowManager : MonoBehaviour
     readonly SnowfallController snowfall = new();
 
     int clearKernel = -1;
+    int clearStateKernel = -1;
+    int scrollStateKernel = -1;
     int scrollKernel = -1;
     int blurCaptureKernel = -1;
     int deformKernel = -1;
@@ -244,6 +246,8 @@ public class SnowManager : MonoBehaviour
         skyMaterial = new Material(skyShader) { hideFlags = HideFlags.HideAndDontSave };
 
         clearKernel = simCompute.FindKernel("KClear");
+        clearStateKernel = simCompute.FindKernel("KClearState");
+        scrollStateKernel = simCompute.FindKernel("KScrollState");
         scrollKernel = simCompute.FindKernel("KScroll");
         blurCaptureKernel = simCompute.FindKernel("KBlurCapture");
         deformKernel = simCompute.FindKernel("KDeform");
@@ -404,6 +408,12 @@ public class SnowManager : MonoBehaviour
         Shader.SetGlobalFloat(SnowShaderIDs.FallbackSWE, settings.DefaultSwe);
         Shader.SetGlobalFloat(SnowShaderIDs.FallbackRhoN, settings.DefaultRhoN);
 
+        // KAR ÇİZGİSİ DONMA SEVİYESİNDEN. Ayrı bir sayı tanımlanmıyor;
+        // sıcaklık alanı neredeyse kar da orada başlıyor.
+        Shader.SetGlobalFloat(SnowShaderIDs.SnowLineY, env.FreezingLevelY);
+        Shader.SetGlobalFloat(SnowShaderIDs.SnowLineBand, settings.SnowLineBand);
+        Shader.SetGlobalFloat(SnowShaderIDs.SnowLineSWE, settings.SnowLineSwe);
+
         // Sastrugi yönü YUMUŞATILIYOR (spec §18.4, tau 120 s).
         Vector2 rawWind = new Vector2(env.WindDirection.x, env.WindDirection.z);
 
@@ -475,7 +485,8 @@ public class SnowManager : MonoBehaviour
 
         if (pendingClear)
         {
-            ClearTo(cmd, snow, groups, new Vector4(settings.DefaultSwe, settings.DefaultRhoN, 0f, 0f));
+            ClearStateTo(cmd, snow, groups,
+                         new Vector4(0f, settings.DefaultRhoN, 0f, 0f));
             ClearTo(cmd, trail, groups, Vector4.zero);
             ClearTo(cmd, trailTemp, groups, Vector4.zero);
             ClearTo(cmd, capture, groups, Vector4.zero);
@@ -496,7 +507,7 @@ public class SnowManager : MonoBehaviour
 
             // RT_Snow: yeni şerit dünyanın genel kar durumuyla doluyor (spec §6.4).
             Scroll(cmd, groups, ref snow, ref snowTemp,
-                   new Vector4(settings.DefaultSwe, settings.DefaultRhoN, 0f, 0f));
+                   new Vector4(0f, settings.DefaultRhoN, 0f, 0f), true);
 
             pendingScroll = false;
             pendingScrollTexels = Vector2Int.zero;
@@ -799,13 +810,23 @@ public class SnowManager : MonoBehaviour
         cmd.DispatchCompute(simCompute, clearKernel, groups, groups, 1);
     }
 
-    void Scroll(CommandBuffer cmd, int groups, ref RenderTexture src, ref RenderTexture dst,
-                Vector4 newEdge)
+    /// Durum dokusu: SWE kanalı kar çizgisi eğrisinden doluyor.
+    void ClearStateTo(CommandBuffer cmd, RenderTexture target, int groups, Vector4 value)
     {
+        cmd.SetComputeVectorParam(simCompute, SnowShaderIDs.ClearValue, value);
+        cmd.SetComputeTextureParam(simCompute, clearStateKernel, SnowShaderIDs.Dst, target);
+        cmd.DispatchCompute(simCompute, clearStateKernel, groups, groups, 1);
+    }
+
+    void Scroll(CommandBuffer cmd, int groups, ref RenderTexture src, ref RenderTexture dst,
+                Vector4 newEdge, bool stateTexture = false)
+    {
+        int kernel = stateTexture ? scrollStateKernel : scrollKernel;
+
         cmd.SetComputeVectorParam(simCompute, SnowShaderIDs.NewEdgeValue, newEdge);
-        cmd.SetComputeTextureParam(simCompute, scrollKernel, SnowShaderIDs.Src, src);
-        cmd.SetComputeTextureParam(simCompute, scrollKernel, SnowShaderIDs.Dst, dst);
-        cmd.DispatchCompute(simCompute, scrollKernel, groups, groups, 1);
+        cmd.SetComputeTextureParam(simCompute, kernel, SnowShaderIDs.Src, src);
+        cmd.SetComputeTextureParam(simCompute, kernel, SnowShaderIDs.Dst, dst);
+        cmd.DispatchCompute(simCompute, kernel, groups, groups, 1);
 
         // Ping-pong: aynı doku hem kaynak hem hedef olamaz (spec §20).
         (src, dst) = (dst, src);

@@ -770,6 +770,24 @@ geri dönülünce yazılıyor — LRU 512 blok, 16 MB.
 bloklamadan geri okuyor; ayak sesi, hız çarpanı ve ayak tozu ondan besleniyor.
 Hız çarpanı YAYINLANIYOR, karakter controller'ına bağlanmıyor.
 
+**Kar ↔ mevcut hava (köprü bağlandı).** `SnowEnvironmentBridge` artık manuel
+sayı tutmuyor: rüzgâr `WindField`'dan, güneş yüksekliği `TimeOfDay`'den, sıcaklık
+`TemperatureField.At(gözlemci.y)`'den, yağış şiddeti `WeatherState`'ten, sis
+`AtmosphereController.Visibility`'den geliyor. Referans atanmamışsa o alan manuel
+değere düşüyor. Kar sistemi bunların hiçbirini YAZMIYOR.
+
+**Yağmur kar yağarken susuyor.** `SnowfallController` `SnowRuntimeState.RainWeight01`
+yayınlıyor; `PrecipitationRenderer` şiddetini bununla çarpıyor. Kar şiddeti de
+`1 − RainWeight01` ile kısılıyor: ikisinin ağırlığı aynı rampanın iki ucu, üst üste
+binme matematiksel olarak imkânsız. Bağ TEK YÖNLÜ — kar sistemi yağmurdan bir şey
+okumuyor.
+
+**Kar çizgisi donma seviyesinden.** Dağın belli bir kottan yukarısı doğuştan karlı.
+Kot `TemperatureField.FreezingLevel` → `ISnowEnvironmentSource.FreezingLevelY`;
+ayrı bir "kar çizgisi" sayısı YOK. Bant kalınlığı ve üstteki SWE `SnowSettings`'te.
+Başlangıç temizliği (`KClearState`), bölgeye yeni giren şerit (`KScrollState`),
+kaskadın yeni şeridi (`KFarScrollState`) ve kaskadın da dışı bu eğriden doluyor.
+
 **Kar olayları (Faz 11–13).** Kabuk `RT_Trail.B`'de, üçgen sıcaklık profiliyle
 (tepe −5 °C) oluşuyor ve yeterli yük binince kırılıyor — patikayla karıştırma,
 patika kırılmaz. Rüzgâr gölgesi `RT_WindShadow`'da Gauss-Seidel ile çözülüyor;

@@ -38,6 +38,14 @@ public interface ISnowEnvironmentSource
     /// Celsius. Gündöngüsü + mevsim bunu sürer.
     float TemperatureC { get; }
 
+    /// SICAKLIĞIN SIFIRA İNDİĞİ KOT (m).
+    ///
+    /// SPEC EKLENTİSİ (§3.1'de yok). Kar çizgisi bundan türüyor: dağın
+    /// belli bir kottan yukarısı doğuştan karlı. Ayrı bir "kar çizgisi"
+    /// sayısı tanımlamak ikinci bir kaynak yaratırdı ve "sıcaklık +8 ama
+    /// tepe karsız" gibi çelişkiler üretirdi. Gerekçe `DECISIONS.md`.
+    float FreezingLevelY { get; }
+
     // --- Yağış (mevcut yağmur sisteminden) ---
 
     PrecipitationKind PrecipKind { get; }

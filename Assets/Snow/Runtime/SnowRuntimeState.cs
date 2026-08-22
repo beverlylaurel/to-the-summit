@@ -22,9 +22,16 @@ public static class SnowRuntimeState
     /// 0..1 rüzgâr × yağış.
     public static float Stormness01 { get; internal set; }
 
-    /// Kar yağıyor mu. Mevcut yağmur sistemi bunu okuyup kendini susturmalı;
-    /// bağlamak kullanıcının işi (spec §3.4).
+    /// Kar yağıyor mu (spec §3.4).
     public static bool IsSnowing { get; internal set; }
+
+    /// YAĞMURUN AĞIRLIĞI. 1 = yağmur tam güçte, 0 = susturuldu.
+    ///
+    /// Kar başlayınca 1'den 0'a rampa iniyor; kar şiddeti ancak bu SIFIRA
+    /// ULAŞTIKTAN sonra yükselmeye başlıyor. İkisi asla aynı anda görünmüyor
+    /// — çapraz soldurma yumuşak geçiş değil, iki yağışın üst üste
+    /// binmesidir (`DECISIONS.md`).
+    public static float RainWeight01 { get; internal set; } = 1f;
 
     /// Oyun kapanırken veya sistem devre dışı kalırken sıfırlanıyor — statik
     /// alanlar Play oturumları arasında yaşıyor ve bayat değer okutuyor.
@@ -35,5 +42,6 @@ public static class SnowRuntimeState
         LooseSnowFraction = 0f;
         Stormness01 = 0f;
         IsSnowing = false;
+        RainWeight01 = 1f;
     }
 }

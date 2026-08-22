@@ -90,6 +90,22 @@ float3 _SnowUpDirection;
 float _FallbackSWE;
 float _FallbackRhoN;
 
+/// KAR ÇİZGİSİ. Donma seviyesinin üstünde kar kalıcı; altında yağdığı sürece
+/// birikip sonra eriyor. Başlangıç durumu, bölgeye YENİ giren teksel ve
+/// kaskadın da dışı bu eğriden doluyor — dağ karlı doğuyor.
+///
+/// `_SnowLineY` donma seviyesinden geliyor (`ISnowEnvironmentSource`), ayrı
+/// bir sayı değil: "sıcaklık +8 ama tepe karsız" çelişkisi böyle imkânsız.
+float _SnowLineY;
+float _SnowLineBand;
+float _SnowLineSWE;
+
+float SnowInitialSweAt(float groundY)
+{
+    float t = saturate((groundY - _SnowLineY) / max(_SnowLineBand, 1e-3));
+    return lerp(_FallbackSWE, _SnowLineSWE, t * t * (3.0 - 2.0 * t));
+}
+
 // ------------------------------------------------------------------ yakalama
 
 /// Yakalama hacminin sıfır noktası — gözlemcinin dünya Y'si.
@@ -278,7 +294,10 @@ float2 SnowFarStateAt(float2 posXZ)
 {
     float2 uv = (posXZ - _SnowFarCenter) / max(_SnowFarAreaSize, 1e-3) + 0.5;
 
-    if (any(uv < 0.0) || any(uv > 1.0)) return float2(_FallbackSWE, _FallbackRhoN);
+    // Kaskadın da dışı: sabit değil, kar çizgisi eğrisi. Sabit olsaydı
+    // dağın tepesi ile eteği aynı kalınlıkta kar taşırdı.
+    if (any(uv < 0.0) || any(uv > 1.0))
+        return float2(SnowInitialSweAt(SampleGroundHeight(posXZ)), _FallbackRhoN);
 
     return SAMPLE_TEXTURE2D_LOD(_SnowFarTex, sampler_LinearClamp, uv, 0).rg;
 }

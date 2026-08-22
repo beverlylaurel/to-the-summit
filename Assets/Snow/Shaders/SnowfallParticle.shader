@@ -130,6 +130,17 @@ Shader "ToTheSummit/SnowfallParticle"
 
                 float size = max(f.size, minWorld);
 
+                // ALT PİKSEL TANENİN IŞIĞI PİKSELE ORANLI DÜŞER.
+                //
+                // Asgari ekran boyu tanenin boyunu büyütüyor ama ışığını
+                // artırmıyor: 5 mm'lik tane, 3 cm'lik tane kadar parlak
+                // çiziliyordu ve ekranda ikisi de aynı büyüklükte tek tip
+                // nokta oluyordu ("irili ufaklı değil" — ölçümde tanelerin
+                // %92'si tabana dayanmıştı). Alan oranı kadar soldurmak
+                // alt piksel bir yayıcının doğru integralidir; boy farkı
+                // artık parlaklık farkı olarak taşınıyor.
+                float subPixel = saturate((f.size * f.size) / max(size * size, 1e-12));
+
                 // Kameraya bakan düzlem + ömür boyu dönüş.
                 float3 forward = toCam / max(dist, 1e-4);
                 float3 right = normalize(cross(float3(0, 1, 0), forward));
@@ -173,7 +184,7 @@ Shader "ToTheSummit/SnowfallParticle"
                 float fogCut = lerp(120.0, 35.0, saturate(_FogDensity01));
                 float fogFade = 1.0 - saturate(dist / max(fogCut, 1.0));
 
-                float alpha = f.alpha * fogFade * _AlphaScale;
+                float alpha = f.alpha * fogFade * _AlphaScale * subPixel;
 
                 // SPEC §17.1: "Output Particle Lit Quad", Metallic 0,
                 // Smoothness 0.2, `Emissive = _FlakeEmissive * mainLightColor

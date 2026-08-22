@@ -415,7 +415,12 @@ public class PrecipitationRenderer : MonoBehaviour
         // orada damla sayısı sıfıra iniyor.
         // yalnız YAĞMUR taşıyor.
         //
-        float rainIntensity = state.Precipitation;
+        // KAR YAĞARKEN YAĞMUR SUSUYOR (kar spec §3.4, §17.1).
+        //
+        // `SnowRuntimeState` kar sisteminin YAYINLADIĞI durum; okumak
+        // sistemler arası çağrı değil, ilan edilmiş arayüz. Kar sistemi de
+        // buradan hiçbir şey okumuyor — bağ tek yönlü.
+        float rainIntensity = state.Precipitation * SnowRuntimeState.RainWeight01;
 
         // MARSHALL-PALMER SIFIRDA GEÇERSİZ, KAPI ŞART.
         //

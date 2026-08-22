@@ -90,6 +90,9 @@ public static class SnowShaderIDs
 
     // --- Kar yüzeyi materyali ---
     public static readonly int FallbackSWE = Shader.PropertyToID("_FallbackSWE");
+    public static readonly int SnowLineY = Shader.PropertyToID("_SnowLineY");
+    public static readonly int SnowLineBand = Shader.PropertyToID("_SnowLineBand");
+    public static readonly int SnowLineSWE = Shader.PropertyToID("_SnowLineSWE");
     public static readonly int FallbackRhoN = Shader.PropertyToID("_FallbackRhoN");
     public static readonly int SnowBreakup = Shader.PropertyToID("_SnowBreakup");
     public static readonly int SnowDetailNormal = Shader.PropertyToID("_SnowDetailNormal");
