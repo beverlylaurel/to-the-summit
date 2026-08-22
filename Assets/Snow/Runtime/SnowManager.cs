@@ -52,6 +52,15 @@ public class SnowManager : MonoBehaviour
     /// Geri okuma aralığı, kare (spec §17.1).
     const int ReadbackInterval = 30;
 
+    /// Gauss-Seidel iterasyon sayısı (spec §18.0).
+    const int WindShadowIterations = 24;
+
+    /// Rüzgâr bu kadar dönünce gölge yeniden çözülüyor (spec §18.0).
+    const float WindShadowAngleThreshold = 15f;
+
+    /// Rüzgâr taşınımının haç döşemesi (spec §18.1): beş dispatch.
+    const int WindTransportTiles = 5;
+
     /// Sahnede tek bir yönetici var; teşhis penceresi ve geçişler bunu okur.
     /// `FindObjectOfType` yerine: arama gizli bağımlılık yaratır, bu ise açık.
     public static SnowManager Active { get; private set; }
@@ -98,6 +107,21 @@ public class SnowManager : MonoBehaviour
     int rimKernel = -1;
     int accumulateKernel = -1;
     int reduceKernel = -1;
+    int windShadowKernel = -1;
+    int windTransportKernel = -1;
+
+    /// Rüzgâr gölgesi ZAMANA YAYILIYOR. Yirmi dört iterasyon tek karede
+    /// koşarsa 1024²'de elli milyon çağrı eder ve her dört metrede bir
+    /// görünür bir takılma olur. Kare başına bir iterasyon: aynı sonuç,
+    /// yarım saniyede yakınsıyor.
+    int windShadowIterationsLeft;
+    Vector2 windShadowDirection;
+
+    /// Sastrugi yönü CPU'da yumuşatılıyor (spec §18.4, tau 120 s). Ham
+    /// rüzgâr yönü kullanılırsa mevcut sistemin esintileri deseni titretiyor.
+    Vector2 sastrugiWindDir = Vector2.right;
+
+    int windTransportTile;
 
     int accumulateTile;
     int lastReadbackFrame = -1;
@@ -199,7 +223,12 @@ public class SnowManager : MonoBehaviour
         // ASSUMPTION: RT_WindShadow RGHalf. Spec §6.2 tablosu RGHalf diyor (R=Wz,
         // G=Wsz), §18.0 metni RHalf diyor. `KWindShadow` iki kanal birden yazıyor
         // (`_WindShadowZOut`, `_WindShadowSzOut`); tek kanal yetmez, tablo kazandı.
-        windShadow = Create("RT_WindShadow", q.SkyResolution, RenderTextureFormat.RGHalf);
+        // ASSUMPTION: spec §6.2 tablosu RGHalf diyor; RGFloat açılıyor.
+        // Doku MUTLAK yüzey yüksekliği (Wz) tutuyor ve Gauss-Seidel onu
+        // adım adım biriktiriyor. Bu projenin arazisi ~4900 m'de; yarım
+        // hassasiyetin oradaki adımı 4 metre (ölçüldü) ve rüzgâr gölgesi
+        // santimetre mertebesinde bir fark. RT_SkyVis ile aynı sebep.
+        windShadow = Create("RT_WindShadow", q.SkyResolution, RenderTextureFormat.RGFloat);
 
         rimBlur = Create("RT_RimBlur", q.Resolution, RenderTextureFormat.RHalf);
 
@@ -220,6 +249,13 @@ public class SnowManager : MonoBehaviour
         rimKernel = simCompute.FindKernel("KRim");
         accumulateKernel = simCompute.FindKernel("KAccumulate");
         reduceKernel = simCompute.FindKernel("KReduceState");
+        windShadowKernel = simCompute.FindKernel("KWindShadow");
+        windTransportKernel = simCompute.FindKernel("KWindTransport");
+
+        windShadowIterationsLeft = WindShadowIterations;
+        windShadowDirection = Vector2.zero;
+        windTransportTile = 0;
+        sastrugiWindDir = Vector2.right;
 
         accumulateTile = 0;
         lastReadbackFrame = -1;
@@ -365,6 +401,23 @@ public class SnowManager : MonoBehaviour
         Shader.SetGlobalFloat(SnowShaderIDs.FallbackSWE, settings.DefaultSwe);
         Shader.SetGlobalFloat(SnowShaderIDs.FallbackRhoN, settings.DefaultRhoN);
 
+        // Sastrugi yönü YUMUŞATILIYOR (spec §18.4, tau 120 s).
+        Vector2 rawWind = new Vector2(env.WindDirection.x, env.WindDirection.z);
+
+        if (rawWind.sqrMagnitude > 1e-4f)
+        {
+            rawWind.Normalize();
+
+            float k = 1f - Mathf.Exp(-Time.deltaTime / SnowConstants.SastrugiWindTau);
+            sastrugiWindDir = Vector2.Lerp(sastrugiWindDir, rawWind, k).normalized;
+        }
+
+        Shader.SetGlobalVector(SnowShaderIDs.SastrugiWindDir,
+            new Vector4(sastrugiWindDir.x, sastrugiWindDir.y, 0f, 0f));
+
+        // Isı kaynakları: yalnız bölgeye değenler (spec §18.2).
+        SnowHeatRegistry.Publish(AreaCenter, q.AreaSize);
+
         SnowRuntimeState.Stormness01 =
             Mathf.Clamp01(env.PrecipIntensity01 * Mathf.Clamp01(env.WindSpeed / 15f));
 
@@ -463,6 +516,9 @@ public class SnowManager : MonoBehaviour
         cmd.BeginSample(SnowProfiler.MarkerNames[3]);
         DispatchAccumulate(cmd, groups);
 
+        DispatchWindShadow(cmd);
+        DispatchWindTransport(cmd, groups);
+
         // KALICILIK BİRİKMEDEN SONRA. Geri yüklenen blok en son bilinen
         // durumu taşıyor; birikme onun üstüne yazsaydı yükleme boşa giderdi.
         if (persistence != null) persistence.Dispatch(cmd);
@@ -545,6 +601,75 @@ public class SnowManager : MonoBehaviour
     public void MarkSkyVisDirty()
     {
         skyCamera.Rescan(LayerMask.NameToLayer(OccluderLayerName));
+    }
+
+    // ----------------------------------------------------- rüzgâr gölgesi
+
+    void DispatchWindShadow(CommandBuffer cmd)
+    {
+        Vector2 wind = new Vector2(env.WindDirection.x, env.WindDirection.z);
+
+        // Rüzgâr 15°'den fazla döndüyse baştan çöz (spec §18.0).
+        if (wind.sqrMagnitude > 1e-4f)
+        {
+            wind.Normalize();
+
+            float dot = Vector2.Dot(wind, windShadowDirection);
+
+            if (windShadowDirection == Vector2.zero ||
+                dot < Mathf.Cos(WindShadowAngleThreshold * Mathf.Deg2Rad))
+            {
+                windShadowDirection = wind;
+                windShadowIterationsLeft = WindShadowIterations;
+            }
+        }
+
+        if (windShadowIterationsLeft <= 0) return;
+
+        windShadowIterationsLeft--;
+
+        SnowQualityData q = settings.QualityData;
+        int groups = Mathf.CeilToInt(q.SkyResolution / (float)SnowConstants.GroupSize);
+
+        cmd.SetComputeTextureParam(simCompute, windShadowKernel, SnowShaderIDs.SkyVisY, skyVis);
+        cmd.SetComputeTextureParam(simCompute, windShadowKernel, SnowShaderIDs.WindShadow, windShadow);
+
+        Texture ground = groundHeight.HeightTexture;
+        if (ground == null) return;
+
+        cmd.SetComputeTextureParam(simCompute, windShadowKernel, SnowShaderIDs.GroundHeightTex, ground);
+
+        // DAMA TAHTASI: iki parite, aynı karede. Tek parite koşarsa çözüm
+        // yarım kalıyor ve gölge hiç oluşmuyor (spec §22).
+        for (int parity = 0; parity < 2; parity++)
+        {
+            cmd.SetComputeIntParam(simCompute, SnowShaderIDs.GSParity, parity);
+            cmd.DispatchCompute(simCompute, windShadowKernel, groups, groups, 1);
+        }
+    }
+
+    // ---------------------------------------------------- rüzgâr taşınımı
+
+    void DispatchWindTransport(CommandBuffer cmd, int groups)
+    {
+        Texture ground = groundHeight.HeightTexture;
+        if (ground == null) return;
+
+        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.SnowDeltaTime, Time.deltaTime);
+
+        cmd.SetComputeTextureParam(simCompute, windTransportKernel, SnowShaderIDs.GroundHeightTex, ground);
+        cmd.SetComputeTextureParam(simCompute, windTransportKernel,
+                                   SnowShaderIDs.SnowWindShadowTex, windShadow);
+        cmd.SetComputeTextureParam(simCompute, windTransportKernel, SnowShaderIDs.SnowRW, snow);
+        cmd.SetComputeTextureParam(simCompute, windTransportKernel, SnowShaderIDs.TrailRW, trail);
+
+        // HAÇ DÖŞEMESİ: beş dispatch, her biri komşularıyla çakışmayan
+        // hücreleri işliyor (spec §18.1). Atomik kullanılmıyor.
+        for (int tile = 1; tile <= WindTransportTiles; tile++)
+        {
+            cmd.SetComputeIntParam(simCompute, SnowShaderIDs.TileIndex, tile);
+            cmd.DispatchCompute(simCompute, windTransportKernel, groups, groups, 1);
+        }
     }
 
     // --------------------------------------------------------------- birikme

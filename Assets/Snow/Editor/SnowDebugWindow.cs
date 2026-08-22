@@ -452,6 +452,7 @@ public class SnowDebugWindow : EditorWindow
 
         material.SetTexture(SnowShaderIDs.SnowBreakup, breakup);
         material.SetTexture(SnowShaderIDs.SnowDetailNormal, detailNormal);
+        material.SetTexture(SnowShaderIDs.SastrugiNoise, SnowTextureBaker.EnsureSastrugiNoise());
         EditorUtility.SetDirty(material);
 
         return material;

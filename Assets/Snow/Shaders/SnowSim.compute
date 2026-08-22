@@ -190,6 +190,9 @@ void KDeform(uint3 id : SV_DispatchThreadID)
 
         trail.r = max(trail.r, target);
 
+        // Üzerinden geçilen yerde sırt kalmaz (spec §18.4).
+        trail.a = 0.0;
+
         float compact = SNOW_COMPACT_RATE * saturate(target / max(baseH, 1e-4));
         snow.g = min(snow.g + compact, SNOW_PACKED_N);
         snow.a = 1.0;
@@ -363,6 +366,26 @@ void KAccumulate(uint3 id : SV_DispatchThreadID)
     float rhoTarget = lerp(190.0, 400.0, s.b);
     if (rho < rhoTarget)
         rho += (rhoTarget - rho) * (1.0 - exp(-dt / SNOW_SETTLE_TAU));
+
+    // ---- 2b. Isı alanı (spec §18.2) [KAYNAK: Grosbellet ve ark., CGF 2016] ----
+    //
+    // ÖRTÜ ÇARPAN, SICAKLIK MUTLAK ÇIKARMA. Bir çatı karı oransal azaltıyor,
+    // bir ateş ise mutlak olarak eritiyor. İkisini karıştırmak iki ateşin
+    // üst üste binmesini "daha az erime" yapardı.
+    float theta = SnowHeatField(posWS);
+
+    if (theta > 0.0)
+    {
+        float hNow = SnowBaseHeight(s.r, s.g);
+        float hTarget = max(0.0, hNow - theta);
+        float sweTarget = hTarget * SnowDensity(s.g) / SNOW_RHO_WATER;
+
+        // Anında değil, erime hızıyla yaklaşıyor: kar kaybolurken görünüyor.
+        s.r = max(sweTarget, s.r - SNOW_HEAT_MELT_RATE * theta * dt);
+
+        // Erirken ıslanıyor → koyulaşıyor ve parlıyor.
+        s.b = min(1.0, s.b + SNOW_HEAT_WET_RATE * theta * dt);
+    }
 
     // ---- 3. Erime — derece-gün. Sıcaklık GÜNDÖNGÜSÜNDEN. ----
     float melt = SNOW_MELT_DDF * max(0.0, _TemperatureC);
@@ -595,4 +618,237 @@ void KBlockUnpack(uint3 id : SV_DispatchThreadID)
 
     _SnowOut[target] = snow;
     _TrailOut[target] = trail;
+}
+
+// ------------------------------------------------------ ruzgar golgesi (18.0)
+
+#pragma kernel KWindShadow
+#pragma kernel KWindTransport
+
+/// RUZGAR-ETKI YUZEYI [KAYNAK: Cordonnier ve ark., EG 2018, 4.2].
+///
+/// Ruzgar araziye yapisik akmiyor: bir sirtin veya engelin arkasinda yuzey
+/// yerden kopup parabolik bir kapak olusturuyor. Kapagin alti RUZGAR
+/// GOLGESI - orada erozyon yok, sadece birikme var. Kar kornisleri ve duvar
+/// dibi yiginlari bundan doguyor.
+///
+/// YERINDE COZULUYOR, PING-PONG YOK. Gauss-Seidel'in dama tahtasi sirasi
+/// zaten yerinde calismak icin var: tek iterasyonlarda beyaz hucreler
+/// siyahlarin GUNCEL degerini okuyor. Ping-pong yapilsaydi Jacobi olurdu ve
+/// yakinsama yavaslardi.
+RWTexture2D<float2> _WindShadow;      // x = Wz, y = Wsz
+
+Texture2D<float>    _SkyVisY;
+
+uint  _GSParity;
+
+/// A = yuzey yuksekligi. RT_SkyVis acik alanda -9999 tutuyor; orada
+/// ARAZININ kendisi yuzeydir.
+///
+/// ASSUMPTION: spec 18.0 "A kaynagi RT_SkyVis" diyor ama o dokunun bos
+/// alandaki degerini soylemiyor. -9999 ile denklemler anlamsizlasiyor
+/// (kapak yerin 10 km altinda olurdu); zemin yuksekligine dusuluyor.
+float WindShadowSurface(int2 p, uint resolution)
+{
+    p = clamp(p, int2(0, 0), int2((int)resolution - 1, (int)resolution - 1));
+
+    float occl = _SkyVisY[p];
+
+    float2 uv = (float2(p) + 0.5) / resolution;
+    float2 worldXZ = (uv - 0.5) * _SkyAreaSize + _SkyCenterXZ;
+
+    return max(occl, SampleGroundHeight(worldXZ));
+}
+
+[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
+void KWindShadow(uint3 id : SV_DispatchThreadID)
+{
+    uint res = (uint)_SkyResolution;
+    if (id.x >= res || id.y >= res) return;
+
+    // DAMA TAHTASI. Parite uygulanmazsa golge hic olusmuyor (spec 22).
+    if (((id.x + id.y) & 1) != _GSParity) return;
+
+    float A = WindShadowSurface(int2(id.xy), res);
+
+    float2 W  = _WindWS.xz;
+    float  Wl = length(W);
+
+    if (Wl < 0.05)
+    {
+        _WindShadow[id.xy] = float2(A, 0.0);
+        return;
+    }
+
+    float2 Wn = W / Wl;
+
+    float cell = _SkyAreaSize / _SkyResolution;
+
+    // Yukari akis (upwind) komsusu.
+    int2 up = int2(id.xy) - int2(round(Wn));
+    up = clamp(up, int2(0, 0), int2((int)res - 1, (int)res - 1));
+
+    float2 upState = _WindShadow[up];
+
+    float WzUp = upState.x;
+    float AUp  = WindShadowSurface(up, res);
+
+    // KOŞUL ADAY DEĞERE BAKIYOR, SAKLANANA DEĞİL — ölçülmüş sebeple.
+    //
+    // Spec §18.0'ın sözde kodu `if (Wz > A)` diye SAKLANAN değere bakıyor.
+    // Sıfırdan (veya A'dan) başlayan bir çözümde bu koşul hiçbir zaman
+    // sağlanmıyor: kapak doğmadan önce Wz zaten A'ya eşit oluyor ve her
+    // hücre araziyi izleyen dala düşüyor. Ölçüldü: duvarın iki yanında da
+    // gölge 0.000 m.
+    //
+    // Doğrusu akışı rüzgâr boyunca İLERLETMEK: yukarı akıştan gelen düşey
+    // hız balistik olarak taşınıyor (c kadar yavaşlayarak), ve o hızla
+    // hesaplanan aday yüzey araziyi AŞIYORSA hava ayrılmış demektir.
+    float WszBallistic = upState.y - SNOW_WINDSHADOW_C * cell / max(Wl, 0.05);
+    float WzBallistic  = WzUp + WszBallistic * cell / max(Wl, 0.05);
+
+    float Wz;
+    float Wsz;
+
+    if (WzBallistic > A)
+    {
+        // Ayrılmış: rüzgâr-etki yüzeyi yerden kopmuş.
+        Wz = WzBallistic;
+        Wsz = WszBallistic;
+    }
+    else
+    {
+        // Yapışık: yüzey araziyi izliyor.
+        //
+        // EĞİM ±1 İLE SINIRLI. Tek tekselde 8 m yükselen bir duvar eğim 10.7
+        // veriyor ve düşey hız 107 m/s çıkıyor — kapak kilometrelerce
+        // uzuyor. 45° zaten akışın ayrıldığı sınır; ötesi fiziksel değil.
+        float slope = clamp((A - AUp) / cell, -1.0, 1.0);
+
+        Wz = A;
+        Wsz = slope * Wl;
+    }
+
+    _WindShadow[id.xy] = float2(Wz, Wsz);
+}
+
+// ------------------------------------------------- ruzgar tasinimi (18.1/18.4)
+
+/// HAC SEKLINDE DOSEME [KAYNAK: Cordonnier ve ark., EG 2018, 7.1].
+///
+/// Bir hucreden komsusuna kutle tasimak, butun hucreler ayni anda calisirken
+/// yazma cakismasi yaratiyor. Makale bunu bes dispatch'lik hac dosemesiyle
+/// cozuyor ve bunun atomik komutlardan DAHA HIZLI oldugunu belirtiyor.
+/// Atomik kullanilmiyor.
+static const uint kCrossTile[5][5] =
+{
+    { 5, 1, 2, 3, 4 },
+    { 2, 3, 4, 5, 1 },
+    { 4, 5, 1, 2, 3 },
+    { 1, 2, 3, 4, 5 },
+    { 3, 4, 5, 1, 2 }
+};
+
+RWTexture2D<float4> _SnowRW;
+RWTexture2D<float4> _TrailRW;
+
+/// Yatirilan kar GEVSEK. Sikismis bir yuzeyden kalkip baska yere konan tane
+/// oraya toz olarak iniyor.
+void DepositSWE(int2 p, float swe, uint resolution)
+{
+    if (any(p < 0) || any(p >= (int)resolution)) return;
+    if (swe <= 0.0) return;
+
+    float4 s = _SnowRW[p];
+
+    float rhoOld = SnowDensity(s.g);
+    float rhoNew = SNOW_RHO_MIN * 1.5;
+
+    float total = s.r + swe;
+
+    s.g = SnowDensityN((rhoOld * s.r + rhoNew * swe) / max(total, 1e-6));
+    s.r = min(total, SNOW_SWE_MAX);
+
+    _SnowRW[p] = s;
+}
+
+float SnowSurfAt(int2 p, uint resolution)
+{
+    p = clamp(p, int2(0, 0), int2((int)resolution - 1, (int)resolution - 1));
+
+    float4 s = _SnowRW[p];
+    return SampleGroundHeight(SnowTexelToWorld((uint2)p)) + SnowBaseHeight(s.r, s.g);
+}
+
+[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
+void KWindTransport(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+
+    if (kCrossTile[id.x % 5][id.y % 5] != _TileIndex) return;
+
+    float4 s = _SnowRW[id.xy];
+
+    // SINTERLENME ESIGI [KAYNAK: He ve ark. 2017]. Sikismis kar kolay kolay
+    // savrulmuyor; esik yogunlukla yukseliyor.
+    float thresholdU10 = lerp(SNOW_DRIFT_U10_LOOSE, SNOW_DRIFT_U10_PACKED, s.g);
+    float driftActive = saturate((_WindSpeed - thresholdU10) / 4.0);
+
+    // --- Sastrugi genligi (spec 18.4) ---
+    // Ayni driftActive, ayni kernel. Ayri bir ruzgar esigi tanimlanmiyor.
+    float4 trail = _TrailRW[id.xy];
+
+    float sastGrow = driftActive * (1.0 - s.b) * (1.0 - trail.b);
+    float sast = trail.a;
+
+    sast += (sastGrow - sast) * (1.0 - exp(-_SnowDeltaTime / SNOW_SASTRUGI_TAU));
+    sast -= _SnowfallSWERate * _SnowDeltaTime * SNOW_SASTRUGI_BURY;
+
+    trail.a = saturate(sast);
+    _TrailRW[id.xy] = trail;
+
+    if (driftActive <= 0.001) return;
+
+    float2 worldXZ = SnowTexelToWorld(id.xy);
+    float A = SampleGroundHeight(worldXZ) + SnowBaseHeight(s.r, s.g);
+
+    // RUZGAR GOLGESINDEYSEK ASINMA YOK [KAYNAK: Cordonnier 5.4 kural 2].
+    // Ters uygulanirsa yigin ruzgar USTUNDE olusur (spec 22).
+    float shadow = SampleWindShadow(float3(worldXZ.x, A, worldXZ.y));
+    if (shadow > 0.01) return;
+
+    float ts = SnowTexelSize();
+
+    float d2x = SnowSurfAt(int2(id.xy) + int2(1, 0), _Resolution) - 2.0 * A
+              + SnowSurfAt(int2(id.xy) - int2(1, 0), _Resolution);
+
+    float d2z = SnowSurfAt(int2(id.xy) + int2(0, 1), _Resolution) - 2.0 * A
+              + SnowSurfAt(int2(id.xy) - int2(0, 1), _Resolution);
+
+    float curvW = abs(_WindWS.x) * d2x / (ts * ts) + abs(_WindWS.z) * d2z / (ts * ts);
+
+    // Yalniz DISBUKEY yerler asiniyor [KAYNAK: Cordonnier 5.4 kural 1].
+    if (curvW > 0.0) return;
+
+    float erodeH = min(SnowBaseHeight(s.r, s.g),
+                       -SNOW_EROSION_RATE * curvW * driftActive * _SnowDeltaTime);
+
+    float erodeSWE = erodeH * SnowDensity(s.g) / SNOW_RHO_WATER;
+    erodeSWE = min(erodeSWE, s.r);
+
+    if (erodeSWE <= 0.0) return;
+
+    s.r -= erodeSWE;
+    _SnowRW[id.xy] = s;
+
+    // Ruzgar yonundeki IKI komsuya yatiriliyor [KAYNAK: Cordonnier 5.4].
+    float2 wn = normalize(_WindWS.xz + 1e-5);
+
+    int2 nA = int2(id.xy) + int2((int)round(wn.x), 0);
+    int2 nB = int2(id.xy) + int2(0, (int)round(wn.y));
+
+    float wA = abs(wn.x) / max(abs(wn.x) + abs(wn.y), 1e-4);
+
+    DepositSWE(nA, erodeSWE * wA, _Resolution);
+    DepositSWE(nB, erodeSWE * (1.0 - wA), _Resolution);
 }

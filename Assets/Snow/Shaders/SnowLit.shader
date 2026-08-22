@@ -8,6 +8,7 @@ Shader "ToTheSummit/SnowLit"
     {
         [NoScaleOffset] _SnowBreakup ("Kenar gürültüsü", 2D) = "gray" {}
         [NoScaleOffset][Normal] _SnowDetailNormal ("Detay normali", 2D) = "bump" {}
+        [NoScaleOffset] _SastrugiNoise ("Sastrugi gürültüsü", 2D) = "gray" {}
 
         _SnowBreakupScale ("Gürültü ölçeği (1/m)", Float) = 3.0
         _SnowEdgeFadeRange ("Kenar geçiş aralığı (m)", Float) = 0.02

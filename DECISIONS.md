@@ -1007,6 +1007,57 @@ Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olma
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
 
+## Kar Faz 12: rüzgâr gölgesinin koşulu spec'te ters kurulmuş (2026-08-22)
+
+**Belirti.** Duvarın iki yanında da gölge **0.000 m**. Kapak hiç oluşmuyor.
+
+**Sebep.** Spec §18.0'ın sözde kodu `if (Wz > A)` diye **saklanan** değere
+bakıyor. Sıfırdan (veya A'dan) başlayan bir çözümde bu koşul hiçbir zaman
+sağlanmıyor: her hücre araziyi izleyen dala düşüyor ve `Wsz = W·∇A` tam
+olarak yükseklik düşüşünü telafi ediyor. Kapak doğmadan koşul sağlanamıyor,
+koşul sağlanmadan kapak doğmuyor.
+
+**Çözüm.** Koşul **aday** değere bakıyor: yukarı akıştan gelen düşey hız
+balistik olarak taşınıyor (`c` kadar yavaşlayarak) ve o hızla hesaplanan aday
+yüzey araziyi aşıyorsa hava ayrılmış demektir. Aynı denklemler, doğru sırada.
+
+**Ölçüm sonrası.** +X rüzgârında duvarın arkası **13.858 m**, önü **0.000 m**;
+yön çevrilince taraf değişiyor; rüzgârsızken 0.000.
+
+### Eğim ±1 ile sınırlandı
+
+Tek tekselde 8 m yükselen bir duvar eğim 10.7 veriyor ve düşey hız 107 m/s
+çıkıyor — kapak kilometrelerce uzuyor. 45° zaten akışın ayrıldığı sınır;
+ötesi fiziksel değil. Cordonnier'nin arazisi yumuşak eğimli, bu projenin
+engelleri keskin.
+
+### `RT_WindShadow` RGHalf değil RGFloat
+
+`RT_SkyVis` ile aynı sebep: doku mutlak yüzey yüksekliği tutuyor, Gauss-Seidel
+onu adım adım biriktiriyor ve gölge santimetre mertebesinde bir fark.
+4900 m'de yarım hassasiyetin adımı 4 metre.
+
+### Tek kanallı doku içe aktarımı DEĞERİ ALPHA'YA KOYUYOR
+
+`TextureImporterType.SingleChannel` varsayılan olarak değeri alpha kanalına
+yazıyor; shader `.r` okuyup **sıfır** buluyor. Belirtisi "gürültü hiç etki
+etmiyor" — kar kenarı düz çizgi, sastrugi dümdüz. Ölçüldü: sastrugi değişimi
+her iki eksende de 0.00 mm.
+
+`Default` tipe geçildi. Sonrası: gürültü `.r` aralığı 0.063–0.871, sastrugi
+değişimi rüzgâr yönünde **13.20 mm/örnek**, dik yönde **0.54** — sırtlar
+rüzgâra dik, oran 24.5.
+
+**Neden kayıtta:** aynı hata prosedürel üretilen HER tek kanallı dokuda
+tekrar eder ve belirtisi sessizdir.
+
+### Gauss-Seidel kareye yayıldı
+
+Yirmi dört iterasyon × iki parite tek karede koşarsa 1024²'de elli milyon
+çağrı eder ve bölge her dört metrede bir yenilendiği için görünür bir
+takılma olur. Kare başına bir iterasyon: aynı sonuç, yarım saniyede
+yakınsıyor.
+
 ## Kar Faz 10: blok boyu spec'in aritmetiğiyle uyuşmuyor (2026-08-22)
 
 **Spec §21 Faz 10** izleri "4×4 m bloklar hâlinde `Dictionary<int2, half[]>`,

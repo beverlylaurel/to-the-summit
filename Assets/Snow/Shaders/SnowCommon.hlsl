@@ -175,6 +175,91 @@ float SampleSkyVisibility(float3 posWS)
     return vis * (1.0 / 9.0);
 }
 
+// --------------------------------------------------------- rüzgâr gölgesi
+
+TEXTURE2D(_SnowWindShadowTex);
+
+/// > 0 → rüzgâr gölgesinde (birikme bölgesi), 0 → açık (erozyon mümkün).
+/// Spec §18.0 birebir.
+float SampleWindShadow(float3 posWS)
+{
+    float2 uv = (posWS.xz - _SkyCenterXZ) / _SkyAreaSize + 0.5;
+    if (any(uv < 0.0) || any(uv > 1.0)) return 0.0;
+
+    // Doku Wz tutuyor; gölge Wz − A. A yüzeyin kendisi.
+    float wz = SAMPLE_TEXTURE2D_LOD(_SnowWindShadowTex, sampler_LinearClamp, uv, 0).r;
+
+    return max(0.0, wz - posWS.y);
+}
+
+/// KOMPAKT DESTEKLİ DÜŞÜŞ [KAYNAK: Wyvill, Guy & Galin 1999].
+/// Yarıçapı dışında TAM OLARAK sıfır — bu sayede erken çıkış mümkün.
+/// Lineer veya Gauss kullanmak keskin daire ya da sonsuz kuyruk üretir
+/// (spec §20).
+float WyvillFalloff(float r, float R)
+{
+    float t = saturate(1.0 - (r * r) / max(R * R, 1e-6));
+    return t * t * t;
+}
+
+// --------------------------------------------------------------- ısı kaynağı
+
+/// Spec §18.2: on altı elemanlı uniform dizi. `StructuredBuffer` kullanılmıyor.
+#define SNOW_MAX_HEAT_SOURCES 16
+
+float4 _HeatSources[SNOW_MAX_HEAT_SOURCES];   // xyz = konum, w = yarıçap
+float4 _HeatParams[SNOW_MAX_HEAT_SOURCES];    // x = şiddet
+int    _HeatCount;
+
+/// SICAKLIK ALANLARI TOPLANARAK BİRLEŞİYOR [KAYNAK: Grosbellet ve ark.,
+/// CGF 2016, §4]. Örtü alanları çarpılır, sıcaklık alanları TOPLANIR;
+/// karıştırılırsa iki ateşin üst üste binmesi karı eritmek yerine korur.
+float SnowHeatField(float3 posWS)
+{
+    float theta = 0.0;
+
+    [loop]
+    for (int hi = 0; hi < _HeatCount; ++hi)
+    {
+        float3 hp = _HeatSources[hi].xyz;
+        float  hr = _HeatSources[hi].w;
+
+        float r = distance(posWS, hp);
+        if (r >= hr) continue;
+
+        theta += _HeatParams[hi].x * WyvillFalloff(r, hr);
+    }
+
+    return theta;
+}
+
+// ------------------------------------------------------------------ sastrugi
+
+TEXTURE2D(_SastrugiNoise);
+SAMPLER(sampler_SastrugiNoise);
+
+/// CPU'da yumuşatılmış rüzgâr yönü. Ham yön kullanılırsa mevcut rüzgâr
+/// sisteminin esintileri deseni titretiyor (spec §18.4).
+float2 _SastrugiWindDir;
+
+/// SIRTLAR RÜZGÂRA DİK UZANIYOR (transverse). Dalga boyu rüzgâr yönünde
+/// KISA, sırtlar rüzgâra dik yönde UZUN. UV'ler ters yazılırsa desen 90°
+/// yanlış olur (spec §18.4, §22).
+float SnowSastrugiOffset(float2 posXZ, float amplitude)
+{
+    if (amplitude <= 0.001) return 0.0;
+
+    float2 wd = _SastrugiWindDir;
+    float2 wp = float2(-wd.y, wd.x);
+
+    float2 sUV = float2(dot(posXZ, wd) / SNOW_SASTRUGI_LENGTH,
+                        dot(posXZ, wp) / SNOW_SASTRUGI_WIDTH);
+
+    float n = SAMPLE_TEXTURE2D_LOD(_SastrugiNoise, sampler_SastrugiNoise, sUV, 0).r * 2.0 - 1.0;
+
+    return n * SNOW_SASTRUGI_HEIGHT * amplitude;
+}
+
 // ------------------------------------------------------------- kar yüzeyi
 
 TEXTURE2D(_SnowStateTex);
@@ -241,7 +326,14 @@ float SnowSurfaceAt(float2 uv)
     float swe  = lerp(far.x, s.r, inside);
     float rhoN = lerp(far.y, s.g, inside);
 
-    return SnowSurfaceHeight(swe, rhoN, t.r * inside, t.g * inside);
+    float h = SnowSurfaceHeight(swe, rhoN, t.r * inside, t.g * inside);
+
+    // SASTRUGİ BURAYA DA EKLENİYOR. Yalnız köşe shader'ına eklenirse
+    // normal'ler düz kalıyor ve sırtlar ışığa hiç tepki vermiyor — spec
+    // §18.4'ün "en sık atlanan adım" dediği yer burası.
+    h += SnowSastrugiOffset(SnowUVToWorld(uv), t.a * inside);
+
+    return max(h, 0.0);
 }
 
 #endif

@@ -26,7 +26,7 @@ public static class SnowTextureBaker
 
         EnsureFolder();
 
-        var tex = new Texture2D(BreakupResolution, BreakupResolution, TextureFormat.R8, false, true);
+        var tex = new Texture2D(BreakupResolution, BreakupResolution, TextureFormat.RGBA32, false, true);
         var px = new Color32[BreakupResolution * BreakupResolution];
 
         for (int y = 0; y < BreakupResolution; y++)
@@ -46,7 +46,12 @@ public static class SnowTextureBaker
         AssetDatabase.ImportAsset(BreakupPath, ImportAssetOptions.ForceUpdate);
 
         var importer = (TextureImporter)AssetImporter.GetAtPath(BreakupPath);
-        importer.textureType = TextureImporterType.SingleChannel;
+
+        // `SingleChannel` DEĞİL. O tip değeri varsayılan olarak ALPHA'ya
+        // koyuyor; shader `.r` okuyor ve sıfır buluyor. Belirtisi "gürültü
+        // hiç etki etmiyor" — kar kenarı düz çizgi, sastrugi dümdüz
+        // (ölçüldü). `Default` ile gri tonlama üç kanala da yazılıyor.
+        importer.textureType = TextureImporterType.Default;
         importer.sRGBTexture = false;
         importer.wrapMode = TextureWrapMode.Repeat;
         importer.filterMode = FilterMode.Bilinear;
@@ -112,6 +117,60 @@ public static class SnowTextureBaker
         importer.SaveAndReimport();
 
         return AssetDatabase.LoadAssetAtPath<Texture2D>(DetailNormalPath);
+    }
+
+    // ---------------------------------------------------------------- sastrugi
+
+    public const string SastrugiNoisePath = "Assets/Snow/Textures/T_Sastrugi_Noise.png";
+
+    /// SASTRUGİ GÜRÜLTÜSÜ (spec §18.4). UV'si rüzgâr yönünde sıkıştırılarak
+    /// örnekleniyor; dokunun kendisi izotropik olmalı, yönü UV veriyor.
+    public static Texture2D EnsureSastrugiNoise()
+    {
+        var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(SastrugiNoisePath);
+        if (existing != null) return existing;
+
+        EnsureFolder();
+
+        const int Res = 256;
+
+        var tex = new Texture2D(Res, Res, TextureFormat.RGBA32, false, true);
+        var px = new Color32[Res * Res];
+
+        for (int y = 0; y < Res; y++)
+        for (int x = 0; x < Res; x++)
+        {
+            // Dalga + gürültü. Saf gürültü sırt yerine benek verir; saf dalga
+            // ise tekrar eden bir tarak deseni.
+            float u = (x + 0.5f) / Res;
+            float v = (y + 0.5f) / Res;
+
+            float wave = Mathf.Sin(u * Mathf.PI * 2f * 3f) * 0.5f + 0.5f;
+            float noise = TilingFbm(u, v);
+
+            float value = Mathf.Clamp01(wave * 0.55f + noise * 0.45f);
+
+            byte b = (byte)Mathf.Clamp(Mathf.RoundToInt(value * 255f), 0, 255);
+            px[y * Res + x] = new Color32(b, b, b, 255);
+        }
+
+        tex.SetPixels32(px);
+        tex.Apply(false, false);
+
+        File.WriteAllBytes(SastrugiNoisePath, tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+
+        AssetDatabase.ImportAsset(SastrugiNoisePath, ImportAssetOptions.ForceUpdate);
+
+        var importer = (TextureImporter)AssetImporter.GetAtPath(SastrugiNoisePath);
+        importer.textureType = TextureImporterType.Default;
+        importer.sRGBTexture = false;
+        importer.wrapMode = TextureWrapMode.Repeat;
+        importer.filterMode = FilterMode.Bilinear;
+        importer.mipmapEnabled = true;
+        importer.SaveAndReimport();
+
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(SastrugiNoisePath);
     }
 
     // ------------------------------------------------------------ tane atlası

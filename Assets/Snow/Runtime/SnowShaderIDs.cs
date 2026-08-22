@@ -145,6 +145,12 @@ public static class SnowShaderIDs
     public static readonly int BlockTexels = Shader.PropertyToID("_BlockTexels");
     public static readonly int BlockStored = Shader.PropertyToID("_BlockStored");
 
+    // --- Rüzgâr gölgesi ve taşınım (Faz 12) ---
+    public static readonly int WindShadow = Shader.PropertyToID("_WindShadow");
+    public static readonly int SkyVisY = Shader.PropertyToID("_SkyVisY");
+    public static readonly int SnowRW = Shader.PropertyToID("_SnowRW");
+    public static readonly int TrailRW = Shader.PropertyToID("_TrailRW");
+
     // --- Teşhis penceresi ---
     public static readonly int DebugMode = Shader.PropertyToID("_DebugMode");
     public static readonly int DebugRange = Shader.PropertyToID("_DebugRange");

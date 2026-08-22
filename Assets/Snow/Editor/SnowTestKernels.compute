@@ -105,3 +105,37 @@ void KTestCoverMask(uint3 id : SV_DispatchThreadID)
                                                    _SnowSlopeThreshold, _SnowSlopeSharpness,
                                                    _SnowBreakupStrength, _SnowEdgeSharpness);
 }
+
+// --------------------------------------------------------------- Faz 12 sinamasi
+
+#pragma kernel KTestSastrugi
+#pragma kernel KTestHeat
+
+float2 _TestAxis;
+float  _TestStep;
+float  _TestAmplitude;
+
+/// Sastrugi yuksekligi verilen eksen boyunca. CPU tarafi bunu ruzgar yonunde
+/// ve ruzgara dik yonde ayri ayri cagirip degisim hizini karsilastiriyor:
+/// sirtlar ruzgara DIK uzanmali (spec 18.4).
+[numthreads(64, 1, 1)]
+void KTestSastrugi(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution) return;
+
+    float2 posXZ = _TestAxis * (id.x * _TestStep);
+
+    _TestOut[uint2(id.x, 0)] = SnowSastrugiOffset(posXZ, _TestAmplitude);
+}
+
+/// Isi alani verilen eksen boyunca. Wyvill dususu yaricapinda TAM sifir
+/// olmali; lineer ya da Gauss kullanilsaydi kuyruk kalirdi.
+[numthreads(64, 1, 1)]
+void KTestHeat(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution) return;
+
+    float3 posWS = float3(_TestAxis.x, 0.0, _TestAxis.y) * (id.x * _TestStep);
+
+    _TestOut[uint2(id.x, 0)] = SnowHeatField(posWS);
+}
