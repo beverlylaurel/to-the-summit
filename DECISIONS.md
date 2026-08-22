@@ -1017,30 +1017,51 @@ Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olma
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
 
-## Clipmap halkaları ortak snap ızgarasında (2026-08-22)
+## Kar mesh'i tek ızgaraya indi; spec'in ızgara tablosu düzeltildi (2026-08-22)
 
-Halkalar kendi adımlarına snap'leniyordu ve merkezleri birbirine göre
-kayıyordu. Delik o kaymayı karşılamak için ya küçültülüyor (BİNDİRME) ya
-büyütülüyordu (BOŞLUK). Bindirme bandında iki yüzey aynı anda çiziliyor;
-quad'ları 4 kat farklı olduğu için kaba olan ince olanın içinden çıkıyor ve
-oyuncunun çevresinde kare bir bant bırakıyordu (ölçüldü: 2→3 bandı 36 m
-yarıçapında, 6,75 m genişliğinde). Derinlik payı çözmüyor: sapma santimetre
-değil, onlarca santimetre.
+Spec v2 §8.1 çok seviyeli clipmap'i **yasaklıyor** ve gerekçesini Asirvatham &
+Hoppe'den alıntılıyor: *"Only the finest level is rendered as a complete grid
+square."* 24 metrelik bir deformasyon alanı için tek seviye yeterli.
 
-**Ortak snap adımı = en kaba halkanınki.** Göreli kayma sıfır, delik
-`ızgara / 3` ile birebir oturuyor. Ölçüm: boşluk 0,00 cm, bindirme 0,00 cm,
-her kalitede.
+Silinenler: `SnowClipmap`, `SnowFarCascade`, halka/delik/etek/dikiş makinesi,
+halka derinlik payı, mesh kenar gömmesi, `KFarScroll*`/`KFarAccumulate`
+kernelleri, 15 mesh prob modu ve izolasyon anahtarları. Yerine tek kare ızgara:
+24 m, tek draw call (`SnowSurface` + `SnowMeshBuilder`).
 
-**Izgara bütün halkalarda AYNI olmak zorunda.** Halka genişlikleri 3 katı
-büyüyor; delik `ızgara/3` ile tam çıkması için quad'ların da tam 3 katı olması
-gerekiyor. Halka başına farklı ızgara denendi (rapor §6) ve delik hiçbir
-halkada oturmadı. Üçgen bütçesi ızgaranın kendisi küçültülerek düşürüldü:
-Ring0Grid 400 → 192, toplam 1.178.600 → 276.480 üçgen.
+Bunların hepsi §22'nin tuzak tablosunda adıyla yazılı: *"Mesh'te delik/yırtık →
+çok seviyeli clipmap kurulmuş; kurma"*, *"Draw call 1'den fazla → mesh
+parçalara bölünmüş"*, *"Mesh yürürken kayıyor → SnapStep ≠ 2 × quadSize"*.
+Bir gündür uğraşılan üç belirtinin üçü de o tabloda duruyordu.
 
-**Bedeli:** en iç halka 3,6 m'lik adımlarla yer değiştiriyor. ±4 m kapladığı
-için oyuncu her hâlükârda 2,2 m payla içinde kalıyor.
+**Uzak kaskad neden gerekmiyor.** §8.4: *"24 m ötesinde kar mesh'i yoktur."*
+Uzaktaki kar arazi materyalinin kar tutması katmanıyla (§16) çiziliyor, durumu
+`SnowOutsideStateAt` — kar çizgisi eğrisi, yüksekliğin fonksiyonu. Dağın tepesi
+ile eteği hâlâ farklı kalınlıkta kar taşıyor; ikinci bir durum dokusu bunun
+için gerekli değildi.
 
----
+**Spec'in kendi çelişkisi düzeltildi.** §6.4 "`SnapStep / texelSize` tam sayı
+olmalı" diyor ve "preset tablosundaki her satırda tam sayıdır" diye ekliyordu.
+Ölçüldü — üç satırın üçü de kuralı çiğniyordu:
+
+```
+Low     255/512   -> 4.015686
+Medium  511/1024  -> 4.007828      spec metni: "0.09393 / 0.02344 = 4.0. Tam."
+High    1023/1024 -> 2.001955
+```
+
+Spec'in hesabı üç haneye yuvarlanmıştı; 4.0078 "4.0" görünüyordu. Tek sayı
+ızgara şartı §8.1'de **çok seviyeli** clipmap'in iç içe geçme gereği olarak
+alıntılanmış ve tek seviyeye kopyalanmıştı — gerekçesi bu spec'te geçersiz.
+
+Kullanıcı kararıyla ızgaralar ikinin kuvvetine çekildi (256/512/1024) ve spec
+dosyası düzeltildi (§0 madde 10, §6.1, §6.4, §8.1, §8.2, §15.3, Faz 0 kabul).
+Yeni kural: **`MeshGrid` ve `Resolution` ikinin kuvveti, `MeshGrid ≤
+Resolution`.** `SnowConstantsTest` bunu tam sayı aritmetiğiyle doğruluyor —
+float karşılaştırması bu hatayı bir daha yakalayamaz.
+
+**Tetikleyici:** kar mesh'inde delik, yırtık veya oyuncuyu takip eden bir kare
+görülürse önce §22 tuzak tablosuna bakılır; oradaki hiçbir satır uymuyorsa
+karar yeniden açılır.
 
 ## Zemin yüksekliği dokusu RFloat — spec §7.1'den sapma (2026-08-22)
 

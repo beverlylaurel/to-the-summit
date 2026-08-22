@@ -47,6 +47,10 @@ harmanlama her zaman basamak üretir.
 **Araç notu:** prob görünümü (her şüpheli ayrı renk, ışıktan bağımsız) dört
 şüpheliyi tek turda eledi. Ondan önce aynı belirtiye dokuz tur harcandı.
 
+**Mekanizma artık yok** (2026-08-22): spec v2 §8.1 çok seviyeli clipmap'i
+yasakladı, uzak kaskad §8.4 gereği silindi. Devir noktası diye bir yer kalmadı.
+Yukarıdaki KURAL geçerliliğini koruyor — bu belge dersleri tutuyor, kodu değil.
+
 ---
 
 ## Kar yüzeyinde uzun, düz, dik bir sırt (çıkıntı)
@@ -73,6 +77,10 @@ ve dik bir duvar olarak görünüyor. Etek yalnız EN DIŞ halkada olmalı — o
 **Kural:** bir düzeltme başka bir kusurun varlığına dayanıyorsa, o kusur
 kapandığında düzeltme de kusura döner. Derinlik payı ve iç etek ikisi de
 bindirmenin/boşluğun telafisiydi; bindirme sıfırlanınca ikisi de zarara geçti.
+
+**Mekanizma artık yok** (2026-08-22): halka, delik, etek ve dikiş silindi —
+mesh tek kare ızgara. Üç kusurun üçü de çok seviyeli clipmap'in kendi
+karmaşıklığından doğmuştu; spec §8.1 bu yüzden yasaklıyor.
 
 ---
 

@@ -14,9 +14,6 @@
 #pragma kernel KRim
 #pragma kernel KAccumulate
 #pragma kernel KReduceState
-#pragma kernel KFarScroll
-#pragma kernel KFarScrollState
-#pragma kernel KFarAccumulate
 #pragma kernel KBlockPack
 #pragma kernel KBlockUnpack
 
@@ -542,86 +539,6 @@ void KReduceState(uint3 id : SV_DispatchThreadID)
     }
 
     _ReducedOut[id.xy] = float4(swe / count, rhoN / count, visible / count, 1.0);
-}
-
-// ---------------------------------------------------------------- uzak kaskad
-
-/// UZAK KASKAD (spec §21 Faz 10). 192 m, 512 teksel, iki kanal.
-///
-/// Yakın bölge 16 m; ondan ötesi eskiden SABİT bir değerdi ve dağın tamamı
-/// aynı kalınlıkta kar taşıyordu. Kaskad orada da gerçek birikme ve erime
-/// veriyor — teksel 37.5 cm, deformasyon yok.
-Texture2D<float2>   _FarSrc;
-RWTexture2D<float2> _FarDst;
-
-uint   _FarResolution;
-float  _FarAreaSize;
-float2 _FarAreaCenter;
-float2 _FarScrollTexels;
-float2 _FarNewEdgeValue;
-
-float2 FarTexelToWorld(uint2 id)
-{
-    float2 uv = (float2(id) + 0.5) / _FarResolution;
-    return (uv - 0.5) * _FarAreaSize + _FarAreaCenter;
-}
-
-[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
-void KFarScroll(uint3 id : SV_DispatchThreadID)
-{
-    if (id.x >= _FarResolution || id.y >= _FarResolution) return;
-
-    int2 src = int2(id.xy) + int2(round(_FarScrollTexels));
-    bool inside = all(src >= 0) && all(src < (int)_FarResolution);
-
-    _FarDst[id.xy] = inside ? _FarSrc[src] : _FarNewEdgeValue;
-}
-
-/// Kaskadın kaydırılması: yeni giren şerit kar çizgisi eğrisinden doluyor.
-[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
-void KFarScrollState(uint3 id : SV_DispatchThreadID)
-{
-    if (id.x >= _FarResolution || id.y >= _FarResolution) return;
-
-    int2 src = int2(id.xy) + int2(round(_FarScrollTexels));
-    bool inside = all(src >= 0) && all(src < (int)_FarResolution);
-
-    float2 edge = float2(SnowInitialSweAt(SampleGroundHeight(FarTexelToWorld(id.xy))),
-                         _FarNewEdgeValue.y);
-
-    _FarDst[id.xy] = inside ? _FarSrc[src] : edge;
-}
-
-/// Kaskadın birikmesi. §11'in SADELEŞTİRİLMİŞ hâli: yağış, oturma, erime,
-/// yağmur. Rüzgâr yeniden dağıtımı ve gökyüzü örtüsü YOK — 37.5 cm tekselde
-/// ikisinin de karşılığı yok, olsaydı gürültüden başka bir şey üretmezdi.
-[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
-void KFarAccumulate(uint3 id : SV_DispatchThreadID)
-{
-    if (id.x >= _FarResolution || id.y >= _FarResolution) return;
-
-    float2 s = _FarSrc[id.xy];
-
-    float swe = s.x;
-    float rho = SnowDensity(s.y);
-    float dt  = _DeltaTimeEff;
-
-    float fall = _SnowfallSWERate * dt;
-
-    float rhoNew = clamp(55.0 + _WindSpeed * 7.5, 50.0, 320.0);
-
-    float sweNext = swe + fall;
-    rho = (rho * swe + rhoNew * fall) / max(sweNext, 1e-6);
-    swe = sweNext;
-
-    if (rho < 190.0) rho += (190.0 - rho) * (1.0 - exp(-dt / SNOW_SETTLE_TAU));
-
-    float melt = SNOW_MELT_DDF * max(0.0, _TemperatureC);
-    melt *= 1.0 + _RainOnSnow01 * SNOW_RAIN_MELT_BOOST;
-
-    swe = clamp(swe - melt * dt, 0.0, SNOW_SWE_MAX);
-
-    _FarDst[id.xy] = float2(swe, SnowDensityN(rho));
 }
 
 // ------------------------------------------------------------------ kalıcılık

@@ -732,12 +732,14 @@ Simülasyon kare başına bir kez koşuyor; geçiş her kamera için kaydediliyo
 göre. Sebebi ölçülmüş: yarım hassasiyetin 4900 m'deki adımı 4 metre
 (`DECISIONS.md`). Çözücü taraf `SnowCaptureY()` ile geri çeviriyor.
 
-**Zemin mesh'i (Faz 4).** Tessellation yok; iç içe dört halka (8/24/72/216 m),
-hepsi tek materyal, her biri kendi quad boyutunun iki katına snap'li. Yükseklik
-köşe shader'ında `SnowSurfaceAt`'ten geliyor, normal fragman'da merkezi farkla.
-4 mm altındaki kar `clip()` ile hiç çizilmiyor — z-fighting bu yüzden yok.
-Kenar gürültüyle kırılıyor (`T_Snow_Breakup`, prosedürel üretiliyor).
-`GroundCoverage01` eşiğin altında ve kar yağmıyorsa bütün halkalar kapanıyor.
+**Zemin mesh'i (Faz 4).** Tessellation yok, çok seviyeli clipmap de yok: TEK
+kare ızgara, 24 m, tek draw call (`SnowSurface` + `SnowMeshBuilder`). Merkez
+`SnowManager.AreaCenter`'dan geliyor — mesh, yakalama kamerası ve deformasyon
+RT'si AYNI snap'lenmiş merkezi kullanıyor, ayrı ayrı snap eden ikinci bir
+kaynak yok. Yükseklik köşe shader'ında `SnowSurfaceAt`'ten geliyor, normal
+fragman'da merkezi farkla — ikisi aynı fonksiyondan. 4 mm altındaki kar
+`clip()` ile hiç çizilmiyor; kenar gürültüyle kırılıyor (`T_Snow_Breakup`).
+`GroundCoverage01` eşiğin altında ve kar yağmıyorsa mesh tamamen kapanıyor.
 
 **Birikme zinciri (Faz 5).** `SnowfallController` sıcaklık histerezisiyle
 (0.5 / 2.0 °C) kar yağıp yağmadığına karar veriyor ve `SnowRuntimeState`'e
@@ -760,11 +762,8 @@ sızma + BRDF yansıma; parıltı yalnız gündüz (`_SunElevation01` kapısı) 
 ekran uzayında yoğunluğu sabit. Ortam gölgede maviye çalıyor. Sis URP'nin
 `MixFog`'undan — kendi sis hesabı yok.
 
-**Uzak kaskad ve kalıcılık (Faz 10).** Yakın bölgenin dışı sabit bir sayı
-değil, 192 m'lik ikinci bir durum dokusu; orada da yağış, oturma ve erime
-işliyor. `SnowSurfaceAt` bölge dışında onu okuyor, kaskadın da dışında sabite
-düşüyor. Bölgeden çıkan 4 m'lik bloklar indirgenmiş çözünürlükte saklanıyor ve
-geri dönülünce yazılıyor — LRU 512 blok, 16 MB.
+**Kalıcılık (Faz 10).** Bölgeden çıkan 4 m'lik bloklar indirgenmiş
+çözünürlükte saklanıyor ve geri dönülünce yazılıyor — LRU 512 blok, 16 MB.
 
 **Oyun tarafı (Faz 9).** `SnowSampler` dört karede bir 64×64 pencereyi
 bloklamadan geri okuyor; ayak sesi, hız çarpanı ve ayak tozu ondan besleniyor.
@@ -782,28 +781,28 @@ yayınlıyor; `PrecipitationRenderer` şiddetini bununla çarpıyor. Kar şiddet
 binme matematiksel olarak imkânsız. Bağ TEK YÖNLÜ — kar sistemi yağmurdan bir şey
 okumuyor.
 
-**Yakın bölge → kaskad devri DERİNLİKTE.** Mesh ±8 m'de yakın durumdan uzak
-kaskada geçiyor. Harmanlama derinliğin kendisinde yapılıyor; ham SWE ve
-yoğunluğu ayrı harmanlamak (derinlik doğrusal olmadığı için) devir noktasında
-basamak üretiyordu.
+**Mesh ile bölge AYNI kare.** İkisi de 24 m. Bu yüzden kenar sönümü bölge
+UV'sinden okunuyor (`SnowEdgeFade`), ayrı bir merkez/genişlik çifti
+yayınlanmıyor. Ayrıştıkları sürece sönüm mesh'i ortasından kesiyor ve `clip`
+orada duvar bırakıyordu.
 
-**Kar mesh'inin kenarı araziye iniyor.** Mesh arazinin üstünde ayrı bir yüzey;
-en dış halkanın sınırında kalınlık kadar dik bir duvar bırakıyordu. Kalınlık
-son %14'lük bantta sıfıra sönüyor, orada dağın kendi kar katmanı devralıyor —
-o katman yer değiştirme uygulamadığı için ikisi kenarda çakışıyor.
+**Kar mesh'inin kenarı SIFIRA iniyor.** Dış 2 metrede yer değiştirme 0'a
+sönüyor; mesh kenarı arazi yüzeyiyle aynı yükseklikte bitiyor, basamak
+kalmıyor. Ötesini dağın kendi kar katmanı çiziyor — o katman yer değiştirme
+uygulamadığı için ikisi kenarda çakışıyor.
 
-**Dağın karı ile kar mesh'inin karı tek durumdan.** Kar mesh'i (clipmap)
-oyuncunun çevresindeki 128 m'yi kaplıyor; dağın geri kalanının karını
-`MountainSurface` çiziyor. İkisi de `SnowStateAt` okuyor — yakın bölge → uzak
-kaskad → kar çizgisi. Ayrı bir "arazi karı" sayısı YOK, o yüzden sınırda
-çelişemezler. Dağ tarafında yerinden oynatma yok (gölgeleme katmanı); deforme
-olan gerçek kar yalnız yakın bölgede.
+**Dağın karı ile kar mesh'inin karı tek durumdan.** Kar mesh'i oyuncunun
+çevresindeki 24 m'yi kaplıyor; dağın geri kalanının karını `MountainSurface`
+çiziyor. İkisi de `SnowStateAt` okuyor — bölgenin içinde durum dokusu, dışında
+kar çizgisi eğrisi (`SnowOutsideStateAt`). Ayrı bir "arazi karı" sayısı YOK, o
+yüzden sınırda çelişemezler. Dağ tarafında yerinden oynatma yok (gölgeleme
+katmanı); deforme olan gerçek kar yalnız yakın bölgede.
 
 **Kar çizgisi donma seviyesinden.** Dağın belli bir kottan yukarısı doğuştan karlı.
 Kot `TemperatureField.FreezingLevel` → `ISnowEnvironmentSource.FreezingLevelY`;
 ayrı bir "kar çizgisi" sayısı YOK. Bant kalınlığı ve üstteki SWE `SnowSettings`'te.
-Başlangıç temizliği (`KClearState`), bölgeye yeni giren şerit (`KScrollState`),
-kaskadın yeni şeridi (`KFarScrollState`) ve kaskadın da dışı bu eğriden doluyor.
+Başlangıç temizliği (`KClearState`), bölgeye yeni giren şerit (`KScrollState`)
+ve bölgenin dışı (`SnowOutsideStateAt`) bu eğriden doluyor.
 
 **Kar olayları (Faz 11–13).** Kabuk `RT_Trail.B`'de, üçgen sıcaklık profiliyle
 (tepe −5 °C) oluşuyor ve yeterli yük binince kırılıyor — patikayla karıştırma,

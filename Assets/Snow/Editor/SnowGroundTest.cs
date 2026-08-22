@@ -320,33 +320,6 @@ public static class SnowGroundTest
                              (ok ? prop.objectReferenceValue.name : "ATANMAMIŞ"));
             }
 
-            // KASKADIN KENDİ REFERANSLARI. `SnowManager` denetleniyordu ama
-            // kaskad ayrı bir bileşen; referansı boşsa `OnEnable` fırlatıyor
-            // ve kaskad sessizce hiç koşmuyor. Kar mesh'inin DIŞINI o
-            // besliyor, yani boş kalırsa dağ çıplak görünüyor.
-            var cascade = Object.FindAnyObjectByType<SnowFarCascade>();
-
-            if (cascade == null)
-            {
-                r.AppendLine("  [-] SnowFarCascade sahnede YOK");
-                empty++;
-            }
-            else
-            {
-                var cso = new UnityEditor.SerializedObject(cascade);
-
-                foreach (string name in new[] { "settings", "simCompute", "followTarget" })
-                {
-                    var prop = cso.FindProperty(name);
-                    bool ok = prop != null && prop.objectReferenceValue != null;
-
-                    if (!ok) empty++;
-
-                    r.AppendLine("  [" + M(ok) + "] kaskad." + name.PadRight(13) +
-                                 (ok ? prop.objectReferenceValue.name : "ATANMAMIŞ"));
-                }
-            }
-
             if (empty > 0)
             {
                 // KURULUMU BURADA KOŞTURUP TEKRAR BAKIYORUZ. Böylece "otomatik
@@ -490,46 +463,30 @@ public static class SnowGroundTest
         r.AppendLine();
         r.AppendLine("## Kar mesh'inin kapsadığı alan");
 
-        var clipmap = manager != null ? manager.GetComponent<SnowClipmap>() : null;
+        var snowSurface = manager != null ? manager.GetComponent<SnowSurface>() : null;
 
-        if (clipmap == null || manager.Settings == null)
+        if (snowSurface == null || manager.Settings == null)
         {
-            r.AppendLine("  [!] SnowClipmap yok.");
+            r.AppendLine("  [!] SnowSurface yok.");
         }
         else
         {
             SnowQualityData q = manager.Settings.QualityData;
+            SnowMeshBuilder.Grid g = SnowMeshBuilder.Describe(q);
 
-            // GERÇEK GEOMETRİ. Halka ölçüleri `SnowMeshBuilder`'dan; yayınlanan
-            // yarıçap bununla AYNI olmak zorunda.
-            //
-            // Bir süre yayınlanan değer `AreaSize * 2^(R−1) * 0.5` = 64 m,
-            // gerçek mesh ise ±108 m idi. Sönüm 64 m'de sıfırlayınca
-            // `clip(h − 0.004)` kar yüzeyini ortasından kesti: basamaklı,
-            // çizgili bir duvar. İki gün bu ayrışma yüzünden yandı.
-            SnowMeshBuilder.Ring[] rings = SnowMeshBuilder.Describe(q);
-            float realExtent = rings[^1].Extent * 0.5f;
-            float published = clipmap.OuterExtent;
-
-            bool agree = Mathf.Abs(realExtent - published) < 0.01f;
+            // MESH İLE BÖLGE AYNI KAREYİ KAPLIYOR (spec §6.1). Ayrışırsa kenar
+            // sönümü mesh'i ortasından keser ve `clip` orada duvar bırakır —
+            // iki gün bu ayrışma yüzünden yandı.
+            bool agree = Mathf.Abs(g.Extent - q.AreaSize) < 0.001f;
 
             r.AppendLine("  Bölge (kar durumu)       " + q.AreaSize.ToString("0.0") + " m");
-            r.AppendLine("  Halka sayısı             " + q.RingCount);
-
-            for (int i = 0; i < rings.Length; i++)
-                r.AppendLine("    halka " + i + "                 ±" +
-                             (rings[i].Extent * 0.5f).ToString("0.0") + " m" +
-                             "   quad " + (rings[i].QuadSize * 100f).ToString("0.0") + " cm");
-
-            r.AppendLine("  [" + M(agree) + "] Yayınlanan yarıçap   ±" + published.ToString("0.0") +
-                         " m   gerçek ±" + realExtent.ToString("0.0") + " m");
-
-            if (!agree)
-            {
-                r.AppendLine("      AYRIŞMA. Kenar sönümü mesh'i ortasından keser ve");
-                r.AppendLine("      `clip` orada basamaklı, çizgili bir duvar bırakır.");
-                sourceIsVisible = false;
-            }
+            r.AppendLine("  Mesh                     " + g.Extent.ToString("0.0") + " m" +
+                         "   ±" + (g.Extent * 0.5f).ToString("0.0") + " m");
+            r.AppendLine("  Izgara                   " + g.Quads + " quad" +
+                         "   quad " + (g.QuadSize * 100f).ToString("0.000") + " cm");
+            r.AppendLine("  Üçgen                    " + g.TriangleCount.ToString("N0"));
+            r.AppendLine("  [" + M(agree) + "] Mesh = bölge          " +
+                         (agree ? "aynı kare" : "AYRIŞMA"));
         }
 
         r.AppendLine();

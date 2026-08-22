@@ -32,7 +32,8 @@ public static class SnowConstantsTest
         ("RhoMin", "SNOW_RHO_MIN"),
         ("RhoMax", "SNOW_RHO_MAX"),
         ("RhoWater", "SNOW_RHO_WATER"),
-        ("SnapStep", "SNOW_SNAP_STEP"),
+        ("SnapQuads", "SNOW_SNAP_QUADS"),
+        ("EdgeFadeStart", "SNOW_EDGE_FADE_START"),
         ("MinVisibleHeight", "SNOW_MIN_VISIBLE_HEIGHT"),
         ("CaptureBelow", "SNOW_CAPTURE_BELOW"),
         ("CaptureAbove", "SNOW_CAPTURE_ABOVE"),
@@ -77,9 +78,6 @@ public static class SnowConstantsTest
         ("CrustSolid", "SNOW_CRUST_SOLID"),
         ("CrustBreakPen", "SNOW_CRUST_BREAK_PEN"),
         ("CrustSinkScale", "SNOW_CRUST_SINK_SCALE"),
-        ("RingScaleShader", "SNOW_RING_SCALE"),
-        ("SkirtDepth", "SNOW_SKIRT_DEPTH"),
-        ("MeshEdgeSink", "SNOW_MESH_EDGE_SINK"),
         ("SastrugiTau", "SNOW_SASTRUGI_TAU"),
         ("SastrugiBury", "SNOW_SASTRUGI_BURY"),
         ("SastrugiHeight", "SNOW_SASTRUGI_HEIGHT"),
@@ -93,11 +91,12 @@ public static class SnowConstantsTest
         ("SuspMaxHeight", "SNOW_SUSP_MAX_HEIGHT"),
         ("SprayParticlesPerM3", "SNOW_SPRAY_PARTICLES_PER_M3"),
         ("GroupSize", "SNOW_GROUP_SIZE"),
-        ("Ring0Extent", "SNOW_RING0_EXTENT"),
-        ("RingScale", "SNOW_RING_SCALE"),
-        ("RingSnapQuads", "SNOW_RING_SNAP_QUADS"),
-        ("RingDepthBias", "SNOW_RING_DEPTH_BIAS"),
     };
+
+    /// TABLODA OLMAYAN, KASITLI. `SnapQuadsInt` `SnapQuads`'ın tam sayı ikizi
+    /// ve HLSL karşılığı yok — shader'da bölme yapılmıyor. `MeshBoundsHeight`
+    /// CPU'da mesh sınırı kuruyor, shader okumuyor.
+    static readonly string[] CsharpOnly = { "SnapQuadsInt", "MeshBoundsHeight" };
 
     [MenuItem("To The Summit/Kar/Sabit Eşliğini Sına", false, 60)]
     static void RunMenu() => Debug.Log(Run(out bool ok) + (ok ? "" : "\nEŞLİK BOZUK."));
@@ -163,6 +162,7 @@ public static class SnowConstantsTest
         {
             bool listed = false;
             foreach ((string cs, string _) in Pairs) if (cs == name) { listed = true; break; }
+            foreach (string only in CsharpOnly) if (only == name) { listed = true; break; }
             if (!listed) { report.AppendLine($"TABLODA YOK  C# {name}"); ok = false; }
         }
 
@@ -173,12 +173,64 @@ public static class SnowConstantsTest
             if (!listed) { report.AppendLine($"TABLODA YOK  HLSL {name}"); ok = false; }
         }
 
+        ok &= GridRuleTests(report);
+
         report.Insert(0, ok
             ? $"Sabit eşliği TAMAM — {matched}/{Pairs.Length} çift birebir aynı.\n"
             : $"Sabit eşliği BOZUK — {matched}/{Pairs.Length} çift eşleşti.\n");
 
         return report.ToString();
     }
+
+    /// IZGARA KURALI (spec §6.4).
+    ///
+    /// > `MeshGrid` ve `Resolution` ikisi de ikinin kuvveti olmak zorundadır,
+    /// > ve `MeshGrid ≤ Resolution`. Bu sağlandığında
+    /// > `quad/texel = Resolution / MeshGrid` daima tam sayıdır, dolayısıyla
+    /// > `_ScrollTexels = SnapStep / texelSize` da daima tam sayıdır.
+    ///
+    /// HEPSİ TAM SAYI ARİTMETİĞİYLE. Spec'in ilk hâli oranı float'la hesaplayıp
+    /// üç haneye yuvarlamıştı; 4.0078 "4.0" görünüyordu ve üç presetin üçü de
+    /// kuralı çiğnerken tablo "her satırda tam sayı" diyordu. Float
+    /// karşılaştırması bu hatayı bir daha yakalayamaz.
+    static bool GridRuleTests(StringBuilder r)
+    {
+        bool all = true;
+
+        r.AppendLine();
+        r.AppendLine("## Izgara kuralı — ikinin kuvveti (spec §6.4)");
+
+        foreach (SnowQualityPreset p in Enum.GetValues(typeof(SnowQualityPreset)))
+        {
+            SnowQualityData q = SnowQuality.Get(p);
+
+            bool gridPow = IsPowerOfTwo(q.MeshGrid);
+            bool resPow = IsPowerOfTwo(q.Resolution);
+            bool order = q.MeshGrid <= q.Resolution;
+            bool divides = q.Resolution % q.MeshGrid == 0;
+
+            // Tam sayı yolu: SnapStep/texelSize sadeleşince bu çıkıyor.
+            int scroll = SnowConstants.SnapQuadsInt * (q.Resolution / q.MeshGrid);
+            bool scrollOk = divides && q.ScrollTexels == scroll && scroll > 0;
+
+            bool pass = gridPow && resPow && order && divides && scrollOk;
+            all &= pass;
+
+            r.AppendLine("  [" + (pass ? "+" : "-") + "] " + p.ToString().PadRight(8) +
+                         " ızgara " + q.MeshGrid.ToString().PadLeft(4) +
+                         (gridPow ? "" : " (2^n DEĞİL)") +
+                         "   çözünürlük " + q.Resolution.ToString().PadLeft(4) +
+                         (resPow ? "" : " (2^n DEĞİL)") +
+                         (order ? "" : "   IZGARA > ÇÖZÜNÜRLÜK") +
+                         (divides ? "   res/grid " + (q.Resolution / q.MeshGrid)
+                                  : "   BÖLÜNMÜYOR") +
+                         "   _ScrollTexels " + q.ScrollTexels);
+        }
+
+        return all;
+    }
+
+    static bool IsPowerOfTwo(int v) => v > 0 && (v & (v - 1)) == 0;
 
     static readonly Regex DefineLine =
         new(@"^\s*#define\s+(SNOW_[A-Z0-9_]+)\s+(-?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?)",

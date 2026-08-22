@@ -1,6 +1,6 @@
 // ROL: kar yüzeyinin materyali — geometri, kenar kesme, detay normalleri,
 // ışıklandırma ve parıltı.
-// Çağıran: SnowClipmap'in halka renderer'ları.
+// Çağıran: SnowSurface'in mesh renderer'ı.
 
 Shader "ToTheSummit/SnowLit"
 {

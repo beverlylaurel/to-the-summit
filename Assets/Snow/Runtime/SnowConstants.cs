@@ -26,9 +26,23 @@ public static class SnowConstants
 
     // --- Bölge takibi (spec §6.4) ---
 
-    /// Bölge merkezinin snap'lendiği ızgara, metre. Snap yapılmazsa izler teksel
-    /// altı kayar ve titrer; spec bunu "en zor teşhis edilen hata" diye işaretliyor.
-    public const float SnapStep = 0.25f;
+    /// Bölge merkezi kaç quad'lık adımlarla yer değiştiriyor.
+    ///
+    /// SNAP ADIMI SABİT DEĞİL, TÜRETİLMİŞ: `SnowQualityData.SnapStep` =
+    /// `QuadSize × SnapQuads`. Sabit yazılırsa preset değiştiğinde quad boyu
+    /// kayar ama adım kalır, oran bozulur ve izler teksel altı titrer (§22).
+    ///
+    /// 2 katsayısı doğruluk için gerekli değil; `1 × quadSize` de geçerli.
+    /// RT kaydırma sıklığını yarıya indirdiği için 2 seçilmiş.
+    public const float SnapQuads = 2f;
+
+    /// `SnapQuads`'ın tam sayı hâli. `ScrollTexels` float'a hiç uğramadan
+    /// hesaplansın diye ayrı duruyor.
+    public const int SnapQuadsInt = 2;
+
+    /// Kenar sönümünün başladığı normalize kenar uzaklığı (spec §8.3).
+    /// 24 m alanın dış 2 metresi: 1 − 2×2/24 = 0.833.
+    public const float EdgeFadeStart = 0.833f;
 
     // --- Kar / arazi çakışması (spec §8.1) ---
 
@@ -185,17 +199,6 @@ public static class SnowConstants
     /// Sağlam kabuğun üstünde batmanın kaç katına indiği.
     public const float CrustSinkScale = 0.04f;
 
-    /// Halka genişliklerinin büyüme oranı; shader'da `SNOW_RING_SCALE`.
-    public const float RingScaleShader = 3f;
-
-    /// En dış halkanın eteği bu kadar aşağı iniyor (rapor §5).
-    public const float SkirtDepth = 2f;
-
-    /// Kar mesh'inin kenarı bu kadar arazinin altına iniyor. Kenarı kırpmak
-    /// yerine gömmek, kırpma gürültüsünün kenarı testere gibi kemirmesini
-    /// bitiriyor (ölçüldü, SYMPTOMS.md).
-    public const float MeshEdgeSink = 0.10f;
-
     // --- Sastrugi (spec §18.4) ---
 
     /// Sastrugi genliğinin zaman sabiti, saniye.
@@ -245,20 +248,9 @@ public static class SnowConstants
     /// Compute thread group boyutu. Her zaman 8×8×1.
     public const int GroupSize = 8;
 
-    // --- Zemin mesh'i halkaları (spec §13.1) ---
-
-    /// En içteki halkanın kenar uzunluğu, metre. Üç presette de aynı; değişen
-    /// grid sayısı, kapsam değil.
-    public const float Ring0Extent = 8f;
-
-    /// Her halka bir öncekinin bu katı kadar geniş (8 → 24 → 72 → 216 m).
-    public const float RingScale = 3f;
-
-    /// Halka kendi quad boyutunun bu katına snap'leniyor. Snap'lenmezse yüzey
-    /// dalgalanır (spec §22).
-    public const float RingSnapQuads = 2f;
-
-    /// Dış halkanın iç halkaya göre aşağı itilme adımı, metre. Kaplama
-    /// bandında iç halka derinlik testini kazansın diye.
-    public const float RingDepthBias = 0f;
+    /// Mesh'in düşey sınır payı, metre (spec §8.2).
+    ///
+    /// Yer değiştirme köşe shader'ında olduğu için CPU sınırları bilmiyor.
+    /// Dar bırakılırsa kar, kamera açısına göre eleniyor (§22).
+    public const float MeshBoundsHeight = 600f;
 }

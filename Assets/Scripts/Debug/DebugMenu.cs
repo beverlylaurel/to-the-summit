@@ -21,8 +21,7 @@ public class DebugMenu : MonoBehaviour
     [SerializeField] PrecipitationRenderer precipitation;
     [SerializeField] TemperatureField temperature;
     [SerializeField] SnowfallRenderer snowfall;
-    [SerializeField] SnowClipmap snowClipmap;
-    [SerializeField] SnowFarCascade snowCascade;
+    [SerializeField] SnowManager snowManager;
     [SerializeField] PerformanceHud hud;
     [SerializeField] ClimbHud climbHud;
     [SerializeField] CursorLock cursorLock;
@@ -65,22 +64,9 @@ public class DebugMenu : MonoBehaviour
     /// gerçekten koşuyor mu sorusunu tek tıkla ayırıyor.
     bool forceMountainSnow;
 
-    /// Teşhis: kar mesh'inin yer değiştirmesini tamamen kapatır.
-    bool flattenSnow;
-
-    /// Mesh prob görünümü: 0 kapalı, 1–5 teşhis modları.
-    int meshProbe;
-
-    /// Teşhis: dikiş ve etek ayrı ayrı kapatılabiliyor.
-    bool stitchOff;
-    bool skirtOff;
-
     /// Teşhis: rüzgâr taşınımı ve gölgesi ayrı ayrı kapatılabiliyor.
     bool windTransportOff;
     bool windShadowOff;
-
-    /// Teşhis: kaç clipmap halkası çizilsin. −1 = hepsi.
-    int probeRings = -1;
 
     /// Sürgü açıkken dayatılan DENİZ SEVİYESİ sıcaklığı.
     ///
@@ -467,41 +453,7 @@ public class DebugMenu : MonoBehaviour
             // HALKA SINIRI TEŞHİSİ. Halkalar ±8, ±16, ±32, ±64 m. Kusur bir
             // halkanın kenarındaysa halka sayısı azalınca kusur da o sınırla
             // birlikte içeri kayar.
-            int ringsBefore = probeRings;
-
-            // BAĞLANMAMIŞ SÜRGÜ SESSİZ OLMAMALI. Bir kez oldu: referans boştu,
-            // sürgü oynuyordu, hiçbir şey değişmiyordu ve dışarıdan "düzeltme
-            // işe yaramadı" gibi görünüyordu.
-            GUILayout.Label(snowClipmap == null
-                ? "Çizilen halka — BAĞLANMADI (snowClipmap boş)"
-                : $"Çizilen halka {(probeRings < 0 ? "hepsi" : probeRings.ToString())}" +
-                  "   (±8, ±16, ±32, ±64 m)");
-            probeRings = Mathf.RoundToInt(GUILayout.HorizontalSlider(probeRings, -1f, 4f));
-
-            if (probeRings != ringsBefore && snowClipmap != null)
-            {
-                snowClipmap.ProbeVisibleRings = probeRings;
-                snowClipmap.RefreshVisibility();
-            }
-
-            // PROB GÖRÜNÜMÜ. Her şüpheli ayrı renk; ışıktan bağımsız.
-            string[] probeNames =
-            {
-                "kapalı", "1 halka", "2 köşe işareti", "3 kalınlık",
-                "4 kenar sönümü", "5 quad ızgarası", "6 NaN avcısı",
-                "7 komşu farkı", "8 dünya Y bandı", "9 bölge maskesi",
-                "10 veri kaynağı", "11 taban", "12 iz (carve)", "13 sırt (rim)",
-                "14 sastrugi", "15 ZEMİN yüksekliği",
-            };
-
-            int before = meshProbe;
-            GUILayout.Label("Mesh probu: " + probeNames[Mathf.Clamp(meshProbe, 0, 15)]);
-            meshProbe = Mathf.RoundToInt(GUILayout.HorizontalSlider(meshProbe, 0f, 15f));
-
-            if (meshProbe != before)
-                Shader.SetGlobalFloat("_SnowMeshProbe", meshProbe);
-
-            var mgr = snowClipmap != null ? snowClipmap.GetComponent<SnowManager>() : null;
+            SnowManager mgr = snowManager;
 
             if (mgr != null)
             {
@@ -518,27 +470,6 @@ public class DebugMenu : MonoBehaviour
                     windShadowOff = nextWs;
                     mgr.WindShadowOff = windShadowOff;
                 }
-            }
-
-            bool nextStitch = GUILayout.Toggle(stitchOff, "Dikişi kapat (teşhis)");
-            if (nextStitch != stitchOff)
-            {
-                stitchOff = nextStitch;
-                Shader.SetGlobalFloat("_SnowStitchOff", stitchOff ? 1f : 0f);
-            }
-
-            bool nextSkirt = GUILayout.Toggle(skirtOff, "Eteği kapat (teşhis)");
-            if (nextSkirt != skirtOff)
-            {
-                skirtOff = nextSkirt;
-                Shader.SetGlobalFloat("_SnowSkirtOff", skirtOff ? 1f : 0f);
-            }
-
-            bool nextFlat = GUILayout.Toggle(flattenSnow, "Kar yüzeyini düzleştir (teşhis)");
-            if (nextFlat != flattenSnow)
-            {
-                flattenSnow = nextFlat;
-                Shader.SetGlobalFloat("_SnowFlattenProbe", flattenSnow ? 1f : 0f);
             }
 
             bool nextForce = GUILayout.Toggle(forceMountainSnow, "Dağı zorla karla kapla (teşhis)");
@@ -592,26 +523,6 @@ public class DebugMenu : MonoBehaviour
 
     /// DEVİR NOKTASINDAKİ BASAMAK.
     ///
-    /// Kar mesh'i ±8 m'de yakın bölgeden kaskada devrediyor. İkisi ayrı
-    /// kernellerle yoğunluk geliştiriyor; yoğunluk ayrışırsa AYNI SWE farklı
-    /// DERİNLİK veriyor (0.05 SWE: ρ=110'da 45 cm, ρ=190'da 26 cm) ve devir
-    /// noktasında oyuncuyu takip eden kare bir sırt kalıyor.
-    ///
-    /// İki derinlik yan yana yazılıyor; fark varsa sebep tek bakışta görünür.
-    string DepthCompare()
-    {
-        var manager = snowClipmap != null ? snowClipmap.GetComponent<SnowManager>() : null;
-
-        if (manager == null || snowCascade == null) return "derinlik: bileşen yok";
-
-        float dNear = Depth(manager.MeanSwe, manager.MeanRhoN);
-        float dFar = Depth(snowCascade.MeanSwe, snowCascade.MeanRhoN);
-
-        return $"derinlik  yakın {dNear * 100f:F1} cm (ρ {Rho(manager.MeanRhoN):F0})   " +
-               $"kaskad {dFar * 100f:F1} cm (ρ {Rho(snowCascade.MeanRhoN):F0})   " +
-               $"FARK {Mathf.Abs(dNear - dFar) * 100f:F1} cm";
-    }
-
     static float Rho(float rhoN) => Mathf.Lerp(50f, 550f, Mathf.Clamp01(rhoN));
 
     static float Depth(float swe, float rhoN) =>
@@ -647,22 +558,10 @@ public class DebugMenu : MonoBehaviour
         // kalıyor — ekrandan bakınca "kar çizgisi çalışmıyor" gibi görünüyor
         // ama çizgi doğru, doku boş. `GroundCoverage01` o dokunun geri
         // okumasıdır: kar varsa 1'e yakın, doku boşsa 0.
-        // MESH KENARI DA BURADA. Kenardaki duvarı sönümlemek için yazılan
-        // globaller gerçekten ulaşıyor mu — sıfırsa sönüm hiç çalışmıyor.
-        float meshExtent = Shader.GetGlobalFloat("_SnowMeshExtent");
-        Vector4 meshCenter = Shader.GetGlobalVector("_SnowMeshCenterXZ");
-
-        float toEdge = walker != null
-            ? meshExtent - Mathf.Max(Mathf.Abs(walker.transform.position.x - meshCenter.x),
-                                     Mathf.Abs(walker.transform.position.z - meshCenter.y))
-            : 0f;
-
-        return $"mesh ±{meshExtent:F0} m, kenara {toEdge:F0} m   " +
-               $"kar çizgisi {lineY:F0} m + {band:F0} m bant   " +
+        return $"kar çizgisi {lineY:F0} m + {band:F0} m bant   " +
                $"çizgiden {depth * 100f:F1} cm   " +
                $"DOKUDA {SnowRuntimeState.GroundCoverage01:F2}   " +
-               $"gevşek {SnowRuntimeState.LooseSnowFraction:F2}" +
-               System.Environment.NewLine + DepthCompare();
+               $"gevşek {SnowRuntimeState.LooseSnowFraction:F2}";
     }
 
     /// SÜRGÜ GERÇEK SİSTEMLERE YAZIYOR, KAR SİSTEMİNE DEĞİL.

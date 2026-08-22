@@ -87,9 +87,6 @@ public static class SnowShaderIDs
     public static readonly int SastrugiNoise = Shader.PropertyToID("_SastrugiNoise");
 
     // --- Kar yüzeyi materyali ---
-    public static readonly int Ring0Quad = Shader.PropertyToID("_SnowRing0Quad");
-    public static readonly int MeshCenterXZ = Shader.PropertyToID("_SnowMeshCenterXZ");
-    public static readonly int MeshExtent = Shader.PropertyToID("_SnowMeshExtent");
     public static readonly int FallbackSWE = Shader.PropertyToID("_FallbackSWE");
     // KOT KAR CIZGISI. Yukaridaki `_SnowLineY` KARAKTER ustu birikmenin
     // kendi cizgisi (spec 16.1) ve MaterialPropertyBlock ile veriliyor; bu
@@ -137,18 +134,6 @@ public static class SnowShaderIDs
     public static readonly int BurstGrowth = Shader.PropertyToID("_BurstGrowth");
 
     // --- Uzak kaskad ve kalıcılık (Faz 10) ---
-    public static readonly int FarSrc = Shader.PropertyToID("_FarSrc");
-    public static readonly int FarDst = Shader.PropertyToID("_FarDst");
-    public static readonly int FarResolution = Shader.PropertyToID("_FarResolution");
-    public static readonly int FarAreaSize = Shader.PropertyToID("_FarAreaSize");
-    public static readonly int FarAreaCenter = Shader.PropertyToID("_FarAreaCenter");
-    public static readonly int FarScrollTexels = Shader.PropertyToID("_FarScrollTexels");
-    public static readonly int FarNewEdgeValue = Shader.PropertyToID("_FarNewEdgeValue");
-
-    public static readonly int SnowFarTex = Shader.PropertyToID("_SnowFarTex");
-    public static readonly int SnowFarCenter = Shader.PropertyToID("_SnowFarCenter");
-    public static readonly int SnowFarAreaSize = Shader.PropertyToID("_SnowFarAreaSize");
-
     public static readonly int BlockBuffer = Shader.PropertyToID("_BlockBuffer");
     public static readonly int BlockOrigin = Shader.PropertyToID("_BlockOrigin");
     public static readonly int BlockTexels = Shader.PropertyToID("_BlockTexels");

@@ -85,7 +85,7 @@ public static class SnowScrollTest
                 new(0, 0),          // birim: içerik hiç kaymamalı
                 new(7, 3),
                 new(-5, 11),
-                new(16, -16),       // Medium'da bir SnapStep = 16 teksel
+                new(4, -4),         // Medium'da bir SnapStep = 4 teksel
                 new(Res, 0),        // tamamen dışarı: her teksel yeni şerit
                 new(-1200, 1200),   // iki eksende de dışarı
             };
@@ -194,19 +194,24 @@ public static class SnowScrollTest
         foreach (SnowQualityPreset p in System.Enum.GetValues(typeof(SnowQualityPreset)))
         {
             SnowQualityData q = SnowQuality.Get(p);
-            float texel = q.AreaSize / q.Resolution;
-            float ratio = SnowConstants.SnapStep / texel;
-            float err = Mathf.Abs(ratio - Mathf.Round(ratio));
+            float texel = q.TexelSize;
+            float ratio = q.SnapStep / texel;
+            float err = Mathf.Abs(ratio - q.ScrollTexels);
 
             // Bir SnapStep tam sayı teksele denk gelmezse merkez teksel altı
             // titrer; belirtisi izlerin kayması olur (spec §6.4).
+            //
+            // FLOAT ORANI TAM SAYI HESABIYLA KARŞILAŞTIRILIYOR. Spec'in ilk
+            // hâli float'ı üç haneye yuvarlayıp "tam" demişti; gerçek oran
+            // 4.0078'di ve hata orada saklandı.
             bool pass = err < 1e-4f;
             all &= pass;
 
             r.AppendLine("  [" + (pass ? "+" : "-") + "] " + p.ToString().PadRight(8) +
                 " teksel " + (texel * 100f).ToString("F4") + " cm   " +
                 "SnapStep / teksel = " + ratio.ToString("F6") +
-                (pass ? "  (tam sayı)" : "  KESİRLİ — snap bozuk"));
+                "   tam sayı hesabı " + q.ScrollTexels +
+                (pass ? "  (uyuyor)" : "  AYRIŞMA — snap bozuk"));
         }
 
         // Gerçek dünya süpürmesi: sahnedeki koordinat mertebesinde (~-7500 m)
@@ -222,9 +227,9 @@ public static class SnowScrollTest
 
         for (float x = X0; x <= X0 + 20f; x += 0.01f)
         {
-            Vector2Int c = SnowManager.SnapToTexelGrid(new Vector3(x, 0f, x), t);
+            Vector2Int c = SnowManager.SnapToTexelGrid(new Vector3(x, 0f, x), t, med.SnapStep);
 
-            float want = Mathf.Floor(x / SnowConstants.SnapStep) * SnowConstants.SnapStep;
+            float want = Mathf.Floor(x / med.SnapStep) * med.SnapStep;
             float got = c.x * t;
 
             maxDev = Mathf.Max(maxDev, Mathf.Abs(got - want));

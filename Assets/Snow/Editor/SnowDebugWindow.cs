@@ -142,10 +142,9 @@ public class SnowDebugWindow : EditorWindow
 
         Toggle<SnowfallRenderer>(host, "Kar yağışı (taneler)");
         Toggle<SnowCurtainController>(host, "Süspansiyon perdeleri");
-        Toggle<SnowClipmap>(host, "Kar yüzeyi (zemin mesh'i)");
+        Toggle<SnowSurface>(host, "Kar yüzeyi (zemin mesh'i)");
         Toggle<SnowCoverageDriver>(host, "Nesne üstü kar");
         Toggle<SnowBurstParticles>(host, "Ayak tozu / püskürtme");
-        Toggle<SnowFarCascade>(host, "Uzak kaskad");
         Toggle<SnowPersistence>(host, "İz kalıcılığı");
 
         EditorGUILayout.HelpBox(
@@ -197,9 +196,6 @@ public class SnowDebugWindow : EditorWindow
             {
                 settings.SetTestSnow(testSwe);
                 manager.RefillRegion();
-
-                var cascade = manager.GetComponent<SnowFarCascade>();
-                if (cascade != null) cascade.RefillRegion();
             }
 
             using (new EditorGUI.DisabledScope(!settings.HasTestSnow))
@@ -208,9 +204,6 @@ public class SnowDebugWindow : EditorWindow
                 {
                     settings.ClearTestSnow();
                     manager.RefillRegion();
-
-                    var cascade = manager.GetComponent<SnowFarCascade>();
-                    if (cascade != null) cascade.RefillRegion();
                 }
             }
         }
@@ -415,8 +408,8 @@ public class SnowDebugWindow : EditorWindow
         var ground = go.GetComponent<SnowGroundHeight>();
         if (ground == null) ground = go.AddComponent<SnowGroundHeight>();
 
-        var clipmap = go.GetComponent<SnowClipmap>();
-        if (clipmap == null) clipmap = go.AddComponent<SnowClipmap>();
+        var surface = go.GetComponent<SnowSurface>();
+        if (surface == null) surface = go.AddComponent<SnowSurface>();
 
         if (go.GetComponent<SnowCoverageDriver>() == null)
             go.AddComponent<SnowCoverageDriver>();
@@ -429,9 +422,6 @@ public class SnowDebugWindow : EditorWindow
 
         var sampler = go.GetComponent<SnowSampler>();
         if (sampler == null) sampler = go.AddComponent<SnowSampler>();
-
-        var cascade = go.GetComponent<SnowFarCascade>();
-        if (cascade == null) cascade = go.AddComponent<SnowFarCascade>();
 
         var persistence = go.GetComponent<SnowPersistence>();
         if (persistence == null) persistence = go.AddComponent<SnowPersistence>();
@@ -468,8 +458,7 @@ public class SnowDebugWindow : EditorWindow
             menuSerialized.FindProperty("temperature").objectReferenceValue =
                 Object.FindAnyObjectByType<TemperatureField>();
             menuSerialized.FindProperty("snowfall").objectReferenceValue = snowfall;
-            menuSerialized.FindProperty("snowClipmap").objectReferenceValue = clipmap;
-            menuSerialized.FindProperty("snowCascade").objectReferenceValue = cascade;
+            menuSerialized.FindProperty("snowManager").objectReferenceValue = manager;
             menuSerialized.ApplyModifiedProperties();
         }
 
@@ -499,12 +488,12 @@ public class SnowDebugWindow : EditorWindow
 
         Material snowLit = LoadOrCreateSnowMaterial();
 
-        var clipmapSerialized = new SerializedObject(clipmap);
-        clipmapSerialized.FindProperty("settings").objectReferenceValue = settings;
-        clipmapSerialized.FindProperty("followTarget").objectReferenceValue =
+        var surfaceSerialized = new SerializedObject(surface);
+        surfaceSerialized.FindProperty("settings").objectReferenceValue = settings;
+        surfaceSerialized.FindProperty("manager").objectReferenceValue =
             player != null ? player.transform : null;
-        clipmapSerialized.FindProperty("snowMaterial").objectReferenceValue = snowLit;
-        clipmapSerialized.ApplyModifiedProperties();
+        surfaceSerialized.FindProperty("snowMaterial").objectReferenceValue = snowLit;
+        surfaceSerialized.ApplyModifiedProperties();
 
         Material flakeMat = LoadOrCreateParticleMaterial(FlakeMaterialPath, stretch: false, alpha: 1f);
         Material driftMat = LoadOrCreateParticleMaterial(DriftMaterialPath, stretch: true, alpha: 0.12f);
@@ -535,15 +524,6 @@ public class SnowDebugWindow : EditorWindow
             player != null ? player.transform : null;
         samplerSerialized.ApplyModifiedProperties();
 
-        var cascadeSerialized = new SerializedObject(cascade);
-        cascadeSerialized.FindProperty("groundHeight").objectReferenceValue = ground;
-        cascadeSerialized.FindProperty("settings").objectReferenceValue = settings;
-        cascadeSerialized.FindProperty("simCompute").objectReferenceValue =
-            AssetDatabase.LoadAssetAtPath<ComputeShader>(ComputePath);
-        cascadeSerialized.FindProperty("followTarget").objectReferenceValue =
-            player != null ? player.transform : null;
-        cascadeSerialized.ApplyModifiedProperties();
-
         var persistenceSerialized = new SerializedObject(persistence);
         persistenceSerialized.FindProperty("manager").objectReferenceValue = manager;
         persistenceSerialized.FindProperty("simCompute").objectReferenceValue =
@@ -567,19 +547,17 @@ public class SnowDebugWindow : EditorWindow
 
         EditorUtility.SetDirty(curtains);
 
-        managerSerialized.FindProperty("farCascade").objectReferenceValue = cascade;
         managerSerialized.FindProperty("persistence").objectReferenceValue = persistence;
         managerSerialized.FindProperty("curtains").objectReferenceValue = curtains;
         managerSerialized.ApplyModifiedProperties();
 
-        EditorUtility.SetDirty(cascade);
         EditorUtility.SetDirty(persistence);
 
         EditorUtility.SetDirty(burst);
         EditorUtility.SetDirty(sampler);
 
         EditorUtility.SetDirty(snowfall);
-        EditorUtility.SetDirty(clipmap);
+        EditorUtility.SetDirty(surface);
         EditorUtility.SetDirty(manager);
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(go.scene);
 

@@ -62,7 +62,7 @@ public static class SnowAutoWire
     /// F1 panelinin kar alanları. Kurulum bunları da bağlıyor.
     static readonly string[] MenuRequired =
     {
-        "temperature", "snowfall", "snowClipmap", "snowCascade",
+        "temperature", "snowfall", "snowManager",
     };
 
     static void Count(SerializedObject so, string[] names, ref int missing, ref string first)

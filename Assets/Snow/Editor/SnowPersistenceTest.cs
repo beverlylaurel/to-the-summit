@@ -22,8 +22,6 @@ public static class SnowPersistenceTest
     const int BlockTexels = 128;
     const int StoredSide = 64;
 
-    const int FarRes = 128;
-    const float FarArea = 192f;
 
     [MenuItem("To The Summit/Kar/Kalıcılık Sınaması", false, 59)]
     static void RunMenu() => Debug.Log(Run(out _));
@@ -31,12 +29,11 @@ public static class SnowPersistenceTest
     public static string Run(out bool ok)
     {
         var r = new StringBuilder(8192);
-        r.AppendLine("# Kar — kalıcılık ve uzak kaskad sınaması");
+        r.AppendLine("# Kar — kalıcılık ve bölge dışı kar sınaması");
         r.AppendLine(System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         r.AppendLine();
 
         ok = HalfTest(r);
-        ok &= CascadeTest(r);
         ok &= BlockTest(r);
         ok &= WiringTest(r);
 
@@ -81,122 +78,6 @@ public static class SnowPersistenceTest
         return all;
     }
 
-    // ------------------------------------------------------------ uzak kaskad
-
-    static bool CascadeTest(StringBuilder r)
-    {
-        r.AppendLine();
-        r.AppendLine("## Uzak kaskad (spec §21 Faz 10)");
-
-        var sim = AssetDatabase.LoadAssetAtPath<ComputeShader>(SimPath);
-        if (sim == null) { r.AppendLine("  [-] " + SimPath + " yüklenemedi."); return false; }
-
-        int accumulate = sim.FindKernel("KFarAccumulate");
-        int scroll = sim.FindKernel("KFarScroll");
-        int groups = Mathf.CeilToInt(FarRes / 8f);
-
-        RenderTexture a = NewRg(FarRes);
-        RenderTexture b = NewRg(FarRes);
-
-        bool all = true;
-
-        try
-        {
-            sim.SetInt(SnowShaderIDs.FarResolution, FarRes);
-            sim.SetFloat(SnowShaderIDs.FarAreaSize, FarArea);
-            sim.SetVector(SnowShaderIDs.FarAreaCenter, Vector4.zero);
-
-            // Sıfırdan başlat: kaydırmayı doku boyu kadar sürerek doldur.
-            sim.SetVector(SnowShaderIDs.FarScrollTexels, new Vector4(FarRes, FarRes, 0f, 0f));
-            sim.SetVector(SnowShaderIDs.FarNewEdgeValue, new Vector4(0f, 0.10f, 0f, 0f));
-            sim.SetTexture(scroll, SnowShaderIDs.FarSrc, a);
-            sim.SetTexture(scroll, SnowShaderIDs.FarDst, b);
-            sim.Dispatch(scroll, groups, groups, 1);
-            (a, b) = (b, a);
-
-            float seeded = Read(a).r;
-            bool cleared = Mathf.Abs(seeded) < 1e-5f;
-            all &= cleared;
-            r.AppendLine("  [" + M(cleared) + "] Kenar değeriyle dolum   SWE " +
-                         seeded.ToString("0.000000"));
-
-            // Bir saat kar: SWE tam olarak hız × süre kadar artmalı.
-            const float Rate = 8.33e-7f;
-            const float Hour = 3600f;
-
-            Shader.SetGlobalFloat(SnowShaderIDs.TemperatureC, -5f);
-            Shader.SetGlobalFloat(SnowShaderIDs.RainOnSnow01, 0f);
-            Shader.SetGlobalFloat(SnowShaderIDs.WindSpeed, 0f);
-
-            sim.SetFloat(SnowShaderIDs.SnowfallSWERate, Rate);
-            sim.SetFloat(SnowShaderIDs.DeltaTimeEff, Hour);
-            sim.SetTexture(accumulate, SnowShaderIDs.FarSrc, a);
-            sim.SetTexture(accumulate, SnowShaderIDs.FarDst, b);
-            sim.Dispatch(accumulate, groups, groups, 1);
-            (a, b) = (b, a);
-
-            Color snowed = Read(a);
-            float want = Rate * Hour;
-
-            bool accumulates = Mathf.Abs(snowed.r - want) < want * 0.02f;
-            all &= accumulates;
-            r.AppendLine("  [" + M(accumulates) + "] Birikme                 " +
-                         (snowed.r * 1000f).ToString("0.000") + " mm/saat  (beklenen " +
-                         (want * 1000f).ToString("0.000") + ")");
-
-            // Sıcaklık +5 → erime. Derece-gün, yakın bölgeyle aynı sabit.
-            Shader.SetGlobalFloat(SnowShaderIDs.TemperatureC, 5f);
-
-            sim.SetFloat(SnowShaderIDs.SnowfallSWERate, 0f);
-            sim.SetTexture(accumulate, SnowShaderIDs.FarSrc, a);
-            sim.SetTexture(accumulate, SnowShaderIDs.FarDst, b);
-            sim.Dispatch(accumulate, groups, groups, 1);
-            (a, b) = (b, a);
-
-            float melted = snowed.r - Read(a).r;
-            float wantMelt = SnowConstants.MeltDdf * 5f * Hour;
-
-            bool melts = Mathf.Abs(melted - wantMelt) < wantMelt * 0.05f;
-            all &= melts;
-            r.AppendLine("  [" + M(melts) + "] Erime                   " +
-                         (melted * 1000f).ToString("0.0000") + " mm  (beklenen " +
-                         (wantMelt * 1000f).ToString("0.0000") + ")");
-
-            // Kaydırma: içerik dünyaya çakılı kalıyor mu.
-            sim.SetVector(SnowShaderIDs.FarScrollTexels, new Vector4(7f, -3f, 0f, 0f));
-            sim.SetVector(SnowShaderIDs.FarNewEdgeValue, new Vector4(0.5f, 0.5f, 0f, 0f));
-            sim.SetTexture(scroll, SnowShaderIDs.FarSrc, a);
-            sim.SetTexture(scroll, SnowShaderIDs.FarDst, b);
-            sim.Dispatch(scroll, groups, groups, 1);
-            (a, b) = (b, a);
-
-            Color[] scrolled = ReadAll(a);
-
-            int edge = 0;
-            for (int i = 0; i < scrolled.Length; i++)
-                if (Mathf.Abs(scrolled[i].r - 0.5f) < 1e-3f) edge++;
-
-            // 7 sütun + 3 satır yeni şerit, köşe kesişimi bir kez sayılıyor.
-            int expected = FarRes * 7 + FarRes * 3 - 21;
-            bool scrolls = Mathf.Abs(edge - expected) <= FarRes;
-
-            all &= scrolls;
-            r.AppendLine("  [" + M(scrolls) + "] Kaydırma                yeni şerit " + edge +
-                         " teksel  (beklenen ~" + expected + ")");
-        }
-        finally
-        {
-            Release(ref a);
-            Release(ref b);
-        }
-
-        return all;
-    }
-
-    // ---------------------------------------------------------------- blok
-
-    /// PAKETLE, AÇ, KARŞILAŞTIR. Beklenen değer kâğıttan değil, kaynağın
-    /// kendisinden 2×2 kutu ortalamasıyla hesaplanıyor.
     static bool BlockTest(StringBuilder r)
     {
         r.AppendLine();
@@ -346,20 +227,28 @@ public static class SnowPersistenceTest
 
         string common = System.IO.File.ReadAllText(CommonPath);
 
-        bool sampled = common.Contains("SnowFarStateAt");
-        bool used = common.Contains("float2 far = SnowFarStateAt");
+        // SPEC §8.4: "24 m ötesinde kar mesh'i yoktur." Bölgenin dışındaki
+        // kar durumu SABİT BİR SAYI DEĞİL, kar çizgisi eğrisi — sabit olsaydı
+        // dağın tepesi ile eteği aynı kalınlıkta kar taşırdı.
+        bool defined = common.Contains("float2 SnowOutsideStateAt");
+        bool curved = common.Contains("SnowInitialSweAt(SampleGroundHeight(posXZ))");
+        bool used = common.Contains("SnowOutsideStateAt(SnowUVToWorld(uv))");
 
-        r.AppendLine("  [" + M(sampled) + "] Kaskad örnekleniyor     `SnowFarStateAt` tanımlı");
-        r.AppendLine("  [" + M(used) + "] Sabit yerine kaskad     `SnowSurfaceAt` kaskadı okuyor");
+        // Kaskad geri sızmasın: silindiği için gerekçesi de yok.
+        bool noCascade = !common.Contains("SnowFarStateAt") && !common.Contains("_SnowFarTex");
 
-        return sampled && used;
+        r.AppendLine("  [" + M(defined) + "] Bölge dışı tanımlı      `SnowOutsideStateAt`");
+        r.AppendLine("  [" + M(curved) + "] Kar çizgisi eğrisi      yükseklik fonksiyonu, sabit değil");
+        r.AppendLine("  [" + M(used) + "] `SnowStateAt` okuyor    bölge dışında devreye giriyor");
+        r.AppendLine("  [" + M(noCascade) + "] Kaskad kalıntısı yok    (spec §8.4)");
+
+        return defined && curved && used && noCascade;
     }
 
     // ----------------------------------------------------------------- yardım
 
     static string M(bool ok) => ok ? "+" : "-";
 
-    static RenderTexture NewRg(int res) => New(res, RenderTextureFormat.RGHalf);
     static RenderTexture NewArgb(int res) => New(res, RenderTextureFormat.ARGBHalf);
 
     static RenderTexture New(int res, RenderTextureFormat format)

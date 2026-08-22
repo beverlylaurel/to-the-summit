@@ -11,7 +11,15 @@
 #define SNOW_RHO_WATER            1000.0
 
 // --- Bölge takibi (spec §6.4) ---
-#define SNOW_SNAP_STEP               0.25
+
+/// Bölge merkezi kaç quad'lık adımlarla yer değiştiriyor. Adımın METRE
+/// karşılığı türetilmiş: `QuadSize × SNOW_SNAP_QUADS`. Sabit metre yazılırsa
+/// preset değişince oran bozulur ve izler teksel altı titrer (§22).
+#define SNOW_SNAP_QUADS              2.0
+
+/// Kenar sönümünün başladığı normalize kenar uzaklığı (spec §8.3).
+/// 24 m alanın dış 2 metresi: 1 − 2×2/24 = 0.833.
+#define SNOW_EDGE_FADE_START         0.833
 
 // --- Kar / arazi çakışması (spec §8.1) ---
 #define SNOW_MIN_VISIBLE_HEIGHT      0.004
@@ -79,22 +87,8 @@
 #define SNOW_CRUST_BREAK_PEN         0.05
 #define SNOW_CRUST_SINK_SCALE        0.04
 
-/// Halka genişliklerinin büyüme oranı. `SnowConstants.RingScale` ile eş.
-#define SNOW_RING_SCALE              3.0
-
 /// EN DIŞ HALKANIN ETEĞİ bu kadar aşağı iniyor (rapor §5).
 ///
-/// Halkalar düz ızgara; dağ dalgalı veya dik bir sırttan geçerken mesh'in
-/// kenarı arazinin üstünde havada kalıp altındaki boşluğu gösteriyordu. Etek
-/// üçgenleri temasi her koşulda kapatıyor. 2 m, arazinin bir dış-halka
-/// quad'ı (54 cm) boyunca yapabileceği en dik düşüşün üstünde.
-#define SNOW_SKIRT_DEPTH             2.0
-
-/// Kar mesh'inin kenarı bu kadar arazinin altına iniyor. Terrain tekseli
-/// 7.32 m; iki yüzeyin arasındaki fark bu değerin altında kalırsa kenar yine
-/// görünür. 10 cm ölçülmüş güvenli değer.
-#define SNOW_MESH_EDGE_SINK          0.10
-
 // --- Sastrugi (spec §18.4) ---
 #define SNOW_SASTRUGI_TAU          900.0
 #define SNOW_SASTRUGI_BURY         260.0
@@ -118,19 +112,5 @@
 // --- Hesaplama (spec §20) ---
 #define SNOW_GROUP_SIZE              8
 
-// --- Zemin mesh'i halkaları (spec §13.1) ---
-#define SNOW_RING0_EXTENT            8.0
-#define SNOW_RING_SCALE              3.0
-#define SNOW_RING_SNAP_QUADS         2.0
-/// Dış halka bu kadar aşağı itiliyor (halka başına, metre).
-///
-/// SIFIR — ve bu bilinçli. Pay, halkalar BİNDİRDİĞİ zaman hangisinin
-/// kazanacağını belirlemek içindi. Ortak snap ızgarasından sonra bindirme
-/// yok: halkalar sınır çizgisini paylaşıyor. Payı sıfırdan büyük tutmak tam o
-/// çizgide pay kadar bir BASAMAK üretiyor — her halka sınırında bir kademe.
-///
-/// 1 mm → 2 cm → 0. İkisi de ölçümle: önce bindirme vardı ve 1 mm yetmiyordu,
-/// sonra bindirme kalktı ve payın kendisi kusur oldu.
-#define SNOW_RING_DEPTH_BIAS         0.0
 
 #endif

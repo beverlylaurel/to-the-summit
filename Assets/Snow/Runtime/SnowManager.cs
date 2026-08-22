@@ -30,9 +30,6 @@ public class SnowManager : MonoBehaviour
     [Tooltip("Ayak tozu ve püskürtme havuzu. Boş bırakılırsa çizilmez.")]
     [SerializeField] SnowBurstParticles burstParticles;
 
-    [Tooltip("Uzak kaskad. Boş bırakılırsa bölge dışı sabit kar durumuna düşer.")]
-    [SerializeField] SnowFarCascade farCascade;
-
     [Tooltip("Kar detay normali (spec §14.2). Global yayınlanıyor: kar mesh'i " +
              "ile dağın kar katmanı AYNI dokuyu kullanıyor.")]
     [SerializeField] Texture2D detailNormal;
@@ -309,7 +306,7 @@ public class SnowManager : MonoBehaviour
 
         lastSimulatedFrame = -1;
 
-        centerTexel = SnapToTexelGrid(followTarget.position, TexelSize);
+        centerTexel = SnapToTexelGrid(followTarget.position, TexelSize, settings.QualityData.SnapStep);
         pendingClear = true;
         pendingScroll = false;
 
@@ -379,12 +376,16 @@ public class SnowManager : MonoBehaviour
 
     /// STATİK VE PARAMETRELİ: sınama bu fonksiyonun KENDİSİNİ çağırıyor.
     /// Teste kopyasını yazmak, kopyanın doğruluğunu sınamak olur.
-    public static Vector2Int SnapToTexelGrid(Vector3 worldPos, float texelSize)
+    ///
+    /// SNAP ADIMI DIŞARIDAN. Sabit değil, kalite presetinden türüyor
+    /// (`SnowQualityData.SnapStep` = quad × 2). Sabit yazılsaydı preset
+    /// değişince quad boyu kayar, adım kalır ve oran bozulurdu (spec §6.4).
+    public static Vector2Int SnapToTexelGrid(Vector3 worldPos, float texelSize, float snapStep)
     {
         // ÖNCE SnapStep IZGARASINA, SONRA TAM SAYI TEKSELE. Kesirli snap, snap
         // yapmamakla aynı belirtiyi üretiyor: izler teksel altı kayıp titriyor
         // (spec §6.4).
-        float snapped = SnowConstants.SnapStep;
+        float snapped = snapStep;
 
         float x = Mathf.Floor(worldPos.x / snapped) * snapped;
         float z = Mathf.Floor(worldPos.z / snapped) * snapped;
@@ -394,7 +395,7 @@ public class SnowManager : MonoBehaviour
 
     void UpdateRegion()
     {
-        Vector2Int next = SnapToTexelGrid(followTarget.position, TexelSize);
+        Vector2Int next = SnapToTexelGrid(followTarget.position, TexelSize, settings.QualityData.SnapStep);
         if (next == centerTexel) return;
 
         // Teksel id'si merkez +delta kadar kayınca aynı dünya içeriği kaynakta
@@ -435,8 +436,6 @@ public class SnowManager : MonoBehaviour
 
         float rainOnSnow = env.PrecipKind == PrecipitationKind.Rain ? env.PrecipIntensity01 : 0f;
         Shader.SetGlobalFloat(SnowShaderIDs.RainOnSnow01, rainOnSnow);
-
-        if (farCascade != null) farCascade.WriteGlobals();
 
         // DETAY NORMALİ GLOBAL. Materyalde de duruyor ama dağın kar katmanı
         // ayrı bir materyal; ikisinin aynı dokuyu kullanması için tek yer bu.
@@ -547,8 +546,6 @@ public class SnowManager : MonoBehaviour
 
                 (snow, snowTemp) = (snowTemp, snow);
             }
-
-            if (farCascade != null) farCascade.RefillRegion();
         }
 
         if (pendingClear)
@@ -605,7 +602,6 @@ public class SnowManager : MonoBehaviour
         // durumu taşıyor; birikme onun üstüne yazsaydı yükleme boşa giderdi.
         if (persistence != null) persistence.Dispatch(cmd);
 
-        if (farCascade != null) farCascade.Dispatch(cmd);
         cmd.EndSample(SnowProfiler.MarkerNames[3]);
 
         // Yağış simülasyonu da AYNI tamponda (spec §15.2).

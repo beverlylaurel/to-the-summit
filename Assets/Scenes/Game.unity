@@ -196,15 +196,14 @@ GameObject:
   - component: {fileID: 76489726}
   - component: {fileID: 76489725}
   - component: {fileID: 76489724}
-  - component: {fileID: 76489736}
   - component: {fileID: 76489735}
   - component: {fileID: 76489734}
   - component: {fileID: 76489733}
   - component: {fileID: 76489732}
-  - component: {fileID: 76489731}
   - component: {fileID: 76489730}
   - component: {fileID: 76489729}
   - component: {fileID: 76489728}
+  - component: {fileID: 76489736}
   m_Layer: 0
   m_Name: Kar Sistemi
   m_TagString: Untagged
@@ -240,9 +239,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SnowEnvironmentBridge
   sunLight: {fileID: 410087040}
+  wind: {fileID: 1805896805}
+  time: {fileID: 508855605}
+  temperature: {fileID: 1805896810}
+  weather: {fileID: 1805896806}
+  atmosphere: {fileID: 1805896809}
+  observer: {fileID: 848219609}
+  fogFullVisibility: 60
+  fogClearVisibility: 20000
   manualWindDirection: {x: 1, y: 0, z: 0}
   manualWindSpeed: 3
   manualTemperatureC: -4
+  manualFreezingLevelY: 1400
   manualPrecipKind: 2
   manualPrecipIntensity: 0.5
   manualFogDensity: 0.2
@@ -264,7 +272,7 @@ MonoBehaviour:
   groundHeight: {fileID: 76489724}
   snowfallRenderer: {fileID: 76489734}
   burstParticles: {fileID: 76489733}
-  farCascade: {fileID: 76489731}
+  detailNormal: {fileID: 2800000, guid: 101b6d63f01d0e74f9c2854c14f99fb9, type: 3}
   persistence: {fileID: 76489730}
   curtains: {fileID: 76489729}
   simCompute: {fileID: 7200000, guid: 019ba54c4a5178c4f84c134849ea4aad, type: 3}
@@ -328,21 +336,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SnowPersistence
   manager: {fileID: 76489726}
   simCompute: {fileID: 7200000, guid: 019ba54c4a5178c4f84c134849ea4aad, type: 3}
---- !u!114 &76489731
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 76489723}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3066dae19326532479e8aa149187cd82, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowFarCascade
-  settings: {fileID: 11400000, guid: 1bdd01165981db9469d51c90967f8bbf, type: 2}
-  simCompute: {fileID: 7200000, guid: 019ba54c4a5178c4f84c134849ea4aad, type: 3}
-  followTarget: {fileID: 848219609}
 --- !u!114 &76489732
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -419,11 +412,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 76489723}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9d3c48b55919c21429bc6146577494b1, type: 3}
+  m_Script: {fileID: 11500000, guid: f2a13c00a90985546a84a43069dbf92b, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowClipmap
+  m_EditorClassIdentifier: Assembly-CSharp::SnowSurface
   settings: {fileID: 11400000, guid: 1bdd01165981db9469d51c90967f8bbf, type: 2}
-  followTarget: {fileID: 848219609}
+  manager: {fileID: 0}
   snowMaterial: {fileID: 2100000, guid: be530b3b9185ab147b717ee164b0c41f, type: 2}
 --- !u!1 &263682441
 GameObject:
@@ -1296,6 +1289,9 @@ MonoBehaviour:
   time: {fileID: 508855605}
   atmosphere: {fileID: 1805896809}
   precipitation: {fileID: 75784308}
+  temperature: {fileID: 1805896810}
+  snowfall: {fileID: 76489734}
+  snowManager: {fileID: 76489726}
   hud: {fileID: 1780705007}
   climbHud: {fileID: 1780705011}
   cursorLock: {fileID: 848219610}

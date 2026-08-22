@@ -35,13 +35,11 @@ float SnowBaseHeight(float swe, float rhoN)
     return swe * SNOW_RHO_WATER / max(SnowDensity(rhoN), 1.0);
 }
 
-/// İz oyulduktan ve kenar sırtı eklendikten sonraki yüzey yüksekliği, metre.
-/// Kar yüzeyinin zeminden yüksekliği (spec §6.3). Taban DIŞARIDAN veriliyor:
-/// yakın bölge ile kaskad arasında taban harmanlanıyor, bu yüzden SWE ve
-/// yoğunluktan tek başına türetilemiyor.
-float SnowSurfaceFromBase(float baseHeight, float carve, float rim)
+/// İz oyulduktan ve kenar sırtı eklendikten sonraki yüzey yüksekliği, metre
+/// (spec §6.3).
+float SnowSurfaceHeight(float swe, float rhoN, float carve, float rim)
 {
-    return max(baseHeight - carve + rim, 0.0);
+    return max(SnowBaseHeight(swe, rhoN) - carve + rim, 0.0);
 }
 
 // ------------------------------------------------------------ dünya ↔ teksel
@@ -73,23 +71,8 @@ float SnowTexelSize()
 /// Bölgenin kenarında yumuşak sönüm. Dışarıda 0, ortada 1.
 /// TABAN DERİNLİĞİ İÇİN GENİŞ MASKE.
 ///
-/// `SnowInsideMask` bölgenin son %12'sinde sönüyor — Medium'da 0,96 m. Yakın
-/// durum ile kaskad yerel olarak farklı olduğu için o dar bantta hâlâ dik bir
-/// kenar kalıyordu: prob mod 7 devir çizgisini parlak bir V olarak gösterdi,
-/// mod 9 ve 10 aynı çizgiyi işaret etti.
-///
-/// Taban derinliği artık bölgenin YARISINDAN itibaren harmanlanıyor: aynı fark
-/// 0,96 m yerine ~4,4 m'ye yayılıyor, eğim yirmide birine iniyor ve kenar
-/// görünmüyor.
-///
-/// İZLER BUNU KULLANMIYOR. Ayak izi, sırt ve sastrugi dar maskeyle sönüyor;
-/// yoksa 3,6 m ötede izler solmaya başlardı.
-float SnowInsideWide(float2 uv)
-{
-    float2 e = abs(uv - 0.5) * 2.0;
-    return 1.0 - smoothstep(0.45, 1.0, max(e.x, e.y));
-}
-
+/// Bölgenin kenarında yumuşak geçiş. Sert kesilseydi deformasyon alanının
+/// sınırı yerde görünür bir kare olurdu.
 float SnowInsideMask(float2 uv)
 {
     float2 e = abs(uv - 0.5) * 2.0;
@@ -108,33 +91,22 @@ float  _FogDensity01;
 float  _RainOnSnow01;
 float3 _SnowUpDirection;
 
-/// Halka 0'ın quad boyu. Halka i'nin quad'ı bunun `SNOW_RING_SCALE^i` katı.
-float _SnowRing0Quad;
-
-/// KAR MESH'İNİN KENARI. En dış halkanın merkezi ve yarım genişliği.
-/// Kalınlık kenarda sıfıra inip araziyle çakışsın diye.
-float2 _SnowMeshCenterXZ;
-float  _SnowMeshExtent;
-
-/// KALINLIK MESH'İN KENDİ KENARINDA SÖNÜYOR.
+/// KENAR SÖNÜMÜ (spec §8.3).
 ///
-/// Gerçek kar durumu yalnız bölgenin içinde (Medium'da ±8 m) tam çözünürlükte;
-/// dışarısı 37.5 cm tekselli kaskad, onun da dışı kar çizgisi eğrisi. Kalınlık
-/// bölge sınırında DİK kesiliyordu ve orada 45 cm'lik bir duvar kalıyordu —
-/// ölçüldü: halka sürgüsü 1'de duvar var, 4'te aynı yerde, yani sınır bölgenin
-/// kenarı (±8 m).
+/// Mesh 24 m'de bitiyor; ötesinde arazi var. Yer değiştirme mesh'in dış
+/// 2 metresinde 0'a iniyor, böylece mesh kenarı arazi yüzeyiyle AYNI
+/// yükseklikte bitiyor ve basamak oluşmuyor (spec §8.4 kural 1).
 ///
-/// Sönüm bölge kenarından mesh kenarına yayılıyor. Ötesini dağın kendi kar
-/// katmanı çiziyor ve o yer değiştirme uygulamıyor; mesh sıfıra inince ikisi
-/// çakışıyor ve dikiş kalmıyor.
-float SnowMeshEdgeFade(float2 posXZ)
+/// UV TABANLI, DÜNYA KOORDİNATI DEĞİL: mesh ile deformasyon bölgesi aynı
+/// kareyi kaplıyor (spec §6.1), dolayısıyla bölge UV'si mesh'in kenarını da
+/// tarif ediyor. Ayrı bir merkez/genişlik çifti yayınlamak ikinci bir kaynak
+/// olurdu.
+float SnowEdgeFade(float2 uv)
 {
-    if (_SnowMeshExtent <= 0.0) return 1.0;
+    float2 e = abs(uv - 0.5) * 2.0;         // 0 merkez, 1 kenar
+    float edge = max(e.x, e.y);
 
-    float2 d = abs(posXZ - _SnowMeshCenterXZ);
-    float r = max(d.x, d.y);
-
-    return 1.0 - smoothstep(_SnowMeshExtent * 0.75, _SnowMeshExtent, r);
+    return 1.0 - smoothstep(SNOW_EDGE_FADE_START, 1.0, edge);
 }
 
 /// Bölgenin dışındaki dünyanın genel kar durumu.
@@ -143,7 +115,7 @@ float _FallbackRhoN;
 
 /// KAR ÇİZGİSİ. Donma seviyesinin üstünde kar kalıcı; altında yağdığı sürece
 /// birikip sonra eriyor. Başlangıç durumu, bölgeye YENİ giren teksel ve
-/// kaskadın da dışı bu eğriden doluyor — dağ karlı doğuyor.
+/// bölgenin dışı bu eğriden doluyor — dağ karlı doğuyor.
 ///
 /// `_SnowLineGroundY` donma seviyesinden geliyor (`ISnowEnvironmentSource`), ayrı
 /// bir sayı değil: "sıcaklık +8 ama tepe karsız" çelişkisi böyle imkânsız.
@@ -365,29 +337,16 @@ float SnowSastrugiOffset(float2 posXZ, float amplitude)
 TEXTURE2D(_SnowStateTex);
 TEXTURE2D(_SnowTrailTex);
 
-// --- Uzak kaskad (spec §21 Faz 10) ---
-TEXTURE2D(_SnowFarTex);
-
-float2 _SnowFarCenter;
-float  _SnowFarAreaSize;
-
-/// Yakın bölgenin DIŞINDAKİ karın durumu. Eskiden sabit bir sayıydı ve
-/// dağın tamamı aynı kalınlıkta kar taşıyordu; kaskad orada da gerçek
-/// birikme ve erime veriyor. Kaskadın da dışında sabite düşülüyor.
-float2 SnowFarStateAt(float2 posXZ)
+/// BÖLGENİN DIŞINDA KAR ÇİZGİSİ EĞRİSİ (spec §8.4).
+///
+/// 24 m ötesinde kar mesh'i YOK; uzaktaki kar arazi materyaline uygulanan kar
+/// tutması shader'ıyla gösteriliyor (spec §16). O katmanın okuduğu durum burası.
+///
+/// Sabit bir sayı değil, yüksekliğin fonksiyonu — sabit olsaydı dağın tepesi
+/// ile eteği aynı kalınlıkta kar taşırdı.
+float2 SnowOutsideStateAt(float2 posXZ)
 {
-    float2 uv = (posXZ - _SnowFarCenter) / max(_SnowFarAreaSize, 1e-3) + 0.5;
-
-    // TEK ÇIKIŞ. Erken dönüşün içinde doku örneklemek bölünmüş akışta
-    // "potentially uninitialized" veriyor; iki dal da hesaplanıp seçiliyor.
-    //
-    // Kaskadın da dışı sabit değil, kar çizgisi eğrisi — sabit olsaydı dağın
-    // tepesi ile eteği aynı kalınlıkta kar taşırdı.
-    float2 cascade = SAMPLE_TEXTURE2D_LOD(_SnowFarTex, sampler_LinearClamp, saturate(uv), 0).rg;
-    float2 outside = float2(SnowInitialSweAt(SampleGroundHeight(posXZ)), _FallbackRhoN);
-
-    bool inside = all(uv >= 0.0) && all(uv <= 1.0);
-    return inside ? cascade : outside;
+    return float2(SnowInitialSweAt(SampleGroundHeight(posXZ)), _FallbackRhoN);
 }
 
 /// Kar yüzeyinin zeminden yüksekliği, verilen bölge UV'sinde.
@@ -402,10 +361,10 @@ float4 SnowStateAt(float2 uv)
     float  inside = SnowInsideMask(uv);
     float4 s = SAMPLE_TEXTURE2D_LOD(_SnowStateTex, sampler_LinearClamp, saturate(uv), 0);
 
-    float2 far = SnowFarStateAt(SnowUVToWorld(uv));
+    float2 outside = SnowOutsideStateAt(SnowUVToWorld(uv));
 
-    s.r = lerp(far.x, s.r, inside);
-    s.g = lerp(far.y, s.g, inside);
+    s.r = lerp(outside.x, s.r, inside);
+    s.g = lerp(outside.y, s.g, inside);
     s.b *= inside;
     s.a *= inside;
 
@@ -422,52 +381,22 @@ float4 SnowTrailAt(float2 uv)
 
 float SnowSurfaceAt(float2 uv)
 {
-    float  inside = SnowInsideMask(uv);
-    float2 uvC    = saturate(uv);
+    float2 uvC = saturate(uv);
 
-    float4 s = SAMPLE_TEXTURE2D_LOD(_SnowStateTex, sampler_LinearClamp, uvC, 0);
-    float4 t = SAMPLE_TEXTURE2D_LOD(_SnowTrailTex, sampler_LinearClamp, uvC, 0);
+    float4 snow  = SAMPLE_TEXTURE2D_LOD(_SnowStateTex, sampler_LinearClamp, uvC, 0);
+    float4 trail = SAMPLE_TEXTURE2D_LOD(_SnowTrailTex, sampler_LinearClamp, uvC, 0);
 
-    float2 far = SnowFarStateAt(SnowUVToWorld(uv));
+    float h = SnowSurfaceHeight(snow.r, snow.g, trail.r, trail.g);
 
-    // DERİNLİK HARMANLANIYOR, HAM SWE/YOĞUNLUK DEĞİL.
-    //
-    // Derinlik `SWE × 1000 / ρ` — doğrusal değil. İki büyüklüğü ayrı ayrı
-    // harmanlayınca aradaki derinlik profili sıçrıyor ve devir noktasında
-    // (±8 m) basamak kalıyor. Ölçüldü: yakın 52,5 cm (ρ 95), kaskad 45,4 cm
-    // (ρ 110) → 7 cm'lik kare bir sırt, oyuncuyu takip ediyor.
-    //
-    // Derinliği harmanlamak geçişi yüksekliğin KENDİSİNDE sürekli yapıyor:
-    // iki uç ne olursa olsun arada tek yönlü, düz bir rampa kalıyor.
-    //
-    // İz de burada sönüyor; ayrıca `inside` ile çarpmaya gerek yok.
-    // Taban geniş bantta, iz dar bantta.
-    float baseNear = SnowBaseHeight(s.r, s.g);
-    float baseFar  = SnowBaseHeight(far.x, far.y);
+    // SASTRUGİ BURAYA DA EKLENİYOR (spec §18.4). Yalnız köşe shader'ına
+    // eklenirse normal'ler düz kalıyor ve sırtlar ışığa hiç tepki vermiyor —
+    // spec'in "en sık atlanan adım" dediği yer burası.
+    h += SnowSastrugiOffset(SnowUVToWorld(uv), trail.a);
 
-    float baseH = lerp(baseFar, baseNear, SnowInsideWide(uv));
-
-    // İz tabandan ÇIKIYOR; sırt ekleniyor. İkisi de yalnız bölgenin içinde.
-    float h = SnowSurfaceFromBase(baseH, t.r * inside, t.g * inside);
-
-    // SASTRUGİ BURAYA DA EKLENİYOR. Yalnız köşe shader'ına eklenirse
-    // normal'ler düz kalıyor ve sırtlar ışığa hiç tepki vermiyor — spec
-    // §18.4'ün "en sık atlanan adım" dediği yer burası.
-    h += SnowSastrugiOffset(SnowUVToWorld(uv), t.a * inside);
-
-    // KENAR SÖNÜMÜ BURADA, KÖŞE SHADER'INDA DEĞİL: fragment normali bu
-    // fonksiyondan merkezi farkla hesaplanıyor, sönüm yalnız vertex'te
-    // olursa geometri ile normal aynı yüzeyi tarif etmiyor.
-    //
-    // KENAR KESİLMİYOR, GÖMÜLÜYOR. Sönümün kalınlığı sıfıra indirdiği bantta
-    // yükseklik 4 mm eşiğinden geçiyor ve `clip(edgeFade − breakup*0.6)`
-    // kenarı testere gibi kemiriyordu — bandı genişletmek testereyi de
-    // genişletti (ölçüldü, üç tur). Kenar artık arazinin ALTINA iniyor:
-    // gömülü kenarı arazi örtüyor, kırpmanın tırtığı görünmüyor ve
-    // z-fighting de kalmıyor.
-    float fade = SnowMeshEdgeFade(SnowUVToWorld(uv));
-
-    return h * fade - (1.0 - fade) * SNOW_MESH_EDGE_SINK;
+    // KENAR SÖNÜMÜ BURADA, YALNIZ KÖŞE SHADER'INDA DEĞİL: fragment normali bu
+    // fonksiyondan merkezi farkla hesaplanıyor (spec §8.6). Sönüm yalnız
+    // vertex'te olsaydı geometri ile normal aynı yüzeyi tarif etmezdi.
+    return h * SnowEdgeFade(uv);
 }
 
 #endif
