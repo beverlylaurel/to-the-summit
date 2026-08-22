@@ -1215,6 +1215,33 @@ doluyor (spec §6.4). Aşağıdaki DERS geçerliliğini koruyor.
 **Ders:** dispatch'ler arası taşınan bayrak, sıfırlamayı unutan HER çağıranı
 bozar. Sınama rigleri de çağıran sayılır.
 
+## VFX grafikleri KURULDU ama SAHNEYE BAĞLANMADI (2026-08-22)
+
+Beş `.vfx` üretildi ve doğrulandı. Sahneye **bilerek bağlanmadı**.
+
+Sebep: mevcut compute yolu (`SnowfallRenderer`, `SnowfallSim.compute`,
+`SnowfallParticle.shader`) çalışıyor ve ekranda kar yağdırıyor. VFX katmanı da
+bağlanırsa **iki yağış sistemi birden** koşar — kar iki katına çıkar ve hangi
+sistemin ne çizdiği ayrılamaz.
+
+`SnowfallLayers` ve `SnowDriftVfxController` referansları boşken hiçbir şey
+yapmıyor; bu bilinçli. Bağlanana kadar görüntü değişmiyor.
+
+**Grafikler henüz ÖZELLİK YAYINLAMIYOR.** Denetleyiciler `SetFloat("SpawnRate")`
+çağırıyor ama grafikte o adda bir `VFXParameter` yok — `HasFloat` false dönüyor
+ve çağrı sessizce düşüyor. Bir sonraki adım grafiklere exposed parametre
+eklemek.
+
+**Sıra:**
+1. Grafiklere exposed parametre (`SpawnRate`, `TurbulenceIntensity`, `DriftActive`)
+2. Kullanıcı Play'de VFX yağışını görsün
+3. Görüldükten SONRA compute yolu silinir — önce değil
+
+**Tetikleyici:** kullanıcı VFX yağışını doğrulayınca compute yolu silinir ve bu
+kayıt kapanır.
+
+---
+
 ## `VFX_SnowfallCurtain` bir parçacık sistemi DEĞİL — karar bekliyor (2026-08-22)
 
 Spec Faz 8 altı `.vfx` sayıyor, beşi kuruldu. Altıncısı `VFX_SnowfallCurtain`

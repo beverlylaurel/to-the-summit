@@ -823,6 +823,13 @@ döndürmeyi gerektirir. Türevler kaydırmadan önce alınıyor (`SAMPLE_TEXTUR
 yoksa hücre sınırında mip patlıyor. Spec §13.2'nin döşeme boyları ve şiddetleri
 değişmedi; yalnız örnekleme değişti.
 
+**VFX grafikleri koddan üretiliyor.** `SnowVfxBuilder` reflection'la VFX
+Graph'ın internal model API'sini sürüyor; beş `.vfx` menüden çıkıyor, elle
+çizim yok. Grafikler ÜRETİLDİ ama sahneye BAĞLANMADI — mevcut compute yolu
+çalışıyor ve ikisi birden koşarsa kar iki katına çıkar (`DECISIONS.md`).
+`SnowfallLayers` ve `SnowDriftVfxController` referansları boşken hiçbir şey
+yapmıyor.
+
 **Kar olayları (Faz 11–13).** Kabuk `RT_Trail.B`'de, üçgen sıcaklık profiliyle
 (tepe −5 °C) oluşuyor ve yeterli yük binince kırılıyor — patikayla karıştırma,
 patika kırılmaz. Rüzgâr gölgesi `RT_WindShadow`'da Gauss-Seidel ile çözülüyor;

@@ -429,6 +429,15 @@ public class SnowDebugWindow : EditorWindow
         var curtains = go.GetComponent<SnowCurtainController>();
         if (curtains == null) curtains = go.AddComponent<SnowCurtainController>();
 
+        // VFX KATMANLARI: bileşen sahnede duruyor ama VFX referansları BOŞ.
+        // Boşken hiçbir şey yapmıyorlar — mevcut compute yolu çalışmaya devam
+        // ediyor. İkisi birden bağlanırsa kar iki katına çıkar (`DECISIONS.md`).
+        var fallLayers = go.GetComponent<SnowfallLayers>();
+        if (fallLayers == null) fallLayers = go.AddComponent<SnowfallLayers>();
+
+        var driftVfx = go.GetComponent<SnowDriftVfxController>();
+        if (driftVfx == null) driftVfx = go.AddComponent<SnowDriftVfxController>();
+
         if (go.GetComponent<SnowProfiler>() == null)
             go.AddComponent<SnowProfiler>();
 
@@ -469,6 +478,19 @@ public class SnowDebugWindow : EditorWindow
         coverageSerialized.ApplyModifiedProperties();
 
         EditorUtility.SetDirty(coverage);
+
+        var fallLayersSerialized = new SerializedObject(fallLayers);
+        fallLayersSerialized.FindProperty("environment").objectReferenceValue = bridge;
+        fallLayersSerialized.FindProperty("farLayer").objectReferenceValue = curtains;
+        fallLayersSerialized.ApplyModifiedProperties();
+
+        var driftVfxSerialized = new SerializedObject(driftVfx);
+        driftVfxSerialized.FindProperty("environment").objectReferenceValue = bridge;
+        driftVfxSerialized.FindProperty("settings").objectReferenceValue = settings;
+        driftVfxSerialized.ApplyModifiedProperties();
+
+        EditorUtility.SetDirty(fallLayers);
+        EditorUtility.SetDirty(driftVfx);
 
         var groundSerialized = new SerializedObject(ground);
         groundSerialized.FindProperty("settings").objectReferenceValue = settings;
