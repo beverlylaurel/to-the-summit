@@ -159,11 +159,6 @@ half4 SnowLitFragment(Varyings IN) : SV_Target
 
     SnowShadeSetup(IN.positionWS, N, surface, height);
 
-    // KALINLIK PROBU. Aydınlatma, sis, tonemap — hiçbiri çalışmıyor; gri
-    // doğrudan dönüyor ki dağın katmanıyla birebir karşılaştırılabilsin.
-    if (_SnowDepthProbe > 0.5)
-        return half4((half3)saturate(height / SNOW_DEPTH_PROBE_RANGE).xxx, 1);
-
     float3 V = GetWorldSpaceNormalizeViewDir(IN.positionWS);
 
     Light mainLight = GetMainLight(IN.shadowCoord);

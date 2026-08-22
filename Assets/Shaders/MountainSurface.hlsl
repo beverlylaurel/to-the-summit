@@ -142,9 +142,6 @@ float MountainBand(float3 worldPos)
 #include "../Snow/Shaders/SnowDetailNormals.hlsl"
 #include "../Snow/Shaders/SnowCover.hlsl"
 
-/// Teşhis: 1 olduğunda dağın kar maskesi zorlanıyor. Bkz. aşağıdaki kullanım.
-float _SnowForceMountainMask;
-
 
 struct MountainSurface
 {
@@ -465,22 +462,6 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     float snowMask = SnowCoverMaskWithNoise(worldPos, normalWS, surface.occlusion, snowBreak,
                                             0.45, _SnowCoverSlopeSharpness,
                                             _SnowCoverBreakupStrength, _SnowCoverEdgeSharpness);
-
-    // KALINLIK PROBU. Arazi örtüsünün gösterdiği kalınlık: örtü kalınlığı ×
-    // maske. Kar mesh'i ile AYNI ölçekte dönüyor ki sınır karşılaştırılabilsin.
-    if (_SnowDepthProbe > 0.5)
-    {
-        half g = (half)saturate(_SnowCoverThickness * snowMask / SNOW_DEPTH_PROBE_RANGE);
-
-        surface.albedo = 0;
-        surface.emission = half3(g, g, g);
-        surface.smoothness = 0;
-        surface.occlusion = 1;
-
-        return surface;
-    }
-
-    snowMask = max(snowMask, _SnowForceMountainMask);
 
     if (snowMask > 0.001)
     {

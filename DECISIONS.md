@@ -83,10 +83,8 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Kar Teşhisi'ndeki "Sınama karı" bölümü** — Play'de dünyayı elle karla
   dolduran kontrol. Kar sistemi kabul edilince silinir; ayar dosyasına
   yazmadığı için kalıntı bırakmıyor
-- **F1'deki "Kalınlık probu" ve "Dağı zorla karla kapla"** — kar mesh'i ile dağın
-  kar katmanının sınırındaki kareyi ayırmak için. Prob aydınlatmayı atlayıp
-  kalınlığı gri döndürüyor; sınırda basamak varsa sebep veri, yoksa aydınlatma.
-  Belirti kapanınca ikisi de silinir
+- **`SnowVfxApiProbe`** — VFX Graph'ın grafik kurma API'si reflection'la
+  erişilebilir mi diye ölçen tek seferlik sonda. Faz 8 kararı verilince silinir
 - **`SnowEnvironmentBridge` elle girilen değerler** — köprü şu an sabit sayılar
   yayınlıyor (rüzgâr 3 m/s, sıcaklık −4 °C, yağış 0.5). Gerçek sistemlere bağlanınca
   bu alanlar silinir
@@ -113,9 +111,6 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   kar sistemi 0..1 istiyor. İki uç (`minVis` / `maxVis`) ölçülüp seçilecek, tahmin
   edilmeyecek
   → [Kar sistemi: spec'ten bilinçli sapmalar](#kar-sistemi-specten-bilinçli-sapmalar-ve-iki-assumption-2026-08-22)
-- **`SnowRuntimeState`'i kim okuyacak** — kar sistemi beş değer yayınlıyor ama tüketicisi
-  yok. `IsSnowing` → yağmuru susturmak Faz 5'te, `GroundCoverage01` → nesne kaplaması
-  Faz 7'de bağlanacak. O ana kadar yayın boşa gidiyor ve bu **bilinçli**
 
 ### `DepthNormals` fragman maliyeti KABUL EDİLDİ
 
@@ -1237,10 +1232,18 @@ döndürmeyi gerektirir; atlanırsa ışık yanlış yönden gelir. Kaydırma te
 ızgarayı kırıyor.
 
 **Maliyet:** katman başına 1 yerine 3 doku örneği. Medium'da 2 katman → 6 örnek.
-Spec §15 bütçesi kar mesh'i için < 1,0 ms; ÖLÇÜLMEDİ.
+**ÖLÇÜLMEDİ.**
 
-**Tetikleyici:** `SnowProfiler` kar mesh'ini 1,0 ms üstünde gösterirse stokastik
-döşeme yalnız Meso katmanına bırakılır — ekranda görünen tekrar oydu.
+`SnowProfiler` bunu ölçemez — o yalnız compute pass'lerini sayıyor
+(`Kar.Gokyuzu`, `Kar.Yakalama`, `Kar.Iz`, `Kar.Birikme`, `Kar.Yagis`). Stokastik
+döşeme FRAGMENT maliyeti. İlk yazılan tetikleyici bu yüzden ölçülemezdi.
+
+**Tetikleyici:** F1 HUD'ındaki kare süresi karlı geniş manzarada **16,7 ms**'i
+(60 FPS) aşarsa stokastik döşeme yalnız Meso katmanına bırakılır — ekranda
+görünen tekrar oydu, Macro 8 m'de zaten nadiren tekrarlıyor.
+
+**Ölçüm nasıl yapılır:** Profiler penceresinde Rendering ve GPU modülleri açık
+olmalı; kapalıyken sayaçlar 0 dönüyor (denendi).
 
 ---
 
