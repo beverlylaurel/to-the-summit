@@ -1082,17 +1082,6 @@ dönülürse rapor BAŞARISIZ diyor.
 
 ---
 
-## Kar çizgisi hareket edince bölge yeniden dolduruluyor (2026-08-22)
-
-`KTopUpState`: çizgi son doldurmadan 5 m'den fazla kaydıysa mevcut tekseller
-`max(mevcut, çizgi)` ile yükseltiliyor. Eşik 5 m çünkü sıcaklığın kendi salınımı
-altında kalıyor, F1 sürgüsü ise anında aşıyor.
-
-**Sadece yükseltiyor.** Çizgi yukarı kayınca var olan kar SİLİNMİYOR — onu erime
-götürür. İzler, yoğunluk ve ıslaklık kanallarına dokunulmuyor.
-
----
-
 ## Sahne kurulumu artık kendiliğinden koşuyor (2026-08-22)
 
 Kar sistemine her yeni referans eklendiğinde kullanıcıdan "Sahneyi kur"a
@@ -1207,21 +1196,6 @@ yok ama spec'in dayattığı kenetlemenin doğru tamamlayıcısı.
 
 ---
 
-## `ISnowEnvironmentSource`'a `FreezingLevelY` eklendi (2026-08-22)
-
-Spec §3.1 arayüzünde yok. Kar çizgisi (dağın hangi kottan yukarısının doğuştan
-karlı olduğu) bir sayıya ihtiyaç duyuyordu ve iki seçenek vardı: ayarlarda ayrı
-bir "kar çizgisi kotu" tutmak, ya da mevcut donma seviyesini okumak.
-
-Ayrı sayı **ikinci bir kaynak** olurdu: sıcaklık +8 °C iken bile tepe karlı,
-ya da tersi. `CLAUDE.md` → Atmosfer tutarlılığı bunu yasaklıyor. Donma seviyesi
-zaten `TemperatureField.FreezingLevel`'de var ve HUD'da gösteriliyor.
-
-**Maliyet:** arayüzü uygulayan her sınıf (köprü + iki sınama sahtesi) bir alan
-daha taşıyor.
-
----
-
 ## Kar çizgisi ayrı kernelde: bayrak sızdı, işaret çakıştı (2026-08-22)
 
 "Yeni açılan teksel kar çizgisinden dolsun" bilgisini taşımak için üç yol
@@ -1235,8 +1209,42 @@ denendi:
 3. **Ayrı kernel** (`KClearState`, `KScrollState`, `KFarScrollState`).
    Paylaşılan durum da işaret alanı da yok. Bu uygulandı.
 
+**Mekanizma artık yok** (2026-08-22): kar çizgisi kaldırıldı — kar irtifaya
+bağlı değil, yağarsa tutar. Üç kernel de silindi; yeni şerit `_NewEdgeValue`'dan
+doluyor (spec §6.4). Aşağıdaki DERS geçerliliğini koruyor.
+
 **Ders:** dispatch'ler arası taşınan bayrak, sıfırlamayı unutan HER çağıranı
 bozar. Sınama rigleri de çağıran sayılır.
+
+## Kar çizgisi KALDIRILDI — kar irtifaya bağlı değil (2026-08-22)
+
+Kullanıcı kararı: *"kar çizgisi diye bir şey olmamalı. kar yüksekliğe bağlı
+olmamalı. kar yağıyorsa kar tutar bu kadar basit bir mantık olmalı."*
+
+Silinenler: `SnowInitialSweAt` eğrisi, `_SnowLineGroundY`/`_SnowLineBand`/
+`_SnowLineSWE` globalleri, `SnowSettings.snowLineBand`/`snowLineSwe`,
+`KClearState`/`KTopUpState`/`KScrollState` kernelleri,
+`ISnowEnvironmentSource.FreezingLevelY`.
+
+Kar çizgisi kalkınca `KClearState` ve `KScrollState`, `KClear`/`KScroll` ile
+birebir aynı işi yapıyordu — üçü birden gitti. Kaydırma spec §6.4'ün tek
+`KScroll`'una döndü, yeni şerit `_NewEdgeValue`'dan doluyor.
+
+**İrtifa etkisi kaybolmuyor, tek kaynaktan geliyor.** `TemperatureField` kotla
+düşüyor; yağış §3.4 histerezisiyle (0.5 / 2.0 °C) kara dönüyor. Yüksekte kar
+daha çok tutuyor çünkü orası soğuk — ayrı bir irtifa terimi aynı şeyi ikinci
+kez söylerdi ve ikisi çelişebilirdi.
+
+`defaultSwe = 0`: dünya çıplak başlıyor, kar yalnız yağdıkça birikiyor.
+
+**Bu spec'e YAKLAŞMA.** Spec §3.1'de `FreezingLevelY` yok, §11'de irtifa terimi
+yok. Kar çizgisi bizim eklentimizdi; kaldırılması sapmayı da kapattı.
+
+**Tetikleyici:** "dağın tepesi çıplak kalıyor" belirtisi görülürse sebep kar
+çizgisinin yokluğu değil, sıcaklık zinciri veya yağış şiddetidir — önce
+`TemperatureField.At(kot)` ve `SnowRuntimeState.IsSnowing` ölçülür.
+
+---
 
 ## Kar sistemi spec'e karşı denetlendi (2026-08-22)
 

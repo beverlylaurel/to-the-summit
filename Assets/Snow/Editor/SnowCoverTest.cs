@@ -264,7 +264,6 @@ public static class SnowCoverTest
         public Light Sun => null;
         public float SunElevation01 { get; set; }
         public float TemperatureC { get; set; }
-        public float FreezingLevelY { get; set; } = 1400f;
         public PrecipitationKind PrecipKind { get; set; }
         public float PrecipIntensity01 { get; set; }
         public float FogDensity01 { get; set; }

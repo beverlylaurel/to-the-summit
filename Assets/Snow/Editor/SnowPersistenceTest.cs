@@ -231,18 +231,18 @@ public static class SnowPersistenceTest
         // kar durumu SABİT BİR SAYI DEĞİL, kar çizgisi eğrisi — sabit olsaydı
         // dağın tepesi ile eteği aynı kalınlıkta kar taşırdı.
         bool defined = common.Contains("float2 SnowOutsideStateAt");
-        bool curved = common.Contains("SnowInitialSweAt(SampleGroundHeight(posXZ))");
+        bool plain = common.Contains("float2(_FallbackSWE, _FallbackRhoN)");
         bool used = common.Contains("SnowOutsideStateAt(SnowUVToWorld(uv))");
 
         // Kaskad geri sızmasın: silindiği için gerekçesi de yok.
         bool noCascade = !common.Contains("SnowFarStateAt") && !common.Contains("_SnowFarTex");
 
         r.AppendLine("  [" + M(defined) + "] Bölge dışı tanımlı      `SnowOutsideStateAt`");
-        r.AppendLine("  [" + M(curved) + "] Kar çizgisi eğrisi      yükseklik fonksiyonu, sabit değil");
+        r.AppendLine("  [" + M(plain) + "] İrtifa terimi yok       kar yağarsa tutar, kota bakmaz");
         r.AppendLine("  [" + M(used) + "] `SnowStateAt` okuyor    bölge dışında devreye giriyor");
         r.AppendLine("  [" + M(noCascade) + "] Kaskad kalıntısı yok    (spec §8.4)");
 
-        return defined && curved && used && noCascade;
+        return defined && plain && used && noCascade;
     }
 
     // ----------------------------------------------------------------- yardım

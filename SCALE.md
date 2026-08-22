@@ -56,7 +56,6 @@ Bunlar gerçek dünyanın metreleri. Dağ iki katına çıkınca donma seviyesi 
 | Birikinti gövdesi | 45 × 16 m | Rüzgârın oluşturduğu yığının gerçek boyu |
 | Kar bölgesi `AreaSize` | 24 m | Oyuncunun etrafındaki deformasyon penceresi; kar mesh'i de AYNI kareyi kaplıyor. Ölçüsü OYUNCUNUN adımı, dağın boyu değil — dağ iki katına çıkınca ayak izi büyümez. Üç presette de 24 |
 | Kar `SnapStep` | 0.25 m | Bölgenin oturduğu ızgara. Teksel boyuna değil oyuncunun hareketine ölçülü; üç presette de tam sayı teksele denk gelmeli (8 / 16 / 24) |
-| Kar çizgisi bandı | 450 m | Donma seviyesinin üstünde karın tam kalınlığa ulaştığı kot farkı. Kotun KENDİSİ dağın boyuyla kaymaz — sıcaklık alanından geliyor, o da deniz seviyesi + lapse rate |
 | Kar mesh ızgarası | 256 / 512 / 1024 quad | İKİNİN KUVVETİ ZORUNLU (spec §6.4): `Resolution / MeshGrid` tam sayı olmazsa `_ScrollTexels` kesirli çıkar ve izler teksel altı titrer. Dağın boyuna bağlı değil |
 | Kar kalıcılık bloğu | 4 m | Saklanan parçanın boyu; ayak izi ölçeğine göre seçildi, dağın boyuna değil |
 | Perde doğum mesafesi | 35 m | Savrulan kar tabakasının kameraya ulaşma mesafesi |

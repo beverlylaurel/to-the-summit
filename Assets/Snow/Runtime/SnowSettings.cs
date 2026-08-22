@@ -101,13 +101,6 @@ public class SnowSettings : ScriptableObject
     [Tooltip("Bölge dışındaki ve yeni açılan şeritteki normalize yoğunluk.")]
     [SerializeField, Range(0f, 1f)] float defaultRhoN = 0.12f;
 
-    [Header("Kar çizgisi")]
-    [Tooltip("Donma seviyesinin kaç metre üstünde kar TAM kalınlığa ulaşır.")]
-    [SerializeField] float snowLineBand = 450f;
-
-    [Tooltip("Kar çizgisinin üstündeki kalıcı kar (m SWE). 0.05 ≈ 25 cm derinlik.")]
-    [SerializeField] float snowLineSwe = 0.05f;
-
     public SnowQualityPreset Quality => quality;
     public SnowQualityData QualityData => SnowQuality.Get(quality);
 
@@ -152,6 +145,4 @@ public class SnowSettings : ScriptableObject
 
     public float DefaultSwe => testSweOverride >= 0f ? testSweOverride : defaultSwe;
     public float DefaultRhoN => defaultRhoN;
-    public float SnowLineBand => snowLineBand;
-    public float SnowLineSwe => snowLineSwe;
 }

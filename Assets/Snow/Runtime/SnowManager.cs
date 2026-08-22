@@ -103,13 +103,6 @@ public class SnowManager : MonoBehaviour
     readonly SnowfallController snowfall = new();
 
     int clearKernel = -1;
-    int clearStateKernel = -1;
-    int topUpKernel = -1;
-
-    /// Bölgenin en son hangi kar çizgisiyle doldurulduğu. Çizgi bundan
-    /// uzaklaşınca mevcut tekseller yükseltiliyor.
-    float filledSnowLineY = float.NaN;
-    int scrollStateKernel = -1;
     int scrollKernel = -1;
     int blurCaptureKernel = -1;
     int deformKernel = -1;
@@ -275,9 +268,6 @@ public class SnowManager : MonoBehaviour
         skyMaterial = new Material(skyShader) { hideFlags = HideFlags.HideAndDontSave };
 
         clearKernel = simCompute.FindKernel("KClear");
-        clearStateKernel = simCompute.FindKernel("KClearState");
-        topUpKernel = simCompute.FindKernel("KTopUpState");
-        scrollStateKernel = simCompute.FindKernel("KScrollState");
         scrollKernel = simCompute.FindKernel("KScroll");
         blurCaptureKernel = simCompute.FindKernel("KBlurCapture");
         deformKernel = simCompute.FindKernel("KDeform");
@@ -447,9 +437,6 @@ public class SnowManager : MonoBehaviour
 
         // KAR ÇİZGİSİ DONMA SEVİYESİNDEN. Ayrı bir sayı tanımlanmıyor;
         // sıcaklık alanı neredeyse kar da orada başlıyor.
-        Shader.SetGlobalFloat(SnowShaderIDs.SnowLineGroundY, env.FreezingLevelY);
-        Shader.SetGlobalFloat(SnowShaderIDs.SnowLineBand, settings.SnowLineBand);
-        Shader.SetGlobalFloat(SnowShaderIDs.SnowLineSWE, settings.SnowLineSwe);
 
         // Sastrugi yönü YUMUŞATILIYOR (spec §18.4, tau 120 s).
         Vector2 rawWind = new Vector2(env.WindDirection.x, env.WindDirection.z);
@@ -530,28 +517,10 @@ public class SnowManager : MonoBehaviour
 
         cmd.SetComputeIntParam(simCompute, SnowShaderIDs.Resolution, q.Resolution);
 
-        // KAR ÇİZGİSİ KAYDIYSA MEVCUT TEKSELLERİ YÜKSELT. Eşik 5 m: sıcaklığın
-        // kendi salınımı bunun altında kalıyor, F1 sürgüsü ise anında aşıyor.
-        float lineY = env.FreezingLevelY;
-
-        if (float.IsNaN(filledSnowLineY) || Mathf.Abs(lineY - filledSnowLineY) > 5f)
-        {
-            filledSnowLineY = lineY;
-
-            if (!pendingClear)
-            {
-                cmd.SetComputeTextureParam(simCompute, topUpKernel, SnowShaderIDs.Snow, snow);
-                cmd.SetComputeTextureParam(simCompute, topUpKernel, SnowShaderIDs.SnowOut, snowTemp);
-                cmd.DispatchCompute(simCompute, topUpKernel, groups, groups, 1);
-
-                (snow, snowTemp) = (snowTemp, snow);
-            }
-        }
-
         if (pendingClear)
         {
-            ClearStateTo(cmd, snow, groups,
-                         new Vector4(0f, settings.DefaultRhoN, 0f, 0f));
+            ClearTo(cmd, snow, groups,
+                    new Vector4(settings.DefaultSwe, settings.DefaultRhoN, 0f, 0f));
             ClearTo(cmd, trail, groups, Vector4.zero);
             ClearTo(cmd, trailTemp, groups, Vector4.zero);
             ClearTo(cmd, capture, groups, Vector4.zero);
@@ -572,7 +541,7 @@ public class SnowManager : MonoBehaviour
 
             // RT_Snow: yeni şerit dünyanın genel kar durumuyla doluyor (spec §6.4).
             Scroll(cmd, groups, ref snow, ref snowTemp,
-                   new Vector4(0f, settings.DefaultRhoN, 0f, 0f), true);
+                   new Vector4(settings.DefaultSwe, settings.DefaultRhoN, 0f, 0f));
 
             pendingScroll = false;
             pendingScrollTexels = Vector2Int.zero;
@@ -884,23 +853,16 @@ public class SnowManager : MonoBehaviour
         cmd.DispatchCompute(simCompute, clearKernel, groups, groups, 1);
     }
 
-    /// Durum dokusu: SWE kanalı kar çizgisi eğrisinden doluyor.
-    void ClearStateTo(CommandBuffer cmd, RenderTexture target, int groups, Vector4 value)
-    {
-        cmd.SetComputeVectorParam(simCompute, SnowShaderIDs.ClearValue, value);
-        cmd.SetComputeTextureParam(simCompute, clearStateKernel, SnowShaderIDs.Dst, target);
-        cmd.DispatchCompute(simCompute, clearStateKernel, groups, groups, 1);
-    }
-
+    /// TEK KAYDIRMA KERNELİ (spec §6.4). Durum dokusu için ayrı bir kernel
+    /// vardı; SWE kanalını kar çizgisi eğrisinden dolduruyordu. Çizgi kalkınca
+    /// ikisi birebir aynı işi yapıyor — yeni şerit `_NewEdgeValue`'dan doluyor.
     void Scroll(CommandBuffer cmd, int groups, ref RenderTexture src, ref RenderTexture dst,
-                Vector4 newEdge, bool stateTexture = false)
+                Vector4 newEdge)
     {
-        int kernel = stateTexture ? scrollStateKernel : scrollKernel;
-
         cmd.SetComputeVectorParam(simCompute, SnowShaderIDs.NewEdgeValue, newEdge);
-        cmd.SetComputeTextureParam(simCompute, kernel, SnowShaderIDs.Src, src);
-        cmd.SetComputeTextureParam(simCompute, kernel, SnowShaderIDs.Dst, dst);
-        cmd.DispatchCompute(simCompute, kernel, groups, groups, 1);
+        cmd.SetComputeTextureParam(simCompute, scrollKernel, SnowShaderIDs.Src, src);
+        cmd.SetComputeTextureParam(simCompute, scrollKernel, SnowShaderIDs.Dst, dst);
+        cmd.DispatchCompute(simCompute, scrollKernel, groups, groups, 1);
 
         // Ping-pong: aynı doku hem kaynak hem hedef olamaz (spec §20).
         (src, dst) = (dst, src);

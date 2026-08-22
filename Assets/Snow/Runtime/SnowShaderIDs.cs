@@ -92,9 +92,6 @@ public static class SnowShaderIDs
     // kendi cizgisi (spec 16.1) ve MaterialPropertyBlock ile veriliyor; bu
     // ise ARAZININ hangi kottan yukarisinin karli oldugu, global. Ayni ada
     // konsalardi property block globali ezerdi.
-    public static readonly int SnowLineGroundY = Shader.PropertyToID("_SnowLineGroundY");
-    public static readonly int SnowLineBand = Shader.PropertyToID("_SnowLineBand");
-    public static readonly int SnowLineSWE = Shader.PropertyToID("_SnowLineSWE");
     public static readonly int FallbackRhoN = Shader.PropertyToID("_FallbackRhoN");
     public static readonly int SnowBreakup = Shader.PropertyToID("_SnowBreakup");
     public static readonly int SnowDetailNormal = Shader.PropertyToID("_SnowDetailNormal");

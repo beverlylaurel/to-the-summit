@@ -65,6 +65,14 @@ public static class SnowAutoWire
         "temperature", "snowfall", "snowManager",
     };
 
+    /// Kar yüzeyinin kendi referansları. AYRI BİLEŞEN, AYRI DENETİM: boş
+    /// kalırsa `OnEnable` fırlatıyor ve mesh hiç çizilmiyor — ekrandan
+    /// bakınca "kar yok" gibi görünüyor, sebebi ise tek bir boş alan.
+    static readonly string[] SurfaceRequired =
+    {
+        "settings", "manager", "snowMaterial",
+    };
+
     static void Count(SerializedObject so, string[] names, ref int missing, ref string first)
     {
         foreach (string name in names)
@@ -95,6 +103,9 @@ public static class SnowAutoWire
         // buydu.
         var menu = Object.FindAnyObjectByType<DebugMenu>();
         if (menu != null) Count(new SerializedObject(menu), MenuRequired, ref missing, ref first);
+
+        var surface = Object.FindAnyObjectByType<SnowSurface>();
+        if (surface != null) Count(new SerializedObject(surface), SurfaceRequired, ref missing, ref first);
 
         if (missing == 0) return;
 

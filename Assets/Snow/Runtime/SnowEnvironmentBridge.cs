@@ -32,7 +32,6 @@ public class SnowEnvironmentBridge : MonoBehaviour, ISnowEnvironmentSource
     [SerializeField] Vector3 manualWindDirection = Vector3.right;
     [SerializeField] float manualWindSpeed = 3f;
     [SerializeField] float manualTemperatureC = -4f;
-    [SerializeField] float manualFreezingLevelY = 1400f;
     [SerializeField] PrecipitationKind manualPrecipKind = PrecipitationKind.Snow;
     [SerializeField, Range(0f, 1f)] float manualPrecipIntensity = 0.5f;
     [SerializeField, Range(0f, 1f)] float manualFogDensity = 0.2f;
@@ -54,10 +53,6 @@ public class SnowEnvironmentBridge : MonoBehaviour, ISnowEnvironmentSource
     public float TemperatureC => temperature != null && observer != null
         ? temperature.At(observer.position.y)
         : manualTemperatureC;
-
-    public float FreezingLevelY => temperature != null
-        ? temperature.FreezingLevel
-        : manualFreezingLevelY;
 
     /// PROJEDE YAĞIŞIN "TÜRÜ" KAVRAMI YOK. Yağış varsa `Rain` bildiriliyor;
     /// karın kar olduğu kararı `SnowfallController`'ın sıcaklık histerezisinde

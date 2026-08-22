@@ -490,8 +490,7 @@ public class SnowDebugWindow : EditorWindow
 
         var surfaceSerialized = new SerializedObject(surface);
         surfaceSerialized.FindProperty("settings").objectReferenceValue = settings;
-        surfaceSerialized.FindProperty("manager").objectReferenceValue =
-            player != null ? player.transform : null;
+        surfaceSerialized.FindProperty("manager").objectReferenceValue = manager;
         surfaceSerialized.FindProperty("snowMaterial").objectReferenceValue = snowLit;
         surfaceSerialized.ApplyModifiedProperties();
 

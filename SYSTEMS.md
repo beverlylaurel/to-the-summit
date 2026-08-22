@@ -794,15 +794,16 @@ uygulamadığı için ikisi kenarda çakışıyor.
 **Dağın karı ile kar mesh'inin karı tek durumdan.** Kar mesh'i oyuncunun
 çevresindeki 24 m'yi kaplıyor; dağın geri kalanının karını `MountainSurface`
 çiziyor. İkisi de `SnowStateAt` okuyor — bölgenin içinde durum dokusu, dışında
-kar çizgisi eğrisi (`SnowOutsideStateAt`). Ayrı bir "arazi karı" sayısı YOK, o
+dünyanın genel kar durumu (`SnowOutsideStateAt`). Ayrı bir "arazi karı" sayısı YOK, o
 yüzden sınırda çelişemezler. Dağ tarafında yerinden oynatma yok (gölgeleme
 katmanı); deforme olan gerçek kar yalnız yakın bölgede.
 
-**Kar çizgisi donma seviyesinden.** Dağın belli bir kottan yukarısı doğuştan karlı.
-Kot `TemperatureField.FreezingLevel` → `ISnowEnvironmentSource.FreezingLevelY`;
-ayrı bir "kar çizgisi" sayısı YOK. Bant kalınlığı ve üstteki SWE `SnowSettings`'te.
-Başlangıç temizliği (`KClearState`), bölgeye yeni giren şerit (`KScrollState`)
-ve bölgenin dışı (`SnowOutsideStateAt`) bu eğriden doluyor.
+**KAR İRTİFAYA BAĞLI DEĞİL.** Yükseklikten türeyen bir kar çizgisi vardı;
+kaldırıldı. Kar yağarsa tutar, yağmazsa tutmaz. Yüksekte karın daha çok olması
+sıcaklıktan kendiliğinden çıkıyor: `TemperatureField` kotla düşüyor, yağış
+§3.4 histerezisiyle kara dönüyor. İkinci bir irtifa terimi aynı şeyi ikinci kez
+söylerdi. Bölge dışı ve yeni açılan şerit `_FallbackSWE`/`_FallbackRhoN`'dan
+doluyor (`SnowOutsideStateAt`).
 
 **Kar olayları (Faz 11–13).** Kabuk `RT_Trail.B`'de, üçgen sıcaklık profiliyle
 (tepe −5 °C) oluşuyor ve yeterli yük binince kırılıyor — patikayla karıştırma,

@@ -448,7 +448,7 @@ public class DebugMenu : MonoBehaviour
 
             GUILayout.Label($"Kar şiddeti {lockedSnow:F2}   " + SnowStatus());
             lockedSnow = GUILayout.HorizontalSlider(lockedSnow, 0f, 1f);
-            GUILayout.Label(SnowLineStatus());
+            GUILayout.Label(SnowStateStatus());
 
             // HALKA SINIRI TEŞHİSİ. Halkalar ±8, ±16, ±32, ±64 m. Kusur bir
             // halkanın kenarındaysa halka sayısı azalınca kusur da o sınırla
@@ -528,38 +528,24 @@ public class DebugMenu : MonoBehaviour
     static float Depth(float swe, float rhoN) =>
         swe < 0f ? 0f : swe * 1000f / Mathf.Max(Rho(rhoN), 1f);
 
-    /// KAR ÇİZGİSİ ZİNCİRİ OKUNABİLİR OLMALI.
+    /// KAR DURUMU OKUNABİLİR OLMALI.
     ///
-    /// "Dağda kar yok" belirtisi zincirin herhangi bir halkasında kopabilir:
-    /// global yazılmamış, kot yanlış, kalınlık sıfır. Üçü de ekrandan aynı
-    /// görünüyor. Bu satır üçünü de sayıyla ayırıyor — globaller
-    /// `Shader.SetGlobalFloat` ile yazıldığı için CPU'dan geri okunabiliyor.
-    string SnowLineStatus()
+    /// "Kar yok" belirtisi zincirin herhangi bir halkasında kopabilir: kar
+    /// yağmıyor, sıcaklık yüksek, ya da doku boş. Üçü de ekrandan aynı
+    /// görünüyor. Bu satır üçünü sayıyla ayırıyor.
+    ///
+    /// KAR İRTİFAYA BAĞLI DEĞİL. Yükseklikten türeyen kar çizgisi kaldırıldı;
+    /// kar yağarsa tutar. Yüksekte karın çok olması sıcaklıktan geliyor.
+    string SnowStateStatus()
     {
-        float lineY = Shader.GetGlobalFloat("_SnowLineGroundY");
-        float band = Shader.GetGlobalFloat("_SnowLineBand");
-        float lineSwe = Shader.GetGlobalFloat("_SnowLineSWE");
         float rhoN = Shader.GetGlobalFloat("_FallbackRhoN");
-
-        if (band <= 0f)
-            return "kar çizgisi: GLOBAL YAZILMAMIŞ (bant 0) — kar sistemi uyanmamış";
-
-        float groundY = walker != null ? walker.transform.position.y : 0f;
-        float t = Mathf.Clamp01((groundY - lineY) / band);
-        float swe = Mathf.Lerp(Shader.GetGlobalFloat("_FallbackSWE"), lineSwe, t * t * (3f - 2f * t));
-
         float rho = Mathf.Lerp(50f, 550f, Mathf.Clamp01(rhoN));
-        float depth = swe * 1000f / Mathf.Max(rho, 1f);
 
-        // İKİ AYRI YOL, İKİ AYRI SAYI.
-        //
-        // Kar çizgisi yolu bölgenin DIŞI için. Oyuncunun çevresinde shader
-        // DURUM DOKUSUNU okuyor. Doku boşsa maske sıfır çıkıyor ve dağ çıplak
-        // kalıyor — ekrandan bakınca "kar çizgisi çalışmıyor" gibi görünüyor
-        // ama çizgi doğru, doku boş. `GroundCoverage01` o dokunun geri
-        // okumasıdır: kar varsa 1'e yakın, doku boşsa 0.
-        return $"kar çizgisi {lineY:F0} m + {band:F0} m bant   " +
-               $"çizgiden {depth * 100f:F1} cm   " +
+        // `GroundCoverage01` durum dokusunun geri okuması: kar varsa 1'e
+        // yakın, doku boşsa 0.
+        return $"yağıyor mu {(SnowRuntimeState.IsSnowing ? "EVET" : "hayır")}   " +
+               $"şiddet {SnowRuntimeState.SnowfallIntensity01:F2}   " +
+               $"yeni kar ρ {rho:F0}   " +
                $"DOKUDA {SnowRuntimeState.GroundCoverage01:F2}   " +
                $"gevşek {SnowRuntimeState.LooseSnowFraction:F2}";
     }

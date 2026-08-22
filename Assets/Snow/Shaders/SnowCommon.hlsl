@@ -113,16 +113,6 @@ float SnowEdgeFade(float2 uv)
 float _FallbackSWE;
 float _FallbackRhoN;
 
-/// KAR ÇİZGİSİ. Donma seviyesinin üstünde kar kalıcı; altında yağdığı sürece
-/// birikip sonra eriyor. Başlangıç durumu, bölgeye YENİ giren teksel ve
-/// bölgenin dışı bu eğriden doluyor — dağ karlı doğuyor.
-///
-/// `_SnowLineGroundY` donma seviyesinden geliyor (`ISnowEnvironmentSource`), ayrı
-/// bir sayı değil: "sıcaklık +8 ama tepe karsız" çelişkisi böyle imkânsız.
-float _SnowLineGroundY;
-float _SnowLineBand;
-float _SnowLineSWE;
-
 /// TAM SAYI HASH — PCG3D [KAYNAK: Jarzynski & Olano, JCGT 2020,
 /// "Hash Functions for GPU Rendering"].
 ///
@@ -154,12 +144,6 @@ float3 SnowRandU3(uint3 seed)
 float3 SnowRandCell3(int3 cell)
 {
     return SnowRandU3(asuint(cell));
-}
-
-float SnowInitialSweAt(float groundY)
-{
-    float t = saturate((groundY - _SnowLineGroundY) / max(_SnowLineBand, 1e-3));
-    return lerp(_FallbackSWE, _SnowLineSWE, t * t * (3.0 - 2.0 * t));
 }
 
 // ------------------------------------------------------------------ yakalama
@@ -337,16 +321,19 @@ float SnowSastrugiOffset(float2 posXZ, float amplitude)
 TEXTURE2D(_SnowStateTex);
 TEXTURE2D(_SnowTrailTex);
 
-/// BÖLGENİN DIŞINDA KAR ÇİZGİSİ EĞRİSİ (spec §8.4).
+/// BÖLGENİN DIŞINDAKİ DÜNYANIN GENEL KAR DURUMU (spec §6.4, §8.4).
 ///
 /// 24 m ötesinde kar mesh'i YOK; uzaktaki kar arazi materyaline uygulanan kar
 /// tutması shader'ıyla gösteriliyor (spec §16). O katmanın okuduğu durum burası.
 ///
-/// Sabit bir sayı değil, yüksekliğin fonksiyonu — sabit olsaydı dağın tepesi
-/// ile eteği aynı kalınlıkta kar taşırdı.
+/// KAR İRTİFAYA BAĞLI DEĞİL. Yükseklikten türeyen bir "kar çizgisi" eğrisi
+/// vardı; kaldırıldı. Kar yağarsa tutar, yağmazsa tutmaz. Yüksekte karın daha
+/// çok olması sıcaklıktan kendiliğinden çıkıyor: `TemperatureField` kotla
+/// düşüyor, yağış §3.4 histerezisiyle kara dönüyor. İkinci bir irtifa terimi
+/// aynı şeyi ikinci kez söylerdi ve ikisi çelişebilirdi.
 float2 SnowOutsideStateAt(float2 posXZ)
 {
-    return float2(SnowInitialSweAt(SampleGroundHeight(posXZ)), _FallbackRhoN);
+    return float2(_FallbackSWE, _FallbackRhoN);
 }
 
 /// Kar yüzeyinin zeminden yüksekliği, verilen bölge UV'sinde.
