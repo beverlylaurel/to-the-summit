@@ -284,6 +284,50 @@ public static class SnowGroundTest
             r.AppendLine("  [+] Kar sisteminin okuduğu zemin, görünen arazinin AYNISI.");
         }
 
+        // ------------------------------------------------- sahnedeki referanslar
+        //
+        // ATANMAMIŞ REFERANS SESSİZ. `SnowManager.detailNormal` boşsa
+        // `_SnowDetailNormal` global'i hiç yazılmıyor, bağlanmamış sampler
+        // NaN üretiyor ve arazi kapkara çıkıyor. Hata mesajı yok; ekranda
+        // gördüğün şey "kar sistemi bozuk" gibi görünüyor.
+        r.AppendLine();
+        r.AppendLine("## Sahnedeki kar referansları");
+
+        var manager = Object.FindAnyObjectByType<SnowManager>();
+
+        if (manager == null)
+        {
+            r.AppendLine("  [!] Sahnede SnowManager yok — Kar Teşhisi'nde \"Sahneyi kur\".");
+        }
+        else
+        {
+            var so = new UnityEditor.SerializedObject(manager);
+
+            string[] required = { "settings", "simCompute", "captureShader", "skyShader",
+                                  "groundHeight", "environmentSource", "followTarget",
+                                  "detailNormal" };
+
+            int empty = 0;
+
+            foreach (string name in required)
+            {
+                var prop = so.FindProperty(name);
+                bool ok = prop != null && prop.objectReferenceValue != null;
+
+                if (!ok) empty++;
+
+                r.AppendLine("  [" + M(ok) + "] " + name.PadRight(20) +
+                             (ok ? prop.objectReferenceValue.name : "ATANMAMIŞ"));
+            }
+
+            if (empty > 0)
+            {
+                r.AppendLine();
+                r.AppendLine("      " + empty + " referans boş. Kar Teşhisi'nde \"Sahneyi kur\".");
+                sourceIsVisible = false;
+            }
+        }
+
         r.AppendLine();
         r.AppendLine("SONUÇ: " + (sourceIsVisible ? "TAMAM" : "BAŞARISIZ"));
         return r.ToString();

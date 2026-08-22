@@ -27,6 +27,15 @@ float3 SampleDetailPacked(float2 worldXZ, float tileMeters, float strength)
     float3 n = UnpackNormal(SAMPLE_TEXTURE2D(_SnowDetailNormal, sampler_SnowDetailNormal,
                                              worldXZ / max(tileMeters, 1e-3)));
 
+    // BAĞLANMAMIŞ DOKU NaN ÜRETİYOR. Unity bağlanmamış bir sampler'a beyaz
+    // veriyor; DXT5nm yolunda `UnpackNormal(beyaz)` → `sqrt(1 - 1 - 1)` → NaN.
+    // NaN `RNMBlend`'den geçince yüzeyin TAMAMI siyah çıkıyor (ölçüldü: dağ
+    // kapkara, ayakta kalan tek şey dokusu materyalinde duran kar mesh'i).
+    //
+    // Bu bir telafi terimi değil: eksik bir referansın bedeli "detay yok"
+    // olmalı, "arazi yok" değil.
+    if (!all(isfinite(n))) n = float3(0.0, 0.0, 1.0);
+
     n.xy *= strength;
     n = normalize(n);
 
