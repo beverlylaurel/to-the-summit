@@ -185,6 +185,11 @@ public static class SnowConstants
     /// Sağlam kabuğun üstünde batmanın kaç katına indiği.
     public const float CrustSinkScale = 0.04f;
 
+    /// Kar mesh'inin kenarı bu kadar arazinin altına iniyor. Kenarı kırpmak
+    /// yerine gömmek, kırpma gürültüsünün kenarı testere gibi kemirmesini
+    /// bitiriyor (ölçüldü, SYMPTOMS.md).
+    public const float MeshEdgeSink = 0.10f;
+
     // --- Sastrugi (spec §18.4) ---
 
     /// Sastrugi genliğinin zaman sabiti, saniye.
