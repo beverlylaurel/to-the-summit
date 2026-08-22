@@ -39,11 +39,40 @@ public class SnowfallLayers : MonoBehaviour
     [Tooltip("Rüzgâr hızını okuyan köprü. Türbülans şiddeti ondan türüyor.")]
     [SerializeField] SnowEnvironmentBridge environment;
 
+    [Tooltip("Spawn kutusunun izlediği hedef — kamera.")]
+    [SerializeField] Transform followTarget;
+
+    [Header("Devir")]
+    [Tooltip("Compute tabanlı eski yağış. Yakın katman bağlıyken KAPATILIYOR; " +
+             "iki yağış sistemi birden koşarsa kar iki katına çıkar.")]
+    [SerializeField] SnowfallRenderer computeFallback;
+
     /// Teşhis: yakın katmanın o anki oranı.
     public float NearRate { get; private set; }
 
     /// Teşhis: katman gerçekten sürülüyor mu.
     public bool NearDriven => nearLayer != null;
+
+    /// TEK YAĞIŞ SİSTEMİ KOŞAR.
+    ///
+    /// Yakın katman bağlıysa compute yolu kapanıyor. İkisi birden koşarsa kar
+    /// iki katına çıkar ve hangisinin ne çizdiği ayrılamaz — bir belirti
+    /// görüldüğünde hangi sisteme bakılacağı belirsiz olur.
+    ///
+    /// Compute yolu VFX doğrulanana kadar duruyor; doğrulanınca silinecek
+    /// (`DECISIONS.md` → Silinecek geçiciler).
+    void OnEnable()
+    {
+        if (computeFallback != null)
+            computeFallback.enabled = nearLayer == null;
+    }
+
+    void OnDisable()
+    {
+        // Bileşen kapanınca eski yol geri açılıyor: kar sisteminin tamamen
+        // susması, yarısının susmasından iyidir.
+        if (computeFallback != null) computeFallback.enabled = true;
+    }
 
     void LateUpdate()
     {
@@ -54,6 +83,20 @@ public class SnowfallLayers : MonoBehaviour
         NearRate = Mathf.Lerp(0f, SnowConstants.MaxFlakeRate, i01);
 
         if (nearLayer == null) return;
+
+        // SPAWN KUTUSU KAMERAYI İZLİYOR (spec §17.1): merkez
+        // `cameraPos + up * 11 + windDir * 3`, 1 m ızgarasına SNAP'Lİ.
+        //
+        // Snap yoksa kamera hareketinde spawn deseni yürüyor — taneler
+        // kameranın peşinden sürüklenen bir küme gibi görünüyor.
+        if (followTarget != null)
+        {
+            Vector3 wind = environment != null ? environment.WindDirection : Vector3.zero;
+            Vector3 c = followTarget.position + Vector3.up * 11f + wind * 3f;
+
+            nearLayer.transform.position = new Vector3(
+                Mathf.Floor(c.x), Mathf.Floor(c.y), Mathf.Floor(c.z));
+        }
 
         // ORAN GRAFİKTE DEĞİL BURADA. Grafikteki sabit oran yalnız
         // varsayılan; şiddet oyunun hava sisteminden geliyor (spec §17.3).

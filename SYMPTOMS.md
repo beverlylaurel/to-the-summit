@@ -856,3 +856,91 @@ yazılmayacak, HLSL varsayılanı (0,0,0), yani "hepsi kapalı" görünecekti. (
 BÜTÜN prob kiplerinde 40× büyütüyordu; "tür" probu 40 kat büyütülmüş şeritler gösterdi ve
 ölçtüğü geometriyi bozdu. Teşhis aracı önce doğrulanır.
 
+
+## "kar yağmıyor" — VFX bağlıydı, parçacık doğuyordu, ekranda hiçbir şey yoktu
+
+**İlk şüpheli yanlış çıktı: sıcaklık.** Oyuncu 206 m'de, ölçülen +6 °C, donma
+seviyesi deniz seviyesinin altında — "sıcak olduğu için yağmur yağıyor, kar
+değil" diye okundu. Sıcaklık kapısı kaldırıldıktan **sonra da** kar yağmadı.
+
+**İkinci şüpheli de yanlış: Play donuktu.** `runInBackground: 0` yüzünden Unity
+odaksızken `Update` koşmuyordu; ölçülen bütün sıfırlar bayattı. Açıldı, tick
+geldi, zincir uçtan uca doğrulandı — `Precipitation 1 → IsSnowing → NearRate
+16000 → SpawnRate 16000 → alive 39892`. **Kar hâlâ görünmüyordu.**
+
+**Gerçek sebep sınır kutusuydu.** `VFXBasicInitialize.bounds` varsayılanı
+1 m³. Unity o kutuyu frustum'a göre kırpıyor: `VFXRenderer.isVisible` false,
+sistem hiç çizilmiyor. 39892 parçacık vardı ve hiçbiri ekrana gelmiyordu.
+`SnowVfxBuilder` beş grafiğin hiçbirine bounds yazmamıştı.
+
+**Ayırt eden ölçüm:** `Renderer.bounds.size` = (1, 1, 1) ile `culled: true`
+yan yana. Zincirin her adımı doğru sayı veriyordu; yalnız son adım — çizim —
+sessizce atlanıyordu. Zinciri sonuna kadar okumak, "veri akıyor demek ki
+çalışıyor" varsayımını kırdı.
+
+**Yan bulgu: `Unity_RunCommand` Play'i düşürüyor.** İlk çağrı C# derliyor,
+derleme domain reload tetikliyor, Play çıkıyor. Play modunda ölçüm alırken
+ölçüm aracının ölçtüğü şeyi öldürdüğü fark edilene kadar iki tur yandı.
+
+
+## "kar yukarı doğru yağıyor" / "yukarı aşağı sağa sola hareket ediyor"
+
+**Sebep türbülansın kip'iydi, şiddeti değil.** `Block.Turbulence` `Relative`
+modda hızı bir HEDEFE ÇEKİYOR (`velocity += (hedef − velocity) * drag * dt`);
+hedef türbülans alanı, ortalaması sıfır. Başlangıçta yazılan −0.6…−1.4 m/s
+terminal hız bir saniyede yeniyor, geriye rastgele savrulma kalıyor.
+
+**Çözüm hızı dayatmak değil, fizikten çıkarmak oldu.** Yerçekimi (−9.81) +
+sürükleme (9.81) dengesi terminal hızı kendisi veriyor: `v = g/drag = 1 m/s`,
+spec §17.1'in kuru kar için istediği 0.6–1.4 bandının ortası. Türbülans
+`Absolute` moda alındı — kuvvet ekliyor, hızı ezmiyor. Yüksek sürükleme aynı
+zamanda karın NEDEN savrulduğunu açıklıyor: hafif tane rüzgâr hızına hızla
+yaklaşır. İki davranış tek katsayıdan.
+
+**Ayırt eden ölçüm — üçüncü araçta bulundu.** İlk iki araç yalan söyledi:
+
+1. Ekran görüntüsündeki parlak nokta sayımı. Tespit eşiği gökyüzü/dağ
+   kontrastına bağlı, tanelerin ancak %13'ünü buluyordu; üstelik spawn
+   kesilince taneler aynı anda ölüyor (39970 → 5723) ve dağılımı kaydırıyordu.
+   Ortalama y "yukarı" çıktı — gerçeğin tersi.
+2. `cam.Render()` ile manuel yakalama. URP'nin gökyüzü ve post adımlarını
+   atlıyor, sahne kapkara geliyor. Parlaklık yargısı için kullanılamaz.
+
+Çalışan araç: `boundsMode = Automatic`. Unity gerçek parçacık kutusunu her
+frame hesaplayıp `Renderer.bounds`'a yazıyor — ışıktan, ölümden ve gözden
+bağımsız bir sayı. Ölçüm:
+
+    Spawn kutusu        205,0 … 231,0 m   (merkez 218, yükseklik 26)
+    Gerçek parçacıklar  197,1 … 230,9 m   (merkez 214, yükseklik 33,8)
+
+Taneler kutunun **7,9 m altına** inmiş, üst sınır spawn sınırında kalmış.
+Hareket tek yönlü. Terminal 1 m/s × max ömür 9 s = 9 m; ölçülen 7,9 m tutarlı.
+Prob ölçümden sonra kaldırıldı.
+
+
+## "uzakta siyah tanecikler hareket ediyor"
+
+**Kar taneleri siyah çiziliyordu.** `Orient: Face Camera Plane` normali kameraya
+çeviriyor; güneş yandan gelince `N·L ≈ 0` ve Lit quad kararıyor. Gerçek kar
+tanesi çok saçıcı — ışığı her yöne dağıtır, tek yönlü diffuse ile
+modellenemez. Spec §17.1 bunu emissive ile karşılıyor; builder emissive'i hiç
+yazmamıştı.
+
+**Aynı ekranda ikinci sapma: "yakınımda kar yok".** `ScreenSpaceSize` bloğu
+`PixelAbsolute` modda boyutu SABİTLİYOR — yakındaki tane de uzaktaki de tam
+1.3 piksel. Spec `size = max(size, minWorld)` istiyor, yani 1.3 piksel TABAN.
+Bloğun hiçbir modu bunu vermiyor (`PixelAbsolute`,
+`PixelRelativeToResolution`, `RatioRelativeTo*` — paket kaynağından okundu).
+Blok çıkarıldı; asgari boyut ayrı iş, `DECISIONS.md`'de.
+
+
+## `SetSlot` "yazdım" dedi, asset sıfır kaldı
+
+Kar tanesine terminal hız yazıldı, log doğruladı, `.vfx` dosyasında
+`{"vector":{"x":0,"y":0,"z":0}}` duruyordu. `velocity` slotu `Vector3` değil
+`UnityEditor.VFX.Vector` sarmalayıcısı; `PropertyInfo.SetValue` tip
+uyuşmazlığında varsayılanı bırakıp sessizce dönüyor.
+
+**Düzeltme yalnız o çağrı değil, yardımcının kendisi oldu.** `SetSlot` artık
+yazdığını geri okuyup karşılaştırıyor, eşleşmezse hangi tipin beklendiğini
+söyleyerek fırlatıyor. Sessiz düşüş bir kez bulundu; ikincisini araç yakalar.

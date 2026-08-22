@@ -1022,3 +1022,64 @@ Bizde konusu yok: yağmur Garg-Nayar iz veritabanından geliyor ve o çok daha f
 
 ---
 
+
+## Yağış sıcaklıktan koparıldı
+
+**Kural.** `SnowfallController` yalnız yağış olup olmadığına bakar. Sıcaklık kapısı yok:
+yağıyorsa kardır.
+
+**Neden.** Kullanıcı kararı, kar çizgisi kaldırılırken konan kuralın devamı: *"kar
+yağıyorsa kar tutar, bu kadar basit bir mantık olmalı."* Spec §3.4'ün 0.5/2.0 °C
+histerezisi bunun tersini yapıyordu — dağın alt kotlarında (+6 °C) yağış hep yağmur
+kalıyordu ve kar hiç görünmüyordu.
+
+**Ne kayboldu.** `Wetness` sıcaklıktan türüyordu, kaynağı kalmadı → sabit 0, tane her
+zaman kuru. `RainWeight01` histerezisin çıktısıydı → sabit 0, yağmur hiç çizilmiyor.
+Tane terminal hızı ıslaklıkla lerp ediliyordu (`0.6–1.4` ↔ `1.4–3.0`) → kuru bant
+kaldı.
+
+**Ölçüm — sıcaklık zaten yağış ŞİDDETİNİ sürmüyordu.** Kopartma istendiğinde ilk
+varsayım "donma seviyesi şiddeti de etkiliyordur" idi ve yanlış çıktı: `Baseline()`
+eğrisini `referenceRainCeiling`/`referenceStormFloor`'dan okuyor, bunlar `Bind()`'da
+kotlardan hesaplanan SABİTLER. Sıcaklığın sürdüğü `rainCeiling`/`stormFloor` yalnız iki
+HUD satırında görünüyordu, hesaba hiç girmiyordu. O yüzden kopartma tek bir dosyaya
+dokundu; kalan zincir (donma seviyesi → yağmur tavanı → HUD) ölü kod olarak silindi.
+
+
+## Kar tanesi terminal hızı dayatılmıyor, fizikten çıkıyor
+
+**Kural.** `VFX_Snowfall`'ın Update bağlamında yerçekimi (−9.81 m/s²) ve sürükleme
+(katsayı 9.81) var; terminal hız dengeden çıkıyor: `v = g / drag = 1 m/s`.
+
+**Neden — denenen ve başarısız olan yol.** Önce spec §17.1'in yazdığı gibi başlangıç
+hızı yazıldı (`velocity = (0, −0.6…−1.4, 0)`). Kar düşmedi; havada savruldu. Sebep
+`Block.Turbulence`'ın `Relative` kipi: o kip hızı bir hedefe ÇEKİYOR
+(`velocity += (hedef − velocity) * drag * dt`) ve hedef türbülans alanı, ortalaması
+sıfır. Yazılan terminal hız bir saniyede yeniyordu.
+
+**Neden dayatmak yerine denge.** Sürükleme katsayısı iki davranışı birden açıklıyor:
+terminal hızın düşük olması (1 m/s) ve karın rüzgârda savrulması (hafif tane rüzgâr
+hızına hızla yaklaşır). Sabit hız dayatmak ikincisini ayrı bir terim olarak eklemeyi
+gerektirirdi.
+
+**Uçlar.** `v = 1 m/s` spec'in kuru kar için istediği 0.6–1.4 bandının ortası. Islak kar
+bandı (1.4–3.0) şu an erişilemez — ıslaklık sıcaklıktan geliyordu, yağış sıcaklıktan
+koparıldı.
+
+
+## VFX grafiklerinin sınır kutusu elle yazılıyor
+
+**Kural.** `SnowVfxBuilder.SetBounds` her grafiğe açık bir `bounds` veriyor; kutu
+cömert tutuluyor.
+
+**Neden.** `VFXBasicInitialize.bounds` varsayılanı 1 m³. Unity o kutuyu frustum'a göre
+kırpıyor ve sistem hiç çizilmiyor — `isVisible` false. Belirti "kar yağmıyor"du;
+zincirin her adımı doğru sayı veriyor, 39892 parçacık yaşıyor, hiçbiri ekrana
+gelmiyordu.
+
+**Neden cömert.** Fazla büyük kutu yalnız kırpmayı gevşetir (birkaç gereksiz çizim);
+küçük kutu sistemi tamamen yok eder. Asimetrik risk.
+
+**Neden `Automatic` değil.** Unity gerçek kutuyu her frame GPU'da hesaplayabiliyor ama
+bu bir okuma-geri maliyeti. Ölçüm için geçici olarak açıldı (kar düşüyor mu sorusunu
+ışıktan bağımsız cevapladı), ölçüm bitince kapatıldı.

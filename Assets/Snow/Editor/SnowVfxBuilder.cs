@@ -85,6 +85,10 @@ public static class SnowVfxBuilder
         // ediliyor; kapasite tavanı grafikte duruyor.
         SetSetting(init, "capacity", 40000u, r);
 
+        // Spawn kutusu (40, 26, 40); türbülans ve rüzgâr taneyi kutunun
+        // dışına taşıyor, sınır kutusu onu da kapsıyor.
+        SetBounds(init, new Vector3(60f, 40f, 60f), r);
+
         // Spec §17.1: `Set Position (AABox)`, kutu (40, 26, 40), KUTUNUN
         // TAMAMINA spawn (yüzeyine değil).
         //
@@ -114,10 +118,46 @@ public static class SnowVfxBuilder
         SetSlot(size, "A", 0.018f * 0.6f, r);
         SetSlot(size, "B", 0.018f * 1.7f, r);
 
+        // TERMİNAL HIZ (spec §17.1). Bu blok olmadan tane hiç düşmüyor:
+        // türbülans onu havada savuruyor ama aşağı taşıyan bir şey yok —
+        // ölçüldü, kar havada asılı kaldı.
+        //
+        // Spec: `terminalVel = lerp(random(0.6, 1.4), random(1.4, 3.0),
+        // _SnowWetness)`. Islaklık sıcaklıktan geliyordu ve yağış sıcaklıktan
+        // koparıldığında sabit 0'a düştü — tane her zaman kuru, yani
+        // `random(0.6, 1.4)`.
+        object vel = AddBlock(init, "Block.SetAttribute", r);
+        SetSetting(vel, "attribute", "velocity", r);
+        SetSetting(vel, "Random", "Uniform", r);
+        // SLOT TİPİ `Vector3` DEĞİL. `velocity` slotu `UnityEditor.VFX.Vector`
+        // sarmalayıcısı; Vector3 yazınca değer sessizce sıfır kalıyordu
+        // (ölçüldü — asset'te `{"vector":{"x":0,"y":0,"z":0}}`).
+        SetSlotField(vel, "A", "vector", new Vector3(0f, -0.6f, 0f), r);
+        SetSlotField(vel, "B", "vector", new Vector3(0f, -1.4f, 0f), r);
+
         // --- Update: türbülans (spec §17.1)
         object update = AddContext(graph, "VFXBasicUpdate", new Vector2(0, 500), r);
 
+        // TERMİNAL HIZ FİZİKTEN ÇIKIYOR, DAYATILMIYOR.
+        //
+        // İlk deneme başlangıç hızını yazıp bırakıyordu; türbülans `Relative`
+        // modda onu bir saniyede yiyordu (o mod hızı hedefe ÇEKİYOR, hedef de
+        // ortalama sıfır). Belirti: kar düşmüyor, yukarı-aşağı-sağa-sola
+        // savruluyor — ölçüldü.
+        //
+        // Yerçekimi + sürükleme dengesi terminal hızı kendisi veriyor:
+        // `v = g / drag = 9.81 / 9.81 = 1 m/s`. Spec §17.1'in kuru kar için
+        // istediği 0.6–1.4 m/s bandının ortası.
+        //
+        // Yüksek sürükleme aynı zamanda karın NEDEN savrulduğunu açıklıyor:
+        // hafif tane rüzgâr hızına hızla yaklaşır. İki davranış tek katsayıdan.
+        AddBlock(update, "Block.Gravity", r);
+
         object turb = AddBlock(update, "Block.Turbulence", r);
+
+        // TÜRBÜLANS KUVVET, HIZ DEĞİL. `Relative` hızı ezerdi; `Absolute`
+        // kuvvet ekliyor, sürükleme onu dengeliyor.
+        SetSetting(turb, "Mode", "Absolute", r);
 
         // Spec §17.1: `Intensity = 0.35 * _WindSpeed + 0.15`. Rüzgâra bağlı
         // olduğu için parametreden sürülüyor; taban değer 0.15.
@@ -126,7 +166,11 @@ public static class SnowVfxBuilder
         LinkParameter(turbParam, turb, "Intensity", r);
         SetSlot(turb, "frequency", 0.12f, r);
         SetSlot(turb, "octaves", 2, r);
-        SetSlot(turb, "Drag", 0.9f, r);
+
+        // Sürükleme kendi bloğunda: türbülansın `Drag` slotu yalnız `Relative`
+        // modda anlamlı, `Absolute`'ta okunmuyor.
+        object drag = AddBlock(update, "Block.Drag", r);
+        SetSlot(drag, "dragCoefficient", 9.81f, r);
 
         // --- Output: URP Lit Quad (spec §17.1)
         //
@@ -142,12 +186,28 @@ public static class SnowVfxBuilder
         SetSetting(output, "zWriteMode", "Off", r);
         SetSetting(output, "useSoftParticle", true, r);
 
-        // ASGARİ EKRAN BOYUTU HAZIR BLOKTA. Spec §17.1 formülle tarif ediyor
-        // (`minWorld = dist * _MinPixelSize / ...`); `ScreenSpaceSize` +
-        // `PixelAbsolute` aynı işi yapıyor. Kendi formülümüzü custom HLSL'e
-        // yazmak hazır olanın üstüne ikinci bir terim koymak olurdu.
-        object ss = AddBlock(output, "Block.ScreenSpaceSize", r);
-        SetSlot(ss, "PixelSize", 1.3f, r);
+        // TANE SİYAH ÇIKIYORDU. `Orient: Face Camera Plane` normali kameraya
+        // çeviriyor; güneş yandan gelince N·L ≈ 0 ve Lit quad kararıyor.
+        // Gerçek kar tanesi çok saçıcı, ışığı her yöne dağıtıyor — spec bunu
+        // emissive ile karşılıyor (§17.1).
+        SetSetting(output, "useEmissive", true, r);
+        SetSlot(output, "emissiveColor", new Color(0.55f, 0.60f, 0.70f), r);
+
+        // Spec §17.1: `Metallic = 0`, `Smoothness = 0.2`.
+        SetSlot(output, "smoothness", 0.2f, r);
+        SetSlot(output, "metallic", 0f, r);
+
+        // ASGARİ EKRAN BOYUTU BURADA YOK — `ScreenSpaceSize` onu vermiyor.
+        //
+        // Blok denendi ve çıkarıldı: `SizeMode` seçeneklerinin hiçbiri "asgari"
+        // değil (`PixelAbsolute`, `PixelRelativeToResolution`,
+        // `RatioRelativeTo*` — ölçüldü, paket kaynağı). `PixelAbsolute` boyutu
+        // SABİTLİYOR: yakındaki tane de uzaktaki de 1.3 piksel oluyor, kar
+        // toz gibi görünüyor.
+        //
+        // Spec §17.1 `size = max(size, minWorld)` istiyor; o bir operatör
+        // zinciri gerektiriyor (mesafe, fov, ekran yüksekliği). Ayrı iş —
+        // `DECISIONS.md`.
 
         // Yönelim: `Face Camera Plane` (spec §17.1). Varsayılan zaten bu;
         // yine de yazılıyor ki varsayılan değişirse sessizce kaymasın.
@@ -166,9 +226,24 @@ public static class SnowVfxBuilder
     /// Dört kısa ömürlü sistem aynı iskeleti paylaşıyor: spawn → init →
     /// update → çıktı. Tek fark ayarları; iskeleti kopyalamak dört yerde
     /// aynı hatayı yapmak olurdu.
+    /// SINIR KUTUSU YAZILMAZSA SİSTEM HİÇ ÇİZİLMEZ.
+    ///
+    /// `VFXBasicInitialize.bounds` varsayılanı 1 m³. Unity o kutuyu frustum'a
+    /// göre kırpıyor: parçacıklar doğsa bile `VFXRenderer.isVisible` false
+    /// kalıyor ve sistem tamamen kayboluyor. Ölçüldü — kar yağmıyordu, sebep
+    /// buydu (`SYMPTOMS.md`).
+    ///
+    /// Kutu CÖMERT tutuluyor: fazla büyük olması yalnız kırpmayı gevşetir,
+    /// küçük olması sistemi yok eder.
+    static void SetBounds(object init, Vector3 size, StringBuilder r)
+    {
+        SetSlotField(init, "bounds", "center", Vector3.zero, r);
+        SetSlotField(init, "bounds", "size", size, r);
+    }
+
     static (object init, object update, object output) Skeleton(
         object graph, uint capacity, float lifeA, float lifeB,
-        float sizeA, float sizeB, StringBuilder r)
+        float sizeA, float sizeB, Vector3 boundsSize, StringBuilder r)
     {
         object spawner = AddContext(graph, "VFXBasicSpawner", new Vector2(0, 0), r);
         object rate = AddBlock(spawner, "VFXSpawnerConstantRate", r);
@@ -181,6 +256,7 @@ public static class SnowVfxBuilder
 
         object init = AddContext(graph, "VFXBasicInitialize", new Vector2(0, 200), r);
         SetSetting(init, "capacity", capacity, r);
+        SetBounds(init, boundsSize, r);
 
         object life = AddBlock(init, "Block.SetAttribute", r);
         SetSetting(life, "attribute", "lifetime", r);
@@ -218,7 +294,8 @@ public static class SnowVfxBuilder
         object graph = NewGraph("VFX_SnowPuff", r);
 
         var (init, update, output) =
-            Skeleton(graph, 512, 0.4f, 0.9f, 0.02f, 0.06f, r);
+            Skeleton(graph, 512, 0.4f, 0.9f, 0.02f, 0.06f,
+                     new Vector3(6f, 6f, 6f), r);
 
         AddBlock(update, "Block.Gravity", r);
         AddBlock(update, "Block.Drag", r);
@@ -242,7 +319,8 @@ public static class SnowVfxBuilder
 
         // Kapasite 3000, ömür 0.5–1.1 s, boyut 0.03–0.10 m (spec §18.6).
         var (init, update, output) =
-            Skeleton(graph, 3000, 0.5f, 1.1f, 0.03f, 0.10f, r);
+            Skeleton(graph, 3000, 0.5f, 1.1f, 0.03f, 0.10f,
+                     new Vector3(10f, 8f, 10f), r);
 
         // Yerçekimi −9.81 × 0.35, drag 2.5 (spec §18.6).
         AddBlock(update, "Block.Gravity", r);
@@ -269,7 +347,8 @@ public static class SnowVfxBuilder
 
         // Ömür 1.2–3.0 s (spec §18.7). Boyut küçük ve çok sayıda.
         var (init, update, output) =
-            Skeleton(graph, 8000, 1.2f, 3.0f, 0.01f, 0.03f, r);
+            Skeleton(graph, 8000, 1.2f, 3.0f, 0.01f, 0.03f,
+                     new Vector3(80f, 10f, 80f), r);
 
         // `Orient: Along Velocity`, 4–8× uzatılmış (spec §18.7).
         object orient = AddBlock(output, "Block.Orient", r);
@@ -290,7 +369,8 @@ public static class SnowVfxBuilder
 
         // Ömür 6–12 s; boyut genişlik 12–25 m (spec §18.7).
         var (init, update, output) =
-            Skeleton(graph, 14, 6f, 12f, 12f, 25f, r);
+            Skeleton(graph, 14, 6f, 12f, 12f, 25f,
+                     new Vector3(400f, 80f, 400f), r);
 
         object orient = AddBlock(output, "Block.Orient", r);
         SetSetting(orient, "mode", "AlongVelocity", r);
@@ -385,6 +465,20 @@ public static class SnowVfxBuilder
                 ?? throw new InvalidOperationException("Slot değeri yazılamıyor.");
 
             degerP.SetValue(slot, value);
+
+            // YAZILAN GERİ OKUNUYOR. Slot tipi beklenenden farklıysa
+            // `SetValue` sessizce varsayılanı bırakıyor: log "yazdım" derken
+            // asset sıfır kalıyor. Bir kez oldu — `velocity` slotu `Vector3`
+            // değil `Vector` sarmalayıcısıydı, kar hiç düşmedi.
+            object geri = degerP.GetValue(slot);
+
+            if (!Equals(geri, value))
+                throw new InvalidOperationException(
+                    model.GetType().Name + "." + slotName + " yazılamadı: " +
+                    "verilen " + value.GetType().Name + " = " + value +
+                    ", slotta " + (geri?.GetType().Name ?? "null") + " = " + geri +
+                    ". Slot tipi farklı — alt alana yazmak için SetSlotField kullan.");
+
             r.AppendLine("           slot   " + slotName.PadRight(24) + value);
             return;
         }

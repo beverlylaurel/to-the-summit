@@ -709,9 +709,10 @@ tam bu yüzden pahalıya patladı.
 **Okur** (yalnız `SnowEnvironmentBridge` üzerinden, doğrudan değil):
 - `WindField` → rüzgâr yönü ve hızı. `Velocity` m/s'dir; `Strength` 0..1'dir, hız değil.
 - `TimeOfDay` → `SunHeight` (güneş yüksekliği 0..1) ve ana ışık
-- `TemperatureField` → gözlemcinin kotundaki sıcaklık; donma kararı buradan
-- `WeatherState` → `Precipitation` (0..1). Yağışın **türü** projede yok; kar/yağmur
-  kararını kar sisteminin kendi histerezisi veriyor (0.5 / 2.0 °C).
+- `TemperatureField` → gözlemcinin kotundaki sıcaklık. **Yağışa bağlı değil**;
+  yalnız `_TemperatureC` global'i olarak shader'lara gidiyor.
+- `WeatherState` → `Precipitation` (0..1). Yağışın **türü** projede yok ve
+  sorulmuyor: yağış varsa kar yağar.
 - `AtmosphereController` → görüş mesafesi, 0..1'e normalize edilerek
 
 **Okumaz:** `RenderSettings`, `VolumeProfile`, `Light.intensity`. Tek satır bile yazmıyor;
@@ -741,9 +742,8 @@ fragman'da merkezi farkla — ikisi aynı fonksiyondan. 4 mm altındaki kar
 `clip()` ile hiç çizilmiyor; kenar gürültüyle kırılıyor (`T_Snow_Breakup`).
 `GroundCoverage01` eşiğin altında ve kar yağmıyorsa mesh tamamen kapanıyor.
 
-**Birikme zinciri (Faz 5).** `SnowfallController` sıcaklık histerezisiyle
-(0.5 / 2.0 °C) kar yağıp yağmadığına karar veriyor ve `SnowRuntimeState`'e
-yayınlıyor; yağmuru KAPATMIYOR. `_SnowfallSWERate` ve VFX tane sayısı AYNI
+**Birikme zinciri (Faz 5).** `SnowfallController` yağış olup olmadığına bakıp
+`SnowRuntimeState`'e yayınlıyor. **Sıcaklık kapısı yok** — yağıyorsa kardır. `_SnowfallSWERate` ve VFX tane sayısı AYNI
 `i01` değerinden türüyor. `KAccumulate` yağışı gökyüzü görünürlüğüyle,
 rüzgâr yönlü yeniden dağıtımla, oturmayla, derece-gün erimesiyle ve yağmur
 çarpanıyla işliyor; karenin 1/4'ü her karede. Kaplama ve gevşek kar oranı
@@ -775,11 +775,9 @@ sayı tutmuyor: rüzgâr `WindField`'dan, güneş yüksekliği `TimeOfDay`'den, 
 `AtmosphereController.Visibility`'den geliyor. Referans atanmamışsa o alan manuel
 değere düşüyor. Kar sistemi bunların hiçbirini YAZMIYOR.
 
-**Yağmur kar yağarken susuyor.** `SnowfallController` `SnowRuntimeState.RainWeight01`
-yayınlıyor; `PrecipitationRenderer` şiddetini bununla çarpıyor. Kar şiddeti de
-`1 − RainWeight01` ile kısılıyor: ikisinin ağırlığı aynı rampanın iki ucu, üst üste
-binme matematiksel olarak imkânsız. Bağ TEK YÖNLÜ — kar sistemi yağmurdan bir şey
-okumuyor.
+**Yağmur hiç çizilmiyor.** `SnowfallController` `RainWeight01`'i sabit 0
+yayınlıyor; `PrecipitationRenderer` şiddetini bununla çarpıyor. Tek yağış türü
+kar. Bağ TEK YÖNLÜ — kar sistemi yağmurdan bir şey okumuyor.
 
 **Mesh ile bölge AYNI kare.** İkisi de 24 m. Bu yüzden kenar sönümü bölge
 UV'sinden okunuyor (`SnowEdgeFade`), ayrı bir merkez/genişlik çifti
@@ -807,12 +805,22 @@ aynı büyüklüğü göstermek zorunda; biri derinlik biri örtü okursa sını
 `_SnowUpDirection` ve dört örtü parametresi global yayınlanıyor ki arazi ile
 nesne shader'ı aynı sayıları okusun.
 
-**KAR İRTİFAYA BAĞLI DEĞİL.** Yükseklikten türeyen bir kar çizgisi vardı;
-kaldırıldı. Kar yağarsa tutar, yağmazsa tutmaz. Yüksekte karın daha çok olması
-sıcaklıktan kendiliğinden çıkıyor: `TemperatureField` kotla düşüyor, yağış
-§3.4 histerezisiyle kara dönüyor. İkinci bir irtifa terimi aynı şeyi ikinci kez
-söylerdi. Bölge dışı ve yeni açılan şerit `_FallbackSWE`/`_FallbackRhoN`'dan
+**KAR NE İRTİFAYA NE SICAKLIĞA BAĞLI.** Önce yükseklikten türeyen kar çizgisi
+kaldırıldı, sonra §3.4'ün sıcaklık histerezisi. Kalan kural tek cümle: yağış
+varsa kar yağar ve tutar. Sıcaklık yağışın **şiddetini** de sürmüyor —
+`Baseline()` sabit referans kotlardan okuyor, donma seviyesinden değil. Bölge dışı ve yeni açılan şerit `_FallbackSWE`/`_FallbackRhoN`'dan
 doluyor (`SnowOutsideStateAt`).
+
+**Yakın kar katmanı VFX'te.** `SnowfallLayers` `SnowRuntimeState.SnowfallIntensity01`
+okuyup `VFX_Snowfall`'ın `SpawnRate`'ini sürüyor, spawn kutusunu kameraya 1 m
+ızgarasında snap'leyerek taşıyor. Grafik `SnowVfxBuilder`'dan üretiliyor; elle
+düzenlenmiyor, üretim tekrar koşturulabilir. Tane düşüşü grafikte fizikten
+çıkıyor (yerçekimi −9.81 + sürükleme 9.81 → terminal 1 m/s), türbülans
+`Absolute` modda kuvvet olarak üstüne biniyor. Katman bağlıyken compute tabanlı
+`SnowfallRenderer` kapanıyor — iki yağış sistemi birden koşmuyor.
+
+**Her VFX grafiğinin sınır kutusu elle yazılıyor.** Varsayılan 1 m³; Unity o
+kutuyu kırpıp sistemi tamamen gizliyor. Değerler `SnowVfxBuilder.SetBounds`'ta.
 
 **Detay normalleri stokastik döşeniyor** `[KAYNAK: Heitz & Neyret, HPG 2018]`.
 Dört katman da aynı 256² dokuyu okuyor; sabit döşemede 0,6 m'lik tekrar gözle

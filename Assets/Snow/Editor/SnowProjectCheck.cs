@@ -67,7 +67,7 @@ public static class SnowProjectCheck
         }
 
         // --- VFX Graph ---
-        bool vfx = HasType("UnityEngine.VFX.VisualEffect, Unity.VisualEffectGraph.Runtime");
+        bool vfx = HasType("UnityEngine.VFX.VisualEffect");
         if (vfx)
             Line(r, true, "VFX Graph", "kurulu");
         else
@@ -153,5 +153,19 @@ public static class SnowProjectCheck
         return free;
     }
 
-    static bool HasType(string qualifiedName) => System.Type.GetType(qualifiedName) != null;
+    /// TİP TÜM ASSEMBLY'LERDE ARANIYOR.
+    ///
+    /// `Type.GetType("ad, Assembly")` yalnız adı verilen assembly'de bakar ve
+    /// isim yanlışsa sessizce null döner. `UnityEngine.VFX.VisualEffect`
+    /// pakette değil, built-in `UnityEngine.VFXModule` içinde — rapor bir tur
+    /// boyunca "VFX Graph KURULU DEĞİL" dedi, oysa paket kuruluydu ve beş
+    /// grafik çalışıyordu.
+    static bool HasType(string fullName)
+    {
+        foreach (System.Reflection.Assembly a in
+                 System.AppDomain.CurrentDomain.GetAssemblies())
+            if (a.GetType(fullName, false) != null) return true;
+
+        return false;
+    }
 }

@@ -385,6 +385,11 @@ public class SnowDebugWindow : EditorWindow
     /// `SnowAutoWire` bunu eksik referans gördüğünde kendiliğinden çağırıyor;
     /// düğme de yerinde duruyor. Ayrı bir sınıfa çıkarmak denendi ve on üç
     /// sabit, altı yardımcı metot peşinden sürüklendi — kazancı yoktu.
+    /// Kurulumu menüden koşturur. Pencereyi açıp düğmeye basmak yerine tek
+    /// komut; otomatik kurulum yeni bir bileşeni henüz tanımıyorken gerekiyor.
+    [MenuItem("To The Summit/Kar/Sahneyi Kur", false, 51)]
+    static void SetupSceneMenu() => SetupScene();
+
     public static void SetupScene()
     {
         EnsureLayer(SnowProjectCheck.DeformerLayer);
@@ -479,14 +484,33 @@ public class SnowDebugWindow : EditorWindow
 
         EditorUtility.SetDirty(coverage);
 
+        // VFX NESNELERİ. Grafikler `SnowVfxBuilder` ile üretiliyor; burada
+        // sahneye yerleşip denetleyicilere bağlanıyorlar.
+        //
+        // Grafik yoksa referans boş kalıyor ve denetleyici hiçbir şey yapmıyor
+        // — eski compute yolu çalışmaya devam ediyor. Yarım bağlamaktansa hiç
+        // bağlamamak doğru.
+        var snowfallVfx = EnsureVfx(go, "VFX_Snowfall");
+        var puffVfx = EnsureVfx(go, "VFX_SnowPuff");
+        var sprayVfx = EnsureVfx(go, "VFX_SnowSpray");
+        var spindriftVfx = EnsureVfx(go, "VFX_Spindrift");
+        var curtainVfx = EnsureVfx(go, "VFX_SnowCurtain");
+
         var fallLayersSerialized = new SerializedObject(fallLayers);
         fallLayersSerialized.FindProperty("environment").objectReferenceValue = bridge;
         fallLayersSerialized.FindProperty("farLayer").objectReferenceValue = curtains;
+        fallLayersSerialized.FindProperty("nearLayer").objectReferenceValue = snowfallVfx;
+        fallLayersSerialized.FindProperty("computeFallback").objectReferenceValue = snowfall;
+        fallLayersSerialized.FindProperty("followTarget").objectReferenceValue =
+            Camera.main != null ? Camera.main.transform
+                                : (player != null ? player.transform : null);
         fallLayersSerialized.ApplyModifiedProperties();
 
         var driftVfxSerialized = new SerializedObject(driftVfx);
         driftVfxSerialized.FindProperty("environment").objectReferenceValue = bridge;
         driftVfxSerialized.FindProperty("settings").objectReferenceValue = settings;
+        driftVfxSerialized.FindProperty("spindrift").objectReferenceValue = spindriftVfx;
+        driftVfxSerialized.FindProperty("curtain").objectReferenceValue = curtainVfx;
         driftVfxSerialized.ApplyModifiedProperties();
 
         EditorUtility.SetDirty(fallLayers);
@@ -600,6 +624,33 @@ public class SnowDebugWindow : EditorWindow
 
     /// Kar yüzeyi materyali. Halkaların HEPSİ aynı materyali paylaşıyor —
     /// ayrı ayrı olsaydı SRP Batcher dört halkayı dört çizime bölerdi.
+    /// VFX nesnesi: yoksa yaratılıyor, asset'i bağlanıyor.
+    ///
+    /// Asset yoksa `null` dönüyor ve çağıran tarafta referans boş kalıyor —
+    /// denetleyici o zaman hiçbir şey yapmıyor ve eski yol çalışmaya devam
+    /// ediyor. Sessizce boş bir `VisualEffect` bırakmak, ekranda "kar
+    /// yağmıyor" olarak görünür ve sebebi aranır.
+    static UnityEngine.VFX.VisualEffect EnsureVfx(GameObject host, string ad)
+    {
+        var asset = AssetDatabase.LoadAssetAtPath<UnityEngine.VFX.VisualEffectAsset>(
+            "Assets/Snow/VFX/" + ad + ".vfx");
+
+        if (asset == null) return null;
+
+        Transform t = host.transform.Find(ad);
+
+        GameObject go = t != null ? t.gameObject : new GameObject(ad);
+        if (t == null) go.transform.SetParent(host.transform, false);
+
+        var vfx = go.GetComponent<UnityEngine.VFX.VisualEffect>();
+        if (vfx == null) vfx = go.AddComponent<UnityEngine.VFX.VisualEffect>();
+
+        vfx.visualEffectAsset = asset;
+        EditorUtility.SetDirty(vfx);
+
+        return vfx;
+    }
+
     static Material LoadOrCreateSnowMaterial()
     {
         Texture2D breakup = SnowTextureBaker.EnsureBreakup();

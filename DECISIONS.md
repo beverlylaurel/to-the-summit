@@ -83,8 +83,6 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Kar Teşhisi'ndeki "Sınama karı" bölümü** — Play'de dünyayı elle karla
   dolduran kontrol. Kar sistemi kabul edilince silinir; ayar dosyasına
   yazmadığı için kalıntı bırakmıyor
-- **`SnowVfxApiProbe`** — VFX Graph'ın grafik kurma API'si reflection'la
-  erişilebilir mi diye ölçen tek seferlik sonda. Faz 8 kararı verilince silinir
 - **`SnowEnvironmentBridge` elle girilen değerler** — köprü şu an sabit sayılar
   yayınlıyor (rüzgâr 3 m/s, sıcaklık −4 °C, yağış 0.5). Gerçek sistemlere bağlanınca
   bu alanlar silinir
@@ -100,6 +98,26 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
      adım olayına bağlanacak (klipler de atanacak)
   5. `SnowMovementModifier.SpeedMultiplier` hareket koduna bağlanacak
   → [Kar sistemi: spec'ten bilinçli sapmalar](#kar-sistemi-specten-bilinçli-sapmalar-ve-iki-assumption-2026-08-22)
+
+- **Kar tanesinin asgari ekran boyutu yok** — spec §17.1
+  `size = max(size, minWorld)` istiyor, `minWorld = distToCam * (1.3 /
+  _ScreenHeight) * 2 * tan(fov*0.5)`. Hazır `ScreenSpaceSize` bloğu bunu
+  VERMİYOR: modlarının hiçbiri asgari değil, hepsi boyutu zorluyor (paket
+  kaynağından okundu). `PixelAbsolute` denendi ve çıkarıldı — yakındaki taneyi
+  de 1.3 piksele kilitliyordu, kar toz gibi görünüyordu. Doğru çözüm bir
+  operatör zinciri (mesafe, fov, ekran yüksekliği) ve `SnowVfxBuilder`'da
+  operatör ekleme yeteneği yok — şu an yalnız bağlam, blok ve parametre
+  kurabiliyor.
+  **Tetikleyici:** uzaktaki kar kayboluyorsa ya da TAA'da titriyorsa.
+  **Maliyet:** builder'a operatör desteği + zincir, yarım gün.
+
+- **Yağmur artık hiç çizilmiyor** — `RainWeight01` sabit 0. Sıcaklık yağıştan
+  koparılınca (kullanıcı kararı) kar/yağmur ayrımı yapacak tek kapı da gitti;
+  tek yağış türü kar. `PrecipitationRenderer` ve iz doku zinciri sahnede
+  duruyor ama çarpan sıfır.
+  **Tetikleyici:** alçak kotlarda yağmur istenirse — o zaman türü neyin
+  seçeceği yeni bir karardır (irtifa? cephe? el ile?).
+  **Maliyet:** karar verilirse tek satır; sistem duruyor.
 
 - **Şimşek yağan kar ve yağmuru aydınlatmalı** — kar/yağmur spec'lerine geçildiğinde
   ışık kaynağı listesine şimşek eklenecek
