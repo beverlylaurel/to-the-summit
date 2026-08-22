@@ -739,6 +739,19 @@ köşe shader'ında `SnowSurfaceAt`'ten geliyor, normal fragman'da merkezi farkl
 Kenar gürültüyle kırılıyor (`T_Snow_Breakup`, prosedürel üretiliyor).
 `GroundCoverage01` eşiğin altında ve kar yağmıyorsa bütün halkalar kapanıyor.
 
+**Birikme zinciri (Faz 5).** `SnowfallController` sıcaklık histerezisiyle
+(0.5 / 2.0 °C) kar yağıp yağmadığına karar veriyor ve `SnowRuntimeState`'e
+yayınlıyor; yağmuru KAPATMIYOR. `_SnowfallSWERate` ve VFX tane sayısı AYNI
+`i01` değerinden türüyor. `KAccumulate` yağışı gökyüzü görünürlüğüyle,
+rüzgâr yönlü yeniden dağıtımla, oturmayla, derece-gün erimesiyle ve yağmur
+çarpanıyla işliyor; karenin 1/4'ü her karede. Kaplama ve gevşek kar oranı
+64² indirgenmiş durumdan otuz karede bir geri okunuyor.
+
+**Gökyüzü haritası.** `SnowOccluder` layer'ındaki geometri tepeden çizilip
+`RT_SkyVis`'e yazılıyor — bölge merkezi 4 m'den fazla kaydığında veya elle
+kirletildiğinde, her kare değil. Üç tüketicisi var: zemin birikmesi, nesne
+üstü kar, kar tanesi kesme.
+
 **Bölge kaydırma.** Durum dokuları oyuncuyu takip eden 16 m'lik bir pencerede duruyor;
 pencere `SnapStep` (0.25 m) ızgarasına oturuyor ve kaydığında içerik `KScroll` ile aynı
 dünya noktasında kalıyor. Üç presette de bir SnapStep tam sayı teksele denk geliyor

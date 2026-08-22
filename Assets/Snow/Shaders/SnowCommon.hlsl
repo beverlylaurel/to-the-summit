@@ -139,6 +139,42 @@ float3 SampleGroundNormal(float2 posXZ)
     return normalize(float3(hL - hR, e.x + e.y, hD - hU));
 }
 
+// ------------------------------------------------------ gökyüzü görünürlüğü
+
+TEXTURE2D(_SnowSkyVisTex);
+
+float2 _SkyCenterXZ;
+float  _SkyAreaSize;
+float  _SkyResolution;
+
+/// Bu noktanın gökyüzünü ne kadar gördüğü, 0..1 (spec §12.2).
+///
+/// ÜÇ TÜKETİCİSİ OLAN TEK HARİTA: zemin birikmesi, nesne üstü kar, kar tanesi
+/// kesme. Ayrı ayrı çözüm üretilmiyor.
+///
+/// 3×3 örnekleme saçakta yumuşak geçiş veriyor; tek örnekle çatı kenarı
+/// jilet gibi kesilir.
+float SampleSkyVisibility(float3 posWS)
+{
+    float2 uv = (posWS.xz - _SkyCenterXZ) / _SkyAreaSize + 0.5;
+    if (any(uv < 0.0) || any(uv > 1.0)) return 1.0;
+
+    float t = 1.0 / _SkyResolution;
+    float vis = 0.0;
+
+    [unroll]
+    for (int y = -1; y <= 1; ++y)
+    [unroll]
+    for (int x = -1; x <= 1; ++x)
+    {
+        float occlY = SAMPLE_TEXTURE2D_LOD(_SnowSkyVisTex, sampler_LinearClamp,
+                                           uv + float2(x, y) * t, 0).r;
+        vis += 1.0 - smoothstep(0.05, 0.40, occlY - posWS.y);
+    }
+
+    return vis * (1.0 / 9.0);
+}
+
 // ------------------------------------------------------------- kar yüzeyi
 
 TEXTURE2D(_SnowStateTex);

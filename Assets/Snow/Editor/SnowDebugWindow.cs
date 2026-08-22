@@ -255,6 +255,7 @@ public class SnowDebugWindow : EditorWindow
     const string ComputePath = "Assets/Snow/Shaders/SnowSim.compute";
     const string CaptureShaderPath = "Assets/Snow/Shaders/Hidden_SnowCaptureDepth.shader";
     const string SnowLitShaderPath = "Assets/Snow/Shaders/SnowLit.shader";
+    const string SkyShaderPath = "Assets/Snow/Shaders/Hidden_SnowSkyDepth.shader";
     const string SnowLitMaterialPath = "Assets/Snow/Settings/M_SnowLit.mat";
 
     /// SAHNE ELLE DÜZENLENMİYOR. Proje kuralı: bileşen ekleme, referans bağlama ve
@@ -309,6 +310,8 @@ public class SnowDebugWindow : EditorWindow
             AssetDatabase.LoadAssetAtPath<ComputeShader>(ComputePath);
         managerSerialized.FindProperty("captureShader").objectReferenceValue =
             AssetDatabase.LoadAssetAtPath<Shader>(CaptureShaderPath);
+        managerSerialized.FindProperty("skyShader").objectReferenceValue =
+            AssetDatabase.LoadAssetAtPath<Shader>(SkyShaderPath);
         managerSerialized.ApplyModifiedProperties();
 
         Material snowLit = LoadOrCreateSnowMaterial();

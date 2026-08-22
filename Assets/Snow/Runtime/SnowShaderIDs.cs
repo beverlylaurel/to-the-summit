@@ -55,6 +55,7 @@ public static class SnowShaderIDs
     public static readonly int Capture = Shader.PropertyToID("_Capture");
     public static readonly int CaptureBlur = Shader.PropertyToID("_CaptureBlur");
     public static readonly int BlurredCarve = Shader.PropertyToID("_BlurredCarve");
+    public static readonly int ReducedOut = Shader.PropertyToID("_ReducedOut");
     public static readonly int CarveOut = Shader.PropertyToID("_CarveOut");
 
     // --- Compute: parametreler ---

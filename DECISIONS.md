@@ -1007,6 +1007,50 @@ Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olma
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
 
+## Kar Faz 5: iki spec içi tutarsızlık ve bir format değişimi (2026-08-22)
+
+### `RT_SkyVis` RHalf değil RFloat
+
+Doku MUTLAK dünya Y tutuyor ve §12.2'nin eşikleri 0.05–0.40 m. Bu projenin
+arazisi ~4900 m'de; yarım hassasiyetin oradaki adımı **4 metre** (ölçüldü).
+Eşikler tamamen anlamsız kalırdı. Göreli kodlama da yetmiyor: 50 m yukarıdaki
+bir kaya çıkıntısında adım 6 cm'ye çıkıyor, eşik 5 cm. Bedeli 2 MB.
+
+**Not:** aynı sorun Faz 12'nin `RT_WindShadow`'unda tekrar edecek — o da yüzey
+yüksekliği tutuyor. Oraya gelindiğinde RGFloat'a çevrilecek.
+
+### §17.2'nin tablosu kendi koduyla çelişiyor
+
+Kod `Lerp(0, 16000, i01)` diyor, "referans" tablo 0.06 → **1200** veriyor.
+Doğrusal karşılığı 960. SWE sütunu doğrusalla uyuşuyor, tane sütunu uyuşmuyor.
+**Kod uygulandı** (§0.3 — kod bloğu normatif, tablo "referans" etiketli).
+
+### Birikme hızı spec'in sağlamasından yüksek çıkıyor — ikisi de tutarlı
+
+Spec §11 "3 mm/sa SWE + ρ 107 → ~2.8 cm/sa" diyor. Ölçülen: SWE **2.998 mm/sa**
+(birebir), ama bir saat sonunda yoğunluk **76 kg/m³** ve yükseklik artışı
+**3.96 cm/sa**. Fark yoğunluktan: spec ρ 107 varsaymış, oysa kuru ve rüzgârsız
+havada taze kar 55'te doğuyor (`lerp(55,145,wet=0)`) ve altı saatlik oturma
+sabitiyle bir saatte ancak 76'ya çıkıyor. ρ 107 ancak ıslak kar veya ~7 m/s
+rüzgârla oluşuyor.
+
+**Korunan nicelik SWE ve o birebir tutuyor.** Yükseklik türetilmiş bir sayı;
+sağlama satırındaki yuvarlama farkı bir hata değil.
+
+### `KReduceState` spec'te adlandırılmamış
+
+§11 kaplamayı, §17.1 gevşek kar oranını `AsyncGPUReadback` ile istiyor; §17.1
+açıkça "64×64 küçültülmüş state" diyor ama kernel'i adlandırmıyor. Eklendi:
+tam çözünürlükte geri okuma 8 MB, indirgenmiş hâli 64 KB ve aynı iki sayıyı
+veriyor.
+
+### Birikme tek şeridi yazıyor, ping-pong yerine şerit kopyası
+
+`KAccumulate` döşeme döndürmesiyle karenin 1/4'ünü işliyor (§15.2). Ping-pong
+yapılamaz: diğer üç şerit eski tamponda kalırdı. Yazılan şerit `CopyTexture`
+ile hedefe taşınıyor. `KAccumulate` komşu teksel okuyor (eğim) — bu yüzden
+in-place de yapılamaz.
+
 ## Kar Faz 4: delik boyu spec'ten sapıyor — çatlak ölçüldü (2026-08-22)
 
 **Spec §13.1** dış halkaların ortasındaki boşluğu **134² quad** diye veriyor.

@@ -28,6 +28,18 @@ public class SnowManager : MonoBehaviour
     [Tooltip("Hidden/Snow/CaptureDepth — deformer'ların alt yüzeyini yazar.")]
     [SerializeField] Shader captureShader;
 
+    [Tooltip("Hidden/Snow/SkyDepth — kar yağışını engelleyen geometriyi yazar.")]
+    [SerializeField] Shader skyShader;
+
+    /// Gökyüzü haritasının engelleri bu layer'dan geliyor (spec §1.3).
+    const string OccluderLayerName = "SnowOccluder";
+
+    /// İndirgenmiş durumun kenarı (spec §17.1).
+    const int ReducedResolution = 64;
+
+    /// Geri okuma aralığı, kare (spec §17.1).
+    const int ReadbackInterval = 30;
+
     /// Sahnede tek bir yönetici var; teşhis penceresi ve geçişler bunu okur.
     /// `FindObjectOfType` yerine: arama gizli bağımlılık yaratır, bu ise açık.
     public static SnowManager Active { get; private set; }
@@ -52,9 +64,18 @@ public class SnowManager : MonoBehaviour
     // ikincisi kendi hedefini gerektiriyor — aynı dokuyu hem kaynak hem hedef
     // yapmak yasak (spec §20). Tek kanal, 2 MB.
     RenderTexture rimBlur;
+    RenderTexture skyDepth;
+
+    /// 64² indirgenmiş durum. Kaplama ve gevşek kar oranı buradan geri
+    /// okunuyor; tam çözünürlükte okumak 8 MB'lık bir transfer olurdu.
+    RenderTexture reduced;
 
     Material captureMaterial;
+    Material skyMaterial;
+
     readonly SnowCaptureCamera captureCamera = new();
+    readonly SnowSkyCamera skyCamera = new();
+    readonly SnowfallController snowfall = new();
 
     int clearKernel = -1;
     int scrollKernel = -1;
@@ -63,6 +84,16 @@ public class SnowManager : MonoBehaviour
     int rimBlurHKernel = -1;
     int rimBlurVKernel = -1;
     int rimKernel = -1;
+    int accumulateKernel = -1;
+    int reduceKernel = -1;
+
+    int accumulateTile;
+    int lastReadbackFrame = -1;
+    bool readbackPending;
+
+    /// İlk geri okuma gelene kadar kaplama dünyanın genel kar durumundan
+    /// türetiliyor; sonra gerçek ölçüm devralıyor.
+    bool coverageMeasured;
 
     /// Sahnede birden çok kamera var (oyun + sahne görünümü). Geçiş her kamera
     /// için kaydediliyor; simülasyon KARE BAŞINA BİR KEZ koşmalı, yoksa
@@ -111,6 +142,8 @@ public class SnowManager : MonoBehaviour
             throw new System.InvalidOperationException($"{nameof(SnowManager)}: {nameof(groundHeight)} atanmadı.");
         if (captureShader == null)
             throw new System.InvalidOperationException($"{nameof(SnowManager)}: {nameof(captureShader)} atanmadı.");
+        if (skyShader == null)
+            throw new System.InvalidOperationException($"{nameof(SnowManager)}: {nameof(skyShader)} atanmadı.");
 
         env = environmentSource as ISnowEnvironmentSource;
 
@@ -143,7 +176,13 @@ public class SnowManager : MonoBehaviour
         // RT_CaptureBlur) format aynı olsa bile o dokunun içeriğini siler.
         // Bedeli 8 MB.
         snowTemp = Create("RT_SnowTemp", q.Resolution, RenderTextureFormat.ARGBHalf);
-        skyVis = Create("RT_SkyVis", q.SkyResolution, RenderTextureFormat.RHalf);
+        // ASSUMPTION: spec §6.2 tablosu RHalf diyor; RFloat açılıyor.
+        // Doku MUTLAK dünya Y tutuyor ve §12.2'nin eşikleri 0.05–0.40 m.
+        // Bu projenin arazisi ~4900 m'de ve yarım hassasiyetin oradaki adımı
+        // 4 METRE (ölçüldü) — eşikler tamamen anlamsız kalırdı. Göreli
+        // kodlama da yetmiyor: 50 m yukarıdaki bir kaya çıkıntısında adım
+        // 6 cm'ye çıkıyor, eşik 5 cm. Bedeli 2 MB.
+        skyVis = Create("RT_SkyVis", q.SkyResolution, RenderTextureFormat.RFloat);
 
         // ASSUMPTION: RT_WindShadow RGHalf. Spec §6.2 tablosu RGHalf diyor (R=Wz,
         // G=Wsz), §18.0 metni RHalf diyor. `KWindShadow` iki kanal birden yazıyor
@@ -153,8 +192,12 @@ public class SnowManager : MonoBehaviour
         rimBlur = Create("RT_RimBlur", q.Resolution, RenderTextureFormat.RHalf);
 
         captureDepth = CreateDepth("RT_CaptureDepth", q.Resolution);
+        skyDepth = CreateDepth("RT_SkyDepth", q.SkyResolution);
+
+        reduced = Create("RT_SnowReduced", ReducedResolution, RenderTextureFormat.ARGBFloat);
 
         captureMaterial = new Material(captureShader) { hideFlags = HideFlags.HideAndDontSave };
+        skyMaterial = new Material(skyShader) { hideFlags = HideFlags.HideAndDontSave };
 
         clearKernel = simCompute.FindKernel("KClear");
         scrollKernel = simCompute.FindKernel("KScroll");
@@ -163,6 +206,18 @@ public class SnowManager : MonoBehaviour
         rimBlurHKernel = simCompute.FindKernel("KRimBlurH");
         rimBlurVKernel = simCompute.FindKernel("KRimBlurV");
         rimKernel = simCompute.FindKernel("KRim");
+        accumulateKernel = simCompute.FindKernel("KAccumulate");
+        reduceKernel = simCompute.FindKernel("KReduceState");
+
+        accumulateTile = 0;
+        lastReadbackFrame = -1;
+        readbackPending = false;
+        coverageMeasured = false;
+
+        snowfall.Reset();
+
+        // Engeller statik; bir kez taranıyor (spec §12.1 — her kare değil).
+        skyCamera.Rescan(LayerMask.NameToLayer(OccluderLayerName));
 
         lastSimulatedFrame = -1;
 
@@ -193,6 +248,14 @@ public class SnowManager : MonoBehaviour
             captureMaterial = null;
         }
 
+        if (skyMaterial != null)
+        {
+            DestroyImmediate(skyMaterial);
+            skyMaterial = null;
+        }
+
+        snowfall.Reset();
+
         Release(ref capture);
         Release(ref captureBlur);
         Release(ref captureDepth);
@@ -203,6 +266,8 @@ public class SnowManager : MonoBehaviour
         Release(ref skyVis);
         Release(ref windShadow);
         Release(ref rimBlur);
+        Release(ref skyDepth);
+        Release(ref reduced);
     }
 
     void LateUpdate()
@@ -210,6 +275,10 @@ public class SnowManager : MonoBehaviour
         if (!IsReady) return;
 
         UpdateRegion();
+
+        // Yağış kararı ÖNCE: `_SnowfallSWERate` aynı karede KDeform ve
+        // KAccumulate tarafından okunuyor.
+        snowfall.Tick(env);
 
         // GLOBALLER HER KAREDE YAZILIYOR, yalnız değişince değil. Bileşenlerin
         // OnEnable sırası eklenme sırasına bağlı; bir doku henüz hazır değilken
@@ -289,14 +358,28 @@ public class SnowManager : MonoBehaviour
         // `AsyncGPUReadback` ile geliyor (spec §11). O gelene kadar dünyanın
         // genel kar durumundan türetiliyor — yoksa kar mesh'leri hiç açılmaz
         // (spec §15.2 kaplama sıfırken her şeyi kapatıyor).
-        float fallbackHeight = settings.DefaultSwe * SnowConstants.RhoWater /
-                               Mathf.Max(1f, Mathf.Lerp(SnowConstants.RhoMin, SnowConstants.RhoMax,
-                                                        settings.DefaultRhoN));
+        if (!coverageMeasured)
+        {
+            // İLK GERİ OKUMAYA KADAR VEKİL. Ölçüm gelene kadar kar mesh'leri
+            // hiç açılmasaydı ilk kareler çıplak arazi olurdu.
+            float fallbackHeight = settings.DefaultSwe * SnowConstants.RhoWater /
+                                   Mathf.Max(1f, Mathf.Lerp(SnowConstants.RhoMin,
+                                                            SnowConstants.RhoMax,
+                                                            settings.DefaultRhoN));
 
-        SnowRuntimeState.GroundCoverage01 =
-            Mathf.Clamp01(fallbackHeight / SnowConstants.MinVisibleHeight);
+            SnowRuntimeState.GroundCoverage01 =
+                Mathf.Clamp01(fallbackHeight / SnowConstants.MinVisibleHeight);
+        }
 
         Shader.SetGlobalFloat(SnowShaderIDs.SnowCoverage, SnowRuntimeState.GroundCoverage01);
+
+        // Gökyüzü haritasının kapsamı — üç tüketici de bunu okuyor (spec §12).
+        Vector2 skyCenter = skyCamera.Center;
+
+        Shader.SetGlobalVector(SnowShaderIDs.SkyCenterXZ,
+            new Vector4(skyCenter.x, skyCenter.y, 0f, 0f));
+        Shader.SetGlobalFloat(SnowShaderIDs.SkyAreaSize, SnowConstants.SkyAreaSize);
+        Shader.SetGlobalFloat(SnowShaderIDs.SkyResolution, q.SkyResolution);
     }
 
     // ------------------------------------------------------------------ dispatch
@@ -347,8 +430,10 @@ public class SnowManager : MonoBehaviour
             pendingScrollTexels = Vector2Int.zero;
         }
 
+        DispatchSky(cmd, restoreView, restoreProj);
         DispatchCapture(cmd, groups, restoreView, restoreProj);
         DispatchTrail(cmd, groups);
+        DispatchAccumulate(cmd, groups);
 
         // Ping-pong sonrası hangi dokunun güncel olduğu değişti; aynı karenin
         // geometrisi eskisini okumasın diye globaller burada tazeleniyor.
@@ -401,6 +486,105 @@ public class SnowManager : MonoBehaviour
         cmd.DispatchCompute(simCompute, rimKernel, groups, groups, 1);
 
         (trail, trailTemp) = (trailTemp, trail);
+    }
+
+    // ------------------------------------------------------- gökyüzü haritası
+
+    void DispatchSky(CommandBuffer cmd, Matrix4x4 restoreView, Matrix4x4 restoreProj)
+    {
+        // HER KARE DEĞİL (spec §12.1). Statik geometrinin silueti kare kare
+        // değişmiyor.
+        if (!skyCamera.NeedsRefresh(AreaCenter)) return;
+
+        skyCamera.Record(cmd, skyVis, skyDepth, skyMaterial,
+                         AreaCenter, followTarget.position.y, restoreView, restoreProj);
+    }
+
+    /// Sahneye engel eklendiğinde veya taşındığında çağrılır.
+    public void MarkSkyVisDirty()
+    {
+        skyCamera.Rescan(LayerMask.NameToLayer(OccluderLayerName));
+    }
+
+    // --------------------------------------------------------------- birikme
+
+    void DispatchAccumulate(CommandBuffer cmd, int groups)
+    {
+        SnowQualityData q = settings.QualityData;
+
+        Texture ground = groundHeight.HeightTexture;
+        if (ground == null) return;
+
+        int tiles = Mathf.Max(1, q.AccumulateTiles);
+        accumulateTile = (accumulateTile + 1) % tiles;
+
+        // DÖŞEME DÖNDÜRMESİ (spec §15.2). Her karede dokunun 1/tiles'ı
+        // işleniyor, dt aynı katla çarpılıyor. Kar oturması ve erimesi saat
+        // mertebesinde; görsel fark yok.
+        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.DeltaTimeEff, Time.deltaTime * tiles);
+        cmd.SetComputeIntParam(simCompute, SnowShaderIDs.TileIndex, accumulateTile);
+        cmd.SetComputeIntParam(simCompute, SnowShaderIDs.TileCount, tiles);
+
+        cmd.SetComputeTextureParam(simCompute, accumulateKernel, SnowShaderIDs.GroundHeightTex, ground);
+        cmd.SetComputeTextureParam(simCompute, accumulateKernel, SnowShaderIDs.SnowSkyVisTex, skyVis);
+        cmd.SetComputeTextureParam(simCompute, accumulateKernel, SnowShaderIDs.Snow, snow);
+        cmd.SetComputeTextureParam(simCompute, accumulateKernel, SnowShaderIDs.SnowOut, snowTemp);
+
+        int tileGroups = Mathf.Max(1, groups / tiles);
+        cmd.DispatchCompute(simCompute, accumulateKernel, tileGroups, groups, 1);
+
+        // YALNIZ BİR ŞERİT YAZILDI. Ping-pong yapılamaz — diğer şeritler eski
+        // tamponda kalırdı. Yazılan şerit hedefe kopyalanıyor.
+        int tileWidth = q.Resolution / tiles;
+        cmd.CopyTexture(snowTemp, 0, 0, accumulateTile * tileWidth, 0,
+                        tileWidth, q.Resolution,
+                        snow, 0, 0, accumulateTile * tileWidth, 0);
+
+        DispatchReduce(cmd);
+    }
+
+    void DispatchReduce(CommandBuffer cmd)
+    {
+        // Otuz karede bir (spec §17.1). Daha sık okumanın kazancı yok:
+        // kaplama saat mertebesinde değişiyor.
+        if (readbackPending) return;
+        if (Time.frameCount - lastReadbackFrame < ReadbackInterval) return;
+
+        lastReadbackFrame = Time.frameCount;
+
+        int reduceGroups = Mathf.CeilToInt(ReducedResolution / (float)SnowConstants.GroupSize);
+
+        cmd.SetComputeTextureParam(simCompute, reduceKernel, SnowShaderIDs.Snow, snow);
+        cmd.SetComputeTextureParam(simCompute, reduceKernel, SnowShaderIDs.ReducedOut, reduced);
+        cmd.DispatchCompute(simCompute, reduceKernel, reduceGroups, reduceGroups, 1);
+
+        readbackPending = true;
+        cmd.RequestAsyncReadback(reduced, OnReduced);
+    }
+
+    void OnReduced(AsyncGPUReadbackRequest request)
+    {
+        readbackPending = false;
+
+        if (!IsReady || request.hasError) return;
+
+        Unity.Collections.NativeArray<Color> data = request.GetData<Color>();
+
+        float coverage = 0f;
+        float loose = 0f;
+
+        for (int i = 0; i < data.Length; i++)
+        {
+            coverage += data[i].b;
+            loose += 1f - data[i].g;
+        }
+
+        float inv = 1f / Mathf.Max(1, data.Length);
+
+        SnowRuntimeState.GroundCoverage01 = Mathf.Clamp01(coverage * inv);
+        SnowRuntimeState.LooseSnowFraction = Mathf.Clamp01(loose * inv);
+
+        coverageMeasured = true;
     }
 
     // ------------------------------------------------------------------ yakalama
