@@ -22,8 +22,6 @@ public class DebugMenu : MonoBehaviour
     [SerializeField] PerformanceHud hud;
     [SerializeField] ClimbHud climbHud;
     [SerializeField] CursorLock cursorLock;
-    [Tooltip("Kar çarpışma yüzeyinin ayrışma probu. Ölçüm bitince prob da bu bölüm de silinir.")]
-    [SerializeField] SnowCollisionProbe snowProbe;
     [Tooltip("Rota çizgilerinin oyun görünümü katmanı.")]
     [SerializeField] RouteOverlay routeOverlay;
     [Tooltip("Bulut ayarlarını taşıyan Volume bileşeni.")]
@@ -53,7 +51,6 @@ public class DebugMenu : MonoBehaviour
 
     bool weatherLocked;
     float lockedPrecipitation = 0.6f;
-    float lockedSnowiness;
 
     bool windLocked;
     float lockedWindStrength = 0.5f;
@@ -88,7 +85,7 @@ public class DebugMenu : MonoBehaviour
         ThunderPlayer thunderRef, LightningFlash lightningRef, TimeOfDay timeRef,
         AtmosphereController atmosphereRef, PrecipitationRenderer precipitationRef,
         PerformanceHud hudRef, ClimbHud climbHudRef,
-        CursorLock cursorLockRef, SnowCollisionProbe snowProbeRef,
+        CursorLock cursorLockRef,
         RouteOverlay routeOverlayRef, Volume cloudVolumeRef, CloudWeatherDriver cloudDriverRef)
     {
         cloudVolume = cloudVolumeRef;
@@ -106,7 +103,6 @@ public class DebugMenu : MonoBehaviour
         precipitation = precipitationRef;
         hud = hudRef;
         climbHud = climbHudRef;
-        snowProbe = snowProbeRef;
         routeOverlay = routeOverlayRef;
     }
 
@@ -116,7 +112,7 @@ public class DebugMenu : MonoBehaviour
             || wind == null || thunder == null || lightning == null || time == null
             || atmosphere == null
             || precipitation == null || hud == null || climbHud == null
-            || cursorLock == null || snowProbe == null || routeOverlay == null
+            || cursorLock == null || routeOverlay == null
             || cloudVolume == null || cloudDriver == null)
             throw new InvalidOperationException($"{nameof(DebugMenu)}: bağımlılıklar atanmadı.");
 
@@ -173,7 +169,6 @@ public class DebugMenu : MonoBehaviour
         if (weatherLocked)
         {
             weatherDriver.IntensityOverride = lockedPrecipitation;
-            weatherDriver.SnowinessOverride = lockedSnowiness;
         }
         if (windLocked) wind.ApplyOverride(lockedWindStrength, lockedWindAngle);
     }
@@ -216,7 +211,6 @@ public class DebugMenu : MonoBehaviour
         BeginColumn();
         DrawClouds();
         DrawOverlays();
-        DrawSnowCollision();
         EndColumn();
 
         GUILayout.EndHorizontal();
@@ -405,7 +399,7 @@ public class DebugMenu : MonoBehaviour
     {
         BeginSection("Hava durumu");
 
-        GUILayout.Label($"Yağış {weather.Precipitation:F2}   Karlılık {weather.Snowiness:F2}");
+        GUILayout.Label($"Yağış {weather.Precipitation:F2}");
 
         // Sürücü KAPATILMAZ, hedefi dışarıdan verilir. Kapatınca `StormIntensity` ve
         // `ClearWindow` donuyor ama atmosfer onları okumaya devam ediyordu: sürgü
@@ -418,7 +412,6 @@ public class DebugMenu : MonoBehaviour
             if (!weatherLocked)
             {
                 weatherDriver.IntensityOverride = -1f;
-                weatherDriver.SnowinessOverride = -1f;
             }
         }
 
@@ -426,9 +419,6 @@ public class DebugMenu : MonoBehaviour
         {
             GUILayout.Label($"Yağış şiddeti {lockedPrecipitation:F2}");
             lockedPrecipitation = GUILayout.HorizontalSlider(lockedPrecipitation, 0f, 1f);
-
-            GUILayout.Label($"Kar oranı {lockedSnowiness:F2}   (0 yağmur, 1 kar)");
-            lockedSnowiness = GUILayout.HorizontalSlider(lockedSnowiness, 0f, 1f);
         }
 
         GUILayout.Space(6f);
@@ -444,8 +434,7 @@ public class DebugMenu : MonoBehaviour
             GUILayout.Label($"Şiddet {weatherDriver.StormIntensity:F2}  " +
                             $"bulut kütlesi {weatherDriver.CloudMass:F2}  " +
                             $"tavan payı {weatherDriver.CeilingAt(walker.transform.position.y):F2}");
-            GUILayout.Label($"Kar sınırı {weatherDriver.RainCeiling:F0} → " +
-                            $"{weatherDriver.SnowFloor:F0} m");
+            GUILayout.Label($"Yağmur tavanı {weatherDriver.RainCeiling:F0} m");
             weatherDriver.ForceWindow = GUILayout.Toggle(weatherDriver.ForceWindow,
                 "Havayı zorla aç");
         }
@@ -511,85 +500,6 @@ public class DebugMenu : MonoBehaviour
         GameObject lines = routeOverlay.gameObject;
         bool showLines = GUILayout.Toggle(lines.activeSelf, "Rota çizgileri");
         if (showLines != lines.activeSelf) lines.SetActive(showLines);
-
-        EndSection();
-    }
-
-    /// GEÇİCİ ÖLÇÜM BÖLÜMÜ. Karın görsel yüzeyi GPU'da, çarpışma yüzeyi CPU'da
-    /// hesaplanıyor; ikisi ayrıştığında belirti sessiz. Prob CPU yüzeyini turuncu
-    /// işaretlerle çiziyor — işaretler karın görünen yüzeyine oturmuyorsa ayrışma var.
-    ///
-    /// 8b doğrulanınca bu bölüm ve `SnowCollisionProbe` silinir.
-    void DrawSnowCollision()
-    {
-        BeginSection("Teşhis: yağmur izi");
-
-        GUILayout.Label(PrecipitationRenderer.StreakProbe switch
-        {
-            1 => "BÜYÜT: izler 40× büyük, gölgeleme normal",
-            2 => "HAM DESEN: veritabanının döndürdüğü değer",
-            3 => "ALFA: son şeffaflık",
-            4 => "AMBIENT: radyansın ikinci terimi",
-            5 => "RADYANS: iki terim toplanmış, luminans",
-            6 => "ORAN: radyans / gök — KIRMIZI = damla gökten parlak",
-            7 => "ÇAP: damla çapı 0.5-5 mm — karışık renk = farklı boy",
-            8 => "MESAFE: 0 - kutu yarısı — tek renk = derinlik yok",
-            _ => "kapalı",
-        });
-
-        using (new GUILayout.HorizontalScope())
-        {
-            if (GUILayout.Button("kapat")) PrecipitationRenderer.StreakProbe = 0;
-            if (GUILayout.Button("büyüt")) PrecipitationRenderer.StreakProbe = 1;
-            if (GUILayout.Button("ham desen")) PrecipitationRenderer.StreakProbe = 2;
-            if (GUILayout.Button("alfa")) PrecipitationRenderer.StreakProbe = 3;
-        }
-
-        using (new GUILayout.HorizontalScope())
-        {
-            if (GUILayout.Button("ambient")) PrecipitationRenderer.StreakProbe = 4;
-            if (GUILayout.Button("radyans")) PrecipitationRenderer.StreakProbe = 5;
-            if (GUILayout.Button("oran")) PrecipitationRenderer.StreakProbe = 6;
-            if (GUILayout.Button("çap")) PrecipitationRenderer.StreakProbe = 7;
-            if (GUILayout.Button("mesafe")) PrecipitationRenderer.StreakProbe = 8;
-        }
-
-        if (PrecipitationRenderer.StreakProbe >= 2)
-        {
-            GUILayout.Label("koyu gri  0.00 - 0.02   (yok)");
-            GUILayout.Label("mavi      0.02 - 0.08");
-            GUILayout.Label("camgöbeği 0.08 - 0.18");
-            GUILayout.Label("yeşil     0.18 - 0.32");
-            GUILayout.Label("sarı      0.32 - 0.50");
-            GUILayout.Label("turuncu   0.50 - 0.70");
-            GUILayout.Label("kırmızı   0.70 +");
-        }
-
-        if (GUILayout.Button("Ayarları geri al")) PrecipitationRenderer.StreakProbe = 0;
-
-        EndSection();
-
-        BeginSection("Teşhis: kar çarpışması");
-
-        // Bileşen değil NESNE açılıyor: prob kapalı bir nesnede duruyor (kurulum
-        // sırasında bağlanmadan OnEnable'a girmesin diye) ve `enabled` orada işlemez.
-        GameObject host = snowProbe.gameObject;
-        bool next = GUILayout.Toggle(host.activeSelf, "CPU yüzeyini çiz");
-        if (next != host.activeSelf) host.SetActive(next);
-
-        if (host.activeSelf)
-        {
-            GUILayout.Label($"Zemin {snowProbe.GroundHeight:F2} m");
-            GUILayout.Label($"Kar derinliği {snowProbe.SnowDepth:F2} m");
-            GUILayout.Label($"Ayak {snowProbe.FeetHeight:F2} m");
-
-            // Ayak, zeminin kar kadar üstünde durmalı. Fark büyüyorsa oyuncu ya karın
-            // içine gömülüyor ya da üstünde asılı kalıyor.
-            float error = snowProbe.FeetHeight - (snowProbe.GroundHeight + snowProbe.SnowDepth);
-            GUILayout.Label($"Ayak sapması {error:+0.00;-0.00} m");
-        }
-
-        if (GUILayout.Button("Ayarları geri al")) host.SetActive(false);
 
         EndSection();
     }

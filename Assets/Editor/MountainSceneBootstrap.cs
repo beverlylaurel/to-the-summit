@@ -317,7 +317,7 @@ public static class MountainSceneBootstrap
 
         // Ayarlar sürücüden önce yüklenir: bulut tavanı orada tanımlı ve yağışın nerede
         // kesileceğini o belirliyor. İki yerde ayrı tanımlanırsa "bulutların üstündeyim
-        // ama tepemden kar yağıyor" durumu geri gelir.
+        // ama tepemden yağış geliyor" durumu geri gelir.
         var atmosphereSettings = LoadOrCreateAtmosphereSettings();
 
         var atmosphere = Object.FindAnyObjectByType<AtmosphereController>();
@@ -576,11 +576,10 @@ public static class MountainSceneBootstrap
         EnsureTerrainSurface(gen, regenerated, ref changed);
         Phase("yüzey haritaları");
 
-        EnsureSnowSurface(gen, player, ref changed);
         EnsureRouteOverlay(gen, ref changed);
         EnsureClimbHud(player, gen, ref changed);
         EnsureDebugMenu(player, ref changed);
-        Phase("kar, rota, göstergeler");
+        Phase("rota, göstergeler");
 
         if (changed)
         {
@@ -1587,25 +1586,12 @@ public static class MountainSceneBootstrap
             Object.FindAnyObjectByType<PerformanceHud>(),
             Object.FindAnyObjectByType<ClimbHud>(),
             player.GetComponent<CursorLock>(),
-            player.GetComponentInChildren<SnowCollisionProbe>(true),
             Object.FindAnyObjectByType<RouteOverlay>(FindObjectsInactive.Include),
             cloudVolume,
             Object.FindAnyObjectByType<CloudWeatherDriver>());
 
         EditorUtility.SetDirty(menu);
 
-        // GEÇİCİ: tırtık işaretleyici. Kullanıcı ekran ortasını tırtıklı yere
-        // doğrultup M'ye basıyor, koordinat `Logs/notches.log`'a yazılıyor. Belirti
-        // çözülünce bileşen de bu blok da silinir.
-        var marker = Object.FindAnyObjectByType<NotchMarker>();
-        if (marker == null)
-        {
-            marker = menu.gameObject.AddComponent<NotchMarker>();
-            changed = true;
-        }
-
-        marker.Bind(player.GetComponentInChildren<Camera>());
-        EditorUtility.SetDirty(marker);
     }
 
     /// Script'i silinmiş bileşenler sahnede boş kabuk olarak kalır: Unity uyarı basar,
@@ -1697,7 +1683,7 @@ public static class MountainSceneBootstrap
     {
         var terrain = gen.GetComponent<Terrain>();
 
-        // Birikim ağırlığı hâkim rüzgâr yönüne göre pişiyor; açı asset'in ADINDA
+        // Rüzgâr ağırlığı hâkim rüzgâr yönüne göre pişiyor; açı asset'in ADINDA
         // taşınıyor ki yön değişince harita bayat sayılsın ve yeniden pişsin.
         float prevailing = LoadOrCreate<WindSettings>(WindPath).prevailingDegrees;
 
@@ -1724,61 +1710,10 @@ public static class MountainSceneBootstrap
             SurfaceMapBaker.LoadNormals(),
             SurfaceMapBaker.LoadHorizon(),
             SurfaceMapBaker.LoadHeight(),
-            LoadSurfaceSet("SnowPowder"),
-            LoadSurfaceSet("SnowPacked"),
             AssetDatabase.LoadAssetAtPath<Shader>(SurfaceShaderPath));
 
         EditorUtility.SetDirty(surface);
     }
-
-    /// Karın ÇARPIŞMA yüzeyi ve ayrışma probu. Kar geometrik olarak yükseliyor ama
-    /// TerrainCollider bunu bilmiyor; oyuncunun ayağı ikinci bir zemin katmanına
-    /// oturuyor. Her çalışmada yeniden bağlanır — kar ayarı ya da rüzgâr kaynağı
-    /// sonradan değiştiğinde sahnedeki örnek eski referansta kalmasın.
-    static void EnsureSnowSurface(MountainGenerator gen, FirstPersonController player,
-        ref bool changed)
-    {
-        var terrain = gen.GetComponent<Terrain>();
-
-        var snow = terrain.GetComponent<SnowSurface>();
-        if (snow == null)
-        {
-            snow = terrain.gameObject.AddComponent<SnowSurface>();
-            changed = true;
-        }
-
-        snow.Bind(terrain.GetComponent<TerrainSurface>(),
-                  Object.FindAnyObjectByType<WindField>(),
-                  LoadOrCreateTerrainMaterialSettings(),
-                  terrain);
-        EditorUtility.SetDirty(snow);
-
-        var controller = new SerializedObject(player);
-        controller.FindProperty("snow").objectReferenceValue = snow;
-        if (controller.ApplyModifiedPropertiesWithoutUndo()) changed = true;
-
-        // Prob KENDİ KAPALI NESNESİNDE. Oyuncunun üstüne eklenseydi `AddComponent`
-        // `OnEnable`'ı anında çağırırdı ve bileşen daha bağlanmadan bağımlılık
-        // hatası fırlatırdı. Kapalı bir nesneye eklenen bileşende OnEnable beklemede
-        // kalıyor; ölçüm F1'den açılınca çalışıyor.
-        var probe = player.GetComponentInChildren<SnowCollisionProbe>(true);
-        if (probe == null)
-        {
-            var host = new GameObject("Snow Probe");
-            host.SetActive(false);
-            host.transform.SetParent(player.transform, false);
-            probe = host.AddComponent<SnowCollisionProbe>();
-            changed = true;
-        }
-
-        probe.Bind(snow, player.transform);
-
-        EditorUtility.SetDirty(probe);
-    }
-
-    /// Rota çizgilerinin oyun görünümü katmanı. KAPALI kurulur: gösterge, sürekli
-    /// çizilen bir katman değil. Kapalı nesneye eklendiği için `OnEnable` bağlanmadan
-    /// çalışmıyor.
     static void EnsureRouteOverlay(MountainGenerator gen, ref bool changed)
     {
         var overlay = Object.FindAnyObjectByType<RouteOverlay>(FindObjectsInactive.Include);
@@ -1871,31 +1806,6 @@ public static class MountainSceneBootstrap
         }
 
         return changed;
-    }
-
-    /// Yüzey malzemesi seti. `TextureIngest` üretiyor, `StochasticTextureBaker`
-    /// dönüştürüyor; burada yalnız yükleniyor. Yoksa null döner ve shader detay
-    /// dalını hiç açmaz.
-    static SurfaceMaterialSet LoadSurfaceSet(string prefix)
-    {
-        string path = $"{TextureIngest.Folder}/{prefix}.asset";
-        var set = AssetDatabase.LoadAssetAtPath<SurfaceMaterialSet>(path);
-
-        // Ham haritalar projede ama set asset'i yoksa kur: doku elle kopyalanmış
-        // olabilir. `TextureIngest` klasörden alırken zaten kuruyor; bu yol o
-        // adımdan geçmemiş dosyalar için.
-        if (set == null && File.Exists($"{TextureIngest.Folder}/{prefix}_Normal.png"))
-        {
-            set = ScriptableObject.CreateInstance<SurfaceMaterialSet>();
-            set.assetPrefix = prefix;
-            AssetDatabase.CreateAsset(set, path);
-            AssetDatabase.SaveAssets();
-        }
-
-        if (set == null) return null;
-
-        StochasticTextureBaker.EnsureAll();
-        return set;
     }
 
     /// Doğuş yeri ve bakış yönü. İŞARETLİYSE rota asset'inden (bkz. `RoutePainter`);

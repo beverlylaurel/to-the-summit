@@ -92,7 +92,6 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ### `DepthNormals` fragman maliyeti KABUL EDİLDİ
 
-`SnowDisplacedNormal` bu geçişte fragman başına çağrılıyor. Kaldırılması denenmedi çünkü
 gerekçesi geçerli: SSAO bu tamponu okuyor ve kar birikintisinin eğimi orada olmazsa
 kabartının dibindeki gölge hiç oluşmuyor. Ucuzlatmak için köşe normalini yazmak, geçişi
 var eden sorunu geri getirir — arazi örgüsünün üçgen kırıkları "yüzey kıvrımı" okunup
@@ -330,7 +329,6 @@ Gerekçe: orometrisi "bir baskın dev + kademeli komşular + bir yanda yüksek p
 karakterinde — "her yer dağ olmayacak" kuralına doğal uyum. Ayrıca **yeşil→kar** isteğini
 karşılayan tek aday: Khumbu'da 2500–4000 m rododendron ormanı, ağaç sınırı ~4000 m, kar
 çizgisi ~5200 m. (Karakurum baştan çıplak; Alpler hem alçak hem baştan sona yeşil.)
-**Sınır:** bölge seçimi yalnız şeklin istatistiğini veriyor; bitki örtüsü ve kar çizgisi
 L2 ile yüzey malzemelerinin işi.
 
 **Prominence eşiği mesafeye göre kademeli.** Ham yoğunluk 540 km'ye taşınınca 38 127 zirve
@@ -414,7 +412,6 @@ sabit sanılmıştı, oysa `seaLevelCelsius` tek bir serbest sayı.
 | | ova 186 m | ova 2400 m |
 |---|---|---|
 | Gereken `seaLevelCelsius` | **+7.8** | +22.1 |
-| Kar çizgisi | 1 200 m | 3 400 m |
 | **Zirvede** | **−29.3 °C** | −15.0 °C |
 | **Tırmanılacak dikey** | **5 523 m** | 3 309 m |
 | Ortalama eğim | 33.3° | 21.5° |
@@ -593,14 +590,12 @@ DBM büyük: ızgara, Laplace çözücü, ve gerçek zamanlı olmadığı için 
 
 ## Şimşek–yağış etkileşimi ERTELENDİ (2026-08-19)
 
-**Karar.** Şimşek flaşı şu an yağan kar tanelerini ve yağmur izlerini aydınlatmıyor.
 Bilerek bırakıldı.
 
 **Gerekçe.** `lightning-spec.md` §9.3.5 bunu açık nokta olarak işaretliyor ve Dobashi
 makalesinde hiç ele alınmamış. Kar ve yağmur spec'leri yeniden yazılacak; şimdi
 bağlanırsa o yazımda ikinci kez sökülecek.
 
-**Nereye bağlanacak.** `snow-spec.md` §7 ve `rain-spec.md` §6.3.3'te tane başına ışık
 kaynağı işleme yeri var — şimşek oraya ÜÇÜNCÜ kaynak olarak girer (güneş ve gök zaten
 var). Tane kendi rengini seçmiyor, üstüne düşen ışığı saçıyor; bu yüzden `_LightningFlash`
 globalini okumak yeterli, ayrı bir renk ayarı açılmayacak (`RATIONALE.md` → Yağış: "tane
@@ -612,14 +607,10 @@ tanelerin kararması ya da flaşa hiç tepki vermemesi belirtisi de aynı kaydı
 **Maliyet.** Küçük: tane aydınlatması zaten bir ışık toplamı, dördüncü terim eklemek.
 Asıl iş şimşeğin çakma anının o sistemlere ulaştırılması — global zaten yazılıyor.
 
-## Spec sırası: terrain → snow → rain → lightning (2026-08-17)
-
 **Gerekçe — terrain önce:** `terrain-generation-spec.md` bir ekleme değil, **tam yeniden
-üretim** (Divide Tree + orometri + erozyon). Mevcut dağ gidiyor. Kar birikimi, yüzey
 kalibrasyonu, gölge mesafesi, rota, ova — hepsi arazinin üstünde duruyor. Kar önce
 yapılırsa arazi değişince kar işinin iyi kısmı ikinci kez yapılır.
 
-**snow ikinci:** oyunun kimliği. Ölçülmüş açık bir hata da burada kapanıyor — yağış
 partikülleri ışık okumuyor, gece karı öğle karıyla aynı. Bekleyen "cepheyi ne sürecek"
 kararı da bu spec'in içi.
 
@@ -816,7 +807,6 @@ bağımlılığını `[SerializeField]` ile alıyor, singleton ve `FindObjectOfT
   renderer asset'inde yaşadığı için sahne nesnesine referans veremiyor; köprü statik
   kuruldu. Enjeksiyon kuralını çiğniyor.
 - **Shader'lar `HeightFog.hlsl`'i include ediyor.** `Precipitation.shader` ve perde,
-  projenin sis uygulamasından `SpindriftColor` / `AirColor` çağırıyor. Yağmuru taşımak
   sis dosyasının tamamını sürüklüyor.
 
 **Tetikleyici.** İkinci bir projeye taşıma ihtiyacı doğduğunda — ya da co-op başladığında
@@ -877,118 +867,8 @@ demek), yani `3 × 2.0/0.8 = 7.5`. Kodda `SourceScale = 7.5f`.
 `d_i` her damlada aynı ve izotrop. Sahneye lamba, fener ya da şimşek eklendiğinde
 gerekecek — şimşek zaten bekleyen kararlar listesinde.
 
-## Sürüklenen kar kendi sınır tabakası yasasını koruyor
-
-Yağan yağışa logaritmik rüzgâr profili verildi (`PrecipitationRenderer.WindBandFactor`,
-`z₀ = 0.1 m`). **Sürüklenen kar dokunulmadan bırakıldı** — onun `speedFactor`'ı yerde %30,
-katmanın tepesinde %95 veren doğrusal bir eğri ve ölçümle ayarlanmıştı.
-
-**Gerekçe:** aynı fiziğin iki yasası projede duruyor, bu bir tutarsızlık. Ama şekilleri
-yakın (9 m'de doğrusal %95, logaritmik %98) ve saltasyon katmanının kendi fiziği farklı:
-zıplayan tane serbest akışta değil, yüzey sürtünmesinin içinde. Birleştirmek ölçülmüş bir
-davranışı bozma riski taşıyor ve şu an bir belirti üretmiyor.
-
-**Ayrı olan yalnız YATAY hız payı.** Atalet süzgeci sürüklenen kara da uygulanıyor ve orada
-kendi çökme hızını okuyor (`SPINDRIFT_FALL_SPEED`, 0.5 m/s) — girdap tarafında iki yasa yok.
-
-**Tetikleyici:** sürüklenen karla yağan kar aynı karede görünüp hızları çelişirse
-(tanecik perdesi yerden kalkarken yukarıdaki tane belirgin farklı hızda giderse), iki yasa
-tek yasada birleştirilir.
-
-**Maliyet:** birleştirme yarım gün; `speedFactor`'ın ölçülmüş uçlarının log profille
-yeniden doğrulanması gerekir.
-
-## Çığ oyuna girmiyor — kar modeli üç katmana iniyor (2026-08-21)
-
-**Karar.** Kullanıcı kararı: çığ yok. Gerekçe `DESIGN.md` §1'de, registerden türüyor.
-
-**Teknik sonucu bugün ödeniyor** — `snow-spec.md`'nin (Cordonnier 2018) hangi parçası
-düşüyor:
-
-| düşen | neden |
-|---|---|
-| `U` (kararsız) katmanı | Yalnız çığı beslemek için var. Makalede başka tüketicisi yok. |
-| Stabilite geçişleri (§5.2 tablosu) | `S ↔ U` arasında karar veriyordu; `U` yoksa konusu yok. |
-| `x_U` — yağıştan kararsız pay (§5.1) | Aynı sebep. |
-| Snow-Moving boolean katmanı (§6.1) | Çığın kendi durum bitine ait. |
-| Pipe model, Moore komşuluğu, yield kriteri, viskoz terim (§6.1) | Çığın kendisi. |
-| `α` sıcaklık karışımı | Granüler/viskoz çığ ayrımı içindi. |
-
-**Makalenin eksik bıraktığı altı formülün dördü konusuz kaldı** (`snow-spec.md` §11.2):
-`α`'nın sıcaklıkla eşlemesi (3), stabilite interpolasyonunun tam biçimi (4), eğimin
-stabiliteye etkisi (5), rüzgârın stabiliteyi azaltma sabiti (6). Ölçülüp seçilecek şey
-kalmadı; tahmin riski de.
-
-**Kalan katman yığını: `B` + `S` + `P`.** `C` (sıkışmış) da şimdilik yazılmıyor: makalede
-tek kaynağı kayak/tırmanışçı izleri (`S -> C`) ve çığ. İkisi de yoksa katman hep sıfır
-kalır — ölü kod olur.
-
-Oyuncunun ayak izi bu katmanı DİRİLTMİYOR: simülasyon hücresi 7.3 m, ayak izi 0.3 m —
-iz hücrenin altında kalıyor, katman onu gösteremez. Ayak izi ayrı bir sistem (yerel
-yüksek çözünürlüklü deformasyon dokusu, mevcut `SnowDisplacement`/`SnowTessellation`
-zincirine bağlanır) ve Cordonnier'den bağımsızdır.
-
-**KORNİŞLER KAYBOLMUYOR.** Onları üreten mekanizma çığ değil, rüzgâr taşınımı (§5.4) ve
-wind-effect surface'ın parabolik kapağı (§3.3). İkisi de duruyor.
-
-**Kaybedilen ne:** çığın süpürdüğü temiz kuloarlar ve etekteki moloz konileri. Ama toz kar
-difüzyonu (§5.3) zaten "sürekli küçük dökülme" süreci — dik yüzleri soyup eğim kırığında
-biriktiriyor. Yani etkinin yumuşak hâli bedavaya kalıyor.
-
-**Poisson çerçevesi de küçülüyor.** §4'ün asıl değeri temporal zoom'du ve o yalnız
-interaktif fenomenler (çığ 0.1 s, kayakçı 0.1 s) için gerekiyordu. Kalan olayların hepsi
-gün ölçeğinde. Yerine stokastik gün zamanlayıcısı: fırtına başlangıcı ~haftada 1, süresi
-~3 gün, günde 2 adım. Kümelenme korunuyor, olay kuyruğu makinesi gerekmiyor.
-
-**Tetikleyici — karar geri alınırsa:** `U` katmanı ve §5.2 tablosu geri gelir, üstüne §6.1
-yazılır. `S`/`P` ayrımı ve rüzgâr taşınımı olduğu gibi kalır, yani geri dönüş yıkıcı değil.
-
-## Kar yağışı VFX Graph yerine compute parçacığı
-
-**Karar.** §10'un `VFX_Snowfall.vfx` / `VFX_Spindrift.vfx` / `VFX_SnowPuff.vfx`
-varlıkları ÜRETİLMEDİ. Yerine `SnowFlakes.compute` + `SnowFlakes.shader` ile
-GPU parçacığı, toz bulutu için de Unity'nin kendi parçacık sistemi.
-
-**Gerekçe.** İki ayrı engel. Birincisi: `com.unity.visualeffectgraph` paketi projede
-kurulu değil. İkincisi ve asıl olan: `.vfx` bir düğüm grafiği, metin olarak
-yazılamıyor — elle üretilen dosya bozuk asset olur. Paket kurulsa bile grafiğin
-kendisi Unity'nin VFX Graph editöründe çizilmek zorunda.
-
-Fizik ve sayılar §10.1'den birebir alındı: doğum kutusu 40x26x40, 1 m snap, ömür
-4–9 s, düşme hızı kuru 0.6–1.4 / ıslak 1.4–3.0, salınım 5.5 Hz / 0.35 m, asgari ekran
-boyutu 1.3 piksel, örtü kesme, zemin kesme, savrulma 30 m şerit / ömür 1.2–3.0.
-
-**Tetikleyici — geri dönülecek belirti:** VFX Graph paketi kurulup grafik editörde
-çizilmek istenirse. O zaman `SnowfallController` aynı preset değerlerini
-`VisualEffect.SetFloat` ile sürer; arayan taraf değişmez.
-
-**Maliyet.** Geçiş küçük: denetleyici zaten preset okuyup sayı üretiyor. Asıl iş
-grafiğin kendisini çizmek.
-
-## Kar atmosfer sürücüsü VARSAYILAN KAPALI
-
-**Karar.** `SnowAtmosphereDriver`'ın sis / güneş / ortam anahtarları kapalı kuruluyor.
-
-**Gerekçe.** Projenin kendi atmosfer zinciri var (`AtmosphereController`, `TimeOfDay`,
-`SkyWeatherDriver`). İkisi aynı anda açıkken sis ve güneş iki kaynaktan sürülür ve
-CLAUDE.md'nin atmosfer tutarlılığı kuralı bunu yasaklıyor.
-
-**Tetikleyici:** kar v2 projenin hava zincirine bağlandığında. O adımda ya bu sürücü
-silinir ya mevcut sürücülere fırtına katsayısı verilir.
-
-## Lens karı renderer'a EKLENMEDİ
-
-**Karar.** `SnowLensFeature` yazıldı ama URP renderer'ına otomatik eklenmiyor.
-
-**Gerekçe.** §10.2 onu "opsiyonel, en son" diye işaretliyor. Otomatik açılsaydı
-her yağışta ekranı lekeleyen bir efekt kullanıcının haberi olmadan devreye girerdi.
-
-**Tetikleyici:** istenirse `PC_Renderer` asset'ine elle eklenir ve `lensShader`
-alanına `Hidden/Snow/Lens` bağlanır.
-
 ## Eski yağış sistemi yalnız yağmur taşıyor
 
-**Karar.** `PrecipitationRenderer` içinde karlılık sabit sıfır. Karı kar sistemi v2
 çiziyor; eski sistemde kalan kar kodu ÖLÜ.
 
 **Gerekçe.** İki sistem aynı anda kar çizince gökyüzünde iki farklı kar oluyor ve
@@ -999,19 +879,5 @@ v2'nin preseti Clear'daydı ve hiç tane üretmiyordu.
 tanecik bütçesini, aynı tamponu ve aynı çizim yolunu paylaşıyor. Kör ameliyat
 çalışan yağmuru da bozar; yağmurun kendi kabulü olmadan kesilmez.
 
-**Tetikleyici:** v2 karı Unity'de doğrulandıktan sonra. O adımda `SnowBoxSize`,
-sürüklenen kar tanecikleri, karlılık oranı ve ilgili shader dalları tek seferde
 çıkarılır.
 
-## Kar v2 projenin hava zincirine BAĞLANDI
-
-**Karar.** `SnowWeather` artık `WeatherState` ve `TemperatureField`'dan okuyor.
-Kendi preset seçimi dış zincir bağlıyken devre dışı.
-
-**Gerekçe.** Önceki karar ("Kar v2 kendi hava kaynağını sürüyor") tetikleyicisini
-verdi: F1'den yağış açıldı, v2 karı tepki vermedi. Atmosfer tutarlılığı kuralı
-iki kaynağı yasaklıyor.
-
-Şiddet = `Precipitation x Snowiness`. Yağmur payı v2'yi hiç ilgilendirmiyor.
-Preset konumu artık SÜREKLİ (0..4); ayrık olsaydı şiddet salınırken preset iki değer
-arasında zıplar ve 45 saniyelik geçiş hiç bitmezdi.

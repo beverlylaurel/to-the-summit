@@ -47,11 +47,8 @@ yukarıdaki bulut yavaşlayamaz.
 ## Kuşaklar ve hava dalgalanması
 
 **Sınırlar mutlak metre değil orandır.** Tırmanışın altı yağmurda, üstü karda geçer ve dağ
-değişse de bu oran korunur. Oran yalnız **referansı** verir; yağmur/kar sınırının kendisi
 donma seviyesiyle hareket eder. Sabit sınırla dağda gözle görülen tek birikme işareti
-kayboluyordu — kar sınırının fırtınada inip sonra çekilmesi.
 
-**Kalıcı kar çizgisi hareketli sınırı okumaz, referansı okur** — buzul hava durumuyla
 gelgit yapmaz.
 
 **Dinginlik iki Perlin katmanının çarpımından.** Üçüncü ve çok yavaş bir gürültü nadiren
@@ -73,7 +70,6 @@ tavanını (7000 m) kullanıyordu: sönme 5800 m'de başlıyor, zirve 5686 m —
 işlemiyordu. Görüntüde yağış kesiliyor ama `WeatherState` yağmaya devam ettiği için sis,
 ses ve zemin karı bulut denizinin üstünde de fırtına okuyordu.
 
-**Karlılık da aynı zaman sabitiyle kayar.** Dışarıda bırakılırsa, ulaşılan seviye yukarı
 anında sıçradığı için yağmurdan kara geçiş oyuncunun ne kadar hızlı yükseldiğine kalıyor.
 
 **Rüzgâr neden iki sayı.** Esinti sürekli şiddetin üstüne biner ve tavanı aşar; aşınca
@@ -127,10 +123,7 @@ sınırsıza gidiyor ve ekranda "3900 km görüş" yazıyordu.
 **Esinti okunmaz.** Ham hız okununca rüzgârın saniyelik sarsıntısı kayan dokuyu seğirtiyor
 ve zamansal birikimin altında bulut kenarlarını blok blok pikselleştiriyordu.
 
-### Sürüklenen kar
-
 **Ataklarla gelir, sürekli şiddetle değil.** Kar taşınımı sürtünme hızının **küpüyle**
-gider; küp, hamlenin tepesini patlamaya dibini sakinliğe çeviriyor. Gerçek spindrift 10-20
 saniye fışkırır, diner, tekrar gelir — sürekli şiddetle sürülünce perde hiç kesilmeyen düz
 bir akıntı oluyordu.
 
@@ -149,7 +142,6 @@ görünmez, vadide ise boğar.
 **Sürüklenme kaynağını tüketir.** Bu bağ olmadan perde sonsuza kadar aynı şiddette
 akıyordu.
 
-**Kar sıfırın altında erimez.** Erime karlılık oranından sürülüyordu; o bir sıcaklık
 vekiliydi ve sıfırın çok altındaki bandı bile "ılık" sayıp eritebiliyordu. Faz değişimi
 enerji ister; enerji yoksa kar durur — dağın karının kalıcı olmasının sebebi bu.
 
@@ -376,14 +368,12 @@ süren sahte pırıltı. Şiddet düşünce diffuse zemine gömülüyor ama dar 
 
 **Dört geçiş de yer değiştirmeyi uygular** — biri atlanırsa gölge yüzeyin altında kalır.
 
-**Kalıcı kar çizgisi türetilir.** Ayrı sabit tutulduğunda çizgi kar kuşağının altına
 düşüyor, zemin beyazken tepeden yağmur yağıyordu. Yükseltme payı yumuşatma bandından küçük
 kalırsa çizginin alt ucu kar kuşağının içine sarkıyor ve aynı çelişki dar bir şeritte geri
 geliyordu.
 
 **Taze kar kot ekseninde.** Tek global sayıyla dağın tamamı aynı anda beyazlıyor ve öyle
 kalıyordu; üstelik birikme hızını *oyuncunun bulunduğu kotun* havası sürüyordu. Erime donma
-seviyesinin altında dakikalar, üstünde saatler sürer — kar sınırının fırtınada inip sonra
 çekilmesi buradan çıkıyor.
 
 **Hava kaynaklı değerler global.** `UnityPerMaterial` tamponunun içindeyken
@@ -572,8 +562,6 @@ kanalı yutar, geriye denizin aydınlanması kalır.
 
 ## Volumetrik sis
 
-**Savrulan kar tek kaynaktan.** Perde bir dönem hem froxel hacminde (her hücrede
-`SpindriftAt`) hem arazi yolunda hesaplanıyordu. İkisi de aynı hatayı yapıyordu: alanın
 içindeki sırt algılayıcı (`crest`/`lee`) 60–80 m'lik keskin eşikler taşıyor, froxel ızgarası
 ve ışın örneklemesi o eşiklerin üstünden atlıyor ve kamera kıpırdadıkça yer değiştiren
 dikey şeritler kalıyordu.
@@ -737,7 +725,6 @@ ortalama çıkarma ekranın yarısını tam sıfıra kırpıp ikili maske üreti
 yok" dedi ve haklıydı.
 
 Üstelik üç eğri üst üste biniyordu: kare (silinmişti), ortalama çıkarma, ve
-`lerp(0.40, 0.90, karlılık)` ağırlığı. Her biri tek başına savunulabilirdi; üçü çarpımsal
 olunca çıktının makaleyle ilgisi kalmadı. Şimdi tek eğri var ve makalenin koyduğu yerde.
 
 **Ders:** referanstan sapmalar tek tek savunulur ama BİRİKİR. Üç sapmanın hangisinin ne
@@ -824,7 +811,6 @@ dedi. Ölçüm zinciri:
 
 - Yörünge açıları hesaplandı: 8.5 m/s'de 0.5 mm damla yataydan **13.4°**, 1 mm damla 25°.
   Damlaların %63'ü 28°'nin altında. Fizik doğru — damla rüzgârın yatay hızını tam yer.
-- Şüpheliler tek tek elendi (F1 anahtarları): girdap değil, sürüklenen kar değil, yağan
   kar değil. **Rüzgâr sürüklenmesi kapatılınca yatay hareket bitti.**
 - Yani hata damlada değil, rüzgârın büyüklüğündeydi.
 
@@ -899,13 +885,11 @@ takip edemez, ortalar. Model tam genliği uyguluyordu, damla yaprak gibi çırp�
     0.5 mm damla  tau 0.206  kaba 0.504  ince 0.201
     1.1 mm damla  tau 0.455  kaba 0.245  ince 0.088
     5.0 mm damla  tau 0.932  kaba 0.105  ince 0.037
-    kar tanesi    tau 0.143  kaba 0.647  ince 0.286
 
 **YAĞMURU KARDAN AYIRAN ŞEY BU.** Sapma genliğinin iz boyuna oranı:
 
     yağmur 0.5 mm   5.6 cm / 19.5 cm = 0.29   -> çizgi okunur
     yağmur 5.0 mm   1.2 cm / 24.5 cm = 0.05
-    kar tanesi     34.3 cm / 19.3 cm = 1.78   -> süzülür, çırpınır
 
 Oran 1'i geçince yol bir çizgi değil bir kıvrım olarak okunuyor. Eskiden yağmur da o
 tarafta duruyordu.
@@ -1024,7 +1008,6 @@ Makalenin çözümü perdeyi tanecikle BİRLİKTE kullanmak. Bizde o birleşim �
 
 **Spec'in atladığı bir şey de bulundu:** Langer §6.2'de yöntemin YAĞMUR uzantısını da
 veriyor (`ventana.avi`) — dikey yön ve yüksek `C` ile yalnız `|ω_y| ≈ 0` bileşenleri
-katkı veriyor, uzun dalga boylu dikey çizgiler kalıyor. `snow-spec.md` bunu hiç yazmamış.
 Bizde konusu yok: yağmur Garg-Nayar iz veritabanından geliyor ve o çok daha fiziksel.
 
 **Cordonnier tarafında spec sadık.** Tam okumada doğrulanan üç madde:
@@ -1038,94 +1021,3 @@ Bizde konusu yok: yağmur Garg-Nayar iz veritabanından geliyor ve o çok daha f
 
 ---
 
-## Kar v2: snap adımı tam sayI teksele yuvarlanıyor
-
-**Kural.** Bölge merkezi 0.25 m'ye değil, 0.25 m'ye **en yakın tam sayı teksele**
-snap'leniyor.
-
-**Gerektıren hesap.** Spec 0.25 m diyor ve kaydırmanın tam sayı teksel olmasını şart
-koşuyor. İkisi aynı anda mümkün değil: 24 m / 2048 = 1.172 cm tekselde 0.25 m tam
-21.33 teksel eder. Kesirli kaydırma her adımda içeriği yeniden örnekler — spec'in
-kendi tuzak listesinde "izler yürüdükçe titriyor" diye geçen belirtinin ta kendisi.
-
-Yuvarlama sonucu: High 21 teksel (24.6 cm), Medium 16 (tam 25.0 cm), Low 11 (25.8 cm).
-Niçin önemsiz: 0.25 m'nin kendisi bir yuvarlak sayı, fiziksel bir eşik değil.
-
-## Kar v2: zemin yüksekliği R16, RHalf değil
-
-**Kural.** `Tex_GroundHeight` R16 UNorm.
-
-**Kağıtta hesap.** Spec RHalf diyor. Half'in 0.5–1.0 aralığındaki adımı 2^-11; dağın
-6189 m'lik yükseklik menzilinde bu **3.0 metre** eder. Kar derinliği santimetre
-mertebesinde — zemin 3 m oynarsa kar yüzeyi zeminin içine girer ya da havada kalır.
-
-R16 tam olarak Unity Terrain'in kendi hassasiyeti: 65536 adım / 6189 m = 9.4 cm. Yani
-kaynağın üstüne **hiç** hata eklemiyor. Half eklerdi.
-
-## Kar v2: engel kamerasının kendi renderer'ı
-
-**Kural.** `SnowOcclusionCamera` `SnowOcclusionRenderer.asset` kullanıyor.
-
-**Ölçüm.** Ana renderer'la başlatıldığında `PhysicallyBasedSkyURP` çöktü:
-`CalculateActualScreenResolution` bizim tek kanallı RHalf hedefimizde `cameraTargetHandle`
-null buluyor. Render graph düşünce oyun ekranı da bozuluyordu (tüm ekran turkuaz).
-
-Hatayı kaçınmakla düzeltmek yetmezdi: gökyüzü, bulut ve sis geçişlerinin bir engel
-haritasında işi yok, koşmaları saf israf.
-
-## Kar v2: replacement shader yerine override materyal
-
-**Kural.** Engel çizimi `SetReplacementShader` ile değil, renderer listesi + override
-materyalle yapılıyor.
-
-**Gerekçe.** `Camera.SetReplacementShader` built-in pipeline özelliği; SRP'de
-desteklenmiyor. Spec URP'yi zorunlu kılıyor, yani spec'in yazdığı yöntem bu boru
-hattında yok. Shader ve çıktı birebir aynı, yalnız bağlanma şekli değişti.
-
-## Kar v2: durum dokusu float, half değil
-
-**Kural.** `RT_State` ve `RT_StateTemp` ARGBFloat.
-
-**Ölçüm.** Half ile 90 saniye Heavy yağışta `swe` **hiç** değişmedi — tam olarak
-0.0199890'da kaldı.
-
-**Kağıtta sebebi.** swe = 0.02 civarında half'in adımı 2^-6 x 2^-10 = 1.53e-5. Bir
-birikme adımında eklenen miktar 8.33e-7 m/s x 0.067 s = 5.6e-8, yani adımın
-**273'te biri**. Her yazma aynı sayıya geri yuvarlanıyor.
-
-Bu kanalın özeli değil: §6'nın bütün kanalları yavaş üstel yaklaşım. rhoN oturması
-adım başına 6e-7 (half adımı 6.1e-5), wet gevşemesi sınırda. Ölçek değiştirmek
-çözmez — half'in hassasiyeti GÖRECELİ, milimetreye geçmek aynı oranı verir.
-
-**Maliyet.** High'ta 67 + 67 MB; toplam VRAM 77.5 → ~145 MB. Medium (1536) yarıya
-indiriyor. Elenen alternatifler: 16-bit UNorm adımı 9.2e-6 ile hâlâ 164 kat büyük;
-uzun sim adımı (18 s) tile rotasyonuyla görünür şerit dikisi üretiyor.
-
-## Kar v2: clipmap halkaları tek adıma snap'leniyor
-
-**Kural.** Bütün halkalar en kaba halkanın quad'ının iki katına snap'leniyor.
-
-**Kağıtta hesap.** §7.1 her halkanın kendi quad boyuna snap'lenmesini söylüyor.
-Halka 0 adımı 5 cm, halka 1 adımı 15 cm; ikisi ayrı yuvarlanınca merkezleri 7.5 cm'ye
-kadar ayrışıyor ve halka 1'in deliği halka 0'ın kenarına oturmuyor.
-
-Tek adım ikisini birden çözüyor çünkü 1.35 m her halkanın quad'ının tam katı:
-54 x 2.5 cm = 18 x 7.5 cm = 6 x 22.5 cm = 2 x 67.5 cm. Hem merkezler aynı hem her
-halkanın ızgarası dünyaya çapalı kalıyor.
-
-## Kar v2: kaskad blok ızgarasına snap'leniyor
-
-**Kural.** Uzak kaskad tek teksele değil 32 tekselliğine (6 m) bloklara snap'leniyor.
-
-**Gerekçe.** Kalıcılık blok hâlinde saklanıyor. Tek teksellik kaydırmada blok sınırı
-hiç hizalanmaz ve geri yükleme bir bloğun 31 tekselini eski veriyle ezerdi. 18.75 cm
-tekselde 4 m tam sayı blok etmiyor (21.33), o yüzden blok 32 teksele yuvarlandı.
-
-## Kar v2: kalıcılık gezinerek yakalıyor
-
-**Kural.** Her karede bir blok saklanıyor; blok pencereden çıkarken değil.
-
-**Gerekçe.** §10 "bölgeden çıkan şeritler `AsyncGPUReadback` ile alınır" diyor ama
-geri okuma asenkron: istek döndüğünde şerit çoktan kaymış oluyor ve okunan veri
-yeni içerik. Sürekli tarama deponun blok çıkarken zaten sıcak olmasını sağlıyor.
-Bedeli: saklanan veri en fazla 1024 kare (~17 s) eski.

@@ -37,13 +37,11 @@ Shader "ToTheSummit/Precipitation"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _RainColor;
-                float4 _SnowColor;
             CBUFFER_END
 
             // Kar kendi kutusunda sarılır: aynı tanecik bütçesi kameraya daha sıkı
             // paketlenir. Nokta biçimli tane, uzayan damla kadar ekran alanı kaplamıyor.
             float3 _BoxSize;
-            float3 _SnowBoxSize;
 
             // Damla ve tane farklı hızlarda düşer, farklı oranda rüzgâr yer:
             // her popülasyonun kendi birikmiş kayması ve kendi yön vektörü var.
@@ -57,8 +55,6 @@ Shader "ToTheSummit/Precipitation"
             #define WIND_MIN_HEIGHT  0.1      // = z₀; burada profil tam sıfır, rüzgâr yerde durur
             #define WIND_PROFILE_L   5.4806   // ln(24/0.1)
             #define WIND_LAG_TOP     4.3791   // G(24), gecikme integralinin üst ucu
-            #define SNOW_FALL_SPEED  1.4      // `PrecipitationRenderer.SnowFallSpeed`'in aynası
-            #define SPINDRIFT_FALL_SPEED 0.5  // kırık taneciğin çökme hızı, atalet için
 
             // Girdap oktavlarının uzamsal dalga sayısı ve kendi zaman frekansı.
             // `Turbulence` içindeki katsayıların aynası; atalet süzgeci bunları okuyor.
@@ -72,19 +68,10 @@ Shader "ToTheSummit/Precipitation"
             float4 _RainDrifts[RAIN_SPEED_CLASSES];
             float4 _RainDriftsNear[RAIN_SPEED_CLASSES];   // iç kutunun kendi kayması
             float3 _NearBoxSize;
-            float3 _SnowDriftNear;
             float4 _RainDirections[RAIN_SPEED_CLASSES];
-            float3 _SnowDrift;
-            float4 _SnowDirection;   // xyz birim yön, w bileşke hız (m/s)
-
-            float _Snowiness;
             float _Density;          // görsel yoğunluk, şiddetin bükülmüş hali
             float _Precipitation;    // ham şiddet, damla boyutu dağılımı için
-            float _SnowDensityScale;
-            float _SnowSize;
-            float _SnowTurbulence;  // kar tanesinin girdaba kapılma genliği, metre
             float _RainTurbulence;  // damlanın girdaba kapılma genliği, metre
-            float _SnowSpin;        // dönme hızı, rüzgârla ölçeklenir
             float3 _WindSweep;      // girdap alanının rüzgârla birikmiş ötelemesi, metre
 
             // ---- GARG-NAYAR İZ VERİTABANI  `[Garg 2006, §5]`, `rain-spec.md` §6 ----
@@ -110,24 +97,6 @@ Shader "ToTheSummit/Precipitation"
             /// Fiziksel ölçekte iz 24 m'de 0.4 × 12 piksel ve α ≈ 0.02 — gözle
             /// "var mı yok mu" ayrılamıyor. Üç kip üç ayrı soruyu ayırıyor:
             /// boyut mu küçük, desen mi boş, alfa mı düşük.
-            float  _StreakDebug;
-
-            /// Teşhiste quad'ın büyütme katsayısı. Fiziksel boy korunmuyor; amaç
-            /// deseni GÖRMEK.
-            float  _StreakDebugScale;
-
-            /// Ayrık renk bantları. Göz "biraz koyu" ile "yarısı kadar"ı ayıramıyor;
-            /// bant sınırı tek doğru cevap üretiyor.
-            float3 ProbeRamp(float v)
-            {
-                if (v < 0.02) return float3(0.10, 0.10, 0.12);
-                if (v < 0.08) return float3(0.10, 0.20, 0.90);
-                if (v < 0.18) return float3(0.10, 0.80, 0.85);
-                if (v < 0.32) return float3(0.15, 0.85, 0.25);
-                if (v < 0.50) return float3(0.95, 0.90, 0.20);
-                if (v < 0.70) return float3(0.98, 0.55, 0.10);
-                return float3(0.95, 0.15, 0.10);
-            }
 
             /// GÜNEŞ DİSKİNİN RADYANSI — yönlü kanalın kaynağı.
             ///
@@ -233,37 +202,11 @@ Shader "ToTheSummit/Precipitation"
                 float4 positionCS : SV_POSITION;
                 float2 corner     : TEXCOORD0;
                 float  alpha      : TEXCOORD1;
-                float  isSnow     : TEXCOORD2;
                 float3 color      : TEXCOORD3;
-                float4 lobes      : TEXCOORD4;    // tutamın iki yan lobunun kayması
-                float  shape      : TEXCOORD5;    // tanenin iskelet çeşidi, 0-1
-                float  isDrift    : TEXCOORD6;    // sürüklenen kar mı, yağan kar mı
                 float3 streak     : TEXCOORD7;    // (osc, dcam alt indeks, dcam payı)
-                float  dropMm     : TEXCOORD10;   // damlanın çapı (mm), teşhis için
-                float  dropDist   : TEXCOORD11;   // kameraya uzaklık (m), teşhis için
                 float2 streakCrop : TEXCOORD8;    // (v ölçeği, birleştirme yapıldı mı)
                 float3 airColor   : TEXCOORD9;    // damlanın ARDINDAKİ göğün radyansı
             };
-
-            // Havanın rengi. AtmosphereController global olarak yazıyor; sis, bulut,
-            // gökyüzü ve şimşek de aynı değerden besleniyor. Tane kendi rengini
-            // seçmiyor, çünkü kendi ışığını üretmiyor.
-            // Sürüklenen kar: kutu, birikmiş kayma, tane boyu, katman kalınlığı.
-            float3 _SpindriftBox;
-            float3 _SpindriftParticleDrift;
-            float _SpindriftSize;
-            float _SpindriftLayer;
-
-            /// Tutamın tek bir topağı: dolu bir göbek, çevresinde sönen bir hâle.
-            ///
-            /// Keskin kenar taneyi kâğıttan kesilmiş gibi gösteriyor, oysa kümelenmenin
-            /// sınırı yok. Ama sönüm yarıçapın tamamına yayılırsa da tanenin dolu hiçbir
-            /// yeri kalmıyor ve tane olduğundan hem küçük hem soluk görünüyor — göbek
-            /// dolu kalır, kuyruk yarıçapın yarısından fazlasına yayılır.
-            float Lobe(float2 p, float2 offset, float radius)
-            {
-                return smoothstep(radius, radius * 0.42, length(p - offset));
-            }
 
             // Tanecik ızgarasını kamera etrafında kutu katları kadar kaydırır.
             // Kaydırma kutu boyutunun tam katı olduğu için tanecikler dünyada sabit görünür.
@@ -294,7 +237,7 @@ Shader "ToTheSummit/Precipitation"
 
             // Türbülans alanı: havadaki girdaplar. Tanecik konumundan örneklenir, kendi
             // tohumundan değil — aynı girdaptaki tanecikler birlikte savrulmalı. Bağımsız
-            // rastgelelik kar yağışı değil karınca sürüsü görüntüsü verir.
+            // rastgelelik yağış değil karınca sürüsü görüntüsü verir.
             //
             // Alan rüzgârla birlikte akar (Taylor hipotezi: türbülans ortalama akışla
             // taşınır). Kaba girdap rüzgârı tam izler, ince girdap kısmi hızda geride
@@ -342,19 +285,8 @@ Shader "ToTheSummit/Precipitation"
                 float3 cameraPos = _WorldSpaceCameraPos;
                 float4 seed = float4(IN.seedXY, IN.seedZW);
 
-                float isDrift = IN.positionOS.x;
                 float isNear = IN.positionOS.y;   // iç kutuya mı ait
-                float driftHeight = 0.0;
 
-                // Tür seçimi yoğunluk elemesinden bağımsız olmalı: ayrı karma.
-                // Yağmurun payı dördüncü kuvvetle söner: kar başlar başlamaz damla
-                // neredeyse kaybolur, sulu kar kısa ve silik kalır.
-                // step(y,x) "x >= y" demek; eşik sıfırken hash'i tam sıfır olan tanecikler
-                // sınırı geçip kar oluyordu. Kesin küçüktür gerekiyor: karlılık sıfırsa
-                // tek bir tane bile düşmemeli
-                float typeRoll = Hash(seed.yzx);
-                float rainShare = pow(1.0 - _Snowiness, 4.0);
-                float isSnow = 1.0 - step(1.0 - rainShare, typeRoll);
 
                 // Marshall-Palmer: küçük damla çok yaygın, iri seyrek. Ölçek parametresi
                 // yağış şiddetiyle değişir (Λ = 4.1·R^-0.21), yani sağanakta dağılım iriye
@@ -384,10 +316,7 @@ Shader "ToTheSummit/Precipitation"
                 // ATALET SÜZGECİNİN GEVŞEME SÜRESİ ÇÖKME HIZINDAN: `τ = v_t/g`. Üç
                 // popülasyonun üçü de ayrı: damla 2-9 m/s, kar tanesi 1.4, yerden
                 // kalkan kırık tanecik ~0.5 (küçük ve düzensiz, havaya anında oturur).
-                // Sürüklenen tanenin `isSnow`'u aşağıdaki blokta 1 oluyor, burada hâlâ
-                // 0 — o yüzden `isDrift` ayrı okunuyor.
-                float fallSpeed = lerp(lerp(physicalSpeed, SNOW_FALL_SPEED, isSnow),
-                                       SPINDRIFT_FALL_SPEED, isDrift);
+                float fallSpeed = physicalSpeed;
 
                 // İÇ KUTU. Ayrı bir tanecik popülasyonu; kendi kutusuna, kendi
                 // kaymasıyla sarıyor. Kar da iç kutuya girebiliyor — orada temsil payı
@@ -395,10 +324,10 @@ Shader "ToTheSummit/Precipitation"
                 // doğru sonucu veriyor.
                 float3 box = isNear > 0.5
                            ? _NearBoxSize
-                           : lerp(_BoxSize, _SnowBoxSize, isSnow);
+                           : _BoxSize;
                 float3 drift = isNear > 0.5
-                             ? lerp(_RainDriftsNear[dropClass].xyz, _SnowDriftNear, isSnow)
-                             : lerp(_RainDrifts[dropClass].xyz, _SnowDrift, isSnow);
+                             ? _RainDriftsNear[dropClass].xyz
+                             : _RainDrifts[dropClass].xyz;
 
                 // ---- RÜZGÂRIN SINIR TABAKASI ----
                 //
@@ -441,8 +370,7 @@ Shader "ToTheSummit/Precipitation"
                 // ORAN hesaplıyor. Normalize edilmiş vektörle kar 1.4 m/s gidiyormuş
                 // gibi okunur, rüzgâr payı kaybolur ve tane sınır tabakasını hiç
                 // görmez.
-                float3 classVelocity = lerp(_RainDirections[dropClass].xyz * _RainDirections[dropClass].w,
-                                            _SnowDirection.xyz * _SnowDirection.w, isSnow);
+                float3 classVelocity = _RainDirections[dropClass].xyz * _RainDirections[dropClass].w;
                 float2 windFlat = classVelocity.xz;
                 float windSpeed = length(windFlat);
                 float2 windUnit = windSpeed > 1e-4 ? windFlat / windSpeed : float2(0.0, 0.0);
@@ -453,43 +381,6 @@ Shader "ToTheSummit/Precipitation"
 
                 float variation = Hash(seed.xyz);
 
-                // --- SÜRÜKLENEN KAR ---
-                // Yağıştan üç farkı var ve üçü de fiziksel:
-                //   Yüksekliği YERDEN ölçülür — tane havada değil, yüzeyin üstünde akıyor.
-                //   Dağılım küpsel: çoğu yere yapışık, seyrek olanı yukarıda. Gerçek
-                //   profil kuvvet yasası; küp onun ucuz ve doğru yönlü yaklaşımı.
-                //   Yatay gider, düşmez.
-                if (isDrift > 0.5)
-                {
-                    box = _SpindriftBox;
-
-                    float lift = Hash(seed.zwy);
-                    float above = lift * lift * lift * _SpindriftLayer;
-
-                    // SINIR TABAKASI. Rüzgâr yüzeyde sıfıra iner ve yükseldikçe
-                    // logaritmik olarak açılır; yerde zıplayan tane serbest akışın
-                    // ancak küçük bir payını yer. Serbest hızla sürülünce taneler
-                    // 12 m/s'de üşüşüyor ve rüzgârdan etkilenmiyormuş gibi, tek parça
-                    // akan bir perde gibi okunuyordu.
-                    //
-                    // Kayma CPU'da serbest akışla birikiyor; taneye özel katsayıyla
-                    // çarpmak integralin kendisini ölçekler, çünkü katsayı tane boyunca
-                    // sabit (yükseklik değişmiyor).
-                    // Yerde %30, katmanın tepesinde %95. Önce %12-55 kurulmuştu ve
-                    // yerdeki tane 12 m/s rüzgârda 1.5 m/s ile sürünüyordu — rüzgârdan
-                    // etkilenmiyormuş gibi okunuyordu. Zıplayan tane serbest akışın
-                    // azımsanmayacak bir payını yer; süspansiyondaki neredeyse rüzgâr
-                    // hızında gider.
-                    float speedFactor = lerp(0.30, 0.95, lift);
-
-                    float3 local = WrapAroundCamera(
-                        seed.xyz * box + _SpindriftParticleDrift * speedFactor,
-                        cameraPos, box);
-
-                    worldPos = float3(local.x, TerrainHeightAt(local.xz) + above, local.z);
-                    isSnow = 1.0;
-                    driftHeight = lift;   // 0 yerde, 1 katmanın tepesinde
-                }
 
                 // ---- TANECİĞİN GİRDABA TEPKİSİ: ATALET SÜZGECİ ----
                 //
@@ -558,12 +449,12 @@ Shader "ToTheSummit/Precipitation"
                 gainCoarse *= sqrt(coarseShare / 0.5);
                 gainFine   *= sqrt((1.0 - coarseShare) / 0.5);
 
-                float response = lerp(_RainTurbulence, _SnowTurbulence, isSnow);
+                float response = _RainTurbulence;
 
                 // Sürüklenen tanenin girdap payı RÜZGÂRLA ölçekli: dingin havada
                 // sürüklenme zaten yok, türbülans da yok. Sabit payla düşük rüzgârda
                 // taneler yerinde titriyordu.
-                response = lerp(response, response * _SpindriftWind.w * 1.6, isDrift);
+                response = response;
 
                 // Türbülans yamalı gelir (intermittency): enerji öbekler hâlinde geçer,
                 // düzgün yayılmaz. İki farklı frekanslı dalganın çarpımı tekrar desenini
@@ -621,7 +512,6 @@ Shader "ToTheSummit/Precipitation"
                 // kopmasından doğuyor. Yerden kalkan tane düşmüyor, çırpmıyor —
                 // rüzgârla taşınıyor. Uygulanınca düşük rüzgârda 22 santimlik salınım
                 // taneyi yerinde zigzag çizdiriyordu: ilerlemesi salınımından yavaştı.
-                worldPos += float3(glide.x, 0.0, glide.y) * isSnow * (1.0 - isDrift);
 
                 // Gerçek kar tanesi 1 mm ile 15 mm arasında değişir. Dar bir dağılım
                 // hepsini aynı boyda gösterip misket hissi yaratıyordu.
@@ -642,59 +532,18 @@ Shader "ToTheSummit/Precipitation"
                 // gerçek olmalı, yoksa desenin frekansı ekranda yanlış boyda çıkar.
                 float radius = dropRadius;
 
-                // BÜYÜTME YALNIZ "BÜYÜT" KİPİNDE. Bir süre bütün prob kiplerinde
-                // açıktı ve "tür" probu 40× büyütülmüş şeritler gösterdi: araç
-                // ölçtüğü geometriyi bozuyordu. Desen okumak için büyütme gerekiyor
-                // (kip 1-2), tür/mesafe/çap için gerekmiyor — orada quad'ın gerçek
-                // boyu sorunun kendisi.
-                float debugScale = (_StreakDebug > 0.5 && _StreakDebug < 2.5)
-                                 ? max(_StreakDebugScale, 1.0) : 1.0;
-
-                float rainWidth = 2.0 * radius * debugScale;
-                float rainLength = dropSpeed * _StreakExposure * debugScale;
+                float rainWidth = 2.0 * radius;
+                float rainLength = dropSpeed * _StreakExposure;
 
                 float sizeSpread = 0.4 + 1.4 * variation;
-                float size = lerp(rainWidth, _SnowSize * sizeSpread, isSnow);
+                float size = rainWidth;
 
                 // Yoğunluk eşiğinin üstünde kalan tanecikler sıfır boyutla elenir.
                 // Damlalar ayrıca karlılıkla seyrelir: geçişte sayıları da azalsın.
                 // Burada da kesin küçüktür: yağış sıfırken havada tanecik asılı kalmasın
-                float densityLimit = _Density * lerp(1.0 - _Snowiness, _SnowDensityScale, isSnow);
+                float densityLimit = _Density;
                 size *= 1.0 - step(densityLimit, seed.w);
 
-                // Sürüklenen kar kendi kapısından geçer: rüzgâr eşiği `_SpindriftDensity`
-                // içine CPU'da gömülü, yerdeki gevşek kar profilden okunuyor. Yağış
-                // yoğunluğuyla hiç ilgisi yok — yağış dinmişken de savrulur.
-                if (isDrift > 0.5)
-                {
-                    float ground = TerrainHeightAt(worldPos.xz);
-                    float supply = SampleSnowProfile(ground).r;
-
-                    // ÖBEKLENME. Sürüklenen kar tekdüze bir perde değil: yatay konvektif
-                    // rulolar boyunca şeritler halinde yoğunlaşıp seyreliyor. `patch`
-                    // zaten yağışın okuduğu hamle zarfı — aynı hava, ikinci bir gürültü
-                    // kurmaya gerek yok.
-                    // Eşik geçildikten sonra kapı GENİŞ açılır: gerçek bir ground
-                    // blizzard'da ayağının dibindeki hava taneyle dolu olur. 140
-                    // katsayısıyla tanelerin yarısı eleniyordu ve toz seyrek kalıyordu.
-                    // Öbeklenme zarfı (`patch`) yerinde — seyrelten o olmalı, taban değil.
-                    float lifted = saturate(_SpindriftDensity * 400.0) * supply
-                                 * (0.35 + patch * 1.65);
-
-                    // DAĞILIM GAMMA BENZERİ: çok sayıda küçük, az sayıda iri. Düzgün
-                    // dağılımda iri tane fazla çıkıyor ve toz yerine kar yağıyor gibi
-                    // okunuyordu. Kare almak kuyruğu küçüğe kaydırıyor.
-                    float grain = variation * variation;
-
-                    // BOY YÜKSEKLİKLE KÜÇÜLÜR. Ölçüm: saltasyon katmanında maksimum
-                    // tane çapı yükseklikle doğrusal azalıyor — iri tane yere yakın
-                    // zıplar, yukarıda yalnız ince olan asılı kalır.
-                    size = _SpindriftSize * (0.35 + 1.9 * grain)
-                         * lerp(1.0, 0.3, driftHeight);
-
-                    size *= 1.0 - step(lifted, Hash(seed.wxz));
-
-                }
 
                 float3 viewDirection = normalize(cameraPos - worldPos);
                 float3 cameraRight = normalize(UNITY_MATRIX_I_V._m00_m10_m20);
@@ -703,16 +552,16 @@ Shader "ToTheSummit/Precipitation"
                 // Damla bileşke hız + türbülans dalgalanması yönünde uzar (yukarıda
                 // türetildi); tane kameraya döner, yön okumaz.
                 float3 rainAxis = normalize(dropVelocity + velocityFluctuation);
-                float3 fallAxis = normalize(lerp(rainAxis, _SnowDirection.xyz, isSnow));
+                float3 fallAxis = normalize(rainAxis);
                 float3 streakRight = normalize(cross(fallAxis, viewDirection));
 
-                float3 right = lerp(streakRight, cameraRight, isSnow);
-                float3 up = lerp(fallAxis, cameraUp, isSnow);
+                float3 right = streakRight;
+                float3 up = fallAxis;
 
                 // Uzama artık serbest bir ayar değil: boy/genişlik oranı damlanın
                 // pozlama süresince kat ettiği yolun çapına oranı. Hızlı düşen iri damla
                 // kendiliğinden daha uzun iz bırakıyor.
-                float stretch = lerp(rainLength / max(rainWidth, 1e-6), 1.0, isSnow);
+                float stretch = rainLength / max(rainWidth, 1e-6);
 
                 // Bir pikselden ince quad'ı rasterizer ya tek piksel çizer ya tamamen
                 // atlar; kalınlık farkı ekrana ulaşmadan yok olur ve tanecikler piksel
@@ -775,16 +624,12 @@ Shader "ToTheSummit/Precipitation"
 
                 // Kristal düz yüzeyleri döndükçe ışığı yakalayıp bırakır. Kar yağışının
                 // parıldaması silüetten değil buradan gelir.
-                // _SnowSpin birikmiş açı; tane başına sabit katsayı hızı çeşitlendirir
-                float spin = _SnowSpin * (0.6 + 0.8 * Hash(seed.zxy)) + variation * 6.2831853;
 
                 OUT.positionCS = TransformWorldToHClip(worldPos);
                 OUT.corner = IN.corner;
                 OUT.streak = float3(oscIndex, floor(dcamPos), frac(dcamPos));
                 // Yataydan eğim: damlanın GERÇEK yörünge açısı, girdap sapması dahil.
                 // `fallAxis` yağmurda `dropVelocity + velocityFluctuation`'ın birimi.
-                OUT.dropMm = radius * 2000.0;
-                OUT.dropDist = camDistance;
                 OUT.streakCrop = float2(vScale, vScale > 1.0 ? 1.0 : 0.0);
 
                 // DAMLANIN ARDINDAKİ GÖK. Damla ışık üretmiyor, arkadan geleni kırıyor;
@@ -794,7 +639,7 @@ Shader "ToTheSummit/Precipitation"
                 // Ölçüldü — onunla radyans 0.08-0.32 bandında kalıyor ve damlalar
                 // gökten koyu düşüp SİYAH LEKE gibi okunuyordu. Göğü çizen fonksiyon
                 // `AirColor` (`Sky.shader` da onu çağırıyor), tek kaynak o.
-                // TON İLE PARLAKLIK AYRI — `SpindriftColor`'ın kuralının aynısı.
+                // TON İLE PARLAKLIK AYRI.
                 //
                 // Damla dalga boyu seçmiyor; rengi üstüne düşen ışıktan. Ama gündüz tek
                 // bir yönün rengini alamaz: onu aydınlatan gök kubbenin TAMAMI ve sonuç
@@ -813,62 +658,8 @@ Shader "ToTheSummit/Precipitation"
                 float3 skyHue = sky / max(1e-4, skyLuma);
                 float lowSun = 1.0 - smoothstep(0.02, 0.28, _SunHeight);
                 OUT.airColor = lerp(1.0, skyHue, lowSun * 0.9) * skyLuma;
-                OUT.isSnow = isSnow;
-                OUT.isDrift = isDrift;
 
-                // Tanenin rengi havanın renginden türer ama onunla çarpılmaz. Tane
-                // güçlü bir saçıcı: içinde durduğu havadan parlaktır. Düz çarpım
-                // kapalı havada taneyi parlak bulutların önüne koyu gri koyuyordu —
-                // kirli, yarı saydam bir leke gibi. Karekök terimi tonu koruyup
-                // parlaklığı yumuşakça kaldırır: kapalı gündüzde beyaza oturur,
-                // şafakta turuncu kalır, gece kısık kalır, şimşekte parlar.
-                // _SnowColor bir renk değil, havanın üstüne binen ton.
-                float3 fog = _HeightFogColor.rgb;
-                float3 snowTint = _SnowColor.rgb * (fog * 0.9 + sqrt(fog) * 0.75);
-
-                // Atmosfer derinliği: uzak tane havanın rengine gömülür. Renk sabit
-                // kalınca yakınla uzak aynı beyazlıkta çiziliyor ve yağış tek düzleme
-                // yapışmış görünüyordu — sise karışma kutu içinde bile katmanlar açar.
-                snowTint = lerp(snowTint, fog,
-                    smoothstep(4.0, box.x * 0.5, camDistance) * 0.55);
-
-                OUT.color = lerp(_RainColor.rgb, snowTint, isSnow);
-
-                // Yakın tane, uzak perdeyle AYNI rengi okur. Ayrı kaynak kurulsaydı
-                // taneler perdenin içinde başka renkte yüzerdi.
-                OUT.color = lerp(OUT.color, SpindriftColor(), isDrift);
-
-                // Tutamın iki yan lobu. Yönleri taneye sabit, dönüşü spin taşıyor:
-                // kümelenme savruldukça topakları da birlikte dönüyor.
-                // Uzanım geniş bir aralıktan: kısa uzanan lob merkezle kaynaşıp
-                // tümsekli daire verir, uzun uzanan lob taşıp topağı iki parçalı
-                // gösterir — biçim çeşidi buradan doğuyor.
-                // Toz taneleri için lob, dönme ve iskelet ÖLÜ: fragment tarafında
-                // yumuşak disk çiziliyor, hiçbiri okunmuyor. Dallanma mekânsal olarak
-                // tutarlı — toz taneleri tampon içinde bitişik duruyor.
-                if (isDrift > 0.5)
-                {
-                    OUT.lobes = 0.0;
-                    OUT.shape = 0.0;
-
-                    // Alfa burada kapanıyor: erken çıkış aşağıdaki ortak satırı
-                    // atlıyor ve tanımsız alfayla çıkmak taneyi görünmez yapardı.
-                    OUT.alpha = _SnowColor.a * (0.85 + 0.15 * Hash(seed.wxy))
-                              * fade / sqrt(widen);
-                    return OUT;
-                }
-
-                float lobeAngle = Hash(seed.wzy) * 6.2831853 + spin;
-                float lobeAngle2 = Hash(seed.zwx) * 6.2831853 + spin * 1.13;
-                float lobeReach = 0.18 + 0.26 * Hash(seed.yzw);
-                float lobeReach2 = 0.18 + 0.26 * Hash(seed.wyx);
-
-                OUT.lobes = float4(cos(lobeAngle) * lobeReach, sin(lobeAngle) * lobeReach,
-                                   cos(lobeAngle2) * lobeReach2, sin(lobeAngle2) * lobeReach2);
-
-                // İskelet çeşidi: merkez lobun ağırlığını ve bükümün frekansını
-                // çeşitlendirir. Tek tip merkez, her taneyi aynı silüete mahkûm ediyordu.
-                OUT.shape = Hash(seed.xwy);
+                OUT.color = _RainColor.rgb;
 
                 // ---- ŞEFFAFLIK  `[Garg 2006, §5]`, `[Garg & Nayar 2005]` ----
                 //
@@ -910,16 +701,13 @@ Shader "ToTheSummit/Precipitation"
                 float localDensity = _RainDensity.x + _RainDensity.y * nearShare;
                 float representation = 1000.0 / max(localDensity, 1e-4);
 
-                float rainAlpha = (1.0 - pow(1.0 - singleDrop, representation))
-                                * (1.0 - _Snowiness);
+                float rainAlpha = 1.0 - pow(1.0 - singleDrop, representation);
 
                 // Taneye özel opaklık: hepsi aynı yoğunlukta olunca derinlik kayboluyordu.
                 // Aralıklar dar; iki çarpan üst üste bindiği için geniş bantlar karı
                 // saydamlaştırıyordu — çeşitlilik kalsın, cılızlık kalmasın.
-                float snowAlpha = _SnowColor.a * (0.85 + 0.15 * Hash(seed.wxy));
 
                 // Dönen yüzey ışığa geldiğinde parlar, kenarına döndüğünde söner
-                snowAlpha *= 0.9 + 0.1 * sin(spin);
 
                 // Genişletme yapaydı; alfa düşmezse uzaktaki tanecikler olduğundan
                 // parlak görünür. Tam ışık korunumu (bölü widen) ince damlaları
@@ -955,7 +743,7 @@ Shader "ToTheSummit/Precipitation"
                 // rain is very faint in bright regions... While this may be physically
                 // accurate, it doesn't create a perception of strong rainfall."
                 float rainThin = pow(widen, -0.35);
-                OUT.alpha = lerp(rainAlpha, snowAlpha, isSnow) * fade * rainThin;
+                OUT.alpha = rainAlpha * fade * rainThin;
                 return OUT;
             }
 
@@ -1078,107 +866,7 @@ Shader "ToTheSummit/Precipitation"
 
                 // Kar tanesi: üç yumuşak lobun birleşimi.
                 //
-                // Havada süzülen şey tek bir kristal değil, kümelenme — yüzlerce
-                // kristalin birbirine yapışmış hâli, düzensiz ve tüylü. Kristalin
-                // kolları bir iki milimetre; onları görmek için taneyi göze değdirmek
-                // gerekiyor. Altı kollu bir silüet çizmek mikroskop görüntüsünü
-                // gökyüzüne koymak oluyordu ve kar yerine yıldız yağıyordu.
-                //
-                // Loblar `max` ile birleşiyor: toplamak merkezi doyurup taneyi tekrar
-                // diske çeviriyor, max ise topakları ayrı ayrı ayakta bırakıyor.
-                float2 p = centered * 2.0;
-
-                // Daire kırılır: örnekleme konumu iki oktav sinüs bükümüyle oynar —
-                // üç temiz daire değil, düzensiz tüylü topak. Faz lob kaymasından,
-                // kaba oktavın frekansı iskelet çeşidinden: iki tane aynı bükümü
-                // giymez, desen taneyle birlikte döner.
-                float warpFreq = 5.5 + 3.0 * IN.shape;
-                p += float2(sin(p.y * warpFreq + IN.lobes.x * 23.0),
-                            sin(p.x * (warpFreq + 1.3) + IN.lobes.z * 19.0)) * 0.10;
-                p += float2(sin(p.y * 15.0 + IN.lobes.w * 31.0),
-                            sin(p.x * 13.0 + IN.lobes.y * 27.0)) * 0.055;
-
-                // Merkez lob taneye göre büyüyüp küçülür; yan lobların yarıçapı
-                // uzanımlarıyla ters orantılı, toplam uzanım quad sınırında kalır.
-                // Küçük merkez + uzun uzanım = parçalı topak, büyük merkez + kısa
-                // uzanım = tüylü yumak — filo artık tek silüet giymiyor.
-                float centerRadius = 0.85 - 0.30 * IN.shape;
-                float snowMask = max(Lobe(p, float2(0.0, 0.0), centerRadius),
-                                 max(Lobe(p, IN.lobes.xy, 0.62 - 0.35 * length(IN.lobes.xy)),
-                                     Lobe(p, IN.lobes.zw, 0.54 - 0.30 * length(IN.lobes.zw))));
-
-                // SÜRÜKLENEN KAR TOZDUR, kristal değil. Yağan tane kümelenmiş bir
-                // topaktır ve lobları görünür; yerden kalkan tane o kümelenmenin
-                // rüzgârla KIRILMIŞ hâli — kenarsız, biçimsiz, yumuşak. Kristal
-                // maskesini giydirmek kar yağıyormuş gibi okutuyordu.
-                float dustMask = saturate(1.0 - dot(centered, centered) * 4.0);
-                dustMask *= dustMask;
-
-                float mask = lerp(lerp(rainMask, snowMask, IN.isSnow), dustMask, IN.isDrift);
-
-                // Hacim: tek renkli leke kâğıttan kesilmiş gibi düz okunur. Kapalı
-                // gökte ışık yukarıdan gelir — topağın üst yarısı aydınlık, altı loş;
-                // dolu göbek kenardan bir tık parlak (kalın yer çok saçar). İkisi
-                // birlikte topağı küreye çevirir. Yağmur damlasına uygulanmaz.
-                float ballLight = (0.84 + 0.32 * IN.corner.y) * (0.88 + 0.18 * snowMask);
-                float3 snowColor = IN.color * lerp(1.0, ballLight, IN.isSnow * (1.0 - IN.isDrift));
-
-                // Yağmurun rengi veritabanından + kaynak renklerinden; karınki mevcut
-                // zincirden. Karlılık ikisini seçiyor.
-                float3 color = lerp(rainRadiance, snowColor, max(IN.isSnow, IN.isDrift));
-
-                // TEŞHİS: yalnız yağmur damlaları. Kar kendi yolunda kalıyor ki
-                // sahnede referans kalsın.
-                if (_StreakDebug > 0.5 && IN.isSnow < 0.5 && IN.isDrift < 0.5)
-                {
-                    // 1 — BÜYÜT: normal gölgeleme, yalnız boyut büyük. Sorun boyutsa
-                    //     izler burada normal görünür.
-                    if (_StreakDebug < 1.5) return half4(color, IN.alpha * mask);
-
-                    // 2 — HAM DESEN: yönlü kanalın örneklediği değer, opak. Zincir
-                    //     kopuksa burası düz siyah kalır.
-                    if (_StreakDebug < 2.5) return half4(ProbeRamp(pointStreak), 1.0);
-
-                    // 3 — ALFA: son şeffaflık. Desen doğru olsa bile alfa görünmeyecek
-                    //     kadar küçük olabilir; bu ikisini ayırır.
-                    if (_StreakDebug < 3.5) return half4(ProbeRamp(IN.alpha * mask), 1.0);
-
-                    // 4 — AMBIENT DESEN: radyansın ikinci terimi. Yönlü kanal ince bir
-                    //     filament, izin geri kalanını ambient taşıyor; ikisini ayrı
-                    //     görmeden "renk neden sıfır" sorusu cevaplanamıyor.
-                    if (_StreakDebug < 4.5) return half4(ProbeRamp(ambientStreak), 1.0);
-
-                    // 5 — RADYANS: iki terim toplandıktan ve kalibrasyonla çarpıldıktan
-                    //     sonraki luminans. Arka planla karşılaştırılacak büyüklük bu.
-                    if (_StreakDebug < 5.5)
-                        return half4(ProbeRamp(dot(rainRadiance, float3(0.2126, 0.7152, 0.0722))), 1.0);
-
-                    // 8 — MESAFE: damlanın kameraya uzaklığı, kutunun yarı genişliğine
-                    //     göre. Derinlik algısı boy gradyanı ve hareket paralaksından
-                    //     gelir; ikisi de mesafe DAĞILIMINA bağlı. Ekran tek renkse
-                    //     damlalar fiilen tek mesafede demektir ve derinlik imkânsızdır.
-                    if (_StreakDebug > 7.5)
-                        return half4(ProbeRamp(saturate(IN.dropDist / (_BoxSize.x * 0.5))), 1.0);
-
-                    // 7 — ÇAP: damlanın çapı renk bandı olarak. Kalınlık farkı
-                    //     ekranda piksel altı olduğu için gözle ayrılamıyor; bu prob
-                    //     "damlalar gerçekten farklı boyda mı" sorusunu tek doğru
-                    //     cevapla kapatıyor. Tek renk = hepsi aynı, karışık renk = farklı.
-                    //     0.5-5 mm bandı [0,1]'e eşleniyor.
-                    if (_StreakDebug > 6.5)
-                        return half4(ProbeRamp(saturate((IN.dropMm - 0.5) / 4.5)), 1.0);
-
-                    // 6 — ORAN: radyans / ardındaki göğün radyansı. TEK DOĞRU CEVAPLI
-                    //     test. Damla ışık üretmiyor, gökten geleni kırıyor; oran 1
-                    //     olmalı. Yarısı basılıyor ki 1 TURUNCU banda (0.50-0.70)
-                    //     düşsün — koyu gri/mavi çok sönük, kırmızı çok parlak demek.
-                    float3 sky = max(IN.airColor, 1e-6);
-                    float ratio = dot(rainRadiance, float3(0.2126, 0.7152, 0.0722))
-                                / max(dot(sky, float3(0.2126, 0.7152, 0.0722)), 1e-6);
-                    return half4(ProbeRamp(ratio * 0.5), 1.0);
-                }
-
-                return half4(color, IN.alpha * mask);
+                return half4(rainRadiance, IN.alpha * rainMask);
             }
             ENDHLSL
         }

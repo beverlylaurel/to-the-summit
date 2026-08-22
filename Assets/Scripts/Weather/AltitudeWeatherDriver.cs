@@ -23,28 +23,28 @@ public class AltitudeWeatherDriver : MonoBehaviour
     [Header("Kuşak sınırları (metre) — hepsini bootstrap hesaplar")]
     [Tooltip("Düz arazinin kotu.")]
     [SerializeField] float groundAltitude;
-    [Tooltip("Yağmurun tam şiddete ulaştığı ve karın başladığı yükseklik. DEĞİŞKEN: " +
+    [Tooltip("Yağmurun tam şiddete ulaştığı yükseklik. DEĞİŞKEN: " +
              "donma seviyesiyle birlikte iner ve çıkar.")]
     [SerializeField] float rainCeiling;
-    [Tooltip("Karın tamamen yerleştiği yükseklik. Arası sulu kar. DEĞİŞKEN.")]
-    [SerializeField] float snowFloor;
+    [Tooltip("Yüksek fırtına kuşağının başladığı yükseklik. DEĞİŞKEN.")]
+    [SerializeField] float stormFloor;
     [Tooltip("Donma seviyesinin uzun vadeli ortalaması. Kalıcı kar çizgisi buradan " +
              "türer — hareketli sınırdan türeseydi buzul da gelgit yapardı.")]
     [SerializeField] float referenceRainCeiling;
-    [SerializeField] float referenceSnowFloor;
+    [SerializeField] float referenceStormFloor;
     [Tooltip("Dalgalanmanın kapanıp sürekli fırtınanın başladığı yükseklik.")]
-    [SerializeField] float blizzardAltitude;
+    [SerializeField] float stormPeakAltitude;
     [Tooltip("Dağın zirvesi. Yalnızca tırmanış göstergesi okuyor.")]
     [SerializeField] float summitAltitude;
 
     // Kuşaklar dağın yüksekliğine oranla tanımlanır: dağ değişince kotlar kendiliğinden
-    // kayar, tırmanışın hangi kısmının yağmurlu hangi kısmının karlı olduğu sabit kalır.
+    // kayar, tırmanışın hangi kısmının fırtınalı olduğu sabit kalır.
     //
     // Serileştirilmiyorlar. Serileştirilen bir alanın sahnedeki kopyası kod varsayılanını
     // eziyor: kuşak sınırları bir kez yanlış değerle kaydedildikten sonra kodu değiştirmek
     // hiçbir işe yaramıyordu ve fark ancak oyunda görüldü.
     const float RainShare = 0.10f;    // dağın bu kadarı yalnızca yağmur
-    const float SleetShare = 0.04f;   // üstündeki sulu kar kuşağının genişliği
+    const float UpperBandShare = 0.04f;   // üstündeki sulu kar kuşağının genişliği
 
     // Perlin teorik olarak 0-1 ama bir çizgi boyunca örneklenince pratikte ~0.30-0.70
     // arasında geziyor; uçlara neredeyse hiç varmıyor. Ham değere eşik koymak bu yüzden
@@ -75,7 +75,6 @@ public class AltitudeWeatherDriver : MonoBehaviour
     float cloudMass;
     float windowRoll;
     float driftCombined;
-    float snowiness;
     float progressAltitude;
     bool initialized;
 
@@ -127,7 +126,7 @@ public class AltitudeWeatherDriver : MonoBehaviour
     /// gezerken bir kotun havasını görmek için beklemeyi ortadan kaldırır.
     public bool Instant { get; set; }
 
-    /// Test anahtarı: hedef şiddet ve karlılık dışarıdan verilir. Negatif = kapalı.
+    /// Test anahtarı: hedef şiddet dışarıdan verilir. Negatif = kapalı.
     ///
     /// Bileşeni KAPATMAK yerine bu kullanılır. Kapatılınca `intensity` donuyor ama
     /// `AtmosphereController` `StormIntensity` ve `ClearWindow`'u okumaya devam ediyor:
@@ -135,22 +134,21 @@ public class AltitudeWeatherDriver : MonoBehaviour
     /// kalınlığı, yağmur soğurması ve yüksek katman kilitlenme anındaki değerde
     /// donuyordu. Tek durum iki kanala ayrılıyor ve çelişiyordu.
     public float IntensityOverride { get; set; } = -1f;
-    public float SnowinessOverride { get; set; } = -1f;
 
     /// Havanın baktığı yükseklik: anlık Y değil, tırmanışın ulaştığı seviye.
     public float ProgressAltitude => progressAltitude;
 
     /// Sürekli fırtınanın başladığı yükseklik.
-    public float BlizzardAltitude => blizzardAltitude;
+    public float BlizzardAltitude => stormPeakAltitude;
 
     /// Donma seviyesinin uzun vadeli ortalamasından türeyen sabit referans. Kalıcı kar
     /// çizgisi bunu okur: buzul hava durumuyla gelgit yapmaz.
-    public float ReferenceSnowFloor => referenceSnowFloor;
+    public float ReferenceStormFloor => referenceStormFloor;
 
     /// Yağışın kar olarak düşmeye başladığı ve tamamen kara döndüğü kotlar.
     /// Yüzeyin taze karı da bu bandı izler: aşağıda yağmur yağarken zemin beyazlamamalı.
     public float RainCeiling => rainCeiling;
-    public float SnowFloor => snowFloor;
+    public float StormFloor => stormFloor;
 
     /// Dağın gerçek zirvesi. Yalnızca gösterge için.
     public float SummitAltitude => summitAltitude;
@@ -177,12 +175,12 @@ public class AltitudeWeatherDriver : MonoBehaviour
         // Tırmanışın alt kısmı yağmurda, üstü karda geçer. Aradaki sulu kar kuşağı dar:
         // ikisi de "sadece" olmalı, geçiş bir bant değil bir sınır gibi okunmalı.
         referenceRainCeiling = ground + height * RainShare;
-        referenceSnowFloor = referenceRainCeiling + height * SleetShare;
+        referenceStormFloor = referenceRainCeiling + height * UpperBandShare;
         rainCeiling = referenceRainCeiling;
-        snowFloor = referenceSnowFloor;
+        stormFloor = referenceStormFloor;
 
         // Zirve fırtınası son 1000 metrede. Dağ değişse de kendiliğinden kayar.
-        blizzardAltitude = Mathf.Max(referenceSnowFloor + 200f, peak - 1000f);
+        stormPeakAltitude = Mathf.Max(referenceStormFloor + 200f, peak - 1000f);
     }
 
     void OnEnable()
@@ -212,22 +210,13 @@ public class AltitudeWeatherDriver : MonoBehaviour
 
         bool overridden = IntensityOverride >= 0f;
 
-        float snowinessTarget = SnowinessOverride >= 0f
-            ? SnowinessOverride
-            : SnowinessAt(altitude);
         float target = overridden ? IntensityOverride : Baseline(altitude) * Variation(altitude);
 
-        // Hedef ne kadar zıplarsa zıplasın gerçek değer kayarak varır:
-        // sağanak yağmurdan bir anda dingin kara geçmek fiziksel olarak imkânsız olur
-        //
-        // Karlılık da aynı yumuşatmadan geçer. Yürürken kuşağın kendi genişliği zaten
-        // dakikalar sürüyor, ama ulaşılan seviye yukarı doğru anında sıçradığı için
-        // yağmurdan kara geçiş konumun ne kadar hızlı değiştiğine bağlı kalıyordu:
-        // şiddet için imkânsız denen ani geçiş karlılık için serbestti.
+        // Hedef ne kadar zıplarsa zıplasın gerçek değer kayarak varır: sağanaktan bir
+        // anda dingin havaya geçmek fiziksel olarak imkânsız olur.
         if (!initialized || Instant || overridden)
         {
             intensity = target;
-            snowiness = snowinessTarget;
             cloudMass = target;
             initialized = true;
         }
@@ -235,7 +224,6 @@ public class AltitudeWeatherDriver : MonoBehaviour
         {
             float t = 1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(0.01f, settings.smoothingSeconds));
             intensity = Mathf.Lerp(intensity, target, t);
-            snowiness = Mathf.Lerp(snowiness, snowinessTarget, t);
 
             // Kütlenin kendi, çok daha yavaş zaman sabiti var. Aynı değerden sürülünce
             // bulutlar yağışla birlikte anında inceliyordu: yağış duruyor, aynı karede
@@ -257,7 +245,7 @@ public class AltitudeWeatherDriver : MonoBehaviour
         // yani kural hiç işlemiyordu: bulut denizinin üstünde de yağış devam ediyordu.
         ClearWindow = WindowAt(altitude);
 
-        weather.Set(intensity * CeilingAt(observer.position.y), snowiness);
+        weather.Set(intensity * CeilingAt(observer.position.y));
 
         // Rüzgâr aynı değere bağlı: yağış sertleşirken rüzgâr da sertleşir,
         // chill ara geldiğinde ikisi birlikte diner.
@@ -330,7 +318,7 @@ public class AltitudeWeatherDriver : MonoBehaviour
 
         // Sulu kar bandının genişliği sabit: sınır kayarken bandın kendisi daralıp
         // genişlemez, olduğu gibi taşınır.
-        snowFloor = rainCeiling + (referenceSnowFloor - referenceRainCeiling);
+        stormFloor = rainCeiling + (referenceStormFloor - referenceRainCeiling);
     }
 
     /// Yükseklikten gelen zemin şiddet. Kuşak köşeleri arasında doğrusal geçer.
@@ -351,14 +339,14 @@ public class AltitudeWeatherDriver : MonoBehaviour
             return Mathf.Lerp(settings.openingIntensity, settings.rainPeak,
                 Mathf.InverseLerp(openingEnd, referenceRainCeiling, altitude));
 
-        // Geçiş kuşağı: yağmur tavanından karın sakin tabanına iner
-        if (altitude < referenceSnowFloor)
-            return Mathf.Lerp(settings.rainPeak, settings.snowBase,
-                Mathf.InverseLerp(referenceRainCeiling, referenceSnowFloor, altitude));
+        // Geçiş kuşağı: yağmur tavanından fırtınanın sakin tabanına iner
+        if (altitude < referenceStormFloor)
+            return Mathf.Lerp(settings.rainPeak, settings.stormBase,
+                Mathf.InverseLerp(referenceRainCeiling, referenceStormFloor, altitude));
 
-        if (altitude < blizzardAltitude)
-            return Mathf.Lerp(settings.snowBase, settings.snowPeak,
-                Mathf.InverseLerp(referenceSnowFloor, blizzardAltitude, altitude));
+        if (altitude < stormPeakAltitude)
+            return Mathf.Lerp(settings.stormBase, settings.stormPeak,
+                Mathf.InverseLerp(referenceStormFloor, stormPeakAltitude, altitude));
 
         return 1f;
     }
@@ -401,7 +389,7 @@ public class AltitudeWeatherDriver : MonoBehaviour
         if (ForceWindow) return settings.clearWindowStrength;
 
         float summit = Mathf.SmoothStep(0f, 1f,
-            Mathf.InverseLerp(blizzardAltitude - 300f, blizzardAltitude, altitude));
+            Mathf.InverseLerp(stormPeakAltitude - 300f, stormPeakAltitude, altitude));
         float open = Mathf.Lerp(WindowOpen, SummitWindowOpen, summit);
 
         return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(open, open + WindowBand, windowRoll))
@@ -422,30 +410,11 @@ public class AltitudeWeatherDriver : MonoBehaviour
     }
 
     /// Yağışın o kotta kar olarak düşen payı.
-    public float SnowinessAt(float altitude) =>
-        Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(rainCeiling, snowFloor, altitude));
 
     /// Bulut sütununun tepesine göre yağışın o kotta hayatta kalan payı.
     public float CeilingAt(float altitude) =>
         1f - Mathf.SmoothStep(0f, 1f,
             Mathf.InverseLerp(CloudColumnTop, CloudColumnTop + 300f, altitude));
-
-    /// O kotta zemine düşen KAR miktarı: şiddet × karlılık × bulut tavanı. Yüzeyin kar
-    /// birikimi bunu kot bandı başına ayrı ayrı sorar — birikim tek bir global sayı
-    /// olduğu sürece kar sınırı ne inebiliyor ne çekilebiliyordu.
-    public float SnowfallRateAt(float altitude)
-    {
-        // Test kilitleri BURADA DA geçerli. Okunmadıklarında F1'de yağış 1.00 yazarken
-        // bantlar doğal havayı biriktiriyordu: panel bir şey söylüyor, zemin başka bir
-        // şey yapıyordu.
-        float storm = IntensityOverride >= 0f
-            ? IntensityOverride
-            : Baseline(altitude) * Variation(altitude);
-
-        float snow = SnowinessOverride >= 0f ? SnowinessOverride : SnowinessAt(altitude);
-
-        return storm * snow * CeilingAt(altitude);
-    }
 
     float VariationAmount(float altitude)
     {
@@ -458,9 +427,9 @@ public class AltitudeWeatherDriver : MonoBehaviour
         // sağanağa dönüşüyor, saatlerce hiçbir şey değişmiyordu. Taban genlikle bile
         // aralık dar (0.70-1.00): zirve hâlâ acımasız, ama ölü değil.
         float fade = Mathf.Lerp(1f, settings.summitVariation, Mathf.SmoothStep(0f, 1f,
-            Mathf.InverseLerp(blizzardAltitude - 300f, blizzardAltitude, altitude)));
+            Mathf.InverseLerp(stormPeakAltitude - 300f, stormPeakAltitude, altitude)));
 
-        return Mathf.Lerp(settings.rainVariation, settings.snowVariation,
-            Mathf.InverseLerp(referenceRainCeiling, referenceSnowFloor, altitude)) * fade;
+        return Mathf.Lerp(settings.rainVariation, settings.stormVariation,
+            Mathf.InverseLerp(referenceRainCeiling, referenceStormFloor, altitude)) * fade;
     }
 }

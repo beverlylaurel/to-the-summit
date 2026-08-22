@@ -14,16 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AtmosphereSettings
   clearVisibility: 25000
   rainVisibility: 900
-  snowVisibility: 320
   windClosure: 0.65
   clearDay: {r: 0.6, g: 0.68, b: 0.8, a: 1}
   rainDay: {r: 0.42, g: 0.45, b: 0.5, a: 1}
-  snowDay: {r: 0.8, g: 0.84, b: 0.9, a: 1}
   duskOvercast: {r: 0.62, g: 0.44, b: 0.38, a: 1}
   duskStrength: 0.75
   clearNight: {r: 0.05, g: 0.07, b: 0.12, a: 1}
   rainNight: {r: 0.06, g: 0.07, b: 0.09, a: 1}
-  snowNight: {r: 0.14, g: 0.16, b: 0.22, a: 1}
   clearCoverage: 0.18
   stormCoverage: 0.95
   minCoverage: 0.4
@@ -61,16 +58,6 @@ MonoBehaviour:
   dawnSeaVisibility: 2200
   dawnSeaHalfHeight: 120
   valleyFogBurnOff: 0.45
-  spindriftDensity: 0.005
-  spindriftWindThreshold: 0.22
-  spindriftWindBand: 0.45
-  spindriftBrightness: 2.2
-  spindriftMaxDepthCalm: 0.35
-  spindriftMaxDepthStorm: 1.2
-  spindriftCrestBoost: 3
-  spindriftCrestRise: 4
-  spindriftHeightCalm: 10
-  spindriftHeightStorm: 150
   deckLeadMeters: 400
   deckThickness: 900
   deckVisibility: 60

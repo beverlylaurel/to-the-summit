@@ -69,13 +69,13 @@ rastgeleliğini veya kendi hava kavramını kurmaz.
 
 | Kaynak | Ne üretir | Neye bakar |
 |---|---|---|
-| `AltitudeWeatherDriver` | Yağış şiddeti, karlılık, rüzgâr şiddeti | Tırmanışın ulaştığı yükseklik |
+| `AltitudeWeatherDriver` | Yağış şiddeti, rüzgâr şiddeti | Tırmanışın ulaştığı yükseklik |
 | `TerrainWindShelter` | Rüzgârın arazi maruziyeti | Oyuncunun altındaki arazinin biçimi |
 | `TemperatureField` | Sıcaklık, hissedilen sıcaklık, donma seviyesi | Kot, saat, yağış, rüzgâr |
 | `TimeOfDay` | Saat, güneş yönü, gündüz katsayısı, ışığın rengi | Kendi saati |
 | `WindField` | Rüzgâr vektörü, sürekli şiddet, anlık esinti | Sürücünün verdiği şiddet + kendi gürültüsü |
 
-`WeatherState` bir kaynak değil, taşıyıcı: sürücünün yazdığı iki değeri (şiddet, karlılık)
+`WeatherState` bir kaynak değil, taşıyıcı: sürücünün yazdığı değeri (şiddet)
 tutar ve değiştiğinde olay yayar.
 
 **Rüzgâr iki sayıdır** — sürekli şiddet ve anlık esinti — ve ayrı yayımlanır. Yavaş tepki
@@ -90,7 +90,7 @@ anında takip eder, aşağı bir ölü bant ve gecikmeyle iner. Gerekçeler `RAT
 ```mermaid
 graph TD
     ALT[Tırmanış yüksekliği] --> DRV[AltitudeWeatherDriver]
-    DRV -->|şiddet, karlılık| WS[WeatherState]
+    DRV -->|şiddet| WS[WeatherState]
     DRV -->|şiddet| WF[WindField]
     DRV -->|açık pencere| ATM
     TOD[TimeOfDay]
@@ -134,8 +134,6 @@ Yükseklik arttıkça hava sertleşir. Kuşak sınırları `AltitudeWeatherDrive
 başka hiçbir yerde tekrarlanmaz — yüzey de tanecikler de oradan okur.
 
 Sınırlar mutlak metre değil **dağın yüksekliğine oran**. Oran yalnız **referansı** verir;
-yağmur/kar sınırının kendisi sabit değildir — donma seviyesi soğuk cephede iner, öğle
-ısınmasında çıkar, `TimeOfDay` ve şiddet birlikte sürer. **Kalıcı kar çizgisi bu hareketli
 sınırı okumaz, referansı okur.** Aradaki sulu kar kuşağı dar tutulur: geçiş bir bant değil
 bir sınır gibi okunmalı.
 
@@ -144,7 +142,6 @@ bir sınır gibi okunmalı.
 | Açılış | Çok hafif yağmur, neredeyse rüzgârsız | Dingin yağmur ve rüzgâr | Çıplak kaya, ıslanır |
 | Yağmur | Kademeli sertleşir, kar yok | Sağanak katmanı açılır, uzak gök gürültüsü | Islak kaya |
 | Geçiş | Yağmur çekilir, kar yerleşir | Yağmur sesi hızla kısılır | Taze kar birikmeye başlar |
-| Prosedürel | Bazen tipi, bazen sakin kar | Yalnızca rüzgâr | Kalıcı kar çizgisinin üstü |
 | Zirve | Dalgalanma kapanır, sürekli fırtına | Tam güç rüzgâr | Sürekli örtü |
 
 **Kurallar**
@@ -157,7 +154,6 @@ bir sınır gibi okunmalı.
   Sonuç kendiliğinden çıkar: kısa pencereler gökyüzünü açmadan geçer, uzun olanlar açar.
 - **Bulut tepesinin üstünde yağış yoktur** ve bu kesme bulut sisteminden **itilir**
   (`CloudLayerProbe` → `CloudColumnTop`); sürücü çekmez.
-- **Ani geçiş yoktur:** şiddet **ve karlılık** hedeflerine aynı zaman sabitiyle kayar.
 
 Gerekçeler: `RATIONALE.md` → Kuşaklar ve hava dalgalanması.
 
@@ -168,7 +164,6 @@ Gerekçeler: `RATIONALE.md` → Kuşaklar ve hava dalgalanması.
 ### Yağış tanecikleri (`PrecipitationRenderer`, `Precipitation.shader`)
 
 **Okur:** şiddet (yoğunluk ve damla boyutu dağılımı), **tepedeki bulut kolonunun yağış payı**
-(`AtmosphereController.LocalRain`), karlılık (damla/tane oranı), rüzgâr vektörü (savrulma
 **ve girdap alanının sürüklenmesi**), rüzgârın **esintili** şiddeti (girdap genliği, tanenin
 dönme hızı), **arazi yüzeyini** (`TerrainHeightAt` — rüzgârın sınır tabakası), **günün
 saatini** (`TimeOfDay.CurrentSunColor × SunIntensity`, izin yönlü terimi) ve **göğün o
@@ -187,13 +182,10 @@ sahnede öyle bir kaynak yok. Şimşek eklendiğinde gerekecek (`DECISIONS.md`).
   verir, yayvan ince katman yağdırmaz. Kolonun tepesinin üstünde pay sıfırlanır. Pay
   ~2.5 s'lik sabitle yumuşatılır.
 - **Türbülans yamalıdır:** genlik, rüzgârla akan alçak frekanslı bir zarfla yerel çarpılır;
-  damla da tane de aynı zarfı okur. Kar tanesinin ayrıca taneye özel çırpıntısı vardır
   (1–3 Hz); damla çırpmaz.
 - **Tane kendi rengini seçmez** — havanın rengini çarpanla parlatır.
 - **Tanenin biçimi kristal değil kümelenmedir.**
-- **Kar tanesi esintiyi anında yer** (~0.1 s); damla gevşeme süresiyle uyar (terminal hız/g).
   Dönme ve girdap **esintiye** bağlanır, sürekli şiddete değil.
-- **Damla ve tane ayrı popülasyondur**; karlılık oranı belirler. Sulu kar ikisinin bir arada
   bulunmasıdır.
 - **Damla boyutu hem düşme hızını hem rüzgâra direncini belirler**; dağılım şiddetle kayar.
 - **Tanecikler İKİ İÇ İÇE KUTUDA yaşar** (48 m ve 12 m), ikisi de kamerada merkezli,
@@ -230,85 +222,9 @@ sahnede öyle bir kaynak yok. Şimşek eklendiğinde gerekecek (`DECISIONS.md`).
   dikey bileşenle kurulur ve üstüne **girdap alanının kendi türevinden** çıkan damla başına
   sapma binder. Sapma uydurulmaz: çizilen konumun tam türevi alınır.
 
-### Kar sistemi v2 (`Assets/Snow/`)
-
-Yeni kar sistemi. `unity-kar-sistemi-spec-v2.md` uygulanıyor, Faz 0–3 bitti.
-Eski iz/yama sistemi **silindi** (Faz 4). Arazinin kendi kar birikintisi görüntüsü
-(`SnowMacroDepth`, bölünme) duruyor: clipmap'in kapsadığı 162 m'nin dışını o çiziyor.
-
-Kar bir yükseklik değil bir **madde**: her teksel kar su eşdeğeri (SWE) ve yoğunluk
-tutuyor, görünür derinlik ikisinden türetiliyor. Batış, patika oluşması, izlerin
-dolması ayrı ayrı kodlanmıyor — hepsi bu tek modelden çıkıyor.
-
-**`SnowWeather` okur:** yağış preseti, sıcaklık.
-**Okumaz:** projenin `WeatherState`, `WindField`, `TemperatureField` zincirini. Bu bilinçli
-ve **geçici**: spec kendi hava kaynağını tanımlıyor, iki kaynak aynı anda yaşamaz.
-Bağlama kararı `DECISIONS.md` → "Kar v2 kendi hava kaynağını sürüyor".
-
-**`SnowOcclusionCapture` okur:** `SnowOccluder` katmanındaki nesneleri, bölge merkezini.
-**Okumaz:** karakterleri ve hareketli nesneleri — onlar o katmanda olmayacak, yoksa
-oyuncunun altına kar yağmaz.
-
-**`SnowGroundHeight` okur:** Unity Terrain'in yükseklik haritasını.
-**Okumaz:** `MountainHeight.asset`'i. O bölge ölçeğinde (30 km) ve karla aynı hassasiyette
-değil.
-
-**`SnowManager` okur:** takip hedefinin konumu, `SnowWeather`, `SnowGroundHeight`,
-`SnowOcclusionCapture`. Hepsi `[SerializeField]` ile enjekte.
-**Okumaz:** hiçbir sistemi arayarak bulmuyor. Tek istisna `SnowManager.Active` —
-renderer varlığı sahneye bağlanamıyor, başka köprü yok.
-
-- **Bölge merkezi TAM SAYI TEKSELE snap'leniyor.** Kesirli snap, snap yapmamakla aynı
-  belirtiyi üretiyor: izler yürüdükçe teksel altı kayıyor ve titriyor.
-- **Izgara dünya orijinine çapalı.** Aynı dünya noktası her zaman aynı teksele düşüyor,
-  oyuncu oraya nereden gelirse gelsin.
-- **Engel haritası her karede değil**, merkez eşikten fazla kayınca ya da elle
-  kirletilince yenileniyor. Yerinden oynayan nesneler `MarkOcclusionDirty()` çağırır.
-- **Engel kamerasının kendi renderer'ı var** (`SnowOcclusionRenderer.asset`). Ana
-  renderer'daki gökyüzü/bulut/sis geçişleri onun tek kanallı hedefinde çöküyordu.
-- **Birikme gökyüzü görünürlüğüyle çarpılıyor.** Çatı altına kar yağmıyor; saçak
-  altında kademeli azalıyor, keskin çizgi oluşmuyor.
-- **Ayak izlerinin dolması için ayrı kod YOK.** Sıkışmış teksele taze kar biniyor,
-  karışım yoğunluğu düşüyor, derinlik iki koldan da artıyor. Patika izi uzun süre
-  görünür kalıyor çünkü yoğunluğu yüksek.
-- **Simulasyon karede bir kez koşuyor.** İş CPU'da birikiyor, ilk kamera tüketiyor;
-  sahne görünümü ikinci kez koşturmuyor.
-
-**`SnowClipmap` okur:** durum dokusu, uzak kaskad, zemin yüksekliği.
-**Okumaz:** araziyi. Kar yüzeyi ayrı bir mesh; arazi yalnız YÜKSEKLİK kaynağı.
-
-**`SnowDeformerRegistry` okur:** etkin `SnowDeformer` bileşenlerini.
-**Okumaz:** oyuncuyu, karakteri, hiçbir oyun sınıfını. Temas noktaları kendilerini
-kaydediyor; sistem kimin bastığını bilmiyor.
-
-**`SnowfallController` okur:** hava preseti, rüzgâr, engel haritası, zemin yüksekliği,
-yüzeydeki gevşek kar oranı.
-**Okumaz:** projenin `PrecipitationRenderer`'ını. İki yağış sistemi aynı anda
-çalışırsa gökyüzünde iki kar olur — biri kapatılacak.
-
-**`SnowSampler` okur:** durum dokusunu, 64x64 bölge hâlinde, bloklamayan geri okumayla.
-**Okumaz:** her karede tam doku. Geçilen süre iki kare; ayak sesi ve hız cezası için
-yeterli.
-
-- **Clipmap halkaları TEK adıma snap'leniyor**, halka başına değil. Ayrı adımlar
-  merkezleri ayırıyor ve halkalar arasında çatlak açılıyor.
-- **Arazi clipmap'in içinde KABARMIYOR.** Kesilmiyor — kesmek sınırda çatlak açar;
-  yalnız kendi kar birikintisi sönüyor, böylece her zaman kar yüzeyinin altında kalıyor.
-- **Patika oluşması için ayrı kod yok.** Yüzey yükü zaten taşıyorsa batılmıyor; aynı
-  hattan geçildikçe yoğunluk artıyor ve taşıma kapasitesi yükseliyor.
-- **Kütle deformasyonda TAM korunuyor.** Ekstrüde edilen kütle halka ağırlıklarının
-  toplamına bölünüp kenara dağıtılıyor; gevşeme gather formülasyonunda.
-- **İzler rüzgârda doluyor**, zamanlayıcıyla değil: rüzgâr arttıkça duruş açısı düşüyor
-  ve çukur kendiliğinden akıyor.
-- **Havadayken iz yok.** Zıplayarak ilerlerken arkada iz kalmıyor.
-- **Uzak kaskad 192 m.** Clipmap'in dış halkaları düz yedek yerine onu okuyor; at ve
-  araba izleri uzaktan görünür kalıyor.
-- **Kalıcılık gezinerek yakalıyor**, blok çıkarken değil: geri okuma asenkron ve blok
-  o ana kadar gitmiş olurdu. Saklanan veri en fazla 17 saniye eski.
-
 ### Hava sesi (`WeatherAudio`, `AudioBand`)
 
-**Okur:** şiddet, karlılık, rüzgârın sürekli şiddeti **ve** esintisi.
+**Okur:** şiddet, rüzgârın sürekli şiddeti **ve** esintisi.
 
 Dört band (hafif yağmur, sağanak, dingin rüzgâr, fırtına rüzgârı), eşit-güç geçişiyle
 karışır; ayrık "hafif/şiddetli" durumu yoktur.
@@ -323,9 +239,8 @@ karışır; ayrık "hafif/şiddetli" durumu yoktur.
 
 ### Gök gürültüsü (`ThunderPlayer`)
 
-**Okur:** şiddet (sıklık ve yakınlık), karlılık (kesilme).
+**Okur:** şiddet (sıklık ve yakınlık).
 
-- Belirli bir şiddetin altında hiç çalmaz. Karlılık yükseldikçe seyrelir ama **tamamen
   susmaz** — tipide şimşek nadirdir, yok değildir.
 - Çakma anında `Struck` olayı yayılır ve **uzaklığı metre olarak** taşır. **Mesafenin tek
   sahibi burasıdır:** hem sesin gecikmesi (`mesafe / 340`) hem çakmanın dünyadaki yeri
@@ -424,7 +339,6 @@ kernel: yoğunluk+aydınlatma, sonra Beer-Lambert birikimi.
   fonksiyonları çağırır. Model tek yerde durmasa hacmin sınırında sisin yapısı değişirdi.
 - Kompozisyon Beer-Lambert gereği: `sonuç = kuyruk × T_hacim + saçılım_hacim`. Geçiş yapı
   gereği sürekli, ayrıca blend penceresi yok.
-- **Savrulan kar TEK KAYNAKTAN:** `HeightFog.hlsl → SpindriftPath`, kameradan okunur ve
   dikey profil **kapalı biçimde** integre edilir.
 - **Alanlar sinüs TOPLAMIDIR, çarpımı değil** — yönleri paralel olmayan, dalga boyları
   oransız beş bileşen. Sinüs seçildi çünkü CPU ile GPU birebir aynı sonucu veriyor ve
@@ -454,7 +368,7 @@ Sis, görüş mesafesi, hava sinyalleri. **Gökyüzü, ortam ışığı ve yans�
 (bkz. **Gökyüzü ve atmosfer**); hacimsel bulutlar ayrı sistem (bkz. **Bulutlar**).
 Buradaki `coverage` bulutların da okuduğu tek eşlemedir.
 
-**Okur:** şiddet, karlılık, rüzgârın **sürekli** şiddeti ve yönü, günün saati, ve
+**Okur:** şiddet, rüzgârın **sürekli** şiddeti ve yönü, günün saati, ve
 sürücüden üç sinyal — **açık pencere**, **kuru kapsama**, **bulut kütlesi**.
 **Okumaz:** esintiyi, kuşak kotlarını, yüksekliği, ilerlemeyi.
 
@@ -481,31 +395,6 @@ ikisi ayrı olay ama ikisi de yalnız doğrudan güneşi keser, dolaylıya dokun
   konumunda örnekler (`BankField`); **formül değişirse ikisi birlikte değişir.**
 - **Bulut tabanı sabit değil:** sakin havada iner, yağış ve rüzgâr yükseltir; dakikalar
   ölçeğinde yer değiştirir.
-
-#### Sürüklenen kar (dördüncü katman)
-
-Rüzgâr eşiği aşınca gevşek kar havalanıp yüzeye yapışık sığ perde oluşturur.
-
-- **İki koşul birden:** rüzgâr eşiği (CPU, tek dünya durumu) ve **yerde taze kar** (shader
-  kot profilinden).
-- **Yükseklik yerden ölçülür**; arazi yüksekliği `SurfaceMapBaker` pişirmesinden.
-- **Ataklarla gelir:** kaldırma payı **hamleli** hızdan (`Strength × (1 + Gust)`) ve eşiğin
-  üstünde **küple** ölçeklenir.
-- **KRETTEN fışkırır, yamacın tamamından değil** — rüzgâr yönünde ileri/geri iki arazi
-  örneği; ikisi de alçaksa sırttayız. Kret üzerinde kaldırma güçlenir ve katman kalınlaşır.
-- **Rüzgâr altına kuyruk bırakır.**
-- **Dikey profil kuvvet yasası**, üstel değil.
-- **Sürüklenme kaynağını TÜKETİR.** Yalnız örtü süpürülür, kalınlık deposu değil.
-  Süpürülen kar kot ekseninde yok olur; rüzgâr altına yığılma yüzeyde birikim ağırlığıyla
-  zaten var, ikinci kez modellenmez.
-- **KAR SIFIRIN ALTINDA ERİMEZ.** Erime sıcaklıktan sürülür, karlılık oranından değil;
-  sıfırın altında tek kayıp çok yavaş **süblimasyon**.
-- Kaldırma payı atmosferden **global yayınlanır** (`_SpindriftLift`); yüzey ve yağış
-  tanecikleri aynı globali okur.
-- Ayrı tanecik sistemi **değil**: sıfır ek çizim, güneş rengi sisin okuduğu yerden.
-- **Rengi ile parlaklığı ayrı kurulur** — ton 1'e normalize, seviyeye fiziksel tavan
-  (perde kardır), ölçüsü **güneşin yüksekliği**.
-- Akış alanı **bilerek kaba**; ince yapı yakın tanecik katmanının işi.
 
 #### Hava haritası ve bulut biçimi
 
@@ -633,88 +522,8 @@ pişmeden önce.
 
 ### Dağ yüzeyi (`TerrainSurface`, `MountainSurface.hlsl`)
 
-**Okur:** karlılık ve şiddet (taze kar, ıslaklık), **hâkim** rüzgâr yönü ve anlık şiddeti,
 öğle güneşi (liken), kar kuşağı kotları (hava sürücüsünden).
 **Okumaz:** anlık rüzgâr yönünü — birikinti ekseni hâkim yönden kurulur.
-
-#### Örtü, kalınlık, birikinti
-
-- **Kapsama ile kalınlık ayrı iki sorudur** ve farklı yerlerde zirve yapar. Kayanın
-  kabartısını gömen **kalınlıktır**. `TerrainSurface` iki depo tutar; örtü yağışla hızlı
-  kapanır, kalınlık arkadan gelir, erirken ters sıra. Kalıcı çizginin üstünde kalınlık
-  havadan bağımsız tamdır.
-- **İki ayrı kalınlık kanalı.** `depth` kabartıyı besler (sastrugi, pütür, mikro doku) ve
-  birikinti onu şekillendirir; `burial` "altındaki taş görünüyor mu" sorusunun cevabıdır ve
-  birikinti ona **karışmaz** — gömülme doyar.
-- Birikintinin **ısırığı** örtü maskesine eşikten ÖNCE girer: kar bol olduğu yerde delmez,
-  yalnız inceltir.
-- **Birikinti alanı** (`SnowDrift.hlsl`) derinliğin YATAY şeklini verir; rüzgâr eksenine
-  hizalı yığınlar üretir. **Konkavlık okumaz.**
-- **ARAZİ AĞIRLIĞI TEK KAYNAK.** Arazi rüzgârın **hızını** değiştirir, hız da birikimi;
-  süpürülme ve dolma ayrı iki terim değil. Liston & Sturm (SnowTran-3D):
-
-      W = clamp(1 + 0.5·Ωs + 0.5·Ωc, 0.5, 1.5),   birikim ∝ 1/W  ∈ [0.67, 2.0]
-
-  `Ωs` hâkim rüzgâr yönündeki eğim, `Ωc` eğrilik.
-- `W` bir **rüzgâr hızı** çarpanıdır: `TerrainWindShelter` oyuncunun hissettiği rüzgârı da
-  bu haritadan okur.
-- Ağırlık **pişer** (`SurfaceMapBaker.BakeDriftWeight` → `MountainSnowDrift`), çünkü hâkim
-  rüzgâr yönü sabit bir ayar. Gölgelendirme (`cover`, `pile`), geometri (`SnowMacroDepth`)
-  ve çarpışma (`SnowSurface`) **üçü de bu tek dokuyu** okur.
-- Eğrilik çekirdeği **dairesel** (Gauss ağırlıklı disk, σ = yarıçap/2).
-
-#### Kar yüzeyi
-
-- Gömülen taş dokusunun yerine karın kendi dokusu gelir; üstüne desimetre ölçeğinde
-  **pütür** yalnız karlı piksellerde biner.
-- **Sastrugi:** kabartının rüzgâr yönündeki bileşeni kısılır, yanal bileşeni güçlendirilir.
-  Tarama gücü paylaşılan gürültüyle yamalanır ve **maruziyetle** kapılanır. Maruziyet
-  **birikim ağırlığından** gelir, gökyüzü açıklığından değil. **Yeni gürültü örneği
-  alınmaz.**
-- **Tazelik ayrı bir sinyaldir:** taze toz mat, pütürsüz, parıltılı ve sastrugiyi örter;
-  yıllanmış névé camsı ve oyulmuş. Taze pay yerleşmişliği geri çeker.
-- **Kar parlaması** yalnız doğrudan güneşte (arazi gölgesi kapılar), yalnız yakında ve
-  **tazeliğe** bağlı. Rengi anlık güneşin süzülmüş rengi.
-- **Kar gece matlaşır.** Kaynak `_SurfaceDawnDir.y`; ayrı zamanlayıcı yok.
-- **Alpenglow ayrı bir ışık değil**, kızıllaşmış güneşin kendisi — ve **arazi gölgesine
-  tabidir** (aynı ufuk haritası). Rengi `TimeOfDay`'in süzülmüş güneşi, penceresi
-  `HorizonFactor`.
-
-#### Geometri, çarpışma ve katmanlar
-
-`SnowDisplacement.hlsl` alanı makro derinliğe (0.2–3 m) çevirip yüzeyi fiilen kaldırır,
-`SnowTessellation.hlsl` yakın ve karlı yamaları böler.
-
-- **Dört geçiş de** (ForwardLit, ShadowCaster, DepthOnly, DepthNormals) aynı yer
-  değiştirmeyi uygular.
-- Yer değiştirme yalnız **dünya konumunun** fonksiyonudur ve sönümü bölünmenin **içinde**
-  biter — ikisi de LOD çatlağını engelleyen kurallar.
-- Çarpışma aynı hesabın CPU ikizinden (`SnowSurface`, `SnowDriftField`); ayak o kota oturur
-  (`FirstPersonController.SettleOnSnow`). CPU ikizi **mesafe sönümü uygulamaz** — sönüm
-  kameraya bağlı, çarpışma kamerayı bilmez (`COOP.md`, `DECISIONS.md`).
-
-Katmanların **nerede** olduğu gürültüyle değil dağın kendi biçimiyle belirlenir; veriler
-`SurfaceMapBaker` tarafından heightmap'ten çıkarılır:
-
-| Katman | Kaynak |
-|---|---|
-| Çakıl | Akış birikimi — dik yüzler malzeme verir, oluklar toplar |
-| Liken | Konkavlık + gökyüzü maruziyeti + öğle güneşi + rakım sınırı |
-| Oksit | Jeolojik bant maskesi — demir damarları katmanları izler |
-| Kar | Eğim + birikim ağırlığı (rüzgâraltı/içbükey) + hava + rakım |
-| Islaklık | Yağış; hızlı ıslanır, yavaş kurur |
-
-- Liken **öğle** güneşine bakar, anlığa değil.
-- **Kar iki parçadır.** *Kalıcı kar çizgisi* sürücünün kar kuşağından **türetilir**
-  (`SnowFloor + permanentSnowRise`), ayrı sabit tutulmaz; yükseltme payı çizginin
-  **yumuşatma bandından büyük** olmalı. *Taze kar* **kot ekseninde** tutulur: dağ 128 banda
-  bölünür, her bant kendi kotundaki yağışla dolar ve kendi sıcaklığıyla erir. Profil yüzeye
-  128×1 doku olarak verilir.
-- **Hava kaynaklı değerler GLOBAL yazılır, materyale değil** (`_SnowfallFloor`,
-  `_SnowfallCeiling`, `_PermanentSnowLine`, `_SnowProfile`). **Kural:** bir değer çalışma
-  anında paylaşılan bir kaynaktan geliyorsa materyalin ayarı değildir, globaldir.
-
-Gerekçeler: `RATIONALE.md` → Dağ yüzeyi.
 
 ### Gökyüzü ve atmosfer (`PhysicallyBasedSkyURP` paketi, `SkyWeatherDriver`)
 
@@ -793,7 +602,6 @@ diğerlerinin üstüne yazıyor.
 
 ### Renk düzenlemesi (`LookController`)
 
-**Okur:** şiddet ve karlılık (fırtına ağırlığı), gündüz katsayısı, `TimeOfDay`'in
 `SurfaceLightLevel`i, ortam probe'unun zenit parlaklığı. Post-process profilini sürer,
 ayrı bir hava kavramı kurmaz.
 
@@ -825,20 +633,6 @@ Gerekçeler: `RATIONALE.md` → Renk düzenlemesi.
   (`DECISIONS.md` → "L0 uygulandı").
 - Aynı tohum → aynı grafik → aynı kimlikler; co-op'ta senkronlanacak bir şey yok.
 
-### Kar sınırı (`BuildSnowCoverage`)
-
-**Okur:** kot, `WeatherDriver`'ın kar kuşağı, pişmiş konkavlık ve birikinti ağırlığı,
-`_GroundNormals` (bakı için **kaba mip**).
-
-**Bilinçli kural: her terim kendi ölçeğinden okunur.**
-- **Bakı yamaç yüzü ölçeğinden** (mip 4, ~234 m) — mevsimlik ışınım bir yüzün toplamıdır.
-- **Kırılma gürültüsü arazi ölçeğinde** (125 m taban, 4 oktav) — gerçek kar sınırının
-  düzensizliği oluk ve sırt ölçeğindedir.
-- **Kayma bandın yarısını geçemez.** Üç terim de mutlak metre.
-
-Örtü ile kalınlık **ayrı kanal**: albedo iki santim karda doyar, kalınlık arkadan gelir.
-Eşik bu yüzden alçak (0.03); üst eşik (0.45) geçişin genişliğini verir.
-
 ### Arazi ışığı (`MountainSurface.shader`)
 
 **Okur:** `TimeOfDay` (güneş yönü ve şiddeti), ortam probu (`SkyAmbientBaker` → `DynamicGI`),
@@ -856,7 +650,6 @@ Araziye ulaşan güneşi **üç yol** kesiyor ve üçü de aynı kanaldan gidiyo
 - **Ufuk haritası "sırtın arkasında mıyım" der, "yamaçta mıyım" demez** — noktanın kendi
   eğimi pişirirken çıkarılır, yoksa gölge iki kez uygulanır.
 - **Işıklandırma normali yer değiştirmeyi bilir.** İleri geçiş de DepthNormals geçişi de
-  `SnowDisplacedNormal` kullanır.
 - **Güneş hava kütlesiyle söner.** `sun.intensity` `BeamTransmittance`'ın **en parlak
   kanalını** taşır — `Tint()` rengi aynı kanala göre normalize ettiği için
   `CurrentSunColor × intensity` gerçek huzmeye eşit kalır.
@@ -869,7 +662,6 @@ Araziye ulaşan güneşi **üç yol** kesiyor ve üçü de aynı kanaldan gidiyo
 
 **Okur:** `TerrainMaterialSettings.patternSeed`.
 **Yazar:** iki hash kökü — `MountainHash` (kaya bandı, oksit, liken, tanecik, kırılma) ve
-`SnowDriftHash` (birikinti şekli, yani gerçek geometri).
 
 - **Tohum çağrı yerlerine değil hash köküne uygulanır** — yeni bir prosedürel katman
   eklendiğinde kaydırmayı unutmak böylece mümkün değil.
@@ -969,7 +761,6 @@ gerçekten yaşandı.
 - [ ] İki bilinçli kural birbirini yutuyor mu? *(Sürücü "bulutlar aralanır" diyordu, atmosferin kapsama tabanı o anın hiç gelmemesini sağlıyordu.)*
 - [ ] Kodda okuduğun varsayılan, sahnede geçerli olan değer mi? *(Serileştirilmiş alanın sahnedeki kopyası kazanır; kuşak sınırları ve kapsama eşikleri iki kez bu yüzden yanlış teşhis edildi.)*
 - [ ] Bir yükseklik eşiği ikinci bir yerde tekrar tanımlanıyor mu? *(Kar kuşağı yalnızca hava sürücüsünde durmalı.)*
-- [ ] Oyuncunun konumundan gelen bir değer bütün dünyaya uygulanıyor mu? *(Karlılık oyuncunun kotundan geliyordu; zirvedeyken etek de karlı görünüyordu.)*
 - [ ] Gece ve gündüz aynı görünüyor mu? *(Tanecikler hâlâ öyle.)*
 
 ---

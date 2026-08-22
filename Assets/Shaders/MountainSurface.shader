@@ -1,4 +1,4 @@
-// include-rev: 109  (Unity, .hlsl degisince .shader'i yeniden
+// include-rev: 112  (Unity, .hlsl degisince .shader'i yeniden
 // derlemeyebiliyor; bu satir degisince derleme zorlanir)
 Shader "ToTheSummit/MountainSurface"
 {
@@ -27,11 +27,9 @@ Shader "ToTheSummit/MountainSurface"
             Tags { "LightMode" = "UniversalForward" }
 
             HLSLPROGRAM
-            #pragma vertex SnowTessVertexStage
-            #pragma hull SnowHull
-            #pragma domain ForwardDomain
+            #pragma vertex Vertex
             #pragma fragment Fragment
-            #pragma target 4.6
+            #pragma target 3.5
 
             // ARAZİNİN GÖLGESİ İKİ KAYNAKTAN. Dağın kendi sırtı yükseklik alanından
             // yürüyerek bulunuyor (bkz. TerrainSunShadow) — gölge haritası o mesafeyi
@@ -73,7 +71,6 @@ Shader "ToTheSummit/MountainSurface"
             /// hepsi yanlış çıktı, çünkü eksik olan tek sayı diş boyuydu.
 
             #include "MountainSurface.hlsl"
-            #include "SnowTessellation.hlsl"
 
             struct Attributes
             {
@@ -87,22 +84,11 @@ Shader "ToTheSummit/MountainSurface"
                 float  fogFactor   : TEXCOORD2;
             };
 
-            // Köşe aşaması yalnız konumu taşıyor: asıl iş bölünmeden SONRA, domain'de.
-            // Yer değiştirme burada yapılsaydı 4.28 metrelik ızgarada uygulanır ve
-            // birikintinin şekli hiç çözülemezdi.
-            TessellationControlPoint SnowTessVertexStage(Attributes IN)
-            {
-                return SnowTessVertex(IN.positionOS);
-            }
-
-            [domain("tri")]
-            Varyings ForwardDomain(TessellationFactors factors,
-                                   const OutputPatch<TessellationControlPoint, 3> patch,
-                                   float3 barycentric : SV_DomainLocation)
+            Varyings Vertex(Attributes IN)
             {
                 Varyings OUT;
 
-                float3 positionWS = SnowDomainPositionWS(patch, barycentric);
+                float3 positionWS = TransformObjectToWorld(IN.positionOS.xyz);
 
                 OUT.positionWS = positionWS;
                 OUT.positionCS = TransformWorldToHClip(positionWS);
@@ -123,17 +109,7 @@ Shader "ToTheSummit/MountainSurface"
                 // Forward+ ışık döngüsü makroları bu değişkeni adıyla okuyor
                 InputData inputData = (InputData)0;
                 inputData.positionWS = IN.positionWS;
-                // NORMAL YER DEĞİŞTİRMEYİ BİLMELİ. Örgü domain aşamasında kabarıyor
-                // (`SnowDomainPositionWS`) ama burada pişirilmiş arazi normali
-                // kullanılıyordu: siluet kabarıyor, ışık altındaki düz yüzeyi
-                // aydınlatıyordu. `SnowDisplacedNormal`'ın kendi yorumu tam bunu
-                // söylüyor ve DepthNormals geçişi zaten öyle yapıyor — üç geçişten
-                // yalnız bu ayrıktı.
-                //
-                // Belirti: güneşle dönen, hiçbir gölge anahtarının etkilemediği koyu
-                // lekeler. Renk probu ayırdı — gölgelendirme normali "sırtı dönük"
-                // derken gerçek yüzey güneşi görüyordu (mor sınıf).
-                float3 shadingNormal = SnowDisplacedNormal(IN.positionWS, surface.normalWS);
+                float3 shadingNormal = surface.normalWS;
                 inputData.normalWS = shadingNormal;
                 inputData.viewDirectionWS = GetWorldSpaceNormalizeViewDir(IN.positionWS);
                 inputData.fogCoord = IN.fogFactor;
@@ -224,11 +200,8 @@ Shader "ToTheSummit/MountainSurface"
             ENDHLSL
         }
 
-        // Gölge ve derinlik geçişleri ELLE YAZILDI. Önceden URP'nin hazır dosyalarından
-        // geliyordu ve gerekçesi doğruydu (gölge sapması gibi tuzakları bize taşımasın).
-        // Kar yer değiştirmesi geldiğinde zorunlu oldu: o dosyalar kendi vertex
-        // fonksiyonlarını getiriyor, yer değiştirme oraya giremiyor. Girmezse gölge
-        // birikintinin ALTINDA kalır ve bulut derinliği yanlış okur.
+        // Gölge ve derinlik geçişleri ELLE YAZILDI: URP'nin hazır dosyaları gölge sapması
+        // gibi tuzaklarını da beraberinde getiriyor.
         //
         // Sapma yine URP'nin kendi fonksiyonuyla (`ApplyShadowBias`) uygulanıyor —
         // elle yazılan yalnız köşe akışı.
@@ -242,17 +215,14 @@ Shader "ToTheSummit/MountainSurface"
             ColorMask 0
 
             HLSLPROGRAM
-            #pragma vertex SnowTessVertexStage
-            #pragma hull SnowHull
-            #pragma domain ShadowDomain
+            #pragma vertex Vertex
             #pragma fragment ShadowFragment
-            #pragma target 4.6
+            #pragma target 3.5
             #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
             #include "MountainSurfaceInput.hlsl"
-            #include "SnowTessellation.hlsl"
 
             float3 _LightDirection;
             float3 _LightPosition;
@@ -260,19 +230,11 @@ Shader "ToTheSummit/MountainSurface"
             struct Attributes { float4 positionOS : POSITION; };
             struct Varyings { float4 positionCS : SV_POSITION; };
 
-            TessellationControlPoint SnowTessVertexStage(Attributes IN)
-            {
-                return SnowTessVertex(IN.positionOS);
-            }
-
-            [domain("tri")]
-            Varyings ShadowDomain(TessellationFactors factors,
-                                  const OutputPatch<TessellationControlPoint, 3> patch,
-                                  float3 barycentric : SV_DomainLocation)
+            Varyings Vertex(Attributes IN)
             {
                 Varyings OUT;
 
-                float3 positionWS = SnowDomainPositionWS(patch, barycentric);
+                float3 positionWS = TransformObjectToWorld(IN.positionOS.xyz);
 
                 // Sapma normale göre uygulanıyor; yer değiştirmiş yüzeyin normali
                 // arazininkinden farklı, o yüzden düz yukarı değil gerçek normal.
@@ -281,7 +243,7 @@ Shader "ToTheSummit/MountainSurface"
                                                      uv, 0).rg * 2.0 - 1.0;
                 float3 baseNormal = normalize(float3(packed.x,
                     sqrt(saturate(1.0 - dot(packed, packed))), packed.y));
-                float3 normalWS = SnowDisplacedNormal(positionWS, baseNormal);
+                float3 normalWS = baseNormal;
 
                 #if defined(_CASTING_PUNCTUAL_LIGHT_SHADOW)
                     float3 lightDirection = normalize(_LightPosition - positionWS);
@@ -315,32 +277,21 @@ Shader "ToTheSummit/MountainSurface"
             ColorMask R
 
             HLSLPROGRAM
-            #pragma vertex SnowTessVertexStage
-            #pragma hull SnowHull
-            #pragma domain DepthDomain
+            #pragma vertex Vertex
             #pragma fragment DepthFragment
-            #pragma target 4.6
+            #pragma target 3.5
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "MountainSurfaceInput.hlsl"
-            #include "SnowTessellation.hlsl"
 
             struct Attributes { float4 positionOS : POSITION; };
             struct Varyings { float4 positionCS : SV_POSITION; };
 
-            TessellationControlPoint SnowTessVertexStage(Attributes IN)
-            {
-                return SnowTessVertex(IN.positionOS);
-            }
-
-            [domain("tri")]
-            Varyings DepthDomain(TessellationFactors factors,
-                                 const OutputPatch<TessellationControlPoint, 3> patch,
-                                 float3 barycentric : SV_DomainLocation)
+            Varyings Vertex(Attributes IN)
             {
                 Varyings OUT;
                 OUT.positionCS = TransformWorldToHClip(
-                    SnowDomainPositionWS(patch, barycentric));
+                    TransformObjectToWorld(IN.positionOS.xyz));
                 return OUT;
             }
 
@@ -365,15 +316,12 @@ Shader "ToTheSummit/MountainSurface"
             ZWrite On
 
             HLSLPROGRAM
-            #pragma vertex SnowTessVertexStage
-            #pragma hull SnowHull
-            #pragma domain NormalsDomain
+            #pragma vertex Vertex
             #pragma fragment frag
-            #pragma target 4.6
+            #pragma target 3.5
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "MountainSurfaceInput.hlsl"
-            #include "SnowTessellation.hlsl"
 
             struct Attributes { float4 positionOS : POSITION; };
             struct Varyings
@@ -382,18 +330,10 @@ Shader "ToTheSummit/MountainSurface"
                 float3 positionWS : TEXCOORD0;
             };
 
-            TessellationControlPoint SnowTessVertexStage(Attributes IN)
-            {
-                return SnowTessVertex(IN.positionOS);
-            }
-
-            [domain("tri")]
-            Varyings NormalsDomain(TessellationFactors factors,
-                                   const OutputPatch<TessellationControlPoint, 3> patch,
-                                   float3 barycentric : SV_DomainLocation)
+            Varyings Vertex(Attributes IN)
             {
                 Varyings OUT;
-                OUT.positionWS = SnowDomainPositionWS(patch, barycentric);
+                OUT.positionWS = TransformObjectToWorld(IN.positionOS.xyz);
                 OUT.positionCS = TransformWorldToHClip(OUT.positionWS);
                 return OUT;
             }
@@ -408,7 +348,7 @@ Shader "ToTheSummit/MountainSurface"
 
                 // SSAO bu tamponu okuyor: kar birikintisinin eğimi burada da olmalı,
                 // yoksa kabartının dibinde olması gereken gölge hiç oluşmaz.
-                return half4(SnowDisplacedNormal(IN.positionWS, baseNormal), 0.0);
+                return half4(baseNormal, 0.0);
             }
             ENDHLSL
         }

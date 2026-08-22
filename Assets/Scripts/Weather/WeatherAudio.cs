@@ -67,25 +67,19 @@ public class WeatherAudio : MonoBehaviour
         EnsureBands();
 
         float precipitation = weather.Precipitation;
-        float snowiness = weather.Snowiness;
 
         // Sürekli şiddet hangi sesin çaldığını, esinti o sesin ne kadar yükseldiğini
         // belirler. İkisi ayrı okunuyor çünkü kulak ikisini ayrı duyar.
         float sustained = wind.Strength;
         float felt = Mathf.Clamp01(sustained * (1f + wind.Gust));
 
-        DriveRain(precipitation, snowiness, felt);
+        DriveRain(precipitation, felt);
         DriveWind(sustained, felt);
     }
 
-    void DriveRain(float precipitation, float snowiness, float felt)
+    void DriveRain(float precipitation, float felt)
     {
-        // Kar sessiz yağar: yükseldikçe yağmur katmanları kapanır.
-        //
-        // Eğri taneciklerinkiyle aynı olmalı. Yağmurun payı orada dördüncü kuvvetle
-        // sönüyor; ses doğrusal kısılınca ekranda kar yağarken kulakta yağmur kalıyordu.
-        float rainShare = Mathf.Pow(1f - snowiness, 4f);
-        float master = precipitation * rainShare * masterVolume
+        float master = precipitation * masterVolume
                        * (1f + felt * windRainBoost);
 
         // Çiseleme boğuk, sağanak tiz

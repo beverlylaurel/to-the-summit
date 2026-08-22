@@ -149,8 +149,6 @@ float3 LightningScatter(float3 cameraPos, float3 worldPos)
 // ediliyor. İkinci bir isim uydurulmuştu; o global gelmediğinde değer sıfır kalıyor,
 // perde "güneş alçak" sanılıp ham gök mavisine boyanıyordu.
 float _SunHeight;
-float _SpindriftBrightness;  // perdenin kendi parlaklığı, gök luminansı çarpanı
-float _SpindriftMaxDepth;    // perdenin optik derinlik tavanı
 
 // BULUT SİSTEMİ SÖKÜLDÜ — burada yalnız iki iz kaldı.
 //
@@ -208,95 +206,6 @@ float HeightFogIntegral(float3 cameraPos, float3 worldPos)
     // `FogDensityAt` artık mutlak yoğunluk veriyor: dışarıda ikinci bir çarpım yok,
     // yoksa iki katmandan biri iki kez ölçeklenirdi.
     return distance * sum / Steps;
-}
-
-/// SAVRULAN KARIN OPTİK DERİNLİĞİ — tek kaynak, kapalı biçim.
-///
-/// Perde iki yerden birden geliyordu: froxel hacmi her hücrede `SpindriftAt` çağırıyor,
-/// arazi yolu da ışın boyunca örnekliyordu. İkisi de aynı hatayı yapıyordu — alanın
-/// içindeki `crest`/`lee` 60-80 m'lik KESKİN eşikler ve her okumada dört ayrı arazi
-/// yüksekliği. Froxel ızgarası (160×90) uzakta o eşiklerden geniş, ışın örneklemesi de
-/// üstünden atlıyor; ikisi de kamera kıpırdadıkça yer değiştiren dikey şeritler bırakıyor.
-/// Örnek sayısını artırmak çözüm değil, alan keskin kenarlı.
-///
-/// Gök yolu bunu baştan doğru yapıyordu (`SkyFogDepth`): perde yalnız kameranın
-/// çevresinden okunur, dikey profil kapalı biçimde integre edilir. Artık üç yol da
-/// buradan geçiyor.
-///
-/// Dikey profil `exp(-falloff·h)`; ışının eğimi onu sıkıştırır. Menzil katmanın kendi
-/// sönüm katsayısından: üç e-katı kolonun %95'ini taşır.
-float SpindriftPath(float3 cameraPos, float3 worldPos)
-{
-    if (_SpindriftDensity <= 0.0) return 0.0;
-
-    float3 ray = worldPos - cameraPos;
-    float distance = length(ray);
-    if (distance < 0.01) return 0.0;
-
-    float range = min(distance, 3.0 / max(_SpindriftFalloff, 1e-4));
-    float slope = abs(ray.y) / distance;
-    float k = _SpindriftFalloff * slope;
-
-    float path = k > 1e-5 ? (1.0 - exp(-k * range)) / k : range;
-    float raw = SpindriftAt(cameraPos) * path;
-
-    // Doyuma gitmez ama yapısını da kaybetmez: sert kırpma uzakta bütün değerleri aynı
-    // tavana yapıştırıp akış deseninin kontrastını siliyordu.
-    return _SpindriftMaxDepth * raw / (raw + _SpindriftMaxDepth);
-}
-
-/// Havada asılı karın rengi. Gökyüzü rengiNDEN türemiyor: `AirColor` bakış yönüne bağlı,
-/// aşağı bakarken ufuk rengine oturup en çok 0.55 ile çarpılıyor — sis için doğru (vadiye
-/// bakınca sis koyu okunur), havada asılı kar için yanlış. Savrulan kar yukarıdan güneşle
-/// ve altındaki karın yansımasıyla aydınlanır; hangi yöne bakıldığı onu karartmaz.
-///
-/// (Bu satır bir dönem "aşağı bakarken neredeyse siyah dönüyor" diyordu. Koddan
-/// doğrulandı: dönmüyor. Siyah ekran belirtisi aranırken bu yorum yanlış yere baktırdı.)
-///
-/// Kaynak ufkun hemen üstündeki gök rengi — zaten sisin okuduğu ışık, ayrı bir kaynak
-/// kurulmuyor. Doygunluğu alınıyor (kristal dalga boyu seçmez) ve yukarı ölçekleniyor
-/// (kar albedosu havanın saçılmasından yüksek).
-float3 SpindriftColor()
-{
-    // Kristal DALGA BOYU SEÇMEZ: rengi kendinden değil, üstüne düşen ışıktan gelir.
-    // Şafakta savrulan kar kızıl olmalı — tam doygunluk alınırsa asla olmaz.
-    //
-    // Ama gündüz de ufuk göğünün rengini alamaz: güneş tepedeyken perdeyi aydınlatan
-    // şey tek bir yön değil, gök kubbenin tamamı — sonuç nötr beyazdır. Ufuk mavisini
-    // taşımak yamacı fosforlu maviye çeviriyordu.
-    //
-    // Ayrım güneşin yüksekliğinden: alçakken ışık yönlü ve renkli, yükseldikçe dağınık
-    // ve nötr.
-    float3 light = _HeightFogSunColor.rgb;
-    float luma = dot(light, float3(0.2126, 0.7152, 0.0722));
-
-    float lowSun = 1.0 - smoothstep(0.02, 0.28, _SunHeight);
-
-    // PARLAKLIK AYRI BİR KATSAYI. Ufuk göğünün luminansı kapalı havada karın kendisinden
-    // düşük; perde olduğu gibi kullanılınca parlak beyazın üstüne KOYU nötr bir film
-    // oturuyor ve göz onu mavi-gri okuyor (eşzamanlı kontrast). Oysa savrulan kar aynı
-    // kardır, aynı ışıkla aydınlanır — zeminden koyu olamaz.
-    // KATSAYI IŞIK ZAYIFKEN ÇALIŞIR. İşi perdeyi "kardan koyu" bandından çıkarmak;
-    // ışık zaten parlakken yükseltilecek bir şey yok. Sabit çarpanla gündüz taban
-    // luminansı 1'i aşıp beyaza kırpılıyordu — dağ akşamüstü fosforlu görünüyordu.
-    // RENK ve PARLAKLIK AYRI. `_HeightFogSunColor` ham gök ışıması × sahne kazancı,
-    // yani HDR ve ÜST SINIRI YOK — üstelik en büyük olduğu yer tam olarak güneş
-    // yönündeki ufuk, yani şafak ve akşamüstü. Olduğu gibi renk olarak geçirilince
-    // 1'i aşıyor ve beyaza kırpılıyordu: dağın fosforlu görünmesi buydu. Katsayıyı
-    // kısmak yetmez, tavan gerekir.
-    //
-    // Tavan fiziksel: perde kardır, en fazla tam aydınlanmış kar kadar parlak olabilir.
-    float3 hue = light / max(1e-4, luma);
-    float3 tinted = lerp(1.0, hue, lowSun * 0.9);
-
-    // ZEMİNE ULAŞAN IŞIK, ufuk parıltısı değil. Yamaç şafakta hâlâ gölgedeyken perde
-    // ufkun parlaklığını alırsa dağ aydınlatılmış görünüyor. Güneşin yüksekliği
-    // aydınlanmanın gerçek ölçüsü.
-    float dayLevel = saturate(_SunHeight * 3.5);
-    float gain = lerp(_SpindriftBrightness, 1.0, saturate(luma));
-
-    float level = saturate(luma * gain) * lerp(0.3, 1.0, dayLevel);
-    return tinted * level;
 }
 
 float HeightFogAmount(float3 cameraPos, float3 worldPos)
@@ -364,20 +273,7 @@ float SkyFogDepth(float3 cameraPos, float3 dir, float maxPath)
               + _FogSeaDensity * min(seaPath, maxPath)
               + _FogFreeDensity * min(freePath, maxPath);
 
-    // Rüzgâr eşiğin altındaysa iki doku örneği boşa gidiyordu: arazi yüksekliği ve
-    // kar profili, sonucu sıfırla çarpılacak bir değer için okunuyordu. Gökyüzü her
-    // pikselde bu yoldan geçiyor.
-    if (_SpindriftDensity <= 0.0) return sky;
-
-    float driftGround = TerrainHeightAt(cameraPos.xz);
-    float driftHeight = max(0.0, cameraPos.y - driftGround);
-    float driftPath = exp(-_SpindriftFalloff * driftHeight) / (_SpindriftFalloff * s);
-    float driftDensity = _SpindriftDensity
-                       * SampleSnowProfile(driftGround).r
-                       * SpindriftFlow(cameraPos.xz);
-
-    float rawDrift = driftDensity * min(driftPath, maxPath);
-    return sky + _SpindriftMaxDepth * rawDrift / (rawDrift + _SpindriftMaxDepth);
+    return sky;
 }
 
 float SkyFogAmount(float3 cameraPos, float3 dir)
@@ -595,37 +491,11 @@ void FogPath(float3 cameraPos, float3 worldPos, out float3 scattering, out float
     float integral = HeightFogIntegral(tailStart, worldPos)
                    * FogBankPath(tailStart.xz, worldPos.xz);
 
-    // PERDE KAMERADAN, kuyruğun başından değil: katman araziye yapışık ve oyuncunun
-    // çevresinde. Hacim onu artık taşımıyor, tek kaynak burası.
-    float drift = SpindriftPath(cameraPos, worldPos);
-
-    // İKİ KATMAN SIRAYLA, tek karışımda değil. Sürüklenen kar araziye yapışık ve
-    // gözün ÖNÜNDE duruyor; sisin mavisi ise yol boyunca dağılmış. Tek karışımda
-    // toplanınca perdenin sönümü sisin payını da açıyor ve rüzgâr arttıkça yamaç
-    // beyazlayacağına MAVİLEŞİYORDU.
-    //
-    // Önce sis uygulanır (uzak), sonra perde onun üstüne biner (yakın). Perde kendi
-    // nötr rengini taşıyor, altındakini boyamıyor.
     float surfacePass = exp(-integral);
 
-    // PERDE DERİNLEŞTİKÇE SÖNER, gökyüzünün rengine boyanmaz. `AirColor` bakış yönüne
-    // bağlı ve gökyüzü gradyanını taşıyor; ona yakınsatınca o gradyan dağın üstüne
-    // biniyor ve ufuk çizgisi dağın içinden geçiyormuş gibi görünüyordu.
-    //
-    // Fosforluluğun çaresi renk değiştirmek değil parlaklığı kısmak: kalın perde daha
-    // çok saçar ama kendi içinde de söner, dışarı çıkan ışık doyuma gider.
-    float3 veil = SpindriftColor()
-                * lerp(1.0, 0.55, saturate(drift / max(0.01, _SpindriftMaxDepth)));
-
-    float veilPass = exp(-drift);
-
-    // Hacim kuyruğun ÖNÜNDE: kuyruğun sonucu hacmin geçirgenliğiyle süzülüp hacmin
-    // kendi saçılımı üstüne biniyor. Spec §5.4'teki `renk × transmittance + inScattering`
-    // formülünün ta kendisi — burada iki katsayı olarak, birleştirilmeden.
-    transmittance = volumeTransmittance * veilPass * surfacePass;
+    transmittance = volumeTransmittance * surfacePass;
     scattering = volumeScatter
-               + volumeTransmittance * (veil * (1.0 - veilPass)
-                                      + veilPass * air * (1.0 - surfacePass))
+               + volumeTransmittance * air * (1.0 - surfacePass)
                + LightningScatter(cameraPos, worldPos);
 }
 

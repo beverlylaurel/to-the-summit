@@ -15,10 +15,7 @@ MonoBehaviour:
   openingRise: 400
   openingIntensity: 0
   rainPeak: 0.3
-  snowBase: 0.4
-  snowPeak: 0.9
   rainVariation: 0.4
-  snowVariation: 0.55
   slowFrequency: 0.005
   fastFrequency: 0.02
   summitVariation: 0.3

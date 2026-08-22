@@ -54,7 +54,7 @@ public static class BikeBootstrap
 
     /// YÜZEY TAKIMI. Kadro boyası, krom, kauçuk, deri ve yağlı çelik.
     ///
-    /// PARLAKLIK BİLEREK DÜŞÜK. Fabrika çıkışı krom karlı havada bütün gökyüzünü aynalıyor
+    /// PARLAKLIK BİLEREK DÜŞÜK. Fabrika çıkışı krom kapalı havada bütün gökyüzünü aynalıyor
     /// ve bisiklet plastik gibi parlıyordu; kullanılmış bir bisikletin kromu çukurlu ve
     /// mat. Aynı sebeple kadro boyası da cilalı değil, yıllanmış.
     ///
@@ -335,7 +335,7 @@ public static class BikeBootstrap
         var input = root.GetComponent<BikePlayerInput>();
         Ride(bike, input, model);
 
-        // GÖLGE AÇIK. Bisiklet gölge düşürmüyordu; arazi ve kar sistemleri gölgeyi
+        // GÖLGE AÇIK. Bisiklet gölge düşürmüyordu; arazi sistemi gölgeyi
         // okuyor, gölgesiz duran nesne havada asılı gibi görünüyor.
         foreach (Renderer renderer in model.GetComponentsInChildren<Renderer>())
         {

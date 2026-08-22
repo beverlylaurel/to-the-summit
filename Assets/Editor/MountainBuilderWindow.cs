@@ -648,7 +648,7 @@ public class MountainBuilderWindow : EditorWindow
     void DrawMaskTab()
     {
         Section("Maske",
-            "İşlemlerin NEREYE uygulanacağını sınırlar. Örnek: yalnız 3000 m üstüne kar "
+            "İşlemlerin NEREYE uygulanacağını sınırlar. Örnek: yalnız 3000 m üstüne aşınma "
             + "oluğu oymak, yalnız dik yüzleri aşındırmak, yalnız sırtları "
             + "keskinleştirmek.\n\n"
             + "Önizlemeyi açarsan maske sarıyla boyanır.");
@@ -1462,7 +1462,7 @@ public class MountainBuilderWindow : EditorWindow
 
         if (pts.Count > 2)
         {
-            // İKİ KAT ÇİZGİ: koyu alt katman her zeminde görünür kılıyor, kar üstünde
+            // İKİ KAT ÇİZGİ: koyu alt katman her zeminde görünür kılıyor, açık zeminde
             // tek sarı çizgi kayboluyordu.
             Handles.color = new Color(0f, 0f, 0f, 0.55f);
             Handles.DrawAAPolyLine(4f, pts.ToArray());

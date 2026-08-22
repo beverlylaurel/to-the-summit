@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 
 /// Rastgele aralıklarla şimşek çaktırır. Yağış şiddeti arttıkça sıklaşır ve yakınlaşır,
-/// karlılık arttıkça kesilir. Çakma anında olay yayar, sesi ise arkadan gelir.
+/// Çakma anında olay yayar, sesi ise arkadan gelir.
 [RequireComponent(typeof(AudioSource), typeof(AudioLowPassFilter))]
 public class ThunderPlayer : MonoBehaviour
 {
@@ -82,7 +82,6 @@ public class ThunderPlayer : MonoBehaviour
         Reschedule();
 
         if (weather.Precipitation < settings.minPrecipitation) return;
-        if (weather.Snowiness >= settings.snowCutoff) return;
 
         Strike();
     }
@@ -120,8 +119,7 @@ public class ThunderPlayer : MonoBehaviour
             ? Pick(close, ref lastCloseIndex)
             : Pick(distant, ref lastDistantIndex);
 
-        // Karlılık arttıkça seyrelir ama tamamen kısılmaz: çaldığında duyulmalı
-        float fade = Mathf.Lerp(1f, settings.minVolume, Mathf.Clamp01(weather.Snowiness / settings.snowCutoff));
+        float fade = 1f;
 
         // Hafif yağışta gürültü de sönük olmalı; şiddetle birlikte güçlenir
         fade *= Mathf.Lerp(0.45f, 1f, weather.Precipitation);

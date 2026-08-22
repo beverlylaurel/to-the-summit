@@ -18,7 +18,7 @@ using UnityEngine;
 ///
 /// NEDEN BERRAK HAVA İÇİN PİŞİYOR: makale atmosfer partikülü yoğunluğunu ÜNİFORM
 /// varsayıyor — tablonun önceden hesaplanabilmesinin tek sebebi bu (§3.2). Bizim yerel
-/// sisimiz (vadi denizi, banklar, savrulan kar) üniform değil ve havaya göre değişiyor;
+/// sisimiz (vadi denizi, banklar) üniform değil ve havaya göre değişiyor;
 /// tabloya girseydi her hava durumunda yeniden pişmesi gerekirdi. Bu yüzden tablo
 /// makalenin kastettiği şeyi taşıyor: HER ZAMAN var olan hava. Yerel sis kendi yolundan
 /// (`HeightFog.hlsl`) geçmeye devam ediyor, çift sayım yok.

@@ -38,16 +38,6 @@ MonoBehaviour:
   screeAmount: 0.6
   screeRange: {x: 0.62, y: 0.88}
   screeSlopeLimit: 38
-  snowColor: {r: 0.9, g: 0.93, b: 0.98, a: 1}
-  snowSlopeLimit: 65
-  snowBreakup: 0.5
-  snowBurial: 0.9
-  snowRounding: 0.28
-  snowlineSunLift: 200
-  snowlineGullyDrop: 150
-  snowlineRagged: 120
-  sastrugi: 0.6
-  snowSmoothness: 0.3
   wetDarkening: 0.45
   wetSmoothness: 0.6
   dryingSeconds: 120

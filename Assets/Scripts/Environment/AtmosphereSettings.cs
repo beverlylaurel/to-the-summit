@@ -18,15 +18,12 @@ public class AtmosphereSettings : ScriptableObject
     public float clearVisibility = 25000f;
     [Tooltip("En şiddetli yağmurda.")]
     public float rainVisibility = 900f;
-    [Tooltip("Rüzgârsız yoğun karda.")]
-    public float snowVisibility = 320f;
     [Tooltip("Sert rüzgârda görüşün ek olarak kısaldığı oran. Tipi görüşü kapatır.")]
     [Range(0f, 0.9f)] public float windClosure = 0.65f;
 
     [Header("Renk — gündüz")]
     public Color clearDay = new(0.60f, 0.68f, 0.80f);
     public Color rainDay = new(0.42f, 0.45f, 0.50f);
-    public Color snowDay = new(0.80f, 0.84f, 0.90f);
 
     [Header("Renk — şafak ve gün batımı")]
     [Tooltip("Kapalı havada şafak daha sönük ve solgun olur. Açık havadaki ton " +
@@ -38,7 +35,6 @@ public class AtmosphereSettings : ScriptableObject
     [Header("Renk — gece")]
     public Color clearNight = new(0.05f, 0.07f, 0.12f);
     public Color rainNight = new(0.06f, 0.07f, 0.09f);
-    public Color snowNight = new(0.14f, 0.16f, 0.22f);
 
     [Header("Bulut kapsaması")]
     [Tooltip("Açık havadaki bulut kapsaması.")]
@@ -64,9 +60,6 @@ public class AtmosphereSettings : ScriptableObject
              "sekiz saniyelik esintileriyle inip kalkmaz.")]
     public float cloudBottomSmoothing = 120f;
 
-
-
-
     [Header("Bulut kalitesi")]
     [Tooltip("Görüş mesafesinin kaç katında bulut tamamen atmosfere karışır. Bulutlar " +
              "kilometrelerce yukarıda ve havanın o yüksekliği daha berrak.")]
@@ -78,7 +71,6 @@ public class AtmosphereSettings : ScriptableObject
              "yarıçapı belirler. Bu sayı denizin kendi ufkuna eşitlenirse ufuktaki bulut " +
              "tam karışıma girer ve kaybolur — belirgin şekilde uzun tutulur.")]
     public float maxHazeDistance = 55000f;
-
 
     [Tooltip("Bulut küresinin yarıçapı (metre). Denizin ufka değdiği mesafe sqrt(2·R·Δh) " +
              "ve buradaki Δh gözün DENİZ ÜSTÜNDEKİ payı — zirvede topu topu birkaç yüz " +
@@ -94,7 +86,6 @@ public class AtmosphereSettings : ScriptableObject
              "fırtınada menzil dört kilometreye, bulutun içindeyken üç yüz metreye " +
              "düşüyor ve yanı başındaki bulut çizilmiyordu.")]
     public float minHazeDistance = 16000f;
-
 
     [Header("Yükseklik sisi")]
     [Tooltip("Açık havada yoğunluğun yarıya indiği yükseklik farkı (metre). Katmanın " +
@@ -129,8 +120,6 @@ public class AtmosphereSettings : ScriptableObject
     public float inversionStormRise = 900f;
     [Tooltip("Güneş yükseldikçe sisin dağılma hızı.")]
     [Range(0.1f, 1f)] public float valleyFogBurnOff = 0.45f;
-    [Tooltip("Şafak sis denizinin taban kotundaki görüşü (metre). Gece yoğuşan nem vadiyi " +
-             "havadan bağımsız doldurur; güneş yükselince dağılır, banklar yerel deler.")]
     // 600 → 2200 m. 600 m vadi dibinde DUVAR gibi sisti: 186 m'de bile görüş 1.8 km'de
     // kalıyor ve 1.7 km'deki bulut katmanı 3 km'lik yoldan geçemeyip tamamen siliniyordu.
     // 2200 m pus seviyesi: vadi dolu görünür, yamaçtan bakan bulutları da görür.
@@ -150,47 +139,6 @@ public class AtmosphereSettings : ScriptableObject
     [Tooltip("Görüşün dakikalar ölçeğindeki nefes payı: aynı fırtınada sis epizotlar " +
              "hâlinde kalınlaşıp seyrelir, hiçbir an sabit durmaz.")]
     [Range(0f, 0.5f)] public float visibilityBreathing = 0.2f;
-
-    [Header("Sürüklenen kar")]
-    [Tooltip("Rüzgârın yerdeki gevşek karı kaldırdığı perdenin yoğunluğu (1/metre). " +
-             "Tam etkide 0.004 ≈ bir kilometre görüş.")]
-    public float spindriftDensity = 0.004f;
-    [Tooltip("Kaldırmanın başladığı rüzgâr şiddeti. Gerçekte kar yaklaşık 4.5 m/s'de " +
-             "sürüklenmeye başlar; şiddet 0-1 ölçeğinde bunun karşılığı ~0.22.")]
-    [Range(0f, 1f)] public float spindriftWindThreshold = 0.22f;
-    [Tooltip("Eşikten tam etkiye geçiş genişliği. Dar tutulunca hamle atakları yalnız " +
-             "eşiğin hemen üstünde yaşıyor: rüzgâr biraz artınca bant doyuyor ve perde " +
-             "sürekliye dönüyor. Geniş bant atakları yüksek rüzgârda da sürdürüyor.")]
-    [Range(0.02f, 0.8f)] public float spindriftWindBand = 0.45f;
-    [Tooltip("Perdenin parlaklığı, ufuk göğünün luminansı çarpanı. 1 bırakılırsa perde " +
-             "karın kendisinden koyu kalıyor ve parlak beyazın üstünde mavi-gri bir " +
-             "film gibi okunuyor. Savrulan kar aynı kardır, zeminden koyu olamaz.")]
-    [Range(0.5f, 5f)] public float spindriftBrightness = 2.2f;
-    [Tooltip("Perdenin optik derinlik tavanı, eşik civarındaki hafif rüzgârda. " +
-             "0.5 ≈ uzaktaki yüzey renginin %60'ını korur. Tavan olmadan ışın yamaca " +
-             "paralel gidince kilometrelerce yol alıp doyuma gidiyor ve uzak yamaç " +
-             "her rüzgârda bembeyaz kesiliyordu.")]
-    [Range(0.2f, 3f)] public float spindriftMaxDepthCalm = 0.5f;
-    [Tooltip("Optik derinlik tavanı tam fırtınada. Gerçek ground blizzard'da uzak arazi " +
-             "TAMAMEN kaybolur (görüş 400 metrenin altı); 3.0 ≈ %5 görünürlük. Sabit " +
-             "tavanla hafif rüzgâr ile fırtına uzakta aynı görünüyordu — mesafe " +
-             "şiddeti anlatamıyordu.")]
-    [Range(0.5f, 8f)] public float spindriftMaxDepthStorm = 3f;
-    [Tooltip("Sırt kretinde kaldırmanın kaç katına çıktığı. Spindrift yamacın " +
-             "tamamından değil KRETTEN fışkırır: rüzgâr tepeyi aşarken hızlanır ve " +
-             "gevşek karı havaya fırlatır.")]
-    [Range(1f, 6f)] public float spindriftCrestBoost = 3f;
-    [Tooltip("Kretin üstünde katmanın kaç katına kalınlaştığı. Tüy sırttan yukarı " +
-             "fışkırıp rüzgâr altına dökülür; sabit kalınlıkla perde yamaca yapışık " +
-             "kalıyor ve fışkırma hiç görünmüyordu.")]
-    [Range(1f, 8f)] public float spindriftCrestRise = 4f;
-    [Tooltip("Perdenin yarı-yüksekliği dingin uçta (metre). Yerden ölçülür.")]
-    public float spindriftHeightCalm = 10f;
-    [Tooltip("Perdenin yarı-yüksekliği fırtınada (metre). Ölçüm: saltasyon ilk on " +
-             "santimde biter, süspansiyon taşınım hesaplarında 5 metreyle sınırlanır, " +
-             "ama konvektif koşullarda YÜZLERCE metreye çıkar. 45 metre o aralığın çok " +
-             "altındaydı; fırtına ucu gerçeğe göre alçak kalıyordu.")]
-    public float spindriftHeightStorm = 150f;
 
     [Header("Bulut kuşağı")]
     [Tooltip("Sisli kuşağın bulut tabanının ne kadar altından başladığı (metre).")]

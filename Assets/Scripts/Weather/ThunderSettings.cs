@@ -23,9 +23,7 @@ public class ThunderSettings : ScriptableObject
     public float maxInterval = 110f;
     [Tooltip("Bu şiddetin altında gök gürültüsü hiç çalmaz.")]
     [Range(0f, 1f)] public float minPrecipitation = 0.2f;
-    [Tooltip("Karlılık bu değeri aşınca susar. Tipide şimşek nadirdir ama yok değildir.")]
-    [Range(0f, 1f)] public float snowCutoff = 0.65f;
-    [Tooltip("Karlı havada bile korunan en düşük ses seviyesi.")]
+    [Tooltip("Korunan en düşük ses seviyesi.")]
     [Range(0f, 1f)] public float minVolume = 0.5f;
 
     [Header("Yakınlık")]

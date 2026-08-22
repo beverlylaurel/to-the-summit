@@ -9,12 +9,12 @@ using UnityEngine;
 ///
 /// ÖLÇÜM KENDİ HESABI DEĞİL, PİŞMİŞ HARİTA. Burada rüzgâr ekseninde iki yükseklik
 /// örneği alınıp kabartma hesaplanıyordu; aynı soruyu ("bu nokta rüzgârdan ne kadar
-/// korunaklı") kar sistemi de cevaplıyor ve ikisi ayrı cevap veriyordu — karın derin
+/// korunaklı") başka bir sistem de cevaplarsa ikisi ayrışır — yüzeyin
 /// rüzgâraltı yığını saydığı yerde oyuncu tam rüzgâr hissedebiliyordu. Aynı büyüklük
 /// için iki kaynak olmaz.
 ///
 /// Pişmiş harita aynı fiziği daha iyi kuruyor: eğim VE eğrilik, 103 metrelik Gauss
-/// çekirdeği, hâkim rüzgâr ekseni (bkz. `SurfaceMapBaker.BakeDriftWeight`). Buradaki
+/// çekirdeği, hâkim rüzgâr ekseni (bkz. `SurfaceMapBaker.BakeWindWeight`). Buradaki
 /// iki nokta örneği tek bir kayanın üstünde "sırt" sanabiliyordu.
 [RequireComponent(typeof(WindField))]
 public class TerrainWindShelter : MonoBehaviour
@@ -53,7 +53,7 @@ public class TerrainWindShelter : MonoBehaviour
         // Harita BİRİKİM ağırlığı taşıyor (0.67-2.0); rüzgâr hızı çarpanı onun tersi
         // (0.5-1.5). Maruziyet sözleşmesi 0-1, ortası 0.5 — çarpandan yarım çıkarınca
         // birebir oturuyor.
-        float windSpeedFactor = 1f / surface.DriftWeightAt(observer.position);
+        float windSpeedFactor = 1f / surface.WindWeightAt(observer.position);
         float target = Mathf.Clamp01(windSpeedFactor - 0.5f);
 
         exposure = Mathf.Lerp(exposure, target,

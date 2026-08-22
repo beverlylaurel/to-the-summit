@@ -13,7 +13,7 @@
 // bildirimi tür değil, isim üretir.
 
 /// Bir yüzeyin bütün doku bildirimleri. Yüzey adı ön ek olarak geçiyor:
-///   DECLARE_SURFACE_DETAIL(Snow) → _SnowNormal, _SnowNormalLut, ...
+///   DECLARE_SURFACE_DETAIL(Rock) → _RockNormal, _RockNormalLut, ...
 #define DECLARE_SURFACE_DETAIL(name)      \
     TEXTURE2D(_##name##Normal);           \
     TEXTURE2D(_##name##NormalLut);        \

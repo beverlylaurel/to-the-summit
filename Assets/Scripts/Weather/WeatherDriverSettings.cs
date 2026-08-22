@@ -20,23 +20,23 @@ public class WeatherDriverSettings : ScriptableObject
     [Tooltip("Açılıştaki şiddet. Çok hafif olmalı.")]
     /// SIFIR: koşu AÇIK havada başlıyor. 0.12'ydi ve tabanda sürekli hafif yağış
     /// bırakıyordu; iklim kışa çekilince o yağış kara döndü ve oyun ilk saniyeden
-    /// karlı başlıyordu. Oysa tasarım "başlangıçta açık, yaklaşmanın ortasında cephe"
+    /// fırtınalı başlıyordu. Oysa tasarım "başlangıçta açık, yaklaşmanın ortasında cephe"
     /// (bkz. DECISIONS.md).
     [Range(0f, 1f)] public float openingIntensity;
 
     [Header("Şiddet eğrisi")]
     [Tooltip("Yağmurun tavandaki şiddeti.")]
     [Range(0f, 1f)] public float rainPeak = 0.65f;
-    [Tooltip("Kar yerleştiğinde şiddet. Yağmur tavanından düşük: kar sakin başlar.")]
-    [Range(0f, 1f)] public float snowBase = 0.4f;
+    [Tooltip("Yüksek kuşak yerleştiğinde şiddet. Yağmur tavanından düşük: fırtına sakin başlar.")]
+    [Range(0f, 1f)] public float stormBase = 0.4f;
     [Tooltip("Zirve fırtınasına girmeden hemen önceki şiddet.")]
-    [Range(0f, 1f)] public float snowPeak = 0.9f;
+    [Range(0f, 1f)] public float stormPeak = 0.9f;
 
     [Header("Dalgalanma")]
     [Tooltip("Yağmur bölgesindeki dalgalanma genliği.")]
     [Range(0f, 1f)] public float rainVariation = 0.4f;
-    [Tooltip("Kar bölgesindeki dalgalanma genliği. Asıl çeşitlilik burada.")]
-    [Range(0f, 1f)] public float snowVariation = 0.55f;
+    [Tooltip("Yüksek kuşakta dalgalanma genliği. Asıl çeşitlilik burada.")]
+    [Range(0f, 1f)] public float stormVariation = 0.55f;
     [Tooltip("Havanın genel halinin değişme hızı. 0.005 ≈ 3.5 dakika.")]
     public float slowFrequency = 0.005f;
     [Tooltip("Kısa esintilerin hızı. 0.02 ≈ 50 saniye.")]

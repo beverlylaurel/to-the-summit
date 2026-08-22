@@ -15,7 +15,6 @@ MonoBehaviour:
   minInterval: 15
   maxInterval: 110
   minPrecipitation: 0.2
-  snowCutoff: 0.65
   minVolume: 0.5
   closeChanceAtPeak: 0.85
   closeThreshold: 0.45

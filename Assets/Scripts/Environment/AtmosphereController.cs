@@ -38,19 +38,11 @@ public class AtmosphereController : MonoBehaviour
     static readonly int FogInversionHeightId = Shader.PropertyToID("_FogInversionHeight");
     static readonly int FogInversionWidthId = Shader.PropertyToID("_FogInversionWidth");
     static readonly int FogFreeDensityId = Shader.PropertyToID("_FogFreeDensity");
-    static readonly int SpindriftDensityId = Shader.PropertyToID("_SpindriftDensity");
-    static readonly int SpindriftFalloffId = Shader.PropertyToID("_SpindriftFalloff");
-    static readonly int SpindriftBrightnessId = Shader.PropertyToID("_SpindriftBrightness");
 
     /// Ham kaldırma payı (0-1), yoğunlukla çarpılmamış hâli. Yüzey bunu okuyup yerdeki
     /// karı süpürüyor: eşik kuralı burada duruyor, orada ikinci kez kurulmasın diye.
-    static readonly int SpindriftLiftId = Shader.PropertyToID("_SpindriftLift");
-    static readonly int SpindriftMaxDepthId = Shader.PropertyToID("_SpindriftMaxDepth");
-    static readonly int SpindriftCrestId = Shader.PropertyToID("_SpindriftCrest");
-    static readonly int SpindriftDriftId = Shader.PropertyToID("_SpindriftDrift");
-    static readonly int SpindriftWindId = Shader.PropertyToID("_SpindriftWind");
 
-    /// HAM rüzgâr: yön × hız (m/s), w ani esinti. `_SpindriftWind`'den AYRI çünkü o
+    /// HAM rüzgâr: yön × hız (m/s), w ani esinti.
     /// yalnız kar için ve CPU'da savrulma eşiği uygulanmış hâli — kar kalkmayan hafif
     /// esintide sıfır. Bitki örtüsü ham rüzgârı okuyor: yapraklar o esintide de kıpırdar.
     static readonly int WindVectorId = Shader.PropertyToID("_WindVector");
@@ -93,7 +85,6 @@ public class AtmosphereController : MonoBehaviour
 
     Color zenith, targetZenith;
     float nextEditorApply;
-    Vector2 spindriftDrift;
     float appliedShadowDistance = -1f;
     float coverage;
     bool initialized;
@@ -179,7 +170,6 @@ public class AtmosphereController : MonoBehaviour
             || weatherDriver == null) return;
 
         float precipitation = weather.Precipitation;
-        float snowiness = weather.Snowiness;
         float day = time.DayFactor;
 
 
@@ -235,8 +225,8 @@ public class AtmosphereController : MonoBehaviour
             ? 18000f * Mathf.Pow(rainRate, -0.70f)
             : settings.clearVisibility;
 
-        // Kar yağmurdan çok daha kapatıcı; onun sabiti yerinde kalıyor.
-        float wet = Mathf.Lerp(rainVisibility, settings.snowVisibility, snowiness);
+        // Sabit yerinde kalıyor.
+        float wet = rainVisibility;
         float targetVisibility = Mathf.Min(settings.clearVisibility,
             Mathf.Lerp(settings.clearVisibility, wet, Mathf.Min(1f, precipitation * 4f)));
 
@@ -252,7 +242,7 @@ public class AtmosphereController : MonoBehaviour
         // 1164 m'den 445 m'ye düşüyordu — yağmurun kendi sönümlemesinin iki buçuk katı
         // bir kesinti, kaynağı da yalnızca rüzgâr.
         float closure = wind.Strength * settings.windClosure * precipitation
-                      * Mathf.Lerp(0.2f, 1f, snowiness);
+                      * 0.2f;
         targetVisibility *= 1f - closure;
 
         // Sis bankları rüzgârla sürüklenir; yüzey sürtünmesi yüzünden bulut kadar
@@ -283,8 +273,8 @@ public class AtmosphereController : MonoBehaviour
         targetVisibility = Mathf.Lerp(targetVisibility, deckVis, deck);
 
         // Gece sis kararır; renk hava tipiyle birlikte seçilir
-        Color dayColor = Blend(settings.clearDay, settings.rainDay, settings.snowDay, precipitation, snowiness);
-        Color nightColor = Blend(settings.clearNight, settings.rainNight, settings.snowNight, precipitation, snowiness);
+        Color dayColor = Color.Lerp(settings.clearDay, settings.rainDay, precipitation);
+        Color nightColor = Color.Lerp(settings.clearNight, settings.rainNight, precipitation);
         Color targetColor = Color.Lerp(nightColor, dayColor, day);
 
         // Şafak ve gün batımı: güneş ufuktayken atmosfer kızıllaşır.
@@ -369,7 +359,7 @@ public class AtmosphereController : MonoBehaviour
         if (view != null) view.clearFlags = CameraClearFlags.Skybox;
 
         ApplyShadowDistance();
-        ApplySky(precipitation, snowiness);
+        ApplySky(precipitation);
     }
 
     /// Kameranın bulut kuşağının neresinde olduğu: 0 dışında, 1 tam içinde.
@@ -410,7 +400,7 @@ public class AtmosphereController : MonoBehaviour
 
     /// Bulut geçişi ayrı bir shader'da çalıştığı için parametreler global yazılır;
     /// gökyüzü ve bulutlar aynı değerleri okur, ikisi çelişemez.
-    void ApplySky(float precipitation, float snowiness)
+    void ApplySky(float precipitation)
     {
         if (skyMaterial == null) return;
 
@@ -809,56 +799,7 @@ public class AtmosphereController : MonoBehaviour
         Shader.SetGlobalFloat(FogBankStrengthId, bankStrength);
 
 
-        // SÜRÜKLENEN KAR. Rüzgâr eşiği burada uygulanıyor, shader'da değil: kaldırmanın
-        // olup olmadığı tek bir dünya durumu, piksel başına sorulacak bir şey değil.
-        // Yerde kar olup olmadığını shader kot profilinden kendisi okuyor — orası
-        // gerçekten konuma bağlı.
-        // HAMLE ATAKLARI. Sürüklenen kar sürekli akmaz: hamleyle 10-20 saniye fışkırır,
-        // diner, tekrar gelir. Sürekli şiddet tek başına okunduğunda perde hiç kesilmeyen
-        // düz bir akıntı oluyordu.
-        //
-        // Kar taşınımı sürtünme hızının KÜPÜYLE gider. Küp, hamlenin tepesini patlamaya
-        // dibini sakinliğe çeviriyor — atak yapısı buradan doğuyor, ayrı bir zamanlayıcı
-        // kurmaya gerek yok.
-        float felt = wind.Strength * (1f + wind.Gust);
-
-        float over = Mathf.InverseLerp(settings.spindriftWindThreshold,
-                                       settings.spindriftWindThreshold
-                                       + settings.spindriftWindBand, felt);
-        float lift = over * over * over;
-
-        // Perde rüzgâr sertleştikçe kalınlaşır: daha güçlü akım kar tanesini daha
-        // yükseğe taşır.
-        float driftHeight = Mathf.Lerp(settings.spindriftHeightCalm,
-                                       settings.spindriftHeightStorm, felt);
-
-        Shader.SetGlobalFloat(SpindriftDensityId, settings.spindriftDensity * lift);
-        Shader.SetGlobalFloat(SpindriftFalloffId, 1f / Mathf.Max(1f, driftHeight));
-        Shader.SetGlobalFloat(SpindriftBrightnessId, settings.spindriftBrightness);
-        Shader.SetGlobalFloat(SpindriftLiftId, lift);
-        // Tavan rüzgârla büyüyor: hafif rüzgârda uzak yamaç okunur kalır, gerçek
-        // fırtınada whiteout gelir. Sabitken ikisi uzakta aynı görünüyordu.
-        Shader.SetGlobalFloat(SpindriftMaxDepthId,
-            Mathf.Lerp(settings.spindriftMaxDepthCalm,
-                       settings.spindriftMaxDepthStorm, lift));
-
-        // Kret tüyünün gücü ve boyu ayarlardan; ikisi de yalnız shader'ın işine yarıyor.
-        Shader.SetGlobalVector(SpindriftCrestId,
-            new Vector4(settings.spindriftCrestBoost, settings.spindriftCrestRise, 0f, 0f));
-
-        // Akan alan rüzgâr HIZIYLA taşınıyor. Sis banklarının kayması dakikalar
-        // ölçeğinde; sürüklenen kar rüzgârın kendisiyle gider, saniyeler ölçeğinde.
-        // Taşınmazsa perde renk değiştirir ama akmaz ve göz onu sis sanar.
         Vector3 flow = wind.Velocity;
-        spindriftDrift += new Vector2(flow.x, flow.z) * Time.deltaTime;
-
-        Vector2 windDir = new Vector2(flow.x, flow.z);
-        windDir = windDir.sqrMagnitude > 0.01f ? windDir.normalized : Vector2.right;
-
-        Shader.SetGlobalVector(SpindriftDriftId,
-            new Vector4(spindriftDrift.x, spindriftDrift.y, 0f, 0f));
-        Shader.SetGlobalVector(SpindriftWindId,
-            new Vector4(windDir.x, windDir.y, 0f, wind.Strength));
 
         Shader.SetGlobalVector(WindVectorId,
             new Vector4(flow.x, flow.y, flow.z, wind.Gust));
@@ -902,7 +843,4 @@ public class AtmosphereController : MonoBehaviour
 
         return current < 1e-6f ? 1f : target / current;
     }
-
-    static Color Blend(Color clear, Color rain, Color snow, float precipitation, float snowiness)
-        => Color.Lerp(clear, Color.Lerp(rain, snow, snowiness), precipitation);
 }

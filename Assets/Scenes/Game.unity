@@ -592,7 +592,7 @@ MonoBehaviour:
   m_RequiresDepthTexture: 0
   m_RequiresColorTexture: 0
   m_TaaSettings:
-    m_Quality: 3
+    m_Quality: 2
     m_FrameInfluence: 0.1
     m_JitterScale: 1
     m_MipBias: 0
@@ -825,262 +825,6 @@ Transform:
   - {fileID: 289392992}
   m_Father: {fileID: 9035993439250858401}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &596074311
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 596074313}
-  - component: {fileID: 596074312}
-  - component: {fileID: 596074314}
-  - component: {fileID: 596074316}
-  - component: {fileID: 596074315}
-  - component: {fileID: 596074325}
-  - component: {fileID: 596074324}
-  - component: {fileID: 596074323}
-  - component: {fileID: 596074322}
-  - component: {fileID: 596074321}
-  - component: {fileID: 596074320}
-  - component: {fileID: 596074319}
-  - component: {fileID: 596074318}
-  - component: {fileID: 596074317}
-  m_Layer: 0
-  m_Name: Kar Sistemi
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &596074312
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 596074311}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ff4eba9c627479a4cb481dd2ab61cd27, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowManager
-  settings: {fileID: 11400000, guid: 576bad01297763e4da88e72d16d5958c, type: 2}
-  simCompute: {fileID: 7200000, guid: 019ba54c4a5178c4f84c134849ea4aad, type: 3}
-  occlusion: {fileID: 596074314}
-  groundHeight: {fileID: 596074316}
-  weather: {fileID: 596074315}
-  deformers: {fileID: 596074324}
-  farCascade: {fileID: 596074322}
-  followTarget: {fileID: 848219609}
---- !u!4 &596074313
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 596074311}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &596074314
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 596074311}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1d42f23a733f1fd4e96d9409e84637c4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowOcclusionCapture
-  settings: {fileID: 11400000, guid: 576bad01297763e4da88e72d16d5958c, type: 2}
-  occlusionShader: {fileID: 4800000, guid: d67a120b6b604d245a554b6bd34a917b, type: 3}
---- !u!114 &596074315
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 596074311}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 808fe43d65ee95d46ac951ab96f5036d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowWeather
-  presets:
-  - {fileID: 11400000, guid: 300c6fffda7d6a54aae4e10f42d1b008, type: 2}
-  - {fileID: 11400000, guid: c3cdeb114379c9249826aad69c3d375c, type: 2}
-  - {fileID: 11400000, guid: bf220d84f7749964390fefd6a46a518f, type: 2}
-  - {fileID: 11400000, guid: f8eeeaec02e987046b48003ad55500d5, type: 2}
-  - {fileID: 11400000, guid: a4af0e5f0ba11c844a7c5e454f4bd5aa, type: 2}
-  activePreset: 0
-  temperatureC: -6
-  windDirectionDegrees: 0
---- !u!114 &596074316
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 596074311}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0f09e444ba711494dbee01e7cccf2fe4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowGroundHeight
-  settings: {fileID: 11400000, guid: 576bad01297763e4da88e72d16d5958c, type: 2}
-  terrain: {fileID: 1738276033}
---- !u!114 &596074317
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 596074311}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2b10fb9849224f5469f016de6af20545, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowAtmosphereDriver
-  weather: {fileID: 596074315}
-  sun: {fileID: 0}
-  driveFog: 0
-  driveSun: 0
-  driveAmbient: 0
-  baseFogDensity: 0.005
-  baseSunIntensity: 1
-  baseAmbientIntensity: 1
---- !u!114 &596074318
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 596074311}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8e3b6e38db3f3ca4c85359a14e8f630c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowfallController
-  manager: {fileID: 596074312}
-  weather: {fileID: 596074315}
-  flakeCompute: {fileID: 7200000, guid: 8ad43cea68b39f04ab5b9eb1df7bb11e, type: 3}
-  flakeShader: {fileID: 4800000, guid: 5bd2d629359d48b4f8fe531d2b32829c, type: 3}
-  followCamera: {fileID: 330585545}
-  minPixelSize: 1.3
-  flutterFrequency: 5.5
-  flutterAmplitude: 0.35
-  flakeTint: {r: 0.95, g: 0.96, b: 1, a: 1}
-  flakeEmissive: 1
-  softFadeDistance: 0.4
-  spindriftRate: 6000
---- !u!114 &596074319
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 596074311}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 90bca0a29e684b54c8b8901e117af695, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowSampler
-  manager: {fileID: 596074312}
-  followTarget: {fileID: 848219609}
---- !u!114 &596074320
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 596074311}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5c124e30850a0184a82e8c04d6fe4541, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowProfiler
---- !u!114 &596074321
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 596074311}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 762704ef2931ea6478136e5239db62fa, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowPersistence
-  cascade: {fileID: 596074322}
---- !u!114 &596074322
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 596074311}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3066dae19326532479e8aa149187cd82, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowFarCascade
-  manager: {fileID: 596074312}
-  simCompute: {fileID: 7200000, guid: 019ba54c4a5178c4f84c134849ea4aad, type: 3}
-  persistence: {fileID: 596074321}
---- !u!114 &596074323
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 596074311}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9d3c48b55919c21429bc6146577494b1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowClipmap
-  settings: {fileID: 11400000, guid: 576bad01297763e4da88e72d16d5958c, type: 2}
-  material: {fileID: 2100000, guid: 8f61bfdbeaf29874ba88c4eb4bda0b23, type: 2}
-  followTarget: {fileID: 848219609}
---- !u!114 &596074324
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 596074311}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b1037da953aaa3e4fbeb31f5bf91fd0c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowDeformerRegistry
-  settings: {fileID: 11400000, guid: 576bad01297763e4da88e72d16d5958c, type: 2}
---- !u!114 &596074325
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 596074311}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a8fba89231ba57b4eaed3e90bbe0d8f9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowCoverageDriver
-  weather: {fileID: 596074315}
-  occlusion: {fileID: 596074314}
-  coverageTau: 240
-  windTilt: 0.22
-  windTiltReference: 15
 --- !u!1 &651637588
 GameObject:
   m_ObjectHideFlags: 0
@@ -1272,52 +1016,6 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
---- !u!1 &798857320
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 798857322}
-  - component: {fileID: 798857321}
-  m_Layer: 0
-  m_Name: Snow Probe
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!114 &798857321
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 798857320}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dd8c5804089c94946be6c5eae8c3aa86, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowCollisionProbe
-  snow: {fileID: 1738276036}
-  player: {fileID: 848219609}
---- !u!4 &798857322
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 798857320}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 848219609}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &813786004
 GameObject:
   m_ObjectHideFlags: 0
@@ -1328,7 +1026,6 @@ GameObject:
   m_Component:
   - component: {fileID: 813786006}
   - component: {fileID: 813786005}
-  - component: {fileID: 813786007}
   m_Layer: 0
   m_Name: Debug Menu
   m_TagString: Untagged
@@ -1361,7 +1058,6 @@ MonoBehaviour:
   hud: {fileID: 1780705007}
   climbHud: {fileID: 1780705011}
   cursorLock: {fileID: 848219610}
-  snowProbe: {fileID: 798857321}
   routeOverlay: {fileID: 2018777761}
   cloudVolume: {fileID: 832575518}
   cloudDriver: {fileID: 1147612207}
@@ -1380,19 +1076,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &813786007
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 813786004}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2b51ccf1b023dc949b54504b026e1715, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NotchMarker
-  view: {fileID: 330585545}
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -1463,7 +1146,6 @@ MonoBehaviour:
   preview: 0
   previewStorm: 0.8
   previewDay: 0.6
-  snowWeight: 0.35
 --- !u!1 &848219606
 GameObject:
   m_ObjectHideFlags: 0
@@ -1480,9 +1162,6 @@ GameObject:
   - component: {fileID: 848219612}
   - component: {fileID: 848219613}
   - component: {fileID: 848219614}
-  - component: {fileID: 848219618}
-  - component: {fileID: 848219617}
-  - component: {fileID: 848219616}
   - component: {fileID: 848219615}
   m_Layer: 0
   m_Name: Player
@@ -1510,7 +1189,6 @@ MonoBehaviour:
   jumpHeight: 1.1
   slopeLimit: 45
   stepOffset: 0.4
-  snow: {fileID: 1738276036}
 --- !u!143 &848219608
 CharacterController:
   m_ObjectHideFlags: 0
@@ -1550,7 +1228,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 651637589}
-  - {fileID: 798857322}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &848219610
@@ -1734,76 +1411,6 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
---- !u!114 &848219616
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 848219606}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: af415617a1146fc43856c0556b07ad11, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowFootstepAudio
-  sampler: {fileID: 596074319}
-  source: {fileID: 848219615}
-  clipSets:
-  - dry: []
-    wet: []
-  - dry: []
-    wet: []
-  - dry: []
-    wet: []
-  - dry: []
-    wet: []
-  - dry: []
-    wet: []
-  volume: 0.8
-  pitchJitter: 0.08
---- !u!114 &848219617
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 848219606}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9485fb869b408314f8e17dac3e38ebe4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowMovementModifier
-  sampler: {fileID: 596074319}
-  player: {fileID: 848219607}
-  smoothing: 0.25
---- !u!114 &848219618
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 848219606}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cdcc10d8a8a380b499e48a41177904af, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowFootstepDriver
-  registry: {fileID: 596074324}
-  followTarget: {fileID: 848219609}
-  strideLength: 0.75
-  footLateral: 0.11
-  footLead: 0.18
-  contactTime: 0.32
-  bootSize: {x: 0.3, y: 0.11}
-  footLoadKg: 81.5
-  maxSink: 0.45
-  footstepAudio: {fileID: 848219616}
-  sampler: {fileID: 596074319}
-  puffMaterial: {fileID: 0}
-  groundMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  groundProbeDistance: 1.4
 --- !u!1 &1147612204
 GameObject:
   m_ObjectHideFlags: 0
@@ -2235,7 +1842,6 @@ GameObject:
   - component: {fileID: 1738276032}
   - component: {fileID: 1738276031}
   - component: {fileID: 1738276035}
-  - component: {fileID: 1738276036}
   m_Layer: 0
   m_Name: Mountain
   m_TagString: Untagged
@@ -2352,30 +1958,12 @@ MonoBehaviour:
   time: {fileID: 508855605}
   weatherDriver: {fileID: 1805896804}
   temperature: {fileID: 1805896810}
-  snowPowder: {fileID: 11400000, guid: e10f7a3a3b41de44e86fac6dfff785f2, type: 2}
-  snowPacked: {fileID: 11400000, guid: 3580a9aeb15a03546aaf362ad3d5cf8f, type: 2}
   surfaceMaps: {fileID: 2800000, guid: 07fea8576ef26e44999b9f55ed1a5459, type: 2}
-  snowDriftWeight: {fileID: 2800000, guid: ce4583cf81e3d4e49a5f183fea0185f9, type: 2}
+  windWeight: {fileID: 2800000, guid: ce4583cf81e3d4e49a5f183fea0185f9, type: 2}
   groundNormals: {fileID: 2800000, guid: 01e2bdda4928e6c4f8c6f50d50eed21f, type: 2}
   horizon: {fileID: 18700000, guid: e35e6252450d4ad438f9d336e11aae69, type: 2}
   terrainHeights: {fileID: 2800000, guid: 512a0861f7006c74d88f1c274060165d, type: 2}
   surfaceShader: {fileID: 4800000, guid: 27f5cb8a03aefad47831df21395927cb, type: 3}
---- !u!114 &1738276036
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1738276030}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e41ee2e3cb2645f4eb522d8f503563e8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowSurface
-  surface: {fileID: 1738276035}
-  wind: {fileID: 1805896805}
-  settings: {fileID: 11400000, guid: 24a73e2a115e2634f8d2703ca2aaa145, type: 2}
-  terrain: {fileID: 1738276033}
 --- !u!1 &1780705005
 GameObject:
   m_ObjectHideFlags: 0
@@ -2538,10 +2126,10 @@ MonoBehaviour:
   settings: {fileID: 11400000, guid: b2c3544750df89a47884920f8b841e75, type: 2}
   groundAltitude: 0.48831105
   rainCeiling: 603.2107
-  snowFloor: 844.2996
+  stormFloor: 844.2996
   referenceRainCeiling: 603.2107
-  referenceSnowFloor: 844.2996
-  blizzardAltitude: 5027.712
+  referenceStormFloor: 844.2996
+  stormPeakAltitude: 5027.712
   summitAltitude: 6027.712
 --- !u!114 &1805896805
 MonoBehaviour:
@@ -2569,7 +2157,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WeatherState
   precipitation: 0
-  snowiness: 0
 --- !u!4 &1805896807
 Transform:
   m_ObjectHideFlags: 0
@@ -5092,4 +4679,3 @@ SceneRoots:
   - {fileID: 1268737632}
   - {fileID: 1147612206}
   - {fileID: 787919894}
-  - {fileID: 596074313}

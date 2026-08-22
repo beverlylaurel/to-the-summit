@@ -5,8 +5,6 @@ using UnityEngine.Rendering;
 /// Yağışı tek draw call ile çizer. Tanecik konumları CPU'da tutulmaz;
 /// vertex shader zaman + rüzgâr kaymasından üretir.
 ///
-/// Damla ve kar tanesi ayrı popülasyonlardır: her taneciğin türü sabittir, kendi hızıyla
-/// düşer ve kendi şeklinde çizilir. Karlılık yalnızca oranı belirler — sulu kar gerçekte
 /// de damlanın taneye dönüşmesi değil, ikisinin bir arada bulunmasıdır.
 public class PrecipitationRenderer : MonoBehaviour
 {
@@ -66,7 +64,6 @@ public class PrecipitationRenderer : MonoBehaviour
     ///
     /// Payın konumdan türemesi zorunlu: aynı noktadaki iki tanecik hangi kutudan
     /// geldiğine bakılmaksızın AYNI sayıda gerçek damlayı temsil etmeli, yoksa aynı
-    /// yerde iki farklı opaklık çıkar.
     ///
     /// Şiddetli yağmurun gerçek yoğunluğu ~1000/m³. Dış kutuda 2.03, iç kutunun
     /// içinde 2.03 + 14.47 = 16.5 → temsil payı 491'den 61'e iniyor. Yani yakın damla
@@ -80,16 +77,13 @@ public class PrecipitationRenderer : MonoBehaviour
         NearParticles / (NearBoxSize.x * NearBoxSize.y * NearBoxSize.z);
 
     /// Teşhis kipi F1 panelinden sürülüyor, Inspector'dan değil.
-    public static int StreakProbe;
 
     /// Teşhiste quad'ın büyütme katsayısı. 24 m'deki iz fiziksel ölçekte 0.4 × 12
     /// piksel; 40 kat büyütme onu 16 × 480'e çıkarıyor, yani desen okunur oluyor.
-    const float StreakProbeScale = 40f;
 
     // Ayarlar bilerek serileştirilmiyor: Inspector'a girince sahnedeki bileşen eski
     // değerlerle donuyor ve koddaki değişiklik etkisiz kalıyor.
 
-    // Alan. Kar kendi kutusunda sarılır: nokta biçimli tane, uzayan damla kadar ekran
     // alanı kaplamadığı için aynı bütçenin kameraya daha sıkı paketlenmesi gerekir.
     /// Yağış kutusu 48 m; kamera merkezde sarılıyor, yani görünür yarıçap 24 m.
     ///
@@ -148,27 +142,19 @@ public class PrecipitationRenderer : MonoBehaviour
     /// %10'da yakın alan kaplaması İKİ BUÇUK KAT, toplam %11 artıyor ve ortanca alfa
     /// değişmiyor. %20'de yakın biraz daha artıyor ama toplam ve ortanca düşüyor.
     static readonly Vector3 NearBoxSize = new(12f, 12f, 12f);
-    static readonly Vector3 SnowBoxSize = new(40f, 40f, 40f);
 
-    /// Sürüklenen kar kutusu. Yatayda dar tutuluyor: aynı tanecik sayısı küçük alana
     /// sıkışınca yoğunluk kareyle artıyor. Uzaklık sönümü de kutu boyundan türüyor
     /// (yarısında biter), yani kutuyu daraltmak görünür bölgeyi de yoğunlaştırıyor.
     /// 90 ve 45 metrede taneler ayırt edilemeyecek kadar seyrekti — uzağı zaten
     /// hacimsel perde taşıyor, yakın katmanın işi oyuncunun çevresi.
-    static readonly Vector3 SpindriftBoxSize = new(24f, 12f, 24f);
 
-    /// Tane boyu. Gerçek sürüklenen kar taneciği 0.05-0.2 mm; burada 14 mm, yani
     /// fiziksel boyun ~100 katı. Bilerek: gerçek boyda her tane piksel altına düşer ve
     /// tek tek görünmez olur — o zaten uzak perdenin işi. Yakın katmanın işi taneyi
     /// GÖSTERMEK, sayısını değil hareketini okutmak.
-    const float SpindriftSize = 0.014f;
 
     /// Katmanın yerden kalınlığı (metre). Tane yüksekliği bunun içinde küpsel
     /// dağılıyor: çoğu yere yapışık, seyrek olanı yukarıda.
-    const float SpindriftLayerHeight = 9f;
-    /// Yağış tanecikleri. Bütçe bölünüyor: ilk blok yağış, kalanı sürüklenen kar.
     /// Ayrı bir mesh yerine tek mesh büyütüldü — iki sistem aynı anda çalışabilsin diye.
-    /// Gerçekte kar yağarken de yerden kar kalkar; paylaşımlı bütçe bunu yasaklardı.
     /// 90 000'den çıkarıldı. Ölçüldü: 48 m küp kutuda 90 000 tanecik 0.8 damla/m³
     /// demek; şiddetli yağmurun gerçek yoğunluğu Marshall-Palmer'a göre ~1000/m³.
     /// Yani eski tavan gerçekte orta şiddetin bile altındaydı ve %50 ÇİSELTİ gibi
@@ -182,17 +168,14 @@ public class PrecipitationRenderer : MonoBehaviour
     /// kutuda; bayrak vertex konumunun `y`'sinde taşınıyor.
     const int NearParticles = 25000;
 
-    /// Sürüklenen kar tanecikleri. Yağıştan FAZLA: ince toz ancak taneler tek tek
     /// seçilemeyecek kadar sıkışınca okunuyor. 40.000'de metrekareye ~70 tane düşüyordu
     /// ve göz her birini ayırt ediyordu — "taneli", "toz değil". Kutuyu daraltmak
     /// çözmez: uzaklık sönümü kutu boyundan türüyor, daraltınca toz birkaç metrede
     /// bitip baloncuk gibi görünüyor. Tek doğru kaldıraç sayı.
-    const int SpindriftParticles = 80000;
 
-    const int ParticleCount = PrecipitationParticles + SpindriftParticles;
+    const int ParticleCount = PrecipitationParticles;
 
     const int PrecipitationSubMesh = 0;
-    const int SpindriftSubMesh = 1;
     /// Şiddetin çizilen tanecik sayısına dönüşüm eğrisi — MARSHALL-PALMER'DAN.
     ///
     /// Dağılımda `N₀` sabit ve `Λ = 4.1·R^(−0.21)`, yani toplam damla sayısı
@@ -203,11 +186,7 @@ public class PrecipitationRenderer : MonoBehaviour
     /// boyu da sürüyor — çifte sayım. Ölçüldü: şiddet 0.30'da yalnız %14 tanecik
     /// çiziliyordu (36k) ve hafif yağmur ekranda yok oluyordu.
     const float DensityExponent = 0.21f;
-    // Karın tanecik bütçesindeki payı. Yağmurla kar bir aradayken ikisini bölmek için
-    // var; saf kar fırtınasında ise yağmur payı zaten sıfır olduğundan kısıtlamanın
     // karşılığı yok. 0.45'te bütçenin yarısından fazlası hiçbir işe yaramadan eleniyor
-    // ve tam karlılıkta kar seyrek görünüyordu.
-    const float SnowDensityScale = 0.9f;
     const int MeshSeed = 1;
 
     // Yağmur. Damla boyutu hem düşme hızını hem rüzgâra direncini belirler:
@@ -249,27 +228,15 @@ public class PrecipitationRenderer : MonoBehaviour
     const int RainSpeedClasses = 8;
     static readonly Color RainColor = new(0.78f, 0.83f, 0.92f, 0.42f);
 
-    // Kar
-    const float SnowFallSpeed = 1.4f;
-    const float SnowWindFactor = 1f;      // hafif olduğu için rüzgârı tam yer
-    const float SnowSize = 0.11f;
-    const float SnowSpinCalm = 0.8f;      // dingin havada dönme hızı, rad/s
-    const float SnowSpinStorm = 4.5f;     // tam fırtınada dönme hızı, rad/s
-
     // Girdap genlikleri. Dingin havada tanecikler neredeyse düz iner; genlik
     // rüzgârdan ölçeklenir, kendi zamanlayıcısını kurmaz
-    const float SnowTurbulenceCalm = 0.15f;
-    const float SnowTurbulenceStorm = 1.2f;
     const float RainTurbulenceCalm = 0.03f;
     const float RainTurbulenceStorm = 0.25f;
-    // Tanenin rengi değil, havanın rengine binen ton. Kar kendi ışığını üretmiyor:
     // gölgelendirici havanın rengini bununla çarpıp parlatıyor, böylece şafakta turuncu,
     // gece koyu, şimşekte parlak oluyor. Sabit beyaz, kapalı gökyüzünün önünde patlayıp
     // yıldız gibi duruyordu.
-    static readonly Color SnowColor = new(0.95f, 0.96f, 1f, 1f);
 
     static readonly int BoxSizeId = Shader.PropertyToID("_BoxSize");
-    static readonly int SnowBoxSizeId = Shader.PropertyToID("_SnowBoxSize");
     static readonly int StreakPointId = Shader.PropertyToID("_StreakPoint");
     static readonly int StreakAmbientId = Shader.PropertyToID("_StreakAmbient");
     static readonly int StreakCellBlendId = Shader.PropertyToID("_StreakCellBlend");
@@ -281,36 +248,19 @@ public class PrecipitationRenderer : MonoBehaviour
     static readonly int StreakSourceScaleId = Shader.PropertyToID("_StreakSourceScale");
     static readonly int StreakSunRadianceId = Shader.PropertyToID("_StreakSunRadiance");
     static readonly int RainDensityId = Shader.PropertyToID("_RainDensity");
-    static readonly int StreakDebugId = Shader.PropertyToID("_StreakDebug");
-    static readonly int StreakDebugScaleId = Shader.PropertyToID("_StreakDebugScale");
 
     static readonly int RainDriftsId = Shader.PropertyToID("_RainDrifts");
     static readonly int RainDriftsNearId = Shader.PropertyToID("_RainDriftsNear");
     static readonly int NearBoxSizeId = Shader.PropertyToID("_NearBoxSize");
-    static readonly int SnowDriftNearId = Shader.PropertyToID("_SnowDriftNear");
     static readonly int RainDirectionsId = Shader.PropertyToID("_RainDirections");
-    static readonly int SnowDriftId = Shader.PropertyToID("_SnowDrift");
-    static readonly int SnowDirectionId = Shader.PropertyToID("_SnowDirection");
-    static readonly int SpindriftBoxId = Shader.PropertyToID("_SpindriftBox");
-    static readonly int SpindriftDriftId = Shader.PropertyToID("_SpindriftParticleDrift");
-    static readonly int SpindriftSizeId = Shader.PropertyToID("_SpindriftSize");
-    static readonly int SpindriftLayerId = Shader.PropertyToID("_SpindriftLayer");
 
     /// Atmosfer yazıyor, burada yalnız OKUNUYOR: rüzgâr eşiği geçilmediyse toz alt
     /// parçası hiç çizilmesin diye. İkinci bir eşik hesabı kurmak iki sistemi ayırırdı.
-    static readonly int SpindriftDensityId = Shader.PropertyToID("_SpindriftDensity");
-    static readonly int SnowinessId = Shader.PropertyToID("_Snowiness");
     static readonly int DensityId = Shader.PropertyToID("_Density");
     static readonly int PrecipitationId = Shader.PropertyToID("_Precipitation");
-    static readonly int SnowDensityScaleId = Shader.PropertyToID("_SnowDensityScale");
-    static readonly int SnowSizeId = Shader.PropertyToID("_SnowSize");
-    static readonly int SnowTurbulenceId = Shader.PropertyToID("_SnowTurbulence");
     static readonly int RainTurbulenceId = Shader.PropertyToID("_RainTurbulence");
-    static readonly int SnowSpinId = Shader.PropertyToID("_SnowSpin");
     static readonly int WindSweepId = Shader.PropertyToID("_WindSweep");
     static readonly int RainColorId = Shader.PropertyToID("_RainColor");
-    static readonly int SnowColorId = Shader.PropertyToID("_SnowColor");
-
 
     Mesh mesh;
     Material material;
@@ -318,19 +268,13 @@ public class PrecipitationRenderer : MonoBehaviour
     readonly Vector4[] rainDriftsNear = new Vector4[RainSpeedClasses];
     readonly Vector4[] rainDirections = new Vector4[RainSpeedClasses];
     readonly Vector3[] rainVelocities = new Vector3[RainSpeedClasses];
-    Vector3 snowDrift;
-    Vector3 snowDriftNear;
-    Vector3 spindriftDrift;
     Vector3 windSweep;
-    float snowSpin;
     float density;
     float precipitation;
 
-    /// Teşhis: bu bileşen o an ne çiziyor. Kar sistemi v2 ile aynı anda ekranda
     /// bir şey varsa hangisinin olduğu başka türlü ayrılamıyor.
     public float DebugRainIntensity => precipitation;
     public float DebugDensity => density;
-    float snowiness;
     float localFactor = 1f;
 
     /// Yağış artık gökten tek parça düşmüyor: kaynağı tepedeki bulut kolonudur.
@@ -380,7 +324,6 @@ public class PrecipitationRenderer : MonoBehaviour
     /// Büyüklük shader'a lazım çünkü damla başına yön sapması bir ORAN: türbülans
     /// hız dalgalanmasının bileşke hıza oranı. Normalize edilmiş yön tek başına o
     /// oranı kuramaz — payda kaybolur ve sapma dingin havada da fırtınadaki kadar
-    /// büyük çıkar.
     static Vector4 WithSpeed(Vector3 velocity)
     {
         float speed = velocity.magnitude;
@@ -395,7 +338,7 @@ public class PrecipitationRenderer : MonoBehaviour
     ///   ışığın azimutu   — aynı açının kameranın eksenine göre bileşeni
     ///   `θ_v`            — kameranın bakışıyla düşüş yönü arasındaki açı (shader'da,
     ///                      damla başına, çünkü ekranın her yerinde farklı)
-    void UpdateStreaks(Vector3 rainVelocity, float snowiness)
+    void UpdateStreaks(Vector3 rainVelocity)
     {
         // TEK SEFERLİK DURUM RAPORU. Üç bağ da sessizce eksik olabiliyordu ve belirti
         // "yağmur hiç görünmüyor" — hangisinin eksik olduğu ekrandan anlaşılmıyor.
@@ -412,8 +355,6 @@ public class PrecipitationRenderer : MonoBehaviour
         var camera = Camera.main;
         if (camera == null) return;
 
-        // Yağışın DÜNYA yönü — rüzgârla eğilmiş düşüş ekseni. Kar payı yüksekken de
-        // hesaplanıyor: karlılık geçişinde damlalar hâlâ çiziliyor.
         Vector3 fall = rainVelocity.sqrMagnitude > 1e-8f
             ? rainVelocity.normalized
             : Vector3.down;
@@ -436,8 +377,6 @@ public class PrecipitationRenderer : MonoBehaviour
         material.SetVector(StreakSunRadianceId, new Vector4(sun.r, sun.g, sun.b, 1f));
 
         material.SetFloat(StreakSourceScaleId, SourceScale);
-        material.SetFloat(StreakDebugId, StreakProbe);
-        material.SetFloat(StreakDebugScaleId, StreakProbeScale);
 
         if (!streakTextureReported)
         {
@@ -474,13 +413,9 @@ public class PrecipitationRenderer : MonoBehaviour
         // Bağıntı R > 0 için doğru ama R → 0'da yağış OLAYININ kendisi bitmeli. Kapı
         // şiddetin en alt diliminde: 0.05 altı çiseleme bile değil (R < 2.5 mm/sa),
         // orada damla sayısı sıfıra iniyor.
-        // KAR ARTIK BU SİSTEMDE DEĞİL. Kar sistemi v2 karı kendi çiziyor; bu bileşen
         // yalnız YAĞMUR taşıyor.
         //
-        // ŞİDDETİN YALNIZ YAĞMUR PAYI ALINIYOR. Kar oranı 1 iken bu bileşen hiçbir
-        // şey çizmiyor. Hem tanecik SAYISI hem şiddet aynı payı görmek zorunda —
-        // yalnız şiddeti kısmak tanecikleri yerinde bırakıyor.
-        float rainIntensity = state.Precipitation * (1f - state.Snowiness);
+        float rainIntensity = state.Precipitation;
 
         // MARSHALL-PALMER SIFIRDA GEÇERSİZ, KAPI ŞART.
         //
@@ -496,11 +431,6 @@ public class PrecipitationRenderer : MonoBehaviour
                 * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.05f, rainIntensity));
 
         precipitation = rainIntensity;
-        snowiness = 0f;
-
-        // Kar tarafına ait ölü kod bu dosyada duruyor ve AYRI BİR ADIMDA silinecek:
-        // bütçe bölüşümü ve tampon düzeni yağmurla iç içe; kör ameliyat yağmuru da
-        // bozar. Kayıt DECISIONS.md'de.
     }
 
     void Update()
@@ -534,18 +464,8 @@ public class PrecipitationRenderer : MonoBehaviour
             rainDriftsNear[i] = Advance(rainDriftsNear[i], rainVelocities[i], NearBoxSize);
             rainDirections[i] = WithSpeed(rainVelocities[i]);
         }
-
-        // Kar da sınır tabakasını okur; yasa shader'da, damla ve tane için ortak.
-        Vector3 snowVelocity = Vector3.down * SnowFallSpeed + wind.Velocity * SnowWindFactor;
-        snowDrift = Advance(snowDrift, snowVelocity, SnowBoxSize);
-        snowDriftNear = Advance(snowDriftNear, snowVelocity, NearBoxSize);
-
-        // SÜRÜKLENEN KAR YALNIZ YATAY GİDER: yerden kalkan tane düşmüyor, rüzgârla
-        // taşınıyor. Rüzgârı tam yiyor — kırık kar taneciği yağan kar tanesinden çok
         // daha küçük, havanın hızına anında oturuyor. Dikey kayma yok, çünkü tanenin
         // yerden yüksekliği kutudan değil arazi yüzeyinden türüyor.
-        Vector3 spindriftVelocity = new(wind.Velocity.x, 0f, wind.Velocity.z);
-        spindriftDrift = Advance(spindriftDrift, spindriftVelocity, SpindriftBoxSize);
 
         // Tanecik esintiyi anında yer: sürekli şiddet değil, o andaki hız neyse o.
         // Hız zaten Velocity üzerinden esintili geliyordu; dönme ve türbülans sürekli
@@ -558,8 +478,6 @@ public class PrecipitationRenderer : MonoBehaviour
         // Sarma yok: her tane açıyı farklı katsayıyla çarptığı için sarma noktası
         // her tanede başka yere düşer ve sıçrama görünür. Saatler sonra bile
         // float hassasiyeti binde bir radyan seviyesinde, göze çarpmaz
-        float spinRate = Mathf.Lerp(SnowSpinCalm, SnowSpinStorm, felt);
-        snowSpin += spinRate * Time.deltaTime;
 
         // Girdap alanının rüzgârla sürüklenme ötelemesi (Taylor: türbülans ortalama
         // akışla taşınır). Sarılmıyor: alanın içinde 0.7-0.9 gibi karışık frekans
@@ -569,38 +487,21 @@ public class PrecipitationRenderer : MonoBehaviour
         windSweep += wind.Velocity * Time.deltaTime;
 
         material.SetVector(BoxSizeId, BoxSize);
-        material.SetVector(SnowBoxSizeId, SnowBoxSize);
         // KOŞULSUZ: temsil payı buradan türüyor ve `UpdateStreaks`'in önünde dört erken
         // çıkış var. Uniform yazılmazsa HLSL varsayılanı sıfır olur, yoğunluk tabana
-        // düşer ve bütün damlalar tam opak çıkar.
         material.SetVector(RainDensityId, new Vector4(OuterDensity, NearDensity, 0f, 0f));
         material.SetVector(NearBoxSizeId, NearBoxSize);
         material.SetVectorArray(RainDriftsId, rainDrifts);
         material.SetVectorArray(RainDriftsNearId, rainDriftsNear);
-        material.SetVector(SnowDriftNearId, snowDriftNear);
         material.SetVectorArray(RainDirectionsId, rainDirections);
-        material.SetVector(SnowDriftId, snowDrift);
-        material.SetVector(SnowDirectionId, WithSpeed(snowVelocity));
-        material.SetVector(SpindriftBoxId, SpindriftBoxSize);
-        material.SetVector(SpindriftDriftId, spindriftDrift);
-        material.SetFloat(SpindriftSizeId, SpindriftSize);
-        material.SetFloat(SpindriftLayerId, SpindriftLayerHeight);
-        material.SetFloat(SnowinessId, snowiness);
         material.SetFloat(DensityId, density * localFactor);
         material.SetFloat(PrecipitationId, precipitation * localFactor);
 
-        UpdateStreaks(snowVelocity, snowiness);
-
-        material.SetFloat(SnowDensityScaleId, SnowDensityScale);
-        material.SetFloat(SnowSizeId, SnowSize);
-        material.SetFloat(SnowTurbulenceId,
-            Mathf.Lerp(SnowTurbulenceCalm, SnowTurbulenceStorm, felt));
+        UpdateStreaks(rainVelocities[RainSpeedClasses / 2]);
         material.SetFloat(RainTurbulenceId,
             Mathf.Lerp(RainTurbulenceCalm, RainTurbulenceStorm, felt));
-        material.SetFloat(SnowSpinId, snowSpin);
         material.SetVector(WindSweepId, windSweep);
         material.SetColor(RainColorId, RainColor);
-        material.SetColor(SnowColorId, SnowColor);
 
         Draw();
     }
@@ -650,9 +551,6 @@ public class PrecipitationRenderer : MonoBehaviour
 
         if (density * localFactor > 0.0005f)
             Graphics.RenderMesh(parameters, mesh, PrecipitationSubMesh, transform);
-
-        if (Shader.GetGlobalFloat(SpindriftDensityId) > 0.00001f)
-            Graphics.RenderMesh(parameters, mesh, SpindriftSubMesh, transform);
     }
 
     /// Her tanecik bir quad. Köşe bilgisi UV0'da, tanecik tohumu UV1/UV2'de, tanecik
@@ -710,11 +608,9 @@ public class PrecipitationRenderer : MonoBehaviour
         built.SetUVs(0, corners);
         built.SetUVs(1, seedXY);
         built.SetUVs(2, seedZW);
-        built.subMeshCount = 2;
+        built.subMeshCount = 1;
         built.SetIndices(indices, 0, PrecipitationParticles * 6,
                          MeshTopology.Triangles, PrecipitationSubMesh, false);
-        built.SetIndices(indices, PrecipitationParticles * 6, SpindriftParticles * 6,
-                         MeshTopology.Triangles, SpindriftSubMesh, false);
 
         // Konumlar shader'da üretildiği için hesaplanan sınırlar anlamsız; culling'i kapat
         built.bounds = new Bounds(Vector3.zero, Vector3.one * 100000f);

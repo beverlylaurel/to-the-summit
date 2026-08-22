@@ -24,27 +24,17 @@ public class FirstPersonController : MonoBehaviour
     [Range(20f, 80f)] public float slopeLimit = 45f;
     public float stepOffset = 0.4f;
 
-    [Header("Kar")]
-    [Tooltip("Karın çarpışma yüzeyi. Kar sistemi olmayan sahnelerde (test zemini) boş " +
-             "bırakılır — orada kar yoktur, yokluğu bir hata değil.")]
-    [SerializeField] SnowSurface snow;
-
     CharacterController controller;
     Vector3 velocity;
 
     /// Kontrolcü karın üstünde asılı duruyor: kapsül çıplak araziye değiyor olmadığı
     /// için `isGrounded` yanlış döner. Yürüme ve zıplama bu bayrağı da saymak zorunda.
-    bool onSnow;
 
     /// Kendi kapsülünü ayıklamak için: zemin ışını oyuncunun içinden başlıyor ve
     /// filtrelenmezse ilk çarptığı şey kendi çarpışma hacmi oluyor.
     readonly RaycastHit[] groundHits = new RaycastHit[4];
-
-    /// ZEMİNE BASIYOR MU. Kar deformasyonu bunu okuyor: havadayken iz bırakılmamalı.
-    ///
-    /// İki koşulun BİRLEŞİMİ, tek başına `isGrounded` değil — kapsül karın üstünde
-    /// asılıyken `isGrounded` yanlış dönüyor ve zıplamadan yürürken iz kesilirdi.
-    public bool OnGround => controller != null && (controller.isGrounded || onSnow);
+    /// ZEMİNE BASIYOR MU.
+    public bool OnGround => controller != null && controller.isGrounded;
 
     /// Test amaçlı hız çarpanı. Normal oyunda 1.
     public float SpeedMultiplier { get; set; } = 1f;
@@ -84,7 +74,7 @@ public class FirstPersonController : MonoBehaviour
         float speed = (kb.leftShiftKey.isPressed ? sprintSpeed : walkSpeed) * SpeedMultiplier;
         Vector3 wish = (transform.right * input.x + transform.forward * input.y) * speed;
 
-        if (controller.isGrounded || onSnow)
+        if (controller.isGrounded)
         {
             velocity.x = wish.x;
             velocity.z = wish.z;
@@ -101,63 +91,12 @@ public class FirstPersonController : MonoBehaviour
 
     void ApplyGravity()
     {
-        if ((controller.isGrounded || onSnow) && velocity.y < 0f)
+        if (controller.isGrounded && velocity.y < 0f)
             velocity.y = -2f;
 
         velocity.y += gravity * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
 
-        if (snow != null) SettleOnSnow();
     }
 
-    /// KAR İKİNCİ ZEMİN. Arazi çarpışması çıplak kayanın yüzeyi; kar onun üstünde
-    /// geometrik olarak yükseliyor ama TerrainCollider bunu bilmiyor. Ayak karın
-    /// üstünün altına düştüğü karede yukarı çekiliyor.
-    ///
-    /// Arazi yüksekliği ışınla ölçülüyor, `SampleHeight` ile değil: çarpışma yüzeyi
-    /// yükseklik haritasının üçgenlenmiş hâli ve ikisi köşegende birkaç santim
-    /// ayrışıyor. Kar eşiği 18 cm — o fark doğrudan gömülmeye dönüşürdü.
-    void SettleOnSnow()
-    {
-        onSnow = false;
-
-        // Yükselirken karışılmıyor: zıplayan oyuncu kendi karının içine geri çekilmemeli.
-        if (velocity.y > 0f) return;
-
-        var origin = transform.position + Vector3.up * 2f;
-        int count = Physics.RaycastNonAlloc(origin, Vector3.down, groundHits, 8f,
-            ~0, QueryTriggerInteraction.Ignore);
-
-        float ground = float.NegativeInfinity;
-        for (int i = 0; i < count; i++)
-        {
-            if (groundHits[i].collider == controller) continue;
-            ground = Mathf.Max(ground, groundHits[i].point.y);
-        }
-
-        if (float.IsNegativeInfinity(ground)) return;
-
-        // Derinlik ZEMİN kotundan soruluyor, ayak kotundan değil: kot bandı okuması
-        // shader tarafında da yüzey noktasından yapılıyor, ayak karın üstünde duruyor.
-        float depth = snow.DepthAt(new Vector3(transform.position.x, ground,
-                                               transform.position.z));
-        if (depth < 0.001f) return;
-
-        // Kar yüzeyine İKİ YÖNDE de yapışılıyor. Yalnız yukarı çekmek denendi ve
-        // yamaçtan inerken zıplattı: kar yüzeyi eğim boyunca düşerken oyuncu ancak
-        // -2 m/s ile iniyor, aradaki farkta havada kalıp serbest düşüyor, sonra bir
-        // sonraki karede geri kaldırılıyordu. Zemin yüzeyi bir tarafa iterse zemin
-        // değil tramplen olur.
-        //
-        // Aşağı yapışma MESAFEYLE sınırlı: uçurumdan atlayan oyuncu karın yüzeyine
-        // geri çekilmemeli. Sınır basamak payı kadar — kontrolcünün zaten tırmandığı
-        // yükseklik.
-        float top = ground + depth;
-        float delta = top - transform.position.y;
-        if (delta < -stepOffset) return;
-
-        controller.Move(Vector3.up * delta);
-        velocity.y = -2f;
-        onSnow = true;
-    }
 }

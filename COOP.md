@@ -18,27 +18,6 @@ Yeni bir borç fark edildiğinde **aynı adımda** buraya yazılır. Ödendiğin
 
 ---
 
-## 0. Karın görsel yüzeyi kameraya bağlı, çarpışma yüzeyi değil
-
-`SnowDisplacement.hlsl` kar geometrisini kameraya uzaklıkla söndürüyor: bölünme
-`snowTessNear`–`snowTessFar` arasında kapanıyor, yer değiştirme ondan önce sıfıra
-iniyor. `SnowSurface.DepthAt` ise sönüm uygulamıyor — çarpışma kamerayı bilmez.
-
-Tek oyuncuda doğru: oyuncu kameranın konumunda, ayağının altındaki sönüm 1.
-
-İkinci oyuncu geldiğinde yanlış olacak: uzaktaki oyuncunun bastığı kar SENİN ekranında
-düz çiziliyor ama o kendi karının üstünde duruyor. Uzaktan bakınca zeminin bir metre
-üstünde yürüyor görünür.
-
-**Ne olması gerekiyor:** ya sönüm görünürlükten değil bir LOD kademesinden türeyecek
-ve uzak oyuncu kendi kademesini taşıyacak, ya da uzak oyuncunun ayağı ağdan gelen
-mutlak kotla çizilecek.
-
-**Maliyet:** sönüm formülü tek yerde (`SnowDisplacement`), değişimi küçük. Asıl iş
-uzak oyuncunun kotunun ağdan gelmesi — o zaten gerekecek.
-
----
-
 ## 1. Rastgelelik paylaşılmıyor
 
 Dört yerde yerel `UnityEngine.Random` var. Her istemci kendi tohumundan çektiği için
@@ -99,24 +78,6 @@ birden kayar: farklı gökyüzü, farklı rüzgâr, farklı bulut.
 
 **Olması gereken:** günün saati ortak koşu durumundan gelmeli, `Time.time` yerine ondan
 türeyen bir değer örneklenmeli.
-
----
-
-## 4. Zemindeki kar örtüsü yerel birikiyor
-
-`TerrainSurface` kot bandı başına iki integral tutuyor (örtü ve kalınlık deposu). Borç
-**küçüldü**: birikme hızı artık oyuncunun bulunduğu kottan değil, bandın kendi kotundaki
-havadan geliyor — yani girdi tamamen paylaşılan saatten türeyen gürültü. İki istemci aynı
-anda başlarsa aynı yere gider.
-
-**Kalan borç:** integralin *başlangıç anı*. Sonradan katılan oyuncu sıfırdan başlar,
-diğerininki dolu.
-
-**Olması gereken:** katılırken profilin o anki hâli gönderilmeli, ya da integral
-paylaşılan saatten yeniden koşturulmalı.
-
-**Not:** görsel bir değer, oynanışa girmiyor. Öncelik düşük — ama iki oyuncu yan yana
-durup birinin karlı diğerinin çıplak bir yamaç görmesi tuhaf.
 
 ---
 
@@ -183,12 +144,5 @@ Bunlar ağ eklendiğinde olduğu gibi kalabilir; listeye tekrar girmesinler:
 - **Gölgelendiriciler, tanecik biçimi, ses karışımı, post-process** — tamamı yerel görüntü
 - **Ayar asset'leri** — build'in parçası, çalışma zamanında değişmiyorlar
 
-- **Kar deformasyonu İSTEMCİ-YEREL.** `SnowManager` durum dokusunu yalnız yerel
-  oyuncunun etrafında tutuyor ve `SnowDeformerRegistry` yalnız yerel temasları
-  topluyor. Ağ gelince: uzak oyuncuların ayak temasları da deformer olarak
-  yayınlanmalı (konum, yön, yük, güç), yoksa herkes kendi izini görür.
-  Maliyet: küçük — `SnowDeformerGPU` zaten 64 bayt ve kare başına en fazla iki
-  temas var. Spec §14 bunu kapsam dışı bırakıyor, bu satır yalnız envanter.
-- **Hava preseti yerel.** `SnowWeather` presetini kim değiştirirse yalnız onda
   değişiyor. Ağ gelince preset ve geçiş zamanı sunucudan gelmeli; birikme hesabı
   deterministik olduğu için başka bir şey senkronlanması gerekmiyor.

@@ -24,7 +24,7 @@ public class WindField : MonoBehaviour
     /// HÂKİM rüzgâr yönü, birim vektör. Anlık `Velocity`'den ayrı: esinti ve yalpa
     /// içermiyor.
     ///
-    /// Kar birikintisi ve sastrugi bunu okur, `Velocity`'yi değil. İkisi karıştırılınca
+    /// Yüzey deseni bunu okur, `Velocity`'yi değil. İkisi karıştırılınca
     /// desen dünyada kayıyor: alan `dot(worldXZ, windAxis)` üzerinden kuruluyor ve
     /// dağın ortasında |worldXZ| yedi bin metre — bir hamlenin 0.14 radyanlık sapması
     /// deseni 980 metre sürüklüyordu (gövde 45 m). Tanecik, ses ve savrulma anlık
@@ -78,7 +78,7 @@ public class WindField : MonoBehaviour
     /// ÜS 4 SÜRGÜYLE BULUNDU, hesapla değil — doğru değer tercih. Sürgü F1'deydi,
     /// değer bulununca silindi.
     ///
-    /// EŞİKLER KORUNUYOR: `Strength` de bu hızdan türüyor, yani sürüklenen karın rüzgâr
+    /// EŞİKLER KORUNUYOR: `Strength` de bu hızdan türüyor, yani rüzgâr
     /// eşiği (0.22) artık şiddet ~0.56'da açılıyor, tam blizzard ~0.87'de. Fırtına
     /// olay oluyor, kural değil.
     ///

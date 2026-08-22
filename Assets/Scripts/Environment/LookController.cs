@@ -39,8 +39,6 @@ public class LookController : MonoBehaviour
     [SerializeField, Range(0f, 1f)] float previewStorm = 0.8f;
     [SerializeField, Range(0f, 1f)] float previewDay = 0.6f;
 
-    [Tooltip("Karlılığın fırtına hissine katkısı. Kar, yağmurdan daha kapatıcıdır.")]
-    [SerializeField, Range(0f, 1f)] float snowWeight = 0.35f;
 
     ColorAdjustments colorAdjustments;
     WhiteBalance whiteBalance;
@@ -132,8 +130,7 @@ public class LookController : MonoBehaviour
         }
         else
         {
-            // Kar yağışı aynı şiddetteki yağmurdan daha kapatıcı hissettirir
-            storm = Mathf.Clamp01(weather.Precipitation * Mathf.Lerp(1f, 1f + snowWeight, weather.Snowiness));
+            storm = Mathf.Clamp01(weather.Precipitation);
             day = time.DayFactor;
             horizon = time.HorizonFactor;
         }

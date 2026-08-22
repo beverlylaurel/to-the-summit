@@ -73,12 +73,12 @@ public static class SurfaceMapBaker
     /// işlem demek ve karşılığında görünür hiçbir şey kazandırmıyor.
     public const int MapResolution = 1024;
 
-    const string DriftPath = "Assets/Terrain/MountainSnowDrift.asset";
+    const string DriftPath = "Assets/Terrain/MountainWindWeight.asset";
 
-    /// Kar BİRİKİM AĞIRLIĞI haritası. Adında hem biçim sürümü hem hâkim rüzgâr açısı
+    /// rüzgâr AĞIRLIĞI haritası. Adında hem biçim sürümü hem hâkim rüzgâr açısı
     /// taşınıyor: harita o yöne göre pişiyor ve açı değişince yeniden pişmesi gerekiyor.
     static string DriftName(float prevailingDegrees) =>
-        $"MountainSnowDrift-r8-{Mathf.RoundToInt(prevailingDegrees)}";
+        $"MountainWindWeight-r8-{Mathf.RoundToInt(prevailingDegrees)}";
 
     /// SÜRÜM İÇE AKTARMA VERİSİNDE, nesne adında değil. Ad kullanılıyordu ve Unity her
     /// pişirmede "Main Object Name X does not match filename Y" uyarısı basıyordu:
@@ -193,7 +193,7 @@ public static class SurfaceMapBaker
         // Birikim ağırlığı HAM eğrilikten pişiyor, normalleşmiş kanaldan değil: ağırlık
         // işaretli bir büyüklük istiyor (çukur eksi, sırt artı) ve Normalize sıfır
         // noktasını 0.5'e taşıyıp aralığı dağılıma göre esnetiyor.
-        BakeDriftWeight(height, concavity, res, spacing, vertical, prevailingDegrees);
+        BakeWindWeight(height, concavity, res, spacing, vertical, prevailingDegrees);
 
         Normalize(accumulation);
         Normalize(concavity);
@@ -520,9 +520,9 @@ public static class SurfaceMapBaker
     /// etek tamamen doyuyordu. Uçlardaki %2'lik dilim kırpılır — birkaç aykırı hücre
     /// bütün bandı kendine ayırmasın — geri kalanı tüm aralığı kullanır.
     /// Dağ değişse bile ölçek kendiliğinden doğru kalır.
-    /// KAR BİRİKİM AĞIRLIĞI. Arazi rüzgârın hızını değiştirir, hız da birikimi:
+    /// rüzgâr AĞIRLIĞI. Arazi rüzgârın hızını değiştirir, hız da birikimi:
     /// rüzgârüstü ve dışbükey yüzeyde rüzgâr hızlanır ve kar kazınır; rüzgâraltı ve
-    /// içbükey yüzeyde yavaşlar ve kar yığılır. Liston &amp; Sturm'ün SnowTran-3D /
+    /// içbükey yüzeyde yavaşlar ve rüzgâr yavaşlar. Liston &amp; Sturm'ün rüzgâr-arazi /
     /// MicroMet formülasyonu:
     ///
     ///     W = 1 + 0.5·Ωs + 0.5·Ωc,  W ∈ [0.5, 1.5],  birikim ∝ 1/W
@@ -534,7 +534,7 @@ public static class SurfaceMapBaker
     /// PİŞİRİLİYOR, çalışma anında hesaplanmıyor: hâkim rüzgâr yönü sabit bir ayar.
     /// Böylece ne fragman başına ek gradyan okuması var, ne de CPU ikizinin normal
     /// haritasını ayrıca örneklemesi gerekiyor — iki taraf aynı dokuyu okuyor.
-    static void BakeDriftWeight(float[,] height, float[] concavity, int res,
+    static void BakeWindWeight(float[,] height, float[] concavity, int res,
         float spacing, float vertical, float prevailingDegrees)
     {
         float angle = prevailingDegrees * Mathf.Deg2Rad;

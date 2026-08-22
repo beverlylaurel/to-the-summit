@@ -101,21 +101,11 @@ public class ClimbHud : MonoBehaviour
 
         builder.AppendFormat("HAVA KUŞAKLARI\n");
         builder.AppendFormat("  Yağmur biter           {0:F0} m\n", weatherDriver.RainCeiling - ground);
-        builder.AppendFormat("  Saf kar başlar         {0:F0} m\n", weatherDriver.SnowFloor - ground);
         builder.AppendFormat("  Sürekli fırtına        {0:F0} m\n\n",
             weatherDriver.BlizzardAltitude - ground);
 
         builder.AppendFormat("YAĞIŞ\n");
         builder.AppendFormat("  Şiddet                 {0:F2}\n", weather.Precipitation);
-        builder.AppendFormat("  Kar oranı              {0:F2}   (0 yağmur, 1 kar)\n",
-            weather.Snowiness);
-        builder.AppendFormat("  Yere düşen             yağmur {0:F2}   kar {1:F2}\n",
-            weather.Precipitation * (1f - weather.Snowiness),
-            weather.Precipitation * weather.Snowiness);
-        builder.AppendFormat("  Zemindeki kar örtüsü   %{0:F0}   (bulunduğun kotta)\n",
-            surface.SnowCoverAt(observer.position.y) * 100f);
-        builder.AppendFormat("  Kar kalınlığı deposu   %{0:F0}\n",
-            surface.SnowPackAt(observer.position.y) * 100f);
         builder.AppendFormat("  Açık pencere           {0:F2}   (1 = hava açıldı)\n\n",
             weatherDriver.ClearWindow);
 

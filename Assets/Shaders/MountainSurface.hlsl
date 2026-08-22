@@ -6,16 +6,13 @@
 // dosyalarından geliyor — kafa lambası gibi ek ışıklar bedava çalışsın diye.
 
 #include "MountainSurfaceInput.hlsl"
-// Teşhis için: `SnowMacroDepth` ve `SnowDisplacement` fragment'ta okunuyor. Koruma
-// makrosu var, `SnowTessellation.hlsl` ikinci kez dahil ettiğinde sorun çıkmıyor.
-#include "SnowDisplacement.hlsl"
 
 // Dünya koordinatı binlerce metreye çıkıyor. sin tabanlı hash o ölçekte float
 // hassasiyetini tüketip piksel piksel gürültüye dönüşür; hücre indeksi önce küçük
 // bir periyoda katlanır, tekrar kilometrelerce ötede kalır.
 float MountainHash(float3 p)
 {
-    // Tohum burada uygulanıyor, çağrı yerlerinde değil — bkz. `SnowDrift.hlsl`,
+    // Tohum burada uygulanıyor, çağrı yerlerinde değil.
     // `_PatternSeed`. Ölçekli koordinata eklendiği için her katman farklı dünya
     // mesafesi kadar kayıyor; katmanlar birbirinden bağımsız yenileniyor.
     p = fmod(abs(p + _PatternSeed.xyz), 512.0);
@@ -248,113 +245,6 @@ half3 Alpenglow(float3 worldPos, float3 normalWS, float altitude, half3 albedo,
          * (_SurfaceDawnStrength * lit * facing * gate);
 }
 
-/// Kar parlaması: taze karın buz kristali yüzcükleri minik aynalardır — her biri
-/// güneşi ancak yarım-vektörle tam hizadayken bir anlığına yansıtır. Parıltı dünyada
-/// sabittir (kristal yerinde durur); oyuncu hareket edince yüzcükler hizaya girip
-/// çıkar ve kar yürüdükçe yanıp söner. Yalnız doğrudan güneş ışığında olur — gölgede
-/// kar parıldamaz (arazi gölgesi kapılar) — ve ancak yakın mesafede seçilir: açısal
-/// bir olay, uzakta pırıltı kaybolur. Yakınlık kapısı aynı zamanda maliyet kapısı.
-/// Güneşin yüksekliği (sinüs), TimeOfDay'in yayınladığı GLOBAL. Materyal
-/// property'si üzerinden gelen sürüm bu kapıyı kapatmıyordu.
-
-half3 SnowSparkle(float3 worldPos, float3 normalWS, float cover)
-{
-    if (cover <= 0.1) return 0.0;
-
-    // Güneş battıysa kaynak yok; ay pırıltısı gerçekte de gözle zor seçilir, atlanır.
-    // Ufuktaki güneş de parıldatır (kızıl çakımlar) — alt sınır ufkun hemen altı.
-    // Kapı yalnız "güneş var mı" demiyor, ŞİDDETİ de taşıyor. Çakım
-    // _SurfaceDawnColor ile çarpılıyor ve o renk tepe kanalı 1'e normalize edilmiş
-    // bir TON — parlaklık taşımıyor. Sadece varlık kapısı kullanılınca ortalık
-    // kararırken çakımlar aynı kalıyor ve zemin yıldız tarlasına dönüyordu.
-    // Güneş alçaldıkça sönmesi gerek: 11°'de tam, ufukta sıfır.
-    // Bant yukarı çekildi (8.6° → 27°) ve kareyle keskinleştirildi: alacakaranlıkta
-    // sahne loşken çakımlar tam güçte kalıp göze batıyordu. Pırıltı güneşin gerçekten
-    // yükseldiği saatlerin işidir.
-    float sunUp = smoothstep(0.15, 0.45, _SunHeight);
-    sunUp *= sunUp;
-    if (sunUp <= 0.0) return 0.0;
-
-    float3 toCamera = _WorldSpaceCameraPos - worldPos;
-    float distance = length(toCamera);
-    if (distance > 75.0) return 0.0;
-
-    // Gölgedeki kar parıldamaz: doğrudan güneş şartı
-    float shade = TerrainSunShadow(worldPos, _SurfaceDawnDir.xyz);
-    if (shade <= 0.02) return 0.0;
-
-    float3 viewDir = toCamera / max(distance, 0.01);
-    float3 halfVector = normalize(viewDir + _SurfaceDawnDir.xyz);
-
-    float sparkle = 0.0;
-
-    // --- Yakın alan: tek tek kristaller ---
-    // ~3 cm'lik hücreler, her hücrede kristal yok; kristal hücre içinde tek NOKTA.
-    // Nokta gerçek boyuna yakın tutulur, uzaklaştıkça yalnız örtüşmeyi önleyecek
-    // kadar büyür ve parlaklığı alanıyla bölüşür (enerji korunumu) — büyüyen nokta
-    // parlamaz, yayvanlaşır.
-    float near = 1.0 - smoothstep(25.0, 75.0, distance);
-    if (near > 0.0)
-    {
-        // Tazelik parlaklığı değil YOĞUNLUĞU sürer: yaşlı karda sağlam yüzcük azalır
-        // ama kalan yüzcük yine ayna gibi parlaktır. Parlaklığı kısmak çakımları
-        // bloom eşiğinin altına itiyor ve pırıltıyı toptan görünmez ediyordu —
-        // eşik bir uçurum, kısılan çakım sönmüyor, YOK oluyor.
-        float3 cell = floor(worldPos * 30.0);
-        // SIKLIK MESAFEYLE SEYRELİR. Hücre ızgarası dünyaya sabit (3.3 cm), dolayısıyla
-        // piksel başına düşen hücre sayısı mesafenin KARESİYLE artıyor: uzakta çakımlar
-        // piksel altı istatistiğe dönüşüp parazit gibi okunuyordu. Geçen hücre oranını
-        // 1/mesafe² ile kısmak ekrandaki çakım YOĞUNLUĞUNU sabit tutar — menzili
-        // kesmeye gerek kalmaz, uzak yamaç da pırıldar ama seyrek.
-        float keepNear = 1.0 - lerp(0.6, 0.3, SampleSnowProfile(worldPos.y - _TerrainOrigin.y).r);
-        // Referans 25 m: o mesafeye kadar tam yoğunluk, ötesinde ters kareyle
-        // seyrelir (50 m'de %25, 75 m'de %11). Referans 8 m denendi ve fazla geldi —
-        // 30 m'de yoğunluk %7'ye iniyor, pırıltı pratikte kayboluyordu.
-        float keep = keepNear * saturate(625.0 / max(1.0, distance * distance));
-
-        if (MountainHash(cell.xzy) >= 1.0 - keep)
-        {
-            // Nokta boyu ekran-sabit — bilinçli ödün: gerçek kristal boyuna inmek
-            // denendi ve söküldü, çekirdek pikselaltına düşüp örneklenemez oluyor
-            // ve pırıltı tamamen kayboluyordu.
-            float3 sub = frac(worldPos * 30.0) - 0.5;
-            float radius = lerp(0.10, 0.34, smoothstep(8.0, 75.0, distance));
-            float core = smoothstep(radius, radius * 0.35, length(sub));
-
-            if (core > 0.0)
-            {
-                // Çoğu kristal silik, nadiri göz alır — tekdüzelik etiket gibi durur
-                float bright = MountainHash(cell.zyx);
-                bright = bright * bright * bright;
-
-                // Yüzcükler TAM rastgele yatar: dar dağılım pırıltıyı belirli bakış
-                // geometrisine hapsedip ekranın yarısını boş bırakıyordu
-                float3 jitter = float3(MountainHash(cell), MountainHash(cell.yzx),
-                                       MountainHash(cell.zxy)) - 0.5;
-                float3 facet = normalize(normalWS + jitter * 2.2);
-
-                // Lob 120 -> 40: 120 çok dar, kamera azıcık oynayınca çakım açıyı
-                // kaybedip PAT diye sönüyordu — kıpır kıpır, sinir bozucu. Geniş lob
-                // aynı çakımı birkaç derecede yumuşak açıp kapatır: pırıltı kalır,
-                // titreşim gider.
-                float glint = pow(saturate(dot(facet, halfVector)), 16.0);
-
-                // Genlik ekranda kalibre edildi. Başlangıçta 2.5+9.5 idi: çakım 12'ye
-                // kadar çıkıyor, _SurfaceDawnColor tepe kanalı 1'e normalize olduğu için
-                // şiddet taşımıyor ve bloom eşiği deliniyordu — öğleden sonra göz alıyordu.
-                sparkle += glint * (0.18 + 0.72 * bright) * core * near;
-            }
-        }
-    }
-
-    // Uzak alan pırıltı şeridi DENENDİ VE SÖKÜLDÜ: pikselaltı yüzcük istatistiğini
-    // hücre gürültüsüyle taklit etmek, güneş yolu yerine yamacı kaplayan kirli bir
-    // çizik dokusu bastı. Uzak pırıltı ancak gerçek pikselaltı örnekleme/temporal
-    // birikimle olur; o maliyete değmez — yakın alan kristalleri yeter.
-
-    return _SurfaceDawnColor.rgb * (sparkle * cover * sunUp * shade);
-}
-
 /// Yüzey haritalarını kübik B-spline ile okur — dört bilinear okumanın ağırlıklı
 /// birleşimi.
 ///
@@ -387,289 +277,6 @@ float4 SampleSurfaceMaps(float2 uv)
                  + g1.x * SAMPLE_TEXTURE2D(_SurfaceMaps, sampler_SurfaceMaps, float2(p1.x, p0.y)))
          + g1.y * (g0.x * SAMPLE_TEXTURE2D(_SurfaceMaps, sampler_SurfaceMaps, float2(p0.x, p1.y))
                  + g1.x * SAMPLE_TEXTURE2D(_SurfaceMaps, sampler_SurfaceMaps, float2(p1.x, p1.y)));
-}
-
-struct SnowCoverage
-{
-    float cover;   // örtü maskesi: 0 çıplak kaya, 1 tam örtü
-    float depth;   // kabartı kalınlığı: normali yuvarlar, tarağı ve pütürü besler
-    float burial;  // GÖMÜLME kalınlığı: altındaki taş görünüyor mu. Birikinti KARIŞMAZ
-    float patch;   // serpinti gürültüsünün ham değeri; sastrugi kümelenmesi yeniden kullanır
-    float shelter; // arazi birikim ağırlığı, 0.67-2.0. Rüzgârın burada ne kadar yavaşladığı
-    float fresh;   // taze pay: yeni yağmış toz mu, yıllanmış névé mi
-};
-
-/// Kar örtüsü ve kalınlığı. Kapsama "kar var mı" der, kalınlık "ne kadar" — ikisi
-/// aynı kaynaktan gelir ama farklı yerlerde zirve yapar: rüzgâr sırttan alıp oyuğa
-/// bırakır, dik yüzde tutunacak yer yoktur. Kar bir renk olarak kaldığı sürece dağ,
-/// üstüne beyaz sürülmüş kaya gibi duruyordu.
-///
-/// micro: kabartı gürültüsünün değeri, çağıran hesaplayıp veriyor. Yeni gürültü
-/// örneği alınmıyor; prosedürel normalin zaten ürettiği değer paylaşılıyor.
-SnowCoverage BuildSnowCoverage(float3 worldPos, float3 normalWS, float altitude,
-                               float slope, float concavity, float micro)
-{
-    float snowFit = smoothstep(cos(radians(_SnowSlopeLimit)) - 0.16,
-                               cos(radians(_SnowSlopeLimit)) + 0.10, slope);
-
-    // ARAZİ AĞIRLIĞI. Rüzgâra bakan yüz süpürülür, arkasında birikir; oyuk dolar,
-    // sırt kazınır. İkisi ayrı terim değil: arazi rüzgârın HIZINI değiştiriyor, hız da
-    // birikimi. Eskiden `lee` anlık normalden, `hollow` konkavlık kanalından ayrı ayrı
-    // geliyordu — aynı fiziği iki yerden hesaplamak demekti ve geometrik derinlik
-    // eklenince üçüncü bir kopya çıkacaktı.
-    //
-    // Ağırlık PİŞMİŞ (bkz. `SurfaceMapBaker.BakeDriftWeight`): Liston & Sturm'ün
-    // W = 1 + 0.5·Ωs + 0.5·Ωc bağıntısı, birikim 1/W. Gölgelendirme, geometri ve
-    // çarpışma üçü de bu tek dokuyu okuyor.
-    float shelter = SampleDriftWeight(worldPos);
-
-    // Kar çizgisi tek bir kot değil, yerel bir değer. Sabit kot, dağın çevresini
-    // dolaşan temiz bir kontur çiziyor ve etekte boyanmış bir bant gibi okunuyordu.
-    // Gerçek çizgiyi üç şey oynatır ve üçü de buradan hesaplanır:
-    //
-    //   Bakı — öğle güneşini gören yamaç karı eritir, çizgi orada yükselir. Kuzey
-    //   yüzü aynı kotta karlı kalır. Liken de aynı güneşe göre yerleşiyor.
-    //
-    //   Oluklar — kar dere yataklarından dil gibi sarkar: gölge ve soğuk hava
-    //   çukurda tutar. Konkavlık çizgiyi aşağı çeker.
-    //
-    //   Düzensizlik — kilometre ölçeğinde kaba gürültü; çizginin kontur olduğunu
-    //   belli eden son ipucunu kırar.
-    // ÜÇ TERİM DE SIFIR ORTALAMALI OLMALI. Ayarlanan kot "ortalama arazide çizginin
-    // yeri" demek; terimlerden biri sistematik bir kayma taşırsa çizgi ayarlandığı
-    // yerde değil, hep başka bir yerde oluşur.
-    //
-    // Bakı DÜZ ZEMİNE GÖRE. Ham `dot(normal, güneş)` düz zemine öğle güneşinin
-    // yüksekliği kadar (burada 0.5'in üstü) pay veriyordu: hiçbir yüzey nötr değildi
-    // ve çizgi her yerde ~100 metre yukarı kayıyordu. Farkı alınca düz zemin sıfır,
-    // güneye bakan yamaç pozitif, kuzey yüzü NEGATİF olur — kuzey yüzünde kar daha
-    // aşağı iner, gerçekte de öyle.
-    // BAKI YAMAÇ YÜZÜ ÖLÇEĞİNDEN OKUNUYOR, karo normalinden DEĞİL.
-    //
-    // Ölçüldü: karo normali 14.65 m'de ortanca 4 derece değişiyor, bu `dot`'u ~0.17
-    // kaydırıyor ve `_SnowlineSunLift` 200 m ile çarpılınca kar çizgisi 15 METREDE
-    // 34 METRE oynuyor. Sonuç yumuşak bant değil, her kabartıyı takip eden keskin
-    // kıvrım. Renk probu sınır boyunca kot rampasını suçladı ve tek titreyen girdi
-    // buydu — `wobble` 625 m dalga boylu, `hollowness` pişmiş harita, ikisi yumuşak.
-    //
-    // Fizik: bakının kar çizgisine etkisi MEVSİMLİK IŞINIM üzerinden. O bir yamaç
-    // yüzünün toplamı, tek karonun değil. Mip 4 = 2048/16 = 128 texel = 234 m/texel,
-    // yani yamaç yüzü ölçeği.
-    //
-    // Gölgelendirme normali DEĞİŞMEDİ: o piksel başına kalmalı, kabartı ondan geliyor.
-    float2 faceUv = (worldPos.xz - _TerrainOrigin.xz) / _TerrainSize.xz;
-    float2 facePacked = SAMPLE_TEXTURE2D_LOD(_GroundNormals, sampler_GroundNormals,
-                                             faceUv, 4).rg * 2.0 - 1.0;
-    float3 faceNormal = float3(facePacked.x,
-                               sqrt(saturate(1.0 - dot(facePacked, facePacked))),
-                               facePacked.y);
-
-    float flatSun = saturate(_SurfaceSunDir.y);
-    float aspect = saturate(dot(faceNormal, _SurfaceSunDir.xyz)) - flatSun;
-
-    // Konkavlık haritası 0-1 normalize (bkz. SurfaceMapBaker.Normalize), ortancası
-    // 0.5. Ham haliyle çarpılınca sabit bir aşağı kayma taşıyordu.
-    float hollowness = concavity - 0.5;
-
-    float wobble = MountainFbm(worldPos * 0.0016, 2) - 0.5;
-
-    float lineShift = aspect * _SnowlineSunLift
-                    - hollowness * _SnowlineGullyDrop
-                    + wobble * _SnowlineRagged * 2.0;
-
-    // KAYMA BANDI SİLEMEZ. Üç terim de mutlak metre (toplamda ±470 m) ve kalıcı kar
-    // çizgisinin 700 metrelik bandı için ayarlanmıştı. Yağış bandı ise dar — kar
-    // sınırı fırtınada indiğinde 220 metreye kadar iniyor. Kayma bandın kendisinden
-    // büyük olunca maskeyi tamamen kapatabiliyor: kar yağıyor, birikim doluyor, zemin
-    // çıplak kalıyordu.
-    //
-    // Her çizgi kendi bandının yarısı kadar oynayabilir. Çizgi hâlâ düzensiz, ama
-    // bandın dışına çıkamıyor.
-
-
-    // Kalıcı kar çizgisi: bu kotun üstü yaz kış karlıdır ve havadan bağımsızdır.
-    // Yüzeyin kendi rakımına bakar — havanın karlılığı oyuncunun bulunduğu kottan
-    // geldiği için, ona bağlanınca zirvedeyken etek de karlı görünüyordu.
-    float permanentShift = clamp(lineShift, -_PermanentSnowBand, _PermanentSnowBand);
-    float permanent = smoothstep(_PermanentSnowLine - _PermanentSnowBand,
-                                 _PermanentSnowLine + _PermanentSnowBand,
-                                 altitude - permanentShift);
-
-    // TAZE ÖRTÜNÜN TEK KAYNAĞI PROFİL.
-    //
-    // Burada bir dönem İKİNCİ BİR KAR ÇİZGİSİ vardı: profil ayrıca
-    // `smoothstep(_SnowfallFloor, _SnowfallCeiling, altitude)` ile çarpılıyordu.
-    // Aynı bilgi iki yerden geliyordu ve ikisi ayrışıyordu — profil "bu kotta kar
-    // birikti" derken çarpan "bu kotta kar yağmaz" diyip siliyordu.
-    //
-    // Belirti: F1'den yağış 1 / kar 1 kilitlenip 206 metrede beklenince zemin çıplak
-    // kalıyordu. Profil doluyordu (birikim `SnowfallRateAt` üzerinden kilidi okuyor),
-    // ama çarpan kilidi GÖRMEYEN `_SnowfallFloor/_Ceiling` eşiğinden geliyordu.
-    // Kullanıcı üç turda bildirdi; ilk iki şüphelim (birikim hızı, başlangıç durumu)
-    // yanlıştı.
-    //
-    // Profil zaten kot ekseninde tutulan bir dizi: "hangi kotta ne kadar kar var".
-    // Kar tutmasının AYRI bir yükseklik sınırı yok — sınır yağışın kendisinde.
-    //
-    // Yerel düzensizlik kayboluyor değil, YERİ DEĞİŞİYOR: kayma artık profilin
-    // örneklendiği kota uygulanıyor. Güneşe bakan yüz profili yukarıdan, oluk
-    // aşağıdan okuyor; kar sınırı yine dolaşarak düzensiz, ama tek kaynaktan.
-    float snowBand = max(1.0, _SnowfallCeiling - _SnowfallFloor);
-    float snowfallShift = clamp(lineShift, -snowBand * 0.5, snowBand * 0.5);
-
-    float2 profile = SampleSnowProfile(altitude - snowfallShift);
-    float fresh = profile.r;
-
-    float supply = max(permanent, fresh);
-
-    // KIRILMA GÜRÜLTÜSÜ ARAZİ ÖLÇEĞİNDE. 0.05 (20 m taban, 2 oktav) yazıyordu ve
-    // ölçüldü: `cover`'ın ORTALAMASI yumuşak — bant probunda yedi bandın hepsi geniş
-    // bir kuşak kaplıyor — ama YEREL VARYANS devasaydı. Bantların içi tuz-biberdi,
-    // komşu iki piksel birkaç bant atlıyordu. Gözün "sert" dediği şey kenarın
-    // genişliği değil DOKUSUYDU.
-    //
-    // Fizik: gerçek kar sınırının düzensizliği arazi ölçeğinde olur — oluk, sırt,
-    // kaya çıkıntısı, onlarca-yüzlerce metre. Piksel ölçeğinde tuz-biber saçılmanın
-    // karşılığı yok.
-    //
-    // 125 m taban, 4 oktav: sınır DOLAŞARAK düzensiz. İnce bileşen duruyor ama genliği
-    // 1/8 — kenara serpilen cılız benekler yaşıyor, dantel gidiyor.
-    float sprinkle = MountainFbm(worldPos * 0.008, 4);
-    float edge = (sprinkle - 0.5) * _SnowBreakup * 0.6;
-    float cover = saturate(supply * snowFit * shelter + edge);
-
-    // Mikro yerleşim: kabartı gürültüsünün çukurunda örtü bir tık güçlenir, tepeciğinde
-    // zayıflar — kar mikro çukura oturur, sırtın ucunu rüzgâr açar. Çarpan yumuşak ve
-    // eşiksiz (0.85–1.15); arz sıfırsa sıfırda kalır. 0.375, iki oktavlı FBM'in ortası.
-    cover *= 1.0 + (0.375 - micro) * 0.4;
-
-    // BİRİKİNTİ ALANI. Derinlik şimdiye kadar yalnız kot bandı, eğim ve rüzgâr
-    // maruziyetinden geliyordu — üçü de arazi ızgarasında (4.28 m) değişiyor, yani
-    // dört metrenin altında derinlik DÜMDÜZ. Kar bu yüzden yakından boyanmış gibi
-    // duruyordu: kalınlık var ama şekli yok.
-    //
-    // Alan rüzgâr eksenine hizalı: yığınlar rüzgâr boyunca uzar, ona dik daralır.
-    // 0.5 nötr — altı kazınmış, üstü yığılmış.
-    float2 windAxis = normalize(_SurfaceWindDir.xz + float2(0.0001, 0.0));
-    float drift = SnowDriftShape(worldPos.xz, windAxis);
-
-    // Birikinti kenarı ÖRTÜYÜ de ısırıyor: kazınmış şeritte kar incelmekle kalmaz,
-    // yer yer delinip altındaki taşı gösterir.
-    //
-    // EŞİKTEN ÖNCE. Eşikten sonra çarpıldığında doymuş örtü (kalıcı kar çizgisinin
-    // üstünde cover = 1) doğrudan 0.89'a düşüyordu ve `lerp(kaya, kar, 0.89)` bütün
-    // yamaca yüzde on bir kaya karıştırıyordu: rüzgâr ekseninde uzamış, kahverengi-siyah,
-    // yarı saydam şeritler. Kar bol olduğu yerde birikinti örtüyü DELMEZ, yalnız
-    // inceltir; delinme örtünün zaten cılız olduğu kenarda olur. Eşiğin girdisine
-    // uygulanınca bol arz yeniden 1'e doyuyor, cılız kenar ise gerçekten deliniyor.
-    cover *= lerp(1.0, lerp(0.75, 1.1, drift), _SnowDriftCoverBite);
-
-    // EŞİK ÇOK DÜŞÜK OLMALI. 0.16-0.42'ydi ve ölçüldü: tam beyaz olmak için mevsimlik
-    // deponun %42'si gerekiyordu, %20'nin altında ise hiçbir şey görünmüyordu. Oysa iki
-    // santim taze kar zemini beyaza çevirir — albedo neredeyse anında doyar, KALINLIK
-    // yavaş gelir. İkisi ayrı hızda ve ayrı kanalda (`cover` ile `burial`).
-    //
-    // ÜST EŞİK 0.18'DEN 0.45'E AÇILDI. Kusur genişlik değil BENEKTİ ve ölçüldü:
-    //
-    //   geçiş penceresi        0.15
-    //   kırılma gürültüsü      ±0.15   (`_SnowBreakup` 0.5 × 0.6)
-    //   oran                   1.00
-    //
-    // Gürültü pencerenin TAMAMINI süpürünce sonuç ikili oluyor — ya tam kar ya tam
-    // kaya, arada yumuşama yok. Ekranda kenar dantel gibi çıkıyordu. 0.42'lik pencerede
-    // aynı gürültü üçte bire iniyor: kenar düzensiz kalıyor ama yumuşuyor.
-    //
-    // `snowBreakup`'ı kısmak da benek sorununu çözerdi ama serpintiyi öldürürdü; o bir
-    // kez denenip geri alınmıştı. Pencereyi açmak ikisini birden koruyor.
-    //
-    // Alt eşik 0.03'te DURUYOR: "iki santim taze kar zemini beyaza çevirir" kuralı
-    // derinlik için doğru ve bozulmuyor. Değişen yalnız doymanın hızı.
-    //
-    // Bedeli ölçüldü: kalıcı çizgi ±350 m'lik rampadan geliyor, görünür geçiş
-    // 106 m → 226 m'ye çıkıyor. Gerçek kar sınırı da 100-300 m arasında geçer.
-    cover = smoothstep(0.03, 0.45, cover);
-
-    // Konkavlık burada büyütülmüyor. Harita akış birikiminden türüyor ve ızgaraya
-    // hizalı bir gürültü taşıyor (bkz. DECISIONS.md). Katkısı büyütülünce o gürültü
-    // kalınlığa, oradan kabartıya geçiyor ve yamaçta dişli, düzenli bir desen
-    // bırakıyordu.
-    // Rüzgâr yüzü kalınlıkta YUMUŞATILARAK uygulanır: aynı çarpan örtüde zaten var,
-    // ham haliyle ikinci kez çarpılınca rüzgâra bakan yamaçta pay 0.55'ten 0.30'a
-    // düşüyor ve kar hep ince kalıyordu. Süpürme gerçek, ama iki kez sayılmamalı.
-    float pile = slope * shelter;
-
-    // Kalınlığın arzı ayrı depodan: örtü hızlı kapanır, kalınlık arkadan gelir.
-    // Erirken ters — depo örtüden hızlı boşalır: kar önce incelir, sonra delinir,
-    // en son çıplak kalır. Kalıcı çizginin üstünde kalınlık havadan bağımsız tam.
-    // KALINLIK TOPLANIR, seçilmez. `max()` ile kalıcı kar payı 1'e vardığı anda taze
-    // karın kalınlığa katkısı yok oluyordu: fırtınadan önce ve sonra yüzey birebir
-    // aynıydı, birikme gözle görülmüyordu. Toplandığında kalıcı kar tek başına
-    // kayaları yarı gömülü bırakıyor, üstüne taze kar gelince gömülüyorlar — çıkıntının
-    // kaybolması birikmenin en okunaklı işareti.
-    // `snowfall` çarpanı KALKTI: taze örtüyle aynı sebep, profil zaten kot ekseninde
-    // ve ikinci bir kar çizgisi onu siliyordu. Profil de üstteki `snowfallShift` ile
-    // örneklendiği için düzensizlik kalınlıkta da duruyor.
-    float packSupply = saturate(permanent * 0.7 + profile.g);
-
-    // Derinliğe ÇARPAN olarak giriyor, toplanmıyor: karın olmadığı yerde birikinti
-    // de olmaz. Kazınan yerde yarıya iner, yığılan yerde bir buçuk katına çıkar.
-    float driftDepth = lerp(1.0, lerp(0.45, 1.55, drift), _SnowDriftStrength);
-
-    SnowCoverage snow;
-    snow.cover = cover;
-    snow.shelter = shelter;
-
-    // İKİ AYRI KALINLIK. Birikinti alanı kabartıyı şekillendirir ama "taş görünüyor mu"
-    // sorusuna karışamaz: 60 cm kar da 90 cm kar da altındaki taşı TAMAMEN gizler,
-    // gömülme doyar. Tek kanal olduğunda birikinti çukurunda `buried` 1'in altına
-    // düşüyor ve `powder` üzerinden kayanın rengi karın içinden geri geliyordu —
-    // rüzgâr ekseninde uzamış, gri, yarı saydam şeritler. Ölçüldü: F1 teşhis
-    // panelinde birikintiyi kapatmak izleri tek başına siliyor.
-    snow.burial = snow.cover * saturate(packSupply * pile * _SnowDepthScale);
-    snow.depth = snow.cover * saturate(packSupply * pile * _SnowDepthScale * driftDepth);
-    snow.patch = sprinkle;
-    cover = snow.cover;   // aşağıdaki tazelik hesabı örtüyü buradan okuyor
-
-    // TAZELİK, örtüden ayrı bir sinyal. Kalıcı kar çizgisinin üstünde örtü zaten 1;
-    // orada yeni yağan karın kapsamaya ekleyeceği bir şey yok, o yüzden `max()` taze
-    // karı yutuyordu ve fırtınadan sonra yüzey hiç değişmiyordu. Oysa gerçekte fark
-    // kapsamada değil YÜZEYDE: taze toz mat, pütürsüz ve parıltılı; yıllanmış névé
-    // camsı ve rüzgârla oyulmuş.
-    snow.fresh = saturate(fresh) * cover;
-    return snow;
-}
-
-/// KAR MİKRO DETAYI: iki yüzey durumunun tazelik oranına göre karışımı.
-/// Okuma, harman ve UV kurulumu ortak modülde (`SurfaceDetail.hlsl`); burada yalnız
-/// KARA ÖZGÜ kararlar var — hangi iki yüzey, hangi eksende hizalı, hangi oranla.
-float3 SnowMicroNormal(float3 worldPos, float3 normalWS, float fresh, out float roughness)
-{
-    float2 uv = SurfacePlanarUV(worldPos, normalWS, _SnowDetailScale);
-
-    // Türevler bir kez hesaplanıp elle geçiriliyor: stokastik okuma her örneği
-    // farklı kaymadan alıyor, donanımın türevi hücre sınırında sıçrardı.
-    float2 ddxUV = ddx(uv);
-    float2 ddyUV = ddy(uv);
-
-    SurfaceDetail powder;
-    SAMPLE_SURFACE_DETAIL(SnowPowder, sampler_SnowPowderNormal, uv, ddxUV, ddyUV, powder)
-
-    // SASTRUGİ RÜZGÂRI İZLER. Sıkışmış kar dokusu yönlü (ölçüldü: 0.78 anizotropi,
-    // toz 1.21) ama yönü dokuda sabit. Prosedürel sastrugi tarağı zaten rüzgâr
-    // eksenine hizalı; doku hizalanmazsa iki desen çapraz durur ve yüzey karışır.
-    float2 windUV = uv, windDdx = ddxUV, windDdy = ddyUV;
-    SurfaceAlignUV(normalize(_SurfaceWindDir.xz + float2(0.0001, 0.0)),
-                   windUV, windDdx, windDdy);
-
-    SurfaceDetail packed;
-    SAMPLE_SURFACE_DETAIL(SnowPacked, sampler_SnowPowderNormal, windUV, windDdx, windDdy, packed)
-
-    // Karışım YÜKSEKLİĞE göre: taze kar önce çukurları doldurur, sert kabuk
-    // tümseklerde açıkta kalır. Doğrusal karışım ikisini her yerde bulanıklaştırıyordu.
-    SurfaceDetail snow = BlendSurfaceDetail(packed, powder, fresh, 0.12);
-
-    roughness = snow.roughness;
-    return snow.normal;
 }
 
 MountainSurface BuildMountainSurface(float3 worldPos)
@@ -747,144 +354,19 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     float bx = bumpGrad.x * _BumpScale * e;
     float bz = bumpGrad.z * _BumpScale * e;
 
-    // --- Kar: eğim, oyuk, rüzgâr yönü ve hava durumu ---
-    SnowCoverage snow = BuildSnowCoverage(worldPos, normalWS, altitude,
-                                          slope, concavity, here);
-
-    // Toz kar bandı: cılız örtü kayayı beyaza boyamaz, rengini soldurur — taşın tonu
-    // serpintinin altından okunur. Saf kar rengine ancak kalınlıkla ulaşılır.
-    // Eğim yumuşak: 2.5 çarpanı geçişi sıkıştırıyor ve kalınlığın rüzgâraltı
-    // sınırlarında hızlı değiştiği yerlerde (sırt aşımı) iki ton arasında keskin
-    // bir bant çiziyordu — gerçek kar tonu metrelerce yayılarak değişir.
-    // İKİ AYRI KAVRAM, tek değişkende toplanmışlardı:
-    //   `buried`  — kaya ne kadar gömüldü. Yalnız kalınlıktan gelir. RENGİ bu sürer.
-    //   `aged`    — kar ne kadar yıllandı. Taze pay bunu geri çeker. PARLAKLIĞI bu sürer.
-    // Tek değişkenken taze karın albedosu da düşüyordu; oysa taze toz karın EN parlak
-    // hâlidir, en mat olanı da odur. Yanlış olan parlaklık değil, ikisinin bağlanmasıydı.
-    float buried = saturate(snow.burial * 1.7);
-    float aged = buried * (1.0 - snow.fresh * 0.6);
-    half3 powder = lerp(albedo, _SnowColor.rgb, 0.6);
-    albedo = lerp(albedo, lerp(powder, _SnowColor.rgb, buried), snow.cover);
-
-    // Kabartıyı gömen şey kapsama değil kalınlık: bir parmak kar altındaki taşı
-    // gösterir, yarım metre kar göstermez.
-    float rockRelief = _BumpStrength * (1.0 - snow.burial * _SnowBurial) * (1.0 + wet * 0.3);
-
-    // Gömülen taş dokusunun yerine karın kendi dokusu gelir. Gömme tek başına
-    // çalışınca kalın kar düz plastiğe dönüyor ve sastrugi'nin taradığı gradyan da
-    // onunla birlikte siliniyordu — kalınlık arttıkça kar yüzeyi kendi kabartısını
-    // kazanır.
-    float snowRelief = _BumpStrength * 0.45 * snow.depth;
+    float rockRelief = _BumpStrength * (1.0 + wet * 0.3);
 
     float2 gradient = float2(-bx, -bz);
 
-    // Sastrugi: rüzgâr kar yüzeyini kendi yönünde oyar ve biriktirir, geriye o yöne
-    // uzanan sırtlar bırakır. Aynı gürültünün rüzgâr yönündeki bileşeni kısılıp yanal
-    // bileşeni güçlendirilince desen o yönde uzuyor — yüzey taranmış gibi çizgileniyor.
-    //
-    // Yeni bir gürültü örneği alınmıyor. Arazi fragmanında her ek örnek kare hızından
-    // ölçülebilir pay götürüyor (bkz. DECISIONS.md); eldeki eğimi yeniden şekillendirmek
-    // aynı görüntüyü bedelsiz veriyor.
-    //
-    // Tarama gücü serpinti gürültüsüyle yamalanır: gerçek sastrugi tekdüze tarak izi
-    // değil, sırt yamalarıdır. Gürültü karın kenar serpintisiyle paylaşılıyor.
-    //
-    // Rüzgârın oyduğu yüzey RÜZGÂRIN HIZLI ESTİĞİ yüzeydir. Eskiden gökyüzü açıklığı
-    // kanalı okunuyordu (liken için pişmiş, bir doku okuması kazanıyordu) ama o kanal
-    // yönsüz: bir çukurun tabanı göğü görmez ama rüzgâr da almaz, oysa göğü gören bir
-    // rüzgâraltı terası taranmaz. Birikim ağırlığı zaten aynı fonksiyonda örneklendi;
-    // ödünç kanalın gerekçesi kalmadı.
-    //
-    // Ağırlık 0.67 (rüzgâr hızlı, kar kazınır) → 2.0 (yavaş, kar yığılır). Tarak
-    // hızlının tarafında güçlü.
-    float2 windAxis = normalize(_SurfaceWindDir.xz + 0.0001);
-    float2 sideAxis = float2(-windAxis.y, windAxis.x);
-    // Taze kar sastrugiyi SÖNDÜRÜR: tarak rüzgârın günler süren işidir, yeni yağan
-    // toz onu örter. Fırtına dinip kar durduğunda tarak yeniden ortaya çıkar.
-    float comb = saturate(_Sastrugi * _SurfaceWindDir.w * snow.depth
-                          * (0.4 + snow.patch * 1.6)
-                          * lerp(0.35, 1.3, saturate((2.0 - snow.shelter) / 1.33)))
-               * (1.0 - snow.fresh * 0.8);
+    float2 shaped = gradient * rockRelief;
 
-    float2 combed = windAxis * dot(gradient, windAxis) * (1.0 - comb * 0.75)
-                  + sideAxis * dot(gradient, sideAxis) * (1.0 + comb * 1.5);
-
-    // Kayada ham gradyan taş genliğiyle, karda taranmış gradyan kar genliğiyle.
-    // İnce kar ikisini üst üste gösterir: taş az gömülü, kar dokusu henüz cılız.
-    float2 shaped = gradient * rockRelief + combed * (snowRelief * snow.cover);
-
-    // Pütür: kar dümdüz yağmaz — çökme, rüzgâr ve kabuklanma desimetre ölçeğinde
-    // höyükler bırakır. Taş kabartısının dalga boyu (~3 m) bunun için fazla iri;
-    // tek başına kalınca örtü "kağıt gibi eşit yağmış" okunuyordu. İnce oktav
-    // yalnız karlı piksellerde örneklenir: dallanma mekânsal olarak tutarlı,
-    // çıplak arazide maliyeti yok.
-    if (snow.cover > 0.05)
-    {
-        float lumpScale = _BumpScale * 3.0;
-        float le = 0.12;
-        float3 lumpGrad;
-        float lump = MountainFbmD(worldPos * lumpScale, 2, lumpGrad);
-        float lumpX = lumpGrad.x * lumpScale * le;
-        float lumpZ = lumpGrad.z * lumpScale * le;
-
-        shaped += float2(-lumpX, -lumpZ)
-                * (_BumpStrength * 0.6 * snow.depth * snow.cover);
-    }
-
-    // KAR MİKRO DETAYI. Prosedürel kabartı METRE ölçeğinde (sastrugi, tümsek);
-    // doku SANTİMETRE ölçeğini dolduruyor. Yalnız yakında: uzakta texel piksel
-    // altına düşer ve kaynar.
-    float snowDetailRough = 0.0;
-    if (snow.cover > 0.05 && _SnowDetailStrength > 0.001)
-    {
-        float toCamera = distance(worldPos, _WorldSpaceCameraPos);
-        float visible = 1.0 - smoothstep(_SnowDetailFade * 0.4, _SnowDetailFade, toCamera);
-
-        if (visible > 0.001)
-        {
-            float3 micro = SnowMicroNormal(worldPos, normalWS, snow.fresh, snowDetailRough);
-
-            // Teğet uzayı eğimi dünya eğimine ekleniyor. Kar örtüsü ve derinliğiyle
-            // ölçekli: çıplak kayada kar kabartısı olmaz, ince örtüde zayıf kalır.
-            shaped += micro.xy * (_SnowDetailStrength * visible
-                                  * snow.cover * saturate(0.35 + snow.depth));
-
-            snowDetailRough *= visible * snow.cover;
-        }
-    }
-
-    // Kalın kar çukuru doldurur, sırtı körleştirir: gölgelendirme normali yukarı döner.
-    // Fazlası dağın hacmini alıyor, o yüzden ayar dar bir aralıkta tutuluyor.
     float3 shaded = normalize(normalWS + float3(shaped.x, 0.0, shaped.y));
 
     MountainSurface surface;
     surface.albedo = albedo;
-    surface.emission = Alpenglow(worldPos, normalWS, altitude, albedo, exposure)
-                     + SnowSparkle(worldPos, normalWS, snow.cover);
-    // Taze kar küçük kabartıyı örter: yeni yağmış örtü altındaki dokuyu yumuşatır,
-    // yıllanmış kar rüzgârla oyulup sertleştiği için altındaki biçimi geri verir.
-    surface.normalWS = normalize(lerp(shaded, float3(0.0, 1.0, 0.0),
-        snow.depth * _SnowRounding * (1.0 + snow.fresh * 0.5)));
-
-    // İnce toz mat, yerleşmiş kalın örtü kar parlaklığına ulaşır; rüzgâr taraması
-    // yüzeyi bir tık daha cilalar — sertleşmiş sastrugi karı taze tozdan parlaktır.
-    half snowGloss = saturate(_SnowSmoothness * (0.55 + 0.45 * aged) + comb * 0.08);
-
-    // GECE MATLAŞIR. Güneş battığında yönlü ışık AYA çevriliyor; kar pürüzsüzlüğü
-    // gündüz değerinde kalınca ay ışığı dar speküler lobla çakıyor ve yüzey normali
-    // kar tümsekleri/sastrugi tarağıyla dalgalı olduğu için kamera oynadıkça yanıp
-    // sönüyor — gece boyunca süren sahte bir pırıltı. Şiddet düşünce diffuse zemine
-    // gömülüyor ama dar lob tonemap'ten sağ çıkıyor: oran değişmiyor, görünürlük
-    // değişiyor. Gerçekte ay ışığında kar hafif bir cila verir, ÇAKIM vermez —
-    // çakım güneşin işi (kristal pırıltısı zaten ayrıca güneşe kapılı).
-    // Kaynak _SurfaceDawnDir.y: güneşin yüksekliği, ayrı bir zamanlayıcı yok.
-    snowGloss *= lerp(0.35, 1.0, smoothstep(-0.06, 0.10, _SunHeight));
-
-    // Dokunun pürüzlülüğü parlaklığa YAMA olarak biniyor, yerine geçmiyor: cila
-    // hâlâ kar sisteminin (tazelik, ıslaklık, gece, sastrugi) kararı. Doku yalnız
-    // yüzeyin kendi düzensizliğini ekliyor — cilalı kabuk parlar, toz mat kalır.
-    snowGloss = saturate(snowGloss * lerp(1.0, 1.35 - snowDetailRough, _SnowDetailRough));
-    surface.smoothness = lerp(lerp(_RockSmoothness, _WetSmoothness, wet), snowGloss, snow.cover);
+    surface.emission = Alpenglow(worldPos, normalWS, altitude, albedo, exposure);
+    surface.normalWS = shaded;
+    surface.smoothness = lerp(_RockSmoothness, _WetSmoothness, wet);
 
     // Maruziyet haritası ambient'i kısar: vadi dibi göğün küçük bir parçasını görür.
     // Yüz metre ölçeğinde çalışır; santimetre ölçeğinin sahibi SSAO idi ama kapatıldı —
@@ -919,20 +401,15 @@ MountainSurface BuildMountainSurface(float3 worldPos)
                       - 4.0 * MountainFbm(worldPos * fineScale, 2);
         float fineDip = saturate(fineLap * 9.0);
 
-        cavityDip = saturate(coarseDip * 0.28 + fineDip * 0.18) * cavityRange
-                  * (1.0 - snow.burial * _SnowBurial);
+        cavityDip = saturate(coarseDip * 0.28 + fineDip * 0.18) * cavityRange;
         microCavity = 1.0 - cavityDip;
     }
-    //
-    // Ama kar çukuru doldurur. Dolan bir oyuk artık göğün küçük bir parçasını görmüyor;
-    // yüzeyi düzleşmiş, göğe açılmıştır. Kısıntı kalınlıkla geri açılıyor — kalınlığın
-    // en güçlü ipucu bu: kabartının gömülmesi ince kalıyor, kapanan gölge ise okunuyor.
-    surface.occlusion = lerp(lerp(1.0, exposure, _CavityStrength), 1.0, snow.burial)
-                      * microCavity;
+
+    surface.occlusion = lerp(1.0, exposure, _CavityStrength) * microCavity;
 
     // Diplere toz ve kırıntı birikir: çukur yalnız loş değil, MAT da. Aynı dip
-    // değeri pürüzlülüğe çevrilir — bedava. Kar kendi parlaklığını korur.
-    surface.smoothness *= 1.0 - cavityDip * 1.2 * (1.0 - snow.cover);
+    // değeri pürüzlülüğe çevrilir — bedava.
+    surface.smoothness *= 1.0 - cavityDip * 1.2;
 
     return surface;
 }

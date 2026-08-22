@@ -141,7 +141,6 @@ public class VolumetricFogFeature : ScriptableRendererFeature
         static readonly int LightParamsId = Shader.PropertyToID("_FogLightParams");
         static readonly int AmbientSHId = Shader.PropertyToID("_FogAmbientSH");
         static readonly int TerrainHeightMapId = Shader.PropertyToID("_TerrainHeightMap");
-        static readonly int SnowProfileId = Shader.PropertyToID("_SnowProfile");
         static readonly int LightDirectionId = Shader.PropertyToID("_FogMainLightDirection");
         static readonly int LightColorId = Shader.PropertyToID("_FogMainLightColor");
         static readonly int CookieTextureId = Shader.PropertyToID("_MainLightCookieTexture");
@@ -334,10 +333,8 @@ public class VolumetricFogFeature : ScriptableRendererFeature
             // besliyor ama compute kernel'leri global doku tablosunu OKUMUYOR; bağlanmazsa
             // Unity "Property is not set" basıp kernel'i geçersiz sayıyor.
             //
-            // Yoğunluk modeli ikisini de okuyor: arazi yüksekliği spindrift'in yere
             // yapışması için, kar profili de rüzgârın kaldıracak kar bulup bulmadığı için.
             BindGlobalTexture(cmd, densityKernel, TerrainHeightMapId, "_TerrainHeightMap");
-            BindGlobalTexture(cmd, densityKernel, SnowProfileId, "_SnowProfile");
             BindGlobalTexture(cmd, densityKernel, CookieTextureId, "_MainLightCookieTexture");
 
             // ANA IŞIĞIN GÖLGESİ. `MainLightRealtimeShadow` compute içinde çağrılıyor

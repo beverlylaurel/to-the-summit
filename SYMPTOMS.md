@@ -97,7 +97,6 @@ da var.
 
 **İlk şüpheli:** akış alanının deseni. *(Yanlış — alan düzeltildi, şerit kaldı.)*
 
-**Sebep:** **keskin bir alanın az örnekle taranması**. `SpindriftAt` içindeki sırt
 algılayıcı (`crest`/`lee`) 60–80 m'lik keskin eşikler taşıyor ve her okumada dört ayrı
 arazi yüksekliği örnekliyor. Işın boyunca sekiz örnek bu alanın üstünden atlıyor; kamera
 kıpırdadıkça örnekler başka yere düşüyor.
@@ -246,8 +245,6 @@ yerde gölge var"*.
 | normal dokusu kabalığı | 2048'de taraf değiştiren piksel %0.2–1.2 |
 | bulut cookie'si | anahtar kapatılınca ekran değişmedi |
 
-**Gerçek sebep:** örgü domain aşamasında kabarıyor (`SnowDomainPositionWS`) ama ileri
-ışıklandırma geçişi pişirilmiş arazi normalini kullanıyordu. `SnowDisplacedNormal`
 DepthNormals geçişinde vardı, ileri geçişte yoktu — üç geçişten yalnız biri ayrıktı.
 Fonksiyonun kendi yorumu doğru davranışı zaten yazıyordu: *"harmanlamazsa siluet kabarır
 ama ışık düz yüzeyi aydınlatır."*
@@ -289,32 +286,6 @@ ediyordu.
 
 Düzeltmeden sonra 17:49'da güneş şiddeti 3.020 → **0.258**.
 
-## Kar sınırı sert, kenarda dantel gibi bir dokuya dönüyor
-
-**İki yanlış düzeltme.** Sırayla:
-
-1. **Eşik penceresi** `smoothstep(0.03, 0.18)` → `(0.03, 0.45)`. Gerekçe: kırılma
-   gürültüsünün genliği (±0.15) pencerenin tamamı kadardı, yani ikili sonuç üretiyordu.
-   Ölçüm doğruydu ama sebep bu değildi. **Yerinde bırakıldı**, geçişi genişletiyor.
-2. **Bakı terimi kaba mip'ten okundu.** Karo normali 14.65 m'de ortanca 4° değişiyor,
-   `dot`'u 0.17 kaydırıyor, `_SnowlineSunLift` 200 m ile çarpılınca kar çizgisi 15
-   metrede 34 metre oynuyordu. Fizik olarak da doğru düzeltme: bakının kar çizgisine
-   etkisi mevsimlik ışınım üzerinden ve o bir yamaç yüzü büyüklüğü, tek karonun değil.
-   **Yerinde bırakıldı**, ama sebep bu da değildi.
-
-**Gerçek sebep bant probuyla bulundu:** `cover`'ın **ORTALAMASI zaten yumuşaktı** —
-yedi bandın hepsi geniş bir kuşak kaplıyordu. Sert olan **yerel varyanstı**: bantların
-içi tuz-biberdi, komşu iki piksel birkaç bant atlıyordu.
-
-`sprinkle = MountainFbm(worldPos * 0.05, 2)` — 20 m taban. Geçiş kuşağı boyunca her karo
-bağımsız zar atıyordu. Gözün "sert" dediği şey kenarın **genişliği değil DOKUSU**.
-
-Düzeltme: `worldPos * 0.008, 4` — 125 m taban, 4 oktav. Sınır dolaşarak düzensiz, ince
-bileşen 1/8 genlikte duruyor.
-
-**Kural:** "sert görünüyor" iki ayrı şey olabilir — dar geçiş ya da yüksek varyans.
-İkisi ayrı ölçülür, yoksa doğru olan genişletilir ve belirti kalır.
-
 ## Ayar dosyası düzenlemesi oyuna ulaşmıyor
 
 Bir belirtinin **dört turu** boşa gitti çünkü `.asset` düzenlemelerinin çalışma zamanına
@@ -341,20 +312,16 @@ Kullanıcı: *"terrain specinden önceki dağda gördüğüm birebir aynı bir k
 `RouteTerrainShaper` (menzil 70 m, yalnız yol ve doğuş düzlüğü), `MountainGenerator`
 (ondan önce çalışır, üstüne yazılır). Yani taban geometri kesin yeni.
 
-**Gerçek sebep:** `SnowDisplacement` de geometri — köşeler fiilen hareket ediyor — ve
-yatay şeklinin TAMAMI `SnowDriftShape(worldPos.xz, …)`'dan geliyor. O fonksiyon dünya
 koordinatına bağlı, sabit hash'li. Yükseklik haritası değişti, bu değişmedi: aynı dünya
 koordinatında aynı birikinti sırtı, aynı dalga, aynı yığın.
 
 Aynısı yüzey deseninde de: `MountainBand`, oksit, liken, tanecik, kırılma — hepsi
 `worldPos` anahtarlı.
 
-**Ölçek:** `snowDisplaceMax` 3.2 m, yani birebir tekrar eden katman 5709 metrelik dağın
 **1/1780'i**. Küçük, ama yüzeye yakından bakılınca ekranın çoğunu kaplıyor — şikâyet
 yerindeydi.
 
 **Düzeltme:** `_PatternSeed`, İKİ HASH KÖKÜNE birden uygulanıyor (`MountainHash`,
-`SnowDriftHash`), tek tek çağrı yerlerine değil. Yeni bir prosedürel katman eklendiğinde
 kaydırmayı unutmak mümkün değil.
 
 **Kural:** dağ baştan üretildiğinde `patternSeed` de artırılır. Geometri yenilenip boya
@@ -479,7 +446,6 @@ veritabanında yok. Kapatmanın yolu L2/L3 mesh modülleri.
   menü (yanlış işi yapıyor). Yol testi önce: görülmemesi imkânsız bir değer verilir,
   ekranda görülür, sonra gerçek ölçüme geçilir.
 
-
 ## Teşhis aracının kendisi
 
 Bu oturumda araç **iki kez yalan söyledi** ve ikisi de tur kaybettirdi.
@@ -507,7 +473,6 @@ Ve aynı turda dördüncü kez: ölçüm **koridorun içinde** yapılmalıydı, 
 diye yapıldı ve bütün yönleri kapsadı. Ova 20.8° çıktı; koridorla sınırlanınca 6.3°.
 Yanlış maske, yanlış sayı.
 
-
 Beşinci ve altıncı, aynı oturumda, ikisi de **ölçüm turu yaktı**:
 
 - **İki prob arasında öncelik hatası.** Prob 1'in koşulu `> 0.5`, prob 2'ninki `> 1.5`
@@ -520,8 +485,6 @@ Beşinci ve altıncı, aynı oturumda, ikisi de **ölçüm turu yaktı**:
   doğru araziye "fazla koyu" dedi. **Kural:** fiziksel referans alınırken hangi koşulda
   ölçüldüğü de yazılır — irtifa, hava, yüzey.
 
-
-Yedinci, kar sınırında: **gradyan KARŞILAŞTIRAN prob hiçbir şey söylemez.** Dört girdinin
 ekran üstü değişim hızını karşılaştırıp en hızlısını basan bir prob yazıldı; sınırda
 "kot rampası" çıktı ve bu trivial olarak doğruydu — geçişte zaten değişen büyüklük her
 zaman kazanır. Cevap mutlak bantlardan geldi: `cover` eşit aralıklı renklere bölününce
@@ -533,7 +496,6 @@ Sertlik bir *ne kadar* sorusudur.
 Prob sonuç vermiyorsa sıradaki araç **Unity Frame Debugger**: hangi geçişin ekrana ne
 yazdığını kesin gösterir. Yalnız kamera renk tamponuna yazan adımlara bakılır; motion
 vector, gölge haritası ve ara doku adımları tuhaf görünür, normaldir.
-
 
 ## "Ekranın tamamı grenli, gökyüzü dahil" — desenin DC bileşeni
 
@@ -562,17 +524,14 @@ yazdığı ortalama.
 
 **Aynı turda ikinci belirti: benekler kirli koyu okunuyordu.** 235 m görüşte gök tamamen
 sis rengindeyken tanecikler gökten belirgin koyu düşüyordu. Sebep: perde `AirColor`'a
-bağlanmıştı — o bakış yönüne bağlı ve gök gradyanını taşıyor. Doğrusu `SpindriftColor`.
 
 Bunun şüpheli araması hiç gerekmedi: kural **zaten yazılıydı**, `HeightFog.hlsl:248` ve
 `:611`, ikisi de "havada asılı tane gök rengine boyanmaz" diyor. Yeni bir görsel mevcut
 bir büyüklüğe bağlanırken o büyüklüğün fiziksel karşılığı okunmadı.
 
-
 ## "Damlalar yere çarpıp sekiyor sanki dolu yağıyor gibi" / "yatayda hareket eden damlalar var"
 
 **İlk şüpheliler — üçü de yanlış çıktı.** Yere yakın, küçük ve hareketli üç şey vardı ve
-üçü de doluya benziyordu: girdap (ölçeği bir adım önce 4 kat sıkılmıştı), sürüklenen kar
 (tanecikleri tam zeminde, yatay akıyor), yağan kar (çırpınıyor). Hepsi tek seferde F1
 anahtarı olarak kondu; **üçü de kapatıldığında sekme sürdü.**
 
@@ -599,58 +558,3 @@ yazılmayacak, HLSL varsayılanı (0,0,0), yani "hepsi kapalı" görünecekti. (
 BÜTÜN prob kiplerinde 40× büyütüyordu; "tür" probu 40 kat büyütülmüş şeritler gösterdi ve
 ölçtüğü geometriyi bozdu. Teşhis aracı önce doğrulanır.
 
-
-## "Yağmur havada kar gibi sürükleniyor"
-
-**Belirti sıralaması önemli:** aynı oturumda yağmura altı değişiklik üst üste bindi (kutu
-48 m, girdap ölçeği 4 kat, damla başına yön sapması, iz boyunun bileşke hıza geçmesi,
-rüzgâr eğrisinin kareye alınması, sınır tabakası). Kullanıcı "her şey çok abartı oldu,
-yağmur kar gibi hareket ediyor" dedi. Şüpheli listesi çıkarmak yerine **son eklenen ve en
-az doğrulanmış iki şey ölçüldü**; ikisi de bozuk çıktı.
-
-**Sebep 1 — yükseklik bantları sahte yatay hız üretiyordu.** Bant kaymaları sınırsız
-ayrışıyor (30 sn'de 101 m), kutuya sarılınca fark rastgeleye dönüşüyor (±24 m), ve düşen
-damla bantlar arasında geçerken o fark ona **21 m/s'ye kadar** yatay hız olarak biniyordu —
-rüzgârın kendisinden büyük. Kapalı biçimli gecikmeyle değiştirildi; türevi analitik
-karşılığıyla 4e-9 farkla örtüşüyor.
-
-**Sebep 2 — girdapta atalet süzgeci yoktu.** Ölçek dört kat sıklaştırılınca damla ince
-oktavdan 4 Hz'lik bir zorlama görmeye başladı; tau = 0.21 sn olan damla onu takip edemez
-ama model tam genliği uyguluyordu. Damla yaprak gibi çırpıyordu — yani kar gibi.
-
-**Ayırt eden ölçüm sayıydı, ekran değil.** İki bant kaymasının zamana göre ayrışması ile
-damlanın bant eksenindeki inme hızı çarpıldı; çıkan 21 m/s rüzgârdan büyüktü ve tek başına
-hükmü verdi. Ekranda "biraz fazla sürükleniyor" ile "sahte hız var" ayrılamazdı.
-
-**Ders:** üst üste altı değişiklik bindiğinde şüpheli listesi işe yaramaz — hepsi aynı anda
-duruyor ve hangisinin ne bozduğu ölçülemiyor. En son eklenen ve en az doğrulanan iki şey
-tek tek sayıyla sınanır.
-
-
-## "F1'de yağış 1 kar 1 yapıyorum, 206 metrede kar tutmuyor"
-
-**İki şüphelim de yanlış çıktı ve iki tur yaktı.**
-
-1. *Birikim çok yavaş.* `snowAccumulationSeconds` 90 → 40 yapıldı. Belirti sürdü.
-2. *Profil sıfırdan başlıyor.* Başlangıç durumu iklim kuşağından kuruldu. Belirti sürdü.
-
-**Gerçek sebep: İKİNCİ BİR KAR ÇİZGİSİ.** `MountainSurface.hlsl` profili kendi altitude
-eşiğiyle çarpıyordu:
-
-    float snowfall = smoothstep(_SnowfallFloor, _SnowfallCeiling, altitude - shift);
-    float fresh    = profile.r * snowfall;      // profil 1 olsa bile 0 ile çarpılıyor
-
-206 metrede `snowfall = 0`. Birikim tarafını doldurmak hiçbir işe yaramıyordu; shader
-sonucu ayrı bir eşikle siliyordu. Üstelik o eşik `_SnowfallFloor/_Ceiling`'den geliyor ve
-F1 KİLİDİNİ GÖRMÜYOR — birikim tarafı ise `SnowfallRateAt` üzerinden görüyor. Aynı olgu
-iki kaynaktan, ikisi ayrışıyor.
-
-**Ayırt eden ölçüm ekran değil KOD OKUMASIYDI:** "profil doluyor mu" sorusuna takılmak
-yerine profilin tüketildiği yere kadar zincir satır satır izlendi. Çarpan orada duruyordu.
-
-**Düzeltme tek satır değil, kaynak birleştirme:** çarpan silindi, yerel düzensizlik
-(güneş yüzü, oluk, dolambaç) profilin ÖRNEKLENDİĞİ KOTA taşındı —
-`SampleSnowProfile(altitude - snowfallShift)`. Kar sınırı hâlâ düzensiz, ama tek kaynaktan.
-
-**Ders:** bir değer "doğru hesaplanıyor ama ekranda yok" ise, hesaplandığı yere değil
-TÜKETİLDİĞİ yere bakılır. Aynı olgunun ikinci bir kaynağı varsa belirti hep budur.

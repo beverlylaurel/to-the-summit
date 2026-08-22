@@ -17,7 +17,7 @@ public class SurfaceMaterialSet : ScriptableObject
              "yenilendiğinde nereden geldiği aranmasın.")]
     public string sourceFolder;
 
-    [Tooltip("Proje içi dosya ön eki, örn. `SnowPowder`. Haritalar bu adın " +
+    [Tooltip("Proje içi dosya ön eki, örn. `RockCliff`. Haritalar bu adın " +
              "sonuna _Normal/_Roughness/_Height eklenerek aranır.")]
     public string assetPrefix;
 
@@ -36,7 +36,7 @@ public class SurfaceMaterialSet : ScriptableObject
     public float bakedLightCorrelation;
 
     [Tooltip("Yönlülük: normalin x ve y saçılım oranı. 1.0 yönsüz (toz kar), " +
-             "0.7 altı belirgin yönlü (rüzgâr sastrugisi, katmanlı kaya).")]
+             "0.7 altı belirgin yönlü (katmanlı kaya, damarlı yüzey).")]
     public float anisotropy;
 
     /// Sahnede kullanılabilir mi. Eksik harita varsa shader dalı hiç açılmaz.

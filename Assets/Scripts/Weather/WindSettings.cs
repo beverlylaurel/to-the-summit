@@ -44,7 +44,7 @@ public class WindSettings : ScriptableObject
 
     [Header("Yön")]
     [Tooltip("Dağın HÂKİM rüzgâr yönü (derece, +X'ten saat yönünün tersine). Kar " +
-             "birikintisi ve sastrugi bu eksene oturuyor: yığınlar saatler içinde " +
+             "deseni bu eksene oturuyor: biçim saatler içinde " +
              "oluşur, anlık esintiyle dönmezler.")]
     [Range(0f, 360f)] public float prevailingDegrees = 205f;
 
