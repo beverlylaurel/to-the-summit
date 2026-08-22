@@ -71,6 +71,10 @@ public static class SnowVfxBuilder
         // --- Initialize
         object init = AddContext(graph, "VFXBasicInitialize", new Vector2(0, 200), r);
 
+        // Kapasite 40000 (spec §17.1). Runtime'da `Spawn Rate` ile kontrol
+        // ediliyor; kapasite tavanı grafikte duruyor.
+        SetSetting(init, "capacity", 40000u, r);
+
         // Spec §17.1: `Set Position (AABox)`, kutu (40, 26, 40), KUTUNUN
         // TAMAMINA spawn (yüzeyine değil).
         //
@@ -81,21 +85,33 @@ public static class SnowVfxBuilder
         // Enum'da `Box` yok, `OrientedBox` var (ölçüldü — PositionShape.Type).
         SetSetting(pos, "shape", "OrientedBox", r);
         SetSetting(pos, "positionMode", "Volume", r);
+        SetSlotField(pos, "Box", "size", new Vector3(40f, 26f, 40f), r);
 
         // Ömür 4–9 s (spec §17.1).
         object life = AddBlock(init, "Block.SetAttribute", r);
         SetSetting(life, "attribute", "lifetime", r);
         SetSetting(life, "Random", "Uniform", r);
+        SetSlot(life, "A", 4f, r);
+        SetSlot(life, "B", 9f, r);
 
         // Boyut: taban 0.018 m, random 0.6–1.7× (spec §17.1).
         object size = AddBlock(init, "Block.SetAttribute", r);
         SetSetting(size, "attribute", "size", r);
         SetSetting(size, "Random", "Uniform", r);
 
+        // Taban 0.018 m, random 0.6–1.7× (spec §17.1). Uçlar burada çarpılıyor;
+        // shader'da ikinci bir çarpan yok.
+        SetSlot(size, "A", 0.018f * 0.6f, r);
+        SetSlot(size, "B", 0.018f * 1.7f, r);
+
         // --- Update: türbülans (spec §17.1)
         object update = AddContext(graph, "VFXBasicUpdate", new Vector2(0, 500), r);
 
         object turb = AddBlock(update, "Block.Turbulence", r);
+
+        // Spec §17.1: `Intensity = 0.35 * _WindSpeed + 0.15`. Rüzgâra bağlı
+        // kısmı runtime'da sürülüyor; grafikte sabit taban duruyor.
+        SetSlot(turb, "Intensity", 0.15f, r);
         SetSlot(turb, "frequency", 0.12f, r);
         SetSlot(turb, "octaves", 2, r);
         SetSlot(turb, "Drag", 0.9f, r);
@@ -167,14 +183,26 @@ public static class SnowVfxBuilder
     /// enum sırası değişince sessizce başka bir şey seçer.
     static void SetSetting(object model, string name, object value, StringBuilder r)
     {
-        FieldInfo f = model.GetType()
-            .GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+        // AYAR HER ZAMAN MODELİN KENDİ ALANI DEĞİL. `VFXBasicInitialize.capacity`
+        // parçacık verisine yönlendiriliyor ve bağlamda öyle bir alan yok
+        // (ölçüldü — `GetSetting` override'lı). O yüzden tip `GetSetting`'den
+        // okunuyor, alandan değil.
+        MethodInfo getSetting = model.GetType().GetMethod("GetSetting",
+            BindingFlags.Public | BindingFlags.Instance,
+            null, new[] { typeof(string) }, null)
+            ?? throw new InvalidOperationException("GetSetting yok.");
+
+        object ayar = getSetting.Invoke(model, new object[] { name });
+
+        FieldInfo alan = ayar?.GetType()
+            .GetField("field", BindingFlags.Public | BindingFlags.Instance)
+            ?.GetValue(ayar) as FieldInfo
             ?? throw new InvalidOperationException(
                 model.GetType().Name + " ayarı yok: " + name);
 
-        object son = value is string str && f.FieldType.IsEnum
-            ? Enum.Parse(f.FieldType, str)
-            : Convert.ChangeType(value, f.FieldType);
+        object son = value is string str && alan.FieldType.IsEnum
+            ? Enum.Parse(alan.FieldType, str)
+            : Convert.ChangeType(value, alan.FieldType);
 
         MethodInfo set = model.GetType().GetMethod("SetSettingValue",
             BindingFlags.Public | BindingFlags.Instance,
@@ -202,13 +230,9 @@ public static class SnowVfxBuilder
         for (int i = 0; i < n; i++)
         {
             object slot = get.Invoke(model, new object[] { i });
-            PropertyInfo adP = slot.GetType().GetProperty("name",
-                BindingFlags.Public | BindingFlags.Instance);
+            if (Prop(slot, "name")?.GetValue(slot) as string != slotName) continue;
 
-            if (adP?.GetValue(slot) as string != slotName) continue;
-
-            PropertyInfo degerP = slot.GetType().GetProperty("value",
-                BindingFlags.Public | BindingFlags.Instance)
+            PropertyInfo degerP = Prop(slot, "value")
                 ?? throw new InvalidOperationException("Slot değeri yazılamıyor.");
 
             degerP.SetValue(slot, value);
@@ -282,7 +306,6 @@ public static class SnowVfxBuilder
         AddChild(graph, ctx);
 
         r.AppendLine("      bağlam  " + typeName);
-        if (Dump) DumpModel(ctx, r);
         return ctx;
     }
 
@@ -295,7 +318,6 @@ public static class SnowVfxBuilder
         AddChild(context, block);
         r.AppendLine("        blok  " + typeName);
 
-        if (Dump) DumpModel(block, r);
         return block;
     }
 
@@ -345,11 +367,8 @@ public static class SnowVfxBuilder
             object slot = get.Invoke(model, new object[] { i });
             if (slot == null) continue;
 
-            string ad = slot.GetType().GetProperty("name",
-                BindingFlags.Public | BindingFlags.Instance)?.GetValue(slot) as string;
-
-            object deger = slot.GetType().GetProperty("value",
-                BindingFlags.Public | BindingFlags.Instance)?.GetValue(slot);
+            string ad = Prop(slot, "name")?.GetValue(slot) as string;
+            object deger = Prop(slot, "value")?.GetValue(slot);
 
             r.AppendLine("           slot   " + (ad ?? "?").PadRight(28) +
                          (deger == null ? "null" : deger.GetType().Name + " = " + deger));
@@ -384,8 +403,94 @@ public static class SnowVfxBuilder
         r.AppendLine("      bağ     " + from.GetType().Name + " → " + to.GetType().Name);
     }
 
+    /// YAPI SLOTU İÇİNDEKİ ALAN. `Box` slotu `OrientedBox` taşıyor; kutunun
+    /// boyu onun `size` alanında. Slotun değerini komple değiştirmek yerine
+    /// mevcut değeri alıp alanını yazıyoruz — merkez ve açı korunuyor.
+    static void SetSlotField(object model, string slotName, string fieldName,
+                             object value, StringBuilder r)
+    {
+        MethodInfo nb = model.GetType().GetMethod("GetNbInputSlots",
+            BindingFlags.Public | BindingFlags.Instance);
+        MethodInfo get = model.GetType().GetMethod("GetInputSlot",
+            BindingFlags.Public | BindingFlags.Instance);
+
+        int n = (int)nb.Invoke(model, null);
+
+        for (int i = 0; i < n; i++)
+        {
+            object slot = get.Invoke(model, new object[] { i });
+            if (Prop(slot, "name")?.GetValue(slot) as string != slotName) continue;
+
+            PropertyInfo degerP = Prop(slot, "value");
+            object kutu = degerP.GetValue(slot);
+
+            FieldInfo f = kutu.GetType().GetField(fieldName,
+                BindingFlags.Public | BindingFlags.Instance)
+                ?? throw new InvalidOperationException(
+                    kutu.GetType().Name + " alanı yok: " + fieldName);
+
+            f.SetValue(kutu, value);
+            degerP.SetValue(slot, kutu);
+
+            r.AppendLine("           slot   " + (slotName + "." + fieldName).PadRight(24) + value);
+            return;
+        }
+
+        throw new InvalidOperationException(model.GetType().Name + " slotu yok: " + slotName);
+    }
+
+    /// ÖZELLİK ARAYICI, BELİRSİZLİK GÜVENLİ.
+    ///
+    /// `children` hiyerarşide gölgeleniyor (`VFXModel` ve türevleri ayrı ayrı
+    /// tanımlıyor); düz `GetProperty` `AmbiguousMatchException` atıyor. En
+    /// türemiş tipten başlayıp yukarı yürüyor, ilk bulduğunu alıyor.
+    static PropertyInfo Prop(object o, string name)
+    {
+        for (Type t = o.GetType(); t != null; t = t.BaseType)
+        {
+            PropertyInfo p = t.GetProperty(name,
+                BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+
+            if (p != null) return p;
+        }
+
+        return null;
+    }
+
+    /// GRAFİĞİN SON HÂLİ. Ayarlar uygulandıktan SONRA dökülüyor: slot adları
+    /// ayara göre değişiyor (şekil kutu olunca `arcSphere` gidiyor, kutu
+    /// geliyor). Kurulum sırasında dökmek eski adları gösterir.
+    static void DumpGraph(object graph, StringBuilder r)
+    {
+        r.AppendLine();
+        r.AppendLine("## Son hâl");
+
+        if (Prop(graph, "children")?.GetValue(graph) is not System.Collections.IEnumerable ctxs)
+        {
+            r.AppendLine("  [!] grafik çocukları okunamadı");
+            return;
+        }
+
+        foreach (object ctx in ctxs)
+        {
+            r.AppendLine("  bağlam  " + ctx.GetType().Name);
+            DumpModel(ctx, r);
+
+            if (Prop(ctx, "children")?.GetValue(ctx) is not System.Collections.IEnumerable blocks)
+                continue;
+
+            foreach (object b in blocks)
+            {
+                r.AppendLine("    blok  " + b.GetType().Name);
+                DumpModel(b, r);
+            }
+        }
+    }
+
     static void Save(object graph, StringBuilder r)
     {
+        if (Dump) DumpGraph(graph, r);
+
         foreach (string ad in new[] { "UpdateSubAssets", "OnSaved" })
         {
             MethodInfo m = graph.GetType().GetMethod(ad,
