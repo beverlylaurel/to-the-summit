@@ -37,19 +37,6 @@ public class SnowEnvironmentBridge : MonoBehaviour, ISnowEnvironmentSource
     [SerializeField, Range(0f, 1f)] float manualPrecipIntensity = 0.5f;
     [SerializeField, Range(0f, 1f)] float manualFogDensity = 0.2f;
 
-    /// TEŞHİS GEÇERSİZ KILMALARI (F1). `NonSerialized`: sahneye yazılmıyor,
-    /// Play'den çıkınca sıfırlanıyor. Eksi/NaN "dokunma" demek.
-    [System.NonSerialized] public float OverrideTemperatureC = float.NaN;
-    [System.NonSerialized] public float OverridePrecip01 = -1f;
-
-    public bool HasOverride => !float.IsNaN(OverrideTemperatureC) || OverridePrecip01 >= 0f;
-
-    public void ClearOverrides()
-    {
-        OverrideTemperatureC = float.NaN;
-        OverridePrecip01 = -1f;
-    }
-
     public Vector3 WindDirection => wind != null
         ? SafeHorizontal(wind.Velocity)
         : manualWindDirection.normalized;
@@ -64,17 +51,9 @@ public class SnowEnvironmentBridge : MonoBehaviour, ISnowEnvironmentSource
         ? Mathf.Clamp01(time.SunHeight)
         : (sunLight != null ? Mathf.Clamp01(Vector3.Dot(-sunLight.transform.forward, Vector3.up)) : 0f);
 
-    public float TemperatureC
-    {
-        get
-        {
-            if (!float.IsNaN(OverrideTemperatureC)) return OverrideTemperatureC;
-
-            return temperature != null && observer != null
-                ? temperature.At(observer.position.y)
-                : manualTemperatureC;
-        }
-    }
+    public float TemperatureC => temperature != null && observer != null
+        ? temperature.At(observer.position.y)
+        : manualTemperatureC;
 
     public float FreezingLevelY => temperature != null
         ? temperature.FreezingLevel
@@ -88,14 +67,9 @@ public class SnowEnvironmentBridge : MonoBehaviour, ISnowEnvironmentSource
         ? (PrecipIntensity01 > 0.001f ? PrecipitationKind.Rain : PrecipitationKind.None)
         : manualPrecipKind;
 
-    public float PrecipIntensity01
-    {
-        get
-        {
-            if (OverridePrecip01 >= 0f) return OverridePrecip01;
-            return weather != null ? Mathf.Clamp01(weather.Precipitation) : manualPrecipIntensity;
-        }
-    }
+    public float PrecipIntensity01 => weather != null
+        ? Mathf.Clamp01(weather.Precipitation)
+        : manualPrecipIntensity;
 
     /// GÖRÜŞ METRE, SİS 0..1. Dönüşüm burada yapılıyor çünkü sınırlar bu
     /// projeye ait; sis sistemine dokunulmuyor.

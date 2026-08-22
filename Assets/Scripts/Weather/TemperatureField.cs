@@ -71,9 +71,30 @@ public class TemperatureField : MonoBehaviour
         time = clock;
     }
 
+    bool overrideActive;
+    float overrideSeaLevelCelsius;
+
+    /// TEŞHİS GEÇERSİZ KILMASI — deseni `WindField.ApplyOverride` ile aynı.
+    ///
+    /// Deniz seviyesi sıcaklığını değiştiriyor, `At` / `FeltAt` / `FreezingLevel`
+    /// üçü de ondan türediği için HUD, donma seviyesi, kar çizgisi ve kar
+    /// yağışı AYNI ANDA kayıyor. Yalnız kar sistemine ayrı bir sıcaklık
+    /// dayatmak "HUD +8 °C derken kar yağıyor" çelişkisini üretirdi.
+    public void ApplyOverride(float seaLevelC)
+    {
+        overrideActive = true;
+        overrideSeaLevelCelsius = seaLevelC;
+    }
+
+    public void ClearOverride() => overrideActive = false;
+
+    public bool HasOverride => overrideActive;
+
+    float SeaLevelC => overrideActive ? overrideSeaLevelCelsius : seaLevelCelsius;
+
     /// Verilen kottaki ölçülen hava sıcaklığı (°C).
     public float At(float altitude) =>
-        seaLevelCelsius
+        SeaLevelC
         - lapseRate * altitude * 0.001f
         + daytimeWarming * time.DayFactor
         - stormCooling * weather.Precipitation;
@@ -86,7 +107,7 @@ public class TemperatureField : MonoBehaviour
     /// Sıcaklığın sıfıra indiği kot (metre). Yağmurun kara döndüğü sınır buradan gelir.
     /// Düşüş oranı sabit olduğu için tersi kapalı biçimde çözülüyor.
     public float FreezingLevel =>
-        (seaLevelCelsius
+        (SeaLevelC
          + daytimeWarming * time.DayFactor
          - stormCooling * weather.Precipitation) / (lapseRate * 0.001f);
 }

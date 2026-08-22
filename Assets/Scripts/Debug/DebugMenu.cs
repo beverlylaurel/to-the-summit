@@ -19,7 +19,7 @@ public class DebugMenu : MonoBehaviour
     [SerializeField] TimeOfDay time;
     [SerializeField] AtmosphereController atmosphere;
     [SerializeField] PrecipitationRenderer precipitation;
-    [SerializeField] SnowEnvironmentBridge snowBridge;
+    [SerializeField] TemperatureField temperature;
     [SerializeField] SnowfallRenderer snowfall;
     [SerializeField] PerformanceHud hud;
     [SerializeField] ClimbHud climbHud;
@@ -59,8 +59,12 @@ public class DebugMenu : MonoBehaviour
     /// kaynağı olsaydı yağışla çelişebilirdi.
     float lockedSnow;
 
-    /// Sürgü açıkken dayatılan sıcaklık. Kar eşiği 0,5 °C; −6 rahat altında.
-    const float SnowForceTempC = -6f;
+    /// Sürgü açıkken dayatılan DENİZ SEVİYESİ sıcaklığı.
+    ///
+    /// Donma seviyesi = (deniz sv. + gündüz ısınması − fırtına soğuması) / 0.0065.
+    /// −2 °C'de öğlen ve yağışsız uçta bile donma seviyesi −57 m çıkıyor, yani
+    /// oyuncunun kotu ne olursa olsun kar. Sayı kâğıtta bu iki uçtan seçildi.
+    const float SnowSeaLevelC = -2f;
     float lockedPrecipitation = 0.6f;
 
     bool windLocked;
@@ -478,20 +482,28 @@ public class DebugMenu : MonoBehaviour
             : "yağıyor";
     }
 
-    /// Sürgü köprünün `NonSerialized` alanına yazıyor: sahneye de ayar
-    /// dosyasına da dokunulmuyor, Play'den çıkınca sıfırlanıyor.
+    /// SÜRGÜ GERÇEK SİSTEMLERE YAZIYOR, KAR SİSTEMİNE DEĞİL.
+    ///
+    /// Yağış `AltitudeWeatherDriver`'a, soğuk `TemperatureField`'a gidiyor.
+    /// Kar sistemi ikisini de köprüden okuyor, ayrıca dayatma almıyor. Böylece
+    /// HUD'daki sıcaklık, donma seviyesi, kar çizgisi ve yağan kar tek bir
+    /// durumdan türüyor — `CLAUDE.md` → Atmosfer tutarlılığı.
     void ApplySnowOverride()
     {
-        if (snowBridge == null) return;
+        if (temperature == null) return;
 
-        if (weatherLocked && lockedSnow > 0.001f)
+        bool wantSnow = weatherLocked && lockedSnow > 0.001f;
+
+        if (wantSnow)
         {
-            snowBridge.OverridePrecip01 = lockedSnow;
-            snowBridge.OverrideTemperatureC = SnowForceTempC;
+            // Kar sürgüsü yağış şiddetini de o an devralıyor; iki sürgü aynı
+            // sayıyı sürseydi hangisinin kazandığı ekrandan anlaşılmazdı.
+            weatherDriver.IntensityOverride = lockedSnow;
+            temperature.ApplyOverride(SnowSeaLevelC);
         }
-        else if (snowBridge.HasOverride)
+        else if (temperature.HasOverride)
         {
-            snowBridge.ClearOverrides();
+            temperature.ClearOverride();
         }
     }
 

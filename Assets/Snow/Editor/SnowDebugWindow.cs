@@ -460,7 +460,8 @@ public class SnowDebugWindow : EditorWindow
         if (debugMenu != null)
         {
             var menuSerialized = new SerializedObject(debugMenu);
-            menuSerialized.FindProperty("snowBridge").objectReferenceValue = bridge;
+            menuSerialized.FindProperty("temperature").objectReferenceValue =
+                Object.FindAnyObjectByType<TemperatureField>();
             menuSerialized.FindProperty("snowfall").objectReferenceValue = snowfall;
             menuSerialized.ApplyModifiedProperties();
         }
