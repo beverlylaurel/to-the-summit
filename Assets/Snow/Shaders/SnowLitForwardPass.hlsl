@@ -55,8 +55,12 @@ float SnowSurfaceWorldY(float2 posXZ)
 /// paylaşıyor, arada yarık kalmıyor.
 float SnowStitchedWorldY(float2 posXZ, float ringIndex)
 {
-    float ringQuad = _SnowRing0Quad * pow(SNOW_RING_SCALE, ringIndex);
-    float coarse = ringQuad * SNOW_RING_SCALE;
+    // SIFIRA BÖLME KORUMASI. `_SnowRing0Quad` yalnız clipmap görünürken
+    // yazılıyor; ilk karelerde ya da mesh kapalıyken sıfır kalıyor ve
+    // `floor(x / 0)` NaN üretiyor. NaN köşe, ekranda bıçak gibi bir yaprak
+    // olarak çıkıyor.
+    float ringQuad = max(_SnowRing0Quad, 1e-4) * pow(SNOW_RING_SCALE, ringIndex);
+    float coarse = max(ringQuad * SNOW_RING_SCALE, 1e-4);
 
     float2 a = floor(posXZ / coarse) * coarse;
     float2 t = saturate((posXZ - a) / coarse);
@@ -113,7 +117,14 @@ Varyings SnowLitVertex(Attributes IN)
 
     // DİKİŞ: işaret 2. Sınır köşesi kaba ızgaradan okuyor.
     if (IN.ringId.y > 1.5 && _SnowStitchOff < 0.5)
-        positionWS.y = SnowStitchedWorldY(flat.xz, IN.ringId.x);
+    {
+        float stitched = SnowStitchedWorldY(flat.xz, IN.ringId.x);
+
+        // Sonuç sonlu değilse dikiş uygulanmıyor. Bir NaN köşe bütün üçgeni
+        // ekrana yayıyor; bedeli o köşede dikişsiz kalmak olmalı, yaprak
+        // değil.
+        if (isfinite(stitched)) positionWS.y = stitched;
+    }
 
     OUT.probeData = IN.ringId;
     OUT.positionWS = positionWS;
@@ -314,11 +325,65 @@ half4 SnowLitFragment(Varyings IN) : SV_Target
             return half4((half3)SnowMeshEdgeFade(IN.positionWS.xz).xxx, 1);
 
         // 5 — QUAD IZGARASI. Dama tahtası; kare boyu quad boyu.
-        float quad = _SnowRing0Quad * pow(SNOW_RING_SCALE, ring);
-        float2 cell = floor(IN.positionWS.xz / quad);
-        float checker = fmod(cell.x + cell.y, 2.0);
+        if (mode < 5.5)
+        {
+            float quad = max(_SnowRing0Quad, 1e-4) * pow(SNOW_RING_SCALE, ring);
+            float2 cell = floor(IN.positionWS.xz / quad);
+            float checker = fmod(cell.x + cell.y, 2.0);
 
-        return half4((half3)lerp(0.25, 0.75, checker).xxx, 1);
+            return half4((half3)lerp(0.25, 0.75, checker).xxx, 1);
+        }
+
+        float2 puv = SnowWorldToUV(IN.positionWS);
+
+        // 6 — NaN AVCISI. Sonlu olmayan tek bir değer bile KIRMIZI.
+        if (mode < 6.5)
+        {
+            bool bad = !isfinite(height)
+                    || !all(isfinite(IN.positionWS))
+                    || !all(isfinite(puv));
+
+            return bad ? half4(1, 0, 0, 1) : half4(0.1, 0.1, 0.1, 1);
+        }
+
+        // 7 — KOMŞU FARKI. Süreksizlik parlıyor. 1 teksel adımla merkezi fark;
+        // 5 cm'lik sıçrama tam beyaz.
+        if (mode < 7.5)
+        {
+            float t = 1.0 / max(_SnowResolution, 1.0);
+
+            float dx = abs(SnowSurfaceAt(puv + float2(t, 0)) - SnowSurfaceAt(puv - float2(t, 0)));
+            float dz = abs(SnowSurfaceAt(puv + float2(0, t)) - SnowSurfaceAt(puv - float2(0, t)));
+
+            return half4((half3)saturate(max(dx, dz) / 0.05).xxx, 1);
+        }
+
+        // 8 — DÜNYA Y BANDI. Her metre bir bant; yüzey sıçrarsa bantlar kırılır.
+        if (mode < 8.5)
+        {
+            float band = frac(IN.positionWS.y);
+            return half4((half3)lerp(0.2, 0.9, step(0.5, band)).xxx, 1);
+        }
+
+        // 9 — BÖLGE MASKESİ. Yakın bölgenin sönüm karesi doğrudan görünür.
+        if (mode < 9.5)
+        {
+            float inside = SnowInsideMask(puv);
+            return half4((half3)inside.xxx, 1);
+        }
+
+        // 10 — VERİ KAYNAĞI. Yeşil = yakın durum, mavi = kaskad, kırmızı = kar
+        // çizgisi eğrisi. Hangi pikselin nereden beslendiği tek bakışta.
+        float inside2 = SnowInsideMask(puv);
+
+        float2 cuv = (IN.positionWS.xz - _SnowFarCenter) / max(_SnowFarAreaSize, 1e-3) + 0.5;
+        bool inCascade = all(cuv >= 0.0) && all(cuv <= 1.0);
+
+        float3 col = inside2 > 0.5 ? float3(0, 1, 0)
+                   : inCascade    ? float3(0, 0.4, 1)
+                                  : float3(1, 0, 0);
+
+        return half4((half3)col, 1);
     }
 
     // PROJENİN SİSİ, URP'NİNKİ DEĞİL (rapor §7). Dağ `ApplyHeightFog`

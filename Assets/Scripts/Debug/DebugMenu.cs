@@ -484,12 +484,14 @@ public class DebugMenu : MonoBehaviour
             string[] probeNames =
             {
                 "kapalı", "1 halka", "2 köşe işareti", "3 kalınlık",
-                "4 kenar sönümü", "5 quad ızgarası",
+                "4 kenar sönümü", "5 quad ızgarası", "6 NaN avcısı",
+                "7 komşu farkı", "8 dünya Y bandı", "9 bölge maskesi",
+                "10 veri kaynağı",
             };
 
             int before = meshProbe;
-            GUILayout.Label("Mesh probu: " + probeNames[Mathf.Clamp(meshProbe, 0, 5)]);
-            meshProbe = Mathf.RoundToInt(GUILayout.HorizontalSlider(meshProbe, 0f, 5f));
+            GUILayout.Label("Mesh probu: " + probeNames[Mathf.Clamp(meshProbe, 0, 10)]);
+            meshProbe = Mathf.RoundToInt(GUILayout.HorizontalSlider(meshProbe, 0f, 10f));
 
             if (meshProbe != before)
                 Shader.SetGlobalFloat("_SnowMeshProbe", meshProbe);
