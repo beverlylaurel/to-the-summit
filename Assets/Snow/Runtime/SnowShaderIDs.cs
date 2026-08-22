@@ -90,7 +90,11 @@ public static class SnowShaderIDs
 
     // --- Kar yüzeyi materyali ---
     public static readonly int FallbackSWE = Shader.PropertyToID("_FallbackSWE");
-    public static readonly int SnowLineY = Shader.PropertyToID("_SnowLineY");
+    // KOT KAR CIZGISI. Yukaridaki `_SnowLineY` KARAKTER ustu birikmenin
+    // kendi cizgisi (spec 16.1) ve MaterialPropertyBlock ile veriliyor; bu
+    // ise ARAZININ hangi kottan yukarisinin karli oldugu, global. Ayni ada
+    // konsalardi property block globali ezerdi.
+    public static readonly int SnowLineGroundY = Shader.PropertyToID("_SnowLineGroundY");
     public static readonly int SnowLineBand = Shader.PropertyToID("_SnowLineBand");
     public static readonly int SnowLineSWE = Shader.PropertyToID("_SnowLineSWE");
     public static readonly int FallbackRhoN = Shader.PropertyToID("_FallbackRhoN");

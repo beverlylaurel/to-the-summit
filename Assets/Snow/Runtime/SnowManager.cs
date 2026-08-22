@@ -410,7 +410,7 @@ public class SnowManager : MonoBehaviour
 
         // KAR ÇİZGİSİ DONMA SEVİYESİNDEN. Ayrı bir sayı tanımlanmıyor;
         // sıcaklık alanı neredeyse kar da orada başlıyor.
-        Shader.SetGlobalFloat(SnowShaderIDs.SnowLineY, env.FreezingLevelY);
+        Shader.SetGlobalFloat(SnowShaderIDs.SnowLineGroundY, env.FreezingLevelY);
         Shader.SetGlobalFloat(SnowShaderIDs.SnowLineBand, settings.SnowLineBand);
         Shader.SetGlobalFloat(SnowShaderIDs.SnowLineSWE, settings.SnowLineSwe);
 

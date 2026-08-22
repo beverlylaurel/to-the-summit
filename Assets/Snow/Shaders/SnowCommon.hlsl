@@ -94,15 +94,15 @@ float _FallbackRhoN;
 /// birikip sonra eriyor. Başlangıç durumu, bölgeye YENİ giren teksel ve
 /// kaskadın da dışı bu eğriden doluyor — dağ karlı doğuyor.
 ///
-/// `_SnowLineY` donma seviyesinden geliyor (`ISnowEnvironmentSource`), ayrı
+/// `_SnowLineGroundY` donma seviyesinden geliyor (`ISnowEnvironmentSource`), ayrı
 /// bir sayı değil: "sıcaklık +8 ama tepe karsız" çelişkisi böyle imkânsız.
-float _SnowLineY;
+float _SnowLineGroundY;
 float _SnowLineBand;
 float _SnowLineSWE;
 
 float SnowInitialSweAt(float groundY)
 {
-    float t = saturate((groundY - _SnowLineY) / max(_SnowLineBand, 1e-3));
+    float t = saturate((groundY - _SnowLineGroundY) / max(_SnowLineBand, 1e-3));
     return lerp(_FallbackSWE, _SnowLineSWE, t * t * (3.0 - 2.0 * t));
 }
 
