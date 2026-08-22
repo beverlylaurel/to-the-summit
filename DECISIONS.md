@@ -80,14 +80,24 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   model yeniden seyreltilirse topoloji değişir ve boyama kaybolur. Seyreltme yapıldı
   (3.1 M → 200 bin), boyama artık güvenle yapılabilir; bütçe değişirse maske aktarımı
   yazmak gerekir
-- **`SnowTestRunner`** (`Assets/Snow/Editor/`) — `Logs/snow-test.request`
-  dosyasına bakıp sınamaları koşan geçici araç. Kar spec'i bitince silinir;
-  sınamaların kendisi kalır
 - **`SnowEnvironmentBridge` elle girilen değerler** — köprü şu an sabit sayılar
   yayınlıyor (rüzgâr 3 m/s, sıcaklık −4 °C, yağış 0.5). Gerçek sistemlere bağlanınca
   bu alanlar silinir
 
 ## Bekleyen kararlar
+
+- **Kar sisteminin kullanıcı tarafı beş iş** — kod tarafı bitti, bunlar
+  sahne/prefab kararı ve spec §1.4 gereği ayrı ayrı onaya tabi:
+  1. Ana kameranın Culling Mask'inden `SnowDeformer` çıkarılacak
+  2. Karakterin ayak/bacak kemiklerine proxy mesh + `SnowDeformer`
+  3. Çatı/köprü/kaya nesneleri `SnowOccluder` layer'ına
+  4. `SnowFootstepAudio`, `SnowPuffEmitter`, `SnowSprayController` karakterin
+     adım olayına bağlanacak (klipler de atanacak)
+  5. `SnowMovementModifier.SpeedMultiplier` hareket koduna bağlanacak
+  → [Kar sistemi: spec'ten bilinçli sapmalar](#kar-sistemi-specten-bilinçli-sapmalar-ve-iki-assumption-2026-08-22)
+- **Köprünün iki TODO'su** — `PrecipKind` ve `FogDensity01` hâlâ elle girilen
+  değerlerden geliyor. Gerçek sistemlere bağlanması `SnowEnvironmentBridge`'de
+  yorum olarak hazır
 
 - **Şimşek yağan kar ve yağmuru aydınlatmalı** — kar/yağmur spec'lerine geçildiğinde
   ışık kaynağı listesine şimşek eklenecek
@@ -1006,6 +1016,26 @@ noktada saniyelerce durursa görünür.
 Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olmadan
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
+
+## Kar sınamaları Unity'ye tıklamadan koşuyor (2026-08-22)
+
+`Assets/Snow/Editor/SnowTestRunner.cs` `Logs/snow-test.request` dosyasının
+zaman damgasını izliyor; damga değişince bütün kar sınamalarını koşup sonucu
+`Logs/snow-test.log`'a yazıyor. Deseni `BackgroundRefresh` ile aynı.
+
+**Neden kalıcı.** Geçici diye yazılmıştı ama on üç fazın tamamı bununla
+ölçüldü ve bir tek turda üç ayrı gerçek hata yakalandı (kabuk profilinin
+düzlüğü, tek kanallı dokunun alpha'ya yazması, rüzgâr gölgesinin hiç
+oluşmaması). İstek dosyası yokken hiçbir şey yapmıyor.
+
+**Kullanımı:**
+
+```
+date > Logs/snow-test.request
+```
+
+Sonra `Logs/snow-test.log` okunur. Menüden tek tek de koşulabiliyor:
+`To The Summit/Kar/…`
 
 ## Kar Faz 12: rüzgâr gölgesinin koşulu spec'te ters kurulmuş (2026-08-22)
 

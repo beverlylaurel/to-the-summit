@@ -770,6 +770,21 @@ geri dönülünce yazılıyor — LRU 512 blok, 16 MB.
 bloklamadan geri okuyor; ayak sesi, hız çarpanı ve ayak tozu ondan besleniyor.
 Hız çarpanı YAYINLANIYOR, karakter controller'ına bağlanmıyor.
 
+**Kar olayları (Faz 11–13).** Kabuk `RT_Trail.B`'de, üçgen sıcaklık profiliyle
+(tepe −5 °C) oluşuyor ve yeterli yük binince kırılıyor — patikayla karıştırma,
+patika kırılmaz. Rüzgâr gölgesi `RT_WindShadow`'da Gauss-Seidel ile çözülüyor;
+gölgede erozyon yok, yalnız birikme var — duvar dibi yığınları buradan doğuyor.
+Sastrugi genliği `RT_Trail.A`'da, rüzgâr taşınımıyla aynı eşikten besleniyor ve
+sırtlar rüzgâra DİK uzanıyor. Isı kaynakları Wyvill düşüşüyle sıcaklık alanı
+yayıyor; alanlar TOPLANIYOR. Püskürtme miktarı V̇ = genişlik × batma × hızdan
+türüyor. Süspansiyon perdeleri üstel yükseklik profiliyle, PBSM'nin 5 m
+tavanına kadar.
+
+**Yağış (Faz 8, 13).** Kar taneleri, yer savrulması, ayak tozu, püskürtme ve
+perdeler GPU'da simüle ediliyor — VFX Graph varlığı bu iş akışında
+üretilemediği için (gerekçe `DECISIONS.md`). Hepsi `SnowManager`'ın tek
+CommandBuffer'ında.
+
 **Bölge kaydırma.** Durum dokuları oyuncuyu takip eden 16 m'lik bir pencerede duruyor;
 pencere `SnapStep` (0.25 m) ızgarasına oturuyor ve kaydığında içerik `KScroll` ile aynı
 dünya noktasında kalıyor. Üç presette de bir SnapStep tam sayı teksele denk geliyor
