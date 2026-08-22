@@ -5,9 +5,11 @@
 #ifndef SNOW_COMMON_INCLUDED
 #define SNOW_COMMON_INCLUDED
 
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
 #include "SnowConstants.hlsl"
 
-SAMPLER(snow_linear_clamp_sampler);
+// sampler_LinearClamp URP core'un GlobalSamplers.hlsl'inde tanımlı (ölçüldü).
+// Kendi sampler'ımızı açmıyoruz — spec bu adı kullanıyor (§7.3, §9.4, §10.2, §12.2).
 
 // ---------------------------------------------------------------- kar durumu
 
@@ -72,6 +74,35 @@ float SnowInsideMask(float2 uv)
     return 1.0 - smoothstep(0.88, 1.0, max(e.x, e.y));
 }
 
+// ---------------------------------------------------------------------- çevre
+
+/// HEPSİ MEVCUT SİSTEMLERDEN OKUNUYOR (spec §3). Kar sistemi bunlardan hiçbirini
+/// üretmiyor; `SnowManager.WriteGlobals` köprüden alıp yayınlıyor.
+float3 _WindWS;
+float  _WindSpeed;
+float  _TemperatureC;
+float  _SunElevation01;
+float  _FogDensity01;
+float  _RainOnSnow01;
+float3 _SnowUpDirection;
+
+/// Bölgenin dışındaki dünyanın genel kar durumu.
+float _FallbackSWE;
+float _FallbackRhoN;
+
+// ------------------------------------------------------------------ yakalama
+
+/// Yakalama hacminin sıfır noktası — gözlemcinin dünya Y'si.
+float _SnowCaptureOriginY;
+
+/// RT_Capture'ın R kanalı GÖRELİ tutuluyor (yarım hassasiyet, bkz.
+/// Hidden_SnowCaptureDepth). Dünya Y'sine dönüşü tek yerden geçiyor ki
+/// çözücü tarafta unutulmasın.
+float SnowCaptureY(float encoded)
+{
+    return _SnowCaptureOriginY + encoded;
+}
+
 // ------------------------------------------------------------ zemin yüksekliği
 
 TEXTURE2D(_GroundHeightTex);
@@ -86,7 +117,7 @@ float  _GroundHeightRange;   // 0..1 değerin haritalandığı aralık
 float SampleGroundHeight(float2 posXZ)
 {
     float2 uv = (posXZ - _GroundOriginXZ) / _GroundSizeXZ;
-    float  n  = SAMPLE_TEXTURE2D_LOD(_GroundHeightTex, snow_linear_clamp_sampler, saturate(uv), 0).r;
+    float  n  = SAMPLE_TEXTURE2D_LOD(_GroundHeightTex, sampler_LinearClamp, saturate(uv), 0).r;
     return _GroundBaseY + n * _GroundHeightRange;
 }
 

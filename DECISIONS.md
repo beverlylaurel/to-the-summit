@@ -80,11 +80,9 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   model yeniden seyreltilirse topoloji değişir ve boyama kaybolur. Seyreltme yapıldı
   (3.1 M → 200 bin), boyama artık güvenle yapılabilir; bütçe değişirse maske aktarımı
   yazmak gerekir
-- **`TerrainSurface`'ta iki öksüz alan** — `weatherDriver` (`AltitudeWeatherDriver`) ve
-  `temperature` (`TemperatureField`) serileştirilmiş, `Bind()` ile atanıyor ama hiçbir
-  yerde okunmuyor. Kar kuşağı kotlarını besliyorlardı, kar `741e6b7`'de silindi.
-  Silinmesi `Bind()` imzasını ve sahnenin serileştirilmiş bağlarını değiştirir —
-  onaya tabi, tek adımda `MountainSceneBootstrap` ile birlikte yapılacak
+- **`SnowTestRunner`** (`Assets/Snow/Editor/`) — `Logs/snow-test.request`
+  dosyasına bakıp sınamaları koşan geçici araç. Kar spec'i bitince silinir;
+  sınamaların kendisi kalır
 - **`SnowEnvironmentBridge` elle girilen değerler** — köprü şu an sabit sayılar
   yayınlıyor (rüzgâr 3 m/s, sıcaklık −4 °C, yağış 0.5). Gerçek sistemlere bağlanınca
   bu alanlar silinir
@@ -910,6 +908,104 @@ okuyor ve §20 "komşu okuyan pass'lerde ping-pong" diyor. Başka bir dokuyu öd
 
 **Tetikleyici:** spec'in sonraki bir fazı bu iki dokudan birini farklı formatta
 kullanmaya kalkarsa karar yeniden açılır.
+
+## Kar Faz 2–3: URP'nin desteklemediği iki spec varsayımı (2026-08-22)
+
+### Yakalama kamerası KAMERA DEĞİL
+
+**Ölçüm.** Spec §9.1 `Camera` + `SetReplacementShader` istiyor. URP runtime'ında
+`SetReplacementShader` / `RenderWithShader` referansı **yok** — yerleşik boru
+hattına ait bir özellik. URP'de kamera yolunu kurmak, kendi
+`ScriptableRendererData`'sını URP asset'inin renderer listesine eklemeyi
+gerektirir; bu §1.1'in yasakladığı URP asset değişikliğidir.
+
+**Karar.** Açık ortografik matris + override materyal ile `DrawRenderer`.
+Teknik birebir aynı: alttan yukarı bakan ortografik frustum, derinlik testiyle
+en alçak yüzeyin kazanması. Değişen yalnızca çizimi kimin tetiklediği. Yan
+kazanç: her şey spec §15.2'nin istediği tek CommandBuffer içinde kalıyor.
+
+**Tetikleyici:** Unity URP'ye replacement shader desteği eklerse karar yeniden
+açılabilir — ama açılmasına gerek yok, mevcut yol daha az bağımlılık taşıyor.
+
+### Yakalanan yükseklik MUTLAK DEĞİL GÖRELİ
+
+**Ölçüm.** `RT_Capture` yarım hassasiyet (spec §6.2). Bu projenin arazisi
+~4900 m'de ve `Mathf.FloatToHalf` ile ölçülen adım orada **4000 mm**. Görünür
+karın alt sınırı 4 mm (spec §8.1); mutlak dünya Y saklamak batma derinliğini
+tamamen yok ediyor. Spec küçük ölçekli bir oyun varsaymış.
+
+**Karar.** `_SnowCaptureOriginY` (gözlemcinin Y'si) çıkarılarak kodlanıyor.
+Ölçülen adım: ayak civarında (0.1 m) **0.061 mm**, hacim ucunda (3 m)
+**1.953 mm**. Çözücü taraf `SnowCaptureY()` ile tek yerden geri çeviriyor.
+
+**Tetikleyici:** yakalama hacmi ±3 m'den büyütülürse adım büyür; 6 m'de
+3.9 mm'ye çıkar ve görünür kar sınırına dayanır.
+
+### İki doku spec tablosunda yok, ikisi de zorunlu
+
+| Doku | Neden | Bedel |
+|---|---|---|
+| `RT_CaptureDepth` | §9.2 `ZWrite On` + `ZTest LEqual` istiyor; en alçak yüzeyin kazanması derinlik tamponu olmadan çözülemez. Renk kanalında `BlendOp Min` işe yaramaz — R'nin en küçüğü ile GB'nin en küçüğü farklı fragmanlardan gelir ve hız yanlış tekselle eşleşir | 4 MB |
+| `RT_RimBlur` | §10.2 iki geçişli ayrılabilir blur istiyor; ilkini `RT_TrailTemp` karşılıyor, ikincisi kendi hedefini gerektiriyor (aynı doku hem kaynak hem hedef olamaz, §20) | 2 MB |
+
+### Sırt blur'u kutu, ağırlık uydurulmadı
+
+Spec §10.2 "iki geçişli separable blur" diyor, ağırlık vermiyor. Tekdüze kutu
+seçildi (§0.2 — en basit çalışan çözüm). Gauss seçmek uydurulmuş bir sigma
+getirirdi ve `SnowConstants` dışında bir sayı doğardı.
+
+**Tetikleyici:** sırt kenarında 7 teksellik keskin bir kesim görünürse ağırlık
+profili yeniden açılır.
+
+### KRim erken çıkışı §10.2 ile çelişiyordu — ölçümle yakalandı
+
+**Belirti.** Sırt her yerde 0. Ölçüldü: merkez 0.00 mm, kenar 0.00 mm.
+
+**Sebep.** Spec §15.2'nin zorunlu optimizasyonu `if (carve < 0.002 && rim <
+0.002) return;`. Ama §10.2'ye göre sırt tam da carve'ın SIFIR olduğu yerde,
+izin DIŞINDA oluşuyor (`blur(carve) − carve`). Erken çıkış sırtı doğduğu
+teksellerde öldürüyor. İki madde birbiriyle çelişiyor.
+
+**Çözüm.** Erken çıkış bulanık carve'ı da soruyor:
+`if (carve < 0.002 && rim < 0.002 && blurCarve < 0.002) return;`. Bulanık
+carve "yakında iz var mı" sorusunun cevabı; optimizasyonun amacı (boş bölgeyi
+atlamak) korunuyor, sırt yaşıyor. Ölçüm sonrası: tepe 77.45 mm @ 15.5 cm,
+ayak yarıçapı 15.0 cm — sırt izin dışında.
+
+### Yakalama blur'unun Poisson çekirdeği simetrik değil
+
+Spec §9.4'ün dört noktasının x toplamı **+0.5463 teksel**. Durağan bir ayakta
+bile sırt ağırlık merkezi +X'e 3.73 mm kayıyor. Tekniğin kendisine ait
+(Batman GDC 2014), spec'ten aynen alındı, değiştirilmedi.
+
+**Neden kayıtta:** hıza bağlı asimetri ölçülürken bu taban değer çıkarılmazsa
+sonuç yanlış okunur. Ölçülen kayma +X 3 m/s'te **+5.89 mm**, −X 3 m/s'te
+**−5.58 mm** — taban değerin etrafında iki yönlü ve simetrik.
+
+### Sıkışma kare başına uygulanıyor — spec metniyle çelişiyor
+
+**Bulgu.** Spec §10.1 prozası "aynı hattan 5–6 **geçişten** sonra batma %18'e
+düşer" diyor, ama verdiği kod `SNOW_COMPACT_RATE`'i `KDeform`'un her
+çağrısında uyguluyor. `KDeform` kare başına koşuyor; 120 fps'te bir ayak
+basışı ~36 kare eder. Ölçüldü: rhoN tavanına **4 çağrıda** ulaşıyor.
+
+**Karar.** Sayı spec'ten geldiği gibi bırakıldı (§0.3 — sayısal değerleri
+değiştirme). Belirti Faz 3 sınamasında rakamla kayıtlı.
+
+**Ölçüm sonrası not.** Sınama düz zeminde tek ayak izini kırk kez tekrarladı:
+batma %18'in altına **5. geçişte** indi — spec metninin dediği "5–6 geçiş".
+Yani sayı bu ölçekte doğru davranıyor; frekans bağımlılığı ancak oyuncu aynı
+noktada saniyelerce durursa görünür.
+
+**Tetikleyici:** oyunda "bir saniye durunca altım buz tutuyor" görülürse
+`SNOW_COMPACT_RATE` dt ile çarpılır — bu bir [KALİBRASYON] sayısıdır ve
+§0.5 test sonrası ayarlanmasına izin veriyor.
+
+### Simülasyon kare başına bir kez
+
+Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olmadan
+editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
+`SnowManager.Dispatch`'in başında.
 
 ## Kar Faz 4: clipmap Medium preset SEÇİLDİ (2026-08-22)
 

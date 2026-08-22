@@ -67,7 +67,7 @@ public class SnowGroundHeight : MonoBehaviour
     /// kaynağı (spec §7.1). Bir kez kendi dokumuza pişiriyoruz.
     void BakeFromTerrain()
     {
-        var found = FindObjectsByType<Terrain>(FindObjectsSortMode.None);
+        var found = FindObjectsByType<Terrain>(FindObjectsInactive.Exclude);
 
         if (found.Length > 1)
             throw new System.InvalidOperationException(

@@ -22,6 +22,26 @@ public class SnowDebugWindow : EditorWindow
     /// Her kanalın görüntüleme tavanı. rhoN/wet/disturb zaten 0..1.
     static readonly float[] ChannelRanges = { 0.60f, 1f, 1f, 1f, 1.20f };
 
+    /// Yakalama dokusunun kanalları başka şeyler ölçüyor; kendi adları ve
+    /// kendi aralıkları var. Durum dokusunun ölçeğiyle gösterilirse hepsi
+    /// beyaz patlar.
+    static readonly string[] CaptureChannelNames =
+    {
+        "R — alt yüzey Y (gözlemciye göre, m)",
+        "G — hız X (m/s)",
+        "B — hız Z (m/s)",
+        "A — maske",
+    };
+
+    /// x = gösterimden çıkarılan taban, y = aralık.
+    static readonly Vector2[] CaptureChannelScales =
+    {
+        new(-SnowConstants.CaptureBelow, SnowConstants.CaptureBelow + SnowConstants.CaptureAbove),
+        new(-6f, 12f),
+        new(-6f, 12f),
+        new(0f, 1f),
+    };
+
     enum PreviewSource
     {
         Durum,
@@ -81,12 +101,19 @@ public class SnowDebugWindow : EditorWindow
         EnsurePreview(shown.width);
 
         bool raw = source == PreviewSource.GokyuzuGorunurlugu || source == PreviewSource.RuzgarGolgesi;
+        bool capture = source == PreviewSource.Yakalama;
 
         float worldSize = raw ? SnowConstants.SkyAreaSize : manager.Settings.QualityData.AreaSize;
         Vector2 worldCenter = manager.AreaCenter;
 
-        debugMaterial.SetFloat(SnowShaderIDs.DebugMode, raw ? 5f : channel);
-        debugMaterial.SetFloat(SnowShaderIDs.DebugRange, raw ? 1f : ChannelRanges[channel]);
+        int captureChannel = Mathf.Min(channel, CaptureChannelScales.Length - 1);
+        Vector2 captureScale = CaptureChannelScales[captureChannel];
+
+        debugMaterial.SetFloat(SnowShaderIDs.DebugMode,
+            raw ? 5f : (capture ? captureChannel : channel));
+        debugMaterial.SetFloat(SnowShaderIDs.DebugRange,
+            raw ? 1f : (capture ? captureScale.y : ChannelRanges[channel]));
+        debugMaterial.SetFloat(SnowShaderIDs.DebugBias, capture ? captureScale.x : 0f);
         debugMaterial.SetFloat(SnowShaderIDs.DebugGridSize, gridSize);
         debugMaterial.SetVector(SnowShaderIDs.DebugWorldCenter,
             new Vector4(worldCenter.x, worldCenter.y, 0f, 0f));
@@ -159,6 +186,9 @@ public class SnowDebugWindow : EditorWindow
             manager.AreaCenter.x.ToString("0.000") + " , " + manager.AreaCenter.y.ToString("0.000"));
         EditorGUILayout.LabelField("Son kaydırma",
             manager.LastScrollTexels.x + " , " + manager.LastScrollTexels.y + " teksel");
+        EditorGUILayout.LabelField("Yakalama",
+            (manager.CaptureActive ? "aktif" : "boşta") +
+            "   deformer " + SnowDeformerRegistry.Count);
 
         ISnowEnvironmentSource env = manager.Environment;
 
@@ -189,7 +219,17 @@ public class SnowDebugWindow : EditorWindow
 
         bool raw = source == PreviewSource.GokyuzuGorunurlugu || source == PreviewSource.RuzgarGolgesi;
         using (new EditorGUI.DisabledScope(raw))
-            channel = EditorGUILayout.Popup("Kanal", channel, ChannelNames);
+        {
+            if (source == PreviewSource.Yakalama)
+            {
+                channel = Mathf.Min(channel, CaptureChannelNames.Length - 1);
+                channel = EditorGUILayout.Popup("Kanal", channel, CaptureChannelNames);
+            }
+            else
+            {
+                channel = EditorGUILayout.Popup("Kanal", channel, ChannelNames);
+            }
+        }
 
         gridSize = EditorGUILayout.Slider("Izgara (m)", gridSize, 0.25f, 8f);
         // IZGARA BİR TEST DEĞİL, ÖLÇEK ÇUBUĞU. Faz 1'de dokular boş — içinde
@@ -213,6 +253,7 @@ public class SnowDebugWindow : EditorWindow
 
     const string SettingsPath = "Assets/Snow/Settings/SnowSettings.asset";
     const string ComputePath = "Assets/Snow/Shaders/SnowSim.compute";
+    const string CaptureShaderPath = "Assets/Snow/Shaders/Hidden_SnowCaptureDepth.shader";
 
     /// SAHNE ELLE DÜZENLENMİYOR. Proje kuralı: bileşen ekleme, referans bağlama ve
     /// layer açma kodda yapılıyor; kullanıcı yalnız düğmeye basıyor.
@@ -261,6 +302,8 @@ public class SnowDebugWindow : EditorWindow
         managerSerialized.FindProperty("groundHeight").objectReferenceValue = ground;
         managerSerialized.FindProperty("simCompute").objectReferenceValue =
             AssetDatabase.LoadAssetAtPath<ComputeShader>(ComputePath);
+        managerSerialized.FindProperty("captureShader").objectReferenceValue =
+            AssetDatabase.LoadAssetAtPath<Shader>(CaptureShaderPath);
         managerSerialized.ApplyModifiedProperties();
 
         EditorUtility.SetDirty(manager);
@@ -276,7 +319,7 @@ public class SnowDebugWindow : EditorWindow
 
     static Light FindSun()
     {
-        foreach (Light l in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+        foreach (Light l in Object.FindObjectsByType<Light>(FindObjectsInactive.Exclude))
             if (l.type == LightType.Directional && l.isActiveAndEnabled) return l;
 
         return null;

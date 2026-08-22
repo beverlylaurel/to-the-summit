@@ -11,10 +11,6 @@ public class TerrainSurface : MonoBehaviour
     [SerializeField] WeatherState weather;
     [SerializeField] WindField wind;
     [SerializeField] TimeOfDay time;
-    [Tooltip("Kar kuşağının kotlarını buradan okur; ikinci bir yerde tanımlanmaz.")]
-    [SerializeField] AltitudeWeatherDriver weatherDriver;
-    [Tooltip("Erime sıcaklıktan sürülür; kar sıfırın altında ERİMEZ.")]
-    [SerializeField] TemperatureField temperature;
 
     [SerializeField] Texture2D surfaceMaps;
     [Tooltip("Arazinin rüzgârı hızlandırma/yavaşlatma ağırlığı. Hâkim rüzgâr yönüne "
@@ -89,22 +85,6 @@ public class TerrainSurface : MonoBehaviour
     Material material;
     int appliedRevision = -1;
     float wetness;
-    // Kar birikimi KOT EKSENİNDE tutulur. Tek bir global sayıyla kar sınırı ne
-    // inebiliyor ne çekilebiliyordu: dağın tamamı 90 saniyede beyazlayıp öyle
-    // kalıyordu. Her bant kendi kotundaki havayla dolar ve kendi sıcaklığıyla erir.
-
-    /// Hava kilidinin son görülen değeri. Kilit değişince profil yeniden kuruluyor.
-    float lastIntensityOverride = -1f;
-
-    /// Profilin yenilenme aralığı (saniye). Bu aralıkta
-    /// tek adım atmak kare kare atmakla aynı sayıyı veriyor. Çeyrek saniyede örtü
-    /// binde üç değişiyor — göze görünmez, ama doku yüklemesi yirmide bire iniyor.
-    /// Erimenin tam hıza ulaştığı sıcaklık (°C). Altında kareyle yavaşlar, sıfırın
-    /// altında tamamen durur.
-    const float MeltFullWarmth = 6f;
-
-    const float ProfileUploadSeconds = 0.25f;
-
 
     /// Arazinin yatay genişliği (metre). Yüzey haritası UV'si buradan türüyor;
     /// her sorguda bileşen aranmasın diye saklanıyor.
@@ -148,8 +128,7 @@ public class TerrainSurface : MonoBehaviour
     }
 
     public void Bind(TerrainMaterialSettings source, WeatherState weatherState, WindField windField,
-        TimeOfDay timeOfDay, AltitudeWeatherDriver driver, TemperatureField thermometer,
-        Texture2D maps, Texture2D windMap,
+        TimeOfDay timeOfDay, Texture2D maps, Texture2D windMap,
         Texture2D normals, Texture2DArray horizonMap, Texture2D heightMap,
         Shader shader)
     {
@@ -157,8 +136,6 @@ public class TerrainSurface : MonoBehaviour
         weather = weatherState;
         wind = windField;
         time = timeOfDay;
-        weatherDriver = driver;
-        temperature = thermometer;
         surfaceMaps = maps;
         windWeight = windMap;
         groundNormals = normals;

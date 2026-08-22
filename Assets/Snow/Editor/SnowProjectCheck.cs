@@ -101,7 +101,7 @@ public static class SnowProjectCheck
                 "DEĞİŞTİRİLMEDİ.");
 
         // --- Terrain ---
-        var terrains = Object.FindObjectsByType<Terrain>(FindObjectsSortMode.None);
+        var terrains = Object.FindObjectsByType<Terrain>(FindObjectsInactive.Exclude);
         if (terrains.Length == 0)
             Line(r, null, "Terrain", "sahnede yok — `groundSource = MeshBake` gerekir.");
         else if (terrains.Length == 1)

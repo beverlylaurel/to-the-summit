@@ -54,6 +54,7 @@ public static class SnowShaderIDs
     public static readonly int Capture = Shader.PropertyToID("_Capture");
     public static readonly int CaptureBlur = Shader.PropertyToID("_CaptureBlur");
     public static readonly int BlurredCarve = Shader.PropertyToID("_BlurredCarve");
+    public static readonly int CarveOut = Shader.PropertyToID("_CarveOut");
 
     // --- Compute: parametreler ---
     public static readonly int Resolution = Shader.PropertyToID("_Resolution");
@@ -61,6 +62,7 @@ public static class SnowShaderIDs
     public static readonly int NewEdgeValue = Shader.PropertyToID("_NewEdgeValue");
     public static readonly int ClearValue = Shader.PropertyToID("_ClearValue");
     public static readonly int DeltaTimeEff = Shader.PropertyToID("_DeltaTimeEff");
+    public static readonly int SnowDeltaTime = Shader.PropertyToID("_SnowDeltaTime");
     public static readonly int TileIndex = Shader.PropertyToID("_TileIndex");
     public static readonly int TileCount = Shader.PropertyToID("_TileCount");
     public static readonly int BlurRadiusTexels = Shader.PropertyToID("_BlurRadiusTexels");
@@ -69,6 +71,7 @@ public static class SnowShaderIDs
 
     // --- Yakalama ---
     public static readonly int DeformerVelocity = Shader.PropertyToID("_DeformerVelocity");
+    public static readonly int SnowCaptureOriginY = Shader.PropertyToID("_SnowCaptureOriginY");
 
     // --- Isı kaynakları (spec §18.2) ---
     public static readonly int HeatSources = Shader.PropertyToID("_HeatSources");
@@ -98,6 +101,7 @@ public static class SnowShaderIDs
     // --- Teşhis penceresi ---
     public static readonly int DebugMode = Shader.PropertyToID("_DebugMode");
     public static readonly int DebugRange = Shader.PropertyToID("_DebugRange");
+    public static readonly int DebugBias = Shader.PropertyToID("_DebugBias");
     public static readonly int DebugGridSize = Shader.PropertyToID("_DebugGridSize");
     public static readonly int DebugWorldCenter = Shader.PropertyToID("_DebugWorldCenter");
     public static readonly int DebugWorldSize = Shader.PropertyToID("_DebugWorldSize");

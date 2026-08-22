@@ -4,6 +4,11 @@
 
 #pragma kernel KClear
 #pragma kernel KScroll
+#pragma kernel KBlurCapture
+#pragma kernel KDeform
+#pragma kernel KRimBlurH
+#pragma kernel KRimBlurV
+#pragma kernel KRim
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "SnowCommon.hlsl"
@@ -25,6 +30,38 @@ float4 _NewEdgeValue;
 
 /// KClear'ın yazdığı değer.
 float4 _ClearValue;
+
+/// KBlurCapture yarıçapı, teksel.
+float _BlurRadiusTexels;
+
+// ---------------------------------------------------------------- iz oluşumu
+
+Texture2D<float4>   _CaptureBlur;
+Texture2D<float4>   _Trail;
+RWTexture2D<float4> _TrailOut;
+Texture2D<float4>   _Snow;
+RWTexture2D<float4> _SnowOut;
+
+/// Ayrılabilir blur'un ikinci geçişinin hedefi ve KRim'in kaynağı. Tek kanal.
+Texture2D<float>    _BlurredCarve;
+RWTexture2D<float>  _CarveOut;
+
+/// TAM HIZLI KERNEL'LERİN dt'si. `_DeltaTimeEff` KAccumulate'in döşeme
+/// döndürmesiyle çarpılmış hâlidir (spec §15.2); ikisi karıştırılırsa izler
+/// dört kat hızlı dolar.
+float _SnowDeltaTime;
+
+float _RimBlurTexels;
+
+/// Faz 5'e kadar 0 — kar yağmıyorsa izler dolmaz, bu doğru davranış (spec §10.3).
+float _SnowfallSWERate;
+
+/// Spec §9.4'teki dört nokta birebir.
+static const float2 kPoisson4[4] =
+{
+    float2( 0.3475,  0.0042), float2( 0.8806, -0.3576),
+    float2(-0.0640, -0.6415), float2(-0.6178,  0.3813)
+};
 
 [numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
 void KClear(uint3 id : SV_DispatchThreadID)
@@ -48,4 +85,166 @@ void KScroll(uint3 id : SV_DispatchThreadID)
     bool inside = all(src >= 0) && all(src < (int)_Resolution);
 
     _Dst[id.xy] = inside ? _Src[src] : _NewEdgeValue;
+}
+
+/// YAKALAMA BLUR'U — 4-tap bilinear Poisson [KAYNAK: Batman GDC 2014].
+///
+/// Merkez + dört Poisson tapı, hepsi eşit ağırlıkta (0.2). Poisson dağılımı
+/// düzenli bir kernel'in bıraktığı yıldız desenini kırıyor; bilinear örnekleme
+/// dört tapı sekiz teksel değerine yayıyor.
+[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
+void KBlurCapture(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+
+    float2 uv = (float2(id.xy) + 0.5) / _Resolution;
+    float  r  = _BlurRadiusTexels / _Resolution;
+
+    float4 sum = _Src.SampleLevel(sampler_LinearClamp, uv, 0);
+
+    [unroll]
+    for (int i = 0; i < 4; ++i)
+        sum += _Src.SampleLevel(sampler_LinearClamp, uv + kPoisson4[i] * r, 0);
+
+    _Dst[id.xy] = sum * 0.2;
+}
+
+/// İZ OLUŞUMU (spec §10.1) ve İZLERİN DOLMASI (spec §10.3).
+///
+/// Batma ÖLÇÜLÜYOR: yakalamanın verdiği alt yüzey Y'si ile kar sütununun
+/// tepesi arasındaki fark. Basınç formülü, kapsül, damga yok.
+[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
+void KDeform(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+
+    float2 worldXZ = SnowTexelToWorld(id.xy);
+    float4 cap     = _CaptureBlur[id.xy];
+    float4 trail   = _Trail[id.xy];
+    float4 snow    = _Snow[id.xy];
+
+    // --- İzlerin dolması (spec §10.3) ---
+    // Kar yağmıyor ve rüzgâr 4 m/s altındaysa hiç dolmaz. Yoğunluk KALIR:
+    // patika kar dolduktan sonra da belli olur.
+    float fillRate = _SnowfallSWERate * SNOW_FILL_GAIN;
+    fillRate += max(0.0, _WindSpeed - 4.0) * SNOW_WIND_FILL;
+
+    trail.r = max(0.0, trail.r - fillRate * _SnowDeltaTime);
+    trail.g = max(0.0, trail.g - fillRate * _SnowDeltaTime * 1.4);   // sırt daha hızlı erir
+
+    // --- Batma (spec §10.1) ---
+    float groundY  = SampleGroundHeight(worldXZ);
+    float baseH    = SnowBaseHeight(snow.r, snow.g);
+    float snowTopY = groundY + baseH;
+
+    float penetration = 0.0;
+    if (cap.a > 0.5)
+        penetration = clamp(snowTopY - SnowCaptureY(cap.r), 0.0, baseH);
+
+    if (penetration > 0.0005)
+    {
+        float packed    = saturate((snow.g - SNOW_LOOSE_N) / max(SNOW_PACKED_N - SNOW_LOOSE_N, 1e-3));
+        float sinkScale = lerp(1.0, SNOW_PACKED_SINK_SCALE, packed);
+        float target    = min(penetration * sinkScale, baseH);
+
+        trail.r = max(trail.r, target);
+
+        float compact = SNOW_COMPACT_RATE * saturate(target / max(baseH, 1e-4));
+        snow.g = min(snow.g + compact, SNOW_PACKED_N);
+        snow.a = 1.0;
+    }
+
+    _TrailOut[id.xy] = trail;
+    _SnowOut[id.xy]  = snow;
+}
+
+/// AYRILABİLİR KUTU BLUR, yatay geçiş.
+///
+/// ASSUMPTION: spec §10.2 "iki geçişli separable blur" diyor, ağırlık vermiyor.
+/// Tekdüze kutu seçildi — §0.2 gereği en basit çalışan çözüm ve uydurulmuş
+/// katsayı getirmiyor. Yarıçap spec'in verdiği `_RimBlurTexels = 7`.
+[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
+void KRimBlurH(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+
+    int radius = (int)round(_RimBlurTexels);
+    int last   = (int)_Resolution - 1;
+
+    float sum = 0.0;
+
+    [loop]
+    for (int k = -radius; k <= radius; ++k)
+        sum += _Src[int2(clamp((int)id.x + k, 0, last), id.y)].r;
+
+    _Dst[id.xy] = float4(sum / (2.0 * radius + 1.0), 0.0, 0.0, 0.0);
+}
+
+/// Ayrılabilir kutu blur, düşey geçiş. Tek kanala yazıyor.
+[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
+void KRimBlurV(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+
+    int radius = (int)round(_RimBlurTexels);
+    int last   = (int)_Resolution - 1;
+
+    float sum = 0.0;
+
+    [loop]
+    for (int k = -radius; k <= radius; ++k)
+        sum += _Src[int2(id.x, clamp((int)id.y + k, 0, last))].r;
+
+    _CarveOut[id.xy] = sum / (2.0 * radius + 1.0);
+}
+
+/// KENAR YIĞILMASI (spec §10.2) [KAYNAK: TLOU2, SIGGRAPH 2020].
+///
+/// `blur(carve) − carve`. Ters yazılırsa sırt izin İÇİNDE oluşur ve iz çukur
+/// yerine tümsek görünür (spec §22).
+[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
+void KRim(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+
+    float4 trail = _Trail[id.xy];
+    float  carve = trail.r;
+    float  rim   = trail.g;
+
+    // Sırt hareket yönünde asimetrik olsun diye blur hız kadar kaydırılıyor.
+    float2 vel   = _CaptureBlur[id.xy].gb;
+    float2 uvOff = -vel * SNOW_RIM_VELOCITY_BIAS / _SnowAreaSize;
+
+    float blurCarve = _BlurredCarve.SampleLevel(sampler_LinearClamp,
+                        (float2(id.xy) + 0.5) / _Resolution + uvOff, 0);
+
+    // ERKEN ÇIKIŞ BULANIK CARVE'I DA SORUYOR — ölçülmüş sebeple.
+    //
+    // ASSUMPTION: spec §15.2 erken çıkışı yalnız `carve` ve `rim`'e bakıyor.
+    // Ama §10.2'ye göre sırt tam da carve'ın SIFIR olduğu yerde, izin
+    // DIŞINDA oluşuyor. İki madde çelişiyor; §15.2'nin hâli uygulandığında
+    // sırt her yerde 0 çıktı (ölçüldü: merkez 0.00 mm, kenar 0.00 mm).
+    // Bulanık carve "yakında iz var mı" sorusunun cevabı; optimizasyonun
+    // amacı (boş bölgeyi atlamak) korunuyor, sırt yaşıyor.
+    if (carve < 0.002 && rim < 0.002 && blurCarve < 0.002)
+    {
+        _TrailOut[id.xy] = trail;
+        return;
+    }
+
+    float raised = max(0.0, blurCarve - carve);
+
+    // Sırt yüksekliği MEVCUT KAR DERİNLİĞİYLE ölçekleniyor; atlanırsa sığ karda
+    // da derin kardaki kadar sırt çıkar (spec §22).
+    float4 snow  = _Snow[id.xy];
+    float  baseH = SnowBaseHeight(snow.r, snow.g);
+    float  depthScale = saturate(baseH / SNOW_RIM_REF_DEPTH);
+
+    float rimTarget = raised * SNOW_RIM_STRENGTH * depthScale;
+    rim = max(rim, min(rimTarget, SNOW_RIM_MAX));
+
+    trail.r = carve;
+    trail.g = rim;
+
+    _TrailOut[id.xy] = trail;   // B (kabuk) ve A (sastrugi) korunuyor
 }

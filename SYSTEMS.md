@@ -528,8 +528,7 @@ rüzgâr yönü ve şiddeti (`WindField.PrevailingDirection` / `Strength`), öğ
 rengi ve yönü (alpenglow).
 **Okumaz:** anlık rüzgâr yönünü — yüzey deseni hâkim yönden kurulur.
 **Artık okumuyor:** kar kuşağı kotlarını. `AltitudeWeatherDriver` ve `TemperatureField`
-alanları duruyor ama hiçbir yerde kullanılmıyor (kar silinince öksüz kaldılar,
-`DECISIONS.md` → Silinecek geçiciler).
+bağları 2026-08-22'de söküldü — kar silinince öksüz kalmışlardı.
 
 ### Gökyüzü ve atmosfer (`PhysicallyBasedSkyURP` paketi, `SkyWeatherDriver`)
 
@@ -721,6 +720,17 @@ kod taramasıyla doğrulandı.
 **Yayınlar** (`SnowRuntimeState`, salt okunur): `IsSnowing`, `SnowfallIntensity01`,
 `GroundCoverage01`, `LooseSnowFraction`, `Stormness01`. Bunları **kimse uygulamıyor** —
 tüketiciyi bağlamak ayrı bir iştir, kar sistemi kimseyi zorlamaz.
+
+**Yakalama zinciri (Faz 2–3).** Deformer'lar `SnowDeformer` bileşeniyle kendini
+kaydediyor; bölgede deformer yoksa yakalama, blur, `KDeform` ve `KRim` hiç
+koşmuyor. Zincir: alttan yukarı bakan ortografik çizim → `KBlurCapture` →
+`KDeform` (batma + dolma) → `KRimBlurH`/`KRimBlurV` → `KRim` (kenar yığılması).
+Simülasyon kare başına bir kez koşuyor; geçiş her kamera için kaydediliyor ama
+`Time.frameCount` muhafazası ikinci koşuyu eliyor.
+
+**Yakalanan yükseklik göreli.** `RT_Capture.R` mutlak dünya Y değil, gözlemciye
+göre. Sebebi ölçülmüş: yarım hassasiyetin 4900 m'deki adımı 4 metre
+(`DECISIONS.md`). Çözücü taraf `SnowCaptureY()` ile geri çeviriyor.
 
 **Bölge kaydırma.** Durum dokuları oyuncuyu takip eden 16 m'lik bir pencerede duruyor;
 pencere `SnapStep` (0.25 m) ızgarasına oturuyor ve kaydığında içerik `KScroll` ile aynı

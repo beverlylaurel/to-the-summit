@@ -23,6 +23,11 @@ Shader "Hidden/Snow/Debug"
             float  _DebugMode;
             float  _DebugRange;
 
+            /// Gösterimden önce çıkarılan değer. Yakalama dokusunun kanalları
+            /// sıfır merkezli (yükseklik gözlemciye göre, hız işaretli); bias
+            /// olmadan negatif yarı tamamen siyah kalır ve yarısı okunmaz.
+            float  _DebugBias;
+
             /// Dünya ızgarası: içeriğin oyuncu yürürken KAYMADIĞINI kanıtlıyor.
             /// Snap doğruysa çizgiler dünyada sabit durur (spec Faz 1 kabul kriteri).
             float  _DebugGridSize;
@@ -54,7 +59,7 @@ Shader "Hidden/Snow/Debug"
                 else if (_DebugMode < 4.5) v = s.r * 1000.0 / max(SnowDensityDbg(s.g), 1.0);
                 else                       v = s.r;
 
-                float shown = saturate(v / max(_DebugRange, 1e-5));
+                float shown = saturate((v - _DebugBias) / max(_DebugRange, 1e-5));
                 half3 color = half3(shown, shown, shown);
 
                 // Dünya ızgarası
