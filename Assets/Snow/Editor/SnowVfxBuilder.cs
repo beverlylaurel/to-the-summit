@@ -68,31 +68,63 @@ public static class SnowVfxBuilder
         object spawner = AddContext(graph, "VFXBasicSpawner", new Vector2(0, 0), r);
         AddBlock(spawner, "VFXSpawnerConstantRate", r);
 
-        // --- Initialize: konum, ömür, boyut
+        // --- Initialize
         object init = AddContext(graph, "VFXBasicInitialize", new Vector2(0, 200), r);
 
-        // Spec §17.1: `Set Position (AABox)` (40, 26, 40).
+        // Spec §17.1: `Set Position (AABox)`, kutu (40, 26, 40), KUTUNUN
+        // TAMAMINA spawn (yüzeyine değil).
         //
-        // `PositionBox` BİR ŞEKİL, blok değil (ölçüldü — `PositionShapeBase`).
-        // Bloğu `PositionShape`; şekli ayar olarak taşıyor.
-        AddBlock(init, "Block.PositionShape", r);
+        // `PositionBox` bir ŞEKİL, blok değil (ölçüldü). Bloğu `PositionShape`;
+        // şekli `shape` ayarında taşıyor.
+        object pos = AddBlock(init, "Block.PositionShape", r);
 
-        // Ömür 4–9 s, boyut 0.018 m × 0.6–1.7 (spec §17.1).
-        AddBlock(init, "Block.SetAttribute", r);
+        // Enum'da `Box` yok, `OrientedBox` var (ölçüldü — PositionShape.Type).
+        SetSetting(pos, "shape", "OrientedBox", r);
+        SetSetting(pos, "positionMode", "Volume", r);
+
+        // Ömür 4–9 s (spec §17.1).
+        object life = AddBlock(init, "Block.SetAttribute", r);
+        SetSetting(life, "attribute", "lifetime", r);
+        SetSetting(life, "Random", "Uniform", r);
+
+        // Boyut: taban 0.018 m, random 0.6–1.7× (spec §17.1).
+        object size = AddBlock(init, "Block.SetAttribute", r);
+        SetSetting(size, "attribute", "size", r);
+        SetSetting(size, "Random", "Uniform", r);
 
         // --- Update: türbülans (spec §17.1)
         object update = AddContext(graph, "VFXBasicUpdate", new Vector2(0, 500), r);
-        AddBlock(update, "Block.Turbulence", r);
 
-        // --- Output: Lit Quad (spec §17.1)
-        object output = AddContext(graph, "VFXComposedParticleOutput", new Vector2(0, 800), r);
+        object turb = AddBlock(update, "Block.Turbulence", r);
+        SetSlot(turb, "frequency", 0.12f, r);
+        SetSlot(turb, "octaves", 2, r);
+        SetSlot(turb, "Drag", 0.9f, r);
 
-        // ASGARİ EKRAN BOYUTU HAZIR BLOKTA. Spec §17.1 bunu formülle tarif
-        // ediyor (`minWorld = dist * _MinPixelSize / ...`); VFX Graph'ta
-        // `ScreenSpaceSize` bloğu aynı işi yapıyor. Kendi formülümüzü custom
-        // HLSL'e yazmak, hazır olanın üstüne ikinci bir terim koymak olurdu.
-        AddBlock(output, "Block.ScreenSpaceSize", r);
-        AddBlock(output, "Block.Orient", r);
+        // --- Output: URP Lit Quad (spec §17.1)
+        //
+        // `VFXComposedParticleOutput` YETMİYOR: URP 17.5'te tek gölgeleme
+        // seçeneği ShaderGraph (ölçüldü — somut `ParticleShading` tek). Spec
+        // "Output Particle Lit Quad" istiyor; onun karşılığı URP paketindeki
+        // `VFXURPLitPlanarPrimitiveOutput`, `primitiveType` varsayılanı Quad.
+        object output = AddContext(graph, "URP.VFXURPLitPlanarPrimitiveOutput",
+                                   new Vector2(0, 800), r);
+
+        // Spec §17.1: `Blend = Alpha`, `Depth Write = Off`, `Soft Particles = On`.
+        SetSetting(output, "blendMode", "Alpha", r);
+        SetSetting(output, "zWriteMode", "Off", r);
+        SetSetting(output, "useSoftParticle", true, r);
+
+        // ASGARİ EKRAN BOYUTU HAZIR BLOKTA. Spec §17.1 formülle tarif ediyor
+        // (`minWorld = dist * _MinPixelSize / ...`); `ScreenSpaceSize` +
+        // `PixelAbsolute` aynı işi yapıyor. Kendi formülümüzü custom HLSL'e
+        // yazmak hazır olanın üstüne ikinci bir terim koymak olurdu.
+        object ss = AddBlock(output, "Block.ScreenSpaceSize", r);
+        SetSlot(ss, "PixelSize", 1.3f, r);
+
+        // Yönelim: `Face Camera Plane` (spec §17.1). Varsayılan zaten bu;
+        // yine de yazılıyor ki varsayılan değişirse sessizce kaymasın.
+        object orient = AddBlock(output, "Block.Orient", r);
+        SetSetting(orient, "mode", "FaceCameraPlane", r);
 
         Link(spawner, init, r);
         Link(init, update, r);
@@ -109,14 +141,83 @@ public static class SnowVfxBuilder
         .FirstOrDefault(a => a.GetName().Name == EditorAsm)
         ?? throw new InvalidOperationException(EditorAsm + " yüklü değil.");
 
+    /// İKİ ASSEMBLY'DE ARANIYOR. Bloklar ve temel bağlamlar VFX Graph
+    /// paketinde, ama `Output Particle URP Lit Quad` (spec §17.1) URP
+    /// paketinde: `UnityEditor.VFX.URP.VFXURPLitPlanarPrimitiveOutput`.
+    /// Yalnız VFX assembly'sine bakınca "tip bulunamadı" veriyordu.
     static Type Find(string shortName)
     {
-        string full = shortName.StartsWith("Block.")
-            ? "UnityEditor.VFX.Block." + shortName.Substring(6)
-            : "UnityEditor.VFX." + shortName;
+        string full =
+            shortName.StartsWith("Block.") ? "UnityEditor.VFX.Block." + shortName.Substring(6) :
+            shortName.StartsWith("URP.")   ? "UnityEditor.VFX.URP." + shortName.Substring(4) :
+                                             "UnityEditor.VFX." + shortName;
 
-        return Asm.GetType(full, false)
-            ?? throw new InvalidOperationException("VFX tipi bulunamadı: " + full);
+        foreach (Assembly a in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            Type t = a.GetType(full, false);
+            if (t != null) return t;
+        }
+
+        throw new InvalidOperationException("VFX tipi bulunamadı: " + full);
+    }
+
+    // ------------------------------------------------------------ ayar / slot
+
+    /// Blok veya bağlam ayarı. Enum'lar ADLA veriliyor; sayısal değer yazmak
+    /// enum sırası değişince sessizce başka bir şey seçer.
+    static void SetSetting(object model, string name, object value, StringBuilder r)
+    {
+        FieldInfo f = model.GetType()
+            .GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException(
+                model.GetType().Name + " ayarı yok: " + name);
+
+        object son = value is string str && f.FieldType.IsEnum
+            ? Enum.Parse(f.FieldType, str)
+            : Convert.ChangeType(value, f.FieldType);
+
+        MethodInfo set = model.GetType().GetMethod("SetSettingValue",
+            BindingFlags.Public | BindingFlags.Instance,
+            null, new[] { typeof(string), typeof(object) }, null)
+            ?? throw new InvalidOperationException("SetSettingValue yok.");
+
+        set.Invoke(model, new[] { name, son });
+        r.AppendLine("           ayar   " + name.PadRight(24) + son);
+    }
+
+    /// Giriş slotu değeri. Slot ADLA aranıyor — indeks kullanmak ayar
+    /// değişince başka slotu yazar.
+    static void SetSlot(object model, string slotName, object value, StringBuilder r)
+    {
+        MethodInfo nb = model.GetType().GetMethod("GetNbInputSlots",
+            BindingFlags.Public | BindingFlags.Instance);
+        MethodInfo get = model.GetType().GetMethod("GetInputSlot",
+            BindingFlags.Public | BindingFlags.Instance);
+
+        if (nb == null || get == null)
+            throw new InvalidOperationException(model.GetType().Name + " slot taşımıyor.");
+
+        int n = (int)nb.Invoke(model, null);
+
+        for (int i = 0; i < n; i++)
+        {
+            object slot = get.Invoke(model, new object[] { i });
+            PropertyInfo adP = slot.GetType().GetProperty("name",
+                BindingFlags.Public | BindingFlags.Instance);
+
+            if (adP?.GetValue(slot) as string != slotName) continue;
+
+            PropertyInfo degerP = slot.GetType().GetProperty("value",
+                BindingFlags.Public | BindingFlags.Instance)
+                ?? throw new InvalidOperationException("Slot değeri yazılamıyor.");
+
+            degerP.SetValue(slot, value);
+            r.AppendLine("           slot   " + slotName.PadRight(24) + value);
+            return;
+        }
+
+        throw new InvalidOperationException(
+            model.GetType().Name + " slotu yok: " + slotName);
     }
 
     /// Boş bir `.vfx` yaratıp grafiğini döndürüyor.
@@ -181,10 +282,11 @@ public static class SnowVfxBuilder
         AddChild(graph, ctx);
 
         r.AppendLine("      bağlam  " + typeName);
+        if (Dump) DumpModel(ctx, r);
         return ctx;
     }
 
-    static void AddBlock(object context, string typeName, StringBuilder r)
+    static object AddBlock(object context, string typeName, StringBuilder r)
     {
         Type t = Find(typeName);
         var block = ScriptableObject.CreateInstance(t)
@@ -192,6 +294,66 @@ public static class SnowVfxBuilder
 
         AddChild(context, block);
         r.AppendLine("        blok  " + typeName);
+
+        if (Dump) DumpModel(block, r);
+        return block;
+    }
+
+    /// AYARLARI VE SLOTLARI YAZ. Hangi bloğun hangi ayarı açtığını tahmin etmek
+    /// "ayar bulunamadı" hatasına çıkıyor; adları modelden okuyoruz.
+    ///
+    /// Menüden açılıyor; üretim kapalı koşuyor.
+    static bool Dump;
+
+    [MenuItem("To The Summit/Kar/VFX Grafiklerini Üret (döküm)", false, 63)]
+    static void BuildAllWithDump()
+    {
+        Dump = true;
+        try { BuildAll(); }
+        finally { Dump = false; }
+    }
+
+    static void DumpModel(object model, StringBuilder r)
+    {
+        // --- ayarlar
+        MethodInfo getSettings = model.GetType().GetMethod("GetSettings",
+            BindingFlags.Public | BindingFlags.Instance,
+            null, new[] { typeof(bool), typeof(object) }, null);
+
+        var alanlar = model.GetType()
+            .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .Where(f => f.GetCustomAttributes()
+                         .Any(a => a.GetType().Name.StartsWith("VFXSetting")))
+            .ToArray();
+
+        foreach (FieldInfo f in alanlar)
+            r.AppendLine("           ayar   " + f.Name.PadRight(28) +
+                         f.FieldType.Name + " = " + (f.GetValue(model) ?? "null"));
+
+        // --- slotlar
+        MethodInfo nb = model.GetType().GetMethod("GetNbInputSlots",
+            BindingFlags.Public | BindingFlags.Instance);
+        MethodInfo get = model.GetType().GetMethod("GetInputSlot",
+            BindingFlags.Public | BindingFlags.Instance);
+
+        if (nb == null || get == null) return;
+
+        int n = (int)nb.Invoke(model, null);
+
+        for (int i = 0; i < n; i++)
+        {
+            object slot = get.Invoke(model, new object[] { i });
+            if (slot == null) continue;
+
+            string ad = slot.GetType().GetProperty("name",
+                BindingFlags.Public | BindingFlags.Instance)?.GetValue(slot) as string;
+
+            object deger = slot.GetType().GetProperty("value",
+                BindingFlags.Public | BindingFlags.Instance)?.GetValue(slot);
+
+            r.AppendLine("           slot   " + (ad ?? "?").PadRight(28) +
+                         (deger == null ? "null" : deger.GetType().Name + " = " + deger));
+        }
     }
 
     static void AddChild(object parent, object child)
