@@ -485,8 +485,20 @@ MountainSurface BuildMountainSurface(float3 worldPos)
 
         // Spec §14.2 Macro katmanı. `disturb` sıfır: dağda iz yok, ezilmiş kar
         // katmanının burada karşılığı da yok.
-        snowNormal = SnowApplyDetailNormals(snowNormal, worldPos, freshness, 0.0,
-                                            length(_WorldSpaceCameraPos - worldPos));
+        //
+        // DETAY YALNIZ YATAYA YAKIN YÜZEYDE. Spec'in kendi ön koşulu:
+        // `WorldNormalToTangentPacked` tanjant çerçevesini dünya +Y'ye
+        // sabitliyor ve gerekçesini "kar yüzeyi yataya yakın" diye yazıyor.
+        // Kar MESH'i için doğru; dağda değil. Düzlemsel XZ örneklemesi dik
+        // yamaçta dikey olarak eziliyor ve yüzeyde akan siyah şeritler
+        // bırakıyor (ölçüldü: şeritler yalnız eğimin dikleştiği bantta).
+        //
+        // Ağırlık `snowSlope`: zaten hesaplanmış, yeni terim değil. Karın
+        // durduğu yer ile detayın geçerli olduğu yer aynı yer.
+        float3 detailed = SnowApplyDetailNormals(snowNormal, worldPos, freshness, 0.0,
+                                                 length(_WorldSpaceCameraPos - worldPos));
+
+        snowNormal = normalize(lerp(snowNormal, detailed, snowSlope));
 
         surface.normalWS = normalize(lerp(surface.normalWS, snowNormal, snowMask));
 
