@@ -90,6 +90,10 @@ public static class SnowConstantsTest
         ("SuspMaxHeight", "SNOW_SUSP_MAX_HEIGHT"),
         ("SprayParticlesPerM3", "SNOW_SPRAY_PARTICLES_PER_M3"),
         ("GroupSize", "SNOW_GROUP_SIZE"),
+        ("Ring0Extent", "SNOW_RING0_EXTENT"),
+        ("RingScale", "SNOW_RING_SCALE"),
+        ("RingSnapQuads", "SNOW_RING_SNAP_QUADS"),
+        ("RingDepthBias", "SNOW_RING_DEPTH_BIAS"),
     };
 
     [MenuItem("To The Summit/Kar/Sabit Eşliğini Sına", false, 60)]

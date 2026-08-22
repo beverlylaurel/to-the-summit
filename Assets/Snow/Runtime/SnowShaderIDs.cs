@@ -16,6 +16,7 @@ public static class SnowShaderIDs
     public static readonly int GroundHeightTex = Shader.PropertyToID("_GroundHeightTex");
     public static readonly int GroundOriginXZ = Shader.PropertyToID("_GroundOriginXZ");
     public static readonly int GroundSizeXZ = Shader.PropertyToID("_GroundSizeXZ");
+    public static readonly int GroundTexelXZ = Shader.PropertyToID("_GroundTexelXZ");
     public static readonly int GroundBaseY = Shader.PropertyToID("_GroundBaseY");
     public static readonly int GroundHeightRange = Shader.PropertyToID("_GroundHeightRange");
 
@@ -87,8 +88,8 @@ public static class SnowShaderIDs
     // --- Kar yüzeyi materyali ---
     public static readonly int FallbackSWE = Shader.PropertyToID("_FallbackSWE");
     public static readonly int FallbackRhoN = Shader.PropertyToID("_FallbackRhoN");
-    public static readonly int RingWorldOffset = Shader.PropertyToID("_RingWorldOffset");
     public static readonly int SnowBreakup = Shader.PropertyToID("_SnowBreakup");
+
     public static readonly int ShadowTint = Shader.PropertyToID("_ShadowTint");
     public static readonly int TranslucencyStrength = Shader.PropertyToID("_TranslucencyStrength");
     public static readonly int SparkleCellSize = Shader.PropertyToID("_SparkleCellSize");

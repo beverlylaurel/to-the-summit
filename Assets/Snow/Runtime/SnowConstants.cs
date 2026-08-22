@@ -233,4 +233,21 @@ public static class SnowConstants
 
     /// Compute thread group boyutu. Her zaman 8×8×1.
     public const int GroupSize = 8;
+
+    // --- Zemin mesh'i halkaları (spec §13.1) ---
+
+    /// En içteki halkanın kenar uzunluğu, metre. Üç presette de aynı; değişen
+    /// grid sayısı, kapsam değil.
+    public const float Ring0Extent = 8f;
+
+    /// Her halka bir öncekinin bu katı kadar geniş (8 → 24 → 72 → 216 m).
+    public const float RingScale = 3f;
+
+    /// Halka kendi quad boyutunun bu katına snap'leniyor. Snap'lenmezse yüzey
+    /// dalgalanır (spec §22).
+    public const float RingSnapQuads = 2f;
+
+    /// Dış halkanın iç halkaya göre aşağı itilme adımı, metre. Kaplama
+    /// bandında iç halka derinlik testini kazansın diye.
+    public const float RingDepthBias = 0.001f;
 }

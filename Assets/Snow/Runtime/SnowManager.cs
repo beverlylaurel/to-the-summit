@@ -284,6 +284,19 @@ public class SnowManager : MonoBehaviour
 
         SnowRuntimeState.Stormness01 =
             Mathf.Clamp01(env.PrecipIntensity01 * Mathf.Clamp01(env.WindSpeed / 15f));
+
+        // FAZ 4 VEKİLİ. Gerçek kaplama Faz 5'te `KAccumulate`'ten
+        // `AsyncGPUReadback` ile geliyor (spec §11). O gelene kadar dünyanın
+        // genel kar durumundan türetiliyor — yoksa kar mesh'leri hiç açılmaz
+        // (spec §15.2 kaplama sıfırken her şeyi kapatıyor).
+        float fallbackHeight = settings.DefaultSwe * SnowConstants.RhoWater /
+                               Mathf.Max(1f, Mathf.Lerp(SnowConstants.RhoMin, SnowConstants.RhoMax,
+                                                        settings.DefaultRhoN));
+
+        SnowRuntimeState.GroundCoverage01 =
+            Mathf.Clamp01(fallbackHeight / SnowConstants.MinVisibleHeight);
+
+        Shader.SetGlobalFloat(SnowShaderIDs.SnowCoverage, SnowRuntimeState.GroundCoverage01);
     }
 
     // ------------------------------------------------------------------ dispatch

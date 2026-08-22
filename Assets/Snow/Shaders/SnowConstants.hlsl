@@ -102,4 +102,10 @@
 // --- Hesaplama (spec §20) ---
 #define SNOW_GROUP_SIZE              8
 
+// --- Zemin mesh'i halkaları (spec §13.1) ---
+#define SNOW_RING0_EXTENT            8.0
+#define SNOW_RING_SCALE              3.0
+#define SNOW_RING_SNAP_QUADS         2.0
+#define SNOW_RING_DEPTH_BIAS         0.001
+
 #endif

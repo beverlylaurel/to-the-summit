@@ -1007,6 +1007,46 @@ Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olma
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
 
+## Kar Faz 4: delik boyu spec'ten sapıyor — çatlak ölçüldü (2026-08-22)
+
+**Spec §13.1** dış halkaların ortasındaki boşluğu **134² quad** diye veriyor.
+Bu sayı çatlak üretiyor ve sebebi aritmetik:
+
+Halka 1'in quad'ı 6 cm, deliği 134 quad = **8.04 m**. İç halka ise **8.00 m**.
+Delik iç halkadan zaten BÜYÜK. Üstüne her halka kendi ızgarasına snap'leniyor
+(§13.1: "kendi quad boyutunun 2 katına"), yani iç halkanın merkezi dış
+halkanınkine göre 0, 4 veya 8 cm kayabiliyor. En kötü hâlde 10 cm'lik gerçek
+bir yarık açılıyor ve altındaki çıplak arazi görünüyor.
+
+**Karar.** Delik hesaplanıyor:
+`floor((içHalkaKenarı − 2 × enBüyükKayma) / quad)`. Medium'da **130²**
+çıkıyor. Ölçüldü — her presette, her halka çiftinde, olası bütün kaymalar tek
+tek denendi:
+
+| preset | halka | en kötü örtüşme |
+|---|---|---|
+| Medium | 0→1 | 2.00 cm |
+| Medium | 1→2 | 6.00 cm |
+| Medium | 2→3 | 18.00 cm |
+| High | 0→1 | 0.83 cm |
+
+Üçgen bütçesi **1.178.600** — spec'in kendi tahmini 1.17 M.
+
+**Kaplama bandındaki z-fighting.** Örtüşme kaçınılmaz (çatlağın alternatifi
+o). Dış halkalar köşe shader'ında halka indeksi × 1 mm aşağı itiliyor; bandda
+iç halka derinlik testini kazanıyor. Halka indeksi köşe verisinde taşınıyor —
+`MaterialPropertyBlock` kullanmak SRP Batcher'ı kapatırdı (§15.2).
+
+**Tetikleyici:** halka sayısı veya kapsam oranı değişirse delik yeniden
+hesaplanır; sınama zaten her presette koşuyor.
+
+## `_RingWorldOffset` KALDIRILDI
+
+Spec §13.2 köşe shader'ında `posWS.xz += _RingWorldOffset` diyor ama §13.1
+"konumlandırma Transform ile" diyor. İkisi birden uygulanırsa konum iki kez
+sayılır. Transform seçildi (SRP Batcher per-object veriyi zaten taşıyor);
+uniform ölü kalacağı için silindi.
+
 ## Kar Faz 4: clipmap Medium preset SEÇİLDİ (2026-08-22)
 
 **Karar.** Zemin mesh'i Medium ile yazılacak: 4 halka, iç halka 400 grid, +1.17 M üçgen.

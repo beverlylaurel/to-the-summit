@@ -56,6 +56,8 @@ Bunlar gerçek dünyanın metreleri. Dağ iki katına çıkınca donma seviyesi 
 | Birikinti gövdesi | 45 × 16 m | Rüzgârın oluşturduğu yığının gerçek boyu |
 | Kar bölgesi `AreaSize` | 16 m | Oyuncunun etrafındaki deformasyon penceresi. Ölçüsü OYUNCUNUN adımı, dağın boyu değil — dağ iki katına çıkınca ayak izi büyümez. Üç presette de 16 |
 | Kar `SnapStep` | 0.25 m | Bölgenin oturduğu ızgara. Teksel boyuna değil oyuncunun hareketine ölçülü; üç presette de tam sayı teksele denk gelmeli (8 / 16 / 24) |
+| Kar halka 0 kapsamı | 8 m | Oyuncunun çevresindeki yoğun geometri; ölçüsü adım ve ayak izi, dağın boyu değil |
+| Kar halka oranı | ×3 | Clipmap kademesi; dağ büyüyünce kademe sayısı değişmez |
 | Kar `SkyAreaSize` | 96 m | Gökyüzü görünürlük haritasının kapsamı; kar yağışının önünü kesen yakın geometrinin menzili |
 | Kar yoğunlukları 50–550 kg/m³, su 1000 | — | Malzemenin kendi fiziği |
 | Kar sıcaklık eşikleri (−20 / −5 / 5 °C, kar 0.5 / 2.0) | °C | Suyun fiziği; dağ büyüyünce kar farklı sıcaklıkta erimez |

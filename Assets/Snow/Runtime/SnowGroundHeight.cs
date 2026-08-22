@@ -166,6 +166,16 @@ public class SnowGroundHeight : MonoBehaviour
 
         Shader.SetGlobalVector(SnowShaderIDs.GroundOriginXZ, new Vector4(OriginXZ.x, OriginXZ.y, 0f, 0f));
         Shader.SetGlobalVector(SnowShaderIDs.GroundSizeXZ, new Vector4(SizeXZ.x, SizeXZ.y, 0f, 0f));
+
+        // Zemin normali bu adımla türetiliyor (SnowCommon → SampleGroundNormal).
+        // Kar tekseliyle örneklenirse aynı zemin tekseline düşer ve normal her
+        // yerde dümdüz yukarı çıkar.
+        int width = tex != null ? Mathf.Max(1, tex.width) : 1;
+        int height = tex != null ? Mathf.Max(1, tex.height) : 1;
+
+        Shader.SetGlobalVector(SnowShaderIDs.GroundTexelXZ,
+            new Vector4(SizeXZ.x / width, SizeXZ.y / height, 0f, 0f));
+
         Shader.SetGlobalFloat(SnowShaderIDs.GroundBaseY, BaseY);
         Shader.SetGlobalFloat(SnowShaderIDs.GroundHeightRange, HeightRange);
     }

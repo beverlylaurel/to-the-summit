@@ -732,6 +732,13 @@ Simülasyon kare başına bir kez koşuyor; geçiş her kamera için kaydediliyo
 göre. Sebebi ölçülmüş: yarım hassasiyetin 4900 m'deki adımı 4 metre
 (`DECISIONS.md`). Çözücü taraf `SnowCaptureY()` ile geri çeviriyor.
 
+**Zemin mesh'i (Faz 4).** Tessellation yok; iç içe dört halka (8/24/72/216 m),
+hepsi tek materyal, her biri kendi quad boyutunun iki katına snap'li. Yükseklik
+köşe shader'ında `SnowSurfaceAt`'ten geliyor, normal fragman'da merkezi farkla.
+4 mm altındaki kar `clip()` ile hiç çizilmiyor — z-fighting bu yüzden yok.
+Kenar gürültüyle kırılıyor (`T_Snow_Breakup`, prosedürel üretiliyor).
+`GroundCoverage01` eşiğin altında ve kar yağmıyorsa bütün halkalar kapanıyor.
+
 **Bölge kaydırma.** Durum dokuları oyuncuyu takip eden 16 m'lik bir pencerede duruyor;
 pencere `SnapStep` (0.25 m) ızgarasına oturuyor ve kaydığında içerik `KScroll` ile aynı
 dünya noktasında kalıyor. Üç presette de bir SnapStep tam sayı teksele denk geliyor

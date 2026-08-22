@@ -254,6 +254,8 @@ public class SnowDebugWindow : EditorWindow
     const string SettingsPath = "Assets/Snow/Settings/SnowSettings.asset";
     const string ComputePath = "Assets/Snow/Shaders/SnowSim.compute";
     const string CaptureShaderPath = "Assets/Snow/Shaders/Hidden_SnowCaptureDepth.shader";
+    const string SnowLitShaderPath = "Assets/Snow/Shaders/SnowLit.shader";
+    const string SnowLitMaterialPath = "Assets/Snow/Settings/M_SnowLit.mat";
 
     /// SAHNE ELLE DÜZENLENMİYOR. Proje kuralı: bileşen ekleme, referans bağlama ve
     /// layer açma kodda yapılıyor; kullanıcı yalnız düğmeye basıyor.
@@ -279,6 +281,9 @@ public class SnowDebugWindow : EditorWindow
 
         var ground = go.GetComponent<SnowGroundHeight>();
         if (ground == null) ground = go.AddComponent<SnowGroundHeight>();
+
+        var clipmap = go.GetComponent<SnowClipmap>();
+        if (clipmap == null) clipmap = go.AddComponent<SnowClipmap>();
 
         var player = Object.FindAnyObjectByType<FirstPersonController>();
 
@@ -306,6 +311,16 @@ public class SnowDebugWindow : EditorWindow
             AssetDatabase.LoadAssetAtPath<Shader>(CaptureShaderPath);
         managerSerialized.ApplyModifiedProperties();
 
+        Material snowLit = LoadOrCreateSnowMaterial();
+
+        var clipmapSerialized = new SerializedObject(clipmap);
+        clipmapSerialized.FindProperty("settings").objectReferenceValue = settings;
+        clipmapSerialized.FindProperty("followTarget").objectReferenceValue =
+            player != null ? player.transform : null;
+        clipmapSerialized.FindProperty("snowMaterial").objectReferenceValue = snowLit;
+        clipmapSerialized.ApplyModifiedProperties();
+
+        EditorUtility.SetDirty(clipmap);
         EditorUtility.SetDirty(manager);
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(go.scene);
 
@@ -315,6 +330,29 @@ public class SnowDebugWindow : EditorWindow
 
         Debug.Log($"Kar sistemi kuruldu. Renderer özelliği eklenen renderer sayısı: {added}.\n" +
                   SnowProjectCheck.Run());
+    }
+
+    /// Kar yüzeyi materyali. Halkaların HEPSİ aynı materyali paylaşıyor —
+    /// ayrı ayrı olsaydı SRP Batcher dört halkayı dört çizime bölerdi.
+    static Material LoadOrCreateSnowMaterial()
+    {
+        Texture2D breakup = SnowTextureBaker.EnsureBreakup();
+
+        var material = AssetDatabase.LoadAssetAtPath<Material>(SnowLitMaterialPath);
+
+        if (material == null)
+        {
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(SnowLitShaderPath);
+            if (shader == null) return null;
+
+            material = new Material(shader);
+            AssetDatabase.CreateAsset(material, SnowLitMaterialPath);
+        }
+
+        material.SetTexture(SnowShaderIDs.SnowBreakup, breakup);
+        EditorUtility.SetDirty(material);
+
+        return material;
     }
 
     static Light FindSun()

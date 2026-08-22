@@ -108,6 +108,7 @@ float SnowCaptureY(float encoded)
 TEXTURE2D(_GroundHeightTex);
 
 float2 _GroundOriginXZ;      // zemin dokusunun dünya köşesi
+float2 _GroundTexelXZ;       // zemin dokusunun bir tekselinin dünya boyu
 float2 _GroundSizeXZ;        // kapsadığı alan, metre
 float  _GroundBaseY;         // 0..1 değerin haritalandığı taban kot
 float  _GroundHeightRange;   // 0..1 değerin haritalandığı aralık
@@ -119,6 +120,47 @@ float SampleGroundHeight(float2 posXZ)
     float2 uv = (posXZ - _GroundOriginXZ) / _GroundSizeXZ;
     float  n  = SAMPLE_TEXTURE2D_LOD(_GroundHeightTex, sampler_LinearClamp, saturate(uv), 0).r;
     return _GroundBaseY + n * _GroundHeightRange;
+}
+
+/// ASSUMPTION: spec §13.3 `SampleGroundNormal`'ı çağırıyor ama tanımlamıyor.
+/// Zemin yükseklik dokusundan merkezi farkla türetiliyor — kar sistemi
+/// böylece mevcut arazi bileşenlerinden hiçbir şey OKUMUYOR (spec §3).
+/// Adım zemin dokusunun kendi teksel boyu; kar tekseliyle (1.5 cm) örneklenirse
+/// aynı teksele düşer ve normal her yerde dümdüz yukarı çıkar.
+float3 SampleGroundNormal(float2 posXZ)
+{
+    float2 e = max(_GroundTexelXZ, 1e-3);
+
+    float hL = SampleGroundHeight(posXZ - float2(e.x, 0.0));
+    float hR = SampleGroundHeight(posXZ + float2(e.x, 0.0));
+    float hD = SampleGroundHeight(posXZ - float2(0.0, e.y));
+    float hU = SampleGroundHeight(posXZ + float2(0.0, e.y));
+
+    return normalize(float3(hL - hR, e.x + e.y, hD - hU));
+}
+
+// ------------------------------------------------------------- kar yüzeyi
+
+TEXTURE2D(_SnowStateTex);
+TEXTURE2D(_SnowTrailTex);
+
+/// Kar yüzeyinin zeminden yüksekliği, verilen bölge UV'sinde.
+///
+/// BÖLGE DIŞINDA DÜNYANIN GENEL DURUMU. `SnowInsideMask` kenarda yumuşak
+/// geçiş veriyor; sert kesilseydi deformasyon alanının sınırı yerde görünür
+/// bir kare olurdu.
+float SnowSurfaceAt(float2 uv)
+{
+    float  inside = SnowInsideMask(uv);
+    float2 uvC    = saturate(uv);
+
+    float4 s = SAMPLE_TEXTURE2D_LOD(_SnowStateTex, sampler_LinearClamp, uvC, 0);
+    float4 t = SAMPLE_TEXTURE2D_LOD(_SnowTrailTex, sampler_LinearClamp, uvC, 0);
+
+    float swe  = lerp(_FallbackSWE,  s.r, inside);
+    float rhoN = lerp(_FallbackRhoN, s.g, inside);
+
+    return SnowSurfaceHeight(swe, rhoN, t.r * inside, t.g * inside);
 }
 
 #endif
