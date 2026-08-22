@@ -14,6 +14,33 @@ her seferinde belirtinin en çok göze çarptığı katman seçilmişti. Bulut k
 
 ---
 
+## Kar yüzeyinde uzun, düz, dik bir sırt (çıkıntı)
+
+**İlk şüpheli:** kenar sönümü. *(Yanlış — sönüm yarıçapı ve bandı üç kez
+değişti, sırt aynı kaldı.)*
+
+**Sebep:** eteğin iç dikişe konması. Etek 2 m AŞAĞI iniyor. Yamaçta dikişin
+aşağı tarafındaki yüzey eteğin tepesinden alçakta kalıyor, etek açıkta kalıyor
+ve dik bir duvar olarak görünüyor. Etek yalnız EN DIŞ halkada olmalı — orada
+ötesinde yüzey yok, arazinin içine giriyor.
+
+**Aynı turda çıkan iki kusur daha:**
+
+1. **T-kavşağı.** İnce halkanın kenarında köşe aralığı kaba halkanınkinin
+   üçte biri; aradaki iki ince köşe kaba kenarın düz çizgisinden sapıyor ve
+   dikiş boyunca yarık açıyor. Sınır köşeleri artık yüksekliği KABA ızgaradan
+   okuyor (bilinear dikiş).
+2. **Derinlik payı basamağı.** Pay, halkalar bindirdiğinde hangisinin
+   kazanacağını belirlemek içindi. Ortak snap'ten sonra bindirme sıfır;
+   halkalar sınır çizgisini PAYLAŞIYOR ve pay tam o çizgide pay kadar basamak
+   üretiyor. 1 mm → 2 cm → **0**.
+
+**Kural:** bir düzeltme başka bir kusurun varlığına dayanıyorsa, o kusur
+kapandığında düzeltme de kusura döner. Derinlik payı ve iç etek ikisi de
+bindirmenin/boşluğun telafisiydi; bindirme sıfırlanınca ikisi de zarara geçti.
+
+---
+
 ## Kar yüzeyi bloklar/basamaklar hâlinde; mesh kapatılınca zemin pürüzsüz
 
 **İlk şüpheli:** clipmap halkalarının dikişi. *(Yanlış — halka sürgüsüyle

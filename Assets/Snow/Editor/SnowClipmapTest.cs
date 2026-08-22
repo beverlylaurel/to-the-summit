@@ -96,9 +96,53 @@ public static class SnowClipmapTest
     static bool CoverageTest(StringBuilder r)
     {
         r.AppendLine();
+        // ---------------------------------------------------------------- oranlar
+        //
+        // Deliğin İÇ HALKAYA TAM oturması üç şarta bağlı ve üçü de sessizce
+        // bozulabiliyor: quad oranı tam 3 olacak, delik dünya ölçüsü iç
+        // halkanın kapsamasına eşit olacak, derinlik payı sıfır olacak.
+        // Üçünden biri kayarsa ekranda halka sınırında bant çıkıyor.
+        r.AppendLine("## Halka oranları (deliğin tam oturması)");
+
+        bool ratios = true;
+
+        foreach (SnowQualityPreset preset in System.Enum.GetValues(typeof(SnowQualityPreset)))
+        {
+            SnowMeshBuilder.Ring[] rr = SnowMeshBuilder.Describe(SnowQuality.Get(preset));
+
+            for (int i = 1; i < rr.Length; i++)
+            {
+                float quadRatio = rr[i].QuadSize / rr[i - 1].QuadSize;
+                float holeSpan = rr[i].HoleQuads * rr[i].QuadSize;
+
+                bool quadOk = Mathf.Abs(quadRatio - SnowConstants.RingScale) < 1e-4f;
+                bool holeOk = Mathf.Abs(holeSpan - rr[i - 1].Extent) < 1e-4f;
+                bool snapOk = Mathf.Abs(rr[i].SnapStep - rr[i - 1].SnapStep) < 1e-4f;
+
+                ratios &= quadOk && holeOk && snapOk;
+
+                r.AppendLine("  [" + M(quadOk && holeOk && snapOk) + "] " +
+                             preset.ToString().PadRight(8) + (i - 1) + "→" + i +
+                             ":  quad oranı " + quadRatio.ToString("0.000") +
+                             ",  delik " + holeSpan.ToString("0.00") + " m / iç " +
+                             rr[i - 1].Extent.ToString("0.00") + " m" +
+                             ",  ortak snap " + (snapOk ? "evet" : "HAYIR"));
+            }
+        }
+
+        // Bindirme sıfırken pay, sınır çizgisinde pay kadar BASAMAK üretiyor.
+        bool biasOk = Mathf.Abs(SnowConstants.RingDepthBias) < 1e-6f;
+        ratios &= biasOk;
+
+        r.AppendLine("  [" + M(biasOk) + "] Derinlik payı        " +
+                     SnowConstants.RingDepthBias.ToString("0.000") +
+                     " m   (bindirme sıfırken 0 olmalı)");
+
+        r.AppendLine();
+
         r.AppendLine("## Halkalar arası çatlak (bütün olası kaymalar)");
 
-        bool all = true;
+        bool all = ratios;
 
         foreach (SnowQualityPreset preset in System.Enum.GetValues(typeof(SnowQualityPreset)))
         {

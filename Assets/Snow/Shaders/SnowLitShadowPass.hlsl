@@ -32,8 +32,12 @@ ShadowVaryings SnowShadowVertex(ShadowAttributes IN)
     float3 positionWS = TransformObjectToWorld(IN.positionOS.xyz);
 
     float h;
+    float3 flat = positionWS;
+
     positionWS = SnowDisplacedPositionWS(positionWS, IN.ringId.x, h);
-    positionWS.y -= IN.ringId.y * SNOW_SKIRT_DEPTH;
+
+    if (IN.ringId.y > 0.5 && IN.ringId.y < 1.5) positionWS.y -= SNOW_SKIRT_DEPTH;
+    if (IN.ringId.y > 1.5) positionWS.y = SnowStitchedWorldY(flat.xz, IN.ringId.x);
 
     OUT.positionWS = positionWS;
 

@@ -86,6 +86,9 @@ float  _FogDensity01;
 float  _RainOnSnow01;
 float3 _SnowUpDirection;
 
+/// Halka 0'ın quad boyu. Halka i'nin quad'ı bunun `SNOW_RING_SCALE^i` katı.
+float _SnowRing0Quad;
+
 /// KAR MESH'İNİN KENARI. En dış halkanın merkezi ve yarım genişliği.
 /// Kalınlık kenarda sıfıra inip araziyle çakışsın diye.
 float2 _SnowMeshCenterXZ;

@@ -32,6 +32,35 @@ struct Varyings
 /// Teşhis: 1 olduğunda kar mesh'i hiç yükselmiyor.
 float _SnowFlattenProbe;
 
+/// Yüzeyin dünya Y'si, verilen XZ'de. Dikiş için ayrı ayrı örnekleniyor.
+float SnowSurfaceWorldY(float2 posXZ)
+{
+    float3 p = float3(posXZ.x, 0.0, posXZ.y);
+    return SampleGroundHeight(posXZ) + SnowSurfaceAt(SnowWorldToUV(p));
+}
+
+/// T-KAVŞAĞI DİKİŞİ.
+///
+/// Sınır köşesi yüksekliği KABA ızgaradan okuyor: dış halkanın köşelerinin
+/// arasındaki bilinear yüzey. İki halka sınırda birebir aynı çizgiyi
+/// paylaşıyor, arada yarık kalmıyor.
+float SnowStitchedWorldY(float2 posXZ, float ringIndex)
+{
+    float ringQuad = _SnowRing0Quad * pow(SNOW_RING_SCALE, ringIndex);
+    float coarse = ringQuad * SNOW_RING_SCALE;
+
+    float2 a = floor(posXZ / coarse) * coarse;
+    float2 t = saturate((posXZ - a) / coarse);
+    float2 b = a + coarse;
+
+    float y00 = SnowSurfaceWorldY(float2(a.x, a.y));
+    float y10 = SnowSurfaceWorldY(float2(b.x, a.y));
+    float y01 = SnowSurfaceWorldY(float2(a.x, b.y));
+    float y11 = SnowSurfaceWorldY(float2(b.x, b.y));
+
+    return lerp(lerp(y00, y10, t.x), lerp(y01, y11, t.x), t.y);
+}
+
 float3 SnowDisplacedPositionWS(float3 positionWS, float ringIndex, out float heightOut)
 {
     float groundY = SampleGroundHeight(positionWS.xz);
@@ -65,11 +94,17 @@ Varyings SnowLitVertex(Attributes IN)
     float3 positionWS = TransformObjectToWorld(IN.positionOS.xyz);
 
     float h;
+    float3 flat = positionWS;
+
     positionWS = SnowDisplacedPositionWS(positionWS, IN.ringId.x, h);
 
-    // ETEK (rapor §5): işaretli köşeler aşağı iniyor ve mesh ile arazi
-    // arasındaki boşluğu kapatıyor.
-    positionWS.y -= IN.ringId.y * SNOW_SKIRT_DEPTH;
+    // ETEK: işaret 1. Aşağı iniyor, mesh ile arazi arasını kapatıyor.
+    if (IN.ringId.y > 0.5 && IN.ringId.y < 1.5)
+        positionWS.y -= SNOW_SKIRT_DEPTH;
+
+    // DİKİŞ: işaret 2. Sınır köşesi kaba ızgaradan okuyor.
+    if (IN.ringId.y > 1.5)
+        positionWS.y = SnowStitchedWorldY(flat.xz, IN.ringId.x);
 
     OUT.positionWS = positionWS;
     OUT.snowHeight = h;

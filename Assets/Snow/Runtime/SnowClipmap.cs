@@ -141,6 +141,10 @@ public class SnowClipmap : MonoBehaviour
         Shader.SetGlobalVector(SnowShaderIDs.MeshCenterXZ,
                                new Vector4(outer.x, outer.z, 0f, 0f));
         Shader.SetGlobalFloat(SnowShaderIDs.MeshExtent, OuterExtent);
+
+        // Dikiş için: halka 0'ın quad'ı. Halka i'nin quad'ı bunun 3^i katı.
+        Shader.SetGlobalFloat(SnowShaderIDs.Ring0Quad,
+                              SnowConstants.Ring0Extent / Mathf.Max(settings.QualityData.Ring0Grid, 1));
     }
 
     /// En dış halkanın merkezden kenara uzaklığı (m).

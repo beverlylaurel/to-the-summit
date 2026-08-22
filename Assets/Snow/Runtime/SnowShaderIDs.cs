@@ -87,6 +87,7 @@ public static class SnowShaderIDs
     public static readonly int SastrugiNoise = Shader.PropertyToID("_SastrugiNoise");
 
     // --- Kar yüzeyi materyali ---
+    public static readonly int Ring0Quad = Shader.PropertyToID("_SnowRing0Quad");
     public static readonly int MeshCenterXZ = Shader.PropertyToID("_SnowMeshCenterXZ");
     public static readonly int MeshExtent = Shader.PropertyToID("_SnowMeshExtent");
     public static readonly int FallbackSWE = Shader.PropertyToID("_FallbackSWE");

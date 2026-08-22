@@ -77,6 +77,7 @@ public static class SnowConstantsTest
         ("CrustSolid", "SNOW_CRUST_SOLID"),
         ("CrustBreakPen", "SNOW_CRUST_BREAK_PEN"),
         ("CrustSinkScale", "SNOW_CRUST_SINK_SCALE"),
+        ("RingScaleShader", "SNOW_RING_SCALE"),
         ("SkirtDepth", "SNOW_SKIRT_DEPTH"),
         ("MeshEdgeSink", "SNOW_MESH_EDGE_SINK"),
         ("SastrugiTau", "SNOW_SASTRUGI_TAU"),

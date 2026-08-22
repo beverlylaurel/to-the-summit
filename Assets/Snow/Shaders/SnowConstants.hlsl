@@ -79,6 +79,9 @@
 #define SNOW_CRUST_BREAK_PEN         0.05
 #define SNOW_CRUST_SINK_SCALE        0.04
 
+/// Halka genişliklerinin büyüme oranı. `SnowConstants.RingScale` ile eş.
+#define SNOW_RING_SCALE              3.0
+
 /// EN DIŞ HALKANIN ETEĞİ bu kadar aşağı iniyor (rapor §5).
 ///
 /// Halkalar düz ızgara; dağ dalgalı veya dik bir sırttan geçerken mesh'in
@@ -121,12 +124,13 @@
 #define SNOW_RING_SNAP_QUADS         2.0
 /// Dış halka bu kadar aşağı itiliyor (halka başına, metre).
 ///
-/// 1 mm idi ve yetmiyordu: bindirme bölgesinde dış halkanın quad'ı 3 kat
-/// kaba, aynı yükseklik alanını daha seyrek örnekliyor ve eğimli yerde
-/// santimetrelerce sapıyor. İç halkanın içinden fırlayıp z-fight yapıyordu
-/// (rapor §4). 2 cm, en kaba halkanın quad'ının (54 cm) eğimli arazide
-/// üreteceği sapmanın altında kalmayacak kadar büyük, gözle görülmeyecek
-/// kadar küçük.
-#define SNOW_RING_DEPTH_BIAS         0.02
+/// SIFIR — ve bu bilinçli. Pay, halkalar BİNDİRDİĞİ zaman hangisinin
+/// kazanacağını belirlemek içindi. Ortak snap ızgarasından sonra bindirme
+/// yok: halkalar sınır çizgisini paylaşıyor. Payı sıfırdan büyük tutmak tam o
+/// çizgide pay kadar bir BASAMAK üretiyor — her halka sınırında bir kademe.
+///
+/// 1 mm → 2 cm → 0. İkisi de ölçümle: önce bindirme vardı ve 1 mm yetmiyordu,
+/// sonra bindirme kalktı ve payın kendisi kusur oldu.
+#define SNOW_RING_DEPTH_BIAS         0.0
 
 #endif

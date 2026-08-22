@@ -185,6 +185,9 @@ public static class SnowConstants
     /// Sağlam kabuğun üstünde batmanın kaç katına indiği.
     public const float CrustSinkScale = 0.04f;
 
+    /// Halka genişliklerinin büyüme oranı; shader'da `SNOW_RING_SCALE`.
+    public const float RingScaleShader = 3f;
+
     /// En dış halkanın eteği bu kadar aşağı iniyor (rapor §5).
     public const float SkirtDepth = 2f;
 
@@ -257,5 +260,5 @@ public static class SnowConstants
 
     /// Dış halkanın iç halkaya göre aşağı itilme adımı, metre. Kaplama
     /// bandında iç halka derinlik testini kazansın diye.
-    public const float RingDepthBias = 0.02f;
+    public const float RingDepthBias = 0f;
 }

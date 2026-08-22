@@ -35,12 +35,20 @@ public static class SnowMeshBuilder
         /// Konumun oturduğu ızgara adımı, metre.
         public readonly float SnapStep;
 
-        /// Eteği var mı. HER halkada var: iç halkaların dış kenarı ile dış
-        /// halkanın deliği arasında ≤ maxOffset'lik bir boşluk kalıyor ve onu
-        /// bu etek kapatıyor. En dış halkada ise araziyle temasi kapatıyor.
+        /// Eteği var mı — YALNIZ EN DIŞ HALKADA.
+        ///
+        /// Etek 2 m AŞAĞI iniyor. İç dikişe konursa yamaçta felaket oluyor:
+        /// dikişin aşağı tarafındaki yüzey eteğin tepesinden alçakta kalıyor
+        /// ve etek açıkta, dik bir duvar olarak görünüyor (ölçüldü —
+        /// `SYMPTOMS.md`). Ortak snap ızgarasından sonra iç dikişte boşluk
+        /// zaten SIFIR, yani iç etek gereksiz.
+        ///
+        /// En dışta ise ötesinde yüzey yok; etek arazinin içine giriyor ve
+        /// mesh'in kenarını her koşulda kapatıyor.
         public readonly bool Outermost;
 
-        public Ring(int index, float extent, int grid, int holeQuads, float snapStep)
+        public Ring(int index, float extent, int grid, int holeQuads, float snapStep,
+                    bool outermost)
         {
             Index = index;
             Extent = extent;
@@ -48,10 +56,7 @@ public static class SnowMeshBuilder
             QuadSize = extent / grid;
             HoleQuads = holeQuads;
             SnapStep = snapStep;
-
-            // Etek HER halkada: iç halkanın kenarı ile dış halkanın deliği
-            // arasında kalan dikişi ve en dışta araziyle teması kapatıyor.
-            Outermost = true;
+            Outermost = outermost;
         }
     }
 
@@ -84,7 +89,8 @@ public static class SnowMeshBuilder
             // Genişlik oranı 3 ve ızgara aynı olduğu için bu TAM SAYI.
             int holeQuads = i == 0 ? 0 : quality.Ring0Grid / 3;
 
-            rings[i] = new Ring(i, extent, quality.Ring0Grid, holeQuads, commonSnap);
+            rings[i] = new Ring(i, extent, quality.Ring0Grid, holeQuads, commonSnap,
+                                i == quality.RingCount - 1);
 
             extent *= SnowConstants.RingScale;
         }
@@ -113,7 +119,20 @@ public static class SnowMeshBuilder
         {
             int v = j * side + i;
             vertices[v] = new Vector3(i * q - half, 0f, j * q - half);
-            ringId[v] = new Vector2(ring.Index, 0f);
+
+            // T-KAVŞAĞI İŞARETİ (y = 2).
+            //
+            // Halkanın DIŞ kenarındaki köşeler, bir dış halkanın delik
+            // kenarıyla aynı çizgide duruyor. Dış halkanın köşe aralığı 3 kat
+            // seyrek; aradaki iki ince köşe kaba kenarın DÜZ çizgisinden
+            // sapıyor ve dikiş boyunca ince yarıklar açılıyor (klasik
+            // T-kavşağı çatlağı).
+            //
+            // İşaretli köşeler yüksekliği kaba ızgaradan okuyor; iki yüzey
+            // sınırda birebir aynı çizgiyi paylaşıyor.
+            bool border = i == 0 || j == 0 || i == grid || j == grid;
+
+            ringId[v] = new Vector2(ring.Index, border && !ring.Outermost ? 2f : 0f);
         }
 
         int holeLo = (grid - ring.HoleQuads) / 2;
