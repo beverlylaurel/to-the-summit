@@ -150,8 +150,10 @@ half4 SnowLitFragment(Varyings IN) : SV_Target
 
     Light mainLight = GetMainLight(IN.shadowCoord);
 
+    half heightAO = SnowHeightAO(SnowWorldToUV(IN.positionWS), height);
+
     half3 color = SnowDirectLight(mainLight, N, V, surface);
-    color += SnowAmbient(N, surface, mainLight.shadowAttenuation);
+    color += SnowAmbient(N, surface, mainLight.shadowAttenuation, heightAO);
 
 #if defined(_ADDITIONAL_LIGHTS)
     // Forward+ kümeleme `inputData`'nın alanlarını okuyor; makro onu isimle

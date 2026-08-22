@@ -187,6 +187,9 @@ public static class SnowShadingTest
             (ForwardPath, "SNOW_MIN_VISIBLE_HEIGHT", "Karın kenarında titreme → clip eşiği yok"),
             (DetailPath, "RNMBlend", "Detay normal yanlış → RNM yerine lerp"),
             (SparklePath, "log2", "Parıltı titriyor → LOD uyarlaması atlanmış"),
+            (LightingPath, "SnowHeightAO", "İz içi AO yok → izler düz görünüyor"),
+            (LightingPath, "cosPhi * cosPhi", "AO cos² ortalaması değil"),
+            (LightingPath, "crustMask", "Kabuk shading'i yok"),
         };
 
         bool all = true;
@@ -208,6 +211,19 @@ public static class SnowShadingTest
         all &= noLerpBlend;
 
         r.AppendLine("  [" + M(noLerpBlend) + "] normal harmanlamada lerp YOK");
+
+        // YASAK: AO doğrudan ışığa uygulanmamalı — gölgeyi iki kez saymaktır
+        // ve izleri siyah lekelere çevirir (spec §18.5, §22).
+        string lighting = System.IO.File.ReadAllText(LightingPath);
+
+        int aoInAmbient = lighting.IndexOf("ambient *= heightAO", System.StringComparison.Ordinal);
+        bool aoOnlyAmbient = aoInAmbient >= 0 &&
+                             !lighting.Contains("diffuse *= heightAO") &&
+                             !lighting.Contains("lightCol * heightAO");
+
+        all &= aoOnlyAmbient;
+        r.AppendLine("  [" + M(aoOnlyAmbient) + "] AO YALNIZ ortamda      " +
+                     (aoOnlyAmbient ? "" : "doğrudan ışığa da uygulanmış → izler siyah leke olur"));
 
         return all;
     }

@@ -277,6 +277,82 @@ public static class SnowAccumulationTest
                          wet.ToString("0.000") + "  (tau 1800 s → 0.632 beklenir)");
 
             r.AppendLine();
+            r.AppendLine("## Kabuk (spec §18.3)");
+
+            // ÜÇGEN PROFİL: -20 °C'de sıfır, -5 °C'de TEPE, +5 °C'de sıfır.
+            // "T < 0 ise kabuk oluşur" yazmak çok soğukta da kabuk üretirdi.
+            float[] temps = { -25f, -20f, -12f, -5f, 0f, 5f, 10f };
+            var crusts = new float[temps.Length];
+
+            for (int i = 0; i < temps.Length; i++)
+            {
+                rig.ResetSnow(0.02f, 0.30f);
+
+                // ISLATMA ADIMI KABUK ÜRETMEMELİ, yoksa ölçülen şey probun
+                // değil ısıtmanın kabuğu olur (bir kez oldu: profil −25 ile
+                // +5 arasında dümdüz 0.126 çıktı).
+                // +10 °C üçgenin dışında: crustGain sıfır, üstelik kabuk
+                // eriyor. Islaklık ise tavana gidiyor.
+                rig.Accumulate(1800f, 0f, temperature: 10f, rain: 1f, wind: Vector2.zero);
+
+                // Prob adımı KISA: ıslaklık tau 1800 s ile sönüyor, uzun bir
+                // adımda kapı kapanır ve bütün sıcaklıklar sıfır ölçülür.
+                rig.Accumulate(600f, 0f, temperature: temps[i], rain: 0f, wind: Vector2.zero);
+
+                crusts[i] = rig.Crust(Center);
+            }
+
+            int peak = 0;
+            for (int i = 1; i < crusts.Length; i++) if (crusts[i] > crusts[peak]) peak = i;
+
+            // Üçgenin iki ucu da sıfır, tepe −5 °C, ve −12 °C ile 0 °C
+            // tepenin ALTINDA: profil gerçekten üçgen, plato değil.
+            bool triangle = Mathf.Approximately(temps[peak], -5f) &&
+                            crusts[0] < 1e-4f && crusts[1] < 1e-4f &&
+                            crusts[temps.Length - 1] < 1e-4f &&
+                            crusts[2] < crusts[3] && crusts[4] < crusts[3];
+
+            all &= triangle;
+
+            var line = new StringBuilder("  [" + M(triangle) + "] Üçgen profil      ");
+            for (int i = 0; i < temps.Length; i++)
+                line.Append(temps[i].ToString("0").PadLeft(3)).Append("°C→")
+                    .Append(crusts[i].ToString("0.000")).Append("  ");
+
+            r.AppendLine(line.ToString());
+            r.AppendLine("  [i] Tepe " + temps[peak].ToString("0") +
+                         " °C  (spec: kabuk en hızlı −5 °C civarında oluşur)");
+
+            // Kuru kar çimentolanmıyor.
+            rig.ResetSnow(0.02f, 0.30f);
+            rig.Accumulate(600f, 0f, temperature: -5f, rain: 0f, wind: Vector2.zero);
+            float dryCrust = rig.Crust(Center);
+
+            bool dryGate = dryCrust < 1e-4f;
+            all &= dryGate;
+            r.AppendLine("  [" + M(dryGate) + "] Kuru kar          " + dryCrust.ToString("0.0000") +
+                         "  (çevrim için ıslaklık gerekiyor)");
+
+            // Rüzgâr levhası: 8 m/s üstünde kuru karda da kabuk.
+            rig.ResetSnow(0.02f, 0.10f);
+            rig.Accumulate(Hour * 2f, 0f, temperature: -15f, rain: 0f, wind: new Vector2(14f, 0f));
+            float slab = rig.Crust(Center);
+
+            bool slabOk = slab > 1e-3f;
+            all &= slabOk;
+            r.AppendLine("  [" + M(slabOk) + "] Rüzgâr levhası    " + slab.ToString("0.000") +
+                         "  (14 m/s, −15 °C, kuru — rüzgâr kendi kabuğunu yapıyor)");
+
+            // Taze kar kabuğu örtüyor.
+            rig.Accumulate(600f, 8.33e-7f, temperature: -15f, rain: 0f, wind: Vector2.zero);
+            float buried = rig.Crust(Center);
+
+            bool buries = buried < slab;
+            all &= buries;
+            r.AppendLine("  [" + M(buries) + "] Taze kar örtüyor  " + slab.ToString("0.000") +
+                         " → " + buried.ToString("0.000"));
+
+            r.AppendLine();
             r.AppendLine("## Gökyüzü örtüsü (spec §12)");
 
             // --- 8. Çatının altına kar yağmıyor ---
@@ -378,7 +454,7 @@ public static class SnowAccumulationTest
         readonly int kClear, kAccumulate;
         readonly int groups;
 
-        RenderTexture snow, snowTemp, skyVis;
+        RenderTexture snow, snowTemp, trail, trailTemp, skyVis;
         Texture2D ground;
         readonly Texture2D readOne;
 
@@ -397,6 +473,11 @@ public static class SnowAccumulationTest
 
             snow = Rt(res, RenderTextureFormat.ARGBHalf);
             snowTemp = Rt(res, RenderTextureFormat.ARGBHalf);
+
+            // KAccumulate Faz 11'den beri kabuğu da yazıyor; bağlanmazsa
+            // dispatch sessizce hiçbir şey yapmıyor (ölçüldü).
+            trail = Rt(res, RenderTextureFormat.ARGBHalf);
+            trailTemp = Rt(res, RenderTextureFormat.ARGBHalf);
             skyVis = Rt(res, RenderTextureFormat.RFloat);
 
             readOne = new Texture2D(1, 1, TextureFormat.RGBAFloat, false, true)
@@ -512,7 +593,14 @@ public static class SnowAccumulationTest
             sim.SetVector(SnowShaderIDs.ClearValue, new Vector4(swe, rhoN, 0f, 0f));
             sim.SetTexture(kClear, SnowShaderIDs.Dst, snow);
             sim.Dispatch(kClear, groups, groups, 1);
+
+            sim.SetVector(SnowShaderIDs.ClearValue, Vector4.zero);
+            sim.SetTexture(kClear, SnowShaderIDs.Dst, trail);
+            sim.Dispatch(kClear, groups, groups, 1);
         }
+
+        /// Kabuk kanalı (RT_Trail.B).
+        public float Crust(Vector2 worldXZ) => ReadOne(trail, worldXZ).b;
 
         /// Tek adımda `seconds` kadar ilerletir. Döşeme döndürmesi kapalı
         /// (tiles = 1) — sınamanın ölçtüğü şey döndürme değil fizik.
@@ -534,19 +622,24 @@ public static class SnowAccumulationTest
             sim.SetTexture(kAccumulate, SnowShaderIDs.SnowSkyVisTex, skyVis);
             sim.SetTexture(kAccumulate, SnowShaderIDs.Snow, snow);
             sim.SetTexture(kAccumulate, SnowShaderIDs.SnowOut, snowTemp);
+            sim.SetTexture(kAccumulate, SnowShaderIDs.Trail, trail);
+            sim.SetTexture(kAccumulate, SnowShaderIDs.TrailOut, trailTemp);
             sim.Dispatch(kAccumulate, groups, groups, 1);
 
             (snow, snowTemp) = (snowTemp, snow);
+            (trail, trailTemp) = (trailTemp, trail);
         }
 
-        public Color Snow(Vector2 worldXZ)
+        public Color Snow(Vector2 worldXZ) => ReadOne(snow, worldXZ);
+
+        Color ReadOne(RenderTexture rt, Vector2 worldXZ)
         {
             Vector2 uv = (worldXZ - center) / areaSize + new Vector2(0.5f, 0.5f);
             int x = Mathf.Clamp(Mathf.FloorToInt(uv.x * res), 0, res - 1);
             int y = Mathf.Clamp(Mathf.FloorToInt(uv.y * res), 0, res - 1);
 
             RenderTexture prev = RenderTexture.active;
-            RenderTexture.active = snow;
+            RenderTexture.active = rt;
             readOne.ReadPixels(new Rect(x, y, 1, 1), 0, 0);
             readOne.Apply(false);
             RenderTexture.active = prev;
@@ -558,6 +651,8 @@ public static class SnowAccumulationTest
         {
             Rel(ref snow);
             Rel(ref snowTemp);
+            Rel(ref trail);
+            Rel(ref trailTemp);
             Rel(ref skyVis);
 
             if (ground != null) Object.DestroyImmediate(ground);

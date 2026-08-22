@@ -12,6 +12,9 @@ public enum SnowFootstepSurface
     Shallow,
     Powder,
     Deep,
+
+    /// Sağlam kabuk: üstünde neredeyse hiç batmadan yürünüyor (spec §18.3).
+    Crust,
 }
 
 /// PROJENİN İLK AYAK SESİ SİSTEMİ. Spec §19.1 "mevcut ayak sesi sistemine
@@ -36,6 +39,7 @@ public class SnowFootstepAudio : MonoBehaviour
     [SerializeField] AudioClip[] shallow;
     [SerializeField] AudioClip[] powder;
     [SerializeField] AudioClip[] deep;
+    [SerializeField] AudioClip[] crust;
 
     [Tooltip("Islak varyantlar. Boşsa kuru klipler çalıyor.")]
     [SerializeField] AudioClip[] packedWet;
@@ -54,6 +58,10 @@ public class SnowFootstepAudio : MonoBehaviour
         if (!sample.Valid) return SnowFootstepSurface.None;
 
         if (sample.Depth < 0.02f) return SnowFootstepSurface.None;
+
+        // KABUK ÖNCE. Kabuklu yüzeyde altındaki karın derinliği ne olursa
+        // olsun duyulan ses kabuğun sesidir (spec §18.3).
+        if (sample.Crust > SnowConstants.CrustSolid) return SnowFootstepSurface.Crust;
 
         if (sample.Depth < 0.08f && sample.Density01 > 0.55f) return SnowFootstepSurface.Packed;
         if (sample.Depth < 0.08f) return SnowFootstepSurface.Shallow;
@@ -106,6 +114,7 @@ public class SnowFootstepAudio : MonoBehaviour
             SnowFootstepSurface.Shallow => shallow,
             SnowFootstepSurface.Powder => powder,
             SnowFootstepSurface.Deep => deep,
+            SnowFootstepSurface.Crust => crust,
             _ => null,
         };
     }

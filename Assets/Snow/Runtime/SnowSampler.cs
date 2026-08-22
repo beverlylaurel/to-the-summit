@@ -19,6 +19,9 @@ public struct SnowSample
 
     public float Wetness;
 
+    /// Yüzey kabuğunun sağlamlığı (spec §18.3). `RT_Trail.B`.
+    public float Crust;
+
     public bool Valid;
 }
 
@@ -170,6 +173,7 @@ public class SnowSampler : MonoBehaviour
             SinkDepth = trail.r,
             Density01 = Mathf.Clamp01(snow.g),
             Wetness = Mathf.Clamp01(snow.b),
+            Crust = Mathf.Clamp01(trail.b),
             Valid = true,
         };
     }

@@ -571,15 +571,24 @@ public class SnowManager : MonoBehaviour
         cmd.SetComputeTextureParam(simCompute, accumulateKernel, SnowShaderIDs.Snow, snow);
         cmd.SetComputeTextureParam(simCompute, accumulateKernel, SnowShaderIDs.SnowOut, snowTemp);
 
+        // KABUK RT_Trail.B'DE (spec §18.3, §20). KAccumulate onu da yazıyor;
+        // iz dokusunun aynı şeridi de taşınmak zorunda.
+        cmd.SetComputeTextureParam(simCompute, accumulateKernel, SnowShaderIDs.Trail, trail);
+        cmd.SetComputeTextureParam(simCompute, accumulateKernel, SnowShaderIDs.TrailOut, trailTemp);
+
         int tileGroups = Mathf.Max(1, groups / tiles);
         cmd.DispatchCompute(simCompute, accumulateKernel, tileGroups, groups, 1);
 
         // YALNIZ BİR ŞERİT YAZILDI. Ping-pong yapılamaz — diğer şeritler eski
         // tamponda kalırdı. Yazılan şerit hedefe kopyalanıyor.
         int tileWidth = q.Resolution / tiles;
-        cmd.CopyTexture(snowTemp, 0, 0, accumulateTile * tileWidth, 0,
-                        tileWidth, q.Resolution,
-                        snow, 0, 0, accumulateTile * tileWidth, 0);
+        int tileX = accumulateTile * tileWidth;
+
+        cmd.CopyTexture(snowTemp, 0, 0, tileX, 0, tileWidth, q.Resolution,
+                        snow, 0, 0, tileX, 0);
+
+        cmd.CopyTexture(trailTemp, 0, 0, tileX, 0, tileWidth, q.Resolution,
+                        trail, 0, 0, tileX, 0);
 
         DispatchReduce(cmd);
     }

@@ -161,9 +161,32 @@ void KDeform(uint3 id : SV_DispatchThreadID)
 
     if (penetration > 0.0005)
     {
-        float packed    = saturate((snow.g - SNOW_LOOSE_N) / max(SNOW_PACKED_N - SNOW_LOOSE_N, 1e-3));
-        float sinkScale = lerp(1.0, SNOW_PACKED_SINK_SCALE, packed);
-        float target    = min(penetration * sinkScale, baseH);
+        // --- KABUK KIRILMASI (spec §18.3) [KAYNAK: Cordonnier §5.2, §5.4] ---
+        //
+        // KABUK PATİKA DEĞİL. Patika trafikten oluşur, kar sütununu boydan
+        // boya sıkıştırır ve KIRILMAZ. Kabuk erime-donmadan veya rüzgâr
+        // levhasından doğar, yalnız yüzeydeki ince tabakadır, altı gevşek
+        // kalır ve yeterli yük binince KIRILIR.
+        float crust  = trail.b;
+        float packed = saturate((snow.g - SNOW_LOOSE_N) / max(SNOW_PACKED_N - SNOW_LOOSE_N, 1e-3));
+
+        bool onCrust = (crust > SNOW_CRUST_SOLID) && (penetration <= SNOW_CRUST_BREAK_PEN);
+
+        float sinkScale;
+
+        if (onCrust)
+        {
+            sinkScale = SNOW_CRUST_SINK_SCALE;
+        }
+        else
+        {
+            sinkScale = lerp(1.0, SNOW_PACKED_SINK_SCALE, packed);
+
+            // Kırıldı; yeni bir erime-donma çevrimine kadar oluşmuyor.
+            if (crust > SNOW_CRUST_SOLID) trail.b = 0.0;
+        }
+
+        float target = min(penetration * sinkScale, baseH);
 
         trail.r = max(trail.r, target);
 
@@ -353,13 +376,51 @@ void KAccumulate(uint3 id : SV_DispatchThreadID)
     if (_RainOnSnow01 > 0.01)
         rho = min(rho + _RainOnSnow01 * 25.0 * dt / 60.0, SNOW_RHO_MAX);
 
-    // ---- 5. Tazelik sönümü ----
+    // ---- 5. Kabuk: erime-donma çimentolanması (spec §18.3) ----
+    // [KAYNAK: Cordonnier ve ark., EG 2018, §5.2]
+    //
+    // ÜÇGEN PROFİL: -20 °C'de sıfır, -5 °C'de TEPE, +5 °C'de yine sıfır.
+    // "T < 0 ise kabuk oluşur" yazmak çok soğukta da kabuk üretir ve
+    // yanlıştır: kabuk erime-donma ÇEVRİMİNDEN doğuyor, çevrim için de
+    // ara sıra erimek gerekiyor.
+    float4 trail = _Trail[pix];
+
+    float tempLocal = _TemperatureC;
+    float crustGain;
+
+    if (tempLocal <= SNOW_T_FREEZE)
+        crustGain = 0.0;
+    else if (tempLocal <= SNOW_T_COOL)
+        crustGain = (tempLocal - SNOW_T_FREEZE) / (SNOW_T_COOL - SNOW_T_FREEZE);
+    else if (tempLocal <= SNOW_T_WARM)
+        crustGain = 1.0 - (tempLocal - SNOW_T_COOL) / (SNOW_T_WARM - SNOW_T_COOL);
+    else
+        crustGain = 0.0;
+
+    // Çevrim için ıslaklık gerekir: tamamen kuru kar çimentolanmaz.
+    crustGain *= saturate(s.b * 3.0);
+
+    float crust = trail.b;
+    crust += crustGain * SNOW_CRUST_GAIN * dt;
+
+    // Rüzgâr levhası: rüzgâr karı döverek kırılgan kabuk yapıyor (§5.4).
+    crust += saturate((_WindSpeed - 8.0) / 8.0) * SNOW_CRUST_WIND_GAIN * (1.0 - s.g) * dt;
+
+    if (tempLocal > SNOW_T_WARM) crust -= dt / SNOW_CRUST_MELT_TAU;
+
+    // Taze kar örtüyor: artık yüzey kabuğu değil.
+    crust -= fall * SNOW_CRUST_BURY;
+
+    trail.b = saturate(crust);
+
+    // ---- 6. Tazelik sönümü ----
     s.a *= exp(-dt / SNOW_DISTURB_TAU);
 
     s.g = SnowDensityN(rho);
     s.r = clamp(s.r, 0.0, SNOW_SWE_MAX);
 
-    _SnowOut[pix] = s;
+    _SnowOut[pix]  = s;
+    _TrailOut[pix] = trail;
 }
 
 /// DURUMU 64²'YE İNDİRGER. `GroundCoverage01` ve `LooseSnowFraction`
