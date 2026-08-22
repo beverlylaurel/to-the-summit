@@ -453,8 +453,14 @@ public class DebugMenu : MonoBehaviour
             // halkanın kenarındaysa halka sayısı azalınca kusur da o sınırla
             // birlikte içeri kayar.
             int ringsBefore = probeRings;
-            GUILayout.Label($"Çizilen halka {(probeRings < 0 ? "hepsi" : probeRings.ToString())}" +
-                            "   (±8, ±16, ±32, ±64 m)");
+
+            // BAĞLANMAMIŞ SÜRGÜ SESSİZ OLMAMALI. Bir kez oldu: referans boştu,
+            // sürgü oynuyordu, hiçbir şey değişmiyordu ve dışarıdan "düzeltme
+            // işe yaramadı" gibi görünüyordu.
+            GUILayout.Label(snowClipmap == null
+                ? "Çizilen halka — BAĞLANMADI (snowClipmap boş)"
+                : $"Çizilen halka {(probeRings < 0 ? "hepsi" : probeRings.ToString())}" +
+                  "   (±8, ±16, ±32, ±64 m)");
             probeRings = Mathf.RoundToInt(GUILayout.HorizontalSlider(probeRings, -1f, 4f));
 
             if (probeRings != ringsBefore && snowClipmap != null)

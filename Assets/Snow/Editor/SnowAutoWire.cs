@@ -59,19 +59,15 @@ public static class SnowAutoWire
         Check();
     }
 
-    static void Check()
+    /// F1 panelinin kar alanları. Kurulum bunları da bağlıyor.
+    static readonly string[] MenuRequired =
     {
-        if (EditorApplication.isPlaying) return;
+        "temperature", "snowfall", "snowClipmap",
+    };
 
-        var manager = Object.FindAnyObjectByType<SnowManager>();
-        if (manager == null) return;   // Kar sistemi kurulmamış: karışmıyoruz.
-
-        var so = new SerializedObject(manager);
-
-        int missing = 0;
-        string first = null;
-
-        foreach (string name in Required)
+    static void Count(SerializedObject so, string[] names, ref int missing, ref string first)
+    {
+        foreach (string name in names)
         {
             SerializedProperty prop = so.FindProperty(name);
             if (prop != null && prop.objectReferenceValue != null) continue;
@@ -79,6 +75,26 @@ public static class SnowAutoWire
             missing++;
             first ??= name;
         }
+    }
+
+    static void Check()
+    {
+        if (EditorApplication.isPlaying) return;
+
+        var manager = Object.FindAnyObjectByType<SnowManager>();
+        if (manager == null) return;   // Kar sistemi kurulmamış: karışmıyoruz.
+
+        int missing = 0;
+        string first = null;
+
+        Count(new SerializedObject(manager), Required, ref missing, ref first);
+
+        // F1'İN REFERANSLARI DA BURADA. Önce yalnız `SnowManager` denetleniyordu
+        // ve yeni bir F1 alanı eklendiğinde kurulum hiç koşmuyordu: alan boş
+        // kalıyor, sürgü sessizce hiçbir şey yapmıyordu. Otomasyonun deliği
+        // buydu.
+        var menu = Object.FindAnyObjectByType<DebugMenu>();
+        if (menu != null) Count(new SerializedObject(menu), MenuRequired, ref missing, ref first);
 
         if (missing == 0) return;
 
