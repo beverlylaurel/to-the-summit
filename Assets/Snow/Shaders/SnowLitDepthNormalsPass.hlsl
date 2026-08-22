@@ -43,12 +43,13 @@ half4 SnowDepthNormalsFragment(DepthNormalsVaryings IN) : SV_Target
 {
     UNITY_SETUP_INSTANCE_ID(IN);
 
-    float2 uv = SnowWorldToUV(IN.positionWS);
-    float  h  = SnowSurfaceAt(uv);
+    // İLERİ GEÇİŞLE AYNI KURULUM. SSAO bu tamponu okuyor; detay normalleri
+    // burada yoksa karın üstündeki AO yüzeyin gerçek eğimini görmez.
+    float3 N;
+    SnowSurface surface;
+    float height;
 
-    SnowClipEdge(h, IN.positionWS);
-
-    float3 N = SnowNormalAt(uv, h, IN.positionWS);
+    SnowShadeSetup(IN.positionWS, N, surface, height);
 
     return half4(NormalizeNormalPerPixel(N), 0.0);
 }

@@ -1,12 +1,11 @@
-// ROL: kar yüzeyinin köşe yer değiştirmesi, normali ve (Faz 4'te geçici)
-// ışıklandırması. Faz 6'da ışıklandırma SnowLighting.hlsl'e taşınacak.
+// ROL: kar yüzeyinin köşe yer değiştirmesi, normali ve ışıklandırması.
 // Çağıran: SnowLit.shader.
 
 #ifndef SNOW_LIT_FORWARD_PASS_INCLUDED
 #define SNOW_LIT_FORWARD_PASS_INCLUDED
 
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-#include "SnowLitInput.hlsl"
+#include "SnowLighting.hlsl"
+#include "SnowDetailNormals.hlsl"
 
 struct Attributes
 {
@@ -113,29 +112,61 @@ void SnowClipEdge(float h, float3 positionWS)
     clip(edgeFade - breakup * 0.6);
 }
 
+/// Fragman'da ortak kurulum: kesme, normal, yüzey. Hem ileri geçiş hem
+/// DepthNormals aynı yüzeyi görmeli.
+void SnowShadeSetup(float3 positionWS, out float3 N, out SnowSurface surface, out float height)
+{
+    float2 uv = SnowWorldToUV(positionWS);
+    height = SnowSurfaceAt(uv);
+
+    SnowClipEdge(height, positionWS);
+
+    float4 state = SnowStateAt(uv);
+    float4 trail = SnowTrailAt(uv);
+
+    float dist = length(GetCameraPositionWS() - positionWS);
+    float footprint = length(fwidth(positionWS.xz));
+
+    float freshness = 1.0 - saturate((SnowDensity(state.g) - 100.0) / 350.0);
+
+    N = SnowNormalAt(uv, height, positionWS);
+    N = SnowApplyDetailNormals(N, positionWS, freshness, state.a, dist);
+
+    surface = SnowBuildSurface(state.g, state.b, state.a, trail.b,
+                               height, positionWS, footprint);
+}
+
 half4 SnowLitFragment(Varyings IN) : SV_Target
 {
     UNITY_SETUP_INSTANCE_ID(IN);
 
-    float2 uv = SnowWorldToUV(IN.positionWS);
-    float  h  = SnowSurfaceAt(uv);
+    float3 N;
+    SnowSurface surface;
+    float height;
 
-    SnowClipEdge(h, IN.positionWS);
+    SnowShadeSetup(IN.positionWS, N, surface, height);
 
-    float3 N = SnowNormalAt(uv, h, IN.positionWS);
-
-    // FAZ 4 GEÇİCİ IŞIKLANDIRMASI. Spec §14'ün tam modeli (sarmalı NdotL,
-    // yarı saydamlık, parıltı, RNM detay normalleri) Faz 6'da geliyor.
-    // Buradaki tek amaç geometriyi ve normali görünür kılmak.
-    const half3 ALBEDO = half3(0.90, 0.92, 0.95);
+    float3 V = GetWorldSpaceNormalizeViewDir(IN.positionWS);
 
     Light mainLight = GetMainLight(IN.shadowCoord);
 
-    half ndotl = saturate(dot(N, mainLight.direction));
-    half3 direct = ALBEDO * ndotl * mainLight.color * mainLight.shadowAttenuation;
-    half3 ambient = SampleSH(N) * ALBEDO;
+    half3 color = SnowDirectLight(mainLight, N, V, surface);
+    color += SnowAmbient(N, surface, mainLight.shadowAttenuation);
 
-    half3 color = direct + ambient;
+#if defined(_ADDITIONAL_LIGHTS)
+    // Forward+ kümeleme `inputData`'nın alanlarını okuyor; makro onu isimle
+    // arıyor.
+    InputData inputData = (InputData)0;
+    inputData.positionWS = IN.positionWS;
+    inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(IN.positionCS);
+
+    uint pixelLightCount = GetAdditionalLightsCount();
+
+    LIGHT_LOOP_BEGIN(pixelLightCount)
+        Light light = GetAdditionalLight(lightIndex, IN.positionWS, half4(1, 1, 1, 1));
+        color += SnowDirectLight(light, N, V, surface);
+    LIGHT_LOOP_END
+#endif
 
     // MEVCUT SİSİN KENDİSİ (spec §14). Kendi sis hesabımız yok.
     color = MixFog(color, IN.fogFactor);

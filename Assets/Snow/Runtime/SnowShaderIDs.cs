@@ -90,6 +90,7 @@ public static class SnowShaderIDs
     public static readonly int FallbackSWE = Shader.PropertyToID("_FallbackSWE");
     public static readonly int FallbackRhoN = Shader.PropertyToID("_FallbackRhoN");
     public static readonly int SnowBreakup = Shader.PropertyToID("_SnowBreakup");
+    public static readonly int SnowDetailNormal = Shader.PropertyToID("_SnowDetailNormal");
 
     public static readonly int ShadowTint = Shader.PropertyToID("_ShadowTint");
     public static readonly int TranslucencyStrength = Shader.PropertyToID("_TranslucencyStrength");

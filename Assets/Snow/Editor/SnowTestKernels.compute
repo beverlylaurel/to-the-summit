@@ -13,3 +13,68 @@ void KStamp(uint3 id : SV_DispatchThreadID)
     if (id.x >= _Resolution || id.y >= _Resolution) return;
     _Dst[id.xy] = float4(id.x, id.y, 0.0, 1.0);
 }
+
+// --------------------------------------------------------------- Faz 6 sinamalari
+
+#pragma kernel KTestSparkle
+#pragma kernel KTestRnm
+
+// SnowSparkle bunlari SnowLitInput'un CBUFFER'indan aliyor; burada tek tek
+// tanimlaniyor ki kernel URP isiklandirmasini yuklemek zorunda kalmasin.
+float _SparkleCellSize;
+float _SparkleDensity;
+float _SparkleSharpness;
+
+// SnowDetailNormals TEXTURE2D/UnpackNormal makrolarini kullaniyor; onlar
+// core kutuphanesinden geliyor.
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
+
+#include "../Shaders/SnowSparkle.hlsl"
+#include "../Shaders/SnowDetailNormals.hlsl"
+
+RWTexture2D<float4> _TestOut;
+
+float  _TestFootprint;
+float3 _TestViewDir;
+float3 _TestLightDir;
+
+/// Verilen piksel ayak izinde, dunya uzerinde yayilmis noktalarda paritinin
+/// degeri. CPU tarafi bunun esigi asma oranini sayiyor: Bowles & Wang'in
+/// iddiasi tam olarak bu oranin mesafeden BAGIMSIZ olmasi.
+[numthreads(8, 8, 1)]
+void KTestSparkle(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+
+    // Ornekleme araligi ayak iziyle olcekleniyor: gercek bir ekranda da
+    // komsu pikseller bir ayak izi kadar ayriktir.
+    float2 posXZ = (float2(id.xy) + 0.5) * _TestFootprint;
+
+    float3 posWS = float3(posXZ.x, 0.0, posXZ.y);
+
+    _TestOut[id.xy] = SnowSparkle(posWS, normalize(_TestViewDir),
+                                  normalize(_TestLightDir), _TestFootprint);
+}
+
+/// RNM'nin uc ozelligi: duz detayla taban degismez, duz tabanla detay aynen
+/// gecer, sonuc birim uzunluktadir.
+[numthreads(8, 8, 1)]
+void KTestRnm(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= 3 || id.y >= 1) return;
+
+    float3 flat_ = float3(0.5, 0.5, 1.0);
+
+    // Egik bir ornek normal, paketli hale getirilmis.
+    float3 tilted = normalize(float3(0.4, -0.3, 0.86));
+    float3 tiltedPacked = tilted * 0.5 + 0.5;
+
+    float3 result;
+
+    if (id.x == 0)      result = RNMBlend(tiltedPacked, flat_) - tilted;
+    else if (id.x == 1) result = RNMBlend(flat_, tiltedPacked) - tilted;
+    else                result = float3(length(RNMBlend(tiltedPacked, tiltedPacked)), 0, 0);
+
+    _TestOut[id.xy] = float4(result, 1.0);
+}

@@ -226,6 +226,7 @@ public class SnowManager : MonoBehaviour
         pendingScroll = false;
 
         SnowRuntimeState.Reset();
+        ApplyQualityKeyword(q);
 
         Active = this;
         IsReady = true;
@@ -629,6 +630,18 @@ public class SnowManager : MonoBehaviour
     }
 
     // ------------------------------------------------------------------ dokular
+
+    /// KALİTE KADEMESİ SHADER'A KEYWORD OLARAK GİDİYOR (spec §15.3). Detay
+    /// normal katmanı sayısı ve parıltı bunlarla açılıp kapanıyor; runtime
+    /// dalı yerine varyant seçilmesi dallanmayı tamamen kaldırıyor.
+    static void ApplyQualityKeyword(SnowQualityData quality)
+    {
+        Shader.DisableKeyword(SnowQuality.KeywordLow);
+        Shader.DisableKeyword(SnowQuality.KeywordMedium);
+        Shader.DisableKeyword(SnowQuality.KeywordHigh);
+
+        Shader.EnableKeyword(quality.Keyword);
+    }
 
     static RenderTexture Create(string name, int resolution, RenderTextureFormat format)
     {

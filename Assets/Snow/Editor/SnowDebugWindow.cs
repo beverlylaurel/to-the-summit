@@ -340,6 +340,7 @@ public class SnowDebugWindow : EditorWindow
     static Material LoadOrCreateSnowMaterial()
     {
         Texture2D breakup = SnowTextureBaker.EnsureBreakup();
+        Texture2D detailNormal = SnowTextureBaker.EnsureDetailNormal();
 
         var material = AssetDatabase.LoadAssetAtPath<Material>(SnowLitMaterialPath);
 
@@ -353,6 +354,7 @@ public class SnowDebugWindow : EditorWindow
         }
 
         material.SetTexture(SnowShaderIDs.SnowBreakup, breakup);
+        material.SetTexture(SnowShaderIDs.SnowDetailNormal, detailNormal);
         EditorUtility.SetDirty(material);
 
         return material;

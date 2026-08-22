@@ -752,7 +752,15 @@ rüzgâr yönlü yeniden dağıtımla, oturmayla, derece-gün erimesiyle ve yağ
 kirletildiğinde, her kare değil. Üç tüketicisi var: zemin birikmesi, nesne
 üstü kar, kar tanesi kesme.
 
-**Bölge kaydırma.** Durum dokuları oyuncuyu takip eden 16 m'lik bir pencerede duruyor;
+**Kar görünümü (Faz 6).** Albedo ve pürüzlülük yoğunluktan türüyor (taze
+0.90 / sıkışmış 0.70), ıslaklık ikisini de koyultuyor. Detay normalleri
+Reoriented Normal Mapping ile harmanlanıyor — dört ölçek, kaç tanesinin açık
+olduğunu kalite keyword'ü belirliyor. Işıklandırma sarmalı NdotL + arkadan
+sızma + BRDF yansıma; parıltı yalnız gündüz (`_SunElevation01` kapısı) ve
+ekran uzayında yoğunluğu sabit. Ortam gölgede maviye çalıyor. Sis URP'nin
+`MixFog`'undan — kendi sis hesabı yok.
+
+**Bölge kaydırma. Durum dokuları oyuncuyu takip eden 16 m'lik bir pencerede duruyor;
 pencere `SnapStep` (0.25 m) ızgarasına oturuyor ve kaydığında içerik `KScroll` ile aynı
 dünya noktasında kalıyor. Üç presette de bir SnapStep tam sayı teksele denk geliyor
 (8 / 16 / 24) — kesirli olsaydı izler teksel altı titrerdi. Ölçüm:

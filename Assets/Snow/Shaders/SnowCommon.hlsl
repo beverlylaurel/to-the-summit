@@ -185,6 +185,29 @@ TEXTURE2D(_SnowTrailTex);
 /// BÖLGE DIŞINDA DÜNYANIN GENEL DURUMU. `SnowInsideMask` kenarda yumuşak
 /// geçiş veriyor; sert kesilseydi deformasyon alanının sınırı yerde görünür
 /// bir kare olurdu.
+/// Kar durumunun ham hâli, bölge dışında dünyanın genel durumuyla
+/// harmanlanmış. R=swe G=rhoN B=wet A=disturb.
+float4 SnowStateAt(float2 uv)
+{
+    float  inside = SnowInsideMask(uv);
+    float4 s = SAMPLE_TEXTURE2D_LOD(_SnowStateTex, sampler_LinearClamp, saturate(uv), 0);
+
+    s.r = lerp(_FallbackSWE,  s.r, inside);
+    s.g = lerp(_FallbackRhoN, s.g, inside);
+    s.b *= inside;
+    s.a *= inside;
+
+    return s;
+}
+
+/// İz dokusunun ham hâli. R=carve G=rim B=kabuk A=sastrugi. Bölge dışında
+/// iz yok.
+float4 SnowTrailAt(float2 uv)
+{
+    return SAMPLE_TEXTURE2D_LOD(_SnowTrailTex, sampler_LinearClamp, saturate(uv), 0)
+           * SnowInsideMask(uv);
+}
+
 float SnowSurfaceAt(float2 uv)
 {
     float  inside = SnowInsideMask(uv);

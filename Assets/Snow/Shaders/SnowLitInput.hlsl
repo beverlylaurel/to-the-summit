@@ -11,8 +11,19 @@
 /// SRP BATCHER İÇİN TEK BLOK. Bir property bu bloğun dışında kalırsa Frame
 /// Debugger'da "SRP Batch" düşer ve dört halka dört ayrı çizim olur.
 CBUFFER_START(UnityPerMaterial)
-    float _SnowBreakupScale;
-    float _SnowEdgeFadeRange;
+    float  _SnowBreakupScale;
+    float  _SnowEdgeFadeRange;
+
+    float4 _ShadowTint;
+    float  _TranslucencyStrength;
+
+    float  _SparkleCellSize;
+    float  _SparkleDensity;
+    float  _SparkleSharpness;
+    float  _SparkleIntensity;
+
+    float  _SnowAORadius;
+    float  _SnowAOStrength;
 CBUFFER_END
 
 /// Kar kenarının düz çizgi yerine lekeler hâlinde bitmesini sağlayan gürültü
