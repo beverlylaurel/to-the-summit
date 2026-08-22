@@ -28,6 +28,9 @@ struct Varyings
 ///
 /// Kamera mesafesine göre kısma YOK — kısılırsa yüzey oyuncu yaklaştıkça
 /// kayar ve dalgalanır.
+/// Teşhis: 1 olduğunda kar mesh'i hiç yükselmiyor.
+float _SnowFlattenProbe;
+
 float3 SnowDisplacedPositionWS(float3 positionWS, float ringIndex, out float heightOut)
 {
     float groundY = SampleGroundHeight(positionWS.xz);
@@ -39,6 +42,11 @@ float3 SnowDisplacedPositionWS(float3 positionWS, float ringIndex, out float hei
     // kadar dik bir duvar kalıyor. Sönüm en dış halkanın son %14'ünde;
     // Medium'da ~9 m, 64 m uzaklıkta alt piksel.
     h *= SnowMeshEdgeFade(positionWS.xz);
+
+    // TEŞHİS: yer değiştirmeyi tamamen kapatır. Şerit GEOMETRİ mi yoksa
+    // GÖLGELEME mi — iki gündür geometri sanılıp yükseklik yamaları yazıldı.
+    // 1 olduğunda yüzey araziye yapışıyor; şerit duruyorsa geometri değil.
+    h *= 1.0 - _SnowFlattenProbe;
 
     heightOut = h;
 

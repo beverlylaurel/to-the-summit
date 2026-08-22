@@ -64,6 +64,9 @@ public class DebugMenu : MonoBehaviour
     /// gerçekten koşuyor mu sorusunu tek tıkla ayırıyor.
     bool forceMountainSnow;
 
+    /// Teşhis: kar mesh'inin yer değiştirmesini tamamen kapatır.
+    bool flattenSnow;
+
     /// Teşhis: kaç clipmap halkası çizilsin. −1 = hepsi.
     int probeRings = -1;
 
@@ -467,6 +470,13 @@ public class DebugMenu : MonoBehaviour
             {
                 snowClipmap.ProbeVisibleRings = probeRings;
                 snowClipmap.RefreshVisibility();
+            }
+
+            bool nextFlat = GUILayout.Toggle(flattenSnow, "Kar yüzeyini düzleştir (teşhis)");
+            if (nextFlat != flattenSnow)
+            {
+                flattenSnow = nextFlat;
+                Shader.SetGlobalFloat("_SnowFlattenProbe", flattenSnow ? 1f : 0f);
             }
 
             bool nextForce = GUILayout.Toggle(forceMountainSnow, "Dağı zorla karla kapla (teşhis)");
