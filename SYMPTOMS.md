@@ -1167,6 +1167,17 @@ geliyor ve yorumda bu açıkça yazılı.
 *Şimşek sesi `timeScale` desenkronu.* Rapor "unscaled yerine simülasyon zamanı
 kullanılmalı" diyor; `ThunderPlayer` zaten `Time.deltaTime` kullanıyor.
 
+*SkyFog silüet konturu.* Rapor `ZTest Equal`'ın ufuk çizgisinde tek piksellik
+kontur bıraktığını söylüyor. Kod bunu **zaten çözmüş** ve çözümü yorumda
+anlatmış: derinlik TAMPONU ile derinlik DOKUSU silüet pikselinde ayrışıyordu,
+şimdi ikinci bir kapı var (`SampleSceneDepth` uzak düzlem değilse `discard`).
+Rapor eski bir sürümü analiz etmiş.
+
+*Ufuk haritası sınırında gölge kaybı.* Rapor kenar kelepçeleme istiyor. Kodda
+`return 1.0` bilinçli ve gerekçesi yorumda: pişirilmiş arazi orada bitiyor,
+güneşi kesecek kütle de yok, doğru cevap "engel yok". Aksi denenmiş ve ovada
+zemini simsiyah yapmış.
+
 **Yapılamayan:** bisikletin zemin direnci (`RollingResistance`). Alan gerçekten
 boşta duruyor ama `TerrainSurface`'te zemin TİPİ API'si yok (`WindWeightAt` ve
 `SlopeAt` var). Önce zemin sınıflandırması gerekiyor — `DECISIONS.md`.

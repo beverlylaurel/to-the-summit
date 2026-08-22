@@ -137,11 +137,19 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   zaten `SpeedMultiplier` yayınlıyor ama hareket koduna bağlamak onaya tabi.
   **Tetikleyici:** zemin tipi ayrımı istendiğinde.
 
-- **`fix.md`'nin kalan maddeleri incelenmedi** — 16 maddeden 6'sı düzeltildi,
-  3'ü geçersiz çıktı, 1'i yapılamadı. Kalanlar: SkyFog `ZTest` konturu,
-  froxel dilim basamaklanması (temporal reprojection), yağmur kutusu popping,
-  ay evreleri, ufuk haritası sınırı (kodda bilinçli, yorumda gerekçesi var),
-  ACES renk sapması (kalibrasyon), cavity AO 50 m LOD pop, yıldız şişmesi.
+- **Ay hep dolunay** — `MoonDirection => -SunDirection`; ay güneşin tam zıttında
+  duruyor, yani her akşam güneş batarken doğuyor ve hep dolu görünüyor. Gök
+  paketi evreyi kendi hesaplıyor ama yön bu olduğu sürece hep dolunay çıkar.
+  Ay yörüngesine bağımsız açısal ofset eklemek TASARIM kararı: gece
+  aydınlatması evreye göre değişir, tırmanışın gece bölümü etkilenir.
+  **Tetikleyici:** kullanıcı ay evreleri isterse. `DESIGN.md`'ye de bakılmalı.
+
+- **`fix.md`'nin kalan dört maddesi** — doğrulandı ama yapılmadı, hiçbiri
+  kullanıcı tarafından ekranda görülmüş değil:
+  cavity AO'nun 50 m'de sert kesilmesi (`MountainSurface.hlsl:419`,
+  LOD pop), yıldızların küp dikişinde şişmesi (`StarField.hlsl:135`,
+  `fwidth(cellUV)` sıçraması), yağmur kutusu popping, froxel dilim
+  basamaklanması (temporal reprojection gerektiriyor — büyük iş).
   **Tetikleyici:** ilgili belirti ekranda görüldüğünde.
 
 - **VFX'te gökyüzü örtü kesmesi yok** — spec §17.1 `_SnowSkyVisTex`'ten okuyup
