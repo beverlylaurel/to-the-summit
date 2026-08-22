@@ -136,7 +136,140 @@ public static class SnowGroundTest
         r.AppendLine("  TerrainCollider'a çarptı " + terrainHits + " / " + offsets.Length);
         r.AppendLine("  Terrain ile uyuşan       " + matches + " / " + offsets.Length);
 
-        bool sourceIsVisible = matches == offsets.Length && hasRelief;
+        // ---------------------------------------------------------------- bake
+        //
+        // BURAYA KADAR OLAN ÖLÇÜM "Terrain görünen arazi mi" sorusunu yanıtlıyor.
+        // ASIL SORU BU DEĞİL: kar, Terrain'i DOĞRUDAN okumuyor — `SnowGroundHeight`
+        // bir dokuya pişiriyor ve shader onu örneklüyor. Pişirme indeks sırası
+        // ters olsa (spec §7.1 özellikle uyarıyor: `h[y, x]`) kar yüzeyi dağın
+        // yüksekliğini YANLIŞ YERDEN okur ve araziden ayrı durur.
+        //
+        // Aşağısı pişirmenin kendisini sınıyor: shader'ın yaptığı eşlemenin
+        // birebir aynısı CPU'da kurulup Terrain'in gerçek yüksekliğiyle
+        // karşılaştırılıyor.
+        r.AppendLine();
+        r.AppendLine("## Pişen doku Terrain'i doğru kopyalıyor mu");
+
+        int res = td.heightmapResolution;
+        float[,] hm = td.GetHeights(0, 0, res, res);
+
+        int bakeOk = 0;
+        float bakeWorst = 0f;
+        var bakePoints = new[]
+        {
+            new Vector2(0.25f, 0.25f), new Vector2(0.5f, 0.5f), new Vector2(0.75f, 0.25f),
+            new Vector2(0.25f, 0.75f), new Vector2(0.9f, 0.6f),
+        };
+
+        foreach (Vector2 uv in bakePoints)
+        {
+            // Shader: uv = (posXZ - origin) / size, sonra doku örnekleniyor.
+            // Doku pikseli (x, y) = h[y, x]. En yakın teksel yeterli — aradığımız
+            // hata metre mertebesinde, teksel arası fark değil.
+            int px = Mathf.Clamp(Mathf.RoundToInt(uv.x * (res - 1)), 0, res - 1);
+            int py = Mathf.Clamp(Mathf.RoundToInt(uv.y * (res - 1)), 0, res - 1);
+
+            float baked = pos.y + hm[py, px] * size.y;
+            float truth = pos.y + td.GetInterpolatedHeight(uv.x, uv.y);
+
+            // Ters indeksin ne verdiği de yazılıyor: hata buysa o sütun tutar.
+            float swapped = pos.y + hm[px, py] * size.y;
+
+            float gap = Mathf.Abs(baked - truth);
+            float swapGap = Mathf.Abs(swapped - truth);
+            bool ok = gap < 2f;
+
+            if (ok) bakeOk++;
+            bakeWorst = Mathf.Max(bakeWorst, gap);
+
+            r.AppendLine("  [" + M(ok) + "] uv(" + uv.x.ToString("0.00") + "," + uv.y.ToString("0.00") + ")" +
+                         "   gerçek " + truth.ToString("0.0") + " m" +
+                         "   pişen " + baked.ToString("0.0") + " m" +
+                         "   fark " + gap.ToString("0.0") + " m" +
+                         "   (ters indeks farkı " + swapGap.ToString("0.0") + " m)");
+        }
+
+        bool bakeMatches = bakeOk == bakePoints.Length;
+
+        r.AppendLine();
+        r.AppendLine("  " + (bakeMatches
+            ? "[+] Pişen doku Terrain'in aynısı."
+            : "[-] PİŞEN DOKU YANLIŞ. En büyük fark " + bakeWorst.ToString("0.0") + " m."));
+
+        // ---------------------------------------------------------------- çözünürlük
+        //
+        // Kar bölgesi 16 m; zemin dokusunun tekseli bundan büyükse kar yüzeyi
+        // bölgenin içinde neredeyse DÜZ çıkar. Sayı burada, yorum yok.
+        float groundTexel = size.x / Mathf.Max(res - 1, 1);
+
+        r.AppendLine();
+        r.AppendLine("## Zemin dokusunun çözünürlüğü");
+        r.AppendLine("  Teksel                   " + groundTexel.ToString("0.00") + " m");
+        r.AppendLine("  Kar bölgesi              16.00 m  (" +
+                     (16f / groundTexel).ToString("0.0") + " teksel)");
+        r.AppendLine("  Clipmap kapsaması        128.00 m  (" +
+                     (128f / groundTexel).ToString("0.0") + " teksel)");
+
+        // ------------------------------------------------- kar yüzeyi ile arazi arası
+        //
+        // ASIL SAYI BU. Kar mesh'i `SampleGroundHeight` + kalınlık kadar
+        // yükseliyor; arazi kendi üçgenleriyle çiziliyor. İkisinin arası kar
+        // kalınlığı kadar olmalı. Daha fazlaysa kar yüzeyi havada duruyor
+        // demektir ve fark burada metre olarak çıkar.
+        //
+        // Shader BİLİNEAR örnekliyor, Terrain ÜÇGENLERLE. Aynı köşelerden
+        // geçseler de hücrenin içinde farklı yüzeyler; fark bu ölçümde görünür.
+        r.AppendLine();
+        r.AppendLine("## Kar yüzeyi araziden ne kadar ayrılıyor");
+
+        float texel = size.x / Mathf.Max(res - 1, 1);
+        float worstSep = 0f, sumSep = 0f;
+        int samples = 0;
+        Vector2 worstAt = Vector2.zero;
+
+        for (int i = 0; i <= 32; i++)
+        for (int j = 0; j <= 32; j++)
+        {
+            float wx = center.x - 64f + i * 4f;
+            float wz = center.z - 64f + j * 4f;
+
+            float u = (wx - pos.x) / size.x;
+            float v = (wz - pos.z) / size.z;
+            if (u < 0f || u > 1f || v < 0f || v > 1f) continue;
+
+            // Shader'ın bilinear örneklemesi, birebir.
+            float fx = u * (res - 1), fy = v * (res - 1);
+            int x0 = Mathf.Clamp((int)fx, 0, res - 2);
+            int y0 = Mathf.Clamp((int)fy, 0, res - 2);
+            float tx = fx - x0, ty = fy - y0;
+
+            float n = Mathf.Lerp(Mathf.Lerp(hm[y0, x0], hm[y0, x0 + 1], tx),
+                                 Mathf.Lerp(hm[y0 + 1, x0], hm[y0 + 1, x0 + 1], tx), ty);
+
+            float snowGroundY = pos.y + n * size.y;
+            float terrainY = pos.y + td.GetInterpolatedHeight(u, v);
+
+            float sep = Mathf.Abs(snowGroundY - terrainY);
+            sumSep += sep;
+            samples++;
+
+            if (sep > worstSep) { worstSep = sep; worstAt = new Vector2(wx, wz); }
+        }
+
+        float meanSep = samples > 0 ? sumSep / samples : 0f;
+
+        // Kar kalınlığı 26–45 cm. Ayrılık bunun altındaysa yüzey araziye oturuyor.
+        bool hugsGround = worstSep < 0.5f;
+
+        r.AppendLine("  Örnek sayısı             " + samples + "  (oyuncunun çevresinde 128 m, 4 m adım)");
+        r.AppendLine("  Zemin tekseli            " + texel.ToString("0.00") + " m");
+        r.AppendLine("  [" + M(hugsGround) + "] Ortalama ayrılık     " + (meanSep * 100f).ToString("0.0") + " cm");
+        r.AppendLine("  [" + M(hugsGround) + "] EN BÜYÜK ayrılık     " + worstSep.ToString("0.00") + " m" +
+                     "   @ (" + worstAt.x.ToString("0") + ", " + worstAt.y.ToString("0") + ")");
+        r.AppendLine("      Beklenen: kar kalınlığı kadar, yani 26–45 cm. Metre mertebesindeyse");
+        r.AppendLine("      kar yüzeyi arazinin üstünde havada duruyor.");
+
+        bool sourceIsVisible = matches == offsets.Length && hasRelief && bakeMatches && hugsGround;
 
         r.AppendLine();
 
