@@ -99,17 +99,12 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   5. `SnowMovementModifier.SpeedMultiplier` hareket koduna bağlanacak
   → [Kar sistemi: spec'ten bilinçli sapmalar](#kar-sistemi-specten-bilinçli-sapmalar-ve-iki-assumption-2026-08-22)
 
-- **Kar tanesinin asgari ekran boyutu yok** — spec §17.1
-  `size = max(size, minWorld)` istiyor, `minWorld = distToCam * (1.3 /
-  _ScreenHeight) * 2 * tan(fov*0.5)`. Hazır `ScreenSpaceSize` bloğu bunu
-  VERMİYOR: modlarının hiçbiri asgari değil, hepsi boyutu zorluyor (paket
-  kaynağından okundu). `PixelAbsolute` denendi ve çıkarıldı — yakındaki taneyi
-  de 1.3 piksele kilitliyordu, kar toz gibi görünüyordu. Doğru çözüm bir
-  operatör zinciri (mesafe, fov, ekran yüksekliği) ve `SnowVfxBuilder`'da
-  operatör ekleme yeteneği yok — şu an yalnız bağlam, blok ve parametre
-  kurabiliyor.
-  **Tetikleyici:** uzaktaki kar kayboluyorsa ya da TAA'da titriyorsa.
-  **Maliyet:** builder'a operatör desteği + zincir, yarım gün.
+- **Savrulan kar VFX'leri konumlanmıyor** — `SnowDriftVfxController` yalnız
+  oranı sürüyor; `VFX_Spindrift` ve `VFX_SnowCurtain` sahne orijininde duruyor
+  (ölçüldü: konum (0,0,0), kamera 7,5 km ötede). Spawn kutuları kameraya
+  taşınmadan bu iki katman hiç görünmüyor.
+  **Tetikleyici:** rüzgâr yüksekken yerde savrulan kar görünmüyorsa.
+  **Maliyet:** `SnowfallLayers`'daki takip mantığının aynısı, birkaç satır.
 
 - **Yağmur artık hiç çizilmiyor** — `RainWeight01` sabit 0. Sıcaklık yağıştan
   koparılınca (kullanıcı kararı) kar/yağmur ayrımı yapacak tek kapı da gitti;
@@ -125,10 +120,6 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Cepheyi ne sürecek** — yaklaşmanın yarısında kar başlaması isteniyor; şiddet şu an
   yalnız rakımdan geliyor ve ovada minimum
   → [Yaklaşmada kar bir CEPHEDEN gelir](#yaklaşmada-kar-bir-cepheden-gelir)
-- **`FogDensity01` normalizasyonu** — `AtmosphereController.Visibility` metre cinsinden;
-  kar sistemi 0..1 istiyor. İki uç (`minVis` / `maxVis`) ölçülüp seçilecek, tahmin
-  edilmeyecek
-  → [Kar sistemi: spec'ten bilinçli sapmalar](#kar-sistemi-specten-bilinçli-sapmalar-ve-iki-assumption-2026-08-22)
 
 ### `DepthNormals` fragman maliyeti KABUL EDİLDİ
 
@@ -1259,27 +1250,25 @@ kayıt kapanır.
 
 ---
 
-## `VFX_SnowfallCurtain` bir parçacık sistemi DEĞİL — karar bekliyor (2026-08-22)
+## §17.2 uzak katman `.vfx` DEĞİL, kendi bileşeni (2026-08-22)
 
-Spec Faz 8 altı `.vfx` sayıyor, beşi kuruldu. Altıncısı `VFX_SnowfallCurtain`
-ve §17.2'nin tarifi bir parçacık sistemine uymuyor:
+Spec Faz 8 altı `.vfx` sayıyor ama §17.2'nin tarifi bir parçacık sistemine
+uymuyor:
 
 > Kameraya sabit 3 adet dikey quad, mesafeler 18 m, 32 m, 55 m. Her biri
 > kameranın FOV'unu tam kaplar, kameraya bakar. UV kaydırma: `uv += (...) * time`.
 
-Bunda spawn yok, ömür yok, parçacık yok — üç sabit quad ve kayan UV var. VFX
-Graph'ta kurulacak olsaydı üç ölümsüz parçacık + kameraya kilitli konum + UV
-kaydırma bloğu gerekirdi; hem daha pahalı hem tarife daha uzak.
+Spawn yok, ömür yok, parçacık yok. VFX Graph'ta kurulsaydı üç ölümsüz parçacık +
+kameraya kilitli konum + UV kaydırma bloğu gerekirdi; hem daha pahalı hem tarife
+daha uzak.
 
-Projede zaten `SnowCurtainController` + `SnowCurtain.shader` bu davranışı
-birebir yapıyor (Faz 8'de yazıldı, çalışıyor).
+**`SnowfallCurtains` + `SnowfallCurtain.shader` olarak yazıldı.** Sapma yalnız
+dosya biçiminde; mesafeler, alpha'lar, kaydırma formülü ve devre dışı eşiği
+spec'ten birebir.
 
-**Yapılmadı, karar kullanıcıya bırakıldı.** İki seçenek:
-1. Mevcut shader yolu kalsın; §0.3'ün dosya adı bağı için sapma kaydı bu
-2. `.vfx` olarak da kurulsun; o zaman mevcut shader yolu silinir
-
-**Tetikleyici:** kullanıcı hangisini istediğini söyleyince biri uygulanır ve bu
-kayıt silinir.
+**Bu kayıt daha önce yanlış yazılmıştı:** "projede zaten `SnowCurtainController`
+bu davranışı birebir yapıyor" deniyordu. Yapmıyordu — o §18.7'nin SAVRULMA
+perdeleri, tetiği rüzgâr. İkisi ayrı sistem, ayrı tetik, ayrı spec bölümü.
 
 ---
 

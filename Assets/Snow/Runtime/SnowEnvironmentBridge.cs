@@ -68,10 +68,35 @@ public class SnowEnvironmentBridge : MonoBehaviour, ISnowEnvironmentSource
 
     /// GÖRÜŞ METRE, SİS 0..1. Dönüşüm burada yapılıyor çünkü sınırlar bu
     /// projeye ait; sis sistemine dokunulmuyor.
-    public float FogDensity01 => atmosphere != null
-        ? 1f - Mathf.Clamp01(Mathf.InverseLerp(fogFullVisibility, fogClearVisibility,
-                                               atmosphere.Visibility))
-        : manualFogDensity;
+    ///
+    /// EŞLEME GÖRÜŞTE DEĞİL SÖNÜMLEMEDE DOĞRUSAL.
+    /// `[KAYNAK: Koschmieder — görüş V ile sönümleme σ ters orantılı,
+    /// σ = 3.912 / V]`.
+    ///
+    /// Önceki hâli görüş mesafesinde doğrusaldı ve fiziksel olarak ters
+    /// sonuç veriyordu: 1150 m görüşte sis yoğunluğu 0.95 çıkıyordu — yani
+    /// "neredeyse tam sis". 1150 m berrak bir havadır. Aradaki her şey sise
+    /// boğuluyordu; uzak yağış perdesi alpha'sını 0.10'dan 0.043'e düşürüp
+    /// görünmez kılan da buydu (ölçüldü, `SYMPTOMS.md`).
+    ///
+    /// 3.912 sabiti hem pay hem paydada olduğu için sadeleşiyor; 1/V yetiyor.
+    ///
+    /// Uçlar:
+    ///        60 m -> 1.00      200 m -> 0.30      1150 m -> 0.05
+    ///       100 m -> 0.60      500 m -> 0.11     20000 m -> 0.00
+    public float FogDensity01
+    {
+        get
+        {
+            if (atmosphere == null) return manualFogDensity;
+
+            float sigma = 1f / Mathf.Max(1f, atmosphere.Visibility);
+            float sigmaFull = 1f / Mathf.Max(1f, fogFullVisibility);
+            float sigmaClear = 1f / Mathf.Max(1f, fogClearVisibility);
+
+            return Mathf.Clamp01(Mathf.InverseLerp(sigmaClear, sigmaFull, sigma));
+        }
+    }
 
     static Vector3 SafeHorizontal(Vector3 v)
     {

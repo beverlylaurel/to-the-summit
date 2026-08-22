@@ -1083,3 +1083,58 @@ küçük kutu sistemi tamamen yok eder. Asimetrik risk.
 **Neden `Automatic` değil.** Unity gerçek kutuyu her frame GPU'da hesaplayabiliyor ama
 bu bir okuma-geri maliyeti. Ölçüm için geçici olarak açıldı (kar düşüyor mu sorusunu
 ışıktan bağımsız cevapladı), ölçüm bitince kapatıldı.
+
+
+## Kar tanesinin asgari ekran boyutu Custom HLSL bloğunda
+
+**Kural.** `VFX_Snowfall`'ın çıktı bağlamında bir `CustomHLSL` bloğu var:
+`scaleX = max(scaleX, newScale.x)`. Tane hiçbir mesafede 1.3 pikselin altına
+düşmüyor, ama yakındayken gerçek dünya boyutunu koruyor.
+
+**Neden hazır blok kullanılmadı.** `ScreenSpaceSize` bunu vermiyor: `SizeMode`
+seçeneklerinin hiçbiri asgari değil (`PixelAbsolute`,
+`PixelRelativeToResolution`, `RatioRelativeTo*` — paket kaynağından okundu).
+`PixelAbsolute` denendi ve boyutu SABİTLEDİ; yakındaki tane de 1.3 piksele
+kilitlendi, kar toz gibi göründü.
+
+**Formül sıfırdan yazılmadı.** `ScreenSpaceSize`'ın kendi HLSL'i alındı, tek fark
+son iki satırda atama yerine `max`. Spec §17.1'in
+`distToCam * (px / h) * 2 * tan(fov/2)` ifadesiyle aynı büyüklük; aynı işi yapan
+çalışan bir ifade zaten paketin içindeydi.
+
+**Doğrulandı ölçümle:** `minPixelSize` geçici olarak 20 yapıldı — taneler her
+mesafede iri toplar oldu ve FPS 114'ten 14'e düştü (overdraw). Mekanizmanın
+çalıştığı da, 1.3'ün neden 1.3 olduğu da aynı ölçümden çıktı.
+
+
+## Sis yoğunluğu görüşte değil sönümlemede doğrusal
+
+**Kural.** `SnowEnvironmentBridge.FogDensity01` görüş mesafesini `σ = 1/V`
+üzerinden 0..1'e çeviriyor `[KAYNAK: Koschmieder — σ = 3.912 / V]`.
+
+**Neden.** Önceki hâli görüş mesafesinde doğrusaldı ve fiziksel olarak ters
+sonuç veriyordu: 1150 metre görüşte sis yoğunluğu **0.95** çıkıyordu, yani
+"neredeyse tam sis". 1150 m berrak bir havadır.
+
+**Belirti buydu:** uzak yağış perdesinin alpha'sı `1 − fog * 0.6` ile 0.10'dan
+0.043'e düşüyordu ve perde ekranda görünmüyordu. Aynı yanlış değer savrulma
+perdesi shader'ını ve eski compute yağışını da kısıyordu.
+
+**Uçlar kâğıtta:** 60 m → 1.00, 100 m → 0.60, 200 m → 0.30, 500 m → 0.12,
+1150 m → 0.05, 20 km → 0.00. 3.912 sabiti hem pay hem paydada olduğu için
+sadeleşiyor.
+
+
+## Uzak yağış perdesinin yoğunluğu dokudan geliyor, alpha'dan değil
+
+**Kural.** Perde alpha'sı spec §17.2'nin verdiği 0.10 / 0.07 / 0.05'te duruyor;
+katmanın gücü doku yoğunluğundan (2400 tane, ~%22 kaplama) geliyor.
+
+**Neden.** İlk doku 900 taneydi (~%8) ve perdenin ekrana katkısı ölçüldüğünde
+1.05/255 çıktı — perde açık ve kapalı iki kare arasındaki ortalama fark. Alpha'yı
+artırmak tülü kalınlaştırırdı; perdenin temsil ettiği şey ise uzaktaki
+TANELER. Sayıyı artırmak tarife sadık, alpha'yı artırmak değil.
+
+**Ölçüm aracı:** perde açık/kapalı iki kare, yakın katman susturulmuş. Ekranın
+%36.8'i etkileniyordu — yani perde çiziliyordu, yalnız katkısı zayıftı. "Hiç
+çizilmiyor" ile "çok soluk" ancak böyle ayrıldı.

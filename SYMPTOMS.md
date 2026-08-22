@@ -944,3 +944,42 @@ uyuşmazlığında varsayılanı bırakıp sessizce dönüyor.
 **Düzeltme yalnız o çağrı değil, yardımcının kendisi oldu.** `SetSlot` artık
 yazdığını geri okuyup karşılaştırıyor, eşleşmezse hangi tipin beklendiğini
 söyleyerek fırlatıyor. Sessiz düşüş bir kez bulundu; ikincisini araç yakalar.
+
+
+## "uzaktaki kar kayboluyor" — iki ayrı sebep, ikisi de ölçüldü
+
+**Birincisi asgari ekran boyutunun hiç olmamasıydı.** 20 metredeki 2 cm'lik tane
+ekranda yarım pikselin altına düşüyor ve kayboluyor. Spec §17.1 bunu ayrıca
+uyarıyor. `ScreenSpaceSize` bloğu denendi ve YANLIŞ çıktı: hiçbir modu asgari
+değil, `PixelAbsolute` boyutu sabitliyor — yakındaki tane de 1.3 piksele
+kilitlendi, kar toz gibi göründü. Çözüm `CustomHLSL` bloğu: aynı paketin kendi
+formülü, atama yerine `max`.
+
+**İkincisi uzak katmanın hiç yazılmamış olmasıydı.** `SnowfallLayers.farLayer`
+alanı `SnowCurtainController` tipindeydi ve HİÇ KULLANILMIYORDU; üstelik yanlış
+sistemi gösteriyordu — o §18.7'nin savrulma perdeleri (tetik rüzgâr), §17.2'nin
+yağış perdeleri değil. `DECISIONS.md`'deki "mevcut shader bu davranışı birebir
+yapıyor" kaydı bu ikisini karıştırmıştı.
+
+**Yeni katman kurulduğunda da görünmedi — üçüncü sebep sisti.** `FogDensity01`
+görüş mesafesinde doğrusal eşleniyordu ve 1150 metrede **0.95** veriyordu.
+Perde alpha'sı `1 − fog * 0.6` ile 0.10'dan 0.043'e düşüyordu. Eşleme
+sönümlemeye çevrildi (Koschmieder, `σ = 1/V`); aynı görüş artık 0.05 veriyor.
+
+**Ayırt eden ölçüm — "hiç çizilmiyor" mu "çok soluk" mu.** Perde açık ve kapalı
+iki kare alındı, yakın katman susturuldu, piksel farkı ölçüldü: ekranın %36.8'i
+etkileniyor, en büyük fark 100/255, ortalama 1.05/255. Yani çiziliyordu ve
+zayıftı. Göz kararıyla ikisi ayrılamazdı — ekranda ikisi de "yok" görünüyor.
+
+
+## Sahne kurulumu Play modunda çalıştırıldı ve sessizce yarım kaldı
+
+Play'de eklenen bileşenler ve bağlar Play çıkınca siliniyor; sahne dosyasına hiç
+yazılmıyor. Bir tur boyunca "VFX bağlandı" görüldü, Play kapandı, sahnede
+`VisualEffect` referansı sıfır kaldı ve kar yağmadı.
+
+İkinci kez `MarkSceneDirty` "This cannot be used during play mode" fırlattı —
+ama kurulumun SONUNDA, o noktaya kadar yarım iş yapılmıştı.
+
+**Kapı en başa kondu:** `SetupScene` artık `EditorApplication.isPlaying` ise
+hemen hata verip çıkıyor.

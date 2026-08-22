@@ -376,6 +376,11 @@ public class SnowDebugWindow : EditorWindow
     const string PuffMaterialPath = "Assets/Snow/Settings/M_SnowPuff.mat";
     const string CurtainShaderPath = "Assets/Snow/Shaders/SnowCurtain.shader";
     const string CurtainMaterialPath = "Assets/Snow/Settings/M_SnowCurtain.mat";
+
+    // Uzak YAGIS perdeleri (spec 17.2) — yukaridaki SAVRULMA perdelerinden ayri.
+    const string FallCurtainShaderPath = "Assets/Snow/Shaders/SnowfallCurtain.shader";
+    const string FallCurtainMaterialPath = "Assets/Snow/Settings/M_SnowfallCurtain.mat";
+    const string FallCurtainTexturePath = "Assets/Snow/Textures/T_SnowfallCurtain.png";
     const string SnowLitMaterialPath = "Assets/Snow/Settings/M_SnowLit.mat";
 
     /// SAHNE ELLE DÜZENLENMİYOR. Proje kuralı: bileşen ekleme, referans bağlama ve
@@ -392,6 +397,23 @@ public class SnowDebugWindow : EditorWindow
 
     public static void SetupScene()
     {
+        // PLAY MODUNDA KURULUM YAPILMAZ.
+        //
+        // Play'de eklenen bileşenler ve bağlar Play çıkınca SİLİNİYOR; sahne
+        // dosyasına hiç yazılmıyor. Bir kez oldu: VFX katmanları Play'de
+        // kuruldu, "bağlandı" görüldü, Play kapanınca sahnede `VisualEffect`
+        // referansı sıfırdı ve kar yağmadı (`SYMPTOMS.md`).
+        //
+        // `MarkSceneDirty` zaten Play'de fırlatıyor ama kurulumun SONUNDA —
+        // o noktaya kadar yarım iş yapılmış oluyor. Kapı en başta.
+        if (EditorApplication.isPlaying)
+        {
+            Debug.LogError("Kar sistemi kurulumu Play modunda çalıştırılamaz. " +
+                           "Play'de kurulan bileşenler Play çıkınca silinir. " +
+                           "Önce Play'i durdurun.");
+            return;
+        }
+
         EnsureLayer(SnowProjectCheck.DeformerLayer);
         EnsureLayer(SnowProjectCheck.OccluderLayer);
 
@@ -442,6 +464,9 @@ public class SnowDebugWindow : EditorWindow
 
         var driftVfx = go.GetComponent<SnowDriftVfxController>();
         if (driftVfx == null) driftVfx = go.AddComponent<SnowDriftVfxController>();
+
+        var fallCurtains = go.GetComponent<SnowfallCurtains>();
+        if (fallCurtains == null) fallCurtains = go.AddComponent<SnowfallCurtains>();
 
         if (go.GetComponent<SnowProfiler>() == null)
             go.AddComponent<SnowProfiler>();
@@ -498,7 +523,6 @@ public class SnowDebugWindow : EditorWindow
 
         var fallLayersSerialized = new SerializedObject(fallLayers);
         fallLayersSerialized.FindProperty("environment").objectReferenceValue = bridge;
-        fallLayersSerialized.FindProperty("farLayer").objectReferenceValue = curtains;
         fallLayersSerialized.FindProperty("nearLayer").objectReferenceValue = snowfallVfx;
         fallLayersSerialized.FindProperty("computeFallback").objectReferenceValue = snowfall;
         fallLayersSerialized.FindProperty("followTarget").objectReferenceValue =
@@ -513,8 +537,16 @@ public class SnowDebugWindow : EditorWindow
         driftVfxSerialized.FindProperty("curtain").objectReferenceValue = curtainVfx;
         driftVfxSerialized.ApplyModifiedProperties();
 
+        var fallCurtainsSerialized = new SerializedObject(fallCurtains);
+        fallCurtainsSerialized.FindProperty("environment").objectReferenceValue = bridge;
+        fallCurtainsSerialized.FindProperty("view").objectReferenceValue = Camera.main;
+        fallCurtainsSerialized.FindProperty("curtainMaterial").objectReferenceValue =
+            EnsureFallCurtainMaterial();
+        fallCurtainsSerialized.ApplyModifiedProperties();
+
         EditorUtility.SetDirty(fallLayers);
         EditorUtility.SetDirty(driftVfx);
+        EditorUtility.SetDirty(fallCurtains);
 
         var groundSerialized = new SerializedObject(ground);
         groundSerialized.FindProperty("settings").objectReferenceValue = settings;
@@ -649,6 +681,45 @@ public class SnowDebugWindow : EditorWindow
         EditorUtility.SetDirty(vfx);
 
         return vfx;
+    }
+
+    /// UZAK YAGIS PERDESININ MALZEMESI (spec 17.2).
+    ///
+    /// Doku yoksa malzeme yine kuruluyor ama perde gorunmuyor: shader'in
+    /// varsayilani "black", alpha 0. Sessizce bos kalmasin diye uyari
+    /// veriliyor — dokuyu ureten menu ayri.
+    static Material EnsureFallCurtainMaterial()
+    {
+        Shader shader = AssetDatabase.LoadAssetAtPath<Shader>(FallCurtainShaderPath);
+
+        if (shader == null)
+        {
+            Debug.LogWarning("Uzak perde shader'i yok: " + FallCurtainShaderPath);
+            return null;
+        }
+
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(FallCurtainMaterialPath);
+
+        if (mat == null)
+        {
+            mat = new Material(shader);
+            AssetDatabase.CreateAsset(mat, FallCurtainMaterialPath);
+        }
+        else if (mat.shader != shader)
+        {
+            mat.shader = shader;
+        }
+
+        var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(FallCurtainTexturePath);
+
+        if (tex == null)
+            Debug.LogWarning("Uzak perde dokusu yok. Menu: " +
+                             "To The Summit/Kar/Uzak Perde Dokusunu Uret");
+        else
+            mat.SetTexture("_MainTex", tex);
+
+        EditorUtility.SetDirty(mat);
+        return mat;
     }
 
     static Material LoadOrCreateSnowMaterial()

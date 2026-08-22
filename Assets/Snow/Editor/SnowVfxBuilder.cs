@@ -197,22 +197,29 @@ public static class SnowVfxBuilder
         SetSlot(output, "smoothness", 0.2f, r);
         SetSlot(output, "metallic", 0f, r);
 
-        // ASGARİ EKRAN BOYUTU BURADA YOK — `ScreenSpaceSize` onu vermiyor.
-        //
-        // Blok denendi ve çıkarıldı: `SizeMode` seçeneklerinin hiçbiri "asgari"
-        // değil (`PixelAbsolute`, `PixelRelativeToResolution`,
-        // `RatioRelativeTo*` — ölçüldü, paket kaynağı). `PixelAbsolute` boyutu
-        // SABİTLİYOR: yakındaki tane de uzaktaki de 1.3 piksel oluyor, kar
-        // toz gibi görünüyor.
-        //
-        // Spec §17.1 `size = max(size, minWorld)` istiyor; o bir operatör
-        // zinciri gerektiriyor (mesafe, fov, ekran yüksekliği). Ayrı iş —
-        // `DECISIONS.md`.
-
         // Yönelim: `Face Camera Plane` (spec §17.1). Varsayılan zaten bu;
         // yine de yazılıyor ki varsayılan değişirse sessizce kaymasın.
         object orient = AddBlock(output, "Block.Orient", r);
         SetSetting(orient, "mode", "FaceCameraPlane", r);
+
+        // ASGARİ EKRAN BOYUTU (spec §17.1).
+        //
+        // Hazır `ScreenSpaceSize` bloğu bunu VERMİYOR: `SizeMode`
+        // seçeneklerinin hiçbiri asgari değil, hepsi boyutu ZORLUYOR (paket
+        // kaynağından okundu). `PixelAbsolute` denendi — yakındaki taneyi de
+        // 1.3 piksele kilitledi, kar toz gibi göründü.
+        //
+        // Formül o bloğun KENDİ kodundan alındı; tek fark son iki satırda
+        // atama yerine `max`. Sıfırdan yazılmadı: aynı işi yapan çalışan
+        // ifade zaten paketin içindeydi.
+        //
+        //   scaleX = newScale       -> tane TAM 1.3 piksel  (blok böyle)
+        //   scaleX = max(1, ...)    -> tane EN AZ 1.3 piksel (spec böyle)
+        //
+        // 1.3 koda gömülü: spec sabit veriyor, ayarlanabilir olması istenmiyor.
+        object minPx = AddBlock(output, "Block.CustomHLSL", r);
+        SetSetting(minPx, "m_BlockName", "Asgari ekran boyutu", r);
+        SetSetting(minPx, "m_HLSLCode", MinScreenSizeHlsl, r);
 
         Link(spawner, init, r);
         Link(init, update, r);
@@ -390,6 +397,30 @@ public static class SnowVfxBuilder
     /// paketinde, ama `Output Particle URP Lit Quad` (spec §17.1) URP
     /// paketinde: `UnityEditor.VFX.URP.VFXURPLitPlanarPrimitiveOutput`.
     /// Yalnız VFX assembly'sine bakınca "tip bulunamadı" veriyordu.
+    /// ASGARİ EKRAN BOYUTU — `ScreenSpaceSize` bloğunun kendi ifadesi,
+    /// atama yerine `max` ile.
+    ///
+    /// `clipPosW` kameraya uzaklık (klip uzayının w'si). Payda taneyi ekranda
+    /// bir piksele oturtan ölçek; `UNITY_MATRIX_P`'nin köşegeni fov'u,
+    /// `_ScreenParams` çözünürlüğü taşıyor. Spec §17.1'in
+    /// `distToCam * (px / h) * 2 * tan(fov/2)` formülüyle aynı büyüklük.
+    const string MinScreenSizeHlsl =
+@"void SnowMinScreenSize(inout VFXAttributes attributes)
+{
+    const float minPixelSize = 1.3f;
+
+    float clipPosW = TransformPositionVFXToClip(attributes.position).w;
+
+    float denom = attributes.size * 0.5f
+                * min(abs(UNITY_MATRIX_P[0][0] * _ScreenParams.x),
+                      abs(UNITY_MATRIX_P[1][1] * _ScreenParams.y));
+
+    float2 newScale = (float2(minPixelSize, minPixelSize) * clipPosW) / denom;
+
+    attributes.scaleX = max(attributes.scaleX, newScale.x);
+    attributes.scaleY = max(attributes.scaleY, newScale.y);
+}";
+
     static Type Find(string shortName)
     {
         string full =

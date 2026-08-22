@@ -819,6 +819,18 @@ düzenlenmiyor, üretim tekrar koşturulabilir. Tane düşüşü grafikte fizikt
 `Absolute` modda kuvvet olarak üstüne biniyor. Katman bağlıyken compute tabanlı
 `SnowfallRenderer` kapanıyor — iki yağış sistemi birden koşmuyor.
 
+**Uzak yağış katmanı `SnowfallCurtains`.** Kameraya kilitli üç quad (18/32/55 m),
+kayan doku, alpha `layerAlpha * SnowfallIntensity01 * (1 − FogDensity01 * 0.6)`.
+Şiddeti `SnowRuntimeState`'ten KENDİSİ okuyor — `SnowfallLayers` üzerinden ikinci
+bir yol geçmiyor. `SnowCurtainController` ile karıştırılmamalı: o §18.7'nin
+savrulma perdeleri, tetiği rüzgâr; bu §17.2'nin yağış perdeleri, tetiği yağış.
+Dokusu `SnowCurtainTextureBuilder` menüsünden üretiliyor, repoda elle çizilmiş
+doku yok.
+
+**`FogDensity01` sönümlemede doğrusal, görüşte değil.** `SnowEnvironmentBridge`
+görüş mesafesini `1/V` üzerinden 0..1'e çeviriyor (Koschmieder). Tüketiciler:
+uzak yağış perdesi, savrulma perdesi shader'ı, eski compute yağış shader'ı.
+
 **Her VFX grafiğinin sınır kutusu elle yazılıyor.** Varsayılan 1 m³; Unity o
 kutuyu kırpıp sistemi tamamen gizliyor. Değerler `SnowVfxBuilder.SetBounds`'ta.
 

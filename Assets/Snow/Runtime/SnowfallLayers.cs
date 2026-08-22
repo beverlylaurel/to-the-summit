@@ -31,9 +31,15 @@ public class SnowfallLayers : MonoBehaviour
     [Tooltip("Grafikteki türbülans şiddeti özelliğinin adı.")]
     [SerializeField] string turbulenceProperty = "TurbulenceIntensity";
 
-    [Header("Uzak katman — doku perdeleri (spec §17.2)")]
-    [Tooltip("Uzak doku katmanı. Boş bırakılırsa sürülmez.")]
-    [SerializeField] SnowCurtainController farLayer;
+    // UZAK KATMAN BURADAN SÜRÜLMÜYOR. `SnowfallCurtains` şiddeti
+    // `SnowRuntimeState.SnowfallIntensity01`'den KENDİSİ okuyor — spec §17.3'ün
+    // "her ikisi de aynı i01'den" kuralı böyle de sağlanıyor, tek kaynak
+    // `SnowRuntimeState`. Buradan ikinci bir yol geçirmek aynı sayıyı iki kez
+    // taşımak olurdu.
+    //
+    // Önceden burada `SnowCurtainController` tipinde bir alan vardı ve hiç
+    // kullanılmıyordu; üstelik yanlış sistemi gösteriyordu (o §18.7'nin
+    // SAVRULMA perdeleri, bu §17.2'nin YAĞIŞ perdeleri).
 
     [Header("Çevre")]
     [Tooltip("Rüzgâr hızını okuyan köprü. Türbülans şiddeti ondan türüyor.")]
@@ -78,8 +84,6 @@ public class SnowfallLayers : MonoBehaviour
     {
         float i01 = SnowRuntimeState.SnowfallIntensity01;
 
-        // Spec §17.2: şiddet 0.05'in altındaysa uzak katman devre dışı.
-        // Yakın katman da sıfır oranla zaten parçacık üretmiyor.
         NearRate = Mathf.Lerp(0f, SnowConstants.MaxFlakeRate, i01);
 
         if (nearLayer == null) return;

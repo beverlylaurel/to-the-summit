@@ -206,6 +206,7 @@ GameObject:
   - component: {fileID: 76489736}
   - component: {fileID: 76489738}
   - component: {fileID: 76489737}
+  - component: {fileID: 76489739}
   m_Layer: 0
   m_Name: Kar Sistemi
   m_TagString: Untagged
@@ -240,7 +241,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c3abcdd2ecdcab43bf753cd569996f0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SnowEnvironmentBridge
-  sunLight: {fileID: 787919893}
+  sunLight: {fileID: 1544747437}
   wind: {fileID: 1805896805}
   time: {fileID: 508855605}
   temperature: {fileID: 1805896810}
@@ -458,10 +459,24 @@ MonoBehaviour:
   nearLayer: {fileID: 865627818}
   rateProperty: SpawnRate
   turbulenceProperty: TurbulenceIntensity
-  farLayer: {fileID: 76489729}
   environment: {fileID: 76489725}
   followTarget: {fileID: 330585546}
   computeFallback: {fileID: 76489734}
+--- !u!114 &76489739
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 76489723}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02577d05a4ef76249bacc58342be2642, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SnowfallCurtains
+  curtainMaterial: {fileID: 2100000, guid: 74aee2ffa8c54044f96b587908e9f1ce, type: 2}
+  view: {fileID: 330585545}
+  environment: {fileID: 76489725}
 --- !u!1 &263682441
 GameObject:
   m_ObjectHideFlags: 0

@@ -157,6 +157,13 @@ public static class SnowShaderIDs
     public static readonly int CurtainSpawnWidth = Shader.PropertyToID("_CurtainSpawnWidth");
     public static readonly int CurtainNoise = Shader.PropertyToID("_CurtainNoise");
 
+    // Uzak yagis perdeleri (spec 17.2). Yukaridakiler 18.7'nin SAVRULMA
+    // perdelerine ait; ikisi ayri sistem, ayri sabitler.
+    public static readonly int CurtainLayerAlpha = Shader.PropertyToID("_Alpha");
+    public static readonly int CurtainScrollSpeed = Shader.PropertyToID("_ScrollSpeed");
+    public static readonly int CurtainTiling = Shader.PropertyToID("_Tiling");
+    public static readonly int CurtainWindUv = Shader.PropertyToID("_WindUV");
+
     // --- Teşhis penceresi ---
     public static readonly int DebugMode = Shader.PropertyToID("_DebugMode");
     public static readonly int DebugRange = Shader.PropertyToID("_DebugRange");
