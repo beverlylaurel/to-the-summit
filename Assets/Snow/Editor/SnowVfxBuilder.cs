@@ -70,7 +70,13 @@ public static class SnowVfxBuilder
         // --- Spawn: sabit oran. Oran runtime'da `_FlakeRate` ile sürülüyor
         //     (spec §17.3); grafikte yalnız blok duruyor.
         object spawner = AddContext(graph, "VFXBasicSpawner", new Vector2(0, 0), r);
-        AddBlock(spawner, "VFXSpawnerConstantRate", r);
+        object rate = AddBlock(spawner, "VFXSpawnerConstantRate", r);
+
+        // Oran runtime'da `SnowfallLayers`'dan geliyor (spec §17.3): VFX
+        // yoğunluğu ve `_SnowfallSWERate` AYNI `i01`'den türüyor.
+        object rateParam = AddParameter(graph, "SpawnRate", typeof(float), 0f,
+                                        new Vector2(-300, 0), r);
+        LinkParameter(rateParam, rate, "Rate", r);
 
         // --- Initialize
         object init = AddContext(graph, "VFXBasicInitialize", new Vector2(0, 200), r);
@@ -114,8 +120,10 @@ public static class SnowVfxBuilder
         object turb = AddBlock(update, "Block.Turbulence", r);
 
         // Spec §17.1: `Intensity = 0.35 * _WindSpeed + 0.15`. Rüzgâra bağlı
-        // kısmı runtime'da sürülüyor; grafikte sabit taban duruyor.
-        SetSlot(turb, "Intensity", 0.15f, r);
+        // olduğu için parametreden sürülüyor; taban değer 0.15.
+        object turbParam = AddParameter(graph, "TurbulenceIntensity", typeof(float),
+                                        0.15f, new Vector2(-300, 500), r);
+        LinkParameter(turbParam, turb, "Intensity", r);
         SetSlot(turb, "frequency", 0.12f, r);
         SetSlot(turb, "octaves", 2, r);
         SetSlot(turb, "Drag", 0.9f, r);
@@ -163,7 +171,13 @@ public static class SnowVfxBuilder
         float sizeA, float sizeB, StringBuilder r)
     {
         object spawner = AddContext(graph, "VFXBasicSpawner", new Vector2(0, 0), r);
-        AddBlock(spawner, "VFXSpawnerConstantRate", r);
+        object rate = AddBlock(spawner, "VFXSpawnerConstantRate", r);
+
+        // Oran dışarıdan sürülüyor (spec §17.3, §18.7). Parametre olmasaydı
+        // `SetFloat` sessizce düşerdi.
+        object rateParam = AddParameter(graph, "SpawnRate", typeof(float), 0f,
+                                        new Vector2(-300, 0), r);
+        LinkParameter(rateParam, rate, "Rate", r);
 
         object init = AddContext(graph, "VFXBasicInitialize", new Vector2(0, 200), r);
         SetSetting(init, "capacity", capacity, r);
@@ -536,6 +550,86 @@ public static class SnowVfxBuilder
 
         link.Invoke(from, new object[] { to, 0, 0 });
         r.AppendLine("      bağ     " + from.GetType().Name + " → " + to.GetType().Name);
+    }
+
+    /// EXPOSED PARAMETRE. Grafik dışarıdan sürülebilsin diye.
+    ///
+    /// Parametre YOKSA `VisualEffect.SetFloat` sessizce düşüyor: `HasFloat`
+    /// false dönüyor, çağrı hiçbir şey yapmıyor ve dışarıdan "kar yağmıyor"
+    /// görünüyor. Denetleyicinin yazdığı her ad burada karşılığını bulmalı.
+    static object AddParameter(object graph, string name, Type type,
+                               object value, Vector2 pos, StringBuilder r)
+    {
+        Type pt = Find("VFXParameter");
+
+        var param = ScriptableObject.CreateInstance(pt)
+            ?? throw new InvalidOperationException("VFXParameter örneklenemedi.");
+
+        MethodInfo init = pt.GetMethod("Init",
+            BindingFlags.Public | BindingFlags.Instance,
+            null, new[] { typeof(Type) }, null)
+            ?? throw new InvalidOperationException("VFXParameter.Init yok.");
+
+        init.Invoke(param, new object[] { type });
+
+        SetPosition(param, pos);
+        AddChild(graph, param);
+
+        // `exposedName` ve `exposed` yalnız GET; alanları `[VFXSetting]`
+        // (ölçüldü — VFXParameter.cs:56-59), o yüzden ayar yoluyla yazılıyor.
+        // Çocuk eklendikten SONRA: ayar değişimi grafiği haberdar ediyor.
+        SetSetting(param, "m_ExposedName", name, r);
+        SetSetting(param, "m_Exposed", true, r);
+
+        // Varsayılan değer parametrenin kendi çıkış slotunda duruyor.
+        MethodInfo getOut = pt.GetMethod("GetOutputSlot",
+            BindingFlags.Public | BindingFlags.Instance);
+
+        if (getOut?.Invoke(param, new object[] { 0 }) is object outSlot)
+            Prop(outSlot, "value")?.SetValue(outSlot, value);
+
+        r.AppendLine("      param   " + name.PadRight(24) + type.Name + " = " + value);
+        return param;
+    }
+
+    /// Parametrenin çıkışını bir bloğun giriş slotuna bağlıyor.
+    static void LinkParameter(object param, object target, string slotName,
+                              StringBuilder r)
+    {
+        object outSlot = param.GetType().GetMethod("GetOutputSlot",
+            BindingFlags.Public | BindingFlags.Instance)
+            ?.Invoke(param, new object[] { 0 })
+            ?? throw new InvalidOperationException("Parametrenin çıkış slotu yok.");
+
+        MethodInfo nb = target.GetType().GetMethod("GetNbInputSlots",
+            BindingFlags.Public | BindingFlags.Instance);
+        MethodInfo get = target.GetType().GetMethod("GetInputSlot",
+            BindingFlags.Public | BindingFlags.Instance);
+
+        int n = (int)nb.Invoke(target, null);
+
+        for (int i = 0; i < n; i++)
+        {
+            object slot = get.Invoke(target, new object[] { i });
+            if (Prop(slot, "name")?.GetValue(slot) as string != slotName) continue;
+
+            MethodInfo link = outSlot.GetType().GetMethod("Link",
+                BindingFlags.Public | BindingFlags.Instance,
+                null, new[] { outSlot.GetType(), typeof(bool) }, null)
+                ?? throw new InvalidOperationException("VFXSlot.Link yok.");
+
+            bool ok = (bool)link.Invoke(outSlot, new object[] { slot, true });
+
+            r.AppendLine("      bağ     param → " + target.GetType().Name +
+                         "." + slotName + (ok ? "" : "  BAŞARISIZ"));
+
+            if (!ok) throw new InvalidOperationException(
+                "Parametre bağlanamadı: " + slotName);
+
+            return;
+        }
+
+        throw new InvalidOperationException(target.GetType().Name + " slotu yok: " + slotName);
     }
 
     /// YAPI SLOTU İÇİNDEKİ ALAN. `Box` slotu `OrientedBox` taşıyor; kutunun

@@ -1227,13 +1227,12 @@ sistemin ne çizdiği ayrılamaz.
 `SnowfallLayers` ve `SnowDriftVfxController` referansları boşken hiçbir şey
 yapmıyor; bu bilinçli. Bağlanana kadar görüntü değişmiyor.
 
-**Grafikler henüz ÖZELLİK YAYINLAMIYOR.** Denetleyiciler `SetFloat("SpawnRate")`
-çağırıyor ama grafikte o adda bir `VFXParameter` yok — `HasFloat` false dönüyor
-ve çağrı sessizce düşüyor. Bir sonraki adım grafiklere exposed parametre
-eklemek.
+**Parametreler EKLENDİ** (2026-08-22): beş grafik de `SpawnRate` yayınlıyor ve
+spawn oranına bağlı; `VFX_Snowfall` ayrıca `TurbulenceIntensity` yayınlıyor ve
+türbülansa bağlı. Denetleyicilerin `SetFloat` çağrıları artık karşılık buluyor.
 
 **Sıra:**
-1. Grafiklere exposed parametre (`SpawnRate`, `TurbulenceIntensity`, `DriftActive`)
+1. Sahnede `VisualEffect` nesneleri kurulup denetleyicilere bağlanacak
 2. Kullanıcı Play'de VFX yağışını görsün
 3. Görüldükten SONRA compute yolu silinir — önce değil
 
