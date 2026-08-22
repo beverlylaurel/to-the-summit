@@ -119,6 +119,62 @@ public static class SnowTextureBaker
         return AssetDatabase.LoadAssetAtPath<Texture2D>(DetailNormalPath);
     }
 
+    // ----------------------------------------------------------------- perde
+
+    public const string CurtainNoisePath = "Assets/Snow/Textures/T_Snow_Curtain.png";
+
+    /// PERDE GÜRÜLTÜSÜ (spec §18.7): yumuşak kenarlı, YATAYDA UZAMIŞ.
+    /// İzotropik bir gürültü perdeyi bulut gibi gösterir; savrulan kar
+    /// tabakası rüzgâr yönünde uzun şeritler hâlinde akar.
+    public static Texture2D EnsureCurtainNoise()
+    {
+        var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(CurtainNoisePath);
+        if (existing != null) return existing;
+
+        EnsureFolder();
+
+        const int Res = 256;
+
+        var tex = new Texture2D(Res, Res, TextureFormat.RGBA32, false, true);
+        var px = new Color32[Res * Res];
+
+        for (int y = 0; y < Res; y++)
+        for (int x = 0; x < Res; x++)
+        {
+            float u = (x + 0.5f) / Res;
+            float v = (y + 0.5f) / Res;
+
+            // Yatayda dört kat sıkıştırılmış örnekleme → yatayda uzun şeritler.
+            float n = TilingFbm(u * 0.25f, v);
+
+            // Düşeyde yumuşak kenar: perdenin altı ve üstü sönüyor.
+            float edge = Mathf.Sin(v * Mathf.PI);
+
+            float value = Mathf.Clamp01(n * edge * 1.6f);
+
+            byte b = (byte)Mathf.Clamp(Mathf.RoundToInt(value * 255f), 0, 255);
+            px[y * Res + x] = new Color32(b, b, b, 255);
+        }
+
+        tex.SetPixels32(px);
+        tex.Apply(false, false);
+
+        File.WriteAllBytes(CurtainNoisePath, tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+
+        AssetDatabase.ImportAsset(CurtainNoisePath, ImportAssetOptions.ForceUpdate);
+
+        var importer = (TextureImporter)AssetImporter.GetAtPath(CurtainNoisePath);
+        importer.textureType = TextureImporterType.Default;
+        importer.sRGBTexture = false;
+        importer.wrapMode = TextureWrapMode.Repeat;
+        importer.filterMode = FilterMode.Bilinear;
+        importer.mipmapEnabled = true;
+        importer.SaveAndReimport();
+
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(CurtainNoisePath);
+    }
+
     // ---------------------------------------------------------------- sastrugi
 
     public const string SastrugiNoisePath = "Assets/Snow/Textures/T_Sastrugi_Noise.png";

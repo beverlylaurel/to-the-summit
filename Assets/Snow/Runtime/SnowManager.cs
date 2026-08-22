@@ -35,6 +35,9 @@ public class SnowManager : MonoBehaviour
 
     [Tooltip("İzlerin bölgeden çıkınca saklanması. Boş bırakılırsa izler kaybolur.")]
     [SerializeField] SnowPersistence persistence;
+
+    [Tooltip("Süspansiyon perdeleri. Boş bırakılırsa çizilmez.")]
+    [SerializeField] SnowCurtainController curtains;
     [SerializeField] ComputeShader simCompute;
 
     [Tooltip("Hidden/Snow/CaptureDepth — deformer'ların alt yüzeyini yazar.")]
@@ -530,6 +533,7 @@ public class SnowManager : MonoBehaviour
         cmd.BeginSample(SnowProfiler.MarkerNames[4]);
         if (snowfallRenderer != null) snowfallRenderer.Dispatch(cmd);
         if (burstParticles != null) burstParticles.Dispatch(cmd);
+        if (curtains != null) curtains.Dispatch(cmd);
         cmd.EndSample(SnowProfiler.MarkerNames[4]);
 
         // Ping-pong sonrası hangi dokunun güncel olduğu değişti; aynı karenin

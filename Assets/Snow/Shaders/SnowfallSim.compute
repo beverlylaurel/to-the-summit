@@ -334,3 +334,106 @@ void KBurstUpdate(uint3 id : SV_DispatchThreadID)
 
     _Flakes[idx] = f;
 }
+
+// ------------------------------------------------- suspansiyon perdeleri (18.7)
+
+#pragma kernel KCurtainUpdate
+
+/// SUSPANSIYON KATMANI [KAYNAK: Pomeroy & Gray 1990; PBSM; Nishimura & Hunt
+/// 2000]. Savrulan kar iki katmana ayriliyor: saltasyon (1-5 cm, yuzeye
+/// yapisik, yogun) ve suspansiyon (ustu, pratikte <= 5 m, seyrek). Bu kernel
+/// ikincisi; birincisi KDriftUpdate.
+///
+/// STRUCT PAYLASILIYOR ama iki alan farkli anlam tasiyor:
+///   size  = perdenin YUKSEKLIGI (m)
+///   frame = perdenin GENISLIGI (m)
+/// Perdeler atlas kullanmiyor, kendi gurultusunu kaydiriyor.
+float _CurtainDriftActive;
+float _CurtainScaleH;
+float _CurtainAlphaBase;
+float _CurtainSpawnDistance;
+float _CurtainSpawnWidth;
+
+void SpawnCurtain(uint idx, inout SnowFlake f)
+{
+    float3 r0 = SnowRand3(float3(idx, _FlakeSeed, 21.0));
+    float3 r1 = SnowRand3(float3(idx, _FlakeSeed, 22.0));
+
+    float2 wind = normalize(_WindWS.xz + 1e-5);
+    float2 side = float2(-wind.y, wind.x);
+
+    float2 planar = _DriftOrigin.xz
+                  - wind * _CurtainSpawnDistance
+                  + side * ((r0.x * 2.0 - 1.0) * _CurtainSpawnWidth);
+
+    // USTEL DAGILIM. Yatay kutle akisi yukseklikle ustel azaliyor
+    // [KAYNAK: Nishimura & Hunt 2000]; dogum yuksekligi onun dogrudan
+    // karsiligi. Duz dagilim perdeleri her kotta ayni sikligta yapardi.
+    float h = -_CurtainScaleH * log(max(1.0 - r0.y, 1e-4));
+    h = min(h, SNOW_SUSP_MAX_HEIGHT);
+
+    float groundY = SampleGroundHeight(planar);
+
+    f.position = float3(planar.x, groundY + h, planar.y);
+
+    f.age = 0.0;
+    f.lifetime = lerp(6.0, 12.0, r1.x);
+
+    // Ruzgardan biraz YAVAS: surunme hissi veriyor.
+    f.velocity = _WindWS * lerp(0.7, 0.95, r1.y);
+
+    f.size  = lerp(1.5, 4.0, r1.z);       // yukseklik
+    f.phase = h;                          // dogum kotu, alpha icin saklaniyor
+    f.frame = lerp(12.0, 25.0, r0.z);     // genislik
+    f.alpha = 0.0;
+}
+
+[numthreads(64, 1, 1)]
+void KCurtainUpdate(uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+    if (idx >= _FlakeCapacity) return;
+
+    SnowFlake f = _Flakes[idx];
+
+    if (idx >= _FlakeAliveCount)
+    {
+        f.lifetime = 0.0;
+        f.alpha = 0.0;
+        _Flakes[idx] = f;
+        return;
+    }
+
+    if (f.lifetime <= 0.0 || f.age >= f.lifetime)
+    {
+        SpawnCurtain(idx, f);
+        _Flakes[idx] = f;
+        return;
+    }
+
+    float dt = _SnowDeltaTime;
+
+    f.age += dt;
+    f.position += f.velocity * dt;
+
+    // ZEMINI TAKIP EDIYOR. Bu satir olmazsa perde arazinin icine giriyor
+    // ve yamacta yariya kadar gomulu bir tabaka gorunuyor (spec 22).
+    float groundY = SampleGroundHeight(f.position.xz);
+    f.position.y = max(f.position.y, groundY + 0.15);
+
+    float height = f.position.y - groundY;
+
+    // YUKSELDIKCE SOLUYOR - ustel profilin gorsel karsiligi. Sabit alpha
+    // kullanmak butun kotlari ayni yogunlukta gosterirdi (spec 22).
+    float profile = exp(-height / max(_CurtainScaleH, 1e-3));
+
+    float t = saturate(f.age / max(f.lifetime, 1e-3));
+    float life = saturate(t / 0.12) * saturate((1.0 - t) / 0.25);
+
+    // Engellerde soluyor.
+    float occl = 1.0 - smoothstep(0.0, 2.0, SnowOcclusionY(f.position) - f.position.y);
+
+    f.alpha = _CurtainAlphaBase * profile * _CurtainDriftActive * life * occl;
+
+    _Flakes[idx] = f;
+}

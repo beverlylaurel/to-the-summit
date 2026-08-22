@@ -151,6 +151,9 @@ public static class SnowTestRunner
         all &= Section(r, "Rüzgâr", () => SnowWindTest.Run(out bool ok) + Mark(ok),
                        out_ => !out_.Contains("[BAŞARISIZ]"));
 
+        all &= Section(r, "Püskürtme", () => SnowSprayTest.Run(out bool ok) + Mark(ok),
+                       out_ => !out_.Contains("[BAŞARISIZ]"));
+
         r.AppendLine(new string('=', 72));
         r.AppendLine(all ? "TOPLU SONUÇ: TAMAM" : "TOPLU SONUÇ: BAŞARISIZ");
 

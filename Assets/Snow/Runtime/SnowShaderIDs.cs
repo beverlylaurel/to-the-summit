@@ -151,6 +151,14 @@ public static class SnowShaderIDs
     public static readonly int SnowRW = Shader.PropertyToID("_SnowRW");
     public static readonly int TrailRW = Shader.PropertyToID("_TrailRW");
 
+    // --- Süspansiyon perdeleri (Faz 13) ---
+    public static readonly int CurtainDriftActive = Shader.PropertyToID("_CurtainDriftActive");
+    public static readonly int CurtainScaleH = Shader.PropertyToID("_CurtainScaleH");
+    public static readonly int CurtainAlphaBase = Shader.PropertyToID("_CurtainAlphaBase");
+    public static readonly int CurtainSpawnDistance = Shader.PropertyToID("_CurtainSpawnDistance");
+    public static readonly int CurtainSpawnWidth = Shader.PropertyToID("_CurtainSpawnWidth");
+    public static readonly int CurtainNoise = Shader.PropertyToID("_CurtainNoise");
+
     // --- Teşhis penceresi ---
     public static readonly int DebugMode = Shader.PropertyToID("_DebugMode");
     public static readonly int DebugRange = Shader.PropertyToID("_DebugRange");
