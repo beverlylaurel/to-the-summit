@@ -411,24 +411,46 @@ public static class SnowGroundTest
         r.AppendLine();
         r.AppendLine("## Kar mesh'inin kapsadığı alan");
 
-        SnowQualityData q = manager != null && manager.Settings != null
-            ? manager.Settings.QualityData
-            : default;
-
         var clipmap = manager != null ? manager.GetComponent<SnowClipmap>() : null;
 
-        if (clipmap == null)
+        if (clipmap == null || manager.Settings == null)
         {
             r.AppendLine("  [!] SnowClipmap yok.");
         }
         else
         {
-            float span = q.AreaSize * Mathf.Pow(2f, Mathf.Max(q.RingCount - 1, 0));
-            r.AppendLine("  Bölge (en iç)            " + q.AreaSize.ToString("0.0") + " m");
+            SnowQualityData q = manager.Settings.QualityData;
+
+            // GERÇEK GEOMETRİ. Halka ölçüleri `SnowMeshBuilder`'dan; yayınlanan
+            // yarıçap bununla AYNI olmak zorunda.
+            //
+            // Bir süre yayınlanan değer `AreaSize * 2^(R−1) * 0.5` = 64 m,
+            // gerçek mesh ise ±108 m idi. Sönüm 64 m'de sıfırlayınca
+            // `clip(h − 0.004)` kar yüzeyini ortasından kesti: basamaklı,
+            // çizgili bir duvar. İki gün bu ayrışma yüzünden yandı.
+            SnowMeshBuilder.Ring[] rings = SnowMeshBuilder.Describe(q);
+            float realExtent = rings[^1].Extent * 0.5f;
+            float published = clipmap.OuterExtent;
+
+            bool agree = Mathf.Abs(realExtent - published) < 0.01f;
+
+            r.AppendLine("  Bölge (kar durumu)       " + q.AreaSize.ToString("0.0") + " m");
             r.AppendLine("  Halka sayısı             " + q.RingCount);
-            r.AppendLine("  Toplam kapsama           " + span.ToString("0.0") + " m  " +
-                         "← ekrandaki KARENİN kenarı bu");
-            r.AppendLine("  Uzak kaskad              192.0 m  (yalnız durum, mesh değil)");
+
+            for (int i = 0; i < rings.Length; i++)
+                r.AppendLine("    halka " + i + "                 ±" +
+                             (rings[i].Extent * 0.5f).ToString("0.0") + " m" +
+                             "   quad " + (rings[i].QuadSize * 100f).ToString("0.0") + " cm");
+
+            r.AppendLine("  [" + M(agree) + "] Yayınlanan yarıçap   ±" + published.ToString("0.0") +
+                         " m   gerçek ±" + realExtent.ToString("0.0") + " m");
+
+            if (!agree)
+            {
+                r.AppendLine("      AYRIŞMA. Kenar sönümü mesh'i ortasından keser ve");
+                r.AppendLine("      `clip` orada basamaklı, çizgili bir duvar bırakır.");
+                sourceIsVisible = false;
+            }
         }
 
         r.AppendLine();

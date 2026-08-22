@@ -14,6 +14,37 @@ her seferinde belirtinin en çok göze çarptığı katman seçilmişti. Bulut k
 
 ---
 
+## Kar açılınca çevrede basamaklı, dikey çizgili devasa bir duvar
+
+**İlk şüpheli:** mesh'in araziden ayrı durması. *(Yanlış — 128 m'de ortalama
+ayrılık 1 cm.)*
+
+**İkinci şüpheli:** dış halkanın kenarındaki kalınlık basamağı. *(Yanlış — halka
+sürgüsüyle ölçüldü: duvar 1'de de 4'te de aynı yerde.)*
+
+**Üçüncü şüpheli:** gölgeleme. *(Kısmen — yer değiştirme kapatılınca kalınlık
+gitti, çizgiler kaldı. Ama sebep bu değildi.)*
+
+**Sebep: İKİ SAYI AYRIŞMIŞTI.** `SnowMeshBuilder` halkaları
+`Ring0Extent × RingScale^i` ile büyütüyor: ±4, ±12, ±36, **±108 m**. Kenar
+sönümüne yayınlanan yarıçap ise `AreaSize × 2^(R−1) × 0.5` = **64 m**
+hesaplıyordu. Sönüm 64 m'de kalınlığı sıfırlayınca `clip(h − 0.004)` kar
+yüzeyini **ortasından** testere gibi kesiyordu. Basamaklar dörtgen köşegenleri,
+dikey çizgiler kesik kenarın normalleri.
+
+`AreaSize` kar DURUMU bölgesi (16 m); halka ölçüsüyle ilgisi yok. İkisini aynı
+sanmak iki gün yaktı.
+
+**Ayırt eden ölçüm:** `SnowMeshBuilder.Describe`'ın verdiği gerçek halka
+ölçüleri ile shader'a yayınlanan yarıçapı yan yana bastırmak. Fark tek satırda
+göründü: `±0.0 m` / `±108.0 m`.
+
+**Kural:** bir shader'a "sınır" gönderiyorsan, o sınırı üreten geometriden
+TÜRET. İkinci bir formülle yeniden hesaplama — iki formül er geç ayrışır ve
+ayrıştığında hiçbir yerde hata vermez. Sınama artık ikisini karşılaştırıyor.
+
+---
+
 ## Kar yağıyor ama dağ çıplak; ayak altında beyaz kare seninle geliyor
 
 **İlk şüpheli:** kar mesh'inin araziden ayrı durması. *(Yanlış — 128 m'de 1089

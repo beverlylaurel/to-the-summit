@@ -91,7 +91,7 @@ float3 _SnowUpDirection;
 float2 _SnowMeshCenterXZ;
 float  _SnowMeshExtent;
 
-/// KALINLIK VERİNİN OLDUĞU YERDE TAM, ÖTESİNDE KADEMELİ İNİYOR.
+/// KALINLIK MESH'İN KENDİ KENARINDA SÖNÜYOR.
 ///
 /// Gerçek kar durumu yalnız bölgenin içinde (Medium'da ±8 m) tam çözünürlükte;
 /// dışarısı 37.5 cm tekselli kaskad, onun da dışı kar çizgisi eğrisi. Kalınlık
@@ -104,21 +104,12 @@ float  _SnowMeshExtent;
 /// çakışıyor ve dikiş kalmıyor.
 float SnowMeshEdgeFade(float2 posXZ)
 {
-    if (_SnowAreaSize <= 0.0) return 1.0;
+    if (_SnowMeshExtent <= 0.0) return 1.0;
 
-    // SÖNÜM DAR OLMAK ZORUNDA.
-    //
-    // Bir tur boyunca sönüm bölge kenarından mesh kenarına (8 → 64 m) yayıldı
-    // ve belirti BÜYÜDÜ: `SnowClipEdge` 4 mm eşiğinin altını gürültüyle
-    // kırpıyor, kalınlık o 56 m boyunca eşiğin dibinde gezinince kırpma
-    // gürültüsü 56 m genişliğinde taraklı bir band üretti (ölçüldü).
-    //
-    // Kalınlığın gerçek verisi zaten yalnız bölgenin içinde. Sönüm bölgenin
-    // son %15'inde bitiyor; ötesini dağın kar katmanı çiziyor.
-    float half = _SnowAreaSize * 0.5;
+    float2 d = abs(posXZ - _SnowMeshCenterXZ);
+    float r = max(d.x, d.y);
 
-    float2 d = abs(posXZ - _SnowAreaCenter) / max(half, 1e-3);
-    return 1.0 - smoothstep(0.85, 1.0, max(d.x, d.y));
+    return 1.0 - smoothstep(_SnowMeshExtent * 0.75, _SnowMeshExtent, r);
 }
 
 /// Bölgenin dışındaki dünyanın genel kar durumu.

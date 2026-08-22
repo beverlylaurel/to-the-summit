@@ -144,8 +144,21 @@ public class SnowClipmap : MonoBehaviour
     }
 
     /// En dış halkanın merkezden kenara uzaklığı (m).
+    ///
+    /// MESH'İN GERÇEK ÖLÇÜSÜNDEN. Formül bir süre `AreaSize * 2^(R−1) * 0.5`
+    /// idi ve 64 m veriyordu; mesh ise `Ring0Extent * RingScale^(R−1)` ile
+    /// büyüyor: 8 → 24 → 72 → 216 m, yani ±108 m. Sönüm 64 m'de sıfırlayınca
+    /// `clip(h − 0.004)` kar yüzeyini ORTASINDAN testere gibi kesiyordu;
+    /// basamaklar dörtgen köşegenleri, dikey çizgiler kesik kenarın
+    /// normalleriydi. İki gün bu yüzden yandı.
+    ///
+    /// `AreaSize` kar BÖLGESİ (16 m), halka ölçüsü değil. İkisi ayrı sayı.
+    /// AYARDAN, çalışma anındaki halka dizisinden DEĞİL. Dizi yalnız Play'de
+    /// kuruluyor; edit mode'da sıfır dönüp denetimi yanıltıyordu.
     public float OuterExtent => settings != null
-        ? settings.QualityData.AreaSize * Mathf.Pow(2f, Mathf.Max(RingCount - 1, 0)) * 0.5f
+        ? SnowConstants.Ring0Extent
+          * Mathf.Pow(SnowConstants.RingScale, Mathf.Max(settings.QualityData.RingCount - 1, 0))
+          * 0.5f
         : 0f;
 
     /// TEŞHİS: kaç halka çizilsin. Halka sınırındaki kusur, sınır yer
