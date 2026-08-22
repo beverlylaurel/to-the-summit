@@ -4,6 +4,7 @@
 
 #pragma kernel KClear
 #pragma kernel KClearState
+#pragma kernel KTopUpState
 #pragma kernel KScroll
 #pragma kernel KScrollState
 #pragma kernel KBlurCapture
@@ -127,6 +128,29 @@ void KScroll(uint3 id : SV_DispatchThreadID)
     bool inside = all(src >= 0) && all(src < (int)_Resolution);
 
     _Dst[id.xy] = inside ? _Src[src] : _NewEdgeValue;
+}
+
+/// KAR ÇİZGİSİ HAREKET EDİNCE MEVCUT TEKSELLER DE YÜKSELİYOR.
+///
+/// Çizgi yalnız ilk temizlikte ve bölgeye yeni giren şeritte uygulanıyordu.
+/// Oyun +8 °C'de açılıp bölge SWE 0 ile dolunca, sıcaklık sonradan düşse de
+/// zemin çıplak kalıyordu: birikme 1.39e-6 m/s, görünür kalınlığa saatler
+/// sürüyor. Belirti "kar yağıyor ama dağ çıplak" (ölçüldü: DOKUDA 0.00).
+///
+/// SADECE YÜKSELTİYOR, indirmiyor: `max`. Çizgi yukarı kayınca var olan kar
+/// silinmez — onu erime götürür, bu kernel değil. İzler ve yoğunluk da
+/// korunuyor, yalnız SWE kanalına dokunuluyor.
+[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
+void KTopUpState(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+
+    float4 s = _Snow[id.xy];
+    float target = SnowInitialSweAt(SampleGroundHeight(SnowTexelToWorld(id.xy)));
+
+    s.r = max(s.r, target);
+
+    _SnowOut[id.xy] = s;
 }
 
 /// Durum dokusunun kaydırılması: bölgeye YENİ giren şerit kar çizgisi

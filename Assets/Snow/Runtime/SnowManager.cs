@@ -107,6 +107,11 @@ public class SnowManager : MonoBehaviour
 
     int clearKernel = -1;
     int clearStateKernel = -1;
+    int topUpKernel = -1;
+
+    /// Bölgenin en son hangi kar çizgisiyle doldurulduğu. Çizgi bundan
+    /// uzaklaşınca mevcut tekseller yükseltiliyor.
+    float filledSnowLineY = float.NaN;
     int scrollStateKernel = -1;
     int scrollKernel = -1;
     int blurCaptureKernel = -1;
@@ -260,6 +265,7 @@ public class SnowManager : MonoBehaviour
 
         clearKernel = simCompute.FindKernel("KClear");
         clearStateKernel = simCompute.FindKernel("KClearState");
+        topUpKernel = simCompute.FindKernel("KTopUpState");
         scrollStateKernel = simCompute.FindKernel("KScrollState");
         scrollKernel = simCompute.FindKernel("KScroll");
         blurCaptureKernel = simCompute.FindKernel("KBlurCapture");
@@ -510,6 +516,26 @@ public class SnowManager : MonoBehaviour
         int groups = Mathf.CeilToInt(q.Resolution / (float)SnowConstants.GroupSize);
 
         cmd.SetComputeIntParam(simCompute, SnowShaderIDs.Resolution, q.Resolution);
+
+        // KAR ÇİZGİSİ KAYDIYSA MEVCUT TEKSELLERİ YÜKSELT. Eşik 5 m: sıcaklığın
+        // kendi salınımı bunun altında kalıyor, F1 sürgüsü ise anında aşıyor.
+        float lineY = env.FreezingLevelY;
+
+        if (float.IsNaN(filledSnowLineY) || Mathf.Abs(lineY - filledSnowLineY) > 5f)
+        {
+            filledSnowLineY = lineY;
+
+            if (!pendingClear)
+            {
+                cmd.SetComputeTextureParam(simCompute, topUpKernel, SnowShaderIDs.Snow, snow);
+                cmd.SetComputeTextureParam(simCompute, topUpKernel, SnowShaderIDs.SnowOut, snowTemp);
+                cmd.DispatchCompute(simCompute, topUpKernel, groups, groups, 1);
+
+                (snow, snowTemp) = (snowTemp, snow);
+            }
+
+            if (farCascade != null) farCascade.RefillRegion();
+        }
 
         if (pendingClear)
         {

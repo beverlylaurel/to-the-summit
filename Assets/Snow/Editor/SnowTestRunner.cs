@@ -168,6 +168,9 @@ public static class SnowTestRunner
         all &= Section(r, "Sabit eşliği", () => SnowConstantsTest.Run(out bool ok) + Mark(ok),
                        out_ => !out_.Contains("[BAŞARISIZ]"));
 
+        all &= Section(r, "Compute global", () => SnowComputeGlobalTest.Run(out bool ok) + Mark(ok),
+                       out_ => !out_.Contains("[BAŞARISIZ]"));
+
         all &= Section(r, "Zemin kaynağı", () => SnowGroundTest.Run(),
                        out_ => out_.Contains("SONUÇ: TAMAM"));
 

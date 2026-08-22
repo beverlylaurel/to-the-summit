@@ -14,6 +14,36 @@ her seferinde belirtinin en çok göze çarptığı katman seçilmişti. Bulut k
 
 ---
 
+## Kar yağıyor ama dağ çıplak; ayak altında beyaz kare seninle geliyor
+
+**İlk şüpheli:** kar mesh'inin araziden ayrı durması. *(Yanlış — 128 m'de 1089
+nokta ölçüldü, ortalama ayrılık 1 cm.)*
+
+**İkinci şüpheli:** pişen zemin dokusunun ters indeksli olması. *(Yanlış — 0.0 m
+fark; ters indeks olsaydı 1017 m verecekti.)*
+
+**Üçüncü şüpheli:** `Shader.SetGlobalFloat`'ın compute'a ulaşmaması.
+*(Yanlış — ölçüldü: 12.345 yazıldı, compute'ta 12.345 okundu.)*
+
+**Sebep:** kar çizgisi yalnız İLK TEMİZLİKTE ve bölgeye YENİ giren şeritte
+uygulanıyordu. Oyun +8 °C'de açılıyor, donma seviyesi 1451 m, oyuncu 205 m'de —
+çizginin altında, bölge doğru olarak SWE 0 ile doluyor. Sonra sıcaklık düşüp
+çizgi −557 m'ye inince **mevcut tekseller güncellenmiyor**. Birikme 1.39e-6 m/s,
+görünür kalınlığa saatler sürüyor.
+
+Beyaz kare de kar mesh'inin toplam kapsaması: 16 m × 2³ = **128 m**.
+
+**Ayırt eden ölçüm:** F1'e iki ayrı sayı kondu — kar çizgisinden hesaplanan
+kalınlık (45.5 cm, DOĞRU) ve durum dokusunun geri okuması (`DOKUDA 0.00`,
+BOŞ). İkisi aynı satırda görününce sebep tek bakışta ayrıldı: çizgi doğru,
+doku boş.
+
+**Kural:** bir alanı "başlangıçta doldur" diye kurduysan, o alanı süren
+değişken SONRADAN değişebiliyorsa doldurma da tekrarlanmalı. Yoksa belirti
+"özellik hiç çalışmıyor" gibi görünür, oysa yalnız bir kez çalışmıştır.
+
+---
+
 ## Havada solucan/sigara dumanı gibi kar; bir yerde yağıyor, bir yerde boş gökyüzü
 
 **İlk şüpheli:** tane sayısı az. *(Yanlış — sayı dört katına çıkarıldı, desen aynen kaldı,

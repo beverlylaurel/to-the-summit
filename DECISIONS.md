@@ -1017,6 +1017,17 @@ Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olma
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
 
+## Kar çizgisi hareket edince bölge yeniden dolduruluyor (2026-08-22)
+
+`KTopUpState`: çizgi son doldurmadan 5 m'den fazla kaydıysa mevcut tekseller
+`max(mevcut, çizgi)` ile yükseltiliyor. Eşik 5 m çünkü sıcaklığın kendi salınımı
+altında kalıyor, F1 sürgüsü ise anında aşıyor.
+
+**Sadece yükseltiyor.** Çizgi yukarı kayınca var olan kar SİLİNMİYOR — onu erime
+götürür. İzler, yoğunluk ve ıslaklık kanallarına dokunulmuyor.
+
+---
+
 ## Sahne kurulumu artık kendiliğinden koşuyor (2026-08-22)
 
 Kar sistemine her yeni referans eklendiğinde kullanıcıdan "Sahneyi kur"a

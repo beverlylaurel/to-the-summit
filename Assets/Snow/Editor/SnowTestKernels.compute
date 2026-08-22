@@ -3,9 +3,21 @@
 // Caginan: SnowScrollTest. Editor klasorunde -> derlemeye girmiyor.
 
 #pragma kernel KStamp
+#pragma kernel KGlobalProbe
 
 RWTexture2D<float4> _Dst;
 uint _Resolution;
+
+/// GLOBAL SORGUSU. `Shader.SetGlobalFloat` ile yazilan bir deger compute
+/// shader'a ULASIYOR MU? Cevabi hatirlamak yerine olcmek icin.
+float _ProbeGlobalA;
+float _ProbeGlobalB;
+
+[numthreads(1, 1, 1)]
+void KGlobalProbe(uint3 id : SV_DispatchThreadID)
+{
+    _Dst[uint2(0, 0)] = float4(_ProbeGlobalA, _ProbeGlobalB, 0.0, 1.0);
+}
 
 [numthreads(8, 8, 1)]
 void KStamp(uint3 id : SV_DispatchThreadID)
