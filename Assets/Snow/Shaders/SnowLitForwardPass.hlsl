@@ -38,11 +38,6 @@ float3 SnowDisplacedPositionWS(float3 positionWS, float ringIndex, out float hei
 
     float h = SnowSurfaceAt(uv);
 
-    // KENARDA KALINLIK SIFIRA İNİYOR. Yoksa mesh'in dış sınırında kalınlık
-    // kadar dik bir duvar kalıyor. Sönüm en dış halkanın son %14'ünde;
-    // Medium'da ~9 m, 64 m uzaklıkta alt piksel.
-    h *= SnowMeshEdgeFade(positionWS.xz);
-
     // TEŞHİS: yer değiştirmeyi tamamen kapatır. Şerit GEOMETRİ mi yoksa
     // GÖLGELEME mi — iki gündür geometri sanılıp yükseklik yamaları yazıldı.
     // 1 olduğunda yüzey araziye yapışıyor; şerit duruyorsa geometri değil.
