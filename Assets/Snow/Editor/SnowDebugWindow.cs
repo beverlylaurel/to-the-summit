@@ -63,6 +63,7 @@ public class SnowDebugWindow : EditorWindow
     PreviewSource source;
     int channel;
     float gridSize = 1f;
+    float testSwe = 0.02f;
     Vector2 scroll;
 
     Material debugMaterial;
@@ -122,6 +123,63 @@ public class SnowDebugWindow : EditorWindow
         Graphics.Blit(shown, preview, debugMaterial, 0);
     }
 
+    /// SINAMA KARI. Ayar dosyasına DOKUNMUYOR: değer `NonSerialized` bir
+    /// alanda duruyor, Play'den çıkınca ve her derlemede sıfırlanıyor.
+    /// Geri almayı unutmak mümkün değil.
+    ///
+    /// Bu bölüm kar sistemi kabul edilince silinecek
+    /// (`DECISIONS.md` → Silinecek geçiciler).
+    void DrawTestSnow()
+    {
+        SnowManager manager = SnowManager.Active;
+        if (manager == null || manager.Settings == null) return;
+
+        SnowSettings settings = manager.Settings;
+
+        EditorGUILayout.Space(8f);
+        EditorGUILayout.LabelField("Sınama karı", EditorStyles.boldLabel);
+
+        testSwe = EditorGUILayout.Slider("Başlangıç SWE (m)", testSwe, 0f, 0.10f);
+
+        float rho = Mathf.Lerp(SnowConstants.RhoMin, SnowConstants.RhoMax, settings.DefaultRhoN);
+        float depth = testSwe * SnowConstants.RhoWater / Mathf.Max(rho, 1f);
+
+        EditorGUILayout.LabelField("Karşılığı",
+            (depth * 100f).ToString("0.0") + " cm derinlik  (yoğunluk " + rho.ToString("0") + " kg/m³)");
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("Dünyayı karla doldur", GUILayout.Height(24f)))
+            {
+                settings.SetTestSnow(testSwe);
+                manager.RefillRegion();
+
+                var cascade = manager.GetComponent<SnowFarCascade>();
+                if (cascade != null) cascade.RefillRegion();
+            }
+
+            using (new EditorGUI.DisabledScope(!settings.HasTestSnow))
+            {
+                if (GUILayout.Button("Ayarları geri al", GUILayout.Height(24f)))
+                {
+                    settings.ClearTestSnow();
+                    manager.RefillRegion();
+
+                    var cascade = manager.GetComponent<SnowFarCascade>();
+                    if (cascade != null) cascade.RefillRegion();
+                }
+            }
+        }
+
+        EditorGUILayout.HelpBox(
+            settings.HasTestSnow
+                ? "Sınama karı AÇIK. Ayar dosyasına yazılmadı; Play'den çıkınca " +
+                  "veya derleme olunca kendiliğinden sıfırlanır."
+                : "Ayar dosyasındaki değer kullanılıyor (defaultSwe = " +
+                  settings.DefaultSwe.ToString("0.000") + ").",
+            settings.HasTestSnow ? MessageType.Warning : MessageType.None);
+    }
+
     RenderTexture SourceTexture(SnowManager m) => source switch
     {
         PreviewSource.Iz => m.TrailTexture,
@@ -163,6 +221,8 @@ public class SnowDebugWindow : EditorWindow
 
         EditorGUILayout.LabelField("Kurulum", EditorStyles.boldLabel);
         if (GUILayout.Button("Sahneyi kur", GUILayout.Height(28f))) SetupScene();
+
+        DrawTestSnow();
 
         EditorGUILayout.Space(8f);
         EditorGUILayout.LabelField("Durum", EditorStyles.boldLabel);

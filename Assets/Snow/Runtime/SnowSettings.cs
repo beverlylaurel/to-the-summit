@@ -132,6 +132,17 @@ public class SnowSettings : ScriptableObject
     public float FlakeEmissive => flakeEmissive;
     public float SpindriftRate => spindriftRate;
 
-    public float DefaultSwe => defaultSwe;
+    /// SINAMA GEÇERSİZ KILMASI. `NonSerialized`: asset'e hiç yazılmıyor,
+    /// Play'den çıkınca ve her derlemede kendiliğinden sıfırlanıyor. Geri
+    /// almayı unutmak MÜMKÜN DEĞİL — ayar dosyasına elle sayı yazmanın
+    /// yerine bunun için var.
+    [System.NonSerialized] float testSweOverride = -1f;
+
+    public bool HasTestSnow => testSweOverride >= 0f;
+
+    public void SetTestSnow(float swe) => testSweOverride = Mathf.Max(0f, swe);
+    public void ClearTestSnow() => testSweOverride = -1f;
+
+    public float DefaultSwe => testSweOverride >= 0f ? testSweOverride : defaultSwe;
     public float DefaultRhoN => defaultRhoN;
 }

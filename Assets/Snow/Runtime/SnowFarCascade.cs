@@ -178,6 +178,9 @@ public class SnowFarCascade : MonoBehaviour
         (far, farTemp) = (farTemp, far);
     }
 
+    /// Kaskadı dünyanın güncel kar durumuyla baştan doldurur.
+    public void RefillRegion() => pendingClear = true;
+
     public void WriteGlobals()
     {
         if (far == null) return;

@@ -601,6 +601,10 @@ public class SnowManager : MonoBehaviour
                          AreaCenter, followTarget.position.y, restoreView, restoreProj);
     }
 
+    /// Bölgeyi dünyanın güncel kar durumuyla baştan doldurur. Sınama
+    /// geçersiz kılması değiştiğinde çağrılıyor.
+    public void RefillRegion() => pendingClear = true;
+
     /// Sahneye engel eklendiğinde veya taşındığında çağrılır.
     public void MarkSkyVisDirty()
     {
