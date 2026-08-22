@@ -318,6 +318,12 @@ public class SnowDebugWindow : EditorWindow
         var sampler = go.GetComponent<SnowSampler>();
         if (sampler == null) sampler = go.AddComponent<SnowSampler>();
 
+        var cascade = go.GetComponent<SnowFarCascade>();
+        if (cascade == null) cascade = go.AddComponent<SnowFarCascade>();
+
+        var persistence = go.GetComponent<SnowPersistence>();
+        if (persistence == null) persistence = go.AddComponent<SnowPersistence>();
+
         if (go.GetComponent<SnowProfiler>() == null)
             go.AddComponent<SnowProfiler>();
 
@@ -387,9 +393,28 @@ public class SnowDebugWindow : EditorWindow
             player != null ? player.transform : null;
         samplerSerialized.ApplyModifiedProperties();
 
+        var cascadeSerialized = new SerializedObject(cascade);
+        cascadeSerialized.FindProperty("settings").objectReferenceValue = settings;
+        cascadeSerialized.FindProperty("simCompute").objectReferenceValue =
+            AssetDatabase.LoadAssetAtPath<ComputeShader>(ComputePath);
+        cascadeSerialized.FindProperty("followTarget").objectReferenceValue =
+            player != null ? player.transform : null;
+        cascadeSerialized.ApplyModifiedProperties();
+
+        var persistenceSerialized = new SerializedObject(persistence);
+        persistenceSerialized.FindProperty("manager").objectReferenceValue = manager;
+        persistenceSerialized.FindProperty("simCompute").objectReferenceValue =
+            AssetDatabase.LoadAssetAtPath<ComputeShader>(ComputePath);
+        persistenceSerialized.ApplyModifiedProperties();
+
         managerSerialized.FindProperty("snowfallRenderer").objectReferenceValue = snowfall;
         managerSerialized.FindProperty("burstParticles").objectReferenceValue = burst;
+        managerSerialized.FindProperty("farCascade").objectReferenceValue = cascade;
+        managerSerialized.FindProperty("persistence").objectReferenceValue = persistence;
         managerSerialized.ApplyModifiedProperties();
+
+        EditorUtility.SetDirty(cascade);
+        EditorUtility.SetDirty(persistence);
 
         EditorUtility.SetDirty(burst);
         EditorUtility.SetDirty(sampler);

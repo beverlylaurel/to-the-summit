@@ -180,6 +180,24 @@ float SampleSkyVisibility(float3 posWS)
 TEXTURE2D(_SnowStateTex);
 TEXTURE2D(_SnowTrailTex);
 
+// --- Uzak kaskad (spec §21 Faz 10) ---
+TEXTURE2D(_SnowFarTex);
+
+float2 _SnowFarCenter;
+float  _SnowFarAreaSize;
+
+/// Yakın bölgenin DIŞINDAKİ karın durumu. Eskiden sabit bir sayıydı ve
+/// dağın tamamı aynı kalınlıkta kar taşıyordu; kaskad orada da gerçek
+/// birikme ve erime veriyor. Kaskadın da dışında sabite düşülüyor.
+float2 SnowFarStateAt(float2 posXZ)
+{
+    float2 uv = (posXZ - _SnowFarCenter) / max(_SnowFarAreaSize, 1e-3) + 0.5;
+
+    if (any(uv < 0.0) || any(uv > 1.0)) return float2(_FallbackSWE, _FallbackRhoN);
+
+    return SAMPLE_TEXTURE2D_LOD(_SnowFarTex, sampler_LinearClamp, uv, 0).rg;
+}
+
 /// Kar yüzeyinin zeminden yüksekliği, verilen bölge UV'sinde.
 ///
 /// BÖLGE DIŞINDA DÜNYANIN GENEL DURUMU. `SnowInsideMask` kenarda yumuşak
@@ -192,8 +210,10 @@ float4 SnowStateAt(float2 uv)
     float  inside = SnowInsideMask(uv);
     float4 s = SAMPLE_TEXTURE2D_LOD(_SnowStateTex, sampler_LinearClamp, saturate(uv), 0);
 
-    s.r = lerp(_FallbackSWE,  s.r, inside);
-    s.g = lerp(_FallbackRhoN, s.g, inside);
+    float2 far = SnowFarStateAt(SnowUVToWorld(uv));
+
+    s.r = lerp(far.x, s.r, inside);
+    s.g = lerp(far.y, s.g, inside);
     s.b *= inside;
     s.a *= inside;
 
@@ -216,8 +236,10 @@ float SnowSurfaceAt(float2 uv)
     float4 s = SAMPLE_TEXTURE2D_LOD(_SnowStateTex, sampler_LinearClamp, uvC, 0);
     float4 t = SAMPLE_TEXTURE2D_LOD(_SnowTrailTex, sampler_LinearClamp, uvC, 0);
 
-    float swe  = lerp(_FallbackSWE,  s.r, inside);
-    float rhoN = lerp(_FallbackRhoN, s.g, inside);
+    float2 far = SnowFarStateAt(SnowUVToWorld(uv));
+
+    float swe  = lerp(far.x, s.r, inside);
+    float rhoN = lerp(far.y, s.g, inside);
 
     return SnowSurfaceHeight(swe, rhoN, t.r * inside, t.g * inside);
 }

@@ -1007,6 +1007,37 @@ Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olma
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
 
+## Kar Faz 10: blok boyu spec'in aritmetiğiyle uyuşmuyor (2026-08-22)
+
+**Spec §21 Faz 10** izleri "4×4 m bloklar hâlinde `Dictionary<int2, half[]>`,
+LRU 512" diye saklıyor. Aritmetiği yapılmamış: Medium'da teksel 1.5625 cm,
+yani 4 m blok **256×256 teksel**. Dört kanal yarım hassasiyette 256 KB;
+512 blokla **128 MB**.
+
+**Karar.** Blok dörde indirgenerek saklanıyor (64×64, 6.25 cm/teksel):
+blok 32 KB, toplam **16 MB**. Ayak izleri o çözünürlükte hâlâ okunuyor —
+bir bot 30 cm, yani beş teksel.
+
+**Paketleme her karede bir blok, sırayla.** "Çıkan bloğu paketle" yolu
+bloğu zaten dışarıdayken okumak demek olurdu; sırayla paketleyince saklanan
+hâl en fazla on altı kare eski oluyor ve iz o sürede değişmiyor.
+
+**Ölçüm.** Paketle-aç turu: 16384 / 16384 teksel yazıldı, **maks hata
+0.00000**, blok dışına taşan teksel 0.
+
+### Uzak kaskad sabit kar durumunun yerine geçti
+
+Yakın bölge 16 m; ötesi `_FallbackSWE` diye tek bir sayıydı ve dağın tamamı
+aynı kalınlıkta kar taşıyordu — öğlen erimiyor, gece birikmiyordu. Kaskad
+192 m / 512 teksel (37.5 cm) ile orada da gerçek birikme veriyor.
+
+Kaskadın birikmesi §11'in sadeleştirilmiş hâli: rüzgâr yeniden dağıtımı ve
+gökyüzü örtüsü YOK. 37.5 cm tekselde ikisinin de karşılığı yok; olsaydı
+gürültüden başka bir şey üretmezdi.
+
+**Ölçüm.** Birikme 2.998 mm/saat (beklenen 2.999), erime 0.8335 mm
+(beklenen 0.8334) — yakın bölgeyle aynı sabitler.
+
 ## Kar Faz 8: VFX Graph YERİNE COMPUTE — en büyük sapma (2026-08-22)
 
 **Spec §17.1** `VFX/VFX_Snowfall.vfx` istiyor. VFX Graph varlığı bir **düğüm

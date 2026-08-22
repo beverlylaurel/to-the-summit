@@ -127,6 +127,24 @@ public static class SnowShaderIDs
     public static readonly int BurstWindPull = Shader.PropertyToID("_BurstWindPull");
     public static readonly int BurstGrowth = Shader.PropertyToID("_BurstGrowth");
 
+    // --- Uzak kaskad ve kalıcılık (Faz 10) ---
+    public static readonly int FarSrc = Shader.PropertyToID("_FarSrc");
+    public static readonly int FarDst = Shader.PropertyToID("_FarDst");
+    public static readonly int FarResolution = Shader.PropertyToID("_FarResolution");
+    public static readonly int FarAreaSize = Shader.PropertyToID("_FarAreaSize");
+    public static readonly int FarAreaCenter = Shader.PropertyToID("_FarAreaCenter");
+    public static readonly int FarScrollTexels = Shader.PropertyToID("_FarScrollTexels");
+    public static readonly int FarNewEdgeValue = Shader.PropertyToID("_FarNewEdgeValue");
+
+    public static readonly int SnowFarTex = Shader.PropertyToID("_SnowFarTex");
+    public static readonly int SnowFarCenter = Shader.PropertyToID("_SnowFarCenter");
+    public static readonly int SnowFarAreaSize = Shader.PropertyToID("_SnowFarAreaSize");
+
+    public static readonly int BlockBuffer = Shader.PropertyToID("_BlockBuffer");
+    public static readonly int BlockOrigin = Shader.PropertyToID("_BlockOrigin");
+    public static readonly int BlockTexels = Shader.PropertyToID("_BlockTexels");
+    public static readonly int BlockStored = Shader.PropertyToID("_BlockStored");
+
     // --- Teşhis penceresi ---
     public static readonly int DebugMode = Shader.PropertyToID("_DebugMode");
     public static readonly int DebugRange = Shader.PropertyToID("_DebugRange");

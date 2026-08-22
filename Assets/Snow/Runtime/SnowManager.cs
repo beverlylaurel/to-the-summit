@@ -29,6 +29,12 @@ public class SnowManager : MonoBehaviour
 
     [Tooltip("Ayak tozu ve püskürtme havuzu. Boş bırakılırsa çizilmez.")]
     [SerializeField] SnowBurstParticles burstParticles;
+
+    [Tooltip("Uzak kaskad. Boş bırakılırsa bölge dışı sabit kar durumuna düşer.")]
+    [SerializeField] SnowFarCascade farCascade;
+
+    [Tooltip("İzlerin bölgeden çıkınca saklanması. Boş bırakılırsa izler kaybolur.")]
+    [SerializeField] SnowPersistence persistence;
     [SerializeField] ComputeShader simCompute;
 
     [Tooltip("Hidden/Snow/CaptureDepth — deformer'ların alt yüzeyini yazar.")]
@@ -354,6 +360,8 @@ public class SnowManager : MonoBehaviour
         float rainOnSnow = env.PrecipKind == PrecipitationKind.Rain ? env.PrecipIntensity01 : 0f;
         Shader.SetGlobalFloat(SnowShaderIDs.RainOnSnow01, rainOnSnow);
 
+        if (farCascade != null) farCascade.WriteGlobals();
+
         Shader.SetGlobalFloat(SnowShaderIDs.FallbackSWE, settings.DefaultSwe);
         Shader.SetGlobalFloat(SnowShaderIDs.FallbackRhoN, settings.DefaultRhoN);
 
@@ -454,6 +462,12 @@ public class SnowManager : MonoBehaviour
 
         cmd.BeginSample(SnowProfiler.MarkerNames[3]);
         DispatchAccumulate(cmd, groups);
+
+        // KALICILIK BİRİKMEDEN SONRA. Geri yüklenen blok en son bilinen
+        // durumu taşıyor; birikme onun üstüne yazsaydı yükleme boşa giderdi.
+        if (persistence != null) persistence.Dispatch(cmd);
+
+        if (farCascade != null) farCascade.Dispatch(cmd);
         cmd.EndSample(SnowProfiler.MarkerNames[3]);
 
         // Yağış simülasyonu da AYNI tamponda (spec §15.2).

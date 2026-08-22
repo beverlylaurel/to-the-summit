@@ -11,6 +11,10 @@
 #pragma kernel KRim
 #pragma kernel KAccumulate
 #pragma kernel KReduceState
+#pragma kernel KFarScroll
+#pragma kernel KFarAccumulate
+#pragma kernel KBlockPack
+#pragma kernel KBlockUnpack
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "SnowCommon.hlsl"
@@ -390,4 +394,144 @@ void KReduceState(uint3 id : SV_DispatchThreadID)
     }
 
     _ReducedOut[id.xy] = float4(swe / count, rhoN / count, visible / count, 1.0);
+}
+
+// ---------------------------------------------------------------- uzak kaskad
+
+/// UZAK KASKAD (spec §21 Faz 10). 192 m, 512 teksel, iki kanal.
+///
+/// Yakın bölge 16 m; ondan ötesi eskiden SABİT bir değerdi ve dağın tamamı
+/// aynı kalınlıkta kar taşıyordu. Kaskad orada da gerçek birikme ve erime
+/// veriyor — teksel 37.5 cm, deformasyon yok.
+Texture2D<float2>   _FarSrc;
+RWTexture2D<float2> _FarDst;
+
+uint   _FarResolution;
+float  _FarAreaSize;
+float2 _FarAreaCenter;
+float2 _FarScrollTexels;
+float2 _FarNewEdgeValue;
+
+float2 FarTexelToWorld(uint2 id)
+{
+    float2 uv = (float2(id) + 0.5) / _FarResolution;
+    return (uv - 0.5) * _FarAreaSize + _FarAreaCenter;
+}
+
+[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
+void KFarScroll(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _FarResolution || id.y >= _FarResolution) return;
+
+    int2 src = int2(id.xy) + int2(round(_FarScrollTexels));
+    bool inside = all(src >= 0) && all(src < (int)_FarResolution);
+
+    _FarDst[id.xy] = inside ? _FarSrc[src] : _FarNewEdgeValue;
+}
+
+/// Kaskadın birikmesi. §11'in SADELEŞTİRİLMİŞ hâli: yağış, oturma, erime,
+/// yağmur. Rüzgâr yeniden dağıtımı ve gökyüzü örtüsü YOK — 37.5 cm tekselde
+/// ikisinin de karşılığı yok, olsaydı gürültüden başka bir şey üretmezdi.
+[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
+void KFarAccumulate(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _FarResolution || id.y >= _FarResolution) return;
+
+    float2 s = _FarSrc[id.xy];
+
+    float swe = s.x;
+    float rho = SnowDensity(s.y);
+    float dt  = _DeltaTimeEff;
+
+    float fall = _SnowfallSWERate * dt;
+
+    float rhoNew = clamp(55.0 + _WindSpeed * 7.5, 50.0, 320.0);
+
+    float sweNext = swe + fall;
+    rho = (rho * swe + rhoNew * fall) / max(sweNext, 1e-6);
+    swe = sweNext;
+
+    if (rho < 190.0) rho += (190.0 - rho) * (1.0 - exp(-dt / SNOW_SETTLE_TAU));
+
+    float melt = SNOW_MELT_DDF * max(0.0, _TemperatureC);
+    melt *= 1.0 + _RainOnSnow01 * SNOW_RAIN_MELT_BOOST;
+
+    swe = clamp(swe - melt * dt, 0.0, SNOW_SWE_MAX);
+
+    _FarDst[id.xy] = float2(swe, SnowDensityN(rho));
+}
+
+// ------------------------------------------------------------------ kalıcılık
+
+/// KALICILIK [KAYNAK: Rockstar patenti US11534688B2]. Bölgeden çıkan blok
+/// paketlenip saklanıyor, geri dönülünce yazılıyor.
+///
+/// ASSUMPTION: blok İNDİRGENMİŞ çözünürlükte saklanıyor. Spec 4×4 m blok
+/// diyor; tam çözünürlükte bir blok 256×256 teksel yani 256 KB, LRU 512
+/// blokla 128 MB eder. Dörde indirgenince (6.25 cm/teksel) 16 KB ve toplam
+/// 8 MB — ayak izleri o çözünürlükte hâlâ okunuyor.
+RWStructuredBuffer<float4> _BlockBuffer;
+
+/// Bloğun bölge içindeki sol alt köşesi, teksel.
+int2 _BlockOrigin;
+
+/// Bir blok kenarının kaç teksel olduğu (tam çözünürlükte).
+uint _BlockTexels;
+
+/// Saklanan bloğun kenarı, teksel.
+uint _BlockStored;
+
+[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
+void KBlockPack(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _BlockStored || id.y >= _BlockStored) return;
+
+    uint step = _BlockTexels / _BlockStored;
+    int2 origin = _BlockOrigin + int2(id.xy * step);
+
+    float4 sum = 0.0;
+    float count = 0.0;
+
+    for (uint y = 0; y < step; ++y)
+    for (uint x = 0; x < step; ++x)
+    {
+        int2 p = clamp(origin + int2(x, y), int2(0, 0),
+                       int2((int)_Resolution - 1, (int)_Resolution - 1));
+
+        float4 snow = _Snow[p];
+        float4 trail = _Trail[p];
+
+        sum += float4(snow.r, snow.g, trail.r, trail.g);
+        count += 1.0;
+    }
+
+    _BlockBuffer[id.y * _BlockStored + id.x] = sum / count;
+}
+
+[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
+void KBlockUnpack(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _BlockTexels || id.y >= _BlockTexels) return;
+
+    int2 target = _BlockOrigin + int2(id.xy);
+
+    if (any(target < 0) || any(target >= (int)_Resolution)) return;
+
+    uint step = _BlockTexels / _BlockStored;
+    uint2 src = id.xy / step;
+
+    float4 stored = _BlockBuffer[src.y * _BlockStored + src.x];
+
+    float4 snow = _Snow[target];
+    float4 trail = _Trail[target];
+
+    // YALNIZ SAKLANAN KANALLAR YAZILIYOR. Islaklık ve tazelik anlık durum;
+    // geri yüklenirse kar "eskiden nasılsa öyle" görünür.
+    snow.r = stored.x;
+    snow.g = stored.y;
+    trail.r = stored.z;
+    trail.g = stored.w;
+
+    _SnowOut[target] = snow;
+    _TrailOut[target] = trail;
 }
