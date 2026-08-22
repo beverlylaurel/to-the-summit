@@ -75,6 +75,10 @@ public class DebugMenu : MonoBehaviour
     bool stitchOff;
     bool skirtOff;
 
+    /// Teşhis: rüzgâr taşınımı ve gölgesi ayrı ayrı kapatılabiliyor.
+    bool windTransportOff;
+    bool windShadowOff;
+
     /// Teşhis: kaç clipmap halkası çizilsin. −1 = hepsi.
     int probeRings = -1;
 
@@ -496,6 +500,25 @@ public class DebugMenu : MonoBehaviour
 
             if (meshProbe != before)
                 Shader.SetGlobalFloat("_SnowMeshProbe", meshProbe);
+
+            var mgr = snowClipmap != null ? snowClipmap.GetComponent<SnowManager>() : null;
+
+            if (mgr != null)
+            {
+                bool nextWt = GUILayout.Toggle(windTransportOff, "Rüzgâr taşınımını kapat (teşhis)");
+                if (nextWt != windTransportOff)
+                {
+                    windTransportOff = nextWt;
+                    mgr.WindTransportOff = windTransportOff;
+                }
+
+                bool nextWs = GUILayout.Toggle(windShadowOff, "Rüzgâr gölgesini kapat (teşhis)");
+                if (nextWs != windShadowOff)
+                {
+                    windShadowOff = nextWs;
+                    mgr.WindShadowOff = windShadowOff;
+                }
+            }
 
             bool nextStitch = GUILayout.Toggle(stitchOff, "Dikişi kapat (teşhis)");
             if (nextStitch != stitchOff)

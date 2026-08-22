@@ -150,6 +150,15 @@ public class SnowManager : MonoBehaviour
     /// editörde her şey iki kat hızlı ilerler.
     int lastSimulatedFrame = -1;
 
+    /// SİMÜLASYON İZOLASYON ANAHTARLARI (teşhis).
+    ///
+    /// Prob, kusurun VERİDE olduğunu gösterdi: taban derinliğinde kama
+    /// şeklinde fazla kar. Kütleyi hareket ettiren tek şey rüzgâr taşınımı;
+    /// onu ve beslediği rüzgâr gölgesini ayrı ayrı kapatmak sorumluyu tek
+    /// turda ayırıyor.
+    [System.NonSerialized] public bool WindTransportOff;
+    [System.NonSerialized] public bool WindShadowOff;
+
     /// Yakın bölgenin ortalama SWE'si ve yoğunluğu — kaskadla karşılaştırmak
     /// için. Derinlik = SWE × 1000 / ρ.
     public float MeanSwe { get; private set; } = -1f;
@@ -589,8 +598,8 @@ public class SnowManager : MonoBehaviour
         cmd.BeginSample(SnowProfiler.MarkerNames[3]);
         DispatchAccumulate(cmd, groups);
 
-        DispatchWindShadow(cmd);
-        DispatchWindTransport(cmd, groups);
+        if (!WindShadowOff) DispatchWindShadow(cmd);
+        if (!WindTransportOff) DispatchWindTransport(cmd, groups);
 
         // KALICILIK BİRİKMEDEN SONRA. Geri yüklenen blok en son bilinen
         // durumu taşıyor; birikme onun üstüne yazsaydı yükleme boşa giderdi.
