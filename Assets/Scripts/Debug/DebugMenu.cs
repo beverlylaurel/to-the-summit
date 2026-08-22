@@ -517,8 +517,17 @@ public class DebugMenu : MonoBehaviour
         float rho = Mathf.Lerp(50f, 550f, Mathf.Clamp01(rhoN));
         float depth = swe * 1000f / Mathf.Max(rho, 1f);
 
+        // İKİ AYRI YOL, İKİ AYRI SAYI.
+        //
+        // Kar çizgisi yolu bölgenin DIŞI için. Oyuncunun çevresinde shader
+        // DURUM DOKUSUNU okuyor. Doku boşsa maske sıfır çıkıyor ve dağ çıplak
+        // kalıyor — ekrandan bakınca "kar çizgisi çalışmıyor" gibi görünüyor
+        // ama çizgi doğru, doku boş. `GroundCoverage01` o dokunun geri
+        // okumasıdır: kar varsa 1'e yakın, doku boşsa 0.
         return $"kar çizgisi {lineY:F0} m + {band:F0} m bant   " +
-               $"senin kotunda {depth * 100f:F1} cm";
+               $"çizgiden {depth * 100f:F1} cm   " +
+               $"DOKUDA {SnowRuntimeState.GroundCoverage01:F2}   " +
+               $"gevşek {SnowRuntimeState.LooseSnowFraction:F2}";
     }
 
     /// SÜRGÜ GERÇEK SİSTEMLERE YAZIYOR, KAR SİSTEMİNE DEĞİL.
