@@ -152,13 +152,17 @@ public class SnowfallRenderer : MonoBehaviour
                                    spindriftRate, settings.QualityData.VfxCapacityScale);
     }
 
-    /// Kararlı durumda canlı tane sayısı = doğum oranı × ortalama ömür.
+    /// YOĞUNLUK ŞİDDETLE DOĞRU ORANTILI.
+    ///
+    /// "Doğum oranı × ortalama ömür" hesabı i01 = 0.38'in üstünde kapasiteye
+    /// dayanıyor ve yoğunluk şiddetten BAĞIMSIZ hâle geliyor: yarım şiddette
+    /// de tam şiddette de kırk bin tane. Ölçüldü — 0.5 şiddette ekran
+    /// tamamen beyaz.
+    ///
     /// Saf fonksiyon: Play'e girmeden sınanabiliyor.
     public static int FlakeCountFor(float intensity01, float capacityScale)
     {
-        const float MeanLifetime = 6.5f;
-
-        float wanted = intensity01 * SnowConstants.MaxFlakeRate * MeanLifetime * capacityScale;
+        float wanted = Mathf.Clamp01(intensity01) * FlakeCapacity * capacityScale;
         return Mathf.Clamp(Mathf.RoundToInt(wanted), 0, FlakeCapacity);
     }
 

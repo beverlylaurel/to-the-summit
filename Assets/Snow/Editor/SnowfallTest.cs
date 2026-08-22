@@ -62,15 +62,20 @@ public static class SnowfallTest
         r.AppendLine("  [" + M(zero) + "] Şiddet 0          " + none +
                      " tane  (kar yoksa hiç iş yok)");
 
-        // Şiddet arttıkça tane sayısı doğrusal artıyor.
+        // Şiddet arttıkça tane sayısı DOĞRU ORANTILI artıyor. Doyum
+        // olsaydı yarım şiddette de tam şiddette de aynı yoğunluk olurdu.
         int low = SnowfallRenderer.FlakeCountFor(0.06f, 1f);
         int mid = SnowfallRenderer.FlakeCountFor(0.24f, 1f);
+        int half = SnowfallRenderer.FlakeCountFor(0.50f, 1f);
         int high = SnowfallRenderer.FlakeCountFor(1f, 1f);
 
-        bool monotone = low > 0 && low < mid && mid < high;
+        bool monotone = low > 0 && low < mid && mid < half && half < high &&
+                        Mathf.Abs(half * 2f - high) < 2f;
+
         all &= monotone;
         r.AppendLine("  [" + M(monotone) + "] Şiddet → tane     0.06 → " + low +
-                     ",  0.24 → " + mid + ",  1.00 → " + high + "  (kapasite tavanı 40000)");
+                     ",  0.24 → " + mid + ",  0.50 → " + half + ",  1.00 → " + high +
+                     "  (yarım şiddet yarım yoğunluk)");
 
         // Kalite preseti kapasiteyi ölçekliyor (spec §15.3).
         int lowQuality = SnowfallRenderer.FlakeCountFor(0.24f, 0.35f);

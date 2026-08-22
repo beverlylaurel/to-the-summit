@@ -123,6 +123,50 @@ public class SnowDebugWindow : EditorWindow
         Graphics.Blit(shown, preview, debugMaterial, 0);
     }
 
+    /// İZOLASYON ANAHTARLARI. Belirtiden sorumluyu bulmanın tek yolu
+    /// şüphelileri TEK TEK kapatmak; tahmin turu yakıyor.
+    ///
+    /// Şüphelilerin TAMAMI burada, tek seferde. Biri eksik olsaydı "hepsini
+    /// kapattım hâlâ oluyor" cevabı hiçbir şey söylemezdi.
+    ///
+    /// Bu bölüm kar sistemi kabul edilince silinecek.
+    void DrawIsolation()
+    {
+        SnowManager manager = SnowManager.Active;
+        if (manager == null) return;
+
+        GameObject host = manager.gameObject;
+
+        EditorGUILayout.Space(8f);
+        EditorGUILayout.LabelField("İzolasyon", EditorStyles.boldLabel);
+
+        Toggle<SnowfallRenderer>(host, "Kar yağışı (taneler)");
+        Toggle<SnowCurtainController>(host, "Süspansiyon perdeleri");
+        Toggle<SnowClipmap>(host, "Kar yüzeyi (zemin mesh'i)");
+        Toggle<SnowCoverageDriver>(host, "Nesne üstü kar");
+        Toggle<SnowBurstParticles>(host, "Ayak tozu / püskürtme");
+        Toggle<SnowFarCascade>(host, "Uzak kaskad");
+        Toggle<SnowPersistence>(host, "İz kalıcılığı");
+
+        EditorGUILayout.HelpBox(
+            "Her satır bir şüpheli. Kapatıp belirtinin kaybolduğu satır sorumludur. " +
+            "Play'den çıkınca hepsi geri açılır — sahneye yazılmıyor.",
+            MessageType.None);
+    }
+
+    static void Toggle<T>(GameObject host, string label) where T : MonoBehaviour
+    {
+        var component = host.GetComponent<T>();
+
+        using (new EditorGUI.DisabledScope(component == null))
+        {
+            bool on = component != null && component.enabled;
+            bool next = EditorGUILayout.Toggle(label, on);
+
+            if (component != null && next != on) component.enabled = next;
+        }
+    }
+
     /// SINAMA KARI. Ayar dosyasına DOKUNMUYOR: değer `NonSerialized` bir
     /// alanda duruyor, Play'den çıkınca ve her derlemede sıfırlanıyor.
     /// Geri almayı unutmak mümkün değil.
@@ -222,6 +266,7 @@ public class SnowDebugWindow : EditorWindow
         EditorGUILayout.LabelField("Kurulum", EditorStyles.boldLabel);
         if (GUILayout.Button("Sahneyi kur", GUILayout.Height(28f))) SetupScene();
 
+        DrawIsolation();
         DrawTestSnow();
 
         EditorGUILayout.Space(8f);

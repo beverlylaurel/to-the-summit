@@ -163,12 +163,20 @@ Shader "ToTheSummit/SnowfallParticle"
 
                 float alpha = f.alpha * fogFade * _AlphaScale;
 
-                // GECE LAMBALARIN ALTINDA GÖRÜNSÜNLER (spec §17.1). Renk ana
-                // ışıktan geliyor; kar sistemi kendi ışığını uydurmuyor.
+                // TANE AYDINLATILMIŞ BİR YÜZEY, IŞIK KAYNAĞI DEĞİL.
+                //
+                // Işıma terimi spec §17.1'de `_FlakeEmissive * mainLightColor
+                // * 0.04` — yalnız gece lambaların altında görünsünler diye
+                // küçük bir katkı. `0.04` atlanınca güneş şiddeti 3.03 olan
+                // bu sahnede tane rengi 3.4 çıkıyor ve kırk bin tane ekranı
+                // tamamen beyaza boğuyor (ölçüldü).
                 Light mainLight = GetMainLight();
-                half3 lit = mainLight.color * _FlakeEmissive;
 
-                OUT.color = float4(_FlakeTint.rgb * (0.35 + lit), alpha);
+                half3 ambient = SampleSH(half3(0, 1, 0));
+                half3 diffuse = _FlakeTint.rgb * (ambient + mainLight.color * 0.35h);
+                half3 emissive = mainLight.color * _FlakeEmissive * 0.04h;
+
+                OUT.color = float4(diffuse + emissive, alpha);
                 OUT.fogFactor = ComputeFogFactor(OUT.positionCS.z);
 
                 return OUT;
