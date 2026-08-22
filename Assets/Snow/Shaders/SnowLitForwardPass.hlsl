@@ -89,8 +89,21 @@ float3 SnowNormalAtStep(float2 uv, float t, float hHere, float3 positionWS)
     float3 nSnow   = normalize(float3(hL - hR, 2.0 * ms, hD - hU));
     float3 nGround = SampleGroundNormal(positionWS.xz);
 
+    // KENAR BANDINDA NORMAL ARAZİDEN.
+    //
+    // Sönüm bandında kalınlık birkaç metrede 45 cm düşüyor; merkezi türev
+    // `hL − hR` devasa çıkıyor ve normal neredeyse YATAY oluyor. Shader
+    // orayı dik bir kaya duvarı sanıp aşırı parlatıyor ya da karartıyor —
+    // ekrandaki dikey çizgili şerit buydu (ölçüldü: yer değiştirme
+    // kapatılınca şerit kalıyordu, yani gölgeleme).
+    //
+    // Bandın içinde yüzey zaten araziye oturuyor; normali de arazininki.
+    float meshFade = SnowMeshEdgeFade(positionWS.xz);
+
     // İnce karda zeminin şekli baskın; kalınlaştıkça karın kendi yüzeyi.
-    return normalize(lerp(nGround, nSnow, saturate(hHere / 0.08)));
+    float3 n = normalize(lerp(nGround, nSnow, saturate(hHere / 0.08)));
+
+    return normalize(lerp(nGround, n, meshFade));
 }
 
 /// NORMAL FRAGMENT'TA, MERKEZİ FARKLA (spec §13.3). Vertex'te hesaplanırsa
@@ -110,14 +123,30 @@ float3 SnowNormalAt(float2 uv, float hHere, float3 positionWS)
 /// hemen üstünde gürültüyle kırılıyor.
 void SnowClipEdge(float h, float3 positionWS)
 {
-    clip(h - SNOW_MIN_VISIBLE_HEIGHT);
+    // KENAR BANDINDA KIRPMA YOK.
+    //
+    // Kırpmanın işi SIĞ KARI gizlemek: 4 mm altındaki kar araziyle
+    // z-fight ederdi. Ama mesh'in dış kenarında kalınlık bilerek negatife
+    // indiriliyor (arazinin altına gömülsün diye) ve kırpma orada da
+    // çalışınca mesh toprağa GİREMİYOR — 4 mm'de havada bıçakla kesiliyor
+    // ve geriye kalınlık kadar dik bir duvar kalıyordu.
+    //
+    // İki değişiklik birbiriyle çelişiyordu: biri gömmeye çalışıyor, öteki
+    // gömülmeden kesiyordu. Kenar bandında kırpma kapalı; oradaki geometri
+    // arazinin altında kaldığı için zaten derinlik testinde kaybediyor.
+    float meshFade = SnowMeshEdgeFade(positionWS.xz);
 
-    float edgeFade = saturate((h - SNOW_MIN_VISIBLE_HEIGHT) / _SnowEdgeFadeRange);
+    if (meshFade > 0.999)
+    {
+        clip(h - SNOW_MIN_VISIBLE_HEIGHT);
 
-    float breakup = SAMPLE_TEXTURE2D(_SnowBreakup, sampler_SnowBreakup,
-                                     positionWS.xz * _SnowBreakupScale).r;
+        float edgeFade = saturate((h - SNOW_MIN_VISIBLE_HEIGHT) / _SnowEdgeFadeRange);
 
-    clip(edgeFade - breakup * 0.6);
+        float breakup = SAMPLE_TEXTURE2D(_SnowBreakup, sampler_SnowBreakup,
+                                         positionWS.xz * _SnowBreakupScale).r;
+
+        clip(edgeFade - breakup * 0.6);
+    }
 }
 
 /// Fragman'da ortak kurulum: kesme, normal, yüzey. Hem ileri geçiş hem
