@@ -372,6 +372,38 @@ half4 SnowLitFragment(Varyings IN) : SV_Target
             return half4((half3)inside.xxx, 1);
         }
 
+        // 11–15 — YÜKSEKLİĞE KATKI VEREN HER TERİM AYRI AYRI.
+        //
+        // Mod 7 süreksizliğin YERİNİ veriyor ama hangi terimden geldiğini
+        // vermiyor. Bunlar terimleri tek tek boyuyor; kusur hangisinde
+        // parlarsa sahibi o.
+        if (mode > 10.5)
+        {
+            float4 ps = SnowStateAt(puv);
+            float4 pt = SnowTrailAt(puv);
+
+            // 11 — TABAN (harmanlanmış derinlik), 0–60 cm.
+            if (mode < 11.5)
+                return half4((half3)saturate(SnowBaseHeight(ps.r, ps.g) / 0.6).xxx, 1);
+
+            // 12 — İZ (carve), 0–20 cm.
+            if (mode < 12.5)
+                return half4((half3)saturate(pt.r / 0.2).xxx, 1);
+
+            // 13 — SIRT (rim), 0–10 cm.
+            if (mode < 13.5)
+                return half4((half3)saturate(pt.g / 0.1).xxx, 1);
+
+            // 14 — SASTRUGİ genliği, 0–1.
+            if (mode < 14.5)
+                return half4((half3)saturate(pt.a).xxx, 1);
+
+            // 15 — ZEMİN YÜKSEKLİĞİ bandı. Kusur BURADA da varsa sebep karda
+            // değil, ARAZİDE.
+            float gb = frac(SampleGroundHeight(IN.positionWS.xz));
+            return half4((half3)lerp(0.2, 0.9, step(0.5, gb)).xxx, 1);
+        }
+
         // 10 — VERİ KAYNAĞI. Yeşil = yakın durum, mavi = kaskad, kırmızı = kar
         // çizgisi eğrisi. Hangi pikselin nereden beslendiği tek bakışta.
         float inside2 = SnowInsideMask(puv);
