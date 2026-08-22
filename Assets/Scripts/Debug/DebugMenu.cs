@@ -524,7 +524,18 @@ public class DebugMenu : MonoBehaviour
         // kalıyor — ekrandan bakınca "kar çizgisi çalışmıyor" gibi görünüyor
         // ama çizgi doğru, doku boş. `GroundCoverage01` o dokunun geri
         // okumasıdır: kar varsa 1'e yakın, doku boşsa 0.
-        return $"kar çizgisi {lineY:F0} m + {band:F0} m bant   " +
+        // MESH KENARI DA BURADA. Kenardaki duvarı sönümlemek için yazılan
+        // globaller gerçekten ulaşıyor mu — sıfırsa sönüm hiç çalışmıyor.
+        float meshExtent = Shader.GetGlobalFloat("_SnowMeshExtent");
+        Vector4 meshCenter = Shader.GetGlobalVector("_SnowMeshCenterXZ");
+
+        float toEdge = walker != null
+            ? meshExtent - Mathf.Max(Mathf.Abs(walker.transform.position.x - meshCenter.x),
+                                     Mathf.Abs(walker.transform.position.z - meshCenter.y))
+            : 0f;
+
+        return $"mesh ±{meshExtent:F0} m, kenara {toEdge:F0} m   " +
+               $"kar çizgisi {lineY:F0} m + {band:F0} m bant   " +
                $"çizgiden {depth * 100f:F1} cm   " +
                $"DOKUDA {SnowRuntimeState.GroundCoverage01:F2}   " +
                $"gevşek {SnowRuntimeState.LooseSnowFraction:F2}";
