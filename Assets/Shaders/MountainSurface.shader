@@ -60,7 +60,17 @@ Shader "ToTheSummit/MountainSurface"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            float _TerrainShadowReceive;
+            /// TEŞHİS ANAHTARI — TERS MANTIK, BİLEREK.
+            ///
+            /// Eskiden `_TerrainShadowReceive` idi (1 = açık) ve yalnız
+            /// `DebugMenu.Update()` yazıyordu. Panel sahnede yoksa ya da
+            /// kapalıysa global hiç yazılmıyor, Unity globalleri SIFIR
+            /// başlıyor ve arazi gölgesiz çiziliyordu — build'de oynanışın
+            /// tamamı gölgesiz.
+            ///
+            /// Ters mantıkla varsayılan doğru tarafa düşüyor: kimse yazmazsa
+            /// 0 kalır, 0 da "kapatma" demek.
+            float _TerrainShadowOff;
             /// GEÇİCİ. Aydınlık-gölge sınırının etrafına ince renk şeritleri basıyor.
             /// Soru "zikzak var mı" ve cevabı parlaklıkla değil BİÇİMLE veriliyor:
             /// normal alanı düzgünse şeritler ince ve akıcı, doku ızgarasına oturmuşsa
@@ -136,10 +146,10 @@ Shader "ToTheSummit/MountainSurface"
                 // Hareketli nesnelerin gölgesi haritadan ve arazininkiyle ÇARPILIYOR:
                 // ikisi ayrı olay — biri sırtın arkasında kalmak, öteki üstünde bir cisim
                 // durmak. Aynı kanaldan gidiyorlar çünkü ikisi de doğrudan güneşi kesiyor.
-                // TEŞHİS ANAHTARI: `_TerrainShadowReceive` sıfırken gölge haritası hiç
+                // TEŞHİS ANAHTARI: `_TerrainShadowOff` birken gölge haritası hiç
                 // okunmuyor. Arazi ekranın çoğunu kaplıyor ve bu okuma piksel başına
                 // yapılıyor — kare süresindeki payı ancak kapatıp ölçerek bilinir.
-                if (_TerrainShadowReceive > 0.5)
+                if (_TerrainShadowOff < 0.5)
                     mainLight.shadowAttenuation *=
                         MainLightRealtimeShadow(TransformWorldToShadowCoord(IN.positionWS));
 

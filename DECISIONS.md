@@ -108,6 +108,21 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   **Tetikleyici:** savrulan kar tek noktadan fışkırıyor görünüyorsa.
   **Maliyet:** iki grafiğe kutu + süspansiyona CustomHLSL üstel yükseklik.
 
+- **Bisikletin zemin direnci bağlı değil** — `BikeController.RollingResistance`
+  alanı var ve `-1` iken ayardan geliyor; hiçbir sistem beslemiyor. Bisiklet
+  çakılda da asfaltta da aynı direnci görüyor. `TerrainSurface`'te zemin TİPİ
+  API'si yok (`WindWeightAt`, `SlopeAt` var); önce zemin sınıflandırması
+  gerekiyor. Kar derinliğinden beslemek ayrı bir yol — `SnowMovementModifier`
+  zaten `SpeedMultiplier` yayınlıyor ama hareket koduna bağlamak onaya tabi.
+  **Tetikleyici:** zemin tipi ayrımı istendiğinde.
+
+- **`fix.md`'nin kalan maddeleri incelenmedi** — 16 maddeden 6'sı düzeltildi,
+  3'ü geçersiz çıktı, 1'i yapılamadı. Kalanlar: SkyFog `ZTest` konturu,
+  froxel dilim basamaklanması (temporal reprojection), yağmur kutusu popping,
+  ay evreleri, ufuk haritası sınırı (kodda bilinçli, yorumda gerekçesi var),
+  ACES renk sapması (kalibrasyon), cavity AO 50 m LOD pop, yıldız şişmesi.
+  **Tetikleyici:** ilgili belirti ekranda görüldüğünde.
+
 - **VFX'te gökyüzü örtü kesmesi yok** — spec §17.1 `_SnowSkyVisTex`'ten okuyup
   çatı altındaki taneyi öldürmeyi "atlanmayacak" diye işaretliyor. VFX'in o
   dokuya erişimi yok; CustomHLSL'e doku parametresi geçirmek gerekiyor.

@@ -46,7 +46,6 @@ public class DebugMenu : MonoBehaviour
     float speedMultiplier = StartSpeedMultiplier;
     bool freeFly;
 
-    static readonly int TerrainShadowId = Shader.PropertyToID("_TerrainShadowReceive");
 
     /// 0 kapalı · 1 bant · 2 opaklık · 3 perde yok. Şüphelilerin tamamı tek yerde:
     /// "perde bir şey yapıyor mu", "doğru yerde mi", "gücü doğru mu" üç ayrı soru ve
@@ -171,18 +170,6 @@ public class DebugMenu : MonoBehaviour
     {
         Time.timeScale = 1f;
 
-        // Panel açıkken bileşen kapanırsa imleç serbest kalırdı
-        if (open) cursorLock.Restore();
-        open = false;
-    }
-
-    void Update()
-    {
-        // PANELDEN BAĞIMSIZ. Yorumun kendisi "yazılmazsa sıfır kalır ve arazi hiç gölge
-        // almaz" diyordu ama satır panel çizim kodundaydı: panel KAPALIYKEN global hiç
-        // yazılmıyor, sıfır kalıyor ve arazi gölgesiz çiziliyordu. Oyunun normal hâli
-        // panel kapalı olduğu için bu, oynanışın tamamını etkiliyordu.
-        Shader.SetGlobalFloat(TerrainShadowId, 1f);
         var keyboard = Keyboard.current;
         if (keyboard != null && keyboard.f1Key.wasPressedThisFrame) Toggle();
 

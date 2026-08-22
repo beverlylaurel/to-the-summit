@@ -208,10 +208,29 @@ public class TimeOfDay : MonoBehaviour
     /// boyunca yer değiştirir. Güneş açıkça işaretlenince seçim sabitleniyor.
     void MarkAsSun()
     {
+        // GECE ANA IŞIK AYA DEVREDİLİYOR.
+        //
+        // Eskiden hep güneşe sabitlenmişti. Güneş ufkun altına inip şiddeti
+        // sıfıra yaklaşınca URP ana ışık olarak SÖNMÜŞ güneşi görmeye devam
+        // ediyordu: ay tepedeyken hiçbir şey ay yönünde gölge düşürmüyordu.
+        //
+        // İşaretlemenin asıl amacı korunuyor — şimşek çakması güneşten parlak
+        // olduğu için Unity'nin "en parlak olanı seç" davranışı ana ışığı bir
+        // kareliğine şimşeğe kaptırıyordu. Açık atama o seçimi hâlâ
+        // sabitliyor; yalnız hangisine sabitlendiği artık günün saatine bağlı.
+        Light wanted = sun;
+
+        if (moon != null && SunHeight <= NightHandoverHeight)
+            wanted = moon;
+
         // Eşitlik kontrolü gereksiz yazımı önlüyor: bu bir sahne ayarı ve her karede
         // yazılınca sahne sürekli kirleniyor.
-        if (sun != null && RenderSettings.sun != sun) RenderSettings.sun = sun;
+        if (wanted != null && RenderSettings.sun != wanted) RenderSettings.sun = wanted;
     }
+
+    /// Güneş bu yüksekliğin altındayken ana ışık ay. Sıfır değil: güneş tam
+    /// ufuktayken şiddeti zaten sıfıra yakın ve gölgeleri anlamsızca uzuyor.
+    const float NightHandoverHeight = -0.05f;
 
     /// Test ve önizleme için saati doğrudan verir
     public void SetNormalized(float value)
@@ -255,6 +274,10 @@ public class TimeOfDay : MonoBehaviour
         float elevation = SunDirection.y;
 
         SunHeight = elevation;
+
+        // Ana ışık devri günün saatine bağlı, bir kerelik kurulum değil.
+        // `Bind` ve `OnEnable`'da kalsaydı gece hep güneşte kalırdı.
+        MarkAsSun();
 
         // Geniş bir kuşakta yumuşasın: alacakaranlık aniden bitmesin.
         // Dar tutulunca sabah 8 ile öğle 12 aynı parlaklıkta görünüyordu.

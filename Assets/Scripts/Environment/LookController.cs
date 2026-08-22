@@ -29,6 +29,15 @@ public class LookController : MonoBehaviour
     [Tooltip("Işık farkının kapatılan payı. 1 = tam normalizasyon, şafağı öğlene çevirir.")]
     [SerializeField, Range(0f, 1f)] float adaptShare = 0.35f;
 
+    /// Karanlığa açılma zaman sabiti (saniye). Rodopsin yenilenmesi yavaş.
+    const float AdaptToDarkSeconds = 2.5f;
+
+    /// Aydınlığa kısılma zaman sabiti (saniye). Gözbebeği hızlı kapanır.
+    const float AdaptToLightSeconds = 0.5f;
+
+    /// O anki pozlama uyumu. Hedefe yumuşayarak varıyor.
+    float adapt;
+
     [SerializeField] LookSettings look;
     [SerializeField] WeatherState weather;
     [SerializeField] TimeOfDay time;
@@ -178,8 +187,23 @@ public class LookController : MonoBehaviour
         // ALT SINIR 0.02 → 0.0005. Eskiden `lightLevel` 0.02'de kırpılıyordu, yani
         // uyum en fazla 5.6 durak görebiliyordu; gerçek gece bundan çok daha aşağıda ve
         // kırpma alacakaranlığı tek bir seviyeye düzlüyordu.
-        float adapt = Mathf.Clamp(adaptShare * -Mathf.Log(Mathf.Max(0.0005f, lightLevel), 2f),
-                                  0f, exposureCap);
+        float adaptTarget = Mathf.Clamp(adaptShare * -Mathf.Log(Mathf.Max(0.0005f, lightLevel), 2f),
+                                        0f, exposureCap);
+
+        // GÖZ ANINDA UYUM SAĞLAMAZ, VE İKİ YÖNDE AYNI HIZDA DA SAĞLAMAZ.
+        //
+        // Hedef doğrudan yazılıyordu: şimşek çakınca ya da gölgeden güneşe
+        // çıkınca ekran parlaklığı TEK KAREDE sıçrıyordu.
+        //
+        // İnsan gözünde karanlığa uyum (rodopsin yenilenmesi) aydınlığa
+        // uyumdan kat kat yavaştır. Simetrik yumuşatma ikisini de ortalar ve
+        // ikisi de yanlış olur.
+        //
+        // `adapt` ARTIYORSA karanlığa açılıyoruz — yavaş. Azalıyorsa
+        // aydınlığa kısılıyoruz — hızlı.
+        float tau = adaptTarget > adapt ? AdaptToDarkSeconds : AdaptToLightSeconds;
+        adapt = Mathf.Lerp(adapt, adaptTarget,
+                           1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(0.01f, tau)));
 
         Set(colorAdjustments.postExposure, profile.exposure + adapt);
         Set(colorAdjustments.contrast, profile.contrast);

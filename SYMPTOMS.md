@@ -1113,3 +1113,60 @@ Kutu spec'e döndürüldü, yoğunluk kapasiteden alındı (120000). Ölçüldü
 daireydi; 4×4 kar tanesi atlası dallı ve boşluklu, aynı ekran alanında daha az
 piksel dolduruyor. Gökyüzü bölgesinde en parlak piksel 222 → 193'e düşmüştü,
 emissive ölçeği 1.0 → 1.6 ile 225'e döndü, hiçbir piksel doymadı.
+
+
+## `fix.md` denetimi — 16 iddianın 6'sı doğrulandı, 3'ü geçersiz çıktı
+
+Kullanıcı bir analiz raporu verdi ve "ezbere hareket etme, önce doğrula" dedi.
+Her madde kodda arandı.
+
+**Doğrulanan ve düzeltilenler:**
+
+*Yağmur sesi kar yağarken çalıyordu.* `WeatherAudio.DriveRain` ham
+`weather.Precipitation` okuyordu — ne `RainWeight01` çarpanı ne de
+`PrecipitationRenderer`'ın 0.05 kesme eşiği. Kar sistemi yağmuru görselde
+kapattığında ses açık kaldı; rapor bunu "hafif yağmurda ses var görüntü yok"
+diye yakalamış, kar tarafı devreye girince tam bir tutarsızlığa dönüşmüş.
+
+*Gece ana ışık aya devredilmiyordu.* `RenderSettings.sun` hep güneşe
+sabitlenmişti. Sabitlemenin kendisi bilinçliydi (şimşek güneşten parlak olduğu
+için Unity ana ışığı bir kareliğine ona kaptırıyordu) ama hangisine
+sabitlendiği günün saatinden bağımsızdı. Ölçüldü: saat 0.00'da ana ışık artık
+`Moon Light`, gündüz `Directional Light`.
+
+*Alpenglow'da arazi kendi gölgesini kapatıyordu.* `TerrainSunShadow` güneş
+ufka değdiği an `1.0` dönüyordu; gün batımından sonra vadi dipleri sırtlarla
+aynı parlaklıkta kalıyordu. Sınır ufkun 0.035 altına çekildi ve arada gölge
+yumuşakça bırakılıyor.
+
+*Göz adaptasyonu tek karede sıçrıyordu.* `LookController` `adapt`i doğrudan
+yazıyordu. Asimetrik üstel yumuşatma kondu — karanlığa açılma 2.5 s, aydınlığa
+kısılma 0.5 s; insan gözünde ikisi aynı hızda değil.
+
+*`_TerrainShadowReceive` `DebugMenu`'ye bağımlıydı.* Global yalnız
+`DebugMenu.Update()`'te yazılıyordu; panel sahnede yoksa Unity globali sıfır
+başlar ve **arazi tamamen gölgesiz** çizilir. Anahtar `_TerrainShadowOff`'a
+çevrildi: kimse yazmazsa 0 kalır, 0 da "kapatma" demek — varsayılan artık
+doğru tarafa düşüyor.
+
+*Sıcaklıkta termal eylemsizlik yoktu.* `daytimeWarming * DayFactor` anındaydı;
+güneş ufka değdiği saniyede hava birkaç derece zıplıyordu. Gerçekte günün en
+soğuk anı gün doğumudur. `DayFactor` 45 dakikalık bir gecikmeyle izleniyor.
+
+**Geçersiz çıkanlar — iddia kodla uyuşmadı:**
+
+*Bulut tabanı gecikmesi.* Rapor `activeCloudBottom`'ın görsel bulut tabanı
+olduğunu varsayıyor. Kodun kendi yorumu aksini söylüyor: "`CloudBottom` ve
+`CloudTop` KALDIRILDI, silinen bulut sistemine aitti"; gerçek kotlar
+`CloudLayerProbe`'dan geliyor. Madde eski mimariye ait.
+
+*Bulut gölgesi çifte kararma.* Rapor "ortam ışığı sıfıra yaklaşır" diyor.
+Kodda cookie yalnız `mainLight.color`'ı çarpıyor; ambient ayrı kanaldan
+geliyor ve yorumda bu açıkça yazılı.
+
+*Şimşek sesi `timeScale` desenkronu.* Rapor "unscaled yerine simülasyon zamanı
+kullanılmalı" diyor; `ThunderPlayer` zaten `Time.deltaTime` kullanıyor.
+
+**Yapılamayan:** bisikletin zemin direnci (`RollingResistance`). Alan gerçekten
+boşta duruyor ama `TerrainSurface`'te zemin TİPİ API'si yok (`WindWeightAt` ve
+`SlopeAt` var). Önce zemin sınıflandırması gerekiyor — `DECISIONS.md`.

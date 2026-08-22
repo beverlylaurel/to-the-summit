@@ -169,7 +169,21 @@ struct MountainSurface
 /// bandı, altında tam gölge. Gerçekte de dağ gölgesinin kenarı böyle yumuşar.
 float TerrainSunShadow(float3 worldPos, float3 sunDir)
 {
-    if (sunDir.y < 0.0) return 1.0;   // gece ışığını kendi yönü söndürür
+    // UFUK ALTINDA HEMEN BIRAKMIYOR — ALPENGLOW İÇİN.
+    //
+    // Eskiden `sunDir.y < 0.0` ile kesiliyordu: güneş ufka değdiği AN arazi
+    // kendi gölgesini tamamen kapatıyor, gün batımından sonraki alpenglow
+    // boyunca vadi dipleri ve sırt arkaları sırtlarla aynı parlaklıkta
+    // kalıyordu — derinlik hissi bir karede kayboluyor.
+    //
+    // Işığın kendi yönü zaten söndürüyor; buradaki kapının işi yalnız ufuk
+    // haritasının anlamsız açı okumasını engellemek. O yüzden sınır ufkun
+    // biraz ALTINA çekildi ve arada gölge yumuşakça bırakılıyor.
+    if (sunDir.y < -0.035) return 1.0;
+
+    // −0.035 ile 0 arasında gölge sönerek çekiliyor: sert bir açma/kapama
+    // gün batımında görünür bir sıçrama yapardı.
+    float horizonFade = saturate(sunDir.y / 0.035 + 1.0);
 
     float2 uv = (worldPos.xz - _TerrainOrigin.xz) / _TerrainSize.xz;
 
@@ -210,7 +224,7 @@ float TerrainSunShadow(float3 worldPos, float3 sunDir)
 
     // Yarı gölgenin açısal genişliği (radyan): ufkun altına az, üstüne geniş —
     // gölgenin içi dolu kalır, kenarı alacakaranlık gibi açılır
-    return smoothstep(horizon - 0.02, horizon + 0.10, elevation);
+    return lerp(1.0, smoothstep(horizon - 0.02, horizon + 0.10, elevation), horizonFade);
 }
 
 /// Alpenglow: ayrı bir ışık değil, kızıllaşmış güneşin KENDİSİ — vadi Dünya'nın

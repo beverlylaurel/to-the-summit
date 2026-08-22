@@ -92,11 +92,51 @@ public class TemperatureField : MonoBehaviour
 
     float SeaLevelC => overrideActive ? overrideSeaLevelCelsius : seaLevelCelsius;
 
+    /// TERMAL EYLEMSİZLİK. `DayFactor`'ın gecikmeli hâli.
+    ///
+    /// Güneşin ısıtması anında değil: yer önce ısınır, havayı sonra ısıtır.
+    /// Gerçek dünyada günün en soğuk anı GÜN DOĞUMUdur — güneş çoktan çıkmıştır
+    /// ama gece boyunca kaybedilen ısı henüz geri gelmemiştir; tepe sıcaklık da
+    /// öğlede değil, öğleden birkaç saat sonradır.
+    ///
+    /// `DayFactor` doğrudan kullanılıyordu: güneş ufka değdiği saniyede sıcaklık
+    /// birkaç derece zıplıyordu.
+    float warmth;
+
+    bool warmthReady;
+
+    /// Isınmanın güneşi izleme gecikmesi (saniye, oyun zamanı).
+    [Tooltip("Havanın güneşi izleme gecikmesi. Büyük değer: sabah daha soğuk, " +
+             "akşam daha ılık kalır.")]
+    [SerializeField] float thermalLagSeconds = 2700f;
+
+    void LateUpdate()
+    {
+        if (time == null) return;
+
+        float target = time.DayFactor;
+
+        // İlk karede hedefe oturuyor: yoksa sahne her açılışta gece
+        // sıcaklığından başlayıp yavaşça ısınırdı.
+        if (!warmthReady)
+        {
+            warmth = target;
+            warmthReady = true;
+            return;
+        }
+
+        warmth = Mathf.Lerp(warmth, target,
+                            1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(1f, thermalLagSeconds)));
+    }
+
+    /// Gecikmeli gündüz katsayısı. `time` yoksa anlık değere düşüyor.
+    float Warmth => warmthReady ? warmth : (time != null ? time.DayFactor : 0f);
+
     /// Verilen kottaki ölçülen hava sıcaklığı (°C).
     public float At(float altitude) =>
         SeaLevelC
         - lapseRate * altitude * 0.001f
-        + daytimeWarming * time.DayFactor
+        + daytimeWarming * Warmth
         - stormCooling * weather.Precipitation;
 
     /// Hissedilen sıcaklık: rüzgâr deriden ısıyı taşır, termometre bunu görmez.
@@ -108,6 +148,6 @@ public class TemperatureField : MonoBehaviour
     /// Düşüş oranı sabit olduğu için tersi kapalı biçimde çözülüyor.
     public float FreezingLevel =>
         (SeaLevelC
-         + daytimeWarming * time.DayFactor
+         + daytimeWarming * Warmth
          - stormCooling * weather.Precipitation) / (lapseRate * 0.001f);
 }

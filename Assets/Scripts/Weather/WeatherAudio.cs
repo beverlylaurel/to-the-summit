@@ -79,14 +79,27 @@ public class WeatherAudio : MonoBehaviour
 
     void DriveRain(float precipitation, float felt)
     {
-        float master = precipitation * masterVolume
+        // YAĞMUR SESİ YAĞMUR ÇİZİLİYORSA ÇALAR.
+        //
+        // `SnowRuntimeState.RainWeight01` yağmurun görsel ağırlığı;
+        // `PrecipitationRenderer` damla yoğunluğunu bununla çarpıyor. Ses de
+        // aynı sayıyı okumazsa kar yağarken yağmur sesi duyulur — kar sistemi
+        // devreye girdiğinde tam bu oldu.
+        float rain = precipitation * SnowRuntimeState.RainWeight01;
+
+        // GÖRSEL KESME EŞİĞİYLE AYNI. `PrecipitationRenderer` 0.05 altında
+        // damla sayısını sıfıra indiriyor; ses aynı yerde susmazsa oyuncu tek
+        // damla görmeden çiseleme duyar.
+        rain *= Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.05f, rain));
+
+        float master = rain * masterVolume
                        * (1f + felt * windRainBoost);
 
         // Çiseleme boğuk, sağanak tiz
-        float brightness = Mathf.Lerp(0.55f, 1f, precipitation);
+        float brightness = Mathf.Lerp(0.55f, 1f, rain);
 
-        light.Drive(master * Mathf.Sqrt(1f - precipitation), brightness, 1f);
-        heavy.Drive(master * Mathf.Sqrt(precipitation), brightness, 1f);
+        light.Drive(master * Mathf.Sqrt(1f - rain), brightness, 1f);
+        heavy.Drive(master * Mathf.Sqrt(rain), brightness, 1f);
     }
 
     /// Seviye esintiyi izler, band geçişi sürekli şiddeti. Geçiş de esintiye bağlansaydı
