@@ -116,6 +116,7 @@ public static class SnowShaderIDs
     public static readonly int FlakeAliveCount = Shader.PropertyToID("_FlakeAliveCount");
     public static readonly int FlakeBaseSize = Shader.PropertyToID("_FlakeBaseSize");
     public static readonly int FlakeSeed = Shader.PropertyToID("_FlakeSeed");
+    public static readonly int FlakeSeedU = Shader.PropertyToID("_FlakeSeedU");
     public static readonly int FlakeAtlas = Shader.PropertyToID("_FlakeAtlas");
     public static readonly int SpawnCenter = Shader.PropertyToID("_SpawnCenter");
     public static readonly int SpawnExtent = Shader.PropertyToID("_SpawnExtent");

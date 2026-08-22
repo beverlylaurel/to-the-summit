@@ -33,9 +33,9 @@ Material:
     - _FlakeEmissive: 1
     - _MinPixelSize: 1.3
     - _SoftFade: 0.4
-    - _StretchMin: 4
     - _StretchAlongVelocity: 1
     - _StretchMax: 8
+    - _StretchMin: 4
     m_Colors:
     - _FlakeTint: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []

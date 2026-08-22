@@ -38,6 +38,10 @@ float3 _SpawnExtent;
 float  _FlakeBaseSize;
 float  _FlakeSeed;
 
+/// Doğum hash'inin tam sayı tohumu. `_FlakeSeed` türbülans alanını
+/// kaydırmak için kalıyor, hash artık ondan beslenmiyor.
+uint   _FlakeSeedU;
+
 float  _SnowWetness;
 float  _SnowDeltaTime;
 
@@ -56,33 +60,33 @@ float  _DriftStripWidth;
 
 // ------------------------------------------------------------------- rastgele
 
-float3 SnowRand3(float3 p)
+/// Tane doğum rastgeleliği. Tamamı tam sayı hash'ten — `frac(sin(...))`
+/// yüz bin indiste çöküyordu (`SnowCommon.hlsl` → `SnowPcg3d`).
+float3 SnowRand3(uint idx, uint slot)
 {
-    p = float3(dot(p, float3(127.1, 311.7, 74.7)),
-               dot(p, float3(269.5, 183.3, 246.1)),
-               dot(p, float3(113.5, 271.9, 124.6)));
-
-    return frac(sin(p) * 43758.5453123);
+    return SnowRandU3(uint3(idx, _FlakeSeedU, slot));
 }
 
-float SnowRand(float3 p) { return SnowRand3(p).x; }
+/// Değer gürültüsünün ızgara köşesi. Hücre tam sayı; dağın tepesinde de
+/// eteğinde de aynı kalitede.
+float SnowRand(int3 cell) { return SnowRandCell3(cell).x; }
 
 // ------------------------------------------------------------------ türbülans
 
 float SnowValueNoise(float3 p)
 {
-    float3 i = floor(p);
+    int3 i = (int3)floor(p);
     float3 f = frac(p);
     f = f * f * (3.0 - 2.0 * f);
 
-    float n000 = SnowRand(i + float3(0, 0, 0));
-    float n100 = SnowRand(i + float3(1, 0, 0));
-    float n010 = SnowRand(i + float3(0, 1, 0));
-    float n110 = SnowRand(i + float3(1, 1, 0));
-    float n001 = SnowRand(i + float3(0, 0, 1));
-    float n101 = SnowRand(i + float3(1, 0, 1));
-    float n011 = SnowRand(i + float3(0, 1, 1));
-    float n111 = SnowRand(i + float3(1, 1, 1));
+    float n000 = SnowRand(i + int3(0, 0, 0));
+    float n100 = SnowRand(i + int3(1, 0, 0));
+    float n010 = SnowRand(i + int3(0, 1, 0));
+    float n110 = SnowRand(i + int3(1, 1, 0));
+    float n001 = SnowRand(i + int3(0, 0, 1));
+    float n101 = SnowRand(i + int3(1, 0, 1));
+    float n011 = SnowRand(i + int3(0, 1, 1));
+    float n111 = SnowRand(i + int3(1, 1, 1));
 
     return lerp(lerp(lerp(n000, n100, f.x), lerp(n010, n110, f.x), f.y),
                 lerp(lerp(n001, n101, f.x), lerp(n011, n111, f.x), f.y), f.z);
@@ -117,8 +121,8 @@ float SnowOcclusionY(float3 posWS)
 
 void SpawnFlake(uint idx, inout SnowFlake f)
 {
-    float3 r0 = SnowRand3(float3(idx, _FlakeSeed, 1.0));
-    float3 r1 = SnowRand3(float3(idx, _FlakeSeed, 2.0));
+    float3 r0 = SnowRand3(idx, 1u);
+    float3 r1 = SnowRand3(idx, 2u);
 
     // SPAWN KUTUSU 1 m IZGARASINA SNAP'Lİ (CPU'da). Snap yoksa kamera
     // hareketinde doğum deseni yürüyor ve taneler kayıyormuş gibi görünüyor.
@@ -213,8 +217,8 @@ void KFlakeUpdate(uint3 id : SV_DispatchThreadID)
 /// Daha yükseğe doğurmak süspansiyon katmanıdır ve ayrı bir sistemdir.
 void SpawnDrift(uint idx, inout SnowFlake f)
 {
-    float3 r0 = SnowRand3(float3(idx, _FlakeSeed, 11.0));
-    float3 r1 = SnowRand3(float3(idx, _FlakeSeed, 12.0));
+    float3 r0 = SnowRand3(idx, 11u);
+    float3 r1 = SnowRand3(idx, 12u);
 
     float2 wind = normalize(_WindWS.xz + 1e-5);
     float2 side = float2(-wind.y, wind.x);
@@ -356,8 +360,8 @@ float _CurtainSpawnWidth;
 
 void SpawnCurtain(uint idx, inout SnowFlake f)
 {
-    float3 r0 = SnowRand3(float3(idx, _FlakeSeed, 21.0));
-    float3 r1 = SnowRand3(float3(idx, _FlakeSeed, 22.0));
+    float3 r0 = SnowRand3(idx, 21u);
+    float3 r1 = SnowRand3(idx, 22u);
 
     float2 wind = normalize(_WindWS.xz + 1e-5);
     float2 side = float2(-wind.y, wind.x);

@@ -4,6 +4,12 @@
 #ifndef SNOW_SPARKLE_INCLUDED
 #define SNOW_SPARKLE_INCLUDED
 
+// Tam sayi hash buradan (SnowPcg3d / SnowRandCell3). Include yoktu ve
+// SnowTestKernels.compute'un ALTI kerneli birden derlenmedi; dispatch'ler
+// sessizce sifir dondu, on ayri sinama 'yanlis sonuc' verdi. Gercek sebep
+// tek satirlik eksik include'du.
+#include "SnowCommon.hlsl"
+
 /// MESAFEDE TİTREMEYEN PARILTI
 /// [KAYNAK: Bowles & Wang, "Sparkly but not too Sparkly!", SIGGRAPH 2015].
 ///
@@ -12,20 +18,20 @@
 /// UZAYINDA sabit tutmak — hücre boyu piksel ayak izine göre LOD'lanıyor,
 /// eşik de aynı oranda gevşiyor.
 
-float3 SnowHash33(float3 p)
+/// AYNI ÇÖKME BURADA DA VARDI. Hücre `floor(posWS.xz / cellSize)`; 6000 m'lik
+/// dağda ve milimetrik hücrede girdi milyonlara çıkıyor, `frac(sin(...))`
+/// orada tekrar eden değer üretiyor. Tam sayı hash'te bu sınır yok
+/// (`SnowCommon.hlsl` → `SnowPcg3d`).
+float3 SnowHash33(int3 cell)
 {
-    p = float3(dot(p, float3(127.1, 311.7, 74.7)),
-               dot(p, float3(269.5, 183.3, 246.1)),
-               dot(p, float3(113.5, 271.9, 124.6)));
-
-    return frac(sin(p) * 43758.5453123);
+    return SnowRandCell3(cell);
 }
 
 /// Bir kristal hücresinin mikro normali. Aşağı bakanlar yukarı çevriliyor —
 /// yüzeyin altına bakan bir kristal parlayamaz.
 float3 SparkleCellNormal(float2 cell)
 {
-    float3 r = SnowHash33(float3(cell, 17.0));
+    float3 r = SnowHash33(int3((int2)cell, 17));
     float3 n = normalize(r * 2.0 - 1.0);
     return (n.y < 0) ? float3(n.x, -n.y, n.z) : n;
 }

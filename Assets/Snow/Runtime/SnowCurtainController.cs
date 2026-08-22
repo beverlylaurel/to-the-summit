@@ -127,6 +127,7 @@ public class SnowCurtainController : MonoBehaviour
 
         cmd.SetComputeFloatParam(snowfallCompute, SnowShaderIDs.SnowDeltaTime, Time.deltaTime);
         cmd.SetComputeFloatParam(snowfallCompute, SnowShaderIDs.FlakeSeed, Time.frameCount * 0.013f);
+        cmd.SetComputeIntParam(snowfallCompute, SnowShaderIDs.FlakeSeedU, Time.frameCount);
 
         cmd.SetComputeIntParam(snowfallCompute, SnowShaderIDs.FlakeCapacity, Capacity);
         cmd.SetComputeIntParam(snowfallCompute, SnowShaderIDs.FlakeAliveCount, alive);

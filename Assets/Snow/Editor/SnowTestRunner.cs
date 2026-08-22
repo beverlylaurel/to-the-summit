@@ -99,6 +99,53 @@ public static class SnowTestRunner
     /// HER SINAMA AYRI YAKALANIYOR. Biri istisna atarsa diğerleri yine koşsun;
     /// yoksa tek bir bozuk sınama bütün raporu susturur ve neyin çalıştığı
     /// görünmez olur.
+    /// SHADER HATALARI ÖNCE. Bir compute derlenmezse bütün dispatch'ler
+    /// sessizce sıfır döner ve on ayrı sınama birden "yanlış sonuç" der;
+    /// gerçek sebep tek satırlık bir HLSL hatasıdır. Bu bölüm o satırı
+    /// raporun BAŞINA koyuyor.
+    static void AppendShaderMessages(StringBuilder r)
+    {
+        string[] paths =
+        {
+            "Assets/Snow/Shaders/SnowSim.compute",
+            "Assets/Snow/Shaders/SnowfallSim.compute",
+            "Assets/Snow/Editor/SnowTestKernels.compute",
+        };
+
+        bool any = false;
+
+        foreach (string path in paths)
+        {
+            var cs = AssetDatabase.LoadAssetAtPath<ComputeShader>(path);
+            if (cs == null) { r.AppendLine("YOK: " + path); any = true; continue; }
+
+            int count = ShaderUtil.GetComputeShaderMessageCount(cs);
+            if (count == 0) continue;
+
+            any = true;
+            r.AppendLine("SHADER HATASI — " + path);
+
+            foreach (var m in ShaderUtil.GetComputeShaderMessages(cs))
+                r.AppendLine("  " + m.file + "(" + m.line + "): " + m.message);
+        }
+
+        foreach (string path in AssetDatabase.FindAssets("t:Shader", new[] { "Assets/Snow/Shaders" }))
+        {
+            string file = AssetDatabase.GUIDToAssetPath(path);
+            var sh = AssetDatabase.LoadAssetAtPath<Shader>(file);
+
+            if (sh == null || ShaderUtil.GetShaderMessageCount(sh) == 0) continue;
+
+            any = true;
+            r.AppendLine("SHADER HATASI — " + file);
+
+            foreach (var m in ShaderUtil.GetShaderMessages(sh))
+                r.AppendLine("  " + m.file + "(" + m.line + "): " + m.message);
+        }
+
+        if (any) { r.AppendLine(new string('-', 72)); r.AppendLine(); }
+    }
+
     static string Run()
     {
         var r = new StringBuilder(16384);
@@ -107,6 +154,8 @@ public static class SnowTestRunner
         r.AppendLine("Unity " + Application.unityVersion);
         r.AppendLine(new string('=', 72));
         r.AppendLine();
+
+        AppendShaderMessages(r);
 
         bool all = true;
 

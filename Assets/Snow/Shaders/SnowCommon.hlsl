@@ -100,6 +100,39 @@ float _SnowLineGroundY;
 float _SnowLineBand;
 float _SnowLineSWE;
 
+/// TAM SAYI HASH — PCG3D [KAYNAK: Jarzynski & Olano, JCGT 2020,
+/// "Hash Functions for GPU Rendering"].
+///
+/// `frac(sin(dot(p, k)))` BÜYÜK GİRDİDE ÇÖKÜYOR. Ölçüldü: 104 000 tane için
+/// X ekseninde yalnız 5237 FARKLI değer üretiyordu (%5). Yüz bin tane beş bin
+/// dikey hat üzerine yığılınca ekranda "solucan", "sigara dumanı" ve
+/// "bir yerde yağıyor bir yerde boş gökyüzü" görünüyordu (`SYMPTOMS.md`).
+///
+/// PCG3D'de çökme yok: aynı ölçümde 104 000/104 000 farklı değer, kova sapması
+/// ×1.04, eksenler arası korelasyon 0.0003.
+uint3 SnowPcg3d(uint3 v)
+{
+    v = v * 1664525u + 1013904223u;
+
+    v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
+    v ^= v >> 16u;
+    v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
+
+    return v;
+}
+
+/// 0..1 aralığında üç bağımsız sayı.
+float3 SnowRandU3(uint3 seed)
+{
+    return float3(SnowPcg3d(seed)) * (1.0 / 4294967296.0);
+}
+
+/// Tam sayı ızgara hücresinden — negatif koordinatlar da güvenli.
+float3 SnowRandCell3(int3 cell)
+{
+    return SnowRandU3(asuint(cell));
+}
+
 float SnowInitialSweAt(float groundY)
 {
     float t = saturate((groundY - _SnowLineGroundY) / max(_SnowLineBand, 1e-3));
@@ -294,12 +327,16 @@ float2 SnowFarStateAt(float2 posXZ)
 {
     float2 uv = (posXZ - _SnowFarCenter) / max(_SnowFarAreaSize, 1e-3) + 0.5;
 
-    // Kaskadın da dışı: sabit değil, kar çizgisi eğrisi. Sabit olsaydı
-    // dağın tepesi ile eteği aynı kalınlıkta kar taşırdı.
-    if (any(uv < 0.0) || any(uv > 1.0))
-        return float2(SnowInitialSweAt(SampleGroundHeight(posXZ)), _FallbackRhoN);
+    // TEK ÇIKIŞ. Erken dönüşün içinde doku örneklemek bölünmüş akışta
+    // "potentially uninitialized" veriyor; iki dal da hesaplanıp seçiliyor.
+    //
+    // Kaskadın da dışı sabit değil, kar çizgisi eğrisi — sabit olsaydı dağın
+    // tepesi ile eteği aynı kalınlıkta kar taşırdı.
+    float2 cascade = SAMPLE_TEXTURE2D_LOD(_SnowFarTex, sampler_LinearClamp, saturate(uv), 0).rg;
+    float2 outside = float2(SnowInitialSweAt(SampleGroundHeight(posXZ)), _FallbackRhoN);
 
-    return SAMPLE_TEXTURE2D_LOD(_SnowFarTex, sampler_LinearClamp, uv, 0).rg;
+    bool inside = all(uv >= 0.0) && all(uv <= 1.0);
+    return inside ? cascade : outside;
 }
 
 /// Kar yüzeyinin zeminden yüksekliği, verilen bölge UV'sinde.

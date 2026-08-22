@@ -53,11 +53,14 @@ public class DebugMenu : MonoBehaviour
 
     bool weatherLocked;
 
-    bool snowLocked;
-    float lockedSnowIntensity = 1f;
-    float lockedSnowTempC = -6f;
-    float snowDensityMul = 1f;
-    float snowSizeMul = 1f;
+    /// KAR YAĞIŞIN KENDİSİ, AYRI BİR SİSTEM DEĞİL. Sürgü yağışı açıp
+    /// sıcaklığı donmanın altına indiriyor; "kar mı yağmur mu" kararını yine
+    /// `SnowfallController`'ın histerezisi veriyor. Ayrı bir "kar şiddeti"
+    /// kaynağı olsaydı yağışla çelişebilirdi.
+    float lockedSnow;
+
+    /// Sürgü açıkken dayatılan sıcaklık. Kar eşiği 0,5 °C; −6 rahat altında.
+    const float SnowForceTempC = -6f;
     float lockedPrecipitation = 0.6f;
 
     bool windLocked;
@@ -174,11 +177,13 @@ public class DebugMenu : MonoBehaviour
         var keyboard = Keyboard.current;
         if (keyboard != null && keyboard.f1Key.wasPressedThisFrame) Toggle();
 
-        if (weatherLocked)
-        {
-            weatherDriver.IntensityOverride = lockedPrecipitation;
-        }
+        if (weatherLocked) weatherDriver.IntensityOverride = lockedPrecipitation;
         if (windLocked) wind.ApplyOverride(lockedWindStrength, lockedWindAngle);
+
+        // KİLİT AÇILINCA DA KOŞMALI: geçersiz kılmayı temizleyen taraf burası.
+        // `if (weatherLocked)` içine konsaydı kilit kapandığında kar sonsuza
+        // kadar dayatılmış kalırdı.
+        ApplySnowOverride();
     }
 
     void Toggle()
@@ -214,7 +219,6 @@ public class DebugMenu : MonoBehaviour
         BeginColumn();
         DrawWeather();
         DrawWind();
-        DrawSnow();
         EndColumn();
 
         BeginColumn();
@@ -428,6 +432,9 @@ public class DebugMenu : MonoBehaviour
         {
             GUILayout.Label($"Yağış şiddeti {lockedPrecipitation:F2}");
             lockedPrecipitation = GUILayout.HorizontalSlider(lockedPrecipitation, 0f, 1f);
+
+            GUILayout.Label($"Kar şiddeti {lockedSnow:F2}   " + SnowStatus());
+            lockedSnow = GUILayout.HorizontalSlider(lockedSnow, 0f, 1f);
         }
 
         GUILayout.Space(6f);
@@ -462,90 +469,30 @@ public class DebugMenu : MonoBehaviour
         EndSection();
     }
 
-    /// KAR. Sürgüler köprünün `NonSerialized` geçersiz kılmalarına yazıyor:
-    /// sahneye de ayar dosyasına da dokunulmuyor, Play'den çıkınca sıfırlanıyor.
-    void DrawSnow()
+    string SnowStatus()
     {
-        BeginSection("Kar");
+        if (!SnowRuntimeState.IsSnowing) return "kar yok";
 
-        if (snowBridge == null)
+        return snowfall != null
+            ? $"yağıyor, {snowfall.AliveFlakes} tane"
+            : "yağıyor";
+    }
+
+    /// Sürgü köprünün `NonSerialized` alanına yazıyor: sahneye de ayar
+    /// dosyasına da dokunulmuyor, Play'den çıkınca sıfırlanıyor.
+    void ApplySnowOverride()
+    {
+        if (snowBridge == null) return;
+
+        if (weatherLocked && lockedSnow > 0.001f)
         {
-            GUILayout.Label("Kar köprüsü atanmadı — Kar Teşhisi'nde \"Sahneyi kur\".");
-            EndSection();
-            return;
+            snowBridge.OverridePrecip01 = lockedSnow;
+            snowBridge.OverrideTemperatureC = SnowForceTempC;
         }
-
-        GUILayout.Label($"Yağıyor {(SnowRuntimeState.IsSnowing ? "evet" : "hayır")}   " +
-                        $"şiddet {SnowRuntimeState.SnowfallIntensity01:F2}   " +
-                        $"yağmur payı {SnowRuntimeState.RainWeight01:F2}");
-
-        GUILayout.Label($"Zemin kaplaması {SnowRuntimeState.GroundCoverage01:F2}   " +
-                        $"gevşek kar {SnowRuntimeState.LooseSnowFraction:F2}");
-
-        if (snowfall != null)
-            GUILayout.Label($"Canlı tane {snowfall.AliveFlakes}   " +
-                            $"savrulma {snowfall.AliveDrift}");
-
-        // Sıcaklık ve şiddet KÖPRÜDEN geçiyor; kar sistemi kendi kararını
-        // yine kendi histerezisiyle veriyor. Sürgü kararı atlamıyor.
-        bool next = GUILayout.Toggle(snowLocked, "Karı elle ayarla");
-        if (next != snowLocked)
+        else if (snowBridge.HasOverride)
         {
-            snowLocked = next;
-            if (!snowLocked) snowBridge.ClearOverrides();
-        }
-
-        using (new Disabled(!snowLocked))
-        {
-            GUILayout.Label($"Yağış şiddeti {lockedSnowIntensity:F2}");
-            lockedSnowIntensity = GUILayout.HorizontalSlider(lockedSnowIntensity, 0f, 1f);
-
-            GUILayout.Label($"Sıcaklık {lockedSnowTempC:F1} °C   " +
-                            "(0,5 altında kar, 2,0 üstünde yağmur)");
-            lockedSnowTempC = GUILayout.HorizontalSlider(lockedSnowTempC, -25f, 10f);
-        }
-
-        if (snowLocked)
-        {
-            snowBridge.OverridePrecip01 = lockedSnowIntensity;
-            snowBridge.OverrideTemperatureC = lockedSnowTempC;
-        }
-
-        GUILayout.Space(6f);
-
-        using (new Disabled(snowfall == null))
-        {
-            GUILayout.Label($"Tane yoğunluğu ×{snowDensityMul:F2}");
-            snowDensityMul = GUILayout.HorizontalSlider(snowDensityMul, 0.1f, 4f);
-
-            GUILayout.Label($"Tane boyu ×{snowSizeMul:F2}");
-            snowSizeMul = GUILayout.HorizontalSlider(snowSizeMul, 0.25f, 6f);
-        }
-
-        if (snowfall != null)
-        {
-            snowfall.DensityMultiplier = snowDensityMul;
-            snowfall.SizeMultiplier = snowSizeMul;
-        }
-
-        if (GUILayout.Button("Ayarları geri al"))
-        {
-            snowLocked = false;
             snowBridge.ClearOverrides();
-
-            lockedSnowIntensity = 1f;
-            lockedSnowTempC = -6f;
-            snowDensityMul = 1f;
-            snowSizeMul = 1f;
-
-            if (snowfall != null)
-            {
-                snowfall.DensityMultiplier = 1f;
-                snowfall.SizeMultiplier = 1f;
-            }
         }
-
-        EndSection();
     }
 
     void DrawWind()

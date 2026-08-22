@@ -16,12 +16,6 @@ public sealed class SnowfallController
     /// dururdu.
     bool snowing;
 
-    /// Yağmur→kar el değiştirmesinin rampası. Ani kesme "yağmur kayboldu"
-    /// diye okunuyor; bu süre boyunca yağmur soluyor, kar sonra başlıyor.
-    const float HandoffSeconds = 0.8f;
-
-    float rainWeight = 1f;
-
     public float SnowfallSweRate { get; private set; }
     public float FlakeRate { get; private set; }
 
@@ -32,7 +26,6 @@ public sealed class SnowfallController
     public void Reset()
     {
         snowing = false;
-        rainWeight = 1f;
         SnowfallSweRate = 0f;
         FlakeRate = 0f;
         Wetness = 0f;
@@ -50,16 +43,18 @@ public sealed class SnowfallController
 
         SnowRuntimeState.IsSnowing = precipActive && snowing;
 
-        // EL DEĞİŞTİRME SIRAYLA. Kar açıkken yağmur 0'a iniyor; kar şiddeti
-        // yağmurun kalanı kadar KISILIYOR. Üst üste binme matematiksel
-        // olarak imkânsız: ikisinin ağırlığı aynı rampanın iki ucu.
-        float step = Time.deltaTime / HandoffSeconds;
-        rainWeight = Mathf.MoveTowards(rainWeight, SnowRuntimeState.IsSnowing ? 0f : 1f, step);
-
-        SnowRuntimeState.RainWeight01 = rainWeight;
+        // YAĞMUR ANINDA SUSUYOR, SOLDURULMUYOR.
+        //
+        // Çapraz soldurma "yumuşak geçiş" değil, iki yağışın üst üste
+        // binmesidir (`DECISIONS.md`). Yumuşaklık tanenin BİÇİMİNDE:
+        // `Wetness` 0.5–2.0 °C bandında kuru kardan sulu kara geçiyor.
+        //
+        // Rampa bir kez denendi ve `IsSnowing`'in anlamını bozdu: histerezis
+        // "kar" derken bayrak 0.8 s boyunca false kalıyordu.
+        SnowRuntimeState.RainWeight01 = SnowRuntimeState.IsSnowing ? 0f : 1f;
 
         SnowRuntimeState.SnowfallIntensity01 =
-            SnowRuntimeState.IsSnowing ? env.PrecipIntensity01 * (1f - rainWeight) : 0f;
+            SnowRuntimeState.IsSnowing ? env.PrecipIntensity01 : 0f;
 
         float i01 = SnowRuntimeState.SnowfallIntensity01;
 

@@ -63,10 +63,6 @@ public class SnowfallRenderer : MonoBehaviour
     [Tooltip("Tanenin taban boyu (m). Rastgele 0.6–1.7 katıyla çarpılıyor.")]
     [SerializeField] float flakeBaseSize = 0.018f;
 
-    /// TEŞHİS GEÇERSİZ KILMALARI (F1). `NonSerialized`: sahneye yazılmıyor,
-    /// Play'den çıkınca sıfırlanıyor.
-    [System.NonSerialized] public float DensityMultiplier = 1f;
-    [System.NonSerialized] public float SizeMultiplier = 1f;
 
     [Tooltip("Yer savrulmasının azami doğum oranı katsayısı.")]
     [SerializeField, Range(0f, 1f)] float spindriftRate = 1f;
@@ -173,10 +169,6 @@ public class SnowfallRenderer : MonoBehaviour
         aliveDrift = DriftCountFor(env.WindSpeed, SnowRuntimeState.LooseSnowFraction,
                                    spindriftRate, settings.QualityData.VfxCapacityScale);
 
-        aliveFlakes = Mathf.Clamp(Mathf.RoundToInt(aliveFlakes * DensityMultiplier),
-                                  0, FlakeCapacity);
-        aliveDrift = Mathf.Clamp(Mathf.RoundToInt(aliveDrift * DensityMultiplier),
-                                 0, DriftCapacity);
     }
 
     /// Kararlı durumda canlı tane sayısı = doğum oranı × ortalama ömür.
@@ -234,8 +226,8 @@ public class SnowfallRenderer : MonoBehaviour
 
         cmd.SetComputeFloatParam(snowfallCompute, SnowShaderIDs.SnowDeltaTime, Time.deltaTime);
         cmd.SetComputeFloatParam(snowfallCompute, SnowShaderIDs.FlakeSeed, Time.frameCount * 0.017f);
-        cmd.SetComputeFloatParam(snowfallCompute, SnowShaderIDs.FlakeBaseSize,
-                                 flakeBaseSize * SizeMultiplier);
+        cmd.SetComputeIntParam(snowfallCompute, SnowShaderIDs.FlakeSeedU, Time.frameCount);
+        cmd.SetComputeFloatParam(snowfallCompute, SnowShaderIDs.FlakeBaseSize, flakeBaseSize);
 
         cmd.SetComputeVectorParam(snowfallCompute, SnowShaderIDs.SpawnCenter, spawnCenter);
         cmd.SetComputeVectorParam(snowfallCompute, SnowShaderIDs.SpawnExtent, SpawnBox * 0.5f);
