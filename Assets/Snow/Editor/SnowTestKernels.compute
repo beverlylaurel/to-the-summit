@@ -13,10 +13,16 @@ uint _Resolution;
 float _ProbeGlobalA;
 float _ProbeGlobalB;
 
+/// Global DOKU compute'a ulasiyor mu. Float'larin ulastigi olculdu; doku ayri
+/// bir soru ve projede `_GroundHeightTex` kernel BASINA baglaniyor.
+Texture2D<float4> _ProbeGlobalTex;
+SamplerState sampler_ProbeGlobalTex;
+
 [numthreads(1, 1, 1)]
 void KGlobalProbe(uint3 id : SV_DispatchThreadID)
 {
-    _Dst[uint2(0, 0)] = float4(_ProbeGlobalA, _ProbeGlobalB, 0.0, 1.0);
+    float tex = _ProbeGlobalTex.SampleLevel(sampler_ProbeGlobalTex, float2(0.5, 0.5), 0).r;
+    _Dst[uint2(0, 0)] = float4(_ProbeGlobalA, _ProbeGlobalB, tex, 1.0);
 }
 
 [numthreads(8, 8, 1)]

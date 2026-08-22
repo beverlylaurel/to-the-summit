@@ -188,18 +188,22 @@ public class SnowFarCascade : MonoBehaviour
         lastReadbackFrame = Time.frameCount;
         readbackPending = true;
 
-        UnityEngine.Rendering.AsyncGPUReadback.Request(far, 0, request =>
+        // FORMAT ŞART. `RT_SnowFar` RGHalf (4 bayt/piksel); `Vector2` 8 bayt.
+        // Yanlış boyutta okunan yarı-hassas bitler float32 olarak yorumlanınca
+        // denormal çıkıyor ve ölçüm her zaman 0.0000 yazıyordu — aracın
+        // kendisi yalan söylüyordu. Okuma açıkça RGBAFloat'a çevriliyor.
+        UnityEngine.Rendering.AsyncGPUReadback.Request(far, 0, TextureFormat.RGBAFloat, request =>
         {
             readbackPending = false;
             if (request.hasError || far == null) return;
 
-            var data = request.GetData<Vector2>();
+            var data = request.GetData<Color>();
 
             float sum = 0f;
             int step = Mathf.Max(1, data.Length / 4096);
             int n = 0;
 
-            for (int i = 0; i < data.Length; i += step) { sum += data[i].x; n++; }
+            for (int i = 0; i < data.Length; i += step) { sum += data[i].r; n++; }
 
             MeanSwe = n > 0 ? sum / n : 0f;
         });

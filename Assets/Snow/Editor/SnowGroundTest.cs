@@ -320,6 +320,33 @@ public static class SnowGroundTest
                              (ok ? prop.objectReferenceValue.name : "ATANMAMIŞ"));
             }
 
+            // KASKADIN KENDİ REFERANSLARI. `SnowManager` denetleniyordu ama
+            // kaskad ayrı bir bileşen; referansı boşsa `OnEnable` fırlatıyor
+            // ve kaskad sessizce hiç koşmuyor. Kar mesh'inin DIŞINI o
+            // besliyor, yani boş kalırsa dağ çıplak görünüyor.
+            var cascade = Object.FindAnyObjectByType<SnowFarCascade>();
+
+            if (cascade == null)
+            {
+                r.AppendLine("  [-] SnowFarCascade sahnede YOK");
+                empty++;
+            }
+            else
+            {
+                var cso = new UnityEditor.SerializedObject(cascade);
+
+                foreach (string name in new[] { "settings", "simCompute", "followTarget" })
+                {
+                    var prop = cso.FindProperty(name);
+                    bool ok = prop != null && prop.objectReferenceValue != null;
+
+                    if (!ok) empty++;
+
+                    r.AppendLine("  [" + M(ok) + "] kaskad." + name.PadRight(13) +
+                                 (ok ? prop.objectReferenceValue.name : "ATANMAMIŞ"));
+                }
+            }
+
             if (empty > 0)
             {
                 // KURULUMU BURADA KOŞTURUP TEKRAR BAKIYORUZ. Böylece "otomatik

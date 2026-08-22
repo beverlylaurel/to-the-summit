@@ -35,6 +35,14 @@ public static class SnowComputeGlobalTest
         Shader.SetGlobalFloat("_ProbeGlobalA", A);
         Shader.SetGlobalFloat("_ProbeGlobalB", B);
 
+        // Global DOKU: 0.75 gri tek piksel.
+        var probeTex = new Texture2D(1, 1, TextureFormat.RFloat, false, true)
+        { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp };
+        probeTex.SetPixel(0, 0, new Color(0.75f, 0f, 0f, 1f));
+        probeTex.Apply();
+
+        Shader.SetGlobalTexture("_ProbeGlobalTex", probeTex);
+
         var rt = new RenderTexture(1, 1, 0, RenderTextureFormat.ARGBFloat)
         { enableRandomWrite = true, hideFlags = HideFlags.HideAndDontSave };
         rt.Create();
@@ -56,21 +64,27 @@ public static class SnowComputeGlobalTest
         rt.Release();
         Object.DestroyImmediate(rt);
 
+        Object.DestroyImmediate(probeTex);
+
         bool okA = Mathf.Abs(c.r - A) < 0.001f;
         bool okB = Mathf.Abs(c.g - B) < 0.001f;
-        pass = okA && okB;
+        bool okTex = Mathf.Abs(c.b - 0.75f) < 0.01f;
 
-        r.AppendLine("  yazilan                  A = " + A + "   B = " + B);
-        r.AppendLine("  compute'ta okunan        A = " + c.r + "   B = " + c.g);
+        pass = okA && okB && okTex;
+
+        r.AppendLine("  yazilan                  A = " + A + "   B = " + B + "   doku = 0,75");
+        r.AppendLine("  compute'ta okunan        A = " + c.r + "   B = " + c.g + "   doku = " + c.b);
         r.AppendLine();
-        r.AppendLine("  [" + (pass ? "+" : "-") + "] Global compute'a ulasiyor mu");
+        r.AppendLine("  [" + (okA && okB ? "+" : "-") + "] Global FLOAT compute'a ulasiyor mu");
+        r.AppendLine("  [" + (okTex ? "+" : "-") + "] Global DOKU compute'a ulasiyor mu");
 
-        if (!pass)
+        if (!okTex)
         {
             r.AppendLine();
-            r.AppendLine("      ULASMIYOR. `Shader.SetGlobalFloat` ile yazilan her parametre");
-            r.AppendLine("      compute kernel'inde SIFIR okunuyor. Compute'a ihtiyac duyulan");
-            r.AppendLine("      her deger `cmd.SetComputeFloatParam` ile ayrica gecirilmeli.");
+            r.AppendLine("      DOKU ULASMIYOR. `Shader.SetGlobalTexture` compute kernel'inde");
+            r.AppendLine("      okunmuyor; her kernele `SetComputeTextureParam` ile AYRI");
+            r.AppendLine("      baglanmak zorunda. `SampleGroundHeight` kullanan bir kernel");
+            r.AppendLine("      dokuyu almazsa sessizce sifir okur.");
         }
 
         r.AppendLine();
