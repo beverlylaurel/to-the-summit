@@ -97,6 +97,24 @@ public static class SnowVfxApiProbe
         r.AppendLine("  Blok tipi sayısı            " + blok);
         r.AppendLine("  Bağlam (context) tipi       " + ctx);
 
+        // ADLARI DA YAZ. Kurucu araç bunlardan seçiyor; adı tahmin etmek
+        // "örneklenemedi" hatasına çıkıyor (PositionBox bir ŞEKİL, blok değil).
+        r.AppendLine();
+        r.AppendLine("### Blok adları");
+
+        foreach (Type t in asm.GetTypes()
+                     .Where(t => !t.IsAbstract && blockType != null && blockType.IsAssignableFrom(t))
+                     .OrderBy(t => t.FullName))
+            r.AppendLine("  " + t.FullName);
+
+        r.AppendLine();
+        r.AppendLine("### Bağlam adları");
+
+        foreach (Type t in asm.GetTypes()
+                     .Where(t => !t.IsAbstract && ctxType != null && ctxType.IsAssignableFrom(t))
+                     .OrderBy(t => t.FullName))
+            r.AppendLine("  " + t.FullName);
+
         // --- Örnekleme gerçekten oluyor mu: tek bir blok yaratmayı dene.
         r.AppendLine();
         r.AppendLine("## Örnekleme denemesi");
