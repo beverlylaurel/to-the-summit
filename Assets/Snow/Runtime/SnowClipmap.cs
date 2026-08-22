@@ -148,13 +148,25 @@ public class SnowClipmap : MonoBehaviour
         ? settings.QualityData.AreaSize * Mathf.Pow(2f, Mathf.Max(RingCount - 1, 0)) * 0.5f
         : 0f;
 
+    /// TEŞHİS: kaç halka çizilsin. Halka sınırındaki kusur, sınır yer
+    /// değiştirince onunla birlikte kayar — hangi halkanın kenarı olduğunu
+    /// böyle ayırıyoruz. Eksi değer "hepsi" demek.
+    ///
+    /// `NonSerialized`: sahneye yazılmıyor, Play'den çıkınca sıfırlanıyor.
+    [System.NonSerialized] public int ProbeVisibleRings = -1;
+
     void SetVisible(bool on)
     {
         visible = on;
 
         if (ringRenderers == null) return;
 
-        foreach (MeshRenderer r in ringRenderers)
-            if (r != null) r.enabled = on;
+        int limit = ProbeVisibleRings < 0 ? ringRenderers.Length : ProbeVisibleRings;
+
+        for (int i = 0; i < ringRenderers.Length; i++)
+            if (ringRenderers[i] != null) ringRenderers[i].enabled = on && i < limit;
     }
+
+    /// Teşhis sürgüsü değişince görünürlüğü yeniden uygula.
+    public void RefreshVisibility() { if (visible) SetVisible(true); }
 }

@@ -468,6 +468,7 @@ public class SnowDebugWindow : EditorWindow
             menuSerialized.FindProperty("temperature").objectReferenceValue =
                 Object.FindAnyObjectByType<TemperatureField>();
             menuSerialized.FindProperty("snowfall").objectReferenceValue = snowfall;
+            menuSerialized.FindProperty("snowClipmap").objectReferenceValue = clipmap;
             menuSerialized.ApplyModifiedProperties();
         }
 

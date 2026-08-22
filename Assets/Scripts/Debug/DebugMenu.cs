@@ -21,6 +21,7 @@ public class DebugMenu : MonoBehaviour
     [SerializeField] PrecipitationRenderer precipitation;
     [SerializeField] TemperatureField temperature;
     [SerializeField] SnowfallRenderer snowfall;
+    [SerializeField] SnowClipmap snowClipmap;
     [SerializeField] PerformanceHud hud;
     [SerializeField] ClimbHud climbHud;
     [SerializeField] CursorLock cursorLock;
@@ -62,6 +63,9 @@ public class DebugMenu : MonoBehaviour
     /// Teşhis anahtarı: dağın kar maskesini zorluyor. Kar katmanının kodu
     /// gerçekten koşuyor mu sorusunu tek tıkla ayırıyor.
     bool forceMountainSnow;
+
+    /// Teşhis: kaç clipmap halkası çizilsin. −1 = hepsi.
+    int probeRings = -1;
 
     /// Sürgü açıkken dayatılan DENİZ SEVİYESİ sıcaklığı.
     ///
@@ -444,6 +448,20 @@ public class DebugMenu : MonoBehaviour
             GUILayout.Label($"Kar şiddeti {lockedSnow:F2}   " + SnowStatus());
             lockedSnow = GUILayout.HorizontalSlider(lockedSnow, 0f, 1f);
             GUILayout.Label(SnowLineStatus());
+
+            // HALKA SINIRI TEŞHİSİ. Halkalar ±8, ±16, ±32, ±64 m. Kusur bir
+            // halkanın kenarındaysa halka sayısı azalınca kusur da o sınırla
+            // birlikte içeri kayar.
+            int ringsBefore = probeRings;
+            GUILayout.Label($"Çizilen halka {(probeRings < 0 ? "hepsi" : probeRings.ToString())}" +
+                            "   (±8, ±16, ±32, ±64 m)");
+            probeRings = Mathf.RoundToInt(GUILayout.HorizontalSlider(probeRings, -1f, 4f));
+
+            if (probeRings != ringsBefore && snowClipmap != null)
+            {
+                snowClipmap.ProbeVisibleRings = probeRings;
+                snowClipmap.RefreshVisibility();
+            }
 
             bool nextForce = GUILayout.Toggle(forceMountainSnow, "Dağı zorla karla kapla (teşhis)");
             if (nextForce != forceMountainSnow)
