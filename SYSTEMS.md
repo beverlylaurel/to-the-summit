@@ -760,7 +760,17 @@ sızma + BRDF yansıma; parıltı yalnız gündüz (`_SunElevation01` kapısı) 
 ekran uzayında yoğunluğu sabit. Ortam gölgede maviye çalıyor. Sis URP'nin
 `MixFog`'undan — kendi sis hesabı yok.
 
-**Bölge kaydırma. Durum dokuları oyuncuyu takip eden 16 m'lik bir pencerede duruyor;
+**Uzak kaskad ve kalıcılık (Faz 10).** Yakın bölgenin dışı sabit bir sayı
+değil, 192 m'lik ikinci bir durum dokusu; orada da yağış, oturma ve erime
+işliyor. `SnowSurfaceAt` bölge dışında onu okuyor, kaskadın da dışında sabite
+düşüyor. Bölgeden çıkan 4 m'lik bloklar indirgenmiş çözünürlükte saklanıyor ve
+geri dönülünce yazılıyor — LRU 512 blok, 16 MB.
+
+**Oyun tarafı (Faz 9).** `SnowSampler` dört karede bir 64×64 pencereyi
+bloklamadan geri okuyor; ayak sesi, hız çarpanı ve ayak tozu ondan besleniyor.
+Hız çarpanı YAYINLANIYOR, karakter controller'ına bağlanmıyor.
+
+**Bölge kaydırma.** Durum dokuları oyuncuyu takip eden 16 m'lik bir pencerede duruyor;
 pencere `SnapStep` (0.25 m) ızgarasına oturuyor ve kaydığında içerik `KScroll` ile aynı
 dünya noktasında kalıyor. Üç presette de bir SnapStep tam sayı teksele denk geliyor
 (8 / 16 / 24) — kesirli olsaydı izler teksel altı titrerdi. Ölçüm:
