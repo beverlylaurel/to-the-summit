@@ -1,0 +1,282 @@
+// ROL: kar tanelerinin ve yer savrulmasının GPU simülasyonu (spec §17.1).
+// Çağıran: SnowfallRenderer.
+
+#pragma kernel KFlakeUpdate
+#pragma kernel KDriftUpdate
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "SnowCommon.hlsl"
+
+/// Tek tanenin durumu. 12 float = 48 bayt; 40 000 tane 1.9 MB.
+struct SnowFlake
+{
+    float3 position;
+    float  age;
+    float3 velocity;
+    float  lifetime;      // <= 0 → bu yuva kapalı
+    float  size;
+    float  phase;
+    float  frame;         // atlas karesi 0..15
+    float  alpha;
+};
+
+RWStructuredBuffer<SnowFlake> _Flakes;
+
+uint  _FlakeCapacity;
+
+/// AÇIK YUVA SAYISI. Yoğunluk bununla ayarlanıyor: `i < _FlakeAliveCount`
+/// olan taneler sonsuza kadar dönüyor, ötekiler kapalı duruyor.
+///
+/// Klasik "kare başına şu kadar doğur" yolu sayaç ve atomik gerektiriyor;
+/// bu yol ikisini de gerektirmiyor ve hacim İLK KAREDE doluyor (spec §17.1
+/// "kutunun tamamına spawn").
+uint  _FlakeAliveCount;
+
+float3 _SpawnCenter;
+float3 _SpawnExtent;
+
+float  _FlakeBaseSize;
+float  _FlakeSeed;
+
+float  _SnowWetness;
+float  _SnowDeltaTime;
+
+/// Türbülans (spec §17.1): şiddet rüzgârla artıyor.
+float  _TurbulenceIntensity;
+float  _TurbulenceFrequency;
+float  _TurbulenceDrag;
+
+float  _FlutterFreq;
+float  _FlutterAmp;
+
+/// Yer savrulması (spec §17.1 Sistem B).
+float3 _DriftOrigin;
+float  _DriftStripLength;
+float  _DriftStripWidth;
+
+// ------------------------------------------------------------------- rastgele
+
+float3 SnowRand3(float3 p)
+{
+    p = float3(dot(p, float3(127.1, 311.7, 74.7)),
+               dot(p, float3(269.5, 183.3, 246.1)),
+               dot(p, float3(113.5, 271.9, 124.6)));
+
+    return frac(sin(p) * 43758.5453123);
+}
+
+float SnowRand(float3 p) { return SnowRand3(p).x; }
+
+// ------------------------------------------------------------------ türbülans
+
+float SnowValueNoise(float3 p)
+{
+    float3 i = floor(p);
+    float3 f = frac(p);
+    f = f * f * (3.0 - 2.0 * f);
+
+    float n000 = SnowRand(i + float3(0, 0, 0));
+    float n100 = SnowRand(i + float3(1, 0, 0));
+    float n010 = SnowRand(i + float3(0, 1, 0));
+    float n110 = SnowRand(i + float3(1, 1, 0));
+    float n001 = SnowRand(i + float3(0, 0, 1));
+    float n101 = SnowRand(i + float3(1, 0, 1));
+    float n011 = SnowRand(i + float3(0, 1, 1));
+    float n111 = SnowRand(i + float3(1, 1, 1));
+
+    return lerp(lerp(lerp(n000, n100, f.x), lerp(n010, n110, f.x), f.y),
+                lerp(lerp(n001, n101, f.x), lerp(n011, n111, f.x), f.y), f.z);
+}
+
+/// İki oktavlı vektör alanı (spec §17.1: Octaves = 2).
+float3 SnowTurbulence(float3 p)
+{
+    float3 a = float3(SnowValueNoise(p),
+                      SnowValueNoise(p + 19.7),
+                      SnowValueNoise(p + 43.3)) * 2.0 - 1.0;
+
+    float3 b = float3(SnowValueNoise(p * 2.13 + 7.1),
+                      SnowValueNoise(p * 2.13 + 31.9),
+                      SnowValueNoise(p * 2.13 + 57.4)) * 2.0 - 1.0;
+
+    return a + b * 0.5;
+}
+
+// -------------------------------------------------------------------- örtü
+
+/// Bu noktanın üstündeki örtünün dünya Y'si. Örtü yoksa çok alçak bir değer.
+float SnowOcclusionY(float3 posWS)
+{
+    float2 uv = (posWS.xz - _SkyCenterXZ) / _SkyAreaSize + 0.5;
+    if (any(uv < 0.0) || any(uv > 1.0)) return -9999.0;
+
+    return SAMPLE_TEXTURE2D_LOD(_SnowSkyVisTex, sampler_LinearClamp, uv, 0).r;
+}
+
+// ------------------------------------------------------------------ kar tanesi
+
+void SpawnFlake(uint idx, inout SnowFlake f)
+{
+    float3 r0 = SnowRand3(float3(idx, _FlakeSeed, 1.0));
+    float3 r1 = SnowRand3(float3(idx, _FlakeSeed, 2.0));
+
+    // SPAWN KUTUSU 1 m IZGARASINA SNAP'Lİ (CPU'da). Snap yoksa kamera
+    // hareketinde doğum deseni yürüyor ve taneler kayıyormuş gibi görünüyor.
+    f.position = _SpawnCenter + (r0 * 2.0 - 1.0) * _SpawnExtent;
+
+    f.age = 0.0;
+    f.lifetime = lerp(4.0, 9.0, r1.x);
+
+    // Terminal hız ıslaklıkla artıyor: sulu kar ağır ve hızlı düşüyor.
+    float dry = lerp(0.6, 1.4, r1.y);
+    float wet = lerp(1.4, 3.0, r1.z);
+    float terminal = lerp(dry, wet, _SnowWetness);
+
+    f.velocity = _WindWS + float3(0.0, -terminal, 0.0);
+
+    f.size = _FlakeBaseSize * lerp(0.6, 1.7, r0.y);
+    f.phase = r0.z * 6.2831853;
+    f.frame = floor(r1.x * 16.0);
+    f.alpha = 0.0;
+}
+
+[numthreads(64, 1, 1)]
+void KFlakeUpdate(uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+    if (idx >= _FlakeCapacity) return;
+
+    SnowFlake f = _Flakes[idx];
+
+    // Kapalı yuva: hiç iş yok.
+    if (idx >= _FlakeAliveCount)
+    {
+        f.lifetime = 0.0;
+        f.alpha = 0.0;
+        _Flakes[idx] = f;
+        return;
+    }
+
+    bool respawn = f.lifetime <= 0.0 || f.age >= f.lifetime;
+
+    if (!respawn)
+    {
+        // ZEMİN KESME (spec §17.1).
+        if (f.position.y < SampleGroundHeight(f.position.xz) + 0.02) respawn = true;
+
+        // ÖRTÜ KESME. Çatı/köprü altına kar yağmaması en çok fark edilen
+        // detay (spec §17.1 — "atlanmayacak").
+        if (SnowOcclusionY(f.position) - f.position.y > 1.5) respawn = true;
+    }
+
+    if (respawn)
+    {
+        SpawnFlake(idx, f);
+        _Flakes[idx] = f;
+        return;
+    }
+
+    float dt = _SnowDeltaTime;
+
+    f.age += dt;
+
+    float3 target = _WindWS + float3(0.0, f.velocity.y, 0.0);
+    float3 turb = SnowTurbulence(f.position * _TurbulenceFrequency + _FlakeSeed) *
+                  _TurbulenceIntensity;
+
+    // Sürüklenme: hıza doğru üstel yaklaşma. Ani sıçrama yok.
+    f.velocity = lerp(f.velocity, target + turb, 1.0 - exp(-_TurbulenceDrag * dt));
+
+    f.position += f.velocity * dt;
+
+    // SALINIM: tane düz düşmüyor, yatayda savruluyor. Sulu karda sönüyor.
+    float2 flutter = float2(sin(f.age * _FlutterFreq + f.phase),
+                            cos(f.age * _FlutterFreq * 0.83 + f.phase));
+
+    f.position.xz += flutter * _FlutterAmp * (1.0 - _SnowWetness) * dt;
+
+    // Ömrün ilk ve son %8'inde alpha rampası — taneler birden belirmiyor.
+    float t = saturate(f.age / max(f.lifetime, 1e-3));
+    float life = saturate(t / 0.08) * saturate((1.0 - t) / 0.08);
+
+    // Saçakta yumuşak geçiş.
+    float occl = 1.0 - smoothstep(0.0, 0.5, SnowOcclusionY(f.position) - f.position.y);
+
+    f.alpha = life * occl;
+
+    _Flakes[idx] = f;
+}
+
+// -------------------------------------------------------------- yer savrulması
+
+/// SALTASYON KATMANI 1–5 cm (spec §18.7) [KAYNAK: Pomeroy & Gray 1990].
+/// Daha yükseğe doğurmak süspansiyon katmanıdır ve ayrı bir sistemdir.
+void SpawnDrift(uint idx, inout SnowFlake f)
+{
+    float3 r0 = SnowRand3(float3(idx, _FlakeSeed, 11.0));
+    float3 r1 = SnowRand3(float3(idx, _FlakeSeed, 12.0));
+
+    float2 wind = normalize(_WindWS.xz + 1e-5);
+    float2 side = float2(-wind.y, wind.x);
+
+    // Rüzgâr ÜSTÜNDE bir şeritte doğuyor, rüzgârla kameraya doğru geliyor.
+    float2 planar = _DriftOrigin.xz
+                  - wind * (r0.x * _DriftStripLength)
+                  + side * ((r0.y * 2.0 - 1.0) * _DriftStripWidth);
+
+    float groundY = SampleGroundHeight(planar);
+
+    f.position = float3(planar.x, groundY + r0.z * 0.05, planar.y);
+
+    f.age = 0.0;
+    f.lifetime = lerp(1.2, 3.0, r1.x);
+
+    f.velocity = _WindWS * lerp(0.7, 1.1, r1.y) + float3(0.0, lerp(0.2, 0.8, r1.z), 0.0);
+
+    f.size = _FlakeBaseSize * lerp(0.8, 1.6, r0.y);
+    f.phase = r0.z * 6.2831853;
+    f.frame = floor(r1.x * 16.0);
+    f.alpha = 0.0;
+}
+
+[numthreads(64, 1, 1)]
+void KDriftUpdate(uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+    if (idx >= _FlakeCapacity) return;
+
+    SnowFlake f = _Flakes[idx];
+
+    if (idx >= _FlakeAliveCount)
+    {
+        f.lifetime = 0.0;
+        f.alpha = 0.0;
+        _Flakes[idx] = f;
+        return;
+    }
+
+    if (f.lifetime <= 0.0 || f.age >= f.lifetime)
+    {
+        SpawnDrift(idx, f);
+        _Flakes[idx] = f;
+        return;
+    }
+
+    float dt = _SnowDeltaTime;
+
+    f.age += dt;
+    f.position += f.velocity * dt;
+
+    float groundY = SampleGroundHeight(f.position.xz);
+
+    // Yerden yükseldikçe soluyor: saltasyon yüzeye yapışık bir katman.
+    float height = f.position.y - groundY;
+    float fade = 1.0 - saturate(height / 0.30);
+
+    float t = saturate(f.age / max(f.lifetime, 1e-3));
+    float life = saturate(t / 0.15) * saturate((1.0 - t) / 0.25);
+
+    f.alpha = fade * life;
+
+    _Flakes[idx] = f;
+}

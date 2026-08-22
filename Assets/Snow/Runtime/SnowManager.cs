@@ -23,6 +23,9 @@ public class SnowManager : MonoBehaviour
     [SerializeField] Transform followTarget;
 
     [SerializeField] SnowGroundHeight groundHeight;
+
+    [Tooltip("Kar yağışı. Boş bırakılırsa yağış çizilmez, gerisi çalışır.")]
+    [SerializeField] SnowfallRenderer snowfallRenderer;
     [SerializeField] ComputeShader simCompute;
 
     [Tooltip("Hidden/Snow/CaptureDepth — deformer'ların alt yüzeyini yazar.")]
@@ -436,6 +439,9 @@ public class SnowManager : MonoBehaviour
         DispatchCapture(cmd, groups, restoreView, restoreProj);
         DispatchTrail(cmd, groups);
         DispatchAccumulate(cmd, groups);
+
+        // Yağış simülasyonu da AYNI tamponda (spec §15.2).
+        if (snowfallRenderer != null) snowfallRenderer.Dispatch(cmd);
 
         // Ping-pong sonrası hangi dokunun güncel olduğu değişti; aynı karenin
         // geometrisi eskisini okumasın diye globaller burada tazeleniyor.

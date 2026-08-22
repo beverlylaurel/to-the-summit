@@ -103,6 +103,26 @@ public static class SnowShaderIDs
     public static readonly int SnowAORadius = Shader.PropertyToID("_SnowAORadius");
     public static readonly int SnowAOStrength = Shader.PropertyToID("_SnowAOStrength");
 
+    // --- Kar yağışı (Faz 8) ---
+    public static readonly int Flakes = Shader.PropertyToID("_Flakes");
+    public static readonly int FlakeCapacity = Shader.PropertyToID("_FlakeCapacity");
+    public static readonly int FlakeAliveCount = Shader.PropertyToID("_FlakeAliveCount");
+    public static readonly int FlakeBaseSize = Shader.PropertyToID("_FlakeBaseSize");
+    public static readonly int FlakeSeed = Shader.PropertyToID("_FlakeSeed");
+    public static readonly int FlakeAtlas = Shader.PropertyToID("_FlakeAtlas");
+    public static readonly int SpawnCenter = Shader.PropertyToID("_SpawnCenter");
+    public static readonly int SpawnExtent = Shader.PropertyToID("_SpawnExtent");
+    public static readonly int TurbulenceIntensity = Shader.PropertyToID("_TurbulenceIntensity");
+    public static readonly int TurbulenceFrequency = Shader.PropertyToID("_TurbulenceFrequency");
+    public static readonly int TurbulenceDrag = Shader.PropertyToID("_TurbulenceDrag");
+    public static readonly int FlutterFreq = Shader.PropertyToID("_FlutterFreq");
+    public static readonly int FlutterAmp = Shader.PropertyToID("_FlutterAmp");
+    public static readonly int DriftOrigin = Shader.PropertyToID("_DriftOrigin");
+    public static readonly int DriftStripLength = Shader.PropertyToID("_DriftStripLength");
+    public static readonly int DriftStripWidth = Shader.PropertyToID("_DriftStripWidth");
+    public static readonly int StretchAlongVelocity = Shader.PropertyToID("_StretchAlongVelocity");
+    public static readonly int AlphaScale = Shader.PropertyToID("_AlphaScale");
+
     // --- Teşhis penceresi ---
     public static readonly int DebugMode = Shader.PropertyToID("_DebugMode");
     public static readonly int DebugRange = Shader.PropertyToID("_DebugRange");

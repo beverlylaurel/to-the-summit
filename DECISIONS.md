@@ -1007,6 +1007,50 @@ Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olma
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
 
+## Kar Faz 8: VFX Graph YERİNE COMPUTE — en büyük sapma (2026-08-22)
+
+**Spec §17.1** `VFX/VFX_Snowfall.vfx` istiyor. VFX Graph varlığı bir **düğüm
+grafiği**; metinden yazılamıyor. Paket kurulu (17.5.0) ama grafiği elle
+serileştirmek ya da `UnityEditor.VFX`'in belgelenmemiş API'siyle kurmak
+görsel olarak doğrulanamayan, tek bir düğüm adı yanlışsa sessizce hiçbir şey
+üretmeyen bir yol.
+
+**Karar.** GPU'da simüle edilen bir tane havuzu: `SnowfallSim.compute` +
+`SnowfallParticle.shader` + `Graphics.RenderPrimitives`. Spec'in saydığı
+**davranışların hepsi** uygulandı ve ölçüldü:
+
+| §17.1'in istediği | Ölçülen |
+|---|---|
+| Kutunun tamamına spawn | 4096 / 4096 tane ilk karede kutu içinde |
+| Boyut 0.6–1.7 kat | 10.8 – 30.6 mm, oran **2.83** (0.6→1.7 tam olarak 2.83) |
+| Hız `_WindWS` + terminal | 1 sn'de Δy = **−0.99 m**, Δx = **+4.00 m** (rüzgâr 4 m/s) |
+| Rüzgâr çevrilince | Δx = **−4.00 m** |
+| Zemin kesme | zemin taneden yüksekken yaşayan tane **0** |
+| Örtü kesme | çatı altında yaşayan tane **0** |
+| Ömrün ilk/son %8'inde fade | doğumda alpha 0.000 → 2 sn sonra 1.000 |
+| 4×4 atlas, rastgele sabit kare | 16 / 16 hücre kullanılıyor |
+| Savrulma eşiği (7 m/s, gevşek 0.15) | 5 → 0, 7 → 0, 12 → 1600, sıkışmışta 0 |
+| Doğum kutusu 1 m snap | 20 cm'lik iki konum aynı merkeze düşüyor |
+
+**Yoğunluk kontrolü sayaç değil AÇIK YUVA SAYISI.** `i < _FlakeAliveCount`
+olan taneler sonsuza kadar dönüyor. Klasik "kare başına şu kadar doğur" yolu
+atomik sayaç istiyor; bu yol istemiyor ve hacim ilk karede doluyor — spec'in
+"kutunun tamamına spawn" maddesi tam olarak bu.
+
+**Tetikleyici:** VFX Graph varlığı elle (Unity penceresinde) kurulursa bu
+sistem silinebilir; davranış listesi yukarıda, karşılaştırma için duruyor.
+
+### `Mathf.SmoothStep` GLSL'in `smoothstep`'i DEĞİL
+
+Unity'nin `Mathf.SmoothStep(a, b, t)` **a ile b arasında** interpolasyon
+yapıyor, eşik uygulamıyor. Tane atlası bu yüzden kristal değil düz soluk bir
+leke çıktı — ölçüldü: on altı hücrenin kaplaması %2.0–%2.8 ve hepsi aynı.
+Kendi `Step01` fonksiyonu yazıldıktan sonra: kaplama %14.1–%40.6, **16/16
+ayrı biçim**.
+
+**Neden kayıtta:** aynı hata prosedürel üretilen her dokuda tekrar eder ve
+belirtisi "doku üretildi ama bir şeye benzemiyor" olur.
+
 ## Kar Faz 7: yağmur koşulu spec'ten farklı — ölçümle bulundu (2026-08-22)
 
 Spec §16.1 karakterin üstündeki karı `env.PrecipKind == Rain` iken siliyor.

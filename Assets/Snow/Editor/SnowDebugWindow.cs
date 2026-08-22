@@ -256,6 +256,10 @@ public class SnowDebugWindow : EditorWindow
     const string CaptureShaderPath = "Assets/Snow/Shaders/Hidden_SnowCaptureDepth.shader";
     const string SnowLitShaderPath = "Assets/Snow/Shaders/SnowLit.shader";
     const string SkyShaderPath = "Assets/Snow/Shaders/Hidden_SnowSkyDepth.shader";
+    const string SnowfallComputePath = "Assets/Snow/Shaders/SnowfallSim.compute";
+    const string ParticleShaderPath = "Assets/Snow/Shaders/SnowfallParticle.shader";
+    const string FlakeMaterialPath = "Assets/Snow/Settings/M_SnowFlake.mat";
+    const string DriftMaterialPath = "Assets/Snow/Settings/M_SnowDrift.mat";
     const string SnowLitMaterialPath = "Assets/Snow/Settings/M_SnowLit.mat";
 
     /// SAHNE ELLE DÜZENLENMİYOR. Proje kuralı: bileşen ekleme, referans bağlama ve
@@ -288,6 +292,9 @@ public class SnowDebugWindow : EditorWindow
 
         if (go.GetComponent<SnowCoverageDriver>() == null)
             go.AddComponent<SnowCoverageDriver>();
+
+        var snowfall = go.GetComponent<SnowfallRenderer>();
+        if (snowfall == null) snowfall = go.AddComponent<SnowfallRenderer>();
 
         var player = Object.FindAnyObjectByType<FirstPersonController>();
 
@@ -326,6 +333,25 @@ public class SnowDebugWindow : EditorWindow
         clipmapSerialized.FindProperty("snowMaterial").objectReferenceValue = snowLit;
         clipmapSerialized.ApplyModifiedProperties();
 
+        Material flakeMat = LoadOrCreateParticleMaterial(FlakeMaterialPath, stretch: false, alpha: 1f);
+        Material driftMat = LoadOrCreateParticleMaterial(DriftMaterialPath, stretch: true, alpha: 0.12f);
+
+        var snowfallSerialized = new SerializedObject(snowfall);
+        snowfallSerialized.FindProperty("settings").objectReferenceValue = settings;
+        snowfallSerialized.FindProperty("snowfallCompute").objectReferenceValue =
+            AssetDatabase.LoadAssetAtPath<ComputeShader>(SnowfallComputePath);
+        snowfallSerialized.FindProperty("flakeMaterial").objectReferenceValue = flakeMat;
+        snowfallSerialized.FindProperty("driftMaterial").objectReferenceValue = driftMat;
+        snowfallSerialized.FindProperty("followTarget").objectReferenceValue =
+            Camera.main != null ? Camera.main.transform
+                                : (player != null ? player.transform : null);
+        snowfallSerialized.FindProperty("environmentSource").objectReferenceValue = bridge;
+        snowfallSerialized.ApplyModifiedProperties();
+
+        managerSerialized.FindProperty("snowfallRenderer").objectReferenceValue = snowfall;
+        managerSerialized.ApplyModifiedProperties();
+
+        EditorUtility.SetDirty(snowfall);
         EditorUtility.SetDirty(clipmap);
         EditorUtility.SetDirty(manager);
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(go.scene);
@@ -360,6 +386,31 @@ public class SnowDebugWindow : EditorWindow
         material.SetTexture(SnowShaderIDs.SnowDetailNormal, detailNormal);
         EditorUtility.SetDirty(material);
 
+        return material;
+    }
+
+    /// Tane ve savrulma materyalleri. İkisi aynı shader'ı paylaşıyor;
+    /// farkları uzatma ve alpha çarpanı (spec §17.1).
+    static Material LoadOrCreateParticleMaterial(string path, bool stretch, float alpha)
+    {
+        Texture2D atlas = SnowTextureBaker.EnsureFlakeAtlas();
+
+        var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+
+        if (material == null)
+        {
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(ParticleShaderPath);
+            if (shader == null) return null;
+
+            material = new Material(shader);
+            AssetDatabase.CreateAsset(material, path);
+        }
+
+        material.SetTexture(SnowShaderIDs.FlakeAtlas, atlas);
+        material.SetFloat(SnowShaderIDs.StretchAlongVelocity, stretch ? 1f : 0f);
+        material.SetFloat(SnowShaderIDs.AlphaScale, alpha);
+
+        EditorUtility.SetDirty(material);
         return material;
     }
 
