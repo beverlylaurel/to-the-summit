@@ -390,6 +390,58 @@ public static class SnowGroundTest
             }
         }
 
+        // ------------------------------------------------- yari hassasiyet kaybi
+        //
+        // Zemin yüksekliği `TextureFormat.RHalf` dokuya 0..1 normalize edilerek
+        // pişiyor ve `_GroundHeightRange` = 8000 m ile çarpılıyor. Half'ın
+        // bağıl adımı 2^-11; 8000 m aralıkta bunun metre karşılığı kotla
+        // birlikte BÜYÜYOR. Kar yüzeyi bu dokudan yer değiştirdiği için
+        // quantization doğrudan basamak olarak görünüyor.
+        r.AppendLine();
+        r.AppendLine("## Zemin dokusunun hassasiyeti");
+
+        // FORMAT KAYNAKTAN OKUNUYOR. Doku yalnız Play'de pişiyor; edit mode'da
+        // bileşene sormak `UnassignedReferenceException` atıyor. Kaynağı
+        // denetlemek hem edit mode'da çalışıyor hem de formatın geri
+        // döndürülmesini yakalıyor.
+        string groundSrc = System.IO.File.ReadAllText("Assets/Snow/Runtime/SnowGroundHeight.cs");
+        bool isHalf = groundSrc.Contains("TextureFormat.RHalf");
+
+        r.AppendLine("  Doku formatı             " + (isHalf ? "RHalf" : "RFloat"));
+
+        float worstStep = 0f;
+        float worstStepAt = 0f;
+
+        for (int i = 0; i <= 40; i++)
+        {
+            float alt = i / 40f * size.y;              // 0 … 8000 m
+            float n = alt / Mathf.Max(size.y, 1e-3f);
+
+            // Dokunun GERÇEK formatındaki adım. RFloat'ta float32 adımı,
+            // RHalf'ta half adımı. Format değişirse bu satır da değişmeli.
+            float step = isHalf
+                ? Mathf.Abs(Mathf.HalfToFloat((ushort)(Mathf.FloatToHalf(n) + 1))
+                            - Mathf.HalfToFloat(Mathf.FloatToHalf(n))) * size.y
+                : Mathf.Max(n, 1e-7f) * 1.1920929e-7f * size.y;
+
+            if (step > worstStep) { worstStep = step; worstStepAt = alt; }
+
+            if (i % 10 == 0)
+                r.AppendLine("  " + alt.ToString("0").PadLeft(5) + " m kotunda adım   " +
+                             (step * 100f).ToString("0.0") + " cm");
+        }
+
+        // Kar kalınlığı 26–45 cm. Adım bunun beşte birini aşarsa yüzey
+        // gözle görülür biçimde basamaklanıyor.
+        bool precisionOk = worstStep < 0.05f;
+
+        r.AppendLine("  [" + M(precisionOk) + "] EN BÜYÜK adım        " +
+                     (worstStep * 100f).ToString("0.0") + " cm   (" + worstStepAt.ToString("0") + " m kotunda)");
+        r.AppendLine("      Kar kalınlığı 26–45 cm. Adım bunun beşte birini aşarsa");
+        r.AppendLine("      kar yüzeyi basamaklanır.");
+
+        if (!precisionOk) sourceIsVisible = false;
+
         // ------------------------------------------------- arazi hangi shader'la
         //
         // BUGÜNE KADAR ÖLÇÜLMEDİ. `MountainSurface.hlsl`'e kar katmanı eklendi

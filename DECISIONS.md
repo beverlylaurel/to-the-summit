@@ -1017,6 +1017,25 @@ Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olma
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
 
+## Zemin yüksekliği dokusu RFloat — spec §7.1'den sapma (2026-08-22)
+
+Spec `TextureFormat.RHalf` diyor. Bu dağ 8000 m ve half'ın metre karşılığı
+kotla büyüyor: 2000 m'de 195 cm, 8000 m'de 781 cm adım (ölçüldü). Kar kalınlığı
+26–45 cm; zemin iki metrelik basamaklara oturunca kar yüzeyi bloklar hâlinde
+çiziliyordu.
+
+**Maliyet:** 4097² × 4 B = **67 MB**. Statik, bir kez pişiyor, RT bütçesinin
+dışında. RHalf 33 MB idi.
+
+**Tetikleyici:** VRAM sıkışırsa çözünürlük 2049'a inebilir (16.8 MB) — teksel
+7.32 → 14.6 m olur; kar bölgesi 16 m olduğu için bölge içinde zemin neredeyse
+düzleşir. Önce ölçülür.
+
+Sınama her koşuda formatı kaynaktan okuyup adımı kot kot basıyor; RHalf'a geri
+dönülürse rapor BAŞARISIZ diyor.
+
+---
+
 ## Kar çizgisi hareket edince bölge yeniden dolduruluyor (2026-08-22)
 
 `KTopUpState`: çizgi son doldurmadan 5 m'den fazla kaydıysa mevcut tekseller

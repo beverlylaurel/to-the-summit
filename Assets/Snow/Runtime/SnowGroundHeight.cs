@@ -94,7 +94,16 @@ public class SnowGroundHeight : MonoBehaviour
 
         if (terrainHeights == null)
         {
-            terrainHeights = new Texture2D(res, res, TextureFormat.RHalf, false, true)
+            // TAM HASSASİYET ŞART, SPEC'TEN BİLİNÇLİ SAPMA.
+            //
+            // Spec §7.1 `RHalf` diyor ve küçük bir arazi varsayıyor. Bu dağ
+            // 8000 m; half'ın bağıl adımı 2^-11 olduğu için metre karşılığı
+            // kotla büyüyor (ölçüldü: 2000 m'de 195 cm, 8000 m'de 781 cm).
+            // Kar kalınlığı 26–45 cm — zemin iki metrelik basamaklara
+            // oturunca kar yüzeyi bloklar hâlinde çiziliyordu.
+            //
+            // Bedeli: 4097² × 4 B = 67 MB. Statik, bir kez pişiyor.
+            terrainHeights = new Texture2D(res, res, TextureFormat.RFloat, false, true)
             {
                 name = "Tex_Ground",
                 wrapMode = TextureWrapMode.Clamp,
@@ -134,7 +143,9 @@ public class SnowGroundHeight : MonoBehaviour
 
         if (bakedHeights == null)
         {
-            bakedHeights = new RenderTexture(1024, 1024, 24, RenderTextureFormat.RHalf)
+            // Mesh bake yolunda doku METRE tutuyor (taban 0, aralık 1); half
+            // orada da 6000 m civarında metrelerce adım verir.
+            bakedHeights = new RenderTexture(1024, 1024, 24, RenderTextureFormat.RFloat)
             {
                 name = "Tex_Ground",
                 filterMode = FilterMode.Bilinear,

@@ -14,6 +14,41 @@ her seferinde belirtinin en çok göze çarptığı katman seçilmişti. Bulut k
 
 ---
 
+## Kar yüzeyi bloklar/basamaklar hâlinde; mesh kapatılınca zemin pürüzsüz
+
+**İlk şüpheli:** clipmap halkalarının dikişi. *(Yanlış — halka sürgüsüyle
+ölçüldü, basamaklar her halkada var.)*
+
+**İkinci şüpheli:** kenar sönümü ve `clip` gürültüsü. *(Yanlış — sönüm
+yarıçapı düzeltildi, basamaklar kaldı.)*
+
+**Sebep:** zemin yüksekliği `TextureFormat.RHalf` dokuya **0–8000 m** aralığında
+normalize edilip yazılıyordu. Half'ın bağıl adımı 2^-11 sabit; metre karşılığı
+kotla birlikte büyüyor:
+
+| Kot | Adım |
+|---|---|
+| 2000 m | **195 cm** |
+| 4000 m | **391 cm** |
+| 8000 m | **781 cm** |
+
+Kar kalınlığı 26–45 cm. Zemin iki metrelik basamaklara oturunca kar yüzeyi
+başka türlü çizilemezdi. Oyuncunun 206 m kotunda adım 12 cm — kalınlığın
+yarısı, bu yüzden bloklar orada da görünüyordu.
+
+**Ayırt eden ölçüm:** kar mesh'ini kapatmak. Dağın kendi kar katmanı (yer
+değiştirme YOK, yalnız gölgeleme) pürüzsüz çıkıyordu. Yer değiştiren tek yüzey
+bozuktu → hata yükseklik kaynağında.
+
+Sonra half round-trip adımı kot kot hesaplandı ve sayı tabloya döküldü.
+
+**Kural:** dokuya normalize edilmiş bir büyüklük yazarken, aralığın ÜST ucundaki
+adımı metre cinsinden hesapla. Half 0..1 aralığında ucuz görünür; 8000 m ile
+çarpıldığında metre olur. Spec §7.1 `RHalf` diyor ama küçük arazi varsayıyor —
+bilinçli sapma, gerekçesi `DECISIONS.md`.
+
+---
+
 ## Kar açılınca çevrede basamaklı, dikey çizgili devasa bir duvar
 
 **İlk şüpheli:** mesh'in araziden ayrı durması. *(Yanlış — 128 m'de ortalama
