@@ -353,7 +353,7 @@ public static class MountainSceneBootstrap
 
         var driver = Object.FindAnyObjectByType<AltitudeWeatherDriver>();
         driver.Bind(weatherState, windField, player.transform,
-            Object.FindAnyObjectByType<TimeOfDay>(), thermometer,
+            Object.FindAnyObjectByType<TimeOfDay>(),
             LoadOrCreate<WeatherDriverSettings>(WeatherDriverPath),
             gen.groundAltitude, gen.peakAltitude);
         EditorUtility.SetDirty(driver);

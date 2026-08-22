@@ -100,7 +100,6 @@ public class ClimbHud : MonoBehaviour
             temperature.FreezingLevel - ground);
 
         builder.AppendFormat("HAVA KUŞAKLARI\n");
-        builder.AppendFormat("  Yağmur biter           {0:F0} m\n", weatherDriver.RainCeiling - ground);
         builder.AppendFormat("  Sürekli fırtına        {0:F0} m\n\n",
             weatherDriver.BlizzardAltitude - ground);
 

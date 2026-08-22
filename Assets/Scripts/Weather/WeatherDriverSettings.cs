@@ -47,13 +47,6 @@ public class WeatherDriverSettings : ScriptableObject
              "zirve hâlâ acımasız ama ölü değil.")]
     [Range(0f, 1f)] public float summitVariation = 0.3f;
 
-    [Header("Donma seviyesi")]
-    [Tooltip("Sınırın hedefe varma süresi (saniye). Sıcaklığın kendisi anında " +
-             "değişebilir ama havanın o sıcaklığa oturması saatler alır; kısa tutulursa " +
-             "kar sınırı esintiyle zıplar. Sınırın NEREDE olduğu artık " +
-             "`TemperatureField`'den geliyor, burada yalnız varış hızı var.")]
-    public float freezingSmoothSeconds = 240f;
-
     [Header("Açık pencere")]
     [Tooltip("Nadiren hava tamamen açılır: bulutlar aralanır, zirve görünür.")]
     [Range(0f, 1f)] public float clearWindowStrength = 0.8f;

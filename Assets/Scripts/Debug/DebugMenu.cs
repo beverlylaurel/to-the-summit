@@ -482,7 +482,6 @@ public class DebugMenu : MonoBehaviour
             GUILayout.Label($"Şiddet {weatherDriver.StormIntensity:F2}  " +
                             $"bulut kütlesi {weatherDriver.CloudMass:F2}  " +
                             $"tavan payı {weatherDriver.CeilingAt(walker.transform.position.y):F2}");
-            GUILayout.Label($"Yağmur tavanı {weatherDriver.RainCeiling:F0} m");
             weatherDriver.ForceWindow = GUILayout.Toggle(weatherDriver.ForceWindow,
                 "Havayı zorla aç");
         }

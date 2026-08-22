@@ -16,18 +16,11 @@ public class AltitudeWeatherDriver : MonoBehaviour
     [SerializeField] WindField wind;
     [SerializeField] Transform observer;
     [SerializeField] TimeOfDay time;
-    [Tooltip("Donma seviyesi buradan gelir; sürücü kendi sıcaklık modelini kurmaz.")]
-    [SerializeField] TemperatureField temperature;
     [SerializeField] WeatherDriverSettings settings;
 
     [Header("Kuşak sınırları (metre) — hepsini bootstrap hesaplar")]
     [Tooltip("Düz arazinin kotu.")]
     [SerializeField] float groundAltitude;
-    [Tooltip("Yağmurun tam şiddete ulaştığı yükseklik. DEĞİŞKEN: " +
-             "donma seviyesiyle birlikte iner ve çıkar.")]
-    [SerializeField] float rainCeiling;
-    [Tooltip("Yüksek fırtına kuşağının başladığı yükseklik. DEĞİŞKEN.")]
-    [SerializeField] float stormFloor;
     [Tooltip("Donma seviyesinin uzun vadeli ortalaması. Kalıcı kar çizgisi buradan " +
              "türer — hareketli sınırdan türeseydi buzul da gelgit yapardı.")]
     [SerializeField] float referenceRainCeiling;
@@ -145,11 +138,6 @@ public class AltitudeWeatherDriver : MonoBehaviour
     /// çizgisi bunu okur: buzul hava durumuyla gelgit yapmaz.
     public float ReferenceStormFloor => referenceStormFloor;
 
-    /// Yağışın kar olarak düşmeye başladığı ve tamamen kara döndüğü kotlar.
-    /// Yüzeyin taze karı da bu bandı izler: aşağıda yağmur yağarken zemin beyazlamamalı.
-    public float RainCeiling => rainCeiling;
-    public float StormFloor => stormFloor;
-
     /// Dağın gerçek zirvesi. Yalnızca gösterge için.
     public float SummitAltitude => summitAltitude;
 
@@ -157,14 +145,12 @@ public class AltitudeWeatherDriver : MonoBehaviour
     public float GroundAltitude => groundAltitude;
 
     public void Bind(WeatherState state, WindField windField, Transform target,
-        TimeOfDay clock, TemperatureField thermometer,
-        WeatherDriverSettings tuning, float ground, float peak)
+        TimeOfDay clock, WeatherDriverSettings tuning, float ground, float peak)
     {
         weather = state;
         wind = windField;
         observer = target;
         time = clock;
-        temperature = thermometer;
         settings = tuning;
 
         groundAltitude = ground;
@@ -176,8 +162,6 @@ public class AltitudeWeatherDriver : MonoBehaviour
         // ikisi de "sadece" olmalı, geçiş bir bant değil bir sınır gibi okunmalı.
         referenceRainCeiling = ground + height * RainShare;
         referenceStormFloor = referenceRainCeiling + height * UpperBandShare;
-        rainCeiling = referenceRainCeiling;
-        stormFloor = referenceStormFloor;
 
         // Zirve fırtınası son 1000 metrede. Dağ değişse de kendiliğinden kayar.
         stormPeakAltitude = Mathf.Max(referenceStormFloor + 200f, peak - 1000f);
@@ -195,9 +179,6 @@ public class AltitudeWeatherDriver : MonoBehaviour
             throw new InvalidOperationException($"{nameof(AltitudeWeatherDriver)}: {nameof(observer)} atanmadı.");
         if (time == null)
             throw new InvalidOperationException($"{nameof(AltitudeWeatherDriver)}: {nameof(time)} atanmadı.");
-        if (temperature == null)
-            throw new InvalidOperationException($"{nameof(AltitudeWeatherDriver)}: {nameof(temperature)} atanmadı.");
-
         initialized = false;
     }
 
@@ -206,7 +187,6 @@ public class AltitudeWeatherDriver : MonoBehaviour
         float altitude = TrackProgress(observer.position.y);
 
         SampleNoise();
-        UpdateFreezingLevel();
 
         bool overridden = IntensityOverride >= 0f;
 
@@ -294,33 +274,6 @@ public class AltitudeWeatherDriver : MonoBehaviour
     /// Girdi olarak *geçen karenin* yumuşatılmış şiddeti kullanılıyor. Şiddet sınırdan,
     /// sınır şiddetten besleniyor; halka bir kare gecikme ve dakikalar ölçeğindeki
     /// yumuşatmayla sönümleniyor.
-    void UpdateFreezingLevel()
-    {
-        // DONMA SEVİYESİ SICAKLIKTAN GELİYOR, ayrı bir formülden değil. Burada
-        // "referans kot − fırtına düşüşü + gündüz yükselişi" diye örtük bir sıcaklık
-        // modeli vardı: sıcaklığın kendisi hiç var olmadan sonuçları hesaplanıyordu.
-        // Nefes, üşüme, donma gibi her yeni özellik kendi tahminini uyduracaktı.
-        //
-        // Sayılar değişmedi, ifade değişti: eski metre kaymaları °C'ye çevrildi ve
-        // 6.5 °C/km düşüşle aynı kotları veriyor.
-        float target = temperature.FreezingLevel;
-
-        if (!initialized || Instant)
-        {
-            rainCeiling = target;
-        }
-        else
-        {
-            float t = 1f - Mathf.Exp(-Time.deltaTime
-                / Mathf.Max(0.01f, settings.freezingSmoothSeconds));
-            rainCeiling = Mathf.Lerp(rainCeiling, target, t);
-        }
-
-        // Sulu kar bandının genişliği sabit: sınır kayarken bandın kendisi daralıp
-        // genişlemez, olduğu gibi taşınır.
-        stormFloor = rainCeiling + (referenceStormFloor - referenceRainCeiling);
-    }
-
     /// Yükseklikten gelen zemin şiddet. Kuşak köşeleri arasında doğrusal geçer.
     ///
     /// Köşeler REFERANS kotlardan okunur, hareketli donma seviyesinden değil. İkisi

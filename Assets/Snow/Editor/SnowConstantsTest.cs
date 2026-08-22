@@ -55,8 +55,6 @@ public static class SnowConstantsTest
         ("DriftBias", "SNOW_DRIFT_BIAS"),
         ("RainMeltBoost", "SNOW_RAIN_MELT_BOOST"),
         ("SweMax", "SNOW_SWE_MAX"),
-        ("SnowOnBelow", "SNOW_ON_BELOW"),
-        ("SnowOffAbove", "SNOW_OFF_ABOVE"),
         ("MaxSweRate", "SNOW_MAX_SWE_RATE"),
         ("MaxFlakeRate", "SNOW_MAX_FLAKE_RATE"),
         ("SkyAreaSize", "SNOW_SKY_AREA_SIZE"),

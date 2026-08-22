@@ -122,12 +122,6 @@ public static class SnowConstants
 
     // --- Yağış (spec §3.4, §17.2) ---
 
-    /// Bu sıcaklığın altında kar başlar, °C.
-    public const float SnowOnBelow = 0.5f;
-
-    /// Bu sıcaklığın üstünde kar durur, °C. İkisi arasındaki bant histerezis.
-    public const float SnowOffAbove = 2f;
-
     /// Tam şiddette yağışın SWE hızı, m/s (5 mm/saat).
     public const float MaxSweRate = 1.39e-6f;
 

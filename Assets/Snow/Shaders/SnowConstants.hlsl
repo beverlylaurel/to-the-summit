@@ -55,8 +55,6 @@
 #define SNOW_SWE_MAX                 0.60
 
 // --- Yağış (spec §3.4, §17.2) ---
-#define SNOW_ON_BELOW                0.5
-#define SNOW_OFF_ABOVE               2.0
 #define SNOW_MAX_SWE_RATE            1.39e-6
 #define SNOW_MAX_FLAKE_RATE      16000.0
 

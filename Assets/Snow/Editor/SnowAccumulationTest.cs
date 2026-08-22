@@ -31,7 +31,7 @@ public static class SnowAccumulationTest
         r.AppendLine(System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         r.AppendLine();
 
-        ok = HysteresisTest(r);
+        ok = TemperatureIndependenceTest(r);
         ok &= IntensityTest(r);
         ok &= GpuTests(r);
 
@@ -43,65 +43,60 @@ public static class SnowAccumulationTest
 
     // -------------------------------------------------------------- histerezis
 
-    /// SICAKLIK EŞİĞİNDE TİTREME OLMAMALI. Tek eşik olsaydı 0.5 °C civarında
-    /// salınan bir sıcaklık karı saniyede birkaç kez başlatıp durdururdu.
-    static bool HysteresisTest(StringBuilder r)
+    /// YAĞIŞ VARSA KAR VAR, SICAKLIK BAKILMIYOR.
+    ///
+    /// Eskiden §3.4'ün histerezisi vardı (0.5 °C altı kar, 2.0 °C üstü
+    /// yağmur). Kaldırıldı: kar çizgisi kaldırılırken konan kural burada da
+    /// geçerli — yağıyorsa kardır. Bu test o kopmanın geri gelmediğini
+    /// doğruluyor.
+    static bool TemperatureIndependenceTest(StringBuilder r)
     {
-        r.AppendLine("## Yağış histerezisi (spec §3.4)");
+        r.AppendLine("## Yağış sıcaklıktan bağımsız");
 
         var env = new FakeEnvironment { PrecipKind = PrecipitationKind.Rain, PrecipIntensity01 = 1f };
         var controller = new SnowfallController();
         controller.Reset();
 
-        // Soğuktan sıcağa: kar 2.0 °C'yi GEÇENE kadar durmamalı.
-        env.TemperatureC = -5f; controller.Tick(env);
-        bool onCold = SnowRuntimeState.IsSnowing;
+        bool hepsi = true;
+        float[] sicakliklar = { -20f, -5f, 0f, 1f, 5f, 30f };
 
-        env.TemperatureC = 1.0f; controller.Tick(env);       // bandın içi
-        bool stillOnInBand = SnowRuntimeState.IsSnowing;
+        foreach (float t in sicakliklar)
+        {
+            env.TemperatureC = t;
+            controller.Tick(env);
 
-        env.TemperatureC = 2.5f; controller.Tick(env);
-        bool offWarm = !SnowRuntimeState.IsSnowing;
+            if (!SnowRuntimeState.IsSnowing) hepsi = false;
+        }
 
-        env.TemperatureC = 1.0f; controller.Tick(env);       // bandın içine geri
-        bool stillOffInBand = !SnowRuntimeState.IsSnowing;
+        r.AppendLine("  [" + M(hepsi) + "] Her sıcaklıkta kar yağıyor    " +
+                     "-20, -5, 0, 1, 5, 30 °C → IsSnowing hepsinde true");
 
-        env.TemperatureC = 0.2f; controller.Tick(env);
-        bool onAgain = SnowRuntimeState.IsSnowing;
-
-        bool hysteresis = onCold && stillOnInBand && offWarm && stillOffInBand && onAgain;
-
-        r.AppendLine("  [" + M(hysteresis) + "] Bant içinde durum KORUNUYOR   " +
-                     "-5→kar, 1.0→kar (sürüyor), 2.5→yok, 1.0→yok (sürüyor), 0.2→kar");
-
-        // Yağış yoksa sıcaklık ne olursa olsun kar yok.
+        // Yağış yoksa kar da yok — tek kapı bu kaldı.
         env.PrecipKind = PrecipitationKind.None;
         env.TemperatureC = -20f;
         controller.Tick(env);
 
         bool noPrecipNoSnow = !SnowRuntimeState.IsSnowing;
-        r.AppendLine("  [" + M(noPrecipNoSnow) + "] Yağış yoksa kar da yok       " +
+        r.AppendLine("  [" + M(noPrecipNoSnow) + "] Yağış yoksa kar da yok        " +
                      "-20 °C ve PrecipKind.None → IsSnowing " + SnowRuntimeState.IsSnowing);
 
-        // Sulu kar bandı: tek tanecik türü, biçim enterpole ediliyor.
+        // Islaklık kaynağı yok: tane her zaman kuru.
         env.PrecipKind = PrecipitationKind.Rain;
-        env.TemperatureC = -1f; controller.Tick(env);
-        float wetCold = controller.Wetness;
+        env.TemperatureC = 5f;
+        controller.Tick(env);
 
-        env.TemperatureC = 1.25f; controller.Tick(env);
-        float wetMid = controller.Wetness;
+        bool kuru = controller.Wetness < 1e-6f;
+        r.AppendLine("  [" + M(kuru) + "] Tane kuru                     " +
+                     "5 °C → Wetness " + controller.Wetness.ToString("0.00"));
 
-        env.TemperatureC = 5f; controller.Tick(env);
-        float wetWarm = controller.Wetness;
-
-        bool wetRamp = wetCold < 0.01f && Mathf.Abs(wetMid - 0.5f) < 0.02f && wetWarm > 0.99f;
-        r.AppendLine("  [" + M(wetRamp) + "] Sulu kar rampası             -1 °C → " +
-                     wetCold.ToString("0.00") + ",  1.25 °C → " + wetMid.ToString("0.00") +
-                     ",  5 °C → " + wetWarm.ToString("0.00"));
+        // Yağmur yolu susuyor: iki yağış üst üste binmemeli.
+        bool yagmurKapali = SnowRuntimeState.RainWeight01 < 1e-6f;
+        r.AppendLine("  [" + M(yagmurKapali) + "] Yağmur yolu kapalı            " +
+                     "RainWeight01 " + SnowRuntimeState.RainWeight01.ToString("0.00"));
 
         controller.Reset();
 
-        return hysteresis && noPrecipNoSnow && wetRamp;
+        return hepsi && noPrecipNoSnow && kuru && yagmurKapali;
     }
 
     // ----------------------------------------------------------------- şiddet
