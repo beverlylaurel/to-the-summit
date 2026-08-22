@@ -45,6 +45,7 @@ public class SnowFarCascade : MonoBehaviour
     /// sıfırsa dağ çıplak kalıyor ve ekranda "kar sadece ayağımın altında"
     /// görünüyor. Yakın bölgenin sayısı ölçülüyordu, bunun ki ölçülmüyordu.
     public float MeanSwe { get; private set; } = -1f;
+    public float MeanRhoN { get; private set; } = -1f;
 
     bool readbackPending;
     int lastReadbackFrame = -1;
@@ -215,12 +216,14 @@ public class SnowFarCascade : MonoBehaviour
             var data = request.GetData<Color>();
 
             float sum = 0f;
+            float rho = 0f;
             int step = Mathf.Max(1, data.Length / 4096);
             int n = 0;
 
-            for (int i = 0; i < data.Length; i += step) { sum += data[i].r; n++; }
+            for (int i = 0; i < data.Length; i += step) { sum += data[i].r; rho += data[i].g; n++; }
 
             MeanSwe = n > 0 ? sum / n : 0f;
+            MeanRhoN = n > 0 ? rho / n : 0f;
         });
     }
 

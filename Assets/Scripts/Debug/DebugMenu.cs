@@ -564,6 +564,33 @@ public class DebugMenu : MonoBehaviour
             : "yağıyor";
     }
 
+    /// DEVİR NOKTASINDAKİ BASAMAK.
+    ///
+    /// Kar mesh'i ±8 m'de yakın bölgeden kaskada devrediyor. İkisi ayrı
+    /// kernellerle yoğunluk geliştiriyor; yoğunluk ayrışırsa AYNI SWE farklı
+    /// DERİNLİK veriyor (0.05 SWE: ρ=110'da 45 cm, ρ=190'da 26 cm) ve devir
+    /// noktasında oyuncuyu takip eden kare bir sırt kalıyor.
+    ///
+    /// İki derinlik yan yana yazılıyor; fark varsa sebep tek bakışta görünür.
+    string DepthCompare()
+    {
+        var manager = snowClipmap != null ? snowClipmap.GetComponent<SnowManager>() : null;
+
+        if (manager == null || snowCascade == null) return "derinlik: bileşen yok";
+
+        float dNear = Depth(manager.MeanSwe, manager.MeanRhoN);
+        float dFar = Depth(snowCascade.MeanSwe, snowCascade.MeanRhoN);
+
+        return $"derinlik  yakın {dNear * 100f:F1} cm (ρ {Rho(manager.MeanRhoN):F0})   " +
+               $"kaskad {dFar * 100f:F1} cm (ρ {Rho(snowCascade.MeanRhoN):F0})   " +
+               $"FARK {Mathf.Abs(dNear - dFar) * 100f:F1} cm";
+    }
+
+    static float Rho(float rhoN) => Mathf.Lerp(50f, 550f, Mathf.Clamp01(rhoN));
+
+    static float Depth(float swe, float rhoN) =>
+        swe < 0f ? 0f : swe * 1000f / Mathf.Max(Rho(rhoN), 1f);
+
     /// KAR ÇİZGİSİ ZİNCİRİ OKUNABİLİR OLMALI.
     ///
     /// "Dağda kar yok" belirtisi zincirin herhangi bir halkasında kopabilir:
@@ -608,8 +635,8 @@ public class DebugMenu : MonoBehaviour
                $"kar çizgisi {lineY:F0} m + {band:F0} m bant   " +
                $"çizgiden {depth * 100f:F1} cm   " +
                $"DOKUDA {SnowRuntimeState.GroundCoverage01:F2}   " +
-               $"KASKAD {(snowCascade != null ? snowCascade.MeanSwe.ToString("0.0000") : "yok")}   " +
-               $"gevşek {SnowRuntimeState.LooseSnowFraction:F2}";
+               $"gevşek {SnowRuntimeState.LooseSnowFraction:F2}" +
+               System.Environment.NewLine + DepthCompare();
     }
 
     /// SÜRGÜ GERÇEK SİSTEMLERE YAZIYOR, KAR SİSTEMİNE DEĞİL.

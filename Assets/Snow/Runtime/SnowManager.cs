@@ -150,6 +150,11 @@ public class SnowManager : MonoBehaviour
     /// editörde her şey iki kat hızlı ilerler.
     int lastSimulatedFrame = -1;
 
+    /// Yakın bölgenin ortalama SWE'si ve yoğunluğu — kaskadla karşılaştırmak
+    /// için. Derinlik = SWE × 1000 / ρ.
+    public float MeanSwe { get; private set; } = -1f;
+    public float MeanRhoN { get; private set; } = -1f;
+
     /// UYKU KOŞULU (spec §15.2). Zeminde kar yok VE yağmıyor.
     ///
     /// `pendingClear` uykuyu bozuyor: bölge daha hiç doldurulmadıysa bir kez
@@ -820,9 +825,13 @@ public class SnowManager : MonoBehaviour
 
         float coverage = 0f;
         float loose = 0f;
+        float swe = 0f;
+        float rhoN = 0f;
 
         for (int i = 0; i < data.Length; i++)
         {
+            swe += data[i].r;
+            rhoN += data[i].g;
             coverage += data[i].b;
             loose += 1f - data[i].g;
         }
@@ -831,6 +840,12 @@ public class SnowManager : MonoBehaviour
 
         SnowRuntimeState.GroundCoverage01 = Mathf.Clamp01(coverage * inv);
         SnowRuntimeState.LooseSnowFraction = Mathf.Clamp01(loose * inv);
+
+        // YAKIN BÖLGENİN DERİNLİĞİ. Kaskadınkiyle karşılaştırılıyor: ikisi
+        // ayrı kernellerle yoğunluk geliştiriyor ve ayrışırlarsa devir
+        // noktasında (±8 m) derinlik basamağı oluşuyor.
+        MeanSwe = swe * inv;
+        MeanRhoN = rhoN * inv;
 
         coverageMeasured = true;
     }
