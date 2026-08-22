@@ -6,6 +6,9 @@
 
 #include "SnowLighting.hlsl"
 #include "../../Shaders/HeightFog.hlsl"
+
+/// Teşhis görünümü. 0 = kapalı. Değerleri `DebugMenu`'de yazıyor.
+float _SnowMeshProbe;
 #include "SnowDetailNormals.hlsl"
 
 struct Attributes
@@ -22,6 +25,7 @@ struct Varyings
     float  snowHeight : TEXCOORD1;
     float4 shadowCoord : TEXCOORD2;
     float  fogFactor  : TEXCOORD3;
+    float2 probeData  : TEXCOORD4;      // x = halka indeksi, y = köşe işareti
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
@@ -106,6 +110,7 @@ Varyings SnowLitVertex(Attributes IN)
     if (IN.ringId.y > 1.5)
         positionWS.y = SnowStitchedWorldY(flat.xz, IN.ringId.x);
 
+    OUT.probeData = IN.ringId;
     OUT.positionWS = positionWS;
     OUT.snowHeight = h;
     OUT.positionCS = TransformWorldToHClip(positionWS);
@@ -259,6 +264,58 @@ half4 SnowLitFragment(Varyings IN) : SV_Target
 #endif
 
     // MEVCUT SİSİN KENDİSİ (spec §14). Kendi sis hesabımız yok.
+    // ------------------------------------------------------------------ prob
+    //
+    // TEK CEVAPLI TEŞHİS GÖRÜNÜMÜ.
+    //
+    // Ekrandaki bir kusurun sahibini göz kararıyla aramak tur yakıyor. Bu
+    // görünüm her şüpheliyi AYRI RENGE boyuyor ve ışıktan, sisten,
+    // tonemap'ten, pozlamadan BAĞIMSIZ çıkıyor — araç kendi yalanını
+    // söyleyemiyor. Renk doğrudan dönüyor, aydınlatma zinciri hiç
+    // çalışmıyor.
+    //
+    // Bu bölüm kar yüzeyi kabul edilince silinecek.
+    if (_SnowMeshProbe > 0.5)
+    {
+        float mode = _SnowMeshProbe;
+        float ring = IN.probeData.x;
+        float flag = IN.probeData.y;
+
+        // 1 — HALKA. Sınırlar ve hangi halkanın nereyi çizdiği.
+        if (mode < 1.5)
+        {
+            float3 c = ring < 0.5 ? float3(1, 0, 0)
+                     : ring < 1.5 ? float3(0, 1, 0)
+                     : ring < 2.5 ? float3(0, 0.4, 1)
+                                  : float3(1, 1, 0);
+            return half4(c, 1);
+        }
+
+        // 2 — KÖŞE İŞARETİ. Etek ve dikiş yerinde mi.
+        if (mode < 2.5)
+        {
+            float3 c = flag > 1.5 ? float3(0, 1, 1)      // dikiş
+                     : flag > 0.5 ? float3(1, 0, 1)      // etek
+                                  : float3(0.15, 0.15, 0.15);
+            return half4(c, 1);
+        }
+
+        // 3 — KALINLIK. 0–60 cm gri; basamak varsa doğrudan görünür.
+        if (mode < 3.5)
+            return half4((half3)saturate(height / 0.6).xxx, 1);
+
+        // 4 — KENAR SÖNÜMÜ. Bandın nerede başlayıp bittiği.
+        if (mode < 4.5)
+            return half4((half3)SnowMeshEdgeFade(IN.positionWS.xz).xxx, 1);
+
+        // 5 — QUAD IZGARASI. Dama tahtası; kare boyu quad boyu.
+        float quad = _SnowRing0Quad * pow(SNOW_RING_SCALE, ring);
+        float2 cell = floor(IN.positionWS.xz / quad);
+        float checker = fmod(cell.x + cell.y, 2.0);
+
+        return half4((half3)lerp(0.25, 0.75, checker).xxx, 1);
+    }
+
     // PROJENİN SİSİ, URP'NİNKİ DEĞİL (rapor §7). Dağ `ApplyHeightFog`
     // kullanıyor; kar mesh'i `MixFog` kullandığı için sınırda farklı
     // parlaklıkta ayrışıyordu.

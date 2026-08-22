@@ -68,6 +68,9 @@ public class DebugMenu : MonoBehaviour
     /// Teşhis: kar mesh'inin yer değiştirmesini tamamen kapatır.
     bool flattenSnow;
 
+    /// Mesh prob görünümü: 0 kapalı, 1–5 teşhis modları.
+    int meshProbe;
+
     /// Teşhis: kaç clipmap halkası çizilsin. −1 = hepsi.
     int probeRings = -1;
 
@@ -472,6 +475,20 @@ public class DebugMenu : MonoBehaviour
                 snowClipmap.ProbeVisibleRings = probeRings;
                 snowClipmap.RefreshVisibility();
             }
+
+            // PROB GÖRÜNÜMÜ. Her şüpheli ayrı renk; ışıktan bağımsız.
+            string[] probeNames =
+            {
+                "kapalı", "1 halka", "2 köşe işareti", "3 kalınlık",
+                "4 kenar sönümü", "5 quad ızgarası",
+            };
+
+            int before = meshProbe;
+            GUILayout.Label("Mesh probu: " + probeNames[Mathf.Clamp(meshProbe, 0, 5)]);
+            meshProbe = Mathf.RoundToInt(GUILayout.HorizontalSlider(meshProbe, 0f, 5f));
+
+            if (meshProbe != before)
+                Shader.SetGlobalFloat("_SnowMeshProbe", meshProbe);
 
             bool nextFlat = GUILayout.Toggle(flattenSnow, "Kar yüzeyini düzleştir (teşhis)");
             if (nextFlat != flattenSnow)
