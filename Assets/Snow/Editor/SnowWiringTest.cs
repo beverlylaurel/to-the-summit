@@ -81,6 +81,7 @@ public static class SnowWiringTest
         pass &= Functions(r, shaderFiles, allShaderText);
         pass &= Uniforms(r, allShaderText);
         pass &= Components(r);
+        pass &= Prose(r);
 
         r.AppendLine();
         r.AppendLine("SONUÇ: " + (pass ? "TAMAM" : "BAŞARISIZ"));
@@ -229,6 +230,80 @@ public static class SnowWiringTest
 
         r.AppendLine();
         return missing.Count == 0;
+    }
+
+    // ------------------------------------------------------------------ 4
+
+    /// SPEC'İN DÜZMETİN KOŞULLARI.
+    ///
+    /// Formül denetimi kod bloklarını tarıyor; spec'in bir kısmı ise DÜZMETİN.
+    /// Sapmaların tamamı orada çıktı — kod bloğu verilen 68 formülün 68'i
+    /// doğruydu. Aşağıdakiler o düzmetinden çıkan, mekanik olarak
+    /// denetlenebilir koşullar. Her satırın yanında spec bölümü var.
+    static bool Prose(StringBuilder r)
+    {
+        r.AppendLine("## Spec'in düzmetin koşulları");
+
+        var checks = new (string Section, string What, string File, string Needle)[]
+        {
+            ("§8.3",  "Kar materyali Queue = Geometry+50",
+             "Assets/Snow/Shaders/SnowLit.shader", "Geometry+50"),
+
+            ("§15.2", "Kar yoksa compute pass'leri kapalı",
+             "Assets/Snow/Runtime/SnowManager.cs", "if (IsDormant) return;"),
+
+            ("§15.2", "Per-material property'ler tek CBUFFER'da",
+             "Assets/Snow/Shaders/SnowLitInput.hlsl", "CBUFFER_START(UnityPerMaterial)"),
+
+            ("§18.4", "Sastrugi SnowSurfaceAt'e de ekli (yoksa normal düz kalır)",
+             "Assets/Snow/Shaders/SnowCommon.hlsl", "h += SnowSastrugiOffset"),
+
+            ("§14.2", "Detay normalleri kar mesh'inde",
+             "Assets/Snow/Shaders/SnowLitForwardPass.hlsl", "SnowApplyDetailNormals"),
+
+            ("§14.2", "Detay normalleri dağın kar katmanında",
+             "Assets/Shaders/MountainSurface.hlsl", "SnowApplyDetailNormals"),
+
+            ("§3.4",  "Yağmur kar yağarken susuyor",
+             "Assets/Scripts/Weather/PrecipitationRenderer.cs", "SnowRuntimeState.RainWeight01"),
+
+            ("§13.2", "Mesafeye göre displacement kısma YOK",
+             "Assets/Snow/Shaders/SnowLit.shader", ""),
+
+            ("§9.2",  "Yakalama shader'ı Cull Off",
+             "Assets/Snow/Shaders/Hidden_SnowCaptureDepth.shader", "Cull Off"),
+
+            ("§16",   "Nesne karı ayrı shader (mevcut shader'lar değişmedi)",
+             "Assets/Snow/Shaders/SnowCoverObject.shader", "SnowCoverMask"),
+        };
+
+        int bad = 0;
+
+        foreach (var c in checks)
+        {
+            bool ok;
+
+            if (c.Needle.Length == 0)
+            {
+                // Olumsuz koşul: mesafeye göre kısma OLMAMALI.
+                string body = File.Exists(c.File) ? File.ReadAllText(c.File) : "";
+                ok = !body.Contains("distanceFade") && !body.Contains("_DisplacementFade");
+            }
+            else
+            {
+                ok = File.Exists(c.File) && File.ReadAllText(c.File).Contains(c.Needle);
+            }
+
+            if (!ok) bad++;
+
+            r.AppendLine("  [" + M(ok) + "] " + c.Section.PadRight(7) + c.What);
+        }
+
+        r.AppendLine();
+        r.AppendLine("  Denetlenen               " + checks.Length + "   eksik " + bad);
+        r.AppendLine();
+
+        return bad == 0;
     }
 
     static string M(bool ok) => ok ? "+" : "-";

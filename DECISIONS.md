@@ -1017,6 +1017,29 @@ Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olma
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
 
+## Spec baştan sona tarandı: dört boşluk, hepsi düzmetinde (2026-08-22)
+
+Kullanıcı "sürekli bir şeyler atladığımızı fark ediyorsun" deyince tek tek
+keşfetmek bırakıldı ve spec'in TAMAMI tarandı: 81 kod bloğu (754 satır) + 307
+düzmetin koşul satırı.
+
+**Kod bloğu verilen yerde sapma yok.** Dört boşluğun dördü de spec'in kod
+vermeyip TARİF ETTİĞİ yerlerde:
+
+1. Arazi kar katmanı hiç yoktu (§8, §13 — kar mesh'i 128 m, gerisi çıplak).
+2. Detay normalleri (§14.2) yalnız kar mesh'inden çağrılıyordu.
+3. `SnowSparkle.hlsl` `SnowCommon.hlsl`'i include etmiyordu — altı kernel
+   sessizce derlenmiyor, on sınama "yanlış sonuç" diyordu.
+4. §15.2 "kar yoksa her şeyi kapat" yalnız mesh ve yağış için uygulanmıştı;
+   compute pass'leri zeminde tek gram kar yokken de her kare koşuyordu.
+
+**Ders ve önlem:** "yazılmış olmak bağlı olmak değil". `SnowWiringTest` bu sınıfı
+tarıyor — çağrılmayan fonksiyon, yazılmayan/okunmayan uniform, kurulumda olmayan
+bileşen, ve spec'in mekanik olarak denetlenebilir düzmetin koşulları. İlk koşuda
+iki ölü ID çıkardı.
+
+---
+
 ## Arazi kar katmanı geri geldi — ama tek kaynaktan (2026-08-22)
 
 `741e6b7` "Kar tamamen söküldü: v1, v2 ve arazi kar katmanı" ile dağın kendi kar

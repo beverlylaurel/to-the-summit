@@ -145,6 +145,15 @@ public class SnowManager : MonoBehaviour
     /// editörde her şey iki kat hızlı ilerler.
     int lastSimulatedFrame = -1;
 
+    /// UYKU KOŞULU (spec §15.2). Zeminde kar yok VE yağmıyor.
+    ///
+    /// `pendingClear` uykuyu bozuyor: bölge daha hiç doldurulmadıysa bir kez
+    /// koşması gerekiyor, yoksa dokular çöp kalıyor ve uyanınca bir kare
+    /// bozuk kar görünüyor.
+    public bool IsDormant => !pendingClear
+                             && !SnowRuntimeState.IsSnowing
+                             && SnowRuntimeState.GroundCoverage01 < 0.01f;
+
     Vector2Int centerTexel;
     bool pendingClear;
     bool pendingScroll;
@@ -486,6 +495,16 @@ public class SnowManager : MonoBehaviour
         // kez ilerler ve belirtisi "editörde kar iki kat hızlı eriyor" olur.
         if (lastSimulatedFrame == Time.frameCount) return;
         lastSimulatedFrame = Time.frameCount;
+
+        // KAR YOKSA HER ŞEY KAPALI (spec §15.2 — "bu entegrasyon için kritik").
+        //
+        // Yazın oyun kar sistemi yokmuş gibi performans göstermeli. Mesh ve
+        // yağış zaten kendi kapılarını taşıyordu; compute pass'leri taşımıyordu
+        // ve zeminde tek gram kar yokken de her kare koşuyorlardı.
+        //
+        // Bekleyen kaydırma/temizlik BİRİKMEYE devam ediyor: uyanınca bölge
+        // doğru yerden doluyor, uykuda geçen mesafe kaybolmuyor.
+        if (IsDormant) return;
 
         SnowQualityData q = settings.QualityData;
         int groups = Mathf.CeilToInt(q.Resolution / (float)SnowConstants.GroupSize);
