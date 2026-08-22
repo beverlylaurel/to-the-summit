@@ -27,24 +27,16 @@ public readonly struct SnowQualityData
     /// En içteki halkanın grid boyutu.
     public readonly int Ring0Grid;
 
-    /// HALKA BAŞINA IZGARA (rapor §6).
+    /// IZGARA BÜTÜN HALKALARDA AYNI — ZORUNLU.
     ///
-    /// Bütün halkalar `Ring0Grid` kullanınca dış halkaların üçgenleri
-    /// ekran pikselinden küçük kalıyor ve rasterizer boşuna doluyordu:
-    /// Medium'da 1.18 M üçgen. Dışa doğru kademeli düşüş toplamı üçte
-    /// birine indiriyor; kaybedilen ayrıntı zaten ekranda görünmüyor.
-    public int GridForRing(int index)
-    {
-        float scale = index switch
-        {
-            0 => 1.000f,
-            1 => 0.750f,
-            2 => 0.500f,
-            _ => 0.375f,
-        };
-
-        return Mathf.Max(16, Mathf.RoundToInt(Ring0Grid * scale / 2f) * 2);
-    }
+    /// Halka genişlikleri 3 katı büyüyor. Delik `ızgara / 3` ile TAM çıkması
+    /// için quad'ların da tam 3 katı olması gerekiyor, bu da ancak ızgaralar
+    /// eşitken oluyor. Halka başına farklı ızgara denendi (rapor §6): delik
+    /// hiçbir halkada tam oturmadı, bindirme ya da boşluk kaçınılmaz oldu
+    /// (ölçüldü: 2→3 sınırında 5,85 m boşluk).
+    ///
+    /// Üçgen bütçesi ızgaranın KENDİSİ küçültülerek düşürülüyor; oranlar
+    /// bozulmuyor.
 
     /// Gökyüzü görünürlük haritasının çözünürlüğü.
     public readonly int SkyResolution;
@@ -101,13 +93,13 @@ public static class SnowQuality
         switch (preset)
         {
             case SnowQualityPreset.Low:
-                return new SnowQualityData(512, 16f, 3, 160, 512, 1, 0, 8, 0.35f, 0, 0, KeywordLow);
+                return new SnowQualityData(512, 16f, 3, 96, 512, 1, 0, 8, 0.35f, 0, 0, KeywordLow);
 
             case SnowQualityPreset.High:
-                return new SnowQualityData(1536, 16f, 4, 320, 1024, 4, 2, 4, 1f, 8, 3, KeywordHigh);
+                return new SnowQualityData(1536, 16f, 4, 288, 1024, 4, 2, 4, 1f, 8, 3, KeywordHigh);
 
             default:
-                return new SnowQualityData(1024, 16f, 4, 256, 1024, 2, 1, 4, 0.65f, 4, 2, KeywordMedium);
+                return new SnowQualityData(1024, 16f, 4, 192, 1024, 2, 1, 4, 0.65f, 4, 2, KeywordMedium);
         }
     }
 }

@@ -1017,6 +1017,31 @@ Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olma
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
 
+## Clipmap halkaları ortak snap ızgarasında (2026-08-22)
+
+Halkalar kendi adımlarına snap'leniyordu ve merkezleri birbirine göre
+kayıyordu. Delik o kaymayı karşılamak için ya küçültülüyor (BİNDİRME) ya
+büyütülüyordu (BOŞLUK). Bindirme bandında iki yüzey aynı anda çiziliyor;
+quad'ları 4 kat farklı olduğu için kaba olan ince olanın içinden çıkıyor ve
+oyuncunun çevresinde kare bir bant bırakıyordu (ölçüldü: 2→3 bandı 36 m
+yarıçapında, 6,75 m genişliğinde). Derinlik payı çözmüyor: sapma santimetre
+değil, onlarca santimetre.
+
+**Ortak snap adımı = en kaba halkanınki.** Göreli kayma sıfır, delik
+`ızgara / 3` ile birebir oturuyor. Ölçüm: boşluk 0,00 cm, bindirme 0,00 cm,
+her kalitede.
+
+**Izgara bütün halkalarda AYNI olmak zorunda.** Halka genişlikleri 3 katı
+büyüyor; delik `ızgara/3` ile tam çıkması için quad'ların da tam 3 katı olması
+gerekiyor. Halka başına farklı ızgara denendi (rapor §6) ve delik hiçbir
+halkada oturmadı. Üçgen bütçesi ızgaranın kendisi küçültülerek düşürüldü:
+Ring0Grid 400 → 192, toplam 1.178.600 → 276.480 üçgen.
+
+**Bedeli:** en iç halka 3,6 m'lik adımlarla yer değiştiriyor. ±4 m kapladığı
+için oyuncu her hâlükârda 2,2 m payla içinde kalıyor.
+
+---
+
 ## Zemin yüksekliği dokusu RFloat — spec §7.1'den sapma (2026-08-22)
 
 Spec `TextureFormat.RHalf` diyor. Bu dağ 8000 m ve half'ın metre karşılığı

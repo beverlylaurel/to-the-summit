@@ -134,12 +134,24 @@ public static class SnowClipmapTest
                     worstOverlap = Mathf.Min(worstOverlap, margin);
                 }
 
-                bool sealed_ = worstGap <= 0f;
+                // KURAL DEĞİŞTİ: bindirme YASAK, boşluk sınırlı.
+                //
+                // Bindirme bandında iki yüzey aynı anda çiziliyor ve quad
+                // farkı yüzünden kaba olan ince olanın içinden çıkıyor.
+                // Boşluk ise her halkanın dış eteğiyle kapanıyor; tek şart
+                // eteğin taşıyabileceğinden geniş olmaması.
+                // ORTAK SNAP: kayma sıfır, delik birebir. Hem bindirme hem
+                // boşluk sıfır olmak zorunda; biri varsa oran bozulmuş
+                // demektir.
+                bool sealed_ = Mathf.Abs(worstGap) < 0.001f
+                            && Mathf.Abs(worstOverlap) < 0.001f;
+
                 all &= sealed_;
 
                 r.AppendLine("  [" + M(sealed_) + "] " + preset.ToString().PadRight(8) +
                              "halka " + (i - 1) + "→" + i + ":  " + steps +
-                             " olası kayma,  en kötü örtüşme " +
+                             " olası kayma,  boşluk " +
+                             (worstGap * 100f).ToString("0.00") + " cm,  bindirme " +
                              (worstOverlap * 100f).ToString("0.00") + " cm" +
                              (sealed_ ? "" : "  ÇATLAK " + (worstGap * 100f).ToString("0.00") + " cm"));
             }
@@ -169,7 +181,7 @@ public static class SnowClipmapTest
             {
                 // ETEK: en dış halkanın dört kenarında quad başına iki üçgen
                 // (rapor §5). Sayılmazsa sınama etek eklenince patlar.
-                int skirt = ring.Outermost ? ring.Grid * 4 * 2 * 3 : 0;
+                int skirt = ring.Outermost ? ring.Grid * 4 * 2 * 3 : 0;   // her halkada
 
                 int expected = (ring.Grid * ring.Grid - ring.HoleQuads * ring.HoleQuads) * 6 + skirt;
                 int actual = (int)mesh.GetIndexCount(0);

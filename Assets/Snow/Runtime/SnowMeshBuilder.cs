@@ -35,19 +35,23 @@ public static class SnowMeshBuilder
         /// Konumun oturduğu ızgara adımı, metre.
         public readonly float SnapStep;
 
-        /// En dıştaki halka mı. Yalnız ona etek ekleniyor; iç halkaların
-        /// kenarını zaten dış halka örtüyor.
+        /// Eteği var mı. HER halkada var: iç halkaların dış kenarı ile dış
+        /// halkanın deliği arasında ≤ maxOffset'lik bir boşluk kalıyor ve onu
+        /// bu etek kapatıyor. En dış halkada ise araziyle temasi kapatıyor.
         public readonly bool Outermost;
 
-        public Ring(int index, float extent, int grid, int holeQuads, bool outermost = false)
+        public Ring(int index, float extent, int grid, int holeQuads, float snapStep)
         {
             Index = index;
             Extent = extent;
             Grid = grid;
             QuadSize = extent / grid;
             HoleQuads = holeQuads;
-            SnapStep = QuadSize * SnowConstants.RingSnapQuads;
-            Outermost = outermost;
+            SnapStep = snapStep;
+
+            // Etek HER halkada: iç halkanın kenarı ile dış halkanın deliği
+            // arasında kalan dikişi ve en dışta araziyle teması kapatıyor.
+            Outermost = true;
         }
     }
 
@@ -57,41 +61,33 @@ public static class SnowMeshBuilder
     {
         var rings = new Ring[quality.RingCount];
 
+        // ORTAK SNAP ADIMI — EN KABA HALKANINKİ.
+        //
+        // Her halka kendi adımına snap'lenirse merkezleri birbirine göre
+        // kayıyor ve delik iç halkaya tam oturamıyor: ya bindirme kalıyor
+        // (iki yüzey aynı anda çiziliyor, kaba olan ince olanın içinden
+        // çıkıyor) ya da boşluk (ölçüldü: 2→3 sınırında 5,85 m).
+        //
+        // Ortak adımda göreli kayma SIFIR. Delik `ızgara / 3` ile birebir
+        // oturuyor. Bedeli: en iç halka 3,6 m'lik adımlarla yer değiştiriyor
+        // — ±4 m kaplıyor, yani oyuncu her hâlükârda 2,2 m payla içinde.
+        float outerExtent = SnowConstants.Ring0Extent
+                          * Mathf.Pow(SnowConstants.RingScale, quality.RingCount - 1);
+
+        float commonSnap = outerExtent / quality.Ring0Grid * SnowConstants.RingSnapQuads;
+
         float extent = SnowConstants.Ring0Extent;
-        rings[0] = new Ring(0, extent, quality.GridForRing(0), 0);
 
-        for (int i = 1; i < quality.RingCount; i++)
+        for (int i = 0; i < quality.RingCount; i++)
         {
-            Ring inner = rings[i - 1];
+            // Delik: iç halkanın kapsaması, dış halkanın quad'ı cinsinden.
+            // Genişlik oranı 3 ve ızgara aynı olduğu için bu TAM SAYI.
+            int holeQuads = i == 0 ? 0 : quality.Ring0Grid / 3;
+
+            rings[i] = new Ring(i, extent, quality.Ring0Grid, holeQuads, commonSnap);
+
             extent *= SnowConstants.RingScale;
-
-            int grid = quality.GridForRing(i);
-            float quadSize = extent / grid;
-
-            // İç halkanın merkezi bu halkanınkinden en çok bu kadar sapabilir:
-            // ikisi de kendi adımına aşağı yuvarlanıyor, kaba adım ince adımın
-            // katı olduğu için fark (kabaAdım − inceAdım) ile sınırlı.
-            float maxOffset = quadSize * SnowConstants.RingSnapQuads - inner.SnapStep;
-
-            // Delik iç halkanın DAİMA örttüğü kadar olmalı.
-            int holeQuads = Mathf.FloorToInt((inner.Extent - 2f * maxOffset) / quadSize);
-
-            // DELİK ÇİFT OLMAK ZORUNDA. Tek sayıda quad ortalanamıyor;
-            // `(grid - hole) / 2` tam bölünmeyince delik bir quad kayıyor ve
-            // içinde üçgen kalıyor (ölçüldü: halka basina ızgara devreye
-            // girince 121/77/57 üçgen delikte kaldı).
-            holeQuads -= holeQuads & 1;
-
-            // EN AZ BİR QUAD BİNDİRME. Sıfır örtüşme çatlak demek; halkalar
-            // kendi ızgaralarına ayrı ayrı snap'lendiği için tam temas
-            // garanti edilemiyor.
-            holeQuads = Mathf.Max(0, holeQuads - 2);
-
-            rings[i] = new Ring(i, extent, grid, holeQuads, i == quality.RingCount - 1);
         }
-
-        if (rings.Length == 1)
-            rings[0] = new Ring(0, rings[0].Extent, rings[0].Grid, 0, true);
 
         return rings;
     }
