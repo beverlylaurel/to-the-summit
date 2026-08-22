@@ -73,6 +73,10 @@ public static class SnowAutoWire
         "settings", "manager", "snowMaterial",
     };
 
+    /// Örtü sürücüsü. Boş kalırsa örtü ayarları 0 yayınlanır, maske sıfır
+    /// çıkar ve dağ çıplak görünür — "kod koşmuyor" ile aynı belirti.
+    static readonly string[] CoverageRequired = { "settings" };
+
     static void Count(SerializedObject so, string[] names, ref int missing, ref string first)
     {
         foreach (string name in names)
@@ -106,6 +110,10 @@ public static class SnowAutoWire
 
         var surface = Object.FindAnyObjectByType<SnowSurface>();
         if (surface != null) Count(new SerializedObject(surface), SurfaceRequired, ref missing, ref first);
+
+        var coverage = Object.FindAnyObjectByType<SnowCoverageDriver>();
+        if (coverage != null)
+            Count(new SerializedObject(coverage), CoverageRequired, ref missing, ref first);
 
         if (missing == 0) return;
 

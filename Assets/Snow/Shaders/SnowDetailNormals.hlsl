@@ -20,12 +20,88 @@ float3 RNMBlend(float3 baseSample, float3 detailSample)
     return normalize(t * dot(t, u) / t.z - u);
 }
 
+/// STOKASTİK DÖŞEME [KAYNAK: Heitz & Neyret, "High-Performance By-Example
+/// Noise using a Histogram-Preserving Blending Operator", HPG 2018].
+///
+/// TEK DOKU HER YERDE AYNI DESENİ BASIYOR. Dört katman da aynı 256²
+/// dokuyu okuyor; 0.6 m'de tekrarlanınca göz ızgarayı yakalıyor ve yukarıdan
+/// bakınca yüzey kareli görünüyor (ölçüldü — kullanıcı ekran görüntüsü).
+///
+/// Çözüm: dünya üçgen ızgaraya bölünüyor, her hücreye kendi rastgele KAYDIRMASI
+/// veriliyor ve üç komşu hücrenin örneği barisentrik ağırlıkla harmanlanıyor.
+/// Desen aynı, ama hiçbir yerde hizalanmıyor.
+///
+/// DÖNDÜRME YOK, YALNIZ KAYDIRMA. Normal haritasını döndürmek teğet uzaydaki
+/// XY'yi de döndürmeyi gerektirir; atlanırsa ışık yanlış yönden gelir.
+/// Kaydırma tek başına ızgarayı kırıyor.
+///
+/// Spec §13.2'nin döşeme boyları ve şiddetleri DEĞİŞMİYOR — yalnız örnekleme
+/// değişiyor.
+
+/// Üçgen ızgara koordinatları: UV'yi eşkenar üçgen hücrelere böler, üç köşenin
+/// hücre kimliğini ve barisentrik ağırlıklarını döndürür.
+void SnowTriangleGrid(float2 uv, out float w1, out float w2, out float w3,
+                      out int2 v1, out int2 v2, out int2 v3)
+{
+    // Eşkenar üçgen ızgarasına dönüşüm. 1.7320508 = sqrt(3).
+    const float2x2 gridToSkewed = float2x2(1.0, 0.0, -0.57735027, 1.15470054);
+
+    float2 skewed = mul(gridToSkewed, uv * 3.4641016);   // 2*sqrt(3)
+    int2 baseId = int2(floor(skewed));
+    float2 f = frac(skewed);
+
+    float3 temp = float3(f.x, f.y, 1.0 - f.x - f.y);
+
+    if (temp.z > 0.0)
+    {
+        w1 = temp.z; w2 = temp.y; w3 = temp.x;
+        v1 = baseId;
+        v2 = baseId + int2(0, 1);
+        v3 = baseId + int2(1, 0);
+    }
+    else
+    {
+        w1 = -temp.z; w2 = 1.0 - temp.y; w3 = 1.0 - temp.x;
+        v1 = baseId + int2(1, 1);
+        v2 = baseId + int2(1, 0);
+        v3 = baseId + int2(0, 1);
+    }
+}
+
+/// Hücre kimliğinden kaydırma. PCG3D — `frac(sin(dot()))` büyük indekste
+/// çöküyor (spec §17.1'de aynı sebeple değiştirilmişti).
+float2 SnowCellOffset(int2 cell)
+{
+    return SnowRandU3(uint3(asuint(cell.x), asuint(cell.y), 0x9E3779B9u)).xy;
+}
+
 /// Detay dokusundan tanjant uzayı normali, 0..1 aralığına geri paketlenmiş
 /// hâlde. `RNMBlend` girdilerini bu aralıkta bekliyor.
 float3 SampleDetailPacked(float2 worldXZ, float tileMeters, float strength)
 {
-    float3 n = UnpackNormal(SAMPLE_TEXTURE2D(_SnowDetailNormal, sampler_SnowDetailNormal,
-                                             worldXZ / max(tileMeters, 1e-3)));
+    float2 uv = worldXZ / max(tileMeters, 1e-3);
+
+    float w1, w2, w3;
+    int2 v1, v2, v3;
+    SnowTriangleGrid(uv, w1, w2, w3, v1, v2, v3);
+
+    // TÜREVLER HÜCRE KAYDIRMASINDAN ÖNCE ALINIYOR. Kaydırma hücre sınırında
+    // sıçradığı için `SAMPLE_TEXTURE2D` kendi türevini kullanırsa orada mip
+    // patlar ve dikişte bulanık bir çizgi kalır.
+    float2 dx = ddx(uv);
+    float2 dy = ddy(uv);
+
+    float4 c1 = SAMPLE_TEXTURE2D_GRAD(_SnowDetailNormal, sampler_SnowDetailNormal,
+                                      uv + SnowCellOffset(v1), dx, dy);
+    float4 c2 = SAMPLE_TEXTURE2D_GRAD(_SnowDetailNormal, sampler_SnowDetailNormal,
+                                      uv + SnowCellOffset(v2), dx, dy);
+    float4 c3 = SAMPLE_TEXTURE2D_GRAD(_SnowDetailNormal, sampler_SnowDetailNormal,
+                                      uv + SnowCellOffset(v3), dx, dy);
+
+    // HARMAN DOĞRUSAL, HİSTOGRAM KORUYUCU DEĞİL. Heitz'in histogram operatörü
+    // ALBEDO için; normal haritasında üç örneğin doğrusal ortalaması zaten
+    // doğru eğimi veriyor (normaller türev, türev doğrusal toplanır).
+    float3 n = UnpackNormal(c1 * w1 + c2 * w2 + c3 * w3);
 
     // BAĞLANMAMIŞ DOKU NaN ÜRETİYOR. Unity bağlanmamış bir sampler'a beyaz
     // veriyor; DXT5nm yolunda `UnpackNormal(beyaz)` → `sqrt(1 - 1 - 1)` → NaN.

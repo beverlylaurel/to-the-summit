@@ -13,6 +13,13 @@ SAMPLER(sampler_SnowBreakup);
 /// besliyor; ayrı bir kaynak kurulmuyor.
 float _SnowCoverage;
 
+/// ÖRTÜ AYARLARI GLOBAL (spec §16). Arazinin kar katmanı da nesne shader'ı da
+/// bunları okuyor; `SnowCoverageDriver` tek sahibi.
+float _SnowCoverSlopeSharpness;
+float _SnowCoverBreakupStrength;
+float _SnowCoverEdgeSharpness;
+float _SnowCoverThickness;
+
 /// KAR YATAYA YAKIN YÜZEYLERDE BİRİKİR
 /// [KAYNAK: Company of Heroes 2, KGC 2013].
 ///

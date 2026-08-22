@@ -20,11 +20,25 @@ public class SnowCoverageDriver : MonoBehaviour
              + "birebir aynı.")]
     [SerializeField, Range(0f, 2f)] float coverageScale = 1f;
 
+    [Tooltip("Örtü ayarlarının kaynağı. Arazi ve nesneler aynı sayıları okuyor.")]
+    [SerializeField] SnowSettings settings;
+
     void LateUpdate()
     {
         Shader.SetGlobalVector(SnowShaderIDs.SnowUpDirection, upDirection.normalized);
         Shader.SetGlobalFloat(SnowShaderIDs.SnowCoverage,
             Mathf.Clamp01(SnowRuntimeState.GroundCoverage01 * coverageScale));
+
+        if (settings == null) return;
+
+        // ÖRTÜ AYARLARI DA BURADAN. Arazinin kar katmanı ile nesne shader'ı
+        // aynı sayıları okumak zorunda; ayrışırlarsa sınırda iki farklı kar
+        // görünür (ölçüldü: arazi derinlikten, mesh örtüden okurken kenarda
+        // 45 cm'lik hendek — `SYMPTOMS.md`).
+        Shader.SetGlobalFloat(SnowShaderIDs.CoverSlopeSharpness, settings.CoverSlopeSharpness);
+        Shader.SetGlobalFloat(SnowShaderIDs.CoverBreakupStrength, settings.CoverBreakupStrength);
+        Shader.SetGlobalFloat(SnowShaderIDs.CoverEdgeSharpness, settings.CoverEdgeSharpness);
+        Shader.SetGlobalFloat(SnowShaderIDs.CoverThickness, settings.CoverThickness);
     }
 
     void OnDisable()

@@ -33,6 +33,13 @@ public static class SnowShaderIDs
     public static readonly int SnowfallSWERate = Shader.PropertyToID("_SnowfallSWERate");
     public static readonly int SnowWetness = Shader.PropertyToID("_SnowWetness");
     public static readonly int SnowCoverage = Shader.PropertyToID("_SnowCoverage");
+
+    // --- Örtü ayarları (spec §16). Arazi ve nesneler AYNI sayıları okusun diye
+    // global; iki yerde ayrı tutulsaydı sınırda çelişirlerdi.
+    public static readonly int CoverSlopeSharpness = Shader.PropertyToID("_SnowCoverSlopeSharpness");
+    public static readonly int CoverBreakupStrength = Shader.PropertyToID("_SnowCoverBreakupStrength");
+    public static readonly int CoverEdgeSharpness = Shader.PropertyToID("_SnowCoverEdgeSharpness");
+    public static readonly int CoverThickness = Shader.PropertyToID("_SnowCoverThickness");
     public static readonly int SnowAccum = Shader.PropertyToID("_SnowAccum");
     public static readonly int SnowLineY = Shader.PropertyToID("_SnowLineY");
 

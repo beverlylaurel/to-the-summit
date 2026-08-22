@@ -109,6 +109,23 @@ float SnowEdgeFade(float2 uv)
     return 1.0 - smoothstep(SNOW_EDGE_FADE_START, 1.0, edge);
 }
 
+/// KALINLIK PROBU — TEK CEVAPLI TEŞHİS.
+///
+/// 0 = kapalı. 1 olduğunda hem kar mesh'i hem dağın kar katmanı, gösterdikleri
+/// kalınlığı AYNI ölçekte gri tonu olarak döndürüyor ve aydınlatma zinciri hiç
+/// çalışmıyor. İki katman aynı yeri farklı kalınlıkta boyuyorsa sınırda gri bir
+/// BASAMAK çıkar; boyamıyorlarsa gri düz kalır ve kare aydınlatmadandır.
+///
+/// Araç ışıktan, sisten ve pozlamadan bağımsız olmak zorunda — geçen sefer
+/// teşhis aracının kendisi yalan söyledi (`SYMPTOMS.md`).
+///
+/// Belirti kapanınca silinecek (`DECISIONS.md` → Silinecek geçiciler).
+float _SnowDepthProbe;
+
+/// Probun gri ölçeği: bu kalınlık beyaz. 60 cm, `SNOW_SWE_MAX`'in derinlik
+/// karşılığının üstünde — doyma olmasın diye.
+#define SNOW_DEPTH_PROBE_RANGE 0.6
+
 /// Bölgenin dışındaki dünyanın genel kar durumu.
 float _FallbackSWE;
 float _FallbackRhoN;

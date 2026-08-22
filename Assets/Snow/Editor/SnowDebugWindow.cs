@@ -411,8 +411,8 @@ public class SnowDebugWindow : EditorWindow
         var surface = go.GetComponent<SnowSurface>();
         if (surface == null) surface = go.AddComponent<SnowSurface>();
 
-        if (go.GetComponent<SnowCoverageDriver>() == null)
-            go.AddComponent<SnowCoverageDriver>();
+        var coverage = go.GetComponent<SnowCoverageDriver>();
+        if (coverage == null) coverage = go.AddComponent<SnowCoverageDriver>();
 
         var snowfall = go.GetComponent<SnowfallRenderer>();
         if (snowfall == null) snowfall = go.AddComponent<SnowfallRenderer>();
@@ -461,6 +461,14 @@ public class SnowDebugWindow : EditorWindow
             menuSerialized.FindProperty("snowManager").objectReferenceValue = manager;
             menuSerialized.ApplyModifiedProperties();
         }
+
+        // ÖRTÜ AYARLARI. Bağlanmazsa global'ler 0 kalıyor, maske sıfır çıkıyor
+        // ve dağda hiç kar görünmüyor — "kod koşmuyor" ile aynı belirti.
+        var coverageSerialized = new SerializedObject(coverage);
+        coverageSerialized.FindProperty("settings").objectReferenceValue = settings;
+        coverageSerialized.ApplyModifiedProperties();
+
+        EditorUtility.SetDirty(coverage);
 
         var groundSerialized = new SerializedObject(ground);
         groundSerialized.FindProperty("settings").objectReferenceValue = settings;

@@ -83,6 +83,10 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Kar Teşhisi'ndeki "Sınama karı" bölümü** — Play'de dünyayı elle karla
   dolduran kontrol. Kar sistemi kabul edilince silinir; ayar dosyasına
   yazmadığı için kalıntı bırakmıyor
+- **F1'deki "Kalınlık probu" ve "Dağı zorla karla kapla"** — kar mesh'i ile dağın
+  kar katmanının sınırındaki kareyi ayırmak için. Prob aydınlatmayı atlayıp
+  kalınlığı gri döndürüyor; sınırda basamak varsa sebep veri, yoksa aydınlatma.
+  Belirti kapanınca ikisi de silinir
 - **`SnowEnvironmentBridge` elle girilen değerler** — köprü şu an sabit sayılar
   yayınlıyor (rüzgâr 3 m/s, sıcaklık −4 °C, yağış 0.5). Gerçek sistemlere bağlanınca
   bu alanlar silinir
@@ -1215,6 +1219,30 @@ doluyor (spec §6.4). Aşağıdaki DERS geçerliliğini koruyor.
 
 **Ders:** dispatch'ler arası taşınan bayrak, sıfırlamayı unutan HER çağıranı
 bozar. Sınama rigleri de çağıran sayılır.
+
+## Detay normalleri stokastik döşeniyor — spec §13.2'den sapma (2026-08-22)
+
+Spec §13.2 dört detay katmanının döşeme boyunu ve şiddetini veriyor, örnekleme
+biçimini vermiyor. Düz döşemede tek 256² doku 0,6 m'de tekrarlanıyor ve yukarıdan
+bakınca yüzey **kareli** görünüyor (kullanıcı ekran görüntüsüyle bildirdi).
+
+`[KAYNAK: Heitz & Neyret, HPG 2018]` üçgen ızgara + hücre başına rastgele
+kaydırma + barisentrik harman. Desen aynı, hizalanma yok.
+
+**Döşeme boyları ve şiddetler DEĞİŞMEDİ** — sapma yalnız örneklemede. Spec §0.3
+sayıları bağlıyor, örnekleme yöntemini değil.
+
+**Döndürme bilerek yok.** Normal haritasını döndürmek teğet uzaydaki XY'yi de
+döndürmeyi gerektirir; atlanırsa ışık yanlış yönden gelir. Kaydırma tek başına
+ızgarayı kırıyor.
+
+**Maliyet:** katman başına 1 yerine 3 doku örneği. Medium'da 2 katman → 6 örnek.
+Spec §15 bütçesi kar mesh'i için < 1,0 ms; ÖLÇÜLMEDİ.
+
+**Tetikleyici:** `SnowProfiler` kar mesh'ini 1,0 ms üstünde gösterirse stokastik
+döşeme yalnız Meso katmanına bırakılır — ekranda görünen tekrar oydu.
+
+---
 
 ## Kar çizgisi KALDIRILDI — kar irtifaya bağlı değil (2026-08-22)
 

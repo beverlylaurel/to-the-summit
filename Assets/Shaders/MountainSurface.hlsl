@@ -140,6 +140,7 @@ float MountainBand(float3 worldPos)
 // Macro'nun tile'ı 8 m — arazi heightmap'inin tekseli 7.32 m. Düz beyaz karın
 // teşhir ettiği o basamak ölçeğini kıran katman tam bu.
 #include "../Snow/Shaders/SnowDetailNormals.hlsl"
+#include "../Snow/Shaders/SnowCover.hlsl"
 
 /// Teşhis: 1 olduğunda dağın kar maskesi zorlanıyor. Bkz. aşağıdaki kullanım.
 float _SnowForceMountainMask;
@@ -437,41 +438,58 @@ MountainSurface BuildMountainSurface(float3 worldPos)
 
     // ------------------------------------------------------------------ kar
     //
-    // DAĞIN KARI, KAR MESH'İYLE AYNI DURUMDAN.
+    // YERİNDEN OYNATMA YOK, bu bir gölgeleme katmanı. Deforme olan gerçek kar
+    // yalnız oyuncunun çevresindeki 24 m'lik bölgede (kar mesh'i).
     //
-    // Kar mesh'i (clipmap) yalnız oyuncunun çevresindeki 128 m'yi kaplıyor.
-    // Dağın geri kalanı bu katmanla karlanıyor. İkisi de `SnowStateAt`
-    // okuduğu için sınırda kalınlık ve yoğunluk aynı sayıdan geliyor.
+    // ARAZİNİN KARI DERİNLİK DEĞİL ÖRTÜ (spec §16).
     //
-    // YERİNDEN OYNATMA YOK, bu bir gölgeleme katmanı. Clipmap'in dışı en yakın
-    // 128 m'de başlıyor; orada 30 cm'lik kabarmanın ekrandaki karşılığı alt
-    // piksel. Deforme olan gerçek kar zaten yakın bölgede.
-    float4 snowState = SnowStateAt(SnowWorldToUV(worldPos));
-    float  snowDepth = SnowBaseHeight(snowState.r, snowState.g);
+    // Eskiden `SnowStateAt`'ten DERİNLİK okunuyordu. O fonksiyon bölgenin
+    // içinde durum dokusunu, dışında `_FallbackSWE`'yi veriyor — iki ayrı
+    // sayı. Kar mesh'i ise kenarında kalınlığı sıfıra indiriyor (spec §8.3).
+    // İkisi üst üste gelince mesh'in dış 2 metresinde HENDEK kalıyordu:
+    // mesh 0 cm gösterirken arazi 45 cm boyuyordu. Oyuncunun çevresindeki
+    // kare o hendeğin çerçevesiydi (ölçüldü — kalınlık probu, `SYMPTOMS.md`).
+    //
+    // Spec'in kendi yolu: arazi örtüsü GLOBAL SKALER `_SnowCoverage`'dan
+    // gelir ve kalınlığı `_SnowCoverThickness` (4 cm). Her yerde aynı sayı,
+    // bölge sınırı diye bir şey yok.
 
     // EĞİM: dik kayada kar durmaz. 0.45 ≈ 63° yatıklık.
     float snowSlope = saturate((normalWS.y - 0.45) / 0.35);
-
-    // KALINLIK: 5 cm'de tam örtü; altında kaya arasından görünüyor.
-    float snowFill = saturate(snowDepth / 0.05);
 
     // KENAR KIRILMASI DAĞIN KENDİ GÜRÜLTÜSÜNDEN. Yeni doku eklenmiyor —
     // kayanın kabartısı zaten orada ve kar sınırı ona oturunca düz kesilmiş
     // bir çizgi gibi durmuyor.
     float snowBreak = MountainFbm(worldPos * _BumpScale * 0.35, 2) * 0.5 + 0.5;
-    float snowMask = saturate((snowSlope * snowFill - snowBreak * 0.35) * 3.0);
 
-    // TEŞHİS ANAHTARI. "Kod koşmuyor" ile "kod koşuyor ama maske sıfır"
-    // dışarıdan aynı görünüyor. Bu global 1 olduğunda maske zorlanıyor:
-    // dağ beyazlaşıyorsa kod koşuyor demektir, beyazlaşmıyorsa koşmuyor.
-    //
-    // Belirti kapanınca silinecek (`DECISIONS.md` → Silinecek geçiciler).
+    float snowMask = SnowCoverMaskWithNoise(worldPos, normalWS, surface.occlusion, snowBreak,
+                                            0.45, _SnowCoverSlopeSharpness,
+                                            _SnowCoverBreakupStrength, _SnowCoverEdgeSharpness);
+
+    // KALINLIK PROBU. Arazi örtüsünün gösterdiği kalınlık: örtü kalınlığı ×
+    // maske. Kar mesh'i ile AYNI ölçekte dönüyor ki sınır karşılaştırılabilsin.
+    if (_SnowDepthProbe > 0.5)
+    {
+        half g = (half)saturate(_SnowCoverThickness * snowMask / SNOW_DEPTH_PROBE_RANGE);
+
+        surface.albedo = 0;
+        surface.emission = half3(g, g, g);
+        surface.smoothness = 0;
+        surface.occlusion = 1;
+
+        return surface;
+    }
+
     snowMask = max(snowMask, _SnowForceMountainMask);
 
     if (snowMask > 0.001)
     {
         // Spec §14.1: albedo ve pürüzlülük TAZELİKTEN, tazelik de yoğunluktan.
-        float freshness = 1.0 - saturate((SnowDensity(snowState.g) - 100.0) / 350.0);
+        //
+        // Yoğunluk dünyanın genel değeri (`_FallbackRhoN`) — ÖLÇÜLEN değil.
+        // Örtü yolunda durum dokusu okunmuyor; okunsaydı bölge sınırında
+        // tazelik sıçrar ve kare geri gelirdi.
+        float freshness = 1.0 - saturate((SnowDensity(_FallbackRhoN) - 100.0) / 350.0);
 
         half3 snowAlbedo = lerp(half3(0.70, 0.73, 0.79), half3(0.90, 0.92, 0.95), freshness);
         half  snowRough  = lerp(0.26, 0.48, freshness);

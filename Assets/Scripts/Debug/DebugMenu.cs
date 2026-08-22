@@ -64,6 +64,11 @@ public class DebugMenu : MonoBehaviour
     /// gerçekten koşuyor mu sorusunu tek tıkla ayırıyor.
     bool forceMountainSnow;
 
+    /// Teşhis: kalınlık probu. Kar mesh'i ile dağın kar katmanı, gösterdikleri
+    /// kalınlığı aynı ölçekte gri tonu olarak döndürüyor; aydınlatma çalışmıyor.
+    /// Sınırda gri basamak varsa sebep veri, yoksa aydınlatma.
+    bool depthProbe;
+
     /// Teşhis: rüzgâr taşınımı ve gölgesi ayrı ayrı kapatılabiliyor.
     bool windTransportOff;
     bool windShadowOff;
@@ -478,6 +483,16 @@ public class DebugMenu : MonoBehaviour
                 forceMountainSnow = nextForce;
                 Shader.SetGlobalFloat("_SnowForceMountainMask", forceMountainSnow ? 1f : 0f);
             }
+
+            bool nextDepth = GUILayout.Toggle(depthProbe, "Kalınlık probu (0–60 cm gri)");
+            if (nextDepth != depthProbe)
+            {
+                depthProbe = nextDepth;
+                Shader.SetGlobalFloat("_SnowDepthProbe", depthProbe ? 1f : 0f);
+            }
+
+            if (depthProbe)
+                GUILayout.Label("   sınırda gri BASAMAK -> veri;  gri DÜZ -> aydınlatma");
         }
 
         GUILayout.Space(6f);

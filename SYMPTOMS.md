@@ -14,6 +14,52 @@ her seferinde belirtinin en çok göze çarptığı katman seçilmişti. Bulut k
 
 ---
 
+## Oyuncunun çevresinde büyük bir kare, onunla birlikte hareket ediyor
+
+**Elenen şüpheliler — hepsi ölçümle:**
+
+| Şüpheli | Nasıl elendi |
+|---|---|
+| Clipmap halkaları | Halkalar tamamen silindi (spec §8.1), kare kaldı |
+| Zemin dokusu çözünürlüğü (7,32 m teksel) | Kar ile arazi arasındaki ayrılık ölçüldü: ortalama 1 cm, en fazla 6 cm. Mesh havada durmuyor |
+| Dağın kar maskesi kapalı | "Zorla karla kapla" açıldı, hiçbir şey değişmedi |
+
+**Araç yalanı:** bir tur `SnowSurface.enabled = false` ile "mesh kapalı, kare
+duruyor" sonucuna varıldı. Mesh KAPANMAMIŞTI — `SnowSurfaceMesh` nesnesi
+`activeInHierarchy: true` bulundu. O turun iki sonucu da geçersizdi.
+
+**Sebep:** kar mesh'i ile arazi AYNI YERİ FARKLI KALINLIKTA boyuyordu.
+
+- Mesh kenarında kalınlığı sıfıra indiriyor (spec §8.3, `h *= fade`)
+- Arazi tam orada `SnowStateAt`'ten okuduğu 45 cm'i boyuyor
+
+Aralarında 2 metre genişliğinde bir **hendek** kalıyor; kare o hendeğin
+çerçevesi. Spec §8.3 doğru, ama varsayımı "mesh'in ötesinde kar yoktur" —
+bizde arazinin kendi kar katmanı vardı.
+
+**Ayırt eden ölçüm:** kalınlık probu. İki shader da kalınlığı aynı ölçekte gri
+döndürüyor, aydınlatma çalışmıyor. Üç seviye tek bakışta göründü:
+
+```
+dışarısı        orta gri        ~45 cm
+karenin içi     beyaza yakın    ~55-60 cm
+kenar halkası   KAPKARA         ~0 cm      <- hendek
+```
+
+**Düzeltme:** arazinin karı derinlik değil ÖRTÜ (spec §16) — global skaler
+`_SnowCoverage`, kalınlık `_SnowCoverThickness` (4 cm). `MountainSurface` artık
+`SnowStateAt` okumuyor. Sınırdaki fark 45 cm yerine 4 cm.
+
+**Kural:** iki katman aynı yeri boyuyorsa ikisi de AYNI büyüklüğü göstermek
+zorunda. Biri derinlik biri örtü okuyorsa sınır her zaman görünür — ve sınır
+oyuncuyu takip ediyorsa kare olur.
+
+**Araç notu:** teşhis aracını kullanmadan önce aracın kendisi doğrulandı — kar
+her yerde 45 cm iken prob orta gri gösterdi (45/60 = 0,75, beklenen). Bir önceki
+turda bu yapılmadığı için yanlış sonuca varıldı.
+
+---
+
 ## Ayak altında kare bir sırt/çıkıntı, oyuncuyla birlikte geliyor
 
 **Elenen şüpheliler — hepsi izolasyon anahtarıyla, tek turda:**

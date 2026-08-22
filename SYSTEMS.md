@@ -791,12 +791,21 @@ sönüyor; mesh kenarı arazi yüzeyiyle aynı yükseklikte bitiyor, basamak
 kalmıyor. Ötesini dağın kendi kar katmanı çiziyor — o katman yer değiştirme
 uygulamadığı için ikisi kenarda çakışıyor.
 
-**Dağın karı ile kar mesh'inin karı tek durumdan.** Kar mesh'i oyuncunun
-çevresindeki 24 m'yi kaplıyor; dağın geri kalanının karını `MountainSurface`
-çiziyor. İkisi de `SnowStateAt` okuyor — bölgenin içinde durum dokusu, dışında
-dünyanın genel kar durumu (`SnowOutsideStateAt`). Ayrı bir "arazi karı" sayısı YOK, o
-yüzden sınırda çelişemezler. Dağ tarafında yerinden oynatma yok (gölgeleme
-katmanı); deforme olan gerçek kar yalnız yakın bölgede.
+**Dağın karı ÖRTÜ, mesh'in karı DERİNLİK — bilinçli ayrım (spec §16, §8.4).**
+Kar mesh'i oyuncunun çevresindeki 24 m'yi kaplıyor ve gerçek kalınlık çiziyor.
+Dağın geri kalanını `MountainSurface` çiziyor ve o **derinlik okumuyor**:
+`SnowCoverMaskWithNoise` + global skaler `_SnowCoverage`, kalınlık
+`_SnowCoverThickness` (4 cm). Yerinden oynatma yok, gölgeleme katmanı.
+
+Arazi bir süre `SnowStateAt`'ten DERİNLİK okudu; o fonksiyon bölgenin içinde
+durum dokusunu, dışında `_FallbackSWE`'yi veriyor. Mesh ise kenarında kalınlığı
+sıfıra indirdiği için (spec §8.3) aralarında 2 metrelik bir hendek kalıyordu —
+oyuncuyu takip eden kare oydu (`SYMPTOMS.md`). İki katman aynı yeri boyuyorsa
+aynı büyüklüğü göstermek zorunda; biri derinlik biri örtü okursa sınır görünür.
+
+Örtü ayarlarının tek sahibi `SnowCoverageDriver`: `_SnowCoverage`,
+`_SnowUpDirection` ve dört örtü parametresi global yayınlanıyor ki arazi ile
+nesne shader'ı aynı sayıları okusun.
 
 **KAR İRTİFAYA BAĞLI DEĞİL.** Yükseklikten türeyen bir kar çizgisi vardı;
 kaldırıldı. Kar yağarsa tutar, yağmazsa tutmaz. Yüksekte karın daha çok olması
@@ -804,6 +813,15 @@ sıcaklıktan kendiliğinden çıkıyor: `TemperatureField` kotla düşüyor, ya
 §3.4 histerezisiyle kara dönüyor. İkinci bir irtifa terimi aynı şeyi ikinci kez
 söylerdi. Bölge dışı ve yeni açılan şerit `_FallbackSWE`/`_FallbackRhoN`'dan
 doluyor (`SnowOutsideStateAt`).
+
+**Detay normalleri stokastik döşeniyor** `[KAYNAK: Heitz & Neyret, HPG 2018]`.
+Dört katman da aynı 256² dokuyu okuyor; sabit döşemede 0,6 m'lik tekrar gözle
+yakalanıyor ve yüzey yukarıdan kareli görünüyordu. Doku artık üçgen ızgarada üç
+kez, hücre başına rastgele KAYDIRMAYLA örneklenip barisentrik ağırlıkla
+harmanlanıyor. Döndürme yok — normal haritasını döndürmek teğet XY'yi de
+döndürmeyi gerektirir. Türevler kaydırmadan önce alınıyor (`SAMPLE_TEXTURE2D_GRAD`),
+yoksa hücre sınırında mip patlıyor. Spec §13.2'nin döşeme boyları ve şiddetleri
+değişmedi; yalnız örnekleme değişti.
 
 **Kar olayları (Faz 11–13).** Kabuk `RT_Trail.B`'de, üçgen sıcaklık profiliyle
 (tepe −5 °C) oluşuyor ve yeterli yük binince kırılıyor — patikayla karıştırma,
