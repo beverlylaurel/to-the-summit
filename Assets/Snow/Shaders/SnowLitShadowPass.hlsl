@@ -36,8 +36,8 @@ ShadowVaryings SnowShadowVertex(ShadowAttributes IN)
 
     positionWS = SnowDisplacedPositionWS(positionWS, IN.ringId.x, h);
 
-    if (IN.ringId.y > 0.5 && IN.ringId.y < 1.5) positionWS.y -= SNOW_SKIRT_DEPTH;
-    if (IN.ringId.y > 1.5) positionWS.y = SnowStitchedWorldY(flat.xz, IN.ringId.x);
+    if (IN.ringId.y > 0.5 && IN.ringId.y < 1.5 && _SnowSkirtOff < 0.5) positionWS.y -= SNOW_SKIRT_DEPTH;
+    if (IN.ringId.y > 1.5 && _SnowStitchOff < 0.5) positionWS.y = SnowStitchedWorldY(flat.xz, IN.ringId.x);
 
     OUT.positionWS = positionWS;
 

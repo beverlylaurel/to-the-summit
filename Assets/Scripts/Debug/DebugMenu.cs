@@ -71,6 +71,10 @@ public class DebugMenu : MonoBehaviour
     /// Mesh prob görünümü: 0 kapalı, 1–5 teşhis modları.
     int meshProbe;
 
+    /// Teşhis: dikiş ve etek ayrı ayrı kapatılabiliyor.
+    bool stitchOff;
+    bool skirtOff;
+
     /// Teşhis: kaç clipmap halkası çizilsin. −1 = hepsi.
     int probeRings = -1;
 
@@ -489,6 +493,20 @@ public class DebugMenu : MonoBehaviour
 
             if (meshProbe != before)
                 Shader.SetGlobalFloat("_SnowMeshProbe", meshProbe);
+
+            bool nextStitch = GUILayout.Toggle(stitchOff, "Dikişi kapat (teşhis)");
+            if (nextStitch != stitchOff)
+            {
+                stitchOff = nextStitch;
+                Shader.SetGlobalFloat("_SnowStitchOff", stitchOff ? 1f : 0f);
+            }
+
+            bool nextSkirt = GUILayout.Toggle(skirtOff, "Eteği kapat (teşhis)");
+            if (nextSkirt != skirtOff)
+            {
+                skirtOff = nextSkirt;
+                Shader.SetGlobalFloat("_SnowSkirtOff", skirtOff ? 1f : 0f);
+            }
 
             bool nextFlat = GUILayout.Toggle(flattenSnow, "Kar yüzeyini düzleştir (teşhis)");
             if (nextFlat != flattenSnow)

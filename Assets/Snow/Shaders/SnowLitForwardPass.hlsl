@@ -9,6 +9,11 @@
 
 /// Teşhis görünümü. 0 = kapalı. Değerleri `DebugMenu`'de yazıyor.
 float _SnowMeshProbe;
+
+/// Teşhis anahtarları. 1 = kapalı. İkisi de ayrı ayrı kapatılabiliyor ki
+/// çıkıntının sahibi tek turda ayrılsın.
+float _SnowStitchOff;
+float _SnowSkirtOff;
 #include "SnowDetailNormals.hlsl"
 
 struct Attributes
@@ -103,11 +108,11 @@ Varyings SnowLitVertex(Attributes IN)
     positionWS = SnowDisplacedPositionWS(positionWS, IN.ringId.x, h);
 
     // ETEK: işaret 1. Aşağı iniyor, mesh ile arazi arasını kapatıyor.
-    if (IN.ringId.y > 0.5 && IN.ringId.y < 1.5)
+    if (IN.ringId.y > 0.5 && IN.ringId.y < 1.5 && _SnowSkirtOff < 0.5)
         positionWS.y -= SNOW_SKIRT_DEPTH;
 
     // DİKİŞ: işaret 2. Sınır köşesi kaba ızgaradan okuyor.
-    if (IN.ringId.y > 1.5)
+    if (IN.ringId.y > 1.5 && _SnowStitchOff < 0.5)
         positionWS.y = SnowStitchedWorldY(flat.xz, IN.ringId.x);
 
     OUT.probeData = IN.ringId;
