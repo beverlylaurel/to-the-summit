@@ -118,11 +118,16 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   **Tetikleyici:** oyunda kalın kar örtüsü isteniyorsa — çözüm
   `AltitudeWeatherDriver`'ın rüzgâr profilinde, kar sisteminde değil.
 
-- **Ayak izi sığ kalıyor, kenar sırtı hiç oluşmuyor** — kar 6 mm iken ayak
-  yalnız 1.1 mm oyuyor (ölçüldü, 113 teksel). `KRim` erken çıkışı
-  `carve < 0.002` olduğu için sırt hiç hesaplanmıyor. İki soru açık: carve
-  neden kar derinliğinin altıda biri, ve kalın karda kendiliğinden çözülüyor mu.
-  **Tetikleyici:** kalın kar örtüsü sağlandığında ilk bakılacak yer burası.
+- **Kenar sırtı sürekli fırtınada oluşmuyor — SEBEBİ DOĞRU DAVRANIŞ.**
+  Ölçüldü: kar ~5 mm, ayak yalnız 1.09 mm oyuyor, `KRim` erken çıkışı
+  `carve < 0.002` olduğu için sırt hesaplanmıyor.
+  Kâğıtta sebep tam çıkıyor: rüzgâr karı `PACKED_N`'e kadar sıkıştırmış
+  (`rhoN 0.53`, eşik 0.55), `packed = 0.956`,
+  `sinkScale = lerp(1.0, 0.18, 0.956) = 0.216`, `5 mm × 0.216 = 1.08 mm`.
+  Sert karda ayak batmaz — istenen davranış bu.
+  **Tetikleyici:** gevşek ve kalın karda (sakin hava) sırt yine oluşmuyorsa
+  o zaman gerçek bir hata vardır. Bağlı kayıt: sürekli fırtınada kar
+  kalınlaşmıyor.
 
 - **Bisikletin zemin direnci bağlı değil** — `BikeController.RollingResistance`
   alanı var ve `-1` iken ayardan geliyor; hiçbir sistem beslemiyor. Bisiklet
