@@ -108,6 +108,22 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   **Tetikleyici:** savrulan kar tek noktadan fışkırıyor görünüyorsa.
   **Maliyet:** iki grafiğe kutu + süspansiyona CustomHLSL üstel yükseklik.
 
+- **Sürekli fırtınada kar KALINLAŞMIYOR** — ölçüldü: bir oyun saati boyunca
+  `MeanSwe` 0.00195'te dengeye oturuyor (yaklaşık 6 mm derinlik), daha fazla
+  artmıyor. Sebep rüzgâr: sahnede hız 12–14 m/s sabit, `DriftActive01 = 1`,
+  yani `KWindTransport` erozyonu yağışı tam dengeliyor.
+  **Fiziksel olarak doğru** — sürekli fırtınada kar birikmez, savrulur. Ama
+  "zamanla zeminde kar yükselmesi" isteniyorsa hava sisteminin sakin dönemler
+  üretmesi gerekiyor; kar tarafında yapılacak bir şey yok.
+  **Tetikleyici:** oyunda kalın kar örtüsü isteniyorsa — çözüm
+  `AltitudeWeatherDriver`'ın rüzgâr profilinde, kar sisteminde değil.
+
+- **Ayak izi sığ kalıyor, kenar sırtı hiç oluşmuyor** — kar 6 mm iken ayak
+  yalnız 1.1 mm oyuyor (ölçüldü, 113 teksel). `KRim` erken çıkışı
+  `carve < 0.002` olduğu için sırt hiç hesaplanmıyor. İki soru açık: carve
+  neden kar derinliğinin altıda biri, ve kalın karda kendiliğinden çözülüyor mu.
+  **Tetikleyici:** kalın kar örtüsü sağlandığında ilk bakılacak yer burası.
+
 - **Bisikletin zemin direnci bağlı değil** — `BikeController.RollingResistance`
   alanı var ve `-1` iken ayardan geliyor; hiçbir sistem beslemiyor. Bisiklet
   çakılda da asfaltta da aynı direnci görüyor. `TerrainSurface`'te zemin TİPİ
