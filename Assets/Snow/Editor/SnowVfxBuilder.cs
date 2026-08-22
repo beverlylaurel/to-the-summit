@@ -37,6 +37,10 @@ public static class SnowVfxBuilder
         try
         {
             BuildSnowfall(r);
+            BuildPuff(r);
+            BuildSpray(r);
+            BuildSpindrift(r);
+            BuildCurtain(r);
         }
         catch (Exception e)
         {
@@ -145,6 +149,137 @@ public static class SnowVfxBuilder
         Link(spawner, init, r);
         Link(init, update, r);
         Link(update, output, r);
+
+        Save(graph, r);
+    }
+
+    // ------------------------------------------------------------- ortak iskelet
+
+    /// Dört kısa ömürlü sistem aynı iskeleti paylaşıyor: spawn → init →
+    /// update → çıktı. Tek fark ayarları; iskeleti kopyalamak dört yerde
+    /// aynı hatayı yapmak olurdu.
+    static (object init, object update, object output) Skeleton(
+        object graph, uint capacity, float lifeA, float lifeB,
+        float sizeA, float sizeB, StringBuilder r)
+    {
+        object spawner = AddContext(graph, "VFXBasicSpawner", new Vector2(0, 0), r);
+        AddBlock(spawner, "VFXSpawnerConstantRate", r);
+
+        object init = AddContext(graph, "VFXBasicInitialize", new Vector2(0, 200), r);
+        SetSetting(init, "capacity", capacity, r);
+
+        object life = AddBlock(init, "Block.SetAttribute", r);
+        SetSetting(life, "attribute", "lifetime", r);
+        SetSetting(life, "Random", "Uniform", r);
+        SetSlot(life, "A", lifeA, r);
+        SetSlot(life, "B", lifeB, r);
+
+        object size = AddBlock(init, "Block.SetAttribute", r);
+        SetSetting(size, "attribute", "size", r);
+        SetSetting(size, "Random", "Uniform", r);
+        SetSlot(size, "A", sizeA, r);
+        SetSlot(size, "B", sizeB, r);
+
+        object update = AddContext(graph, "VFXBasicUpdate", new Vector2(0, 500), r);
+
+        object output = AddContext(graph, "URP.VFXURPLitPlanarPrimitiveOutput",
+                                   new Vector2(0, 800), r);
+        SetSetting(output, "blendMode", "Alpha", r);
+        SetSetting(output, "zWriteMode", "Off", r);
+
+        Link(spawner, init, r);
+        Link(init, update, r);
+        Link(update, output, r);
+
+        return (init, update, output);
+    }
+
+    // ------------------------------------------------------------- VFX_SnowPuff
+
+    /// AYAK TOZ BULUTU (spec §19.3). Spec tetiği veriyor (`depth > 0.06 &&
+    /// density01 < 0.50`) ama parçacığın sayılarını vermiyor; değerler
+    /// `SnowPuffEmitter`'dan taşınıyor — Faz 9'da zaten ölçülüp yerleşmişler.
+    static void BuildPuff(StringBuilder r)
+    {
+        object graph = NewGraph("VFX_SnowPuff", r);
+
+        var (init, update, output) =
+            Skeleton(graph, 512, 0.4f, 0.9f, 0.02f, 0.06f, r);
+
+        AddBlock(update, "Block.Gravity", r);
+        AddBlock(update, "Block.Drag", r);
+
+        object orient = AddBlock(output, "Block.Orient", r);
+        SetSetting(orient, "mode", "FaceCameraPlane", r);
+
+        Save(graph, r);
+    }
+
+    // ------------------------------------------------------------ VFX_SnowSpray
+
+    /// KOŞARKEN PÜSKÜRTME (spec §18.6)
+    /// `[KAYNAK: Sumner, O'Brien & Hodgins, CGF 1999]`.
+    ///
+    /// Miktar uydurulmuyor, simülasyondan geliyor: `V̇ = genişlik × batma × hız`.
+    /// O hesap `SnowSprayController`'da; grafik yalnız parçacığı çiziyor.
+    static void BuildSpray(StringBuilder r)
+    {
+        object graph = NewGraph("VFX_SnowSpray", r);
+
+        // Kapasite 3000, ömür 0.5–1.1 s, boyut 0.03–0.10 m (spec §18.6).
+        var (init, update, output) =
+            Skeleton(graph, 3000, 0.5f, 1.1f, 0.03f, 0.10f, r);
+
+        // Yerçekimi −9.81 × 0.35, drag 2.5 (spec §18.6).
+        AddBlock(update, "Block.Gravity", r);
+
+        object drag = AddBlock(update, "Block.Drag", r);
+        SetSlot(drag, "dragCoefficient", 2.5f, r);
+
+        object orient = AddBlock(output, "Block.Orient", r);
+        SetSetting(orient, "mode", "FaceCameraPlane", r);
+
+        Save(graph, r);
+    }
+
+    // ------------------------------------------------------------ VFX_Spindrift
+
+    /// SALTASYON KATMANI (spec §18.7 Sistem A)
+    /// `[KAYNAK: Pomeroy & Gray 1990; PBSM 1993]`.
+    ///
+    /// YERE YAPIŞIK: 1–5 cm. 1.5 m'ye spawn edilmiyor — o süspansiyon, ayrı
+    /// sistem. Spec bunu ayrıca uyarıyor.
+    static void BuildSpindrift(StringBuilder r)
+    {
+        object graph = NewGraph("VFX_Spindrift", r);
+
+        // Ömür 1.2–3.0 s (spec §18.7). Boyut küçük ve çok sayıda.
+        var (init, update, output) =
+            Skeleton(graph, 8000, 1.2f, 3.0f, 0.01f, 0.03f, r);
+
+        // `Orient: Along Velocity`, 4–8× uzatılmış (spec §18.7).
+        object orient = AddBlock(output, "Block.Orient", r);
+        SetSetting(orient, "mode", "AlongVelocity", r);
+
+        Save(graph, r);
+    }
+
+    // ----------------------------------------------------------- VFX_SnowCurtain
+
+    /// SÜSPANSİYON PERDELERİ (spec §18.7 Sistem B).
+    ///
+    /// KAPASİTE 14 — BİLİNÇLİ OLARAK DÜŞÜK. Her parçacık devasa (genişlik
+    /// 12–25 m); maliyet fill-rate. Spec sayıyı ve gerekçesini birlikte veriyor.
+    static void BuildCurtain(StringBuilder r)
+    {
+        object graph = NewGraph("VFX_SnowCurtain", r);
+
+        // Ömür 6–12 s; boyut genişlik 12–25 m (spec §18.7).
+        var (init, update, output) =
+            Skeleton(graph, 14, 6f, 12f, 12f, 25f, r);
+
+        object orient = AddBlock(output, "Block.Orient", r);
+        SetSetting(orient, "mode", "AlongVelocity", r);
 
         Save(graph, r);
     }

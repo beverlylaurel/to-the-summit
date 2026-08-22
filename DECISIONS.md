@@ -1215,6 +1215,30 @@ doluyor (spec §6.4). Aşağıdaki DERS geçerliliğini koruyor.
 **Ders:** dispatch'ler arası taşınan bayrak, sıfırlamayı unutan HER çağıranı
 bozar. Sınama rigleri de çağıran sayılır.
 
+## `VFX_SnowfallCurtain` bir parçacık sistemi DEĞİL — karar bekliyor (2026-08-22)
+
+Spec Faz 8 altı `.vfx` sayıyor, beşi kuruldu. Altıncısı `VFX_SnowfallCurtain`
+ve §17.2'nin tarifi bir parçacık sistemine uymuyor:
+
+> Kameraya sabit 3 adet dikey quad, mesafeler 18 m, 32 m, 55 m. Her biri
+> kameranın FOV'unu tam kaplar, kameraya bakar. UV kaydırma: `uv += (...) * time`.
+
+Bunda spawn yok, ömür yok, parçacık yok — üç sabit quad ve kayan UV var. VFX
+Graph'ta kurulacak olsaydı üç ölümsüz parçacık + kameraya kilitli konum + UV
+kaydırma bloğu gerekirdi; hem daha pahalı hem tarife daha uzak.
+
+Projede zaten `SnowCurtainController` + `SnowCurtain.shader` bu davranışı
+birebir yapıyor (Faz 8'de yazıldı, çalışıyor).
+
+**Yapılmadı, karar kullanıcıya bırakıldı.** İki seçenek:
+1. Mevcut shader yolu kalsın; §0.3'ün dosya adı bağı için sapma kaydı bu
+2. `.vfx` olarak da kurulsun; o zaman mevcut shader yolu silinir
+
+**Tetikleyici:** kullanıcı hangisini istediğini söyleyince biri uygulanır ve bu
+kayıt silinir.
+
+---
+
 ## Detay normalleri stokastik döşeniyor — spec §13.2'den sapma (2026-08-22)
 
 Spec §13.2 dört detay katmanının döşeme boyunu ve şiddetini veriyor, örnekleme
