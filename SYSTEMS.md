@@ -819,6 +819,28 @@ düzenlenmiyor, üretim tekrar koşturulabilir. Tane düşüşü grafikte fizikt
 `Absolute` modda kuvvet olarak üstüne biniyor. Katman bağlıyken compute tabanlı
 `SnowfallRenderer` kapanıyor — iki yağış sistemi birden koşmuyor.
 
+**Yağış rüzgârdan KUVVET olarak etkileniyor.** `SnowfallLayers` grafiğe
+`WindForce = rüzgârYönü × hız × sürükleme` yazıyor; denge hızı `F / drag` tam
+rüzgâr hızını veriyor, düşey terminal hız bozulmuyor.
+
+**Tane emissive'i ana ışıktan türüyor.** `SnowfallLayers` `FlakeTint × ışık ×
+ölçek` hesaplayıp grafiğe yolluyor — tane gece parlamıyor. Ana ışık
+`TimeOfDay`'in `sun` alanından geliyor; sahnede üç directional ışık var ve
+tarama ile bulmak ayı seçiyordu.
+
+**Tane zemine değince ölüyor.** Kot `SnowfallLayers`'tan YEREL uzayda gidiyor
+(`zeminKotu − kutuKonumu`); grafikteki `position` VFX'in kendi uzayında.
+
+**Adım ritmi ayak fazını yayınlıyor.** `SnowStepRhythm` alınan yoldan adım
+üretiyor (zamandan değil — hız değişince ritim kaymasın), ayak proxy'lerini
+basıyor ve `Stepped` olayını yayınlıyor. `SnowFootstepAudio` ve
+`SnowPuffEmitter` bu olaya ABONE; ritim onları tanımıyor.
+
+**Oyuncu tarafı kar örneğini OKUYOR, yazmıyor.** `SnowFootstepAudio` (§19.1),
+`SnowMovementModifier` (§19.2), `SnowPuffEmitter` (§19.3),
+`SnowSprayController` (§18.6) ve `SnowCharacterAccumulator` (§16.2) oyuncuya
+takılı; hepsi `SnowSampler`'dan okuyor. Kar sistemi oyuncuyu bilmiyor.
+
 **Savrulan kar VFX'leri hedefi izliyor.** `SnowDriftVfxController` yalnız oranı
 değil konumu da sürüyor: saltasyon rüzgâr yönünde 15 m ileri, süspansiyon rüzgâr
 üstünde 35 m ve 2.5 m yukarı, ikisi de 1 m ızgarasına snap'li (spec §18.7).

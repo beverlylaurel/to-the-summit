@@ -1138,3 +1138,60 @@ TANELER. Sayıyı artırmak tarife sadık, alpha'yı artırmak değil.
 **Ölçüm aracı:** perde açık/kapalı iki kare, yakın katman susturulmuş. Ekranın
 %36.8'i etkileniyordu — yani perde çiziliyordu, yalnız katkısı zayıftı. "Hiç
 çizilmiyor" ile "çok soluk" ancak böyle ayrıldı.
+
+
+## Rüzgâr yağışa KUVVET olarak giriyor, hız olarak değil
+
+**Kural.** `SnowfallLayers` grafiğe `WindForce = yön × hız × 9.81` yazıyor;
+9.81 grafikteki `dragCoefficient` ile aynı sayı.
+
+**Neden.** Hız dayatmak yerçekimini bozardı: `velocity = wind` yazmak düşey
+bileşeni de eziyor. Kuvvet vermek ikisini ayırıyor — sürükleme yatayda hızı
+rüzgâra çekiyor (`F/drag = wind`), düşeyde yerçekimiyle dengeleniyor
+(`g/drag = 1 m/s`). Tek katsayı iki davranışı birden veriyor.
+
+**Bağlı sayı uyarısı:** `SnowfallLayers.FlakeDrag` ile builder'daki
+`dragCoefficient` aynı olmak zorunda. Farklı olsalar tane rüzgârdan hızlı ya da
+yavaş sürüklenir.
+
+
+## Adım mesafeden çıkıyor, zamandan değil
+
+**Kural.** `SnowStepRhythm` alınan yolu biriktiriyor; her `strideLength / 2`
+metrede bir ayak düşüyor.
+
+**Neden.** Sabit bir zamanlayıcı hız değişince yanlış ritim verir: yavaş
+yürürken ayaklar kayar, koşarken adım sıklığı yetişmez. Mesafe tabanlı ritim
+hız arttıkça kendiliğinden sıklaşıyor.
+
+**Ayak fazı ve adım olayı aynı sayıdan.** İki ayrı bileşene bölünseydi ikisinin
+fazı kayabilirdi — ses bir ayakta, iz öbüründe düşerdi.
+
+
+## VFX'e dünya koordinatı YOLLANMAZ
+
+**Kural.** Grafiğe giden kotlar C# tarafında yerele çevriliyor
+(`hedefKotu − kutuKonumu`).
+
+**Neden — iki kez karın tamamını sildi.** `attributes.position` VFX'in kendi
+uzayında (kutu merkezine göre ±10); dünya kotu 205 ile karşılaştırınca koşul
+her tane için doğru çıkıyor. `TransformPositionVFXToWorld` denendi ve
+düzeltmedi: `groundY = 0` yazıldığında bile `alive` sıfır kaldı, yani dönüşüm
+beklenen değeri vermiyor.
+
+C# tarafında ikisi de dünya koordinatı olarak biliniyor; çıkarma tahmin
+gerektirmiyor ve VFX'in uzay ayarından bağımsız.
+
+
+## Kar yoğunluğu kapasiteden gelir, kutudan değil
+
+**Kural.** Spawn kutusu spec §17.1'in verdiği (40, 26, 40); yoğunluk kapasiteyle
+ayarlanıyor (120000).
+
+**Neden — kutu küçültmek ters teptti.** Yoğunluk `kapasite / hacim` olduğu için
+kutuyu daraltmak kâğıtta yoğunluğu artırıyor. (24,20,24) ve (20,16,20) denendi,
+kâğıtta 3.5 ve 6.2 tane/m³ çıktı ve **ekranda kar azaldı**.
+
+Sebep rüzgâr: 12 m/s'de tane 10 metreyi 0.85 saniyede geçiyor. Dar kutuda tane
+kameranın çevresinde hiç kalmıyor, bir kenardan girip öbüründen çıkıyor. Spec'in
+geniş kutusu tam bu yüzden geniş.

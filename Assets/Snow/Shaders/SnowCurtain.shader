@@ -9,7 +9,11 @@ Shader "ToTheSummit/SnowCurtain"
         _CurtainTint ("Renk", Color) = (1, 1, 1, 1)
         _ScrollSpeed ("UV kayma hızı", Float) = 0.15
         _SoftFade ("Yumuşak parçacık mesafesi (m)", Float) = 2.0
-        _NearFade ("Kameraya yakın sönüm (m)", Float) = 4.0
+        // 4 m yetmiyordu: perde 12-25 m genis, 10 m otede bile ekranin
+        // yarisini kapliyor ve duz bir levha gibi gorunuyordu ("kagit gibi
+        // incecik, derinligi yok" - kullanici, ekran goruntusuyle). 18 m'de
+        // yakin perdeler sonuyor, uzaktakiler duruyor.
+        _NearFade ("Kameraya yakın sönüm (m)", Float) = 18.0
         _FogSuppress ("Sisin bastırma oranı", Range(0, 1)) = 0.5
     }
 

@@ -108,11 +108,19 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   **Tetikleyici:** savrulan kar tek noktadan fışkırıyor görünüyorsa.
   **Maliyet:** iki grafiğe kutu + süspansiyona CustomHLSL üstel yükseklik.
 
-- **Ayak izleri adım fazına bağlı değil** — iki proxy de sürekli yerde, yürüyüş
-  iki paralel oluk açıyor. Gerçek ayak izi hangi ayağın yerde olduğunu bilmeyi
-  gerektiriyor.
-  **Tetikleyici:** iz "ayak izi" değil "kızak izi" göründüğünde.
-  **Maliyet:** kontrolcüden adım fazı yayını + proxy'lerin y ofseti.
+- **VFX'te gökyüzü örtü kesmesi yok** — spec §17.1 `_SnowSkyVisTex`'ten okuyup
+  çatı altındaki taneyi öldürmeyi "atlanmayacak" diye işaretliyor. VFX'in o
+  dokuya erişimi yok; CustomHLSL'e doku parametresi geçirmek gerekiyor.
+  **Tetikleyici:** çatı/köprü altına kar yağdığı görüldüğünde.
+  **Maliyet:** CustomHLSL doku parametresi + `SnowfallLayers`'tan bağlama.
+
+- **Tane salınımı (flutter) yok** — spec §17.1 `flutterPhase` custom attribute'u
+  ve `sin(age*5.5 + phase)` salınımı istiyor. Türbülans benzer bir etki veriyor
+  ama tanenin kendi çırpınması yok.
+  **Tetikleyici:** kar "düz düşüyor, çırpınmıyor" göründüğünde.
+
+- **Sis fade'i yok** — spec §17.1 `alpha *= 1 − dist / lerp(120, 35, fog)`
+  istiyor. Uzaktaki tane siste sönmüyor.
 
 - **Kenar sırtı (rim) hiç oluşmuyor** — ölçüldü: `trail.g` max 0, carve 1.08 mm
   varken. Spec §10.2 izin kenarında sırt istiyor.

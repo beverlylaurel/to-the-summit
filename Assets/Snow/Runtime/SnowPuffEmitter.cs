@@ -15,6 +15,26 @@ public class SnowPuffEmitter : MonoBehaviour
     [Tooltip("Ayak konumu.")]
     [SerializeField] Transform footAnchor;
 
+
+    [Header("Tetik")]
+    [Tooltip("Adım olayının kaynağı. Boş bırakılırsa bu bileşen kendiliğinden " +
+             "hiçbir şey yapmaz; EmitFootstep() dışarıdan çağrılır.")]
+    [SerializeField] SnowStepRhythm rhythm;
+
+    // ADIM OLAYA ABONE, ÇAĞRIYA DEĞİL. Ritim bileşeni bu sınıfı tanımıyor;
+    // yürüyüş sistemi değişse de burası değişmiyor.
+    void OnEnable()
+    {
+        if (rhythm != null) rhythm.Stepped += OnStep;
+    }
+
+    void OnDisable()
+    {
+        if (rhythm != null) rhythm.Stepped -= OnStep;
+    }
+
+    void OnStep(int foot) => EmitFootstep();
+
     [Header("Ayarlar")]
     [SerializeField] float upSpeed = 0.9f;
     [SerializeField] float spread = 0.7f;

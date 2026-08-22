@@ -241,7 +241,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c3abcdd2ecdcab43bf753cd569996f0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SnowEnvironmentBridge
-  sunLight: {fileID: 787919893}
+  sunLight: {fileID: 410087040}
   wind: {fileID: 1805896805}
   time: {fileID: 508855605}
   temperature: {fileID: 1805896810}
@@ -460,8 +460,12 @@ MonoBehaviour:
   nearLayer: {fileID: 865627818}
   rateProperty: SpawnRate
   turbulenceProperty: TurbulenceIntensity
+  windProperty: WindForce
+  emissiveProperty: FlakeEmissive
+  groundProperty: GroundY
   environment: {fileID: 76489725}
   followTarget: {fileID: 330585546}
+  groundReference: {fileID: 848219609}
   computeFallback: {fileID: 76489734}
 --- !u!114 &76489739
 MonoBehaviour:
@@ -1682,6 +1686,12 @@ GameObject:
   - component: {fileID: 848219613}
   - component: {fileID: 848219614}
   - component: {fileID: 848219615}
+  - component: {fileID: 848219621}
+  - component: {fileID: 848219620}
+  - component: {fileID: 848219619}
+  - component: {fileID: 848219618}
+  - component: {fileID: 848219617}
+  - component: {fileID: 848219616}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1932,6 +1942,124 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &848219616
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 848219606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f8a582636c89ebe48ae825cb3f945b40, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SnowCharacterAccumulator
+  targets: []
+  environmentSource: {fileID: 76489725}
+  footAnchor: {fileID: 1132909437}
+  accumulationRate: 0.05
+  shakeOffRate: 0.06
+  rainClearRate: 0.4
+  shelteredBelow: 0.3
+  shelterClearRate: 0.25
+--- !u!114 &848219617
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 848219606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9485fb869b408314f8e17dac3e38ebe4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SnowMovementModifier
+  sampler: {fileID: 76489732}
+  footAnchor: {fileID: 1132909437}
+--- !u!114 &848219618
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 848219606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 69c9de168dda5ac4bb1e7e6f9e154e6c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SnowSprayController
+  sampler: {fileID: 76489732}
+  particles: {fileID: 76489733}
+  footAnchor: {fileID: 1132909437}
+  velocitySource: {fileID: 848219609}
+  contactWidth: 0.11
+  sprayParticlesPerM3: 40000
+  upSpeed: 1.4
+  sizeRange: {x: 0.03, y: 0.1}
+  lifetimeRange: {x: 0.5, y: 1.1}
+--- !u!114 &848219619
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 848219606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8d3437f392883fa4e9b0ac54b80ac8e8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SnowPuffEmitter
+  sampler: {fileID: 76489732}
+  particles: {fileID: 76489733}
+  footAnchor: {fileID: 1132909437}
+  rhythm: {fileID: 848219621}
+  upSpeed: 0.9
+  spread: 0.7
+  sizeRange: {x: 0.02, y: 0.06}
+  lifetimeRange: {x: 0.4, y: 0.9}
+--- !u!114 &848219620
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 848219606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: af415617a1146fc43856c0556b07ad11, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SnowFootstepAudio
+  sampler: {fileID: 76489732}
+  source: {fileID: 848219615}
+  footAnchor: {fileID: 1132909437}
+  rhythm: {fileID: 848219621}
+  packed: []
+  shallow: []
+  powder: []
+  deep: []
+  crust: []
+  packedWet: []
+  shallowWet: []
+  powderWet: []
+  deepWet: []
+--- !u!114 &848219621
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 848219606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: af180532cafa05447b6d033ab33a6159, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SnowStepRhythm
+  body: {fileID: 848219608}
+  leftFoot: {fileID: 1132909437}
+  rightFoot: {fileID: 198752980}
+  strideLength: 0.78
+  footLift: 0.16
+  minSpeed: 0.15
 --- !u!1 &852782904
 GameObject:
   m_ObjectHideFlags: 0

@@ -34,6 +34,7 @@ Shader "Snow/SnowfallCurtain"
             #pragma fragment frag
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
@@ -76,7 +77,15 @@ Shader "Snow/SnowfallCurtain"
             half4 frag(Varyings input) : SV_Target
             {
                 half a = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv).a;
-                return half4(_Tint.rgb, a * _Alpha);
+
+                // PERDE GECE KARARIYOR. Sabit renk bırakılırsa uzaktaki kar
+                // gece de gündüzki parlaklıkta duruyor. Taban terim ambient'in
+                // yerine geçiyor: perde tamamen sönmesin, ama güneşle birlikte
+                // parlasın.
+                Light mainLight = GetMainLight();
+                half3 lit = _Tint.rgb * (0.25h + mainLight.color * 0.75h);
+
+                return half4(lit, a * _Alpha);
             }
             ENDHLSL
         }

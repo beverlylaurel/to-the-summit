@@ -562,7 +562,16 @@ public class SnowManager : MonoBehaviour
         DispatchAccumulate(cmd, groups);
 
         if (!WindShadowOff) DispatchWindShadow(cmd);
-        if (!WindTransportOff) DispatchWindTransport(cmd, groups);
+        // RÜZGÂR TAŞINIMI EŞİK KAPILI (spec §15.2).
+        //
+        // `KWindTransport` haç döşemesi yüzünden BEŞ dispatch; savrulacak
+        // gevşek kar yokken hepsi boşuna koşuyordu. Eşik `DriftActive01` —
+        // §18.1'in tetiğiyle aynı sayı, ikinci bir eşik tanımlanmıyor.
+        float driftActive = SnowCurtainController.DriftActiveFor(
+            env.WindSpeed, SnowRuntimeState.LooseSnowFraction);
+
+        if (!WindTransportOff && driftActive > 0f)
+            DispatchWindTransport(cmd, groups);
 
         // KALICILIK BİRİKMEDEN SONRA. Geri yüklenen blok en son bilinen
         // durumu taşıyor; birikme onun üstüne yazsaydı yükleme boşa giderdi.

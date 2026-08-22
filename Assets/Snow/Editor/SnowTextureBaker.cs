@@ -126,6 +126,51 @@ public static class SnowTextureBaker
     /// PERDE GÜRÜLTÜSÜ (spec §18.7): yumuşak kenarlı, YATAYDA UZAMIŞ.
     /// İzotropik bir gürültü perdeyi bulut gibi gösterir; savrulan kar
     /// tabakası rüzgâr yönünde uzun şeritler hâlinde akar.
+    /// Döşenebilir tanecik damgalama. Merkez kenara yakınsa tane karşı
+    /// kenardan devam ediyor; dikiş oluşmuyor.
+    ///
+    /// MEVCUT DEĞERİN ÜSTÜNE EKLENİYOR: akış şeridi taneyi maskeliyor, şeridin
+    /// boşluğunda tane de sönük kalıyor. Tane bağımsız çizilseydi perde her
+    /// yerinde eşit yoğunlukta olurdu.
+    static void StampGrains(Color32[] px, int res, int count, int seed)
+    {
+        var rng = new System.Random(seed);
+
+        for (int i = 0; i < count; i++)
+        {
+            float cx = (float)rng.NextDouble() * res;
+            float cy = (float)rng.NextDouble() * res;
+            float rad = Mathf.Lerp(0.8f, 2.4f, (float)rng.NextDouble());
+            float peak = Mathf.Lerp(0.35f, 1f, (float)rng.NextDouble());
+
+            int span = Mathf.CeilToInt(rad) + 1;
+            int x0 = Mathf.FloorToInt(cx);
+            int y0 = Mathf.FloorToInt(cy);
+
+            for (int dy = -span; dy <= span; dy++)
+            for (int dx = -span; dx <= span; dx++)
+            {
+                float d = Mathf.Sqrt(dx * dx + dy * dy);
+                if (d > rad) continue;
+
+                float a = peak * (1f - Mathf.SmoothStep(rad * 0.35f, rad, d));
+                if (a <= 0f) continue;
+
+                int x = ((x0 + dx) % res + res) % res;
+                int y = ((y0 + dy) % res + res) % res;
+                int idx = y * res + x;
+
+                // Şerit maskesi: taban değer düşükse tane de sönük.
+                float mask = px[idx].r / 255f;
+                float katki = a * Mathf.Clamp01(mask * 1.6f) * 255f;
+
+                px[idx].r = (byte)Mathf.Min(255f, px[idx].r + katki);
+                px[idx].g = px[idx].r;
+                px[idx].b = px[idx].r;
+            }
+        }
+    }
+
     public static Texture2D EnsureCurtainNoise()
     {
         var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(CurtainNoisePath);
@@ -144,17 +189,30 @@ public static class SnowTextureBaker
             float u = (x + 0.5f) / Res;
             float v = (y + 0.5f) / Res;
 
-            // Yatayda dört kat sıkıştırılmış örnekleme → yatayda uzun şeritler.
-            float n = TilingFbm(u * 0.25f, v);
+            // AKIŞ ŞERİDİ: yatayda dört kat sıkıştırılmış örnekleme.
+            float akis = TilingFbm(u * 0.25f, v);
 
             // Düşeyde yumuşak kenar: perdenin altı ve üstü sönüyor.
             float edge = Mathf.Sin(v * Mathf.PI);
 
-            float value = Mathf.Clamp01(n * edge * 1.6f);
+            // Şerit KARELENİYOR: aralar boşalıyor, tabaka yerine akıntı çıkıyor.
+            float value = Mathf.Clamp01(akis * akis * 2.4f * edge);
 
             byte b = (byte)Mathf.Clamp(Mathf.RoundToInt(value * 255f), 0, 255);
             px[y * Res + x] = new Color32(b, b, b, 255);
         }
+
+        // TANECİK KATMANI — DAMGALAMA, İKİNCİ BİR FBM DEĞİL.
+        //
+        // İlk sürüm yalnız akış şeridiydi: perde ekranda "kâğıt gibi incecik,
+        // derinliği yok" göründü (kullanıcı ekran görüntüsüyle bildirdi).
+        // İkinci sürüm ikinci bir `TilingFbm(u*6, v*6)` ekledi ve gözle
+        // görülür düzenli bir IZGARA çıkardı — fbm yüksek frekansta tekrar
+        // ediyor.
+        //
+        // Üçüncü sürüm taneleri tek tek damgalıyor: rastgele konum, rastgele
+        // yarıçap, kenarlardan sarmalayarak. Tekrar deseni yok.
+        StampGrains(px, Res, 3200, 20260823);
 
         tex.SetPixels32(px);
         tex.Apply(false, false);

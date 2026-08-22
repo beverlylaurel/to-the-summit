@@ -1028,3 +1028,88 @@ Trail dokusunda `carve max 1.08 mm`, 113 teksel. Zincir baştan sona çalışıy
 
 **`Renderer.isVisible` bu iş için ölçüt değil** — birinci şahısta ayak zaten
 kameraya görünmüyor, `False` okumak yakalamanın çalışmadığı anlamına gelmiyor.
+
+
+## "kar yağışı rüzgârdan etkilenmiyor"
+
+Grafikte rüzgâr terimi HİÇ YOKTU. Türbülans vardı (ortalaması sıfır, savuruyor
+ama taşımıyor), spec §17.1'in `Hız = _WindWS + (0, −terminalVel, 0)` terimi
+yoktu; kar 13 m/s rüzgârda bile dimdik iniyordu.
+
+Rüzgâr HIZ olarak değil KUVVET olarak verildi: aşağıdaki sürükleme zaten hızı
+sıfıra çekiyor, `F = wind × drag` dengesi tam `velocity = wind` veriyor ve düşey
+eksende yerçekimi bozulmuyor. Ölçüldü: `WindForce` beklenen değere birebir eşit,
+`F / drag = 13.97 m/s` = tam rüzgâr hızı.
+
+
+## "beyaz örtü geziyor, kâğıt gibi incecik, derinliği yok"
+
+Suçlu elemeyle bulundu: `SnowCurtainController` (§18.7 savrulma perdeleri).
+Kapatılınca örtü tamamen gitti; benim eklediğim §17.2 yağış perdeleri değildi.
+
+**İki sebep birlikte.** Dokusu tek bir düşük frekanslı fbm'di — yumuşak gri bir
+bulut, hiç tanecik yok. Ve `_NearFade` 4 m'ydi; perde 12–25 m genişliğinde,
+10 m ötede bile ekranın yarısını kaplayıp düz bir levha gibi duruyor.
+
+Doku yeniden üretildi (akış şeridi × damgalanmış tanecik) ve `_NearFade` 18 m'ye
+çıkarıldı. İkinci sürümde ikinci bir `TilingFbm(u*6, v*6)` denendi ve gözle
+görülür düzenli bir IZGARA çıkardı — fbm yüksek frekansta tekrar ediyor;
+üçüncü sürüm taneleri tek tek damgalıyor.
+
+
+## Kar sistemi AY IŞIĞINA bağlanmıştı
+
+`SnowEnvironmentBridge.Sun` = **Moon Light**, `intensity = 0` — tam gündüzde.
+Tane emissive'i sıfır çıkıyordu.
+
+Sebep `FindSun()`'ın "ilk aktif directional light"ı almasıydı. Sahnede ÜÇ tane
+var (Directional Light 2.7, Moon Light 0, Lightning 0) ve tarama sırası ayı
+önce buldu. Ana ışık artık `TimeOfDay`'in `sun` alanından soruluyor — gündöngü
+hangisinin güneş olduğunu zaten biliyor.
+
+**Kar aydınlatmasının geri kalanı temiz çıktı:** `SnowLitForwardPass` ana ışık +
+gölge + ek ışıklar + `SampleSH` ambient okuyor, parıltı `_SunElevation01` ile
+kapılı, savrulma ve yağış perdeleri `GetMainLight()` kullanıyor.
+
+
+## VFX zemin kesmesi karın TAMAMINI sildi — iki kez
+
+Spec §17.1 `if (position.y < groundHeight + 0.02) alive = false` istiyor.
+Eklendi ve `aliveParticleCount` sıfıra düştü. Üç sürüm:
+
+1. `groundY` olarak `followTarget` (KAMERA) yollandı. Kamera göz hizasında,
+   zeminden 1.65 m yukarıda; kesme düzlemi oraya çıkınca her tane daha
+   havadayken ölüyordu.
+2. Kot oyuncunun ayağından alındı ama `attributes.position` VFX'in YEREL
+   uzayında (±10) ve dünya kotu 205 ile karşılaştırılıyordu — koşul her tane
+   için doğru.
+3. `TransformPositionVFXToWorld` eklendi; sonuç yine sıfırın altında çıktı.
+   Ayırt eden ölçüm: `groundY = 0` yazıldı, `alive` yine 0 — yani dönüşüm
+   ne yerel ne dünya, güvenilmez.
+
+Çözüm: dönüşüm kaldırıldı, kot C# tarafında yerele çevrildi
+(`zeminKotu − kutuKonumu`). İkisi de orada dünya koordinatı olarak biliniyor.
+Ölçüldü: `GroundY = −12.46` = beklenen yerel kot, `alive = 39915`.
+
+**Ayırt eden araç:** `GroundY = −99999` yazmak. Kesme etkisiz kalınca `alive`
+39902'ye fırladı — sorunun kesme düzleminde olduğu tek turda kesinleşti.
+
+
+## Kar tanesi yoğunluğu: kutuyu küçültmek TERS tepti
+
+"Yağış 1 iken yeterli kar göremiyorum." Kâğıtta sebep açıktı: spec §17.1'in
+kapasite 40000 + kutu (40,26,40) birleşimi `0.96` tane/m³ veriyor, gerçek yoğun
+kar 3–10 tane/m³.
+
+Yoğunluk `kapasite / hacim` olduğu için önce kutu küçültüldü — (24,20,24) sonra
+(20,16,20). Kâğıtta yoğunluk 3.5 ve 6.2'ye çıktı; **ekranda kar AZALDI.**
+Sebep: rüzgâr 12 m/s'de tane 10 metreyi 0.85 saniyede geçiyor, dar kutuda
+kameranın çevresinde hiç kalmıyor. Spec'in geniş kutusu tam bunun için.
+
+Kutu spec'e döndürüldü, yoğunluk kapasiteden alındı (120000). Ölçüldü:
+`alive 89067`, 119 FPS.
+
+**Ayrıca doku değişince parlaklık yeniden kalibre edildi.** `DefaultDot` tam
+daireydi; 4×4 kar tanesi atlası dallı ve boşluklu, aynı ekran alanında daha az
+piksel dolduruyor. Gökyüzü bölgesinde en parlak piksel 222 → 193'e düşmüştü,
+emissive ölçeği 1.0 → 1.6 ile 225'e döndü, hiçbir piksel doymadı.

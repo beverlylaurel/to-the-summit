@@ -81,13 +81,23 @@ public static class SnowVfxBuilder
         // --- Initialize
         object init = AddContext(graph, "VFXBasicInitialize", new Vector2(0, 200), r);
 
-        // Kapasite 40000 (spec §17.1). Runtime'da `Spawn Rate` ile kontrol
-        // ediliyor; kapasite tavanı grafikte duruyor.
-        SetSetting(init, "capacity", 40000u, r);
+        // KAPASİTE SPEC'İN ÜSTÜNDE — YOĞUNLUK İÇİN.
+        //
+        // Spec §17.1 kapasiteyi 40000, kutuyu (40, 26, 40) veriyor: birlikte
+        // `40000 / 41600 = 0.96` tane/m³. Gerçek yoğun kar 3–10 tane/m³ ve
+        // kullanıcı "yağış 1 iken yeterli kar göremiyorum" dedi.
+        //
+        // ÖNCE KUTU KÜÇÜLTÜLDÜ, GERİ ALINDI. (24,20,24) ve (20,16,20) denendi;
+        // yoğunluk kâğıtta yükseldi ama ekranda kar AZALDI: rüzgâr 12 m/s'de
+        // tane 10 metreyi 0.85 saniyede geçiyor, dar kutuda kameranın
+        // çevresinde hiç kalmıyor. Spec'in geniş kutusu tam bunun için.
+        //
+        // Kutu spec'te bırakıldı, yoğunluk kapasiteden alındı:
+        //   120000 / 41600 = 2.88 tane/m³
+        SetSetting(init, "capacity", 120000u, r);
 
-        // Spawn kutusu (40, 26, 40); türbülans ve rüzgâr taneyi kutunun
-        // dışına taşıyor, sınır kutusu onu da kapsıyor.
-        SetBounds(init, new Vector3(60f, 40f, 60f), r);
+        // Sınır kutusu spawn kutusunu ve rüzgârın taşıdığı payı kapsıyor.
+        SetBounds(init, new Vector3(60f, 42f, 60f), r);
 
         // Spec §17.1: `Set Position (AABox)`, kutu (40, 26, 40), KUTUNUN
         // TAMAMINA spawn (yüzeyine değil).
@@ -99,6 +109,19 @@ public static class SnowVfxBuilder
         // Enum'da `Box` yok, `OrientedBox` var (ölçüldü — PositionShape.Type).
         SetSetting(pos, "shape", "OrientedBox", r);
         SetSetting(pos, "positionMode", "Volume", r);
+
+        // KUTU SPEC'TEN KÜÇÜK — YOĞUNLUK İÇİN.
+        //
+        // Spec §17.1 kutuyu (40, 26, 40) ve kapasiteyi 40000 veriyor. İkisi
+        // birlikte `40000 / 41600 = 0.96` tane/m³ ediyor; gerçek yoğun kar
+        // yağışı 3–10 tane/m³. Kullanıcı "yağış 1 iken yeterli kar
+        // göremiyorum" dedi ve ölçüm doğruladı.
+        //
+        // Kapasiteyi üçe katlamak yerine kutu küçültüldü: yoğunluk
+        // `kapasite / hacim` olduğu için ikisi aynı sonucu veriyor, ama
+        // küçük kutu BEDAVA — aynı 40000 tane daha dar hacimde.
+        // Kutu SPEC'TE: (40, 26, 40). Küçültmek denendi ve geri alındı —
+        // gerekçe yukarıda, kapasitenin yanında.
         SetSlotField(pos, "Box", "size", new Vector3(40f, 26f, 40f), r);
 
         // Ömür 4–9 s (spec §17.1).
@@ -169,6 +192,21 @@ public static class SnowVfxBuilder
 
         // Sürükleme kendi bloğunda: türbülansın `Drag` slotu yalnız `Relative`
         // modda anlamlı, `Absolute`'ta okunmuyor.
+        // RÜZGÂR (spec §17.1: `Hız = _WindWS + float3(0, -terminalVel, 0)`).
+        //
+        // Hız dayatmak yerine KUVVET veriliyor, çünkü aşağıdaki sürükleme
+        // zaten hızı sıfıra çekiyor: `F = wind * drag` dengesi tam
+        // `velocity = wind` veriyor. Düşey eksende yerçekimi ayrı çalışıyor,
+        // terminal hız bozulmuyor.
+        //
+        // Bu blok yoktu ve kar dimdik iniyordu — rüzgâr 13 m/s iken bile.
+        object windForce = AddBlock(update, "Block.Force", r);
+        SetSetting(windForce, "Mode", "Absolute", r);
+
+        object windParam = AddParameter(graph, "WindForce", typeof(Vector3),
+                                        Vector3.zero, new Vector2(-300, 620), r);
+        LinkParameter(windParam, windForce, "Force", r);
+
         object drag = AddBlock(update, "Block.Drag", r);
         SetSlot(drag, "dragCoefficient", 9.81f, r);
 
@@ -190,8 +228,48 @@ public static class SnowVfxBuilder
         // çeviriyor; güneş yandan gelince N·L ≈ 0 ve Lit quad kararıyor.
         // Gerçek kar tanesi çok saçıcı, ışığı her yöne dağıtıyor — spec bunu
         // emissive ile karşılıyor (§17.1).
+        // KAR TANESİ DOKUSU — 4×4 FLIPBOOK ATLASI (spec §17.1).
+        //
+        // Varsayılan `DefaultDot` yuvarlak bir noktaydı; kar tanesi değil.
+        // Atlas zaten üretiliyordu (`SnowTextureBaker`, 256², 4×4, on altı
+        // ayrı tane) ama hiçbir yerde kullanılmıyordu.
+        //
+        // `texIndex` spawn'da rastgele sabitleniyor: tane ömrü boyunca AYNI
+        // kareyi gösteriyor. Animasyon değil çeşitlilik isteniyor.
+        Texture2D atlas = AssetDatabase.LoadAssetAtPath<Texture2D>(
+            "Assets/Snow/Textures/T_Flake_Atlas.png");
+
+        if (atlas != null)
+        {
+            SetSetting(output, "uvMode", "Flipbook", r);
+            SetSlot(output, "baseColorMap", atlas, r);
+            // `flipBookSize` Vector2 DEĞİL, `UnityEditor.VFX.FlipBook` (iki int).
+            // Vector2 yazmak denendi ve `SetSlot` doğrulaması yakaladı.
+            SetSlotField(output, "flipBookSize", "x", 4, r);
+            SetSlotField(output, "flipBookSize", "y", 4, r);
+
+            object texIdx = AddBlock(init, "Block.SetAttribute", r);
+            SetSetting(texIdx, "attribute", "texIndex", r);
+            SetSetting(texIdx, "Random", "Uniform", r);
+            SetSlot(texIdx, "A", 0f, r);
+            SetSlot(texIdx, "B", 15.999f, r);
+        }
+        else
+        {
+            r.AppendLine("           [!] T_Flake_Atlas yok — DefaultDot kalıyor");
+        }
+
         SetSetting(output, "useEmissive", true, r);
-        SetSlot(output, "emissiveColor", new Color(0.55f, 0.60f, 0.70f), r);
+
+        // EMISSIVE ANA IŞIKTAN, SABİT DEĞİL (spec §17.1:
+        // `Emissive = _FlakeEmissive * mainLightColor * 0.04`).
+        //
+        // Sabit renk konmuştu ve tane GECE DE aynı parlıyordu. Renk artık
+        // runtime'da `SnowfallLayers` tarafından ana ışıktan türetiliyor.
+        object emisParam = AddParameter(graph, "FlakeEmissive", typeof(Color),
+                                        new Color(0.55f, 0.60f, 0.70f),
+                                        new Vector2(-300, 820), r);
+        LinkParameter(emisParam, output, "emissiveColor", r);
 
         // Spec §17.1: `Metallic = 0`, `Smoothness = 0.2`.
         SetSlot(output, "smoothness", 0.2f, r);
@@ -220,6 +298,23 @@ public static class SnowVfxBuilder
         object minPx = AddBlock(output, "Block.CustomHLSL", r);
         SetSetting(minPx, "m_BlockName", "Asgari ekran boyutu", r);
         SetSetting(minPx, "m_HLSLCode", MinScreenSizeHlsl, r);
+
+        // ÖMÜR UÇLARINDA SOLMA + ZEMİN KESME (spec §17.1).
+        //
+        // Fade yoksa tane birdenbire beliriyor ve birdenbire kayboluyor;
+        // spec ömrün ilk ve son %8'inde alpha rampası istiyor.
+        //
+        // Zemin kesme olmadan tane yerin ALTINA iniyor ve kar yüzeyinin
+        // içinden görünüyor.
+        object fade = AddBlock(update, "Block.CustomHLSL", r);
+        SetSetting(fade, "m_BlockName", "Ömür solması ve zemin kesme", r);
+        SetSetting(fade, "m_HLSLCode", FadeAndGroundHlsl, r);
+
+        object groundParam = AddParameter(graph, "GroundY", typeof(float), 0f,
+                                          new Vector2(-300, 700), r);
+        // CustomHLSL parametre slotlari `_` onekiyle aciliyor
+        // (`CustomHLSL.parameterPrefix`); ondeksiz ad bulunamiyor.
+        LinkParameter(groundParam, fade, "_groundY", r);
 
         Link(spawner, init, r);
         Link(init, update, r);
@@ -419,6 +514,36 @@ public static class SnowVfxBuilder
 
     attributes.scaleX = max(attributes.scaleX, newScale.x);
     attributes.scaleY = max(attributes.scaleY, newScale.y);
+}";
+
+    /// Spec §17.1: ömrün ilk %8'inde fade-in, son %8'inde fade-out; tane
+    /// zemin yüksekliğinin 2 cm altına inince ölüyor.
+    ///
+    /// `groundY` dışarıdan geliyor — VFX'in zemin dokusuna erişimi yok,
+    /// oyuncunun ayak kotu yeterince iyi bir yaklaşım (kutu yalnız 24 m).
+    const string FadeAndGroundHlsl =
+@"void SnowFlakeFadeAndKill(inout VFXAttributes attributes, in float groundY)
+{
+    float t = attributes.age / max(attributes.lifetime, 1e-4);
+
+    float fadeIn  = smoothstep(0.0, 0.08, t);
+    float fadeOut = 1.0 - smoothstep(0.92, 1.0, t);
+
+    attributes.alpha = fadeIn * fadeOut;
+
+    // POZİSYON YEREL UZAYDA, KOT DA YEREL GELİYOR.
+    //
+    // Üç sürüm denendi, ikisi karın TAMAMINI sildi (`alive = 0`):
+    //   1. `position.y` ile DÜNYA kotu karşılaştırıldı — yerel y ±10 iken
+    //      kot 205, koşul her tane için doğru.
+    //   2. `TransformPositionVFXToWorld(position)` eklendi — sonuç yine
+    //      sıfırın altında çıktı; fonksiyon burada beklendiği gibi
+    //      davranmıyor (ölçüldü: `groundY = 0` iken bile hepsi öldü).
+    //   3. Dönüşüm kaldırıldı, kot C# tarafında yerele çevrildi. `SnowfallLayers`
+    //      `zeminKotu - kutuKonumu` gönderiyor; ikisi de orada dünya
+    //      koordinatı olarak biliniyor, tahmin gerekmiyor.
+    if (attributes.position.y < groundY + 0.02)
+        attributes.alive = false;
 }";
 
     static Type Find(string shortName)

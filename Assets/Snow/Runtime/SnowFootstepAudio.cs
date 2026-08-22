@@ -34,7 +34,29 @@ public class SnowFootstepAudio : MonoBehaviour
     [Tooltip("Ayak konumu.")]
     [SerializeField] Transform footAnchor;
 
+
+    [Header("Tetik")]
+    [Tooltip("Adım olayının kaynağı. Boş bırakılırsa bu bileşen kendiliğinden " +
+             "hiçbir şey yapmaz; PlayFootstep() dışarıdan çağrılır.")]
+    [SerializeField] SnowStepRhythm rhythm;
+
+    // ADIM OLAYA ABONE, ÇAĞRIYA DEĞİL. Ritim bileşeni bu sınıfı tanımıyor;
+    // yürüyüş sistemi değişse de burası değişmiyor.
+    void OnEnable()
+    {
+        if (rhythm != null) rhythm.Stepped += OnStep;
+    }
+
+    void OnDisable()
+    {
+        if (rhythm != null) rhythm.Stepped -= OnStep;
+    }
+
+    void OnStep(int foot) => PlayFootstep();
+
     [Header("Klipler")]
+    [Tooltip("KLİPLER SONRA VERİLECEK. Boş dizi sessiz kalıyor; yüzey seçimi " +
+             "ve tetikleme klip olmadan da çalışıyor, yalnız ses çıkmıyor.")]
     [SerializeField] AudioClip[] packed;
     [SerializeField] AudioClip[] shallow;
     [SerializeField] AudioClip[] powder;

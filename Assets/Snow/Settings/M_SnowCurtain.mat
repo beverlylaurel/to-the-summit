@@ -30,7 +30,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _FogSuppress: 0.5
-    - _NearFade: 4
+    - _NearFade: 18
     - _ScrollSpeed: 0.15
     - _SoftFade: 2
     m_Colors:

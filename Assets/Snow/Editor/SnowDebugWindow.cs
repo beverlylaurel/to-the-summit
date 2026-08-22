@@ -528,6 +528,10 @@ public class SnowDebugWindow : EditorWindow
         fallLayersSerialized.FindProperty("followTarget").objectReferenceValue =
             Camera.main != null ? Camera.main.transform
                                 : (player != null ? player.transform : null);
+
+        // Zemin kotu OYUNCUNUN AYAGINDAN, kameradan degil.
+        fallLayersSerialized.FindProperty("groundReference").objectReferenceValue =
+            player != null ? player.transform : null;
         fallLayersSerialized.ApplyModifiedProperties();
 
         var driftVfxSerialized = new SerializedObject(driftVfx);
@@ -537,7 +541,8 @@ public class SnowDebugWindow : EditorWindow
         driftVfxSerialized.FindProperty("curtain").objectReferenceValue = curtainVfx;
         driftVfxSerialized.ApplyModifiedProperties();
 
-        EnsureFootDeformers(player);
+        var (solAyak, sagAyak) = EnsureFootDeformers(player);
+        EnsurePlayerSide(player, solAyak, sagAyak, sampler, burst, bridge);
 
         var driftVfxSerializedFollow = new SerializedObject(driftVfx);
         driftVfxSerializedFollow.FindProperty("followTarget").objectReferenceValue =
@@ -711,23 +716,24 @@ public class SnowDebugWindow : EditorWindow
     /// EKRANDA GIZLEME `ShadowsOnly` ILE. Spec 1.3 kameranin culling
     /// mask'ine DOKUNMAYI YASAKLIYOR ("Bunu sen yapma"); gorunurlugu
     /// renderer'in kendi ayarindan kapatmak o kurali bozmuyor.
-    static void EnsureFootDeformers(FirstPersonController player)
+    static (Transform sol, Transform sag) EnsureFootDeformers(FirstPersonController player)
     {
-        if (player == null) return;
+        if (player == null) return (null, null);
 
         int layer = LayerMask.NameToLayer(SnowProjectCheck.DeformerLayer);
-        if (layer < 0) return;
+        if (layer < 0) return (null, null);
 
         // Ayak tabani: CharacterController varsa gercek taban, yoksa transform.
         float footY = 0f;
         var cc = player.GetComponent<CharacterController>();
         if (cc != null) footY = cc.center.y - cc.height * 0.5f;
 
-        EnsureFoot(player.transform, "SnowFoot_L", new Vector3(-0.11f, footY, 0f), layer);
-        EnsureFoot(player.transform, "SnowFoot_R", new Vector3( 0.11f, footY, 0f), layer);
+        return (
+            EnsureFoot(player.transform, "SnowFoot_L", new Vector3(-0.11f, footY, 0f), layer),
+            EnsureFoot(player.transform, "SnowFoot_R", new Vector3( 0.11f, footY, 0f), layer));
     }
 
-    static void EnsureFoot(Transform parent, string ad, Vector3 localPos, int layer)
+    static Transform EnsureFoot(Transform parent, string ad, Vector3 localPos, int layer)
     {
         Transform t = parent.Find(ad);
         GameObject go;
@@ -760,6 +766,103 @@ public class SnowDebugWindow : EditorWindow
 
         if (go.GetComponent<SnowDeformer>() == null)
             go.AddComponent<SnowDeformer>();
+
+        EditorUtility.SetDirty(go);
+        return go.transform;
+    }
+
+    /// OYUNCU TARAFI — spec §18.6, §19.1–19.3, §16.2.
+    ///
+    /// Bileşenlerin hepsi yazılıydı ama hiçbiri sahnede yoktu: tek referansları
+    /// bir yorum satırıydı. Burada oyuncuya takılıp `SnowSampler`'a ve adım
+    /// ritmine bağlanıyorlar.
+    ///
+    /// KAR SİSTEMİ OYUNCUYU BİLMİYOR. Bağ tek yönlü: bu bileşenler kar
+    /// örneğini OKUYOR, kar sistemine hiçbir şey yazmıyorlar.
+    static void EnsurePlayerSide(FirstPersonController player,
+                                 Transform solAyak, Transform sagAyak,
+                                 SnowSampler sampler, SnowBurstParticles burst,
+                                 SnowEnvironmentBridge bridge)
+    {
+        if (player == null) return;
+
+        GameObject go = player.gameObject;
+        Transform anchor = solAyak != null ? solAyak : player.transform;
+
+        // --- Adım ritmi: ayak fazı + adım olayı
+        var rhythm = go.GetComponent<SnowStepRhythm>();
+        if (rhythm == null) rhythm = go.AddComponent<SnowStepRhythm>();
+
+        var rs = new SerializedObject(rhythm);
+        rs.FindProperty("body").objectReferenceValue = go.GetComponent<CharacterController>();
+        rs.FindProperty("leftFoot").objectReferenceValue = solAyak;
+        rs.FindProperty("rightFoot").objectReferenceValue = sagAyak;
+        rs.ApplyModifiedProperties();
+
+        // --- Ayak sesi (spec §19.1). Klipler SONRA verilecek.
+        var audio = go.GetComponent<SnowFootstepAudio>();
+        if (audio == null) audio = go.AddComponent<SnowFootstepAudio>();
+
+        var src = go.GetComponent<AudioSource>();
+        if (src == null)
+        {
+            src = go.AddComponent<AudioSource>();
+            src.playOnAwake = false;
+            src.spatialBlend = 1f;
+        }
+
+        var aus = new SerializedObject(audio);
+        aus.FindProperty("sampler").objectReferenceValue = sampler;
+        aus.FindProperty("source").objectReferenceValue = src;
+        aus.FindProperty("footAnchor").objectReferenceValue = anchor;
+        aus.FindProperty("rhythm").objectReferenceValue = rhythm;
+        aus.ApplyModifiedProperties();
+
+        // --- Ayak toz bulutu (spec §19.3)
+        var puff = go.GetComponent<SnowPuffEmitter>();
+        if (puff == null) puff = go.AddComponent<SnowPuffEmitter>();
+
+        var ps = new SerializedObject(puff);
+        ps.FindProperty("sampler").objectReferenceValue = sampler;
+        ps.FindProperty("particles").objectReferenceValue = burst;
+        ps.FindProperty("footAnchor").objectReferenceValue = anchor;
+        ps.FindProperty("rhythm").objectReferenceValue = rhythm;
+        ps.ApplyModifiedProperties();
+
+        // --- Koşarken püskürtme (spec §18.6). Adım olayına değil HIZA bağlı;
+        // sürekli bir akış, tekil bir olay değil.
+        var spray = go.GetComponent<SnowSprayController>();
+        if (spray == null) spray = go.AddComponent<SnowSprayController>();
+
+        var sps = new SerializedObject(spray);
+        sps.FindProperty("sampler").objectReferenceValue = sampler;
+        sps.FindProperty("particles").objectReferenceValue = burst;
+        sps.FindProperty("footAnchor").objectReferenceValue = anchor;
+        sps.FindProperty("velocitySource").objectReferenceValue = player.transform;
+        sps.ApplyModifiedProperties();
+
+        // --- Karda yavaşlama (spec §19.2). SpeedMultiplier yayınlıyor;
+        // hareket koduna BAĞLANMADI — o ayrı onay (`DECISIONS.md`).
+        var move = go.GetComponent<SnowMovementModifier>();
+        if (move == null) move = go.AddComponent<SnowMovementModifier>();
+
+        var ms = new SerializedObject(move);
+        ms.FindProperty("sampler").objectReferenceValue = sampler;
+        ms.FindProperty("footAnchor").objectReferenceValue = anchor;
+        ms.ApplyModifiedProperties();
+
+        // --- Karakter üstü kar (spec §16.2).
+        //
+        // `targets` BİLEREK BOŞ: sahnede henüz karakter mesh'i yok. Mantık
+        // kurulu ve çalışıyor; mesh geldiğinde tek yapılacak bu diziye
+        // renderer'ları koymak.
+        var accum = go.GetComponent<SnowCharacterAccumulator>();
+        if (accum == null) accum = go.AddComponent<SnowCharacterAccumulator>();
+
+        var acs = new SerializedObject(accum);
+        acs.FindProperty("environmentSource").objectReferenceValue = bridge;
+        acs.FindProperty("footAnchor").objectReferenceValue = anchor;
+        acs.ApplyModifiedProperties();
 
         EditorUtility.SetDirty(go);
     }
@@ -868,12 +971,38 @@ public class SnowDebugWindow : EditorWindow
         return material;
     }
 
+    /// ANA IŞIK GÜNDÖNGÜSÜNDEN SORULUYOR, TARAMAYLA BULUNMUYOR.
+    ///
+    /// Eski hâli "ilk aktif directional light"ı alıyordu. Sahnede İKİ tane var
+    /// (güneş ve ay) ve tarama sırası AYI önce buldu: kar sistemi tam gündüzde
+    /// `intensity = 0` olan ay ışığına bağlanmıştı. Tane emissive'i sıfır
+    /// çıkıyordu ve kar aydınlatmasının tamamı yanlış kaynaktan geliyordu.
+    ///
+    /// `TimeOfDay` hangisinin güneş olduğunu zaten biliyor; tahmin etmeye
+    /// gerek yok.
     static Light FindSun()
     {
-        foreach (Light l in Object.FindObjectsByType<Light>(FindObjectsInactive.Exclude))
-            if (l.type == LightType.Directional && l.isActiveAndEnabled) return l;
+        var clock = Object.FindAnyObjectByType<TimeOfDay>();
 
-        return null;
+        if (clock != null)
+        {
+            var sun = new SerializedObject(clock)
+                .FindProperty("sun").objectReferenceValue as Light;
+
+            if (sun != null) return sun;
+        }
+
+        // Gündöngü yoksa tek directional ışığa düşülüyor; iki tane varsa
+        // hangisi olduğu belirsiz kalacağı için EN PARLAK olan seçiliyor.
+        Light best = null;
+
+        foreach (Light l in Object.FindObjectsByType<Light>(FindObjectsInactive.Exclude))
+        {
+            if (l.type != LightType.Directional || !l.isActiveAndEnabled) continue;
+            if (best == null || l.intensity > best.intensity) best = l;
+        }
+
+        return best;
     }
 
     static SnowSettings LoadOrCreateSettings()
