@@ -408,10 +408,21 @@ float SnowSurfaceAt(float2 uv)
 
     float2 far = SnowFarStateAt(SnowUVToWorld(uv));
 
-    float swe  = lerp(far.x, s.r, inside);
-    float rhoN = lerp(far.y, s.g, inside);
+    // DERİNLİK HARMANLANIYOR, HAM SWE/YOĞUNLUK DEĞİL.
+    //
+    // Derinlik `SWE × 1000 / ρ` — doğrusal değil. İki büyüklüğü ayrı ayrı
+    // harmanlayınca aradaki derinlik profili sıçrıyor ve devir noktasında
+    // (±8 m) basamak kalıyor. Ölçüldü: yakın 52,5 cm (ρ 95), kaskad 45,4 cm
+    // (ρ 110) → 7 cm'lik kare bir sırt, oyuncuyu takip ediyor.
+    //
+    // Derinliği harmanlamak geçişi yüksekliğin KENDİSİNDE sürekli yapıyor:
+    // iki uç ne olursa olsun arada tek yönlü, düz bir rampa kalıyor.
+    //
+    // İz de burada sönüyor; ayrıca `inside` ile çarpmaya gerek yok.
+    float hNear = SnowSurfaceHeight(s.r, s.g, t.r, t.g);
+    float hFar  = SnowBaseHeight(far.x, far.y);
 
-    float h = SnowSurfaceHeight(swe, rhoN, t.r * inside, t.g * inside);
+    float h = lerp(hFar, hNear, inside);
 
     // SASTRUGİ BURAYA DA EKLENİYOR. Yalnız köşe shader'ına eklenirse
     // normal'ler düz kalıyor ve sırtlar ışığa hiç tepki vermiyor — spec

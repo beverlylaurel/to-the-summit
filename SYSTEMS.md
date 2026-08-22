@@ -782,6 +782,11 @@ yayınlıyor; `PrecipitationRenderer` şiddetini bununla çarpıyor. Kar şiddet
 binme matematiksel olarak imkânsız. Bağ TEK YÖNLÜ — kar sistemi yağmurdan bir şey
 okumuyor.
 
+**Yakın bölge → kaskad devri DERİNLİKTE.** Mesh ±8 m'de yakın durumdan uzak
+kaskada geçiyor. Harmanlama derinliğin kendisinde yapılıyor; ham SWE ve
+yoğunluğu ayrı harmanlamak (derinlik doğrusal olmadığı için) devir noktasında
+basamak üretiyordu.
+
 **Kar mesh'inin kenarı araziye iniyor.** Mesh arazinin üstünde ayrı bir yüzey;
 en dış halkanın sınırında kalınlık kadar dik bir duvar bırakıyordu. Kalınlık
 son %14'lük bantta sıfıra sönüyor, orada dağın kendi kar katmanı devralıyor —

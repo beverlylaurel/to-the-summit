@@ -14,6 +14,41 @@ her seferinde belirtinin en çok göze çarptığı katman seçilmişti. Bulut k
 
 ---
 
+## Ayak altında kare bir sırt/çıkıntı, oyuncuyla birlikte geliyor
+
+**Elenen şüpheliler — hepsi izolasyon anahtarıyla, tek turda:**
+
+| Şüpheli | Nasıl elendi |
+|---|---|
+| Kenar sönümü | Prob mod 4: o bölgede sönüm düz (=1) |
+| Halka sırası | Prob mod 1: kırmızı→yeşil→mavi→sarı düzgün iç içe |
+| Dikiş | F1 anahtarı kapatıldı, çıkıntı kaldı |
+| Etek | F1 anahtarı kapatıldı, çıkıntı kaldı |
+
+**Sebep:** kar mesh'i ±8 m'de yakın bölgeden uzak kaskada devrediyor ve devirde
+**ham SWE ile yoğunluk AYRI AYRI** harmanlanıyordu. Derinlik `SWE × 1000 / ρ`,
+yani doğrusal değil; iki büyüklüğü ayrı harmanlamak aradaki derinlik profilini
+sıçratıyor.
+
+**Ölçüm:** `derinlik yakın 52,5 cm (ρ 95) · kaskad 45,4 cm (ρ 110) · FARK 7,0 cm`.
+7 cm, 45 cm'lik bir tabakada gözle görülür bir sırt — üstelik kare, çünkü
+`SnowInsideMask` kare bir bölgenin kenarında sönüyor.
+
+Yoğunluk farkı tasarımdan: kaskad bilinçli sadeleştirilmiş (spec Faz 10) ve
+ıslaklık kanalı yok.
+
+**Düzeltme:** derinliğin KENDİSİ harmanlanıyor. İki uç ne olursa olsun arada
+tek yönlü düz bir rampa kalıyor.
+
+**Kural:** iki bölgeyi birleştirirken **görünen büyüklüğü** harmanla, onu üreten
+ham girdileri değil. Girdiler doğrusal olmayan bir bağıntıdan geçiyorsa ayrı
+harmanlama her zaman basamak üretir.
+
+**Araç notu:** prob görünümü (her şüpheli ayrı renk, ışıktan bağımsız) dört
+şüpheliyi tek turda eledi. Ondan önce aynı belirtiye dokuz tur harcandı.
+
+---
+
 ## Kar yüzeyinde uzun, düz, dik bir sırt (çıkıntı)
 
 **İlk şüpheli:** kenar sönümü. *(Yanlış — sönüm yarıçapı ve bandı üç kez
