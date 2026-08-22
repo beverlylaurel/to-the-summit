@@ -38,6 +38,14 @@ public class SnowFarCascade : MonoBehaviour
     bool pendingScroll;
     Vector2Int pendingScrollTexels;
 
+    /// KASKADIN ORTALAMA SWE'Sİ. Karenin DIŞINDAKİ karı bu doku besliyor;
+    /// sıfırsa dağ çıplak kalıyor ve ekranda "kar sadece ayağımın altında"
+    /// görünüyor. Yakın bölgenin sayısı ölçülüyordu, bunun ki ölçülmüyordu.
+    public float MeanSwe { get; private set; } = -1f;
+
+    bool readbackPending;
+    int lastReadbackFrame = -1;
+
     public RenderTexture Texture => far;
     public Vector2 AreaCenter => new(centerTexel.x * TexelSize, centerTexel.y * TexelSize);
     public bool IsReady => far != null;
@@ -167,6 +175,34 @@ public class SnowFarCascade : MonoBehaviour
         cmd.DispatchCompute(simCompute, accumulateKernel, groups, groups, 1);
 
         (far, farTemp) = (farTemp, far);
+
+        RequestReadback();
+    }
+
+    /// Otuz karede bir, tek örnek. Ölçüm aracı; maliyeti yok denecek kadar az.
+    void RequestReadback()
+    {
+        if (readbackPending) return;
+        if (Time.frameCount - lastReadbackFrame < 30) return;
+
+        lastReadbackFrame = Time.frameCount;
+        readbackPending = true;
+
+        UnityEngine.Rendering.AsyncGPUReadback.Request(far, 0, request =>
+        {
+            readbackPending = false;
+            if (request.hasError || far == null) return;
+
+            var data = request.GetData<Vector2>();
+
+            float sum = 0f;
+            int step = Mathf.Max(1, data.Length / 4096);
+            int n = 0;
+
+            for (int i = 0; i < data.Length; i += step) { sum += data[i].x; n++; }
+
+            MeanSwe = n > 0 ? sum / n : 0f;
+        });
     }
 
     void Scroll(CommandBuffer cmd, int groups)

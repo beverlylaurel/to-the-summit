@@ -22,6 +22,7 @@ public class DebugMenu : MonoBehaviour
     [SerializeField] TemperatureField temperature;
     [SerializeField] SnowfallRenderer snowfall;
     [SerializeField] SnowClipmap snowClipmap;
+    [SerializeField] SnowFarCascade snowCascade;
     [SerializeField] PerformanceHud hud;
     [SerializeField] ClimbHud climbHud;
     [SerializeField] CursorLock cursorLock;
@@ -572,6 +573,7 @@ public class DebugMenu : MonoBehaviour
                $"kar çizgisi {lineY:F0} m + {band:F0} m bant   " +
                $"çizgiden {depth * 100f:F1} cm   " +
                $"DOKUDA {SnowRuntimeState.GroundCoverage01:F2}   " +
+               $"KASKAD {(snowCascade != null ? snowCascade.MeanSwe.ToString("0.0000") : "yok")}   " +
                $"gevşek {SnowRuntimeState.LooseSnowFraction:F2}";
     }
 
