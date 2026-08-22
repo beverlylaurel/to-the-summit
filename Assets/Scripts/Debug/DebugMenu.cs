@@ -59,6 +59,10 @@ public class DebugMenu : MonoBehaviour
     /// kaynağı olsaydı yağışla çelişebilirdi.
     float lockedSnow;
 
+    /// Teşhis anahtarı: dağın kar maskesini zorluyor. Kar katmanının kodu
+    /// gerçekten koşuyor mu sorusunu tek tıkla ayırıyor.
+    bool forceMountainSnow;
+
     /// Sürgü açıkken dayatılan DENİZ SEVİYESİ sıcaklığı.
     ///
     /// Donma seviyesi = (deniz sv. + gündüz ısınması − fırtına soğuması) / 0.0065.
@@ -440,6 +444,13 @@ public class DebugMenu : MonoBehaviour
             GUILayout.Label($"Kar şiddeti {lockedSnow:F2}   " + SnowStatus());
             lockedSnow = GUILayout.HorizontalSlider(lockedSnow, 0f, 1f);
             GUILayout.Label(SnowLineStatus());
+
+            bool nextForce = GUILayout.Toggle(forceMountainSnow, "Dağı zorla karla kapla (teşhis)");
+            if (nextForce != forceMountainSnow)
+            {
+                forceMountainSnow = nextForce;
+                Shader.SetGlobalFloat("_SnowForceMountainMask", forceMountainSnow ? 1f : 0f);
+            }
         }
 
         GUILayout.Space(6f);

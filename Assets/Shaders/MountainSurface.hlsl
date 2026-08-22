@@ -141,6 +141,9 @@ float MountainBand(float3 worldPos)
 // teşhir ettiği o basamak ölçeğini kıran katman tam bu.
 #include "../Snow/Shaders/SnowDetailNormals.hlsl"
 
+/// Teşhis: 1 olduğunda dağın kar maskesi zorlanıyor. Bkz. aşağıdaki kullanım.
+float _SnowForceMountainMask;
+
 
 struct MountainSurface
 {
@@ -457,6 +460,13 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // bir çizgi gibi durmuyor.
     float snowBreak = MountainFbm(worldPos * _BumpScale * 0.35, 2) * 0.5 + 0.5;
     float snowMask = saturate((snowSlope * snowFill - snowBreak * 0.35) * 3.0);
+
+    // TEŞHİS ANAHTARI. "Kod koşmuyor" ile "kod koşuyor ama maske sıfır"
+    // dışarıdan aynı görünüyor. Bu global 1 olduğunda maske zorlanıyor:
+    // dağ beyazlaşıyorsa kod koşuyor demektir, beyazlaşmıyorsa koşmuyor.
+    //
+    // Belirti kapanınca silinecek (`DECISIONS.md` → Silinecek geçiciler).
+    snowMask = max(snowMask, _SnowForceMountainMask);
 
     if (snowMask > 0.001)
     {
