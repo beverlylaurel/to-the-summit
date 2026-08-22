@@ -8,9 +8,55 @@ Her kayıt üç şey taşır: belirtinin kullanıcının ağzından hâli, ilk �
 doğar — tahminle çözülen bir şey buraya yazılmaz.
 
 Bu dosyanın kendi dersi: **belirtinin göründüğü yer, belirtinin doğduğu yer değildir.**
-İlk şüphelisi kayda geçmiş on belirtinin **onunda da** ilk şüpheli yanlış çıktı —
+İlk şüphelisi kayda geçmiş on iki belirtinin **on ikisinde de** ilk şüpheli yanlış çıktı —
 her seferinde belirtinin en çok göze çarptığı katman seçilmişti. Bulut kontüründe üç ayrı
 şüpheli (ışın yürüyüşü, zamansal birikim, mesafe sınırı) sırayla elendi; sebep dördüncüdeydi.
+
+---
+
+## Havada solucan/sigara dumanı gibi kar; bir yerde yağıyor, bir yerde boş gökyüzü
+
+**İlk şüpheli:** tane sayısı az. *(Yanlış — sayı dört katına çıkarıldı, desen aynen kaldı,
+sadece daha kalabalık oldu.)*
+
+**Sebep:** doğum hash'i çöküyordu. `frac(sin(dot(p, k)) * 43758.5)` float32'de büyük
+girdide tekrar eden değer üretiyor.
+
+**Ayırt eden ölçüm:** GPU aritmetiği float32 olarak Python'da taklit edildi, üretilen
+X koordinatlarının TEKİL SAYISI sayıldı:
+
+| tane | tekil X değeri | oran |
+|---|---|---|
+| 13 000 | 1 887 | %14.5 |
+| 104 000 | 5 237 | **%5.0** |
+
+Yüz bin tane beş bin dikey hat üzerine yığılıyor. "Solucan" o hatların kendisi,
+"sigara dumanı" hattın rüzgârla eğilmiş hâli, "bir yerde boş gökyüzü" de hatların
+arasındaki boşluk.
+
+PCG3D ile aynı ölçüm: 104 000/104 000 tekil, kova sapması ×1.04, eksenler arası
+korelasyon 0.0003.
+
+**Kural:** indis veya dünya koordinatı büyüyebilen hiçbir yerde `frac(sin(...))` hash
+kullanılmaz. Tam sayı hash (PCG3D) girdinin büyüklüğünden etkilenmiyor. Parıltı
+hash'i de aynı sınıftaydı — hücre `floor(posWS.xz / cellSize)`, 6000 m'lik dağda
+milyonlara çıkıyor.
+
+---
+
+## On ayrı sınama birden "yanlış sonuç" diyor, hepsi sıfır
+
+**İlk şüpheli:** sınamaların ölçtüğü on ayrı davranış. *(Yanlış — hepsi doğruydu.)*
+
+**Sebep:** tek satırlık eksik include. `SnowSparkle.hlsl` `SnowCommon.hlsl`'i include
+etmiyordu; `SnowTestKernels.compute`'un ALTI kerneli birden derlenmedi ve dispatch'ler
+sessizce sıfır döndü.
+
+**Ayırt eden ölçüm:** sınama koşucusuna `ShaderUtil.GetComputeShaderMessages` eklendi
+ve mesajlar raporun BAŞINA yazıldı. Sebep tek satırda göründü.
+
+**Kural:** compute sonucu topluca sıfırsa önce derleme mesajına bakılır, davranışa
+değil. Derlenmeyen bir kernel ile yanlış hesaplayan bir kernel dışarıdan aynı görünür.
 
 ---
 

@@ -1017,6 +1017,20 @@ Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olma
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
 
+## Yağmur→kar geçişinde rampa yok (2026-08-22)
+
+Yağmur soluyup kar sonra başlasın diye 0.8 s'lik bir rampa yazıldı ve geri alındı:
+`IsSnowing`'in anlamını bozuyordu. Histerezis "kar" derken bayrak 0.8 s boyunca
+false kalıyor, kar şiddeti de o süre boyunca kısık çıkıyordu (sınamada spec'in
+şiddetinin onda biri ölçüldü).
+
+`SnowRuntimeState.RainWeight01` artık ikili: kar varsa 0, yoksa 1. Yumuşaklık
+tanenin BİÇİMİNDE — `Wetness` 0.5–2.0 °C bandında kuru kardan sulu kara geçiyor.
+Zaten kayıtlı olan karar da bu: çapraz soldurma yumuşak geçiş değil, iki yağışın
+üst üste binmesi.
+
+---
+
 ## Kar yoğunluğu: kapasite tavanı spec'in kendi formülünü kırpıyordu (2026-08-22)
 
 Kullanıcı "yağış 1 iken yoğun bir kar yağışı görmek istiyorum" dedi. Ölçüldü:
