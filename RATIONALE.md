@@ -562,9 +562,10 @@ kanalı yutar, geriye denizin aydınlanması kalır.
 
 ## Volumetrik sis
 
-içindeki sırt algılayıcı (`crest`/`lee`) 60–80 m'lik keskin eşikler taşıyor, froxel ızgarası
-ve ışın örneklemesi o eşiklerin üstünden atlıyor ve kamera kıpırdadıkça yer değiştiren
-dikey şeritler kalıyordu.
+**Sis rüzgâr barınağını OKUMAZ.** `TerrainWindShelter` içindeki sırt algılayıcı
+(`crest`/`lee`) 60–80 m'lik keskin eşikler taşıyor, froxel ızgarası ve ışın örneklemesi
+o eşiklerin üstünden atlıyor ve kamera kıpırdadıkça yer değiştiren dikey şeritler
+kalıyordu. Kodda sis tarafında tek bir `Shelter` referansı yok; bağ bilerek kurulmadı.
 
 **Alanlar sinüs toplamıdır.** Bank ve akış alanı iki sinüsün çarpımıydı ve yorumu "çarpım
 tekrar desenini kırar" diyordu; kırmıyor — `sin(k₁·p)·sin(k₂·p)` ayrıştırılabilir bir

@@ -1,0 +1,51 @@
+// ROL: kar sisteminin bütün compute kernel'leri. Faz 1'de KClear ve KScroll;
+// sonraki fazlar aynı dosyaya kernel ekler.
+// Çağıran: SnowRenderPass (tek CommandBuffer içinde, BeforeRenderingOpaques).
+
+#pragma kernel KClear
+#pragma kernel KScroll
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "SnowCommon.hlsl"
+
+// Ping-pong: aynı doku hem _Src hem _Dst olarak bağlanamaz (spec §20).
+Texture2D<float4>   _Src;
+RWTexture2D<float4> _Dst;
+
+uint   _Resolution;
+
+/// KAYDIRMA MIKTARI float2 OLARAK BAGLANIYOR. `CommandBuffer`'da tam sayi dizisi
+/// baglamanin asiri yuklemesi Unity surumleri arasinda degisiyor; vektor yolu
+/// her surumde var. Deger zaten tam sayi, `round` sadece bicimi geri veriyor.
+float2 _ScrollTexels;
+
+/// Yeni açılan şeride yazılan değer. RT_Trail için (0,0,0,0), RT_Snow için
+/// dünyanın genel kar durumu (spec §6.4).
+float4 _NewEdgeValue;
+
+/// KClear'ın yazdığı değer.
+float4 _ClearValue;
+
+[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
+void KClear(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+    _Dst[id.xy] = _ClearValue;
+}
+
+/// BÖLGE KAYDIRMA (spec §6.4).
+///
+/// Merkez teksel ızgarasında `_ScrollTexels` kadar kaydı; aynı dünya noktası
+/// kaynakta o kadar ötede kalıyor, o yüzden `src = id + _ScrollTexels`.
+/// Dışarı taşan şerit yeni açılan alandır ve dünyanın genel durumuyla dolar,
+/// boş değil.
+[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
+void KScroll(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+
+    int2 src = int2(id.xy) + int2(round(_ScrollTexels));
+    bool inside = all(src >= 0) && all(src < (int)_Resolution);
+
+    _Dst[id.xy] = inside ? _Src[src] : _NewEdgeValue;
+}

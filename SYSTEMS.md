@@ -522,8 +522,14 @@ pişmeden önce.
 
 ### Dağ yüzeyi (`TerrainSurface`, `MountainSurface.hlsl`)
 
-öğle güneşi (liken), kar kuşağı kotları (hava sürücüsünden).
-**Okumaz:** anlık rüzgâr yönünü — birikinti ekseni hâkim yönden kurulur.
+**Okur:** yağış şiddeti (`WeatherState` → ıslaklık; ıslanma hızlı, kuruma yavaş), hâkim
+rüzgâr yönü ve şiddeti (`WindField.PrevailingDirection` / `Strength`), öğle güneşi
+(`TimeOfDay.NoonSunDirection` — liken yıllık güneşlenmeye yerleşir), gün içi güneş
+rengi ve yönü (alpenglow).
+**Okumaz:** anlık rüzgâr yönünü — yüzey deseni hâkim yönden kurulur.
+**Artık okumuyor:** kar kuşağı kotlarını. `AltitudeWeatherDriver` ve `TemperatureField`
+alanları duruyor ama hiçbir yerde kullanılmıyor (kar silinince öksüz kaldılar,
+`DECISIONS.md` → Silinecek geçiciler).
 
 ### Gökyüzü ve atmosfer (`PhysicallyBasedSkyURP` paketi, `SkyWeatherDriver`)
 
@@ -694,6 +700,34 @@ Gerekçeler: `RATIONALE.md` → Arazi.
 
 ---
 
+### Kar (`Assets/Snow/`) — Faz 0–1 kurulu
+
+Kar sistemi mevcut sistemlere **hiçbir şey yazmaz**. Bütün girdisi tek arayüzden
+(`ISnowEnvironmentSource`) geçer, bütün çıktısı tek statik durumda (`SnowRuntimeState`)
+yayınlanır. Amaç: kar silinirse başka hiçbir sistem bozulmasın — v1 ve v2'nin silinmesi
+tam bu yüzden pahalıya patladı.
+
+**Okur** (yalnız `SnowEnvironmentBridge` üzerinden, doğrudan değil):
+- `WindField` → rüzgâr yönü ve hızı. `Velocity` m/s'dir; `Strength` 0..1'dir, hız değil.
+- `TimeOfDay` → `SunHeight` (güneş yüksekliği 0..1) ve ana ışık
+- `TemperatureField` → gözlemcinin kotundaki sıcaklık; donma kararı buradan
+- `WeatherState` → `Precipitation` (0..1). Yağışın **türü** projede yok; kar/yağmur
+  kararını kar sisteminin kendi histerezisi veriyor (0.5 / 2.0 °C).
+- `AtmosphereController` → görüş mesafesi, 0..1'e normalize edilerek
+
+**Okumaz:** `RenderSettings`, `VolumeProfile`, `Light.intensity`. Tek satır bile yazmıyor;
+kod taramasıyla doğrulandı.
+
+**Yayınlar** (`SnowRuntimeState`, salt okunur): `IsSnowing`, `SnowfallIntensity01`,
+`GroundCoverage01`, `LooseSnowFraction`, `Stormness01`. Bunları **kimse uygulamıyor** —
+tüketiciyi bağlamak ayrı bir iştir, kar sistemi kimseyi zorlamaz.
+
+**Bölge kaydırma.** Durum dokuları oyuncuyu takip eden 16 m'lik bir pencerede duruyor;
+pencere `SnapStep` (0.25 m) ızgarasına oturuyor ve kaydığında içerik `KScroll` ile aynı
+dünya noktasında kalıyor. Üç presette de bir SnapStep tam sayı teksele denk geliyor
+(8 / 16 / 24) — kesirli olsaydı izler teksel altı titrerdi. Ölçüm:
+`To The Summit/Kar/Kaydırma Sınaması`.
+
 ## 5. Bilinçli kurallar
 
 Bunlar hata değil, karar. Yanlışlıkla "düzeltilmemeli". Her birinin gerekçesi
@@ -717,6 +751,10 @@ Bunlar hata değil, karar. Yanlışlıkla "düzeltilmemeli". Her birinin gerekç
 - **Tanecik yoğunluğu şiddetin doğrusal karşılığı değildir.**
 - **Kar sesi yoktur.** Karlı havada duyulan rüzgârdır; tanelerin giysiye çarpma sesi
   bilinen eksik.
+- **Aynı anda hem yağmur hem kar GÖRÜNMEZ.** Geçiş yumuşak ama tür tek: 0.5–2.0 °C
+  bandında ekranda iki ayrı tanecik seti çakışmaz, tek tanecik seti biçim değiştirir
+  (sulu kar). İki seti çapraz soldurmak "yumuşak geçiş" değil, iki yağışın üst üste
+  binmesidir.
 
 **Işık ve gölge**
 - **Arazinin güneş gölgesi gölge haritasından gelmez**, pişirilmiş **ufuk haritasından**

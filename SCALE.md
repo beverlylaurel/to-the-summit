@@ -54,6 +54,12 @@ Bunlar gerçek dünyanın metreleri. Dağ iki katına çıkınca donma seviyesi 
 | `channelDepth` | 14 m | Dere yatağı derinliği |
 | `hummockHeight` | 8 m | Tümsek yüksekliği |
 | Birikinti gövdesi | 45 × 16 m | Rüzgârın oluşturduğu yığının gerçek boyu |
+| Kar bölgesi `AreaSize` | 16 m | Oyuncunun etrafındaki deformasyon penceresi. Ölçüsü OYUNCUNUN adımı, dağın boyu değil — dağ iki katına çıkınca ayak izi büyümez. Üç presette de 16 |
+| Kar `SnapStep` | 0.25 m | Bölgenin oturduğu ızgara. Teksel boyuna değil oyuncunun hareketine ölçülü; üç presette de tam sayı teksele denk gelmeli (8 / 16 / 24) |
+| Kar `SkyAreaSize` | 96 m | Gökyüzü görünürlük haritasının kapsamı; kar yağışının önünü kesen yakın geometrinin menzili |
+| Kar yoğunlukları 50–550 kg/m³, su 1000 | — | Malzemenin kendi fiziği |
+| Kar sıcaklık eşikleri (−20 / −5 / 5 °C, kar 0.5 / 2.0) | °C | Suyun fiziği; dağ büyüyünce kar farklı sıcaklıkta erimez |
+| Saltasyon 1–5 cm, süspansiyon ≤ 5 m | — | Rüzgârın taşıdığı tanenin gerçek yükseklikleri (PBSM) |
 
 **Kural:** bunlardan biri dağın boyuna oranlanırsa atmosfer dağın büyüklüğüne göre farklı
 fizik uygular ve tutarlılık zinciri kopar (`SYSTEMS.md`).

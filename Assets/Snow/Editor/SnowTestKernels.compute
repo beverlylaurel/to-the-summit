@@ -1,0 +1,15 @@
+// ROL: yalniz sinama icin. Her teksele KENDI GPU id'sini yaziyor; kaydirma
+// sinamasi boylece okuma yolundaki olasi y-cevrimini olcup hesaba katabiliyor.
+// Caginan: SnowScrollTest. Editor klasorunde -> derlemeye girmiyor.
+
+#pragma kernel KStamp
+
+RWTexture2D<float4> _Dst;
+uint _Resolution;
+
+[numthreads(8, 8, 1)]
+void KStamp(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+    _Dst[id.xy] = float4(id.x, id.y, 0.0, 1.0);
+}

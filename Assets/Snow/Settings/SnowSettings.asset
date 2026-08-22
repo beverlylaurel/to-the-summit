@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 15d9d6a488ec6144f9614d864686bb8b, type: 3}
+  m_Name: SnowSettings
+  m_EditorClassIdentifier: Assembly-CSharp::SnowSettings
+  quality: 1
+  groundSource: 0
+  groundBakeArea: 512
+  groundLayerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  breakupNoise: {fileID: 0}
+  shadowTint: {r: 0.66, g: 0.76, b: 0.95, a: 1}
+  translucencyStrength: 0.6
+  sparkleCellSize: 0.004
+  sparkleDensity: 0.06
+  sparkleSharpness: 8
+  sparkleIntensity: 12
+  coverSlopeThreshold: 0.25
+  coverSlopeSharpness: 1.6
+  coverBreakupScale: 1.8
+  coverBreakupStrength: 0.55
+  coverEdgeSharpness: 4
+  coverThickness: 0.04
+  coverEdgeBulge: 0.35
+  minPixelSize: 1.3
+  flutterFrequency: 5.5
+  flutterAmplitude: 0.35
+  flakeEmissive: 1
+  spindriftRate: 6000
+  defaultSwe: 0
+  defaultRhoN: 0.12

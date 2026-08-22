@@ -102,6 +102,11 @@ Assets/
 
 Yeni sistem = yeni klasör. Dosyalar `Assets/Scripts` kökünde birikmez.
 
+**İstisna — `Assets/Snow/`.** Kar sistemi runtime, shader, editör aracı ve ayarlarıyla
+tek ağaçta duruyor (`Runtime/`, `Shaders/`, `Editor/`, `Settings/`). Spec §1.5 böyle
+istiyor ve gerekçesi geçerli: kar iki kez silindi, ikisinde de parçaları dört ayrı
+klasörden toplamak gerekti. Üçüncüsünde tek klasör silinecek. Gerekçe `DECISIONS.md`.
+
 ## Tasarım otoritesi
 
 Oyunun **ne olduğu** `DESIGN.md`'de: register (absürt/kayıtsızlık, korku değil), yapı

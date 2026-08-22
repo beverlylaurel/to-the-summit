@@ -80,6 +80,14 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   model yeniden seyreltilirse topoloji değişir ve boyama kaybolur. Seyreltme yapıldı
   (3.1 M → 200 bin), boyama artık güvenle yapılabilir; bütçe değişirse maske aktarımı
   yazmak gerekir
+- **`TerrainSurface`'ta iki öksüz alan** — `weatherDriver` (`AltitudeWeatherDriver`) ve
+  `temperature` (`TemperatureField`) serileştirilmiş, `Bind()` ile atanıyor ama hiçbir
+  yerde okunmuyor. Kar kuşağı kotlarını besliyorlardı, kar `741e6b7`'de silindi.
+  Silinmesi `Bind()` imzasını ve sahnenin serileştirilmiş bağlarını değiştirir —
+  onaya tabi, tek adımda `MountainSceneBootstrap` ile birlikte yapılacak
+- **`SnowEnvironmentBridge` elle girilen değerler** — köprü şu an sabit sayılar
+  yayınlıyor (rüzgâr 3 m/s, sıcaklık −4 °C, yağış 0.5). Gerçek sistemlere bağlanınca
+  bu alanlar silinir
 
 ## Bekleyen kararlar
 
@@ -89,13 +97,24 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Cepheyi ne sürecek** — yaklaşmanın yarısında kar başlaması isteniyor; şiddet şu an
   yalnız rakımdan geliyor ve ovada minimum
   → [Yaklaşmada kar bir CEPHEDEN gelir](#yaklaşmada-kar-bir-cepheden-gelir)
+- **`FogDensity01` normalizasyonu** — `AtmosphereController.Visibility` metre cinsinden;
+  kar sistemi 0..1 istiyor. İki uç (`minVis` / `maxVis`) ölçülüp seçilecek, tahmin
+  edilmeyecek
+  → [Kar sistemi: spec'ten bilinçli sapmalar](#kar-sistemi-specten-bilinçli-sapmalar-ve-iki-assumption-2026-08-22)
+- **`SnowRuntimeState`'i kim okuyacak** — kar sistemi beş değer yayınlıyor ama tüketicisi
+  yok. `IsSnowing` → yağmuru susturmak Faz 5'te, `GroundCoverage01` → nesne kaplaması
+  Faz 7'de bağlanacak. O ana kadar yayın boşa gidiyor ve bu **bilinçli**
 
 ### `DepthNormals` fragman maliyeti KABUL EDİLDİ
 
-gerekçesi geçerli: SSAO bu tamponu okuyor ve kar birikintisinin eğimi orada olmazsa
-kabartının dibindeki gölge hiç oluşmuyor. Ucuzlatmak için köşe normalini yazmak, geçişi
-var eden sorunu geri getirir — arazi örgüsünün üçgen kırıkları "yüzey kıvrımı" okunup
-zeminde kafes çizgileri bırakıyordu.
+**Karar.** `MountainSurface.shader`'ın `DepthNormals` geçişi duruyor, ucuzlatılmadı.
+
+**Gerekçe.** SSAO bu tamponu okuyor (`MountainSurface.shader:302`). Ucuzlatmak için köşe
+normalini yazmak, geçişi var eden sorunu geri getirir — arazi örgüsünün üçgen kırıkları
+"yüzey kıvrımı" okunup zeminde kafes çizgileri bırakıyordu.
+
+**Not (2026-08-22).** Bu kaydın ilk gerekçesi kar birikintisinin eğimiydi; kar sistemi
+`741e6b7`'de silindiği için o gerekçe düştü. SSAO gerekçesi tek başına geçerli.
 
 **Tetikleyici:** kare süresi bütçesi zorlanırsa önce bu geçişin GPU maliyeti ölçülür;
 ölçmeden ucuzlatma yapılmaz.
@@ -867,17 +886,65 @@ demek), yani `3 × 2.0/0.8 = 7.5`. Kodda `SourceScale = 7.5f`.
 `d_i` her damlada aynı ve izotrop. Sahneye lamba, fener ya da şimşek eklendiğinde
 gerekecek — şimşek zaten bekleyen kararlar listesinde.
 
-## Eski yağış sistemi yalnız yağmur taşıyor
+## Kar sistemi: spec'ten bilinçli sapmalar ve iki ASSUMPTION (2026-08-22)
 
-çiziyor; eski sistemde kalan kar kodu ÖLÜ.
+Spec `C:\Users\musta\Desktop\tts\specs\snow\unity-kar-sistemi-spec.md` bağlayıcıdır.
+Aşağıdakiler ondan **bilerek** ayrıldığımız yerler.
 
-**Gerekçe.** İki sistem aynı anda kar çizince gökyüzünde iki farklı kar oluyor ve
-hangisinin ne yaptığı ayrılamıyor. Ölçüldü: kullanıcı ekranda yalnız v1'i gördü,
-v2'nin preseti Clear'daydı ve hiç tane üretmiyordu.
+**Menü yolu.** Spec §1.2 `Tools/Snow/Project Check` diyor; `To The Summit/Kar/Proje
+Kontrolü` yazıldı. §0.3 dosya, sınıf, kernel ve sabit adlarını bağlıyor — menü yolunu
+değil. Projenin bütün araçları `To The Summit` sekmesinde; ikinci bir sekme açmak
+aracı kaybettirir.
 
-**Ölü kod neden hemen silinmedi.** `PrecipitationRenderer`'da kar ve yağmur aynı
-tanecik bütçesini, aynı tamponu ve aynı çizim yolunu paylaşıyor. Kör ameliyat
-çalışan yağmuru da bozar; yağmurun kendi kabulü olmadan kesilmez.
+**Klasör.** Spec §1.5 `Assets/Snow/...` diyor, `CLAUDE.md` ise `Assets/Scripts/<Sistem>/`.
+Spec kazandı — kar sistemi runtime, shader, editör ve ayarlarıyla tek ağaç olarak
+duruyor, silinmesi tek klasör silmek olsun diye. `CLAUDE.md`'ye istisna yazıldı.
 
-çıkarılır.
+**ASSUMPTION 1 — `RT_WindShadow` RGHalf.** Spec §6.2 tablosu RGHalf (R=Wz, G=Wsz),
+§18.0 metni RHalf diyor. `KWindShadow` iki kanal birden yazıyor; tek kanal yetmez.
+Tablo kazandı.
+
+**ASSUMPTION 2 — `RT_SnowTemp` eklendi.** §6.2 tablosunda yok ama `KScroll` komşu teksel
+okuyor ve §20 "komşu okuyan pass'lerde ping-pong" diyor. Başka bir dokuyu ödünç almak
+(örn. `RT_CaptureBlur`) o dokunun içeriğini siler. Bedeli 8 MB.
+
+**Tetikleyici:** spec'in sonraki bir fazı bu iki dokudan birini farklı formatta
+kullanmaya kalkarsa karar yeniden açılır.
+
+## Kar Faz 4: clipmap Medium preset SEÇİLDİ (2026-08-22)
+
+**Karar.** Zemin mesh'i Medium ile yazılacak: 4 halka, iç halka 400 grid, +1.17 M üçgen.
+
+**Ölçülmüş taban.** Şu an `Draw 525`, `SetPass 61`, `Tri 1248k`, 8.2–8.7 ms
+(115–122 FPS). Medium clipmap üçgen sayısını ~2420k'ya çıkarıyor, yani ikiye katlıyor.
+Spec bunu kendisi uyarıyor. VRAM +48 MB (Low'da 15 MB).
+
+**Gerekçe.** Kar yüzeyinin çözünürlüğü iz kenarlarının keskinliğini belirliyor; Low'da
+(3 halka, 240 grid, 512 doku) iz kenarı bulanıklaşıyor. Kullanıcı ikisini de görüp
+Medium dedi.
+
+**Tetikleyici:** Faz 4 açıldıktan sonra kare süresi ölçülür. 8.7 ms'den belirgin
+sapıyorsa Low'a düşülür — karar bütçe ölçüsüne bağlıdır, tercihe değil.
+
+## Yağmur ↔ kar: TEK TÜR, yumuşak geçiş (2026-08-22)
+
+**Karar.** Ekranda hiçbir anda iki ayrı yağış seti birden görünmeyecek. Geçişin
+yumuşaklığı taneciğin **biçiminden** gelecek (damla → sulu kar → kar tanesi), iki seti
+çapraz soldurmaktan değil.
+
+**Gerekçe.** Çapraz soldurma "yumuşak geçiş" değil, iki yağışın üst üste binmesidir;
+kullanıcı bunu açıkça istemiyor. Gerçekte de sulu kar tek bir tanecik türüdür, yağmurla
+karın karışımı değil.
+
+**Sayılar spec'ten.** Histerezis eşiği `SNOW_ON_BELOW = 0.5 °C`, `SNOW_OFF_ABOVE = 2.0 °C`
+(spec §3.4). Bant içinde tanecik biçimi bu iki eşik arasında enterpole edilir.
+
+**Tetikleyici:** eşikte ani bir sıçrama görülürse çözüm ikinci bir set eklemek değil,
+biçim enterpolasyonunun eğrisidir.
+
+## VFX Graph kuruldu (2026-08-22)
+
+`com.unity.visualeffectgraph` 17.5.0 `manifest.json`'a eklendi. Faz 8 (kar yağışı) için
+gerekli; Faz 1–7 kullanmıyor. Kullanıcı "şimdi kur" dedi — Faz 8'e gelindiğinde paket
+indirme beklemesi olmasın diye.
 
