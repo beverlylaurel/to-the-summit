@@ -36,9 +36,12 @@ float SnowBaseHeight(float swe, float rhoN)
 }
 
 /// İz oyulduktan ve kenar sırtı eklendikten sonraki yüzey yüksekliği, metre.
-float SnowSurfaceHeight(float swe, float rhoN, float carve, float rim)
+/// Kar yüzeyinin zeminden yüksekliği (spec §6.3). Taban DIŞARIDAN veriliyor:
+/// yakın bölge ile kaskad arasında taban harmanlanıyor, bu yüzden SWE ve
+/// yoğunluktan tek başına türetilemiyor.
+float SnowSurfaceFromBase(float baseHeight, float carve, float rim)
 {
-    return max(SnowBaseHeight(swe, rhoN) - carve + rim, 0.0);
+    return max(baseHeight - carve + rim, 0.0);
 }
 
 // ------------------------------------------------------------ dünya ↔ teksel
@@ -68,6 +71,25 @@ float SnowTexelSize()
 }
 
 /// Bölgenin kenarında yumuşak sönüm. Dışarıda 0, ortada 1.
+/// TABAN DERİNLİĞİ İÇİN GENİŞ MASKE.
+///
+/// `SnowInsideMask` bölgenin son %12'sinde sönüyor — Medium'da 0,96 m. Yakın
+/// durum ile kaskad yerel olarak farklı olduğu için o dar bantta hâlâ dik bir
+/// kenar kalıyordu: prob mod 7 devir çizgisini parlak bir V olarak gösterdi,
+/// mod 9 ve 10 aynı çizgiyi işaret etti.
+///
+/// Taban derinliği artık bölgenin YARISINDAN itibaren harmanlanıyor: aynı fark
+/// 0,96 m yerine ~4,4 m'ye yayılıyor, eğim yirmide birine iniyor ve kenar
+/// görünmüyor.
+///
+/// İZLER BUNU KULLANMIYOR. Ayak izi, sırt ve sastrugi dar maskeyle sönüyor;
+/// yoksa 3,6 m ötede izler solmaya başlardı.
+float SnowInsideWide(float2 uv)
+{
+    float2 e = abs(uv - 0.5) * 2.0;
+    return 1.0 - smoothstep(0.45, 1.0, max(e.x, e.y));
+}
+
 float SnowInsideMask(float2 uv)
 {
     float2 e = abs(uv - 0.5) * 2.0;
@@ -419,10 +441,14 @@ float SnowSurfaceAt(float2 uv)
     // iki uç ne olursa olsun arada tek yönlü, düz bir rampa kalıyor.
     //
     // İz de burada sönüyor; ayrıca `inside` ile çarpmaya gerek yok.
-    float hNear = SnowSurfaceHeight(s.r, s.g, t.r, t.g);
-    float hFar  = SnowBaseHeight(far.x, far.y);
+    // Taban geniş bantta, iz dar bantta.
+    float baseNear = SnowBaseHeight(s.r, s.g);
+    float baseFar  = SnowBaseHeight(far.x, far.y);
 
-    float h = lerp(hFar, hNear, inside);
+    float baseH = lerp(baseFar, baseNear, SnowInsideWide(uv));
+
+    // İz tabandan ÇIKIYOR; sırt ekleniyor. İkisi de yalnız bölgenin içinde.
+    float h = SnowSurfaceFromBase(baseH, t.r * inside, t.g * inside);
 
     // SASTRUGİ BURAYA DA EKLENİYOR. Yalnız köşe shader'ına eklenirse
     // normal'ler düz kalıyor ve sırtlar ışığa hiç tepki vermiyor — spec
