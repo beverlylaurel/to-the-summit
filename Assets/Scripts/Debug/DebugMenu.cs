@@ -439,6 +439,7 @@ public class DebugMenu : MonoBehaviour
 
             GUILayout.Label($"Kar şiddeti {lockedSnow:F2}   " + SnowStatus());
             lockedSnow = GUILayout.HorizontalSlider(lockedSnow, 0f, 1f);
+            GUILayout.Label(SnowLineStatus());
         }
 
         GUILayout.Space(6f);
@@ -480,6 +481,33 @@ public class DebugMenu : MonoBehaviour
         return snowfall != null
             ? $"yağıyor, {snowfall.AliveFlakes} tane"
             : "yağıyor";
+    }
+
+    /// KAR ÇİZGİSİ ZİNCİRİ OKUNABİLİR OLMALI.
+    ///
+    /// "Dağda kar yok" belirtisi zincirin herhangi bir halkasında kopabilir:
+    /// global yazılmamış, kot yanlış, kalınlık sıfır. Üçü de ekrandan aynı
+    /// görünüyor. Bu satır üçünü de sayıyla ayırıyor — globaller
+    /// `Shader.SetGlobalFloat` ile yazıldığı için CPU'dan geri okunabiliyor.
+    string SnowLineStatus()
+    {
+        float lineY = Shader.GetGlobalFloat("_SnowLineGroundY");
+        float band = Shader.GetGlobalFloat("_SnowLineBand");
+        float lineSwe = Shader.GetGlobalFloat("_SnowLineSWE");
+        float rhoN = Shader.GetGlobalFloat("_FallbackRhoN");
+
+        if (band <= 0f)
+            return "kar çizgisi: GLOBAL YAZILMAMIŞ (bant 0) — kar sistemi uyanmamış";
+
+        float groundY = walker != null ? walker.transform.position.y : 0f;
+        float t = Mathf.Clamp01((groundY - lineY) / band);
+        float swe = Mathf.Lerp(Shader.GetGlobalFloat("_FallbackSWE"), lineSwe, t * t * (3f - 2f * t));
+
+        float rho = Mathf.Lerp(50f, 550f, Mathf.Clamp01(rhoN));
+        float depth = swe * 1000f / Mathf.Max(rho, 1f);
+
+        return $"kar çizgisi {lineY:F0} m + {band:F0} m bant   " +
+               $"senin kotunda {depth * 100f:F1} cm";
     }
 
     /// SÜRGÜ GERÇEK SİSTEMLERE YAZIYOR, KAR SİSTEMİNE DEĞİL.

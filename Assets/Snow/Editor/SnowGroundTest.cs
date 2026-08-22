@@ -363,6 +363,74 @@ public static class SnowGroundTest
             }
         }
 
+        // ------------------------------------------------- arazi hangi shader'la
+        //
+        // BUGÜNE KADAR ÖLÇÜLMEDİ. `MountainSurface.hlsl`'e kar katmanı eklendi
+        // ama Terrain'in materyalinin GERÇEKTEN o shader olduğu doğrulanmadı.
+        // Değilse bugün yazılan her şey hiçbir yere bağlı değil.
+        r.AppendLine();
+        r.AppendLine("## Arazi hangi shader ile çiziliyor");
+
+        // MATERYAL ÇALIŞMA ANINDA ATANIYOR (`TerrainSurface.cs`). Edit mode'da
+        // boş görünmesi NORMAL — bu bir kez yanlış okundu ve "dağ katmanı hiç
+        // bağlı değil" sonucuna varıldı.
+        Material tm = t.materialTemplate;
+        var surface = Object.FindAnyObjectByType<TerrainSurface>();
+
+        if (tm == null)
+        {
+            bool wired = surface != null;
+
+            r.AppendLine("  [" + M(wired) + "] Materyal             " +
+                         (wired
+                          ? "edit mode'da boş; `TerrainSurface` çalışma anında atıyor"
+                          : "YOK ve `TerrainSurface` de yok — arazi varsayılanla çiziliyor"));
+
+            if (!wired) sourceIsVisible = false;
+        }
+        else
+        {
+            bool isMountain = tm.shader != null && tm.shader.name.Contains("Mountain");
+
+            r.AppendLine("  Materyal                 " + tm.name);
+            r.AppendLine("  [" + M(isMountain) + "] Shader               " +
+                         (tm.shader != null ? tm.shader.name : "YOK"));
+
+            if (!isMountain)
+            {
+                r.AppendLine("      Dağın kar katmanı `MountainSurface.hlsl`'de. Terrain başka bir");
+                r.AppendLine("      shader kullanıyorsa o katman HİÇ ÇALIŞMIYOR.");
+                sourceIsVisible = false;
+            }
+        }
+
+        // ------------------------------------------------- kar mesh'i ne kadar kaplıyor
+        //
+        // Ekrandaki KARE bu. Sayısı yazılıyor ki bir daha "acaba ne kadar"
+        // diye tahmin edilmesin.
+        r.AppendLine();
+        r.AppendLine("## Kar mesh'inin kapsadığı alan");
+
+        SnowQualityData q = manager != null && manager.Settings != null
+            ? manager.Settings.QualityData
+            : default;
+
+        var clipmap = manager != null ? manager.GetComponent<SnowClipmap>() : null;
+
+        if (clipmap == null)
+        {
+            r.AppendLine("  [!] SnowClipmap yok.");
+        }
+        else
+        {
+            float span = q.AreaSize * Mathf.Pow(2f, Mathf.Max(q.RingCount - 1, 0));
+            r.AppendLine("  Bölge (en iç)            " + q.AreaSize.ToString("0.0") + " m");
+            r.AppendLine("  Halka sayısı             " + q.RingCount);
+            r.AppendLine("  Toplam kapsama           " + span.ToString("0.0") + " m  " +
+                         "← ekrandaki KARENİN kenarı bu");
+            r.AppendLine("  Uzak kaskad              192.0 m  (yalnız durum, mesh değil)");
+        }
+
         r.AppendLine();
         r.AppendLine("SONUÇ: " + (sourceIsVisible ? "TAMAM" : "BAŞARISIZ"));
         return r.ToString();
