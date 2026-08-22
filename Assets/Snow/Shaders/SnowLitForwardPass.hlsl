@@ -5,6 +5,7 @@
 #define SNOW_LIT_FORWARD_PASS_INCLUDED
 
 #include "SnowLighting.hlsl"
+#include "../../Shaders/HeightFog.hlsl"
 #include "SnowDetailNormals.hlsl"
 
 struct Attributes
@@ -65,6 +66,10 @@ Varyings SnowLitVertex(Attributes IN)
 
     float h;
     positionWS = SnowDisplacedPositionWS(positionWS, IN.ringId.x, h);
+
+    // ETEK (rapor §5): işaretli köşeler aşağı iniyor ve mesh ile arazi
+    // arasındaki boşluğu kapatıyor.
+    positionWS.y -= IN.ringId.y * SNOW_SKIRT_DEPTH;
 
     OUT.positionWS = positionWS;
     OUT.snowHeight = h;
@@ -134,19 +139,21 @@ void SnowClipEdge(float h, float3 positionWS)
     // İki değişiklik birbiriyle çelişiyordu: biri gömmeye çalışıyor, öteki
     // gömülmeden kesiyordu. Kenar bandında kırpma kapalı; oradaki geometri
     // arazinin altında kaldığı için zaten derinlik testinde kaybediyor.
+    // SÖNÜM SÜREKLİ, BASAMAK DEĞİL. `if (meshFade > 0.999)` yazıldığında
+    // kırpma sönüm bandının başladığı yerde ANİDEN kesiliyor ve o hatta ince
+    // kar birden katılaşıp görünür bir çember bırakıyordu. Eşik de gürültü de
+    // sönümle çarpılıyor: bandın içine girildikçe kırpma yumuşakça bırakıyor.
     float meshFade = SnowMeshEdgeFade(positionWS.xz);
 
-    if (meshFade > 0.999)
-    {
-        clip(h - SNOW_MIN_VISIBLE_HEIGHT);
+    clip(h - SNOW_MIN_VISIBLE_HEIGHT * meshFade);
 
-        float edgeFade = saturate((h - SNOW_MIN_VISIBLE_HEIGHT) / _SnowEdgeFadeRange);
+    float edgeFade = saturate((h - SNOW_MIN_VISIBLE_HEIGHT * meshFade)
+                              / max(_SnowEdgeFadeRange, 1e-4));
 
-        float breakup = SAMPLE_TEXTURE2D(_SnowBreakup, sampler_SnowBreakup,
-                                         positionWS.xz * _SnowBreakupScale).r;
+    float breakup = SAMPLE_TEXTURE2D(_SnowBreakup, sampler_SnowBreakup,
+                                     positionWS.xz * _SnowBreakupScale).r;
 
-        clip(edgeFade - breakup * 0.6);
-    }
+    clip(edgeFade - breakup * 0.6 * meshFade);
 }
 
 /// Fragman'da ortak kurulum: kesme, normal, yüzey. Hem ileri geçiş hem
@@ -167,7 +174,16 @@ void SnowShadeSetup(float3 positionWS, out float3 N, out SnowSurface surface, ou
     float freshness = 1.0 - saturate((SnowDensity(state.g) - 100.0) / 350.0);
 
     N = SnowNormalAt(uv, height, positionWS);
-    N = SnowApplyDetailNormals(N, positionWS, freshness, state.a, dist);
+    // DÜZLEMSEL XZ KAPLAMA DİK YÜZEYDE EZİLİYOR (rapor §2). Yüzey dikleştikçe
+    // XZ izdüşümü sıfıra yaklaşıyor, doku dikey şeritler hâlinde uzuyor.
+    // Detay normalleri yataylık oranıyla ağırlıklandırılıyor — kar zaten
+    // yataya yakın yüzeyde durur, dolayısıyla kaybedilen bir şey yok.
+    float planar = saturate((N.y - 0.35) / 0.35);
+
+    // Detay yalnız yataya yakın yüzeyde (rapor §2): dik kenarda düzlemsel XZ
+    // kaplaması dikey şeritler hâlinde uzuyor.
+    float3 detailed = SnowApplyDetailNormals(N, positionWS, freshness, state.a, dist);
+    N = normalize(lerp(N, detailed, planar));
 
     surface = SnowBuildSurface(state.g, state.b, state.a, trail.b,
                                height, positionWS, footprint);
@@ -208,7 +224,10 @@ half4 SnowLitFragment(Varyings IN) : SV_Target
 #endif
 
     // MEVCUT SİSİN KENDİSİ (spec §14). Kendi sis hesabımız yok.
-    color = MixFog(color, IN.fogFactor);
+    // PROJENİN SİSİ, URP'NİNKİ DEĞİL (rapor §7). Dağ `ApplyHeightFog`
+    // kullanıyor; kar mesh'i `MixFog` kullandığı için sınırda farklı
+    // parlaklıkta ayrışıyordu.
+    color = ApplyHeightFog(color, GetCameraPositionWS(), IN.positionWS);
 
     return half4(color, 1.0);
 }

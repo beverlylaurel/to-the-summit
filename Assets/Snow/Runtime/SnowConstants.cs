@@ -185,6 +185,9 @@ public static class SnowConstants
     /// Sağlam kabuğun üstünde batmanın kaç katına indiği.
     public const float CrustSinkScale = 0.04f;
 
+    /// En dış halkanın eteği bu kadar aşağı iniyor (rapor §5).
+    public const float SkirtDepth = 2f;
+
     /// Kar mesh'inin kenarı bu kadar arazinin altına iniyor. Kenarı kırpmak
     /// yerine gömmek, kırpma gürültüsünün kenarı testere gibi kemirmesini
     /// bitiriyor (ölçüldü, SYMPTOMS.md).
@@ -254,5 +257,5 @@ public static class SnowConstants
 
     /// Dış halkanın iç halkaya göre aşağı itilme adımı, metre. Kaplama
     /// bandında iç halka derinlik testini kazansın diye.
-    public const float RingDepthBias = 0.001f;
+    public const float RingDepthBias = 0.02f;
 }

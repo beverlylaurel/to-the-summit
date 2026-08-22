@@ -76,7 +76,10 @@ public static class SnowClipmapTest
         SnowMeshBuilder.Ring[] medium = SnowMeshBuilder.Describe(SnowQuality.Get(SnowQualityPreset.Medium));
         long mediumTris = 0;
         foreach (SnowMeshBuilder.Ring ring in medium)
+        {
             mediumTris += 2L * (ring.Grid * ring.Grid - ring.HoleQuads * ring.HoleQuads);
+            if (ring.Outermost) mediumTris += ring.Grid * 4L * 2L;
+        }
 
         bool budget = mediumTris < 1_300_000;
         all &= budget;
@@ -164,7 +167,11 @@ public static class SnowClipmapTest
 
             try
             {
-                int expected = (ring.Grid * ring.Grid - ring.HoleQuads * ring.HoleQuads) * 6;
+                // ETEK: en dış halkanın dört kenarında quad başına iki üçgen
+                // (rapor §5). Sayılmazsa sınama etek eklenince patlar.
+                int skirt = ring.Outermost ? ring.Grid * 4 * 2 * 3 : 0;
+
+                int expected = (ring.Grid * ring.Grid - ring.HoleQuads * ring.HoleQuads) * 6 + skirt;
                 int actual = (int)mesh.GetIndexCount(0);
 
                 bool indexOk = actual == expected;

@@ -79,6 +79,14 @@
 #define SNOW_CRUST_BREAK_PEN         0.05
 #define SNOW_CRUST_SINK_SCALE        0.04
 
+/// EN DIŞ HALKANIN ETEĞİ bu kadar aşağı iniyor (rapor §5).
+///
+/// Halkalar düz ızgara; dağ dalgalı veya dik bir sırttan geçerken mesh'in
+/// kenarı arazinin üstünde havada kalıp altındaki boşluğu gösteriyordu. Etek
+/// üçgenleri temasi her koşulda kapatıyor. 2 m, arazinin bir dış-halka
+/// quad'ı (54 cm) boyunca yapabileceği en dik düşüşün üstünde.
+#define SNOW_SKIRT_DEPTH             2.0
+
 /// Kar mesh'inin kenarı bu kadar arazinin altına iniyor. Terrain tekseli
 /// 7.32 m; iki yüzeyin arasındaki fark bu değerin altında kalırsa kenar yine
 /// görünür. 10 cm ölçülmüş güvenli değer.
@@ -111,6 +119,14 @@
 #define SNOW_RING0_EXTENT            8.0
 #define SNOW_RING_SCALE              3.0
 #define SNOW_RING_SNAP_QUADS         2.0
-#define SNOW_RING_DEPTH_BIAS         0.001
+/// Dış halka bu kadar aşağı itiliyor (halka başına, metre).
+///
+/// 1 mm idi ve yetmiyordu: bindirme bölgesinde dış halkanın quad'ı 3 kat
+/// kaba, aynı yükseklik alanını daha seyrek örnekliyor ve eğimli yerde
+/// santimetrelerce sapıyor. İç halkanın içinden fırlayıp z-fight yapıyordu
+/// (rapor §4). 2 cm, en kaba halkanın quad'ının (54 cm) eğimli arazide
+/// üreteceği sapmanın altında kalmayacak kadar büyük, gözle görülmeyecek
+/// kadar küçük.
+#define SNOW_RING_DEPTH_BIAS         0.02
 
 #endif

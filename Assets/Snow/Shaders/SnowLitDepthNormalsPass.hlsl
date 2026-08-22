@@ -32,6 +32,7 @@ DepthNormalsVaryings SnowDepthNormalsVertex(DepthNormalsAttributes IN)
 
     float h;
     positionWS = SnowDisplacedPositionWS(positionWS, IN.ringId.x, h);
+    positionWS.y -= IN.ringId.y * SNOW_SKIRT_DEPTH;
 
     OUT.positionWS = positionWS;
     OUT.positionCS = TransformWorldToHClip(positionWS);

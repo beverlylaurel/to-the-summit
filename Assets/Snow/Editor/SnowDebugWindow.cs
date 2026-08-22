@@ -536,6 +536,7 @@ public class SnowDebugWindow : EditorWindow
         samplerSerialized.ApplyModifiedProperties();
 
         var cascadeSerialized = new SerializedObject(cascade);
+        cascadeSerialized.FindProperty("groundHeight").objectReferenceValue = ground;
         cascadeSerialized.FindProperty("settings").objectReferenceValue = settings;
         cascadeSerialized.FindProperty("simCompute").objectReferenceValue =
             AssetDatabase.LoadAssetAtPath<ComputeShader>(ComputePath);

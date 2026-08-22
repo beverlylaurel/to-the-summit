@@ -27,6 +27,9 @@ public class SnowFarCascade : MonoBehaviour
     [Tooltip("Kaskadın merkezinde duracak hedef — genelde oyuncu.")]
     [SerializeField] Transform followTarget;
 
+    [Tooltip("Zemin yüksekliği kaynağı — kaskadın kernelleri de okuyor.")]
+    [SerializeField] SnowGroundHeight groundHeight;
+
     RenderTexture far;
     RenderTexture farTemp;
 
@@ -170,6 +173,18 @@ public class SnowFarCascade : MonoBehaviour
         // Kaskad tam çözünürlükte her karede koşuyor: 512² ucuz ve döşeme
         // döndürmesi bu ölçekte kazanç getirmiyor.
         cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.DeltaTimeEff, Time.deltaTime);
+        // ZEMİN DOKUSU AÇIKÇA BAĞLANIYOR (rapor §7). Ölçüldü: global doku
+        // compute'a zaten ulaşıyor, yani bu bir gereklilik değil — ama
+        // `SnowManager` de her kernele tek tek bağlıyor ve tek bir yerde
+        // istisna bırakmak sonraki okuyanı yanıltıyor.
+        if (groundHeight != null && groundHeight.HeightTexture != null)
+        {
+            cmd.SetComputeTextureParam(simCompute, accumulateKernel,
+                SnowShaderIDs.GroundHeightTex, groundHeight.HeightTexture);
+            cmd.SetComputeTextureParam(simCompute, scrollStateKernel,
+                SnowShaderIDs.GroundHeightTex, groundHeight.HeightTexture);
+        }
+
         cmd.SetComputeTextureParam(simCompute, accumulateKernel, SnowShaderIDs.FarSrc, far);
         cmd.SetComputeTextureParam(simCompute, accumulateKernel, SnowShaderIDs.FarDst, farTemp);
         cmd.DispatchCompute(simCompute, accumulateKernel, groups, groups, 1);
