@@ -127,7 +127,26 @@ public class SnowClipmap : MonoBehaviour
                 0f,
                 Mathf.Floor(p.z / step) * step);
         }
+
+        // MESH'İN KENARI SHADER'A BİLDİRİLİYOR.
+        //
+        // Kar mesh'i arazinin ÜSTÜNDE ayrı bir yüzey; en dış halkanın kenarında
+        // kalınlık kadar dik bir duvar bırakıyordu (ölçüldü: izolasyon
+        // anahtarıyla kar yüzeyi kapatılınca duvar kayboluyor). Kenarın ötesini
+        // artık dağın kendi kar katmanı çiziyor, o da yer değiştirme
+        // uygulamıyor — mesh kenarda arazi seviyesine inince ikisi çakışıyor
+        // ve duvar kalmıyor.
+        Vector3 outer = ringTransforms[^1].position;
+
+        Shader.SetGlobalVector(SnowShaderIDs.MeshCenterXZ,
+                               new Vector4(outer.x, outer.z, 0f, 0f));
+        Shader.SetGlobalFloat(SnowShaderIDs.MeshExtent, OuterExtent);
     }
+
+    /// En dış halkanın merkezden kenara uzaklığı (m).
+    public float OuterExtent => settings != null
+        ? settings.QualityData.AreaSize * Mathf.Pow(2f, Mathf.Max(RingCount - 1, 0)) * 0.5f
+        : 0f;
 
     void SetVisible(bool on)
     {

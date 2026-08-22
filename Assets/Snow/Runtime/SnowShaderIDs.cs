@@ -87,6 +87,8 @@ public static class SnowShaderIDs
     public static readonly int SastrugiNoise = Shader.PropertyToID("_SastrugiNoise");
 
     // --- Kar yüzeyi materyali ---
+    public static readonly int MeshCenterXZ = Shader.PropertyToID("_SnowMeshCenterXZ");
+    public static readonly int MeshExtent = Shader.PropertyToID("_SnowMeshExtent");
     public static readonly int FallbackSWE = Shader.PropertyToID("_FallbackSWE");
     // KOT KAR CIZGISI. Yukaridaki `_SnowLineY` KARAKTER ustu birikmenin
     // kendi cizgisi (spec 16.1) ve MaterialPropertyBlock ile veriliyor; bu

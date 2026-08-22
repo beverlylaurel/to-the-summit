@@ -86,6 +86,20 @@ float  _FogDensity01;
 float  _RainOnSnow01;
 float3 _SnowUpDirection;
 
+/// KAR MESH'İNİN KENARI. En dış halkanın merkezi ve yarım genişliği.
+/// Kalınlık kenarda sıfıra inip araziyle çakışsın diye.
+float2 _SnowMeshCenterXZ;
+float  _SnowMeshExtent;
+
+/// 1 = mesh'in içi, 0 = kenarı. Kenarda kalınlık sönüyor.
+float SnowMeshEdgeFade(float2 posXZ)
+{
+    if (_SnowMeshExtent <= 0.0) return 1.0;
+
+    float2 d = abs(posXZ - _SnowMeshCenterXZ) / _SnowMeshExtent;
+    return 1.0 - smoothstep(0.86, 1.0, max(d.x, d.y));
+}
+
 /// Bölgenin dışındaki dünyanın genel kar durumu.
 float _FallbackSWE;
 float _FallbackRhoN;

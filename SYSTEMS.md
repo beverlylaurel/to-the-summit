@@ -782,6 +782,11 @@ yayınlıyor; `PrecipitationRenderer` şiddetini bununla çarpıyor. Kar şiddet
 binme matematiksel olarak imkânsız. Bağ TEK YÖNLÜ — kar sistemi yağmurdan bir şey
 okumuyor.
 
+**Kar mesh'inin kenarı araziye iniyor.** Mesh arazinin üstünde ayrı bir yüzey;
+en dış halkanın sınırında kalınlık kadar dik bir duvar bırakıyordu. Kalınlık
+son %14'lük bantta sıfıra sönüyor, orada dağın kendi kar katmanı devralıyor —
+o katman yer değiştirme uygulamadığı için ikisi kenarda çakışıyor.
+
 **Dağın karı ile kar mesh'inin karı tek durumdan.** Kar mesh'i (clipmap)
 oyuncunun çevresindeki 128 m'yi kaplıyor; dağın geri kalanının karını
 `MountainSurface` çiziyor. İkisi de `SnowStateAt` okuyor — yakın bölge → uzak

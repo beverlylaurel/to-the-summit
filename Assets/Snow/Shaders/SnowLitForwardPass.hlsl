@@ -35,6 +35,11 @@ float3 SnowDisplacedPositionWS(float3 positionWS, float ringIndex, out float hei
 
     float h = SnowSurfaceAt(uv);
 
+    // KENARDA KALINLIK SIFIRA İNİYOR. Yoksa mesh'in dış sınırında kalınlık
+    // kadar dik bir duvar kalıyor. Sönüm en dış halkanın son %14'ünde;
+    // Medium'da ~9 m, 64 m uzaklıkta alt piksel.
+    h *= SnowMeshEdgeFade(positionWS.xz);
+
     heightOut = h;
 
     // DIŞ HALKALAR BİR TIK AŞAĞIDA. Halkalar kendi ızgaralarına snap'lendiği
