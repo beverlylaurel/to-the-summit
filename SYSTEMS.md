@@ -819,6 +819,14 @@ düzenlenmiyor, üretim tekrar koşturulabilir. Tane düşüşü grafikte fizikt
 `Absolute` modda kuvvet olarak üstüne biniyor. Katman bağlıyken compute tabanlı
 `SnowfallRenderer` kapanıyor — iki yağış sistemi birden koşmuyor.
 
+**Savrulan kar VFX'leri hedefi izliyor.** `SnowDriftVfxController` yalnız oranı
+değil konumu da sürüyor: saltasyon rüzgâr yönünde 15 m ileri, süspansiyon rüzgâr
+üstünde 35 m ve 2.5 m yukarı, ikisi de 1 m ızgarasına snap'li (spec §18.7).
+
+**Ayak proxy'leri karda iz bırakıyor.** Oyuncuya iki `SnowDeformer` kutusu
+(`SnowFoot_L/R`, 11×6×28 cm) `SnowDebugWindow.SetupScene`'den kuruluyor.
+Yakalama pass'i alt yüzeylerini ölçüyor; kar sistemi oyuncuyu bilmiyor.
+
 **Uzak yağış katmanı `SnowfallCurtains`.** Kameraya kilitli üç quad (18/32/55 m),
 kayan doku, alpha `layerAlpha * SnowfallIntensity01 * (1 − FogDensity01 * 0.6)`.
 Şiddeti `SnowRuntimeState`'ten KENDİSİ okuyor — `SnowfallLayers` üzerinden ikinci

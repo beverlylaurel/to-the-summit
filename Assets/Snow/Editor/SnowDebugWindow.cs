@@ -537,6 +537,14 @@ public class SnowDebugWindow : EditorWindow
         driftVfxSerialized.FindProperty("curtain").objectReferenceValue = curtainVfx;
         driftVfxSerialized.ApplyModifiedProperties();
 
+        EnsureFootDeformers(player);
+
+        var driftVfxSerializedFollow = new SerializedObject(driftVfx);
+        driftVfxSerializedFollow.FindProperty("followTarget").objectReferenceValue =
+            Camera.main != null ? Camera.main.transform
+                                : (player != null ? player.transform : null);
+        driftVfxSerializedFollow.ApplyModifiedProperties();
+
         var fallCurtainsSerialized = new SerializedObject(fallCurtains);
         fallCurtainsSerialized.FindProperty("environment").objectReferenceValue = bridge;
         fallCurtainsSerialized.FindProperty("view").objectReferenceValue = Camera.main;
@@ -688,6 +696,74 @@ public class SnowDebugWindow : EditorWindow
     /// Doku yoksa malzeme yine kuruluyor ama perde gorunmuyor: shader'in
     /// varsayilani "black", alpha 0. Sessizce bos kalmasin diye uyari
     /// veriliyor — dokuyu ureten menu ayri.
+    /// AYAK PROXY'LERI — IZ BIRAKAN GORUNMEZ MESH'LER (spec 1.4, 9).
+    ///
+    /// Yakalama pass'i nesnenin ALT YUZEYINI asagidan bakan bir kamerayla
+    /// olcuyor; kapsul tanimi ya da damga dokusu yok. Iz birakacak bir sey
+    /// olmazsa kar hic bozulmuyor — olculdu, sahnede sifir deformer vardi ve
+    /// yurumek hicbir iz birakmiyordu.
+    ///
+    /// IKI AYAK, ADIM FAZI YOK. Gercek ayak izi adim fazina baglanmayi
+    /// gerektiriyor (hangi ayak yerde); su an iki proxy de surekli yerde,
+    /// yani yuruyus iki paralel oluk aciyor. Tek olugtan gercekci, gercek
+    /// ayak izinden basit — DECISIONS.md.
+    ///
+    /// EKRANDA GIZLEME `ShadowsOnly` ILE. Spec 1.3 kameranin culling
+    /// mask'ine DOKUNMAYI YASAKLIYOR ("Bunu sen yapma"); gorunurlugu
+    /// renderer'in kendi ayarindan kapatmak o kurali bozmuyor.
+    static void EnsureFootDeformers(FirstPersonController player)
+    {
+        if (player == null) return;
+
+        int layer = LayerMask.NameToLayer(SnowProjectCheck.DeformerLayer);
+        if (layer < 0) return;
+
+        // Ayak tabani: CharacterController varsa gercek taban, yoksa transform.
+        float footY = 0f;
+        var cc = player.GetComponent<CharacterController>();
+        if (cc != null) footY = cc.center.y - cc.height * 0.5f;
+
+        EnsureFoot(player.transform, "SnowFoot_L", new Vector3(-0.11f, footY, 0f), layer);
+        EnsureFoot(player.transform, "SnowFoot_R", new Vector3( 0.11f, footY, 0f), layer);
+    }
+
+    static void EnsureFoot(Transform parent, string ad, Vector3 localPos, int layer)
+    {
+        Transform t = parent.Find(ad);
+        GameObject go;
+
+        if (t != null)
+        {
+            go = t.gameObject;
+        }
+        else
+        {
+            go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = ad;
+            go.transform.SetParent(parent, false);
+
+            // Collider deformer icin gereksiz ve oyuncunun hareketini bozar.
+            var col = go.GetComponent<Collider>();
+            if (col != null) Object.DestroyImmediate(col);
+        }
+
+        go.layer = layer;
+        go.transform.localPosition = localPos;
+        go.transform.localRotation = Quaternion.identity;
+
+        // Ayak olculeri: 11 cm en, 6 cm yukseklik, 28 cm boy.
+        go.transform.localScale = new Vector3(0.11f, 0.06f, 0.28f);
+
+        var rend = go.GetComponent<MeshRenderer>();
+        rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+        rend.receiveShadows = false;
+
+        if (go.GetComponent<SnowDeformer>() == null)
+            go.AddComponent<SnowDeformer>();
+
+        EditorUtility.SetDirty(go);
+    }
+
     static Material EnsureFallCurtainMaterial()
     {
         Shader shader = AssetDatabase.LoadAssetAtPath<Shader>(FallCurtainShaderPath);

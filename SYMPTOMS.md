@@ -983,3 +983,48 @@ ama kurulumun SONUNDA, o noktaya kadar yarım iş yapılmıştı.
 
 **Kapı en başa kondu:** `SetupScene` artık `EditorApplication.isPlaying` ise
 hemen hata verip çıkıyor.
+
+
+## "kar tutmuyor" — yağış sıcaklıktan koparılmıştı, ERİME kopmamıştı
+
+Kar yağıyordu, `SnowfallSWERate` doğruydu (1.39e-6 m/s = spec'in 5 mm/saat'i),
+zemin birikmesi neredeyse durmuştu: 45 saniyede **3.6e-9 m/s**.
+
+**İlk şüpheli yanlış çıktı: gökyüzü görünürlüğü.** `fall = SWERate * dt * skyVis`
+ve kâğıtta ters hesap `skyVis ≈ 0.16` gerektiriyordu. Doku okundu: `occlY`
+her tekselde −9999, yani engel yok, `skyVis = 1`. Şüpheli elendi.
+
+**Gerçek sebep derece-gün erimesiydi.** Dağın eteğinde hava **+4.8 °C**
+çıkıyordu; `melt = 4.63e-8 * max(0, T)` yağışın %98'ini yiyordu. Ayırt eden
+ölçüm: `SnowEnvironmentBridge.temperature` referansı Play'de null yapıldı
+(sıcaklık manuel −4 °C'ye düştü), aynı ölçüm tekrarlandı:
+
+    +4.8 °C : 3.6e-9  m/s
+    −4.0 °C : 1.10e-7 m/s      otuz kat
+
+**Düzeltme sıcaklık modelini bozmadan yapıldı:** `seaLevelCelsius` +7.8 → −2.
+Kar çizgisi ve yağış-sıcaklık bağı kaldırıldığı için oyun "her kotta kar tutar"
+diyor; sıcaklık modeli de buna uymalı. 206 m'de −1.7 °C, zirvede −42.8 °C.
+
+**Ölçüm aracının sınırı:** `MeanSwe` 64² indirgenmiş durumdan otuz karede bir
+okunuyor ve kısa pencerelerde gürültülü — rüzgâr kapatıldığında hız beklenenin
+tersine düştü. Otuz katlık fark güvenilir, %20'lik farklar değil.
+
+
+## "yürürken iz kalmıyor" — sahnede tek bir deformer yoktu
+
+`SnowDeformer` sayısı sıfırdı. Yakalama pass'i çalışıyordu, kar birikiyordu,
+iz bırakacak hiçbir nesne yoktu. Spec §1.4 karakter proxy'lerini "ayrı ayrı
+onay al" diye bekletiyor; test istendiğinde kuruldu.
+
+**Ölçüm aracı bir kez yalan söyledi.** `RT_Capture` `ARGBHalf`; ilk okuma
+`GetData<float>` ile yapıldı ve "max 0.0078, ayak altında ≈ 0" verdi — yani
+"yakalama çalışmıyor". Doğru tiple (`RGBAFloat` dönüşümü) okununca:
+
+    maskeli teksel 114     R = −0.03 (ayak alt yüzeyi, gözlemciye göre)
+
+114 teksel iki ayağın alanına birebir uyuyor (2 × 0.11 × 0.28 m² / 0.0234 m²).
+Trail dokusunda `carve max 1.08 mm`, 113 teksel. Zincir baştan sona çalışıyordu.
+
+**`Renderer.isVisible` bu iş için ölçüt değil** — birinci şahısta ayak zaten
+kameraya görünmüyor, `False` okumak yakalamanın çalışmadığı anlamına gelmiyor.

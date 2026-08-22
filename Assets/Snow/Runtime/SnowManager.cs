@@ -125,8 +125,6 @@ public class SnowManager : MonoBehaviour
     /// rüzgâr yönü kullanılırsa mevcut sistemin esintileri deseni titretiyor.
     Vector2 sastrugiWindDir = Vector2.right;
 
-    int windTransportTile;
-
     int accumulateTile;
     int lastReadbackFrame = -1;
     bool readbackPending;
@@ -281,7 +279,6 @@ public class SnowManager : MonoBehaviour
 
         windShadowIterationsLeft = WindShadowIterations;
         windShadowDirection = Vector2.zero;
-        windTransportTile = 0;
         sastrugiWindDir = Vector2.right;
 
         accumulateTile = 0;

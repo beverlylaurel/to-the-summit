@@ -344,6 +344,23 @@ public static class MountainSceneBootstrap
         }
 
         thermometer.Bind(weatherState, windField, Object.FindAnyObjectByType<TimeOfDay>());
+
+        // DENİZ SEVİYESİ SICAKLIĞI KIŞLIK.
+        //
+        // Varsayılan +7.8 °C idi ve dağın eteğinde (206 m) hava +4.8 °C
+        // çıkıyordu. Kar yağıyor ama derece-gün erimesi yağışın %98'ini
+        // yiyordu: ölçüldü, birikme hızı 3.6e-9 m/s; sıcaklık -4 °C'ye
+        // çekilince 1.10e-7 m/s, otuz kat.
+        //
+        // Kar çizgisi ve yağış-sıcaklık bağı kaldırıldığı için oyun "her kotta
+        // kar tutar" diyor; sıcaklık modeli de buna uymalı. Kâğıtta 206 m:
+        //   -2 - 6.5*0.206 + 1.63*gunduz - 3.25*yagis
+        //   yağışlı gündüz -4.96 °C, yağışsız gündüz -1.71 °C — ikisi de donma altı.
+        // Zirvede (6028 m) -42.8 °C; kışın Everest zirvesi mertebesinde.
+        var thermoSerialized = new SerializedObject(thermometer);
+        thermoSerialized.FindProperty("seaLevelCelsius").floatValue = -2f;
+        thermoSerialized.ApplyModifiedProperties();
+
         EditorUtility.SetDirty(thermometer);
 
         // KUŞAKLAR ÖLÇÜLEN ARAZİDEN. Taban eskiden `baseHeight × terrainHeight` ile

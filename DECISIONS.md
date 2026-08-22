@@ -99,12 +99,24 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   5. `SnowMovementModifier.SpeedMultiplier` hareket koduna bağlanacak
   → [Kar sistemi: spec'ten bilinçli sapmalar](#kar-sistemi-specten-bilinçli-sapmalar-ve-iki-assumption-2026-08-22)
 
-- **Savrulan kar VFX'leri konumlanmıyor** — `SnowDriftVfxController` yalnız
-  oranı sürüyor; `VFX_Spindrift` ve `VFX_SnowCurtain` sahne orijininde duruyor
-  (ölçüldü: konum (0,0,0), kamera 7,5 km ötede). Spawn kutuları kameraya
-  taşınmadan bu iki katman hiç görünmüyor.
-  **Tetikleyici:** rüzgâr yüksekken yerde savrulan kar görünmüyorsa.
-  **Maliyet:** `SnowfallLayers`'daki takip mantığının aynısı, birkaç satır.
+- **Savrulan kar grafiklerinde spawn KUTUSU yok** — konum sürme eklendi
+  (`SnowDriftVfxController.FollowTarget`), ama `VFX_Spindrift` ve
+  `VFX_SnowCurtain` grafiklerinde `PositionShape` bloğu yok: parçacıklar
+  objenin tam merkezinde doğuyor, spec §18.7'nin şeridinde değil. Süspansiyon
+  için ayrıca üstel yükseklik dağılımı isteniyor
+  (`h = −1.1 * log(1 − rand)`, `h = min(h, 5)`).
+  **Tetikleyici:** savrulan kar tek noktadan fışkırıyor görünüyorsa.
+  **Maliyet:** iki grafiğe kutu + süspansiyona CustomHLSL üstel yükseklik.
+
+- **Ayak izleri adım fazına bağlı değil** — iki proxy de sürekli yerde, yürüyüş
+  iki paralel oluk açıyor. Gerçek ayak izi hangi ayağın yerde olduğunu bilmeyi
+  gerektiriyor.
+  **Tetikleyici:** iz "ayak izi" değil "kızak izi" göründüğünde.
+  **Maliyet:** kontrolcüden adım fazı yayını + proxy'lerin y ofseti.
+
+- **Kenar sırtı (rim) hiç oluşmuyor** — ölçüldü: `trail.g` max 0, carve 1.08 mm
+  varken. Spec §10.2 izin kenarında sırt istiyor.
+  **Tetikleyici:** izin kenarı keskin ve düz göründüğünde.
 
 - **Yağmur artık hiç çizilmiyor** — `RainWeight01` sabit 0. Sıcaklık yağıştan
   koparılınca (kullanıcı kararı) kar/yağmur ayrımı yapacak tek kapı da gitti;
