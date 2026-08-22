@@ -62,20 +62,39 @@ public static class SnowfallTest
         r.AppendLine("  [" + M(zero) + "] Şiddet 0          " + none +
                      " tane  (kar yoksa hiç iş yok)");
 
-        // Şiddet arttıkça tane sayısı DOĞRU ORANTILI artıyor. Doyum
-        // olsaydı yarım şiddette de tam şiddette de aynı yoğunluk olurdu.
+        // ASGARİ EKRAN BOYU İFADESİ İŞARET GÜVENLİ Mİ.
+        //
+        // HLSL burada koşturulamıyor; denetlenen şey kaynağın kendisi.
+        // `UNITY_MATRIX_P._m11` D3D render hedefinde NEGATİF geliyor ve
+        // `abs` olmadan ölçek 10000 katına çıkıyor (ölçüldü). Aynı hatanın
+        // ikinci kez yazılmasını bu satır engelliyor.
+        string particleSrc = System.IO.File.ReadAllText(
+            "Assets/Snow/Shaders/SnowfallParticle.shader");
+
+        bool signSafe = !System.Text.RegularExpressions.Regex.IsMatch(
+            particleSrc, @"(?<!abs\()\s*UNITY_MATRIX_P\._m11");
+
+        all &= signSafe;
+        r.AppendLine("  [" + M(signSafe) + "] _m11 işaret güvenli  " +
+                     (signSafe ? "abs ile sarılı" : "ABS YOK — ölçek negatifte patlar"));
+
+        // Şiddet arttıkça tane sayısı artıyor ve kapasitede doyuyor —
+        // spec §17.1 + §17.2'nin birlikte verdiği davranış.
         int low = SnowfallRenderer.FlakeCountFor(0.06f, 1f);
         int mid = SnowfallRenderer.FlakeCountFor(0.24f, 1f);
-        int half = SnowfallRenderer.FlakeCountFor(0.50f, 1f);
         int high = SnowfallRenderer.FlakeCountFor(1f, 1f);
 
-        bool monotone = low > 0 && low < mid && mid < half && half < high &&
-                        Mathf.Abs(half * 2f - high) < 2f;
+        // SPEC KENDİ İÇİNDE ÇELİŞİYOR: §17.2'nin FORMÜLÜ
+        // `Lerp(0, 16000, i01)` (i01 = 0.06 → 960 tane/s), altındaki
+        // "referans" tablosu 1200 diyor. SWE sütunu doğrusal, tane sütunu
+        // değil. Kod bloğu normatif, tablo referans — formül uygulandı.
+        bool lowMatchesSpec = Mathf.Abs(low - 0.06f * 16000f * 6.5f) < 2f;
+        bool saturates = high == 40000;
+        bool monotone = low > 0 && low < mid && mid <= high && lowMatchesSpec && saturates;
 
         all &= monotone;
         r.AppendLine("  [" + M(monotone) + "] Şiddet → tane     0.06 → " + low +
-                     ",  0.24 → " + mid + ",  0.50 → " + half + ",  1.00 → " + high +
-                     "  (yarım şiddet yarım yoğunluk)");
+                     ",  0.24 → " + mid + ",  1.00 → " + high + "  (kapasite tavanı 40000)");
 
         // Kalite preseti kapasiteyi ölçekliyor (spec §15.3).
         int lowQuality = SnowfallRenderer.FlakeCountFor(0.24f, 0.35f);

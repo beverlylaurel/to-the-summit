@@ -64,6 +64,10 @@ public class SnowDebugWindow : EditorWindow
     int channel;
     float gridSize = 1f;
     float testSwe = 0.02f;
+    string flakeReport;
+    float probeCount = 1f;
+    float probeAlpha = 1f;
+    float probeMinPx = 1.3f;
     Vector2 scroll;
 
     Material debugMaterial;
@@ -121,6 +125,173 @@ public class SnowDebugWindow : EditorWindow
         debugMaterial.SetFloat(SnowShaderIDs.DebugWorldSize, worldSize);
 
         Graphics.Blit(shown, preview, debugMaterial, 0);
+    }
+
+    /// TANE ÖLÇÜMÜ. "Ekran bembeyaz" belirtisi kodla açıklanamadı: 20000
+    /// tane × 2 cm boy ekranın yüzde ikisini kaplar, tamamını değil. Demek ki
+    /// varsayılan sayılardan biri gerçekte başka — hangisi olduğunu tahmin
+    /// etmek yerine tampon CPU'ya okunuyor.
+    ///
+    /// ARACIN KENDİSİ ÖNCE DOĞRULANIYOR: her satırın yanında BEKLENEN değer
+    /// yazıyor. Araç yalan söylüyorsa beklenenle ölçülen ikisi birden saçma
+    /// çıkar; yalnız ölçülen saçmaysa hata karda.
+    ///
+    /// Bu bölüm belirti kapanınca silinecek.
+    void DrawFlakeProbe()
+    {
+        SnowManager manager = SnowManager.Active;
+        if (manager == null) return;
+
+        var renderer = manager.GetComponent<SnowfallRenderer>();
+        if (renderer == null) return;
+
+        EditorGUILayout.LabelField("Tane ölçümü", EditorStyles.boldLabel);
+
+        using (new EditorGUI.DisabledScope(!Application.isPlaying))
+        {
+            if (GUILayout.Button("Taneleri oku", GUILayout.Height(24f)))
+                flakeReport = MeasureFlakes(renderer);
+        }
+
+        if (!string.IsNullOrEmpty(flakeReport))
+            EditorGUILayout.TextArea(flakeReport, GUILayout.MinHeight(190f));
+
+        DrawFlakeOverrides(renderer);
+    }
+
+    /// ÜÇ AYRI DENEY, ÜÇÜ DE TEK CEVAPLI.
+    ///
+    /// Ölçüm tanelerin ekranın yalnız %1.3'ünü kapladığını söyledi; beyazlık
+    /// buradan çıkamaz. Ama taneleri kapatmak beyazlığı kaldırıyor. İkisi
+    /// birden doğruysa beyazlık tanenin PİKSELİNDEN değil, çiziminin yan
+    /// etkisinden geliyor. Hangisi olduğunu bu üç kaydırıcı ayırıyor:
+    ///
+    /// - sayı 0.001 → 13 tane. Beyazlık DURUYORSA piksel sayısıyla ilgisi yok.
+    /// - alpha 0    → taneler çiziliyor ama hiçbir renk katmıyor. Beyazlık
+    ///                DURUYORSA sebep çizimin kendisi (derinlik ön geçişi,
+    ///                saydam kuyruk), tanenin rengi değil.
+    /// - asgari px 0→ asgari ekran boyu zorlaması kalkıyor. Beyazlık
+    ///                KALKIYORSA sebep o ifade.
+    void DrawFlakeOverrides(SnowfallRenderer renderer)
+    {
+        using (new EditorGUI.DisabledScope(!Application.isPlaying))
+        {
+            probeCount = EditorGUILayout.Slider("Tane sayısı çarpanı", probeCount, 0f, 1f);
+            probeAlpha = EditorGUILayout.Slider("Alpha çarpanı", probeAlpha, 0f, 1f);
+            probeMinPx = EditorGUILayout.Slider("Asgari ekran boyu (px)", probeMinPx, 0f, 4f);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("Uygula", GUILayout.Height(22f)))
+                {
+                    renderer.ProbeCountScale = probeCount;
+                    renderer.ProbeAlphaScale = probeAlpha;
+                    renderer.ProbeMinPixelSize = probeMinPx;
+                }
+
+                using (new EditorGUI.DisabledScope(!renderer.HasProbeOverride))
+                {
+                    if (GUILayout.Button("Ayarları geri al", GUILayout.Height(22f)))
+                    {
+                        renderer.ClearProbeOverrides();
+                        probeCount = 1f; probeAlpha = 1f; probeMinPx = 1.3f;
+                    }
+                }
+            }
+
+            EditorGUILayout.LabelField("Çizilen tane", renderer.AliveFlakes.ToString());
+        }
+    }
+
+    static string MeasureFlakes(SnowfallRenderer renderer)
+    {
+        GraphicsBuffer buffer = renderer.FlakeBuffer;
+        int alive = renderer.AliveFlakes;
+
+        if (buffer == null) return "Tampon yok (bileşen kapalı?).";
+        if (alive <= 0) return "Açık yuva yok: AliveFlakes = 0.";
+
+        Camera cam = Camera.main;
+        if (cam == null) return "Camera.main yok — ekran boyu hesaplanamıyor.";
+
+        var raw = new float[buffer.count * 12];
+        buffer.GetData(raw);
+
+        // Piksel/metre dönüşümü: ekran yüksekliği / (2·tan(yarı fov)) · 1/mesafe
+        float halfFov = cam.fieldOfView * 0.5f * Mathf.Deg2Rad;
+        float pxPerMeterAt1m = cam.pixelHeight / (2f * Mathf.Tan(halfFov));
+        float screenArea = cam.pixelWidth * (float)cam.pixelHeight;
+
+        Vector3 camPos = cam.transform.position;
+
+        float sizeMin = float.MaxValue, sizeMax = 0f, sizeSum = 0f;
+        float alphaMin = float.MaxValue, alphaMax = 0f, alphaSum = 0f;
+        float distMin = float.MaxValue, distMax = 0f, distSum = 0f;
+        float lifeMin = float.MaxValue, lifeMax = 0f;
+        float pxMax = 0f;
+        double coveredPx = 0.0;
+        int clamped = 0, near2m = 0, drawn = 0, nan = 0;
+
+        for (int i = 0; i < alive; i++)
+        {
+            int o = i * 12;
+
+            var pos = new Vector3(raw[o + 0], raw[o + 1], raw[o + 2]);
+            float lifetime = raw[o + 7];
+            float size = raw[o + 8];
+            float alpha = raw[o + 11];
+
+            if (float.IsNaN(size) || float.IsNaN(alpha) || float.IsNaN(pos.x)) { nan++; continue; }
+
+            lifeMin = Mathf.Min(lifeMin, lifetime);
+            lifeMax = Mathf.Max(lifeMax, lifetime);
+
+            if (lifetime <= 0f || alpha <= 0.001f) continue;
+            drawn++;
+
+            float dist = Vector3.Distance(camPos, pos);
+
+            sizeMin = Mathf.Min(sizeMin, size); sizeMax = Mathf.Max(sizeMax, size); sizeSum += size;
+            alphaMin = Mathf.Min(alphaMin, alpha); alphaMax = Mathf.Max(alphaMax, alpha); alphaSum += alpha;
+            distMin = Mathf.Min(distMin, dist); distMax = Mathf.Max(distMax, dist); distSum += dist;
+
+            if (dist < 2f) near2m++;
+
+            // Shader'ın yaptığının aynısı: asgari ekran boyu tabanı.
+            float px = size * pxPerMeterAt1m / Mathf.Max(dist, 1e-4f);
+            if (px < 1.3f) { px = 1.3f; clamped++; }
+
+            pxMax = Mathf.Max(pxMax, px);
+            coveredPx += px * (double)px * alpha;
+        }
+
+        if (drawn == 0)
+            return "Açık yuva " + alive + " ama ÇİZİLEN tane 0 " +
+                   "(lifetime ≤ 0 veya alpha ≤ 0.001). NaN: " + nan;
+
+        var r = new System.Text.StringBuilder();
+
+        r.AppendLine("ölçülen / BEKLENEN");
+        r.AppendLine("açık yuva      " + alive + "  / 20000 @ şiddet 0.5");
+        r.AppendLine("çizilen        " + drawn + "  / açık yuvanın ~%84'ü (alpha rampası)");
+        r.AppendLine("NaN            " + nan + "  / 0");
+        r.AppendLine("ömür (s)       " + lifeMin.ToString("0.00") + " – " + lifeMax.ToString("0.00") +
+                     "  / 4.00 – 9.00");
+        r.AppendLine("boy (m)        " + sizeMin.ToString("0.0000") + " – " + sizeMax.ToString("0.0000") +
+                     "  ort " + (sizeSum / drawn).ToString("0.0000") + "  / 0.0108 – 0.0306");
+        r.AppendLine("alpha          " + alphaMin.ToString("0.000") + " – " + alphaMax.ToString("0.000") +
+                     "  ort " + (alphaSum / drawn).ToString("0.000") + "  / 0.00 – 1.00");
+        r.AppendLine("kameraya (m)   " + distMin.ToString("0.00") + " – " + distMax.ToString("0.00") +
+                     "  ort " + (distSum / drawn).ToString("0.00") + "  / 0.1 – 32");
+        r.AppendLine("2 m'den yakın  " + near2m + "  / ~%2");
+        r.AppendLine("ekran boyu px  en büyük " + pxMax.ToString("0.0") +
+                     ",  tabana dayanan " + clamped + "  / en büyük ~40 px");
+        r.AppendLine("KAPLAMA        %" + (coveredPx / screenArea * 100.0).ToString("0.0") +
+                     "  / %2 civarı — %100 ise beyazlığın sebebi bu");
+        r.AppendLine("ekran          " + cam.pixelWidth + "×" + cam.pixelHeight +
+                     ", fov " + cam.fieldOfView.ToString("0.0"));
+
+        return r.ToString();
     }
 
     /// İZOLASYON ANAHTARLARI. Belirtiden sorumluyu bulmanın tek yolu
@@ -262,6 +433,8 @@ public class SnowDebugWindow : EditorWindow
     void OnGUI()
     {
         scroll = EditorGUILayout.BeginScrollView(scroll);
+
+        DrawFlakeProbe();
 
         EditorGUILayout.LabelField("Kurulum", EditorStyles.boldLabel);
         if (GUILayout.Button("Sahneyi kur", GUILayout.Height(28f))) SetupScene();

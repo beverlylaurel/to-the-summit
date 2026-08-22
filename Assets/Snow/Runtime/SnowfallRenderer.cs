@@ -54,6 +54,30 @@ public class SnowfallRenderer : MonoBehaviour
     [Tooltip("Yer savrulmasının azami doğum oranı katsayısı.")]
     [SerializeField, Range(0f, 1f)] float spindriftRate = 1f;
 
+    /// ÖLÇÜM GEÇERSİZ KILMALARI. Hepsi `NonSerialized` ve hepsi
+    /// MaterialPropertyBlock üzerinden — ne ayar dosyasına ne materyale
+    /// yazıyor, Play'den çıkınca sıfırlanıyor. Eksi değer "dokunma" demek.
+    ///
+    /// Belirti kapanınca silinecek.
+    [System.NonSerialized] public float ProbeCountScale = -1f;
+    [System.NonSerialized] public float ProbeAlphaScale = -1f;
+    [System.NonSerialized] public float ProbeMinPixelSize = -1f;
+
+    static readonly int AlphaScaleID = Shader.PropertyToID("_AlphaScale");
+    static readonly int MinPixelSizeID = Shader.PropertyToID("_MinPixelSize");
+
+    public bool HasProbeOverride =>
+        ProbeCountScale >= 0f || ProbeAlphaScale >= 0f || ProbeMinPixelSize >= 0f;
+
+    public void ClearProbeOverrides()
+    {
+        ProbeCountScale = -1f;
+        ProbeAlphaScale = -1f;
+        ProbeMinPixelSize = -1f;
+
+        flakeBlock?.Clear();
+    }
+
     ISnowEnvironmentSource env;
 
     GraphicsBuffer flakes;
@@ -70,6 +94,11 @@ public class SnowfallRenderer : MonoBehaviour
 
     int aliveFlakes;
     int aliveDrift;
+
+    /// ÖLÇÜM İÇİN. Teşhis penceresi tamponu CPU'ya okuyup gerçek boy, alpha
+    /// ve mesafe dağılımını basıyor.
+    public GraphicsBuffer FlakeBuffer => flakes;
+    public GraphicsBuffer DriftBuffer => drift;
 
     public int AliveFlakes => aliveFlakes;
     public int AliveDrift => aliveDrift;
@@ -150,19 +179,28 @@ public class SnowfallRenderer : MonoBehaviour
 
         aliveDrift = DriftCountFor(env.WindSpeed, SnowRuntimeState.LooseSnowFraction,
                                    spindriftRate, settings.QualityData.VfxCapacityScale);
+
+        if (ProbeCountScale >= 0f)
+        {
+            aliveFlakes = Mathf.RoundToInt(aliveFlakes * ProbeCountScale);
+            aliveDrift = Mathf.RoundToInt(aliveDrift * ProbeCountScale);
+        }
     }
 
-    /// YOĞUNLUK ŞİDDETLE DOĞRU ORANTILI.
+    /// Kararlı durumda canlı tane sayısı = doğum oranı × ortalama ömür.
     ///
-    /// "Doğum oranı × ortalama ömür" hesabı i01 = 0.38'in üstünde kapasiteye
-    /// dayanıyor ve yoğunluk şiddetten BAĞIMSIZ hâle geliyor: yarım şiddette
-    /// de tam şiddette de kırk bin tane. Ölçüldü — 0.5 şiddette ekran
-    /// tamamen beyaz.
+    /// DOYUM SPEC'İN KENDİ DAVRANIŞI. §17.2 tam şiddette `_flakeRate` 16000/s
+    /// veriyor, §17.1 ömrü 4–9 s (ortalama 6.5 s) ve kapasiteyi 40000 olarak
+    /// bağlıyor: 16000 × 6.5 = 104000 > 40000. VFX Graph'ın havuzu da tam
+    /// böyle davranır — i01 ≈ 0.385'ten sonra yoğunluk kapasitede kalır.
+    /// Bir ara bunu "orantılı" diye değiştirdim; spec'ten sapmaydı, geri alındı.
     ///
     /// Saf fonksiyon: Play'e girmeden sınanabiliyor.
     public static int FlakeCountFor(float intensity01, float capacityScale)
     {
-        float wanted = Mathf.Clamp01(intensity01) * FlakeCapacity * capacityScale;
+        const float MeanLifetime = 6.5f;
+
+        float wanted = intensity01 * SnowConstants.MaxFlakeRate * MeanLifetime * capacityScale;
         return Mathf.Clamp(Mathf.RoundToInt(wanted), 0, FlakeCapacity);
     }
 
@@ -247,6 +285,9 @@ public class SnowfallRenderer : MonoBehaviour
         if (aliveFlakes > 0)
         {
             flakeBlock.SetBuffer(SnowShaderIDs.Flakes, flakes);
+
+            if (ProbeAlphaScale >= 0f) flakeBlock.SetFloat(AlphaScaleID, ProbeAlphaScale);
+            if (ProbeMinPixelSize >= 0f) flakeBlock.SetFloat(MinPixelSizeID, ProbeMinPixelSize);
 
             var rp = new RenderParams(flakeMaterial)
             {

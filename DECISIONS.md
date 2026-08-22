@@ -1020,6 +1020,39 @@ Geçiş her kamera için kaydediliyor (oyun + sahne görünümü). Muhafaza olma
 editörde simülasyon iki kat hızlı ilerliyordu. `Time.frameCount` muhafazası
 `SnowManager.Dispatch`'in başında.
 
+## Kar sistemi spec'e karşı denetlendi (2026-08-22)
+
+Kullanıcı "birebir spec uygulanacak demedim mi, kaç hatan var" diye sorunca
+tahmin edilmedi, sayıldı. Spec'in 81 kod bloğundan çıkan **68 formül/sabit**
+koda karşı mekanik olarak tarandı.
+
+**Sonuç: 68/68 eşleşti.** İlk turda "eksik" görünen 7 madde regex yanılgısıydı;
+hepsi parametreye taşınmış hâlde duruyor (`_SnowEdgeFadeRange`,
+`_SnowBreakupScale`, `contactWidth`, `_CurtainScaleH`, `SNOW_SUSP_MAX_HEIGHT`).
+
+Gerçek sapmalar spec'in **kod bloğu vermediği**, düz metinle anlattığı yerlerde
+çıktı — ikisi de kapatıldı:
+
+1. **Asgari ekran boyu** (§17.1). Spec formülü doğru veriyor ama HLSL karşılığını
+   vermiyor; sıfırdan yazılınca işaret hatası girdi. Belirti ve ölçüm
+   `SYMPTOMS.md`'de.
+2. **`M_SnowDrift._StretchMax = 3`** (§17.1 Sistem B). Spec yer savrulması için
+   "4–8× uzatılmış" diyor, tane sistemi için "1→3×". Tanenin sayısı savrulmaya
+   kopyalanmıştı. Shader'a `_StretchMin` eklendi; tane 1→3, savrulma 4→8.
+
+Ayrıca aynı gün "düzeltme" diye yazılan iki şey spec'ten sapmaydı, geri alındı:
+tane renginde uydurulmuş `0.35` taban katsayısı (§17.1 "Lit Quad" diyor —
+aydınlatma artık quad'ın kendi normalinden) ve yoğunluğu doyumdan çıkarma
+(doyum §17.1 + §17.2'nin birlikte verdiği davranış).
+
+**Spec'in kendi çelişkisi kayda geçti:** §17.2'nin formülü
+`_flakeRate = Lerp(0, 16000, i01)`, altındaki "referans" tablosu i01 = 0.06 için
+1200 diyor; doğrusal olsa 960 çıkar. Aynı tablonun SWE sütunu doğrusal. Kod
+bloğu normatif sayıldı, tablo referans.
+
+**Ders:** spec'in kod verdiği yerde sapma yok; sapma spec'in *tarif ettiği* yerde
+oluyor. Böyle bir yerde önce projede aynı işi yapan çalışan kod aranır.
+
 ## Kar sınamaları Unity'ye tıklamadan koşuyor (2026-08-22)
 
 `Assets/Snow/Editor/SnowTestRunner.cs` `Logs/snow-test.request` dosyasının

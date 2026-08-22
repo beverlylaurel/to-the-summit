@@ -8,9 +8,49 @@ Her kayıt üç şey taşır: belirtinin kullanıcının ağzından hâli, ilk �
 doğar — tahminle çözülen bir şey buraya yazılmaz.
 
 Bu dosyanın kendi dersi: **belirtinin göründüğü yer, belirtinin doğduğu yer değildir.**
-İlk şüphelisi kayda geçmiş dokuz belirtinin **dokuzunda da** ilk şüpheli yanlış çıktı —
+İlk şüphelisi kayda geçmiş on belirtinin **onunda da** ilk şüpheli yanlış çıktı —
 her seferinde belirtinin en çok göze çarptığı katman seçilmişti. Bulut kontüründe üç ayrı
 şüpheli (ışın yürüyüşü, zamansal birikim, mesafe sınırı) sırayla elendi; sebep dördüncüdeydi.
+
+---
+
+## Ekranın tamamı bembeyaz, ayak altında hareket eden siyahlık, 10 FPS
+
+**İlk şüpheli:** tane sayısı ve tane parlaklığı. *(Yanlış — ikisi de düzeltildi,
+belirti aynen kaldı.)*
+
+**İkinci şüpheli:** çizimin başka bir kameraya sızması. *(Yanlış — kar sisteminde
+gerçek `Camera` yok, yakalama da gökyüzü de elle çiziliyor.)*
+
+**Sebep:** asgari ekran boyu ifadesinde işaret hatası. Yazdığım hâl:
+
+```hlsl
+float tanHalfFov = 1.0 / max(UNITY_MATRIX_P._m11, 1e-4);
+```
+
+D3D render hedefine çizerken projeksiyonun `[1][1]` öğesi **negatife düşüyor**
+(y ekseni ters çevriliyor). `max(-1.732, 1e-4)` → `1e-4`, ölçek 10 000 katına
+çıkıyor: 23 m uzaktaki 2 cm'lik tane **680 m**'lik bir dörtgen oluyor. On üç bin
+tanenin on üçü bile ekranı kapatıyor; beyazlık tanenin rengi değil, üst üste
+binen dev dörtgenler. Ayak altındaki "siyahlık" da aynı dörtgenlerin arkadan
+aydınlanmış olanları.
+
+**Ayırt eden ölçüm:** iki aşamalı.
+1. Tampon CPU'ya okundu: boy 0.011–0.031 m, alpha 0.007–1.0, mesafe 1.3–23 m —
+   **hepsi doğru**, hesaplanan kaplama %1.3. Yani hata tamponda değil, shader'da.
+2. `_MinPixelSize` çalışma anında 0'a çekildi → beyazlık gitti, taneler ilk kez
+   göründü. Şişen terim buydu.
+
+**Aracın kendi yalanı:** ölçüm aracı piksel boyunu **C#'ta** `cam.fieldOfView`
+ile hesaplıyordu ve doğru sayıyı veriyordu; shader başka bir ifade kullanıyordu.
+Araç "beklenen" sütununu doğru bastığı için ilk turda "demek ki taneler değil"
+sonucu çıktı. **Bir ifadeyi ölçmek istiyorsan ifadenin kendisini ölç, niyetini
+değil.**
+
+**Kural:** aynı işi yapan çalışan bir kod varsa ifade oradan kopyalanır.
+`Precipitation.shader` → `PixelsPerRadian()` bu tuzağı yıllar önce yemiş ve
+yanına `abs` şart diye not düşmüş. Kar tarafında sıfırdan yazıldığı için not da
+kaybolmuştu. Sınama artık kaynağı denetliyor: `abs` olmadan `_m11` geçemiyor.
 
 ---
 

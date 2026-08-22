@@ -13,6 +13,7 @@ Shader "ToTheSummit/SnowfallParticle"
         _SoftFade ("Yumuşak parçacık mesafesi (m)", Float) = 0.4
 
         _StretchAlongVelocity ("Hız yönünde uzat", Float) = 0
+        _StretchMin ("Asgari uzama", Float) = 1.0
         _StretchMax ("Azami uzama", Float) = 3.0
         _AlphaScale ("Alpha çarpanı", Float) = 1.0
     }
@@ -68,6 +69,7 @@ Shader "ToTheSummit/SnowfallParticle"
             float  _MinPixelSize;
             float  _SoftFade;
             float  _StretchAlongVelocity;
+            float  _StretchMin;
             float  _StretchMax;
             float  _AlphaScale;
 
@@ -115,9 +117,16 @@ Shader "ToTheSummit/SnowfallParticle"
                 // ASGARİ EKRAN BOYU ZORUNLU (spec §17.1). Uygulanmazsa
                 // uzaktaki taneler alt piksel kalıyor, kayboluyor ve TAA'da
                 // titriyor.
-                float tanHalfFov = 1.0 / max(UNITY_MATRIX_P._m11, 1e-4);
-                float minWorld = dist * (_MinPixelSize / max(_ScaledScreenParams.y, 1.0))
-                               * 2.0 * tanHalfFov;
+                //
+                // ÖLÇEK MEVCUT YAĞIŞ SHADER'INDAKİYLE AYNI İFADE:
+                // `Precipitation.shader` → `PixelsPerRadian()`. `abs` ŞART —
+                // D3D render hedefine çizerken projeksiyonun [1][1] öğesi
+                // NEGATİFE düşüyor. Kendi ifademi yazınca `max(-1.73, 1e-4)`
+                // 1e-4 verdi, ölçek 10000 katına çıktı ve 23 m uzaktaki tane
+                // 680 m'lik bir dörtgen oldu: ekran bembeyaz, 10 FPS
+                // (ölçüldü — `SYMPTOMS.md`).
+                float pixelsPerRadian = abs(UNITY_MATRIX_P._m11) * _ScreenParams.y * 0.5;
+                float minWorld = dist * _MinPixelSize / max(pixelsPerRadian, 1e-4);
 
                 float size = max(f.size, minWorld);
 
@@ -141,7 +150,10 @@ Shader "ToTheSummit/SnowfallParticle"
                     float3 screenVel = normalize(velDir - forward * dot(velDir, forward) + 1e-5);
                     float3 screenSide = cross(forward, screenVel);
 
-                    float stretch = lerp(1.0, _StretchMax, saturate(_WindSpeed / 12.0));
+                    // Spec §17.1: tane sisteminde 1→3×, Sistem B'de (yer
+                    // savrulması) 4–8×. Alt sınır ayrı bir parametre; ikisine
+                    // aynı sayıyı vermek savrulmayı tane gibi gösteriyordu.
+                    float stretch = lerp(_StretchMin, _StretchMax, saturate(_WindSpeed / 12.0));
 
                     offset = (screenVel * rotated.y * stretch + screenSide * rotated.x) * size;
                 }
@@ -163,20 +175,20 @@ Shader "ToTheSummit/SnowfallParticle"
 
                 float alpha = f.alpha * fogFade * _AlphaScale;
 
-                // TANE AYDINLATILMIŞ BİR YÜZEY, IŞIK KAYNAĞI DEĞİL.
+                // SPEC §17.1: "Output Particle Lit Quad", Metallic 0,
+                // Smoothness 0.2, `Emissive = _FlakeEmissive * mainLightColor
+                // * 0.04` (gece lambaların altında görünsünler).
                 //
-                // Işıma terimi spec §17.1'de `_FlakeEmissive * mainLightColor
-                // * 0.04` — yalnız gece lambaların altında görünsünler diye
-                // küçük bir katkı. `0.04` atlanınca güneş şiddeti 3.03 olan
-                // bu sahnede tane rengi 3.4 çıkıyor ve kırk bin tane ekranı
-                // tamamen beyaza boğuyor (ölçüldü).
+                // AYDINLATMA QUAD'IN KENDİ NORMALİNDEN. Uydurma bir taban
+                // katsayısı yok: "Lit Quad" aydınlatılmış bir yüzey demek,
+                // yüzeyin normali de kameraya bakan düzlemin normali.
                 Light mainLight = GetMainLight();
 
-                half3 ambient = SampleSH(half3(0, 1, 0));
-                half3 diffuse = _FlakeTint.rgb * (ambient + mainLight.color * 0.35h);
+                half3 N = (half3)forward;
+                half3 lit = SampleSH(N) + mainLight.color * saturate(dot(N, mainLight.direction));
                 half3 emissive = mainLight.color * _FlakeEmissive * 0.04h;
 
-                OUT.color = float4(diffuse + emissive, alpha);
+                OUT.color = float4(_FlakeTint.rgb * lit + emissive, alpha);
                 OUT.fogFactor = ComputeFogFactor(OUT.positionCS.z);
 
                 return OUT;
