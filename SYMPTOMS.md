@@ -1468,3 +1468,28 @@ tarifi korunuyor; tek iz sığ kalıyor.
 **Araç yalanı:** kesit probu yüzeyi `baseH − carve + rim` ile hesaplıyordu,
 shader'ın oyma sınırını uygulamıyordu. "0 cm" gösterdiği yerde gerçek değer
 0.92 cm'di. Prob shader'ın formülüyle hizalandı.
+
+## Oyuncunun çevresinde parlaklığı farklı bir KARE
+
+**Sebep 1 — otuz kare gecikme.** Dağın kar katmanı `_SnowCoverage`'dan
+besleniyordu, o da async GPU geri okumasından: otuz karede bir tazeleniyor.
+Kar mesh'i ANINDA güncelleniyor. Arada içerisi yeni durumu, dışarısı otuz kare
+önceki durumu gösteriyordu — kullanıcı belirtiyi iki kez, ters yönlerde
+bildirdi (bir kez içerisi beyaz dışarısı siyah, bir kez tam tersi).
+
+**Çözüm:** `_SnowCoverage` artık `SnowManager.WorldSwe`'den, CPU'da, gecikmesiz.
+Eğri yüzey shader'ınınkiyle aynı (`MinVisibleHeight` eşiği, `EdgeFadeRange`
+bandı); üç yer de aynı sabitleri okuyor.
+
+**Sebep 2 — AÇIK.** Gecikme kalkınca altındaki gerçek uyumsuzluk açığa çıktı:
+tam örtüde mesh dağdan **%15 karanlık** (dağ R212 G207 B207, mesh R181 G174
+B176). Albedo, yoğunluk, tazelik formülü ve detay normal dokusu birebir aynı;
+fark aydınlatma yolunda.
+
+Elenen: ortam (ikisi de `SampleSH × AO × diffuse`, ikisinde de yansıma küresi
+yok — bu yüzden mesh'e `GlobalIllumination` eklemek %3 karanlıktan %14 parlağa
+kaçırdı ve geri alındı), wrap diffuse (kâğıtta mesh'i %5 PARLAK yapıyor,
+karartmıyor).
+
+Kalan şüpheli: mesh'in yükseklik tabanlı AO'su (`SnowHeightAO`) — dağda
+karşılığı yok.

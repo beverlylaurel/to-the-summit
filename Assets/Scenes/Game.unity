@@ -391,6 +391,7 @@ MonoBehaviour:
   upDirection: {x: 0, y: 1, z: 0}
   coverageScale: 1
   settings: {fileID: 11400000, guid: 1bdd01165981db9469d51c90967f8bbf, type: 2}
+  snowManager: {fileID: 76489726}
 --- !u!114 &76489736
 MonoBehaviour:
   m_ObjectHideFlags: 0

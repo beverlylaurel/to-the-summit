@@ -50,6 +50,13 @@ public static class SnowConstants
     /// kaldırıyor ve karın araziye kaybolarak karışmasını sağlıyor.
     public const float MinVisibleHeight = 0.004f;
 
+    /// Kenar geçiş bandı, metre. `SnowConstants.hlsl`'in
+    /// `SNOW_EDGE_FADE_RANGE`'i ve `SnowLit.shader`'ın `_SnowEdgeFadeRange`'i
+    /// ile AYNI olmak zorunda: üçü de "kar ne zaman görünür olur" sorusunu
+    /// cevaplıyor. Ayrışırlarsa arazi, mesh ve nesneler farklı anlarda
+    /// beyazlar.
+    public const float EdgeFadeRange = 0.020f;
+
     // --- Yakalama (spec §9.1, §9.4) ---
 
     /// Yakalama kamerasının oyuncunun altına indiği mesafe, metre.

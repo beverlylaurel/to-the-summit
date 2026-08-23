@@ -23,11 +23,40 @@ public class SnowCoverageDriver : MonoBehaviour
     [Tooltip("Örtü ayarlarının kaynağı. Arazi ve nesneler aynı sayıları okuyor.")]
     [SerializeField] SnowSettings settings;
 
+    [Tooltip("Dünya karını okuyan yönetici. Örtü GECİKMESİZ buradan türüyor.")]
+    [SerializeField] SnowManager snowManager;
+
+    /// ÖRTÜ DÜNYA KARINDAN, GERİ OKUMADAN DEĞİL.
+    ///
+    /// Eskiden `SnowRuntimeState.GroundCoverage01` okunuyordu; o değer async
+    /// GPU geri okumasından geliyor ve otuz karede bir tazeleniyor. Kar mesh'i
+    /// ANINDA güncellendiği için arada oyuncunun çevresinde görünür bir KARE
+    /// kalıyordu: içerisi yeni durumu, dışarısı otuz kare önceki durumu
+    /// gösteriyordu (kullanıcı iki kez bildirdi — bir kez içerisi beyaz dışarısı
+    /// siyah, bir kez tam tersi).
+    ///
+    /// `SnowManager.WorldSwe` aynı yağıştan CPU'da entegre ediliyor, gecikmesi
+    /// yok. Eğri yüzey shader'ının kullandığıyla aynı: `SNOW_MIN_VISIBLE_HEIGHT`
+    /// eşiği ve `SNOW_EDGE_FADE_RANGE` bandı.
+    float DunyaOrtusu()
+    {
+        if (snowManager == null || snowManager.WorldSwe < 0f)
+            return SnowRuntimeState.GroundCoverage01;
+
+        float rho = Mathf.Lerp(SnowConstants.RhoMin, SnowConstants.RhoMax,
+                               snowManager.WorldRhoN);
+
+        float derinlik = snowManager.WorldSwe * SnowConstants.RhoWater / Mathf.Max(rho, 1f);
+
+        return Mathf.Clamp01((derinlik - SnowConstants.MinVisibleHeight)
+                             / SnowConstants.EdgeFadeRange);
+    }
+
     void LateUpdate()
     {
         Shader.SetGlobalVector(SnowShaderIDs.SnowUpDirection, upDirection.normalized);
         Shader.SetGlobalFloat(SnowShaderIDs.SnowCoverage,
-            Mathf.Clamp01(SnowRuntimeState.GroundCoverage01 * coverageScale));
+            Mathf.Clamp01(DunyaOrtusu() * coverageScale));
 
         if (settings == null) return;
 
