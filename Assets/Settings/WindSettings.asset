@@ -12,10 +12,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 727293e7242aa434e93c16cac681f2f3, type: 3}
   m_Name: WindSettings
   m_EditorClassIdentifier: Assembly-CSharp::WindSettings
-  calmSpeed: 2
+  calmSpeed: 0.6
   stormSpeed: 14
+  shelteredFactor: 0.35
+  exposedFactor: 1.45
   baseFrequency: 0.011
   baseVariation: 0.25
   gustAmount: 0.4
   gustFrequency: 0.08
+  flickerAmount: 0.12
+  flickerFrequency: 0.5
+  prevailingDegrees: 205
+  directionSpread: 35
   directionDrift: 0.02

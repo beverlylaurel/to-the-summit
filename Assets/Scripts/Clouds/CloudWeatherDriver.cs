@@ -46,6 +46,10 @@ public class CloudWeatherDriver : MonoBehaviour
         clouds.densityMultiplier.overrideState = true;
     }
 
+    [Tooltip("Yüzey sakinken bulut katmanının koruduğu en düşük hız (m/s). " +
+             "Serbest atmosfer yüzey sürtünmesinden etkilenmiyor.")]
+    [SerializeField] float calmAloftSpeed = 2f;
+
     void Update()
     {
         // Yön HÂKİM rüzgârdan, anlık hızdan değil: esinti yönü saliseler içinde yalpalıyor
@@ -54,7 +58,12 @@ public class CloudWeatherDriver : MonoBehaviour
         float degrees = Mathf.Atan2(heading.z, heading.x) * Mathf.Rad2Deg;
         if (degrees < 0f) degrees += 360f;
 
-        clouds.globalSpeed.value = wind.FreeAirSpeed * MetersPerSecondToKilometersPerHour;
+        // BULUT TABANI AYRI. Yüzey rüzgârı sürtünmeden dolayı sakin havada
+        // neredeyse durur (`WindSettings.calmSpeed` 0.6 m/s); serbest atmosfer
+        // durmaz. Aynı sayıyı paylaşsalardı sakin günde gökyüzü donardı.
+        float aloft = Mathf.Max(wind.FreeAirSpeed, calmAloftSpeed);
+
+        clouds.globalSpeed.value = aloft * MetersPerSecondToKilometersPerHour;
         clouds.globalOrientation.value = degrees;
 
         // KAPSAMA ATMOSFERDEN. Kural orada tek yerde duruyor: fırtına kütlesi, kuru hava

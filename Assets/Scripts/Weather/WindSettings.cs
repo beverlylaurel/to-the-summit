@@ -13,8 +13,17 @@ using UnityEngine;
 public class WindSettings : ScriptableObject
 {
     [Header("Taban rüzgâr")]
-    [Tooltip("Severity 0 iken hız (m/s). Sıfır olmamalı.")]
-    public float calmSpeed = 2f;
+    /// YÜZEY RÜZGÂRI, serbest atmosfer değil. Bulut katmanı kendi tabanını
+    /// `CloudWeatherDriver`'dan alıyor — yüzey sürtünmesi yüzeyi yavaşlatır,
+    /// yukarısı durmaz.
+    ///
+    /// 2 m/s'ti ve Beaufort 2 ("hafif esinti") demekti: dağda hiçbir zaman
+    /// durgun hava olmuyordu. Kar terminal hızı 1 m/s olduğu için 2 m/s'lik
+    /// rüzgâr taneyi dikeyden 63° yatırıyor — panel "rüzgâr 0" derken ekranda
+    /// bariz yan yatık kar. 0.6 Beaufort 1 ("hafif hava"); maruziyet çarpanıyla
+    /// birlikte 0.21–0.87 m/s, yani 12–41° arası.
+    [Tooltip("Severity 0 iken YÜZEY hızı (m/s). Sıfır olmamalı.")]
+    public float calmSpeed = 0.6f;
     [Tooltip("Severity 1 iken hız (m/s). Tam fırtına.")]
     public float stormSpeed = 14f;
 

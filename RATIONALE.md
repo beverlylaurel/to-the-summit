@@ -1201,6 +1201,43 @@ hız arttıkça kendiliğinden sıklaşıyor.
 fazı kayabilirdi — ses bir ayakta, iz öbüründe düşerdi.
 
 
+## Sakin hava 0.6 m/s, bulutlar 2 m/s — iki ayrı taban
+
+**Kural.** `WindSettings.calmSpeed = 0.6` (yüzey),
+`CloudWeatherDriver.calmAloftSpeed = 2` (bulut katmanı).
+
+**Neden yüzey düştü.** 2 m/s Beaufort 2 ("hafif esinti") demek: dağda hiçbir
+zaman durgun hava olmuyordu. Kar terminal hızı `g/drag = 1 m/s` olduğu için
+yatay rüzgâr doğrudan eğime çevriliyor:
+
+| rüzgâr | dikeyden sapma |
+|---|---|
+| 0.6 m/s | 31° |
+| 2.0 m/s (eski taban) | 63° |
+| 14 m/s (fırtına) | 86° |
+
+Panel "rüzgâr 0" derken ekranda 63° yatık kar vardı; kullanıcı bunu "sanki çok
+ufak bir rüzgâr varmış gibi" diye bildirdi ve haklıydı. 0.6 Beaufort 1 ("hafif
+hava"); maruziyet çarpanıyla (0.35–1.45) birlikte 0.21–0.87 m/s, yani 12–41°
+arası bir çeşitlilik.
+
+**Neden bulut tabanı ayrı.** `calmSpeed` aynı zamanda bulut ilerleme hızını
+sürüyordu (`CloudWeatherDriver`, `FreeAirSpeed` üzerinden). Yüzeyi durultmak
+gökyüzünü de durduruyordu: 7.2 km/h → 2.2 km/h, on dakikada 360 m, 2000 m'lik
+bulut katmanında fark edilmez bir hareket.
+
+Fizik ikisini zaten ayırıyor: yüzey rüzgârını YER SÜRTÜNMESİ yavaşlatır, serbest
+atmosfer ondan etkilenmez. Bulut katmanı kendi tabanını alıyor; yüzey tabanı
+değişince gökyüzü etkilenmiyor.
+
+**Ölçüm:** kilitli rüzgâr 0'da HUD 0,5 m/s, taneye giden yatay hız 0.51 m/s,
+dikeyden sapma 26.8°.
+
+**Yön DEĞİŞMEDİ.** `directionSpread` 35°, `directionDrift` 0.02 Hz — sakin hava
+±35°'yi 50 saniyelik periyotla dolaşıyor, bu zaten doğru. Kilitliyken yön
+`overrideAngle ± 8°`'e daralıyor; bu teşhis kilidinin amacı, hata değil.
+
+
 ## Salınım hız değil YER DEĞİŞTİRME, ve çıktı bağlamında
 
 **Kural.** `VFX_Snowfall`'ın çıktı bağlamında `SnowFlakeFlutter` bloğu tanenin

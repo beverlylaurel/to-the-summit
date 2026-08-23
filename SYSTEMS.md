@@ -883,6 +883,12 @@ taneleri birlikte ışınlıyordu. Dünya uzayında obje yalnız nereye doğdukl
 belirliyor. Zemin kesmesi de bu yüzden DÜNYA kotu okuyor —
 `SnowfallLayers` `groundReference.position.y`'yi olduğu gibi yolluyor.
 
+**Yüzey rüzgârı ve serbest atmosfer ayrı tabanlarda.** `WindSettings.calmSpeed`
+(0.6 m/s) YÜZEY rüzgârıdır; bulut katmanı kendi tabanını
+`CloudWeatherDriver.calmAloftSpeed`'ten (2 m/s) alıyor. Yüzey sürtünmesi yüzeyi
+yavaşlatır, serbest atmosfer durmaz — tek sayıyı paylaşsalardı sakin günde
+gökyüzü donardı.
+
 **Türbülans ve salınım AYRI işler.** Türbülans havanın ORTAK hareketi ve
 tamamen rüzgâra bağlı (`0.35 * WindSpeed`); uzayda tutarlı bir alan, yan yana
 iki tane aynı yöne itiliyor. Salınım tanenin KENDİ çırpınması, rüzgârdan

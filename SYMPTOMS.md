@@ -1248,6 +1248,10 @@ sürüyor; şiddet 0 → `WindSettings.calmSpeed`. Ölçüm: `WindSpeed = 1.80 m
 `WindForce = (17.54, 0, −0.47)` → `17.54 / 9.81 = 1.79 m/s`, tam +x. HUD da
 dürüst yazıyor: "Hız 2,0 m/s". Sakin hava sıfır hava değil.
 
+**Çözüm:** `calmSpeed` 2.0 → 0.6 m/s (Beaufort 1). Taneyi dikeyden 63° yerine
+31° yatırıyor. Bulut katmanı kendi tabanını aldı, yoksa sakin günde gökyüzü
+donuyordu — gerekçe `RATIONALE.md`.
+
 **Yürürken neden düzeliyor:** yürüme hızı 2.2 m/s, koşma 4 m/s. Kendi hareketin
 1.8 m/s'lik sürüklenmeyle aynı büyüklükte, o yüzden bağıl hareket baskın çıkıyor
 ve sürüklenme göze batmıyor. Dururken tek hareket o.
