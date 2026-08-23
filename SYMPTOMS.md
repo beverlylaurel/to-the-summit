@@ -1354,3 +1354,25 @@ olamaz** — artış adımdan küçükse toplam hiç ilerlemez.
 Bir önceki turda "compute globalleri okumuyor" diye yazılan gerekçe YANLIŞTI;
 `_TemperatureC` testi çekirdeğin globalleri okuduğunu gösterdi. O değişiklik
 zararsız kaldı ama sebep o değildi.
+
+## Kar birikiyor ama zemin beyazlamıyor — örtü 0'da kalıyor
+
+**Sebep:** `_RainOnSnow01` hava sisteminin `PrecipKind` ETİKETİNDEN türüyordu.
+Yağış sıcaklıktan koparıldığından beri o etiket −5 °C'de bile `Rain` diyor.
+Sonuç: kar YAĞARKEN zemin üstüne yağmur yağıyormuş gibi işliyordu —
+`rho += rainOnSnow * 25 * dt/60` yoğunluğu 55'ten 167 kg/m³'e çıkarıyor,
+derinlik (`SWE × 1000 / ρ`) üçte bire iniyor ve 4 mm'lik
+`SNOW_MIN_VISIBLE_HEIGHT` eşiğini hiç geçemiyor.
+
+Ölçüm: SWE 5.5e-4, yoğunluk 167, derinlik 3.31 mm, örtü 0.
+
+**Çözüm:** `rainOnSnow` artık karın KENDİ keskin kararından
+(`SnowRuntimeState.IsSnowing` / `RainWeight01`), etiketten değil. Kar mı yağmur
+mu tek bir yerde karara bağlanıyor (`SnowfallController`, eşik 0.5) ve fizik de
+aynı kararı okuyor.
+
+Ölçüm sonrası: örtü **0.9999**, `_RainOnSnow01` 0.
+
+**Ders:** aynı olgunun iki ayrı doğruluk kaynağı olamaz. Görsel keskin karar
+veriyorken fiziğin başka bir etikete bakması, ekranda kar yağarken zeminde
+yağmur işletiyordu.

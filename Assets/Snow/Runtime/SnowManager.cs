@@ -441,7 +441,22 @@ public class SnowManager : MonoBehaviour
         Shader.SetGlobalFloat(SnowShaderIDs.SunElevation01, env.SunElevation01);
         Shader.SetGlobalFloat(SnowShaderIDs.FogDensity01, env.FogDensity01);
 
-        float rainOnSnow = env.PrecipKind == PrecipitationKind.Rain ? env.PrecipIntensity01 : 0f;
+        // KAR ÜSTÜNE YAĞMUR, KARIN KENDİ KARARINDAN — `PrecipKind` ETİKETİNDEN DEĞİL.
+        //
+        // `env.PrecipKind` hava sisteminin etiketi ve yağış sıcaklıktan
+        // koparıldığından beri −5 °C'de bile `Rain` diyor. Buradan okununca kar
+        // YAĞARKEN zemin üstüne yağmur yağıyormuş gibi davranıyordu: yoğunluk
+        // 55'ten 167 kg/m³'e çıkıyor, derinlik üçte bire iniyor ve 4 mm'lik
+        // görünürlük eşiğini hiç geçemiyordu. Ölçüldü — SWE 5.5e-4 iken
+        // derinlik 3.31 mm, örtü 0.
+        //
+        // Kar mı yağmur mu KESKİN bir karar ve sahibi `SnowfallController`
+        // (eşik 0.5, ikisi asla birlikte). Fizik de aynı kararı okumalı, yoksa
+        // ekranda kar yağarken zeminde yağmur işliyor.
+        float rainOnSnow = SnowRuntimeState.IsSnowing
+                         ? 0f
+                         : SnowRuntimeState.RainWeight01 * env.PrecipIntensity01;
+
         Shader.SetGlobalFloat(SnowShaderIDs.RainOnSnow01, rainOnSnow);
 
         // DETAY NORMALİ GLOBAL. Materyalde de duruyor ama dağın kar katmanı
