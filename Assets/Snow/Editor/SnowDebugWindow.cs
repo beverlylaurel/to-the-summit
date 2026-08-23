@@ -141,7 +141,6 @@ public class SnowDebugWindow : EditorWindow
         EditorGUILayout.LabelField("İzolasyon", EditorStyles.boldLabel);
 
         Toggle<SnowfallRenderer>(host, "Kar yağışı (taneler)");
-        Toggle<SnowCurtainController>(host, "Süspansiyon perdeleri");
         Toggle<SnowSurface>(host, "Kar yüzeyi (zemin mesh'i)");
         Toggle<SnowCoverageDriver>(host, "Nesne üstü kar");
         Toggle<SnowBurstParticles>(host, "Ayak tozu / püskürtme");
@@ -374,8 +373,6 @@ public class SnowDebugWindow : EditorWindow
     const string FlakeMaterialPath = "Assets/Snow/Settings/M_SnowFlake.mat";
     const string DriftMaterialPath = "Assets/Snow/Settings/M_SnowDrift.mat";
     const string PuffMaterialPath = "Assets/Snow/Settings/M_SnowPuff.mat";
-    const string CurtainShaderPath = "Assets/Snow/Shaders/SnowCurtain.shader";
-    const string CurtainMaterialPath = "Assets/Snow/Settings/M_SnowCurtain.mat";
 
     const string SnowLitMaterialPath = "Assets/Snow/Settings/M_SnowLit.mat";
 
@@ -448,9 +445,6 @@ public class SnowDebugWindow : EditorWindow
 
         var persistence = go.GetComponent<SnowPersistence>();
         if (persistence == null) persistence = go.AddComponent<SnowPersistence>();
-
-        var curtains = go.GetComponent<SnowCurtainController>();
-        if (curtains == null) curtains = go.AddComponent<SnowCurtainController>();
 
         // VFX KATMANLARI: bileşen sahnede duruyor ama VFX referansları BOŞ.
         // Boşken hiçbir şey yapmıyorlar — mevcut compute yolu çalışmaya devam
@@ -617,23 +611,7 @@ public class SnowDebugWindow : EditorWindow
 
         managerSerialized.FindProperty("snowfallRenderer").objectReferenceValue = snowfall;
         managerSerialized.FindProperty("burstParticles").objectReferenceValue = burst;
-        Material curtainMat = LoadOrCreateCurtainMaterial();
-
-        var curtainSerialized = new SerializedObject(curtains);
-        curtainSerialized.FindProperty("settings").objectReferenceValue = settings;
-        curtainSerialized.FindProperty("snowfallCompute").objectReferenceValue =
-            AssetDatabase.LoadAssetAtPath<ComputeShader>(SnowfallComputePath);
-        curtainSerialized.FindProperty("curtainMaterial").objectReferenceValue = curtainMat;
-        curtainSerialized.FindProperty("followTarget").objectReferenceValue =
-            Camera.main != null ? Camera.main.transform
-                                : (player != null ? player.transform : null);
-        curtainSerialized.FindProperty("environmentSource").objectReferenceValue = bridge;
-        curtainSerialized.ApplyModifiedProperties();
-
-        EditorUtility.SetDirty(curtains);
-
         managerSerialized.FindProperty("persistence").objectReferenceValue = persistence;
-        managerSerialized.FindProperty("curtains").objectReferenceValue = curtains;
         managerSerialized.ApplyModifiedProperties();
 
         EditorUtility.SetDirty(persistence);
@@ -895,27 +873,6 @@ public class SnowDebugWindow : EditorWindow
         material.SetFloat(SnowShaderIDs.AlphaScale, alpha);
 
         EditorUtility.SetDirty(material);
-        return material;
-    }
-
-    static Material LoadOrCreateCurtainMaterial()
-    {
-        Texture2D noise = SnowTextureBaker.EnsureCurtainNoise();
-
-        var material = AssetDatabase.LoadAssetAtPath<Material>(CurtainMaterialPath);
-
-        if (material == null)
-        {
-            var shader = AssetDatabase.LoadAssetAtPath<Shader>(CurtainShaderPath);
-            if (shader == null) return null;
-
-            material = new Material(shader);
-            AssetDatabase.CreateAsset(material, CurtainMaterialPath);
-        }
-
-        material.SetTexture(SnowShaderIDs.CurtainNoise, noise);
-        EditorUtility.SetDirty(material);
-
         return material;
     }
 

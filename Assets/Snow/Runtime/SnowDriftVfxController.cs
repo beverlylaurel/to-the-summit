@@ -15,9 +15,8 @@ using UnityEngine.VFX;
 ///   Süspansiyon  ≤ 5 m     türbülansla askıda, seyrek
 ///
 /// İKİSİNİN DE TETİĞİ AYNI. Spec §18.7: "Her ikisinin de tetiği §18.1'deki
-/// `DriftActive01`. Ayrı eşik tanımlama." Bu bileşen o değeri
-/// `SnowCurtainController.DriftActiveFor` üzerinden okuyor — ikinci bir eşik
-/// hesabı kurmuyor.
+/// `DriftActive01`. Ayrı eşik tanımlama." Eşik burada, `DriftActiveFor`'da
+/// duruyor; `SnowManager` da oradan okuyor. İkinci bir hesap yok.
 [DisallowMultipleComponent]
 public class SnowDriftVfxController : MonoBehaviour
 {
@@ -45,6 +44,22 @@ public class SnowDriftVfxController : MonoBehaviour
     [SerializeField] string rateProperty = "SpawnRate";
     [SerializeField] string driftProperty = "DriftActive";
 
+    [Tooltip("Grafikteki rüzgâr kuvveti özelliğinin adı.")]
+    [SerializeField] string windProperty = "WindForce";
+
+    /// Saltasyonun sürükleme katsayısı — grafikteki `dragCoefficient` ile aynı
+    /// olmak zorunda; denge hızı `F / drag`.
+    const float SpindriftDrag = 4f;
+
+    /// Süspansiyonun sürükleme katsayısı.
+    const float CurtainDrag = 3f;
+
+    /// Spec §18.7: saltasyon rüzgârın 0.7–1.1 katı, ortası 0.9.
+    const float SpindriftWindShare = 0.9f;
+
+    /// Spec §18.7: süspansiyon rüzgârın 0.7–0.95 katı, ortası 0.82.
+    const float CurtainWindShare = 0.82f;
+
     /// Teşhis: o anki eşik değeri.
     public float DriftActive01 { get; private set; }
 
@@ -63,13 +78,28 @@ public class SnowDriftVfxController : MonoBehaviour
     /// merkezi ortasında.
     const float CurtainHeight = 2.5f;
 
+    /// SAVRULMA EŞİĞİ (spec §18.1).
+    ///
+    /// Gevşek kar düşük rüzgârda kalkıyor, rüzgârla sıkışmış kar yüksek
+    /// rüzgâra kadar yerinde duruyor; eşik ikisinin arasında yoğunlukla
+    /// harmanlanıyor. 4 m/s'lik bant eşiğin üstünde yumuşak bir açılış
+    /// veriyor — eşikte birden başlayan savrulma kesme gibi görünüyordu.
+    public static float DriftActiveFor(float windSpeed, float looseFraction)
+    {
+        float rhoN = 1f - Mathf.Clamp01(looseFraction);
+        float threshold = Mathf.Lerp(SnowConstants.DriftU10Loose,
+                                     SnowConstants.DriftU10Packed, rhoN);
+
+        return Mathf.Clamp01((windSpeed - threshold) / 4f);
+    }
+
     void LateUpdate()
     {
         if (environment == null || settings == null) return;
 
         FollowTarget();
 
-        DriftActive01 = SnowCurtainController.DriftActiveFor(
+        DriftActive01 = DriftActiveFor(
             environment.WindSpeed, SnowRuntimeState.LooseSnowFraction);
 
         // Spec §18.7 Sistem A: `_SpindriftRate * DriftActive01² * LooseSnowFraction`.
@@ -80,6 +110,16 @@ public class SnowDriftVfxController : MonoBehaviour
         SpindriftRate = settings.SpindriftRate
                       * DriftActive01 * DriftActive01
                       * SnowRuntimeState.LooseSnowFraction;
+
+        // RÜZGÂR KUVVET OLARAK. Hız bloğu olmadan `Orient: AlongVelocity`
+        // sıfır hızda çöküyor ve taneler tek noktadan fışkırıyordu.
+        Vector3 wind = environment.WindDirection * environment.WindSpeed;
+
+        if (spindrift != null && spindrift.HasVector3(windProperty))
+            spindrift.SetVector3(windProperty, wind * SpindriftWindShare * SpindriftDrag);
+
+        if (curtain != null && curtain.HasVector3(windProperty))
+            curtain.SetVector3(windProperty, wind * CurtainWindShare * CurtainDrag);
 
         Drive(spindrift, SpindriftRate);
 

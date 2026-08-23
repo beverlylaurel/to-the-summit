@@ -63,7 +63,7 @@ public static class SnowAccumulationTest
         foreach (float t in sicakliklar)
         {
             env.TemperatureC = t;
-            controller.Tick(env);
+            controller.Tick(env, 1f);
 
             if (!SnowRuntimeState.IsSnowing) hepsi = false;
         }
@@ -71,10 +71,25 @@ public static class SnowAccumulationTest
         r.AppendLine("  [" + M(hepsi) + "] Her sıcaklıkta kar yağıyor    " +
                      "-20, -5, 0, 1, 5, 30 °C → IsSnowing hepsinde true");
 
+        // KAR ORANI: 0 yağmur, 1 kar. Sıcaklık karışmıyor.
+        env.TemperatureC = -5f;
+        controller.Tick(env, 0f);
+
+        bool yagmur = !SnowRuntimeState.IsSnowing
+                      && SnowRuntimeState.RainWeight01 > 0.999f;
+
+        controller.Tick(env, 1f);
+
+        bool kar = SnowRuntimeState.IsSnowing
+                   && SnowRuntimeState.RainWeight01 < 0.001f;
+
+        r.AppendLine("  [" + M(yagmur && kar) + "] Kar oranı kar/yağmur seçiyor  " +
+                     "0 → yağmur, 1 → kar, ikisi de -5 °C'de");
+
         // Yağış yoksa kar da yok — tek kapı bu kaldı.
         env.PrecipKind = PrecipitationKind.None;
         env.TemperatureC = -20f;
-        controller.Tick(env);
+        controller.Tick(env, 1f);
 
         bool noPrecipNoSnow = !SnowRuntimeState.IsSnowing;
         r.AppendLine("  [" + M(noPrecipNoSnow) + "] Yağış yoksa kar da yok        " +
@@ -83,20 +98,15 @@ public static class SnowAccumulationTest
         // Islaklık kaynağı yok: tane her zaman kuru.
         env.PrecipKind = PrecipitationKind.Rain;
         env.TemperatureC = 5f;
-        controller.Tick(env);
+        controller.Tick(env, 1f);
 
         bool kuru = controller.Wetness < 1e-6f;
         r.AppendLine("  [" + M(kuru) + "] Tane kuru                     " +
                      "5 °C → Wetness " + controller.Wetness.ToString("0.00"));
 
-        // Yağmur yolu susuyor: iki yağış üst üste binmemeli.
-        bool yagmurKapali = SnowRuntimeState.RainWeight01 < 1e-6f;
-        r.AppendLine("  [" + M(yagmurKapali) + "] Yağmur yolu kapalı            " +
-                     "RainWeight01 " + SnowRuntimeState.RainWeight01.ToString("0.00"));
-
         controller.Reset();
 
-        return hepsi && noPrecipNoSnow && kuru && yagmurKapali;
+        return hepsi && yagmur && kar && noPrecipNoSnow && kuru;
     }
 
     // ----------------------------------------------------------------- şiddet
@@ -135,7 +145,7 @@ public static class SnowAccumulationTest
         foreach ((float i01, float swe, float flake) row in table)
         {
             env.PrecipIntensity01 = row.i01;
-            controller.Tick(env);
+            controller.Tick(env, 1f);
 
             // Tablo yuvarlanmış; %1 tolerans.
             bool sweOk = Mathf.Abs(controller.SnowfallSweRate - row.swe) < row.swe * 0.01f;

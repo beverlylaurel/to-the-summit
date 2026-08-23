@@ -53,6 +53,17 @@ public class DebugMenu : MonoBehaviour
 
     bool weatherLocked;
 
+    /// KAR ORANI: yağışın ne kadarı kar. 1 kar, 0 yağmur.
+    ///
+    /// Eskiden bu sürgü yağışı açıp SICAKLIĞI donmanın altına indiriyordu ve
+    /// kar/yağmur kararını `SnowfallController`'ın histerezisi veriyordu.
+    /// Histerezis kaldırılınca sürgü yalancı oldu: 0 yapılınca hiçbir şeye
+    /// dokunmuyor, kar yağmaya devam ediyordu.
+    ///
+    /// Artık doğrudan `SnowManager.SnowFraction01`'i sürüyor — sıcaklık
+    /// karışmıyor, karar tek yerden geliyor.
+    float lockedSnowFraction = 1f;
+
     /// Teşhis: rüzgâr taşınımı ve gölgesi ayrı ayrı kapatılabiliyor.
     bool windTransportOff;
     bool windShadowOff;
@@ -169,6 +180,10 @@ public class DebugMenu : MonoBehaviour
         if (keyboard != null && keyboard.f1Key.wasPressedThisFrame) Toggle();
 
         if (weatherLocked) weatherDriver.IntensityOverride = lockedPrecipitation;
+
+        // Kar oranı kilitten BAĞIMSIZ sürülüyor: yağış kilidi kapalıyken de
+        // "şu an kar mı yağmur mu" denenebilmeli.
+        if (snowManager != null) snowManager.SnowFraction01 = lockedSnowFraction;
         if (windLocked) wind.ApplyOverride(lockedWindStrength, lockedWindAngle);
 
         // KİLİT AÇILINCA DA KOŞMALI: geçersiz kılmayı temizleyen taraf burası.
@@ -431,8 +446,17 @@ public class DebugMenu : MonoBehaviour
             //
             // Artık yağış varsa kar var; ikinci bir sürgünün anlatacağı bir şey
             // yok.
-            GUILayout.Label($"Yağış (kar) şiddeti {lockedPrecipitation:F2}   " + SnowStatus());
+            GUILayout.Label($"Yağış şiddeti {lockedPrecipitation:F2}");
             lockedPrecipitation = GUILayout.HorizontalSlider(lockedPrecipitation, 0f, 1f);
+
+            // KAR ORANI, KAR ŞİDDETİ DEĞİL. Şiddeti yukarıdaki sürgü veriyor;
+            // bu sürgü o yağışın kaça kar kaça yağmur bölüneceğini söylüyor.
+            // İkisi ayrı soru: "ne kadar yağıyor" ve "ne yağıyor".
+            GUILayout.Label($"Kar oranı {lockedSnowFraction:F2}   " +
+                            (lockedSnowFraction > 0.999f ? "tamamen kar" :
+                             lockedSnowFraction < 0.001f ? "tamamen yağmur" : "karışık") +
+                            "   " + SnowStatus());
+            lockedSnowFraction = GUILayout.HorizontalSlider(lockedSnowFraction, 0f, 1f);
             GUILayout.Label(SnowStateStatus());
 
             // HALKA SINIRI TEŞHİSİ. Halkalar ±8, ±16, ±32, ±64 m. Kusur bir

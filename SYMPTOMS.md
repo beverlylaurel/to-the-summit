@@ -1181,3 +1181,46 @@ zemini simsiyah yapmış.
 **Yapılamayan:** bisikletin zemin direnci (`RollingResistance`). Alan gerçekten
 boşta duruyor ama `TerrainSurface`'te zemin TİPİ API'si yok (`WindWeightAt` ve
 `SlopeAt` var). Önce zemin sınıflandırması gerekiyor — `DECISIONS.md`.
+
+---
+
+## "Etrafta kâğıt gibi incecik beyaz örtü geziyor, bir derinliği yok"
+
+Kullanıcı üç kez bildirdi, üç turda üç ayrı sistem suçlandı. **İkisi de doğruydu —
+iki ayrı kusur aynı belirtiyi veriyordu.**
+
+**Elenen şüpheliler — hepsi ölçümle:**
+
+| Şüpheli | Nasıl elendi |
+|---|---|
+| `VFX_SnowCurtain` | Kapatıldı, örtü kaldı |
+| `VFX_Spindrift` | Kapatıldı, örtü kaldı |
+| Sıfır hızda `Orient: AlongVelocity` (normalize(0)) | `WindForce` sıfırdan (48,0,20)'ye çıkarıldı, dikdörtgen yerinde kaldı |
+| Tek bir dev quad | Spawn 25'e indirildi, 142 tane kaldı — dev quad YOK |
+
+**Gerçek sebep, iki tane:**
+
+**1. Asgari ekran boyutu alfayı kısmıyordu.** Tane 1.3 piksele çekilirken kapladığı
+alan büyüyor, alfa sabit kalıyordu. Ölçüm: `px/rad = 769`, taban 1.8 cm tane
+**10.6 m**'den sonra piksel altına düşüyor; 20 m'de alan ×3.5, 40 m'de ×14.
+Kutu 40×26×40, hacminin çoğu 10.6 m'nin ötesinde — 89 bin tane üst üste binip
+süt gibi bir örtü çıkarıyordu. Keskin dikdörtgen kenar örtünün değil, **spawn
+kutusunun duvarı**.
+
+**2. `SnowCurtainController`, VFX değil.** İkinci kusur hiç VFX değildi: compute
+ile sürülen, `Graphics.RenderPrimitives` ile çizilen 14 quad. Tüm `VisualEffect`
+bileşenleri kapatılınca dikdörtgenler EKRANDA KALDI — belirti bu ölçümle
+sahibini buldu.
+
+**Ayırt eden ölçüm:** kamerayı 180° döndürmek. Kusur yalnız belirli açılarda
+görünüyordu; tek açıya bakan üç tur onu kaçırdı.
+
+## "Yağış 1 kar 1 iken ekranda yağmur izleri var"
+
+**İlk şüpheli (yanlış):** `RainWeight01` hesaplanmıyor. Ölçüldü: `RainWeight01 = 0`,
+doğru değer.
+
+**Gerçek sebep:** yoğunluk `WeatherState.Changed` OLAYINDA bir kez hesaplanıyordu.
+Girdilerinden biri `SnowRuntimeState.RainWeight01` ve o kar oranı sürgüsüyle
+değişiyor — sürgü hava olayı yayınlamıyor. Yağmur son olaydaki yoğunlukta donup
+kalıyordu. `RefreshDensity()` artık `Update`'te.

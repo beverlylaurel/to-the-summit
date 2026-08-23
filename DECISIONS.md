@@ -99,15 +99,6 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   5. `SnowMovementModifier.SpeedMultiplier` hareket koduna bağlanacak
   → [Kar sistemi: spec'ten bilinçli sapmalar](#kar-sistemi-specten-bilinçli-sapmalar-ve-iki-assumption-2026-08-22)
 
-- **Savrulan kar grafiklerinde spawn KUTUSU yok** — konum sürme eklendi
-  (`SnowDriftVfxController.FollowTarget`), ama `VFX_Spindrift` ve
-  `VFX_SnowCurtain` grafiklerinde `PositionShape` bloğu yok: parçacıklar
-  objenin tam merkezinde doğuyor, spec §18.7'nin şeridinde değil. Süspansiyon
-  için ayrıca üstel yükseklik dağılımı isteniyor
-  (`h = −1.1 * log(1 − rand)`, `h = min(h, 5)`).
-  **Tetikleyici:** savrulan kar tek noktadan fışkırıyor görünüyorsa.
-  **Maliyet:** iki grafiğe kutu + süspansiyona CustomHLSL üstel yükseklik.
-
 - **Sürekli fırtınada kar KALINLAŞMIYOR** — ölçüldü: bir oyun saati boyunca
   `MeanSwe` 0.00195'te dengeye oturuyor (yaklaşık 6 mm derinlik), daha fazla
   artmıyor. Sebep rüzgâr: sahnede hız 12–14 m/s sabit, `DriftActive01 = 1`,
@@ -152,14 +143,17 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   basamaklanması (temporal reprojection gerektiriyor — büyük iş).
   **Tetikleyici:** ilgili belirti ekranda görüldüğünde.
 
-- **§17.2 uzak yağış perdesi KALDIRILDI** — yazıldı, iki kez düzeltilmeye
-  çalışıldı, ekranda "kâğıt gibi incecik, derinliği yok" bir levha olarak
-  görünmeye devam etti (kullanıcı iki kez bildirdi; elemeyle bu sistem olduğu
-  doğrulandı). Dosyaları silindi.
-  Spec'in gerekçesi "bu katman olmadan parçacık sayısını 3–4 katına çıkarmak
-  gerekir"; kapasite zaten 40000'den 120000'e çıkarıldı.
+- **QUAD PERDELERİN İKİSİ DE KALDIRILDI** — §17.2 uzak yağış perdesi
+  (`SnowfallCurtains`) ve §18.7 Sistem B süspansiyon perdesi
+  (`SnowCurtainController`). Aynı belirti, aynı gerekçe: devasa kameraya bakan
+  quad "kâğıt gibi incecik, derinliği yok" bir levha olarak okunuyor.
+  Kullanıcı üç kez bildirdi.
+  İkincisi elemeyle bulundu: TÜM `VisualEffect` bileşenleri kapatılınca
+  dikdörtgenler ekranda kaldı, `SnowCurtainController.enabled = false` yapılınca
+  kayboldular. Üç tur boyunca VFX suçlanmıştı.
+  Yerine `FogDensity01` geçiyor — hacimsel büyüklük, bilboard değil.
   **Tetikleyici:** çok yoğun karda uzak mesafe seyrek görünürse — o zaman
-  düz quad yerine hacimli bir yaklaşım gerekir, aynı çözüm tekrar denenmemeli.
+  hacimli bir yaklaşım gerekir, quad çözümü ÜÇÜNCÜ kez denenmemeli.
 
 - **VFX'te gökyüzü örtü kesmesi yok** — spec §17.1 `_SnowSkyVisTex`'ten okuyup
   çatı altındaki taneyi öldürmeyi "atlanmayacak" diye işaretliyor. VFX'in o
@@ -1342,6 +1336,10 @@ spec'ten birebir.
 **Bu kayıt daha önce yanlış yazılmıştı:** "projede zaten `SnowCurtainController`
 bu davranışı birebir yapıyor" deniyordu. Yapmıyordu — o §18.7'nin SAVRULMA
 perdeleri, tetiği rüzgâr. İkisi ayrı sistem, ayrı tetik, ayrı spec bölümü.
+
+**Sonu (2026-08-23):** ikisi de silindi. İki ayrı sistem oldukları doğruydu ama
+ikisi de aynı yerden kırıldı — quad geometrisi hacim taklidi yapamıyor.
+Gerekçe `RATIONALE.md` → "Quad perde yok".
 
 ---
 

@@ -163,7 +163,7 @@ public static class SnowCoverTest
 
             // Kar yağıyor, karakter duruyor → birikiyor.
             env.PrecipIntensity01 = 1f;
-            snowfall.Tick(env);
+            snowfall.Tick(env, 1f);
 
             for (int i = 0; i < 200; i++) accumulator.Step(0.1f, 0f);
             float snowed = accumulator.Accumulation;
@@ -201,7 +201,7 @@ public static class SnowCoverTest
             float beforeRain = accumulator.Accumulation;
 
             env.TemperatureC = 10f;              // kar durur, yağmur başlar
-            snowfall.Tick(env);
+            snowfall.Tick(env, 1f);
 
             for (int i = 0; i < 50; i++) accumulator.Step(0.1f, 0f);
             float afterRain = accumulator.Accumulation;

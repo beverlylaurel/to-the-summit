@@ -1106,6 +1106,29 @@ son iki satırda atama yerine `max`. Spec §17.1'in
 mesafede iri toplar oldu ve FPS 114'ten 14'e düştü (overdraw). Mekanizmanın
 çalıştığı da, 1.3'ün neden 1.3 olduğu da aynı ölçümden çıktı.
 
+**BÜYÜTMEK ALFAYI KISAR — enerji korunumu.** Blok bir dönem yalnız ölçeği
+büyütüyordu. Taneyi piksel tabanına çekmek kapladığı ALANI büyütüyor; alfa
+sabit kalırsa büyüme oranı kadar ışık uyduruluyor.
+
+Ölçüm: `px/rad = 769` (fov 60, 888 px yükseklik). Taban 1.8 cm tane **10.6
+m**'de tam 1.3 piksel; ötesinde taban devreye giriyor ve alanı şişiriyor.
+
+| mesafe | gerçek boy | alan çarpanı |
+|---|---|---|
+| 5 m | 2.77 px | ×1 (dokunmuyor) |
+| 13 m | 1.07 px | ×1.5 |
+| 20 m | 0.69 px | ×3.5 |
+| 40 m | 0.35 px | ×14 |
+
+Spawn kutusu 40×26×40; hacminin çoğu 10.6 m'nin ötesinde. 89 bin tane üst üste
+binince ekranda süt gibi bir örtü çıkıyordu ve örtünün keskin dikdörtgen kenarı
+**kutunun kendi duvarıydı**. Kullanıcı bunu üç kez "kâğıt gibi incecik, derinliği
+yok" diye bildirdi.
+
+Düzeltme `alpha *= saturate(1 / alanOrani)`. 10.6 m'den yakın tane hiç
+etkilenmiyor; uzak tane görünür kalıyor (tabanın amacı buydu) ama sahte
+parlaklık vermiyor.
+
 
 ## Sis yoğunluğu görüşte değil sönümlemede doğrusal
 
@@ -1116,28 +1139,38 @@ mesafede iri toplar oldu ve FPS 114'ten 14'e düştü (overdraw). Mekanizmanın
 sonuç veriyordu: 1150 metre görüşte sis yoğunluğu **0.95** çıkıyordu, yani
 "neredeyse tam sis". 1150 m berrak bir havadır.
 
-**Belirti buydu:** uzak yağış perdesinin alpha'sı `1 − fog * 0.6` ile 0.10'dan
-0.043'e düşüyordu ve perde ekranda görünmüyordu. Aynı yanlış değer savrulma
-perdesi shader'ını ve eski compute yağışını da kısıyordu.
+**Belirti buydu:** o dönem duran uzak yağış perdesinin alpha'sı `1 − fog * 0.6`
+ile 0.10'dan 0.043'e düşüyordu ve perde ekranda görünmüyordu. Perdeler sonradan
+silindi (yukarı bak) ama yanlış değer compute yağışını da kısıyordu; düzeltme
+onun için geçerliliğini koruyor.
 
 **Uçlar kâğıtta:** 60 m → 1.00, 100 m → 0.60, 200 m → 0.30, 500 m → 0.12,
 1150 m → 0.05, 20 km → 0.00. 3.912 sabiti hem pay hem paydada olduğu için
 sadeleşiyor.
 
 
-## Uzak yağış perdesinin yoğunluğu dokudan geliyor, alpha'dan değil
+## Quad perde yok — spec §17.2 ve §18.7 Sistem B silindi
 
-**Kural.** Perde alpha'sı spec §17.2'nin verdiği 0.10 / 0.07 / 0.05'te duruyor;
-katmanın gücü doku yoğunluğundan (2400 tane, ~%22 kaplama) geliyor.
+**Kural.** Ne uzak yağış perdesi (`SnowfallCurtains`) ne süspansiyon perdesi
+(`SnowCurtainController`) projede duruyor. İkisi de spec'te var, ikisi de
+uygulandı, ikisi de aynı gerekçeyle silindi.
 
-**Neden.** İlk doku 900 taneydi (~%8) ve perdenin ekrana katkısı ölçüldüğünde
-1.05/255 çıktı — perde açık ve kapalı iki kare arasındaki ortalama fark. Alpha'yı
-artırmak tülü kalınlaştırırdı; perdenin temsil ettiği şey ise uzaktaki
-TANELER. Sayıyı artırmak tarife sadık, alpha'yı artırmak değil.
+**Neden.** Devasa kameraya bakan quad kaçınılmaz olarak KÂĞIT gibi okunuyor:
+kenarı ekranda düz bir çizgi, içi derinliksiz. Kullanıcı bunu üç kez bildirdi
+("kâğıt gibi incecik, bir derinliği yok"). Sorun alfa ya da doku değil,
+GEOMETRİ: 12–25 m'lik on dört bilboard hacim taklidi yapamıyor.
 
-**Ölçüm aracı:** perde açık/kapalı iki kare, yakın katman susturulmuş. Ekranın
-%36.8'i etkileniyordu — yani perde çiziliyordu, yalnız katkısı zayıftı. "Hiç
-çizilmiyor" ile "çok soluk" ancak böyle ayrıldı.
+**Ölçüm.** Tüm `VisualEffect` bileşenleri kapatıldı; dikdörtgenler ekranda
+kaldı. `SnowCurtainController.enabled = false` yapıldı; kayboldular. Belirti
+sahibini ancak bu iki yakalı ölçümle buldu — üç tur boyunca VFX suçlanmıştı.
+
+**Yerine ne geçti.** Havanın savrulan karla dolu olması `FogDensity01`
+üzerinden geliyor: hacimsel bir büyüklük, görüş mesafesinden (Koschmieder)
+türüyor. Saltasyon (`VFX_Spindrift`, 1–5 cm, yere yapışık) duruyor — o gerçek
+parçacık, bilboard hilesi değil.
+
+**Telafi terimi geri eklenmeyecek.** "Biraz daha soluk yaparsak" ile
+düzelmiyor; iki denemede de aynı yerden kırıldı.
 
 
 ## Rüzgâr yağışa KUVVET olarak giriyor, hız olarak değil

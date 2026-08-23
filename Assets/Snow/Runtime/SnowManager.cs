@@ -38,7 +38,6 @@ public class SnowManager : MonoBehaviour
     [SerializeField] SnowPersistence persistence;
 
     [Tooltip("Süspansiyon perdeleri. Boş bırakılırsa çizilmez.")]
-    [SerializeField] SnowCurtainController curtains;
     [SerializeField] ComputeShader simCompute;
 
     [Tooltip("Hidden/Snow/CaptureDepth — deformer'ların alt yüzeyini yazar.")]
@@ -170,6 +169,12 @@ public class SnowManager : MonoBehaviour
 
     public SnowSettings Settings => settings;
     public ISnowEnvironmentSource Environment => env;
+
+    /// YAĞIŞIN NE KADARI KAR: 1 tamamen kar, 0 tamamen yağmur.
+    ///
+    /// Varsayılan 1 — "yağış varsa kar yağar". Sıcaklıkla ilgisi yok; hava
+    /// sistemi ya da teşhis paneli buradan sürüyor.
+    public float SnowFraction01 { get; set; } = 1f;
     public SnowGroundHeight GroundHeight => groundHeight;
 
     /// Bu karede bölgede deformer var mıydı. Yoksa yakalama, blur ve (sonraki
@@ -351,7 +356,7 @@ public class SnowManager : MonoBehaviour
 
         // Yağış kararı ÖNCE: `_SnowfallSWERate` aynı karede KDeform ve
         // KAccumulate tarafından okunuyor.
-        snowfall.Tick(env);
+        snowfall.Tick(env, SnowFraction01);
 
         // GLOBALLER HER KAREDE YAZILIYOR, yalnız değişince değil. Bileşenlerin
         // OnEnable sırası eklenme sırasına bağlı; bir doku henüz hazır değilken
@@ -567,7 +572,7 @@ public class SnowManager : MonoBehaviour
         // `KWindTransport` haç döşemesi yüzünden BEŞ dispatch; savrulacak
         // gevşek kar yokken hepsi boşuna koşuyordu. Eşik `DriftActive01` —
         // §18.1'in tetiğiyle aynı sayı, ikinci bir eşik tanımlanmıyor.
-        float driftActive = SnowCurtainController.DriftActiveFor(
+        float driftActive = SnowDriftVfxController.DriftActiveFor(
             env.WindSpeed, SnowRuntimeState.LooseSnowFraction);
 
         if (!WindTransportOff && driftActive > 0f)
@@ -583,7 +588,6 @@ public class SnowManager : MonoBehaviour
         cmd.BeginSample(SnowProfiler.MarkerNames[4]);
         if (snowfallRenderer != null) snowfallRenderer.Dispatch(cmd);
         if (burstParticles != null) burstParticles.Dispatch(cmd);
-        if (curtains != null) curtains.Dispatch(cmd);
         cmd.EndSample(SnowProfiler.MarkerNames[4]);
 
         // Ping-pong sonrası hangi dokunun güncel olduğu değişti; aynı karenin

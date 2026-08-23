@@ -849,17 +849,16 @@ değil konumu da sürüyor: saltasyon rüzgâr yönünde 15 m ileri, süspansiyo
 (`SnowFoot_L/R`, 11×6×28 cm) `SnowDebugWindow.SetupScene`'den kuruluyor.
 Yakalama pass'i alt yüzeylerini ölçüyor; kar sistemi oyuncuyu bilmiyor.
 
-**Uzak yağış katmanı `SnowfallCurtains`.** Kameraya kilitli üç quad (18/32/55 m),
-kayan doku, alpha `layerAlpha * SnowfallIntensity01 * (1 − FogDensity01 * 0.6)`.
-Şiddeti `SnowRuntimeState`'ten KENDİSİ okuyor — `SnowfallLayers` üzerinden ikinci
-bir yol geçmiyor. `SnowCurtainController` ile karıştırılmamalı: o §18.7'nin
-savrulma perdeleri, tetiği rüzgâr; bu §17.2'nin yağış perdeleri, tetiği yağış.
-Dokusu `SnowCurtainTextureBuilder` menüsünden üretiliyor, repoda elle çizilmiş
-doku yok.
+**Quad perde YOK — iki kez denendi, ikisi de silindi.** Ne `SnowfallCurtains`
+(§17.2 uzak yağış) ne `SnowCurtainController` (§18.7 süspansiyon) duruyor.
+Devasa kameraya bakan quad kaçınılmaz olarak KÂĞIT gibi okunuyor: kenarı
+ekranda düz bir çizgi, içi derinliksiz. Havanın savrulan karla dolu olması
+artık görüş mesafesinden (`FogDensity01`) geliyor — hacimsel bir büyüklük,
+on dört bilboard değil. Gerekçe `RATIONALE.md`.
 
 **`FogDensity01` sönümlemede doğrusal, görüşte değil.** `SnowEnvironmentBridge`
-görüş mesafesini `1/V` üzerinden 0..1'e çeviriyor (Koschmieder). Tüketiciler:
-uzak yağış perdesi, savrulma perdesi shader'ı, eski compute yağış shader'ı.
+görüş mesafesini `1/V` üzerinden 0..1'e çeviriyor (Koschmieder). Tüketici:
+compute yağış shader'ı. Perde tüketicileri silindi (yukarı bak).
 
 **Her VFX grafiğinin sınır kutusu elle yazılıyor.** Varsayılan 1 m³; Unity o
 kutuyu kırpıp sistemi tamamen gizliyor. Değerler `SnowVfxBuilder.SetBounds`'ta.
@@ -875,10 +874,14 @@ değişmedi; yalnız örnekleme değişti.
 
 **VFX grafikleri koddan üretiliyor.** `SnowVfxBuilder` reflection'la VFX
 Graph'ın internal model API'sini sürüyor; beş `.vfx` menüden çıkıyor, elle
-çizim yok. Grafikler ÜRETİLDİ ama sahneye BAĞLANMADI — mevcut compute yolu
-çalışıyor ve ikisi birden koşarsa kar iki katına çıkar (`DECISIONS.md`).
-`SnowfallLayers` ve `SnowDriftVfxController` referansları boşken hiçbir şey
-yapmıyor.
+çizim yok. Grafikler sahneye BAĞLI: `SnowfallLayers` yağışı, `SnowDriftVfxController`
+saltasyon ve süspansiyonu sürüyor.
+
+**Asgari ekran boyutu alfayı kısıyor.** Uzak taneyi 1.3 piksele çekmek kapladığı
+ALANI büyütüyor; alfa sabit kalırsa büyüme oranı kadar ışık uyduruluyor.
+`SnowVfxBuilder.MinScreenSizeHlsl` alfayı alan oranına bölüyor. Bu bağ olmadan
+89 bin tane üst üste binip ekranda süt gibi bir örtü çıkarıyordu — 10.6 m'den
+uzakta her tane gerçek alanının 3–14 katını boyuyordu (`RATIONALE.md`).
 
 **Kar olayları (Faz 11–13).** Kabuk `RT_Trail.B`'de, üçgen sıcaklık profiliyle
 (tepe −5 °C) oluşuyor ve yeterli yük binince kırılıyor — patikayla karıştırma,
@@ -887,13 +890,12 @@ gölgede erozyon yok, yalnız birikme var — duvar dibi yığınları buradan d
 Sastrugi genliği `RT_Trail.A`'da, rüzgâr taşınımıyla aynı eşikten besleniyor ve
 sırtlar rüzgâra DİK uzanıyor. Isı kaynakları Wyvill düşüşüyle sıcaklık alanı
 yayıyor; alanlar TOPLANIYOR. Püskürtme miktarı V̇ = genişlik × batma × hızdan
-türüyor. Süspansiyon perdeleri üstel yükseklik profiliyle, PBSM'nin 5 m
-tavanına kadar.
+türüyor.
 
-**Yağış (Faz 8, 13).** Kar taneleri, yer savrulması, ayak tozu, püskürtme ve
-perdeler GPU'da simüle ediliyor — VFX Graph varlığı bu iş akışında
-üretilemediği için (gerekçe `DECISIONS.md`). Hepsi `SnowManager`'ın tek
-CommandBuffer'ında.
+**Yağış (Faz 8, 13).** Kar taneleri, yer savrulması, ayak tozu ve püskürtme
+VFX Graph'ta; grafikleri `SnowVfxBuilder` koddan üretiyor. Zemin durumu
+(birikme, iz, kabuk, sastrugi) `SnowManager`'ın tek CommandBuffer'ında
+compute ile koşuyor.
 
 **Bölge kaydırma.** Durum dokuları oyuncuyu takip eden 16 m'lik bir pencerede duruyor;
 pencere `SnapStep` (0.25 m) ızgarasına oturuyor ve kaydığında içerik `KScroll` ile aynı

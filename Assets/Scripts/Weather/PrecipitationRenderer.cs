@@ -306,8 +306,7 @@ public class PrecipitationRenderer : MonoBehaviour
         if (observer == null)
             throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(observer)} atanmadı.");
 
-        weather.Changed += OnWeatherChanged;
-        OnWeatherChanged(weather);
+        RefreshDensity();
 
         // Süzülmüş hız sıfırdan başlarsa ilk karelerde yön vektörü sıfıra normalize
         // olur ve shader'da NaN üretir; düşme hızıyla başlatılır.
@@ -340,16 +339,6 @@ public class PrecipitationRenderer : MonoBehaviour
     ///                      damla başına, çünkü ekranın her yerinde farklı)
     void UpdateStreaks(Vector3 rainVelocity)
     {
-        // TEK SEFERLİK DURUM RAPORU. Üç bağ da sessizce eksik olabiliyordu ve belirti
-        // "yağmur hiç görünmüyor" — hangisinin eksik olduğu ekrandan anlaşılmıyor.
-        if (!streakStateReported)
-        {
-            streakStateReported = true;
-            Debug.Log($"Yağmur izi bağları: çalışma kümesi {(streaks != null ? "var" : "YOK")}"
-                      + $", saat {(timeOfDay != null ? "var" : "YOK")}"
-                      + $", ana kamera {(Camera.main != null ? "var" : "YOK")}");
-        }
-
         if (streaks == null || timeOfDay == null) return;
 
         var camera = Camera.main;
@@ -377,22 +366,6 @@ public class PrecipitationRenderer : MonoBehaviour
         material.SetVector(StreakSunRadianceId, new Vector4(sun.r, sun.g, sun.b, 1f));
 
         material.SetFloat(StreakSourceScaleId, SourceScale);
-
-        if (!streakTextureReported)
-        {
-            streakTextureReported = true;
-            Debug.Log($"İz dokuları bağlandı: yönlü {streaks.Point.width}×{streaks.Point.height}"
-                      + $"×{streaks.Point.depth}, ambient {streaks.Ambient.depth} dilim, "
-                      + $"köşe varlık {streaks.CornerPresent}, "
-                      + $"dcam payları [{string.Join(", ", streaks.DcamHeightFraction)}]");
-        }
-    }
-
-    bool streakStateReported, streakTextureReported;
-
-    void OnDisable()
-    {
-        if (weather != null) weather.Changed -= OnWeatherChanged;
     }
 
     void OnDestroy()
@@ -401,20 +374,18 @@ public class PrecipitationRenderer : MonoBehaviour
         if (mesh != null) Destroy(mesh);
     }
 
-    void OnWeatherChanged(WeatherState state)
+    /// YOĞUNLUK OLAYDA DEĞİL, HER KARE.
+    ///
+    /// Eskiden `WeatherState.Changed` olayında bir kez hesaplanıyordu. Ama
+    /// girdilerinden biri `SnowRuntimeState.RainWeight01` ve o kar oranı
+    /// sürgüsüyle değişiyor — sürgü hava olayı YAYINLAMIYOR. Sonuç: kar oranı
+    /// 1'ken bile yağmur son olaydaki yoğunlukta çizilmeye devam ediyordu
+    /// (ölçüldü: `RainWeight01 = 0` iken ekran yağmur izleriyle doluydu).
+    void RefreshDensity()
     {
-        // MARSHALL-PALMER SIFIRDA GEÇERSİZ, KAPI ŞART.
-        //
-        // `N ∝ R^0.21` eğrisi sıfıra yakın çok dik: şiddet 0.001'de bile yoğunluk 0.234
-        // çıkıyor, yani taneciklerin dörtte biri çiziliyor. Hava yumuşatmayla sıfıra
-        // YAKLAŞIYOR ama oturmuyor; sonuç, panel "yağış 0,00" gösterirken ekranda
-        // yağmur olması (kullanıcı bildirdi, çap probuyla görüldü).
-        //
-        // Bağıntı R > 0 için doğru ama R → 0'da yağış OLAYININ kendisi bitmeli. Kapı
-        // şiddetin en alt diliminde: 0.05 altı çiseleme bile değil (R < 2.5 mm/sa),
-        // orada damla sayısı sıfıra iniyor.
-        // yalnız YAĞMUR taşıyor.
-        //
+        WeatherState state = weather;
+        if (state == null) return;
+
         // KAR YAĞARKEN YAĞMUR SUSUYOR (kar spec §3.4, §17.1).
         //
         // `SnowRuntimeState` kar sisteminin YAYINLADIĞI durum; okumak
@@ -441,6 +412,7 @@ public class PrecipitationRenderer : MonoBehaviour
     void Update()
     {
         EnsureResources();
+        RefreshDensity();
 
         // BAĞ 4: yağış o SÜTUNUN kapsamasıyla ölçekleniyor — komşu bulut yağmazken bunun
         // altında yağabilsin diye. Sütunun tepesinin üstündeysen hiç yağmıyor; tavan

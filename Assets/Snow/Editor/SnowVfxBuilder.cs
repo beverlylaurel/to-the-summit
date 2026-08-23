@@ -466,6 +466,31 @@ public static class SnowVfxBuilder
         SetSetting(spinPos, "positionMode", "Volume", r);
         SetSlotField(spinPos, "Box", "size", new Vector3(30f, 0.05f, 30f), r);
 
+        // HIZ (spec §18.7: `_WindWS * random(0.7, 1.1)` + yukarı 0.2–0.8 m/s).
+        //
+        // Hız bloğu YOKTU ve `Orient: AlongVelocity` sıfır hızda çöküyordu:
+        // konsolda "floating point division by zero", ekranda tek noktadan
+        // koni gibi fışkıran uzun çizgiler. Kutu eklemek yetmedi çünkü sorun
+        // konumda değil YÖNDE'ydi.
+        //
+        // Yukarı bileşen saltasyonun zıplamasını veriyor; rüzgâr bileşeni
+        // `SnowDriftVfxController`'dan geliyor.
+        object spinVel = AddBlock(init, "Block.SetAttribute", r);
+        SetSetting(spinVel, "attribute", "velocity", r);
+        SetSetting(spinVel, "Random", "Uniform", r);
+        SetSlotField(spinVel, "A", "vector", new Vector3(0f, 0.2f, 0f), r);
+        SetSlotField(spinVel, "B", "vector", new Vector3(0f, 0.8f, 0f), r);
+
+        object spinWind = AddBlock(update, "Block.Force", r);
+        SetSetting(spinWind, "Mode", "Absolute", r);
+
+        object spinWindParam = AddParameter(graph, "WindForce", typeof(Vector3),
+                                            Vector3.zero, new Vector2(-300, 520), r);
+        LinkParameter(spinWindParam, spinWind, "Force", r);
+
+        object spinDrag = AddBlock(update, "Block.Drag", r);
+        SetSlot(spinDrag, "dragCoefficient", 4f, r);
+
         // `Orient: Along Velocity`, 4–8× uzatılmış (spec §18.7).
         object orient = AddBlock(output, "Block.Orient", r);
         SetSetting(orient, "mode", "AlongVelocity", r);
@@ -498,6 +523,18 @@ public static class SnowVfxBuilder
         SetSetting(curPos, "shape", "OrientedBox", r);
         SetSetting(curPos, "positionMode", "Volume", r);
         SetSlotField(curPos, "Box", "size", new Vector3(80f, 5f, 80f), r);
+
+        // HIZ (spec §18.7: `_WindWS * random(0.7, 0.95)`). Perde rüzgârla
+        // sürükleniyor; `AlongVelocity` yönünü buradan alıyor.
+        object curWind = AddBlock(update, "Block.Force", r);
+        SetSetting(curWind, "Mode", "Absolute", r);
+
+        object curWindParam = AddParameter(graph, "WindForce", typeof(Vector3),
+                                           Vector3.zero, new Vector2(-300, 520), r);
+        LinkParameter(curWindParam, curWind, "Force", r);
+
+        object curDrag = AddBlock(update, "Block.Drag", r);
+        SetSlot(curDrag, "dragCoefficient", 3f, r);
 
         object orient = AddBlock(output, "Block.Orient", r);
         SetSetting(orient, "mode", "AlongVelocity", r);
@@ -535,10 +572,20 @@ public static class SnowVfxBuilder
                 * min(abs(UNITY_MATRIX_P[0][0] * _ScreenParams.x),
                       abs(UNITY_MATRIX_P[1][1] * _ScreenParams.y));
 
-    float2 newScale = (float2(minPixelSize, minPixelSize) * clipPosW) / denom;
+    float2 newScale = (float2(minPixelSize, minPixelSize) * clipPosW) / max(denom, 1e-6f);
 
-    attributes.scaleX = max(attributes.scaleX, newScale.x);
-    attributes.scaleY = max(attributes.scaleY, newScale.y);
+    float2 eski   = float2(attributes.scaleX, attributes.scaleY);
+    float2 buyumus = max(eski, newScale);
+
+    // ENERJI KORUNUMU. Taneyi piksel tabanina cekmek kapladigi ALANI buyutur;
+    // alfa ayni kalirsa buyume orani kadar isik UYDURULUR. 40 m'deki tane
+    // gercek alaninin 14 katini tam alfayla boyuyordu ve 89 bin tane ust uste
+    // binince ekranda sut gibi bir ortu cikiyordu (olculdu).
+    float alanOrani = (buyumus.x * buyumus.y) / max(eski.x * eski.y, 1e-6f);
+    attributes.alpha *= saturate(1.0f / max(alanOrani, 1.0f));
+
+    attributes.scaleX = buyumus.x;
+    attributes.scaleY = buyumus.y;
 }";
 
     /// Spec §17.1: ömrün ilk %8'inde fade-in, son %8'inde fade-out; tane

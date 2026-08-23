@@ -24,20 +24,35 @@ public sealed class SnowfallController
         Wetness = 0f;
     }
 
-    public void Tick(ISnowEnvironmentSource env)
+    /// KAR ORANI GİRDİ, SICAKLIKTAN TÜREMİYOR.
+    ///
+    /// `snowFraction01` yağışın ne kadarının kar olduğu: 1 tamamen kar,
+    /// 0 tamamen yağmur, arası karışık. Varsayılan 1 — "yağış varsa kar
+    /// yağar" kuralı.
+    ///
+    /// Eskiden bu kararı §3.4'ün sıcaklık histerezisi veriyordu ve kaldırıldı.
+    /// Yerine sıcaklık KONMADI: karar dışarıdan geliyor, böylece hava sistemi
+    /// (ya da F1 sürgüsü) ne isterse onu sürüyor ve kar sistemi kimseyi
+    /// zorlamıyor.
+    public void Tick(ISnowEnvironmentSource env, float snowFraction01)
     {
+        float snowShare = Mathf.Clamp01(snowFraction01);
+
         // YAĞIŞ VARSA KAR VAR. Sıcaklık kapısı yok.
         //
         // Eskiden §3.4'ün histerezisi vardı: 0.5 °C altı kar, 2.0 °C üstü
         // yağmur. Kaldırıldı — kar çizgisi kaldırılırken konan kuralın aynısı
         // geçerli: yağıyorsa kardır, tutar.
-        SnowRuntimeState.IsSnowing = env.PrecipKind != PrecipitationKind.None;
+        bool precipActive = env.PrecipKind != PrecipitationKind.None;
 
-        // Yağmur yolu susuyor: iki yağış üst üste binmesin.
-        SnowRuntimeState.RainWeight01 = 0f;
+        SnowRuntimeState.IsSnowing = precipActive && snowShare > 0.001f;
+
+        // YAĞMUR PAYI KARIN TAMAMLAYICISI. İkisi aynı yağışın iki hâli;
+        // toplamları bir olduğu için üst üste binmeleri imkânsız.
+        SnowRuntimeState.RainWeight01 = precipActive ? 1f - snowShare : 0f;
 
         SnowRuntimeState.SnowfallIntensity01 =
-            SnowRuntimeState.IsSnowing ? env.PrecipIntensity01 : 0f;
+            SnowRuntimeState.IsSnowing ? env.PrecipIntensity01 * snowShare : 0f;
 
         float i01 = SnowRuntimeState.SnowfallIntensity01;
 
