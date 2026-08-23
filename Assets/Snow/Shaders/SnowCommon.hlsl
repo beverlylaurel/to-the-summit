@@ -109,6 +109,15 @@ float3 _WindWS;
 float  _WindSpeed;
 float  _TemperatureC;
 float  _SunElevation01;
+
+/// PARILTI AYARLARI GLOBAL, MATERYALDE DEĞİL. Arazi karı da parıldıyor
+/// (`MountainSurface.shader`) ve o ayrı bir materyal. Per-materyal kalsaydı
+/// iki yüzey iki farklı sayıyla parıldar, bölge sınırı görünürdü.
+/// Tek sahibi `SnowSettings`; yayını `SnowManager`.
+float  _SparkleCellSize;
+float  _SparkleDensity;
+float  _SparkleSharpness;
+float  _SparkleIntensity;
 float  _FogDensity01;
 float  _RainOnSnow01;
 float3 _SnowUpDirection;

@@ -141,6 +141,7 @@ float MountainBand(float3 worldPos)
 // teşhir ettiği o basamak ölçeğini kıran katman tam bu.
 #include "../Snow/Shaders/SnowDetailNormals.hlsl"
 #include "../Snow/Shaders/SnowCover.hlsl"
+#include "../Snow/Shaders/SnowSparkle.hlsl"
 
 
 struct MountainSurface
@@ -150,6 +151,10 @@ struct MountainSurface
     half  smoothness;
     half  occlusion;
     float3 normalWS;
+
+    /// Karın bu noktadaki payı. Parıltı bununla ağırlıklanıyor: kar mesh'i
+    /// parıldayıp arazi parıldamayınca sınır çizgi hâlinde görünüyordu.
+    half  snowMask;
 };
 
 /// Arazinin güneş gölgesi, pişirilmiş ufuk haritasından.
@@ -399,6 +404,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     float3 shaded = normalize(normalWS + float3(shaped.x, 0.0, shaped.y));
 
     MountainSurface surface;
+    surface.snowMask = 0;
     surface.albedo = albedo;
     surface.emission = Alpenglow(worldPos, normalWS, altitude, albedo, exposure);
     surface.normalWS = shaded;
@@ -517,6 +523,8 @@ MountainSurface BuildMountainSurface(float3 worldPos)
 
         // Mikro-oyuk karın altında kalıyor.
         surface.occlusion = lerp(surface.occlusion, 1.0, snowMask * 0.7);
+
+        surface.snowMask = (half)snowMask;
     }
 
     return surface;

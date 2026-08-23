@@ -77,7 +77,19 @@ half3 SnowDirectLight(Light L, float3 N, float3 V, SnowSurface s)
     half trans = pow(back, 3.0) * exp(-s.snowDepth * 7.0) * _TranslucencyStrength;
     diffuse += s.albedo * trans * half3(1.00, 1.02, 1.10);
 
-    half3 spec = DirectBRDFSpecular(s.brdfData, N, L.direction, V);
+    // SPEKÜLER URP SÖZLEŞMESİYLE. `DirectBRDFSpecular` yalnız D·V SKALERİNİ
+    // döndürüyor; URP onu `brdfData.specular` ile ve `NdotL` ile çarpıyor
+    // (`LightingPhysicallyBased`). Spec §14.1 ikisini de yazmamış, kod da
+    // sadık kalmıştı.
+    //
+    // Ölçüldü (öğle, 20 cm kar, düz zemin, post kapalı):
+    //   diffuse 1.747   spec 4.133   sparkle 0.161   toplam 6.041
+    //   aynı karede arazi karının doğrudan ışığı 0.868
+    // Yani doğrudan ışığın %68'i, dielektrik karda 0.04 olması gereken bir
+    // çarpanın hiç uygulanmamasından geliyordu.
+    half NdotL = saturate(dot(N, L.direction));
+    half3 spec = s.brdfData.specular
+               * DirectBRDFSpecular(s.brdfData, N, L.direction, V) * NdotL;
 
     // PARILTI SADECE GÜNDÜZ. `_SunElevation01` gündöngüsünden geliyor;
     // uygulanmazsa gece kar parıldar (spec §22).

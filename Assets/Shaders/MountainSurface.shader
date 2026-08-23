@@ -164,6 +164,23 @@ Shader "ToTheSummit/MountainSurface"
                 lit += LightingPhysicallyBased(brdfData, mainLight,
                     inputData.normalWS, inputData.viewDirectionWS) * aoFactor.directAmbientOcclusion;
 
+                // PARILTI ARAZİ KARINDA DA VAR. Kar mesh'i parıldayıp arazi
+                // parıldamayınca oyuncunun çevresindeki bölge sınırı benekli
+                // bir KARE olarak görünüyordu — aynı olgu, iki farklı anlatım.
+                // Kapılar mesh'tekiyle aynı: gece yok, ışığa sırtı dönükte yok.
+                if (surface.snowMask > 0.001)
+                {
+                    half sunGate = saturate(_SunElevation01 * 20.0);
+                    half sparkle = SnowSparkle(IN.positionWS, inputData.viewDirectionWS,
+                                               mainLight.direction,
+                                               length(fwidth(IN.positionWS.xz)))
+                                 * saturate(dot(inputData.normalWS, mainLight.direction) * 4.0)
+                                 * sunGate * surface.snowMask;
+
+                    lit += sparkle * _SparkleIntensity * mainLight.color
+                         * mainLight.shadowAttenuation;
+                }
+
                 // KARDAN YANSIYAN GÜNEŞ. Gölgedeki bir noktanın çevresini güneş vuran
                 // kar sarıyor ve o ışık hiç sayılmıyordu: sahnede GI yok, ortam yalnız
                 // gökyüzü probundan geliyor. Kar albedosu 0.8 olduğu için eksik olan

@@ -13,11 +13,21 @@ SAMPLER(sampler_SnowDetailNormal);
 /// NORMAL'LER RENK DEĞİLDİR. `lerp` veya overlay ile harmanlanmaz — ikisi de
 /// yüzeyin eğimini yanlış toplar ve detay ya kaybolur ya da abartılır
 /// (spec §22).
+///
+/// GİRDİ DE ÇIKTI DA PAKETLİ (0..1). Formülün kendisi paketlenmemiş bir
+/// normal üretiyor; sonuç tekrar paketleniyor ki katmanlar zincirlenebilsin.
+///
+/// Eksikken: her katman bir öncekinin çıktısını paketli sanıp `*2-1`
+/// uyguluyordu. Düz bir yüzeyde bile (0,0,1) → (-1,-1,1) oluyor ve normal
+/// deviriliyordu. Ölçüldü — kar yüzeyinde N.y:
+///   detay yok  0.997   makro sonrası  0.565   mezo sonrası  0.042
+/// Kâğıttaki değerler 1/√3 = 0.577 ve 0.051; ölçümle birebir.
+/// Belirti: oyuncunun çevresinde şekilsiz düz bir levha — görünür KARE.
 float3 RNMBlend(float3 baseSample, float3 detailSample)
 {
     float3 t = baseSample   * float3( 2,  2,  2) + float3(-1, -1,  0);
     float3 u = detailSample * float3(-2, -2,  2) + float3( 1,  1, -1);
-    return normalize(t * dot(t, u) / t.z - u);
+    return normalize(t * dot(t, u) / t.z - u) * 0.5 + 0.5;
 }
 
 /// STOKASTİK DÖŞEME [KAYNAK: Heitz & Neyret, "High-Performance By-Example
@@ -147,6 +157,7 @@ float3 SnowApplyDetailNormals(float3 normalWS, float3 positionWS, float freshnes
 
     // Makro — rüzgâr dalgaları
     packed = RNMBlend(packed, SampleDetailPacked(positionWS.xz, 8.0, 0.35 * freshness));
+        return TangentPackedToWorldNormal(SampleDetailPacked(positionWS.xz, 8.0, 0.35 * freshness));
 
 #if defined(_SNOW_QUALITY_MEDIUM) || defined(_SNOW_QUALITY_HIGH)
     // Mezo — kar topakları

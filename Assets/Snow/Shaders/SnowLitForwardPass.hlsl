@@ -81,14 +81,24 @@ Varyings SnowLitVertex(Attributes IN)
 /// hâli bu: `fwidth` yalnız fragman komutudur ve vertex'te derlenmez.
 float3 SnowNormalAtStep(float2 uv, float t, float hHere, float3 positionWS)
 {
-    float ms = SnowTexelSize();
+    // PAYDA ÖRNEKLEME ADIMININ DÜNYA BOYU, BİR TEKSEL DEĞİL.
+    //
+    // Merkezi fark `t` uv adımıyla alınıyor ve `t` uzaklıkla `fwidth`'ten
+    // büyüyor. Payda bir tekselde sabit kalınca gradyan adım/teksel oranı
+    // kadar ŞİŞİYOR ve normal deviriliyor.
+    //
+    // Ölçüldü (18 m yukarıdan, 20 cm kar, düz zemin): mesh pikselinin
+    // 121583'ünde N.y < 0.2 — yani neredeyse tamamı YATAY. Arazi aynı karede
+    // 0.5–0.8 arasında. Ekranda kar mesh'i şekilsiz düz bir levha, oyuncunun
+    // çevresinde görünür bir KARE.
+    float ws = t * _SnowAreaSize;
 
     float hL = SnowSurfaceAt(uv - float2(t, 0.0));
     float hR = SnowSurfaceAt(uv + float2(t, 0.0));
     float hD = SnowSurfaceAt(uv - float2(0.0, t));
     float hU = SnowSurfaceAt(uv + float2(0.0, t));
 
-    float3 nSnow   = normalize(float3(hL - hR, 2.0 * ms, hD - hU));
+    float3 nSnow   = normalize(float3(hL - hR, 2.0 * ws, hD - hU));
     float3 nGround = SampleGroundNormal(positionWS.xz);
 
     // İnce karda zeminin şekli baskın; kalınlaştıkça karın kendi yüzeyi
@@ -187,6 +197,13 @@ half4 SnowLitFragment(Varyings IN) : SV_Target
     float3 V = GetWorldSpaceNormalizeViewDir(IN.positionWS);
 
     Light mainLight = GetMainLight(IN.shadowCoord);
+
+    // BULUT GÖLGESİ ARAZİYLE AYNI KANALDAN. Gökyüzünü çizen yoğunluk alanının
+    // kendisi; doğrudan güneşi kesiyor, gökten gelen dolaylı ışığa dokunmuyor.
+    // Arazi bunu `MountainSurface.shader`'da aynı satırla uyguluyor.
+#ifdef _LIGHT_COOKIES
+    mainLight.color *= SampleMainLightCookie(IN.positionWS);
+#endif
 
     half heightAO = SnowHeightAO(SnowWorldToUV(IN.positionWS), height);
 

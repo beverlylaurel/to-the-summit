@@ -17,11 +17,6 @@ CBUFFER_START(UnityPerMaterial)
     float4 _ShadowTint;
     float  _TranslucencyStrength;
 
-    float  _SparkleCellSize;
-    float  _SparkleDensity;
-    float  _SparkleSharpness;
-    float  _SparkleIntensity;
-
     float  _SnowAORadius;
     float  _SnowAOStrength;
 CBUFFER_END

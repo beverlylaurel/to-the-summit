@@ -22,7 +22,7 @@ MonoBehaviour:
   shadowTint: {r: 0.66, g: 0.76, b: 0.95, a: 1}
   translucencyStrength: 0.6
   sparkleCellSize: 0.004
-  sparkleDensity: 0.06
+  sparkleDensity: 0.006
   sparkleSharpness: 8
   sparkleIntensity: 12
   coverSlopeThreshold: 0.25

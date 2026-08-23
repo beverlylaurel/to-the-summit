@@ -245,9 +245,16 @@ public class TerrainSurface : MonoBehaviour
     /// Play mode'da yeniden derleme materyali düşürebilir; kullanım anında doğrulanır.
     /// Bağımlılık kontrolü de burada: ExecuteAlways bileşende OnEnable, bileşen sahneye
     /// eklendiği anda yani Bind'den önce çalışıyor.
+    ///
+    /// REFERANSIN YAŞAMASI YETMİYOR, İÇİ DE DOLU OLMALI. Shader yeniden içe
+    /// aktarıldığında materyal nesnesi ayakta kalıyor ama üzerine yazılmış tüm
+    /// değerler siliniyor. `_TerrainSize` sıfıra düşünce yüzey uv'si
+    /// `(pos - origin) / 0` oluyor ve arazinin TAMAMI NaN basıyor — ölçüldü:
+    /// 162674 pikselin 162674'ü. Ekranda arazi simsiyah, kar mesh'i normal.
+    /// `ApplySettings` de kurtarmıyor, `appliedRevision` eşit kaldığı için atlıyor.
     void EnsureMaterial()
     {
-        if (material != null) return;
+        if (material != null && material.HasVector(TerrainSizeId)) return;
 
         if (settings == null)
             throw new InvalidOperationException($"{nameof(TerrainSurface)}: {nameof(settings)} atanmadı.");

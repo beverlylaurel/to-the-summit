@@ -16,10 +16,6 @@ Shader "ToTheSummit/SnowLit"
         _ShadowTint ("Gölge rengi", Color) = (0.66, 0.76, 0.95, 1.0)
         _TranslucencyStrength ("Yarı saydamlık", Float) = 1.0
 
-        _SparkleCellSize ("Parıltı hücre boyu (m)", Float) = 0.004
-        _SparkleDensity ("Parıltı yoğunluğu", Float) = 0.06
-        _SparkleSharpness ("Parıltı keskinliği", Float) = 8.0
-        _SparkleIntensity ("Parıltı şiddeti", Float) = 12.0
 
         _SnowAORadius ("İz içi AO yarıçapı (m)", Float) = 0.10
         _SnowAOStrength ("İz içi AO şiddeti", Range(0, 1)) = 1.0
@@ -55,6 +51,11 @@ Shader "ToTheSummit/SnowLit"
             #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
             #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile_fog
+
+            // BULUT GÖLGESİ. Arazi bunu okuyor, kar mesh'i okumuyordu: bulutun
+            // altında arazi kararırken oyuncunun çevresindeki kar aynı
+            // parlaklıkta kalıyor ve ekranda takip eden bir KARE oluşuyordu.
+            #pragma multi_compile_fragment _ _LIGHT_COOKIES
 
             // Kalite kademeleri (spec §15.3): detay normal katmanı sayısı ve
             // parıltı bu keyword'lerle açılıp kapanıyor.

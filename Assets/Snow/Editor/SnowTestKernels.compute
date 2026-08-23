@@ -37,11 +37,8 @@ void KStamp(uint3 id : SV_DispatchThreadID)
 #pragma kernel KTestSparkle
 #pragma kernel KTestRnm
 
-// SnowSparkle bunlari SnowLitInput'un CBUFFER'indan aliyor; burada tek tek
-// tanimlaniyor ki kernel URP isiklandirmasini yuklemek zorunda kalmasin.
-float _SparkleCellSize;
-float _SparkleDensity;
-float _SparkleSharpness;
+// Parilti ayarlari artik SnowCommon.hlsl'de GLOBAL (arazi kari da parildiyor
+// ve o ayri bir materyal). Burada tekrar tanimlanmiyor.
 
 // SnowDetailNormals TEXTURE2D/UnpackNormal makrolarini kullaniyor; onlar
 // core kutuphanesinden geliyor.

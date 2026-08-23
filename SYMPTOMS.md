@@ -1520,6 +1520,72 @@ Elenenler: karın kendi caster'ı (kapatıldı, 0.847 → 0.856), arazi caster'�
 (gölge koordinatı kar kalınlığı kadar ışığa ötelendi, 0.856 → 0.851 — fark yok),
 mesh AO'su (0.835, fark yok).
 
-`receiveShadows = false` yapınca oran tam 0.999 oluyor; yani kaynak kesinlikle
-gölge zinciri. Sıradaki adım: gölge haritasının kendisini ve kaskad sınırlarını
-ölçmek.
+`receiveShadows = false` yapınca oran tam 0.999 oluyor.
+
+**GÖLGE ZİNCİRİ YANLIŞ ŞÜPHELİYDİ — KAPANDI.** Sınırın iki yakasında AYNI
+büyüklükleri basan bir prob kurulunca (kar ve dağ shader'ına aynı numaralarla
+altı mod; araç önce sabit renkle doğrulandı: iki taraf da 0.400 okudu) gölge
+terimi 1.000/1.000 çıktı. Yani gölge hiç suçlu değildi; `receiveShadows`'u
+kapatmak farkı kapatıyordu çünkü BAŞKA bir terimi de birlikte kapatıyordu.
+
+Gerçek sebepler ÜÇ TANE, üçü de ayrı ayrı ölçüldü:
+
+| terim | kar mesh | arazi | oran |
+|---|---|---|---|
+| gölge | 1.000 | 1.000 | 1.000 |
+| albedo | 0.923 | 0.923 | 1.000 |
+| pürüzlülük | 0.480 | 0.480 | 1.000 |
+| **normal (N.y)** | **0.041** | **0.998** | ← 1. sebep |
+| **doğrudan ışık** | **6.041** | **0.868** | ← 2. ve 3. sebep |
+
+1. **`RNMBlend` paketlenmemiş normal döndürüyordu.** Girdisi 0..1, çıktısı
+   −1..1 idi; her katman bir öncekini paketli sanıp `*2−1` uyguluyordu. Düz
+   yüzeyde bile `(0,0,1) → (−1,−1,1)`. Kâğıtta tek harman sonrası
+   N.y = 1/√3 = 0.577, iki harman sonrası 0.051; ölçüm 0.5647 ve 0.0415 —
+   birebir. Mesh şekilsiz düz bir levhaydı.
+
+2. **Speküler URP sözleşmesine aykırı kullanılıyordu.** `DirectBRDFSpecular`
+   yalnız D·V skalerini döndürür; `brdfData.specular` (dielektrikte ~0.04) ve
+   `NdotL` çarpanları yoktu. Doğrudan ışığın %68'i buradan geliyordu:
+   spec 4.133 → düzeltmeden sonra 0.146. Spec §14.1 de aynı satırı taşıyor,
+   yani hata spec'te; kod ona sadıktı.
+
+3. **Kar mesh'i bulut gölgesini hiç okumuyordu.** `SnowLit.shader`'da
+   `_LIGHT_COOKIES` pragma'sı yoktu. Ölçüm anında arazideki cookie değeri
+   **0.0421** (güneşin %96'sını kesen bulut); arazi kararırken oyuncunun
+   çevresindeki kar aynı parlaklıkta kalıyordu. Doğrudan ışık oranı 11533 → 1.255.
+
+Üçü düzeltildikten sonra son renk oranı **1.160** (başlangıç 0.847, ara
+değerler 24.9 ve 15.6). Kalan payın sahibi wrap diffuse + translüsanlık +
+parıltı; üçü de karın bilinçli özellikleri.
+
+**Dördüncü bir sebep: parıltı yalnız mesh'te vardı.** Normal düzelince
+`saturate(dot(N,L)*4)` kapısı ilk kez açıldı ve mesh benek benek oldu, arazi
+düz kaldı — kare bu kez parıltıyla çizildi. Parıltı araziye de bağlandı
+(`MountainSurface.shader`, `snowMask` ağırlıklı) ve ayarları materyalden
+global'e taşındı: iki yüzey iki farklı sayıyla parıldayamaz.
+
+---
+
+## Arazi simsiyah, oyuncunun çevresindeki kare normal
+
+**Kullanıcının ağzından:** "kare dışı alan yine simsiyah oldu? bilinçli mi"
+
+**İlk şüpheli (yanlış):** ışıklandırma, gölge, sis.
+
+**Gerçek sebep:** Play sırasında shader yeniden içe aktarılınca `TerrainSurface`
+runtime materyali (`HideFlags.DontSave`) nesne olarak ayakta kalıyor ama
+ÜZERİNE YAZILMIŞ TÜM DEĞERLER siliniyor. `_TerrainSize` sıfıra düşüyor,
+`uv = (pos − origin) / 0` sonsuz oluyor ve arazinin TAMAMI NaN basıyor.
+`EnsureMaterial` yalnız `material != null` kontrol ediyordu; `ApplySettings`
+de `appliedRevision` eşit kaldığı için atlıyordu.
+
+**Ayırt eden ölçüm:** kimlik maskesiyle ayrılmış piksellerde arazinin
+albedo/ortam/doğrudan/normal kanalları **162674 pikselin 162674'ünde NaN**;
+gölge ve N·L kanalları temiz görünüyordu çünkü `saturate(NaN)` D3D'de 0
+döndürüyor. Araç önce sabit renkle doğrulandı.
+
+**Not:** bu yalnız editörde, Play sırasında shader reimport edilince oluyor.
+Ama iki tur ölçümü çöpe attı ve kullanıcıya iki kez yanlış belirti gösterdi.
+`EnsureMaterial` artık `material.HasVector(TerrainSizeId)` de kontrol ediyor ve
+`Update` her kare çağırdığı için kendini onarıyor.

@@ -470,6 +470,13 @@ public class SnowManager : MonoBehaviour
         if (detailNormal != null)
             Shader.SetGlobalTexture(SnowShaderIDs.SnowDetailNormal, detailNormal);
 
+        // PARILTI AYARLARI DA GLOBAL, AYNI GEREKÇEYLE: arazi karı da
+        // parıldıyor ve o ayrı bir materyal. Tek sahibi bu ayar asset'i.
+        Shader.SetGlobalFloat(SnowShaderIDs.SparkleCellSize, settings.SparkleCellSize);
+        Shader.SetGlobalFloat(SnowShaderIDs.SparkleDensity, settings.SparkleDensity);
+        Shader.SetGlobalFloat(SnowShaderIDs.SparkleSharpness, settings.SparkleSharpness);
+        Shader.SetGlobalFloat(SnowShaderIDs.SparkleIntensity, settings.SparkleIntensity);
+
         // BÖLGE DIŞI DÜNYANIN KARINI GÖRÜYOR, sabit bir varsayılanı değil.
         Shader.SetGlobalFloat(SnowShaderIDs.FallbackSWE, Mathf.Max(0f, WorldSwe));
         Shader.SetGlobalFloat(SnowShaderIDs.FallbackRhoN,
