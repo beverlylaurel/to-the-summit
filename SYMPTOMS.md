@@ -1411,3 +1411,25 @@ atlanmıştı.
 
 **Çözüm:** güç 0.30, tavan 2 cm, ve sırt kendi izinden yüksek olamıyor
 (`min(raised, blurCarve)`). Oyma burada sıkıştırma — hacmin çoğu yana taşınmıyor.
+
+## Kar sadece oyuncunun çevresindeki KARE alanda tutuyor
+
+**İki ayrı katman, iki ayrı sebep:**
+
+1. **Bölge dışı sabit 0'dı.** `_FallbackSWE` "dünyanın genel kar durumu"nu
+   taşıyor ama `settings.DefaultSwe` (0) ile besleniyordu — hava sisteminden
+   hiç haber almıyordu. Kar 24 m'lik pencerede birikiyor, dünya öğrenmiyordu.
+
+   **Çözüm:** `SnowManager.WorldSwe` — aynı yağış oranını dünya çapında entegre
+   ediyor, aynı 6 saatlik oturma eğrisini uyguluyor. Üç yerde birden kullanılıyor
+   (bölge dışı, kaydırma kenarı, ilk doldurma) ki oyuncu yürüdükçe kalınlık
+   basamak yapmasın. Ölçüm: `_FallbackSWE` 0 → 3.58 mm.
+
+2. **Kar mesh'i 24 m ve bu TASARIM.** `SnowSurface.Extent = AreaSize × 0.5`;
+   mesh deformasyon bölgesiyle bilerek aynı kareyi kaplıyor (spec §6.1). Onun
+   dışında kar, DAĞIN KENDİ kar katmanından gelmeli
+   (`MountainSurface.hlsl`, global `_SnowCoverage`).
+
+   **AÇIK:** `_SnowCoverage = 0.99996` ölçüldü ama dağ karanlık kaldı; mesh
+   kenarında sert basamak görünüyor. Dağın kar maskesi neden geçmiyor, henüz
+   bulunmadı.

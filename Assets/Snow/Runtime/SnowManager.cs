@@ -377,6 +377,8 @@ public class SnowManager : MonoBehaviour
         // KAccumulate tarafından okunuyor.
         snowfall.Tick(env, SnowFraction01);
 
+        TickWorldSnow(Time.deltaTime * Mathf.Max(0f, SimTimeScale));
+
         // GLOBALLER HER KAREDE YAZILIYOR, yalnız değişince değil. Bileşenlerin
         // OnEnable sırası eklenme sırasına bağlı; bir doku henüz hazır değilken
         // yazılan global null kalıyor ve belirti bir kare siyah zemin oluyor.
@@ -468,8 +470,10 @@ public class SnowManager : MonoBehaviour
         if (detailNormal != null)
             Shader.SetGlobalTexture(SnowShaderIDs.SnowDetailNormal, detailNormal);
 
-        Shader.SetGlobalFloat(SnowShaderIDs.FallbackSWE, settings.DefaultSwe);
-        Shader.SetGlobalFloat(SnowShaderIDs.FallbackRhoN, settings.DefaultRhoN);
+        // BÖLGE DIŞI DÜNYANIN KARINI GÖRÜYOR, sabit bir varsayılanı değil.
+        Shader.SetGlobalFloat(SnowShaderIDs.FallbackSWE, Mathf.Max(0f, WorldSwe));
+        Shader.SetGlobalFloat(SnowShaderIDs.FallbackRhoN,
+                              WorldRhoN >= 0f ? WorldRhoN : settings.DefaultRhoN);
 
         // KAR ÇİZGİSİ DONMA SEVİYESİNDEN. Ayrı bir sayı tanımlanmıyor;
         // sıcaklık alanı neredeyse kar da orada başlıyor.
@@ -555,8 +559,7 @@ public class SnowManager : MonoBehaviour
 
         if (pendingClear)
         {
-            ClearTo(cmd, snow, groups,
-                    new Vector4(settings.DefaultSwe, settings.DefaultRhoN, 0f, 0f));
+            ClearTo(cmd, snow, groups, WorldSnowValue);
             ClearTo(cmd, trail, groups, Vector4.zero);
             ClearTo(cmd, trailTemp, groups, Vector4.zero);
             ClearTo(cmd, capture, groups, Vector4.zero);
@@ -588,8 +591,7 @@ public class SnowManager : MonoBehaviour
             Scroll(cmd, groups, ref trail, ref trailTemp, Vector4.zero);
 
             // RT_Snow: yeni şerit dünyanın genel kar durumuyla doluyor (spec §6.4).
-            Scroll(cmd, groups, ref snow, ref snowTemp,
-                   new Vector4(settings.DefaultSwe, settings.DefaultRhoN, 0f, 0f));
+            Scroll(cmd, groups, ref snow, ref snowTemp, WorldSnowValue);
 
             pendingScroll = false;
             pendingScrollTexels = Vector2Int.zero;
@@ -711,6 +713,58 @@ public class SnowManager : MonoBehaviour
     /// geçersiz kılması değiştiğinde çağrılıyor.
     public void RefillRegion() => pendingClear = true;
 
+    // ------------------------------------------------- dünyanın kar durumu
+
+    /// DÜNYA ÇAPINDA SWE (m). Yüksek çözünürlüklü bölge oyuncunun çevresinde
+    /// yalnız 24 m; kar ise BÜTÜN DAĞA yağıyor.
+    ///
+    /// Bu değer olmadan bölge dışı sabit `settings.DefaultSwe` (0) kalıyordu ve
+    /// kar yalnız oyuncunun çevresindeki KARE alanda tutuyordu — kullanıcı
+    /// ekran görüntüsüyle bildirdi. Bölge bir DETAY katmanı (ayak izi, sırt);
+    /// karın kendisi dünyaya ait.
+    ///
+    /// Üç yerde birden kullanılıyor: bölge dışının görünümü (`_FallbackSWE`),
+    /// kaydırmada açılan yeni şerit, ve bölge ilk doldurulduğunda. Üçü ayrı
+    /// değer okusaydı oyuncu yürüdükçe kar kalınlığı basamak yapardı.
+    public float WorldSwe { get; private set; } = -1f;
+
+    /// Dünya karının normalize yoğunluğu. Bölgedeki oturma eğrisinin aynısı:
+    /// taze karla başlıyor, 6 saatlik zaman sabitiyle oturmuş kara yaklaşıyor.
+    public float WorldRhoN { get; private set; } = -1f;
+
+    /// Oturmuş kuru karın normalize yoğunluğu — çekirdekteki `rhoTarget`
+    /// (190 kg/m³) ile aynı sayı.
+    const float WorldSettledRhoN = 0.28f;
+
+    void TickWorldSnow(float dt)
+    {
+        if (WorldSwe < 0f)
+        {
+            WorldSwe = settings.DefaultSwe;
+            WorldRhoN = settings.DefaultRhoN;
+        }
+
+        float fall = snowfall.SnowfallSweRate * dt;
+
+        if (fall > 0f)
+        {
+            // Yeni kar taze; ortalama yoğunluk ağırlıklı harman — çekirdeğin
+            // yaptığının aynısı.
+            float taze = Mathf.InverseLerp(50f, 550f, 55f);
+            float toplam = WorldSwe + fall;
+
+            WorldRhoN = (WorldRhoN * WorldSwe + taze * fall) / Mathf.Max(toplam, 1e-9f);
+            WorldSwe = Mathf.Min(toplam, SnowConstants.SweMax);
+        }
+
+        // Oturma: çekirdekteki `SNOW_SETTLE_TAU` ile aynı 6 saat.
+        if (WorldRhoN < WorldSettledRhoN)
+            WorldRhoN += (WorldSettledRhoN - WorldRhoN) * (1f - Mathf.Exp(-dt / 21600f));
+    }
+
+    /// Bölge dışının ve yeni açılan şeridin kar durumu.
+    Vector4 WorldSnowValue => new Vector4(WorldSwe, WorldRhoN, 0f, 0f);
+
     // ------------------------------------------------------- sınama kancaları
 
     /// SİMÜLASYON ZAMAN ÇARPANI — yalnız sınama için.
@@ -736,6 +790,11 @@ public class SnowManager : MonoBehaviour
         fillSwe = Mathf.Max(0f, metre) * TazeYogunluk / SuYogunlugu;
         fillRhoN = Mathf.InverseLerp(50f, 550f, TazeYogunluk);
         pendingFill = true;
+
+        // DÜNYA DA DOLUYOR. Yalnız bölge doldurulsaydı sınama "kar sadece
+        // çevremdeki karede" belirtisini kendi eliyle üretirdi.
+        WorldSwe = fillSwe;
+        WorldRhoN = fillRhoN;
     }
 
     bool pendingFill;
