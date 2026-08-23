@@ -1240,3 +1240,22 @@ uzayda bütün kar ekrandan çıkardı.
 **Snap suçlu değildi.** İlk akla gelen ızgarayı kaldırmak; o gerekçesi geçerli
 (spawn deseninin kameranın peşinden sürüklenmesini önlüyor). Işınlanma
 snap'ten değil UZAYDAN geliyordu.
+
+## "Rüzgâr 0 ama kar belirli bir yöne yağıyor — yürürken düzeliyor, dururken rüzgâr varmış gibi"
+
+**Gerçek sebep: rüzgâr GERÇEKTEN var.** Panel sürgüsü hızı değil ŞİDDETİ
+sürüyor; şiddet 0 → `WindSettings.calmSpeed`. Ölçüm: `WindSpeed = 1.80 m/s`,
+`WindForce = (17.54, 0, −0.47)` → `17.54 / 9.81 = 1.79 m/s`, tam +x. HUD da
+dürüst yazıyor: "Hız 2,0 m/s". Sakin hava sıfır hava değil.
+
+**Yürürken neden düzeliyor:** yürüme hızı 2.2 m/s, koşma 4 m/s. Kendi hareketin
+1.8 m/s'lik sürüklenmeyle aynı büyüklükte, o yüzden bağıl hareket baskın çıkıyor
+ve sürüklenme göze batmıyor. Dururken tek hareket o.
+
+**İlk şüpheli (yanlış):** türbülansın `+ 0.15` tabanı. Doğru bir kusur ama
+BASKIN değil: rüzgâr 2 m/s'de türbülans zaten 0.70, taban terimin payı küçük.
+Yine de düzeltildi — gerekçe `RATIONALE.md`.
+
+**Bu turda ortaya çıkan gerçek eksik:** tanenin kendi çırpınması (spec §17.1
+"Salınım") hiç uygulanmamıştı. Türbülans onun yerini tutmuyor — biri tutarlı,
+diğeri dağınık.

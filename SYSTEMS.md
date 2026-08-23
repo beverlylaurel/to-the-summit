@@ -883,6 +883,12 @@ taneleri birlikte ışınlıyordu. Dünya uzayında obje yalnız nereye doğdukl
 belirliyor. Zemin kesmesi de bu yüzden DÜNYA kotu okuyor —
 `SnowfallLayers` `groundReference.position.y`'yi olduğu gibi yolluyor.
 
+**Türbülans ve salınım AYRI işler.** Türbülans havanın ORTAK hareketi ve
+tamamen rüzgâra bağlı (`0.35 * WindSpeed`); uzayda tutarlı bir alan, yan yana
+iki tane aynı yöne itiliyor. Salınım tanenin KENDİ çırpınması, rüzgârdan
+bağımsız, fazı parçacık kimliğinden türüyor — komşular birbirinden habersiz,
+kümenin net yönü sıfır. Biri diğerinin yerini tutmuyor.
+
 **Asgari ekran boyutu alfayı kısıyor.** Uzak taneyi 1.3 piksele çekmek kapladığı
 ALANI büyütüyor; alfa sabit kalırsa büyüme oranı kadar ışık uyduruluyor.
 `SnowVfxBuilder.MinScreenSizeHlsl` alfayı alan oranına bölüyor. Bu bağ olmadan

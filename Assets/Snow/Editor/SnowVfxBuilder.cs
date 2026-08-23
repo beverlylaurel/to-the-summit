@@ -299,6 +299,17 @@ public static class SnowVfxBuilder
         //   scaleX = max(1, ...)    -> tane EN AZ 1.3 piksel (spec böyle)
         //
         // 1.3 koda gömülü: spec sabit veriyor, ayarlanabilir olması istenmiyor.
+        // SALINIM (spec §17.1). Asgari ekran boyutundan ÖNCE: o blok
+        // `attributes.position`'dan kamera uzaklığını okuyor, tane kaydıktan
+        // sonraki konumu görsün.
+        //
+        // Türbülans bunun yerini tutmuyor — ikisi ayrı iş: türbülans havanın
+        // ORTAK hareketi (rüzgâra bağlı), salınım tanenin KENDİ çırpınması
+        // (rüzgârdan bağımsız, komşularıyla ilişkisiz).
+        object flutter = AddBlock(output, "Block.CustomHLSL", r);
+        SetSetting(flutter, "m_BlockName", "Salınım", r);
+        SetSetting(flutter, "m_HLSLCode", FlutterHlsl, r);
+
         object minPx = AddBlock(output, "Block.CustomHLSL", r);
         SetSetting(minPx, "m_BlockName", "Asgari ekran boyutu", r);
         SetSetting(minPx, "m_HLSLCode", MinScreenSizeHlsl, r);
@@ -591,6 +602,52 @@ public static class SnowVfxBuilder
 
     attributes.scaleX = buyumus.x;
     attributes.scaleY = buyumus.y;
+}";
+
+    /// TANENİN KENDİ ÇIRPINMASI (spec §17.1 "Salınım").
+    ///
+    /// Türbülans bunun yerini TUTMUYOR — bu ayrım ölçüldü. Türbülans uzayda
+    /// TUTARLI bir alan (dalga boyu ~8 m): yan yana iki tane aynı yöne itiliyor,
+    /// ve alan zamanla değişmediği için duran bir oyuncu tek lobun içinde
+    /// kalıyor. Sonuç rüzgâr gibi okunuyor — kullanıcı "rüzgâr 0 ama kar belirli
+    /// bir yöne yağıyor, yürürken düzeliyor" dedi.
+    ///
+    /// Salınım tam tersi: her tanenin fazı ayrı, komşular birbirinden bağımsız
+    /// çırpınıyor, kümenin net yönü sıfır.
+    ///
+    /// FAZ PARÇACIK KİMLİĞİNDEN. Spec `flutterPhase` custom attribute'u istiyor;
+    /// kimlik zaten benzersiz ve ömür boyu sabit, ikinci bir alan taşımaya gerek
+    /// yok. İstatistiksel sonuç aynı: taneye düzgün dağılmış sabit faz.
+    ///
+    /// HIZ DEĞİL, YER DEĞİŞTİRME — spec'in ifadesinin İNTEGRALİ.
+    ///
+    /// Spec `Set Position (Add)` ile `... * 0.35 * dt` veriyor, yani her kare
+    /// biraz ekliyor. CustomHLSL bloğu `deltaTime`'a ULAŞAMIYOR: VFX'te bu
+    /// sembolü blokların kendisi `VFXNamedExpression(DeltaTime, "deltaTime")`
+    /// ile bildiriyor (paket kaynağından okundu, `FlipbookPlay.cs:255`) ve
+    /// CustomHLSL öyle bir bildirim yapamıyor. Derleme "undeclared identifier
+    /// 'deltaTime'" ile düştü.
+    ///
+    /// Salınım sınırlı bir titreşim olduğu için integrali kapalı formda:
+    /// `∫ 0.35·sin(ωt) dt = (0.35/ω)·(-cos(ωt))`. Genlik x'te 0.35/5.5 = 6.4 cm,
+    /// z'de 0.35/4.6 = 7.6 cm. Toplam yerine DOĞRUDAN ofset yazılıyor: kare
+    /// hızından bağımsız ve birikme hatası yok.
+    ///
+    /// ÇIKTI BAĞLAMINDA, update'te değil. Salınım yalnız tanenin NEREDE
+    /// ÇİZİLDİĞİNİ değiştiriyor; zemin kesmesini ve birikmeyi etkilememeli.
+    ///
+    /// Genlik ~7 cm, tane boyutu 1.8 cm — birkaç katı, yani görünür.
+    ///
+    /// `_SnowWetness` çarpanı DÜŞTÜ: ıslaklık sıcaklıktan geliyordu ve yağış
+    /// sıcaklıktan koparıldığında sabit 0'a indi, yani çarpan hep 1.
+    const string FlutterHlsl =
+@"void SnowFlakeFlutter(inout VFXAttributes attributes)
+{
+    float faz = frac(sin(float(attributes.particleId) * 12.9898) * 43758.5453) * 6.2831853;
+
+    attributes.position += float3(-cos(attributes.age * 5.5 + faz) * (0.35 / 5.5),
+                                   0.0,
+                                   sin(attributes.age * 4.6 + faz) * (0.35 / 4.6));
 }";
 
     /// Spec §17.1: ömrün ilk %8'inde fade-in, son %8'inde fade-out; tane

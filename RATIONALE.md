@@ -1201,6 +1201,58 @@ hız arttıkça kendiliğinden sıklaşıyor.
 fazı kayabilirdi — ses bir ayakta, iz öbüründe düşerdi.
 
 
+## Salınım hız değil YER DEĞİŞTİRME, ve çıktı bağlamında
+
+**Kural.** `VFX_Snowfall`'ın çıktı bağlamında `SnowFlakeFlutter` bloğu tanenin
+konumunu `(0.35/ω)` genlikli bir salınımla kaydırıyor; faz parçacık kimliğinden.
+
+**Neden hız değil.** Spec §17.1 `Set Position (Add)` ile `... * 0.35 * dt`
+veriyor. CustomHLSL bloğu `deltaTime`'a ULAŞAMIYOR: VFX'te bu sembolü blokların
+kendisi `VFXNamedExpression(VFXBuiltInExpression.DeltaTime, "deltaTime")` ile
+bildiriyor (paket kaynağı, `FlipbookPlay.cs:255`) ve CustomHLSL öyle bir bildirim
+yapamıyor. Derleme "undeclared identifier 'deltaTime'" ile düştü.
+
+Salınım sınırlı bir titreşim olduğu için integrali kapalı formda alındı:
+`∫ 0.35·sin(ωt) dt = −(0.35/ω)·cos(ωt)`. Genlik x'te `0.35/5.5 = 6.4 cm`,
+z'de `0.35/4.6 = 7.6 cm`. Kare hızından bağımsız, birikme hatası yok.
+
+**Neden çıktı bağlamında.** Salınım yalnız tanenin NEREDE ÇİZİLDİĞİNİ
+değiştirmeli; zemin kesmesini ve birikmeyi etkilememeli.
+
+**Neden türbülans yetmiyor.** İkisi farklı şeyler ve bu ayrım ölçümle çıktı:
+
+| | türbülans | salınım |
+|---|---|---|
+| kaynağı | havanın ortak hareketi | tanenin kendi çırpınması |
+| uzayda | tutarlı, dalga boyu ~8 m | taneden taneye bağımsız |
+| zamanda | sabit alan | tanenin yaşına bağlı |
+| net yön | var | yok |
+
+`DECISIONS.md`'de "türbülans benzer bir etki veriyor" diye ertelenmişti; o
+varsayım yanlıştı. Türbülans TUTARLI olduğu için duran bir oyuncu tek gürültü
+lobunun içinde kalıyor ve hafif bir rüzgâr gibi okunuyor.
+
+**Genlik kontrolü:** 7 cm, tane boyutunun (1.8 cm) dört katı — görünür. Daha
+küçük olsaydı piksel altında kalırdı.
+
+
+## Türbülans tamamen rüzgâra bağlı — spec'in `+ 0.15` tabanı yok
+
+**Kural.** `Intensity = 0.35 * WindSpeed`. Spec §17.1 `+ 0.15` de veriyor ve
+sayıları `[KALİBRASYON]` diye işaretliyor.
+
+**Neden.** Türbülans bloğu uzayda TUTARLI bir alan üretiyor. Sabit bir taban,
+rüzgâr sıfırken bile `0.15 / 0.9 = 0.167 m/s`'lik ORTAK bir sürüklenme bırakıyor
+— 5 saniyelik ömürde 83 cm, ve çevredeki bütün taneler aynı yöne. Tutarlı hava
+akımı zaten rüzgârın tanımı; rüzgâr yoksa net sürüklenme de olmamalı. Rüzgârsız
+havada tanenin çırpınması ayrı terimden geliyor (salınım, yukarı bak).
+
+**Bugün görünür bir farkı yok:** `WindSettings.calmSpeed = 2 m/s`, yani rüzgâr
+hiç sıfıra inmiyor ve taban terim hiçbir zaman baskın olmuyor (2 m/s'de
+`0.70` yerine `0.85`). Değişiklik ileriye dönük: sakin hava hızı düşürülürse
+hayalet rüzgâr belirtisi doğmasın.
+
+
 ## VFX sistemleri dünya uzayında simüle ediliyor
 
 **Kural.** Beş grafiğin de `VFXDataParticle.space` alanı World

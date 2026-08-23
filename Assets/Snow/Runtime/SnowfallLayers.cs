@@ -155,10 +155,22 @@ public class SnowfallLayers : MonoBehaviour
         if (nearLayer.HasFloat(rateProperty))
             nearLayer.SetFloat(rateProperty, NearRate);
 
-        // Spec §17.1: `Intensity = 0.35 * _WindSpeed + 0.15`.
+        // TÜRBÜLANS TAMAMEN RÜZGÂRA BAĞLI — spec'in `+ 0.15` tabanı DÜŞTÜ.
+        //
+        // Spec §17.1 `Intensity = 0.35 * _WindSpeed + 0.15` veriyor ve sayıları
+        // `[KALİBRASYON]` diye işaretliyor. Taban terim ölçümde yanlış çıktı:
+        // türbülans bloğu uzayda TUTARLI bir alan (dalga boyu ~8 m) ve zamanla
+        // değişmiyor. Rüzgâr sıfırken 0.15 / drag 0.9 = 0.167 m/s'lik ortak bir
+        // sürüklenme kalıyor; 5 saniyelik ömürde 83 cm ve çevredeki bütün taneler
+        // aynı yöne. Duran oyuncu tek lobun içinde kaldığı için bu hafif bir
+        // rüzgâr gibi okunuyordu (kullanıcı bildirdi: yürürken düzeliyor,
+        // dururken rüzgâr varmış gibi).
+        //
+        // TUTARLI HAVA AKIMI ZATEN RÜZGÂRIN TANIMI. Rüzgâr 0'ken net sürüklenme
+        // de 0 olmalı. Tanenin rüzgârsız havada çırpınması ayrı bir terim —
+        // spec'in "Salınım"ı, grafikte `SnowFlakeFlutter`.
         if (environment != null && nearLayer.HasFloat(turbulenceProperty))
-            nearLayer.SetFloat(turbulenceProperty,
-                               0.35f * environment.WindSpeed + 0.15f);
+            nearLayer.SetFloat(turbulenceProperty, 0.35f * environment.WindSpeed);
 
         // RÜZGÂR KUVVET OLARAK GİDİYOR (spec §17.1). Denge hızı `F / drag`
         // olduğu için hedef hız burada sürüklemeyle çarpılıyor.

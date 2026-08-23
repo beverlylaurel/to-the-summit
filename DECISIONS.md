@@ -161,11 +161,6 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   **Tetikleyici:** çatı/köprü altına kar yağdığı görüldüğünde.
   **Maliyet:** CustomHLSL doku parametresi + `SnowfallLayers`'tan bağlama.
 
-- **Tane salınımı (flutter) yok** — spec §17.1 `flutterPhase` custom attribute'u
-  ve `sin(age*5.5 + phase)` salınımı istiyor. Türbülans benzer bir etki veriyor
-  ama tanenin kendi çırpınması yok.
-  **Tetikleyici:** kar "düz düşüyor, çırpınmıyor" göründüğünde.
-
 - **Sis fade'i yok** — spec §17.1 `alpha *= 1 − dist / lerp(120, 35, fog)`
   istiyor. Uzaktaki tane siste sönmüyor.
 
