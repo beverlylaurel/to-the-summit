@@ -24,6 +24,15 @@
 // --- Kar / arazi çakışması (spec §8.1) ---
 #define SNOW_MIN_VISIBLE_HEIGHT      0.004
 
+/// KENAR GEÇİŞ ARALIĞI (m). `SnowLit.shader`'ın `_SnowEdgeFadeRange`'iyle AYNI
+/// olmak zorunda: biri yüzeyin nerede çizileceğini, öteki örtü metriğinin ne
+/// söyleyeceğini belirliyor. Ayrışırlarsa nesneler zemin beyazlamadan önce
+/// (ya da sonra) beyazlar.
+///
+/// 4 mm → 24 mm bandı, tam şiddette ~13 dakika: kar önce çukurlara düşüyor,
+/// lekeler büyüyor, sonunda sürekli örtü oluyor. Ani sıçrama yok.
+#define SNOW_EDGE_FADE_RANGE         0.020
+
 // --- Yakalama (spec §9.1, §9.4) ---
 #define SNOW_CAPTURE_BELOW           3.0
 #define SNOW_CAPTURE_ABOVE           3.0
@@ -37,8 +46,20 @@
 
 // --- Kenar yığılması (spec §10.2) ---
 #define SNOW_RIM_VELOCITY_BIAS       0.04
-#define SNOW_RIM_STRENGTH            1.8
-#define SNOW_RIM_MAX                 0.10
+/// SIRT GÜCÜ — HACİM KORUNUMUNDAN, KEYFİ DEĞİL.
+///
+/// 1.8 idi ve 20 cm karda `raised × 1.8 × 0.8 ≈ 20 cm` sırt hedefi çıkıyordu;
+/// tavan 10 cm'e kırpsa bile karın YARISI kadar bir duvar demek. Ekranda iz
+/// kanyona, kenarı diken diken bir sıraya dönüşüyordu (kullanıcı bildirdi).
+///
+/// Oyma burada SIKIŞTIRMA: kar yoğunlaşıyor, hacminin çoğu yana taşınmıyor.
+/// Yana taşınan pay yalnız sıkışmayan kısım ve o da izin çevresine, izden
+/// GENİŞ bir halkaya yayılıyor. İkisi birlikte sırtı oymanın küçük bir kesrine
+/// indiriyor.
+#define SNOW_RIM_STRENGTH            0.30
+
+/// Mutlak tavan 2 cm: bundan yükseği kar değil, duvar.
+#define SNOW_RIM_MAX                 0.02
 #define SNOW_RIM_REF_DEPTH           0.25
 #define SNOW_RIM_BLUR_TEXELS         7.0
 
@@ -50,6 +71,12 @@
 #define SNOW_SETTLE_TAU          21600.0
 #define SNOW_DISTURB_TAU           900.0
 #define SNOW_MELT_DDF                4.63e-8
+
+/// ERİME ANAHTARI. 0 = kapalı, 1 = açık.
+///
+/// Tasarım kararı: yağan kar kolay kolay erimemeli. Erime sonra ele alınacak;
+/// formül yerinde duruyor ki geri açmak tek sayı olsun (`DECISIONS.md`).
+#define SNOW_MELT_ENABLED            0.0
 #define SNOW_DRIFT_BIAS              0.45
 #define SNOW_RAIN_MELT_BOOST         2.5
 #define SNOW_SWE_MAX                 0.60

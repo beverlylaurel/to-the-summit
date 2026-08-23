@@ -93,4 +93,35 @@ float4 SampleStochastic(TEXTURE2D_PARAM(tex, samplerState),
     return result;
 }
 
+/// LUT'SUZ STOKASTİK OKUMA — MASKELER İÇİN.
+///
+/// `SampleStochastic` Gauss dönüşümlü doku ve ters histogram tablosu istiyor.
+/// Maskelerde (kar kenarı gürültüsü gibi) o iki varlık yok ve gerekmiyor:
+/// maske zaten eşikleniyor, histogramın birebir korunması görünmüyor. Kalan
+/// iş üç kaymalı örneğin harmanı ve VARYANS GERİ KAZANIMI — bu adım atlanırsa
+/// harman bulanıklaşır ve yöntem anlamsızlaşır.
+///
+/// Neden gerekli: düz döşemede aynı desen sabit periyotla tekrar ediyor ve
+/// zemin yukarıdan bakınca DÜZENLİ BİR IZGARA gibi görünüyor (kullanıcı
+/// bildirdi: "izler çok düzenli, prosedürel değil").
+float SampleStochasticMask(TEXTURE2D_PARAM(tex, samplerState), float2 uv)
+{
+    float2 vertex1, vertex2, vertex3;
+    float3 weights;
+    StochasticHexGrid(uv, vertex1, vertex2, vertex3, weights);
+
+    // Türevler ELLE: her örnek farklı kaymadan okunduğu için donanımın türevi
+    // hücre sınırında sıçrıyor ve mip bir piksellik çizgiler hâlinde atlıyor.
+    float2 dx = ddx(uv);
+    float2 dy = ddy(uv);
+
+    float a = SAMPLE_TEXTURE2D_GRAD(tex, samplerState, uv + StochasticHash(vertex1), dx, dy).r;
+    float b = SAMPLE_TEXTURE2D_GRAD(tex, samplerState, uv + StochasticHash(vertex2), dx, dy).r;
+    float c = SAMPLE_TEXTURE2D_GRAD(tex, samplerState, uv + StochasticHash(vertex3), dx, dy).r;
+
+    float mixed = weights.x * a + weights.y * b + weights.z * c;
+
+    return saturate((mixed - 0.5) / length(weights) + 0.5);
+}
+
 #endif

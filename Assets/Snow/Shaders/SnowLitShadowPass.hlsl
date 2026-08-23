@@ -59,7 +59,9 @@ half4 SnowShadowFragment(ShadowVaryings IN) : SV_Target
     // AYNI KESME. İleri geçişte kesilen yer burada da kesilmeli, yoksa
     // görünmeyen kar görünen gölge atar.
     float2 uv = SnowWorldToUV(IN.positionWS);
-    SnowClipEdge(SnowSurfaceAt(uv), IN.positionWS);
+    float4 state = SnowStateAt(uv);
+
+    SnowClipEdge(SnowSurfaceAt(uv), SnowBaseHeight(state.r, state.g), IN.positionWS);
 
     return 0;
 }

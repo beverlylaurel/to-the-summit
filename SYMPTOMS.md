@@ -1376,3 +1376,38 @@ aynı kararı okuyor.
 **Ders:** aynı olgunun iki ayrı doğruluk kaynağı olamaz. Görsel keskin karar
 veriyorken fiziğin başka bir etikete bakması, ekranda kar yağarken zeminde
 yağmur işletiyordu.
+
+## Zeminde düzenli, tekrar eden koyu leke ızgarası
+
+**Sebep:** kar kenarı gürültüsü (`_SnowBreakup`) DÜZ döşemeyle örnekleniyordu
+(`posWS.xz * scale`). Aynı desen sabit periyotla tekrar edince zemin yukarıdan
+ızgara gibi okunuyor.
+
+**Çözüm:** `SampleStochasticMask` — mevcut `StochasticTiling.hlsl`'in hex
+ızgarası, hücre başına rastgele kayma, varyans geri kazanımı. LUT'suz sürüm,
+çünkü maskede histogramın birebir korunması görünmüyor.
+
+Aynı yöntem projede detay normalleri için ZATEN vardı; breakup dokusu
+atlanmıştı.
+
+## Ayak izi karı delip çıplak zemini gösteriyor
+
+**İki ayrı sebep, ikisi de düzeltildi:**
+
+1. Oyma `baseH`'a kadar gidebiliyordu, yani kar katmanının TAMAMINI
+   kaldırabiliyordu. Gerçekte ayağın altındaki kar SIKIŞIR: gevşek (ρ≈100)
+   sıkışmışa (ρ≈325) dönerken hacim yoğunluk oranı kadar küçülür ve dipte her
+   zaman kar kalır. Oyma artık `baseH × (1 − ρ_gevşek/ρ_sıkı)` ile sınırlı.
+
+2. Kesme (`clip`) OYULMUŞ yüzeye bakıyordu. Derin bir iz eşiğin altına düşünce
+   piksel kesiliyordu. Eşiğin sorduğu soru "burada kar var mı"; cevabı oyulmamış
+   `baseH`. İz artık kar sütununun içinde bir ÇUKUR.
+
+## İz kenarında diken diken duvar
+
+**Sebep:** `SNOW_RIM_STRENGTH` 1.8 ve tavan 10 cm. 20 cm karda sırt hedefi
+~20 cm çıkıyor, tavana kırpılsa bile karın yarısı kadar duvar oluyordu.
+`rim = max(rim, ...)` birikimi bunu kare kare tırtıklı bir zarfa çeviriyordu.
+
+**Çözüm:** güç 0.30, tavan 2 cm, ve sırt kendi izinden yüksek olamıyor
+(`min(raised, blurCarve)`). Oyma burada sıkıştırma — hacmin çoğu yana taşınmıyor.

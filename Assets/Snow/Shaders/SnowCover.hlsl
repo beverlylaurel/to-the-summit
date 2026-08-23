@@ -5,6 +5,7 @@
 #define SNOW_COVER_INCLUDED
 
 #include "SnowCommon.hlsl"
+#include "../../Shaders/StochasticTiling.hlsl"
 
 TEXTURE2D(_SnowBreakup);
 SAMPLER(sampler_SnowBreakup);
@@ -51,8 +52,9 @@ float SnowCoverMask(float3 posWS, float3 N, float ao,
                     float slopeThreshold, float slopeSharpness,
                     float breakupScale, float breakupStrength, float edgeSharpness)
 {
-    float noise = SAMPLE_TEXTURE2D(_SnowBreakup, sampler_SnowBreakup,
-                                   posWS.xz * breakupScale).r;
+    // STOKASTİK DÖŞEME — düz döşemenin ızgarası burada da görünüyordu.
+    float noise = SampleStochasticMask(TEXTURE2D_ARGS(_SnowBreakup, sampler_SnowBreakup),
+                                       posWS.xz * breakupScale);
 
     return SnowCoverMaskWithNoise(posWS, N, ao, noise,
                                   slopeThreshold, slopeSharpness,

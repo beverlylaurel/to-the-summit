@@ -192,7 +192,18 @@ void KDeform(uint3 id : SV_DispatchThreadID)
             if (crust > SNOW_CRUST_SOLID) trail.b = 0.0;
         }
 
-        float target = min(penetration * sinkScale, baseH);
+        // KAR SIKIŞIR, KALKMAZ.
+        //
+        // Eskiden oyma `baseH`'a kadar gidebiliyordu, yani ayak izi kar
+        // katmanını DELİP çıplak zemini gösteriyordu. Gerçekte ayağın altındaki
+        // kar sıkışır: gevşek kar (ρ≈100) sıkışmış kara (ρ≈325) dönerken hacmi
+        // yoğunluk oranı kadar küçülür ve dibinde HER ZAMAN kar kalır.
+        //
+        // Kalan pay `ρ_gevşek / ρ_sıkı`; oyma en fazla bunun tümleyeni kadar.
+        float kalanPay = SnowDensity(SNOW_LOOSE_N) / max(SnowDensity(SNOW_PACKED_N), 1.0);
+        float enFazlaOyma = baseH * (1.0 - kalanPay);
+
+        float target = min(penetration * sinkScale, enFazlaOyma);
 
         trail.r = max(trail.r, target);
 
@@ -290,7 +301,11 @@ void KRim(uint3 id : SV_DispatchThreadID)
     float  baseH = SnowBaseHeight(snow.r, snow.g);
     float  depthScale = saturate(baseH / SNOW_RIM_REF_DEPTH);
 
-    float rimTarget = raised * SNOW_RIM_STRENGTH * depthScale;
+    // SIRT KENDİ İZİNDEN YÜKSEK OLAMAZ. `raised` bulanık ile keskin oymanın
+    // farkı; izin kenarında büyük çıkabiliyor ve `max` birikimi onu kare kare
+    // tırtıklı bir zarfa çeviriyordu — ekrandaki diken sırası buydu.
+    float rimTarget = min(raised, blurCarve) * SNOW_RIM_STRENGTH * depthScale;
+
     rim = max(rim, min(rimTarget, SNOW_RIM_MAX));
 
     trail.r = carve;
@@ -393,9 +408,14 @@ void KAccumulate(uint3 id : SV_DispatchThreadID)
         s.b = min(1.0, s.b + SNOW_HEAT_WET_RATE * theta * dt);
     }
 
-    // ---- 3. Erime — derece-gün. Sıcaklık GÜNDÖNGÜSÜNDEN. ----
+    // ---- 3. Erime ----
+    //
+    // ŞİMDİLİK KAPALI. Tasarım kararı: yağan kar kolay kolay erimemeli; erime
+    // özelliği sonra ele alınacak (`DECISIONS.md`). Formül duruyor, yalnız
+    // çarpanı sıfır — geri açmak tek satır.
     float melt = SNOW_MELT_DDF * max(0.0, _TemperatureC);
     melt *= 1.0 + _RainOnSnow01 * SNOW_RAIN_MELT_BOOST;
+    melt *= SNOW_MELT_ENABLED;
     s.r = max(0.0, s.r - melt * dt);
 
     // ---- 4. Islaklık — sıcaklık VE yağmur ----
@@ -479,7 +499,15 @@ void KReduceState(uint3 id : SV_DispatchThreadID)
 
         swe  += s.r;
         rhoN += s.g;
-        visible += SnowBaseHeight(s.r, s.g) > SNOW_MIN_VISIBLE_HEIGHT ? 1.0 : 0.0;
+        // ÖRTÜ SÜREKLİ, İKİLİ DEĞİL.
+        //
+        // Eskiden teksel başına `derinlik > eşik ? 1 : 0`'dı. Derinlik her yerde
+        // aynı olduğu için bütün teksel AYNI ANDA geçiyor ve örtü 0'dan 1'e tek
+        // karede sıçrıyordu; `_SnowCoverage`'ı okuyan nesneler de birden
+        // beyazlıyordu. Yüzey shader'ı zaten 20 mm'lik bir geçiş bandı
+        // kullanıyor; metrik de aynı eğriyi okumalı.
+        visible += saturate((SnowBaseHeight(s.r, s.g) - SNOW_MIN_VISIBLE_HEIGHT)
+                            / SNOW_EDGE_FADE_RANGE);
         count += 1.0;
     }
 

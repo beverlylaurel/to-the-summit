@@ -8,6 +8,7 @@
 #include "../../Shaders/HeightFog.hlsl"
 
 #include "SnowDetailNormals.hlsl"
+#include "../../Shaders/StochasticTiling.hlsl"
 
 struct Attributes
 {
@@ -103,15 +104,27 @@ float3 SnowNormalAt(float2 uv, float hHere, float3 positionWS)
 ///    eridiği yerleri z-fighting'siz çözüyor.
 /// 3. Gürültülü bitiş `[KAYNAK: Company of Heroes 2, KGC 2013]` — kar kenarı
 ///    düz çizgi değil, gürültülü lekeler hâlinde bitiyor.
-void SnowClipEdge(float h, float3 positionWS)
+/// KESME KARIN VARLIĞINDAN, OYULMUŞ YÜZEYDEN DEĞİL.
+///
+/// `h` oyma ve sırt uygulandıktan SONRAKİ yüzey. Ona bakınca derin bir ayak
+/// izi eşiğin altına düşüyor, piksel kesiliyor ve izin dibinde ÇIPLAK ZEMİN
+/// görünüyordu (kullanıcı bildirdi: "adım attığım yerde zeminin karaltısını
+/// görüyorum").
+///
+/// Eşiğin sorduğu soru "burada kar VAR MI"; cevabı `baseH`, yani oyulmamış
+/// kar sütunu. İz o sütunun içinde bir ÇUKUR — kar orada duruyor, yalnız
+/// yüzeyi alçalmış.
+void SnowClipEdge(float h, float baseH, float3 positionWS)
 {
-    clip(h - SNOW_MIN_VISIBLE_HEIGHT);
+    clip(baseH - SNOW_MIN_VISIBLE_HEIGHT);
 
-    float edgeFade = saturate((h - SNOW_MIN_VISIBLE_HEIGHT)
+    float edgeFade = saturate((baseH - SNOW_MIN_VISIBLE_HEIGHT)
                               / max(_SnowEdgeFadeRange, 1e-4));
 
-    float breakup = SAMPLE_TEXTURE2D(_SnowBreakup, sampler_SnowBreakup,
-                                     positionWS.xz * _SnowBreakupScale).r;
+    // STOKASTİK DÖŞEME. Düz döşemede aynı leke sabit periyotla tekrar ediyor
+    // ve zemin düzenli bir ızgara gibi okunuyordu (kullanıcı bildirdi).
+    float breakup = SampleStochasticMask(TEXTURE2D_ARGS(_SnowBreakup, sampler_SnowBreakup),
+                                         positionWS.xz * _SnowBreakupScale);
 
     clip(edgeFade - breakup * 0.6);
 }
@@ -123,9 +136,10 @@ void SnowShadeSetup(float3 positionWS, out float3 N, out SnowSurface surface, ou
     float2 uv = SnowWorldToUV(positionWS);
     height = SnowSurfaceAt(uv);
 
-    SnowClipEdge(height, positionWS);
-
     float4 state = SnowStateAt(uv);
+
+    SnowClipEdge(height, SnowBaseHeight(state.r, state.g), positionWS);
+
     float4 trail = SnowTrailAt(uv);
 
     float dist = length(GetCameraPositionWS() - positionWS);
