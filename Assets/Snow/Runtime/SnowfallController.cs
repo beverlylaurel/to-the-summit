@@ -45,14 +45,28 @@ public sealed class SnowfallController
         // geçerli: yağıyorsa kardır, tutar.
         bool precipActive = env.PrecipKind != PrecipitationKind.None;
 
-        SnowRuntimeState.IsSnowing = precipActive && snowShare > 0.001f;
+        // KESKİN SINIR: YA KAR YA YAĞMUR, ASLA İKİSİ BİRDEN.
+        //
+        // Eskiden pay ikisine BÖLÜNÜYORDU (kar 0.5 → yarı kar yarı yağmur) ve
+        // gerekçe "toplamları bir olduğu için üst üste binemezler"di. O akıl
+        // yürütme yanlış: toplamın bir olması ikisinin AYNI ANDA ÇİZİLMESİNİ
+        // engellemiyor, yalnız ikisini de yarı şiddette çiziyor. Ekranda kar ve
+        // yağmur iç içe yağıyordu (kullanıcı bildirdi).
+        //
+        // Gerçekte de karışık yağış (sulusepken) ayrı bir olgudur, karla
+        // yağmurun üst üste bindirilmesi değil. Onu istersek kendi taneciği
+        // olur; şimdilik eşik.
+        //
+        // Sürgü artık ANAHTAR: 0.5 ve üstü kar, altı yağmur. Şiddet
+        // BÖLÜNMÜYOR — hangisi kazanırsa yağışın tamamını alıyor.
+        bool karYagiyor = snowShare >= 0.5f;
 
-        // YAĞMUR PAYI KARIN TAMAMLAYICISI. İkisi aynı yağışın iki hâli;
-        // toplamları bir olduğu için üst üste binmeleri imkânsız.
-        SnowRuntimeState.RainWeight01 = precipActive ? 1f - snowShare : 0f;
+        SnowRuntimeState.IsSnowing = precipActive && karYagiyor;
+
+        SnowRuntimeState.RainWeight01 = precipActive && !karYagiyor ? 1f : 0f;
 
         SnowRuntimeState.SnowfallIntensity01 =
-            SnowRuntimeState.IsSnowing ? env.PrecipIntensity01 * snowShare : 0f;
+            SnowRuntimeState.IsSnowing ? env.PrecipIntensity01 : 0f;
 
         float i01 = SnowRuntimeState.SnowfallIntensity01;
 

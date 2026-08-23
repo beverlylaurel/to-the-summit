@@ -86,6 +86,39 @@ public static class SnowAccumulationTest
         r.AppendLine("  [" + M(yagmur && kar) + "] Kar oranı kar/yağmur seçiyor  " +
                      "0 → yağmur, 1 → kar, ikisi de -5 °C'de");
 
+        // KESKİN SINIR: İKİSİ ASLA BİRLİKTE. Eşiğin iki yakası ve tam ortası.
+        //
+        // Eskiden pay bölünüyordu ve 0.5'te ikisi de yarı şiddette çiziliyordu.
+        // Sınama üç noktayı da kontrol ediyor; "hiçbir oranda üst üste binmesin"
+        // kuralı ancak böyle korunur.
+        bool ortusmeYok = true;
+        bool esikDogru = true;
+
+        foreach (float oran in new[] { 0f, 0.25f, 0.49f, 0.5f, 0.51f, 0.75f, 1f })
+        {
+            controller.Tick(env, oran);
+
+            bool k = SnowRuntimeState.IsSnowing;
+            bool y = SnowRuntimeState.RainWeight01 > 0.001f;
+
+            // Tam olarak biri: ikisi birden de, hiçbiri de olmaz.
+            if (k == y) ortusmeYok = false;
+
+            // Şiddet BÖLÜNMÜYOR: kar kazandıysa yağışın tamamını alıyor.
+            if (k && SnowRuntimeState.SnowfallIntensity01 < 0.999f) esikDogru = false;
+            if (y && SnowRuntimeState.RainWeight01 < 0.999f) esikDogru = false;
+
+            if ((oran >= 0.5f) != k) esikDogru = false;
+        }
+
+        r.AppendLine("  [" + M(ortusmeYok) + "] Kar ve yağmur ASLA birlikte   " +
+                     "0 / 0.25 / 0.49 / 0.50 / 0.51 / 0.75 / 1 — hepsinde tam olarak biri");
+
+        r.AppendLine("  [" + M(esikDogru) + "] Eşik 0.50, şiddet bölünmüyor  " +
+                     "kazanan yağışın tamamını alıyor");
+
+        hepsi &= ortusmeYok && esikDogru;
+
         // Yağış yoksa kar da yok — tek kapı bu kaldı.
         env.PrecipKind = PrecipitationKind.None;
         env.TemperatureC = -20f;

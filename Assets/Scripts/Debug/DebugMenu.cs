@@ -452,10 +452,10 @@ public class DebugMenu : MonoBehaviour
             // KAR ORANI, KAR ŞİDDETİ DEĞİL. Şiddeti yukarıdaki sürgü veriyor;
             // bu sürgü o yağışın kaça kar kaça yağmur bölüneceğini söylüyor.
             // İkisi ayrı soru: "ne kadar yağıyor" ve "ne yağıyor".
-            GUILayout.Label($"Kar oranı {lockedSnowFraction:F2}   " +
-                            (lockedSnowFraction > 0.999f ? "tamamen kar" :
-                             lockedSnowFraction < 0.001f ? "tamamen yağmur" : "karışık") +
-                            "   " + SnowStatus());
+            // ANAHTAR, SÜRGÜ DEĞİL. Eşik 0.5; "karışık" diye bir durum yok,
+            // ya kar yağar ya yağmur (`SnowfallController`).
+            GUILayout.Label($"Yağış türü: {(lockedSnowFraction >= 0.5f ? "KAR" : "YAĞMUR")}" +
+                            $"   (sürgü {lockedSnowFraction:F2}, eşik 0.50)   " + SnowStatus());
             lockedSnowFraction = GUILayout.HorizontalSlider(lockedSnowFraction, 0f, 1f);
             GUILayout.Label(SnowStateStatus());
 
