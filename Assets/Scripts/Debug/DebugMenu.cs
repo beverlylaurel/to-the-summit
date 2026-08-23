@@ -174,6 +174,14 @@ public class DebugMenu : MonoBehaviour
         open = false;
     }
 
+    /// Ölçülen ortalama derinlik (mm). `MeanRhoN` normalize yoğunluk;
+    /// `SnowDensity` ile aynı eşleme (50–550 kg/m³).
+    static float SnowDepthMm(SnowManager mgr)
+    {
+        float rho = Mathf.Lerp(50f, 550f, mgr.MeanRhoN);
+        return mgr.MeanSwe * 1000000f / Mathf.Max(rho, 1f);
+    }
+
     void Update()
     {
         var keyboard = Keyboard.current;
@@ -463,6 +471,47 @@ public class DebugMenu : MonoBehaviour
             // halkanın kenarındaysa halka sayısı azalınca kusur da o sınırla
             // birlikte içeri kayar.
             SnowManager mgr = snowManager;
+
+            // ---------------------------------------------- KAR SINAMA ORTAMI
+            //
+            // Birikme, oturma ve iz saat mertebesinde işliyor; gerçek zamanda
+            // beklemek dakikalar alıyor ve hata aramayı imkânsız kılıyor.
+            //
+            // Zaman çarpanı SAHTE DURUM YAZMIYOR: aynı fizik daha hızlı koşuyor
+            // (`_DeltaTimeEff` ölçekleniyor). Doldurma düğmeleri ise durumu
+            // doğrudan yazıyor — "şu derinlikte kar varken iz nasıl görünüyor"
+            // sorusunu beklemeden sormak için.
+            if (mgr != null)
+            {
+                GUILayout.Space(6f);
+                GUILayout.Label("— KAR SINAMASI —");
+
+                GUILayout.Label($"Simülasyon hızı ×{mgr.SimTimeScale:F0}   " +
+                                (mgr.SimTimeScale > 1.5f ? "HIZLANDIRILMIŞ" : "gerçek zaman"));
+
+                mgr.SimTimeScale = Mathf.Round(
+                    GUILayout.HorizontalSlider(mgr.SimTimeScale, 1f, 500f));
+
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button("Kar yok"))    mgr.FillSnowDepth(0f);
+                if (GUILayout.Button("1 cm"))       mgr.FillSnowDepth(0.01f);
+                if (GUILayout.Button("5 cm"))       mgr.FillSnowDepth(0.05f);
+                if (GUILayout.Button("20 cm"))      mgr.FillSnowDepth(0.20f);
+                if (GUILayout.Button("50 cm"))      mgr.FillSnowDepth(0.50f);
+                GUILayout.EndHorizontal();
+
+                GUILayout.Label($"Ölçülen: örtü {SnowRuntimeState.GroundCoverage01:F3}   " +
+                                $"SWE {mgr.MeanSwe * 1000f:F2} mm   " +
+                                $"derinlik {SnowDepthMm(mgr):F1} mm");
+
+                if (GUILayout.Button("Ayarları geri al (sınama)"))
+                {
+                    mgr.SimTimeScale = 1f;
+                    mgr.RefillRegion();
+                }
+
+                GUILayout.Space(6f);
+            }
 
             if (mgr != null)
             {

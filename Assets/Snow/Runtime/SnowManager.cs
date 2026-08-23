@@ -156,7 +156,11 @@ public class SnowManager : MonoBehaviour
     /// `pendingClear` uykuyu bozuyor: bölge daha hiç doldurulmadıysa bir kez
     /// koşması gerekiyor, yoksa dokular çöp kalıyor ve uyanınca bir kare
     /// bozuk kar görünüyor.
+    /// `pendingFill` de uykuyu bozuyor: sınama doldurması yağış kapalıyken
+    /// yapılıyor ve uyku bunu hiç dispatch etmiyordu — düğmeye basılıyor,
+    /// hiçbir şey olmuyordu (ölçüldü).
     public bool IsDormant => !pendingClear
+                             && !pendingFill
                              && !SnowRuntimeState.IsSnowing
                              && SnowRuntimeState.GroundCoverage01 < 0.01f;
 
@@ -561,6 +565,18 @@ public class SnowManager : MonoBehaviour
             pendingClear = false;
         }
 
+        if (pendingFill)
+        {
+            // İZ DOKUSU DA SIFIRLANIYOR: eski oyuklar yeni kar tabakasının
+            // altında kalırdı ve "10 cm kar" dendiğinde ekranda delik delik
+            // bir yüzey çıkardı.
+            ClearTo(cmd, snow, groups, new Vector4(fillSwe, fillRhoN, 0f, 0f));
+            ClearTo(cmd, trail, groups, Vector4.zero);
+            ClearTo(cmd, trailTemp, groups, Vector4.zero);
+
+            pendingFill = false;
+        }
+
         if (pendingScroll)
         {
             LastScrollTexels = pendingScrollTexels;
@@ -695,6 +711,37 @@ public class SnowManager : MonoBehaviour
     /// geçersiz kılması değiştiğinde çağrılıyor.
     public void RefillRegion() => pendingClear = true;
 
+    // ------------------------------------------------------- sınama kancaları
+
+    /// SİMÜLASYON ZAMAN ÇARPANI — yalnız sınama için.
+    ///
+    /// Birikme, oturma, erime ve kabuk saat mertebesinde işliyor; gerçek
+    /// zamanda beklemek dakikalar alıyor. Çarpan `_DeltaTimeEff`'e giriyor,
+    /// yani sahte durum yazmıyor: aynı fizik daha hızlı koşuyor.
+    ///
+    /// Çarpan 1 iken hiçbir şey değişmiyor; sınama dışında dokunulmuyor.
+    public float SimTimeScale { get; set; } = 1f;
+
+    /// Bölgeyi VERİLEN DERİNLİKTE karla doldurur (m). Bir sonraki karede
+    /// uygulanıyor — komut tamponu zaten o karede kuruluyor.
+    ///
+    /// Derinlik SWE'ye yoğunluktan çevriliyor: `swe = derinlik × ρ / ρ_su`.
+    /// Taze kar yoğunluğu kullanılıyor (55 kg/m³) ki "10 cm kar" dendiğinde
+    /// ekranda 10 cm görünsün.
+    public void FillSnowDepth(float metre)
+    {
+        const float TazeYogunluk = 55f;
+        const float SuYogunlugu = 1000f;
+
+        fillSwe = Mathf.Max(0f, metre) * TazeYogunluk / SuYogunlugu;
+        fillRhoN = Mathf.InverseLerp(50f, 550f, TazeYogunluk);
+        pendingFill = true;
+    }
+
+    bool pendingFill;
+    float fillSwe;
+    float fillRhoN;
+
     /// Sahneye engel eklendiğinde veya taşındığında çağrılır.
     public void MarkSkyVisDirty()
     {
@@ -804,7 +851,8 @@ public class SnowManager : MonoBehaviour
         // DÖŞEME DÖNDÜRMESİ (spec §15.2). Her karede dokunun 1/tiles'ı
         // işleniyor, dt aynı katla çarpılıyor. Kar oturması ve erimesi saat
         // mertebesinde; görsel fark yok.
-        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.DeltaTimeEff, Time.deltaTime * tiles);
+        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.DeltaTimeEff,
+                                 Time.deltaTime * tiles * Mathf.Max(0f, SimTimeScale));
         cmd.SetComputeIntParam(simCompute, SnowShaderIDs.TileIndex, accumulateTile);
         cmd.SetComputeIntParam(simCompute, SnowShaderIDs.TileCount, tiles);
 
