@@ -555,6 +555,12 @@ public class SnowManager : MonoBehaviour
         DispatchSky(cmd, restoreView, restoreProj);
         cmd.EndSample(SnowProfiler.MarkerNames[0]);
 
+        // COMPUTE PARAMETRELERİ BÜTÜN ÇEKİRDEKLERDEN ÖNCE. Compute shader'lar
+        // `Shader.SetGlobalFloat` ile yayınlanan globalleri ALMIYOR; buradan
+        // yazılmayan her değer çekirdekte eski kalır.
+        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.SnowfallSWERate,
+                                 snowfall.SnowfallSweRate);
+
         cmd.BeginSample(SnowProfiler.MarkerNames[1]);
         DispatchCapture(cmd, groups, restoreView, restoreProj);
         cmd.EndSample(SnowProfiler.MarkerNames[1]);
@@ -745,6 +751,25 @@ public class SnowManager : MonoBehaviour
 
         int tiles = Mathf.Max(1, q.AccumulateTiles);
         accumulateTile = (accumulateTile + 1) % tiles;
+
+        // YAĞIŞ ORANI COMPUTE PARAMETRESİ OLARAK YAZILIYOR, GLOBAL OLARAK DEĞİL.
+        //
+        // `SnowfallController` bunu `Shader.SetGlobalFloat` ile yayınlıyor ve
+        // MALZEME shader'ları oradan okuyor. COMPUTE shader'lar global shader
+        // değişkenlerini ALMIYOR; `_SnowfallSWERate` çekirdekte eski bir
+        // değerde kalıyordu.
+        //
+        // Belirti: kar hiç tutmuyor. Ölçüldü — gerçekleşen birikme hızı
+        // 1.06e-9 m/s, beklenen 1.39e-6 m/s, yani 1300 kat eksik. Sıfır
+        // olmamasının sebebi editör sınamalarının (`SnowAccumulationTest`)
+        // aynı compute asset'ine `sim.SetFloat` ile yazdığı değerin asset'te
+        // KALMASI.
+        //
+        // BİRİM SINAMASININ GEÇİP OYUNUN ÇALIŞMAMASININ SEBEBİ DE BU: sınama
+        // `sim.SetFloat` kullanıyor, oyun global kullanıyordu. İki ayrı yol.
+        //
+        // Yazma YUKARIDA, `KDeform`'dan önce (`WriteComputeParams`) — o çekirdek
+        // de aynı değeri okuyor ve bu dispatch'ten ÖNCE koşuyor.
 
         // DÖŞEME DÖNDÜRMESİ (spec §15.2). Her karede dokunun 1/tiles'ı
         // işleniyor, dt aynı katla çarpılıyor. Kar oturması ve erimesi saat

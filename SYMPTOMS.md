@@ -1303,3 +1303,39 @@ bozulmuyor — normal çizim yolundan bağımsız.
 
 Spec 1.3 KAMERANIN culling mask'ine dokunmayı yasaklıyor; değişen renderer
 varlığının katman maskesi, o başka bir ayar.
+
+## "Kar tutması için ne kadar beklemeliyim" → tutmuyor
+
+**Ölçüm (tam kar, rüzgârsız, oyun içi zamanla):**
+
+| | hız | beklenenin katı |
+|---|---|---|
+| düzeltme öncesi | 1.06e-9 m/s | 1/1316 |
+| sıcaklık −33 °C | 2.07e-9 m/s | 1/673 |
+| compute parametresi düzeltildi | 2.95e-9 m/s | 1/470 |
+| beklenen (`_SnowfallSWERate`) | 1.39e-6 m/s | 1 |
+
+**Aracın kendisi önce doğrulandı.** İlk tur duvar saatiyle ölçüldü; Unity
+odaksızken Play tick atmayabildiği için `Time.time` farkına geçildi. Kareler
+sayıldı: 119 saniyede 13301 kare, yani Play koşuyordu — ölçüm geçerli.
+
+**Elenen şüpheliler:**
+
+| Şüpheli | Nasıl elendi |
+|---|---|
+| Gökyüzü örtüsü (`skyVis`) | `RT_SkyVis` baştan sona −9999 nöbetçi değeri; `SampleSkyVisibility` bunu 1.0'a çeviriyor (kâğıtta doğrulandı) |
+| Döşeme döndürmesi | 1024/8 = 128 grup, 4 döşem → 32×8 = 256 = tam `tileWidth`, kapsama oranı 1 |
+| Erime | −33 °C'de hız yalnız iki katına çıktı; ikincil sızıntı, baskın değil |
+| Rüzgâr yeniden dağıtımı | Rüzgâr 0.5 m/s → `saturate(0.5/12) = 0.042`, 470 katı açıklayamaz |
+
+**Bulunan sebep (kısmi):** `_SnowfallSWERate` oyunda
+`Shader.SetGlobalFloat` ile yayınlanıyordu. **Compute shader'lar global shader
+değişkenlerini almıyor.** Çekirdek, editör sınamalarının aynı compute asset'ine
+`sim.SetFloat` ile yazıp BIRAKTIĞI eski değeri okuyordu — sıfır olmamasının
+sebebi de bu.
+
+**BİRİM SINAMASININ GEÇİP OYUNUN ÇALIŞMAMASININ SEBEBİ:** sınama
+`sim.SetFloat` (compute parametresi), oyun `Shader.SetGlobalFloat` (global)
+kullanıyordu. İki ayrı yol; sınama oyunun kullandığı yolu hiç denemiyordu.
+
+**Kalan 470 kat henüz bulunmadı.**
