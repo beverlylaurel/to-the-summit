@@ -1493,3 +1493,20 @@ karartmıyor).
 
 Kalan şüpheli: mesh'in yükseklik tabanlı AO'su (`SnowHeightAO`) — dağda
 karşılığı yok.
+
+**Sebep 3 — kar mesh'i gölge alıyordu.** İki yakalı ölçüm (öğle, tam örtü,
+sınırın iki yakası aynı karede):
+
+| durum | oran (mesh / dağ) |
+|---|---|
+| başlangıç | 0.847 |
+| mesh'in AO'su kapalı | 0.835 — AO ELENDİ |
+| mesh gölge ALMIYOR + ATMIYOR | **0.999** |
+| mesh yalnız ATMIYOR | 0.856 |
+| arazi caster'ları da kapalı | 0.881 |
+
+Gölgeyi tamamen kesmek farkı kapatıyor, yani kaynak gölge zinciri. Atma tarafı
+düzeltildi (mesh kendi gölgesini alıyordu; kar araziye oturuyor, arazi zaten
+kendi gölgesini atıyor ve karın öz-gölgelemesi ayrı bir terimde —
+`SnowHeightAO`). Kalan pay hâlâ AÇIK: bütün caster'lar kapalıyken bile oran
+0.881, oysa gölge alma kapalıyken 0.999.

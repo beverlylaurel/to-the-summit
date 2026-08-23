@@ -80,7 +80,22 @@ public class SnowSurface : MonoBehaviour
         r.sharedMaterial = snowMaterial;
 
         // Spec §8.2 birebir.
-        r.shadowCastingMode = ShadowCastingMode.On;
+        // KAR MESH'İ GÖLGE ATMIYOR, ALIYOR.
+        //
+        // Attığında KENDİ gölgesini alıyordu: gölge sapması karın ince
+        // detaylı normaline göre uygulanıyor, o normal yüksek frekanslı ve
+        // sapma yetmiyor — yüzeyin tamamına yayılan akne çıkıyor.
+        //
+        // Ölçüldü (öğle, tam örtü, sınırın iki yakası):
+        //   gölge açık   → mesh dağdan %15 KARANLIK  (oran 0.847)
+        //   gölge kapalı → oran 0.999
+        //
+        // Belirti: oyuncunun çevresinde parlaklığı farklı bir KARE.
+        //
+        // Kaybedilen şey yok: kar araziye oturuyor ve arazi kendi gölgesini
+        // zaten atıyor. Karın KENDİ öz-gölgelemesi ayrı bir terimde —
+        // `SnowHeightAO` yükseklik alanından hesaplıyor ve akne üretmiyor.
+        r.shadowCastingMode = ShadowCastingMode.Off;
         r.receiveShadows = true;
         r.allowOcclusionWhenDynamic = false;
 
