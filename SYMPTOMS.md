@@ -1654,3 +1654,26 @@ yapısı gereği korur — detay sıfırsa sonuç tabanın kendisidir.
 
 **Sonuç:** oluk kontrastı **%1.0 → %13.3**. Ekranda iki sürekli paralel oluk;
 damga yok, dipte çıplak zemin yok.
+
+
+---
+
+## Kar izinde hareket ederken titreme
+
+**Kullanıcının ağzından:** "kar izinde hareket ederken titreme oluyor".
+
+**Ayırt eden ölçüm:** kamera TAMAMEN sabitken iki ardışık render'ın farkı.
+Gölgelendirme deterministikse fark sıfır olmalı.
+
+| durum | kare farkı ort | tepe |
+|---|---|---|
+| olduğu gibi | 0.00376 | 0.0902 |
+| parıltı kapalı | 0.00315 | 0.0120 |
+| **post kapalı** | **0.00000** | **0.0000** |
+
+Post kapalıyken fark TAM SIFIR: kar gölgelendirmesinin kendisi kararlı,
+titremenin tamamı zamansal filtreden (TAA) geliyor. Tepe sıçramaların
+kaynağı parıltı — TAA'nın çözemediği piksel ölçeğinde bir sinyal; yoğunluk
+0.06'dan 0.006'ya indirilince tepe fark 7.5 kat düştü.
+
+Kayıt: gölgelendirme tarafında aranacak bir şey yok.
