@@ -41,8 +41,54 @@
 // --- İz oluşumu (spec §10.1) ---
 #define SNOW_LOOSE_N                 0.10
 #define SNOW_PACKED_N                0.55
+/// EN FAZLA BATMA (m) — TAŞIMA GÜCÜ.
+///
+/// Spec §10.1 `min(penetration, baseH)` diyor, yani kar ne kadar kalınsa ayak
+/// o kadar batıyor. O ifade oyuncunun karın ÜSTÜNDE yürüdüğünü varsayıyor;
+/// bizim oyuncu araziye bastığı için batma her zaman tabakanın tamamı oluyor
+/// ve 20 cm karda 19 cm derinliğinde, dik duvarlı bir çukur açılıyordu
+/// (ölçüldü — kesit: 20/20 20/20 | 3/0 3/0 | 20/20).
+///
+/// Fizikte eksik olan taşıma gücü: bot battıkça altındaki kar sıkışır,
+/// yoğunluğu artar ve bir noktada yükü taşıyıp batmayı durdurur. 1 m karda
+/// ayak zemine inmez.
+///
+/// 8 cm taze kar için makul: bot tabanı ~180 cm², 70 kg → ~39 kPa; taze karın
+/// (ρ 55) sıkışarak ρ≈200'e ulaştığı derinlik bu mertebede.
+///
+/// Görsel sonucu da bu: 8 cm derinliğinde, 25 cm genişliğinde bir oluk
+/// mesh'in 4.7 cm'lik köşe aralığıyla YUMUŞAK temsil edilebiliyor. 19 cm'lik
+/// çukur edilemiyordu.
+#define SNOW_MAX_SINK                0.08
+
+/// TEK GEÇİŞTE EN FAZLA YOĞUNLAŞMA (normalize birim).
+///
+/// SWE korunuyor, yani `baseH = SWE × 1000 / ρ`. Yoğunluk artışı DOĞRUDAN
+/// yükseklik kaybı demek: rhoN 0.01'den 0.55'e çıkınca 20 cm kar 3 cm'ye
+/// iniyor ve iz 17 cm derinliğinde bir çukur oluyor (ölçüldü).
+///
+/// Sınır olmadan bir ayak teması yoğunluğu tepeye çıkarıyordu. Tek geçişte
+/// 0.06 ile spec'in "5–6 geçişten sonra patika oluşur" tarifi de korunuyor
+/// (0.10 → 0.55 arası ~7 geçiş), ama TEK iz sığ kalıyor: 20 cm karda
+/// yoğunluk 55 → 85, yükseklik 20 → 13 cm.
+#define SNOW_MAX_COMPACT_PER_PASS    0.06
+
 #define SNOW_PACKED_SINK_SCALE       0.18
-#define SNOW_COMPACT_RATE            0.12
+/// SIKIŞMA HIZI — SANİYE BAŞINA, KARE BAŞINA DEĞİL.
+///
+/// Spec §10.1 `compact = SNOW_COMPACT_RATE * saturate(...)` diyor ve `dt`
+/// içermiyor; kare başına uygulanınca KARE HIZINA BAĞLI oluyor. 100 fps'de
+/// 0.1 saniyelik bir ayak teması 10 kare eder ve rhoN 0.10'dan 0.55'e tek
+/// adımda çıkıyor — kar bir basışta tamamen sıkışıyor.
+///
+/// Sonucu ölçüldü: `baseH = SWE × 1000 / ρ` 20 cm'den 3 cm'ye düşüyor ve iz
+/// 19 cm derinliğinde, dik duvarlı bir çukur oluyor. Oymayı sınırlamak
+/// çözmüyor çünkü derinlik oymadan değil SIKIŞMADAN geliyor.
+///
+/// Spec'in kendi davranış tarifi: "aynı hattan 5–6 geçişten sonra batma %18'e
+/// düşer, patika oluşur". Ayak teması ~0.3 s; 6 geçiş 1.8 s eder. rhoN'un
+/// 0.10'dan 0.55'e (Δ0.45) 1.8 saniyede çıkması için hız 0.25/s.
+#define SNOW_COMPACT_RATE            0.25
 
 // --- Kenar yığılması (spec §10.2) ---
 #define SNOW_RIM_VELOCITY_BIAS       0.04
@@ -56,17 +102,19 @@
 /// Yana taşınan pay yalnız sıkışmayan kısım ve o da izin çevresine, izden
 /// GENİŞ bir halkaya yayılıyor. İkisi birlikte sırtı oymanın küçük bir kesrine
 /// indiriyor.
-#define SNOW_RIM_STRENGTH            0.30
+#define SNOW_RIM_STRENGTH            0.55
 
-/// Mutlak tavan 2 cm: bundan yükseği kar değil, duvar.
-#define SNOW_RIM_MAX                 0.02
+/// Tavan batmanın yarısı kadar: 8 cm oluğun kenarında 4 cm'lik yumuşak bir
+/// kabartı. Spec §10.2 "bu parça atlanırsa izler ÇUKUR gibi görünür" diyor;
+/// bir tur 2 cm'e kısıldı ve oluk gerçekten çukur gibi kaldı.
+#define SNOW_RIM_MAX                 0.04
 #define SNOW_RIM_REF_DEPTH           0.25
 #define SNOW_RIM_BLUR_TEXELS         7.0
 
 /// Oymanın GÖRÜNTÜ için yayılma yarıçapı, teksel. 2.3 cm/teksel × 3 = 7 cm,
 /// yani ayak genişliğiyle aynı mertebe: çukur ayağın izini koruyor ama duvarı
 /// eğimleniyor ve mesh onu merdivensiz temsil edebiliyor.
-#define SNOW_CARVE_SMOOTH_TEXELS     3.0
+#define SNOW_CARVE_SMOOTH_TEXELS     4.0
 
 // --- İzlerin dolması (spec §10.3) ---
 #define SNOW_FILL_GAIN             900.0

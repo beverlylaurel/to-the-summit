@@ -1433,3 +1433,38 @@ atlanmıştı.
    **AÇIK:** `_SnowCoverage = 0.99996` ölçüldü ama dağ karanlık kaldı; mesh
    kenarında sert basamak görünüyor. Dağın kar maskesi neden geçmiyor, henüz
    bulunmadı.
+
+## İz çukur gibi, dik duvarlı ve dipte karanlık
+
+**Sebep zincirinin tamamı ölçümle çıktı — üç ayrı kusur:**
+
+1. **Sıkışma kare başına uygulanıyordu.** Spec §10.1'in
+   `compact = SNOW_COMPACT_RATE * saturate(...)` ifadesinde `dt` yok. 100 fps'de
+   0.1 saniyelik bir ayak teması 10 kare eder ve rhoN 0.10'dan 0.55'e TEK
+   adımda çıkıyordu.
+
+2. **SWE korunduğu için yoğunluk artışı doğrudan yükseklik kaybı.**
+   `baseH = SWE × 1000 / ρ`; rhoN 0.01 → 0.55 demek 20 cm kar → 3 cm demek.
+   Derinlik oymadan değil SIKIŞMADAN geliyordu — oymayı sınırlamak
+   (iki tur denendi) hiçbir şey değiştirmedi.
+
+3. **Taşıma gücü yoktu.** Spec `min(penetration, baseH)` diyor, yani kar ne
+   kadar kalınsa ayak o kadar batıyor. O ifade oyuncunun karın ÜSTÜNDE
+   yürüdüğünü varsayıyor; bizimki araziye bastığı için batma her zaman
+   tabakanın tamamıydı.
+
+**Çözümler:** sıkışma saniye başına (`× _SnowDeltaTime`, hız 0.25/s), tek
+geçişte en fazla `SNOW_MAX_COMPACT_PER_PASS` (0.06) yoğunlaşma, batmaya mutlak
+sınır (`SNOW_MAX_SINK` 8 cm). Spec'in "5–6 geçişten sonra patika oluşur"
+tarifi korunuyor; tek iz sığ kalıyor.
+
+**Başarısız denemeler (geri alındı):**
+
+| Deneme | Neden battı |
+|---|---|
+| `carve`'a şev açısı sınırı | Duvar `carve`'da değil yoğunluktaydı; hiçbir şey değişmedi |
+| Yoğunluğa şev açısı sınırı | Kütle korunmuyor — kısıt alçak tekseli yükseltip yükseği alçaltmıyor, çukur her karede kenardan doluyor ve İZ TAMAMEN SİLİNDİ |
+
+**Araç yalanı:** kesit probu yüzeyi `baseH − carve + rim` ile hesaplıyordu,
+shader'ın oyma sınırını uygulamıyordu. "0 cm" gösterdiği yerde gerçek değer
+0.92 cm'di. Prob shader'ın formülüyle hizalandı.

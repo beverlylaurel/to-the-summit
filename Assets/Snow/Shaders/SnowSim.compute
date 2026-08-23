@@ -203,16 +203,38 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         float kalanPay = SnowDensity(SNOW_LOOSE_N) / max(SnowDensity(SNOW_PACKED_N), 1.0);
         float enFazlaOyma = baseH * (1.0 - kalanPay);
 
-        float target = min(penetration * sinkScale, enFazlaOyma);
+        // TAŞIMA GÜCÜ: batma mutlak bir sınırla duruyor (gerekçe
+        // `SNOW_MAX_SINK` yanında). Sıkışmış karda sınır da orantılı iniyor —
+        // sert zeminde zaten az batılır.
+        float tasimaSiniri = SNOW_MAX_SINK * sinkScale;
+
+        float target = min(min(penetration * sinkScale, enFazlaOyma), tasimaSiniri);
 
         trail.r = max(trail.r, target);
 
         // Üzerinden geçilen yerde sırt kalmaz (spec §18.4).
         trail.a = 0.0;
 
-        float compact = SNOW_COMPACT_RATE * saturate(target / max(baseH, 1e-4));
+        // `_SnowDeltaTime` ÇARPANI SPEC'TE YOK ve olmadan kare hızına bağlı
+        // kalıyor (gerekçe `SNOW_COMPACT_RATE` yanında).
+        float compact = SNOW_COMPACT_RATE * saturate(target / max(baseH, 1e-4))
+                      * _SnowDeltaTime;
+
+        // TEK GEÇİŞ SINIRI. `snow.a` bu temasta ne kadar yoğunlaştığımızı
+        // tutuyor; ayak kalkınca sıfırlanıyor. Sınır olmadan bir tek temas
+        // yoğunluğu tepeye çıkarıp izi çukura çeviriyordu (gerekçe
+        // `SNOW_MAX_COMPACT_PER_PASS` yanında).
+        float kalanIzin = max(0.0, SNOW_MAX_COMPACT_PER_PASS - snow.a);
+        compact = min(compact, kalanIzin);
+
         snow.g = min(snow.g + compact, SNOW_PACKED_N);
-        snow.a = 1.0;
+        snow.a = snow.a + compact;
+    }
+    else
+    {
+        // Ayak kalktı: geçiş sayacı sıfırlanıyor, sonraki adım kendi payı
+        // kadar yeniden sıkıştırabiliyor. Patika böyle oluşuyor.
+        snow.a = 0.0;
     }
 
     _TrailOut[id.xy] = trail;
