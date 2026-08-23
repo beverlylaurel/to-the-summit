@@ -1263,3 +1263,28 @@ Yine de düzeltildi — gerekçe `RATIONALE.md`.
 **Bu turda ortaya çıkan gerçek eksik:** tanenin kendi çırpınması (spec §17.1
 "Salınım") hiç uygulanmamıştı. Türbülans onun yerini tutmuyor — biri tutarlı,
 diğeri dağınık.
+
+## "Yakın uzun tanecikler sola düşerken biraz ilerideki tanecikler sağa düşüyor"
+
+**Gerçek sebep:** rüzgârın sınır tabakası çarpanı `profile` her damla için KENDİ
+altındaki araziden hesaplanıyordu (`aboveGround = damla.y − TerrainHeightAt(damla.xz)`).
+Düz ovada doğru, dik dağda değil: 48 m'lik yağmur kutusu içinde arazi onlarca
+metre oynuyor ve yan yana iki damladan biri "yerden 2 m", öteki "yerden 30 m"
+çıkıyor. `profile` 0.3 ile 1.0 arasında zıplayınca rüzgâr tepkileri de zıplıyor
+ve yağmurun ortak yönü kalmıyor.
+
+**Elenen şüpheliler — hepsi ölçümle:**
+
+| Şüpheli | Nasıl elendi |
+|---|---|
+| Türbülans genliği | Kâğıtta: sakin havada yanal dalgalanma 0.03 m/s, düşme 4.5 m/s → eğim sapması <0.5°. Fırtınada 8°. Karışıklığı açıklamıyor |
+| `response = response;` ölü satırı | CPU zaten ölçekliyor (`lerp(0.03, 0.25, felt)`); satır artık, eksik ölçekleme değil |
+| Yakın/uzak kutuların ayrı kayması | `dropClass` ikisinde de aynı; kutu ve kayma tutarlı seçiliyor |
+| `TerminalVelocity` CPU/shader uyuşmazlığı | İkisi de aynı Atlas formülü, aralık 0.5–5.0 mm — uyuşuyor |
+
+**Ayırt eden ölçüm:** `profile` geçici olarak `1.0` sabitlendi. İzler tek yönde
+toplandı; geri alınınca yeniden dağıldı. İki yakalı geçiş.
+
+**Çözüm:** referans arazi kotu KAMERANIN altından alınıyor
+(`TerrainHeightAt(cameraPos.xz)`). Sınır tabakası araziyle birlikte yükselir,
+damladan damlaya kırılmaz; kutu yalnız 48 m, o ölçekte profil sürekli olmalı.

@@ -883,6 +883,15 @@ taneleri birlikte ışınlıyordu. Dünya uzayında obje yalnız nereye doğdukl
 belirliyor. Zemin kesmesi de bu yüzden DÜNYA kotu okuyor —
 `SnowfallLayers` `groundReference.position.y`'yi olduğu gibi yolluyor.
 
+**Yağmurun sınır tabakası KAMERANIN arazisinden.** `Precipitation.shader`
+`aboveGround`'u `probe.y − TerrainHeightAt(cameraPos.xz)` ile kuruyor, damlanın
+kendi altındaki araziden değil. Dik arazide damla başına örnekleme profili
+kırıyor ve yağmurun ortak yönü kayboluyor (`SYMPTOMS.md`).
+
+**Yağış türü KESKİN.** `SnowfallController` eşiği 0.5: üstü kar, altı yağmur.
+Şiddet bölünmüyor, kazanan yağışın tamamını alıyor. Kar ve yağmur aynı anda
+ASLA çizilmiyor — `SnowAccumulationTest` yedi oranda sınıyor.
+
 **Yüzey rüzgârı ve serbest atmosfer ayrı tabanlarda.** `WindSettings.calmSpeed`
 (0.6 m/s) YÜZEY rüzgârıdır; bulut katmanı kendi tabanını
 `CloudWeatherDriver.calmAloftSpeed`'ten (2 m/s) alıyor. Yüzey sürtünmesi yüzeyi

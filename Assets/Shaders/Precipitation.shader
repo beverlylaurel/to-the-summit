@@ -354,7 +354,25 @@ Shader "ToTheSummit/Precipitation"
                 // `dΛ/dt = U(1 − f(z))`, yani damlanın yatay hızı tam olarak `U·f(z)`.
                 // Ne rastgele sıçrama var ne de sınırsız birikim.
                 float3 probe = WrapAroundCamera(seed.xyz * box + drift, cameraPos, box);
-                float aboveGround = clamp(probe.y - TerrainHeightAt(probe.xz),
+
+                // YÜKSEKLİK KAMERANIN ARAZİSİNE GÖRE, DAMLANINKİNE GÖRE DEĞİL.
+                //
+                // Eskiden her damla KENDİ altındaki araziyi örnekliyordu. Düz ovada
+                // doğru; dik dağda değil. 48 m'lik kutu içinde arazi onlarca metre
+                // oynuyor ve yan yana iki damladan biri "yerden 2 m", öteki "yerden
+                // 30 m" çıkıyordu. `profile` 0.3 ile 1.0 arasında zıplayınca rüzgâr
+                // tepkileri de zıplıyor ve yağmurun ORTAK YÖNÜ kalmıyordu.
+                //
+                // Belirti: "yakın uzun tanecikler sola düşerken biraz ilerideki
+                // tanecikler sağa düşüyor". Ölçüldü — `profile` zorla 1.0 yapılınca
+                // izler tek yönde toplandı, geri alınınca dağıldı.
+                //
+                // Sınır tabakası araziyle BİRLİKTE yükselir, damladan damlaya
+                // kırılmaz. Tek referans kutunun tamamı için geçerli: kutu yalnız
+                // 48 m, o ölçekte profil sürekli olmalı.
+                float groundRef = TerrainHeightAt(cameraPos.xz);
+
+                float aboveGround = clamp(probe.y - groundRef,
                                           WIND_MIN_HEIGHT, WIND_REF_HEIGHT);
 
                 float profile = log(aboveGround / WIND_Z0) / WIND_PROFILE_L;
@@ -449,12 +467,12 @@ Shader "ToTheSummit/Precipitation"
                 gainCoarse *= sqrt(coarseShare / 0.5);
                 gainFine   *= sqrt((1.0 - coarseShare) / 0.5);
 
+                // Girdap payı RÜZGÂRLA ölçekli: dingin havada sürüklenme zaten yok,
+                // türbülans da yok. Ölçekleme CPU'da (`RainTurbulenceCalm` 0.03 →
+                // `RainTurbulenceStorm` 0.25, `felt` ile). Burada bir kez daha
+                // ölçeklemek çift sayardı; eskiden burada duran `response = response;`
+                // satırı hiçbir şey yapmayan bir artıktı, silindi.
                 float response = _RainTurbulence;
-
-                // Sürüklenen tanenin girdap payı RÜZGÂRLA ölçekli: dingin havada
-                // sürüklenme zaten yok, türbülans da yok. Sabit payla düşük rüzgârda
-                // taneler yerinde titriyordu.
-                response = response;
 
                 // Türbülans yamalı gelir (intermittency): enerji öbekler hâlinde geçer,
                 // düzgün yayılmaz. İki farklı frekanslı dalganın çarpımı tekrar desenini
