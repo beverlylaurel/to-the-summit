@@ -63,6 +63,11 @@
 #define SNOW_RIM_REF_DEPTH           0.25
 #define SNOW_RIM_BLUR_TEXELS         7.0
 
+/// Oymanın GÖRÜNTÜ için yayılma yarıçapı, teksel. 2.3 cm/teksel × 3 = 7 cm,
+/// yani ayak genişliğiyle aynı mertebe: çukur ayağın izini koruyor ama duvarı
+/// eğimleniyor ve mesh onu merdivensiz temsil edebiliyor.
+#define SNOW_CARVE_SMOOTH_TEXELS     3.0
+
 // --- İzlerin dolması (spec §10.3) ---
 #define SNOW_FILL_GAIN             900.0
 #define SNOW_WIND_FILL               0.0012

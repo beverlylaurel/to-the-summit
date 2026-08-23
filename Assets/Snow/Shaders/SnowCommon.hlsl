@@ -37,9 +37,31 @@ float SnowBaseHeight(float swe, float rhoN)
 
 /// İz oyulduktan ve kenar sırtı eklendikten sonraki yüzey yüksekliği, metre
 /// (spec §6.3).
+/// OYMA SIKIŞMAYI ÇİFT SAYAMAZ.
+///
+/// Ölçüldü (20 cm kar, tek ayak izi):
+///
+///   dışarıda  SWE 0.0110  rhoN 0.01 → yoğunluk  55 → baseH 20.0 cm
+///   içeride   SWE 0.0110  rhoN 0.55 → yoğunluk 352 → baseH  3.1 cm
+///   carve     13.8 cm
+///
+/// Ayak basınca kar SIKIŞIYOR: SWE aynı kalıyor, yoğunluk artıyor, `baseH`
+/// kendiliğinden 20 cm'den 3.1 cm'ye iniyor. ÇUKURU ZATEN O YAPIYOR.
+/// Üstüne 13.8 cm'lik oyma da eklenince yüzey negatife düşüyor, sıfıra
+/// kırpılıyor ve izin dibinde DELİK açılıyordu (kullanıcı bildirdi:
+/// "adım attığım yerde zeminin karaltısını görüyorum").
+///
+/// Oyma yine gerekli — sıkışmanın yetişmediği yerde (taze, gevşek kar) çukuru
+/// o veriyor. Ama kalan kar sütununun altına inemez: sıkışmış karın hacmi
+/// yoğunluk oranıyla sınırlı ve dipte HER ZAMAN kar kalır.
 float SnowSurfaceHeight(float swe, float rhoN, float carve, float rim)
 {
-    return max(SnowBaseHeight(swe, rhoN) - carve + rim, 0.0);
+    float baseH = SnowBaseHeight(swe, rhoN);
+
+    float kalanPay = SnowDensity(SNOW_LOOSE_N) / max(SnowDensity(SNOW_PACKED_N), 1.0);
+    float izinliOyma = baseH * (1.0 - kalanPay);
+
+    return max(baseH - min(carve, izinliOyma) + rim, 0.0);
 }
 
 // ------------------------------------------------------------ dünya ↔ teksel
@@ -373,7 +395,33 @@ float SnowSurfaceAt(float2 uv)
     float4 snow  = SAMPLE_TEXTURE2D_LOD(_SnowStateTex, sampler_LinearClamp, uvC, 0);
     float4 trail = SAMPLE_TEXTURE2D_LOD(_SnowTrailTex, sampler_LinearClamp, uvC, 0);
 
-    float h = SnowSurfaceHeight(snow.r, snow.g, trail.r, trail.g);
+    // OYMA GÖRÜNTÜ İÇİN YUMUŞATILIYOR — fizik için değil.
+    //
+    // Teksel 2.3 cm, ayak 11 cm, mesh köşe aralığı ~9 cm. Keskin bir oyma
+    // dik duvarlı bir çukur veriyor ve mesh onu temsil edemeyip MERDİVEN
+    // basıyor: ekranda damgalanmış, kenarı testere dişi bir dikdörtgen
+    // (kullanıcı bildirdi: "yumuşaklığa dair hiçbir şey yok").
+    //
+    // Gerçek kar izi keskin duvarlı değil: kenar göçer, kar içeri akar, oluk
+    // geniş ve yumuşak biter. Dört köşegen örnek ±3 teksel (±7 cm) yayıyor —
+    // ayak genişliğiyle aynı mertebe, yani çukur ayağın izini koruyor ama
+    // duvarı eğimleniyor.
+    //
+    // `trail.r` DOKUDA keskin kalıyor; sıkışma, kabuk ve dolma onu okuyor.
+    // Yumuşatma yalnız yüksekliğe giriyor.
+    float2 bt = SNOW_CARVE_SMOOTH_TEXELS / _SnowResolution;
+
+    float carve = trail.r * 0.5;
+    carve += SAMPLE_TEXTURE2D_LOD(_SnowTrailTex, sampler_LinearClamp,
+                                  saturate(uvC + float2( bt.x,  bt.y)), 0).r * 0.125;
+    carve += SAMPLE_TEXTURE2D_LOD(_SnowTrailTex, sampler_LinearClamp,
+                                  saturate(uvC + float2(-bt.x,  bt.y)), 0).r * 0.125;
+    carve += SAMPLE_TEXTURE2D_LOD(_SnowTrailTex, sampler_LinearClamp,
+                                  saturate(uvC + float2( bt.x, -bt.y)), 0).r * 0.125;
+    carve += SAMPLE_TEXTURE2D_LOD(_SnowTrailTex, sampler_LinearClamp,
+                                  saturate(uvC + float2(-bt.x, -bt.y)), 0).r * 0.125;
+
+    float h = SnowSurfaceHeight(snow.r, snow.g, carve, trail.g);
 
     // SASTRUGİ BURAYA DA EKLENİYOR (spec §18.4). Yalnız köşe shader'ına
     // eklenirse normal'ler düz kalıyor ve sırtlar ışığa hiç tepki vermiyor —
