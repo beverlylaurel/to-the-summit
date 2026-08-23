@@ -161,8 +161,20 @@ void KDeform(uint3 id : SV_DispatchThreadID)
     float baseH    = SnowBaseHeight(snow.r, snow.g);
     float snowTopY = groundY + baseH;
 
+    // KAPSAMA YANAL YÜK PROFİLİ, İKİLİ BİR KAPI DEĞİL.
+    //
+    // `cap.a` bulanıklaştırılmış yakalamanın kapsama payı ve ayak kenarında
+    // dört tekselde yumuşakça iniyor. Ölçüldü:
+    //   0.00 0.04 0.31 0.65 0.81 0.98 1.00 1.00 1.00 0.94 0.70 0.20 0.00
+    // `cap.a > 0.5` eşiği bu rampanın tamamını atıyordu; geriye dik duvarlı
+    // bir damga kalıyordu (izin enine kesiti ölçüldü: 0 0 80 80 80 80 0 0).
+    //
+    // Kar süreklidir: ayağın altındaki çöküntü kenarda birden bitmez, çevre
+    // kar da aşağı çekilir. Profilin sahibi kapsama payı.
+    float kapsama = saturate(cap.a);
+
     float penetration = 0.0;
-    if (cap.a > 0.5)
+    if (kapsama > 0.01)
         penetration = clamp(snowTopY - SnowCaptureY(cap.r), 0.0, baseH);
 
     if (penetration > 0.0005)
@@ -208,7 +220,25 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         // sert zeminde zaten az batılır.
         float tasimaSiniri = SNOW_MAX_SINK * sinkScale;
 
-        float target = min(min(penetration * sinkScale, enFazlaOyma), tasimaSiniri);
+        // DERİNLİK YÜK PROFİLİNİ İZLİYOR, TAVANA ÇARPMIYOR.
+        //
+        // `min(..., tasimaSiniri)` tavanın ÜSTÜNDEKİ her değeri tam tavana
+        // düzleştiriyordu. Yakalama bulanık olduğu için ayak kenarında
+        // yumuşak bir rampa vardı ama rampanın 8 cm üstünde kalan kısmı —
+        // yani neredeyse tamamı — aynı sayıya iniyordu.
+        //
+        // Ölçüldü, izin enine kesiti (mm, 23.4 mm teksel):
+        //   0 0 0 0 0 0 0 0 0 0 0 0 0 0 80 80 80 80 0 0 0 0 0 0 0 0 0 0 0
+        // 8 cm derin, 9 cm geniş, DİK DUVARLI bir damga. Oysa
+        // `SNOW_MAX_SINK` yanındaki gerekçe "8 cm derinliğinde, 25 cm
+        // genişliğinde bir oluk" diyor.
+        //
+        // Tavan artık en derin noktanın sınırı; profili yakalamanın kendisi
+        // veriyor. Ayağın tam altında pay 1, kenarında yumuşakça 0'a iniyor.
+        // Derinliğin tavanı `tasimaSiniri`; profili `kapsama` veriyor.
+        // `min(..., tasimaSiniri)` tek başına tavanın üstündeki HER değeri
+        // tam tavana düzleştiriyor ve rampayı yine yok ediyordu.
+        float target = min(enFazlaOyma, tasimaSiniri) * sinkScale * kapsama;
 
         trail.r = max(trail.r, target);
 

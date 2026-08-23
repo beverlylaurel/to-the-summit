@@ -7,29 +7,6 @@
 TEXTURE2D(_SnowDetailNormal);
 SAMPLER(sampler_SnowDetailNormal);
 
-/// REORIENTED NORMAL MAPPING
-/// [KAYNAK: Barré-Brisebois & Hill 2012; Batman GDC 2014'te birebir].
-///
-/// NORMAL'LER RENK DEĞİLDİR. `lerp` veya overlay ile harmanlanmaz — ikisi de
-/// yüzeyin eğimini yanlış toplar ve detay ya kaybolur ya da abartılır
-/// (spec §22).
-///
-/// GİRDİ DE ÇIKTI DA PAKETLİ (0..1). Formülün kendisi paketlenmemiş bir
-/// normal üretiyor; sonuç tekrar paketleniyor ki katmanlar zincirlenebilsin.
-///
-/// Eksikken: her katman bir öncekinin çıktısını paketli sanıp `*2-1`
-/// uyguluyordu. Düz bir yüzeyde bile (0,0,1) → (-1,-1,1) oluyor ve normal
-/// deviriliyordu. Ölçüldü — kar yüzeyinde N.y:
-///   detay yok  0.997   makro sonrası  0.565   mezo sonrası  0.042
-/// Kâğıttaki değerler 1/√3 = 0.577 ve 0.051; ölçümle birebir.
-/// Belirti: oyuncunun çevresinde şekilsiz düz bir levha — görünür KARE.
-float3 RNMBlend(float3 baseSample, float3 detailSample)
-{
-    float3 t = baseSample   * float3( 2,  2,  2) + float3(-1, -1,  0);
-    float3 u = detailSample * float3(-2, -2,  2) + float3( 1,  1, -1);
-    return normalize(t * dot(t, u) / t.z - u) * 0.5 + 0.5;
-}
-
 /// STOKASTİK DÖŞEME [KAYNAK: Heitz & Neyret, "High-Performance By-Example
 /// Noise using a Histogram-Preserving Blending Operator", HPG 2018].
 ///
@@ -85,9 +62,9 @@ float2 SnowCellOffset(int2 cell)
     return SnowRandU3(uint3(asuint(cell.x), asuint(cell.y), 0x9E3779B9u)).xy;
 }
 
-/// Detay dokusundan tanjant uzayı normali, 0..1 aralığına geri paketlenmiş
-/// hâlde. `RNMBlend` girdilerini bu aralıkta bekliyor.
-float3 SampleDetailPacked(float2 worldXZ, float tileMeters, float strength)
+/// Detay dokusundan tanjant uzayı EĞİMİ (n.xy / n.z).
+/// Eğimler doğrusal toplanır; normaller toplanmaz.
+float2 SampleDetailSlope(float2 worldXZ, float tileMeters, float strength)
 {
     float2 uv = worldXZ / max(tileMeters, 1e-3);
 
@@ -115,8 +92,8 @@ float3 SampleDetailPacked(float2 worldXZ, float tileMeters, float strength)
 
     // BAĞLANMAMIŞ DOKU NaN ÜRETİYOR. Unity bağlanmamış bir sampler'a beyaz
     // veriyor; DXT5nm yolunda `UnpackNormal(beyaz)` → `sqrt(1 - 1 - 1)` → NaN.
-    // NaN `RNMBlend`'den geçince yüzeyin TAMAMI siyah çıkıyor (ölçüldü: dağ
-    // kapkara, ayakta kalan tek şey dokusu materyalinde duran kar mesh'i).
+    // NaN eğim toplamından geçince yüzeyin TAMAMI siyah çıkıyor (ölçüldü:
+    // dağ kapkara, ayakta kalan tek şey dokusu materyalinde duran kar mesh'i).
     //
     // Bu bir telafi terimi değil: eksik bir referansın bedeli "detay yok"
     // olmalı, "arazi yok" değil.
@@ -125,22 +102,9 @@ float3 SampleDetailPacked(float2 worldXZ, float tileMeters, float strength)
     n.xy *= strength;
     n = normalize(n);
 
-    return n * 0.5 + 0.5;
-}
-
-/// TANJANT ÇERÇEVESİ DÜNYA HİZALI. Kar yüzeyi yataya yakın ve mesh'in kendi
-/// tanjantı yok; çerçeve +Y yukarı olacak şekilde sabitleniyor. Dünya
-/// normalinin tanjant uzayındaki karşılığı basit bir eksen takası:
-/// (x, y, z)_dünya → (x, z, y)_tanjant.
-float3 WorldNormalToTangentPacked(float3 n)
-{
-    return float3(n.x, n.z, n.y) * 0.5 + 0.5;
-}
-
-float3 TangentPackedToWorldNormal(float3 packed)
-{
-    float3 n = packed * 2.0 - 1.0;
-    return normalize(float3(n.x, n.z, n.y));
+    // EĞİM DÖNÜYOR, PAKETLİ NORMAL DEĞİL. Tanjant normalinin eğimi n.xy/n.z;
+    // eğimler doğrusal toplanır, normaller toplanmaz.
+    return n.xy / max(n.z, 1e-3);
 }
 
 /// Dört katman (spec §14.2 tablosu). Kaç tanesinin açık olduğunu kalite
@@ -151,28 +115,42 @@ float3 TangentPackedToWorldNormal(float3 packed)
 float3 SnowApplyDetailNormals(float3 normalWS, float3 positionWS, float freshness,
                               float disturb, float distanceToCamera)
 {
-    float3 packed = WorldNormalToTangentPacked(normalWS);
+    // TABANIN EĞİMİ KORUNUYOR. Detay katmanları taban normalinin ÜSTÜNE
+    // eğim olarak biniyor; taban eğimi toplamın içinde aynen duruyor.
+    //
+    // RNM yeniden yönlendirme yoluyla aynı işi yapmaya çalışıyordu ve
+    // ÖLÇÜMDE tabanı koruyamadı: kar izinin oluğu 7.5 cm derindi, taban
+    // normali onu görüyordu (N.y 0.80'e iniyor), detaydan sonra N.y her
+    // yerde 0.998 kalıyordu. Son görüntüde oluğun kontrastı:
+    //   detay devrede    %0.8
+    //   taban normali    %10.6
+    // Detay şiddeti sıfıra indirilince bile %0.5 — yani sorun şiddet değil,
+    // RNM'nin bu bağlamdaki davranışıydı.
+    //
+    // Eğim toplamı bu tuzağı yapısı gereği kuramaz: detay sıfırsa sonuç
+    // tabanın kendisidir.
+    float2 tabanEgim = float2(normalWS.x, normalWS.z) / max(normalWS.y, 1e-3);
 
     float distFade = 1.0 - saturate((distanceToCamera - 6.0) / 10.0);
 
     // Makro — rüzgâr dalgaları
-    packed = RNMBlend(packed, SampleDetailPacked(positionWS.xz, 8.0, 0.35 * freshness));
-        return TangentPackedToWorldNormal(SampleDetailPacked(positionWS.xz, 8.0, 0.35 * freshness));
+    float2 detayEgim = SampleDetailSlope(positionWS.xz, 8.0, 0.35 * freshness);
 
 #if defined(_SNOW_QUALITY_MEDIUM) || defined(_SNOW_QUALITY_HIGH)
     // Mezo — kar topakları
-    packed = RNMBlend(packed, SampleDetailPacked(positionWS.xz, 0.6, 0.50));
+    detayEgim += SampleDetailSlope(positionWS.xz, 0.6, 0.50);
 #endif
 
 #if defined(_SNOW_QUALITY_HIGH)
     // Mikro — kristal detayı
-    packed = RNMBlend(packed, SampleDetailPacked(positionWS.xz, 0.05, 0.40 * distFade));
+    detayEgim += SampleDetailSlope(positionWS.xz, 0.05, 0.40 * distFade);
 
     // Ezilmiş — iz içi
-    packed = RNMBlend(packed, SampleDetailPacked(positionWS.xz, 0.25, disturb * 0.90));
+    detayEgim += SampleDetailSlope(positionWS.xz, 0.25, disturb * 0.90);
 #endif
 
-    return TangentPackedToWorldNormal(packed);
+    float2 toplam = tabanEgim + detayEgim;
+    return normalize(float3(toplam.x, 1.0, toplam.y));
 }
 
 #endif

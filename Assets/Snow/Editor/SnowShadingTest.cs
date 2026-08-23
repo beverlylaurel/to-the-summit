@@ -126,8 +126,8 @@ public static class SnowShadingTest
     static bool RnmTest(StringBuilder r, ComputeShader cs)
     {
         r.AppendLine();
-        r.AppendLine("## Reoriented Normal Mapping (spec §14.2)");
-        r.AppendLine("  [i] [KAYNAK: Barré-Brisebois & Hill 2012]");
+        r.AppendLine("## Detay normali — eğim uzayında toplama (spec §14.2)");
+        r.AppendLine("  [i] RNM tabanı koruyamadı; ölçüm SYMPTOMS.md'de");
 
         int kernel = cs.FindKernel("KTestRnm");
         RenderTexture rt = NewRt(8);
@@ -151,7 +151,7 @@ public static class SnowShadingTest
 
             all &= a && b && c;
 
-            r.AppendLine("  [" + M(a) + "] Düz detay tabanı bozmuyor   sapma " +
+            r.AppendLine("  [" + M(a) + "] Sıfır detay tabanı bozmuyor sapma " +
                          flatDetail.ToString("0.000000"));
             r.AppendLine("  [" + M(b) + "] Düz taban detayı geçiriyor  sapma " +
                          flatBase.ToString("0.000000"));
@@ -185,7 +185,7 @@ public static class SnowShadingTest
             (ForwardPath, "MixFog", "Mevcut sis karın üstünde çalışmıyor"),
             (ForwardPath, "SnowApplyDetailNormals", "Detay normalleri bağlanmamış"),
             (ForwardPath, "SNOW_MIN_VISIBLE_HEIGHT", "Karın kenarında titreme → clip eşiği yok"),
-            (DetailPath, "RNMBlend", "Detay normal yanlış → RNM yerine lerp"),
+            (DetailPath, "SampleDetailSlope", "Detay normal yanlış → eğim toplamı yok"),
             (SparklePath, "log2", "Parıltı titriyor → LOD uyarlaması atlanmış"),
             (LightingPath, "SnowHeightAO", "İz içi AO yok → izler düz görünüyor"),
             (LightingPath, "cosPhi * cosPhi", "AO cos² ortalaması değil"),

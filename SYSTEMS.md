@@ -756,9 +756,10 @@ kirletildiğinde, her kare değil. Üç tüketicisi var: zemin birikmesi, nesne
 
 **Kar görünümü (Faz 6).** Albedo ve pürüzlülük yoğunluktan türüyor (taze
 0.90 / sıkışmış 0.70), ıslaklık ikisini de koyultuyor. Detay normalleri
-Reoriented Normal Mapping ile harmanlanıyor — dört ölçek, kaç tanesinin açık
-olduğunu kalite keyword'ü belirliyor. `RNMBlend`'in girdisi de çıktısı da
-PAKETLİ (0..1); katmanlar zincirlendiği için bu zorunlu. Işıklandırma sarmalı
+EĞİM UZAYINDA toplanıyor (`n.xy / n.z`) — dört ölçek, kaç tanesinin açık
+olduğunu kalite keyword'ü belirliyor. Reoriented Normal Mapping denendi ve
+tabanı koruyamadı: kar izinin oluğu ölçümde kayboluyordu (kontrast %0.8,
+taban normaliyle %10.6). Eğim toplamı tabanı yapısı gereği korur. Işıklandırma sarmalı
 NdotL + arkadan sızma + BRDF yansıma; speküler URP sözleşmesiyle kullanılıyor
 (`brdfData.specular ×` D·V `× NdotL`). Parıltı yalnız gündüz
 (`_SunElevation01` kapısı) ve ekran uzayında yoğunluğu sabit. Ortam gölgede

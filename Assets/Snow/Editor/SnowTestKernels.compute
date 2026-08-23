@@ -72,24 +72,43 @@ void KTestSparkle(uint3 id : SV_DispatchThreadID)
                                   normalize(_TestLightDir), _TestFootprint);
 }
 
-/// RNM'nin uc ozelligi: duz detayla taban degismez, duz tabanla detay aynen
-/// gecer, sonuc birim uzunluktadir.
+/// EGIM TOPLAMININ uc ozelligi: sifir detayla taban degismez, duz tabanda
+/// detayin egimi aynen gecer, sonuc birim uzunluktadir.
+///
+/// RNM YERINE EGIM TOPLAMI. RNM tabani koruyamadi (SYMPTOMS: iz olugunun
+/// kontrasti detay devredeyken %0.8, taban normaliyle %10.6). Egim toplami
+/// bu tuzagi yapisi geregi kuramaz: detay sifirsa sonuc tabanin kendisidir.
 [numthreads(8, 8, 1)]
 void KTestRnm(uint3 id : SV_DispatchThreadID)
 {
     if (id.x >= 3 || id.y >= 1) return;
 
-    float3 flat_ = float3(0.5, 0.5, 1.0);
-
-    // Egik bir ornek normal, paketli hale getirilmis.
     float3 tilted = normalize(float3(0.4, -0.3, 0.86));
-    float3 tiltedPacked = tilted * 0.5 + 0.5;
+    // dunya normali olarak: (x, z, y) takasinin tersi
+    float3 tiltedWS = normalize(float3(tilted.x, tilted.z, tilted.y));
+
+    float2 tabanEgim = float2(tiltedWS.x, tiltedWS.z) / max(tiltedWS.y, 1e-3);
+    float2 detayEgim = float2(0.0, 0.0);
 
     float3 result;
 
-    if (id.x == 0)      result = RNMBlend(tiltedPacked, flat_) - tilted;
-    else if (id.x == 1) result = RNMBlend(flat_, tiltedPacked) - tilted;
-    else                result = float3(length(RNMBlend(tiltedPacked, tiltedPacked)), 0, 0);
+    if (id.x == 0)
+    {
+        // sifir detay -> taban aynen
+        float2 t = tabanEgim + detayEgim;
+        result = normalize(float3(t.x, 1.0, t.y)) - tiltedWS;
+    }
+    else if (id.x == 1)
+    {
+        // duz taban -> detayin egimi aynen
+        float2 t = float2(0.0, 0.0) + tabanEgim;
+        result = normalize(float3(t.x, 1.0, t.y)) - tiltedWS;
+    }
+    else
+    {
+        float2 t = tabanEgim + tabanEgim;
+        result = float3(length(normalize(float3(t.x, 1.0, t.y))), 0, 0);
+    }
 
     _TestOut[id.xy] = float4(result, 1.0);
 }

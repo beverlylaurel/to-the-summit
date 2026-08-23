@@ -111,10 +111,21 @@
 #define SNOW_RIM_REF_DEPTH           0.25
 #define SNOW_RIM_BLUR_TEXELS         7.0
 
-/// Oymanın GÖRÜNTÜ için yayılma yarıçapı, teksel. 2.3 cm/teksel × 3 = 7 cm,
-/// yani ayak genişliğiyle aynı mertebe: çukur ayağın izini koruyor ama duvarı
-/// eğimleniyor ve mesh onu merdivensiz temsil edebiliyor.
-#define SNOW_CARVE_SMOOTH_TEXELS     4.0
+/// Oymanın GÖRÜNTÜ için yayılma yarıçapı, teksel.
+///
+/// GEREKÇESİ DEĞİŞTİ, DEĞERİ DE. Eskiden 4 teksel (9.4 cm) idi ve işi "duvarı
+/// eğimlemek"ti: oyma DİK BASAMAK olarak yazılıyordu (0 → 80 mm → 0, ölçüldü)
+/// ve bulanıklık onu tek başına eğimlendiriyordu.
+///
+/// Basamak kaynağında düzeltildi — oymanın profilini artık yakalamanın
+/// kapsama payı veriyor ve üç tekselde yumuşakça iniyor (`KDeform`). Geriye
+/// kalan tek iş MESH'İN TAŞIYABİLECEĞİ bant genişliği: köşe aralığı 4.7 cm =
+/// 2 teksel, Nyquist bunun altındaki her şeyi merdiven yapar.
+///
+/// 4 teksel kalsaydı 19 cm'lik oluğun yarısını düzleştirirdi. Ölçüldü: oluk
+/// son görüntüyü yalnız %2.3 değiştiriyordu (lineer %5.5), oysa 48°'lik bir
+/// duvar Lambert'te %34 koyulaştırır.
+#define SNOW_CARVE_SMOOTH_TEXELS     2.0
 
 // --- İzlerin dolması (spec §10.3) ---
 #define SNOW_FILL_GAIN             900.0

@@ -1589,3 +1589,68 @@ döndürüyor. Araç önce sabit renkle doğrulandı.
 Ama iki tur ölçümü çöpe attı ve kullanıcıya iki kez yanlış belirti gösterdi.
 `EnsureMaterial` artık `material.HasVector(TerrainSizeId)` de kontrol ediyor ve
 `Update` her kare çağırdığı için kendini onarıyor.
+
+
+---
+
+## Kar izi damga gibi, RDR2 oluğu değil
+
+**Kullanıcının ağzından:** "ben rdr2 tarzı oluk istiyorum, adım gibi gözükmesin"
+ve "yumuşak oluk sığ iz istiyorum".
+
+**İlk şüpheli (yanlış):** oymanın derinliği, `SNOW_MAX_SINK`.
+
+**Gerçek sebep ÜÇ TANE, üçü de ayrı ölçüldü.**
+
+**1. Oymanın enine kesiti dik duvarlı bir basamaktı.**
+
+```
+enine kesit (mm, 23.4 mm teksel): 0 0 0 0 0 0 0 0 80 80 80 80 0 0 0 0
+```
+
+8 cm derin, 9 cm geniş, geçiş SIFIR. `KDeform` yakalamayı `cap.a > 0.5` ile
+ikili bir kapıdan geçiriyordu. Oysa bulanıklaştırılmış kapsama payı zaten
+yumuşak bir rampa:
+
+```
+cap.a kesiti: 0.00 0.04 0.31 0.65 0.81 0.98 1.00 1.00 1.00 0.94 0.70 0.20 0.00
+```
+
+Eşik bu rampanın tamamını atıyordu. Kapsama artık yanal yük profili olarak
+kullanılıyor; kesit yumuşadı:
+
+```
+0 0 9 40 65 80 80 80 80 80 80 77 | 28 | 65 80 80 80 80 80 71 49 14 0 0
+```
+
+İki ayak izi, her biri ~19 cm, üç tekselde yumuşak kenar.
+
+**2. `min(..., tasimaSiniri)` rampayı düzleştiriyordu.** Tavanın üstündeki
+her değer tam tavana iniyordu. Tavan artık en derin noktanın sınırı, profili
+kapsama veriyor.
+
+**3. Detay normalleri oluğun EĞİMİNİ siliyordu — asıl sebep buydu.**
+
+Ölçüm zinciri:
+
+| ölçülen | değer |
+|---|---|
+| oluğun derinliği (yüzey geometrisi) | 7.5 cm, yumuşak profil |
+| merkezi farkın ham bileşeni `\|hD-hU\|` | 39, 22, 17, 19, 35 mm — gradyan var |
+| detay ÖNCESİ N.y | 0.766 – 1.000 (oluk görülüyor) |
+| detay SONRASI N.y | 0.998 her yerde (oluk yok) |
+| son görüntüde oluk kontrastı, detay devrede | **%0.8** |
+| aynı ölçüm, taban normali doğrudan | **%10.6** |
+
+Detay şiddeti sıfıra indirilince bile kontrast %0.5'te kaldı: sorun şiddet
+değil, RNM'nin bu bağlamdaki davranışıydı. `RNMBlend(taban, DÜZ detay)`
+kimliği yerinde ölçüldü ve TUTMADI — cebirsel olarak tutması gerekirken
+tabanı değil düz normali döndürdü.
+
+**Çözüm:** detay artık eğim uzayında toplanıyor
+(`SnowDetailNormals.hlsl` → `SampleDetailSlope`). Dosyanın kendi ilkesi zaten
+buydu: "normaller türev, türev doğrusal toplanır". Eğim toplamı tabanı
+yapısı gereği korur — detay sıfırsa sonuç tabanın kendisidir.
+
+**Sonuç:** oluk kontrastı **%1.0 → %13.3**. Ekranda iki sürekli paralel oluk;
+damga yok, dipte çıplak zemin yok.
