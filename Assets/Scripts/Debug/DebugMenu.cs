@@ -170,6 +170,13 @@ public class DebugMenu : MonoBehaviour
     {
         Time.timeScale = 1f;
 
+        // Panel açıkken bileşen kapanırsa imleç serbest kalırdı
+        if (open) cursorLock.Restore();
+        open = false;
+    }
+
+    void Update()
+    {
         var keyboard = Keyboard.current;
         if (keyboard != null && keyboard.f1Key.wasPressedThisFrame) Toggle();
 
