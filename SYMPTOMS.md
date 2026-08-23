@@ -1288,3 +1288,18 @@ toplandı; geri alınınca yeniden dağıldı. İki yakalı geçiş.
 **Çözüm:** referans arazi kotu KAMERANIN altından alınıyor
 (`TerrainHeightAt(cameraPos.xz)`). Sınır tabakası araziyle birlikte yükselir,
 damladan damlaya kırılmaz; kutu yalnız 48 m, o ölçekte profil sürekli olmalı.
+
+## "Bu ne, ayaklarımın gölgesi mi?" — aşağı bakınca iki kara leke
+
+**Sebep:** ayak proxy'leri (`SnowFoot_L/R`) `ShadowCastingMode.ShadowsOnly` ile
+kuruluyordu. O kip kutuyu ana kameradan GİZLER ama gölgesini ÇİZER — kipin
+amacı zaten bu. Karakter modeli olmadığı için ayakların altında iki serbest
+gölge duruyordu.
+
+**Çözüm:** görünmezlik katmandan (`SnowDeformer` katmanı URP renderer'ın
+opak/saydam maskelerinden çıkarıldı), gölge kapatıldı (`ShadowCastingMode.Off`).
+Yakalama pass'i `cmd.DrawRenderer` ile AÇIK materyalle çizdiği için oyma
+bozulmuyor — normal çizim yolundan bağımsız.
+
+Spec 1.3 KAMERANIN culling mask'ine dokunmayı yasaklıyor; değişen renderer
+varlığının katman maskesi, o başka bir ayar.

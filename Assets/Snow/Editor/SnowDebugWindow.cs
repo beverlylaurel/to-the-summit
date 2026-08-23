@@ -673,9 +673,19 @@ public class SnowDebugWindow : EditorWindow
     /// yani yuruyus iki paralel oluk aciyor. Tek olugtan gercekci, gercek
     /// ayak izinden basit — DECISIONS.md.
     ///
-    /// EKRANDA GIZLEME `ShadowsOnly` ILE. Spec 1.3 kameranin culling
-    /// mask'ine DOKUNMAYI YASAKLIYOR ("Bunu sen yapma"); gorunurlugu
-    /// renderer'in kendi ayarindan kapatmak o kurali bozmuyor.
+    /// GORUNMEZLIK KATMANDAN, GOLGE KAPALI.
+    ///
+    /// Eskiden `ShadowsOnly` kullaniliyordu: kutu ana kameradan gizleniyordu ama
+    /// GOLGE DUSURMEYE DEVAM EDIYORDU — o kipin zaten amaci bu. Karakter
+    /// olmadigi icin ayaklarin altinda iki kara leke goruluyordu (kullanici
+    /// bildirdi, asagi bakinca).
+    ///
+    /// Proxy'nin isi kari OYMAK; golge karakterin isi. Yakalama pass'i
+    /// `cmd.DrawRenderer` ile ACIK materyalle ciziyor (`SnowCaptureCamera`),
+    /// yani normal cizim yolundan bagimsiz — katmani opak/saydam gecislerden
+    /// cikarmak oymayi bozmuyor. Katman maskesi URP renderer varliginda
+    /// (`PC_Renderer`, `Mobile_Renderer`); spec 1.3'un yasakladigi KAMERANIN
+    /// culling mask'i degil.
     static (Transform sol, Transform sag) EnsureFootDeformers(FirstPersonController player)
     {
         if (player == null) return (null, null);
@@ -721,7 +731,7 @@ public class SnowDebugWindow : EditorWindow
         go.transform.localScale = new Vector3(0.11f, 0.06f, 0.28f);
 
         var rend = go.GetComponent<MeshRenderer>();
-        rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+        rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         rend.receiveShadows = false;
 
         if (go.GetComponent<SnowDeformer>() == null)
