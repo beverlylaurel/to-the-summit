@@ -1510,3 +1510,16 @@ düzeltildi (mesh kendi gölgesini alıyordu; kar araziye oturuyor, arazi zaten
 kendi gölgesini atıyor ve karın öz-gölgelemesi ayrı bir terimde —
 `SnowHeightAO`). Kalan pay hâlâ AÇIK: bütün caster'lar kapalıyken bile oran
 0.881, oysa gölge alma kapalıyken 0.999.
+
+**Kalan pay ÖLÇÜLDÜ ama sebebi bulunamadı.** `mainLight.shadowAttenuation`
+doğrudan ekrana basıldı: kar yüzeyinde **tek düze 0.850** (215–219/255, desen
+yok). Işığın gölge gücü 1, yani bu tam gölge değil — PCF taplarının ~%15'i
+gölgede okunuyor, yani yüzey her yerde bir gölge sınırına oturuyor.
+
+Elenenler: karın kendi caster'ı (kapatıldı, 0.847 → 0.856), arazi caster'ı
+(gölge koordinatı kar kalınlığı kadar ışığa ötelendi, 0.856 → 0.851 — fark yok),
+mesh AO'su (0.835, fark yok).
+
+`receiveShadows = false` yapınca oran tam 0.999 oluyor; yani kaynak kesinlikle
+gölge zinciri. Sıradaki adım: gölge haritasının kendisini ve kaskad sınırlarını
+ölçmek.

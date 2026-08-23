@@ -60,6 +60,17 @@ Varyings SnowLitVertex(Attributes IN)
     OUT.positionWS = positionWS;
     OUT.snowHeight = h;
     OUT.positionCS = TransformWorldToHClip(positionWS);
+    // GÖLGE KOORDİNATI ÖTELEME DENENDİ VE İŞE YARAMADI.
+    //
+    // Kar yüzeyi araziden `h` metre yukarıda; gölge haritasına yazan arazi.
+    // Örnekleme noktasını ışığa doğru `h` kadar kaydırmak akneyi çözer diye
+    // denendi — ölçüm değişmedi (oran 0.856 → 0.851).
+    //
+    // Ölçülen gerçek: `mainLight.shadowAttenuation` kar yüzeyinde TEK DÜZE
+    // 0.850 (215–219/255, desen yok). Işığın gölge gücü 1, yani bu tam gölge
+    // değil; PCF taplarının ~%15'i gölgede okunuyor. Kaynağı henüz
+    // bulunmadı — arazi caster'ı değil (öteleme çözmedi), karın kendisi değil
+    // (artık gölge atmıyor).
     OUT.shadowCoord = TransformWorldToShadowCoord(positionWS);
     OUT.fogFactor = ComputeFogFactor(OUT.positionCS.z);
 
