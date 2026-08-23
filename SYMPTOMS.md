@@ -1339,3 +1339,18 @@ sebebi de bu.
 kullanıyordu. İki ayrı yol; sınama oyunun kullandığı yolu hiç denemiyordu.
 
 **Kalan 470 kat henüz bulunmadı.**
+
+**GERÇEK SEBEP BULUNDU — yarım hassasiyet.** `RT_Snow` `ARGBHalf`'tı. R kanalı
+su eşdeğerini (m) tutuyor ve tipik değer 1e-6 – 1e-2. Half'ta 6.1e-5'in altı
+SUBNORMAL, temsil adımı sabit **5.96e-8**. Kare başına eklenen
+`1.39e-6 × dt(0.036) = 5.0e-8` — adımın ALTINDA. Artış yuvarlanmada eriyordu.
+
+`ARGBFloat`'a alındı. Ölçüm: hız 1.371e-6 m/s, beklenen 1.39e-6 → **oran 0.986**.
+
+Aynı sınıfın emsali zaten projede vardı: `RT_SkyVis` mutlak dünya Y tuttuğu için
+RHalf'tan RFloat'a alınmıştı. Ders: **birikimli (integre eden) bir doku half
+olamaz** — artış adımdan küçükse toplam hiç ilerlemez.
+
+Bir önceki turda "compute globalleri okumuyor" diye yazılan gerekçe YANLIŞTI;
+`_TemperatureC` testi çekirdeğin globalleri okuduğunu gösterdi. O değişiklik
+zararsız kaldı ama sebep o değildi.

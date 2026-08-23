@@ -234,14 +234,29 @@ public class SnowManager : MonoBehaviour
         trail = Create("RT_Trail", q.Resolution, RenderTextureFormat.ARGBHalf);
         trailTemp = Create("RT_TrailTemp", q.Resolution, RenderTextureFormat.ARGBHalf);
 
-        snow = Create("RT_Snow", q.Resolution, RenderTextureFormat.ARGBHalf);
+        // RT_SNOW ARGBFloat, HALF DEĞİL — SWE'nin büyüklüğü yarım hassasiyete sığmıyor.
+        //
+        // R kanalı su eşdeğeri (m). Tipik değerler 1e-6 – 1e-2 arası; half'ta
+        // 6.1e-5'in altı SUBNORMAL ve temsil adımı sabit 5.96e-8. Kare başına
+        // eklenen `1.39e-6 × dt` ise 5e-8 — adımın ALTINDA. Artış yuvarlanmada
+        // eriyor, kar hiç tutmuyor.
+        //
+        // Ölçüldü: gerçekleşen birikme hızı beklenenin 1/470'i.
+        //
+        // Aynı sınıfın emsali hemen aşağıda: RT_SkyVis de mutlak dünya Y
+        // tuttuğu için RHalf'tan RFloat'a alınmıştı.
+        //
+        // Bedel: 1024² × 16 B = 16 MB (half'ta 8 MB), iki tampon için +16 MB.
+        snow = Create("RT_Snow", q.Resolution, RenderTextureFormat.ARGBFloat);
 
         // ASSUMPTION: RT_SnowTemp spec §6.2 tablosunda yok ama KScroll komşu teksel
         // okuyor ve §20 "komşu okuyan pass'lerde ping-pong" diyor — RT_Snow'un da
         // kendi tamponuna ihtiyacı var. Başka bir dokuyu ödünç almak (örn.
         // RT_CaptureBlur) format aynı olsa bile o dokunun içeriğini siler.
         // Bedeli 8 MB.
-        snowTemp = Create("RT_SnowTemp", q.Resolution, RenderTextureFormat.ARGBHalf);
+        // Formatı RT_Snow ile AYNI olmak zorunda: `CopyTexture` ikisi arasında
+        // şerit kopyalıyor ve format ayrışırsa kopya sessizce düşer.
+        snowTemp = Create("RT_SnowTemp", q.Resolution, RenderTextureFormat.ARGBFloat);
         // ASSUMPTION: spec §6.2 tablosu RHalf diyor; RFloat açılıyor.
         // Doku MUTLAK dünya Y tutuyor ve §12.2'nin eşikleri 0.05–0.40 m.
         // Bu projenin arazisi ~4900 m'de ve yarım hassasiyetin oradaki adımı
