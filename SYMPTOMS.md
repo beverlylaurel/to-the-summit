@@ -1224,3 +1224,19 @@ doğru değer.
 Girdilerinden biri `SnowRuntimeState.RainWeight01` ve o kar oranı sürgüsüyle
 değişiyor — sürgü hava olayı yayınlamıyor. Yağmur son olaydaki yoğunlukta donup
 kalıyordu. `RefreshDensity()` artık `Update`'te.
+
+## "Yürürken kar tanecikleri çok hızlı yer değiştiriyor, sürekli yeniden render oluyor gibi"
+
+**Sebep:** VFX sistemleri YEREL uzaydaydı (`VFXDataParticle.m_Space: 0`).
+Yerel uzayda parçacık konumu objeye göre tutuluyor; yağış kutusu oyuncuyu 1 m
+ızgarasında takip ettiği için her snap yaşayan 89 bin taneyi birlikte
+ışınlıyordu. Yürüme hızında saniyede birkaç kez.
+
+**Ayırt eden ölçüm:** `timeScale = 0` + `SnowfallLayers` kapalı, kare yakala,
+kutuyu kaydır, tekrar yakala. Dünya uzayında 30 m kaydırma ekranın yalnız
+%0.16'sını değiştirdi ve ortalama parlaklık sabit kaldı (61.9 → 61.8) — yerel
+uzayda bütün kar ekrandan çıkardı.
+
+**Snap suçlu değildi.** İlk akla gelen ızgarayı kaldırmak; o gerekçesi geçerli
+(spawn deseninin kameranın peşinden sürüklenmesini önlüyor). Işınlanma
+snap'ten değil UZAYDAN geliyordu.

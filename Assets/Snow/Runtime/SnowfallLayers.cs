@@ -175,11 +175,12 @@ public class SnowfallLayers : MonoBehaviour
         //
         // VFX'in zemin yükseklik dokusuna erişimi yok; oyuncunun ayak kotu
         // yeterince iyi bir yaklaşım, çünkü spawn kutusu yalnız 24 m.
-        // KOT YEREL GÖNDERİLİYOR. Grafikteki `position` VFX'in kendi uzayında;
-        // dünya kotunu doğrudan yollamak karın tamamını siliyordu.
+        // KOT DÜNYA GÖNDERİLİYOR. Sistem dünya uzayında (`SnowVfxBuilder.SetWorldSpace`),
+        // yani grafikteki `position` da dünya koordinatı. Sistem yerel iken
+        // burada kutu konumu çıkarılıyordu; uzay değişince o düzeltme
+        // gerekçesini yitirdi.
         if (groundReference != null && nearLayer.HasFloat(groundProperty))
-            nearLayer.SetFloat(groundProperty,
-                               groundReference.position.y - nearLayer.transform.position.y);
+            nearLayer.SetFloat(groundProperty, groundReference.position.y);
 
         // TANE GECE PARLAMASIN. Emissive ana ışık renginden türüyor; sabit
         // bırakılırsa kar karanlıkta da aynı parlaklıkta duruyor.

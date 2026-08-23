@@ -1201,19 +1201,50 @@ hız arttıkça kendiliğinden sıklaşıyor.
 fazı kayabilirdi — ses bir ayakta, iz öbüründe düşerdi.
 
 
-## VFX'e dünya koordinatı YOLLANMAZ
+## VFX sistemleri dünya uzayında simüle ediliyor
 
-**Kural.** Grafiğe giden kotlar C# tarafında yerele çevriliyor
-(`hedefKotu − kutuKonumu`).
+**Kural.** Beş grafiğin de `VFXDataParticle.space` alanı World
+(`SnowVfxBuilder.SetWorldSpace`). Bulunamazsa fırlatılıyor — sessizce yerel
+kalmak belirtiyi geri getirir.
 
-**Neden — iki kez karın tamamını sildi.** `attributes.position` VFX'in kendi
-uzayında (kutu merkezine göre ±10); dünya kotu 205 ile karşılaştırınca koşul
-her tane için doğru çıkıyor. `TransformPositionVFXToWorld` denendi ve
-düzeltmedi: `groundY = 0` yazıldığında bile `alive` sıfır kaldı, yani dönüşüm
-beklenen değeri vermiyor.
+**Neden.** Yerel uzayda parçacık konumu objeye GÖRE tutuluyor; obje kayınca
+yaşayan bütün parçacıklar onunla ışınlanıyor. Yağış kutusu oyuncuyu 1 m
+ızgarasında takip ediyor (`SnowfallLayers`), yani yürürken saniyede birkaç kez
+89 bin tane birden bir metre atlıyordu.
 
-C# tarafında ikisi de dünya koordinatı olarak biliniyor; çıkarma tahmin
-gerektirmiyor ve VFX'in uzay ayarından bağımsız.
+**Belirti buydu:** "yürürken kar tanecikleri çok hızlı yer değiştiriyor, sanki
+sürekli farklı farklı render oluyor gibi".
+
+**Ölçüm — iki yaka, `timeScale = 0`.** `SnowfallLayers` kapatılıp zaman
+durduruldu, kare yakalandı, kutu kaydırıldı, tekrar yakalandı:
+
+| kaydırma | değişen piksel | ortalama parlaklık |
+|---|---|---|
+| 1 m | %0.35 | 61.9 → 61.9 |
+| 30 m | %0.16 | 61.9 → 61.8 |
+
+Yerel uzayda 30 m kaydırma bütün karı ekrandan çıkarırdı. Değişen pay yeni
+doğan taneler; yaşayanlar yerinde kaldı.
+
+**Snap silinmedi.** Izgara hâlâ 1 m; onun işi spawn deseninin kameranın peşinden
+sürüklenmesini önlemek ve o gerekçe duruyor. Işınlanma snap'ten değil UZAYDAN
+geliyordu.
+
+
+## `TransformPositionVFXToWorld` uzay ayarının yerini tutmaz
+
+**Kural.** Grafiğe giden kotlar sistemin uzayıyla AYNI uzayda gönderiliyor.
+Bugün sistem dünya uzayında, o yüzden kot da dünya (`groundReference.position.y`).
+
+**Neden — iki kez karın tamamını sildi.** Sistem yerel uzaydayken
+`attributes.position` kutu merkezine göre ±10 çıkıyordu; dünya kotu 205 ile
+karşılaştırınca koşul her tane için doğruydu. Çözüm diye
+`TransformPositionVFXToWorld` eklendi ve DÜZELTMEDİ: `groundY = 0` yazıldığında
+bile `alive` sıfır kaldı, yani dönüşüm beklenen değeri vermiyor.
+
+Doğru çözüm dönüşüm değil, uzayı düzeltmekti — sistem World'e alındı (yukarı bak)
+ve iki taraf da dünya koordinatı konuştu. **Ders:** uzaylar uyuşmuyorsa shader'da
+dönüştürmeye çalışmadan önce sistemin uzayına bak.
 
 
 ## Kar yoğunluğu kapasiteden gelir, kutudan değil

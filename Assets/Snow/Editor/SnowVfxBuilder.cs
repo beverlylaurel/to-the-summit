@@ -96,6 +96,10 @@ public static class SnowVfxBuilder
         //   120000 / 41600 = 2.88 tane/m³
         SetSetting(init, "capacity", 120000u, r);
 
+        // DÜNYA UZAYI. Kutu oyuncuyu 1 m ızgarasında takip ediyor; yerel uzayda
+        // her snap yaşayan 89 bin taneyi birlikte ışınlıyordu.
+        SetWorldSpace(init, r);
+
         // Sınır kutusu spawn kutusunu ve rüzgârın taşıdığı payı kapsıyor.
         SetBounds(init, new Vector3(60f, 42f, 60f), r);
 
@@ -358,6 +362,7 @@ public static class SnowVfxBuilder
 
         object init = AddContext(graph, "VFXBasicInitialize", new Vector2(0, 200), r);
         SetSetting(init, "capacity", capacity, r);
+        SetWorldSpace(init, r);
         SetBounds(init, boundsSize, r);
 
         object life = AddBlock(init, "Block.SetAttribute", r);
@@ -603,17 +608,17 @@ public static class SnowVfxBuilder
 
     attributes.alpha = fadeIn * fadeOut;
 
-    // POZİSYON YEREL UZAYDA, KOT DA YEREL GELİYOR.
+    // POZİSYON DÜNYA UZAYINDA, KOT DA DÜNYA GELİYOR.
     //
-    // Üç sürüm denendi, ikisi karın TAMAMINI sildi (`alive = 0`):
-    //   1. `position.y` ile DÜNYA kotu karşılaştırıldı — yerel y ±10 iken
-    //      kot 205, koşul her tane için doğru.
-    //   2. `TransformPositionVFXToWorld(position)` eklendi — sonuç yine
-    //      sıfırın altında çıktı; fonksiyon burada beklendiği gibi
-    //      davranmıyor (ölçüldü: `groundY = 0` iken bile hepsi öldü).
-    //   3. Dönüşüm kaldırıldı, kot C# tarafında yerele çevrildi. `SnowfallLayers`
-    //      `zeminKotu - kutuKonumu` gönderiyor; ikisi de orada dünya
-    //      koordinatı olarak biliniyor, tahmin gerekmiyor.
+    // Sistem `SetWorldSpace` ile dünya uzayına alındı (gerekçe orada); artık
+    // `attributes.position` doğrudan dünya koordinatı ve `SnowfallLayers`
+    // zemin kotunu olduğu gibi yolluyor.
+    //
+    // Sistem YEREL iken bu satır iki kez karın TAMAMINI silmişti: bir kez
+    // dünya kotu yerel y ile karşılaştırıldığı için, bir kez de
+    // `TransformPositionVFXToWorld` beklendiği gibi davranmadığı için
+    // (ölçüldü: `groundY = 0` iken bile hepsi öldü). Uzay düzelince ikisi de
+    // konu dışı kaldı.
     if (attributes.position.y < groundY + 0.02)
         attributes.alive = false;
 }";
@@ -1036,6 +1041,44 @@ public static class SnowVfxBuilder
                 DumpModel(b, r);
             }
         }
+    }
+
+    /// SİSTEM UZAYI: YEREL Mİ DÜNYA MI.
+    ///
+    /// Yerel uzayda `attributes.position` objeye GÖRE tutuluyor; obje kayınca
+    /// yaşayan bütün parçacıklar onunla birlikte ışınlanıyor. Spawn kutusu
+    /// oyuncuyu 1 m ızgarasında takip ettiği için yürürken saniyede birkaç kez
+    /// tüm kar bir metre atlıyordu — kullanıcı "taneler çok hızlı yer
+    /// değiştiriyor, sürekli yeniden render oluyor gibi" dedi.
+    ///
+    /// Dünya uzayında obje yalnız NEREYE DOĞDUKLARINI belirliyor; doğmuş tane
+    /// dünyada kalıyor.
+    ///
+    /// Uzay `GetSetting` üzerinden görünmüyor (veri nesnesinin `ISpaceable`
+    /// özelliği); bulunamazsa fırlatılıyor — sessizce yerel kalmak belirtiyi
+    /// geri getirir.
+    static void SetWorldSpace(object init, StringBuilder r)
+    {
+        MethodInfo getData = init.GetType().GetMethod("GetData",
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException("GetData yok.");
+
+        object data = getData.Invoke(init, null)
+            ?? throw new InvalidOperationException("Parçacık verisi yok.");
+
+        PropertyInfo uzay = data.GetType().GetProperty("space",
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException(
+                data.GetType().Name + " üzerinde `space` özelliği yok.");
+
+        object dunya = Enum.Parse(uzay.PropertyType, "World");
+        uzay.SetValue(data, dunya);
+
+        object geri = uzay.GetValue(data);
+        if (!Equals(geri, dunya))
+            throw new InvalidOperationException("Uzay yazılamadı: " + geri);
+
+        r.AppendLine("           uzay   World");
     }
 
     static void Save(object graph, StringBuilder r)

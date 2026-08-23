@@ -877,6 +877,12 @@ Graph'ın internal model API'sini sürüyor; beş `.vfx` menüden çıkıyor, el
 çizim yok. Grafikler sahneye BAĞLI: `SnowfallLayers` yağışı, `SnowDriftVfxController`
 saltasyon ve süspansiyonu sürüyor.
 
+**Beş VFX sistemi de DÜNYA uzayında.** Yerel uzayda `attributes.position` objeye
+göre tutuluyor; spawn kutusu oyuncuyu takip ettiği için her kayma yaşayan bütün
+taneleri birlikte ışınlıyordu. Dünya uzayında obje yalnız nereye doğduklarını
+belirliyor. Zemin kesmesi de bu yüzden DÜNYA kotu okuyor —
+`SnowfallLayers` `groundReference.position.y`'yi olduğu gibi yolluyor.
+
 **Asgari ekran boyutu alfayı kısıyor.** Uzak taneyi 1.3 piksele çekmek kapladığı
 ALANI büyütüyor; alfa sabit kalırsa büyüme oranı kadar ışık uyduruluyor.
 `SnowVfxBuilder.MinScreenSizeHlsl` alfayı alan oranına bölüyor. Bu bağ olmadan
