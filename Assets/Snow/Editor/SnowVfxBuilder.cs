@@ -452,6 +452,20 @@ public static class SnowVfxBuilder
             Skeleton(graph, 8000, 1.2f, 3.0f, 0.01f, 0.03f,
                      new Vector3(80f, 10f, 80f), r);
 
+        // SPAWN KUTUSU — YERE YAPIŞIK ŞERİT (spec §18.7: "kameranın rüzgâr
+        // yönündeki 30 m'lik şeridinde, `y = groundY + random(0, 0.05)`.
+        // 1.5 m'ye spawn etme, o süspansiyondur").
+        //
+        // Kutu yoktu: 8000 tane objenin TAM MERKEZİNDE doğuyor ve `AlongVelocity`
+        // ile uzatılmış çizgiler halinde radyal patlıyordu — ekranda tek bir
+        // noktadan fışkıran havai fişek. Kullanıcı ekran görüntüsüyle bildirdi.
+        //
+        // Yükseklik 5 cm: saltasyon katmanı bu kadar.
+        object spinPos = AddBlock(init, "Block.PositionShape", r);
+        SetSetting(spinPos, "shape", "OrientedBox", r);
+        SetSetting(spinPos, "positionMode", "Volume", r);
+        SetSlotField(spinPos, "Box", "size", new Vector3(30f, 0.05f, 30f), r);
+
         // `Orient: Along Velocity`, 4–8× uzatılmış (spec §18.7).
         object orient = AddBlock(output, "Block.Orient", r);
         SetSetting(orient, "mode", "AlongVelocity", r);
@@ -473,6 +487,17 @@ public static class SnowVfxBuilder
         var (init, update, output) =
             Skeleton(graph, 14, 6f, 12f, 12f, 25f,
                      new Vector3(400f, 80f, 400f), r);
+
+        // SPAWN KUTUSU (spec §18.7: "rüzgâr üstünde 35 m, yatayda ±40 m").
+        //
+        // Yükseklik dağılımı spec'te ÜSTEL (`h = −1.1·log(1−rand)`, tavan 5 m);
+        // burada 5 m'lik kutuda düzgün dağılım var. Üstel profili alpha
+        // taşıyor — spec'in kendi alpha formülü `0.16·exp(−h/1.1)` zaten
+        // yükseldikçe soluklaştırıyor, yani görsel sonuç üstel kalıyor.
+        object curPos = AddBlock(init, "Block.PositionShape", r);
+        SetSetting(curPos, "shape", "OrientedBox", r);
+        SetSetting(curPos, "positionMode", "Volume", r);
+        SetSlotField(curPos, "Box", "size", new Vector3(80f, 5f, 80f), r);
 
         object orient = AddBlock(output, "Block.Orient", r);
         SetSetting(orient, "mode", "AlongVelocity", r);

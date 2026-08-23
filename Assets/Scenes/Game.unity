@@ -206,7 +206,6 @@ GameObject:
   - component: {fileID: 76489736}
   - component: {fileID: 76489738}
   - component: {fileID: 76489737}
-  - component: {fileID: 76489739}
   m_Layer: 0
   m_Name: Kar Sistemi
   m_TagString: Untagged
@@ -442,7 +441,7 @@ MonoBehaviour:
   curtain: {fileID: 852782905}
   environment: {fileID: 76489725}
   settings: {fileID: 11400000, guid: 1bdd01165981db9469d51c90967f8bbf, type: 2}
-  followTarget: {fileID: 330585546}
+  followTarget: {fileID: 848219609}
   rateProperty: SpawnRate
   driftProperty: DriftActive
 --- !u!114 &76489738
@@ -467,21 +466,6 @@ MonoBehaviour:
   followTarget: {fileID: 330585546}
   groundReference: {fileID: 848219609}
   computeFallback: {fileID: 76489734}
---- !u!114 &76489739
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 76489723}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 02577d05a4ef76249bacc58342be2642, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowfallCurtains
-  curtainMaterial: {fileID: 2100000, guid: 74aee2ffa8c54044f96b587908e9f1ce, type: 2}
-  view: {fileID: 330585545}
-  environment: {fileID: 76489725}
 --- !u!1 &198752979
 GameObject:
   m_ObjectHideFlags: 0
@@ -3319,6 +3303,7 @@ MonoBehaviour:
   daytimeWarming: 1.63
   stormCooling: 3.25
   windChillPerSpeed: 0.45
+  thermalLagSeconds: 2700
 --- !u!114 &1805896811
 MonoBehaviour:
   m_ObjectHideFlags: 0

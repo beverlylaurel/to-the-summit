@@ -37,7 +37,8 @@ public class SnowDriftVfxController : MonoBehaviour
     [Tooltip("Saltasyon oranının kaynağı.")]
     [SerializeField] SnowSettings settings;
 
-    [Tooltip("Spawn kutularının izlediği hedef — oyuncu/kamera.")]
+    [Tooltip("Spawn kutularının izlediği hedef. OYUNCUNUN AYAĞI olmalı, kamera " +
+             "değil: saltasyon yere yapışık bir katman ve kamera göz hizasında.")]
     [SerializeField] Transform followTarget;
 
     [Header("Özellik adları")]

@@ -40,15 +40,14 @@ public class SnowfallLayers : MonoBehaviour
     [Tooltip("Grafikteki zemin kotu özelliğinin adı.")]
     [SerializeField] string groundProperty = "GroundY";
 
-    // UZAK KATMAN BURADAN SÜRÜLMÜYOR. `SnowfallCurtains` şiddeti
-    // `SnowRuntimeState.SnowfallIntensity01`'den KENDİSİ okuyor — spec §17.3'ün
-    // "her ikisi de aynı i01'den" kuralı böyle de sağlanıyor, tek kaynak
-    // `SnowRuntimeState`. Buradan ikinci bir yol geçirmek aynı sayıyı iki kez
-    // taşımak olurdu.
+    // UZAK YAĞIŞ KATMANI YOK. Spec §17.2 kameraya kilitli üç doku perdesi
+    // istiyor; yazıldı, denendi ve KALDIRILDI — ekranda "kâğıt gibi incecik,
+    // derinliği yok" bir levha olarak görünüyordu (kullanıcı iki kez bildirdi,
+    // elemeyle bu sistem olduğu doğrulandı).
     //
-    // Önceden burada `SnowCurtainController` tipinde bir alan vardı ve hiç
-    // kullanılmıyordu; üstelik yanlış sistemi gösteriyordu (o §18.7'nin
-    // SAVRULMA perdeleri, bu §17.2'nin YAĞIŞ perdeleri).
+    // Spec'in gerekçesi "bu katman olmadan parçacık sayısını 3–4 katına
+    // çıkarmak gerekir"; kapasite zaten 40000'den 120000'e çıkarıldı, yani
+    // gerekçe karşılandı. Sapma `DECISIONS.md`'de.
 
     [Header("Çevre")]
     [Tooltip("Rüzgâr hızını okuyan köprü. Türbülans şiddeti ondan türüyor.")]

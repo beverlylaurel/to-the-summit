@@ -152,6 +152,15 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   basamaklanması (temporal reprojection gerektiriyor — büyük iş).
   **Tetikleyici:** ilgili belirti ekranda görüldüğünde.
 
+- **§17.2 uzak yağış perdesi KALDIRILDI** — yazıldı, iki kez düzeltilmeye
+  çalışıldı, ekranda "kâğıt gibi incecik, derinliği yok" bir levha olarak
+  görünmeye devam etti (kullanıcı iki kez bildirdi; elemeyle bu sistem olduğu
+  doğrulandı). Dosyaları silindi.
+  Spec'in gerekçesi "bu katman olmadan parçacık sayısını 3–4 katına çıkarmak
+  gerekir"; kapasite zaten 40000'den 120000'e çıkarıldı.
+  **Tetikleyici:** çok yoğun karda uzak mesafe seyrek görünürse — o zaman
+  düz quad yerine hacimli bir yaklaşım gerekir, aynı çözüm tekrar denenmemeli.
+
 - **VFX'te gökyüzü örtü kesmesi yok** — spec §17.1 `_SnowSkyVisTex`'ten okuyup
   çatı altındaki taneyi öldürmeyi "atlanmayacak" diye işaretliyor. VFX'in o
   dokuya erişimi yok; CustomHLSL'e doku parametresi geçirmek gerekiyor.

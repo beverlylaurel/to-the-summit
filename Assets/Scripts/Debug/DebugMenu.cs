@@ -53,23 +53,11 @@ public class DebugMenu : MonoBehaviour
 
     bool weatherLocked;
 
-    /// KAR YAĞIŞIN KENDİSİ, AYRI BİR SİSTEM DEĞİL. Sürgü yağışı açıp
-    /// sıcaklığı donmanın altına indiriyor; "kar mı yağmur mu" kararını yine
-    /// `SnowfallController`'ın histerezisi veriyor. Ayrı bir "kar şiddeti"
-    /// kaynağı olsaydı yağışla çelişebilirdi.
-    float lockedSnow;
-
     /// Teşhis: rüzgâr taşınımı ve gölgesi ayrı ayrı kapatılabiliyor.
     bool windTransportOff;
     bool windShadowOff;
 
-    /// Sürgü açıkken dayatılan DENİZ SEVİYESİ sıcaklığı.
-    ///
-    /// Donma seviyesi = (deniz sv. + gündüz ısınması − fırtına soğuması) / 0.0065.
-    /// −2 °C'de öğlen ve yağışsız uçta bile donma seviyesi −57 m çıkıyor, yani
-    /// oyuncunun kotu ne olursa olsun kar. Sayı kâğıtta bu iki uçtan seçildi.
-    const float SnowSeaLevelC = -2f;
-    float lockedPrecipitation = 0.6f;
+   float lockedPrecipitation = 0.6f;
 
     bool windLocked;
     float lockedWindStrength = 0.5f;
@@ -186,7 +174,6 @@ public class DebugMenu : MonoBehaviour
         // KİLİT AÇILINCA DA KOŞMALI: geçersiz kılmayı temizleyen taraf burası.
         // `if (weatherLocked)` içine konsaydı kilit kapandığında kar sonsuza
         // kadar dayatılmış kalırdı.
-        ApplySnowOverride();
     }
 
     void Toggle()
@@ -433,11 +420,19 @@ public class DebugMenu : MonoBehaviour
 
         using (new Disabled(!weatherLocked))
         {
-            GUILayout.Label($"Yağış şiddeti {lockedPrecipitation:F2}");
+            // TEK SÜRGÜ. Eskiden ayrı bir "kar şiddeti" vardı ve yağışı açıp
+            // sıcaklığı donmanın altına indiriyordu; kar/yağmur kararını
+            // sıcaklık histerezisi veriyordu.
+            //
+            // Yağış sıcaklıktan koparıldığında o sürgü YALANCI oldu: kar 0
+            // yapılınca `IntensityOverride`'a hiç dokunmuyor, yağış sürgüsünün
+            // yazdığı değer kalıyor ve kar yağmaya devam ediyordu. Kullanıcı
+            // ekran görüntüsüyle bildirdi.
+            //
+            // Artık yağış varsa kar var; ikinci bir sürgünün anlatacağı bir şey
+            // yok.
+            GUILayout.Label($"Yağış (kar) şiddeti {lockedPrecipitation:F2}   " + SnowStatus());
             lockedPrecipitation = GUILayout.HorizontalSlider(lockedPrecipitation, 0f, 1f);
-
-            GUILayout.Label($"Kar şiddeti {lockedSnow:F2}   " + SnowStatus());
-            lockedSnow = GUILayout.HorizontalSlider(lockedSnow, 0f, 1f);
             GUILayout.Label(SnowStateStatus());
 
             // HALKA SINIRI TEŞHİSİ. Halkalar ±8, ±16, ±32, ±64 m. Kusur bir
@@ -530,31 +525,6 @@ public class DebugMenu : MonoBehaviour
                $"yeni kar ρ {rho:F0}   " +
                $"DOKUDA {SnowRuntimeState.GroundCoverage01:F2}   " +
                $"gevşek {SnowRuntimeState.LooseSnowFraction:F2}";
-    }
-
-    /// SÜRGÜ GERÇEK SİSTEMLERE YAZIYOR, KAR SİSTEMİNE DEĞİL.
-    ///
-    /// Yağış `AltitudeWeatherDriver`'a, soğuk `TemperatureField`'a gidiyor.
-    /// Kar sistemi ikisini de köprüden okuyor, ayrıca dayatma almıyor. Böylece
-    /// HUD'daki sıcaklık, donma seviyesi, kar çizgisi ve yağan kar tek bir
-    /// durumdan türüyor — `CLAUDE.md` → Atmosfer tutarlılığı.
-    void ApplySnowOverride()
-    {
-        if (temperature == null) return;
-
-        bool wantSnow = weatherLocked && lockedSnow > 0.001f;
-
-        if (wantSnow)
-        {
-            // Kar sürgüsü yağış şiddetini de o an devralıyor; iki sürgü aynı
-            // sayıyı sürseydi hangisinin kazandığı ekrandan anlaşılmazdı.
-            weatherDriver.IntensityOverride = lockedSnow;
-            temperature.ApplyOverride(SnowSeaLevelC);
-        }
-        else if (temperature.HasOverride)
-        {
-            temperature.ClearOverride();
-        }
     }
 
     void DrawWind()
