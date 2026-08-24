@@ -1998,3 +1998,40 @@ parıltı seyrektir, kristallerin yalnız güneşi tam yansıtan azınlığı se
 
 **Doğrulama:** öğle + açık hava, üç bakış açısı (yakın/orta/ufka yakın). Uzak
 alan düzgün beyaz, yakında seyrek ince parıltı.
+
+
+---
+
+## 24 m'lik kare geri geldi (gece/şafak, koyu sahnede parlak alan)
+
+**Kullanıcının ağzından:** "kare sorunu geri geldi", "illallah ettim şu kareden".
+
+**Yanlış çıkan ilk şüpheliler:** kar maskesi (`snowMask` matematiği arazide 1
+veriyor), `skyVis` (bölge dışında 1.0 dönüyor), tone mapping.
+
+**ÖLÇÜM ARACI ÜÇ KEZ YALAN SÖYLEDİ — asıl ders bu:**
+1. `LookController` her kare pozlamaya adaptasyon ekliyor. Mesh'i kapatıp
+   ölçünce sahne ortalaması düşüyor, pozlama açılıyor ve arazi "parlak"
+   görünüyordu.
+2. Mesh'i kapatmak kar sistemini yarım bırakıyor; arazi bozuk değerlerle
+   çizilip turkuaza patlıyordu. "Mesh kapalı" karşılaştırması geçersiz.
+3. Üç farklı shader halinde aynı sayı (0.618) çıktı — shader değişikliklerinin
+   ölçüme hiç yansımadığının işaretiydi.
+
+Geçerli yöntem: mesh AÇIK kalır, ekran MERKEZİ (mesh) ile KENARI (arazi)
+karşılaştırılır ve karar `ScreenCapture` görüntüsüyle doğrulanır.
+
+**Gerçek kök — birden çok girdi ayrışması, en büyüğü DAĞ GÖLGESİ.** Arazi
+`TerrainSunShadow` ile dağın kendi gölgesini uyguluyordu, kar mesh'i hiç
+uygulamıyordu: veriler arazi materyalinin `UnityPerMaterial` bloğunda ve mesh
+başka materyal kullanıyor. Güneş ufka yakınken arazi kendi gölgesinde koyulup
+gölge tonuyla maviye çalıyor, mesh gölgesiz ve nötr kalıyordu.
+
+Yanında üç ayrışma daha: yoğunluk (`_FallbackRhoN` yalnız yağıştan
+güncelleniyordu, doku ayrıca sıkışıyor), kar sütunu (arazi 4 cm'lik nesne örtüsü
+sabitini kullanıyordu), AO (arazi sabit 1.0 veriyordu).
+
+**Ölçüm:** oran 1.61 → 1.08; gün boyu 11 saatte tarandı.
+
+**Denendi ve geri alındı:** mesh'e alpenglow eklemek. Şafak oranını 1.02'den
+0.25'e BOZDU — arazi ile aynı `gate` terimi kurulamadı.

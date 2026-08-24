@@ -229,7 +229,7 @@ public class SnowManager : MonoBehaviour
 
         SnowQualityData q = settings.QualityData;
 
-        capture = CreateMsaa("RT_Capture", q.Resolution, RenderTextureFormat.ARGBHalf);
+        capture = Create("RT_Capture", q.Resolution, RenderTextureFormat.ARGBHalf);
         captureBlur = Create("RT_CaptureBlur", q.Resolution, RenderTextureFormat.ARGBHalf);
 
         // RT_Trail ARGBHalf: B (kabuk) ve A (sastrugi) Faz 11–12'de doluyor ama doku
@@ -481,8 +481,39 @@ public class SnowManager : MonoBehaviour
 
         // BÖLGE DIŞI DÜNYANIN KARINI GÖRÜYOR, sabit bir varsayılanı değil.
         Shader.SetGlobalFloat(SnowShaderIDs.FallbackSWE, Mathf.Max(0f, WorldSwe));
-        Shader.SetGlobalFloat(SnowShaderIDs.FallbackRhoN,
-                              WorldRhoN >= 0f ? WorldRhoN : settings.DefaultRhoN);
+
+        // YOĞUNLUK BÖLGENİN ÖLÇÜLEN ORTALAMASINDAN GELİYOR.
+        //
+        // `WorldRhoN` yalnız yağışla güncelleniyor; bölgedeki doku ise ayrıca
+        // SIKIŞIYOR (`KDeform`). İkisi zamanla ayrışıyordu — ölçüldü:
+        // `WorldRhoN = 0.0119`, dokunun ortalaması `0.0799`, altı kattan fazla.
+        //
+        // Yoğunluk hem albedoyu hem pürüzlülüğü sürüyor, üstelik
+        // `SnowBaseHeight = SWE·1000/ρ` üzerinden KALINLIĞI da: aynı SWE ile
+        // arazi 50.4 cm, kar mesh'i 33.7 cm veriyordu. Bölgenin sınırı hem
+        // renk hem kot atlıyor ve oyuncuyu izleyen 24 m'lik bir kare olarak
+        // görünüyordu.
+        //
+        // Bölge dünyanın örneklendiği yer; ortalaması dünyanın değeri için en
+        // iyi tahmin. Ölçüm henüz yapılmadıysa yağıştan gelen değere düşülüyor.
+        float dunyaRhoN = MeanRhoN >= 0f ? MeanRhoN
+                        : (WorldRhoN >= 0f ? WorldRhoN : settings.DefaultRhoN);
+        Shader.SetGlobalFloat(SnowShaderIDs.FallbackRhoN, dunyaRhoN);
+
+        // ARAZİ KAR IŞIKLANDIRMASININ DERİNLİĞİ.
+        //
+        // Arazi `_SnowCoverThickness` (4 cm) kullanıyordu; o sabit NESNELERİN
+        // üstündeki ince örtü için (spec §16). Kar mesh'i ise gerçek sütunu
+        // (~50 cm) görüyor. Derinlik `SnowAmbient`'ın sızma terimini
+        // `exp(-derinlik·7)` ile sürüyor, yani iki yüzey aynı noktada farklı
+        // parlaklıkta çıkıyordu — 24 m'lik kare belirtisinin ölçülen
+        // paylarından biri (1.61 kat farkın bir bölümü).
+        //
+        // Değer BURADA hesaplanıyor, shader'da fonksiyon çağrılmıyor: aynı
+        // hesabı fragment aşamasında yapmak denendi ve arazi ışıklandırmasını
+        // bozdu.
+        float dunyaDerinlik = SnowBaseHeightMetre(Mathf.Max(0f, WorldSwe), dunyaRhoN);
+        Shader.SetGlobalFloat(SnowShaderIDs.WorldSnowDepth, dunyaDerinlik);
 
         // KAR ÇİZGİSİ DONMA SEVİYESİNDEN. Ayrı bir sayı tanımlanmıyor;
         // sıcaklık alanı neredeyse kar da orada başlıyor.
@@ -571,6 +602,7 @@ public class SnowManager : MonoBehaviour
             ClearTo(cmd, snow, groups, WorldSnowValue);
             ClearTo(cmd, trail, groups, Vector4.zero);
             ClearTo(cmd, trailTemp, groups, Vector4.zero);
+
             ClearTo(cmd, capture, groups, Vector4.zero);
             ClearTo(cmd, captureBlur, groups, Vector4.zero);
 
@@ -1063,45 +1095,21 @@ public class SnowManager : MonoBehaviour
         Shader.EnableKeyword(quality.Keyword);
     }
 
+    /// SWE ve normalize yoğunluktan kar sütunu, metre. Shader'daki
+    /// `SnowBaseHeight` ile aynı formül; ikisi ayrışırsa arazi ile mesh farklı
+    /// kalınlık görür.
+    static float SnowBaseHeightMetre(float swe, float rhoN)
+    {
+        float rho = Mathf.Max(SnowConstants.RhoMin + rhoN * (SnowConstants.RhoMax - SnowConstants.RhoMin), 1f);
+        return swe * SnowConstants.RhoWater / rho;
+    }
+
     static RenderTexture Create(string name, int resolution, RenderTextureFormat format)
     {
         var rt = new RenderTexture(resolution, resolution, 0, format)
         {
             name = name,
             enableRandomWrite = true,
-            filterMode = FilterMode.Bilinear,
-            wrapMode = TextureWrapMode.Clamp,
-            useMipMap = false,
-            autoGenerateMips = false,
-            hideFlags = HideFlags.HideAndDontSave,
-        };
-
-        rt.Create();
-        return rt;
-    }
-
-    /// YAKALAMA KENARI ÖRTÜŞMELİ OLMAK ZORUNDA.
-    ///
-    /// Yakalama shader'ı maskeye sabit `1.0` yazıyor: bir teksel ya tamamen
-    /// nesnenin içinde ya tamamen dışında. 16 cm çapındaki gövde 2.3 cm'lik
-    /// tekselde yalnız ~7 teksel; kenar örtüşmesi olmadan yuvarlak siluet
-    /// köşeli bir bloğa raster ediliyor ve her kare basılan bu blok ardışık
-    /// damgalarda merdiven deseni üretiyor. Kullanıcı bunu "iz bırakan şekil
-    /// dikdörtgen" ve "satır satır iz" olarak bildirdi; sonraki her yumuşatma
-    /// (blur, carve) yalnız bu kaynağın üstünü örtüyordu.
-    ///
-    /// MSAA kenar tekseline KISMİ kapsama veriyor (dört örnekle 0.25/0.5/0.75);
-    /// çözülmüş doku artık yuvarlağı yuvarlak taşıyor.
-    ///
-    /// `enableRandomWrite` YOK ve olamaz: MSAA ile birlikte kullanılamıyor.
-    /// Gerek de yok — bu dokuya compute YAZMIYOR, yalnız `KBlurCapture`'ın
-    /// kaynağı olarak okuyor.
-    static RenderTexture CreateMsaa(string name, int resolution, RenderTextureFormat format)
-    {
-        var rt = new RenderTexture(resolution, resolution, 0, format)
-        {
-            name = name,
-            antiAliasing = 4,
             filterMode = FilterMode.Bilinear,
             wrapMode = TextureWrapMode.Clamp,
             useMipMap = false,
@@ -1120,9 +1128,6 @@ public class SnowManager : MonoBehaviour
         var rt = new RenderTexture(resolution, resolution, 24, RenderTextureFormat.Depth)
         {
             name = name,
-            // RENK HEDEFİYLE AYNI ÖRNEK SAYISI. RT_Capture MSAA'lı; örnek
-            // sayıları eşleşmezse hedef çifti bağlanamaz ve yakalama boş çıkar.
-            antiAliasing = 4,
             filterMode = FilterMode.Point,
             wrapMode = TextureWrapMode.Clamp,
             useMipMap = false,

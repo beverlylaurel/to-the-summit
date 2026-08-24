@@ -68,7 +68,7 @@ public static class SnowConstants
     /// Poisson blur yarıçapı, teksel (spec §9.4). Compute'a BURADAN gidiyor;
     /// `SnowConstants.hlsl`'deki eşi yalnız shader içi kullanım için, ikisi
     /// birlikte değişir. Gerekçe (çapraz gidişteki basamak) hlsl tarafında.
-    public const float BlurRadiusTexels = 4.0f;
+    public const float BlurRadiusTexels = 1.5f;
 
     // --- İz oluşumu (spec §10.1) ---
 

@@ -56,10 +56,12 @@
 /// (ekrandan görüldü: düz gidişte kenar temiz, çaprazda merdiven). 1.5 teksel
 /// (3.5 cm) bandı bunu örtmeye yetmiyor.
 ///
-/// 2.5 teksel (5.9 cm) hem basamağı siliyor hem oluğun etrafına kullanıcının
-/// istediği yumuşak geçişi veriyor. Üstüne çıkılamaz: bant izin yarı
-/// genişliğine (14–19 cm oluğun 7–9 cm'i) yaklaşınca oluk yayılıp sığlaşır.
-#define SNOW_BLUR_RADIUS_TEXELS      4.0
+/// ÜST SINIR ÖLÇÜLDÜ. 4.0 teksel denendi ve izi ÖLDÜRDÜ: bulanıklık kapsama
+/// payını yayarken zayıflatıyor (`RT_CaptureBlur` tepe değeri 1.00 → 0.80),
+/// oyma sığlaşıyor ve iz görünürlük eşiğinin altında kalıyor — dokuda 5000
+/// teksel yerine 110 teksel kaldı. 2.0 teksel (4.7 cm) kapsamayı tam
+/// tutarken kenarı yumuşatıyor.
+#define SNOW_BLUR_RADIUS_TEXELS      1.5
 
 // --- Parıltı mesafesi ---
 

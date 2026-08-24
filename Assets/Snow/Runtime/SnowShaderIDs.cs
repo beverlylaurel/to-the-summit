@@ -40,6 +40,11 @@ public static class SnowShaderIDs
     public static readonly int CoverBreakupStrength = Shader.PropertyToID("_SnowCoverBreakupStrength");
     public static readonly int CoverEdgeSharpness = Shader.PropertyToID("_SnowCoverEdgeSharpness");
     public static readonly int CoverThickness = Shader.PropertyToID("_SnowCoverThickness");
+
+    /// Dünyanın kar sütunu, metre. Arazi kar ışıklandırmasının derinliği;
+    /// `_SnowCoverThickness` NESNE üstündeki ince örtü için ve arazi için
+    /// yanlış büyüklük.
+    public static readonly int WorldSnowDepth = Shader.PropertyToID("_WorldSnowDepth");
     public static readonly int SnowAccum = Shader.PropertyToID("_SnowAccum");
     public static readonly int SnowLineY = Shader.PropertyToID("_SnowLineY");
 

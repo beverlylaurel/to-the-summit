@@ -8,6 +8,7 @@
 #include "../../Shaders/HeightFog.hlsl"
 
 #include "SnowDetailNormals.hlsl"
+#include "SnowTerrainShadow.hlsl"
 #include "../../Shaders/StochasticTiling.hlsl"
 
 struct Attributes
@@ -190,6 +191,14 @@ void SnowShadeSetup(float3 positionWS, out float3 N, out SnowSurface surface, ou
 
     float4 state = SnowStateAt(uv);
 
+    // KENARDA YALNIZ YÜKSEKLİK DEĞİL, MADDE DE DÜNYAYA DÖNÜYOR. Yoğunluk hem
+    // albedoyu hem pürüzlülüğü sürüyor; kenarda dünyanın değerine
+    // harmanlanmazsa iki yüzey aynı kotta bitse bile farklı renkte kalıyor.
+    float kenar = SnowEdgeFade(uv);
+    state.g = lerp(_FallbackRhoN, state.g, kenar);
+    state.b = lerp(0.0,           state.b, kenar);
+    state.a = lerp(0.0,           state.a, kenar);
+
     SnowClipEdge(height, SnowBaseHeight(state.r, state.g), positionWS, uv);
 
     float4 trail = SnowTrailAt(uv);
@@ -229,6 +238,13 @@ half4 SnowLitFragment(Varyings IN) : SV_Target
 
     Light mainLight = GetMainLight(IN.shadowCoord);
 
+    // DAĞIN KENDİ GÖLGESİ — arazi bunu uyguluyordu, mesh uygulamıyordu.
+    // Güneş ufka yakınken arazi gölgeye girip koyulurken mesh parlak kalıyor,
+    // bölge sınırı kare olarak görünüyordu (gerekçe `SnowTerrainShadow.hlsl`).
+    // Işığa sırtı dönük yüzeyde hesap gereksiz: katkı zaten sıfır.
+    if (dot(N, mainLight.direction) > 0.0)
+        mainLight.shadowAttenuation *= SnowTerrainSunShadow(IN.positionWS, mainLight.direction);
+
     // BULUT GÖLGESİ ARAZİYLE AYNI KANALDAN. Gökyüzünü çizen yoğunluk alanının
     // kendisi; doğrudan güneşi kesiyor, gökten gelen dolaylı ışığa dokunmuyor.
     // Arazi bunu `MountainSurface.shader`'da aynı satırla uyguluyor.
@@ -236,7 +252,12 @@ half4 SnowLitFragment(Varyings IN) : SV_Target
     mainLight.color *= SampleMainLightCookie(IN.positionWS);
 #endif
 
-    half heightAO = SnowHeightAO(SnowWorldToUV(IN.positionWS), height);
+    // KENARDA AO DA DÜNYAYA DÖNÜYOR. `SnowHeightAO` kar yüzeyinin kendi
+    // örtülmesi ve merkezde gerekli; arazi tarafında böyle bir alan yok, o
+    // kendi `occlusion`'ını kullanıyor. Kenarda ikisi ayrışırsa sınır yine
+    // parlaklık atlıyor — ölçüldü, kalan fark 1.08 kattı.
+    float2 kenarUV = SnowWorldToUV(IN.positionWS);
+    half heightAO = lerp(1.0h, SnowHeightAO(kenarUV, height), (half)SnowEdgeFade(kenarUV));
 
     half3 color = SnowDirectLight(mainLight, N, V, surface);
     color += SnowAmbient(N, surface, mainLight.shadowAttenuation, heightAO);

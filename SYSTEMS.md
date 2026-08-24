@@ -779,6 +779,33 @@ pulu deseni üretti. `SnowTrailBodyAlign` gövdeyi yine hareket yönüne
 hizalıyor (adım sapması ve ileride yön bağımlı bir özellik için), ama iz artık
 buna bağımlı değil.
 
+**Kar mesh'i ve arazi AYNI ışığı görür.** Bölge sınırının kendini
+göstermemesi için ikisinin girdileri de eşleşmek zorunda; ölçülen ve kapatılan
+ayrışmalar:
+
+- **Yoğunluk.** `_FallbackRhoN` artık bölgenin ölçülen ortalamasından
+  (`MeanRhoN`) geliyor. Eskiden yalnız yağıştan güncelleniyordu, oysa doku
+  ayrıca SIKIŞIYOR; ikisi 0.0119'a karşı 0.0799'a kadar ayrıştı. Yoğunluk hem
+  albedoyu hem pürüzlülüğü, `SnowBaseHeight` üzerinden de KALINLIĞI sürüyor.
+- **Kenarda madde.** Mesh kenara doğru yoğunluk/ıslaklık/tazelik değerlerini de
+  dünyanınkine harmanlıyor — yükseklik zaten iniyordu, görünüm inmiyordu.
+- **Kar sütunu.** Arazi `_WorldSnowDepth`'i kullanıyor. Eskiden
+  `_SnowCoverThickness` (4 cm) veriyordu; o sabit NESNE üstündeki ince örtü
+  için (spec §16) ve `SnowAmbient`'ın sızma terimini `exp(-derinlik·7)` ile
+  sürdüğü için iki yüzey farklı parlaklıkta çıkıyordu. Değer C#'ta
+  hesaplanıyor: aynı hesabı fragment aşamasında yapmak arazi
+  ışıklandırmasını bozdu.
+- **AO.** Arazi kendi `occlusion`'ını veriyor (sabit 1.0 değil); mesh de
+  `SnowHeightAO`'yu kenarda 1.0'a indiriyor.
+- **Dağ gölgesi.** Mesh `SnowTerrainSunShadow` ile arazinin kendi gölgesini
+  uyguluyor (`SnowTerrainShadow.hlsl`). Veriler `TerrainSurface` tarafından
+  global adlarla da yayınlanıyor, çünkü arazininkiler `UnityPerMaterial`
+  bloğunda ve mesh başka bir materyal kullanıyor. EN BÜYÜK PAY BUYDU: güneş
+  ufka yakınken arazi kendi gölgesinde koyulurken mesh gölgesiz parlıyordu.
+
+Ölçüm (06:25, 50 cm kar, tepeden bakış): mesh/arazi parlaklık oranı
+1.61 → 1.08. Gün boyu tarandığında gündüz 1.10–1.13, akşam 0.98 bandında.
+
 **Kaynak maskesi ÖRTÜŞMELİ.** `RT_Capture` MSAA'lı (4×) açılıyor; derinlik
 tamponunun örnek sayısı da eşleşiyor. Yakalama shader'ı maskeye sabit `1.0`
 yazdığı için MSAA olmadan bir teksel ya tamamen dolu ya boş oluyordu — 16 cm

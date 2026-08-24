@@ -21,7 +21,7 @@ MonoBehaviour:
   breakupNoise: {fileID: 0}
   shadowTint: {r: 0.66, g: 0.76, b: 0.95, a: 1}
   translucencyStrength: 0.6
-  sparkleCellSize: 0.004
+  sparkleCellSize: 0.0015
   sparkleDensity: 0.0035
   sparkleSharpness: 8
   sparkleIntensity: 7

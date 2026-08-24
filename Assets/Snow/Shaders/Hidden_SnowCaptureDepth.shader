@@ -40,6 +40,7 @@ Shader "Hidden/Snow/CaptureDepth"
             struct Attributes
             {
                 float4 positionOS : POSITION;
+                float3 normalOS   : NORMAL;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -47,6 +48,7 @@ Shader "Hidden/Snow/CaptureDepth"
             {
                 float4 positionCS : SV_POSITION;
                 float  positionWSY : TEXCOORD0;
+                float3 normalWS    : TEXCOORD1;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -60,6 +62,7 @@ Shader "Hidden/Snow/CaptureDepth"
 
                 OUT.positionCS = TransformWorldToHClip(positionWS);
                 OUT.positionWSY = positionWS.y;
+                OUT.normalWS = TransformObjectToWorldNormal(IN.normalOS);
                 return OUT;
             }
 

@@ -157,6 +157,11 @@ float SnowEdgeFade(float2 uv)
 float _FallbackSWE;
 float _FallbackRhoN;
 
+/// Dünyanın kar sütunu, metre — `SnowManager` hesaplayıp yayınlıyor.
+/// Arazi kar ışıklandırmasının derinliği bu; aynı hesabı fragment aşamasında
+/// yapmak denendi ve arazi ışıklandırmasını bozdu.
+float _WorldSnowDepth;
+
 /// DÜNYANIN GENEL KAR KALINLIĞI, metre. Deformasyon bölgesinin DIŞINDA zemin
 /// bu kadar kar taşıyor.
 ///

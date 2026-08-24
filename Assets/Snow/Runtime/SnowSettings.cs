@@ -44,8 +44,12 @@ public class SnowSettings : ScriptableObject
     [SerializeField, Range(0f, 2f)] float translucencyStrength = 0.6f;
 
     [Header("Parıltı (spec §14.4)")]
+    /// HÜCRE BOYU = PARILTININ EKRANDAKİ BOYU. Bir hücre en fazla bir kristal
+    /// parlatıyor, dolayısıyla nokta hücre kadar büyük görünüyor. 4 mm'de
+    /// noktalar iri kalıyordu (kullanıcı bildirdi: "noktacıklar çok büyük,
+    /// daha minik olmalı"). 1.5 mm gerçek kar kristali ölçeğine yakın.
     [Tooltip("Parıltı hücresinin dünya boyu, metre.")]
-    [SerializeField] float sparkleCellSize = 0.004f;
+    [SerializeField] float sparkleCellSize = 0.0015f;
 
     [Tooltip("Piksel başına hedeflenen parıltı olasılığı. Mesafeden bağımsız tutuyor.")]
     [SerializeField] float sparkleDensity = 0.0035f;

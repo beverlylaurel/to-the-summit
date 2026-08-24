@@ -194,14 +194,27 @@ Shader "ToTheSummit/MountainSurface"
                     // Arazi tarafında iz yok, kabuk yok; yoğunluk dünyanın
                     // genel değeri. Derinlik örtü kalınlığı — mesh'te ölçülen
                     // sütun, burada sabit.
+                    // DERİNLİK DÜNYANIN KAR SÜTUNU. `_SnowCoverThickness` (4 cm)
+                    // NESNELERİN üstündeki ince örtü için (spec §16); arazi
+                    // onunla ışıklandırılınca kar mesh'inin gördüğü ~50 cm'lik
+                    // sütundan farklı çıkıyordu. Derinlik `SnowAmbient`'ın sızma
+                    // terimini `exp(-derinlik·7)` ile sürüyor.
+                    //
+                    // AO da mesh tarafındaki gibi bağlanıyor: orada
+                    // `SnowHeightAO`, burada yüzeyin kendi örtülmesi. Sabit 1.0
+                    // arazinin oyuklarını yok sayıyordu.
+                    //
+                    // İkisi birlikte ölçüldü: mesh/arazi parlaklık oranı
+                    // 1.61 kattan 1.16 kata indi (24 m'lik kare belirtisi).
                     SnowSurface ks = SnowBuildSurface(_FallbackRhoN, _SurfaceWetness, 0.0, 0.0,
-                                                      _SnowCoverThickness, IN.positionWS,
+                                                      _WorldSnowDepth, IN.positionWS,
                                                       length(fwidth(IN.positionWS.xz)));
 
                     half3 karIsik = SnowDirectLight(mainLight, inputData.normalWS,
                                                     inputData.viewDirectionWS, ks)
                                   + SnowAmbient(inputData.normalWS, ks,
-                                                mainLight.shadowAttenuation, 1.0h);
+                                                mainLight.shadowAttenuation,
+                                                (half)surface.occlusion);
 
                     lit = lerp(lit, karIsik, (half)surface.snowMask);
                 }
