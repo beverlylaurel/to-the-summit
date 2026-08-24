@@ -156,6 +156,14 @@ struct MountainSurface
     /// Karın bu noktadaki payı. Parıltı bununla ağırlıklanıyor: kar mesh'i
     /// parıldayıp arazi parıldamayınca sınır çizgi hâlinde görünüyordu.
     half  snowMask;
+
+    /// Yüzey dokusunun harmanı, BİR KEZ okunmuş hâliyle taşınıyor.
+    ///
+    /// Işıklandırma bloğu da aynı harmanı istiyor; orada yeniden örneklenseydi
+    /// aynı piksel için on iki doku erişimi iki katına çıkardı. Kar mesh'i ile
+    /// arazinin AYNI dokuyu görmesi zorunlu: mesh yalnız yerel sapmayı çiziyor,
+    /// düz alanı arazi çiziyor, iki yüzey farklı doku görürse sınır ayrışır.
+    SnowSurfaceBlend snowBlend;
 };
 
 /// Arazinin güneş gölgesi, pişirilmiş ufuk haritasından.
@@ -406,6 +414,9 @@ MountainSurface BuildMountainSurface(float3 worldPos)
 
     MountainSurface surface;
     surface.snowMask = 0;
+    surface.snowBlend.albedoTint  = half3(1, 1, 1);
+    surface.snowBlend.roughAdd    = 0;
+    surface.snowBlend.normalSlope = half2(0, 0);
     surface.albedo = albedo;
     surface.emission = Alpenglow(worldPos, normalWS, altitude, albedo, exposure);
     surface.normalWS = shaded;
@@ -505,6 +516,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // Kar mesh'i de aynı harmanı kullanıyor. İkisi aynı dokuyu görmek
         // zorunda: mesh yalnız yerel sapmayı çiziyor, düz alanı arazi çiziyor.
         SnowSurfaceBlend karYuzey = SnowSampleSurface(worldPos, _FallbackRhoN, _SurfaceWetness, 0.0);
+        surface.snowBlend = karYuzey;
 
         snowAlbedo = saturate(snowAlbedo * karYuzey.albedoTint);
         snowRough  = saturate(snowRough + karYuzey.roughAdd);

@@ -28,8 +28,14 @@ struct SnowSurface
 /// YÜZEY PARAMETRELERİ (spec §14.1).
 ///
 /// Ölçüm: taze kuru kar albedosu 0.80–0.90, eski/sıkışmış 0.45–0.70.
-SnowSurface SnowBuildSurface(float rhoN, float wet, float disturb, float crust,
-                             float snowDepth, float3 positionWS, float pixelFootprint)
+/// ÖRNEKLENMİŞ HARMANLA KURULUM.
+///
+/// Doku okuması dışarıda kalıyor: arazi yüzey dokusunu zaten kendi
+/// albedo/normal bloğunda okuyor, `SnowBuildSurface` içinde ikinci kez
+/// örneklenince aynı piksel için on iki doku erişimi iki katına çıkıyordu.
+SnowSurface SnowBuildSurfaceFrom(SnowSurfaceBlend yuzey,
+                                 float rhoN, float wet, float disturb, float crust,
+                                 float snowDepth, float3 positionWS, float pixelFootprint)
 {
     float freshness = 1.0 - saturate((SnowDensity(rhoN) - 100.0) / 350.0);
 
@@ -45,7 +51,6 @@ SnowSurface SnowBuildSurface(float rhoN, float wet, float disturb, float crust,
     // YÜZEY DOKUSU. Dört fotogrametri seti durum zincirinden harmanlanıyor
     // (gerekçe `SnowSurfaceTextures.hlsl`). Albedonun SEVİYESİ yukarıdaki
     // fizikten geliyor; doku yalnız deseni çarpan olarak ekliyor.
-    SnowSurfaceBlend yuzey = SnowSampleSurface(positionWS, rhoN, wet, disturb);
     s.albedo    = saturate(s.albedo * yuzey.albedoTint);
     s.roughness = saturate(s.roughness + yuzey.roughAdd);
     s.surfSlope = yuzey.normalSlope;
@@ -69,6 +74,16 @@ SnowSurface SnowBuildSurface(float rhoN, float wet, float disturb, float crust,
     InitializeBRDFData(s.albedo, 0.0h, half3(0, 0, 0), 1.0h - s.roughness, alpha, s.brdfData);
 
     return s;
+}
+
+/// Dokuyu kendi okuyan sarmalayıcı. Kar mesh'i bunu kullanıyor: orada yüzey
+/// dokusunun tek okuyucusu bu fonksiyon.
+SnowSurface SnowBuildSurface(float rhoN, float wet, float disturb, float crust,
+                             float snowDepth, float3 positionWS, float pixelFootprint)
+{
+    return SnowBuildSurfaceFrom(SnowSampleSurface(positionWS, rhoN, wet, disturb),
+                                rhoN, wet, disturb, crust, snowDepth,
+                                positionWS, pixelFootprint);
 }
 
 /// DOĞRUDAN IŞIK (spec §14.3).

@@ -206,9 +206,13 @@ Shader "ToTheSummit/MountainSurface"
                     //
                     // İkisi birlikte ölçüldü: mesh/arazi parlaklık oranı
                     // 1.61 kattan 1.16 kata indi (24 m'lik kare belirtisi).
-                    SnowSurface ks = SnowBuildSurface(_FallbackRhoN, _SurfaceWetness, 0.0, 0.0,
-                                                      _WorldSnowDepth, IN.positionWS,
-                                                      length(fwidth(IN.positionWS.xz)));
+                    // Doku harmanı `BuildSurface` içinde BİR KEZ okundu ve
+                    // `surface.snowBlend` ile taşındı; burada yeniden
+                    // örneklenmiyor.
+                    SnowSurface ks = SnowBuildSurfaceFrom(surface.snowBlend,
+                                                          _FallbackRhoN, _SurfaceWetness, 0.0, 0.0,
+                                                          _WorldSnowDepth, IN.positionWS,
+                                                          length(fwidth(IN.positionWS.xz)));
 
                     // NORMAL BURADA TEKRAR EKLENMİYOR. Yüzey dokusunun eğimi
                     // `MountainSurface.hlsl` içinde `surface.normalWS`'e zaten
