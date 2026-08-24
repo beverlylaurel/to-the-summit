@@ -2044,3 +2044,11 @@ shader'ın AYNI düz yüzeyi çizmesiydi. Mesh artık yalnız yerel sapmanın
 %0.6'sı. Düz alan tek shader'dan geldiği için orada fark imkânsız.
 Doğrulandı: temiz Play oturumu, 06:26 / 12:00 / 17:02, oyuncunun üstünden
 aşağı bakış — zemin baştan sona tek parça, yalnız iz görünüyor.
+
+**Yan etki — iz kenarları havada kaldı.** Mesh iz-only yapılınca oluğun DUVARI
+boşlukta bitiyordu: duvarın üst kenarı iz dışındaki düz kar yüzeyine
+bağlanıyor, o yüzey artık çizilmediği için kenar asılı kalıyordu (kullanıcı
+yandan bakarken bildirdi). Eşik komşuların en büyüğünden okunarak izin
+çevresinde `SNOW_LOCAL_SKIRT_TEXELS` (3 teksel ≈ 7 cm) genişliğinde bir şerit
+bırakıldı; duvar oraya oturuyor. Şerit düz alanda arazi kotunda
+(`SnowSurfaceAt` sapma sıfırken `baseHeight` veriyor), basamak yapmıyor.

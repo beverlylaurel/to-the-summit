@@ -223,7 +223,20 @@ void SnowShadeSetup(float3 positionWS, out float3 N, out SnowSurface surface, ou
     //
     // Sapma = oyma + sırt. `SNOW_LOCAL_MIN` bir tekselin gürültüsünün üstünde,
     // gözle seçilebilen en sığ izin altında.
-    float4 sapmaTrail = SnowTrailAt(uv);
+    //
+    // ETEK ZORUNLU. Sapma yalnız kendi tekselinden okunursa oluğun DUVARI
+    // havada bitiyor: duvarın üst kenarı iz dışındaki düz kar yüzeyine
+    // bağlanıyordu, o yüzey artık çizilmediği için kenar boşlukta asılı
+    // kalıyor (yandan bakınca görüldü). Komşuların en büyüğü alınınca izin
+    // çevresinde birkaç tekselllik bir şerit daha çiziliyor ve duvar oraya
+    // oturuyor. Şerit düz alanda arazi kotunda (`SnowSurfaceAt` sapma
+    // sıfırken `baseHeight` veriyor), dolayısıyla basamak yapmıyor.
+    float tk = SNOW_LOCAL_SKIRT_TEXELS / _SnowResolution;
+    float4 t0 = SnowTrailAt(uv);
+    float4 tX = max(SnowTrailAt(uv + float2( tk, 0)), SnowTrailAt(uv + float2(-tk, 0)));
+    float4 tY = max(SnowTrailAt(uv + float2(0,  tk)), SnowTrailAt(uv + float2(0, -tk)));
+    float4 sapmaTrail = max(t0, max(tX, tY));
+
     float yerelSapma = sapmaTrail.r + sapmaTrail.g;
     clip(yerelSapma - SNOW_LOCAL_MIN);
 

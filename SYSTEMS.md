@@ -783,7 +783,10 @@ buna bağımlı değil.
 `MountainSurface.shader` dört geçişinde de `SnowWorldCoverHeight()` kadar
 yükseliyor ve karın ışıklandırmasını uyguluyor. Mesh yalnız arazinin
 veremeyeceği yerel sapmanın (iz oyuğu, kenar sırtı) olduğu yerde çiziliyor;
-`SNOW_LOCAL_MIN`'in altında tamamen çekiliyor. Ölçüldü: mesh alanın
+`SNOW_LOCAL_MIN`'in altında tamamen çekiliyor. Eşik kendi tekselinden değil,
+`SNOW_LOCAL_SKIRT_TEXELS` yarıçapındaki komşuların EN BÜYÜĞÜNDEN okunuyor:
+oluğun duvarı iz dışındaki düz kar yüzeyine bağlanıyor ve o yüzey çizilmezse
+duvarın üst kenarı boşlukta asılı kalıyordu (yandan bakınca görüldü). Ölçüldü: mesh alanın
 %0.6'sında görünüyor, geri kalanı tek shader'dan geliyor.
 
 Bu, "24 m'lik kare" belirtisinin KALICI çözümü. Fark küçültülerek

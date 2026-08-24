@@ -91,6 +91,18 @@
 /// izin altında (ölçülen iz derinlikleri 60-80 mm).
 #define SNOW_LOCAL_MIN               0.002
 
+/// İZİN ÇEVRESİNDE ÇİZİLEN ŞERİDİN GENİŞLİĞİ, teksel.
+///
+/// Oluğun duvarı iz dışındaki düz kar yüzeyine bağlanıyor. O yüzey
+/// çizilmezse duvarın üst kenarı boşlukta asılı kalıyor — yandan bakınca
+/// havada duran plakalar olarak görüldü. Komşuların en büyüğü alınıp izin
+/// çevresinde bu kadar teksel daha çizilince duvar oraya oturuyor.
+///
+/// Şerit dar tutulur: düz alanda mesh ile arazi yine yan yana geliyor ve
+/// aradaki fark orada da var. 3 teksel (7 cm) duvarı bağlamaya yetiyor,
+/// göze kuşak olarak okunacak kadar geniş değil.
+#define SNOW_LOCAL_SKIRT_TEXELS       3.0
+
 // --- İz oluşumu (spec §10.1) ---
 #define SNOW_LOOSE_N                 0.10
 #define SNOW_PACKED_N                0.55
