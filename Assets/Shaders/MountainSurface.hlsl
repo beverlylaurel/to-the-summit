@@ -142,6 +142,7 @@ float MountainBand(float3 worldPos)
 #include "../Snow/Shaders/SnowDetailNormals.hlsl"
 #include "../Snow/Shaders/SnowCover.hlsl"
 #include "../Snow/Shaders/SnowSparkle.hlsl"
+#include "../Snow/Shaders/SnowLighting.hlsl"
 
 
 struct MountainSurface

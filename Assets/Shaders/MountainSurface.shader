@@ -164,21 +164,33 @@ Shader "ToTheSummit/MountainSurface"
                 lit += LightingPhysicallyBased(brdfData, mainLight,
                     inputData.normalWS, inputData.viewDirectionWS) * aoFactor.directAmbientOcclusion;
 
-                // PARILTI ARAZİ KARINDA DA VAR. Kar mesh'i parıldayıp arazi
-                // parıldamayınca oyuncunun çevresindeki bölge sınırı benekli
-                // bir KARE olarak görünüyordu — aynı olgu, iki farklı anlatım.
-                // Kapılar mesh'tekiyle aynı: gece yok, ışığa sırtı dönükte yok.
+                // ARAZİNİN KARI DA KARIN KENDİ IŞIKLANDIRMASINI KULLANIYOR.
+                //
+                // Eskiden kar mesh'i sarmal NdotL + arkadan sızma + `_ShadowTint`'li
+                // ortam kullanıyordu, arazinin kar katmanı ise URP'nin standart
+                // PBR'ını. Aynı kar, iki model. Ölçüldü: bölge sınırının iki
+                // yakası arasında %2.3 parlaklık farkı (iç 0.8318, dış 0.8132) —
+                // düz beyaz bir alanda bu fark KESKİN ÇİZGİ olarak okunuyor ve
+                // oyuncuyu takip eden 24 m'lik kareyi çiziyordu.
+                //
+                // Kar nerede olursa olsun aynı maddedir; ışıklandırması da tek
+                // yerden gelir. Kaya tarafı standart PBR'da kalıyor, iki sonuç
+                // `snowMask` ile harmanlanıyor.
                 if (surface.snowMask > 0.001)
                 {
-                    half sunGate = saturate(_SunElevation01 * 20.0);
-                    half sparkle = SnowSparkle(IN.positionWS, inputData.viewDirectionWS,
-                                               mainLight.direction,
-                                               length(fwidth(IN.positionWS.xz)))
-                                 * saturate(dot(inputData.normalWS, mainLight.direction) * 4.0)
-                                 * sunGate * surface.snowMask;
+                    // Arazi tarafında iz yok, kabuk yok; yoğunluk dünyanın
+                    // genel değeri. Derinlik örtü kalınlığı — mesh'te ölçülen
+                    // sütun, burada sabit.
+                    SnowSurface ks = SnowBuildSurface(_FallbackRhoN, _SurfaceWetness, 0.0, 0.0,
+                                                      _SnowCoverThickness, IN.positionWS,
+                                                      length(fwidth(IN.positionWS.xz)));
 
-                    lit += sparkle * _SparkleIntensity * mainLight.color
-                         * mainLight.shadowAttenuation;
+                    half3 karIsik = SnowDirectLight(mainLight, inputData.normalWS,
+                                                    inputData.viewDirectionWS, ks)
+                                  + SnowAmbient(inputData.normalWS, ks,
+                                                mainLight.shadowAttenuation, 1.0h);
+
+                    lit = lerp(lit, karIsik, (half)surface.snowMask);
                 }
 
                 // KARDAN YANSIYAN GÜNEŞ. Gölgedeki bir noktanın çevresini güneş vuran

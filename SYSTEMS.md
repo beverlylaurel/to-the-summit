@@ -765,6 +765,14 @@ NdotL + arkadan sızma + BRDF yansıma; speküler URP sözleşmesiyle kullanıl�
 (`_SunElevation01` kapısı) ve ekran uzayında yoğunluğu sabit. Ortam gölgede
 maviye çalıyor. Sis URP'nin `MixFog`'undan — kendi sis hesabı yok.
 
+**Arazinin kar katmanı karın kendi ışıklandırmasını kullanır.** Kaya standart
+PBR'da kalıyor; kar `SnowDirectLight` + `SnowAmbient`'tan geliyor ve ikisi
+`snowMask` ile harmanlanıyor. Kar nerede olursa olsun aynı maddedir, modeli de
+tek yerden gelir. `_ShadowTint`, `_TranslucencyStrength` ve parıltı ayarları bu
+yüzden GLOBAL — arazi ayrı bir materyal ve per-materyal kalsalardı sıfır okurdu.
+`_SnowBreakup` dokusunun tanımı da tek yerde (`SnowCommon.hlsl`); mesh, arazi ve
+nesne maskesi üçü de onu okuyor.
+
 **Kar mesh'inin kesme eşiği bölge kenarını da sayar.** `SnowEdgeFade` hem
 yüksekliğe hem `SnowClipEdge`'e giriyor; ilki basamağı, ikincisi keskin renk
 çizgisini kaldırıyor. Mesh ile arazi iki ayrı ışıklandırma modeli kullandığı

@@ -13,9 +13,6 @@ Shader "ToTheSummit/SnowLit"
         _SnowBreakupScale ("Gürültü ölçeği (1/m)", Float) = 3.0
         _SnowEdgeFadeRange ("Kenar geçiş aralığı (m)", Float) = 0.006
 
-        _ShadowTint ("Gölge rengi", Color) = (0.66, 0.76, 0.95, 1.0)
-        _TranslucencyStrength ("Yarı saydamlık", Float) = 1.0
-
 
         _SnowAORadius ("İz içi AO yarıçapı (m)", Float) = 0.10
         _SnowAOStrength ("İz içi AO şiddeti", Range(0, 1)) = 1.0

@@ -7,9 +7,6 @@
 #include "SnowCommon.hlsl"
 #include "../../Shaders/StochasticTiling.hlsl"
 
-TEXTURE2D(_SnowBreakup);
-SAMPLER(sampler_SnowBreakup);
-
 /// Zeminde ne kadar kar varsa nesnelerde de o kadar. `SnowCoverageDriver`
 /// besliyor; ayrı bir kaynak kurulmuyor.
 float _SnowCoverage;

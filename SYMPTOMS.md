@@ -1720,3 +1720,30 @@ bu fark KESKİN ÇİZGİ olarak okunuyor. Kenar sönümü kesmeye de girince ge�
 **Not:** kalan %2.3 iki ışıklandırma modelinin farkı — karın wrap diffuse'ü,
 translüsanlığı ve `_ShadowTint`'li ortamı. Kaynağında kapatmak karın kendi
 özelliklerini silmek demek; kenar kuşağı farkı görünmez kılıyor.
+
+
+---
+
+## Kare oyuncuyla birlikte geliyor (kalan %2.3)
+
+**Kullanıcının ağzından:** "baksana benimle birlikte geliyor. çok can sıkıcı."
+
+24 m'lik kare bir hata değil, deformasyon penceresinin kendisi — ayak izi
+çözünürlüğünde simülasyon ancak oyuncunun çevresinde karşılanabiliyor
+(`SCALE.md` → Kar bölgesi). Sorun pencerenin varlığı değil, KENARININ
+görünmesiydi.
+
+**Sebep: aynı kar, iki ışıklandırma modeli.** Kar mesh'i sarmal NdotL +
+arkadan sızma + `_ShadowTint`'li ortam kullanıyordu; arazinin kar katmanı
+URP'nin standart PBR'ı. Ölçüldü: sınırın iki yakası arasında **%2.3**
+parlaklık farkı (iç 0.8318, dış 0.8132). Düz beyaz bir alanda %2 bile keskin
+çizgi olarak okunuyor.
+
+**Çözüm:** arazinin kar katmanı da `SnowDirectLight` + `SnowAmbient`
+kullanıyor; kaya standart PBR'da kalıyor, ikisi `snowMask` ile harmanlanıyor.
+Bunun ön koşulu `_ShadowTint` ve `_TranslucencyStrength`'in materyalden
+GLOBAL'e taşınmasıydı — arazi ayrı bir materyal, per-materyal kalsalardı
+sıfır okur ve fark yeniden doğardı. Aynı sebeple `_SnowBreakup` tanımı da tek
+yere (`SnowCommon.hlsl`) indi.
+
+**Sonuç:** oran **1.023 → 0.9955**. 1 cm'de de 20 cm'de de kare görünmüyor.

@@ -110,6 +110,19 @@ float  _WindSpeed;
 float  _TemperatureC;
 float  _SunElevation01;
 
+/// KENAR KIRILMA GÜRÜLTÜSÜ. Kar mesh'i, arazinin kar katmanı ve nesne üstü
+/// kar maskesi AYNI dokuyu okuyor; tanımı tek yerde, ikisi de bu dosyayı
+/// dahil ediyor.
+TEXTURE2D(_SnowBreakup);
+SAMPLER(sampler_SnowBreakup);
+
+/// KAR IŞIKLANDIRMASININ AYARLARI GLOBAL, MATERYALDE DEĞİL. Arazinin kar
+/// katmanı da aynı ışıklandırmayı kullanıyor (`MountainSurface.shader`) ve o
+/// ayrı bir materyal. Per-materyal kalsalardı arazi bu değerleri SIFIR okur,
+/// iki yüzey yine ayrışırdı. Tek sahibi `SnowSettings`; yayını `SnowManager`.
+float4 _ShadowTint;
+float  _TranslucencyStrength;
+
 /// PARILTI AYARLARI GLOBAL, MATERYALDE DEĞİL. Arazi karı da parıldıyor
 /// (`MountainSurface.shader`) ve o ayrı bir materyal. Per-materyal kalsaydı
 /// iki yüzey iki farklı sayıyla parıldar, bölge sınırı görünürdü.

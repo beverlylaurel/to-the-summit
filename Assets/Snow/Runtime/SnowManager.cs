@@ -472,6 +472,8 @@ public class SnowManager : MonoBehaviour
 
         // PARILTI AYARLARI DA GLOBAL, AYNI GEREKÇEYLE: arazi karı da
         // parıldıyor ve o ayrı bir materyal. Tek sahibi bu ayar asset'i.
+        Shader.SetGlobalColor(SnowShaderIDs.ShadowTint, settings.ShadowTint);
+        Shader.SetGlobalFloat(SnowShaderIDs.TranslucencyStrength, settings.TranslucencyStrength);
         Shader.SetGlobalFloat(SnowShaderIDs.SparkleCellSize, settings.SparkleCellSize);
         Shader.SetGlobalFloat(SnowShaderIDs.SparkleDensity, settings.SparkleDensity);
         Shader.SetGlobalFloat(SnowShaderIDs.SparkleSharpness, settings.SparkleSharpness);

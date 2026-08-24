@@ -14,16 +14,8 @@ CBUFFER_START(UnityPerMaterial)
     float  _SnowBreakupScale;
     float  _SnowEdgeFadeRange;
 
-    float4 _ShadowTint;
-    float  _TranslucencyStrength;
-
     float  _SnowAORadius;
     float  _SnowAOStrength;
 CBUFFER_END
-
-/// Kar kenarının düz çizgi yerine lekeler hâlinde bitmesini sağlayan gürültü
-/// (spec §8.2). Aynı doku nesne üstü kar maskesinde de kullanılıyor (§16).
-TEXTURE2D(_SnowBreakup);
-SAMPLER(sampler_SnowBreakup);
 
 #endif
