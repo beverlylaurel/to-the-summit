@@ -80,6 +80,17 @@
 #define SNOW_SPARKLE_FADE_START      6.0
 #define SNOW_SPARKLE_FADE_END        16.0
 
+/// MESH'İN GÖRÜNÜR OLDUĞU EN KÜÇÜK YEREL SAPMA, metre.
+///
+/// Kar tabanını arazi çiziyor; mesh yalnız arazinin veremeyeceği yerel
+/// sapmayı (iz oyuğu, kenar sırtı) çiziyor. Bunun altında mesh tamamen
+/// çekiliyor ve düz alan TEK shader'dan geliyor — bölge sınırının kare olarak
+/// görünmesinin kaynağı iki ayrı shader'ın aynı yüzeyi çizmesiydi.
+///
+/// 2 mm: bir tekselin sayısal gürültüsünün üstünde, gözle seçilebilen en sığ
+/// izin altında (ölçülen iz derinlikleri 60-80 mm).
+#define SNOW_LOCAL_MIN               0.002
+
 // --- İz oluşumu (spec §10.1) ---
 #define SNOW_LOOSE_N                 0.10
 #define SNOW_PACKED_N                0.55

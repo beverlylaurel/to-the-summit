@@ -2035,3 +2035,12 @@ sabitini kullanıyordu), AO (arazi sabit 1.0 veriyordu).
 
 **Denendi ve geri alındı:** mesh'e alpenglow eklemek. Şafak oranını 1.02'den
 0.25'e BOZDU — arazi ile aynı `gate` terimi kurulamadı.
+
+**KALICI ÇÖZÜM — ikinci çizimi kaldırmak.** Yukarıdaki eşitlemeler oranı
+1.61'den 1.08'e indirdi ama sıfırlamadı ve kare gözle görünmeye devam etti:
+sınır oyuncuyla birlikte kaydığı için %8 fark bile yakalanıyor. Kök, iki ayrı
+shader'ın AYNI düz yüzeyi çizmesiydi. Mesh artık yalnız yerel sapmanın
+(`SNOW_LOCAL_MIN` üstü iz/sırt) olduğu yerde çiziliyor — ölçüldü: alanın
+%0.6'sı. Düz alan tek shader'dan geldiği için orada fark imkânsız.
+Doğrulandı: temiz Play oturumu, 06:26 / 12:00 / 17:02, oyuncunun üstünden
+aşağı bakış — zemin baştan sona tek parça, yalnız iz görünüyor.

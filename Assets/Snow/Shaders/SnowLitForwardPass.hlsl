@@ -201,6 +201,32 @@ void SnowShadeSetup(float3 positionWS, out float3 N, out SnowSurface surface, ou
 
     SnowClipEdge(height, SnowBaseHeight(state.r, state.g), positionWS, uv);
 
+    // MESH YALNIZ YEREL SAPMAYI ÇİZİYOR.
+    //
+    // Kar tabanını ARAZİ çiziyor: `MountainSurface.shader` dört geçişinde de
+    // `SnowWorldCoverHeight()` kadar yükseliyor ve karın ışıklandırmasını
+    // uyguluyor. Mesh de aynı düz yüzeyi ikinci kez çizdiği sürece iki shader
+    // arasındaki HER fark bölge sınırında kare olarak görünüyordu.
+    //
+    // Üç gün boyunca bu fark terim terim kapatılmaya çalışıldı — yoğunluk,
+    // kar sütunu, AO, dağ gölgesi. Her biri ölçülüp kapatıldı (oran 1.61'den
+    // 1.08'e indi) ama sıfırlanmadı: iki ayrı kod yolunun onlarca terimi var
+    // ve biri eşitlenince başka bir saatte başkası ayrışıyor (alpenglow
+    // denemesi şafağı 1.02'den 0.25'e bozdu). Kalan %8-13 statik görüntüde
+    // zor seçiliyor ama sınır OYUNCUYLA BİRLİKTE KAYDIĞI için gözle
+    // yakalanıyor.
+    //
+    // Kalıcı çözüm farkı küçültmek değil, ikinci çizimi kaldırmak: mesh
+    // yalnız arazinin veremeyeceği yerel sapmayı (iz oyuğu, kenar sırtı)
+    // çiziyor, düz alanda TAMAMEN çekiliyor. Düz alan tek shader'dan geldiği
+    // için orada fark matematiksel olarak imkânsız.
+    //
+    // Sapma = oyma + sırt. `SNOW_LOCAL_MIN` bir tekselin gürültüsünün üstünde,
+    // gözle seçilebilen en sığ izin altında.
+    float4 sapmaTrail = SnowTrailAt(uv);
+    float yerelSapma = sapmaTrail.r + sapmaTrail.g;
+    clip(yerelSapma - SNOW_LOCAL_MIN);
+
     float4 trail = SnowTrailAt(uv);
 
     float dist = length(GetCameraPositionWS() - positionWS);

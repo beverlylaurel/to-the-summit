@@ -779,6 +779,24 @@ pulu deseni üretti. `SnowTrailBodyAlign` gövdeyi yine hareket yönüne
 hizalıyor (adım sapması ve ileride yön bağımlı bir özellik için), ama iz artık
 buna bağımlı değil.
 
+**KAR MESH'İ YALNIZ YEREL SAPMAYI ÇİZER.** Kar tabanını arazi çiziyor:
+`MountainSurface.shader` dört geçişinde de `SnowWorldCoverHeight()` kadar
+yükseliyor ve karın ışıklandırmasını uyguluyor. Mesh yalnız arazinin
+veremeyeceği yerel sapmanın (iz oyuğu, kenar sırtı) olduğu yerde çiziliyor;
+`SNOW_LOCAL_MIN`'in altında tamamen çekiliyor. Ölçüldü: mesh alanın
+%0.6'sında görünüyor, geri kalanı tek shader'dan geliyor.
+
+Bu, "24 m'lik kare" belirtisinin KALICI çözümü. Fark küçültülerek
+kapatılamadı: iki ayrı kod yolunun onlarca terimi var, biri eşitlenince başka
+bir saatte başkası ayrışıyor (yoğunluk, kar sütunu, AO, dağ gölgesi tek tek
+kapatıldı, oran 1.61'den 1.08'e indi ama sıfırlanmadı; alpenglow denemesi
+şafağı 1.02'den 0.25'e bozdu). Kalan %8 statik görüntüde zor seçiliyor ama
+sınır OYUNCUYLA BİRLİKTE KAYDIĞI için gözle yakalanıyordu. İkinci çizim
+kaldırılınca düz alanda fark matematiksel olarak imkânsız hâle geldi.
+
+Aşağıdaki eşitlemeler yine de yerinde duruyor: mesh'in görünür olduğu dar
+şeritte iki yüzey komşu ve orada da tutarlı olmaları gerekiyor.
+
 **Kar mesh'i ve arazi AYNI ışığı görür.** Bölge sınırının kendini
 göstermemesi için ikisinin girdileri de eşleşmek zorunda; ölçülen ve kapatılan
 ayrışmalar:
