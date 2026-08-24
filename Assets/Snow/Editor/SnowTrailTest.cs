@@ -201,10 +201,10 @@ public static class SnowTrailTest
                          (lastSink * 100f).ToString("0.00") + " cm,  rhoN 0.100 → " +
                          rhoN.ToString("0.000"));
 
-            r.AppendLine("  [i] Sıkışma hızı        batma %18'in altına " + passesTo18 +
-                         ". geçişte indi; spec metni '5–6 geçiş' diyor. Kod KARE başına " +
-                         "uyguluyor — 120 fps'te bir ayak basışı ~36 kare eder. Sayı " +
-                         "spec'ten (SNOW_COMPACT_RATE 0.12), değiştirilmedi.");
+            r.AppendLine("  [i] Sıkışma          batma %18'in altına " + passesTo18 +
+                         ". geçişte indi; spec metni '5–6 geçiş' diyor. Sıkışma AÇILAN " +
+                         "OYMAYA orantılı (SNOW_COMPACT_GAIN), süreye değil: yerinde " +
+                         "bekleyen oyuncunun altında iz derinleşmiyor.");
 
             // --- 7. yağışla doluyor ---
             rig.ResetSnow(0.02f, 0.10f);

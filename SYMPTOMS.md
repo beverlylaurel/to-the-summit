@@ -1828,3 +1828,30 @@ gerçekten 50 cm yükseliyor — hem bölgede hem dışında.
 
 Görsel doğrulama: 1, 5, 20, 50 cm × (yukarıdan eğik, göz hizası) — hepsinde
 sınır görünmüyor.
+
+
+---
+
+## Yerinde beklerken iz yuvarlak bir çukur gibi derinleşiyor
+
+**Kullanıcının ağzından:** "durduğumda iz yuvarlak olarak derinleşiyor. bunu
+istemiyorum" ve "yuvarlağımsı bir şey görmek istemiyorum".
+
+**Sebep:** sıkışma `_SnowDeltaTime` ile çarpılıyordu, yani GEÇEN SÜREYE
+bağlıydı. Ayak durduğu sürece `snow.g` (yoğunluk) birikiyor; yoğunluk arttıkça
+`baseH = SWE × 1000 / ρ` düşüyor ve yüzey alçalıyor. Oyma sabit kalsa bile
+çukur derinleşiyordu.
+
+`trail.r = max(trail.r, target)` biriktirmiyor — oyma suçlu değildi.
+
+**Çözüm:** sıkışma o karede AÇILAN oymaya orantılı
+(`SNOW_COMPACT_GAIN * yeniOyma / baseH`). Kar da böyle davranır: yük sabitken
+sıkışma bir kerede dengeye gelir, beklemek ek sıkışma üretmez. Yan fayda: kare
+hızından da bağımsız — eskiden `dt` çarpanı bu yüzden eklenmişti.
+
+Ölçüm: 200 kare yürüyüş + 15 saniye bekleme sonunda `snow.a` = 0.0600, yani
+tam olarak `SNOW_MAX_COMPACT_PER_PASS` tavanı; süre boyunca artmıyor.
+
+**Ayrıca oluk inceltildi ve yuvarlaklık kaldırıldı.** Gövde küre (36 cm çap)
+yerine oval (22×12×40 cm) ve hareket yönüne hizalı. Dik kesit 17 tekselden
+10 teksele indi (40 cm → 23 cm).

@@ -240,15 +240,26 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         // tam tavana düzleştiriyor ve rampayı yine yok ediyordu.
         float target = min(enFazlaOyma, tasimaSiniri) * sinkScale * kapsama;
 
+        float eskiOyma = trail.r;
         trail.r = max(trail.r, target);
 
         // Üzerinden geçilen yerde sırt kalmaz (spec §18.4).
         trail.a = 0.0;
 
-        // `_SnowDeltaTime` ÇARPANI SPEC'TE YOK ve olmadan kare hızına bağlı
-        // kalıyor (gerekçe `SNOW_COMPACT_RATE` yanında).
-        float compact = SNOW_COMPACT_RATE * saturate(target / max(baseH, 1e-4))
-                      * _SnowDeltaTime;
+        // SIKIŞMA YENİ OYMAYA ORANTILI, GEÇEN SÜREYE DEĞİL.
+        //
+        // Önce `SNOW_COMPACT_RATE * ... * _SnowDeltaTime` idi: ayak durduğu
+        // sürece sıkışma birikiyordu. Yoğunluk arttıkça `baseH = SWE×1000/ρ`
+        // düşüyor, yani YERİNDE BEKLEYEN oyuncunun altında iz yuvarlak bir
+        // çukur gibi derinleşiyordu (kullanıcı bildirdi).
+        //
+        // Kar öyle davranmaz: yük sabitken sıkışma bir kerede dengeye gelir,
+        // beklemek ek sıkışma üretmez. Sıkışmayı bu karede AÇILAN oymaya
+        // bağlayınca davranış kendiliğinden doğru oluyor — ilk temasta
+        // sıkışıyor, sonraki karelerde `yeniOyma` sıfır olduğu için duruyor.
+        // Kare hızına da bağlı kalmıyor: toplam oyma kare sayısından bağımsız.
+        float yeniOyma = trail.r - eskiOyma;
+        float compact = SNOW_COMPACT_GAIN * saturate(yeniOyma / max(baseH, 1e-4));
 
         // TEK GEÇİŞ SINIRI. `snow.a` bu temasta ne kadar yoğunlaştığımızı
         // tutuyor; ayak kalkınca sıfırlanıyor. Sınır olmadan bir tek temas

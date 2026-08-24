@@ -50,6 +50,12 @@ public class SnowStepRhythm : MonoBehaviour
     /// Teşhis: şu an hangi ayak yerde (0 = sol, 1 = sağ).
     public int PlantedFoot { get; private set; }
 
+    /// Atılan toplam adım sayısı. İz gövdesi buradan adım adım sapma
+    /// türetiyor (`SnowTrailBodyAlign`); `PlantedFoot` iki değer arasında
+    /// gidip geldiği için sapma kaynağı olarak kullanılamıyor — desen
+    /// tekrar ederdi.
+    public int StepCount { get; private set; }
+
     /// Teşhis: yatay hız (m/s).
     public float Speed { get; private set; }
 
@@ -83,6 +89,7 @@ public class SnowStepRhythm : MonoBehaviour
             {
                 travelled -= half;
                 PlantedFoot = 1 - PlantedFoot;
+                StepCount++;
                 Stepped?.Invoke(PlantedFoot);
             }
 

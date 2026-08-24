@@ -79,8 +79,10 @@ public static class SnowConstants
     /// Tam sıkışmış karda batmanın kaç katına indiği. Taze karda 1.0, patikada bu.
     public const float PackedSinkScale = 0.18f;
 
-    /// Bir basışta yoğunluğun ne kadar arttığı.
-    public const float CompactRate = 0.12f;
+    /// Bir basışta yoğunluğun ne kadar arttığı — AÇILAN OYMA başına, geçen
+    /// süre başına değil. `SnowConstants.hlsl`'in `SNOW_COMPACT_GAIN`'i ile
+    /// AYNI olmak zorunda.
+    public const float CompactGain = 0.15f;
 
     // --- Kenar yığılması (spec §10.2) ---
 

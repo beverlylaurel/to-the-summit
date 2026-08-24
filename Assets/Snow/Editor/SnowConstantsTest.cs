@@ -41,7 +41,7 @@ public static class SnowConstantsTest
         ("LooseN", "SNOW_LOOSE_N"),
         ("PackedN", "SNOW_PACKED_N"),
         ("PackedSinkScale", "SNOW_PACKED_SINK_SCALE"),
-        ("CompactRate", "SNOW_COMPACT_RATE"),
+        ("CompactGain", "SNOW_COMPACT_GAIN"),
         ("RimVelocityBias", "SNOW_RIM_VELOCITY_BIAS"),
         ("RimStrength", "SNOW_RIM_STRENGTH"),
         ("RimMax", "SNOW_RIM_MAX"),

@@ -87,21 +87,24 @@
 #define SNOW_MAX_COMPACT_PER_PASS    0.06
 
 #define SNOW_PACKED_SINK_SCALE       0.18
-/// SIKIŞMA HIZI — SANİYE BAŞINA, KARE BAŞINA DEĞİL.
+/// SIKIŞMA KAZANCI — AÇILAN OYMA BAŞINA, GEÇEN SÜRE BAŞINA DEĞİL.
 ///
-/// Spec §10.1 `compact = SNOW_COMPACT_RATE * saturate(...)` diyor ve `dt`
-/// içermiyor; kare başına uygulanınca KARE HIZINA BAĞLI oluyor. 100 fps'de
-/// 0.1 saniyelik bir ayak teması 10 kare eder ve rhoN 0.10'dan 0.55'e tek
-/// adımda çıkıyor — kar bir basışta tamamen sıkışıyor.
+/// Spec §10.1 `compact = SNOW_COMPACT_RATE * saturate(...)` diyor. Kare
+/// başına uygulanınca KARE HIZINA, `dt` ile çarpılınca BEKLEME SÜRESİNE
+/// bağlı oluyor. İkincisi ölçülebilir bir belirti üretti: yerinde bekleyen
+/// oyuncunun altında iz yuvarlak bir çukur gibi derinleşiyordu (kullanıcı
+/// bildirdi). Yoğunluk arttıkça `baseH = SWE × 1000 / ρ` düşüyor.
 ///
-/// Sonucu ölçüldü: `baseH = SWE × 1000 / ρ` 20 cm'den 3 cm'ye düşüyor ve iz
-/// 19 cm derinliğinde, dik duvarlı bir çukur oluyor. Oymayı sınırlamak
-/// çözmüyor çünkü derinlik oymadan değil SIKIŞMADAN geliyor.
+/// Kar öyle davranmaz: yük sabitken sıkışma bir kerede dengeye gelir.
+/// Sıkışma artık o karede AÇILAN oymaya orantılı — ilk temasta oluyor,
+/// sonraki karelerde `yeniOyma` sıfır olduğu için duruyor. Kare hızından da
+/// bağımsız: toplam oyma kare sayısına bağlı değil.
 ///
-/// Spec'in kendi davranış tarifi: "aynı hattan 5–6 geçişten sonra batma %18'e
-/// düşer, patika oluşur". Ayak teması ~0.3 s; 6 geçiş 1.8 s eder. rhoN'un
-/// 0.10'dan 0.55'e (Δ0.45) 1.8 saniyede çıkması için hız 0.25/s.
-#define SNOW_COMPACT_RATE            0.25
+/// Değer: ilk temasta `yeniOyma / baseH` ≈ 0.08/0.20 = 0.4; kazanç 0.15 ile
+/// `compact` ≈ 0.06 çıkıyor, yani tam olarak
+/// `SNOW_MAX_COMPACT_PER_PASS` tavanı. Spec'in "5–6 geçişten sonra patika"
+/// tarifi böylece korunuyor: her geçiş bir tavan dolduruyor.
+#define SNOW_COMPACT_GAIN            0.15
 
 // --- Kenar yığılması (spec §10.2) ---
 #define SNOW_RIM_VELOCITY_BIAS       0.04

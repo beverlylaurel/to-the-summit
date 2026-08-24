@@ -3227,6 +3227,7 @@ GameObject:
   - component: {fileID: 1868059829}
   - component: {fileID: 1868059828}
   - component: {fileID: 1868059827}
+  - component: {fileID: 1868059830}
   m_Layer: 8
   m_Name: SnowTrailBody
   m_TagString: Untagged
@@ -3244,7 +3245,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.36, y: 0.12, z: 0.36}
+  m_LocalScale: {x: 0.22, y: 0.12, z: 0.4}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 848219609}
@@ -3318,6 +3319,24 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1868059825}
   m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1868059830
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1868059825}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f600921ffdbdc148b8d1e306a1abde1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SnowTrailBodyAlign
+  body: {fileID: 848219608}
+  minSpeed: 0.15
+  turnRate: 540
+  lateralJitter: 0.03
+  depthJitter: 0.012
+  rhythm: {fileID: 848219621}
 --- !u!1 &2018777760
 GameObject:
   m_ObjectHideFlags: 0

@@ -749,8 +749,12 @@ public class SnowDebugWindow : EditorWindow
         go.transform.localPosition = localPos;
         go.transform.localRotation = Quaternion.identity;
 
-        // 36 cm capinda, 12 cm yuksekliginde yassi kure.
-        go.transform.localScale = new Vector3(0.36f, 0.12f, 0.36f);
+        // OVAL: 22 cm en, 12 cm yukseklik, 40 cm boy.
+        //
+        // Kure (36 cm cap) once denendi ve iki sikayet uretti: oluk cok
+        // kalin, dururken kalan iz yuvarlak. Oval hem inceltiyor hem
+        // dururken birakılan izi oluk yonunde uzatiyor.
+        go.transform.localScale = new Vector3(0.22f, 0.12f, 0.40f);
 
         var rend = go.GetComponent<MeshRenderer>();
         rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -758,6 +762,19 @@ public class SnowDebugWindow : EditorWindow
 
         if (go.GetComponent<SnowDeformer>() == null)
             go.AddComponent<SnowDeformer>();
+
+        // OVAL GOVDE HAREKET YONUNE BAKMALI. Oyuncunun rotasyonuna bagli
+        // kalsaydi capraz yuruyuste iz yana cikardi.
+        var align = go.GetComponent<SnowTrailBodyAlign>();
+        if (align == null) align = go.AddComponent<SnowTrailBodyAlign>();
+
+        var alignSo = new SerializedObject(align);
+        alignSo.FindProperty("body").objectReferenceValue =
+            parent.GetComponent<CharacterController>();
+        alignSo.ApplyModifiedProperties();
+
+        // `rhythm` burada BAGLANMIYOR: SnowStepRhythm EnsurePlayerSide'da,
+        // yani bu cagridan SONRA ekleniyor. Orada baglaniyor.
 
         EditorUtility.SetDirty(go);
         return go.transform;
@@ -794,6 +811,19 @@ public class SnowDebugWindow : EditorWindow
         rs.FindProperty("leftFoot").objectReferenceValue = izGovdesi;
         rs.FindProperty("rightFoot").objectReferenceValue = null;
         rs.ApplyModifiedProperties();
+
+        // Iz govdesinin adim adim sapmasi ritimden besleniyor.
+        if (izGovdesi != null)
+        {
+            var align = izGovdesi.GetComponent<SnowTrailBodyAlign>();
+            if (align != null)
+            {
+                var aso = new SerializedObject(align);
+                aso.FindProperty("rhythm").objectReferenceValue = rhythm;
+                aso.ApplyModifiedProperties();
+                EditorUtility.SetDirty(align);
+            }
+        }
 
         // --- Ayak sesi (spec §19.1). Klipler SONRA verilecek.
         var audio = go.GetComponent<SnowFootstepAudio>();
