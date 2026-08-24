@@ -143,7 +143,35 @@ void KDeform(uint3 id : SV_DispatchThreadID)
     if (id.x >= _Resolution || id.y >= _Resolution) return;
 
     float2 worldXZ = SnowTexelToWorld(id.xy);
+
+    // KENAR DAĞILMASI: kapsamanın okunduğu teksel gürültüyle kaydırılıyor.
+    // Rampa taşınıyor, bozulmuyor (gerekçe SNOW_TRAIL_EDGE_WARP_TEXELS yanında).
+    float2 kayma =
+        (float2(SnowValueNoise(worldXZ * SNOW_TRAIL_EDGE_SCALE_A),
+                SnowValueNoise(worldXZ * SNOW_TRAIL_EDGE_SCALE_A + 17.3)) * 2.0 - 1.0) * 0.65 +
+        (float2(SnowValueNoise(worldXZ * SNOW_TRAIL_EDGE_SCALE_B),
+                SnowValueNoise(worldXZ * SNOW_TRAIL_EDGE_SCALE_B + 31.7)) * 2.0 - 1.0) * 0.35;
+
+    // KAYDIRMA TAM SAYI TEKSELE YUVARLANAMAZ. `round` ile kenar teksel teksel
+    // zıplıyor ve düzensizlik yerine düzenli bir testere dişi çıkıyor —
+    // ekrandan görüldü. Ara değer dört komşudan elle harmanlanıyor; compute
+    // shader'da doku örnekleyici bağlamaya gerek yok.
+    float2 kp = float2(id.xy) + kayma * SNOW_TRAIL_EDGE_WARP_TEXELS;
+    int2   k0 = (int2)floor(kp);
+    float2 kf = kp - (float2)k0;
+    int    kmax = (int)_Resolution - 1;
+
+    float a00 = _CaptureBlur[(uint2)clamp(k0 + int2(0, 0), 0, kmax)].a;
+    float a10 = _CaptureBlur[(uint2)clamp(k0 + int2(1, 0), 0, kmax)].a;
+    float a01 = _CaptureBlur[(uint2)clamp(k0 + int2(0, 1), 0, kmax)].a;
+    float a11 = _CaptureBlur[(uint2)clamp(k0 + int2(1, 1), 0, kmax)].a;
+
+    // YALNIZ KAPSAMA KAYDIRILIYOR, YÜKSEKLİK DEĞİL. `cap.r` yakalanan yüzeyin
+    // Y'si; kaydırılmış tekselden okunursa batma derinliği komşu noktanın
+    // yüksekliğiyle hesaplanır ve eğimli arazide kaydırma kadar hata verir.
+    // Düzensizlik kapsama profilinin işi; derinlik olduğu yerden okunuyor.
     float4 cap     = _CaptureBlur[id.xy];
+    cap.a          = lerp(lerp(a00, a10, kf.x), lerp(a01, a11, kf.x), kf.y);
     float4 trail   = _Trail[id.xy];
     float4 snow    = _Snow[id.xy];
 

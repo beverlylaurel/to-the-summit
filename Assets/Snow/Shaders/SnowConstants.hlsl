@@ -143,6 +143,35 @@
 /// duvar Lambert'te %34 koyulaştırır.
 #define SNOW_CARVE_SMOOTH_TEXELS     2.0
 
+/// İZ KENARININ DAĞILMASI — leke boyu (1/m) ve genlik.
+///
+/// Kapsama payı yanal profili veriyor ve tek başına DÜZGÜN bir oluk kenarı
+/// üretiyor: iki kenar da matematiksel olarak paralel, göz bunu yapay
+/// buluyor (kullanıcı bildirdi). Gerçek karda kenar göçer, tanecik kayar,
+/// sınır lekeli biter.
+///
+/// GÜRÜLTÜ EŞİĞE DEĞİL, OKUMA KONUMUNA UYGULANIYOR.
+///
+/// Önce kapsama bir eşik gibi kesildi (`(kapsama - gürültü*A) / (1-A)`).
+/// Ölçüldü ve battı: bölme rampanın kontrastını `1/(1-A)` kadar artırıyor,
+/// A=0.60'ta kenar rampası tamamen yok oldu — kesit `0 0 0 80 80 … 80 0`
+/// oldu, iz 21.9 cm'den 14.6 cm'ye indi ve yer yer tek tekselde koptu.
+/// Kenar sapması istenen bandın (3–5 cm) içine ancak izi bozarak giriyordu.
+///
+/// Kapsamanın OKUNDUĞU teksel kaydırılınca rampa olduğu gibi taşınıyor:
+/// sınır oynuyor, profil bozulmuyor, iz kopmuyor. Merkezde kapsama düz
+/// olduğu için kaydırmanın etkisi yok — düzensizlik yalnız kenarda görünür.
+///
+/// İki ölçek: 2.5 (40 cm leke) ana düzensizliği, 9.0 (11 cm) kenarın
+/// kendi tırtığını veriyor. Tek ölçek ya çok yumuşak ya çok gürültülü.
+///
+/// KAYDIRMA GENLİĞİ RAMPA GENİŞLİĞİNİ AŞAMAZ. Rampa 4 teksel; 1.5 teksel
+/// (≈3.5 cm) sınırı gözle görünür oynatıyor ama iki kenarı birbirine
+/// geçirmiyor. 22 cm genişliğinde bir olukta doğal sapma 3–5 cm.
+#define SNOW_TRAIL_EDGE_SCALE_A      2.5
+#define SNOW_TRAIL_EDGE_SCALE_B      9.0
+#define SNOW_TRAIL_EDGE_WARP_TEXELS  1.5
+
 // --- İzlerin dolması (spec §10.3) ---
 #define SNOW_FILL_GAIN             900.0
 #define SNOW_WIND_FILL               0.0012

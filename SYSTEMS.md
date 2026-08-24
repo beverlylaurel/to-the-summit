@@ -772,6 +772,18 @@ yürüyüşte iz yana çıkıyor. Adım sayacından türeyen hash gövdeyi adım
 ±3 cm yana, ±1.2 cm dikey oynatıyor: oluk tekrar eden bir desen basmıyor.
 Sapma oluğu bölecek kadar büyük olamaz, yoksa iki ayrı iz doğar.
 
+**İz kenarları prosedürel gürültüyle dağılıyor.** Kapsama payının OKUNDUĞU
+teksel, iki ölçekli değer gürültüsüyle kaydırılıyor (`SNOW_TRAIL_EDGE_SCALE_A`
+40 cm leke, `_B` 11 cm tırtık); rampa taşınıyor ama biçimi bozulmuyor, iz
+kopmuyor. Gürültü kapsamayı EŞİK gibi kesmiyor — o yol denendi ve rampayı
+`1/(1-A)` kadar dikleştirip izi inceltti, kesiti dik duvara çevirdi (ölçüldü).
+Kaydırma tam sayı teksele yuvarlanamaz; `round` düzenli bir testere dişi
+üretiyor (ekrandan görüldü), ara değer dört komşudan harmanlanıyor. Gürültü
+`SnowValueNoise` — mevcut PCG3B hash'inden türeyen değer gürültüsü, ayrı doku
+bağlanmıyor. Yalnız `cap.a` (kapsama) kaydırılıyor, `cap.r` (yükseklik) değil:
+yükseklik komşudan okunursa eğimli arazide batma derinliği kayma kadar hata
+verir.
+
 **Sıkışma AÇILAN OYMAYA orantılı, geçen süreye değil.** Yerinde bekleyen
 oyuncunun altında iz derinleşmez; sıkışma ilk temasta olur ve
 `SNOW_MAX_COMPACT_PER_PASS` tavanında durur.

@@ -203,6 +203,28 @@ float3 SnowRandCell3(int3 cell)
     return SnowRandU3(asuint(cell));
 }
 
+/// DEĞER GÜRÜLTÜSÜ — dört hücre hash'inin bilinear karışımı.
+///
+/// Hücre hash'i tek başına teksel teksel kırılıyor: iz kenarı lekelenmiyor,
+/// tuz-biber oluyor. Bilinear karışım gürültüye bir DALGA BOYU veriyor;
+/// çağıran ölçeği seçerek leke boyunu belirliyor.
+///
+/// `frac`'ın smoothstep'lenmesi (3t²−2t³) türevi sınırda sürekli kılıyor;
+/// olmadan hücre kenarlarında görünür bir ızgara kalıyor.
+float SnowValueNoise(float2 p)
+{
+    float2 h = floor(p);
+    float2 f = frac(p);
+    f = f * f * (3.0 - 2.0 * f);
+
+    float a = SnowRandCell3(int3((int2)h + int2(0, 0), 0)).x;
+    float b = SnowRandCell3(int3((int2)h + int2(1, 0), 0)).x;
+    float c = SnowRandCell3(int3((int2)h + int2(0, 1), 0)).x;
+    float d = SnowRandCell3(int3((int2)h + int2(1, 1), 0)).x;
+
+    return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
+}
+
 // ------------------------------------------------------------------ yakalama
 
 /// Yakalama hacminin sıfır noktası — gözlemcinin dünya Y'si.

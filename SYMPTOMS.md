@@ -1855,3 +1855,37 @@ tam olarak `SNOW_MAX_COMPACT_PER_PASS` tavanı; süre boyunca artmıyor.
 **Ayrıca oluk inceltildi ve yuvarlaklık kaldırıldı.** Gövde küre (36 cm çap)
 yerine oval (22×12×40 cm) ve hareket yönüne hizalı. Dik kesit 17 tekselden
 10 teksele indi (40 cm → 23 cm).
+
+
+---
+
+## İz kenarı çok düzgün / testere dişi gibi tekrarlıyor
+
+**Kullanıcının ağzından:** "izin sınırlarında dağılmalar ekleyebilir misin?
+prosedürel, düzensiz."
+
+**İlk şüpheli (yanlış çıktı):** kapsamayı gürültüyle EŞİK gibi kesmek —
+`saturate((kapsama - gürültü*A) / (1-A))`. Merkezi korur gibi görünüyor ama
+ölçüldü ve battı: bölme rampanın kontrastını `1/(1-A)` kadar artırıyor, A=0.60'ta
+kenar rampası tamamen yok oldu (kesit `0 0 0 80 80 … 80 0` — dik duvar), iz
+21.9 cm'den 14.6 cm'ye indi, yer yer tek tekselde koptu. İstenen 3–5 cm sapmaya
+ancak izi bozarak ulaşıyordu.
+
+**Gerçek çözüm:** gürültüyü eşiğe değil, kapsamanın OKUNDUĞU teksele uygula.
+Okuma konumu iki ölçekli gürültüyle kaydırılınca rampa olduğu gibi taşınıyor:
+sınır oynuyor, profil bozulmuyor, iz kopmuyor (dolu 111/111 sütun, rampa eski
+profille birebir, kenar sapması 2–4 cm).
+
+**İkinci belirti — testere dişi:** ilk kaydırma tam sayı teksele yuvarlanıyordu
+(`round`). Kenar teksel teksel zıplayınca düzensizlik yerine DÜZENLİ bir testere
+dişi çıktı — ekrandan görüldü, ölçümde değil. Kaydırma bilinear'a çevrildi (dört
+komşudan harmanlama); kenar organik, tekrar etmeyen dağılmaya döndü.
+
+**Ayırt eden ölçüm:** izin enine kesiti (rampa var mı / dik duvar mı), sütun
+doluluk oranı (kopma var mı) ve kenar y konumunun doğrusal eğilim çıkarılmış
+RMS'i (dağılma genliği cm). Görsel testere dişini sayı yakalamadı — düzenli
+desen RMS'i şişirmiyor; ekran gerekti.
+
+**Ölçüm tuzağı:** sahnede iki `CharacterController` var (`Player`, `Bicycle`);
+`FindAnyObjectByType` bisikleti döndürüp yürüyüşü 4 km ötede boş bölgeye
+yaptırdı. Probe HER ZAMAN `SnowTrailBody`'nin ebeveynine takılır.
