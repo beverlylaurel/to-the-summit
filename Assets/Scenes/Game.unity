@@ -1918,10 +1918,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SnowStepRhythm
   body: {fileID: 848219608}
-  leftFoot: {fileID: 1868059826}
-  rightFoot: {fileID: 0}
   strideLength: 0.78
-  footLift: 0.16
   minSpeed: 0.15
 --- !u!1 &852782904
 GameObject:
@@ -3245,7 +3242,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.15, y: 0.24, z: 0.34}
+  m_LocalScale: {x: 0.16, y: 0.24, z: 0.16}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 848219609}
@@ -3334,11 +3331,12 @@ MonoBehaviour:
   body: {fileID: 848219608}
   minSpeed: 0.15
   turnRate: 540
-  lateralJitter: 0.03
-  depthJitter: 0.012
+  lateralJitter: 0.008
+  depthJitter: 0.003
   rhythm: {fileID: 848219621}
   surfaceSampler: {fileID: 76489732}
   surfaceSink: 0.05
+  heightSmoothTime: 0.09
 --- !u!1 &2018777760
 GameObject:
   m_ObjectHideFlags: 0

@@ -21,9 +21,12 @@ using UnityEngine;
 /// farklı derinliğe basar. Sapma adım sayacından türeyen bir hash'ten geliyor:
 /// tekrar etmiyor ama kare kare de titremiyor — bir adım boyunca sabit.
 ///
-/// Yanal sapma OLUĞU BÖLECEK KADAR BÜYÜK OLAMAZ. Gövde 22 cm geniş; ±3 cm
-/// sapma izi kırmadan kenarını düzensizleştiriyor. Daha büyüğü iki ayrı
-/// oluk üretmeye başlar ki tam olarak kaçınılan şey odur.
+/// SAPMA KÜÇÜK KALIR. Önce ±3 cm yanal / ±1.2 cm dikey kullanıldı; her adımda
+/// gövde belirgin biçimde yana zıplayınca oluk kenarı DÜZENLİ çentikler
+/// üretiyordu — kullanıcı bunu "dikdörtgen / testere dişi" olarak bildirdi.
+/// Kenarın düzensizliği zaten `KDeform`'daki prosedürel kaydırmadan geliyor;
+/// o sürekli bir alan, bu ise adım frekansında ayrık bir sıçrama. Sapmanın
+/// işi yalnız iki adımı birbirinin tıpatıp aynısı olmaktan çıkarmak.
 [DisallowMultipleComponent]
 public class SnowTrailBodyAlign : MonoBehaviour
 {
@@ -37,10 +40,10 @@ public class SnowTrailBodyAlign : MonoBehaviour
     [SerializeField] float turnRate = 540f;
 
     [Tooltip("Adım başına yanal sapmanın genliği (m).")]
-    [SerializeField] float lateralJitter = 0.03f;
+    [SerializeField] float lateralJitter = 0.008f;
 
     [Tooltip("Adım başına derinlik sapmasının genliği (m).")]
-    [SerializeField] float depthJitter = 0.012f;
+    [SerializeField] float depthJitter = 0.003f;
 
     [Tooltip("Adım fazını okuduğumuz ritim. Yoksa sapma uygulanmaz.")]
     [SerializeField] SnowStepRhythm rhythm;
@@ -53,17 +56,27 @@ public class SnowTrailBodyAlign : MonoBehaviour
              "bu kadar altına iner; oluk derinliği buradan gelir.")]
     [SerializeField] float surfaceSink = 0.05f;
 
+    [Tooltip("Gövde yüksekliğinin yumuşama süresi (s). Yakalama kare başına " +
+             "bir damga basıyor; yükseklik kare kare sıçrarsa her damga farklı " +
+             "derinlikte kalır ve iz satır satır dilimlenir.")]
+    [SerializeField] float heightSmoothTime = 0.09f;
+
     float yaw;
     Vector3 baseLocalPos;
     float radius;
     int lastStep = -1;
     Vector2 stepOffset;
+    float smoothY;
+    float smoothVel;
+    bool smoothBaslatildi;
 
     void OnEnable()
     {
         baseLocalPos = transform.localPosition;
         radius = transform.localScale.y * 0.5f;
         yaw = transform.eulerAngles.y;
+        smoothBaslatildi = false;
+        smoothVel = 0f;
     }
 
     void LateUpdate()
@@ -95,11 +108,37 @@ public class SnowTrailBodyAlign : MonoBehaviour
         // başına oyulmuş yüzeydir, küre kendi izini okuyup her kare daha derine
         // iner (geri besleme). Toplam iz-öncesi kar kalınlığını verir ve sabit
         // kalır.
-        if (surfaceSampler != null &&
+        //
+        // AYAK HİZASI DENETLEYİCİDEN TÜRETİLİYOR, `baseLocalPos`'tan DEĞİL.
+        // Bu bileşen her kare `localPosition` yazıyor; `OnEnable` bir sonraki
+        // açılışta kendi çıktısını taban sanır ve ofset birikir (ölçüldü:
+        // gövde kar yüzeyinin 15 cm üstüne çıktı). `center.y - height/2`
+        // bu döngüye kapalı.
+        if (surfaceSampler != null && body != null &&
             surfaceSampler.TrySampleSnow(transform.position, out SnowSample ss) && ss.Valid)
         {
+            float ayakY = body.center.y - body.height * 0.5f;
             float izOncesiYuzey = ss.Depth + ss.SinkDepth;
-            p.y = izOncesiYuzey - surfaceSink + radius;
+            float hedefY = ayakY + izOncesiYuzey - surfaceSink + radius;
+
+            // YÜKSEKLİK ZAMANDA YUMUŞATILIYOR.
+            //
+            // Yakalama kare başına BİR damga basıyor. Gövdenin yüksekliği iki
+            // kaynaktan kare kare sıçrıyor: karakter denetleyicisinin zemine
+            // oturma salınımı ve kar yüzeyi okumasının gürültüsü. Ölçüldü:
+            // batma -5.6 ile -9.3 cm arasında zıplıyor. Her damga farklı
+            // derinlikte kalınca iz sürekli bir oluk değil, ARDIŞIK DİLİMLER
+            // yığını oluyor — kullanıcı bunu "satır satır iz" ve "dikdörtgen"
+            // diye bildirdi, özellikle yön değiştirirken.
+            //
+            // Yumuşatma damgaları ortak bir yüksekliğe oturtuyor; oluk sürekli
+            // çıkıyor. Süre kısa tutuluyor: uzun olursa gövde arazi eğimini
+            // geç yakalar ve yokuşta karın içinde/üstünde kalır.
+            if (!smoothBaslatildi) { smoothY = hedefY; smoothBaslatildi = true; }
+            else smoothY = Mathf.SmoothDamp(smoothY, hedefY, ref smoothVel,
+                                            heightSmoothTime, Mathf.Infinity, Time.deltaTime);
+
+            p.y = smoothY;
         }
 
         if (rhythm != null)

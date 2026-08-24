@@ -1933,3 +1933,42 @@ iz oluşamıyordu. Test öncesi `SnowManager.FillSnowDepth(0.20f)` şart.
 ölçmek (blur payını izole eder), durarak tek damga (yürürken eksen karışması
 olmadan net enine kesit), ve gövde world yaw'ı (align dönüyor mu — 90° çıktı,
 dönüyor). Görsel: dar, yüzeysel, kenarı organik dağınık oluk (RDR2 tarzı).
+
+
+---
+
+## Yön değiştirirken iz dikdörtgen / satır satır çıkıyor
+
+**Kullanıcının ağzından:** "farklı yönlere hareket ederken belirgin oluyor o
+dikdörtgen iz", "niye satır satır iz çıkıyor farklı yöne hareket ederken",
+"iz bırakan kaynak dikdörtgen olduktan sonra nereyi düzeltirsen düzelt sadece
+yama yapmış olursun".
+
+**Yanlış çıkan şüpheliler (sırayla, hepsi ölçüldü):**
+- *Adım sapması (jitter).* Kısıldı, doku ölçümünde `ZIGZAG=0` çıktı ama ekranda
+  desen sürdü. Katkısı vardı, kökü değildi.
+- *Yetersiz yumuşatma.* Capture blur 1.5 → 2.5 → 4.0 teksel yapıldı; düz
+  gidişte kenar temizlendi, çaprazda desen kaldı. Üstünü örtüyordu.
+- *Gövde şekli.* Oval → daire yapıldı; yön bağımlılığı kalktı ama tek başına
+  yetmedi.
+
+**Gerçek kök — KAYNAK MASKESİ BİNARY.** `Hidden_SnowCaptureDepth` maskeye
+sabit `1.0` yazıyor ve `RT_Capture` MSAA'sız açılıyordu: bir teksel ya tamamen
+nesnenin içinde ya tamamen dışında. 16 cm gövde 2.3 cm tekselde ~7 teksel;
+kenar örtüşmesi olmadan yuvarlak siluet köşeli bir bloğa raster ediliyor, her
+kare basılan bu blok ardışık damgalarda merdiven/dilim deseni üretiyor. Yön
+değişince damga adımı teksel ızgarasına açı yaptığı için desen belirginleşiyor.
+
+**Ayırt eden ölçüm:** `RT_Capture`'ın alfa kanalını ENİNE okuyup ARA DEĞERLİ
+teksel saymak. MSAA öncesi: `0 0 100 100 100 100 100 100 0 0` → ara değer 0
+(binary, kare kenar). MSAA sonrası: `… 100 100 100 100 100 100 50 0 …` → kenar
+tekseli kısmi kapsama taşıyor. Trail kesiti de sertten yumuşağa döndü:
+`9 19 42 55 66 78 79 80 64 35 18 11 4`.
+
+**Çözüm:** `RT_Capture` ve derinlik tamponu `antiAliasing = 4`. Yanında iki
+destek düzeltmesi: gövde dönel simetrik (yön bağımlılığı yok) ve gövde
+yüksekliği zamanda yumuşatılıyor (damgalar ortak kotta).
+
+**Ders:** belirti "şekil bozuk" ise önce ŞEKLİN ÜRETİLDİĞİ yere bakılır. Blur
+ve carve yumuşatmaları zincirin sonunda; kaynak binary olduğu sürece her biri
+yalnız yama.

@@ -749,19 +749,28 @@ public class SnowDebugWindow : EditorWindow
         go.transform.localPosition = localPos;
         go.transform.localRotation = Quaternion.identity;
 
-        // OVAL: 15 cm en, 24 cm yukseklik, 34 cm boy.
+        // DONEL SIMETRIK: 16 cm cap, 24 cm yukseklik.
         //
-        // Once basik bir oval denendi (22x12x40). Iki sorun olctu:
-        //   - EN cok genis: 12 cm yukseklikte kure, 20 cm karda tamamen
-        //     gomulup ekvatoruyle iz birakiyordu; carve blur'uyla 35 cm cikti.
-        //   - YUKSEKLIK az: basik alt yuzey genis bir DUZ TABAN yakalatiyordu,
-        //     iz dikdortgen gorunuyordu (kesit 80 mm plato).
-        // 24 cm yukseklik yaricapi (12 cm) batmadan (~6 cm) buyuk yapiyor:
-        // yalnizca kurenin dar alt egrisi kara giriyor, iz U kesitine donuyor
-        // ve enine daraliyor (~16 cm, olctu). Boy 34 cm adim izini oluk
-        // yonunde uzatiyor. En kucuk eksen (X) yuruyus yonune DIK; align
-        // kureyi hareket yonune cevirdigi icin dar eksen ize enine geliyor.
-        go.transform.localScale = new Vector3(0.15f, 0.24f, 0.34f);
+        // Once yassi bir oval vardi (22x12x40), sonra dar bir oval (15x24x34).
+        // Ikisi de ayni belirtiyi uretti ve kullanici defalarca bildirdi:
+        // "farkli yonlere hareket ederken dikdortgen iz", "satir satir iz".
+        //
+        // Sebep OVALIN YONE BAGLI OLMASI. Yakalama kare basina bir damga
+        // basiyor; iz ardisik damgalarin birlesimi. Dairesel olmayan bir
+        // kesit, gidis yonu degistikce ize FARKLI bir profil birakiyor ve
+        // ardisik damgalarin kenarlari ust uste binince balik pulu / merdiven
+        // deseni cikiyor. Capraz gidiste en belirgin: orada hem yaw
+        // yumusamasi surerken profil doniyor hem de damga adimi teksel
+        // izgarasina 45 derece geliyor.
+        //
+        // Donel simetrik kesitte (X = Z) gidis yonu izi HIC etkilemiyor:
+        // her damga ayni daire, ardisik daireler tam ortusuyor ve birlesim
+        // duz kenarli surekli bir oluk veriyor. Yaricap (8 cm) batmadan
+        // (~5 cm) buyuk kaldigi icin kesit U olarak kaliyor.
+        //
+        // Yukseklik 24 cm: yaricapi (12 cm) batmanin uzerinde tutuyor, boylece
+        // kure kar sutununu delip duz taban birakmiyor.
+        go.transform.localScale = new Vector3(0.16f, 0.24f, 0.16f);
 
         var rend = go.GetComponent<MeshRenderer>();
         rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -811,12 +820,12 @@ public class SnowDebugWindow : EditorWindow
 
         var rs = new SerializedObject(rhythm);
         rs.FindProperty("body").objectReferenceValue = go.GetComponent<CharacterController>();
-        // TEK GOVDE RITME BAGLI, IKINCI ALAN BOS. Iz artik tek bir kureden
-        // besleniyor; adim ritmi onu hafifce kaldirip indiriyor, boylece oluk
-        // derinligi adim adim dalgalaniyor. Ikisine de ayni transform
-        // verilseydi `Plant` ayni kareye iki kez yazar ve govde titrerdi.
-        rs.FindProperty("leftFoot").objectReferenceValue = izGovdesi;
-        rs.FindProperty("rightFoot").objectReferenceValue = null;
+        // RITIM GOVDEYI SURMUYOR, YALNIZ FAZ URETIYOR. Once iz govdesi buraya
+        // ayak proxy'si olarak bagliydi; ritim onu yarim sinusle kaldirip
+        // indiriyordu. SnowTrailBodyAlign govdeyi kar yuzeyine oturtmaya
+        // baslayinca iki yazar ayni localPosition.y'yi eziyor, govde yuksekligi
+        // kare kare siciriyor ve oluk testere disine donuyordu (olculdu).
+        // Govde yuksekliginin tek sahibi align; ritim yalniz adim olayi ve faz.
         rs.ApplyModifiedProperties();
 
         // Iz govdesinin adim adim sapmasi ritimden besleniyor.

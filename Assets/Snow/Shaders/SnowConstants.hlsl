@@ -49,7 +49,17 @@
 // --- Yakalama (spec §9.1, §9.4) ---
 #define SNOW_CAPTURE_BELOW           3.0
 #define SNOW_CAPTURE_ABOVE           3.0
-#define SNOW_BLUR_RADIUS_TEXELS      1.5
+/// YAKALAMA BULANIKLIĞI KENARIN YUMUŞAKLIĞINI BELİRLİYOR.
+///
+/// Yakalama teksel ızgarasına raster ediliyor; gövde ÇAPRAZ giderken ardışık
+/// damgalar ızgarayla 45° yapıyor ve kenar basamak basamak çıkıyor
+/// (ekrandan görüldü: düz gidişte kenar temiz, çaprazda merdiven). 1.5 teksel
+/// (3.5 cm) bandı bunu örtmeye yetmiyor.
+///
+/// 2.5 teksel (5.9 cm) hem basamağı siliyor hem oluğun etrafına kullanıcının
+/// istediği yumuşak geçişi veriyor. Üstüne çıkılamaz: bant izin yarı
+/// genişliğine (14–19 cm oluğun 7–9 cm'i) yaklaşınca oluk yayılıp sığlaşır.
+#define SNOW_BLUR_RADIUS_TEXELS      4.0
 
 // --- İz oluşumu (spec §10.1) ---
 #define SNOW_LOOSE_N                 0.10

@@ -65,8 +65,10 @@ public static class SnowConstants
     /// Kameranın yukarı doğru gördüğü mesafe, metre. Far plane ikisinin toplamı.
     public const float CaptureAbove = 3f;
 
-    /// Poisson blur yarıçapı, teksel (spec §9.4).
-    public const float BlurRadiusTexels = 1.5f;
+    /// Poisson blur yarıçapı, teksel (spec §9.4). Compute'a BURADAN gidiyor;
+    /// `SnowConstants.hlsl`'deki eşi yalnız shader içi kullanım için, ikisi
+    /// birlikte değişir. Gerekçe (çapraz gidişteki basamak) hlsl tarafında.
+    public const float BlurRadiusTexels = 4.0f;
 
     // --- İz oluşumu (spec §10.1) ---
 

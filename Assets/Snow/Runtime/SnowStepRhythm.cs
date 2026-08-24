@@ -1,5 +1,4 @@
-// ROL: yürüyüşün ayak fazını üretir; ayak proxy'lerini basar ve adım anında
-// olay yayınlar.
+// ROL: yürüyüşün ayak fazını üretir ve adım anında olay yayınlar.
 // Çağıran: sahne (oyuncunun üstünde).
 
 using System;
@@ -12,8 +11,18 @@ using UnityEngine;
 /// her `strideLength` metrede bir adım düşüyor. Hız arttıkça adım kendiliğinden
 /// sıklaşıyor.
 ///
-/// İKİ İŞ TEK FAZDAN. Ayak proxy'lerinin yerden kalkması ve adım olayı aynı
-/// sayının iki görünümü; ayrı bileşenlere bölünseydi ikisinin fazı kayabilirdi.
+/// GÖVDEYİ SÜRMÜYOR, YALNIZ FAZ ÜRETİYOR.
+///
+/// Eskiden ayak proxy'lerini yarım sinüsle kaldırıp indiriyordu. Tek gövdeye
+/// geçilince bu anlamını yitirdi — "havadaki ayak" yok — ve zararlı hâle geldi:
+/// `SnowTrailBodyAlign` gövdeyi kar yüzeyine oturturken bu bileşen aynı
+/// `localPosition.y`'yi eziyordu. İki yazar çakışınca gövde yüksekliği kare
+/// kare salınıyor, oluk derinliği testere dişine dönüyordu (ölçüldü: beklenen
+/// localY 0.27, gerçekleşen 0.402 → 0.556). Üstüne `baseLeftY` her `OnEnable`'da
+/// öteki bileşenin çıktısını taban sanıp ofseti biriktiriyordu.
+///
+/// Gövdenin yüksekliğinin TEK sahibi `SnowTrailBodyAlign`; adım hissi oradaki
+/// adım başına sapmadan geliyor.
 ///
 /// KAR SİSTEMİ BUNU BİLMİYOR. Ayak izi, ses ve toz bulutu bu olaya ABONE
 /// oluyor; buradan kimse çağrılmıyor.
@@ -24,19 +33,9 @@ public class SnowStepRhythm : MonoBehaviour
     [Tooltip("Hızın okunduğu gövde.")]
     [SerializeField] CharacterController body;
 
-    [Header("Ayak proxy'leri")]
-    [Tooltip("Sol ayak — karda iz bırakan proxy.")]
-    [SerializeField] Transform leftFoot;
-
-    [Tooltip("Sağ ayak — karda iz bırakan proxy.")]
-    [SerializeField] Transform rightFoot;
-
     [Header("Yürüyüş")]
     [Tooltip("Bir adımda alınan yol (m). İnsan yürüyüşünde ~0.75 m.")]
     [SerializeField] float strideLength = 0.78f;
-
-    [Tooltip("Havadaki ayağın yerden yüksekliği (m).")]
-    [SerializeField] float footLift = 0.16f;
 
     [Tooltip("Bu hızın altında yürüme sayılmıyor; ayaklar yerde kalıyor.")]
     [SerializeField] float minSpeed = 0.15f;
@@ -60,15 +59,6 @@ public class SnowStepRhythm : MonoBehaviour
     public float Speed { get; private set; }
 
     float travelled;
-    float baseLeftY, baseRightY;
-
-    void OnEnable()
-    {
-        // Kurulumun verdiği taban yükseklikler saklanıyor: kaldırma bunun
-        // ÜSTÜNE ekleniyor, mutlak bir sayı dayatılmıyor.
-        if (leftFoot != null) baseLeftY = leftFoot.localPosition.y;
-        if (rightFoot != null) baseRightY = rightFoot.localPosition.y;
-    }
 
     void LateUpdate()
     {
@@ -97,31 +87,9 @@ public class SnowStepRhythm : MonoBehaviour
         }
         else
         {
-            // DURUNCA İKİ AYAK DA YERE İNİYOR. Havada kalan ayak durgun
-            // oyuncunun altında asılı bir iz bırakıyordu.
+            // DURUNCA FAZ SIFIRLANIYOR; yeni yürüyüş adımın başından başlıyor.
             travelled = 0f;
             Phase01 = 0f;
         }
-
-        Plant();
-    }
-
-    /// Yerdeki ayak tabanda, havadaki ayak kalkık. Kalkış eğrisi yarım sinüs:
-    /// ayak yerden ayrılırken ve inerken yavaş, ortada hızlı.
-    void Plant()
-    {
-        float lift = Speed > minSpeed ? Mathf.Sin(Phase01 * Mathf.PI) * footLift : 0f;
-
-        SetFootY(leftFoot, baseLeftY + (PlantedFoot == 0 ? 0f : lift));
-        SetFootY(rightFoot, baseRightY + (PlantedFoot == 1 ? 0f : lift));
-    }
-
-    static void SetFootY(Transform t, float y)
-    {
-        if (t == null) return;
-
-        Vector3 p = t.localPosition;
-        p.y = y;
-        t.localPosition = p;
     }
 }

@@ -229,7 +229,7 @@ public class SnowManager : MonoBehaviour
 
         SnowQualityData q = settings.QualityData;
 
-        capture = Create("RT_Capture", q.Resolution, RenderTextureFormat.ARGBHalf);
+        capture = CreateMsaa("RT_Capture", q.Resolution, RenderTextureFormat.ARGBHalf);
         captureBlur = Create("RT_CaptureBlur", q.Resolution, RenderTextureFormat.ARGBHalf);
 
         // RT_Trail ARGBHalf: B (kabuk) ve A (sastrugi) Faz 11–12'de doluyor ama doku
@@ -1080,6 +1080,39 @@ public class SnowManager : MonoBehaviour
         return rt;
     }
 
+    /// YAKALAMA KENARI ÖRTÜŞMELİ OLMAK ZORUNDA.
+    ///
+    /// Yakalama shader'ı maskeye sabit `1.0` yazıyor: bir teksel ya tamamen
+    /// nesnenin içinde ya tamamen dışında. 16 cm çapındaki gövde 2.3 cm'lik
+    /// tekselde yalnız ~7 teksel; kenar örtüşmesi olmadan yuvarlak siluet
+    /// köşeli bir bloğa raster ediliyor ve her kare basılan bu blok ardışık
+    /// damgalarda merdiven deseni üretiyor. Kullanıcı bunu "iz bırakan şekil
+    /// dikdörtgen" ve "satır satır iz" olarak bildirdi; sonraki her yumuşatma
+    /// (blur, carve) yalnız bu kaynağın üstünü örtüyordu.
+    ///
+    /// MSAA kenar tekseline KISMİ kapsama veriyor (dört örnekle 0.25/0.5/0.75);
+    /// çözülmüş doku artık yuvarlağı yuvarlak taşıyor.
+    ///
+    /// `enableRandomWrite` YOK ve olamaz: MSAA ile birlikte kullanılamıyor.
+    /// Gerek de yok — bu dokuya compute YAZMIYOR, yalnız `KBlurCapture`'ın
+    /// kaynağı olarak okuyor.
+    static RenderTexture CreateMsaa(string name, int resolution, RenderTextureFormat format)
+    {
+        var rt = new RenderTexture(resolution, resolution, 0, format)
+        {
+            name = name,
+            antiAliasing = 4,
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Clamp,
+            useMipMap = false,
+            autoGenerateMips = false,
+            hideFlags = HideFlags.HideAndDontSave,
+        };
+
+        rt.Create();
+        return rt;
+    }
+
     /// Yakalamanın derinlik tamponu. `enableRandomWrite` yok — compute buraya
     /// yazmıyor, yalnız çizim kullanıyor.
     static RenderTexture CreateDepth(string name, int resolution)
@@ -1087,6 +1120,9 @@ public class SnowManager : MonoBehaviour
         var rt = new RenderTexture(resolution, resolution, 24, RenderTextureFormat.Depth)
         {
             name = name,
+            // RENK HEDEFİYLE AYNI ÖRNEK SAYISI. RT_Capture MSAA'lı; örnek
+            // sayıları eşleşmezse hedef çifti bağlanamaz ve yakalama boş çıkar.
+            antiAliasing = 4,
             filterMode = FilterMode.Point,
             wrapMode = TextureWrapMode.Clamp,
             useMipMap = false,

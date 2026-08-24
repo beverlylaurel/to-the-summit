@@ -765,14 +765,35 @@ NdotL + arkadan sızma + BRDF yansıma; speküler URP sözleşmesiyle kullanıl�
 (`_SunElevation01` kapısı) ve ekran uzayında yoğunluğu sabit. Ortam gölgede
 maviye çalıyor. Sis URP'nin `MixFog`'undan — kendi sis hesabı yok.
 
-**İz TEK gövdeden besleniyor.** Oyuncunun altında tek bir OVAL küre
-(`SnowTrailBody`, 15×24×34 cm) deformer olarak duruyor ve `SnowTrailBodyAlign`
-onu HAREKET yönüne hizalıyor — oyuncunun rotasyonuna değil, yoksa çapraz
-yürüyüşte iz yana çıkıyor. En kısa eksen (15 cm) yürüyüş yönüne DİK geliyor,
-iz eni onu takip ediyor (~16 cm, ölçüldü). Adım sayacından türeyen hash
-gövdeyi adım başına ±3 cm yana, ±1.2 cm dikey oynatıyor: oluk tekrar eden bir
-desen basmıyor. Sapma oluğu bölecek kadar büyük olamaz, yoksa iki ayrı iz
-doğar.
+**İz TEK gövdeden besleniyor ve gövde DÖNEL SİMETRİK.** Oyuncunun altında
+tek bir küre (`SnowTrailBody`, 16 cm çap × 24 cm yükseklik) deformer olarak
+duruyor. Kesit daire olduğu için gidiş yönü izi hiç etkilemiyor: her damga
+aynı, ardışık damgalar tam örtüşüyor. Önce oval denendi (22×12×40, sonra
+15×24×34) ve ikisi de yön değiştikçe ize farklı profil bırakıp kenarda balık
+pulu deseni üretti. `SnowTrailBodyAlign` gövdeyi yine hareket yönüne
+hizalıyor (adım sapması ve ileride yön bağımlı bir özellik için), ama iz artık
+buna bağımlı değil.
+
+**Kaynak maskesi ÖRTÜŞMELİ.** `RT_Capture` MSAA'lı (4×) açılıyor; derinlik
+tamponunun örnek sayısı da eşleşiyor. Yakalama shader'ı maskeye sabit `1.0`
+yazdığı için MSAA olmadan bir teksel ya tamamen dolu ya boş oluyordu — 16 cm
+gövde 2.3 cm tekselde yalnız ~7 teksel, yuvarlak siluet köşeli bloğa raster
+ediliyordu ve her kare basılan bu blok merdiven üretiyordu. Bu KAYNAK
+sorunuydu; sonraki yumuşatmalar (blur, carve) yalnız üstünü örtüyordu.
+`RT_Capture`'a `enableRandomWrite` verilemez (MSAA ile çakışır) ve gerekmiyor:
+compute ona yalnız `KBlurCapture` kaynağı olarak OKUYOR.
+
+**Gövde yüksekliği zamanda yumuşatılıyor.** Karakter denetleyicisinin zemine
+oturma salınımı ve kar yüzeyi okumasının gürültüsü yüksekliği kare kare
+oynatıyor (ölçüldü: batma −5.6 … −9.3 cm). Yakalama kare başına bir damga
+bastığı için her damga farklı derinlikte kalıyor ve iz sürekli bir oluk yerine
+ardışık dilimler yığını oluyordu. `heightSmoothTime` damgaları ortak bir
+yüksekliğe oturtuyor.
+
+**Yükseklik `SnowStepRhythm` tarafından YAZILMIYOR.** Ritim eskiden ayak
+proxy'lerini yarım sinüsle kaldırıyordu; tek gövdeye geçilince iki bileşen
+aynı `localPosition.y`'yi ezmeye başladı ve gövde yüksekliği sıçradı. Ritim
+artık yalnız faz ve adım olayı üretiyor; yüksekliğin tek sahibi align.
 
 **Gövde kar YÜZEYİNE oturuyor, tabana değil.** `SnowTrailBodyAlign`
 `SnowSampler`'dan kar yüksekliğini okuyup gövdeyi yüzeyin `surfaceSink` (5 cm)
