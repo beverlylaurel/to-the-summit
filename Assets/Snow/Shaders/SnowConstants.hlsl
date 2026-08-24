@@ -214,8 +214,14 @@
 /// sınır oynuyor, profil bozulmuyor, iz kopmuyor. Merkezde kapsama düz
 /// olduğu için kaydırmanın etkisi yok — düzensizlik yalnız kenarda görünür.
 ///
-/// İki ölçek: 2.5 (40 cm leke) ana düzensizliği, 9.0 (11 cm) kenarın
-/// kendi tırtığını veriyor. Tek ölçek ya çok yumuşak ya çok gürültülü.
+/// İki ölçek: 2.5 (40 cm leke) ana düzensizliği, 9.0 (11 cm) kenarın kendi
+/// tırtığını veriyor. Tek ölçek ya çok yumuşak ya çok gürültülü.
+///
+/// İNCE ÖLÇEĞİN PAYI KISIK (0.35 → 0.18). Eşit ağırlıkta kenar dijital bir
+/// tırtık gibi okunuyor ve izin dağılması çevredeki düz karla uyumsuz
+/// duruyordu (kullanıcı bildirdi). Kaba ölçek baskın kalınca dağılma karın
+/// kendi lekeli dokusuyla aynı ölçeğe oturuyor; ince ölçek yalnız kenarı
+/// matematiksel düzgünlükten kurtaracak kadar kalıyor.
 ///
 /// KAYDIRMA GENLİĞİ RAMPA GENİŞLİĞİNİ AŞAMAZ. Rampa 4 teksel; 1.5 teksel
 /// (≈3.5 cm) sınırı gözle görünür oynatıyor ama iki kenarı birbirine

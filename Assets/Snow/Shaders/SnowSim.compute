@@ -150,7 +150,7 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         (float2(SnowValueNoise(worldXZ * SNOW_TRAIL_EDGE_SCALE_A),
                 SnowValueNoise(worldXZ * SNOW_TRAIL_EDGE_SCALE_A + 17.3)) * 2.0 - 1.0) * 0.65 +
         (float2(SnowValueNoise(worldXZ * SNOW_TRAIL_EDGE_SCALE_B),
-                SnowValueNoise(worldXZ * SNOW_TRAIL_EDGE_SCALE_B + 31.7)) * 2.0 - 1.0) * 0.35;
+                SnowValueNoise(worldXZ * SNOW_TRAIL_EDGE_SCALE_B + 31.7)) * 2.0 - 1.0) * 0.18;
 
     // KAYDIRMA TAM SAYI TEKSELE YUVARLANAMAZ. `round` ile kenar teksel teksel
     // zıplıyor ve düzensizlik yerine düzenli bir testere dişi çıkıyor —

@@ -231,11 +231,27 @@ void SnowShadeSetup(float3 positionWS, out float3 N, out SnowSurface surface, ou
     // çevresinde birkaç tekselllik bir şerit daha çiziliyor ve duvar oraya
     // oturuyor. Şerit düz alanda arazi kotunda (`SnowSurfaceAt` sapma
     // sıfırken `baseHeight` veriyor), dolayısıyla basamak yapmıyor.
+    // ŞERİT SEKİZ YÖNDEN TOPLANIYOR, DÖRTTEN DEĞİL.
+    //
+    // Dört yönlü `max` şeridi KARE büyütüyor: kenar köşeli çıkıyor ve izin
+    // dağılması çevredeki düz karla uyumsuz, dijital bir tırtık gibi
+    // okunuyordu (kullanıcı bildirdi). Köşegenler eklenince yayılma
+    // sekizgene, yani daireye yakın oluyor.
+    //
+    // Köşegen adımı `0.7071` ile ölçekleniyor: aynı yarıçapta kalsın, köşede
+    // şerit kendiliğinden genişlemesin.
     float tk = SNOW_LOCAL_SKIRT_TEXELS / _SnowResolution;
-    float4 t0 = SnowTrailAt(uv);
-    float4 tX = max(SnowTrailAt(uv + float2( tk, 0)), SnowTrailAt(uv + float2(-tk, 0)));
-    float4 tY = max(SnowTrailAt(uv + float2(0,  tk)), SnowTrailAt(uv + float2(0, -tk)));
-    float4 sapmaTrail = max(t0, max(tX, tY));
+    float tc = tk * 0.7071;
+
+    float4 sapmaTrail = SnowTrailAt(uv);
+    sapmaTrail = max(sapmaTrail, max(SnowTrailAt(uv + float2( tk, 0)),
+                                     SnowTrailAt(uv + float2(-tk, 0))));
+    sapmaTrail = max(sapmaTrail, max(SnowTrailAt(uv + float2(0,  tk)),
+                                     SnowTrailAt(uv + float2(0, -tk))));
+    sapmaTrail = max(sapmaTrail, max(SnowTrailAt(uv + float2( tc,  tc)),
+                                     SnowTrailAt(uv + float2(-tc, -tc))));
+    sapmaTrail = max(sapmaTrail, max(SnowTrailAt(uv + float2( tc, -tc)),
+                                     SnowTrailAt(uv + float2(-tc,  tc))));
 
     float yerelSapma = sapmaTrail.r + sapmaTrail.g;
     clip(yerelSapma - SNOW_LOCAL_MIN);
