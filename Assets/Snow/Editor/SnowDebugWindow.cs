@@ -529,8 +529,8 @@ public class SnowDebugWindow : EditorWindow
         driftVfxSerialized.FindProperty("curtain").objectReferenceValue = curtainVfx;
         driftVfxSerialized.ApplyModifiedProperties();
 
-        var (solAyak, sagAyak) = EnsureFootDeformers(player);
-        EnsurePlayerSide(player, solAyak, sagAyak, sampler, burst, bridge);
+        var izGovdesi = EnsureTrailDeformer(player);
+        EnsurePlayerSide(player, izGovdesi, sampler, burst, bridge);
 
         var driftVfxSerializedFollow = new SerializedObject(driftVfx);
         // AYAK KOTU, KAMERA DEGIL: saltasyon yere yapisik.
@@ -686,26 +686,48 @@ public class SnowDebugWindow : EditorWindow
     /// cikarmak oymayi bozmuyor. Katman maskesi URP renderer varliginda
     /// (`PC_Renderer`, `Mobile_Renderer`); spec 1.3'un yasakladigi KAMERANIN
     /// culling mask'i degil.
-    static (Transform sol, Transform sag) EnsureFootDeformers(FirstPersonController player)
+    static Transform EnsureTrailDeformer(FirstPersonController player)
     {
-        if (player == null) return (null, null);
+        if (player == null) return null;
 
         int layer = LayerMask.NameToLayer(SnowProjectCheck.DeformerLayer);
-        if (layer < 0) return (null, null);
+        if (layer < 0) return null;
 
         // Ayak tabani: CharacterController varsa gercek taban, yoksa transform.
         float footY = 0f;
         var cc = player.GetComponent<CharacterController>();
         if (cc != null) footY = cc.center.y - cc.height * 0.5f;
 
-        return (
-            EnsureFoot(player.transform, "SnowFoot_L", new Vector3(-0.11f, footY, 0f), layer),
-            EnsureFoot(player.transform, "SnowFoot_R", new Vector3( 0.11f, footY, 0f), layer));
+        // ESKI IKI AYAK PROXY'SI SILINIYOR (asagidaki gerekce).
+        foreach (var eskiAd in new[] { "SnowFoot_L", "SnowFoot_R" })
+        {
+            Transform eskiT = player.transform.Find(eskiAd);
+            if (eskiT != null) Object.DestroyImmediate(eskiT.gameObject);
+        }
+
+        return EnsureTrailBody(player.transform, new Vector3(0f, footY, 0f), layer);
     }
 
-    static Transform EnsureFoot(Transform parent, string ad, Vector3 localPos, int layer)
+    /// TEK GOVDE, IKI AYAK DEGIL.
+    ///
+    /// Once iki kup proxy vardi (11x6x28 cm, +-11 cm yanlarda). Uc ayri
+    /// belirti uretiyordu, ucu de kullanici tarafindan bildirildi:
+    ///   - "2 ayaktan besleniyor" -> iki paralel oluk
+    ///   - "keskin dikdortgen izler" -> kup alt yuzeyi duz ve koseli
+    ///   - "capraz giderken ayak izi yan cikiyor" -> kupler oyuncuyla donuyor
+    ///
+    /// Kure ucunu birden kapatiyor. Alt yuzeyi merkeze dogru derinlesip
+    /// kenara dogru sigaliyor: yakalama bunu oldugu gibi olcuyor ve profil
+    /// dogal olarak yumusak bir oluk cikiyor -- damga, basinc formulu ya da
+    /// yumusatma terimi eklemeden. x ve z ayni oldugu icin donmeye de
+    /// bagimsiz; oyuncu capraz giderken iz sekli degismiyor.
+    ///
+    /// Genislik iki ayagin toplam izini karsiliyor (11 cm ayak + 22 cm ara).
+    static Transform EnsureTrailBody(Transform parent, Vector3 localPos, int layer)
     {
-        Transform t = parent.Find(ad);
+        const string Ad = "SnowTrailBody";
+
+        Transform t = parent.Find(Ad);
         GameObject go;
 
         if (t != null)
@@ -714,8 +736,8 @@ public class SnowDebugWindow : EditorWindow
         }
         else
         {
-            go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            go.name = ad;
+            go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            go.name = Ad;
             go.transform.SetParent(parent, false);
 
             // Collider deformer icin gereksiz ve oyuncunun hareketini bozar.
@@ -727,8 +749,8 @@ public class SnowDebugWindow : EditorWindow
         go.transform.localPosition = localPos;
         go.transform.localRotation = Quaternion.identity;
 
-        // Ayak olculeri: 11 cm en, 6 cm yukseklik, 28 cm boy.
-        go.transform.localScale = new Vector3(0.11f, 0.06f, 0.28f);
+        // 36 cm capinda, 12 cm yuksekliginde yassi kure.
+        go.transform.localScale = new Vector3(0.36f, 0.12f, 0.36f);
 
         var rend = go.GetComponent<MeshRenderer>();
         rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -750,14 +772,14 @@ public class SnowDebugWindow : EditorWindow
     /// KAR SİSTEMİ OYUNCUYU BİLMİYOR. Bağ tek yönlü: bu bileşenler kar
     /// örneğini OKUYOR, kar sistemine hiçbir şey yazmıyorlar.
     static void EnsurePlayerSide(FirstPersonController player,
-                                 Transform solAyak, Transform sagAyak,
+                                 Transform izGovdesi,
                                  SnowSampler sampler, SnowBurstParticles burst,
                                  SnowEnvironmentBridge bridge)
     {
         if (player == null) return;
 
         GameObject go = player.gameObject;
-        Transform anchor = solAyak != null ? solAyak : player.transform;
+        Transform anchor = izGovdesi != null ? izGovdesi : player.transform;
 
         // --- Adım ritmi: ayak fazı + adım olayı
         var rhythm = go.GetComponent<SnowStepRhythm>();
@@ -765,8 +787,12 @@ public class SnowDebugWindow : EditorWindow
 
         var rs = new SerializedObject(rhythm);
         rs.FindProperty("body").objectReferenceValue = go.GetComponent<CharacterController>();
-        rs.FindProperty("leftFoot").objectReferenceValue = solAyak;
-        rs.FindProperty("rightFoot").objectReferenceValue = sagAyak;
+        // TEK GOVDE RITME BAGLI, IKINCI ALAN BOS. Iz artik tek bir kureden
+        // besleniyor; adim ritmi onu hafifce kaldirip indiriyor, boylece oluk
+        // derinligi adim adim dalgalaniyor. Ikisine de ayni transform
+        // verilseydi `Plant` ayni kareye iki kez yazar ve govde titrerdi.
+        rs.FindProperty("leftFoot").objectReferenceValue = izGovdesi;
+        rs.FindProperty("rightFoot").objectReferenceValue = null;
         rs.ApplyModifiedProperties();
 
         // --- Ayak sesi (spec §19.1). Klipler SONRA verilecek.

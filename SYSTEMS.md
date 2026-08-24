@@ -765,6 +765,14 @@ NdotL + arkadan sızma + BRDF yansıma; speküler URP sözleşmesiyle kullanıl�
 (`_SunElevation01` kapısı) ve ekran uzayında yoğunluğu sabit. Ortam gölgede
 maviye çalıyor. Sis URP'nin `MixFog`'undan — kendi sis hesabı yok.
 
+**İz TEK gövdeden besleniyor.** Oyuncunun altında tek bir yassı küre
+(`SnowTrailBody`, 36×12×36 cm) deformer olarak duruyor. Önce iki kübik ayak
+proxy'si vardı ve üç ayrı belirti üretiyordu: çift oluk, keskin dikdörtgen
+damga, çapraz yürüyüşte yana çıkan iz. Kürenin alt yüzeyi merkeze doğru
+derinleşip kenara doğru sığaldığı için yakalama doğrudan yumuşak bir oluk
+profili ölçüyor; x ve z eşit olduğu için dönmeye de bağımsız. Adım ritmi
+gövdeyi hafifçe kaldırıp indiriyor, oluk derinliği adım adım dalgalanıyor.
+
 **Arazi de dünyanın kar kalınlığı kadar yükselir.** `SnowWorldCoverHeight`
 (`_FallbackSWE`/`_FallbackRhoN`'dan) `MountainSurface.shader`'ın dört geçişinde
 de köşe konumuna ekleniyor. Kar mesh'i yerel kar sütunu kadar yükseliyor;
