@@ -496,6 +496,19 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         half3 snowAlbedo = lerp(half3(0.70, 0.73, 0.79), half3(0.90, 0.92, 0.95), freshness);
         half  snowRough  = lerp(0.26, 0.48, freshness);
 
+        // YÜZEY DOKUSU BURAYA GİRİYOR.
+        //
+        // Arazinin kar albedosu bu blokta kuruluyor, `SnowBuildSurface`'ten
+        // bağımsız; doku yalnız oraya bağlandığında arazide HİÇBİR etkisi
+        // olmuyordu (ölçüldü: güç 0 ile 3 arasında ekran farkı yok).
+        //
+        // Kar mesh'i de aynı harmanı kullanıyor. İkisi aynı dokuyu görmek
+        // zorunda: mesh yalnız yerel sapmayı çiziyor, düz alanı arazi çiziyor.
+        SnowSurfaceBlend karYuzey = SnowSampleSurface(worldPos, _FallbackRhoN, _SurfaceWetness, 0.0);
+
+        snowAlbedo = saturate(snowAlbedo * karYuzey.albedoTint);
+        snowRough  = saturate(snowRough + karYuzey.roughAdd);
+
         surface.albedo     = lerp(surface.albedo, snowAlbedo, snowMask);
         surface.smoothness = lerp(surface.smoothness, 1.0 - snowRough, snowMask);
 
@@ -518,12 +531,25 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         float3 detailed = SnowApplyDetailNormals(snowNormal, worldPos, freshness, 0.0,
                                                  length(_WorldSpaceCameraPos - worldPos));
 
+        // Doku normalini de ekle: kar dokusunun asıl bilgisi burada.
+        {
+            float2 e = float2(detailed.x, detailed.z) / max(detailed.y, 1e-3)
+                     + (float2)karYuzey.normalSlope;
+            detailed = normalize(float3(e.x, 1.0, e.y));
+        }
+
         snowNormal = normalize(lerp(snowNormal, detailed, snowSlope));
 
         surface.normalWS = normalize(lerp(surface.normalWS, snowNormal, snowMask));
 
-        // Mikro-oyuk karın altında kalıyor.
-        surface.occlusion = lerp(surface.occlusion, 1.0, snowMask * 0.7);
+        // Mikro-oyuk karın altında kalıyor — ama TAMAMEN değil.
+        //
+        // 0.7 ile düzleştirilince arazinin oyukları kar altında yok oluyordu
+        // ve kar tek parça beyaz kalıyordu (ölçüldü: zemin sapması 0.010,
+        // güneşsizken 0.0023). Kar oyuğu doldurur, silmez: 15-20 cm'lik örtü
+        // metrelik bir çukuru kapatmaz. Pay 0.55'e indirildi: 0.35'te zemin
+        // luması 0.88'den 0.59'a düşüp güneşli kar için fazla koyu kaldı.
+        surface.occlusion = lerp(surface.occlusion, 1.0, snowMask * 0.55);
 
         surface.snowMask = (half)snowMask;
     }

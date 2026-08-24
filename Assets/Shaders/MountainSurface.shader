@@ -210,11 +210,31 @@ Shader "ToTheSummit/MountainSurface"
                                                       _WorldSnowDepth, IN.positionWS,
                                                       length(fwidth(IN.positionWS.xz)));
 
-                    half3 karIsik = SnowDirectLight(mainLight, inputData.normalWS,
+                    // NORMAL BURADA TEKRAR EKLENMİYOR. Yüzey dokusunun eğimi
+                    // `MountainSurface.hlsl` içinde `surface.normalWS`'e zaten
+                    // giriyor ve `inputData.normalWS` oradan geliyor; burada
+                    // ikinci kez eklenirse kabartı iki kat çıkar.
+                    float3 karN = inputData.normalWS;
+
+                    // ORTAM IŞIĞI GÖK GÖRÜNÜRLÜĞÜYLE KISILIYOR.
+                    //
+                    // `SampleSH` bu sahnede YÖNSÜZ: ölçüldü, yukarı ve aşağı
+                    // aynı değeri veriyor (0.223, 0.293, 0.420) çünkü PBSky'ın
+                    // yer terimi yok, gökyüzü ufkun altında da çiziliyor. Yönsüz
+                    // ortam kara hiçbir şekil vermiyor: güneş kapatıldığında
+                    // ekran sapması 0.00232'ye düşüyor, yani kar düz beyaz kâğıt.
+                    //
+                    // Bir noktaya ulaşan gök ışınımı, göğü GÖREBİLDİĞİ kadardır.
+                    // Dağın kendi ufku bunu zaten ölçüyor (`SampleSkyVisibility`,
+                    // kar maskesi de aynı büyüklüğü kullanıyor). Ortama
+                    // bağlanınca çukur ve yamaç ayrışıyor.
+                    half gokPayi = (half)SampleSkyVisibility(IN.positionWS);
+
+                    half3 karIsik = SnowDirectLight(mainLight, karN,
                                                     inputData.viewDirectionWS, ks)
-                                  + SnowAmbient(inputData.normalWS, ks,
+                                  + SnowAmbient(karN, ks,
                                                 mainLight.shadowAttenuation,
-                                                (half)surface.occlusion);
+                                                (half)surface.occlusion * gokPayi);
 
                     lit = lerp(lit, karIsik, (half)surface.snowMask);
                 }

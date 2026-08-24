@@ -50,7 +50,17 @@ public class LookSettings : ScriptableObject
     [Header("Açık hava")]
     public LookProfile clearDay = new()
     {
-        exposure = 0f, contrast = 6f, saturation = -8f,
+        // AÇIK GÜNDE POZLAMA KAR İÇİN AÇILIYOR, SAHNE ORTALAMASI İÇİN DEĞİL.
+        //
+        // Ölçüldü (10:00, bulut gölgesi kapalı, tam güneşli yamaç): zemin
+        // luması 0.921, sapma 0.0151. Kar ACES'in omzunda eziliyor; yüzey
+        // dokusunun ürettiği fark 255 seviyenin 4'üne sığıyor ve ekranda
+        // TEK PARÇA BEYAZ olarak okunuyor. 0.85 durak kısılınca luma 0.839,
+        // sapma 0.0274 — kabartı geri geliyor, kar hâlâ sahnenin en parlağı.
+        //
+        // Fotoğrafta da karlı sahne KARA göre pozlanır; ortalamaya göre
+        // pozlanan kar patlar.
+        exposure = -0.85f, contrast = 6f, saturation = -8f,
         colorFilter = Color.white,
         temperature = -4f, tint = 0f, shadowChill = 0.45f,
         bloom = 0.35f, bloomThreshold = 1.1f,

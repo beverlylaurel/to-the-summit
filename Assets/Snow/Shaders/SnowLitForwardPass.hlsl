@@ -273,10 +273,21 @@ void SnowShadeSetup(float3 positionWS, out float3 N, out SnowSurface surface, ou
     // Detay yalnız yataya yakın yüzeyde (rapor §2): dik kenarda düzlemsel XZ
     // kaplaması dikey şeritler hâlinde uzuyor.
     float3 detailed = SnowApplyDetailNormals(N, positionWS, freshness, state.a, dist);
-    N = normalize(lerp(N, detailed, planar));
 
+    // YÜZEY DOKUSU NORMALDEN ÖNCE KURULUYOR. `SnowBuildSurface` dört
+    // fotogrametri setini harmanlarken normalin eğim katkısını da üretiyor;
+    // normal ondan sonra hesaplanmazsa aynı dokular ikinci kez örneklenirdi.
     surface = SnowBuildSurface(state.g, state.b, state.a, trail.b,
                                height, positionWS, footprint);
+
+    // Yüzey dokusunun normali EĞİM UZAYINDA ekleniyor; taban eğimi yapısı
+    // gereği korunuyor (`SnowDetailNormals.hlsl` ile aynı gerekçe: RNM tabanı
+    // koruyamıyordu, ölçüldü).
+    float2 yuzeyEgim = float2(detailed.x, detailed.z) / max(detailed.y, 1e-3)
+                     + (float2)surface.surfSlope;
+    detailed = normalize(float3(yuzeyEgim.x, 1.0, yuzeyEgim.y));
+
+    N = normalize(lerp(N, detailed, planar));
 }
 
 half4 SnowLitFragment(Varyings IN) : SV_Target

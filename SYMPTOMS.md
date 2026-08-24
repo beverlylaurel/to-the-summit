@@ -2052,3 +2052,63 @@ yandan bakarken bildirdi). Eşik komşuların en büyüğünden okunarak izin
 çevresinde `SNOW_LOCAL_SKIRT_TEXELS` (3 teksel ≈ 7 cm) genişliğinde bir şerit
 bırakıldı; duvar oraya oturuyor. Şerit düz alanda arazi kotunda
 (`SnowSurfaceAt` sapma sıfırken `baseHeight` veriyor), basamak yapmıyor.
+
+---
+
+## "Kar tuttuğu zaman yer fazla bembeyaz, doku hiç görünmüyor"
+
+**İlk şüpheli — YANLIŞ: doku bağlanmamış.** Dört fotogrametri seti içe
+aktarıldı, `SnowSettings`'e atandı, `SnowManager` global olarak yayınlıyordu.
+Çalışma zamanında doğrulandı: `_SnowSurfTazeColor(global)=T_SnowSurf_Taze_Color
+2048x2048`. Ekranda hiçbir fark yoktu; güç 0 ile 3 arasında zemin luması
+0.87873 ↔ 0.87753. Bağlantı sağlamdı, ölçüm yalan söylüyordu.
+
+**Ölçümü bozan üç ayrı şey vardı — üçü de kapatılana kadar hiçbir sayı
+güvenilir değildi:**
+
+1. **`.hlsl` düzenlemesi shader'a ulaşmıyordu.** `MountainSurface.hlsl`
+   değişince Unity `.shader`'ı yeniden derlemiyor. `AssetDatabase.ImportAsset(...,
+   ForceUpdate)` çağrılmadan yapılan her ölçüm ESKİ kodu ölçüyordu.
+
+2. **`SnowManager` global'i her karede geri yazıyordu.** Ölçüm için
+   `Shader.SetGlobalFloat("_SnowSurfStrength", 30)` yazmak işe yaramıyor;
+   bir sonraki `Update` ayardaki değeri (0.65) basıyor. Zorlama testi ancak
+   `SnowSettings.asset` üzerinden yapılınca gerçek sonucu verdi: luma
+   0.88 → 0.34. Sistem baştan beri çalışıyordu.
+
+3. **Bulut gölgesi ekranda geziniyordu.** Aynı ayarla 40 saniye arayla alınan
+   iki kare: luma 0.386 ve 0.437. Dakikalar arası A/B karşılaştırmaları
+   bu yüzden anlamsızdı. Ölçüm sırasında `VolumetricClouds.shadows` kapatıldı.
+
+**Gerçek sebep — ÜÇ AYRI KUSUR, üçü de ölçüldü:**
+
+- **Albedo dokusu kendi parlaklığına bölünüyordu.** `SnowSampleSurface`
+  içindeki `ortalama = (renk.r+renk.g+renk.b)/3` PİKSELİN KENDİ parlaklığıydı;
+  ona bölünce her piksel 1'e normalize oluyor ve dokunun deseni tamamen
+  siliniyordu, geriye yalnız renk tonu kalıyordu. Dokunun UZAMSAL ortalaması
+  (doğrusal uzayda ölçülüp sabit olarak gömüldü) kullanılınca desen yerinde
+  kaldı.
+
+- **Kar dokusunun bilgisi renkte değil.** Ölçüldü: albedo haritalarının bağıl
+  sapması %0.9–2.3 (kar beyazdır, renginde bilgi yoktur). Normal haritalarda
+  rms eğim 0.06–0.09, tepe 0.28–0.45. Görüntüyü normal taşıyor; albedo yalnız
+  ton veriyor.
+
+- **KAR ACES'İN OMZUNDA EZİLİYORDU.** Bulut gölgesi kapatılıp tam güneşli
+  yamaç ölçülünce: luma 0.921, sapma 0.0151. Yani dokunun ürettiği bütün fark
+  255 seviyenin ~4'üne sığıyor ve ekranda TEK PARÇA BEYAZ olarak okunuyor.
+  Pozlama 0.85 durak kısılınca luma 0.839, sapma 0.0274 — kabartı geri geldi,
+  kar hâlâ sahnenin en parlağı. `LookSettings.clearDay.exposure` -0.15 → -1.0.
+
+**Ayrıca ölçüldü — ortam ışığı yönsüz.** `RenderSettings.ambientProbe` yukarı
+ve aşağı için AYNI değeri veriyor (0.223, 0.293, 0.420): PBSky'ın yer terimi
+yok, gökyüzü ufkun altında da çiziliyor. Güneş kapatıldığında zemin sapması
+0.00232'ye düşüyor — ortam terimi normalden hiç etkilenmiyor. Doğrudan ışığın
+payı %40, ortamın %60. Kar bu yüzden şekilsizdi. Arazi tarafında ortam artık
+gök görünürlüğüyle (`SampleSkyVisibility`) kısılıyor ve AO'nun kar altında
+düzleştirilme payı 0.70'ten 0.55'e indirildi.
+
+**Yan bulgu — `n.xy / n.z` patlıyor.** Normal haritanın mavi kanalı BC7
+sıkıştırmasıyla sıfıra yaklaştığı teksellerde eğim sonsuza gidiyor ve ekranda
+izole koyu mavi noktalar çıkıyor. Eğime fiziksel tavan kondu: kar 35 dereceden
+dik mikro yüzeyde durmaz (`SNOW_SURF_EGIM_TAVANI = 0.7`).

@@ -21,10 +21,24 @@ MonoBehaviour:
   breakupNoise: {fileID: 0}
   shadowTint: {r: 0.66, g: 0.76, b: 0.95, a: 1}
   translucencyStrength: 0.6
-  sparkleCellSize: 0.0015
-  sparkleDensity: 0.0035
+  sparkleCellSize: 0.0008
+  sparkleDensity: 0.002
   sparkleSharpness: 8
   sparkleIntensity: 7
+  surfTazeColor: {fileID: 2800000, guid: 4de26133a354d9442b8203602c8d2420, type: 3}
+  surfTazeNormal: {fileID: 2800000, guid: 952a9984f9c305546bafc3288fdcaeaf, type: 3}
+  surfTazeRough: {fileID: 2800000, guid: 9d26985d0822b034a83fc508a61fdd97, type: 3}
+  surfTozColor: {fileID: 2800000, guid: 3ae85f68a49c8f847931e1c982937f56, type: 3}
+  surfTozNormal: {fileID: 2800000, guid: 476002a5aceac724080ce069c3d99389, type: 3}
+  surfTozRough: {fileID: 2800000, guid: d3f007604abd17944866b3fce5998745, type: 3}
+  surfYerlesmisColor: {fileID: 2800000, guid: d44e7609b2364494bb52809cfd1fe1bd, type: 3}
+  surfYerlesmisNormal: {fileID: 2800000, guid: 88c178292b0e24e4f892c95770a74130, type: 3}
+  surfYerlesmisRough: {fileID: 2800000, guid: e47016dd1f1b44c4e9dd38ffa66c0e00, type: 3}
+  surfRuzgarColor: {fileID: 2800000, guid: 8d1e5fdd9171fc14b82befef0efed6d9, type: 3}
+  surfRuzgarNormal: {fileID: 2800000, guid: f22dd5d03bea28547b233cb6fc2664b5, type: 3}
+  surfRuzgarRough: {fileID: 2800000, guid: b2f288f8adf2b0a4c878ecdcde6545d8, type: 3}
+  surfTileMeters: 2.5
+  surfStrength: 0.9
   coverSlopeThreshold: 0.25
   coverSlopeSharpness: 1.6
   coverBreakupScale: 1.8
@@ -32,7 +46,7 @@ MonoBehaviour:
   coverEdgeSharpness: 4
   coverThickness: 0.04
   coverEdgeBulge: 0.35
-  minPixelSize: 1.3
+  minPixelSize: 2.4
   flutterFrequency: 5.5
   flutterAmplitude: 0.35
   flakeEmissive: 1

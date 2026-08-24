@@ -35,12 +35,62 @@ Material:
         m_Texture: {fileID: 2800000, guid: 101b6d63f01d0e74f9c2854c14f99fb9, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _SnowSurfRuzgarColor:
+        m_Texture: {fileID: 2800000, guid: 8d1e5fdd9171fc14b82befef0efed6d9, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SnowSurfRuzgarNormal:
+        m_Texture: {fileID: 2800000, guid: f22dd5d03bea28547b233cb6fc2664b5, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SnowSurfRuzgarRough:
+        m_Texture: {fileID: 2800000, guid: b2f288f8adf2b0a4c878ecdcde6545d8, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SnowSurfTazeColor:
+        m_Texture: {fileID: 2800000, guid: 4de26133a354d9442b8203602c8d2420, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SnowSurfTazeNormal:
+        m_Texture: {fileID: 2800000, guid: 952a9984f9c305546bafc3288fdcaeaf, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SnowSurfTazeRough:
+        m_Texture: {fileID: 2800000, guid: 9d26985d0822b034a83fc508a61fdd97, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SnowSurfTozColor:
+        m_Texture: {fileID: 2800000, guid: 3ae85f68a49c8f847931e1c982937f56, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SnowSurfTozNormal:
+        m_Texture: {fileID: 2800000, guid: 476002a5aceac724080ce069c3d99389, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SnowSurfTozRough:
+        m_Texture: {fileID: 2800000, guid: d3f007604abd17944866b3fce5998745, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SnowSurfYerlesmisColor:
+        m_Texture: {fileID: 2800000, guid: d44e7609b2364494bb52809cfd1fe1bd, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SnowSurfYerlesmisNormal:
+        m_Texture: {fileID: 2800000, guid: 88c178292b0e24e4f892c95770a74130, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SnowSurfYerlesmisRough:
+        m_Texture: {fileID: 2800000, guid: e47016dd1f1b44c4e9dd38ffa66c0e00, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _SnowAORadius: 0.1
     - _SnowAOStrength: 1
     - _SnowBreakupScale: 3
     - _SnowEdgeFadeRange: 0.006
+    - _SnowSurfStrength: 0.65
+    - _SnowSurfTileMeters: 2.5
     - _SparkleCellSize: 0.004
     - _SparkleDensity: 0.06
     - _SparkleIntensity: 12

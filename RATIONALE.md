@@ -1348,3 +1348,44 @@ kâğıtta 3.5 ve 6.2 tane/m³ çıktı ve **ekranda kar azaldı**.
 Sebep rüzgâr: 12 m/s'de tane 10 metreyi 0.85 saniyede geçiyor. Dar kutuda tane
 kameranın çevresinde hiç kalmıyor, bir kenardan girip öbüründen çıkıyor. Spec'in
 geniş kutusu tam bu yüzden geniş.
+
+## Açık günün pozlaması kara göre seçildi (-0.15 → -1.0 EV)
+
+**Kural:** `LookSettings.clearDay.exposure` sahne ortalamasına göre değil,
+KARIN ekranda nereye düştüğüne göre ayarlanır.
+
+**Ölçüm** (10:00, bulut gölgesi kapalı, tam güneşli yamaç, ekranın alt %15'i):
+
+| Pozlama | Zemin luması | Sapma |
+|---|---|---|
+| -0.15 EV | 0.921 | 0.0151 |
+| -1.00 EV | 0.839 | 0.0274 |
+
+Kar 0.921'de ACES'in omzunda: yüzey dokusunun, normal haritanın ve mikro
+kabartının ürettiği bütün fark 255 seviyenin ~4'üne sığıyor. Ekranda tek parça
+beyaz olarak okunuyor — kullanıcının "kar tuttuğu zaman yer fazla bembeyaz"
+belirtisi tam olarak bu. 0.85 durak kısılınca sapma iki katına çıkıyor ve kar
+hâlâ sahnenin en parlak yüzeyi.
+
+**Denenmiş ve yetmeyen yol:** dokunun gücünü artırmak. Güç 0.9 → 1.6'da sapma
+0.0151 → 0.0285'e çıkıyor ama aynı anda izole koyu mavi lekeler beliriyor;
+kontrastı omuza rağmen zorlamak, deseni değil ARTEFAKTI büyütüyor.
+
+**Kapsam:** yalnız `clearDay`. Fırtınalı gün zaten -0.8 EV, altın saat -0.8;
+oralarda kar omuza dayanmıyor.
+
+## Kar dokusu albedonun yerine geçmez, çarpan olarak girer
+
+**Kural:** fotogrametri albedosu kendi UZAMSAL ortalamasına bölünüp 1
+civarında bir katsayıya dönüştürülür, seviye fizikten (taze 0.90 / sıkışmış
+0.70) gelmeye devam eder.
+
+**Neden:** doku yerine konsaydı kar örneğinin kendi pozlaması sahneye taşınırdı
+ve ışıklandırma zinciri o aralığa göre ayarlı olduğu için her saat farklı
+kayardı.
+
+**Bir kez yanlış yapıldı:** ortalama olarak PİKSELİN KENDİ parlaklığı
+(`(r+g+b)/3`) kullanıldı. Bu her pikseli 1'e normalize ediyor, yani dokunun
+parlaklık desenini tamamen siliyor — geriye yalnız renk tonu kalıyor. Ölçüldü:
+güç 0 ile 3 arasında ekran sapması 0.01003 ↔ 0.00971, yani desen hiç gelmiyor.
+Dört dokunun doğrusal uzamsal ortalaması ölçülüp sabit olarak gömüldü.

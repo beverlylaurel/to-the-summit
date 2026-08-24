@@ -40,7 +40,18 @@ half SnowSparkle(float3 posWS, float3 V, float3 L, float pixelFootprint)
 {
     float3 H = normalize(V + L);
 
-    float lodF = max(log2(max(pixelFootprint / _SparkleCellSize, 1e-5)), 0.0);
+    // LOD SINIRLI: HÜCRE SONSUZ BÜYÜYEMEZ.
+    //
+    // Bowles & Wang hücreyi piksel ayak izine göre büyütüp yoğunluğu ekran
+    // uzayında sabit tutuyor. Ama parıltının BOYUTU hücre boyuna eşit;
+    // sınırsız LOD'da hücre metrelerce oluyor ve tek hücre birçok pikseli
+    // kaplayınca ekranda İRİ DİKDÖRTGEN lekeler çıkıyor (kullanıcı bildirdi:
+    // "uzaklaştıkça pikseller dikdörtgen gibi olmuş").
+    //
+    // İki seviye ile sınırlı: hücre en fazla dört katına çıkıyor. Üstünde
+    // yoğunluk sabitliği bozulup titreme başlardı, ama oraya varmadan mesafe
+    // kapısı (`SNOW_SPARKLE_FADE_*`) parıltıyı zaten kapatıyor.
+    float lodF = clamp(log2(max(pixelFootprint / _SparkleCellSize, 1e-5)), 0.0, 2.0);
     int   l0 = (int)floor(lodF);
     float f  = lodF - l0;
 

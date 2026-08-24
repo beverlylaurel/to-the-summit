@@ -479,6 +479,26 @@ public class SnowManager : MonoBehaviour
         Shader.SetGlobalFloat(SnowShaderIDs.SparkleSharpness, settings.SparkleSharpness);
         Shader.SetGlobalFloat(SnowShaderIDs.SparkleIntensity, settings.SparkleIntensity);
 
+        // YÜZEY DOKULARI GLOBAL. Kar mesh'i ve arazi aynı dokuyu görmek
+        // zorunda: mesh yalnız yerel sapmayı çiziyor, düz alanı arazi çiziyor
+        // ve ikisi farklı doku kullansaydı bölge sınırı yine kendini
+        // gösterirdi (gerekçe `SnowSettings` → yüzey dokuları).
+        Yayinla("_SnowSurfTazeColor", settings.SurfTazeColor);
+        Yayinla("_SnowSurfTazeNormal", settings.SurfTazeNormal);
+        Yayinla("_SnowSurfTazeRough", settings.SurfTazeRough);
+        Yayinla("_SnowSurfTozColor", settings.SurfTozColor);
+        Yayinla("_SnowSurfTozNormal", settings.SurfTozNormal);
+        Yayinla("_SnowSurfTozRough", settings.SurfTozRough);
+        Yayinla("_SnowSurfYerlesmisColor", settings.SurfYerlesmisColor);
+        Yayinla("_SnowSurfYerlesmisNormal", settings.SurfYerlesmisNormal);
+        Yayinla("_SnowSurfYerlesmisRough", settings.SurfYerlesmisRough);
+        Yayinla("_SnowSurfRuzgarColor", settings.SurfRuzgarColor);
+        Yayinla("_SnowSurfRuzgarNormal", settings.SurfRuzgarNormal);
+        Yayinla("_SnowSurfRuzgarRough", settings.SurfRuzgarRough);
+
+        Shader.SetGlobalFloat("_SnowSurfTileMeters", Mathf.Max(0.01f, settings.SurfTileMeters));
+        Shader.SetGlobalFloat("_SnowSurfStrength", settings.SurfStrength);
+
         // BÖLGE DIŞI DÜNYANIN KARINI GÖRÜYOR, sabit bir varsayılanı değil.
         Shader.SetGlobalFloat(SnowShaderIDs.FallbackSWE, Mathf.Max(0f, WorldSwe));
 
@@ -1098,6 +1118,13 @@ public class SnowManager : MonoBehaviour
     /// SWE ve normalize yoğunluktan kar sütunu, metre. Shader'daki
     /// `SnowBaseHeight` ile aynı formül; ikisi ayrışırsa arazi ile mesh farklı
     /// kalınlık görür.
+    /// Doku atanmamışsa global YAZILMIYOR: `null` yazmak shader'daki
+    /// varsayılanı (beyaz/bump) da siler ve yüzey siyaha döner.
+    static void Yayinla(string ad, Texture2D tex)
+    {
+        if (tex != null) Shader.SetGlobalTexture(ad, tex);
+    }
+
     static float SnowBaseHeightMetre(float swe, float rhoN)
     {
         float rho = Mathf.Max(SnowConstants.RhoMin + rhoN * (SnowConstants.RhoMax - SnowConstants.RhoMin), 1f);

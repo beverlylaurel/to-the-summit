@@ -755,7 +755,30 @@ kirletildiğinde, her kare değil. Üç tüketicisi var: zemin birikmesi, nesne
 üstü kar, kar tanesi kesme.
 
 **Kar görünümü (Faz 6).** Albedo ve pürüzlülük yoğunluktan türüyor (taze
-0.90 / sıkışmış 0.70), ıslaklık ikisini de koyultuyor. Detay normalleri
+0.90 / sıkışmış 0.70), ıslaklık ikisini de koyultuyor. Üstüne DÖRT FOTOGRAMETRİ
+SETİ harmanlanıyor (`SnowSurfaceTextures.hlsl`: taze / toz / yerleşmiş /
+rüzgâr); ağırlıkları yoğunluk, sıcaklık, ıslaklık, bozulma ve rüzgâr
+maruziyetinden geliyor — yani ayrı bir kaynak kurulmuyor, mevcut duruma
+bağlanıyor. Doku albedonun YERİNE geçmiyor, çarpan olarak giriyor: kendi
+UZAMSAL ortalamasına bölünüp 1 civarında bir katsayıya dönüşüyor, seviye
+fizikten gelmeye devam ediyor. Asıl bilgi normal haritada (ölçüldü: albedo
+bağıl sapması %0.9–2.3, normal rms eğimi 0.06–0.09). Normal STOKASTİK
+okunuyor (Heitz-Neyret altıgen ızgarası) — düz döşeme 2.5 m'de kendini tekrar
+edip leke ızgarası üretiyordu. Eğime fiziksel tavan var (35°): normal
+haritanın mavi kanalı sıkıştırmayla sıfıra yaklaşınca `n.xy/n.z` patlıyor ve
+izole koyu mavi noktalar çıkıyordu.
+
+**Aynı doku ARAZİDE de var.** Arazinin kar albedosu `MountainSurface.hlsl`
+içinde kuruluyor ve `SnowBuildSurface`'ten bağımsız; doku yalnız kar mesh'ine
+bağlandığında arazide hiçbir etkisi olmuyordu. Mesh yalnız yerel sapmayı
+çizdiği için düz alanın tamamı arazi tarafı — doku oraya girmezse hiç
+görünmez.
+
+**Kar ↔ pozlama.** Açık günün pozlaması (`LookSettings.clearDay.exposure`)
+KAR için ayarlı, sahne ortalaması için değil. Ölçüldü: -0.15 EV'de tam güneşli
+kar 0.921 luma / 0.0151 sapma ile ACES'in omzunda eziliyor ve yüzeyin bütün
+dokusu 255 seviyenin dördüne sıkışıyor. -1.0 EV'de 0.839 / 0.0274. Bu bağ
+tek yönlü: kar sistemi pozlamayı yazmıyor, pozlama karı gözeterek seçiliyor. Detay normalleri
 EĞİM UZAYINDA toplanıyor (`n.xy / n.z`) — dört ölçek, kaç tanesinin açık
 olduğunu kalite keyword'ü belirliyor. Reoriented Normal Mapping denendi ve
 tabanı koruyamadı: kar izinin oluğu ölçümde kayboluyordu (kontrast %0.8,
@@ -763,12 +786,18 @@ taban normaliyle %10.6). Eğim toplamı tabanı yapısı gereği korur. Işıkla
 NdotL + arkadan sızma + BRDF yansıma; speküler URP sözleşmesiyle kullanılıyor
 (`brdfData.specular ×` D·V `× NdotL`). Parıltı yalnız gündüz
 (`_SunElevation01` kapısı), ekran uzayında yoğunluğu sabit ve YALNIZ YAKINDA:
-6 m'den sonra sönüp 16 m'de tamamen kapanıyor. Bowles & Wang yöntemi yoğunluğu
+3 m'den sonra sönüp 9 m'de tamamen kapanıyor. Bowles & Wang yöntemi yoğunluğu
 sabit tutuyor ama parıltının BOYUTU hücre boyuna bağlı ve hücre uzakta LOD ile
 büyüyor; kapı olmadan tek hücre birçok pikseli kaplayıp iri parlak lekeler
-üretiyordu. Kapı ayak izine değil MESAFEYE bakıyor — ayak izi grazing açıda
+üretiyordu. LOD'un kendisi de SINIRLI (en fazla iki seviye, hücre dört katına
+çıkabiliyor): sınırsız LOD'da hücre metrelerce oluyor ve uzaktaki parıltı
+DİKDÖRTGEN lekeye dönüyordu. Kapı ayak izine değil MESAFEYE bakıyor — ayak izi grazing açıda
 patlıyor ve aynı uzaklıktaki iki yüzey farklı kapanırdı. Ortam gölgede
-maviye çalıyor. Sis URP'nin `MixFog`'undan — kendi sis hesabı yok.
+maviye çalıyor; arazide GÖK GÖRÜNÜRLÜĞÜYLE kısılıyor (`SampleSkyVisibility`).
+Bu gerekli çünkü sahnenin ortam probe'u YÖNSÜZ: PBSky'ın yer terimi yok,
+gökyüzü ufkun altında da çiziliyor ve `SampleSH` yukarı ile aşağı için aynı
+değeri veriyor. Yönsüz ortam kara hiç şekil vermiyor (ölçüldü: güneş
+kapatıldığında zemin sapması 0.0023). Sis URP'nin `MixFog`'undan — kendi sis hesabı yok.
 
 **İz TEK gövdeden besleniyor ve gövde DÖNEL SİMETRİK.** Oyuncunun altında
 tek bir küre (`SnowTrailBody`, 16 cm çap × 24 cm yükseklik) deformer olarak

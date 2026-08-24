@@ -77,8 +77,8 @@
 /// Kapı mesafeye göre; ayak izine göre değil. Ayak izi bakış açısıyla da
 /// değişiyor (grazing açıda patlıyor) ve aynı mesafedeki iki yüzey farklı
 /// kapanırdı.
-#define SNOW_SPARKLE_FADE_START      6.0
-#define SNOW_SPARKLE_FADE_END        16.0
+#define SNOW_SPARKLE_FADE_START      3.0
+#define SNOW_SPARKLE_FADE_END        9.0
 
 /// MESH'İN GÖRÜNÜR OLDUĞU EN KÜÇÜK YEREL SAPMA, metre.
 ///

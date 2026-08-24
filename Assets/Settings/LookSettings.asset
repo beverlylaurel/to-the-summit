@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: LookSettings
   m_EditorClassIdentifier: Assembly-CSharp::LookSettings
   clearDay:
-    exposure: -0.15
+    exposure: -1
     contrast: 12
     saturation: -14
     colorFilter: {r: 0.94, g: 0.95, b: 1, a: 1}

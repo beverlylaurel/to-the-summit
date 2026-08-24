@@ -7,6 +7,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 #include "SnowLitInput.hlsl"
 #include "SnowSparkle.hlsl"
+#include "SnowSurfaceTextures.hlsl"
 
 /// Bir tekseldeki karın ışıkla ilgili her şeyi. Tek yerde toplanıyor ki
 /// doğrudan ışık, ek ışıklar ve ortam aynı yüzeyi görsün.
@@ -17,6 +18,7 @@ struct SnowSurface
     half   wet;
     half   disturb;
     half   crust;
+    half2  surfSlope;   // yüzey dokusunun eğim uzayındaki detayı
     float  snowDepth;
     float3 positionWS;
     float  pixelFootprint;
@@ -39,6 +41,14 @@ SnowSurface SnowBuildSurface(float rhoN, float wet, float disturb, float crust,
 
     s.albedo    = lerp(ALBEDO_PACKED, ALBEDO_FRESH, freshness) * lerp(half3(1, 1, 1), TINT_WET, wet);
     s.roughness = lerp(0.26, 0.48, freshness) * lerp(1.0, 0.38, wet);
+
+    // YÜZEY DOKUSU. Dört fotogrametri seti durum zincirinden harmanlanıyor
+    // (gerekçe `SnowSurfaceTextures.hlsl`). Albedonun SEVİYESİ yukarıdaki
+    // fizikten geliyor; doku yalnız deseni çarpan olarak ekliyor.
+    SnowSurfaceBlend yuzey = SnowSampleSurface(positionWS, rhoN, wet, disturb);
+    s.albedo    = saturate(s.albedo * yuzey.albedoTint);
+    s.roughness = saturate(s.roughness + yuzey.roughAdd);
+    s.surfSlope = yuzey.normalSlope;
 
     // KABUK BUZDUR (spec §18.3). Daha parlak, daha az parıldar. Faz 11'e
     // kadar `crust` sıfır kalıyor ve bu satırlar hiçbir şey yapmıyor.
