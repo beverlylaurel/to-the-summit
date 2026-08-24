@@ -61,7 +61,7 @@ half4 SnowShadowFragment(ShadowVaryings IN) : SV_Target
     float2 uv = SnowWorldToUV(IN.positionWS);
     float4 state = SnowStateAt(uv);
 
-    SnowClipEdge(SnowSurfaceAt(uv), SnowBaseHeight(state.r, state.g), IN.positionWS);
+    SnowClipEdge(SnowSurfaceAt(uv), SnowBaseHeight(state.r, state.g), IN.positionWS, uv);
 
     return 0;
 }

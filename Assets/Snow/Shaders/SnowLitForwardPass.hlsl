@@ -135,12 +135,23 @@ float3 SnowNormalAt(float2 uv, float hHere, float3 positionWS)
 /// Eşiğin sorduğu soru "burada kar VAR MI"; cevabı `baseH`, yani oyulmamış
 /// kar sütunu. İz o sütunun içinde bir ÇUKUR — kar orada duruyor, yalnız
 /// yüzeyi alçalmış.
-void SnowClipEdge(float h, float baseH, float3 positionWS)
+void SnowClipEdge(float h, float baseH, float3 positionWS, float2 uv)
 {
     clip(baseH - SNOW_MIN_VISIBLE_HEIGHT);
 
     float edgeFade = saturate((baseH - SNOW_MIN_VISIBLE_HEIGHT)
                               / max(_SnowEdgeFadeRange, 1e-4));
+
+    // BÖLGE KENARI DA BU SORUNUN PARÇASI. `SnowEdgeFade` yalnız YÜKSEKLİĞE
+    // uygulanıyordu: mesh kenarda araziyle aynı kota iniyor, basamak olmuyor
+    // — ama pikselleri tam parlaklıkta çizilmeye devam ediyordu. Mesh ile
+    // arazi iki ayrı ışıklandırma modeli kullandığı için aralarında %2.3
+    // parlaklık farkı kalıyor (ölçüldü: iç 0.8318, dış 0.8132) ve düz bir
+    // alanda bu fark KESKİN BİR ÇİZGİ olarak okunuyor.
+    //
+    // Kenar sönümü kesmeye de girince geçiş çizgi değil LEKELİ BİR KUŞAK
+    // oluyor; iki yüzey son iki metrede birbirine karışıyor.
+    edgeFade *= SnowEdgeFade(uv);
 
     // STOKASTİK DÖŞEME. Düz döşemede aynı leke sabit periyotla tekrar ediyor
     // ve zemin düzenli bir ızgara gibi okunuyordu (kullanıcı bildirdi).
@@ -159,7 +170,7 @@ void SnowShadeSetup(float3 positionWS, out float3 N, out SnowSurface surface, ou
 
     float4 state = SnowStateAt(uv);
 
-    SnowClipEdge(height, SnowBaseHeight(state.r, state.g), positionWS);
+    SnowClipEdge(height, SnowBaseHeight(state.r, state.g), positionWS, uv);
 
     float4 trail = SnowTrailAt(uv);
 

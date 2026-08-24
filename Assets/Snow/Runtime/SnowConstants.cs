@@ -55,7 +55,7 @@ public static class SnowConstants
     /// ile AYNI olmak zorunda: üçü de "kar ne zaman görünür olur" sorusunu
     /// cevaplıyor. Ayrışırlarsa arazi, mesh ve nesneler farklı anlarda
     /// beyazlar.
-    public const float EdgeFadeRange = 0.020f;
+    public const float EdgeFadeRange = 0.006f;
 
     // --- Yakalama (spec §9.1, §9.4) ---
 

@@ -765,6 +765,12 @@ NdotL + arkadan sızma + BRDF yansıma; speküler URP sözleşmesiyle kullanıl�
 (`_SunElevation01` kapısı) ve ekran uzayında yoğunluğu sabit. Ortam gölgede
 maviye çalıyor. Sis URP'nin `MixFog`'undan — kendi sis hesabı yok.
 
+**Kar mesh'inin kesme eşiği bölge kenarını da sayar.** `SnowEdgeFade` hem
+yüksekliğe hem `SnowClipEdge`'e giriyor; ilki basamağı, ikincisi keskin renk
+çizgisini kaldırıyor. Mesh ile arazi iki ayrı ışıklandırma modeli kullandığı
+için aralarında ~%2 parlaklık farkı var ve düz alanda bu fark çizgi olarak
+okunuyor; kenar kuşağı onu lekeli geçişe çeviriyor.
+
 **Kar mesh'i bulut gölgesini araziyle AYNI kanaldan okur.** `_LIGHT_COOKIES`
 → `SampleMainLightCookie`, tıpkı `MountainSurface.shader`'daki gibi. Okumazsa
 bulutun altında arazi kararırken oyuncunun çevresi aynı parlaklıkta kalıyor ve

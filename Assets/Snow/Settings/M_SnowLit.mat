@@ -40,7 +40,7 @@ Material:
     - _SnowAORadius: 0.1
     - _SnowAOStrength: 1
     - _SnowBreakupScale: 3
-    - _SnowEdgeFadeRange: 0.02
+    - _SnowEdgeFadeRange: 0.006
     - _SparkleCellSize: 0.004
     - _SparkleDensity: 0.06
     - _SparkleIntensity: 12

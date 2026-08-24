@@ -1677,3 +1677,46 @@ kaynağı parıltı — TAA'nın çözemediği piksel ölçeğinde bir sinyal; y
 0.06'dan 0.006'ya indirilince tepe fark 7.5 kat düştü.
 
 Kayıt: gölgelendirme tarafında aranacak bir şey yok.
+
+
+---
+
+## 1 cm karda yüzey delik deşik, kare geri geldi
+
+**Kullanıcının ağzından:** "1cm kar seçtim. bu ne rezalet? kare beni takip
+ediyor."
+
+**İlk şüpheli (yanlış):** kırılma gürültüsünün ölçeği (`_SnowBreakupScale`
+3.0 → desen 33 cm'de tekrar, 256 teksellik doku → 1.3 mm'lik benekler).
+Arazi AYNI gürültüyü kullanıyor ve düzgün görünüyor.
+
+**Gerçek sebep: arazi `lerp`, mesh `clip`.** Aynı soruya iki farklı cevap.
+
+| | arazi | kar mesh'i |
+|---|---|---|
+| kural | `saturate((raw − noise) × sharpness)` → **karışım** | `clip(edgeFade − breakup×0.6)` → **delik** |
+| 1 cm'de sonuç | %29 beyaz, düzgün | yüzeyin yarısı kesilmiş |
+
+`edgeFade` MUTLAK derinlikten geliyordu: 4 mm → 24 mm bandı, 1 cm'de
+`(10−4)/20 = 0.30`. Gürültünün ortalaması da 0.30 — yani ince ama DÜZGÜN bir
+örtü "her yeri kenar" sayılıp piksel ölçeğinde deliniyordu.
+
+**Düzeltme 1 — bant 4→24 mm yerine 4→10 mm.** Sürekli örtü artık 1 cm'de
+kapanıyor. Ölçüm: `_SnowCoverage` 1 cm'de **0.294 → 0.998**, mesh'te
+`edgeFade` 1.0 → `clip(1 − 0.6·breakup) ≥ 0.4` → delik yok.
+
+Tutma temposu (ölçülen 3.15 mm/dk @ %100):
+tam fırtınada ilk beyazlama 1.3 dk / sürekli örtü 3.2 dk;
+%30 şiddette 4.2 dk / 10.6 dk.
+
+**Düzeltme 2 — bölge kenarı kesmeye de girdi.** `SnowEdgeFade` yalnız
+YÜKSEKLİĞE uygulanıyordu: mesh kenarda araziyle aynı kota iniyor, basamak
+olmuyor — ama pikselleri tam parlaklıkta çizilmeye devam ediyordu. Mesh ile
+arazi iki ayrı ışıklandırma modeli kullandığı için aralarında **%2.3**
+parlaklık farkı kalıyor (ölçüldü: iç 0.8318, dış 0.8132) ve düz bir alanda
+bu fark KESKİN ÇİZGİ olarak okunuyor. Kenar sönümü kesmeye de girince geçiş
+çizgi değil lekeli bir kuşak oluyor.
+
+**Not:** kalan %2.3 iki ışıklandırma modelinin farkı — karın wrap diffuse'ü,
+translüsanlığı ve `_ShadowTint`'li ortamı. Kaynağında kapatmak karın kendi
+özelliklerini silmek demek; kenar kuşağı farkı görünmez kılıyor.

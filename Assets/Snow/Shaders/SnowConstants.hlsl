@@ -29,9 +29,22 @@
 /// söyleyeceğini belirliyor. Ayrışırlarsa nesneler zemin beyazlamadan önce
 /// (ya da sonra) beyazlar.
 ///
-/// 4 mm → 24 mm bandı, tam şiddette ~13 dakika: kar önce çukurlara düşüyor,
-/// lekeler büyüyor, sonunda sürekli örtü oluyor. Ani sıçrama yok.
-#define SNOW_EDGE_FADE_RANGE         0.020
+/// 4 mm → 10 mm bandı. Kar önce çukurlara düşüyor, lekeler büyüyor, 1 cm'de
+/// sürekli örtü oluyor. Ani sıçrama yok.
+///
+/// 20 mm İDİ VE 1 CM'DE İKİ YÜZEY ÇELİŞİYORDU. Örtü metriği 1 cm'de 0.294
+/// diyordu (arazi %29 beyaz), kar mesh'i ise aynı yerde kendi eşiğine göre
+/// TAM örtü çiziyordu. Ekranda oyuncuyu takip eden beyaz bir kare, içi de
+/// `clip(edgeFade − breakup·0.6)` yüzünden piksel ölçeğinde delik deşik
+/// (edgeFade 0.30, gürültünün ortalaması 0.30 → yüzeyin yarısı kesiliyordu).
+///
+/// Bant 1 cm'de kapanınca ikisi de aynı şeyi söylüyor: arazi tam beyaz,
+/// mesh'te delik yok.
+///
+/// Tutma temposu (ölçülen SWE hızı 2.89e-6 m/s, ρ55 → 3.15 mm/dk):
+///   tam fırtınada  ilk beyazlama 1.3 dk, sürekli örtü 3.2 dk
+///   %30 şiddette   ilk beyazlama 4.2 dk, sürekli örtü 10.6 dk
+#define SNOW_EDGE_FADE_RANGE         0.006
 
 // --- Yakalama (spec §9.1, §9.4) ---
 #define SNOW_CAPTURE_BELOW           3.0

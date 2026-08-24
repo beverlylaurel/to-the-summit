@@ -11,7 +11,7 @@ Shader "ToTheSummit/SnowLit"
         [NoScaleOffset] _SastrugiNoise ("Sastrugi gürültüsü", 2D) = "gray" {}
 
         _SnowBreakupScale ("Gürültü ölçeği (1/m)", Float) = 3.0
-        _SnowEdgeFadeRange ("Kenar geçiş aralığı (m)", Float) = 0.02
+        _SnowEdgeFadeRange ("Kenar geçiş aralığı (m)", Float) = 0.006
 
         _ShadowTint ("Gölge rengi", Color) = (0.66, 0.76, 0.95, 1.0)
         _TranslucencyStrength ("Yarı saydamlık", Float) = 1.0
