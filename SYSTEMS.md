@@ -765,6 +765,13 @@ NdotL + arkadan sızma + BRDF yansıma; speküler URP sözleşmesiyle kullanıl�
 (`_SunElevation01` kapısı) ve ekran uzayında yoğunluğu sabit. Ortam gölgede
 maviye çalıyor. Sis URP'nin `MixFog`'undan — kendi sis hesabı yok.
 
+**Arazi de dünyanın kar kalınlığı kadar yükselir.** `SnowWorldCoverHeight`
+(`_FallbackSWE`/`_FallbackRhoN`'dan) `MountainSurface.shader`'ın dört geçişinde
+de köşe konumuna ekleniyor. Kar mesh'i yerel kar sütunu kadar yükseliyor;
+arazi yükselmezse sınırda derinlikle ÖLÇEKLENEN bir basamak oluşuyor (2 m
+rampada 50 cm karda %25 eğim). Mesh'in kenar sönümü de sıfıra değil dünya kar
+seviyesine iniyor.
+
 **Kar yüzeyinin normali arazi eğimini taşır.** `SnowSurfaceAt` yalnız kar
 kalınlığını döndürüyor; yüzeyin eğimi arazi eğimi + kalınlık gradyanının
 toplamı. Taşımazsa mesh eğimli yamaçta dimdik kalıyor ve araziden farklı ışık

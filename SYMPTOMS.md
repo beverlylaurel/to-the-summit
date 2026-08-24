@@ -1789,3 +1789,42 @@ kesmeye bağlanmıştı; gerekçesi iki yüzey arasındaki %2.3 farkı lekeli bi
 kuşakla gizlemekti. Fark kaynağında kapanınca kuşak gereksizleşti ve kendisi
 görünür oldu — kenarda granüllü bir hat. Kapatılınca sınır tamamen kayboldu.
 `SnowEdgeFade` yine YÜKSEKLİKTE duruyor (basamağı o önlüyor), kesmede yok.
+
+
+---
+
+## Kare DERİNLİKLE ölçekleniyor: 1 ve 5 cm temiz, 20 ve 50 cm'de var
+
+**Kullanıcının ağzından:** "1 ve 5cm'de düzelmiş, 20cm ve 50cmde sorun devam
+ediyor?"
+
+Bu ayrım tek başına sebebi veriyor: belirti kar DERİNLİĞİYLE ölçekleniyorsa
+kaynağı da derinlikle ölçeklenen bir büyüklüktür.
+
+**Gerçek sebep: mesh kar kalınlığı kadar yükseliyor, arazi yükselmiyor.**
+`_SnowCoverThickness` (4 cm) tanımlı ama hiçbir yerde köşe shader'ına
+girmiyordu — arazinin karı yalnız boyamaydı. Mesh ise gerçekten yükseliyor.
+Bölge kenarında `SnowEdgeFade` yüksekliği son 2 metrede sıfıra indiriyor:
+
+| kar | rampa | eğim |
+|---|---|---|
+| 1 cm | 2 m | %0.5 — görünmez |
+| 5 cm | 2 m | %2.5 — görünmez |
+| 20 cm | 2 m | **%10** |
+| 50 cm | 2 m | **%25** |
+
+**Ölçüm tuzağı:** `Mathf.SmoothStep(a, b, t)` HLSL'in `smoothstep(e0, e1, x)`
+imzasıyla AYNI DEĞİL — Unity'ninki a..b arasında t ile interpolasyon yapıyor.
+İlk hesabım bu yüzden sönümü %70 uv'de 0.036 gösterdi; gerçek değer 1.0.
+
+**Çözüm:** arazi de dünyanın kar kalınlığı kadar yükseliyor
+(`SnowWorldCoverHeight`, `MountainSurface.shader`'ın DÖRT geçişinde birden:
+ileri, gölge, derinlik, DepthNormals). Mesh'in kenar sönümü de sıfıra değil
+DÜNYA KAR SEVİYESİNE iniyor — `lerp(SnowWorldCoverHeight(), h, SnowEdgeFade)`.
+Sınırda iki yüzey aynı kotta bitiyor, basamak kalmıyor.
+
+Kar kalınlığı geometri olmayı SÜRDÜRÜYOR: 50 cm kar biriktiğinde zemin
+gerçekten 50 cm yükseliyor — hem bölgede hem dışında.
+
+Görsel doğrulama: 1, 5, 20, 50 cm × (yukarıdan eğik, göz hizası) — hepsinde
+sınır görünmüyor.

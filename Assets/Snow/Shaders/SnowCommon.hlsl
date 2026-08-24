@@ -157,6 +157,19 @@ float SnowEdgeFade(float2 uv)
 float _FallbackSWE;
 float _FallbackRhoN;
 
+/// DÜNYANIN GENEL KAR KALINLIĞI, metre. Deformasyon bölgesinin DIŞINDA zemin
+/// bu kadar kar taşıyor.
+///
+/// Arazi bunu geometri olarak da uyguluyor (`MountainSurface.shader` köşe
+/// shader'ı). Uygulamazsa mesh kar kalınlığı kadar yükselirken arazi yerinde
+/// kalıyor ve bölge sınırında DERİNLİKLE ÖLÇEKLENEN bir basamak oluşuyor:
+/// 2 metrelik kenar rampasında 1 cm karda %0.5, 20 cm'de %10, 50 cm'de %25
+/// eğim. Kullanıcı 1 ve 5 cm'de sorun görmeyip 20 ve 50 cm'de gördü.
+float SnowWorldCoverHeight()
+{
+    return SnowBaseHeight(_FallbackSWE, _FallbackRhoN);
+}
+
 /// TAM SAYI HASH — PCG3D [KAYNAK: Jarzynski & Olano, JCGT 2020,
 /// "Hash Functions for GPU Rendering"].
 ///
@@ -453,7 +466,12 @@ float SnowSurfaceAt(float2 uv)
     // KENAR SÖNÜMÜ BURADA, YALNIZ KÖŞE SHADER'INDA DEĞİL: fragment normali bu
     // fonksiyondan merkezi farkla hesaplanıyor (spec §8.6). Sönüm yalnız
     // vertex'te olsaydı geometri ile normal aynı yüzeyi tarif etmezdi.
-    return h * SnowEdgeFade(uv);
+    //
+    // SIFIRA DEĞİL, DÜNYA KAR SEVİYESİNE İNİYOR. Arazi de kar kalınlığı kadar
+    // yükseldiği için (`MountainSurface.shader` köşe shader'ı) mesh kenarda
+    // sıfıra inseydi aradaki basamak dünyanın kar kalınlığı kadar olurdu —
+    // 50 cm karda 50 cm. Sınırda iki yüzey aynı kotta bitiyor.
+    return lerp(SnowWorldCoverHeight(), h, SnowEdgeFade(uv));
 }
 
 #endif

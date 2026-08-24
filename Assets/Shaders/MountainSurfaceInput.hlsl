@@ -8,6 +8,10 @@
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
 
+// Arazi kar kalınlığı kadar yükseliyor (`SnowWorldCoverHeight`); gölge ve
+// derinlik geçişleri de aynı ofseti uyguluyor, dolayısıyla tanım burada.
+#include "../Snow/Shaders/SnowCommon.hlsl"
+
 // Materyal sabitleri tek yerde. URP'nin hazır gölge/derinlik geçişleri de bu dosyayı
 // include ediyor; tampon her geçişte birebir aynı olmazsa SRP Batcher materyali
 // uyumsuz sayar ve toplu çizim devre dışı kalır.
