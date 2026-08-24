@@ -1889,3 +1889,47 @@ desen RMS'i şişirmiyor; ekran gerekti.
 **Ölçüm tuzağı:** sahnede iki `CharacterController` var (`Player`, `Bicycle`);
 `FindAnyObjectByType` bisikleti döndürüp yürüyüşü 4 km ötede boş bölgeye
 yaptırdı. Probe HER ZAMAN `SnowTrailBody`'nin ebeveynine takılır.
+
+
+---
+
+## İz dikdörtgen, geniş, kenarında dağılma yok (üçü tek kök)
+
+**Kullanıcının ağzından:** "dikdörtgen ayak sorunu devam ediyor, hafif
+yuvarlağımsı olmalıydı", "oluk çok geniş, daralt demiştim", "oluk kenarlarında
+dağılmalar yok".
+
+**İlk şüpheli (kısmen yanlış):** kenar dağılması eklenmişti (warp) ama kullanıcı
+görmüyordu; "warp çalışmıyor" sanıldı. Gerçekte warp çalışıyordu — sorun izin
+ÇOK GENİŞ olmasıydı; 35 cm izde 3 cm dağılma göze düzgün kenar okunuyordu.
+
+**Ölçüm tuzağı 1 — yanlış nesne:** sahnede iki `CharacterController` var
+(`Player`, `Bicycle`); `FindAnyObjectByType` bisikleti döndürüp yürüyüşü 4 km
+ötede boş bölgeye yaptırıyordu, iz hiç oluşmuyordu. Probe HER ZAMAN
+`SnowTrailBody`'nin ebeveynine takılır.
+
+**Ölçüm tuzağı 2 — kar yok:** yeni Play oturumunda kar birikmemişti (swe=0),
+iz oluşamıyordu. Test öncesi `SnowManager.FillSnowDepth(0.20f)` şart.
+
+**Gerçek kök (kaynak RT karşılaştırmasıyla):** eski gövde basık ovaldi
+(22×12×40). İki bağımsız sebep:
+- **Geniş:** 12 cm yükseklikte küre 20 cm karda TAMAMEN gömülüyor, izini
+  ekvatoruyla (22 cm) bırakıyor; carve blur'uyla 35 cm çıkıyor. CAPTURE RT
+  (küre gölgesi) 14 cm, TRAIL 35 cm — fark blur+ekvator.
+- **Düz taban / dikdörtgen:** basık alt yüzey geniş bir düz alan; ayrıca gövde
+  oyuncunun ayağında (kar sütununun TABANINDA) duruyor, küre tüm sütunu delip
+  batma `enFazlaOyma=8cm` sınırına HER YERDE dayanıyor → 80 mm plato
+  (kesit `3 23 63 80×11 74 36 4`).
+
+**Çözüm:** iki değişiklik.
+1. **Geometri** 15×24×34: 24 cm yükseklik yarıçapı (12 cm) batmadan büyük, dar
+   alt eğri iz bırakıyor → 16 cm, U'ya yakın kesit. Dar izde warp görünür oluyor.
+2. **Kar yüzeyine oturtma:** `SnowTrailBodyAlign` gövdeyi kar yüzeyinin 5 cm
+   altına koyuyor (tabana değil) → küre az batıyor, düz taban U'ya dönüyor.
+   Yükseklik iz-öncesi kalınlıktan (`Depth + SinkDepth`) türetiliyor, yoksa
+   küre kendi izini okuyup derinleşir.
+
+**Ayırt eden ölçüm:** CAPTURE vs CAPTURE_BLUR vs TRAIL RT genişliklerini AYRI
+ölçmek (blur payını izole eder), durarak tek damga (yürürken eksen karışması
+olmadan net enine kesit), ve gövde world yaw'ı (align dönüyor mu — 90° çıktı,
+dönüyor). Görsel: dar, yüzeysel, kenarı organik dağınık oluk (RDR2 tarzı).

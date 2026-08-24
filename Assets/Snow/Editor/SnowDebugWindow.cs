@@ -749,12 +749,19 @@ public class SnowDebugWindow : EditorWindow
         go.transform.localPosition = localPos;
         go.transform.localRotation = Quaternion.identity;
 
-        // OVAL: 22 cm en, 12 cm yukseklik, 40 cm boy.
+        // OVAL: 15 cm en, 24 cm yukseklik, 34 cm boy.
         //
-        // Kure (36 cm cap) once denendi ve iki sikayet uretti: oluk cok
-        // kalin, dururken kalan iz yuvarlak. Oval hem inceltiyor hem
-        // dururken birakılan izi oluk yonunde uzatiyor.
-        go.transform.localScale = new Vector3(0.22f, 0.12f, 0.40f);
+        // Once basik bir oval denendi (22x12x40). Iki sorun olctu:
+        //   - EN cok genis: 12 cm yukseklikte kure, 20 cm karda tamamen
+        //     gomulup ekvatoruyle iz birakiyordu; carve blur'uyla 35 cm cikti.
+        //   - YUKSEKLIK az: basik alt yuzey genis bir DUZ TABAN yakalatiyordu,
+        //     iz dikdortgen gorunuyordu (kesit 80 mm plato).
+        // 24 cm yukseklik yaricapi (12 cm) batmadan (~6 cm) buyuk yapiyor:
+        // yalnizca kurenin dar alt egrisi kara giriyor, iz U kesitine donuyor
+        // ve enine daraliyor (~16 cm, olctu). Boy 34 cm adim izini oluk
+        // yonunde uzatiyor. En kucuk eksen (X) yuruyus yonune DIK; align
+        // kureyi hareket yonune cevirdigi icin dar eksen ize enine geliyor.
+        go.transform.localScale = new Vector3(0.15f, 0.24f, 0.34f);
 
         var rend = go.GetComponent<MeshRenderer>();
         rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -820,6 +827,9 @@ public class SnowDebugWindow : EditorWindow
             {
                 var aso = new SerializedObject(align);
                 aso.FindProperty("rhythm").objectReferenceValue = rhythm;
+                // KAR YUZEYINE OTURTMA icin sampler baglaniyor. Yoksa govde
+                // sabit yukseklikte kalir ve kar tabanina inip duz taban birakir.
+                aso.FindProperty("surfaceSampler").objectReferenceValue = sampler;
                 aso.ApplyModifiedProperties();
                 EditorUtility.SetDirty(align);
             }

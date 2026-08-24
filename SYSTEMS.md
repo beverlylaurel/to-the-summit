@@ -765,12 +765,24 @@ NdotL + arkadan sızma + BRDF yansıma; speküler URP sözleşmesiyle kullanıl�
 (`_SunElevation01` kapısı) ve ekran uzayında yoğunluğu sabit. Ortam gölgede
 maviye çalıyor. Sis URP'nin `MixFog`'undan — kendi sis hesabı yok.
 
-**İz TEK gövdeden besleniyor.** Oyuncunun altında tek bir yassı OVAL
-(`SnowTrailBody`, 22×12×40 cm) deformer olarak duruyor ve `SnowTrailBodyAlign`
+**İz TEK gövdeden besleniyor.** Oyuncunun altında tek bir OVAL küre
+(`SnowTrailBody`, 15×24×34 cm) deformer olarak duruyor ve `SnowTrailBodyAlign`
 onu HAREKET yönüne hizalıyor — oyuncunun rotasyonuna değil, yoksa çapraz
-yürüyüşte iz yana çıkıyor. Adım sayacından türeyen hash gövdeyi adım başına
-±3 cm yana, ±1.2 cm dikey oynatıyor: oluk tekrar eden bir desen basmıyor.
-Sapma oluğu bölecek kadar büyük olamaz, yoksa iki ayrı iz doğar.
+yürüyüşte iz yana çıkıyor. En kısa eksen (15 cm) yürüyüş yönüne DİK geliyor,
+iz eni onu takip ediyor (~16 cm, ölçüldü). Adım sayacından türeyen hash
+gövdeyi adım başına ±3 cm yana, ±1.2 cm dikey oynatıyor: oluk tekrar eden bir
+desen basmıyor. Sapma oluğu bölecek kadar büyük olamaz, yoksa iki ayrı iz
+doğar.
+
+**Gövde kar YÜZEYİNE oturuyor, tabana değil.** `SnowTrailBodyAlign`
+`SnowSampler`'dan kar yüksekliğini okuyup gövdeyi yüzeyin `surfaceSink` (5 cm)
+kadar altına koyuyor. Yoksa gövde oyuncunun ayağında (kar sütununun tabanında)
+kalıyor; küre 20 cm karın tamamını delip batma `enFazlaOyma` sınırına dayanınca
+geniş bir DÜZ TABAN bırakıyor (iz dikdörtgen görünüyor, ölçüldü). Yüzeye
+oturunca yalnız kürenin dar alt eğrisi kara giriyor ve oluk U kesitine
+dönüyor. Yükseklik İZ-ÖNCESİ kalınlıktan (`Depth + SinkDepth`) türetiliyor;
+tek başına `Depth` oyulmuş yüzeydir ve küre kendi izini okuyup her kare daha
+derine iner (geri besleme).
 
 **İz kenarları prosedürel gürültüyle dağılıyor.** Kapsama payının OKUNDUĞU
 teksel, iki ölçekli değer gürültüsüyle kaydırılıyor (`SNOW_TRAIL_EDGE_SCALE_A`

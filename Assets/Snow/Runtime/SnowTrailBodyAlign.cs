@@ -1,4 +1,5 @@
-// ROL: kar izi gövdesini hareket yönüne hizalar ve adım adım hafifçe oynatır.
+// ROL: kar izi gövdesini hareket yönüne hizalar, kar yüzeyine oturtur ve
+// adım adım hafifçe oynatır.
 // Çağıran: yok — gövdenin kendi bileşeni.
 
 using UnityEngine;
@@ -44,14 +45,24 @@ public class SnowTrailBodyAlign : MonoBehaviour
     [Tooltip("Adım fazını okuduğumuz ritim. Yoksa sapma uygulanmaz.")]
     [SerializeField] SnowStepRhythm rhythm;
 
+    [Tooltip("Kar yüksekliğini okuduğumuz örnekleyici. Yoksa gövde sabit " +
+             "yükseklikte kalır (taban davranışı).")]
+    [SerializeField] SnowSampler surfaceSampler;
+
+    [Tooltip("Kürenin kar YÜZEYİNE göre batması (m). Küre alt noktası yüzeyin " +
+             "bu kadar altına iner; oluk derinliği buradan gelir.")]
+    [SerializeField] float surfaceSink = 0.05f;
+
     float yaw;
     Vector3 baseLocalPos;
+    float radius;
     int lastStep = -1;
     Vector2 stepOffset;
 
     void OnEnable()
     {
         baseLocalPos = transform.localPosition;
+        radius = transform.localScale.y * 0.5f;
         yaw = transform.eulerAngles.y;
     }
 
@@ -69,20 +80,43 @@ public class SnowTrailBodyAlign : MonoBehaviour
 
         transform.rotation = Quaternion.Euler(0f, yaw, 0f);
 
-        if (rhythm == null) return;
+        Vector3 p = baseLocalPos;
 
-        // Adım değiştiği KARE'de yeni sapma seçiliyor; adım boyunca sabit
-        // kalıyor ki gövde kare kare titremesin.
-        int step = rhythm.StepCount;
-        if (step != lastStep)
+        // KÜRE KAR YÜZEYİNE OTURUYOR, TABANA DEĞİL.
+        //
+        // Gövde ayakta (kar sütununun tabanında) dururken küre 20 cm karın
+        // tamamını deliyor; batma `enFazlaOyma` sınırına dayanıp geniş bir düz
+        // taban bırakıyor — iz dikdörtgen görünüyor (ölçüldü: kesit 80 mm
+        // plato). Küre yalnız yüzeyin `surfaceSink` kadar altına inince kar
+        // içinde kalan kısım kürenin dar alt eğrisi oluyor ve oluk U kesitine
+        // dönüyor.
+        //
+        // İZ-ÖNCESİ yükseklik `Depth + SinkDepth` kullanılıyor: `Depth` tek
+        // başına oyulmuş yüzeydir, küre kendi izini okuyup her kare daha derine
+        // iner (geri besleme). Toplam iz-öncesi kar kalınlığını verir ve sabit
+        // kalır.
+        if (surfaceSampler != null &&
+            surfaceSampler.TrySampleSnow(transform.position, out SnowSample ss) && ss.Valid)
         {
-            lastStep = step;
-            stepOffset = new Vector2(Hash01(step * 2 + 0), Hash01(step * 2 + 1)) * 2f - Vector2.one;
+            float izOncesiYuzey = ss.Depth + ss.SinkDepth;
+            p.y = izOncesiYuzey - surfaceSink + radius;
         }
 
-        Vector3 p = baseLocalPos;
-        p.x += stepOffset.x * lateralJitter;
-        p.y += stepOffset.y * depthJitter;
+        if (rhythm != null)
+        {
+            // Adım değiştiği KARE'de yeni sapma seçiliyor; adım boyunca sabit
+            // kalıyor ki gövde kare kare titremesin.
+            int step = rhythm.StepCount;
+            if (step != lastStep)
+            {
+                lastStep = step;
+                stepOffset = new Vector2(Hash01(step * 2 + 0), Hash01(step * 2 + 1)) * 2f - Vector2.one;
+            }
+
+            p.x += stepOffset.x * lateralJitter;
+            p.y += stepOffset.y * depthJitter;
+        }
+
         transform.localPosition = p;
     }
 
