@@ -1972,3 +1972,29 @@ yüksekliği zamanda yumuşatılıyor (damgalar ortak kotta).
 **Ders:** belirti "şekil bozuk" ise önce ŞEKLİN ÜRETİLDİĞİ yere bakılır. Blur
 ve carve yumuşatmaları zincirin sonunda; kaynak binary olduğu sürece her biri
 yalnız yama.
+
+
+---
+
+## Uzaktaki parıltılar kocaman piksel gibi görünüyor
+
+**Kullanıcının ağzından:** "kar üzerindeki parlamalar çok yapay duruyor",
+"uzağa baktığımda aynı parlamalar kocaman pixel olarak gözüküyor", "parlama
+sadece yakında olsun", "çok abartı duruyor, gerçekçi olmalı".
+
+**Sebep:** parıltı yoğunluğu Bowles & Wang yöntemiyle ekran uzayında sabit
+tutuluyor — bu doğru ve titremeyi önlüyor — ama parıltının BOYUTU hücre boyuna
+eşit ve hücre piksel ayak izine göre LOD'lanıyor. Uzakta hücre metrelerce
+büyüyor, tek hücre birçok pikseli birden kaplıyor ve ekranda iri parlak
+bloklar çıkıyor. Yöntemin kendisi bozuk değil; eksik olan üst mesafe sınırı.
+
+**Neden mesafe, ayak izi değil:** ayak izi bakış açısıyla da değişiyor,
+grazing açıda patlıyor. Ayak izine bağlanan bir kapı, aynı uzaklıktaki düz
+zeminle eğik yamacı farklı kapatırdı.
+
+**Çözüm:** `SNOW_SPARKLE_FADE_START` 6 m / `_END` 16 m arasında smoothstep ile
+sönüm. Yanında yoğunluk 0.006 → 0.0035 ve parlaklık 12 → 7: gerçek karda
+parıltı seyrektir, kristallerin yalnız güneşi tam yansıtan azınlığı seçilir.
+
+**Doğrulama:** öğle + açık hava, üç bakış açısı (yakın/orta/ufka yakın). Uzak
+alan düzgün beyaz, yakında seyrek ince parıltı.

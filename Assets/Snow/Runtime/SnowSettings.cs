@@ -48,13 +48,17 @@ public class SnowSettings : ScriptableObject
     [SerializeField] float sparkleCellSize = 0.004f;
 
     [Tooltip("Piksel başına hedeflenen parıltı olasılığı. Mesafeden bağımsız tutuyor.")]
-    [SerializeField] float sparkleDensity = 0.06f;
+    [SerializeField] float sparkleDensity = 0.0035f;
 
     [Tooltip("Parıltı konisinin keskinliği.")]
     [SerializeField] float sparkleSharpness = 8f;
 
+    /// YOĞUNLUK VE PARLAKLIK ÖLÇÜLÜ TUTULUYOR. Önce 0.06 / 12 kullanıldı;
+    /// kar yüzeyi sürekli kıvılcım saçıyordu ve kullanıcı "çok abartı, yapay
+    /// duruyor" diye bildirdi. Gerçek karda parıltı seyrektir: kristallerin
+    /// yalnız güneşi tam yansıtan azınlığı göze çarpar.
     [Tooltip("Parıltının parlaklığı.")]
-    [SerializeField] float sparkleIntensity = 12f;
+    [SerializeField] float sparkleIntensity = 7f;
 
     [Header("Nesne üstü kar (spec §16)")]
     [Tooltip("Bu eğimin altındaki yüzeylerde kar tutmaz.")]

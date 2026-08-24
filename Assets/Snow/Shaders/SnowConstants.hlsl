@@ -61,6 +61,23 @@
 /// genişliğine (14–19 cm oluğun 7–9 cm'i) yaklaşınca oluk yayılıp sığlaşır.
 #define SNOW_BLUR_RADIUS_TEXELS      4.0
 
+// --- Parıltı mesafesi ---
+
+/// PARILTI UZAKTA KAPANIYOR.
+///
+/// Bowles & Wang yöntemi parıltı YOĞUNLUĞUNU ekran uzayında sabit tutuyor ama
+/// parıltının BOYUTU hücre boyuna bağlı; hücre piksel ayak izine göre
+/// LOD'landığı için uzakta metrelerce büyüyor ve tek hücre birçok pikseli
+/// birden kaplıyor. Sonuç uzaktan "kocaman parlayan piksel" (kullanıcı
+/// bildirdi). Gerçekte de kristal parıltısı yakın bir olaydır: uzaktaki kar
+/// alanı düzgün beyaz görünür, tek tek kristaller seçilmez.
+///
+/// Kapı mesafeye göre; ayak izine göre değil. Ayak izi bakış açısıyla da
+/// değişiyor (grazing açıda patlıyor) ve aynı mesafedeki iki yüzey farklı
+/// kapanırdı.
+#define SNOW_SPARKLE_FADE_START      6.0
+#define SNOW_SPARKLE_FADE_END        16.0
+
 // --- İz oluşumu (spec §10.1) ---
 #define SNOW_LOOSE_N                 0.10
 #define SNOW_PACKED_N                0.55

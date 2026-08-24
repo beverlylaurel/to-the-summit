@@ -98,10 +98,18 @@ half3 SnowDirectLight(Light L, float3 N, float3 V, SnowSurface s)
     half sparkle = 0;
 
 #if !defined(_SNOW_QUALITY_LOW)
-    sparkle = SnowSparkle(s.positionWS, V, L.direction, s.pixelFootprint)
-            * (1.0 - s.wet) * (1.0 - s.disturb * 0.85)
-            * (1.0 - s.crust * 0.7)
-            * saturate(dot(N, L.direction) * 4.0) * sunGate;
+    // MESAFE KAPISI. Gerekçe `SNOW_SPARKLE_FADE_START` yanında: parıltının
+    // boyutu hücre boyuna bağlı, hücre uzakta LOD ile büyüyor ve tek hücre
+    // birçok pikseli kaplayınca uzaktan iri parlak lekeler çıkıyor.
+    float sparkleDist = distance(s.positionWS, _WorldSpaceCameraPos);
+    half distGate = 1.0h - (half)smoothstep(SNOW_SPARKLE_FADE_START,
+                                            SNOW_SPARKLE_FADE_END, sparkleDist);
+
+    if (distGate > 0.0h)
+        sparkle = SnowSparkle(s.positionWS, V, L.direction, s.pixelFootprint)
+                * (1.0 - s.wet) * (1.0 - s.disturb * 0.85)
+                * (1.0 - s.crust * 0.7)
+                * saturate(dot(N, L.direction) * 4.0) * sunGate * distGate;
 #endif
 
     half3 lightCol = L.color * (L.distanceAttenuation * L.shadowAttenuation);

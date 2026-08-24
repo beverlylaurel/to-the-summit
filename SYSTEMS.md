@@ -762,7 +762,12 @@ tabanı koruyamadı: kar izinin oluğu ölçümde kayboluyordu (kontrast %0.8,
 taban normaliyle %10.6). Eğim toplamı tabanı yapısı gereği korur. Işıklandırma sarmalı
 NdotL + arkadan sızma + BRDF yansıma; speküler URP sözleşmesiyle kullanılıyor
 (`brdfData.specular ×` D·V `× NdotL`). Parıltı yalnız gündüz
-(`_SunElevation01` kapısı) ve ekran uzayında yoğunluğu sabit. Ortam gölgede
+(`_SunElevation01` kapısı), ekran uzayında yoğunluğu sabit ve YALNIZ YAKINDA:
+6 m'den sonra sönüp 16 m'de tamamen kapanıyor. Bowles & Wang yöntemi yoğunluğu
+sabit tutuyor ama parıltının BOYUTU hücre boyuna bağlı ve hücre uzakta LOD ile
+büyüyor; kapı olmadan tek hücre birçok pikseli kaplayıp iri parlak lekeler
+üretiyordu. Kapı ayak izine değil MESAFEYE bakıyor — ayak izi grazing açıda
+patlıyor ve aynı uzaklıktaki iki yüzey farklı kapanırdı. Ortam gölgede
 maviye çalıyor. Sis URP'nin `MixFog`'undan — kendi sis hesabı yok.
 
 **İz TEK gövdeden besleniyor ve gövde DÖNEL SİMETRİK.** Oyuncunun altında
