@@ -79,7 +79,7 @@ Varyings SnowLitVertex(Attributes IN)
 
 /// Merkezi fark, adım DIŞARIDAN veriliyor. Vertex shader'ından çağrılabilen
 /// hâli bu: `fwidth` yalnız fragman komutudur ve vertex'te derlenmez.
-float3 SnowNormalAtStep(float2 uv, float t, float hHere, float3 positionWS)
+float3 SnowNormalAtStep(float2 uv, float t, float3 positionWS)
 {
     // PAYDA ÖRNEKLEME ADIMININ DÜNYA BOYU, BİR TEKSEL DEĞİL.
     //
@@ -98,22 +98,40 @@ float3 SnowNormalAtStep(float2 uv, float t, float hHere, float3 positionWS)
     float hD = SnowSurfaceAt(uv - float2(0.0, t));
     float hU = SnowSurfaceAt(uv + float2(0.0, t));
 
-    float3 nSnow   = normalize(float3(hL - hR, 2.0 * ws, hD - hU));
     float3 nGround = SampleGroundNormal(positionWS.xz);
 
-    // İnce karda zeminin şekli baskın; kalınlaştıkça karın kendi yüzeyi
-    // (spec §8.6).
-    return normalize(lerp(nGround, nSnow, saturate(hHere / 0.08)));
+    // KAR YÜZEYİ = ARAZİ + KALINLIK; EĞİMİ DE İKİSİNİN TOPLAMI.
+    //
+    // `SnowSurfaceAt` yalnız kar KALINLIĞINI döndürüyor, arazi yüksekliğini
+    // değil. Merkezi fark bu yüzden yalnız kalınlığın gradyanını veriyordu ve
+    // sabit kalınlıkta sıfır çıkıyordu — mesh eğimli bir yamaçta bile DİMDİK
+    // bir normal taşıyordu.
+    //
+    // Ölçüldü (%15 eğimli yamaç, 20 cm kar, alçak güneş):
+    //   mesh normali  (-0.008, 0.996, -0.008)   dimdik
+    //   arazi normali ( 0.149, 0.991,  0.047)   eğimli
+    // Sonuç: mesh araziden %11.4 daha koyu (0.6983 / 0.7885) ve yerel doku
+    // 2.27 kat daha çalkantılı. Ekranda oyuncuyu takip eden 24 m'lik kare.
+    // DÜZ zeminde iki normal de dikey olduğu için fark yok — tepeden yapılan
+    // sınamalar bu yüzden temiz görünüyordu.
+    //
+    // Eğimler doğrusal toplanır (`SnowDetailNormals` ile aynı ilke): arazinin
+    // eğimi + kar kalınlığının gradyanı.
+    float2 zeminEgim = float2(nGround.x, nGround.z) / max(nGround.y, 1e-3);
+    float2 karEgim   = float2(hL - hR, hD - hU) / max(2.0 * ws, 1e-6);
+
+    float2 toplam = zeminEgim + karEgim;
+    return normalize(float3(toplam.x, 1.0, toplam.y));
 }
 
 /// NORMAL FRAGMENT'TA, MERKEZİ FARKLA (spec §13.3). Vertex'te hesaplanırsa
 /// normal quad başına sabit kalır ve yüzey bloklu görünür (spec §22).
 /// Adım piksel ayak izinden büyür — uzakta örnekleme aralığı genişleyince
 /// normal kaynamaz.
-float3 SnowNormalAt(float2 uv, float hHere, float3 positionWS)
+float3 SnowNormalAt(float2 uv, float3 positionWS)
 {
     float t = max(1.0 / _SnowResolution, length(fwidth(uv)) * 0.5);
-    return SnowNormalAtStep(uv, t, hHere, positionWS);
+    return SnowNormalAtStep(uv, t, positionWS);
 }
 
 /// KAR NEREDE ÇİZİLMEZ (spec §8.4).
@@ -142,16 +160,18 @@ void SnowClipEdge(float h, float baseH, float3 positionWS, float2 uv)
     float edgeFade = saturate((baseH - SNOW_MIN_VISIBLE_HEIGHT)
                               / max(_SnowEdgeFadeRange, 1e-4));
 
-    // BÖLGE KENARI DA BU SORUNUN PARÇASI. `SnowEdgeFade` yalnız YÜKSEKLİĞE
-    // uygulanıyordu: mesh kenarda araziyle aynı kota iniyor, basamak olmuyor
-    // — ama pikselleri tam parlaklıkta çizilmeye devam ediyordu. Mesh ile
-    // arazi iki ayrı ışıklandırma modeli kullandığı için aralarında %2.3
-    // parlaklık farkı kalıyor (ölçüldü: iç 0.8318, dış 0.8132) ve düz bir
-    // alanda bu fark KESKİN BİR ÇİZGİ olarak okunuyor.
+    // BÖLGE KENARI KESMEYE GİRMİYOR — DENENDİ VE KARENİN KENDİSİYDİ.
     //
-    // Kenar sönümü kesmeye de girince geçiş çizgi değil LEKELİ BİR KUŞAK
-    // oluyor; iki yüzey son iki metrede birbirine karışıyor.
-    edgeFade *= SnowEdgeFade(uv);
+    // `SnowEdgeFade` yalnız YÜKSEKLİĞE uygulanıyor (`SnowSurfaceAt`): mesh
+    // kenarda araziyle aynı kota iniyor ve basamak oluşmuyor. Bir tur bu
+    // sönüm kesmeye de bağlandı, gerekçesi iki yüzey arasındaki %2.3
+    // parlaklık farkını lekeli bir kuşakla gizlemekti.
+    //
+    // Fark kaynağında kapanınca (arazi de karın ışıklandırmasını kullanıyor,
+    // mesh normali arazi eğimini taşıyor) kuşağın gerekçesi kalmadı ve
+    // KENDİSİ görünür oldu: kenarda granüllü bir hat. Ölçüldü — kuşak
+    // kapatılınca sınır tamamen kayboluyor.
+
 
     // STOKASTİK DÖŞEME. Düz döşemede aynı leke sabit periyotla tekrar ediyor
     // ve zemin düzenli bir ızgara gibi okunuyordu (kullanıcı bildirdi).
@@ -179,7 +199,7 @@ void SnowShadeSetup(float3 positionWS, out float3 N, out SnowSurface surface, ou
 
     float freshness = 1.0 - saturate((SnowDensity(state.g) - 100.0) / 350.0);
 
-    N = SnowNormalAt(uv, height, positionWS);
+    N = SnowNormalAt(uv, positionWS);
     // DÜZLEMSEL XZ KAPLAMA DİK YÜZEYDE EZİLİYOR (rapor §2). Yüzey dikleştikçe
     // XZ izdüşümü sıfıra yaklaşıyor, doku dikey şeritler hâlinde uzuyor.
     // Detay normalleri yataylık oranıyla ağırlıklandırılıyor — kar zaten

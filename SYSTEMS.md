@@ -765,6 +765,15 @@ NdotL + arkadan sızma + BRDF yansıma; speküler URP sözleşmesiyle kullanıl�
 (`_SunElevation01` kapısı) ve ekran uzayında yoğunluğu sabit. Ortam gölgede
 maviye çalıyor. Sis URP'nin `MixFog`'undan — kendi sis hesabı yok.
 
+**Kar yüzeyinin normali arazi eğimini taşır.** `SnowSurfaceAt` yalnız kar
+kalınlığını döndürüyor; yüzeyin eğimi arazi eğimi + kalınlık gradyanının
+toplamı. Taşımazsa mesh eğimli yamaçta dimdik kalıyor ve araziden farklı ışık
+alıyor — düz zeminde görünmeyen, eğimde açılan bir kare.
+
+**Bölge kenarı KESMEYE girmez, yalnız yüksekliğe.** Yükseklik sönümü basamağı
+önlüyor; kesmeye de bağlanınca kuşağın kendisi granüllü bir hat olarak
+görünüyor.
+
 **Arazinin kar katmanı karın kendi ışıklandırmasını kullanır.** Kaya standart
 PBR'da kalıyor; kar `SnowDirectLight` + `SnowAmbient`'tan geliyor ve ikisi
 `snowMask` ile harmanlanıyor. Kar nerede olursa olsun aynı maddedir, modeli de

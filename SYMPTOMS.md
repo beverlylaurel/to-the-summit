@@ -1747,3 +1747,45 @@ sıfır okur ve fark yeniden doğardı. Aynı sebeple `_SnowBreakup` tanımı da
 yere (`SnowCommon.hlsl`) indi.
 
 **Sonuç:** oran **1.023 → 0.9955**. 1 cm'de de 20 cm'de de kare görünmüyor.
+
+
+---
+
+## Kare EĞİMLİ arazide geri geliyor (düz zeminde yok)
+
+**Kullanıcının ağzından:** "baksana benimle birlikte geliyor... ne işe
+yaradığını da anlamadım. iğnenç bi his"
+
+**Test hatası (benim):** kareyi hep TEPEDEN (90°) sınadım ve temiz gördüm.
+Kullanıcı eğik açıdan bakıyordu. Düz zeminde iki normal de dikey olduğu için
+fark yok; eğimli yamaçta fark açılıyor. Dik duvar tepeden görünmez.
+
+**Ölçüm (eğik açı, %15 eğimli yamaç, alçak güneş):**
+
+| | kar mesh | arazi |
+|---|---|---|
+| parlaklık | 0.6983 | 0.7885 → **oran 0.8856** |
+| yerel doku RMS | 0.0467 | 0.0271 → **1.72×** |
+| albedo | eşit | eşit |
+| **normal** | **(−0.008, 0.996, −0.008)** dimdik | **(0.149, 0.991, 0.047)** eğimli |
+
+**Gerçek sebep:** `SnowSurfaceAt` yalnız kar KALINLIĞINI döndürüyor, arazi
+yüksekliğini değil. `SnowNormalAt` merkezi farkı bu yüzden yalnız kalınlığın
+gradyanını görüyordu ve sabit kalınlıkta SIFIR çıkıyordu — mesh eğimli bir
+yamaçta bile dimdik bir normal taşıyordu. Arazi eğik, mesh dik → ışığı farklı
+alıyor.
+
+**Çözüm:** kar yüzeyi = arazi + kalınlık, eğimi de ikisinin toplamı.
+Eğimler doğrusal toplanıyor (`SnowDetailNormals` ile aynı ilke):
+`zeminEğim + karEğim`. `hHere` parametresi ve `lerp(nGround, nSnow, h/0.08)`
+kapısı gereksizleşti — ince karda kalınlık gradyanı zaten küçük, kalın karda
+büyük; davranış yapısal olarak doğru.
+
+Sonuç: normal kar (0.5761, **0.9914**, 0.5205) vs arazi (0.5746, **0.9955**,
+0.5237) — eşleşti. Parlaklık oranı **0.8856 → 0.9557**.
+
+**İkinci sebep: kenar kuşağının KENDİSİ.** Bir tur önce `SnowEdgeFade`
+kesmeye bağlanmıştı; gerekçesi iki yüzey arasındaki %2.3 farkı lekeli bir
+kuşakla gizlemekti. Fark kaynağında kapanınca kuşak gereksizleşti ve kendisi
+görünür oldu — kenarda granüllü bir hat. Kapatılınca sınır tamamen kayboldu.
+`SnowEdgeFade` yine YÜKSEKLİKTE duruyor (basamağı o önlüyor), kesmede yok.

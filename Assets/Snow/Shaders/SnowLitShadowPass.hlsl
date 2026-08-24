@@ -38,7 +38,7 @@ ShadowVaryings SnowShadowVertex(ShadowAttributes IN)
     // Normal karın kendi yüzeyinden; gölge sapması ona göre uygulanıyor.
     // ADIM SABİT: `fwidth` vertex shader'da derlenmiyor, tek teksel kullanılıyor.
     float2 uv = SnowWorldToUV(positionWS);
-    float3 normalWS = SnowNormalAtStep(uv, 1.0 / _SnowResolution, h, positionWS);
+    float3 normalWS = SnowNormalAtStep(uv, 1.0 / _SnowResolution, positionWS);
 
     float3 lightDir = _MainLightPosition.xyz;
     OUT.positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDir));
