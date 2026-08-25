@@ -32,7 +32,10 @@ struct Varyings
 /// tarif eder.
 float SnowMeshHeightAt(float2 uv)
 {
-    return SnowSurfaceAt(uv);
+    // `SnowSurfaceAt` bölge kenarında zaten `SnowWorldCoverHeight()`'e
+    // sönüyor (`SnowEdgeFade`). Arazi artık hiç yükselmediği için kenarda
+    // sıfıra inmesi gerekiyor: kar yüksekliğini yalnız mesh taşıyor.
+    return SnowSurfaceAt(uv) * SnowEdgeFade(uv);
 }
 
 /// KÖŞE YER DEĞİŞTİRMESİ (spec §8.3).

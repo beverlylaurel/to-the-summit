@@ -111,7 +111,18 @@ Shader "ToTheSummit/MountainSurface"
                 // Yükseltme kar örtüsü maskesiyle ağırlıklanmıyor: maske
                 // fragman'da, burada yalnız konum var. Kar çizgisinin altında
                 // `_FallbackSWE` zaten sıfır, dolayısıyla yükseltme de sıfır.
-                positionWS.y += SnowWorldCoverHeight();
+                // ARAZİ KAR SÜTUNU KADAR YÜKSELMİYOR.
+                //
+                // Yükseltiliyordu ve fizik tarafında karşılığı yoktu:
+                // `CharacterController` arazi collider'ının, yani KAYANIN
+                // üstünde duruyor. Ölçüldü: ayak 205.539, kaya 205.489,
+                // çizilen yüzey 205.98 — karakter yarım metre gömülü
+                // başlıyordu ve göz kar yüzeyinin altında kalıyordu
+                // (kullanıcı: "karakter spawnı yerin içinde", "iz havada").
+                //
+                // Kar yüksekliğini artık YALNIZ kar mesh'i taşıyor; mesh
+                // bölge kenarında `SnowEdgeFade` ile arazi kotuna iniyor.
+                // Uzakta yarım metrelik kot farkı zaten seçilmiyor.
 
                 OUT.positionWS = positionWS;
                 OUT.positionCS = TransformWorldToHClip(positionWS);
@@ -325,7 +336,6 @@ Shader "ToTheSummit/MountainSurface"
 
                 float3 positionWS = TransformObjectToWorld(IN.positionOS.xyz);
                 // Kar örtüsünün geometrisi: ileri geçişle aynı ofset (bkz. Vertex).
-                positionWS.y += SnowWorldCoverHeight();
 
                 // Sapma normale göre uygulanıyor; yer değiştirmiş yüzeyin normali
                 // arazininkinden farklı, o yüzden düz yukarı değil gerçek normal.
@@ -383,7 +393,6 @@ Shader "ToTheSummit/MountainSurface"
                 Varyings OUT;
                 float3 positionWS = TransformObjectToWorld(IN.positionOS.xyz);
                 // Kar örtüsünün geometrisi: ileri geçişle aynı ofset (bkz. Vertex).
-                positionWS.y += SnowWorldCoverHeight();
                 OUT.positionCS = TransformWorldToHClip(positionWS);
                 return OUT;
             }
@@ -428,7 +437,6 @@ Shader "ToTheSummit/MountainSurface"
                 Varyings OUT;
                 OUT.positionWS = TransformObjectToWorld(IN.positionOS.xyz);
                 // Kar örtüsünün geometrisi: ileri geçişle aynı ofset (bkz. Vertex).
-                OUT.positionWS.y += SnowWorldCoverHeight();
                 OUT.positionCS = TransformWorldToHClip(OUT.positionWS);
                 return OUT;
             }

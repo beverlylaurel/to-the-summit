@@ -530,22 +530,6 @@ public class SnowDebugWindow : EditorWindow
         driftVfxSerialized.FindProperty("curtain").objectReferenceValue = curtainVfx;
         driftVfxSerialized.ApplyModifiedProperties();
 
-        // GÖZ KAR YÜZEYİNİN ÜSTÜNE ÇIKIYOR. Arazi kar sütunu kadar yükseliyor,
-        // `CharacterController` ise kayanın üstünde duruyor; aradaki fark kadar
-        // göz karın İÇİNDE kalıyordu.
-        if (player != null)
-        {
-            var eyeLift = player.GetComponent<SnowEyeHeight>();
-            if (eyeLift == null) eyeLift = player.gameObject.AddComponent<SnowEyeHeight>();
-
-            var eyeSerialized = new SerializedObject(eyeLift);
-            Camera oyuncuKamerasi = player.GetComponentInChildren<Camera>();
-            eyeSerialized.FindProperty("eye").objectReferenceValue =
-                oyuncuKamerasi != null ? oyuncuKamerasi.transform.parent : null;
-            eyeSerialized.FindProperty("sampler").objectReferenceValue = sampler;
-            eyeSerialized.ApplyModifiedProperties();
-        }
-
         var izGovdesi = EnsureTrailDeformer(player);
         EnsurePlayerSide(player, izGovdesi, sampler, burst, bridge);
 

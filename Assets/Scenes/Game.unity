@@ -813,8 +813,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.0006841128, y: 0.99927294, z: -0.021918034, w: 0.03118968}
-  m_LocalPosition: {x: -0.12346578, y: -1.4700073, z: 1.9759072}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1556,7 +1556,6 @@ GameObject:
   - component: {fileID: 848219618}
   - component: {fileID: 848219617}
   - component: {fileID: 848219616}
-  - component: {fileID: 848219622}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1571,7 +1570,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 848219606}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3d7b8c626e749f54ca2419f3a5060f07, type: 3}
   m_Name: 
@@ -1675,7 +1674,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 848219606}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7cc75600a780cec43b55cc75dd9093bb, type: 3}
   m_Name: 
@@ -1921,22 +1920,6 @@ MonoBehaviour:
   body: {fileID: 848219608}
   strideLength: 0.78
   minSpeed: 0.15
---- !u!114 &848219622
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 848219606}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 301abe913f442624ebb7813db75beccc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowEyeHeight
-  eye: {fileID: 651637589}
-  sampler: {fileID: 76489732}
-  sinkDepth: 0.18
-  smoothTime: 0.12
 --- !u!1 &852782904
 GameObject:
   m_ObjectHideFlags: 0
