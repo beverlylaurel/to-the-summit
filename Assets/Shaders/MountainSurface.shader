@@ -230,8 +230,12 @@ Shader "ToTheSummit/MountainSurface"
                     // Doku harmanı `BuildSurface` içinde BİR KEZ okundu ve
                     // `surface.snowBlend` ile taşındı; burada yeniden
                     // örneklenmiyor.
+                    // Yoğunluk, ıslaklık ve bozulma YEREL: izin içi sıkışmış
+                    // kar, dışı bakir. `BuildSurface` ikisini de okudu ve
+                    // struct'ta taşıdı.
                     SnowSurface ks = SnowBuildSurfaceFrom(surface.snowBlend,
-                                                          _FallbackRhoN, _SurfaceWetness, 0.0, 0.0,
+                                                          surface.snowRhoN, surface.snowWet,
+                                                          surface.snowDisturb, 0.0,
                                                           _WorldSnowDepth, IN.positionWS,
                                                           length(fwidth(IN.positionWS.xz)));
 

@@ -158,6 +158,13 @@ struct MountainSurface
     /// parıldayıp arazi parıldamayınca sınır çizgi hâlinde görünüyordu.
     half  snowMask;
 
+    /// Karın YEREL durumu, ışıklandırma bloğuna taşınıyor. İzin içi sıkışmış
+    /// kar; ışık da o yoğunluğu görmek zorunda, yoksa yüzey ezilmiş görünüp
+    /// ışığı bakir kar gibi yansıtır.
+    half snowRhoN;
+    half snowWet;
+    half snowDisturb;
+
     /// Yüzey dokusunun harmanı, BİR KEZ okunmuş hâliyle taşınıyor.
     ///
     /// Işıklandırma bloğu da aynı harmanı istiyor; orada yeniden örneklenseydi
@@ -418,6 +425,9 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     surface.snowBlend.albedoTint  = half3(1, 1, 1);
     surface.snowBlend.roughAdd    = 0;
     surface.snowBlend.normalSlope = half2(0, 0);
+    surface.snowRhoN    = (half)_FallbackRhoN;
+    surface.snowWet     = (half)_SurfaceWetness;
+    surface.snowDisturb = 0;
     surface.albedo = albedo;
     surface.emission = Alpenglow(worldPos, normalWS, altitude, albedo, exposure);
     surface.normalWS = shaded;
@@ -509,12 +519,26 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         float3 izPos = worldPos + float3(izKayma.x, 0.0, izKayma.y);
         float2 izUV = SnowWorldToUV(izPos);
 
-        // Spec §14.1: albedo ve pürüzlülük TAZELİKTEN, tazelik de yoğunluktan.
+        // İZİN İÇİ EZİLMİŞ KARDIR — YOĞUNLUK YEREL OKUNUYOR.
         //
-        // Yoğunluk dünyanın genel değeri (`_FallbackRhoN`) — ÖLÇÜLEN değil.
-        // Örtü yolunda durum dokusu okunmuyor; okunsaydı bölge sınırında
-        // tazelik sıçrar ve kare geri gelirdi.
-        float freshness = 1.0 - saturate((SnowDensity(_FallbackRhoN) - 100.0) / 350.0);
+        // Eskiden yoğunluk her yerde dünyanın genel değeriydi (`_FallbackRhoN`)
+        // ve durum dokusu okunmuyordu; gerekçe "bölge sınırında tazelik sıçrar
+        // ve kare geri gelir" idi. O gerekçe ikinci yüzey varken geçerliydi:
+        // sınır artık yok, çünkü çizen shader tek.
+        //
+        // Sıçrama riski `SnowInsideMask` ile kapalı: bölge kenarında yerel
+        // değer dünyanınkine yumuşak geçiyor. Kazanç, ayak izinin İÇİNİN
+        // gerçekten sıkışmış görünmesi — kar basılınca yoğunlaşır, albedosu
+        // düşer, pürüzlülüğü artar.
+        float4 karDurum = SnowStateAt(izUV);
+        float bolgeIci  = SnowInsideMask(izUV);
+
+        float yerelRho = lerp(_FallbackRhoN, karDurum.g, bolgeIci);
+        float yerelIslak = lerp(_SurfaceWetness, max(_SurfaceWetness, karDurum.b), bolgeIci);
+        float yerelBozulma = karDurum.a * bolgeIci;
+
+        // Spec §14.1: albedo ve pürüzlülük TAZELİKTEN, tazelik de yoğunluktan.
+        float freshness = 1.0 - saturate((SnowDensity(yerelRho) - 100.0) / 350.0);
 
         half3 snowAlbedo = lerp(half3(0.70, 0.73, 0.79), half3(0.90, 0.92, 0.95), freshness);
         half  snowRough  = lerp(0.26, 0.48, freshness);
@@ -527,8 +551,11 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         //
         // Kar mesh'i de aynı harmanı kullanıyor. İkisi aynı dokuyu görmek
         // zorunda: mesh yalnız yerel sapmayı çiziyor, düz alanı arazi çiziyor.
-        SnowSurfaceBlend karYuzey = SnowSampleSurface(izPos, _FallbackRhoN, _SurfaceWetness, 0.0);
-        surface.snowBlend = karYuzey;
+        SnowSurfaceBlend karYuzey = SnowSampleSurface(izPos, yerelRho, yerelIslak, yerelBozulma);
+        surface.snowBlend   = karYuzey;
+        surface.snowRhoN    = (half)yerelRho;
+        surface.snowWet     = (half)yerelIslak;
+        surface.snowDisturb = (half)yerelBozulma;
 
         snowAlbedo = saturate(snowAlbedo * karYuzey.albedoTint);
         snowRough  = saturate(snowRough + karYuzey.roughAdd);
