@@ -77,8 +77,12 @@
 /// Kapı mesafeye göre; ayak izine göre değil. Ayak izi bakış açısıyla da
 /// değişiyor (grazing açıda patlıyor) ve aynı mesafedeki iki yüzey farklı
 /// kapanırdı.
-#define SNOW_SPARKLE_FADE_START      3.0
-#define SNOW_SPARKLE_FADE_END        9.0
+/// PARILTI HÜCRESİNİN TAVANI (m). `fwidth` sıyırtma açıda patlıyor; tavan
+/// olmadan hücre metrelerce oluyor ve parıltı dikdörtgen lekeye dönüyor.
+#define SNOW_SPARKLE_MAX_FOOTPRINT   0.04
+
+#define SNOW_SPARKLE_FADE_START      28.0
+#define SNOW_SPARKLE_FADE_END        50.0
 
 /// MESH'İN GÖRÜNÜR OLDUĞU EN KÜÇÜK YEREL SAPMA, metre.
 ///

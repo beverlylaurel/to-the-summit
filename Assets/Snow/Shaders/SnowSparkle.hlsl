@@ -40,18 +40,21 @@ half SnowSparkle(float3 posWS, float3 V, float3 L, float pixelFootprint)
 {
     float3 H = normalize(V + L);
 
-    // LOD SINIRLI: HÜCRE SONSUZ BÜYÜYEMEZ.
+    // SINIRLANAN ŞEY LOD DEĞİL, AYAK İZİ.
     //
     // Bowles & Wang hücreyi piksel ayak izine göre büyütüp yoğunluğu ekran
-    // uzayında sabit tutuyor. Ama parıltının BOYUTU hücre boyuna eşit;
-    // sınırsız LOD'da hücre metrelerce oluyor ve tek hücre birçok pikseli
-    // kaplayınca ekranda İRİ DİKDÖRTGEN lekeler çıkıyor (kullanıcı bildirdi:
-    // "uzaklaştıkça pikseller dikdörtgen gibi olmuş").
+    // uzayında sabit tutuyor. Bir dönem LOD iki seviyeyle sınırlandı, çünkü
+    // uzakta İRİ DİKDÖRTGEN lekeler çıkıyordu. O sınır belirtiyi kapattı ama
+    // parıltıyı da öldürdü: hücre büyüyemeyince `cellsPerPixel` şişiyor,
+    // `pTarget` sıfıra iniyor ve eşik 1'e dayanıyor — uzakta hiçbir kristal
+    // parlamıyor (kullanıcı bildirdi: "sadece çok yakında görünüyor").
     //
-    // İki seviye ile sınırlı: hücre en fazla dört katına çıkıyor. Üstünde
-    // yoğunluk sabitliği bozulup titreme başlardı, ama oraya varmadan mesafe
-    // kapısı (`SNOW_SPARKLE_FADE_*`) parıltıyı zaten kapatıyor.
-    float lodF = clamp(log2(max(pixelFootprint / _SparkleCellSize, 1e-5)), 0.0, 2.0);
+    // Dikdörtgenlerin gerçek sebebi ayak izinin kendisi: `fwidth(posWS.xz)`
+    // sıyırtma açıda patlıyor, hücre metrelerce oluyor ve tek hücre onlarca
+    // pikseli kaplıyor. Ayak izine tavan konunca hücre en fazla birkaç
+    // santim kalıyor — 30 m'de bir iki piksel, yani leke değil parıltı.
+    float fp = clamp(pixelFootprint, _SparkleCellSize, SNOW_SPARKLE_MAX_FOOTPRINT);
+    float lodF = max(log2(fp / _SparkleCellSize), 0.0);
     int   l0 = (int)floor(lodF);
     float f  = lodF - l0;
 
@@ -63,7 +66,7 @@ half SnowSparkle(float3 posWS, float3 V, float3 L, float pixelFootprint)
         float cellSize = _SparkleCellSize * exp2(l0 + k);
         float3 nMicro  = SparkleCellNormal(floor(posWS.xz / cellSize));
 
-        float cellsPerPixel = max(pow(pixelFootprint / cellSize, 2.0), 1.0);
+        float cellsPerPixel = max(pow(fp / cellSize, 2.0), 1.0);
         float pTarget = saturate(_SparkleDensity / cellsPerPixel);
         float thr = 1.0 - 2.0 * pTarget;
 
