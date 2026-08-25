@@ -394,7 +394,7 @@ float SnowYuzeyRolyef(float2 worldXZ)
 /// `SnowShadeHeightAt`'e konunca `SnowDentSmooth` (9 tap) × `SnowDentSlope`
 /// (4 tap) = 36 çağrı × 6 gürültü = piksel başına 180 örnek oluyor. Hem kare
 /// süresi hem shader derleme süresi patlıyor.
-half2 SnowYuzeyEgim(float2 worldXZ)
+half2 SnowYuzeyEgim(float2 worldXZ, out float yukseklik)
 {
     const float e = 0.02;
 
@@ -402,6 +402,13 @@ half2 SnowYuzeyEgim(float2 worldXZ)
     float hR = SnowYuzeyRolyef(worldXZ + float2(e, 0.0));
     float hD = SnowYuzeyRolyef(worldXZ - float2(0.0, e));
     float hU = SnowYuzeyRolyef(worldXZ + float2(0.0, e));
+
+    // YÜKSEKLİK DE BURADAN — AYRI ÇAĞRI YAPILMIYOR.
+    //
+    // Ortam örtmesi yüzeyin yüksekliğine ihtiyaç duyuyor; ayrı bir
+    // `SnowYuzeyRolyef` çağrısı piksel başına altı gürültü örneği daha
+    // demekti. Dört komşunun ortalaması merkezi zaten veriyor.
+    yukseklik = (hL + hR + hD + hU) * 0.25;
 
     return half2((hR - hL) / (2.0 * e), (hU - hD) / (2.0 * e));
 }

@@ -152,6 +152,11 @@ struct MountainSurface
     half3 emission;
     half  smoothness;
     half  occlusion;
+
+    /// Kar yüzeyinin yerel yüksekliği (m). `SnowYuzeyEgim` gradyanla birlikte
+    /// döndürüyor; ortam örtmesi bunu okuyor. Ayrı çağrı piksel başına altı
+    /// gürültü örneği daha demekti.
+    half  snowSurfaceHeight;
     float3 normalWS;
 
     /// Karın bu noktadaki payı. Parıltı bununla ağırlıklanıyor: kar mesh'i
@@ -476,6 +481,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     }
 
     surface.occlusion = lerp(1.0, exposure, _CavityStrength) * microCavity;
+    surface.snowSurfaceHeight = 0;
 
     // Diplere toz ve kırıntı birikir: çukur yalnız loş değil, MAT da. Aynı dip
     // değeri pürüzlülüğe çevrilir — bedava.
@@ -640,8 +646,11 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // olmamalı. Ama yüzeyin kendi rölyefi karın olduğu HER YERDE var,
         // o yüzden ağırlığı `snowMask`.
         {
-            half2 yuzeyEgim = SnowYuzeyEgim(izPos.xz)
+            float yuzeyYuksekligi;
+            half2 yuzeyEgim = SnowYuzeyEgim(izPos.xz, yuzeyYuksekligi)
                             + SnowMikroEgim(izPos.xz, izDerinlik);
+
+            surface.snowSurfaceHeight = (half)yuzeyYuksekligi;
 
             float3 n = surface.normalWS;
             float2 e = float2(n.x, n.z) / max(n.y, 1e-3) - (float2)yuzeyEgim;
@@ -710,8 +719,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // `lerp(occlusion, 1.0, snowMask * 0.55)` payının yarısından fazlasını
         // siliyordu (ölçüldü: öğle karesinde etki görünmedi).
         {
-            float yukseklik = SnowYuzeyRolyef(izPos.xz);
-            half  cukur = (half)saturate(-yukseklik / SNOW_FBM_AMP);
+            half cukur = (half)saturate(-surface.snowSurfaceHeight / SNOW_FBM_AMP);
 
             surface.occlusion *= lerp((half)1.0, (half)1.0 - SNOW_SURFACE_AO,
                                       cukur * (half)snowMask);
