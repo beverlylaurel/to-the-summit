@@ -1725,3 +1725,39 @@ biçim enterpolasyonunun eğrisidir.
 gerekli; Faz 1–7 kullanmıyor. Kullanıcı "şimdi kur" dedi — Faz 8'e gelindiğinde paket
 indirme beklemesi olmasın diye.
 
+
+## İzin silueti yok — relief mapping'in bilinçli sınırı
+
+**Karar.** Kar izi arazi yüzeyinde relief mapping ile çiziliyor; geometri
+deforme edilmiyor. İki sınır kabul edildi:
+
+1. **Siluet vermiyor.** İzin kenarı ufka karşı bakıldığında çıkıntı yapmaz;
+   yalnız yüzeyin içinde derinlik olarak okunur.
+2. **Çok sıyırtma açıda çözünürlük düşer.** Işın yürüyüşü sekiz adım; kayma
+   `SNOW_RELIEF_MAX_STRETCH` ile 3 birimde kırpılıyor, yoksa iz metrelerce
+   uzayıp bulaşıyor.
+
+**Gerekçe.** Alternatif ikinci bir yüzeydi ve üç gün boyunca her konumda kusur
+üretti (`RATIONALE.md` → "İz neden ikinci bir yüzeyle çizilmiyor"). Sevkiyat
+oyunlarının konsol yolu da bu: Batman Arkham Origins relief mapping kullanıyor
+ve ayak izini açıkça "yarı-düşük frekanslı detay" sayıyor.
+
+**Maliyeti.** Adım başına bir doku okuması; sekiz adım + iki ikili bölme.
+
+**Tetikleyici — geri dönülecek belirti:** iz, ufka karşı bakışta yüzeyin
+içinde eriyip kayboluyorsa veya derin çukurda (>35 cm) kenarı yalanlıyorsa,
+çözüm arazinin tessellate edilmesidir — Unity Terrain yerine kendi
+clipmap/mesh arazimize geçmek gerekir. O adım Rise of the Tomb Raider'ın
+yolu ve maliyeti arazi mimarisini değiştirmek.
+
+## DepthNormals geçişi izi görmüyor
+
+**Karar.** Relief yalnız ileri geçişte uygulanıyor; DepthNormals çıktısında
+iz yok.
+
+**Gerekçe.** Depth prepass'e relief eklemek ışın yürüyüşünü ikinci kez
+çalıştırmak demek ve prepass'in tek işi derinlik/normal — oradaki hata
+gölgeye değil yalnız ekran-uzayı efektlerine yansıyor.
+
+**Tetikleyici:** SSAO veya ekran-uzayı temas gölgesi açıldığında izin içi
+aydınlık kalıyorsa, relief prepass'e de eklenir.
