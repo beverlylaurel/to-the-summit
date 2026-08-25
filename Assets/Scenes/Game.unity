@@ -1556,6 +1556,7 @@ GameObject:
   - component: {fileID: 848219618}
   - component: {fileID: 848219617}
   - component: {fileID: 848219616}
+  - component: {fileID: 848219650}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -5787,3 +5788,19 @@ SceneRoots:
   - {fileID: 1147612206}
   - {fileID: 787919894}
   - {fileID: 76489727}
+--- !u!114 &848219650
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 848219606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 301abe913f442624ebb7813db75beccc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  eye: {fileID: 651637589}
+  sampler: {fileID: 76489732}
+  sinkDepth: 0.18
+  smoothTime: 0.12

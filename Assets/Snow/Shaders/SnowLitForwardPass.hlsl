@@ -27,6 +27,14 @@ struct Varyings
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
+/// MESH'İN ÇİZDİĞİ YÜZEY. Üç yer birden bunu okuyor: köşe yüksekliği, fragman
+/// yüksekliği ve merkezi fark. Ayrı yazılırsa normal ile geometri farklı yüzeyi
+/// tarif eder.
+float SnowMeshHeightAt(float2 uv)
+{
+    return SnowSurfaceAt(uv);
+}
+
 /// KÖŞE YER DEĞİŞTİRMESİ (spec §8.3).
 ///
 /// Kamera mesafesine göre kısma YOK — kısılırsa yüzey kayar (spec §8.3).
@@ -44,9 +52,19 @@ float3 SnowDisplacedPositionWS(float3 positionWS, out float heightOut)
     // gömüldü, iz tamamen kayboldu.
     float2 uv = SnowWorldToUV(positionWS);
 
-    // SINIRDA ARAZİNİN KOTUNA OTURUYOR. Yerel sütun ile dünya sütunu birebir
-    // aynı değil (1.4 cm); keskin sınırda bu fark basamak olarak görünüyordu.
-    float h = lerp(SnowWorldCoverHeight(), SnowSurfaceAt(uv), SnowTrailPresence(uv));
+    // MESH SÜTUNU DEĞİL, SÜTUNDAN SAPMAYI ÇİZER — VE SAPMAYI ARAZİNİN
+    // SÜTUNUNUN ÜSTÜNE KOYAR.
+    //
+    // Arazi `SnowWorldCoverHeight()` kadar yükseliyor. Simülasyonun YEREL
+    // sütunu buna eşit değil: ölçüldü, yerel 0.393 / dünya 0.483. Mesh yerel
+    // sütunu kullandığı sürece iki yüzey aynı kotta olmuyor — fark artı
+    // olunca iz havada duruyor, eksi olunca arazi izi örtüyor ve iz
+    // "kayboluyor". Kullanıcı bu iki belirtiyi sırayla bildirdi.
+    //
+    // Bir kez `- SnowBaseAt(uv)` yazılıp dünya sütununu GERİ EKLEMEK
+    // unutuldu; mesh yarım metre aşağı gömüldü. Doğrusu üç terim birden.
+    float h = SnowMeshHeightAt(uv);
+    h = lerp(h, SnowWorldCoverHeight(), _SnowDebugFlatMesh);
 
     heightOut = h;
     positionWS.y = groundY + h;
@@ -105,14 +123,10 @@ float3 SnowNormalAtStep(float2 uv, float t, float3 positionWS)
     // GEOMETRİ NE ÇİZİYORSA GRADYAN DA ONU OKUR: köşe yüksekliği sınırda dünya
     // sütununa harmanlanıyor, merkezi fark da aynı harmanı okuyor. Yoksa
     // normal ile geometri farklı yüzeyi tarif eder.
-    float hL = lerp(SnowWorldCoverHeight(), SnowSurfaceAt(uv - float2(t, 0.0)),
-                    SnowTrailPresence(uv - float2(t, 0.0)));
-    float hR = lerp(SnowWorldCoverHeight(), SnowSurfaceAt(uv + float2(t, 0.0)),
-                    SnowTrailPresence(uv + float2(t, 0.0)));
-    float hD = lerp(SnowWorldCoverHeight(), SnowSurfaceAt(uv - float2(0.0, t)),
-                    SnowTrailPresence(uv - float2(0.0, t)));
-    float hU = lerp(SnowWorldCoverHeight(), SnowSurfaceAt(uv + float2(0.0, t)),
-                    SnowTrailPresence(uv + float2(0.0, t)));
+    float hL = SnowMeshHeightAt(uv - float2(t, 0.0));
+    float hR = SnowMeshHeightAt(uv + float2(t, 0.0));
+    float hD = SnowMeshHeightAt(uv - float2(0.0, t));
+    float hU = SnowMeshHeightAt(uv + float2(0.0, t));
 
     float3 nGround = SampleGroundNormal(positionWS.xz);
 
@@ -203,9 +217,8 @@ void SnowShadeSetup(float3 positionWS, out float3 N, out SnowSurface surface, ou
 {
     float2 uv = SnowWorldToUV(positionWS);
 
-    // Köşe hangi yüzeyi çizdiyse fragman da onu görüyor: sınırda dünya
-    // sütununa harmanlanmış yükseklik.
-    height = lerp(SnowWorldCoverHeight(), SnowSurfaceAt(uv), SnowTrailPresence(uv));
+    // Köşe hangi yüzeyi çizdiyse fragman da onu görüyor.
+    height = SnowMeshHeightAt(uv);
 
     float4 state = SnowStateAt(uv);
 
@@ -242,10 +255,19 @@ void SnowShadeSetup(float3 positionWS, out float3 N, out SnowSurface surface, ou
     // Sapma = oyma + sırt. `SNOW_LOCAL_MIN` bir tekselin gürültüsünün üstünde,
     // gözle seçilebilen en sığ izin altında.
     //
-    // KESME VARLIĞIN MİLİMETRE ALTINDA. Geçiş bandında yükseklik zaten dünya
-    // sütununa inmiş oluyor (`SnowTrailPresence`), yani mesh sınıra vardığında
-    // arazinin kotunda. Kesme orada gerçekleşince basamak da duvar da kalmıyor.
-    clip(SnowTrailPresence(uv) - 0.02);
+    // MESH BÖLGENİN TAMAMINI ÇİZER — İZ ANCAK ÖYLE GÖRÜNÜR.
+    //
+    // Bir dönem mesh yalnız yerel sapmanın olduğu yere kısıldı (24 m'lik kare
+    // belirtisi için). O kısıtla iz GÖRÜNEMİYOR: arazi kesintisiz ve opak bir
+    // örtü, oluk ise onun ALTINA iniyor; çukuru örten bir yüzey varken çukur
+    // görünmez. Ölçüldü: simülasyonda oluk 0.24 m derin, ekranda hiç yok.
+    //
+    // Kare sorununun kökü iki yüzeyin FARKLI görünmesiydi. Bugün ikisi aynı
+    // dört fotogrametri setini, aynı harmanı ve aynı ışıklandırma yolunu
+    // kullanıyor (`SnowSurfaceTextures.hlsl`, `SnowBuildSurfaceFrom`), yani
+    // fark kaynağı kurudu. Bölge kenarını `SnowEdgeFade` yükseklikte de
+    // maddede de dünyaya indiriyor.
+    clip(0.5 - _SnowDebugHideMesh);
 
     float4 trail = SnowTrailAt(uv);
 

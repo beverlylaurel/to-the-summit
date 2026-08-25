@@ -2175,3 +2175,36 @@ teksele çıkarıldı). Yükseklik geçiş bandında dünya sütununa harmanlan�
 mesh sınıra vardığında tam arazi kotunda; kesme de varlığın 0.02'sinde, sapmanın
 milimetre altında yapılıyor. Köşe, fragman yüksekliği ve merkezi fark AYNI
 harmanı okuyor — biri okumazsa normal ile geometri farklı yüzeyi tarif eder.
+
+---
+
+## "Kar izi havada" — asıl sebep: GÖZ KARIN İÇİNDEYDİ
+
+Üç ayrı tur boyunca mesh'in yüksekliği suçlandı ve üç formül denendi; hiçbiri
+belirtiyi kapatmadı. Ölçüm sırası şöyle yürüdü:
+
+| Şüpheli | Ölçüm | Sonuç |
+|---|---|---|
+| Zemin dokusu kaba | teksel 7.32 m | **yanlış** — bilinear okuma araziyle 3 cm içinde |
+| Arazi sütunu eklemiyor | `SnowWorldCoverHeight` = 0.486 m | **yanlış** — arazi dört geçişte de yükseliyor |
+| İz duvarı çok yüksek | en yüksek yığın 1.5 cm, en derin oyuk 16 cm | **yanlış** — duvar yok |
+| Göz kotu | gövde 206.18, zemin 205.99, kar yüzeyi 206.48 | **DOĞRU** |
+
+`CharacterController` arazi collider'ının, yani KAYANIN üstünde duruyor; arazi
+çizimi ise kar sütunu kadar yükseliyor. Aradaki fark kadar (ölçüldü: 0.30 m)
+göz kar yüzeyinin ALTINDA kalıyor. Oyuncu karın içinde yürüyor: sıyırtma
+bakışta kamera yüzeyin altına düşüyor, kar mesh'i tepede asılı görünüyor ve
+iz "havada" okunuyor. `SnowEyeHeight` gözü sütun kadar (batma payı düşülerek)
+yükseltiyor; collider'a dokunulmuyor.
+
+**İkinci bulgu — sastrugi yalnız mesh'te vardı.** `SnowSurfaceAt` yüksekliğe
+±3.5 cm sastrugi ekliyordu; arazi köşeleri 7.3 m arayla olduğu için aynı sırtı
+taşıyamıyor. Mesh'in çizildiği yer arazinin 3.5 cm üstüne çıkıyor ve kenarda
+dışarı taşan üçgenler görünüyordu. Sastrugi geometriden çıkarıldı.
+
+**Üçüncü bulgu — "yalnız izi çiz" kısıtı ÇUKURU GÖRÜNMEZ YAPIYOR.** Arazi
+kesintisiz ve opak bir örtü; oluk onun altına iniyor. Ölçüldü: simülasyonda
+oluk 0.24 m derin, ekranda hiç yok. Çukuru örten bir yüzey varken çukur
+görünmez — mesh bölgenin tamamını çizmek zorunda. Kısıt kaldırıldı; kare
+sorununun kökü olan "iki yüzey farklı görünüyor" durumu bugün doku ve
+ışıklandırma birleştirilerek kurutuldu.

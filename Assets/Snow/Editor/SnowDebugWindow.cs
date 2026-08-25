@@ -443,6 +443,22 @@ public class SnowDebugWindow : EditorWindow
         var sampler = go.GetComponent<SnowSampler>();
         if (sampler == null) sampler = go.AddComponent<SnowSampler>();
 
+        // GÖZ KAR YÜZEYİNİN ÜSTÜNE ÇIKIYOR. Arazi kar sütunu kadar yükseliyor,
+        // `CharacterController` ise kayanın üstünde duruyor; aradaki fark kadar
+        // göz karın İÇİNDE kalıyordu.
+        if (player != null)
+        {
+            var eyeLift = player.GetComponent<SnowEyeHeight>();
+            if (eyeLift == null) eyeLift = player.AddComponent<SnowEyeHeight>();
+
+            var eyeSerialized = new SerializedObject(eyeLift);
+            Camera oyuncuKamerasi = player.GetComponentInChildren<Camera>();
+            eyeSerialized.FindProperty("eye").objectReferenceValue =
+                oyuncuKamerasi != null ? oyuncuKamerasi.transform.parent : null;
+            eyeSerialized.FindProperty("sampler").objectReferenceValue = sampler;
+            eyeSerialized.ApplyModifiedProperties();
+        }
+
         var persistence = go.GetComponent<SnowPersistence>();
         if (persistence == null) persistence = go.AddComponent<SnowPersistence>();
 

@@ -450,6 +450,24 @@ float4 SnowTrailAt(float2 uv)
            * SnowInsideMask(uv);
 }
 
+/// O TEKSELDEKİ BOZULMAMIŞ KAR SÜTUNU (oyma ve yığılma HARİÇ).
+///
+/// Mesh'in yüksekliği bununla ARAZİYE bağlanıyor: mesh, sütunu değil sütundan
+/// SAPMAYI çiziyor ve sapma sıfırken tam arazinin kotunda kalıyor.
+float SnowBaseAt(float2 uv)
+{
+    float4 snow = SAMPLE_TEXTURE2D_LOD(_SnowStateTex, sampler_LinearClamp, saturate(uv), 0);
+    return SnowBaseHeight(snow.r, snow.g);
+}
+
+/// TEŞHİS ANAHTARLARI. Sıfırken hiçbir etkisi yok; ölçüm sırasında dışarıdan
+/// 1 yazılıp belirtinin hangi yüzeyden geldiği ayrılıyor.
+///
+///   `_SnowDebugHideMesh` — kar mesh'i hiç çizilmez, geriye yalnız arazi kalır.
+///   `_SnowDebugFlatMesh` — mesh çizilir ama iz oyulmamış gibi düz durur.
+float _SnowDebugHideMesh;
+float _SnowDebugFlatMesh;
+
 /// İZİN VARLIĞI — 0 ile 1 arası, SERT SINIR YOK.
 ///
 /// Mesh yalnız yerel sapmanın olduğu yerde çiziliyor (gerekçe
@@ -520,7 +538,18 @@ float SnowSurfaceAt(float2 uv)
     // SASTRUGİ BURAYA DA EKLENİYOR (spec §18.4). Yalnız köşe shader'ına
     // eklenirse normal'ler düz kalıyor ve sırtlar ışığa hiç tepki vermiyor —
     // spec'in "en sık atlanan adım" dediği yer burası.
-    h += SnowSastrugiOffset(SnowUVToWorld(uv), trail.a);
+    // SASTRUGİ GEOMETRİYE GİRMİYOR — ARAZİ ONU TAŞIYAMIYOR.
+    //
+    // Mesh artık yalnız izi çiziyor; düz kar arazi tarafından geliyor ve arazi
+    // köşeleri 7.3 m arayla, yani 3.5 cm'lik sastrugi sırtını temsil etmesi
+    // imkânsız. Yükseklik yalnız mesh'e eklenince mesh'in çizildiği yer
+    // arazinin 3.5 cm üstüne çıkıyor ve sıyırtma bakışta izin kenarında
+    // DIŞARI TAŞAN üçgenler görünüyor (kullanıcı üst üste "kar izi havada"
+    // diye bildirdi; ölçüldü: `SNOW_SASTRUGI_HEIGHT` 0.035 m).
+    //
+    // Sırtın görüntüsü kayboluyor değil: yüzey dokusunun normali iki yüzeyde
+    // de aynı ve rüzgâr yönünü zaten taşıyor.
+    // (`SnowSurfaceTextures.hlsl`, rüzgâr ağırlığı.)
 
     // KENAR SÖNÜMÜ BURADA, YALNIZ KÖŞE SHADER'INDA DEĞİL: fragment normali bu
     // fonksiyondan merkezi farkla hesaplanıyor (spec §8.6). Sönüm yalnız
