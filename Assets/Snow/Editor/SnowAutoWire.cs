@@ -68,10 +68,6 @@ public static class SnowAutoWire
     /// Kar yüzeyinin kendi referansları. AYRI BİLEŞEN, AYRI DENETİM: boş
     /// kalırsa `OnEnable` fırlatıyor ve mesh hiç çizilmiyor — ekrandan
     /// bakınca "kar yok" gibi görünüyor, sebebi ise tek bir boş alan.
-    static readonly string[] SurfaceRequired =
-    {
-        "settings", "manager", "snowMaterial",
-    };
 
     /// Örtü sürücüsü. Boş kalırsa örtü ayarları 0 yayınlanır, maske sıfır
     /// çıkar ve dağ çıplak görünür — "kod koşmuyor" ile aynı belirti.
@@ -107,9 +103,6 @@ public static class SnowAutoWire
         // buydu.
         var menu = Object.FindAnyObjectByType<DebugMenu>();
         if (menu != null) Count(new SerializedObject(menu), MenuRequired, ref missing, ref first);
-
-        var surface = Object.FindAnyObjectByType<SnowSurface>();
-        if (surface != null) Count(new SerializedObject(surface), SurfaceRequired, ref missing, ref first);
 
         var coverage = Object.FindAnyObjectByType<SnowCoverageDriver>();
         if (coverage != null)

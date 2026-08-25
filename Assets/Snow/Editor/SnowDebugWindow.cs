@@ -141,7 +141,6 @@ public class SnowDebugWindow : EditorWindow
         EditorGUILayout.LabelField("İzolasyon", EditorStyles.boldLabel);
 
         Toggle<SnowfallRenderer>(host, "Kar yağışı (taneler)");
-        Toggle<SnowSurface>(host, "Kar yüzeyi (zemin mesh'i)");
         Toggle<SnowCoverageDriver>(host, "Nesne üstü kar");
         Toggle<SnowBurstParticles>(host, "Ayak tozu / püskürtme");
         Toggle<SnowPersistence>(host, "İz kalıcılığı");
@@ -366,15 +365,12 @@ public class SnowDebugWindow : EditorWindow
     const string SettingsPath = "Assets/Snow/Settings/SnowSettings.asset";
     const string ComputePath = "Assets/Snow/Shaders/SnowSim.compute";
     const string CaptureShaderPath = "Assets/Snow/Shaders/Hidden_SnowCaptureDepth.shader";
-    const string SnowLitShaderPath = "Assets/Snow/Shaders/SnowLit.shader";
     const string SkyShaderPath = "Assets/Snow/Shaders/Hidden_SnowSkyDepth.shader";
     const string SnowfallComputePath = "Assets/Snow/Shaders/SnowfallSim.compute";
     const string ParticleShaderPath = "Assets/Snow/Shaders/SnowfallParticle.shader";
     const string FlakeMaterialPath = "Assets/Snow/Settings/M_SnowFlake.mat";
     const string DriftMaterialPath = "Assets/Snow/Settings/M_SnowDrift.mat";
     const string PuffMaterialPath = "Assets/Snow/Settings/M_SnowPuff.mat";
-
-    const string SnowLitMaterialPath = "Assets/Snow/Settings/M_SnowLit.mat";
 
     /// SAHNE ELLE DÜZENLENMİYOR. Proje kuralı: bileşen ekleme, referans bağlama ve
     /// layer açma kodda yapılıyor; kullanıcı yalnız düğmeye basıyor.
@@ -427,9 +423,6 @@ public class SnowDebugWindow : EditorWindow
 
         var ground = go.GetComponent<SnowGroundHeight>();
         if (ground == null) ground = go.AddComponent<SnowGroundHeight>();
-
-        var surface = go.GetComponent<SnowSurface>();
-        if (surface == null) surface = go.AddComponent<SnowSurface>();
 
         var coverage = go.GetComponent<SnowCoverageDriver>();
         if (coverage == null) coverage = go.AddComponent<SnowCoverageDriver>();
@@ -567,13 +560,6 @@ public class SnowDebugWindow : EditorWindow
             AssetDatabase.LoadAssetAtPath<Shader>(SkyShaderPath);
         managerSerialized.ApplyModifiedProperties();
 
-        Material snowLit = LoadOrCreateSnowMaterial();
-
-        var surfaceSerialized = new SerializedObject(surface);
-        surfaceSerialized.FindProperty("settings").objectReferenceValue = settings;
-        surfaceSerialized.FindProperty("manager").objectReferenceValue = manager;
-        surfaceSerialized.FindProperty("snowMaterial").objectReferenceValue = snowLit;
-        surfaceSerialized.ApplyModifiedProperties();
 
         Material flakeMat = LoadOrCreateParticleMaterial(FlakeMaterialPath, stretch: false, alpha: 1f);
         Material driftMat = LoadOrCreateParticleMaterial(DriftMaterialPath, stretch: true, alpha: 0.12f);
@@ -911,30 +897,6 @@ public class SnowDebugWindow : EditorWindow
         acs.ApplyModifiedProperties();
 
         EditorUtility.SetDirty(go);
-    }
-
-    static Material LoadOrCreateSnowMaterial()
-    {
-        Texture2D breakup = SnowTextureBaker.EnsureBreakup();
-        Texture2D detailNormal = SnowTextureBaker.EnsureDetailNormal();
-
-        var material = AssetDatabase.LoadAssetAtPath<Material>(SnowLitMaterialPath);
-
-        if (material == null)
-        {
-            var shader = AssetDatabase.LoadAssetAtPath<Shader>(SnowLitShaderPath);
-            if (shader == null) return null;
-
-            material = new Material(shader);
-            AssetDatabase.CreateAsset(material, SnowLitMaterialPath);
-        }
-
-        material.SetTexture(SnowShaderIDs.SnowBreakup, breakup);
-        material.SetTexture(SnowShaderIDs.SnowDetailNormal, detailNormal);
-        material.SetTexture(SnowShaderIDs.SastrugiNoise, SnowTextureBaker.EnsureSastrugiNoise());
-        EditorUtility.SetDirty(material);
-
-        return material;
     }
 
     /// Tane ve savrulma materyalleri. İkisi aynı shader'ı paylaşıyor;

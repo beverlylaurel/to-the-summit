@@ -202,7 +202,6 @@ GameObject:
   - component: {fileID: 76489732}
   - component: {fileID: 76489730}
   - component: {fileID: 76489728}
-  - component: {fileID: 76489736}
   - component: {fileID: 76489738}
   - component: {fileID: 76489737}
   m_Layer: 0
@@ -392,21 +391,6 @@ MonoBehaviour:
   coverageScale: 1
   settings: {fileID: 11400000, guid: 1bdd01165981db9469d51c90967f8bbf, type: 2}
   snowManager: {fileID: 76489726}
---- !u!114 &76489736
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 76489723}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f2a13c00a90985546a84a43069dbf92b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowSurface
-  settings: {fileID: 11400000, guid: 1bdd01165981db9469d51c90967f8bbf, type: 2}
-  manager: {fileID: 76489726}
-  snowMaterial: {fileID: 2100000, guid: be530b3b9185ab147b717ee164b0c41f, type: 2}
 --- !u!114 &76489737
 MonoBehaviour:
   m_ObjectHideFlags: 0

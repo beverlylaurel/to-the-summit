@@ -456,39 +456,6 @@ public static class SnowGroundTest
             }
         }
 
-        // ------------------------------------------------- kar mesh'i ne kadar kaplıyor
-        //
-        // Ekrandaki KARE bu. Sayısı yazılıyor ki bir daha "acaba ne kadar"
-        // diye tahmin edilmesin.
-        r.AppendLine();
-        r.AppendLine("## Kar mesh'inin kapsadığı alan");
-
-        var snowSurface = manager != null ? manager.GetComponent<SnowSurface>() : null;
-
-        if (snowSurface == null || manager.Settings == null)
-        {
-            r.AppendLine("  [!] SnowSurface yok.");
-        }
-        else
-        {
-            SnowQualityData q = manager.Settings.QualityData;
-            SnowMeshBuilder.Grid g = SnowMeshBuilder.Describe(q);
-
-            // MESH İLE BÖLGE AYNI KAREYİ KAPLIYOR (spec §6.1). Ayrışırsa kenar
-            // sönümü mesh'i ortasından keser ve `clip` orada duvar bırakır —
-            // iki gün bu ayrışma yüzünden yandı.
-            bool agree = Mathf.Abs(g.Extent - q.AreaSize) < 0.001f;
-
-            r.AppendLine("  Bölge (kar durumu)       " + q.AreaSize.ToString("0.0") + " m");
-            r.AppendLine("  Mesh                     " + g.Extent.ToString("0.0") + " m" +
-                         "   ±" + (g.Extent * 0.5f).ToString("0.0") + " m");
-            r.AppendLine("  Izgara                   " + g.Quads + " quad" +
-                         "   quad " + (g.QuadSize * 100f).ToString("0.000") + " cm");
-            r.AppendLine("  Üçgen                    " + g.TriangleCount.ToString("N0"));
-            r.AppendLine("  [" + M(agree) + "] Mesh = bölge          " +
-                         (agree ? "aynı kare" : "AYRIŞMA"));
-        }
-
         r.AppendLine();
         r.AppendLine("SONUÇ: " + (sourceIsVisible ? "TAMAM" : "BAŞARISIZ"));
         return r.ToString();
