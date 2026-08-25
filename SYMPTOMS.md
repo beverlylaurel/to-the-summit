@@ -2137,3 +2137,37 @@ yüzeyin farklı doku/güç görmesi artık mümkün değil.
 **Ayrıca kondu:** albedo çarpanına [0.8, 1.2] tavanı. Beyaz bir maddenin
 uzamsal albedo değişimi %20'yi geçmez; deseni kabartı taşır. Tavan olmadan
 yanlış bir güç değeri yüzeyi yine doygun lekeye çevirebilirdi.
+
+---
+
+## "Kar izi yine havada" — iz bandı arazinin yarım metre üstünde
+
+**İlk şüpheli — YANLIŞ: etek (skirt) yetmiyor.** Daha önce izin duvarı boşlukta
+bitiyordu ve çözüm `SNOW_LOCAL_SKIRT_TEXELS` ile çevresine şerit bırakmaktı. Bu
+belirti ona benziyor ama sebebi başka: şerit yerindeydi, bant KOMPLE yükselmişti.
+
+**Ölçüm — simülasyon sağlamdı.** Gövdenin altında enine kesit: düz karda
+`Depth = 0.496 m`, oluğun ortasında `0.346 m`, kenarda `0.502-0.504`. Yani oyma
+15 cm, yığılma 6-8 mm — hepsi makul. Bozukluk fizikte değil ÇİZİMDE.
+
+**Gerçek sebep — mesh sütunu yükseltiyordu, araziyse eklemiyor.**
+`SnowDisplacedPositionWS` köşeyi `groundY + h` yazıyordu; `h` KAR SÜTUNUNUN
+TAMAMI (0.496 m). Arazi geometrisi kar sütununu hiç eklemiyor — arazide kar
+yalnız ışıklandırma katmanı, yüzey kayanın kotunda duruyor. Mesh yalnız yerel
+sapmanın olduğu yerde çizildiği için sonuç: izin bulunduğu bant, çevresindeki
+arazinin 0.5 m üstünde duran, kenarları boşlukta biten bir duvar.
+
+Kar 20 cm'ken de aynı hata vardı, 8 cm'lik bir kademe olarak; 50 cm'de duvara
+dönüştü ve görünür oldu.
+
+**Ayırt eden ölçüm:** `_WorldSnowDepth = 0.4935`, mesh köşe yüksekliği
+`groundY + 0.496`, arazi yüzeyi `groundY`.
+
+**Çözüm:** köşe artık sütunu değil SÜTUNDAN SAPMAYI yükseltiyor —
+`groundY + SnowSurfaceAt(uv) - SnowBaseAt(uv)`. Düz alan tam olarak arazi
+kotunda (ölçüldü: sapma 0.000), oluk 7.3 cm aşağıda, yığılan kenar birkaç mm
+yukarıda. Çıkarma TEKSEL BAŞINA: dünya ortalaması kullanılsaydı yerel yoğunluk
+farkı kadar basamak kalırdı.
+
+Merkezi fark da aynı çıkarmayı yapıyor; yapmasaydı normal ile geometri farklı
+yüzeyi tarif ederdi.

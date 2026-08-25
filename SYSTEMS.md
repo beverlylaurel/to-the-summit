@@ -808,6 +808,13 @@ pulu deseni üretti. `SnowTrailBodyAlign` gövdeyi yine hareket yönüne
 hizalıyor (adım sapması ve ileride yön bağımlı bir özellik için), ama iz artık
 buna bağımlı değil.
 
+**Mesh KOTU arazi kotudur, sütun kadar yükselmez.** Köşe yüksekliği
+`groundY + SnowSurfaceAt(uv) - SnowBaseAt(uv)`: bozulmamış kar sütunu teksel
+başına çıkarılıyor. Arazi geometrisi kar sütununu eklemiyor (arazide kar yalnız
+ışıklandırma katmanı); mesh eklerse iz bandı sütunun tamamı kadar havada kalır.
+Merkezi fark da aynı çıkarmayı yapıyor, yoksa normal ile geometri farklı yüzeyi
+tarif eder.
+
 **KAR MESH'İ YALNIZ YEREL SAPMAYI ÇİZER.** Kar tabanını arazi çiziyor:
 `MountainSurface.shader` dört geçişinde de `SnowWorldCoverHeight()` kadar
 yükseliyor ve karın ışıklandırmasını uyguluyor. Mesh yalnız arazinin

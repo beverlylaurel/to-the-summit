@@ -38,10 +38,24 @@ float3 SnowDisplacedPositionWS(float3 positionWS, out float heightOut)
     // sönümü zincirini tek yerde topluyor. Fragment normali de aynı
     // fonksiyondan türüyor (spec §8.6); ikisi ayrı yazılırsa geometri ile
     // normal farklı yüzeyi tarif eder.
-    float h = SnowSurfaceAt(SnowWorldToUV(positionWS));
+    float2 uv = SnowWorldToUV(positionWS);
+    float h = SnowSurfaceAt(uv);
 
     heightOut = h;
-    positionWS.y = groundY + h;
+
+    // MESH SÜTUNU DEĞİL, SÜTUNDAN SAPMAYI YÜKSELTİR.
+    //
+    // Arazi geometrisi kar sütununu eklemiyor — kar arazide yalnız
+    // ışıklandırma katmanı, yüzey kayanın kotunda duruyor. Mesh `groundY + h`
+    // yazdığında iz bandı bütün sütun kadar (ölçüldü: 0.496 m) arazinin
+    // üstüne çıkıyor ve kenarları boşlukta bitiyordu (kullanıcı bildirdi:
+    // "kar izi yine havada").
+    //
+    // Bozulmamış sütun çıkarılınca düz alan tam olarak arazi kotunda kalıyor,
+    // oluk aşağı iniyor (0.496 - 0.346 = 15 cm), yığılan kenar birkaç
+    // milimetre yükseliyor. TEKSEL BAŞINA çıkarılıyor, dünya ortalaması
+    // değil: ortalama kullanılsaydı yerel yoğunluk farkı kadar basamak kalırdı.
+    positionWS.y = groundY + h - SnowBaseAt(uv);
 
     return positionWS;
 }
@@ -94,10 +108,13 @@ float3 SnowNormalAtStep(float2 uv, float t, float3 positionWS)
     // çevresinde görünür bir KARE.
     float ws = t * _SnowAreaSize;
 
-    float hL = SnowSurfaceAt(uv - float2(t, 0.0));
-    float hR = SnowSurfaceAt(uv + float2(t, 0.0));
-    float hD = SnowSurfaceAt(uv - float2(0.0, t));
-    float hU = SnowSurfaceAt(uv + float2(0.0, t));
+    // GEOMETRİ NE ÇİZİYORSA GRADYAN DA ONU OKUR. Köşe yüksekliği bozulmamış
+    // sütunu çıkarıyor (gerekçe `SnowDisplacedPositionWS`); merkezi fark aynı
+    // çıkarmayı yapmazsa normal ile geometri farklı yüzeyi tarif eder.
+    float hL = SnowSurfaceAt(uv - float2(t, 0.0)) - SnowBaseAt(uv - float2(t, 0.0));
+    float hR = SnowSurfaceAt(uv + float2(t, 0.0)) - SnowBaseAt(uv + float2(t, 0.0));
+    float hD = SnowSurfaceAt(uv - float2(0.0, t)) - SnowBaseAt(uv - float2(0.0, t));
+    float hU = SnowSurfaceAt(uv + float2(0.0, t)) - SnowBaseAt(uv + float2(0.0, t));
 
     float3 nGround = SampleGroundNormal(positionWS.xz);
 

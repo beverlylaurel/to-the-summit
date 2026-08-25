@@ -450,6 +450,18 @@ float4 SnowTrailAt(float2 uv)
            * SnowInsideMask(uv);
 }
 
+/// O TEKSELDEKİ BOZULMAMIŞ KAR SÜTUNU.
+///
+/// `SnowSurfaceAt` oyulmuş yüzeyi veriyor; bu, oyma olmasaydı yüzeyin nerede
+/// olacağını veriyor. Farkı mesh'in köşe yüksekliğinde kullanılıyor: arazi
+/// geometrisi kar sütununu EKLEMİYOR, dolayısıyla mesh sütunu eklerse iz
+/// bandı arazinin yarım metre üstünde havada durur.
+float SnowBaseAt(float2 uv)
+{
+    float4 snow = SAMPLE_TEXTURE2D_LOD(_SnowStateTex, sampler_LinearClamp, saturate(uv), 0);
+    return SnowBaseHeight(snow.r, snow.g);
+}
+
 float SnowSurfaceAt(float2 uv)
 {
     float2 uvC = saturate(uv);
