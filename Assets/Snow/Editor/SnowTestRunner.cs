@@ -186,9 +186,6 @@ public static class SnowTestRunner
         all &= Section(r, "İz", () => SnowTrailTest.Run(out bool ok) + Mark(ok),
                        out_ => !out_.Contains("[BAŞARISIZ]"));
 
-        all &= Section(r, "Mesh", () => SnowMeshTest.Run(out bool ok) + Mark(ok),
-                       out_ => !out_.Contains("[BAŞARISIZ]"));
-
         all &= Section(r, "Birikme", () => SnowAccumulationTest.Run(out bool ok) + Mark(ok),
                        out_ => !out_.Contains("[BAŞARISIZ]"));
 

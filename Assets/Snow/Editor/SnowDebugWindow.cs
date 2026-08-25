@@ -607,7 +607,6 @@ public class SnowDebugWindow : EditorWindow
         EditorUtility.SetDirty(sampler);
 
         EditorUtility.SetDirty(snowfall);
-        EditorUtility.SetDirty(surface);
         EditorUtility.SetDirty(manager);
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(go.scene);
 
