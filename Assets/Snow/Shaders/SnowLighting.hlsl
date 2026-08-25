@@ -5,7 +5,7 @@
 #define SNOW_LIGHTING_INCLUDED
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-#include "SnowLitInput.hlsl"
+#include "SnowCommon.hlsl"
 #include "SnowSparkle.hlsl"
 #include "SnowSurfaceTextures.hlsl"
 
@@ -180,7 +180,7 @@ half SnowHeightAO(float2 uv, float hCenter)
     // Deformasyon alanının dışında iz yok; hesaba hiç girmiyoruz.
     if (SnowInsideMask(uv) < 0.01) return 1.0h;
 
-    float2 stepUV = _SnowAORadius / _SnowAreaSize;
+    float2 stepUV = SNOW_AO_RADIUS / _SnowAreaSize;
     float sum = 0.0;
 
     [unroll]
@@ -194,7 +194,7 @@ half SnowHeightAO(float2 uv, float hCenter)
             float2 o = kDir8[k] * stepUV * (float)m / (float)SNOW_AO_STEPS;
 
             float hn = SnowSurfaceAt(uv + o);
-            float dist = _SnowAORadius * (float)m / (float)SNOW_AO_STEPS;
+            float dist = SNOW_AO_RADIUS * (float)m / (float)SNOW_AO_STEPS;
 
             maxTan = max(maxTan, (hn - hCenter) / max(dist, 1e-4));
         }
@@ -203,7 +203,7 @@ half SnowHeightAO(float2 uv, float hCenter)
         sum += cosPhi * cosPhi;
     }
 
-    return (half)saturate(lerp(1.0, sum / (float)SNOW_AO_DIRS, _SnowAOStrength));
+    return (half)saturate(lerp(1.0, sum / (float)SNOW_AO_DIRS, SNOW_AO_STRENGTH));
 #endif
 }
 
