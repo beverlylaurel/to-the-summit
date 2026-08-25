@@ -109,14 +109,24 @@ half2 SnowSurfEgimTavan(half3 n)
 /// (Renkte gecerli degil, orada ortalama sifir degil — bu yuzden renk tek
 /// ornekle okunuyor; albedo degisimi zaten %2, tekrari gorunmuyor.)
 /// HÜCRE BAŞINA DÖNME. Stokastik ızgara dokuyu yalnız ÖTELİYOR; desenin yönü
-/// her hücrede aynı kalıyor ve göz "her yerde aynı iz" olarak yakalıyor
-/// (kullanıcı bildirdi). Öteleme + dönme birlikte yönü de kırıyor.
-float2 SnowSurfDondur(float2 p, float2 hucre)
+/// her hücrede aynı kalıyor ve göz "her yerde aynı iz" olarak yakalıyor.
+///
+/// DÖNME HÜCRE MERKEZİ ETRAFINDA VE TÜREVLER DE DÖNÜYOR.
+///
+/// İlk sürüm UV'yi ORİJİN etrafında döndürüyordu. Dünya koordinatı binlerce
+/// birim; rastgele bir açıyla döndürülünce örnek her karede bambaşka bir yere
+/// düşüyor. Daha kötüsü türevler döndürülmüyordu: mip seçimi yanlış çıkıyor ve
+/// yüzey yüksek frekanslı, sık, düzenli bir gürültüye dönüyordu (kullanıcı
+/// bildirdi: "niye bu kadar sık iz var, niye düzenli").
+///
+/// Dönme matrisi dışarı veriliyor ki `SAMPLE_TEXTURE2D_GRAD`'a aynı dönmeden
+/// geçmiş türevler verilebilsin.
+float2x2 SnowSurfDonme(float2 hucre)
 {
     float aci = StochasticHash(hucre).x * 6.2831853;
     float sn, cs;
     sincos(aci, sn, cs);
-    return float2(p.x * cs - p.y * sn, p.x * sn + p.y * cs);
+    return float2x2(cs, -sn, sn, cs);
 }
 
 half2 SnowSurfSlope(TEXTURE2D_PARAM(tex, samplerState), float2 uv)
@@ -128,16 +138,24 @@ half2 SnowSurfSlope(TEXTURE2D_PARAM(tex, samplerState), float2 uv)
     float2 dx = ddx(uv);
     float2 dy = ddy(uv);
 
-    half3 n1 = UnpackNormal(SAMPLE_TEXTURE2D_GRAD(tex, samplerState,
-                            SnowSurfDondur(uv, v1) + StochasticHash(v1), dx, dy));
-    half3 n2 = UnpackNormal(SAMPLE_TEXTURE2D_GRAD(tex, samplerState,
-                            SnowSurfDondur(uv, v2) + StochasticHash(v2), dx, dy));
-    half3 n3 = UnpackNormal(SAMPLE_TEXTURE2D_GRAD(tex, samplerState,
-                            SnowSurfDondur(uv, v3) + StochasticHash(v3), dx, dy));
+    float2x2 R1 = SnowSurfDonme(v1);
+    float2x2 R2 = SnowSurfDonme(v2);
+    float2x2 R3 = SnowSurfDonme(v3);
 
-    half2 e1 = SnowSurfEgimTavan(n1);
-    half2 e2 = SnowSurfEgimTavan(n2);
-    half2 e3 = SnowSurfEgimTavan(n3);
+    // Hücre merkezi etrafında döndür, sonra kendi kaymasını ekle.
+    float2 u1 = mul(R1, uv - v1) + v1 + StochasticHash(v1);
+    float2 u2 = mul(R2, uv - v2) + v2 + StochasticHash(v2);
+    float2 u3 = mul(R3, uv - v3) + v3 + StochasticHash(v3);
+
+    half3 n1 = UnpackNormal(SAMPLE_TEXTURE2D_GRAD(tex, samplerState, u1, mul(R1, dx), mul(R1, dy)));
+    half3 n2 = UnpackNormal(SAMPLE_TEXTURE2D_GRAD(tex, samplerState, u2, mul(R2, dx), mul(R2, dy)));
+    half3 n3 = UnpackNormal(SAMPLE_TEXTURE2D_GRAD(tex, samplerState, u3, mul(R3, dx), mul(R3, dy)));
+
+    // EĞİM DÖNDÜRÜLMÜŞ UZAYDA OKUNDU, DÜNYAYA GERİ ÇEVRİLİYOR. Yapılmazsa
+    // her hücrenin kabartısı rastgele bir yöne bakar ve ışık tutarsız düşer.
+    half2 e1 = (half2)mul(SnowSurfEgimTavan(n1), R1);
+    half2 e2 = (half2)mul(SnowSurfEgimTavan(n2), R2);
+    half2 e3 = (half2)mul(SnowSurfEgimTavan(n3), R3);
 
     half2 harman = (half)w.x * e1 + (half)w.y * e2 + (half)w.z * e3;
     return SnowSurfEgimKis(harman / (half)max(length(w), 1e-3));
@@ -152,8 +170,8 @@ half2 SnowSurfSlope(TEXTURE2D_PARAM(tex, samplerState), float2 uv)
 /// enerji frekansla düşüyor.
 half2 SnowSurfIkiOlcek(TEXTURE2D_PARAM(tex, samplerState), float2 uv)
 {
-    return SnowSurfSlope(TEXTURE2D_ARGS(tex, samplerState), uv) * (half)0.72
-         + SnowSurfSlope(TEXTURE2D_ARGS(tex, samplerState), uv * 0.27) * (half)0.42;
+    return SnowSurfSlope(TEXTURE2D_ARGS(tex, samplerState), uv) * (half)0.62
+         + SnowSurfSlope(TEXTURE2D_ARGS(tex, samplerState), uv * 0.27) * (half)0.28;
 }
 
 /// Dort dokunun harmanı. Agirligi ihmal edilebilir olan doku OKUNMUYOR:

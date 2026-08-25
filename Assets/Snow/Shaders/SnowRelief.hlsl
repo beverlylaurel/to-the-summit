@@ -56,8 +56,11 @@ float2 SnowReliefOffset(float3 posWS, float3 viewDirWS, out float dentOut)
     float2 yatay = -viewDirWS.xz / dikey;
     yatay = clamp(yatay, -SNOW_RELIEF_MAX_STRETCH, SNOW_RELIEF_MAX_STRETCH);
 
+    // Çukur yoksa hiç yürüme: düz karda sekiz doku okuması boşa gider.
+    float merkez = SnowDentAt(uv0);
+    if (merkez < 0.001) return (float2)0.0;
+
     const int ADIM = SNOW_RELIEF_STEPS;
-    float onceki = 0.0;
     float oncekiDerinlik = 0.0;
 
     [unroll]
@@ -67,7 +70,14 @@ float2 SnowReliefOffset(float3 posWS, float3 viewDirWS, out float dentOut)
         float derinlik = t * SNOW_RELIEF_MAX_DEPTH;
         float dent = SnowDentAt(SnowWorldToUV(posWS + float3(yatay.x, 0, yatay.y) * derinlik));
 
-        if (dent >= derinlik)
+        // KARŞILAŞTIRMANIN YÖNÜ. Işın yüzeyden aşağı iniyor; çukurun TABANINI
+        // arıyor. Durma koşulu "ışın yükseklik alanının altına indi", yani
+        // `derinlik >= dent`.
+        //
+        // Bir tur ters yazıldı (`dent >= derinlik`) ve ışın ilk adımda
+        // duruyordu: 22 cm'lik oluk 3 cm okunuyor, hem paralaks hem örtülme
+        // yok oluyordu — iz ekranda "şeffaf" görünüyordu (kullanıcı bildirdi).
+        if (derinlik >= dent)
         {
             // İkili bölme: kesişim önceki adımla bu adım arasında.
             float a = oncekiDerinlik, b = derinlik;
@@ -76,7 +86,7 @@ float2 SnowReliefOffset(float3 posWS, float3 viewDirWS, out float dentOut)
             {
                 float m = (a + b) * 0.5;
                 float d = SnowDentAt(SnowWorldToUV(posWS + float3(yatay.x, 0, yatay.y) * m));
-                if (d >= m) b = m; else a = m;
+                if (m >= d) b = m; else a = m;
             }
 
             float son = (a + b) * 0.5;
@@ -84,11 +94,51 @@ float2 SnowReliefOffset(float3 posWS, float3 viewDirWS, out float dentOut)
             return yatay * son;
         }
 
-        onceki = dent;
         oncekiDerinlik = derinlik;
     }
 
-    return (float2)0.0;
+    // Tavana çarptı: çukur `SNOW_RELIEF_MAX_DEPTH`'ten derin. En derin
+    // noktayı döndürüyoruz, sıfırı değil — yoksa en derin yerde iz kayboluyor.
+    dentOut = SNOW_RELIEF_MAX_DEPTH;
+    return yatay * SNOW_RELIEF_MAX_DEPTH;
+}
+
+/// ÇUKURUN KENDİ GÖLGESİ.
+///
+/// Relief mapping tek başına derinliği verir ama ışığın o derinliğe ULAŞIP
+/// ulaşmadığını söylemez. Alçak güneşte sonuç tersine döner: çukurun güneşe
+/// bakan duvarı parlar, yakın duvarı gölgelenmediği için ayak izi TÜMSEK gibi
+/// okunur (ölçüldü: 10:00'da çukur görünüyor, 17:00'de tümsek).
+///
+/// Işık yönünde kısa bir yürüyüş: yükseklik alanı ışının üstüne çıkıyorsa o
+/// nokta gölgededir. Adım sayısı düşük; gölge kenarı yumuşasın diye sert
+/// karar yerine en büyük engel oranı kullanılıyor.
+half SnowReliefShadow(float3 posWS, float3 lightDirWS, float dent)
+{
+    if (dent < 0.005) return 1.0h;
+
+    // Işık yukarı bakan yön; yatay ilerleme birim derinlik başına.
+    float dikey = max(lightDirWS.y, 0.08);
+    float2 yatay = lightDirWS.xz / dikey;
+    yatay = clamp(yatay, -SNOW_RELIEF_MAX_STRETCH, SNOW_RELIEF_MAX_STRETCH);
+
+    float engel = 0.0;
+
+    [unroll]
+    for (int i = 1; i <= SNOW_RELIEF_SHADOW_STEPS; ++i)
+    {
+        float t = (float)i / (float)SNOW_RELIEF_SHADOW_STEPS;
+
+        // Çukurun tabanından yukarı çıkan ışın: bu adımda yüzeyin altında
+        // kalan pay ne kadar.
+        float isinDerinlik = dent * (1.0 - t);
+        float2 uv = SnowWorldToUV(posWS + float3(yatay.x, 0, yatay.y) * (dent * t));
+        float komsu = SnowDentAt(uv);
+
+        engel = max(engel, saturate((komsu - isinDerinlik) / max(dent, 1e-3)));
+    }
+
+    return (half)saturate(1.0 - engel * SNOW_RELIEF_SHADOW_STRENGTH);
 }
 
 /// Çukurun eğimi — normal buradan geliyor. Merkezi fark, adım bir teksel.

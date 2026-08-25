@@ -259,7 +259,15 @@ Shader "ToTheSummit/MountainSurface"
                     // bağlanınca çukur ve yamaç ayrışıyor.
                     half gokPayi = (half)SampleSkyVisibility(IN.positionWS);
 
-                    half3 karIsik = SnowDirectLight(mainLight, karN,
+                    // ÇUKURUN KENDİ GÖLGESİ doğrudan ışığa uygulanıyor.
+                    // Ortama uygulanmıyor: gök her yönden geliyor, çukurun
+                    // duvarı onu kesmiyor — o iş `occlusion` teriminin.
+                    Light izIsigi = mainLight;
+                    izIsigi.shadowAttenuation *= SnowReliefShadow(IN.positionWS,
+                                                                  mainLight.direction,
+                                                                  surface.snowDentDepth);
+
+                    half3 karIsik = SnowDirectLight(izIsigi, karN,
                                                     inputData.viewDirectionWS, ks)
                                   + SnowAmbient(karN, ks,
                                                 mainLight.shadowAttenuation,

@@ -165,6 +165,10 @@ struct MountainSurface
     half snowWet;
     half snowDisturb;
 
+    /// İzin o pikseldeki derinliği (m). Işıklandırma bloğu çukurun kendi
+    /// gölgesini bununla hesaplıyor.
+    half snowDentDepth;
+
     /// Yüzey dokusunun harmanı, BİR KEZ okunmuş hâliyle taşınıyor.
     ///
     /// Işıklandırma bloğu da aynı harmanı istiyor; orada yeniden örneklenseydi
@@ -428,6 +432,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     surface.snowRhoN    = (half)_FallbackRhoN;
     surface.snowWet     = (half)_SurfaceWetness;
     surface.snowDisturb = 0;
+    surface.snowDentDepth = 0;
     surface.albedo = albedo;
     surface.emission = Alpenglow(worldPos, normalWS, altitude, albedo, exposure);
     surface.normalWS = shaded;
@@ -556,6 +561,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         surface.snowRhoN    = (half)yerelRho;
         surface.snowWet     = (half)yerelIslak;
         surface.snowDisturb = (half)yerelBozulma;
+        surface.snowDentDepth = (half)izDerinlik;
 
         snowAlbedo = saturate(snowAlbedo * karYuzey.albedoTint);
         snowRough  = saturate(snowRough + karYuzey.roughAdd);

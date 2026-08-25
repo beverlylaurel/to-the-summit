@@ -103,6 +103,11 @@
 /// metrelerce uzayıp bulaşıyor.
 #define SNOW_RELIEF_MAX_STRETCH        3.0
 
+/// Çukurun kendi gölgesi. Alçak güneşte yakın duvar gölgelenmezse ayak izi
+/// tümsek gibi okunuyor (ölçüldü: 17:00'de ters görünüyordu).
+#define SNOW_RELIEF_SHADOW_STEPS       5
+#define SNOW_RELIEF_SHADOW_STRENGTH    0.85
+
 #define SNOW_LOCAL_MIN               0.002
 
 /// İZİN ÇEVRESİNDE ÇİZİLEN ŞERİDİN GENİŞLİĞİ, teksel.
@@ -135,10 +140,23 @@
 /// 8 cm taze kar için makul: bot tabanı ~180 cm², 70 kg → ~39 kPa; taze karın
 /// (ρ 55) sıkışarak ρ≈200'e ulaştığı derinlik bu mertebede.
 ///
-/// Görsel sonucu da bu: 8 cm derinliğinde, 25 cm genişliğinde bir oluk
-/// mesh'in 4.7 cm'lik köşe aralığıyla YUMUŞAK temsil edilebiliyor. 19 cm'lik
-/// çukur edilemiyordu.
-#define SNOW_MAX_SINK                0.08
+/// GÖRSEL GEREKÇE DÜŞTÜ, FİZİK GEREKÇESİ DÜZELTİLDİ.
+///
+/// Sayının ikinci gerekçesi "8 cm'lik oluk mesh'in 4.7 cm'lik köşe aralığıyla
+/// yumuşak temsil edilebiliyor, 19 cm'lik çukur edilemiyordu" idi. Kar mesh'i
+/// silindi; iz artık arazi yüzeyinde relief mapping ile çiziliyor ve köşe
+/// aralığı diye bir sınırı yok.
+///
+/// Fizik tarafı da eksikti: 39 kPa TAZE karda (ρ≈55) 8 cm'de durmaz. Taze
+/// karda ayak 20-30 cm batar — "postholing" denen şey budur. 8 cm sıkışmış ya
+/// da rüzgâr paketlemiş kara ait bir sayı.
+///
+/// Taban 0.22'ye çıkarıldı; sıkışmış karda `sinkScale` onu zaten orantılı
+/// indiriyor, yani sert zeminde hâlâ az batılıyor.
+///
+/// Ölçülen belirti: iz dokusunda oyma tam 0.0800'de tıkanıyordu ve relief
+/// 8 cm'den derin bir çukuru hiç göremiyordu (ekranda iz "şeffaf" görünüyordu).
+#define SNOW_MAX_SINK                0.22
 
 /// TEK GEÇİŞTE EN FAZLA YOĞUNLAŞMA (normalize birim).
 ///
