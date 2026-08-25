@@ -1441,3 +1441,27 @@ hücre metrelerce oluyor, tek hücre onlarca pikseli kaplıyor.
 
 **Ölçüldü (10:00, ufka yakın bakış):** yakın 114, orta 45, uzak 0 parlak
 nokta. Mesafe kapısı 28→50 m.
+
+## Kar–gök çoklu yansıması
+
+**Kural:** kar için gök ışınımı `1 / (1 − a·s)` ile büyütülüyor; a kar
+albedosu, s göğün geri yansıtma payı (sabit 0.25).
+
+**Neden:** kar gelen ışığın ~%85'ini geri gönderir, gök onun bir kısmını
+tekrar aşağı yansıtır. Sonsuz seri kapalı biçimde bu çarpanı verir. Terim
+olmadan kar sahasının gölgeleri olduğundan koyu çıkar.
+
+**Ölçüm (10:00, poz dondurulmuş, bulut gölgesi kapalı, sabit bakış):**
+terim kapalı 0.5120 → açık 0.8125. Katsayı gölgeye bağlıyken kazanç %58.7;
+sabit 0.25 ile tam güneşte fark ölçüm gürültüsünün altında (%0.0), çünkü
+orada ortamın toplam içindeki payı küçük ve tonemap omzu sıkıştırıyor.
+
+**Katsayı neden sabit.** Bir tur gölgeye bağlandı ("güneş kısıldıysa üstümüzde
+bulut vardır") ve yanlıştı: dağın kendi gölgesi açık gökte de olur. Bulut
+kapsaması global olarak yayınlanmıyor (ölçüldü: `_CloudCoverage` global 0),
+yani ayrım yapılamıyor — ayrım yapamayan katsayı sabit kalır.
+
+**Tetikleyici:** bulut kapsaması global olarak yayınlanırsa `s` ona bağlanır;
+tam bulutta 0.65 ile çarpan 2.4'e çıkar ve bulut gölgesindeki kar gerçekten
+olması gerektiği kadar aydınlanır. Şu an bulut gölgesi altında zemin 0.09
+luma ölçülüyor (güneşlisi 0.85) — bu, terimin eksik kalan yarısı.

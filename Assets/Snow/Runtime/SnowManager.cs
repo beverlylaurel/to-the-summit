@@ -497,6 +497,10 @@ public class SnowManager : MonoBehaviour
         Yayinla("_SnowSurfRuzgarRough", settings.SurfRuzgarRough);
 
         Shader.SetGlobalFloat("_SnowSurfTileMeters", Mathf.Max(0.01f, settings.SurfTileMeters));
+
+        // Kar-gök çoklu yansıması normalde açık; ölçüm sırasında dışarıdan
+        // 0 yazılıp aynı karede kapalı hâli alınabiliyor.
+        Shader.SetGlobalFloat("_SnowMultiScatter", 1f);
         Shader.SetGlobalFloat("_SnowSurfStrength", settings.SurfStrength);
 
         // BÖLGE DIŞI DÜNYANIN KARINI GÖRÜYOR, sabit bir varsayılanı değil.

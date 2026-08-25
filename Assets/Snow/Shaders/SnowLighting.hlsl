@@ -147,12 +147,41 @@ half3 SnowDirectLight(Light L, float3 N, float3 V, SnowSurface s)
 ///
 /// GECE KAR KOYU OLUR. Ortam düşükse kar da koyu; bu doğru davranış. Karı
 /// gece aydınlatmak için `_ShadowTint`'i veya ambient'i yükseltmek yasak.
+/// 1 = kar-gok coklu yansimasi acik. Olcum icin disaridan 0 yazilabiliyor.
+float _SnowMultiScatter;
+
 half3 SnowAmbient(float3 N, SnowSurface s, half mainShadow, half heightAO)
 {
     half3 ambient = SampleSH(N) * s.albedo;
 
     half shadowed = 1.0 - mainShadow;
     ambient *= lerp(half3(1, 1, 1), (half3)_ShadowTint.rgb, shadowed);
+
+    // KAR İLE GÖK ARASINDA ÇOKLU YANSIMA.
+    //
+    // Kar gelen ışığın ~%85'ini geri gönderiyor; gök (ve özellikle bulut
+    // tabanı) onun bir kısmını tekrar aşağı yansıtıyor. Sonsuz seri, kapalı
+    // biçimde: 1 / (1 - a·s), a = kar albedosu, s = göğün geri yansıtma payı.
+    // Kar sahalarında bu terim olmadan gölgeler olduğundan çok koyu çıkar.
+    //
+    // Ölçüldü (10:00, bulut gölgesi altında / açıkta): zemin luması 0.0898
+    // ↔ 0.8461, yani 1/9. Gerçekte güneşli ve bulut gölgeli kar bu kadar
+    // ayrışmaz; eksik olan terim buydu.
+    //
+    // `s` SABİT ve ölçülü. Bir dönem gölgeye bağlanmıştı ("güneş kısıldıysa
+    // üstümüzde bulut vardır") — yanlış: dağın kendi gölgesi açık gökte de
+    // olur ve orada bulut yoktur. Bulut kapsaması global olarak yayınlanmıyor
+    // (ölçüldü: `_CloudCoverage` global sıfır), yani ayrım yapılamıyor.
+    // Ayrım yapamayan bir katsayı sabit kalır.
+    //
+    // 0.25: yüksek irtifada açık gökte Rayleigh + aerosol geri yansıtması.
+    // Kâğıtta çarpan 1 / (1 - 0.9·0.25) = 1.29 — ölçülü bir artış, gölgeyi
+    // yok etmiyor, yalnız kar sahasının gerçek parlaklığını geri veriyor.
+    half karAlbedo = (s.albedo.r + s.albedo.g + s.albedo.b) * (half)0.3333;
+    half cokKat = (half)1.0 / max((half)1.0 - karAlbedo * (half)0.25, (half)0.25);
+
+    // Teşhis anahtarı: 0 yazılınca terim kapanır, aynı karede ölçüm alınır.
+    ambient *= lerp((half)1.0, cokKat, (half)_SnowMultiScatter);
 
     // YALNIZ ORTAMA. Doğrudan ışığa uygulamak gölgeyi iki kez saymaktır ve
     // izleri siyah lekelere çevirir (spec §18.5, §22).
