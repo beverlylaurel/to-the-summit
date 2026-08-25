@@ -143,6 +143,7 @@ float MountainBand(float3 worldPos)
 #include "../Snow/Shaders/SnowCover.hlsl"
 #include "../Snow/Shaders/SnowSparkle.hlsl"
 #include "../Snow/Shaders/SnowLighting.hlsl"
+#include "../Snow/Shaders/SnowRelief.hlsl"
 
 
 struct MountainSurface
@@ -497,6 +498,17 @@ MountainSurface BuildMountainSurface(float3 worldPos)
 
     if (snowMask > 0.001)
     {
+        // İZ BURADA ÇİZİLİYOR — İKİNCİ BİR YÜZEYLE DEĞİL.
+        //
+        // Gerekçe `SnowRelief.hlsl`. Işın yürüyüşü çukurun görünen yerini
+        // buluyor; sonraki bütün okumalar (doku, normal, gölgeleme) KAYDIRILMIŞ
+        // konumdan yapılıyor, böylece çukur üç boyutlu okunuyor.
+        float3 bakisWS = normalize(_WorldSpaceCameraPos - worldPos);
+        float izDerinlik;
+        float2 izKayma = SnowReliefOffset(worldPos, bakisWS, izDerinlik);
+        float3 izPos = worldPos + float3(izKayma.x, 0.0, izKayma.y);
+        float2 izUV = SnowWorldToUV(izPos);
+
         // Spec §14.1: albedo ve pürüzlülük TAZELİKTEN, tazelik de yoğunluktan.
         //
         // Yoğunluk dünyanın genel değeri (`_FallbackRhoN`) — ÖLÇÜLEN değil.
@@ -515,7 +527,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         //
         // Kar mesh'i de aynı harmanı kullanıyor. İkisi aynı dokuyu görmek
         // zorunda: mesh yalnız yerel sapmayı çiziyor, düz alanı arazi çiziyor.
-        SnowSurfaceBlend karYuzey = SnowSampleSurface(worldPos, _FallbackRhoN, _SurfaceWetness, 0.0);
+        SnowSurfaceBlend karYuzey = SnowSampleSurface(izPos, _FallbackRhoN, _SurfaceWetness, 0.0);
         surface.snowBlend = karYuzey;
 
         snowAlbedo = saturate(snowAlbedo * karYuzey.albedoTint);
@@ -554,6 +566,20 @@ MountainSurface BuildMountainSurface(float3 worldPos)
 
         surface.normalWS = normalize(lerp(surface.normalWS, snowNormal, snowMask));
 
+        // ÇUKURUN EĞİMİ NORMALE EN SON GİRİYOR.
+        //
+        // `snowMask` harmanının İÇİNE konsaydı maskeyle sulanırdı; iz bir
+        // ışıklandırma katmanı değil, yüzeyin kendi biçimi — kar oradaysa
+        // çukur da oradadır. Ölçüldü: harmanın içindeyken 22 cm'lik iz ekranda
+        // zar zor seçiliyordu.
+        {
+            half2 izEgim = SnowDentSlope(izUV);
+            float3 n = surface.normalWS;
+            float2 e = float2(n.x, n.z) / max(n.y, 1e-3) - (float2)izEgim;
+            surface.normalWS = normalize(lerp(n, normalize(float3(e.x, 1.0, e.y)),
+                                              saturate(izDerinlik * 20.0)));
+        }
+
         // Mikro-oyuk karın altında kalıyor — ama TAMAMEN değil.
         //
         // 0.7 ile düzleştirilince arazinin oyukları kar altında yok oluyordu
@@ -562,6 +588,11 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // metrelik bir çukuru kapatmaz. Pay 0.55'e indirildi: 0.35'te zemin
         // luması 0.88'den 0.59'a düşüp güneşli kar için fazla koyu kaldı.
         surface.occlusion = lerp(surface.occlusion, 1.0, snowMask * 0.55);
+
+        // ÇUKUR IŞIK ALMIYOR. Derinlik arttıkça gökyüzünü gören pay düşüyor;
+        // bu ayrı bir gölge değil, geometrik örtülme. Kar düzleştirmesinden
+        // SONRA uygulanıyor: düzleştirme çukuru da silerdi.
+        surface.occlusion *= saturate(1.0 - izDerinlik / SNOW_RELIEF_MAX_DEPTH);
 
         surface.snowMask = (half)snowMask;
     }

@@ -89,6 +89,16 @@
 ///
 /// 2 mm: bir tekselin sayısal gürültüsünün üstünde, gözle seçilebilen en sığ
 /// izin altında (ölçülen iz derinlikleri 60-80 mm).
+/// RELIEF MAPPING — iz arazinin kendi yüzeyinde sanal derinlik olarak çiziliyor.
+///
+/// Adım sayısı düşük tutuluyor: ayak izi yarı-düşük frekanslı bir detay, ve
+/// her adım bir doku okuması (GDC 2014, Batman: "minimal taps").
+#define SNOW_RELIEF_STEPS              8
+#define SNOW_RELIEF_MAX_DEPTH          0.35
+/// Sıyırtma açıda ışın yatıyor ve XZ kayması patlıyor; tavan olmadan iz
+/// metrelerce uzayıp bulaşıyor.
+#define SNOW_RELIEF_MAX_STRETCH        3.0
+
 #define SNOW_LOCAL_MIN               0.002
 
 /// İZİN ÇEVRESİNDE ÇİZİLEN ŞERİDİN GENİŞLİĞİ, teksel.
