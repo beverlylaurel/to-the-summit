@@ -52,31 +52,19 @@ public class SnowTrailBodyAlign : MonoBehaviour
              "yükseklikte kalır (taban davranışı).")]
     [SerializeField] SnowSampler surfaceSampler;
 
-    [Tooltip("Kürenin kar YÜZEYİNE göre batması (m). Küre alt noktası yüzeyin " +
-             "bu kadar altına iner; oluk derinliği buradan gelir.")]
-    // OLUĞUN DERİNLİĞİNİ BU SAYI BELİRLİYOR, `SNOW_MAX_SINK` DEĞİL.
+    // AYARLAR ASSET'TEN, SAHNEDEN DEĞİL.
     //
-    // 5 cm'ken yürüyen oyuncunun izi 1-5 cm kalıyordu; 20 cm'lik çukur yalnız
-    // DURDUĞU yerde oluşuyordu (küre kendi izini okuyup derinleşiyor).
-    // Ölçüldü, 4 m'lik yürüyüşten hemen sonra: 1 cm üstü 2446 teksel, 5 cm
-    // üstü yalnız 166, 12 cm üstü 134 — yani izin neredeyse tamamı birkaç
-    // santimlik bir sıyrık. Ekranda "dar ve sığ" olarak okunuyordu.
-    //
-    // 45 cm taze karda yürüyen bir insan 20-30 cm batar; 18 cm o aralığın alt
-    // ucu ve `SNOW_MAX_SINK` (22 cm) tavanının altında kalıyor.
-    [SerializeField] float surfaceSink = 0.18f;
+    // Çap, batma ve yumuşama sahne bileşeninin alanıydı. Sahne dosyası Unity
+    // açıkken dışarıdan düzenlenince Unity bellekteki kopyayı okumaya devam
+    // ediyor ve Play ESKİ değerlerle çalışıyor; iki turluk düzeltme ekrana
+    // hiç ulaşmadı. Tek sahip asset olunca o tuzak kapanıyor.
+    [Tooltip("İz gövdesinin ölçüleri buradan okunuyor.")]
+    [SerializeField] SnowSettings settings;
 
-    [Tooltip("Gövde yüksekliğinin yumuşama süresi (s). Yakalama kare başına " +
-             "bir damga basıyor; yükseklik kare kare sıçrarsa her damga farklı " +
-             "derinlikte kalır ve iz satır satır dilimlenir.")]
-    // YÜRÜRKEN GÖVDE ZIPLAMASIN.
-    //
-    // 0.09 s'de gövde `CharacterController`'ın adım salınımını izliyordu:
-    // her adımda biraz batıp biraz çıkıyor, iz sürekli bir oluk yerine
-    // ARALIKLI KAPSÜLLER dizisi oluyordu (kullanıcı bildirdi: "bazen böyle
-    // saçma bir iz bırakıyor"). 0.25 s salınımı süzüyor, arazi eğimini
-    // yakalayacak kadar da hızlı kalıyor.
-    [SerializeField] float heightSmoothTime = 0.25f;
+    float surfaceSink;
+    float heightSmoothTime;
+
+
 
     float yaw;
     Vector3 baseLocalPos;
@@ -89,6 +77,18 @@ public class SnowTrailBodyAlign : MonoBehaviour
 
     void OnEnable()
     {
+        if (settings == null)
+            throw new System.InvalidOperationException(
+                $"{nameof(SnowTrailBodyAlign)}: {nameof(settings)} atanmadı.");
+
+        // ÖLÇÜ HER AÇILIŞTA ASSET'TEN YAZILIYOR. Sahnedeki değer ne olursa
+        // olsun geçersiz; tek kaynak var.
+        float cap = Mathf.Max(0.02f, settings.TrailBodyDiameter);
+        transform.localScale = new Vector3(cap, transform.localScale.y, cap);
+
+        surfaceSink = settings.TrailBodySink;
+        heightSmoothTime = settings.TrailBodySmoothTime;
+
         baseLocalPos = transform.localPosition;
         radius = transform.localScale.y * 0.5f;
         yaw = transform.eulerAngles.y;

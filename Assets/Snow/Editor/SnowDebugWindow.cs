@@ -756,6 +756,11 @@ public class SnowDebugWindow : EditorWindow
         //
         // Yukseklik 24 cm: yaricapi (12 cm) batmanin uzerinde tutuyor, boylece
         // kure kar sutununu delip duz taban birakmiyor.
+        // ÖLÇEK ARTIK ASSET'TEN. Burada yalnız yükseklik veriliyor; çapı
+        // `SnowTrailBodyAlign` her açılışta `SnowSettings`'ten yazıyor.
+        // Eski hâlinde ölçek sahnede duruyordu ve sahne dosyası dışarıdan
+        // düzenlenince Unity bellekteki kopyayla çalışmaya devam ediyordu.
+        // ESKİ AÇIKLAMA (ölçüm kaydı olarak duruyor):
         // İZ GÖVDESİ BOTTAN GENİŞ.
         //
         // 16 cm bir bot genişliği; ama taze karda ayak batınca kenar ÇÖKER ve
@@ -831,6 +836,8 @@ public class SnowDebugWindow : EditorWindow
                 // KAR YUZEYINE OTURTMA icin sampler baglaniyor. Yoksa govde
                 // sabit yukseklikte kalir ve kar tabanina inip duz taban birakir.
                 aso.FindProperty("surfaceSampler").objectReferenceValue = sampler;
+                aso.FindProperty("settings").objectReferenceValue =
+                    AssetDatabase.LoadAssetAtPath<SnowSettings>(SettingsPath);
                 aso.ApplyModifiedProperties();
                 EditorUtility.SetDirty(align);
             }

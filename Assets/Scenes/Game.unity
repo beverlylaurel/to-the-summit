@@ -3319,8 +3319,7 @@ MonoBehaviour:
   depthJitter: 0.003
   rhythm: {fileID: 848219621}
   surfaceSampler: {fileID: 76489732}
-  surfaceSink: 0.18
-  heightSmoothTime: 0.25
+  settings: {fileID: 11400000, guid: 1bdd01165981db9469d51c90967f8bbf, type: 2}
 --- !u!1 &2018777760
 GameObject:
   m_ObjectHideFlags: 0

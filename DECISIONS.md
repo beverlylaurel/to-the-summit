@@ -1761,3 +1761,28 @@ gölgeye değil yalnız ekran-uzayı efektlerine yansıyor.
 
 **Tetikleyici:** SSAO veya ekran-uzayı temas gölgesi açıldığında izin içi
 aydınlık kalıyorsa, relief prepass'e de eklenir.
+
+## Sahne dosyasına dışarıdan yazılmaz
+
+**Karar.** `.unity` ve `.asset` dosyaları metin editörüyle (sed/python)
+değiştirilmez. Değişiklik Unity API'siyle yapılır: `EditorSceneManager.
+OpenScene` → `SerializedObject` → `ApplyModifiedProperties` → `SaveScene`.
+
+**Gerekçe — ölçüldü.** Unity sahneyi bellekte tutuyor. Dosya dışarıdan
+değiştirilince Unity onu okumuyor; Play BELLEKTEKİ eski kopyayla çalışıyor ve
+dosyadaki yeni değer hiçbir zaman ekrana ulaşmıyor. Daha kötüsü Unity sahneyi
+sonradan kaydederse dışarıdaki değişiklik sessizce siliniyor.
+
+Bir kez oldu ve iki turluk düzeltme boşa gitti: iz gövdesinin ölçeği, batması
+ve yumuşaması dosyada 0.30 / 0.18 / 0.25 yazarken çalışan sahnede
+0.16 / 0.05 / 0.09 kaldı. Kullanıcı "hâlâ aynı" diye geri bildirdi; ölçüm
+`SerializedObject` üzerinden yapılınca fark görüldü.
+
+**Yapısal önlem.** Davranışı süren sayılar sahne bileşeninin alanı olmaz,
+`ScriptableObject`'e taşınır (proje kuralı zaten bunu söylüyor). İz gövdesinin
+üç sayısı `SnowSettings`'e alındı; `SnowTrailBodyAlign` her `OnEnable`'da
+oradan okuyup ölçeği kendisi yazıyor, sahnedeki değer artık hiçbir şey ifade
+etmiyor.
+
+**Tetikleyici:** bir düzeltme "dosyada doğru ama ekranda eski" görünüyorsa ilk
+bakılacak yer budur — `SerializedObject` ile canlı değeri oku, dosyaya güvenme.
