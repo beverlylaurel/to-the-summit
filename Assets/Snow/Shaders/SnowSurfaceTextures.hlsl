@@ -108,6 +108,17 @@ half2 SnowSurfEgimTavan(half3 n)
 /// buyukluk oldugu icin ayni katsayiya bolmek genligi aynen geri getiriyor.
 /// (Renkte gecerli degil, orada ortalama sifir degil — bu yuzden renk tek
 /// ornekle okunuyor; albedo degisimi zaten %2, tekrari gorunmuyor.)
+/// HÜCRE BAŞINA DÖNME. Stokastik ızgara dokuyu yalnız ÖTELİYOR; desenin yönü
+/// her hücrede aynı kalıyor ve göz "her yerde aynı iz" olarak yakalıyor
+/// (kullanıcı bildirdi). Öteleme + dönme birlikte yönü de kırıyor.
+float2 SnowSurfDondur(float2 p, float2 hucre)
+{
+    float aci = StochasticHash(hucre).x * 6.2831853;
+    float sn, cs;
+    sincos(aci, sn, cs);
+    return float2(p.x * cs - p.y * sn, p.x * sn + p.y * cs);
+}
+
 half2 SnowSurfSlope(TEXTURE2D_PARAM(tex, samplerState), float2 uv)
 {
     float2 v1, v2, v3;
@@ -117,9 +128,12 @@ half2 SnowSurfSlope(TEXTURE2D_PARAM(tex, samplerState), float2 uv)
     float2 dx = ddx(uv);
     float2 dy = ddy(uv);
 
-    half3 n1 = UnpackNormal(SAMPLE_TEXTURE2D_GRAD(tex, samplerState, uv + StochasticHash(v1), dx, dy));
-    half3 n2 = UnpackNormal(SAMPLE_TEXTURE2D_GRAD(tex, samplerState, uv + StochasticHash(v2), dx, dy));
-    half3 n3 = UnpackNormal(SAMPLE_TEXTURE2D_GRAD(tex, samplerState, uv + StochasticHash(v3), dx, dy));
+    half3 n1 = UnpackNormal(SAMPLE_TEXTURE2D_GRAD(tex, samplerState,
+                            SnowSurfDondur(uv, v1) + StochasticHash(v1), dx, dy));
+    half3 n2 = UnpackNormal(SAMPLE_TEXTURE2D_GRAD(tex, samplerState,
+                            SnowSurfDondur(uv, v2) + StochasticHash(v2), dx, dy));
+    half3 n3 = UnpackNormal(SAMPLE_TEXTURE2D_GRAD(tex, samplerState,
+                            SnowSurfDondur(uv, v3) + StochasticHash(v3), dx, dy));
 
     half2 e1 = SnowSurfEgimTavan(n1);
     half2 e2 = SnowSurfEgimTavan(n2);
@@ -127,6 +141,19 @@ half2 SnowSurfSlope(TEXTURE2D_PARAM(tex, samplerState), float2 uv)
 
     half2 harman = (half)w.x * e1 + (half)w.y * e2 + (half)w.z * e3;
     return SnowSurfEgimKis(harman / (half)max(length(w), 1e-3));
+}
+
+/// İKİ ÖLÇEK. Tek ölçekte okunan doku, kaydırılıp döndürülse bile HER YERDE
+/// AYNI BÜYÜKLÜKTE kabartı veriyor; göz o büyüklüğü tanıyıp deseni "tekrar
+/// ediyor" diye okuyor. İkinci, üç kat büyük bir okuma bu tekilliği kırıyor —
+/// aynı doku ama farklı ölçekte, yani farklı bir yüzey gibi.
+///
+/// Genlik: büyük ölçek daha az katkı veriyor, çünkü gerçek kar yüzeyinde de
+/// enerji frekansla düşüyor.
+half2 SnowSurfIkiOlcek(TEXTURE2D_PARAM(tex, samplerState), float2 uv)
+{
+    return SnowSurfSlope(TEXTURE2D_ARGS(tex, samplerState), uv) * (half)0.72
+         + SnowSurfSlope(TEXTURE2D_ARGS(tex, samplerState), uv * 0.27) * (half)0.42;
 }
 
 /// Dort dokunun harmanı. Agirligi ihmal edilebilir olan doku OKUNMUYOR:
@@ -178,28 +205,28 @@ SnowSurfaceBlend SnowSampleSurface(float3 posWS, float rhoN, float wet, float di
         renk += w.x * SAMPLE_TEXTURE2D(_SnowSurfTazeColor, SNOW_SURF_SAMPLER, uv).rgb;
         puru += w.x * SAMPLE_TEXTURE2D(_SnowSurfTazeRough, SNOW_SURF_SAMPLER, uv).r;
         ortToplam += w.x * half3(0.8434, 0.8965, 0.9446);
-        egim += w.x * SnowSurfSlope(TEXTURE2D_ARGS(_SnowSurfTazeNormal, SNOW_SURF_SAMPLER), uv);
+        egim += w.x * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfTazeNormal, SNOW_SURF_SAMPLER), uv);
     }
     if (w.y > ESIK)
     {
         renk += w.y * SAMPLE_TEXTURE2D(_SnowSurfTozColor, SNOW_SURF_SAMPLER, uv).rgb;
         puru += w.y * SAMPLE_TEXTURE2D(_SnowSurfTozRough, SNOW_SURF_SAMPLER, uv).r;
         ortToplam += w.y * half3(0.2949, 0.2990, 0.3019);
-        egim += w.y * SnowSurfSlope(TEXTURE2D_ARGS(_SnowSurfTozNormal, SNOW_SURF_SAMPLER), uv);
+        egim += w.y * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfTozNormal, SNOW_SURF_SAMPLER), uv);
     }
     if (w.z > ESIK)
     {
         renk += w.z * SAMPLE_TEXTURE2D(_SnowSurfYerlesmisColor, SNOW_SURF_SAMPLER, uv).rgb;
         puru += w.z * SAMPLE_TEXTURE2D(_SnowSurfYerlesmisRough, SNOW_SURF_SAMPLER, uv).r;
         ortToplam += w.z * half3(0.7740, 0.8602, 0.9412);
-        egim += w.z * SnowSurfSlope(TEXTURE2D_ARGS(_SnowSurfYerlesmisNormal, SNOW_SURF_SAMPLER), uv);
+        egim += w.z * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfYerlesmisNormal, SNOW_SURF_SAMPLER), uv);
     }
     if (w.w > ESIK)
     {
         renk += w.w * SAMPLE_TEXTURE2D(_SnowSurfRuzgarColor, SNOW_SURF_SAMPLER, uv).rgb;
         puru += w.w * SAMPLE_TEXTURE2D(_SnowSurfRuzgarRough, SNOW_SURF_SAMPLER, uv).r;
         ortToplam += w.w * half3(0.7585, 0.8271, 0.8837);
-        egim += w.w * SnowSurfSlope(TEXTURE2D_ARGS(_SnowSurfRuzgarNormal, SNOW_SURF_SAMPLER), uv);
+        egim += w.w * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfRuzgarNormal, SNOW_SURF_SAMPLER), uv);
     }
 
     // RENK CARPAN OLARAK GIRIYOR, YERINE GECMIYOR.
@@ -230,9 +257,16 @@ SnowSurfaceBlend SnowSampleSurface(float3 posWS, float rhoN, float wet, float di
     half3 carpan = clamp((half)1.0 + (renk / ortalama - (half)1.0) * (half)2.5,
                          (half3)0.8, (half3)1.2);
 
-    o.albedoTint  = lerp(half3(1, 1, 1), carpan, (half)_SnowSurfStrength);
-    o.roughAdd    = (puru - (half)0.5) * (half)0.25 * (half)_SnowSurfStrength;
-    o.normalSlope = egim * (half)_SnowSurfStrength;
+    // MAKRO DEĞİŞİM. Gerçek kar alanı her yerde aynı pürüzde değil: rüzgârın
+    // süpürdüğü yer sert ve düz, kuytusu kabarık. Şiddet 40 m ölçekli bir
+    // gürültüyle 0.55–1.45 arasında geziniyor; desen aynı kalsa bile ekranda
+    // "her yerde aynı" okunmuyor.
+    half makro = (half)(0.55 + SnowValueNoise(posWS.xz * 0.025) * 0.9);
+    half guc = (half)_SnowSurfStrength * makro;
+
+    o.albedoTint  = lerp(half3(1, 1, 1), carpan, guc);
+    o.roughAdd    = (puru - (half)0.5) * (half)0.25 * guc;
+    o.normalSlope = egim * guc;
     return o;
 }
 
