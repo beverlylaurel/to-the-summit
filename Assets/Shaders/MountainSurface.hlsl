@@ -594,6 +594,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // SONRA uygulanıyor: düzleştirme çukuru da silerdi.
         surface.occlusion *= saturate(1.0 - izDerinlik / SNOW_RELIEF_MAX_DEPTH);
 
+
         surface.snowMask = (half)snowMask;
     }
 

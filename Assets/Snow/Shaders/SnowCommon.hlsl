@@ -460,13 +460,10 @@ float SnowBaseAt(float2 uv)
     return SnowBaseHeight(snow.r, snow.g);
 }
 
-/// TEŞHİS ANAHTARLARI. Sıfırken hiçbir etkisi yok; ölçüm sırasında dışarıdan
-/// 1 yazılıp belirtinin hangi yüzeyden geldiği ayrılıyor.
-///
-///   `_SnowDebugHideMesh` — kar mesh'i hiç çizilmez, geriye yalnız arazi kalır.
-///   `_SnowDebugFlatMesh` — mesh çizilir ama iz oyulmamış gibi düz durur.
-float _SnowDebugHideMesh;
-float _SnowDebugFlatMesh;
+/// 1 iken arazi, izin DERINLIGINI renk olarak basar: siyah = iz yok,
+/// kirmizi = SNOW_RELIEF_MAX_DEPTH. Verinin shader'a ulasip ulasmadigini
+/// isiklandirmadan bagimsiz ayirir.
+float _SnowDebugDent;
 
 /// İZİN VARLIĞI — 0 ile 1 arası, SERT SINIR YOK.
 ///

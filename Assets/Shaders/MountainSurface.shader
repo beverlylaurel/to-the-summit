@@ -138,6 +138,16 @@ Shader "ToTheSummit/MountainSurface"
             /// küresi örneklemesi — sahnede yansıma küresi yok, yüzey de mat.
             half4 Fragment(Varyings IN) : SV_Target
             {
+                // TESHIS: izin derinligi dogrudan ekrana. Isiklandirmadan ONCE
+                // donuluyor, cunku kar isigi `lit`i tamamen yeniden kuruyor ve
+                // albedo'ya yazilan teshis rengi orada kayboluyor.
+                if (_SnowDebugDent > 0.5)
+                {
+                    float ham = SnowDentAt(SnowWorldToUV(IN.positionWS)) / SNOW_RELIEF_MAX_DEPTH;
+                    float ici  = SnowInsideMask(SnowWorldToUV(IN.positionWS));
+                    return half4(saturate(ham), saturate(ici) * 0.35h, 0.0h, 1.0h);
+                }
+
                 MountainSurface surface = BuildMountainSurface(IN.positionWS);
 
                 // Forward+ ışık döngüsü makroları bu değişkeni adıyla okuyor
