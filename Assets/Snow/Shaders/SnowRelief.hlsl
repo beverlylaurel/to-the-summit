@@ -37,6 +37,30 @@ float SnowDentAt(float2 uv)
     return max(0.0, trail.r - trail.g);
 }
 
+/// YUMUŞATILMIŞ DERİNLİK — GÖRÜNTÜ İÇİN.
+///
+/// Yakalama tekseli 2.3 cm ve oyma alanının kenarı bir tekselde bitiyor:
+/// ham okunduğunda izin kenarı MERDİVEN gibi çıkıyor, dağılma diye bir şey
+/// kalmıyor (kullanıcı bildirdi: "kenarlar çok keskin, yumuşaklık sıfır").
+///
+/// Bu yumuşatma bir dönem `SnowSurfaceAt` içinde vardı; kar mesh'i silinince
+/// o fonksiyonla birlikte gitti ve relief ham tekseli okumaya başladı.
+///
+/// Merkez + dört köşegen, ±`SNOW_CARVE_SMOOTH_TEXELS`. Yalnız GÖRÜNEN
+/// derinlikte kullanılıyor; ışın yürüyüşü ucuz tek örneklemeyle kalıyor,
+/// çünkü orada iş yüzeyi BULMAK, çizmek değil.
+float SnowDentSmooth(float2 uv)
+{
+    float2 b = SNOW_CARVE_SMOOTH_TEXELS / _SnowResolution;
+
+    float d = SnowDentAt(uv) * 0.5;
+    d += SnowDentAt(uv + float2( b.x,  b.y)) * 0.125;
+    d += SnowDentAt(uv + float2(-b.x,  b.y)) * 0.125;
+    d += SnowDentAt(uv + float2( b.x, -b.y)) * 0.125;
+    d += SnowDentAt(uv + float2(-b.x, -b.y)) * 0.125;
+    return d;
+}
+
 /// IŞIN YÜRÜYÜŞÜ. Bakış ışını yüzeyin altına iner; yükseklik alanı ışının
 /// derinliğini yakaladığı yerde durulur.
 ///
@@ -62,6 +86,7 @@ float2 SnowReliefOffset(float3 posWS, float3 viewDirWS, out float dentOut)
 
     const int ADIM = SNOW_RELIEF_STEPS;
     float oncekiDerinlik = 0.0;
+    float onceki = merkez;
 
     [unroll]
     for (int i = 1; i <= ADIM; ++i)
@@ -79,21 +104,25 @@ float2 SnowReliefOffset(float3 posWS, float3 viewDirWS, out float dentOut)
         // yok oluyordu — iz ekranda "şeffaf" görünüyordu (kullanıcı bildirdi).
         if (derinlik >= dent)
         {
-            // İkili bölme: kesişim önceki adımla bu adım arasında.
-            float a = oncekiDerinlik, b = derinlik;
-            [unroll]
-            for (int k = 0; k < 2; ++k)
-            {
-                float m = (a + b) * 0.5;
-                float d = SnowDentAt(SnowWorldToUV(posWS + float3(yatay.x, 0, yatay.y) * m));
-                if (m >= d) b = m; else a = m;
-            }
+            // KESİŞİM DOĞRUSAL ÇÖZÜLÜYOR, İKİLİ BÖLMEYLE DEĞİL.
+            //
+            // İkili bölme derinliği adım ızgarasına yuvarlıyordu: aynı
+            // derinliği paylaşan pikseller bant bant çıkıyor ve kamera
+            // kıpırdadıkça bantlar kayıyordu — izin içinde HAREKET EDEN
+            // SOĞAN HALKALARI (kullanıcı bildirdi).
+            //
+            // İki örnek arasında hem ışının derinliği hem yükseklik alanı
+            // doğrusal; kesişim kapalı biçimde çözülüyor ve sonuç sürekli.
+            float dOnce = onceki - oncekiDerinlik;   // önceki adımda ışın yüzeyin ÜSTÜNDE
+            float dSimdi = dent - derinlik;          // bu adımda ALTINDA
+            float t = saturate(dOnce / max(dOnce - dSimdi, 1e-5));
 
-            float son = (a + b) * 0.5;
+            float son = lerp(oncekiDerinlik, derinlik, t);
             dentOut = son;
             return yatay * son;
         }
 
+        onceki = dent;
         oncekiDerinlik = derinlik;
     }
 
@@ -133,7 +162,7 @@ half SnowReliefShadow(float3 posWS, float3 lightDirWS, float dent)
         // kalan pay ne kadar.
         float isinDerinlik = dent * (1.0 - t);
         float2 uv = SnowWorldToUV(posWS + float3(yatay.x, 0, yatay.y) * (dent * t));
-        float komsu = SnowDentAt(uv);
+        float komsu = SnowDentSmooth(uv);
 
         engel = max(engel, saturate((komsu - isinDerinlik) / max(dent, 1e-3)));
     }
@@ -147,10 +176,12 @@ half2 SnowDentSlope(float2 uv)
     float t = 1.0 / _SnowResolution;
     float metre = _SnowAreaSize * t;
 
-    float dL = SnowDentAt(uv - float2(t, 0));
-    float dR = SnowDentAt(uv + float2(t, 0));
-    float dD = SnowDentAt(uv - float2(0, t));
-    float dU = SnowDentAt(uv + float2(0, t));
+    // EĞİM DE YUMUŞATILMIŞ ALANDAN. Ham alanın gradyanı teksel sınırında
+    // sıçrıyor ve izin duvarı basamaklı görünüyordu.
+    float dL = SnowDentSmooth(uv - float2(t, 0));
+    float dR = SnowDentSmooth(uv + float2(t, 0));
+    float dD = SnowDentSmooth(uv - float2(0, t));
+    float dU = SnowDentSmooth(uv + float2(0, t));
 
     // Derinlik aşağı doğru pozitif; yüzey normali ters yöne devriliyor.
     return half2((dR - dL) / (2.0 * metre), (dU - dD) / (2.0 * metre));

@@ -628,7 +628,17 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // ÇUKUR IŞIK ALMIYOR. Derinlik arttıkça gökyüzünü gören pay düşüyor;
         // bu ayrı bir gölge değil, geometrik örtülme. Kar düzleştirmesinden
         // SONRA uygulanıyor: düzleştirme çukuru da silerdi.
-        surface.occlusion *= saturate(1.0 - izDerinlik / SNOW_RELIEF_MAX_DEPTH);
+        // ÇUKURUN İÇİ KARARIR AMA SİYAHLAŞMAZ.
+        //
+        // Tam sönüm (1 - d/dMax) 22 cm'lik izde ortamı 0.37'ye indiriyor;
+        // üstüne öz gölge de doğrudan ışığı kesince izin içi neredeyse siyah
+        // çıkıyordu (kullanıcı bildirdi: "izin içi çok siyah").
+        //
+        // Gerçek bir ayak izi çevresindeki karın yarısı kadar parlaktır: çukur
+        // göğü daha dar bir açıdan görür ama duvarları da BEYAZDIR ve
+        // birbirine ışık yansıtır. 0.55 katsayısı en derin noktada ortamı
+        // %45 kısıyor, sıfırlamıyor.
+        surface.occlusion *= saturate(1.0 - 0.55 * izDerinlik / SNOW_RELIEF_MAX_DEPTH);
 
 
         surface.snowMask = (half)snowMask;

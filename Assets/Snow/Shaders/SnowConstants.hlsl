@@ -97,7 +97,7 @@
 ///
 /// Adım sayısı düşük tutuluyor: ayak izi yarı-düşük frekanslı bir detay, ve
 /// her adım bir doku okuması (GDC 2014, Batman: "minimal taps").
-#define SNOW_RELIEF_STEPS              8
+#define SNOW_RELIEF_STEPS              12
 #define SNOW_RELIEF_MAX_DEPTH          0.35
 /// Sıyırtma açıda ışın yatıyor ve XZ kayması patlıyor; tavan olmadan iz
 /// metrelerce uzayıp bulaşıyor.
@@ -111,7 +111,7 @@
 #define SNOW_SURF_FADE_END             28.0
 
 #define SNOW_RELIEF_SHADOW_STEPS       5
-#define SNOW_RELIEF_SHADOW_STRENGTH    0.85
+#define SNOW_RELIEF_SHADOW_STRENGTH    0.5
 
 #define SNOW_LOCAL_MIN               0.002
 
@@ -230,7 +230,7 @@
 /// 4 teksel kalsaydı 19 cm'lik oluğun yarısını düzleştirirdi. Ölçüldü: oluk
 /// son görüntüyü yalnız %2.3 değiştiriyordu (lineer %5.5), oysa 48°'lik bir
 /// duvar Lambert'te %34 koyulaştırır.
-#define SNOW_CARVE_SMOOTH_TEXELS     2.0
+#define SNOW_CARVE_SMOOTH_TEXELS     3.0
 
 /// İZ KENARININ DAĞILMASI — leke boyu (1/m) ve genlik.
 ///
