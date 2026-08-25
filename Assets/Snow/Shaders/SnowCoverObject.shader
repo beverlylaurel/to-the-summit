@@ -59,6 +59,11 @@ Shader "ToTheSummit/SnowCoverObject"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "SnowCover.hlsl"
+            #include "SnowLighting.hlsl"
+
+            /// Arazi ıslaklığı GLOBAL olarak da yayınlanıyor (`TerrainSurface`);
+            /// örtü materyali onu okuyor ki aynı kar iki yüzeyde aynı görünsün.
+            float _SurfaceWetness;
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseMap_ST;
@@ -159,6 +164,35 @@ Shader "ToTheSummit/SnowCoverObject"
 
                 half3 color = LightingPhysicallyBased(brdfData, mainLight, N, V);
                 color += SampleSH(N) * albedo;
+
+                // NESNENİN KARI DA ARAZİNİN KARIYLA AYNI MADDE.
+                //
+                // Örtü bir dönem standart URP PBR'ıyla çiziliyordu: sarmalı
+                // difüz yok, sızma yok, parıltı yok, pürüzlülük başka yoldan.
+                // Aynı kar, kayanın üstünde başka türlü parlıyordu. Kar nerede
+                // olursa olsun aynı maddedir; ışık modeli de tek olmalı.
+                //
+                // Örtü yüzeyi dünyanın genel durumundan kuruluyor: nesnenin
+                // üstünde deformasyon dokusu yok, ölçülecek yerel yoğunluk da
+                // yok. Kalınlık `_SnowCoverThickness` (spec §16).
+                if (mask > 0.001h)
+                {
+                    SnowSurface ks = SnowBuildSurface(_FallbackRhoN, _SurfaceWetness, 0.0, 0.0,
+                                                      _SnowCoverThickness, IN.positionWS,
+                                                      length(fwidth(IN.positionWS.xz)));
+
+                    float3 karN = N;
+                    {
+                        float2 e = float2(karN.x, karN.z) / max(karN.y, 1e-3)
+                                 + (float2)ks.surfSlope;
+                        karN = normalize(float3(e.x, 1.0, e.y));
+                    }
+
+                    half3 karIsik = SnowDirectLight(mainLight, karN, V, ks)
+                                  + SnowAmbient(karN, ks, mainLight.shadowAttenuation, 1.0h);
+
+                    color = lerp(color, karIsik, mask);
+                }
 
 #if defined(_ADDITIONAL_LIGHTS)
                 InputData inputData = (InputData)0;

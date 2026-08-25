@@ -182,6 +182,11 @@ public class TerrainSurface : MonoBehaviour
         wetness = Mathf.Lerp(wetness, target, 1f - Mathf.Exp(-Time.deltaTime / duration));
         material.SetFloat(WetnessId, wetness);
 
+        // ISLAKLIK GLOBAL DE YAYINLANIYOR. Nesnelerin üstündeki kar
+        // (`SnowCoverObject`) başka bir materyalde; aynı ıslaklığı görmezse
+        // aynı kar kayanın üstünde kuru, zeminde ıslak çıkar.
+        Shader.SetGlobalFloat(WetnessId, wetness);
+
         // HÂKİM yön, anlık hız değil. Yüzey deseni bu eksene
         // oturuyor; eksen esintiyle oynayınca desen dünyada sürükleniyordu (alan
         // `dot(worldXZ, windAxis)` üzerinden kuruluyor, bkz. WindField).
