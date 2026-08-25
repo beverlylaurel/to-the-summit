@@ -75,7 +75,22 @@ float SnowDentAt(float2 uv)
 float SnowShadeHeightAt(float2 uv)
 {
     float4 trail = SAMPLE_TEXTURE2D_LOD(_SnowTrailTex, sampler_LinearClamp, saturate(uv), 0);
-    return (trail.r - trail.g) * SnowInsideMask(uv);
+
+    // SIRT KENDİ EĞİMİYLE SINIRLI — KOYU HALKA BURADAN ÇIKIYORDU.
+    //
+    // İzin DIŞINDA `trail.r = 0` ama sırt `trail.g` dolu; yükseklik doğrudan
+    // `−g` oluyor ve normal orada sertçe deviriliyor. Ekranda izin çevresinde
+    // koyu bir çerçeve görülüyordu (kullanıcı bildirdi: "kenarlarda koyulaşma
+    // var, sanki border gibi").
+    //
+    // `KRim` sırdı 4 cm'ye kadar yazıyor ama profili dar: 2-3 tekselde
+    // (5-7 cm) sıfırdan tepeye çıkıyor, yani yan eğimi 30-40°. Gerçek bir
+    // yığın duruş açısını (38°) aşamaz ve ayak izinin yanındaki yığın çok
+    // daha yayvandır.
+    //
+    // Sırt burada `SNOW_RIM_SHADE` payıyla okunuyor: geometrisi duruyor,
+    // gölgelemeye giren payı azalıyor.
+    return (trail.r - trail.g * SNOW_RIM_SHADE) * SnowInsideMask(uv);
 }
 
 /// YUMUŞATILMIŞ DERİNLİK — GÖRÜNTÜ İÇİN.
@@ -252,7 +267,26 @@ half SnowReliefShadow(float3 posWS, float3 lightDirWS, float dent)
         engel = max(engel, saturate((komsu - isinDerinlik) / max(dent, 1e-3)));
     }
 
-    return (half)saturate(1.0 - engel * SNOW_RELIEF_SHADOW_STRENGTH);
+    // İZ RENKTEN DEĞİL GÖLGEDEN GÖRÜNÜR.
+    //
+    // [KAYNAK: adli ayak izi belgeleme — "most detail in an impression
+    // photograph is visible due to small shadows within the impression".]
+    //
+    // GÜNEŞ ALÇAKKEN GÖLGE ZAYIFLIYOR. Işın yatay ilerlemesi
+    // `lightDir.xz / lightDir.y`; güneş alçaldıkça bu büyüyor ve `engel`
+    // neredeyse her yerde 1'e doyuyor. Tam güç bırakılınca akşam izin tamamı
+    // gölgede kalıp simsiyah oluyordu (ölçüldü: 17:49, gündüz oranı 0.33).
+    //
+    // Fizikte de böyle: güneş alçakken toplam aydınlatmada direkt payı
+    // düşüyor, gök payı artıyor; gölge kontrastı azalıyor.
+    float gunesYuksekligi = saturate(lightDirWS.y * 3.0);
+    float guc = lerp(SNOW_SHADOW_LOW_SUN, 1.0, gunesYuksekligi);
+
+    // KAR YARI SAYDAM: engelleme tam olsa bile gölge siyaha inmiyor. Ölçülü
+    // kar gölgesi/güneş oranı açık gökte 0.5-0.6.
+    float golge = saturate(1.0 - engel * guc);
+
+    return (half)lerp(SNOW_SHADOW_FLOOR, 1.0, golge);
 }
 
 /// Çukurun eğimi — normal buradan geliyor. Merkezi fark, adım bir teksel.
@@ -274,6 +308,135 @@ half2 SnowDentSlope(float2 uv)
 
     // Derinlik aşağı doğru pozitif; yüzey normali ters yöne devriliyor.
     return half2((dR - dL) / (2.0 * metre), (dU - dD) / (2.0 * metre));
+}
+
+/// KAR YÜZEYİNİN KENDİ RÖLYEFİ — ÖLÇÜLMÜŞ YER ŞEKİLLERİ.
+///
+/// [KAYNAK: Filhol & Sturm 2015, "Snow bedforms: A review, new data, and a
+/// formation model", JGR Earth Surface; Kochanski, Anderson & Tucker 2019,
+/// "The evolution of snow bedforms in the Colorado Front Range",
+/// The Cryosphere 13:1267 — arazide ölçülmüş boyutlar ve eşikler.]
+///
+///   plane bed   rüzgâr < 6.4 m/s VE kar < 1.4 gün  -> düz
+///   ripple      0.5-2 cm yüksek, 10-25 cm dalga    -> rüzgâra DİK
+///   sastrugi    14-40 cm derin, 45-90 cm aralık    -> rüzgâra PARALEL
+///   snow wave   tepe aralığı 10-20 m               -> rüzgâra dik/eğik
+///
+/// Rüzgâr eşikleri de ölçülmüş: kar hareketi 7-14 m/s, sastrugi oluşumu
+/// en az 20 m/s. Sakin havada yüzey plane bed'e yakın kalıyor; yer şekilleri
+/// rüzgârla beliriyor.
+///
+/// TABAN fBm — DOĞAL YÜZEYLER SELF-AFFINE.
+///
+/// [KAYNAK: yüzey pürüzlülüğü literatürü — self-affine bir yüzeyin güç
+/// spektrumu `C(q) ~ q^(-2(H+1))`.] Oktavlar arası genlik oranı keyfi değil:
+/// frekans iki katına çıkarken genlik `2^(-H)` ile düşüyor. Kar için H = 0.8,
+/// yani oran 0.574. Bu kural olmadan oktav genlikleri elle seçiliyor ve yüzey
+/// ya tek ölçekli (tarak gibi) ya da gürültülü çıkıyor.
+float SnowYuzeyRolyef(float2 worldXZ)
+{
+    // --- fBm tabanı: dört oktav, self-affine ---
+    float h   = 0.0;
+    float amp = SNOW_FBM_AMP;
+    float frq = SNOW_FBM_SCALE;
+
+    [unroll]
+    for (int i = 0; i < 4; ++i)
+    {
+        h += (SnowValueNoise(worldXZ * frq + (float)i * 17.3) * 2.0 - 1.0) * amp;
+
+        amp *= SNOW_FBM_GAIN;
+        frq *= 2.0;
+    }
+
+    // --- rüzgâr ekseni ---
+    float2 w  = _WindWS.xz;
+    float  uz = length(w);
+    w = uz > 1e-4 ? w / uz : float2(1.0, 0.0);
+
+    float2 dik = float2(-w.y, w.x);
+
+    // --- RIPPLE: rüzgâra DİK sırtlar ---
+    //
+    // Sırtlar rüzgâra dik olduğu için dalga rüzgâr YÖNÜNDE ilerliyor; dik
+    // eksende altı kat uzun tutulup sırt hâline getiriliyor.
+    float ripplePay = SNOW_RIPPLE_BASE
+                    + (1.0 - SNOW_RIPPLE_BASE) * saturate((_WindSpeed - 4.0) / 6.0);
+
+    float2 pr = float2(dot(worldXZ, w)   / SNOW_RIPPLE_LENGTH,
+                       dot(worldXZ, dik) / (SNOW_RIPPLE_LENGTH * 6.0));
+
+    h += (SnowValueNoise(pr) * 2.0 - 1.0) * SNOW_RIPPLE_AMP * ripplePay;
+
+    // --- SASTRUGİ: rüzgâra PARALEL, keskin ---
+    //
+    // `n²(3−2n)` üst yarıyı düzleştirip alt yarıyı dikleştiriyor: sastrugi bir
+    // EROZYON şekli, rüzgârüstü yüzü dik ("upwind-facing points resembling
+    // anvils").
+    float sastrugiPay = SNOW_SASTRUGI_BASE
+                      + (1.0 - SNOW_SASTRUGI_BASE) * saturate((_WindSpeed - 8.0) / 12.0);
+
+    float2 ps = float2(dot(worldXZ, w)   / SNOW_SASTRUGI_WIDTH,
+                       dot(worldXZ, dik) / SNOW_SASTRUGI_LENGTH);
+
+    float ns = SnowValueNoise(ps);
+    ns = ns * ns * (3.0 - 2.0 * ns);
+
+    h += (ns - 0.5) * SNOW_SASTRUGI_HEIGHT * sastrugiPay;
+
+    return h;
+}
+
+/// Yüzey rölyefinin eğimi. Dört örnek, 2 cm adım — alan analitik olduğu için
+/// teksel ızgarası hiç devreye girmiyor.
+///
+/// AYRI FONKSİYON, ÇÜNKÜ YÜKSEKLİK ALANINA KONAMAZ. Denendi: yer şekilleri
+/// `SnowShadeHeightAt`'e konunca `SnowDentSmooth` (9 tap) × `SnowDentSlope`
+/// (4 tap) = 36 çağrı × 6 gürültü = piksel başına 180 örnek oluyor. Hem kare
+/// süresi hem shader derleme süresi patlıyor.
+half2 SnowYuzeyEgim(float2 worldXZ)
+{
+    const float e = 0.02;
+
+    float hL = SnowYuzeyRolyef(worldXZ - float2(e, 0.0));
+    float hR = SnowYuzeyRolyef(worldXZ + float2(e, 0.0));
+    float hD = SnowYuzeyRolyef(worldXZ - float2(0.0, e));
+    float hU = SnowYuzeyRolyef(worldXZ + float2(0.0, e));
+
+    return half2((hR - hL) / (2.0 * e), (hU - hD) / (2.0 * e));
+}
+
+/// MİKRO RÖLYEF — tane ölçeği, metre.
+///
+/// Üç oktav, 8.3 / 3.6 / 1.6 cm dalga boyu. Yer şekillerinden ayrı bir
+/// fonksiyon çünkü ağırlığı farklı: bozulmuş kar daha kaba, ama bozulmamış
+/// kar da tamamen pürüzsüz değil.
+///
+/// SİMÜLASYON DOKUSUNA YAZILAMAZ: `KRepose` bir maksimum filtresi ve 10
+/// tekselllik menzille bu ölçeği tamamen süpürüyor. Burada alan analitik,
+/// teksel ızgarası devrede değil.
+float SnowMikroRolyef(float2 worldXZ, float dent)
+{
+    float w = lerp(SNOW_MICRO_BASE, 1.0, saturate(dent / SNOW_MICRO_REF_DEPTH));
+
+    float n  = (SnowValueNoise(worldXZ * SNOW_MICRO_SCALE_A) * 2.0 - 1.0) * SNOW_MICRO_AMP_A;
+    n += (SnowValueNoise(worldXZ * SNOW_MICRO_SCALE_B + 13.9) * 2.0 - 1.0) * SNOW_MICRO_AMP_B;
+    n += (SnowValueNoise(worldXZ * SNOW_MICRO_SCALE_C + 71.3) * 2.0 - 1.0) * SNOW_MICRO_AMP_C;
+
+    return n * w;
+}
+
+/// Mikro rölyefin eğimi. Adım 1 cm — en ince oktav (1.6 cm) da geçsin diye.
+half2 SnowMikroEgim(float2 worldXZ, float dent)
+{
+    const float e = 0.01;
+
+    float mL = SnowMikroRolyef(worldXZ - float2(e, 0.0), dent);
+    float mR = SnowMikroRolyef(worldXZ + float2(e, 0.0), dent);
+    float mD = SnowMikroRolyef(worldXZ - float2(0.0, e), dent);
+    float mU = SnowMikroRolyef(worldXZ + float2(0.0, e), dent);
+
+    return half2((mR - mL) / (2.0 * e), (mU - mD) / (2.0 * e));
 }
 
 #endif

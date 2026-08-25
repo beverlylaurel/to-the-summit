@@ -2574,3 +2574,60 @@ hiçbir çizim yolu okumuyordu. Oluk düz kardan tek çizgiyle ayrılıyordu.
 **Çözüm:** normal ve iz-içi gölge `trail.r − trail.g` okuyor; ışın yürüyüşü
 `trail.r`'da kaldı. Ayrım şart: sırt ışın alanından çıkarıldığında omuzu
 siliyordu (ölçüldü, `r − g` genişliği 19 tekselden 12'ye çöküyordu).
+
+## "Dışarıdaki karda hiçbir detay yok" — kapı üç turluk işi yutmuştu
+
+**Kullanıcının ağzından:** "iz ile dışardaki kar iki ayrı dünya gibi", "sadece
+texture ekledik, başka hiçbir şey yapmadık dışardaki kara", "gözle görülür
+hiçbir gelişme yok, dalga mı geçiyorsun".
+
+**Yanlış çıkan şüpheli:** genliklerin küçük olması. Üç tur boyunca yer şekli
+eklendi, genlikler artırıldı, oktav eklendi — ekranda hiçbir karşılığı olmadı.
+
+**Ayırt eden ölçüm:** `MountainSurface.hlsl`'de çukur eğiminin normale
+girdiği satır:
+
+```hlsl
+surface.normalWS = normalize(lerp(n, ..., saturate(izDerinlik * 20.0)));
+```
+
+Sastrugi, ripple, whaleback ve mikro rölyefin hepsi `SnowDentSlope` üzerinden
+geliyordu ve bu ağırlıkla harmanlanıyordu. Düz karda `izDerinlik = 0`, yani
+ağırlık **tam sıfır**. Eklenen her şey ekrana hiç ulaşmıyordu.
+
+O kapı yalnız İZ için doğruydu — iz olmayan yerde çukur eğimi de olmamalı.
+Ama yüzeyin kendi rölyefi karın olduğu her yerde var.
+
+**Doğrulama:** genlik on katına çıkarılıp kare alındı; rölyef net göründü.
+Yani bağlantı çalışıyordu, kapı kesiyordu. 1× değerlerde eğim 2.3° — gözle
+görülmez.
+
+**Ders:** BİR ALANIN EKRANA ULAŞTIĞINI ÖNCE DOĞRULA. Üç tur boyunca genlik
+ayarlandı; tek bir "10× yap ve bak" ölçümü kapıyı bir turda buldu.
+
+## Görünürlüğü genlik değil EĞİM belirliyor
+
+**Ölçüm:** ilk yer şekli değerleri 1.5 m dalga boyunda ±4 cm genlikteydi.
+Eğim `atan(2A/λ)` = **1.5°**. Ekranda hiçbir şey görünmüyordu.
+
+Aynı genlik 17 cm dalga boyunda 8° veriyor. Dalga boyu kısaldıkça aynı genlik
+çok daha dik.
+
+**İkinci ölçüm:** güneş tepedeyken (12:00, SunHeight 0.88) 7°'lik eğim NdotL'yi
+%1 değiştiriyor — yüzey yine düz okunuyor. Yatık ışıkta (SunHeight 0.27) aynı
+yüzey net görünüyor. Bu FİZİK, hata değil.
+
+Öğlen görünürlük ışıktan bağımsız bir terim gerektiriyor: çukurların ortam
+örtmesi (`SNOW_SURFACE_AO`). O da yüzeyin YÜKSEKLİĞİNDEN geliyor, eğiminden
+değil.
+
+## Aynı alanı 36 kez hesaplamak
+
+**Belirti:** "compiling shaders çok uzun sürüyor".
+
+**Sebep:** yer şekilleri `SnowShadeHeightAt`'e konmuştu. O alanı
+`SnowDentSmooth` 9 tap ile, onu da `SnowDentSlope` 4 tap ile okuyor: piksel
+başına 36 çağrı × 6 gürültü = **180 örnek**.
+
+**Çözüm:** yüzey rölyefi ayrı bir fonksiyonda, kendi 4 örnekli gradyanıyla —
+24 örnek. Yükseklik alanına yalnız izin kendisi giriyor.

@@ -1622,3 +1622,41 @@ küçük bir yüksekliği modüle ediyor. Dalga boyu 12.5 cm (5.3 teksel): tekse
 
 **Geçiş sayısı:** omuz 0.5 tekselden 3 teksele çıkınca 3 geçiş yetmiyor —
 `KRepose` geçiş başına bir teksel yayıyor. `ReposeIterations` 6.
+
+## Kar yüzeyi yer şekilleri — ölçülmüş değerlerden
+
+**Kural:** bozulmamış kar yüzeyi dört ölçekte rölyef taşıyor: fBm tabanı,
+ripple, sastrugi, mikro tane.
+
+**Kaynak.** Filhol & Sturm 2015, "Snow bedforms: A review, new data, and a
+formation model", JGR Earth Surface; Kochanski, Anderson & Tucker 2019, "The
+evolution of snow bedforms in the Colorado Front Range", The Cryosphere 13:1267.
+
+Arazide ölçülmüş yedi yer şekli ve boyutları:
+
+| Yer şekli | Yükseklik/derinlik | Dalga boyu / aralık | Yön |
+|---|---|---|---|
+| plane bed | — | — | rüzgâr < 6.4 m/s **ve** kar < 1.4 gün |
+| ripple | 0.5–2 cm | 10–25 cm | rüzgâra dik |
+| snow step | dikey yüz < 2 cm | — | sivri uç yok |
+| barchan | 7–55 cm | 40 cm+ | hilal |
+| sastrugi | 14–40 cm | sivri uç aralığı 45–90 cm | rüzgâra paralel |
+| snow wave | — | tepe aralığı 10–20 m | rüzgâra dik/eğik |
+
+Rüzgâr eşikleri de ölçülmüş: kar hareketi 7–14 m/s, sastrugi oluşumu en az
+20 m/s. Bu yüzden sakin havada yüzey plane bed'e yakın kalıyor.
+
+**fBm tabanı self-affine.** Doğal yüzeylerin güç spektrumu `C(q) ~ q^(-2(H+1))`.
+Oktavlar arası genlik oranı keyfi değil: frekans iki katına çıkarken genlik
+`2^(-H)`. Kar için H = 0.8, oran 0.574. Bu kural olmadan oktav genlikleri elle
+seçiliyor ve yüzey ya tek ölçekli (tarak) ya da gürültülü çıkıyor.
+
+**Dalga boyları neden kısaltıldı.** İlk değerler ölçülen "snow wave" ölçeğine
+(10–20 m) yakındı ve eğim 1.5–2.3° veriyordu — gözle görünmüyor. Bizim bölge
+24 m; o dalga boyu tek bir eğime dönüşüp yüzeyi eğik gösteriyor. Oktavlar
+1.25 / 0.63 / 0.31 / 0.16 m'ye çekildi, eğimler 5.0–7.6°.
+
+**Öğlen görünürlük ayrı bir terim gerektiriyor.** Ölçüldü: güneş tepedeyken
+(SunHeight 0.88) 7°'lik eğim NdotL'yi %1 değiştiriyor. Yatık ışıkta
+(SunHeight 0.27) aynı yüzey net görünüyor. Işıktan bağımsız görünürlük
+çukurların ortam örtmesinden geliyor — yüzeyin yüksekliğinden, eğiminden değil.

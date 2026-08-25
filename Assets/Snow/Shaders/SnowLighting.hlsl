@@ -147,7 +147,7 @@ half3 SnowDirectLight(Light L, float3 N, float3 V, SnowSurface s)
 
     if (distGate > 0.0h)
         sparkle = SnowSparkle(s.positionWS, V, L.direction, s.pixelFootprint)
-                * (1.0 - s.wet) * (1.0 - s.disturb * 0.85)
+                * (1.0 - s.wet) * (1.0 - s.disturb * 0.45)
                 * (1.0 - s.crust * 0.7)
                 * saturate(dot(N, L.direction) * 4.0) * sunGate * distGate;
 #endif

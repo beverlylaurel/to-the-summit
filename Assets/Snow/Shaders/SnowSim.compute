@@ -90,13 +90,47 @@ uint   _TrailSegmentCount;
 /// geliyordu; yakalama yok, değer doğrudan yazılıyor.
 float2 _TrailVelocityXZ;
 
-/// Tekselin en yakın iz parçasına yatay uzaklığı ve o parçanın yarıçapı.
-/// Dönen değer: yüzeye batmış kısmın yarıçapı aşan payı değil, HAM uzaklık.
-float SnowNearestSegment(float2 worldXZ, out float yaricap)
+/// SİLUET DÜNYA UZAYINDA KEMİRİLİYOR.
+///
+/// Damganın kenarı kusursuz bir kapsül olursa iz kalıptan çıkmış gibi okunuyor
+/// (kullanıcı bildirdi: "kenarlarda dağılma yok"). Gerçekte ayağın açtığı
+/// çukurun sınırı düzensizdir: kenar taneler kopar, bloklar kırılır.
+///
+/// Yarıçap tekselin DÜNYA konumuna bağlı bir gürültüyle modüle ediliyor —
+/// damganın kendi UV'sine değil. Böylece düzensizlik zeminde sabit duruyor;
+/// damga hareket ederken kenar titremiyor.
+///
+/// DALGA BOYU IZGARADAN UZUN. `SNOW_EDGE_BREAK_SCALE` 9 1/m = 11 cm = 4.7
+/// teksel. Genlik ±%18 × 5.5 cm yarıçap = ±1 cm = 0.42 teksel — teksel altı,
+/// yani zigzag üretemez. İkinci oktav yarım genlikte, iki kat frekansta.
+float SnowKemirilmisYaricap(float2 worldXZ, float yaricap)
+{
+    // KIRILMA BLOKLU, AŞINMA SÜREKLİ — İKİSİ BİRDEN.
+    //
+    // Blok bileşeni kenarı kayma yüzeyi boyunca koparıyor (hücre içinde sabit,
+    // sınırda basamak); sürekli bileşen blokların kendi yüzeyini aşındırıyor.
+    // Yalnız sürekli kullanıldığında kenar düzgün bir dalga oluyordu
+    // (kullanıcı bildirdi: "tomurcuk yok, keskin sınırlarla bağlanıyor").
+    float blok = SnowWarpedBlockNoise(worldXZ * SNOW_EDGE_BLOCK_SCALE) * 2.0 - 1.0;
+
+    float n1 = SnowValueNoise(worldXZ * SNOW_EDGE_BREAK_SCALE) * 2.0 - 1.0;
+    float n2 = SnowValueNoise(worldXZ * (SNOW_EDGE_BREAK_SCALE * 2.1) + 61.7) * 2.0 - 1.0;
+
+    float k = blok * SNOW_EDGE_BLOCK + (n1 + n2 * 0.5) * SNOW_EDGE_BREAK;
+
+    return yaricap * (1.0 + k);
+}
+
+/// Tekselin en yakın iz parçasına yatay uzaklığı, o parçanın (kemirilmiş)
+/// yarıçapı ve batma çarpanı.
+float SnowNearestSegment(float2 worldXZ, out float yaricap, out float batmaCarpani,
+                        out float eksenUzakligi)
 {
     float enIyiFark = 1e9;
     float enIyiUzak = 1e9;
     yaricap = 0.0;
+    batmaCarpani = 1.0;
+    eksenUzakligi = 1e9;
 
     for (uint i = 0; i < _TrailSegmentCount; ++i)
     {
@@ -105,18 +139,34 @@ float SnowNearestSegment(float2 worldXZ, out float yaricap)
 
         float2 ab = b.xz - a.xz;
         float  uzunlukKare = dot(ab, ab);
-        float  t = uzunlukKare > 1e-8 ? saturate(dot(worldXZ - a.xz, ab) / uzunlukKare) : 0.0;
+        float  tHam = uzunlukKare > 1e-8 ? dot(worldXZ - a.xz, ab) / uzunlukKare : 0.0;
+        float  t = saturate(tHam);
 
         float d = distance(worldXZ, a.xz + ab * t);
+        float r = SnowKemirilmisYaricap(worldXZ, a.w);
+
+        // ORTA SIRT İÇİN EKSENE DİK MESAFE, KAPSÜLE DEĞİL.
+        //
+        // Kapsülün uçları küresel: orada `d` radyal mesafe oluyor ve sırt bir
+        // ÇİZGİ değil NOKTA olarak çıkıyor. Ardışık kapsüllerin uçlarında sırt
+        // sönüyordu (ölçüldü: bir kesitte 21 mm, komşu kesitte 0). Sonsuz
+        // doğruya olan dik mesafe uç etkisini taşımıyor, sırt kesintisiz.
+        //
+        // Parça çok kısaysa (duruyorken) yön tanımsız; orada sırt yok zaten.
+        float dEksen = uzunlukKare > 1e-8
+                     ? distance(worldXZ, a.xz + ab * tHam)
+                     : 1e9;
 
         // En yakın parça, yarıçapına GÖRE en çok içeride kalan parçadır;
         // ham uzaklık farklı yarıçaplı iki nesneyi karşılaştıramaz.
-        float fark = d - a.w;
+        float fark = d - r;
         if (fark < enIyiFark)
         {
-            enIyiFark = fark;
-            enIyiUzak = d;
-            yaricap   = a.w;
+            enIyiFark     = fark;
+            enIyiUzak     = d;
+            yaricap       = r;
+            batmaCarpani  = b.w;
+            eksenUzakligi = dEksen;
         }
     }
 
@@ -206,20 +256,59 @@ void KDeform(uint3 id : SV_DispatchThreadID)
     // taze karda (ρ≈55) bu ≈ 18.
     float rhoYerel = max(SnowDensity(snow.g), 1.0);
     float fillRate = _SnowfallSWERate * (SNOW_RHO_WATER / rhoYerel);
-    fillRate += max(0.0, _WindSpeed - 4.0) * SNOW_WIND_FILL;
 
-    trail.r = max(0.0, trail.r - fillRate * _SnowDeltaTime);
-    trail.g = max(0.0, trail.g - fillRate * _SnowDeltaTime * 1.4);   // sirt daha hizli erir
+    // RÜZGÂRLA DOLMA SİNTERLENME EŞİĞİNE BAKIYOR — `KWindTransport` GİBİ.
+    //
+    // Sabit `_WindSpeed - 4` eşiği yönsüzdü ve yoğunluğu hiç görmüyordu:
+    // sıkışmış patika da taze kar gibi doluyordu. Oysa savrulan kar GEVŞEK
+    // kardır; eşik yoğunlukla yükseliyor [KAYNAK: He ve ark. 2017, aynı
+    // formül `KWindTransport`'ta].
+    //
+    // Aynı fiziğin iki yerde farklı uygulanması iki belirtiyi birden
+    // engelliyordu:
+    //   - TERS AYAK İZİ: aşırı soğukta sıkışan iz kalıyor, çevresindeki
+    //     gevşek kar süpürülüyor ve iz yüzeyin ÜSTÜNDE kabarık duruyor.
+    //   - İZİN RÜZGÂRALTINA KAYMASI: rüzgârüstü kenar aşınıp rüzgâraltı
+    //     dolarken çukur yavaşça kayıyor.
+    // İkisi de `KWindTransport`'ta zaten var; buradaki yönsüz dolma onları
+    // eziyordu.
+    float esikU10 = lerp(SNOW_DRIFT_U10_LOOSE, SNOW_DRIFT_U10_PACKED, snow.g);
+    fillRate += max(0.0, _WindSpeed - esikU10) * SNOW_WIND_FILL;
+
+    float dolan = fillRate * _SnowDeltaTime;
+
+    trail.r = max(0.0, trail.r - dolan);
+    trail.g = max(0.0, trail.g - dolan * 1.4);   // sirt daha hizli erir
+
+    // DOLAN KAR TAZE KARDIR — YÜZEY YOĞUNLUĞU DA SEYRELİYOR.
+    //
+    // `snow.g` `max` ile birikiyor ve hiç geri inmiyordu: iz dolduktan sonra
+    // yüzey hâlâ "sıkışmış patika" yoğunluğunda kalıyor, `freshness` düşük
+    // çıkıyor ve albedo %15 koyuluyordu. Ekranda dolmuş iz GRİ bir leke
+    // olarak duruyordu (kullanıcı bildirdi: "iz kapanmaya başlarken acayip
+    // grileşme var").
+    //
+    // Yoğunluğun kalması bilinçliydi ve gerekçesi hâlâ geçerli: patika kar
+    // dolduktan sonra da belli olur (spec §10.3). Ama o, ALTTAKİ katmanın
+    // yoğunluğu; yüzeye yeni yağan kar taze ve yüzeyi o çiziyor.
+    //
+    // Seyrelme oranı dolan payın toplam derinliğe oranı: iz kapandıkça yüzey
+    // tamamen tazeye gidiyor, sığ bir dolmada neredeyse hiç değişmiyor.
+    if (dolan > 0.0)
+    {
+        float oran = saturate(dolan / max(trail.r + dolan, 1e-4));
+        snow.g = lerp(snow.g, _FallbackRhoN, oran);
+    }
 
     // --- Batma (spec §10.1) ---
     float baseH = SnowBaseHeight(snow.r, snow.g);
 
     float2 worldXZ = SnowTexelToWorld(id.xy);
 
-    float yaricap;
-    float uzaklik = SnowNearestSegment(worldXZ, yaricap);
+    float yaricap, batmaCarpani, eksenUzakligi;
+    float uzaklik = SnowNearestSegment(worldXZ, yaricap, batmaCarpani, eksenUzakligi);
 
-    if (uzaklik <= yaricap && yaricap > 0.0)
+    if (yaricap > 0.0 && uzaklik <= (yaricap + SNOW_MAX_SINK * SNOW_HOLE_FLARE) * (1.0 + SNOW_SETTLE_TAIL_LEN * 2.5))
     {
         // KAR SIKIŞIR, KALKMAZ.
         //
@@ -262,27 +351,76 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         // TAŞIMA GÜCÜ: batma mutlak bir sınırla duruyor (gerekçe
         // `SNOW_MAX_SINK` yanında). Sıkışmış karda sınır da orantılı iniyor —
         // sert zeminde zaten az batılır.
-        float batma = min(SNOW_MAX_SINK * sinkScale, enFazlaOyma);
+        // BATMA ÇARPANI PARÇADAN GELİYOR. Adımlar eşit derinlikte değil: yük
+        // iki ayağa eşit dağılmaz, altındaki kar da her yerde aynı sıkılıkta
+        // olmaz (`SnowFootprintDeformer`).
+        float batma = min(SNOW_MAX_SINK * sinkScale * batmaCarpani, enFazlaOyma);
 
-        // KÜRE TABANININ ANALİTİK ŞEKLİ. Eksende `batma`, kenara doğru
-        // kürenin eğrisini izleyerek sığlaşıyor.
-        float altYuzey = yaricap - sqrt(max(yaricap * yaricap - uzaklik * uzaklik, 0.0));
+        // DELİK AYAKTAN GENİŞ — BACAK ÇEKİLİRKEN KENAR ÇÖKÜYOR.
+        //
+        // [KAYNAK: postholing tarifi — "as you work to pull your leg out, you
+        // leave a massive hole in the powder".] Derin karda açılan delik
+        // botun ölçüsünde kalmıyor: bacak girerken kenarı iterek, çıkarken de
+        // yıkarak genişletiyor. Sığ karda etkisi yok, derinde belirgin.
+        //
+        // 22 cm batmada 7 cm yarıçap 12 cm'ye çıkıyor, yani delik 24 cm.
+        float genisYaricap = yaricap + batma * SNOW_HOLE_FLARE;
+
+        // KAPSÜL TABANININ ANALİTİK ŞEKLİ. Eksende `batma`, kenara doğru
+        // kesitin eğrisini izleyerek sığlaşıyor.
+        //
+        // İZ İÇİ DÜZENSİZLİK BURAYA YAZILMIYOR. Denendi ve `KRepose` sildi:
+        // o bir MAKSİMUM filtresi, 12 teksel menzille komşuların en derinine
+        // göre dolduruyor ve 11 cm dalga boylu bir gürültüyü tamamen
+        // süpürüyor (kullanıcı bildirdi: "oluğun içi çok düzenli"). Detay
+        // artık çizim tarafında, `SnowRelief.hlsl` → `SnowMikroRolyef`.
+        float altYuzey = genisYaricap
+                       - sqrt(max(genisYaricap * genisYaricap - uzaklik * uzaklik, 0.0));
         float hedef    = max(0.0, batma - altYuzey);
 
-        // İZİN İÇİ DÜZENSİZ — TABAN TEK PARÇA ÇÖKMEZ.
+        // ÇÖKÜNTÜNÜN KUYRUĞU — TEMELİN DIŞI DA ÇÖKÜYOR.
         //
-        // Genlik oyma oranıyla çarpılıyor: merkezde tam, kenarda sıfır. Sınırın
-        // yerini değiştiremediği için zigzag üretemez (gerekçe
-        // `SNOW_TRACK_DETAIL` yanında).
-        float ic = saturate(hedef / max(batma, 1e-3));
+        // Küre formülü `d > R`'de sıfır veriyor, yani oyma kapsülün kenarında
+        // BİTİYOR. Gerçekte öyle değil: taşıma gücü göçmesinde kayma yüzeyleri
+        // temelin dışına taşıyor ve pasif bölge temel genişliğinin 2-3 katına
+        // uzanıyor [KAYNAK: Terzaghi yerel kayma göçmesi]. Ayağın çevresindeki
+        // kar geniş bir alanda hafifçe çöküyor.
+        //
+        // Kullanıcı bunu defalarca bildirdi: "izin kenarları kar yüzeyiyle
+        // birleşmiyor, yumuşaklık yok". Eksik olan gürültü değil, çöküntünün
+        // KENDİSİNİN kenarda bitmesiydi.
+        //
+        // Kuyruk üstel: kenarda batmanın `SNOW_SETTLE_TAIL` payıyla başlıyor,
+        // `SNOW_SETTLE_TAIL_LEN` × yarıçap mesafesinde 1/e'ye düşüyor.
+        // Sürekli bir fonksiyon; gürültü içermediği için zigzag üretemez.
+        float disMesafe = max(0.0, uzaklik - genisYaricap);
+        float kuyruk = batma * SNOW_SETTLE_TAIL
+                     * exp(-disMesafe / max(genisYaricap * SNOW_SETTLE_TAIL_LEN, 1e-3));
 
-        float n1 = SnowValueNoise(worldXZ * SNOW_TRACK_DETAIL_SCALE) * 2.0 - 1.0;
-        float n2 = SnowValueNoise(worldXZ * (SNOW_TRACK_DETAIL_SCALE * 2.0) + 37.1) * 2.0 - 1.0;
+        hedef = max(hedef, kuyruk);
 
-        hedef *= 1.0 + (n1 + n2 * 0.5) * SNOW_TRACK_DETAIL * ic;
-        hedef  = max(0.0, hedef);
+        // OLUĞUN ORTASINDA SIRT: iki ayak arası ezilmiyor.
+        //
+        // Çıkıntı eklenmiyor, oyma eksende sığ bırakılıyor — sırt OYULMAYAN
+        // karın kendisi. Gerekçe ve `KRepose`'un onu neden silmediği
+        // `SNOW_MIDRIDGE` yanında.
+        float bel = saturate(1.0 - eksenUzakligi / SNOW_MIDRIDGE_WIDTH);
+        bel = bel * bel * (3.0 - 2.0 * bel);
+
+        hedef *= 1.0 - SNOW_MIDRIDGE * bel;
 
         trail.r = max(trail.r, hedef);
+
+        // TAZELİK `snow.a`'YA YAZILMIYOR — O KANAL GÖRÜNÜME SIZIYOR.
+        //
+        // Yaş sayacı olarak kullanılmak istendi (`KAccumulate` onu 900 s ile
+        // söndürüyor, tam bir yaş ölçeği). Ama `snow.a` AYNI ZAMANDA
+        // `MountainSurface`'in `yerelBozulma`'sı ve doğrudan doku harmanına
+        // giriyor: iz gri bir lekeye döndü. Bu tuzağa daha önce sıkışma
+        // sayacıyla da düşülmüştü (`SYMPTOMS.md`).
+        //
+        // Kenarın yaşla yuvarlanması ayrı bir kanal açılmadan yapılamıyor;
+        // kayıt `DECISIONS.md`'de.
 
         // Üzerinden geçilen yerde sırt kalmaz (spec §18.4).
         trail.a = 0.0;
@@ -455,18 +593,44 @@ void KRepose(uint3 id : SV_DispatchThreadID)
 
     float en = trail.r;
 
+    // İKİ HALKA: 1 VE 2 TEKSEL KOMŞULAR.
+    //
+    // Tek halkayla göçme geçiş başına bir teksel yayılıyor. Batma tavanı
+    // 22 cm'den 35 cm'ye çıkınca göçecek duvar 7 cm'den 22 cm'ye çıktı ve
+    // yayılması gereken mesafe 22/tan(38°) = 28 cm = 12 tekselle oldu;
+    // 6 geçiş yalnız 6 teksel yayıyordu.
+    //
+    // Ölçüldü (enine kesit, 49 cm kar): kenar rampası 5 tekselde 179 mm,
+    // yani eğim 57° — duruş açısının iki katı. Kullanıcı bunu "kenarlar çok
+    // dik, dağılma hissiyatı yok" diye bildirdi.
+    //
+    // İkinci halka geçiş başına iki teksel yayıyor ve 6 geçişte 12 tekselle
+    // tam yetiyor. Geçiş sayısını ikiye katlamak yerine halka eklemenin
+    // sebebi ara tekselin de doldurulması: 2 teksel ATLAYAN tek bir halka
+    // ara tekseli boş bırakıp merdiven üretirdi.
     [unroll]
     for (int i = 0; i < 8; ++i)
     {
-        int2 p = clamp(int2(id.xy) + kKomsu8[i], int2(0, 0), int2(kmax, kmax));
+        int2 yon = kKomsu8[i];
 
         // Köşegen komşu bir teksel değil, kök2 teksel uzakta.
-        float mesafe = (i < 4) ? adim : adim * 1.41421356;
+        float birim = (i < 4) ? adim : adim * 1.41421356;
+
+        // TEK HALKA — İKİ HALKA IŞINSAL DESEN BIRAKIYORDU.
+        //
+        // `max` yayılımı yön başına bağımsız çalışıyor; sekiz yön bir koni
+        // değil bir YILDIZ üretiyor ve köşegenler boyunca çizgiler kalıyor.
+        // İkinci halka bu deseni iki katına çıkardı (ekranda izin içinde
+        // düzenli çapraz ızgara görüldü).
+        //
+        // Aynı yayılımı daha çok geçişle almak hem daha izotropik hem daha
+        // ucuz: 10 geçiş × 8 okuma = 80, iki halkalı 6 geçiş = 96 okumaydı.
+        int2 p = clamp(int2(id.xy) + yon, int2(0, 0), int2(kmax, kmax));
 
         // Komşunun duvarı `durus` kadarını taşıyor; göçen yalnız fazlası.
         float tasinamayan = max(0.0, _Trail[p].r - durus);
 
-        en = max(en, tasinamayan - mesafe);
+        en = max(en, tasinamayan - birim);
     }
 
     // OMUZ KENDİ KAR SÜTUNUNU DELEMEZ. Oymanın sınırı KDeform'dakiyle aynı:
@@ -480,6 +644,22 @@ void KRepose(uint3 id : SV_DispatchThreadID)
     float sinir = SnowBaseHeight(snow.r, snow.g) * (1.0 - kalanPay);
 
     trail.r = max(trail.r, min(en, sinir));
+
+    // SIRT YAYILIMI VE ÇUKURA DÖKÜLME KALDIRILDI — İKİSİ DE HATALIYDI.
+    //
+    // 1. Yayılım `max` ileydi: `max` bir yığını ALÇALTMADAN genişletiyor.
+    //    Sırt birkaç geçişte bütün izi kaplıyor ve görünen derinlik (`r − g`)
+    //    düşüyordu. Ekranda iz kendi kendine kapanıyor gibi görünüyordu.
+    //    Difüzyonun `max` ile yazılamayacağı buydu: göçme kütleyi taşır,
+    //    kopyalamaz.
+    //
+    // 2. Çukura dökülme (`berm-into-depression`) `KRepose` içindeydi ve bu
+    //    çekirdek kare başına ALTI KEZ koşuyor — hız altıya katlanıyordu.
+    //    Üstelik kar yağmazken izin kapanması ekranda yanlış okunuyor
+    //    (kullanıcı bildirdi: "niye kar yağmıyorken iz kapanıyor ki?").
+    //    İzin dolması yalnız yağış ve rüzgârın işi; ikisi de `KDeform`'da.
+    //
+    // Sırt `KRim` tarafından zaten yumuşak bir profille üretiliyor.
 
     _TrailOut[id.xy] = trail;
 }
