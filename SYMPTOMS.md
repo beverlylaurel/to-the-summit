@@ -2208,3 +2208,306 @@ oluk 0.24 m derin, ekranda hiç yok. Çukuru örten bir yüzey varken çukur
 görünmez — mesh bölgenin tamamını çizmek zorunda. Kısıt kaldırıldı; kare
 sorununun kökü olan "iki yüzey farklı görünüyor" durumu bugün doku ve
 ışıklandırma birleştirilerek kurutuldu.
+
+---
+
+## "Dikdörtgen ayağım varmış gibi iz, dümdüz yürürken zigzag" — asıl sebep: KAR DİK DUVAR TUTUYORDU
+
+Belirti üç ayrı şikâyet gibi göründü ve üç ayrı tur yaktı: (1) iz oluk değil
+hendek, (2) düz yürürken zigzag/örgü, (3) kenarda dağılma yok. Üçü de aynı
+sebebin belirtisi.
+
+| Şüpheli | Ölçüm | Sonuç |
+|---|---|---|
+| Gövde merkezden kaçık | 1.5 mm sapma | **yanlış** — teksel boyunun onda biri |
+| Adım titremesi (`lateralJitter`) | kaldırıldı, iz aynı | **yanlış** |
+| Kenar bükümü dalga boyu | 3.5 → 3.0 cm, iz aynı | **yanlış tek başına** |
+| Yakalamanın kapsama rampası | enine kesit ölçüldü | **DOĞRU** |
+
+İzin enine kesiti (cm, teksel 2.34 cm):
+
+```
+0 0 0 0 0 0 0 0 0 0  10.9  19.0 19.2 19.2 19.2 19.2 19.2 19.2 19.1 19.2 19.0  15.3 5.1 0 0
+```
+
+Tek tekselde 0'dan 19 cm'ye çıkan **dik duvar**, sonra 10 teksel düz taban:
+silindir damgası. Zigzag da buradan geliyordu — kenar bükümü (±0.9 teksel)
+1 teksellik duvarı olduğu gibi kaydırıyor, iz lob lob çıkıyor. Büküm genliği
+kaydırdığı özelliğin boyuyla aynı mertebedeyse özelliği yok eder.
+
+Eksik olan **fizik**: gevşek kar dik duvar tutmaz, duruş açısına (~38°) kadar
+göçer. `KRepose` eklendi — bir teksel komşusundan en fazla `tan(θ)×tekselBoyu`
+kadar derin olabiliyor. Ölçülen yeni kesit:
+
+```
+0 1.1 3.0 4.8 6.6 8.5 10.3 12.1 14.0 15.8 17.6 19.4 21.3 | 22.0 x8 | 21.0 19.1 ... 2.7 0.8 0
+```
+
+Teksel başına 1.83 cm = tan(38°)×2.34 cm. Her yanda 12 teksellik omuz,
+ortada 19 cm düz taban. Büküm/omuz oranı %7'ye düştü.
+
+## "İz saniyeler içinde kayboluyor" — asıl sebep: SİMÜLASYON KARE BAŞINA BİRDEN ÇOK KEZ İLERLİYORDU
+
+| Şüpheli | Ölçüm | Sonuç |
+|---|---|---|
+| Yağışın izi doldurması (formül) | fizik formülü 55 sn'de 0.08 cm | **yanlış** — ölçülen 2 cm |
+| Eski `SNOW_FILL_GAIN = 900` artığı | kaynak temiz, tavan konsa da sönüm sürdü | **yanlış** |
+| Rüzgârın doldurması | rüzgâr 0.54 m/s, eşik 4 m/s | **yanlış** — terim sıfır |
+| Kalıcılık bloklarının bulanıklaştırması | `Unpack` yalnız bölgeye giren blokta koşuyor | **yanlış** |
+| Adımın kaynağı | KDeform 525 karede 1602 kez | **DOĞRU** |
+
+Ayırt eden ölçüm: çekirdeğe **çağrı başına sabit düşüm** (`trail.r -= 1e-5`)
+konup kayıp kare sayısına bölündü. `RecordRenderGraph` her kamera için ayrı
+koşuyor ve `Time.frameCount` bunların arasında ilerleyebildiği için kare
+sayacına bakan koruma tutmuyordu; her çağrı TAM bir karelik `Time.deltaTime`
+uyguluyordu. Adım artık geçen zamandan türüyor (`Time.time` farkı), kamera
+sayısından bağımsız.
+
+**Yan bulgu:** hızlanan yalnız iz değildi — oturma, kabuk, birikme ve sastrugi
+de aynı katsayıyla akıyordu.
+
+**Ölçüm tuzağı:** "kaç teksel dolu" sayacı bu belirtide YALAN SÖYLÜYOR.
+Oyuncunun altındaki canlı gövde her kare yeniden oyuluyor, sayaç sabit kalıyor
+ve "sönüm yok" diyor. Doğru araç tek teksel, tek kanal, zamana karşı.
+
+**İkinci ölçüm tuzağı:** Unity odakta değilken Game view nadiren çiziliyor ve
+kar simülasyonu saniyede ~1.2 kez koşuyor (ölçüldü: 314 çağrı / 266 sn).
+Odaksız yapılan her iz ölçümü seyrek örneklenmiş çıkıyor.
+
+---
+
+## "İz kenarı tırtıl gibi, düzenli diş" — asıl sebep: DAMGA KADANSI
+
+Ölçüm ortamında (Unity odakta değil) izin kenarı düzenli dişliydi. Üç ayrı
+filtre denendi ve üçü de kesmedi:
+
+| Şüpheli | Ölçüm | Sonuç |
+|---|---|---|
+| Kenar bükümünün teksel altı ölçeği | kaldırıldı, diş duruyor | **yanlış** |
+| `SnowDentSmooth` köşegen-anizotropik | 3x3 eş yönlü yapıldı, diş duruyor | **yanlış** |
+| Yumuşatma yarıçapı / eğim adımı | 3.0 ve 2 teksel, diş duruyor | **yanlış** |
+| Damga kadansı | periyot HIZLA ölçekleniyor | **DOĞRU** |
+
+Ayırt eden ölçüm — izin genişliğinin salınım periyodu:
+
+| yürüme hızı | periyot | damga aralığı |
+|---|---|---|
+| 1.2 m/s | 20 teksel | 47 cm |
+| 0.3 m/s | 7 teksel | 16 cm |
+
+Izgara merdiveni olsaydı periyot hızdan BAĞIMSIZ olurdu. Hızla ölçeklendiğine
+göre kaynak zamanda ayrık: gövde damga başına tek poz basıyor ve damgalar
+birleşmeyecek kadar seyrekse birleşimin sınırı taraklanıyor.
+
+İki damga arasındaki mesafe = hız / simülasyon frekansı. Simülasyon render'a
+bağlı; Unity odakta değilken Game view saniyede ~2 kez çiziliyor (ölçüldü:
+314 çağrı / 266 sn), o yüzden ölçüm ortamında damgalar 16-47 cm arayla düşüyor.
+160 FPS'te aralık 0.75 cm, damgalar tamamen örtüşüyor.
+
+**Ölçüm ortamı tuzağı:** odaksız editörde alınan HER iz görüntüsü bu tarağı
+taşır. İz görünümü ölçülecekse ya odak verilecek ya da belirti bu kadansla
+karıştırılmayacak.
+
+**Ayrık yön ayrımı:** eksen boyunca (+X) yürüyüşte iz pürüzsüz çıkıyor, köşegen
+yürüyüşte dişli. Damgalar eksen boyunca üst üste otururken köşegende ızgarayla
+farklı kesişiyor ve tarak görünür hale geliyor.
+
+---
+
+## "Farklı açılara dönünce iz zigzaglı, ama HER ZAMAN değil" — asıl sebep: KALICILIK BLOKLARI CANLI İZİ EZİYORDU
+
+Bu belirti günlerce kovalandı ve her turda yanlış katmana bakıldı. Ayırt eden
+gözlem kullanıcıdan geldi: **iz gövdesi yuvarlak, yuvarlak bir kaynak düz
+çizgide süpürülünce zigzag çıkamaz.** İkincisi de ondan geldi: **her zaman
+olmuyor.** İkisi birlikte suçluyu render katmanından çıkarıp olay-tetiklemeli
+bir yazıcıya indirdi.
+
+| Şüpheli | Ölçüm | Sonuç |
+|---|---|---|
+| Gövde dikdörtgen | mesh `Sphere`, 0.30 x 0.24 x 0.30 | **yanlış** |
+| Gövde oyuncudan kaçık, dönünce yay çiziyor | yatay ofset 0.0000 m | **yanlış** |
+| Gövde yüksekliği salınıyor | kare kare 0.1 cm, tek yönlü | **yanlış** |
+| Damga kadansı | 162 FPS'te damga aralığı 0.75 cm | **yanlış** |
+| Izgara merdiveni / filtre yarıçapı | üç ayrı filtre denendi, diş durdu | **yanlış** |
+| Relief ışını (paralaks) | HAM görünümde de zigzag var | **yanlış** |
+| Kalıcılık bloklarının geri yüklemesi | eksene hizalı bloklar, aralıklı | **DOĞRU** |
+
+**Ayırt eden araç:** `_SnowDebugDent` — ışıklandırma, paralaks ve relief ışını
+kapalı, ekrana yalnız iz dokusunun kendi değeri. Zigzag o görünümde de vardı,
+yani kaynak VERİDE. Bu araç olmadan render tarafında dört tur harcandı.
+
+**İki ayrı hata:**
+
+1. **Sınır dışı okuma.** `step = _BlockTexels / _BlockStored` tam sayı bölmesi:
+   171/64 = 2. Paketleme bloğun 171 tekselinin yalnız 128'ini kapsıyordu; açma
+   tarafında aynı bölme `src`'yi 85'e çıkarıp 64x64'lük tamponun dışını
+   okutuyordu (indeks 5525, tampon 4096) ve okunan çöp doğrudan `trail.r`'a
+   yazılıyordu. Eşleme orantılı hâle getirildi.
+
+2. **Depo izi taşıyamıyor.** 4 m blok başına 64x64, yani teksel başına 6.25 cm
+   — izin çizildiği çözünürlüğün ÜÇTE BİRİ. Önce `=` yerine `max` denendi ve
+   YETMEDİ: iz hâlâ siliniyordu. Kalıcılık artık ize hiç dokunmuyor; yalnız
+   kar durumunu (SWE, yoğunluk) hatırlıyor.
+
+**Ayırt eden ölçüm:** kalıcılık geçici olarak kapatıldı. Aynı git-dön-gel
+yürüyüşü — açıkken 206 teksel, kapalıyken 8362. Kapalıyken derinlik de aynı
+(22.00 cm), yani silen tek şey oydu. Düzeltmeden sonra kalıcılık AÇIK: 8362
+teksel, genişlik 19-22 teksel sabit.
+
+**Neden aralıklı:** geri yükleme yalnız (a) daha önce paketlenmiş ve (b) bölgeye
+YENİ giren bloklarda koşuyor. Paketleme kare başına bir blok ve asenkron geri
+okumayla ilerliyor, yani hangi bloğun saklandığı zamanlamaya bağlı. Taze bir
+yöne düz yürürken hiç tetiklenmiyor; dönünce, geri gelince veya 4 m'lik ızgara
+çizgisi tekrar geçilince tetikleniyor.
+
+**Tekrarlanabilir tetikleyici:** 10 m düz yürü, dön, aynı yoldan geri gel.
+
+---
+
+## Aynı belirtinin ASIL sebebi: SIRT ÇUKURUN DERİNLİĞİNDEN ÇIKARILIYORDU
+
+Yukarıdaki kalıcılık kaydı gerçek bir hataydı ama belirtiyi kapatmadı. Sebep
+şuydu: bütün ölçümler `trail.r` üzerinde yapıldı, oysa ekranda görünen
+`trail.r - trail.g`. Ham teşhis görünümü de aynı farkı basıyor. `g` hiç
+uzamsal olarak ölçülmemişti.
+
+Ölçüldü, aynı iz, aynı kare:
+
+```
+trail.r genisligi   : 19 22 20 21 21 20 22 21 20 21 ...   (sabit)
+(r - g) genisligi   : 12 12 12 13 14 17 20 20 19 19 19 17 13 13 12 12 ...
+```
+
+`r` boyunca sabit, `r - g` periyodik olarak 19'dan 12'ye çöküyor. Periyot
+~33 teksel (77 cm).
+
+`trail.g` karın YUKARI İTİLMİŞ kısmı — izin kenarındaki kabarma. Onu çukurun
+derinliğinden çıkarmak iki ayrı geometriyi tek sayıya sıkıştırıyor, ve sırt tam
+olarak omuzun üstüne düştüğü için omuzu siliyor: omuzda derinlik 8-12 cm, sırt
+4 cm; fark eşiğin altına iniyor ve iz orada BİTİYOR.
+
+Deseni periyodik yapan şey `KRim`: sırt, bulanık oymayı yakalanan HIZLA
+kaydırarak örnekliyor (`SNOW_RIM_VELOCITY_BIAS`) ve `max` ile birikiyor. Gövde
+ilerledikçe kaydırma yer değiştiriyor, sırt iz boyunca dalga dalga basılıyor.
+Yön değişince desen de değişiyor — kullanıcının "farklı açılara dönünce"
+demesinin sebebi bu.
+
+**Düzeltme:** relief derinliği artık yalnız `trail.r`. Ölçüm sonrası genişlik
+20-24 teksel, düzenli çöküş yok.
+
+**Ders:** ekranda görünen büyüklük neyse ÖLÇÜLEN de o olmalı. `r` ölçülüp
+`r - g` çizildiği için altı tur boyunca yanlış katmana bakıldı — filtre,
+paralaks, damga kadansı, kalıcılık.
+
+---
+
+## "Zigzag HER ZAMAN olmuyor" — asıl sebep: SIRT GÖVDENİN OTURMA YÜKSEKLİĞİNE SIZIYORDU
+
+Kullanıcı bunu üç kez söyledi ve üç kez geometriye bakıldı. Aralıklı olan bir
+belirtinin sebebi geometri olamaz; geometri her zaman aynıdır. Aralıklı olan
+şey ZAMANLAMADIR.
+
+`SnowTrailBodyAlign` gövdenin oturma yüksekliğini şöyle alıyordu:
+
+```
+izOncesiYuzey = ss.Depth + ss.SinkDepth
+```
+
+`SnowSampler.Decode`'a bakılınca açılımı çıkıyor:
+
+```
+Depth     = baseHeight - trail.r + trail.g
+SinkDepth = trail.r
+toplam    = baseHeight + trail.g          <-- SIRT İÇERİDE
+```
+
+`trail.g` sırt: `max` ile birikiyor, konumu yakalanan HIZLA kaydırılarak
+örnekleniyor (`SNOW_RIM_VELOCITY_BIAS`), 0 ile 4 cm arasında düzensiz zıplıyor.
+Gövde onun peşinden inip çıkıyor, iz derinliği basamaklanıyor. Yön değişince
+sırdın kaydırması da değişiyor — "farklı açılarda bozuluyor" bundan.
+
+**Aralıklı olmasının sebebi:** bu örnek `SnowSampler`'ın asenkron geri
+okumasından geliyor ve okuma **30 karede bir** tazeleniyor (`ReadbackInterval`).
+Basamağın boyu = hız × 30 kare; görünürlüğü o kadansla yürüyüş hızının fazına
+bağlı. Bazı hızlarda basamak teksel altına düşüyor ve belirti kayboluyor.
+
+**Düzeltme:** `SnowSample.BaseHeight` eklendi — iz öncesi kar sütunu, yalnız
+yağış ve oturmayla değişiyor, saniyeler ölçeğinde sabit. Geri okumanın
+gecikmesi onu etkilemiyor.
+
+**Ölçüldü:** izin genişliği düzeltmeden önce 12↔19 teksel arasında 33 tekselllik
+periyotla salınıyordu; sonra 20 teksel, sapması 1-2.
+
+**Ders:** ARALIKLI BELİRTİ ZAMANLAMAYI GÖSTERİR. Kullanıcı "her zaman olmuyor"
+dediğinde aranacak şey geometri değil, kadans: geri okuma aralığı, asenkron
+istek, olay tetiklemeli yazıcı.
+
+---
+
+## Zigzag/tarak — ASIL SEBEP: YOĞUNLUK, GEOMETRİ DEĞİL
+
+Bu belirti günlerce geometri tarafında arandı ve orada değildi.
+
+**Ayırt eden araç:** iki dokunun ayrı ayrı PNG olarak dışa alınması. Aynı
+yürüyüş, L şeklinde: önce +X, sonra çapraz.
+
+| doku | yatay kol | çapraz kol |
+|---|---|---|
+| `trail.r` (oyma derinliği) | kusursuz düz | **kusursuz düz** |
+| `snow.g` (yoğunluk) | tek renk | **düzenli enine çizgi** |
+
+Derinlik iki kolda da temizdi. Bütün ölçümler ona bakıyordu; belirti ise
+yoğunluktaydı ve yoğunluk hem albedoyu hem pürüzlülüğü sürdüğü için ekranda
+diş/tarak olarak çıkıyordu.
+
+**Yoğunluğu bozan üç ayrı hata:**
+
+1. **Sıkışma kare başına artışa bağlıydı.** `compact = f(trail.r - eskiOyma)`
+   tekselin yoğunluğuna onun HANGİ KAREDE ilk basıldığını kazıyor. Eksen
+   boyunca ilk-temas kümeleri düzgün sütunlar, çaprazda merdiven.
+
+2. **Geri besleme.** `trail.r / baseH` yazıldığında döngü kapanıyor:
+   `baseH = SWE×1000/ρ`, `snow.g` artınca `baseH` düşüyor, oran yükseliyor,
+   `snow.g` yine artıyor. Ayak altındaki her karede bir kez dönüyor, yani son
+   yoğunluk KAÇ KARE ayak altında kalındığına bağlı. Referans `SNOW_MAX_SINK`
+   sabitine bağlandı. Ölçüm: yoğunluk aralığı 0.0102–0.1676 → 0.0102–0.0912.
+
+3. **Sıkışma yalnız ANLIK TEMASTA yazılıyordu.** Blok `penetration > 0.0005`
+   dalının içindeydi. Oyma diskin YUMUŞAK kapsama rampasıyla yazılıyor ve o
+   rampa diskin sert silüetinden geniş; yoğunluk ise yalnız sert silüetin
+   içinde güncelleniyordu. İki sınır farklı olunca ardışık damgaların birleşimi
+   derinlikte pürüzsüz, yoğunlukta TARAKLI çıkıyor. Blok dışarı alındı;
+   yoğunluk artık oymanın saf fonksiyonu.
+
+**Dördüncü hata — kanal çakışması.** Geçiş sayacı `snow.a`'da tutuluyordu ama o
+kanal aynı zamanda bozulma/tazelik: `KAccumulate` onu söndürüyor,
+`MountainSurface` `yerelBozulma` olarak okuyup doku harmanına sürüyor. Sayaç
+doğrudan görünüme sızıyordu. Sayaç tümden kaldırıldı.
+
+**Ders:** EKRANDA GÖRÜNEN BÜYÜKLÜK NEYSE ÖLÇÜLEN DE O OLMALI. Altı tur boyunca
+`trail.r` ölçülüp `snow.g`'nin sürdüğü bir belirti kovalandı. Şüpheli listesi
+tükendiğinde yapılacak şey daha çok hipotez değil, ÇİZİME GİREN HER KANALI tek
+tek dışa almaktır.
+
+**Yanlış çıkan şüpheliler (hepsi ölçüldü):** gövde şekli (küre), gövde ofseti
+(0.0000 m), gövde yüksekliği salınımı (yok), oyuncunun yolu (yanal sapma
+±0.05 cm), damga kadansı, ızgara merdiveni, üç ayrı filtre yarıçapı, relief
+ışın yürüyüşü (kapatıldı, diş durdu), iz eğiminin normale katılması
+(kapatıldı, diş durdu), yüzey dokuları (kapatıldı, diş durdu).
+
+## "Yuvarlak kaynak nasıl zigzag iz çıkarır" — çıkarmıyor, YOL zigzag
+
+Kullanıcının sorusu doğruydu ve cevabı şu: iz sadık, yol değil.
+
+Bütün ölçüm yürüyüşleri `cc.Move`'u DOĞRUDAN çağıran bir probla yapılmıştı ve
+o yolun yanal sapması ±0.05 cm çıkıyordu — dümdüz. Gerçek `FirstPersonController`
+üzerinden, sabit W girdisiyle aynı ölçüm yapıldığında iz kıvrılıyor, dönüyor,
+hatta tam bir halka çiziyor.
+
+**Ayırt eden ölçüm:** `InputSystem.QueueStateEvent` ile W enjekte edilip iz
+dokusu PNG olarak dışa alındı. Aynı karede iki iz görünüyor: sentetik yürüyüşün
+düz çizgisi ve denetleyici yürüyüşünün yılanı.
+
+**Ders:** ÖLÇÜM ARACI GERÇEK YOLU ATLAMAMALI. Prob `cc.Move`'u çağırarak
+denetleyiciyi baypas ediyordu; belirtinin kaynağı tam olarak baypas edilen
+yerdeydi.

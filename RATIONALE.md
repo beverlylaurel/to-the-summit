@@ -1465,3 +1465,101 @@ yani ayrım yapılamıyor — ayrım yapamayan katsayı sabit kalır.
 tam bulutta 0.65 ile çarpan 2.4'e çıkar ve bulut gölgesindeki kar gerçekten
 olması gerektiği kadar aydınlanır. Şu an bulut gölgesi altında zemin 0.09
 luma ölçülüyor (güneşlisi 0.85) — bu, terimin eksik kalan yarısı.
+
+## Neden izin duvarı göçüyor (duruş açısı)
+
+**Kural:** `KRepose` bir tekselin komşusundan en fazla `tan(38°) × tekselBoyu`
+kadar derin olmasına izin veriyor (`SNOW_REPOSE_TAN`).
+
+**Neden 38°:** gevşek kuru karın talus açısı [Cordonnier ve ark., EG 2018, §5.4].
+Fiziksel bir büyüklük; görünüme göre ayarlanmış bir katsayı değil.
+
+**Denenip başarısız olan yol:** kenar bükümünün dalga boyunu değiştirmek
+(11 → farklı ölçekler). Belirti sürdü, çünkü sorun bükümde değil BÜKÜLEN
+ŞEYDE idi: 1 teksellik dik duvar ±0.9 teksel büküldüğünde lob üretir. Genlik
+ile özellik boyu aynı mertebede olamaz.
+
+**Ürettiği belirti (olmadığında):** "dikdörtgen 1 tane ayağım varmış gibi iz",
+"dümdüz yürürken zigzag", "kenarlarda dağılma yok". Üçü de tek sebebin
+belirtisi — ölçüm `SYMPTOMS.md`.
+
+**Yalnız derinleştiriyor:** `trail.r = max(trail.r, min(koni, sinir))`. `min`
+doğrudan yazılırsa çekirdek izi SİLER — kar sütunu birikmemişken sınır sıfır
+çıkıyor. Bu bir kez yaşandı ve bütün iz dokusu 0.00 cm ölçüldü.
+
+## Neden simülasyon adımı `Time.deltaTime` değil
+
+**Kural:** `SnowManager.Dispatch` adımı `Time.time` farkından türetiyor.
+
+**Neden:** `RecordRenderGraph` her kamera için ayrı koşuyor (oyun görünümü,
+sahne görünümü, yardımcı kameralar) ve `Time.frameCount` bunların arasında
+ilerleyebiliyor. Kare sayacına bakan muhafaza tutmuyor, her çağrı tam bir
+karelik zaman uyguluyordu.
+
+**Ölçüm:** KDeform 525 karede 1602 kez koştu (3.05 kat). Ayırt eden araç
+çekirdeğe konan çağrı başına sabit düşümdü; kayıp / düşüm = çağrı sayısı.
+
+**Ürettiği belirti:** ayak izinin saniyeler içinde kapanması. Ama hızlanan
+yalnız iz değildi — oturma, kabuk, birikme ve sastrugi de aynı katsayıyla
+akıyordu. Belirti izde görüldü çünkü tek gözlenebilir olan oydu.
+
+**Telafi terimi geri alındı:** bu bulunmadan önce dolma hızına tavan
+(`SNOW_MAX_FILL_RATE`) konmuştu. Gerekçesi ortadan kalktığı için terim silindi.
+
+## Neden duvar bir yüksekliğe kadar dik duruyor (kohezyon)
+
+**Kural:** `KRepose` yalnız `SNOW_STAND_*` yüksekliğinin ÜSTÜNDE kalan payı
+göçürüyor; altı dik kalıyor. Yükseklik yoğunlukla artıyor (0.06 → 0.18 m).
+
+**Neden:** talus açısı KOHEZYONSUZ tanelerin açısı. Kar sinterlenir ve gerçek
+bir kohezyonu vardır — günlük gözlem de bunu söylüyor: karda ayak izinin
+duvarı dik durur, yalnız tepesinde küçük bir göçük olur.
+
+**Ölçüm:** saf talus modeli 22 cm'lik izi 76 cm genişletti (her yana 28 cm).
+Kohezyon eklenince 42 cm; duvar 3 tekselde (7 cm) iniyor, omuz üstte kalıyor.
+
+**Ürettiği belirti (olmadığında):** "iz şu an çok geniş".
+
+## Neden omuz yüksekliği gürültülü
+
+**Kural:** `SNOW_STAND_NOISE` duruş yüksekliğini yerel olarak ±%45 dalgalandırıyor,
+dalga boyu 18 cm.
+
+**Neden:** sabit yükseklik omuzun dış sınırını DÜZ bir çizgi yapıyor; iz kenarı
+her yerde aynı ve keskin çıkıyor.
+
+**Dalga boyu kuralı:** omuz 4-9 teksel (9-21 cm), dalga boyu 18 cm — omuzdan
+uzun. Kısa olsaydı omuzu yok ederdi; aynı hata kenar bükümünde yapılmıştı.
+
+**Ölçüm:** aynı izin üç kesitinde sol omuz 2.5 / 4.8 / 5.5 cm, sağ omuz
+3.7 / 1.5 / 6.4 cm. Önce üçü de aynıydı.
+
+**Ürettiği belirti (olmadığında):** "iz kenarı çok keskin, istediğim dağılmaya
+sahip değil, dağılma yok bile diyebilirim".
+
+## Neden çukurun karartması çok yansımayla telafi ediliyor
+
+**Kural:** `MountainSurface.hlsl` çukurun görüş payını `V / (1 - a(1-V))` ile
+uyguluyor, doğrudan `V` ile değil.
+
+**Neden:** çukur göğü dar açıdan görüyor ama kaybolan gök ışığının yerine
+çukurun KENDİ BEYAZ DUVARLARI geçiyor. Albedo 0.91 olan bir kovukta V=0.65
+iken net kayıp %5, %35 değil. Aynı formül `SnowAmbient`'te de kullanılıyor.
+
+**Ürettiği belirti (olmadığında):** beyaz yüzeyi düz oranla karartmak onu
+GRİ yapıyor — "kar izi gri?? niye gri onu da bilmiyorum".
+
+## Neden `SnowDentAt` bölge dışında sıfır
+
+**Kural:** iz derinliği `SnowInsideMask` ile çarpılıyor.
+
+**Neden:** `saturate(uv)` kenardaki tekseli bölge dışındaki her noktaya
+kopyalıyor. Sınırdaki bir teksel oyuluysa o oyuk dünyaya şerit olarak yayılıyor
+ve maskenin kestiği yerde DİKDÖRTGEN bir plato çıkıyor.
+
+**Ürettiği belirti (olmadığında):** "karın içinden dikdörtgen cisimler çıkıyor";
+F1 → "Kar yok" ile kayboluyor, çünkü o düğme kar derinliğini sıfırlıyor.
+
+**Not:** durum dokusunun aynı sorunu `SnowStateAt` içinde zaten çözülmüştü
+(bölge dışı dünyanın genel değerine harmanlanıyor). İzin dünya karşılığı yok,
+o yüzden harman değil sıfır.

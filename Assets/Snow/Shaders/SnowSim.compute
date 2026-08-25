@@ -9,6 +9,7 @@
 #pragma kernel KRimBlurH
 #pragma kernel KRimBlurV
 #pragma kernel KRim
+#pragma kernel KRepose
 #pragma kernel KAccumulate
 #pragma kernel KReduceState
 #pragma kernel KBlockPack
@@ -144,34 +145,22 @@ void KDeform(uint3 id : SV_DispatchThreadID)
 
     float2 worldXZ = SnowTexelToWorld(id.xy);
 
-    // KENAR DAĞILMASI: kapsamanın okunduğu teksel gürültüyle kaydırılıyor.
-    // Rampa taşınıyor, bozulmuyor (gerekçe SNOW_TRAIL_EDGE_WARP_TEXELS yanında).
-    float2 kayma =
-        (float2(SnowValueNoise(worldXZ * SNOW_TRAIL_EDGE_SCALE_A),
-                SnowValueNoise(worldXZ * SNOW_TRAIL_EDGE_SCALE_A + 17.3)) * 2.0 - 1.0) * 0.65 +
-        (float2(SnowValueNoise(worldXZ * SNOW_TRAIL_EDGE_SCALE_B),
-                SnowValueNoise(worldXZ * SNOW_TRAIL_EDGE_SCALE_B + 31.7)) * 2.0 - 1.0) * 0.18;
-
-    // KAYDIRMA TAM SAYI TEKSELE YUVARLANAMAZ. `round` ile kenar teksel teksel
-    // zıplıyor ve düzensizlik yerine düzenli bir testere dişi çıkıyor —
-    // ekrandan görüldü. Ara değer dört komşudan elle harmanlanıyor; compute
-    // shader'da doku örnekleyici bağlamaya gerek yok.
-    float2 kp = float2(id.xy) + kayma * SNOW_TRAIL_EDGE_WARP_TEXELS;
-    int2   k0 = (int2)floor(kp);
-    float2 kf = kp - (float2)k0;
-    int    kmax = (int)_Resolution - 1;
-
-    float a00 = _CaptureBlur[(uint2)clamp(k0 + int2(0, 0), 0, kmax)].a;
-    float a10 = _CaptureBlur[(uint2)clamp(k0 + int2(1, 0), 0, kmax)].a;
-    float a01 = _CaptureBlur[(uint2)clamp(k0 + int2(0, 1), 0, kmax)].a;
-    float a11 = _CaptureBlur[(uint2)clamp(k0 + int2(1, 1), 0, kmax)].a;
-
-    // YALNIZ KAPSAMA KAYDIRILIYOR, YÜKSEKLİK DEĞİL. `cap.r` yakalanan yüzeyin
-    // Y'si; kaydırılmış tekselden okunursa batma derinliği komşu noktanın
-    // yüksekliğiyle hesaplanır ve eğimli arazide kaydırma kadar hata verir.
-    // Düzensizlik kapsama profilinin işi; derinlik olduğu yerden okunuyor.
-    float4 cap     = _CaptureBlur[id.xy];
-    cap.a          = lerp(lerp(a00, a10, kf.x), lerp(a01, a11, kf.x), kf.y);
+    // KENAR BÜKÜMÜ KALDIRILDI.
+    //
+    // Kapsama, teksel ızgarasında gürültüyle kaydırılıyordu. İki gürültü
+    // ölçeğinden biri TEKSEL ALTIYDI: 34 1/m, yani 2.9 cm = 1.26 teksel.
+    // Örnekleme ızgarasından küçük bir dalga taşınamaz; kenarda düzensizlik
+    // değil teksel ölçeğinde ZIPLAMA üretiyordu (ölçüldü: omuz kenarı komşu
+    // örnekler arasında ±2 teksel oynuyor, düzenli bir dalga yok).
+    //
+    // O zıplama ekranda küçük kalmıyor: relief ışını sıyırtma açıda 28 teksel
+    // yol alıyor ve bir tekselllik gürültü silueti KIRIYOR — iz lob lob,
+    // tırtıl gibi görünüyordu.
+    //
+    // Bükümün asıl işi 1 tekselllik sert duvarı kırmaktı. O duvar artık yok:
+    // `KRepose` omzu açıyor ve düzensizliği duruş yüksekliğinin gürültüsü
+    // veriyor (dalga boyu 18 cm — teksel ızgarasının sekiz katı).
+    float4 cap   = _CaptureBlur[id.xy];
     float4 trail   = _Trail[id.xy];
     float4 snow    = _Snow[id.xy];
 
@@ -184,15 +173,16 @@ void KDeform(uint3 id : SV_DispatchThreadID)
     // ρ_su/ρ_kar ile çarpılır — taze karda (ρ≈55) bu ≈ 18. Sabit 900 idi,
     // yani ~50 kat hızlı: iz saniyeler içinde doluyordu.
     //
-    // Ölçüldü: 2 sn'lik yürüyüşten hemen sonra izde 2409 teksel var, 20 sn
-    // sonra 179. En derin nokta duruyor ama izin GENİŞ kısmı siliniyor;
-    // ekranda kalan şey dar bir çekirdek (kullanıcı bildirdi: "çok dar").
+    // Bu hız GERÇEKTEN küçük: taze karda (ρ≈55) 1.4e-6 m/s SWE dakikada
+    // 0.15 cm dolduruyor, yani iz dakikalarca duruyor. İzin saniyeler içinde
+    // kapanmasının sebebi bu satır değildi; simülasyon kare başına birden
+    // çok kez ilerliyordu (`SnowManager.Dispatch`, ölçüm oradaki yorumda).
     float rhoYerel = max(SnowDensity(snow.g), 1.0);
     float fillRate = _SnowfallSWERate * (SNOW_RHO_WATER / rhoYerel);
     fillRate += max(0.0, _WindSpeed - 4.0) * SNOW_WIND_FILL;
 
     trail.r = max(0.0, trail.r - fillRate * _SnowDeltaTime);
-    trail.g = max(0.0, trail.g - fillRate * _SnowDeltaTime * 1.4);   // sırt daha hızlı erir
+    trail.g = max(0.0, trail.g - fillRate * _SnowDeltaTime * 1.4);   // sirt daha hizli erir
 
     // --- Batma (spec §10.1) ---
     float groundY  = SampleGroundHeight(worldXZ);
@@ -278,43 +268,74 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         // tam tavana düzleştiriyor ve rampayı yine yok ediyordu.
         float target = min(enFazlaOyma, tasimaSiniri) * sinkScale * kapsama;
 
-        float eskiOyma = trail.r;
         trail.r = max(trail.r, target);
 
         // Üzerinden geçilen yerde sırt kalmaz (spec §18.4).
         trail.a = 0.0;
 
-        // SIKIŞMA YENİ OYMAYA ORANTILI, GEÇEN SÜREYE DEĞİL.
+        // SIKIŞMA ULAŞILAN OYMANIN FONKSİYONU — SAYAÇ YOK.
         //
-        // Önce `SNOW_COMPACT_RATE * ... * _SnowDeltaTime` idi: ayak durduğu
-        // sürece sıkışma birikiyordu. Yoğunluk arttıkça `baseH = SWE×1000/ρ`
-        // düşüyor, yani YERİNDE BEKLEYEN oyuncunun altında iz yuvarlak bir
-        // çukur gibi derinleşiyordu (kullanıcı bildirdi).
+        // Eski hâl iki hata taşıyordu:
         //
-        // Kar öyle davranmaz: yük sabitken sıkışma bir kerede dengeye gelir,
-        // beklemek ek sıkışma üretmez. Sıkışmayı bu karede AÇILAN oymaya
-        // bağlayınca davranış kendiliğinden doğru oluyor — ilk temasta
-        // sıkışıyor, sonraki karelerde `yeniOyma` sıfır olduğu için duruyor.
-        // Kare hızına da bağlı kalmıyor: toplam oyma kare sayısından bağımsız.
-        float yeniOyma = trail.r - eskiOyma;
-        float compact = SNOW_COMPACT_GAIN * saturate(yeniOyma / max(baseH, 1e-4));
-
-        // TEK GEÇİŞ SINIRI. `snow.a` bu temasta ne kadar yoğunlaştığımızı
-        // tutuyor; ayak kalkınca sıfırlanıyor. Sınır olmadan bir tek temas
-        // yoğunluğu tepeye çıkarıp izi çukura çeviriyordu (gerekçe
-        // `SNOW_MAX_COMPACT_PER_PASS` yanında).
-        float kalanIzin = max(0.0, SNOW_MAX_COMPACT_PER_PASS - snow.a);
-        compact = min(compact, kalanIzin);
-
-        snow.g = min(snow.g + compact, SNOW_PACKED_N);
-        snow.a = snow.a + compact;
+        // 1. `compact = f(trail.r - eskiOyma)`, yani O KAREDE açılan oymaya
+        //    bağlıydı. Bu, tekselin yoğunluğuna ONUN HANGİ KAREDE BASILDIĞINI
+        //    kazıyor. Eksen boyunca yürürken ilk-temas kümeleri düzgün sütunlar
+        //    olduğu için görünmüyor; ÇAPRAZ yürürken merdiven oluyorlar.
+        //
+        // 2. Geçiş sayacı `snow.a`'da tutuluyordu. O kanal AYNI ZAMANDA
+        //    bozulma/tazelik: `KAccumulate` onu `exp(-dt/TAU)` ile söndürüyor ve
+        //    `MountainSurface` `yerelBozulma` olarak okuyup DOKU HARMANINA
+        //    sürüyor. Yani sayaç doğrudan görünüme sızıyordu. Üstüne, ayak
+        //    kalkınca sıfırlandığı için çapraz yürüyüşte kapsama teksel
+        //    sınırlarında açılıp kapandıkça sayaç tekrar tekrar doluyordu.
+        //
+        // Ölçüldü: `snow.g` dokusu dışa alındı — yatay kol tek renk, çapraz kol
+        // düzenli enine çizgili. İz derinliği (`trail.r`) ikisinde de kusursuz
+        // düzdü; günlerce yanlış kanala bakılmasının sebebi buydu.
+        //
+        // Doğrusu tek satır: kar YÜKE göre sıkışır. Ulaşılan oyma / kar sütunu
+        // oranı ne kadarsa yoğunluk o kadar. Sayaç gerekmiyor, sıfırlama
+        // gerekmiyor, kare sayısı ve yol geometrisi sonuca girmiyor. Birden
+        // fazla geçiş `trail.r`'ı derinleştirdiği için patika kendiliğinden
+        // oluşmaya devam ediyor (spec §10.1: "5-6 geçişten sonra patika").
+        // REFERANS SABİT, KAR SÜTUNU DEĞİL — YOKSA GERİ BESLEME OLUYOR.
+        //
+        // `trail.r / baseH` yazıldığında döngü kapanıyor: `baseH = SWE×1000/ρ`,
+        // yani `snow.g` artınca `baseH` düşüyor, oran yükseliyor, `snow.g` yine
+        // artıyor. Döngü ayak altındaki HER KAREDE bir kez dönüyor, dolayısıyla
+        // bir tekselin son yoğunluğu KAÇ KARE ayak altında kaldığına bağlı
+        // kalıyor. Çapraz yürüyüşte disk kapsaması teksel ızgarasında düzensiz
+        // ilerlediği için bekleme süresi tarak deseni yapıyordu (ölçüldü:
+        // yoğunluk dokusu dışa alındı, yatay kol tek renk, çapraz kol çizgili).
+        //
+        // `SNOW_MAX_SINK` sabit: taşıma gücünün verdiği en derin oyma. Oran ona
+        // göre alınınca yoğunluk oymanın SAF fonksiyonu oluyor — kare sayısı,
+        // bekleme süresi ve yol geometrisi sonuca girmiyor.
     }
-    else
-    {
-        // Ayak kalktı: geçiş sayacı sıfırlanıyor, sonraki adım kendi payı
-        // kadar yeniden sıkıştırabiliyor. Patika böyle oluşuyor.
-        snow.a = 0.0;
-    }
+
+
+    // SIKIŞMA OYMANIN OLDUĞU HER YERDE, ANLIK TEMASTA DEĞİL.
+    //
+    // Bu blok `penetration > 0.0005` dalının İÇİNDEYDİ. Oyma diskin YUMUŞAK
+    // kapsama rampasıyla (`kapsama`) yazılıyor ve rampa diskin sert
+    // silüetinden daha geniş; yoğunluk ise yalnız sert silüetin içinde
+    // güncelleniyordu. İki sınır farklı olunca ardışık damgaların birleşimi
+    // derinlikte pürüzsüz, yoğunlukta TARAKLI çıkıyordu.
+    //
+    // Ölçüldü: iki doku ayrı ayrı dışa alındı — `trail.r` kusursuz düz bir
+    // şerit, `snow.g` çapraz kolda üst üste binmiş disk yayları. Yatay kolda
+    // ikisi de temiz, çünkü orada sert silüet ızgarayla hizalı ilerliyor.
+    //
+    // Yoğunluk artık oymanın SAF fonksiyonu: `trail.r` neredeyse yoğunluk da
+    // orada. Taban izsiz karın kendi yoğunluğu (`_FallbackRhoN`); sabit bir
+    // döşeme yazılırsa oyma sıfıra giderken yoğunluk sıçrıyor ve kenar yine
+    // sertleşiyor.
+    float hedefN = _FallbackRhoN
+                 + (SNOW_PACKED_N - _FallbackRhoN)
+                   * saturate(trail.r / SNOW_MAX_SINK) * SNOW_COMPACT_GAIN;
+
+    snow.g = max(snow.g, min(hedefN, SNOW_PACKED_N));
+
 
     _TrailOut[id.xy] = trail;
     _SnowOut[id.xy]  = snow;
@@ -413,6 +434,79 @@ void KRim(uint3 id : SV_DispatchThreadID)
     trail.g = rim;
 
     _TrailOut[id.xy] = trail;   // B (kabuk) ve A (sastrugi) korunuyor
+}
+
+/// KOMSU YONLERI — duruş açısı gevşemesi için. Sekiz yön kullanılıyor: dört
+/// yönle koni ELMAS çıkıyor ve izin omzu köşeli görünüyor.
+static const int2 kKomsu8[8] = { int2( 1, 0), int2(-1, 0), int2( 0, 1), int2( 0,-1),
+                                 int2( 1, 1), int2( 1,-1), int2(-1, 1), int2(-1,-1) };
+
+/// KARIN DURUŞ AÇISI.
+///
+/// Gevşek kar dik duvar tutmaz. Ayağın açtığı çukurun kenarı duruş açısına
+/// kadar göçer: duvar dışarı çekilir ve olukta geniş, yumuşak bir omuz kalır.
+///
+/// Ölçüldü — göçme yokken izin enine kesiti (cm, teksel 2.34 cm):
+///   0 0 0 0 0 0 0 0 0 0 10.9 19.0 19.2 19.2 19.2 19.2 19.0 15.3 5.1 0 0
+/// Tek tekselde 0'dan 19 cm'ye inen bir hendek; kullanıcı "dikdörtgen ayak"
+/// diye bildirdi. Kenar bükümü de bu sert duvarı olduğu gibi kaydırdığı için
+/// iz lob lob, zigzaglı çıkıyordu — büküm genliği (0.9 teksel) duvarın
+/// özellik boyuyla (1 teksel) aynı mertebedeydi.
+///
+/// Bir teksel komşusundan en fazla `tan(θ) × tekselBoyu` kadar derin olabilir;
+/// fazlası komşuyu da derinleştirir. YALNIZ DERİNLEŞTİRİYOR: tekrar koşmak
+/// koniyi değiştirmiyor, sonuç kare hızından bağımsız.
+[numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
+void KRepose(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _Resolution || id.y >= _Resolution) return;
+
+    float4 trail = _Trail[id.xy];
+    float4 snow  = _Snow[id.xy];
+
+    int   kmax = (int)_Resolution - 1;
+    float adim = SNOW_REPOSE_TAN * SnowTexelSize();
+
+    // DUVAR BU YÜKSEKLİĞE KADAR DİK DURUYOR; yalnız üstü göçüyor.
+    // Kohezyon yoğunlukla artıyor, `KDeform`'daki `packed` ile aynı eşleme.
+    float packed = saturate((snow.g - SNOW_LOOSE_N) / max(SNOW_PACKED_N - SNOW_LOOSE_N, 1e-3));
+    float durus   = lerp(SNOW_STAND_LOOSE, SNOW_STAND_PACKED, packed);
+
+    // Omuzun dış sınırı düz bir çizgi olmasın: duruş yüksekliği yerel olarak
+    // dalgalanıyor, kenar dağılarak bitiyor.
+    float2 worldXZ = SnowTexelToWorld(id.xy);
+    float  gurultu = SnowValueNoise(worldXZ * SNOW_STAND_NOISE_SCALE) * 2.0 - 1.0;
+    durus *= 1.0 + gurultu * SNOW_STAND_NOISE;
+
+    float en = trail.r;
+
+    [unroll]
+    for (int i = 0; i < 8; ++i)
+    {
+        int2 p = clamp(int2(id.xy) + kKomsu8[i], int2(0, 0), int2(kmax, kmax));
+
+        // Köşegen komşu bir teksel değil, kök2 teksel uzakta.
+        float mesafe = (i < 4) ? adim : adim * 1.41421356;
+
+        // Komşunun duvarı `durus` kadarını taşıyor; göçen yalnız fazlası.
+        float tasinamayan = max(0.0, _Trail[p].r - durus);
+
+        en = max(en, tasinamayan - mesafe);
+    }
+
+    // OMUZ KENDİ KAR SÜTUNUNU DELEMEZ. Oymanın sınırı KDeform'dakiyle aynı:
+    // altta her zaman sıkışmış kar kalıyor.
+    //
+    // SINIR YALNIZ OMUZA UYGULANIYOR, MEVCUT OYMAYA DEĞİL. `min` doğrudan
+    // `trail.r`'a yazılırsa bu çekirdek izi SİLER: kar sütunu henüz
+    // birikmemişken `baseH` sıfır çıkıyor ve iz her karede sıfırlanıyor
+    // (ölçüldü: taze Play'de bütün iz dokusu 0.00 cm).
+    float kalanPay = SnowDensity(SNOW_LOOSE_N) / max(SnowDensity(SNOW_PACKED_N), 1.0);
+    float sinir = SnowBaseHeight(snow.r, snow.g) * (1.0 - kalanPay);
+
+    trail.r = max(trail.r, min(en, sinir));
+
+    _TrailOut[id.xy] = trail;
 }
 
 /// Verilen tekseldeki kar YÜZEYİNİN dünya Y'si. Rüzgâr yeniden dağıtımı için
@@ -640,22 +734,35 @@ void KBlockPack(uint3 id : SV_DispatchThreadID)
 {
     if (id.x >= _BlockStored || id.y >= _BlockStored) return;
 
-    uint step = _BlockTexels / _BlockStored;
-    int2 origin = _BlockOrigin + int2(id.xy * step);
+    // EŞLEME ORANTILI, TAM SAYI BÖLMESİYLE DEĞİL.
+    //
+    // `step = _BlockTexels / _BlockStored` tam sayı bölmesi: 171/64 = 2.
+    // Paketleme bloğun yalnız 128 tekselini kapsıyor, kalan 43 teksel hiç
+    // saklanmıyordu. Açma tarafında aynı bölme `src`'yi 85'e çıkarıp 64x64'lük
+    // tamponun DIŞINI okutuyordu (indeks 5525, tampon 4096) ve okunan çöp
+    // doğrudan `trail.r`'a yazılıyordu.
+    //
+    // Belirtisi izin arkasında eksene hizalı, içi düz DİKDÖRTGEN bloklar —
+    // yalnız bölgeye yeni giren bloklarda, yani oyuncu yürüdükçe arkasında.
+    uint2 bas = (uint2)(((uint2)id.xy * _BlockTexels) / _BlockStored);
+    uint2 son = (uint2)((((uint2)id.xy + 1) * _BlockTexels) / _BlockStored);
+    son = max(son, bas + 1);
+
+    int2 origin = _BlockOrigin + int2(bas);
 
     float4 sum = 0.0;
     float count = 0.0;
 
-    for (uint y = 0; y < step; ++y)
-    for (uint x = 0; x < step; ++x)
+    for (uint y = 0; y < son.y - bas.y; ++y)
+    for (uint x = 0; x < son.x - bas.x; ++x)
     {
         int2 p = clamp(origin + int2(x, y), int2(0, 0),
                        int2((int)_Resolution - 1, (int)_Resolution - 1));
 
+        // İZ SAKLANMIYOR (gerekçe `KBlockUnpack`); z ve w boş duruyor.
         float4 snow = _Snow[p];
-        float4 trail = _Trail[p];
 
-        sum += float4(snow.r, snow.g, trail.r, trail.g);
+        sum += float4(snow.r, snow.g, 0.0, 0.0);
         count += 1.0;
     }
 
@@ -671,23 +778,32 @@ void KBlockUnpack(uint3 id : SV_DispatchThreadID)
 
     if (any(target < 0) || any(target >= (int)_Resolution)) return;
 
-    uint step = _BlockTexels / _BlockStored;
-    uint2 src = id.xy / step;
+    // AÇMA DA ORANTILI EŞLEMEYİ KULLANIYOR (gerekçe `KBlockPack`'te).
+    uint2 src = min(((uint2)id.xy * _BlockStored) / _BlockTexels, _BlockStored - 1);
 
     float4 stored = _BlockBuffer[src.y * _BlockStored + src.x];
 
     float4 snow = _Snow[target];
-    float4 trail = _Trail[target];
 
     // YALNIZ SAKLANAN KANALLAR YAZILIYOR. Islaklık ve tazelik anlık durum;
     // geri yüklenirse kar "eskiden nasılsa öyle" görünür.
     snow.r = stored.x;
     snow.g = stored.y;
-    trail.r = stored.z;
-    trail.g = stored.w;
+
+    // İZ GERİ YÜKLENMİYOR.
+    //
+    // Blok deposu 4 m başına 64x64, yani teksel başına 6.25 cm — izin
+    // çizildiği çözünürlüğün ÜÇTE BİRİ. Bu depo izi taşıyamaz; geri yüklemesi
+    // ancak bozar.
+    //
+    // Ölçüldü: kalıcılık açıkken git-dön-gel yürüyüşünden sonra izde 206
+    // teksel kalıyordu, kapalıyken 8362. Ekranda belirtisi "kar izi çıkmıyor"
+    // ve daha önce "dönünce eksene hizalı dikdörtgen bloklar" idi.
+    //
+    // Kalıcılığın işi kar DURUMUNU hatırlamak (SWE ve yoğunluk); iz bölgeye
+    // özgü bir detay katmanı ve bölgeden çıkınca zaten görünmüyor.
 
     _SnowOut[target] = snow;
-    _TrailOut[target] = trail;
 }
 
 // ------------------------------------------------------ ruzgar golgesi (18.0)

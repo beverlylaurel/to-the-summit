@@ -504,10 +504,22 @@ public class DebugMenu : MonoBehaviour
                                 $"SWE {mgr.MeanSwe * 1000f:F2} mm   " +
                                 $"derinlik {SnowDepthMm(mgr):F1} mm");
 
+                // İZ HAM GÖRÜNÜMÜ — TEK CEVAPLI TEST.
+                //
+                // Işıklandırma, paralaks ve relief ışını KAPALI; ekrana yalnız
+                // iz dokusunun kendi değeri basılıyor (kırmızı = derinlik).
+                // Zigzag bu görünümde de varsa kaynak VERİDE, yoksa ÇİZİMDE.
+                // İki hipotezi ayıran başka bir gözlem yok.
+                bool hamOnce = izHam;
+                izHam = GUILayout.Toggle(izHam, "İzin ham hâli (ışıksız, paralakssız)");
+                if (izHam != hamOnce) Shader.SetGlobalFloat(SnowDebugDentId, izHam ? 1f : 0f);
+
                 if (GUILayout.Button("Ayarları geri al (sınama)"))
                 {
                     mgr.SimTimeScale = 1f;
                     mgr.RefillRegion();
+                    izHam = false;
+                    Shader.SetGlobalFloat(SnowDebugDentId, 0f);
                 }
 
                 GUILayout.Space(6f);
@@ -561,6 +573,11 @@ public class DebugMenu : MonoBehaviour
 
         EndSection();
     }
+
+    /// İz ham görünümü açık mı (`_SnowDebugDent`).
+    bool izHam;
+
+    static readonly int SnowDebugDentId = Shader.PropertyToID("_SnowDebugDent");
 
     string SnowStatus()
     {

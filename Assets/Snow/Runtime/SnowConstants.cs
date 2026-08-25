@@ -69,7 +69,7 @@ public static class SnowConstants
     /// Poisson blur yarıçapı, teksel (spec §9.4). Compute'a BURADAN gidiyor;
     /// `SnowConstants.hlsl`'deki eşi yalnız shader içi kullanım için, ikisi
     /// birlikte değişir. Gerekçe (çapraz gidişteki basamak) hlsl tarafında.
-    public const float BlurRadiusTexels = 1.5f;
+    public const float BlurRadiusTexels = 2.5f;
 
     // --- İz oluşumu (spec §10.1) ---
 
@@ -113,6 +113,12 @@ public static class SnowConstants
 
     /// 4 m/s üstündeki her m/s'nin doldurma hızına eklediği, m/s.
     public const float WindFill = 0.0012f;
+
+    /// Duruş açısı gevşemesinin kare başına geçiş sayısı. Koni geçiş başına
+    /// bir teksel yayılıyor; 22 cm derin bir iz ~12 tekselde yakınsıyor, yani
+    /// dört karede yerine oturuyor. Sonuç idempotent — sayı görünümü değil
+    /// yalnız yakınsama hızını değiştiriyor.
+    public const int ReposeIterations = 3;
 
     // --- Birikme, oturma, erime (spec §11) ---
 

@@ -39,14 +39,7 @@ public class SnowTrailBodyAlign : MonoBehaviour
     [Tooltip("Yön değişiminin yumuşama hızı (derece/saniye).")]
     [SerializeField] float turnRate = 540f;
 
-    [Tooltip("Adım başına yanal sapmanın genliği (m).")]
-    [SerializeField] float lateralJitter = 0.008f;
 
-    [Tooltip("Adım başına derinlik sapmasının genliği (m).")]
-    [SerializeField] float depthJitter = 0.003f;
-
-    [Tooltip("Adım fazını okuduğumuz ritim. Yoksa sapma uygulanmaz.")]
-    [SerializeField] SnowStepRhythm rhythm;
 
     [Tooltip("Kar yüksekliğini okuduğumuz örnekleyici. Yoksa gövde sabit " +
              "yükseklikte kalır (taban davranışı).")]
@@ -69,8 +62,6 @@ public class SnowTrailBodyAlign : MonoBehaviour
     float yaw;
     Vector3 baseLocalPos;
     float radius;
-    int lastStep = -1;
-    Vector2 stepOffset;
     float smoothY;
     float smoothVel;
     bool smoothBaslatildi;
@@ -135,7 +126,23 @@ public class SnowTrailBodyAlign : MonoBehaviour
             surfaceSampler.TrySampleSnow(transform.position, out SnowSample ss) && ss.Valid)
         {
             float ayakY = body.center.y - body.height * 0.5f;
-            float izOncesiYuzey = ss.Depth + ss.SinkDepth;
+
+            // İZ ÖNCESİ SÜTUN DOĞRUDAN OKUNUYOR.
+            //
+            // `ss.Depth + ss.SinkDepth` kullanılıyordu; açılımı
+            // `baseHeight + trail.g`, yani içinde SIRT var. Sırt `max` ile
+            // birikiyor ve konumu hız yönüne göre kaydırılıyor: gövdenin
+            // oturma yüksekliği onun peşinden 4 cm zıplıyor, iz derinliği
+            // basamaklanıyordu.
+            //
+            // Belirti aralıklıydı çünkü örnek 30 karede bir tazelenen bir
+            // asenkron geri okumadan geliyor; basamağın görünürlüğü o kadansla
+            // yürüyüş hızının fazına bağlıydı. Kullanıcı üç kez "her zaman
+            // olmuyor" diye bildirdi.
+            //
+            // `BaseHeight` yalnız yağış ve oturmayla değişiyor, yani saniyeler
+            // ölçeğinde sabit; geri okumanın gecikmesi onu etkilemiyor.
+            float izOncesiYuzey = ss.BaseHeight;
             float hedefY = ayakY + izOncesiYuzey - surfaceSink + radius;
 
             // YÜKSEKLİK ZAMANDA YUMUŞATILIYOR.
@@ -158,31 +165,21 @@ public class SnowTrailBodyAlign : MonoBehaviour
             p.y = smoothY;
         }
 
-        if (rhythm != null)
-        {
-            // Adım değiştiği KARE'de yeni sapma seçiliyor; adım boyunca sabit
-            // kalıyor ki gövde kare kare titremesin.
-            int step = rhythm.StepCount;
-            if (step != lastStep)
-            {
-                lastStep = step;
-                stepOffset = new Vector2(Hash01(step * 2 + 0), Hash01(step * 2 + 1)) * 2f - Vector2.one;
-            }
-
-            p.x += stepOffset.x * lateralJitter;
-            p.y += stepOffset.y * depthJitter;
-        }
+        // ADIM SAPMASI KALDIRILDI.
+        //
+        // Her adımda gövde ±8 mm yana kaydırılıyordu; amaç iki adımı birbirinin
+        // tıpatıp aynısı olmaktan çıkarmaktı. Ama iz yalnız 30 cm geniş ve
+        // sırt (`trail.g`) ile relief kenarı bu kaymayı büyütüyor: düz
+        // yürürken bile ekranda ÖRGÜ gibi bir zigzag çıkıyordu.
+        //
+        // Ölçüldü: izin merkez çizgisi ±1.6 cm salınıyor — sapmanın tepeden
+        // tepeye değeri. Yani zigzagın kaynağı fizik değil, bu süsleme.
+        //
+        // Tekrarı kırma işi `KRepose`'un duruş yüksekliği gürültüsünde: o
+        // SÜREKLİ bir alan ve dalga boyu teksel ızgarasının sekiz katı, adım
+        // frekansında ayrık bir sıçrama değil.
 
         transform.localPosition = p;
     }
 
-    /// Tam sayıdan 0..1. `frac(sin(...))` büyük indekste tekrar ediyor;
-    /// bu karıştırıcı 32 bit boyunca dağınık kalıyor.
-    static float Hash01(int n)
-    {
-        uint x = (uint)n * 747796405u + 2891336453u;
-        x = ((x >> (int)((x >> 28) + 4u)) ^ x) * 277803737u;
-        x = (x >> 22) ^ x;
-        return (x & 0xFFFFFFu) / 16777215f;
-    }
 }

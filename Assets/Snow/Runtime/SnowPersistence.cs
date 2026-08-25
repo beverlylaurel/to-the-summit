@@ -154,7 +154,6 @@ public class SnowPersistence : MonoBehaviour
                                   (Vector2)BlockOrigin(packTarget, q));
 
         cmd.SetComputeTextureParam(simCompute, packKernel, SnowShaderIDs.Snow, manager.SnowTexture);
-        cmd.SetComputeTextureParam(simCompute, packKernel, SnowShaderIDs.Trail, manager.TrailTexture);
         cmd.SetComputeBufferParam(simCompute, packKernel, SnowShaderIDs.BlockBuffer, blockBuffer);
 
         int groups = Mathf.CeilToInt(StoredSide / (float)SnowConstants.GroupSize);
@@ -195,9 +194,7 @@ public class SnowPersistence : MonoBehaviour
                                   (Vector2)BlockOrigin(key, q));
 
         cmd.SetComputeTextureParam(simCompute, unpackKernel, SnowShaderIDs.Snow, manager.SnowTexture);
-        cmd.SetComputeTextureParam(simCompute, unpackKernel, SnowShaderIDs.Trail, manager.TrailTexture);
         cmd.SetComputeTextureParam(simCompute, unpackKernel, SnowShaderIDs.SnowOut, manager.SnowTexture);
-        cmd.SetComputeTextureParam(simCompute, unpackKernel, SnowShaderIDs.TrailOut, manager.TrailTexture);
         cmd.SetComputeBufferParam(simCompute, unpackKernel, SnowShaderIDs.BlockBuffer, blockBuffer);
 
         int groups = Mathf.CeilToInt(blockTexels / (float)SnowConstants.GroupSize);

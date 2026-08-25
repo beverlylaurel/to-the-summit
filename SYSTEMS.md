@@ -723,11 +723,60 @@ kod taramasıyla doğrulandı.
 tüketiciyi bağlamak ayrı bir iştir, kar sistemi kimseyi zorlamaz.
 
 **Yakalama zinciri (Faz 2–3).** Deformer'lar `SnowDeformer` bileşeniyle kendini
-kaydediyor; bölgede deformer yoksa yakalama, blur, `KDeform` ve `KRim` hiç
-koşmuyor. Zincir: alttan yukarı bakan ortografik çizim → `KBlurCapture` →
-`KDeform` (batma + dolma) → `KRimBlurH`/`KRimBlurV` → `KRim` (kenar yığılması).
-Simülasyon kare başına bir kez koşuyor; geçiş her kamera için kaydediliyor ama
-`Time.frameCount` muhafazası ikinci koşuyu eliyor.
+kaydediyor; bölgede deformer yoksa yakalama, blur, `KDeform`, `KRepose` ve
+`KRim` hiç koşmuyor. Zincir: alttan yukarı bakan ortografik çizim →
+`KBlurCapture` → `KDeform` (batma + dolma) → `KRepose` (duvarın göçmesi) →
+`KRimBlurH`/`KRimBlurV` → `KRim` (kenar yığılması).
+
+**Simülasyon adımı geçen zamandan türüyor, `Time.deltaTime`'dan değil.** Geçiş
+her kamera için ayrı kaydediliyor ve `Time.frameCount` bunların arasında
+ilerleyebiliyor; kare sayacına bakan muhafaza tutmuyordu ve her çağrı tam bir
+karelik zaman uyguluyordu (ölçüm `SYMPTOMS.md`). `Time.time` farkı okununca
+aynı anda gelen ikinci çağrı sıfır adım alıyor.
+
+**İzin duvarı kohezyonun taşıyamadığı yerden göçüyor.** `KRepose` duvarın
+`SNOW_STAND_*` yüksekliğine kadarını dik bırakıyor; üstünde kalan pay
+`tan(38°) × tekselBoyu` eğimiyle komşuya yayılıyor. Duruş yüksekliği
+**yoğunluktan** geliyor (sıkışmış kar daha çok tutuyor) ve yerel bir
+gürültüyle dalgalanıyor — omuz her yerde aynı bitmiyor, iz kenarı dağılıyor.
+Yalnız derinleştirdiği için idempotent: geçiş sayısı görünümü değil yakınsama
+hızını belirliyor. Omuz kendi kar sütununu delemiyor, sınır `KDeform`'un oyma
+sınırıyla aynı.
+
+**İz bölge dışında yok.** `SnowDentAt` `SnowInsideMask` ile çarpılıyor; kenet
+edilen teksel dünyaya şerit olarak yayılıp dikdörtgen bir plato üretiyordu.
+Durum dokusu bölge dışında dünyaya harmanlanıyor, iz ise sıfırlanıyor — izin
+dünya karşılığı yok.
+
+**İz gövdesinin oturma yüksekliği SIRDI OKUMAZ.** `SnowSample.BaseHeight` —
+iz öncesi kar sütunu. `Depth + SinkDepth` kullanılıyordu ve açılımında
+`trail.g` (sırt) vardı; sırt `max` ile birikip hız yönüne göre kaydığı için
+gövde onun peşinden zıplıyor, iz derinliği basamaklanıyordu. Örnek 30 karede
+bir tazelenen asenkron geri okumadan geldiği için belirti aralıklıydı.
+
+**Sıkışma oymanın SAF fonksiyonu.** `snow.g` hedefi `trail.r / SNOW_MAX_SINK`
+oranından geliyor; tabanı izsiz karın kendi yoğunluğu (`_FallbackRhoN`, compute'a
+elle bağlanıyor — globaller çekirdeğe ulaşmıyor). Kare başına artışa, geçen
+süreye, kar sütununa veya anlık temasa bağlı DEĞİL. Üçü de denendi ve üçü de
+yoğunluk alanına yürüyüş yönüne bağlı tarak deseni bastı (`SYMPTOMS.md`).
+Geçiş sayacı kaldırıldı: `snow.a` yalnız bozulma/tazelik.
+
+**Relief derinliği yalnız oyma kanalı (`trail.r`).** Sırt (`trail.g`) karın
+yukarı itilmiş kısmı; çukurun derinliğinden çıkarılırsa izin omzunu siliyor
+(ölçüldü: `r` genişliği sabit, `r - g` genişliği 19'dan 12'ye periyodik
+çöküyor). Sırdın kendi geometrisi bugün relief yolunda ÇİZİLMİYOR — kabarma
+görünmüyor, kayıt `DECISIONS.md`'de.
+
+**Kalıcılık ize DOKUNMUYOR.** Blok deposu 4 m başına 64x64, yani teksel
+başına 6.25 cm; izin çizildiği çözünürlüğün üçte biri. O depo izi taşıyamıyor
+ve geri yüklemesi izi siliyordu (ölçüldü: git-dön-gel yürüyüşünden sonra 206
+teksel, kalıcılık kapalıyken 8362). Kalıcılığın işi kar DURUMUNU hatırlamak —
+SWE ve yoğunluk; iz bölgeye özgü bir detay katmanı.
+
+**Çukurun karartması çok yansımayla telafi ediliyor.** Görüş payı `V` yerine
+`V / (1 - a(1-V))` uygulanıyor; kaybolan gök ışığının yerine çukurun beyaz
+duvarları geçiyor. Aynı formül `SnowAmbient`'teki kar-gök zincirinde de var,
+ayrı bir kaynak kurulmuyor.
 
 **Yakalanan yükseklik göreli.** `RT_Capture.R` mutlak dünya Y değil, gözlemciye
 göre. Sebebi ölçülmüş: yarım hassasiyetin 4900 m'deki adımı 4 metre

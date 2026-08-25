@@ -625,20 +625,29 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // luması 0.88'den 0.59'a düşüp güneşli kar için fazla koyu kaldı.
         surface.occlusion = lerp(surface.occlusion, 1.0, snowMask * 0.55);
 
-        // ÇUKUR IŞIK ALMIYOR. Derinlik arttıkça gökyüzünü gören pay düşüyor;
-        // bu ayrı bir gölge değil, geometrik örtülme. Kar düzleştirmesinden
-        // SONRA uygulanıyor: düzleştirme çukuru da silerdi.
-        // ÇUKURUN İÇİ KARARIR AMA SİYAHLAŞMAZ.
+        // ÇUKURUN GÖRÜŞ PAYI ÇOK YANSIMAYLA TELAFİ EDİLİYOR.
         //
-        // Tam sönüm (1 - d/dMax) 22 cm'lik izde ortamı 0.37'ye indiriyor;
-        // üstüne öz gölge de doğrudan ışığı kesince izin içi neredeyse siyah
-        // çıkıyordu (kullanıcı bildirdi: "izin içi çok siyah").
+        // Çukur göğü dar bir açıdan görüyor: görüş payı `V` derinlikle düşüyor.
+        // Ama kaybolan gök ışığının yerine ÇUKURUN KENDİ DUVARLARI geçiyor ve
+        // o duvarlar beyaz. Albedo `a` olan bir kovukta denge:
         //
-        // Gerçek bir ayak izi çevresindeki karın yarısı kadar parlaktır: çukur
-        // göğü daha dar bir açıdan görür ama duvarları da BEYAZDIR ve
-        // birbirine ışık yansıtır. 0.55 katsayısı en derin noktada ortamı
-        // %45 kısıyor, sıfırlamıyor.
-        surface.occlusion *= saturate(1.0 - 0.55 * izDerinlik / SNOW_RELIEF_MAX_DEPTH);
+        //     kazanç = V / (1 - a(1 - V))
+        //
+        // Aynı çok yansıma formülü kar-gök zincirinde de kullanılıyor
+        // (`SnowLighting.hlsl` → `SnowAmbient`), ayrı bir kaynak kurulmuyor.
+        //
+        // Sayılarla: a = 0.91, V = 0.65 iken kazanç 0.95 — yalnız %5 koyu.
+        // Telafi olmadan aynı V doğrudan uygulanıyordu ve BEYAZ YÜZEYİ DÜZ
+        // ORANLA KARARTMAK onu GRİ yapıyordu (kullanıcı bildirdi: "kar izi
+        // gri?? niye gri onu da bilmiyorum").
+        //
+        // Kar düzleştirmesinden SONRA uygulanıyor: düzleştirme çukuru silerdi.
+        {
+            half a = dot(snowAlbedo, half3(0.2126, 0.7152, 0.0722));
+            half V = (half)saturate(1.0 - 0.55 * izDerinlik / SNOW_RELIEF_MAX_DEPTH);
+
+            surface.occlusion *= V / max((half)1.0 - a * ((half)1.0 - V), (half)0.05);
+        }
 
 
         surface.snowMask = (half)snowMask;

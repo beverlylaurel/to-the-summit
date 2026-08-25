@@ -832,7 +832,6 @@ public class SnowDebugWindow : EditorWindow
             if (align != null)
             {
                 var aso = new SerializedObject(align);
-                aso.FindProperty("rhythm").objectReferenceValue = rhythm;
                 // KAR YUZEYINE OTURTMA icin sampler baglaniyor. Yoksa govde
                 // sabit yukseklikte kalir ve kar tabanina inip duz taban birakir.
                 aso.FindProperty("surfaceSampler").objectReferenceValue = sampler;

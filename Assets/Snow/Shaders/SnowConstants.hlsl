@@ -51,17 +51,22 @@
 #define SNOW_CAPTURE_ABOVE           3.0
 /// YAKALAMA BULANIKLIĞI KENARIN YUMUŞAKLIĞINI BELİRLİYOR.
 ///
-/// Yakalama teksel ızgarasına raster ediliyor; gövde ÇAPRAZ giderken ardışık
-/// damgalar ızgarayla 45° yapıyor ve kenar basamak basamak çıkıyor
-/// (ekrandan görüldü: düz gidişte kenar temiz, çaprazda merdiven). 1.5 teksel
-/// (3.5 cm) bandı bunu örtmeye yetmiyor.
+/// ESKİ GEREKÇE YANLIŞTI. "Çapraz gidişte ızgara merdiveni" deniyordu; ölçüm
+/// bunu çürüttü: kenardaki dişlerin periyodu YÜRÜME HIZIYLA ölçekleniyor
+/// (1.2 m/s'de 20 teksel, 0.3 m/s'de 7 teksel), yani ızgaradan değil damga
+/// kadansından geliyor. Izgara merdiveni olsaydı periyot hızdan bağımsız
+/// olurdu. Damga kadansı ayrı bir kayıt (`SYMPTOMS.md`).
+///
+/// Bulanıklığın gerçek işi kenarı yumuşatmak: 2.5 teksel (5.9 cm) bandı
+/// oluğun duvarını üç teksele yayıyor ve kapsama tepesini düşürmüyor
+/// (ölçüldü: en derin nokta 22.00 cm, iz 10305 teksel).
 ///
 /// ÜST SINIR ÖLÇÜLDÜ. 4.0 teksel denendi ve izi ÖLDÜRDÜ: bulanıklık kapsama
 /// payını yayarken zayıflatıyor (`RT_CaptureBlur` tepe değeri 1.00 → 0.80),
 /// oyma sığlaşıyor ve iz görünürlük eşiğinin altında kalıyor — dokuda 5000
 /// teksel yerine 110 teksel kaldı. 2.0 teksel (4.7 cm) kapsamayı tam
 /// tutarken kenarı yumuşatıyor.
-#define SNOW_BLUR_RADIUS_TEXELS      1.5
+#define SNOW_BLUR_RADIUS_TEXELS      2.5
 
 // --- Parıltı mesafesi ---
 
@@ -95,9 +100,18 @@
 /// izin altında (ölçülen iz derinlikleri 60-80 mm).
 /// RELIEF MAPPING — iz arazinin kendi yüzeyinde sanal derinlik olarak çiziliyor.
 ///
-/// Adım sayısı düşük tutuluyor: ayak izi yarı-düşük frekanslı bir detay, ve
-/// her adım bir doku okuması (GDC 2014, Batman: "minimal taps").
-#define SNOW_RELIEF_STEPS              12
+/// ADIM SAYISI IŞININ BOYUNDAN TÜRÜYOR, SABİT DEĞİL.
+///
+/// Sabit 12 adım tepeden bakışta bol, sıyırtma açıda yetersizdi: ışın 66 cm
+/// uzarken adım başına 2.4 teksel atlanıyor ve kesişim adım ızgarasına
+/// yuvarlanıyordu. Belirtisi düz bir oluğun ekranda LOB LOB, zigzaglı
+/// görünmesiydi — ve loblar uzaklaştıkça (bakış yattıkça) büyüyordu.
+///
+/// Hedef adım başına en fazla bir teksel. Tavan tepeden bakışın maliyetini
+/// değil, en yatık bakışın maliyetini sınırlıyor: 0.35 m × 3.0 / 0.023 m = 45,
+/// 32'de kesiliyor çünkü o noktadan sonra iz zaten mesafeyle küçülüyor.
+#define SNOW_RELIEF_STEPS_MIN          8
+#define SNOW_RELIEF_STEPS_MAX          32
 #define SNOW_RELIEF_MAX_DEPTH          0.35
 /// Sıyırtma açıda ışın yatıyor ve XZ kayması patlıyor; tavan olmadan iz
 /// metrelerce uzayıp bulaşıyor.
@@ -163,36 +177,21 @@
 /// 8 cm'den derin bir çukuru hiç göremiyordu (ekranda iz "şeffaf" görünüyordu).
 #define SNOW_MAX_SINK                0.22
 
-/// TEK GEÇİŞTE EN FAZLA YOĞUNLAŞMA (normalize birim).
-///
-/// SWE korunuyor, yani `baseH = SWE × 1000 / ρ`. Yoğunluk artışı DOĞRUDAN
-/// yükseklik kaybı demek: rhoN 0.01'den 0.55'e çıkınca 20 cm kar 3 cm'ye
-/// iniyor ve iz 17 cm derinliğinde bir çukur oluyor (ölçüldü).
-///
-/// Sınır olmadan bir ayak teması yoğunluğu tepeye çıkarıyordu. Tek geçişte
-/// 0.06 ile spec'in "5–6 geçişten sonra patika oluşur" tarifi de korunuyor
-/// (0.10 → 0.55 arası ~7 geçiş), ama TEK iz sığ kalıyor: 20 cm karda
-/// yoğunluk 55 → 85, yükseklik 20 → 13 cm.
-#define SNOW_MAX_COMPACT_PER_PASS    0.06
-
 #define SNOW_PACKED_SINK_SCALE       0.18
-/// SIKIŞMA KAZANCI — AÇILAN OYMA BAŞINA, GEÇEN SÜRE BAŞINA DEĞİL.
+/// SIKIŞMA KAZANCI — ULAŞILAN OYMANIN FONKSİYONU.
 ///
-/// Spec §10.1 `compact = SNOW_COMPACT_RATE * saturate(...)` diyor. Kare
-/// başına uygulanınca KARE HIZINA, `dt` ile çarpılınca BEKLEME SÜRESİNE
-/// bağlı oluyor. İkincisi ölçülebilir bir belirti üretti: yerinde bekleyen
-/// oyuncunun altında iz yuvarlak bir çukur gibi derinleşiyordu (kullanıcı
-/// bildirdi). Yoğunluk arttıkça `baseH = SWE × 1000 / ρ` düşüyor.
+/// Spec §10.1 `compact = SNOW_COMPACT_RATE * saturate(...)` diyor ama neye
+/// orantılı olduğunu söylemiyor. Denenen iki yol da belirti üretti:
 ///
-/// Kar öyle davranmaz: yük sabitken sıkışma bir kerede dengeye gelir.
-/// Sıkışma artık o karede AÇILAN oymaya orantılı — ilk temasta oluyor,
-/// sonraki karelerde `yeniOyma` sıfır olduğu için duruyor. Kare hızından da
-/// bağımsız: toplam oyma kare sayısına bağlı değil.
+/// - `× _SnowDeltaTime`: BEKLEME SÜRESİNE bağlı. Yerinde bekleyen oyuncunun
+///   altında iz çukur gibi derinleşiyordu (yoğunluk arttıkça `baseH` düşüyor).
+/// - kare başına AÇILAN oymaya orantılı: tekselin yoğunluğuna hangi karede
+///   basıldığı kazınıyor. Çapraz yürüyüşte yoğunluk alanı enine ÇİZGİLİ
+///   çıkıyordu (ölçüldü, `SYMPTOMS.md`).
 ///
-/// Değer: ilk temasta `yeniOyma / baseH` ≈ 0.08/0.20 = 0.4; kazanç 0.15 ile
-/// `compact` ≈ 0.06 çıkıyor, yani tam olarak
-/// `SNOW_MAX_COMPACT_PER_PASS` tavanı. Spec'in "5–6 geçişten sonra patika"
-/// tarifi böylece korunuyor: her geçiş bir tavan dolduruyor.
+/// Doğrusu ulaşılan oymanın kar sütununa oranı: `trail.r / baseH`. İdempotent,
+/// kare sayısından ve yol geometrisinden bağımsız. Patika yine oluşuyor çünkü
+/// yoğunluk arttıkça `baseH` düşüyor ve sonraki geçişin oranı yükseliyor.
 #define SNOW_COMPACT_GAIN            0.15
 
 // --- Kenar yığılması (spec §10.2) ---
@@ -230,44 +229,51 @@
 /// 4 teksel kalsaydı 19 cm'lik oluğun yarısını düzleştirirdi. Ölçüldü: oluk
 /// son görüntüyü yalnız %2.3 değiştiriyordu (lineer %5.5), oysa 48°'lik bir
 /// duvar Lambert'te %34 koyulaştırır.
+///
+/// 3.0'da bırakıldı. Bir tur "ızgara merdivenini kesmek için" diye 1.5'e
+/// indirilip geri alındı; o gerekçe ölçümle çürüdü (bkz. yakalama bulanıklığı
+/// — dişlerin kaynağı damga kadansı). Yarıçapın işi duvarı yumuşatmak.
 #define SNOW_CARVE_SMOOTH_TEXELS     3.0
 
-/// İZ KENARININ DAĞILMASI — leke boyu (1/m) ve genlik.
+/// EĞİM FARKININ ADIMI, teksel.
 ///
-/// Kapsama payı yanal profili veriyor ve tek başına DÜZGÜN bir oluk kenarı
-/// üretiyor: iki kenar da matematiksel olarak paralel, göz bunu yapay
-/// buluyor (kullanıcı bildirdi). Gerçek karda kenar göçer, tanecik kayar,
-/// sınır lekeli biter.
-///
-/// GÜRÜLTÜ EŞİĞE DEĞİL, OKUMA KONUMUNA UYGULANIYOR.
-///
-/// Önce kapsama bir eşik gibi kesildi (`(kapsama - gürültü*A) / (1-A)`).
-/// Ölçüldü ve battı: bölme rampanın kontrastını `1/(1-A)` kadar artırıyor,
-/// A=0.60'ta kenar rampası tamamen yok oldu — kesit `0 0 0 80 80 … 80 0`
-/// oldu, iz 21.9 cm'den 14.6 cm'ye indi ve yer yer tek tekselde koptu.
-/// Kenar sapması istenen bandın (3–5 cm) içine ancak izi bozarak giriyordu.
-///
-/// Kapsamanın OKUNDUĞU teksel kaydırılınca rampa olduğu gibi taşınıyor:
-/// sınır oynuyor, profil bozulmuyor, iz kopmuyor. Merkezde kapsama düz
-/// olduğu için kaydırmanın etkisi yok — düzensizlik yalnız kenarda görünür.
-///
-/// İki ölçek: 2.5 (40 cm leke) ana düzensizliği, 9.0 (11 cm) kenarın kendi
-/// tırtığını veriyor. Tek ölçek ya çok yumuşak ya çok gürültülü.
-///
-/// İNCE ÖLÇEĞİN PAYI KISIK (0.35 → 0.18). Eşit ağırlıkta kenar dijital bir
-/// tırtık gibi okunuyor ve izin dağılması çevredeki düz karla uyumsuz
-/// duruyordu (kullanıcı bildirdi). Kaba ölçek baskın kalınca dağılma karın
-/// kendi lekeli dokusuyla aynı ölçeğe oturuyor; ince ölçek yalnız kenarı
-/// matematiksel düzgünlükten kurtaracak kadar kalıyor.
-///
-/// KAYDIRMA GENLİĞİ RAMPA GENİŞLİĞİNİ AŞAMAZ. Rampa 4 teksel; 1.5 teksel
-/// (≈3.5 cm) sınırı gözle görünür oynatıyor ama iki kenarı birbirine
-/// geçirmiyor. 22 cm genişliğinde bir olukta doğal sapma 3–5 cm.
-#define SNOW_TRAIL_EDGE_SCALE_A      2.5
-#define SNOW_TRAIL_EDGE_SCALE_B      9.0
-#define SNOW_TRAIL_EDGE_WARP_TEXELS  1.5
+/// 1 teksel merkezi fark tam ızgara Nyquist'inde çalışıyor ve merdiveni EN ÇOK
+/// büyüten adım o. Duvarın kendi eğimi 3 teksele yayıldığı için 2 tekselllik
+/// fark duvarı kaybetmiyor, merdiveni ise söndürüyor.
+#define SNOW_DENT_SLOPE_TEXELS       2.0
 
 // --- İzlerin dolması (spec §10.3) ---
+/// KARIN DURUŞ AÇISININ TANJANTI.
+///
+/// Gevşek kuru kar ~38°'ye kadar duruyor [KAYNAK: Cordonnier ve ark., EG 2018,
+/// §5.4 — talus açısı]. tan(38°) = 0.781.
+#define SNOW_REPOSE_TAN              0.781
+
+/// DUVARIN KENDİ KENDİNE DURABİLDİĞİ YÜKSEKLİK (m).
+///
+/// TALUS AÇISI TEK BAŞINA YANLIŞ. O açı KOHEZYONSUZ tanelerin açısı; kar
+/// sinterlenir ve gerçek bir kohezyonu vardır. Günlük gözlem de bunu söylüyor:
+/// karda ayak izinin duvarı DİK durur, tepesinde küçük bir göçük olur.
+///
+/// Saf talus modeli 22 cm'lik izi her yana 28 cm açıyordu — toplam 76 cm
+/// (kullanıcı bildirdi: "iz şu an çok geniş"). Kohezyon eklenince yalnız bu
+/// yüksekliğin ÜSTÜNDE kalan pay göçüyor; altı dik kalıyor.
+///
+/// Kohezyon yoğunlukla artıyor: taze kar az tutar, sıkışmış kar çok.
+#define SNOW_STAND_LOOSE             0.06
+#define SNOW_STAND_PACKED            0.18
+
+/// DURUŞ YÜKSEKLİĞİNİN DÜZENSİZLİĞİ ve dalga boyu (1/m).
+///
+/// Sabit yükseklik omuzun dış sınırını DÜZ bir çizgi yapıyor; iz kenarı
+/// keskin ve tekdüze çıkıyor (kullanıcı bildirdi: "iz kenarı çok keskin,
+/// istediğim dağılmaya sahip değil").
+///
+/// Dalga boyu 1/5.5 = 18 cm; omuz 4-9 teksel (9-21 cm). Dalga boyu omuzdan
+/// UZUN: kısa olsaydı omuzu yok ederdi (dalga boyu kuralı, `RATIONALE.md`).
+#define SNOW_STAND_NOISE             0.45
+#define SNOW_STAND_NOISE_SCALE       5.5
+
 #define SNOW_WIND_FILL               0.0012
 
 // --- Birikme, oturma, erime (spec §11) ---

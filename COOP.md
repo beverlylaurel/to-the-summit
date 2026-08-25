@@ -146,3 +146,9 @@ Bunlar ağ eklendiğinde olduğu gibi kalabilir; listeye tekrar girmesinler:
 
   değişiyor. Ağ gelince preset ve geçiş zamanı sunucudan gelmeli; birikme hesabı
   deterministik olduğu için başka bir şey senkronlanması gerekmiyor.
+
+- **İz kalıcılığı yok.** Kalıcılık yalnız kar durumunu (SWE, yoğunluk) saklıyor;
+  ayak izi bölgeden çıkınca unutuluyor. Tek oyuncuda görünmüyor — bölge 24 m ve
+  oyuncu merkezinde. Co-op'ta ikinci oyuncu birincinin izini bölge dışından
+  gelirken göremez. Çözümü depo çözünürlüğünü izinkine çıkarmak (4 m blok için
+  64² değil 171²) ya da izi ayrı, seyrek bir yapıda tutmak.

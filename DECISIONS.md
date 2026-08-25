@@ -10,6 +10,42 @@ aşağıda ayrı listelenir — "şu an neyi bekliyoruz" sorusunun cevabı büt�
 alınabilsin diye. **Yeni kayıt bu üç türden birine giriyorsa aynı adımda buraya da yazılır;
 iş bitince buradan silinir.**
 
+## İzin kenar kabarması (sırt) çizilmiyor — bekleyen
+
+**Karar.** `trail.g` hesaplanmaya devam ediyor ama relief yolunda çizilmiyor.
+
+**Gerekçe.** Sırt karın YUKARI itilmiş kısmı, çukurun derinliğinden çıkarılacak
+bir şey değil. Çıkarıldığında izin omzunu siliyordu (ölçüm `SYMPTOMS.md`).
+Doğru yeri yüzey yüksekliğine POZİTİF katkı; relief ışını bugün yalnız aşağı
+inen bir yükseklik alanı tarıyor, artı yönü taşıyamıyor.
+
+**Tetikleyici — geri dönülecek belirti:** izin kenarında kabarma olmadığı için
+iz "kesilmiş" görünüyorsa.
+
+**Maliyet.** Işın yürüyüşünün başlangıç yüksekliğini sırt kadar yukarı almak ve
+tavanı ona göre büyütmek. Yarım gün. Alternatifi sırdı yalnız normalde
+göstermek (geometrisiz), o daha ucuz ama sıyırtma bakışta siluete katkı vermez.
+
+## İz gövdesi damgalar arası yolu SÜPÜRMÜYOR — bekleyen
+
+**Karar.** Gövde damga başına tek poz basıyor. Düzeltme ertelendi.
+
+**Gerekçe.** İki damga arası mesafe = hız / simülasyon frekansı. 160 FPS'te
+0.75 cm, damgalar tamamen örtüşüyor ve iz sürekli çıkıyor. Belirti yalnız
+simülasyon seyrekleşince doğuyor.
+
+**Ölçüldü.** Odaksız editörde simülasyon ~2 Hz koşuyor ve damgalar 16-47 cm
+arayla düşüyor; izin genişliği o periyotla salınıyor, kenar tırtıllanıyor.
+Periyodun hızla ölçeklenmesi kaynağı kesinleştirdi (`SYMPTOMS.md`).
+
+**Tetikleyici — geri dönülecek belirti:** oyunda FPS düştüğünde (veya hızlı
+koşu/kayma eklendiğinde) izin kenarı düzenli diş göstermeye başlarsa.
+
+**Maliyet.** Gövde, iki damga arasındaki yolu kapsayacak biçimde hareket
+yönünde uzatılacak (küre → elipsoit). Uzatma miktarı SON DAMGADAN beri gidilen
+yol; o anı bilmek için kar yöneticisinden bir olay gerekiyor — bugün olmayan
+tek bağ bu. Yaklaşık yarım günlük iş.
+
 ## Ova kontrastı düzeltilmiyor — irtifadan geliyor
 
 **Karar.** Düz zeminde güneş-gölge farkı ~4 diyafram kalıyor. Dokunulmadı.

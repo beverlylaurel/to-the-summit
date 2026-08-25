@@ -33,8 +33,31 @@
 /// Yumuşatma yalnız son normalde gerekiyor.
 float SnowDentAt(float2 uv)
 {
+    // BÖLGE DIŞINDA İZ YOK — KENET DEĞERİ SONSUZA UZANMAZ.
+    //
+    // `saturate(uv)` kenardaki tekseli bölge dışındaki HER noktaya kopyalıyor.
+    // Sınırdaki bir teksel oyuluysa o oyuk dünyanın geri kalanına şerit olarak
+    // yayılıyor ve `SnowInsideMask`'in kestiği yerde DİKDÖRTGEN bir plato
+    // olarak görünüyor (kullanıcı bildirdi: "karın içinden dikdörtgen cisimler
+    // çıkıyor", "kar yok seçeneğinde gidiyor").
+    //
+    // Durum dokusunun aynı sorunu `SnowStateAt` içinde zaten çözülmüş: orada
+    // bölge dışı dünyanın genel değerine harmanlanıyor. İzin dünya karşılığı
+    // yok — bölge dışında iz de yok.
+    //
+    // SIRT ÇUKURUN DERİNLİĞİNDEN ÇIKARILMIYOR.
+    //
+    // `trail.g` karın YUKARI İTİLMİŞ kısmı — izin kenarındaki kabarma. Onu
+    // `trail.r`'dan çıkarmak iki ayrı geometriyi tek sayıya sıkıştırıyor ve
+    // sırt tam olarak omuzun üstüne düştüğü için omuzu SİLİYOR.
+    //
+    // Ölçüldü: `trail.r`'ın genişliği iz boyunca sabit 19-22 teksel, ama
+    // `r - g`'nin genişliği periyodik olarak 19'dan 12'ye çöküyordu. Ekranda
+    // belirtisi izin parça parça, eksene hizalı bloklara ayrılmasıydı —
+    // sırdın konumu yakalanan HIZLA kaydırıldığı için desen yön değiştirince
+    // değişiyor, düz yürürken de yürüyüş boyunca dalgalanıyordu.
     float4 trail = SAMPLE_TEXTURE2D_LOD(_SnowTrailTex, sampler_LinearClamp, saturate(uv), 0);
-    return max(0.0, trail.r - trail.g);
+    return max(0.0, trail.r) * SnowInsideMask(uv);
 }
 
 /// YUMUŞATILMIŞ DERİNLİK — GÖRÜNTÜ İÇİN.
@@ -46,18 +69,34 @@ float SnowDentAt(float2 uv)
 /// Bu yumuşatma bir dönem `SnowSurfaceAt` içinde vardı; kar mesh'i silinince
 /// o fonksiyonla birlikte gitti ve relief ham tekseli okumaya başladı.
 ///
-/// Merkez + dört köşegen, ±`SNOW_CARVE_SMOOTH_TEXELS`. Yalnız GÖRÜNEN
-/// derinlikte kullanılıyor; ışın yürüyüşü ucuz tek örneklemeyle kalıyor,
-/// çünkü orada iş yüzeyi BULMAK, çizmek değil.
+/// ÇEKİRDEK EŞ YÖNLÜ OLMAK ZORUNDA.
+///
+/// Önce merkez + YALNIZ DÖRT KÖŞEGEN tap vardı. Köşegen giden bir izde bu
+/// çekirdeğin iki tapı kenar BOYUNCA, ikisi kenarı KESEREK düşüyor; filtrenin
+/// tepkisi kenar boyunca ızgara periyoduyla modüle oluyor ve iz TIRTIL gibi
+/// dişleniyordu. Eksen hizalı izde dört tap simetrik olduğu için belirti
+/// görünmüyordu — ölçüldü: +X yürüyüşünde iz pürüzsüz, (1, 0.6) yönünde
+/// düzenli diş (kullanıcı bildirdi: "farklı yönlere giderken sıkıntılı").
+///
+/// Tam 3x3 çadır çekirdeği: dört eksen tapı köşegenlerin kök2 katı ağırlıkta.
+/// Yarıçap 1.5 tekselden büyük olamaz, yoksa ızgara merdiveniyle birlikte
+/// oluğun 3 tekselllik duvarını da siler.
 float SnowDentSmooth(float2 uv)
 {
     float2 b = SNOW_CARVE_SMOOTH_TEXELS / _SnowResolution;
 
-    float d = SnowDentAt(uv) * 0.5;
-    d += SnowDentAt(uv + float2( b.x,  b.y)) * 0.125;
-    d += SnowDentAt(uv + float2(-b.x,  b.y)) * 0.125;
-    d += SnowDentAt(uv + float2( b.x, -b.y)) * 0.125;
-    d += SnowDentAt(uv + float2(-b.x, -b.y)) * 0.125;
+    float d = SnowDentAt(uv) * 0.25;
+
+    d += SnowDentAt(uv + float2( b.x, 0.0)) * 0.125;
+    d += SnowDentAt(uv + float2(-b.x, 0.0)) * 0.125;
+    d += SnowDentAt(uv + float2( 0.0,  b.y)) * 0.125;
+    d += SnowDentAt(uv + float2( 0.0, -b.y)) * 0.125;
+
+    d += SnowDentAt(uv + float2( b.x,  b.y)) * 0.0625;
+    d += SnowDentAt(uv + float2(-b.x,  b.y)) * 0.0625;
+    d += SnowDentAt(uv + float2( b.x, -b.y)) * 0.0625;
+    d += SnowDentAt(uv + float2(-b.x, -b.y)) * 0.0625;
+
     return d;
 }
 
@@ -78,17 +117,42 @@ float2 SnowReliefOffset(float3 posWS, float3 viewDirWS, out float dentOut)
     // bu vektör patlar; tavan konuyor, yoksa iz metrelerce uzar.
     float dikey = max(viewDirWS.y, 0.15);
     float2 yatay = -viewDirWS.xz / dikey;
-    yatay = clamp(yatay, -SNOW_RELIEF_MAX_STRETCH, SNOW_RELIEF_MAX_STRETCH);
 
-    // Çukur yoksa hiç yürüme: düz karda sekiz doku okuması boşa gider.
+    // TAVAN UZUNLUĞA, BİLEŞENE DEĞİL.
+    //
+    // `clamp(yatay, -k, k)` bileşenleri ayrı ayrı kesiyor ve bu bir vektörün
+    // AÇISINI DEĞİŞTİRİYOR: çapraz bakışta x kesilip z kesilmeyince ışın
+    // bakışın olmadığı bir yöne gidiyor. Belirtisi izin bakış yönüne göre
+    // yalpalaması — düz yürünmüş bir oluk zigzag görünüyor, en çok çapraz
+    // bakışta (kullanıcı bildirdi: "farklı yönlere giderken sıkıntılı izler").
+    float uzunluk = length(yatay);
+    yatay *= min(1.0, SNOW_RELIEF_MAX_STRETCH / max(uzunluk, 1e-5));
+    uzunluk = min(uzunluk, SNOW_RELIEF_MAX_STRETCH);
+
+    // ERKEN ÇIKIŞ IŞININ TAMAMINA BAKIYOR, YALNIZ MERKEZE DEĞİL.
+    //
+    // Yalnız `uv0` sorulduğunda oluğun DIŞINDAKİ piksel hiç yürümüyordu — oysa
+    // relief mapping'in bütün amacı o pikselin çukurun içini görmesi. Kenarda
+    // kayma sıfırdan `yatay * derinlik` kadarına (66 cm'ye) sıçrıyor ve bu
+    // süreksizlik ekranda LOB olarak çıkıyor.
+    float2 ucNokta = posWS.xz + yatay * SNOW_RELIEF_MAX_DEPTH;
     float merkez = SnowDentAt(uv0);
-    if (merkez < 0.001) return (float2)0.0;
+    float uzak    = SnowDentAt(SnowWorldToUV(float3(ucNokta.x, posWS.y, ucNokta.y)));
 
-    const int ADIM = SNOW_RELIEF_STEPS;
+    if (max(merkez, uzak) < 0.001) return (float2)0.0;
+
+    // ADIM SAYISI IŞININ BOYUNDAN.
+    //
+    // Sabit adım sayısı sıyırtma açıda yetmiyor: ışın 66 cm uzarken 12 adım
+    // teksel başına 2.4 örnek atlıyor ve kesişim adım ızgarasına yuvarlanıyor.
+    // Adım başına en fazla bir teksel gidilsin istiyoruz.
+    float tekselBoyu = _SnowAreaSize / _SnowResolution;
+    int ADIM = (int)clamp(uzunluk * SNOW_RELIEF_MAX_DEPTH / max(tekselBoyu, 1e-4),
+                          SNOW_RELIEF_STEPS_MIN, SNOW_RELIEF_STEPS_MAX);
+
     float oncekiDerinlik = 0.0;
     float onceki = merkez;
 
-    [unroll]
     for (int i = 1; i <= ADIM; ++i)
     {
         float t = (float)i / (float)ADIM;
@@ -142,6 +206,8 @@ float2 SnowReliefOffset(float3 posWS, float3 viewDirWS, out float dentOut)
 /// Işık yönünde kısa bir yürüyüş: yükseklik alanı ışının üstüne çıkıyorsa o
 /// nokta gölgededir. Adım sayısı düşük; gölge kenarı yumuşasın diye sert
 /// karar yerine en büyük engel oranı kullanılıyor.
+///
+/// KIRPMA UZUNLUĞA, BİLEŞENE DEĞİL — aynı gerekçe `SnowReliefOffset`'te.
 half SnowReliefShadow(float3 posWS, float3 lightDirWS, float dent)
 {
     if (dent < 0.005) return 1.0h;
@@ -149,7 +215,8 @@ half SnowReliefShadow(float3 posWS, float3 lightDirWS, float dent)
     // Işık yukarı bakan yön; yatay ilerleme birim derinlik başına.
     float dikey = max(lightDirWS.y, 0.08);
     float2 yatay = lightDirWS.xz / dikey;
-    yatay = clamp(yatay, -SNOW_RELIEF_MAX_STRETCH, SNOW_RELIEF_MAX_STRETCH);
+    float uzunluk = length(yatay);
+    yatay *= min(1.0, SNOW_RELIEF_MAX_STRETCH / max(uzunluk, 1e-5));
 
     float engel = 0.0;
 
@@ -173,11 +240,15 @@ half SnowReliefShadow(float3 posWS, float3 lightDirWS, float dent)
 /// Çukurun eğimi — normal buradan geliyor. Merkezi fark, adım bir teksel.
 half2 SnowDentSlope(float2 uv)
 {
-    float t = 1.0 / _SnowResolution;
+    float t = SNOW_DENT_SLOPE_TEXELS / _SnowResolution;
     float metre = _SnowAreaSize * t;
 
     // EĞİM DE YUMUŞATILMIŞ ALANDAN. Ham alanın gradyanı teksel sınırında
     // sıçrıyor ve izin duvarı basamaklı görünüyordu.
+    //
+    // FARKIN ADIMI DA BİR TEKSEL OLAMAZ: o adım ızgara Nyquist'inde çalışıyor
+    // ve köşegen izin merdivenini en çok büyüten yer orası (gerekçe
+    // `SNOW_DENT_SLOPE_TEXELS` yanında).
     float dL = SnowDentSmooth(uv - float2(t, 0));
     float dR = SnowDentSmooth(uv + float2(t, 0));
     float dD = SnowDentSmooth(uv - float2(0, t));

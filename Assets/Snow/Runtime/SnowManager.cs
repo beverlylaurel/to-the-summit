@@ -105,6 +105,7 @@ public class SnowManager : MonoBehaviour
     int scrollKernel = -1;
     int blurCaptureKernel = -1;
     int deformKernel = -1;
+    int reposeKernel = -1;
     int rimBlurHKernel = -1;
     int rimBlurVKernel = -1;
     int rimKernel = -1;
@@ -135,7 +136,8 @@ public class SnowManager : MonoBehaviour
     /// Sahnede birden çok kamera var (oyun + sahne görünümü). Geçiş her kamera
     /// için kaydediliyor; simülasyon KARE BAŞINA BİR KEZ koşmalı, yoksa
     /// editörde her şey iki kat hızlı ilerler.
-    int lastSimulatedFrame = -1;
+    float lastSimulatedTime = -1f;
+    float simDeltaTime;
 
     /// SİMÜLASYON İZOLASYON ANAHTARLARI (teşhis).
     ///
@@ -293,6 +295,7 @@ public class SnowManager : MonoBehaviour
         scrollKernel = simCompute.FindKernel("KScroll");
         blurCaptureKernel = simCompute.FindKernel("KBlurCapture");
         deformKernel = simCompute.FindKernel("KDeform");
+        reposeKernel = simCompute.FindKernel("KRepose");
         rimBlurHKernel = simCompute.FindKernel("KRimBlurH");
         rimBlurVKernel = simCompute.FindKernel("KRimBlurV");
         rimKernel = simCompute.FindKernel("KRim");
@@ -315,7 +318,7 @@ public class SnowManager : MonoBehaviour
         // Engeller statik; bir kez taranıyor (spec §12.1 — her kare değil).
         skyCamera.Rescan(LayerMask.NameToLayer(OccluderLayerName));
 
-        lastSimulatedFrame = -1;
+        lastSimulatedTime = -1f;
 
         centerTexel = SnapToTexelGrid(followTarget.position, TexelSize, settings.QualityData.SnapStep);
         pendingClear = true;
@@ -601,10 +604,30 @@ public class SnowManager : MonoBehaviour
     {
         if (!IsReady) return;
 
-        // KARE BAŞINA BİR KEZ. İki kamera aynı kareyi çizerse simülasyon iki
-        // kez ilerler ve belirtisi "editörde kar iki kat hızlı eriyor" olur.
-        if (lastSimulatedFrame == Time.frameCount) return;
-        lastSimulatedFrame = Time.frameCount;
+        // SİMÜLASYON ADIMI GEÇEN ZAMANDAN TÜRÜYOR, `Time.deltaTime`'DAN DEĞİL.
+        //
+        // `RecordRenderGraph` her kamera için ayrı koşuyor (oyun görünümü,
+        // sahne görünümü, yardımcı kameralar) ve `Time.frameCount` bunların
+        // arasında ilerleyebiliyor — kare sayacına bakan koruma tutmuyordu.
+        //
+        // Ölçüldü: KDeform 525 karede 1602 kez koştu (3.05 kat) ve HER koşu
+        // tam bir karelik zaman uyguladı. Belirtisi ayak izinin saniyeler
+        // içinde kapanmasıydı; ama hızlanan yalnız iz değil, oturma, kabuk,
+        // birikme ve sastrugi de aynı katsayıyla akıyordu.
+        //
+        // Geçen zamanı okumak kamera sayısından bağımsız: aynı anda gelen
+        // ikinci çağrı sıfır adım alır ve erken çıkar, simülasyon toplamda
+        // gerçek zaman kadar ilerler.
+        if (lastSimulatedTime < 0f) lastSimulatedTime = Time.time;
+
+        float gecen = Time.time - lastSimulatedTime;
+        if (gecen <= 0f) return;
+
+        lastSimulatedTime = Time.time;
+
+        // Takılma sonrası tek karede dakikalarca simüle etmemek için tavan;
+        // `Time.deltaTime`'ın kendi tavanıyla aynı büyüklük.
+        simDeltaTime = Mathf.Min(gecen, Time.maximumDeltaTime);
 
         // KAR YOKSA HER ŞEY KAPALI (spec §15.2 — "bu entegrasyon için kritik").
         //
@@ -674,6 +697,13 @@ public class SnowManager : MonoBehaviour
         cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.SnowfallSWERate,
                                  snowfall.SnowfallSweRate);
 
+        // İZSİZ KARIN YOĞUNLUĞU DA ÇEKİRDEĞE GİDİYOR. `KDeform` sıkışmanın
+        // tabanını buradan alıyor; sabit bir döşeme yazılırsa diskin kenarında
+        // yoğunluk sıçrıyor ve iz tarak gibi çıkıyor (gerekçe `SnowSim.compute`).
+        // Global olarak da yayınlanıyor ama compute globalleri görmüyor.
+        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.FallbackRhoN,
+                                 WorldRhoN >= 0f ? WorldRhoN : settings.DefaultRhoN);
+
         cmd.BeginSample(SnowProfiler.MarkerNames[1]);
         DispatchCapture(cmd, groups, restoreView, restoreProj);
         cmd.EndSample(SnowProfiler.MarkerNames[1]);
@@ -725,7 +755,7 @@ public class SnowManager : MonoBehaviour
         Texture ground = groundHeight.HeightTexture;
         if (ground == null) return;
 
-        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.SnowDeltaTime, Time.deltaTime);
+        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.SnowDeltaTime, simDeltaTime);
         cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.RimBlurTexels, SnowConstants.RimBlurTexels);
 
         // --- KDeform: batma ve dolma ---
@@ -741,6 +771,21 @@ public class SnowManager : MonoBehaviour
 
         (trail, trailTemp) = (trailTemp, trail);
         (snow, snowTemp) = (snowTemp, snow);
+
+        // --- KRepose: duvarın duruş açısına göçmesi ---
+        //
+        // Koni tek geçişte bir teksel yayılıyor; kare başına birkaç geçişle
+        // birkaç karede yerine oturuyor. Sonuç idempotent, o yüzden geçiş
+        // sayısı görünümü değil YAKINSAMA HIZINI belirliyor.
+        for (int i = 0; i < SnowConstants.ReposeIterations; i++)
+        {
+            cmd.SetComputeTextureParam(simCompute, reposeKernel, SnowShaderIDs.Trail, trail);
+            cmd.SetComputeTextureParam(simCompute, reposeKernel, SnowShaderIDs.Snow, snow);
+            cmd.SetComputeTextureParam(simCompute, reposeKernel, SnowShaderIDs.TrailOut, trailTemp);
+            cmd.DispatchCompute(simCompute, reposeKernel, groups, groups, 1);
+
+            (trail, trailTemp) = (trailTemp, trail);
+        }
 
         // --- Ayrılabilir blur: yatay, sonra düşey ---
         cmd.SetComputeTextureParam(simCompute, rimBlurHKernel, SnowShaderIDs.Src, trail);
@@ -924,7 +969,7 @@ public class SnowManager : MonoBehaviour
         Texture ground = groundHeight.HeightTexture;
         if (ground == null) return;
 
-        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.SnowDeltaTime, Time.deltaTime);
+        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.SnowDeltaTime, simDeltaTime);
 
         cmd.SetComputeTextureParam(simCompute, windTransportKernel, SnowShaderIDs.GroundHeightTex, ground);
         cmd.SetComputeTextureParam(simCompute, windTransportKernel,
@@ -976,7 +1021,7 @@ public class SnowManager : MonoBehaviour
         // işleniyor, dt aynı katla çarpılıyor. Kar oturması ve erimesi saat
         // mertebesinde; görsel fark yok.
         cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.DeltaTimeEff,
-                                 Time.deltaTime * tiles * Mathf.Max(0f, SimTimeScale));
+                                 simDeltaTime * tiles * Mathf.Max(0f, SimTimeScale));
         cmd.SetComputeIntParam(simCompute, SnowShaderIDs.TileIndex, accumulateTile);
         cmd.SetComputeIntParam(simCompute, SnowShaderIDs.TileCount, tiles);
 

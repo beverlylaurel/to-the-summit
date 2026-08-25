@@ -8,8 +8,17 @@ using UnityEngine.Rendering;
 /// Bir noktadaki karın oyun tarafına görünen hâli (spec §19).
 public struct SnowSample
 {
-    /// Kar yüzeyinin zeminden yüksekliği (m).
+    /// Kar yüzeyinin zeminden yüksekliği (m). İZ AÇILDIKTAN SONRAKİ hâli.
     public float Depth;
+
+    /// İZ AÇILMADAN ÖNCEKİ kar sütunu (m). Yalnız yağış ve oturmayla değişir,
+    /// yani saniyeler ölçeğinde sabittir.
+    ///
+    /// `Depth + SinkDepth` bunun yerine kullanılıyordu ve `trail.g`'yi (sırt)
+    /// içeriyordu. Sırt `max` ile birikiyor ve konumu hız yönüne göre
+    /// kaydırılıyor; gövdenin oturma yüksekliği onun peşinden 4 cm zıplayıp
+    /// izin derinliğini basamaklandırıyordu.
+    public float BaseHeight;
 
     /// Bu noktadaki oyulma (m) — batma derinliği.
     public float SinkDepth;
@@ -170,6 +179,7 @@ public class SnowSampler : MonoBehaviour
         return new SnowSample
         {
             Depth = Mathf.Max(baseHeight - trail.r + trail.g, 0f),
+            BaseHeight = baseHeight,
             SinkDepth = trail.r,
             Density01 = Mathf.Clamp01(snow.g),
             Wetness = Mathf.Clamp01(snow.b),
