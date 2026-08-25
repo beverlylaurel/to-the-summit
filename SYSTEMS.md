@@ -733,15 +733,6 @@ Simülasyon kare başına bir kez koşuyor; geçiş her kamera için kaydediliyo
 göre. Sebebi ölçülmüş: yarım hassasiyetin 4900 m'deki adımı 4 metre
 (`DECISIONS.md`). Çözücü taraf `SnowCaptureY()` ile geri çeviriyor.
 
-**Zemin mesh'i (Faz 4).** Tessellation yok, çok seviyeli clipmap de yok: TEK
-kare ızgara, 24 m, tek draw call (`SnowSurface` + `SnowMeshBuilder`). Merkez
-`SnowManager.AreaCenter`'dan geliyor — mesh, yakalama kamerası ve deformasyon
-RT'si AYNI snap'lenmiş merkezi kullanıyor, ayrı ayrı snap eden ikinci bir
-kaynak yok. Yükseklik köşe shader'ında `SnowSurfaceAt`'ten geliyor, normal
-fragman'da merkezi farkla — ikisi aynı fonksiyondan. 4 mm altındaki kar
-`clip()` ile hiç çizilmiyor; kenar gürültüyle kırılıyor (`T_Snow_Breakup`).
-`GroundCoverage01` eşiğin altında ve kar yağmıyorsa mesh tamamen kapanıyor.
-
 **Birikme zinciri (Faz 5).** `SnowfallController` yağış olup olmadığına bakıp
 `SnowRuntimeState`'e yayınlıyor. **Sıcaklık kapısı yok** — yağıyorsa kardır. `_SnowfallSWERate` ve VFX tane sayısı AYNI
 `i01` değerinden türüyor. `KAccumulate` yağışı gökyüzü görünürlüğüyle,
@@ -768,11 +759,11 @@ edip leke ızgarası üretiyordu. Eğime fiziksel tavan var (35°): normal
 haritanın mavi kanalı sıkıştırmayla sıfıra yaklaşınca `n.xy/n.z` patlıyor ve
 izole koyu mavi noktalar çıkıyordu.
 
-**Aynı doku ARAZİDE de var.** Arazinin kar albedosu `MountainSurface.hlsl`
-içinde kuruluyor ve `SnowBuildSurface`'ten bağımsız; doku yalnız kar mesh'ine
-bağlandığında arazide hiçbir etkisi olmuyordu. Mesh yalnız yerel sapmayı
-çizdiği için düz alanın tamamı arazi tarafı — doku oraya girmezse hiç
-görünmez.
+**Doku ARAZİDE okunuyor.** Arazinin kar albedosu `MountainSurface.hlsl`
+içinde kuruluyor ve `SnowBuildSurface`'ten bağımsız; doku yalnız ışıklandırma
+zincirine bağlandığında arazide hiçbir etkisi olmuyordu (ölçüldü: güç 0 ile 3
+arasında ekran farkı yok). Kar yüzeyinin tamamını arazi çizdiği için doku
+oraya girmezse hiç görünmez.
 
 **Kar ↔ pozlama.** Açık günün pozlaması (`LookSettings.clearDay.exposure`)
 KAR için ayarlı, sahne ortalaması için değil. Ölçüldü: -0.15 EV'de tam güneşli
@@ -808,39 +799,29 @@ pulu deseni üretti. `SnowTrailBodyAlign` gövdeyi yine hareket yönüne
 hizalıyor (adım sapması ve ileride yön bağımlı bir özellik için), ama iz artık
 buna bağımlı değil.
 
-**Mesh'in sınırı SERT DEĞİL.** `SnowTrailPresence(uv)` sapmanın yumuşak
-ölçüsünü veriyor; yükseklik geçiş bandında `SnowWorldCoverHeight()`'e
-harmanlanıyor ve kesme ancak varlık 0.02'nin altına düşünce yapılıyor. Köşe,
-fragman yüksekliği ve merkezi fark aynı harmanı okuyor. Sert `clip()` iki kusur
-üretiyordu: oluğun duvarını ortasından kesmek, ve yerel sütun ile dünya sütunu
-arasındaki 1.4 cm'yi basamak olarak göstermek. Arazi kar sütununu ZATEN
-ekliyor (`SnowWorldCoverHeight`, dört geçişte de); mesh'ten sütun çıkarmak
-denendi ve izi arazinin altına gömdü.
+**İZ ARAZİNİN KENDİ YÜZEYİNDE ÇİZİLİYOR — İKİNCİ YÜZEY YOK.**
 
-**KAR MESH'İ YALNIZ YEREL SAPMAYI ÇİZER.** Kar tabanını arazi çiziyor:
-`MountainSurface.shader` dört geçişinde de `SnowWorldCoverHeight()` kadar
-yükseliyor ve karın ışıklandırmasını uyguluyor. Mesh yalnız arazinin
-veremeyeceği yerel sapmanın (iz oyuğu, kenar sırtı) olduğu yerde çiziliyor;
-`SNOW_LOCAL_MIN`'in altında tamamen çekiliyor. Eşik kendi tekselinden değil,
-`SNOW_LOCAL_SKIRT_TEXELS` yarıçapındaki komşuların EN BÜYÜĞÜNDEN okunuyor:
-oluğun duvarı iz dışındaki düz kar yüzeyine bağlanıyor ve o yüzey çizilmezse
-duvarın üst kenarı boşlukta asılı kalıyordu (yandan bakınca görüldü). Ölçüldü: mesh alanın
-%0.6'sında görünüyor, geri kalanı tek shader'dan geliyor.
+Kar mesh'i (`SnowSurface`, `SnowLit.shader` ve mesh kurucusu) tamamen
+kaldırıldı. İz, `MountainSurface`'in fragman'ında relief mapping ile veriliyor:
+`SnowReliefOffset` bakış ışınını yüzeyin altına yürütüyor, çukurun görünen
+yerini buluyor, ve doku/normal/gölgeleme o kaydırılmış konumdan okunuyor.
 
-Bu, "24 m'lik kare" belirtisinin KALICI çözümü. Fark küçültülerek
-kapatılamadı: iki ayrı kod yolunun onlarca terimi var, biri eşitlenince başka
-bir saatte başkası ayrışıyor (yoğunluk, kar sütunu, AO, dağ gölgesi tek tek
-kapatıldı, oran 1.61'den 1.08'e indi ama sıfırlanmadı; alpenglow denemesi
-şafağı 1.02'den 0.25'e bozdu). Kalan %8 statik görüntüde zor seçiliyor ama
-sınır OYUNCUYLA BİRLİKTE KAYDIĞI için gözle yakalanıyordu. İkinci çizim
-kaldırılınca düz alanda fark matematiksel olarak imkânsız hâle geldi.
+Gerekçe ve ölçümler `RATIONALE.md` → "İz neden ikinci bir yüzeyle çizilmiyor".
+Kısaca: yamanın nereye konduğu fark etmiyordu — araziyle aynı kotta olunca
+karakter gömülüyor, yukarı çıkınca kenarı kare oluyordu. Sınır yamanın kendi
+varlığından geliyordu.
 
-Aşağıdaki eşitlemeler yine de yerinde duruyor: mesh'in görünür olduğu dar
-şeritte iki yüzey komşu ve orada da tutarlı olmaları gerekiyor.
+**Kare artık matematiksel olarak imkânsız:** düz alanı da izi de tek shader
+çiziyor, kıyaslanacak ikinci yüzey yok.
 
-**Kar mesh'i ve arazi AYNI ışığı görür.** Bölge sınırının kendini
-göstermemesi için ikisinin girdileri de eşleşmek zorunda; ölçülen ve kapatılan
-ayrışmalar:
+**İzin içi sıkışmış kar.** Yoğunluk, ıslaklık ve bozulma durum dokusundan
+YEREL okunuyor (`SnowStateAt`, relief'in kaydırdığı UV'den) ve
+`SnowInsideMask` ile dünyanın değerine yumuşak geçiyor. Hem yüzey dokusu
+harmanına hem ışıklandırmaya giriyor.
+
+**Çukurun karanlığı ayrı bir gölge değil.** `surface.occlusion` derinlikle
+orantılı kısılıyor — geometrik örtülme. Kar düzleştirmesinden SONRA
+uygulanıyor, yoksa düzleştirme çukuru da siliyordu.
 
 - **Yoğunluk.** `_FallbackRhoN` artık bölgenin ölçülen ortalamasından
   (`MeanRhoN`) geliyor. Eskiden yalnız yağıştan güncelleniyordu, oysa doku
@@ -912,14 +893,16 @@ verir.
 oyuncunun altında iz derinleşmez; sıkışma ilk temasta olur ve
 `SNOW_MAX_COMPACT_PER_PASS` tavanında durur.
 
-**Arazi de dünyanın kar kalınlığı kadar yükselir.** `SnowWorldCoverHeight`
-(`_FallbackSWE`/`_FallbackRhoN`'dan) `MountainSurface.shader`'ın dört geçişinde
-de köşe konumuna ekleniyor. Kar mesh'i yerel kar sütunu kadar yükseliyor;
-arazi yükselmezse sınırda derinlikle ÖLÇEKLENEN bir basamak oluşuyor (2 m
-rampada 50 cm karda %25 eğim). Mesh'in kenar sönümü de sıfıra değil dünya kar
-seviyesine iniyor.
+**Arazi kar sütunu kadar YÜKSELMİYOR.** Bir dönem
+`MountainSurface.shader`'ın dört geçişinde de köşe `SnowWorldCoverHeight()`
+kadar yukarı taşınıyordu, çünkü kar mesh'i yerel sütun kadar yükseliyordu ve
+sınırda basamak kalmasın isteniyordu. Fizikte karşılığı yoktu:
+`CharacterController` arazi collider'ının, yani KAYANIN üstünde duruyor.
+Ölçüldü: ayak 205.539, kaya 205.489, çizilen yüzey 205.98 — karakter yarım
+metre gömülü başlıyordu. Mesh kalktığı için yükseltmenin gerekçesi de kalktı:
+arazi kotu = kar yüzeyi = collider, üçü aynı.
 
-**Kar yüzeyinin normali arazi eğimini taşır.** `SnowSurfaceAt` yalnız kar
+**Kar yüzeyinin normali arazi eğimini taşır.** Arazi normali zaten arazinin
 kalınlığını döndürüyor; yüzeyin eğimi arazi eğimi + kalınlık gradyanının
 toplamı. Taşımazsa mesh eğimli yamaçta dimdik kalıyor ve araziden farklı ışık
 alıyor — düz zeminde görünmeyen, eğimde açılan bir kare.
@@ -936,19 +919,7 @@ yüzden GLOBAL — arazi ayrı bir materyal ve per-materyal kalsalardı sıfır 
 `_SnowBreakup` dokusunun tanımı da tek yerde (`SnowCommon.hlsl`); mesh, arazi ve
 nesne maskesi üçü de onu okuyor.
 
-**Kar mesh'inin kesme eşiği bölge kenarını da sayar.** `SnowEdgeFade` hem
-yüksekliğe hem `SnowClipEdge`'e giriyor; ilki basamağı, ikincisi keskin renk
-çizgisini kaldırıyor. Mesh ile arazi iki ayrı ışıklandırma modeli kullandığı
-için aralarında ~%2 parlaklık farkı var ve düz alanda bu fark çizgi olarak
-okunuyor; kenar kuşağı onu lekeli geçişe çeviriyor.
-
-**Kar mesh'i bulut gölgesini araziyle AYNI kanaldan okur.** `_LIGHT_COOKIES`
-→ `SampleMainLightCookie`, tıpkı `MountainSurface.shader`'daki gibi. Okumazsa
-bulutun altında arazi kararırken oyuncunun çevresi aynı parlaklıkta kalıyor ve
-ekranda takip eden bir kare oluşuyor.
-
-**Parıltı iki yüzeyde de var, ayarı TEK yerde.** Kar mesh'i ve arazinin kar
-katmanı ayrı materyaller; parıltı per-materyal kalsaydı iki farklı sayıyla
+**Parıltının ayarı TEK yerde.** Parıltı per-materyal kalsaydı farklı sayılarla
 parıldarlardı. `_SparkleCellSize/Density/Sharpness/Intensity` global,
 sahibi `SnowSettings`, yayını `SnowManager`. Arazi tarafında `snowMask` ile
 ağırlıklanıyor.
@@ -974,17 +945,6 @@ kar. Bağ TEK YÖNLÜ — kar sistemi yağmurdan bir şey okumuyor.
 UV'sinden okunuyor (`SnowEdgeFade`), ayrı bir merkez/genişlik çifti
 yayınlanmıyor. Ayrıştıkları sürece sönüm mesh'i ortasından kesiyor ve `clip`
 orada duvar bırakıyordu.
-
-**Kar mesh'inin kenarı SIFIRA iniyor.** Dış 2 metrede yer değiştirme 0'a
-sönüyor; mesh kenarı arazi yüzeyiyle aynı yükseklikte bitiyor, basamak
-kalmıyor. Ötesini dağın kendi kar katmanı çiziyor — o katman yer değiştirme
-uygulamadığı için ikisi kenarda çakışıyor.
-
-**Dağın karı ÖRTÜ, mesh'in karı DERİNLİK — bilinçli ayrım (spec §16, §8.4).**
-Kar mesh'i oyuncunun çevresindeki 24 m'yi kaplıyor ve gerçek kalınlık çiziyor.
-Dağın geri kalanını `MountainSurface` çiziyor ve o **derinlik okumuyor**:
-`SnowCoverMaskWithNoise` + global skaler `_SnowCoverage`, kalınlık
-`_SnowCoverThickness` (4 cm). Yerinden oynatma yok, gölgeleme katmanı.
 
 Arazi bir süre `SnowStateAt`'ten DERİNLİK okudu; o fonksiyon bölgenin içinde
 durum dokusunu, dışında `_FallbackSWE`'yi veriyor. Mesh ise kenarında kalınlığı

@@ -1389,3 +1389,55 @@ kayardı.
 parlaklık desenini tamamen siliyor — geriye yalnız renk tonu kalıyor. Ölçüldü:
 güç 0 ile 3 arasında ekran sapması 0.01003 ↔ 0.00971, yani desen hiç gelmiyor.
 Dört dokunun doğrusal uzamsal ortalaması ölçülüp sabit olarak gömüldü.
+
+## İz neden ikinci bir yüzeyle çizilmiyor
+
+**Kural:** kar izi arazinin KENDİ yüzeyinde relief mapping ile veriliyor.
+Arazinin üstüne oturan ayrı bir kar mesh'i yok.
+
+**Neden:** yamanın nereye konduğu fark etmiyor, sınırın kendisi kusur üretiyor.
+Üç günün ölçülmüş bilançosu:
+
+| Yama nerede | Belirti | Ölçüm |
+|---|---|---|
+| Arazi de sütun kadar yükselirken | karakter gömülü başlıyor | ayak 205.539, kaya 205.489, çizilen yüzey 205.98 |
+| Arazi kayada kalırken | 24 m'lik kenar geometrik basamak | yama 0.45 m havada |
+| Yama yalnız izde çizilirken | iz görünmüyor | sim'de oluk 0.24 m, ekranda yok — arazi örtüyor |
+| Yama araziyle aynı kotta | 1.4 cm dudak, sıyırtma açıda "havada levha" | yerel sütun 0.496 / dünya 0.482 |
+
+Dördü de aynı şeyin yüzleri: opak bir örtünün üstüne ikinci bir yüzey koyunca
+o yüzeyin bittiği yer görünür.
+
+**Sevkiyat oyunları da böyle yapmıyor.** Batman: Arkham Origins yükseklik
+alanını runtime'da üretip ya tessellation (PC) ya relief mapping (konsol) ile
+AYNI yüzeye uyguluyor; "üçgen yoğunluğundan bağımsız", "yarı-düşük frekanslı
+detay" [GDC 2014, Colin Barré-Brisebois]. Rise of the Tomb Raider dinamik
+tessellation kullanıyor, deformasyon arazinin kendi geometrisinde [GPU Pro,
+"Deferred Snow Deformation in Rise of the Tomb Raider"]. İkisinde de ikinci
+yüzey yok.
+
+**Bizde tessellation yolu kapalı:** arazi bir Unity Terrain, köşe aralığı
+7.32 m (30 km / 4097). Geriye konsol yolu kalıyor ve ayak izi tam olarak onun
+tarif ettiği detay sınıfı.
+
+**Bedeli, bilinçli:** relief mapping siluet vermez — izin kenarı ufka karşı
+çıkıntı yapmaz — ve çok sıyırtma açıda çözünürlüğü düşer. `DECISIONS.md`.
+
+**Ölçüldü (10:00, kar 0.45 m, tepeden bakış):** iz pikselleri luma 0.6720,
+çevre 0.8436 → **kontrast %20.3**. Kare yok, havada kalan parça yok.
+
+## Parıltıda sınırlanan şey LOD değil, ayak izi
+
+**Kural:** `pixelFootprint` 4 cm'de kırpılıyor; LOD serbest.
+
+**Neden:** Bowles & Wang hücreyi ayak izine göre büyütüp yoğunluğu ekran
+uzayında sabit tutuyor. LOD iki seviyeyle sınırlanınca hücre büyüyemiyor,
+`cellsPerPixel` şişiyor, `pTarget` sıfıra iniyor ve eşik 1'e dayanıyor —
+uzakta hiçbir kristal parlamıyor. Belirti (iri dikdörtgen lekeler) kapanmıştı
+ama parıltı da ölmüştü.
+
+Dikdörtgenlerin gerçek sebebi `fwidth(posWS.xz)`: sıyırtma açıda patlıyor,
+hücre metrelerce oluyor, tek hücre onlarca pikseli kaplıyor.
+
+**Ölçüldü (10:00, ufka yakın bakış):** yakın 114, orta 45, uzak 0 parlak
+nokta. Mesafe kapısı 28→50 m.
