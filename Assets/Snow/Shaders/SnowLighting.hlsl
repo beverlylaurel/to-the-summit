@@ -46,7 +46,19 @@ SnowSurface SnowBuildSurfaceFrom(SnowSurfaceBlend yuzey,
     SnowSurface s;
 
     s.albedo    = lerp(ALBEDO_PACKED, ALBEDO_FRESH, freshness) * lerp(half3(1, 1, 1), TINT_WET, wet);
-    s.roughness = lerp(0.26, 0.48, freshness) * lerp(1.0, 0.38, wet);
+    // KURU KAR PÜRÜZLÜDÜR — PARLAK DEĞİL.
+    //
+    // Eskiden sıkışmış kar 0.26, taze kar 0.48 pürüzlülük alıyordu; yani
+    // pürüzsüzlük 0.74 ve 0.52. Bu değerlerde speküler lob dar kalıyor ve
+    // güneş yansıması karın üstünde ARABA BOYASI gibi keskin bir parlaklık
+    // bırakıyor (kullanıcı bildirdi: "metalik bir görüntü").
+    //
+    // Kuru karın yansıması çoklu saçılımdan gelir: geniş, sönük, yönsüze
+    // yakın. Ayna gibi davranan şey ıslak kar ve buz kabuğudur — ikisi de
+    // aşağıda ayrıca ele alınıyor.
+    //
+    // Sıkışmış yüzey taze kardan DAHA düzgün olduğu için hâlâ daha düşük.
+    s.roughness = lerp(0.45, 0.72, freshness) * lerp(1.0, 0.62, wet);
 
     // YÜZEY DOKUSU. Dört fotogrametri seti durum zincirinden harmanlanıyor
     // (gerekçe `SnowSurfaceTextures.hlsl`). Albedonun SEVİYESİ yukarıdaki
@@ -58,7 +70,10 @@ SnowSurface SnowBuildSurfaceFrom(SnowSurfaceBlend yuzey,
     // KABUK BUZDUR (spec §18.3). Daha parlak, daha az parıldar. Faz 11'e
     // kadar `crust` sıfır kalıyor ve bu satırlar hiçbir şey yapmıyor.
     half crustMask = saturate((crust - 0.35) / 0.35);
-    s.roughness = lerp(s.roughness, 0.12, crustMask);
+
+    // Kabuk buz: gerçekten parlak, ama 0.12 cam gibiydi. Buz yüzeyi de
+    // mikro çatlaklı ve mattır; 0.25 keskin ama abartısız bir yansıma veriyor.
+    s.roughness = lerp(s.roughness, 0.25, crustMask);
     s.albedo    = lerp(s.albedo, s.albedo * half3(0.93, 0.95, 1.00), crustMask);
 
     s.wet = wet;

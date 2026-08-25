@@ -546,7 +546,10 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         float freshness = 1.0 - saturate((SnowDensity(yerelRho) - 100.0) / 350.0);
 
         half3 snowAlbedo = lerp(half3(0.70, 0.73, 0.79), half3(0.90, 0.92, 0.95), freshness);
-        half  snowRough  = lerp(0.26, 0.48, freshness);
+        // Kuru kar pürüzlüdür; gerekçe `SnowLighting.hlsl` → `SnowBuildSurfaceFrom`.
+        // İki yol aynı sayıyı kullanmak zorunda, yoksa aynı kar iki farklı
+        // parlaklıkla çizilir.
+        half  snowRough  = lerp(0.45, 0.72, freshness);
 
         // YÜZEY DOKUSU BURAYA GİRİYOR.
         //
