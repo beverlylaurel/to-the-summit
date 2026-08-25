@@ -144,6 +144,25 @@ SnowSurfaceBlend SnowSampleSurface(float3 posWS, float rhoN, float wet, float di
     half4 w = SnowSurfaceWeights(rhoN, wet, disturb, posWS);
     float2 uv = posWS.xz / max(_SnowSurfTileMeters, 0.01);
 
+    // İKİ ÖLÇEKLİ ALAN BÜKÜMÜ — DESEN KENDİNİ TEKRAR ETMESİN.
+    //
+    // Stokastik döşeme periyodu kırıyor ama okuma hâlâ DÜZENLİ bir ızgaradan
+    // geliyor: aynı leke aynı yönde, aynı aralıkla dizilmiş görünüyor
+    // (kullanıcı bildirdi: "kar dokusu çok düzenli"). Gerçek kar yüzeyinde
+    // desen rüzgârla akar, gerilir, kıvrılır.
+    //
+    // Koordinatın kendisi büküldüğünde desen artık düz bir ızgarada
+    // durmuyor: uzun dalga lekeleri sürüklüyor, kısa dalga kenarlarını
+    // kemiriyor. Genlik ikisinde de kendi dalga boyunun altında —
+    // üstünde olsaydı doku kendi üstüne katlanıp bulanırdı.
+    float2 bukum =
+        (float2(SnowValueNoise(posWS.xz * 0.11),
+                SnowValueNoise(posWS.xz * 0.11 + 23.7)) * 2.0 - 1.0) * 0.65 +
+        (float2(SnowValueNoise(posWS.xz * 0.47),
+                SnowValueNoise(posWS.xz * 0.47 + 61.3)) * 2.0 - 1.0) * 0.14;
+
+    uv += bukum;
+
     half3 renk = 0;
     half  puru = 0;
     half2 egim = 0;

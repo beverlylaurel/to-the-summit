@@ -101,7 +101,7 @@
 /// Şerit dar tutulur: düz alanda mesh ile arazi yine yan yana geliyor ve
 /// aradaki fark orada da var. 3 teksel (7 cm) duvarı bağlamaya yetiyor,
 /// göze kuşak olarak okunacak kadar geniş değil.
-#define SNOW_LOCAL_SKIRT_TEXELS       3.0
+#define SNOW_LOCAL_SKIRT_TEXELS       9.0
 
 // --- İz oluşumu (spec §10.1) ---
 #define SNOW_LOOSE_N                 0.10

@@ -808,12 +808,14 @@ pulu deseni üretti. `SnowTrailBodyAlign` gövdeyi yine hareket yönüne
 hizalıyor (adım sapması ve ileride yön bağımlı bir özellik için), ama iz artık
 buna bağımlı değil.
 
-**Mesh KOTU arazi kotudur, sütun kadar yükselmez.** Köşe yüksekliği
-`groundY + SnowSurfaceAt(uv) - SnowBaseAt(uv)`: bozulmamış kar sütunu teksel
-başına çıkarılıyor. Arazi geometrisi kar sütununu eklemiyor (arazide kar yalnız
-ışıklandırma katmanı); mesh eklerse iz bandı sütunun tamamı kadar havada kalır.
-Merkezi fark da aynı çıkarmayı yapıyor, yoksa normal ile geometri farklı yüzeyi
-tarif eder.
+**Mesh'in sınırı SERT DEĞİL.** `SnowTrailPresence(uv)` sapmanın yumuşak
+ölçüsünü veriyor; yükseklik geçiş bandında `SnowWorldCoverHeight()`'e
+harmanlanıyor ve kesme ancak varlık 0.02'nin altına düşünce yapılıyor. Köşe,
+fragman yüksekliği ve merkezi fark aynı harmanı okuyor. Sert `clip()` iki kusur
+üretiyordu: oluğun duvarını ortasından kesmek, ve yerel sütun ile dünya sütunu
+arasındaki 1.4 cm'yi basamak olarak göstermek. Arazi kar sütununu ZATEN
+ekliyor (`SnowWorldCoverHeight`, dört geçişte de); mesh'ten sütun çıkarmak
+denendi ve izi arazinin altına gömdü.
 
 **KAR MESH'İ YALNIZ YEREL SAPMAYI ÇİZER.** Kar tabanını arazi çiziyor:
 `MountainSurface.shader` dört geçişinde de `SnowWorldCoverHeight()` kadar

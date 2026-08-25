@@ -2140,7 +2140,7 @@ yanlış bir güç değeri yüzeyi yine doygun lekeye çevirebilirdi.
 
 ---
 
-## "Kar izi yine havada" — iz bandı arazinin yarım metre üstünde
+## "Kar izi yine havada" — sonra "kar izi kayboldu"
 
 **İlk şüpheli — YANLIŞ: etek (skirt) yetmiyor.** Daha önce izin duvarı boşlukta
 bitiyordu ve çözüm `SNOW_LOCAL_SKIRT_TEXELS` ile çevresine şerit bırakmaktı. Bu
@@ -2150,24 +2150,28 @@ belirti ona benziyor ama sebebi başka: şerit yerindeydi, bant KOMPLE yükselmi
 `Depth = 0.496 m`, oluğun ortasında `0.346 m`, kenarda `0.502-0.504`. Yani oyma
 15 cm, yığılma 6-8 mm — hepsi makul. Bozukluk fizikte değil ÇİZİMDE.
 
-**Gerçek sebep — mesh sütunu yükseltiyordu, araziyse eklemiyor.**
-`SnowDisplacedPositionWS` köşeyi `groundY + h` yazıyordu; `h` KAR SÜTUNUNUN
-TAMAMI (0.496 m). Arazi geometrisi kar sütununu hiç eklemiyor — arazide kar
-yalnız ışıklandırma katmanı, yüzey kayanın kotunda duruyor. Mesh yalnız yerel
-sapmanın olduğu yerde çizildiği için sonuç: izin bulunduğu bant, çevresindeki
-arazinin 0.5 m üstünde duran, kenarları boşlukta biten bir duvar.
+**İKİNCİ ŞÜPHELİ DE YANLIŞ: "arazi kar sütununu eklemiyor".** Mesh köşesi
+`groundY + h` yazıyor ve `h` sütunun tamamı (0.496 m) — arazi bunu eklemiyor
+sanıldı ve sütun çıkarıldı (`- SnowBaseAt(uv)`). Sonuç: iz TAMAMEN KAYBOLDU.
+Arazi zaten `SnowWorldCoverHeight()` kadar yükseliyor (`MountainSurface.shader`
+dört geçişte de) — ölçüldü: 0.4862 m. Çıkarma mesh'i arazinin yarım metre
+altına gömdü. Geri alındı.
 
-Kar 20 cm'ken de aynı hata vardı, 8 cm'lik bir kademe olarak; 50 cm'de duvara
-dönüştü ve görünür oldu.
+**Ölçüm önce yapılsaydı iki tur birden kapanırdı:** izin tamamı taranınca en
+yüksek yığın 1.5 cm, en derin oluk 16 cm çıktı. Yani ortada yarım metrelik bir
+duvar hiç yoktu; görünen şey 16 cm'lik oluğun DUVARININ `clip()` tarafından
+ortasından kesilmesiydi. Kesik yüz, kameraya yakın açıdan boşlukta duran bir
+duvar gibi okunuyor.
 
-**Ayırt eden ölçüm:** `_WorldSnowDepth = 0.4935`, mesh köşe yüksekliği
-`groundY + 0.496`, arazi yüzeyi `groundY`.
+**Gerçek sebep — sert `clip()` sınırı.** İki kusuru birden üretiyordu:
+oluk duvarını ortasından kesiyor, ve mesh'in yerel sütunu ile arazinin dünya
+sütunu birebir aynı olmadığı için (0.496 / 0.482) sınırda 1.4 cm'lik BASAMAK
+bırakıyordu — kullanıcının "dağılmalarla arazi birleşiminde çok keskin
+sınırlar" dediği şey bu.
 
-**Çözüm:** köşe artık sütunu değil SÜTUNDAN SAPMAYI yükseltiyor —
-`groundY + SnowSurfaceAt(uv) - SnowBaseAt(uv)`. Düz alan tam olarak arazi
-kotunda (ölçüldü: sapma 0.000), oluk 7.3 cm aşağıda, yığılan kenar birkaç mm
-yukarıda. Çıkarma TEKSEL BAŞINA: dünya ortalaması kullanılsaydı yerel yoğunluk
-farkı kadar basamak kalırdı.
-
-Merkezi fark da aynı çıkarmayı yapıyor; yapmasaydı normal ile geometri farklı
-yüzeyi tarif ederdi.
+**Çözüm — yumuşak varlık.** `SnowTrailPresence(uv)` sapmanın 0..1 arası yumuşak
+ölçüsünü veriyor (dokuz örnek, `SNOW_LOCAL_SKIRT_TEXELS` yarıçapı 3'ten 9
+teksele çıkarıldı). Yükseklik geçiş bandında dünya sütununa harmanlanıyor, yani
+mesh sınıra vardığında tam arazi kotunda; kesme de varlığın 0.02'sinde, sapmanın
+milimetre altında yapılıyor. Köşe, fragman yüksekliği ve merkezi fark AYNI
+harmanı okuyor — biri okumazsa normal ile geometri farklı yüzeyi tarif eder.

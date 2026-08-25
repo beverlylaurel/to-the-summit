@@ -450,16 +450,36 @@ float4 SnowTrailAt(float2 uv)
            * SnowInsideMask(uv);
 }
 
-/// O TEKSELDEKİ BOZULMAMIŞ KAR SÜTUNU.
+/// İZİN VARLIĞI — 0 ile 1 arası, SERT SINIR YOK.
 ///
-/// `SnowSurfaceAt` oyulmuş yüzeyi veriyor; bu, oyma olmasaydı yüzeyin nerede
-/// olacağını veriyor. Farkı mesh'in köşe yüksekliğinde kullanılıyor: arazi
-/// geometrisi kar sütununu EKLEMİYOR, dolayısıyla mesh sütunu eklerse iz
-/// bandı arazinin yarım metre üstünde havada durur.
-float SnowBaseAt(float2 uv)
+/// Mesh yalnız yerel sapmanın olduğu yerde çiziliyor (gerekçe
+/// `SnowLitForwardPass`). Sınır `clip()` ile keskin kesilince iki şey birden
+/// bozuluyordu:
+///
+///   - Oluğun DUVARI ortasından kesiliyor; kesitin dış yüzü boşlukta duran bir
+///     duvar gibi okunuyor (kullanıcı bildirdi: "kar izi havada").
+///   - Mesh'in yerel sütunu ile arazinin dünya sütunu birebir aynı değil
+///     (ölçüldü: 0.496 / 0.482, 1.4 cm fark). Keskin sınırda bu fark BASAMAK
+///     olarak görünüyor (kullanıcı bildirdi: "dağılmalarla arazi birleşiminde
+///     çok keskin sınırlar").
+///
+/// Yumuşak varlık ikisini de kapatıyor: geçiş bandında yükseklik dünya
+/// sütununa harmanlanıyor, yani mesh sınıra geldiğinde arazinin tam kotunda
+/// oluyor ve kesme sapmanın milimetre altına düştüğü yerde gerçekleşiyor.
+///
+/// Dokuz örnek, sekiz yön + merkez. Yarıçap `SNOW_LOCAL_SKIRT_TEXELS`.
+float SnowTrailPresence(float2 uv)
 {
-    float4 snow = SAMPLE_TEXTURE2D_LOD(_SnowStateTex, sampler_LinearClamp, saturate(uv), 0);
-    return SnowBaseHeight(snow.r, snow.g);
+    float tk = SNOW_LOCAL_SKIRT_TEXELS / _SnowResolution;
+    float tc = tk * 0.7071;
+
+    float4 iz = SnowTrailAt(uv);
+    iz = max(iz, max(SnowTrailAt(uv + float2( tk, 0)), SnowTrailAt(uv + float2(-tk, 0))));
+    iz = max(iz, max(SnowTrailAt(uv + float2(0,  tk)), SnowTrailAt(uv + float2(0, -tk))));
+    iz = max(iz, max(SnowTrailAt(uv + float2( tc,  tc)), SnowTrailAt(uv + float2(-tc, -tc))));
+    iz = max(iz, max(SnowTrailAt(uv + float2( tc, -tc)), SnowTrailAt(uv + float2(-tc,  tc))));
+
+    return smoothstep(SNOW_LOCAL_MIN, SNOW_LOCAL_MIN * 8.0, iz.r + iz.g);
 }
 
 float SnowSurfaceAt(float2 uv)

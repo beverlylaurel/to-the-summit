@@ -38,24 +38,18 @@ float3 SnowDisplacedPositionWS(float3 positionWS, out float heightOut)
     // sönümü zincirini tek yerde topluyor. Fragment normali de aynı
     // fonksiyondan türüyor (spec §8.6); ikisi ayrı yazılırsa geometri ile
     // normal farklı yüzeyi tarif eder.
+    // SÜTUN ÇIKARILMAZ. Arazi de kar sütunu kadar yükseliyor
+    // (`SnowWorldCoverHeight`, ölçüldü: 0.4862 m; mesh'in yerel sütunu 0.496).
+    // Bir kez `- SnowBaseAt(uv)` denendi ve mesh arazinin yarım metre ALTINA
+    // gömüldü, iz tamamen kayboldu.
     float2 uv = SnowWorldToUV(positionWS);
-    float h = SnowSurfaceAt(uv);
+
+    // SINIRDA ARAZİNİN KOTUNA OTURUYOR. Yerel sütun ile dünya sütunu birebir
+    // aynı değil (1.4 cm); keskin sınırda bu fark basamak olarak görünüyordu.
+    float h = lerp(SnowWorldCoverHeight(), SnowSurfaceAt(uv), SnowTrailPresence(uv));
 
     heightOut = h;
-
-    // MESH SÜTUNU DEĞİL, SÜTUNDAN SAPMAYI YÜKSELTİR.
-    //
-    // Arazi geometrisi kar sütununu eklemiyor — kar arazide yalnız
-    // ışıklandırma katmanı, yüzey kayanın kotunda duruyor. Mesh `groundY + h`
-    // yazdığında iz bandı bütün sütun kadar (ölçüldü: 0.496 m) arazinin
-    // üstüne çıkıyor ve kenarları boşlukta bitiyordu (kullanıcı bildirdi:
-    // "kar izi yine havada").
-    //
-    // Bozulmamış sütun çıkarılınca düz alan tam olarak arazi kotunda kalıyor,
-    // oluk aşağı iniyor (0.496 - 0.346 = 15 cm), yığılan kenar birkaç
-    // milimetre yükseliyor. TEKSEL BAŞINA çıkarılıyor, dünya ortalaması
-    // değil: ortalama kullanılsaydı yerel yoğunluk farkı kadar basamak kalırdı.
-    positionWS.y = groundY + h - SnowBaseAt(uv);
+    positionWS.y = groundY + h;
 
     return positionWS;
 }
@@ -108,13 +102,17 @@ float3 SnowNormalAtStep(float2 uv, float t, float3 positionWS)
     // çevresinde görünür bir KARE.
     float ws = t * _SnowAreaSize;
 
-    // GEOMETRİ NE ÇİZİYORSA GRADYAN DA ONU OKUR. Köşe yüksekliği bozulmamış
-    // sütunu çıkarıyor (gerekçe `SnowDisplacedPositionWS`); merkezi fark aynı
-    // çıkarmayı yapmazsa normal ile geometri farklı yüzeyi tarif eder.
-    float hL = SnowSurfaceAt(uv - float2(t, 0.0)) - SnowBaseAt(uv - float2(t, 0.0));
-    float hR = SnowSurfaceAt(uv + float2(t, 0.0)) - SnowBaseAt(uv + float2(t, 0.0));
-    float hD = SnowSurfaceAt(uv - float2(0.0, t)) - SnowBaseAt(uv - float2(0.0, t));
-    float hU = SnowSurfaceAt(uv + float2(0.0, t)) - SnowBaseAt(uv + float2(0.0, t));
+    // GEOMETRİ NE ÇİZİYORSA GRADYAN DA ONU OKUR: köşe yüksekliği sınırda dünya
+    // sütununa harmanlanıyor, merkezi fark da aynı harmanı okuyor. Yoksa
+    // normal ile geometri farklı yüzeyi tarif eder.
+    float hL = lerp(SnowWorldCoverHeight(), SnowSurfaceAt(uv - float2(t, 0.0)),
+                    SnowTrailPresence(uv - float2(t, 0.0)));
+    float hR = lerp(SnowWorldCoverHeight(), SnowSurfaceAt(uv + float2(t, 0.0)),
+                    SnowTrailPresence(uv + float2(t, 0.0)));
+    float hD = lerp(SnowWorldCoverHeight(), SnowSurfaceAt(uv - float2(0.0, t)),
+                    SnowTrailPresence(uv - float2(0.0, t)));
+    float hU = lerp(SnowWorldCoverHeight(), SnowSurfaceAt(uv + float2(0.0, t)),
+                    SnowTrailPresence(uv + float2(0.0, t)));
 
     float3 nGround = SampleGroundNormal(positionWS.xz);
 
@@ -204,7 +202,10 @@ void SnowClipEdge(float h, float baseH, float3 positionWS, float2 uv)
 void SnowShadeSetup(float3 positionWS, out float3 N, out SnowSurface surface, out float height)
 {
     float2 uv = SnowWorldToUV(positionWS);
-    height = SnowSurfaceAt(uv);
+
+    // Köşe hangi yüzeyi çizdiyse fragman da onu görüyor: sınırda dünya
+    // sütununa harmanlanmış yükseklik.
+    height = lerp(SnowWorldCoverHeight(), SnowSurfaceAt(uv), SnowTrailPresence(uv));
 
     float4 state = SnowStateAt(uv);
 
@@ -241,37 +242,10 @@ void SnowShadeSetup(float3 positionWS, out float3 N, out SnowSurface surface, ou
     // Sapma = oyma + sırt. `SNOW_LOCAL_MIN` bir tekselin gürültüsünün üstünde,
     // gözle seçilebilen en sığ izin altında.
     //
-    // ETEK ZORUNLU. Sapma yalnız kendi tekselinden okunursa oluğun DUVARI
-    // havada bitiyor: duvarın üst kenarı iz dışındaki düz kar yüzeyine
-    // bağlanıyordu, o yüzey artık çizilmediği için kenar boşlukta asılı
-    // kalıyor (yandan bakınca görüldü). Komşuların en büyüğü alınınca izin
-    // çevresinde birkaç tekselllik bir şerit daha çiziliyor ve duvar oraya
-    // oturuyor. Şerit düz alanda arazi kotunda (`SnowSurfaceAt` sapma
-    // sıfırken `baseHeight` veriyor), dolayısıyla basamak yapmıyor.
-    // ŞERİT SEKİZ YÖNDEN TOPLANIYOR, DÖRTTEN DEĞİL.
-    //
-    // Dört yönlü `max` şeridi KARE büyütüyor: kenar köşeli çıkıyor ve izin
-    // dağılması çevredeki düz karla uyumsuz, dijital bir tırtık gibi
-    // okunuyordu (kullanıcı bildirdi). Köşegenler eklenince yayılma
-    // sekizgene, yani daireye yakın oluyor.
-    //
-    // Köşegen adımı `0.7071` ile ölçekleniyor: aynı yarıçapta kalsın, köşede
-    // şerit kendiliğinden genişlemesin.
-    float tk = SNOW_LOCAL_SKIRT_TEXELS / _SnowResolution;
-    float tc = tk * 0.7071;
-
-    float4 sapmaTrail = SnowTrailAt(uv);
-    sapmaTrail = max(sapmaTrail, max(SnowTrailAt(uv + float2( tk, 0)),
-                                     SnowTrailAt(uv + float2(-tk, 0))));
-    sapmaTrail = max(sapmaTrail, max(SnowTrailAt(uv + float2(0,  tk)),
-                                     SnowTrailAt(uv + float2(0, -tk))));
-    sapmaTrail = max(sapmaTrail, max(SnowTrailAt(uv + float2( tc,  tc)),
-                                     SnowTrailAt(uv + float2(-tc, -tc))));
-    sapmaTrail = max(sapmaTrail, max(SnowTrailAt(uv + float2( tc, -tc)),
-                                     SnowTrailAt(uv + float2(-tc,  tc))));
-
-    float yerelSapma = sapmaTrail.r + sapmaTrail.g;
-    clip(yerelSapma - SNOW_LOCAL_MIN);
+    // KESME VARLIĞIN MİLİMETRE ALTINDA. Geçiş bandında yükseklik zaten dünya
+    // sütununa inmiş oluyor (`SnowTrailPresence`), yani mesh sınıra vardığında
+    // arazinin kotunda. Kesme orada gerçekleşince basamak da duvar da kalmıyor.
+    clip(SnowTrailPresence(uv) - 0.02);
 
     float4 trail = SnowTrailAt(uv);
 
