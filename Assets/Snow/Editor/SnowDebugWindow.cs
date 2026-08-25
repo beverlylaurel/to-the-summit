@@ -536,7 +536,7 @@ public class SnowDebugWindow : EditorWindow
         if (player != null)
         {
             var eyeLift = player.GetComponent<SnowEyeHeight>();
-            if (eyeLift == null) eyeLift = player.AddComponent<SnowEyeHeight>();
+            if (eyeLift == null) eyeLift = player.gameObject.AddComponent<SnowEyeHeight>();
 
             var eyeSerialized = new SerializedObject(eyeLift);
             Camera oyuncuKamerasi = player.GetComponentInChildren<Camera>();
