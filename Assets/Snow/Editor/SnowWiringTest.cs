@@ -255,8 +255,6 @@ public static class SnowWiringTest
             ("§15.2", "Per-material property'ler tek CBUFFER'da",
              "Assets/Snow/Shaders/SnowLitInput.hlsl", "CBUFFER_START(UnityPerMaterial)"),
 
-            ("§18.4", "Sastrugi SnowSurfaceAt'e de ekli (yoksa normal düz kalır)",
-             "Assets/Snow/Shaders/SnowCommon.hlsl", "h += SnowSastrugiOffset"),
 
             ("§14.2", "Detay normalleri kar mesh'inde",
              "Assets/Snow/Shaders/SnowLitForwardPass.hlsl", "SnowApplyDetailNormals"),

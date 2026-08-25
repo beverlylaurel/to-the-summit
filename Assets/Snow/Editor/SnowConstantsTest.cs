@@ -82,8 +82,6 @@ public static class SnowConstantsTest
         ("SastrugiLength", "SNOW_SASTRUGI_LENGTH"),
         ("SastrugiWidth", "SNOW_SASTRUGI_WIDTH"),
         ("SastrugiWindTau", "SNOW_SASTRUGI_WIND_TAU"),
-        ("AoRadius", "SNOW_AO_RADIUS"),
-        ("AoStrength", "SNOW_AO_STRENGTH"),
         ("SuspScaleH", "SNOW_SUSP_SCALE_H"),
         ("SuspAlphaBase", "SNOW_SUSP_ALPHA_BASE"),
         ("SuspMaxHeight", "SNOW_SUSP_MAX_HEIGHT"),

@@ -29,19 +29,6 @@ public class TerrainSurface : MonoBehaviour
     static readonly int TerrainOriginId = Shader.PropertyToID("_TerrainOrigin");
     static readonly int TerrainSizeId = Shader.PropertyToID("_TerrainSize");
 
-    /// DAĞ GÖLGESİ GLOBAL DE YAYINLANIYOR.
-    ///
-    /// Yukarıdaki üçü arazi materyalinin `UnityPerMaterial` bloğunda; kar
-    /// mesh'i BAŞKA bir materyal kullandığı için onlara erişemiyor ve arazinin
-    /// kendi gölgesini (`TerrainSunShadow`) hesaplayamıyordu. Sonuç, güneş
-    /// ufka yakınken arazi kendi gölgesinde koyulurken kar mesh'inin gölgesiz
-    /// parlaması — oyuncuyu izleyen 24 m'lik kare belirtisinin ölçülen son
-    /// payı. Aynı veriler global adlarla da yayınlanınca iki yüzey aynı
-    /// gölgeyi görüyor.
-    static readonly int ShadowHorizonId = Shader.PropertyToID("_TerrainShadowHorizon");
-    static readonly int ShadowOriginId = Shader.PropertyToID("_TerrainShadowOrigin");
-    static readonly int ShadowSizeId = Shader.PropertyToID("_TerrainShadowSize");
-
     static readonly int RockPrimaryId = Shader.PropertyToID("_RockPrimary");
     static readonly int RockSecondaryId = Shader.PropertyToID("_RockSecondary");
     static readonly int LowlandTintId = Shader.PropertyToID("_LowlandTint");
@@ -289,9 +276,6 @@ public class TerrainSurface : MonoBehaviour
         material.SetVector(TerrainSizeId, terrain.terrainData.size);
 
         // Kar mesh'i de aynı gölgeyi okusun (gerekçe alan tanımlarının yanında).
-        Shader.SetGlobalTexture(ShadowHorizonId, horizon);
-        Shader.SetGlobalVector(ShadowOriginId, transform.position);
-        Shader.SetGlobalVector(ShadowSizeId, terrain.terrainData.size);
         terrainSpan = terrain.terrainData.size.x;
 
         // Arazi yüksekliği GLOBAL: sis ve gökyüzü de okuyor, yalnız yüzeyin ayarı değil.

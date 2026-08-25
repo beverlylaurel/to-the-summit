@@ -304,8 +304,6 @@
 #define SNOW_SASTRUGI_WIND_TAU     120.0
 
 // --- İz içi AO (spec §18.5) ---
-#define SNOW_AO_RADIUS               0.10
-#define SNOW_AO_STRENGTH             1.0
 
 // --- Süspansiyon perdeleri (spec §18.7) ---
 #define SNOW_SUSP_SCALE_H            1.1

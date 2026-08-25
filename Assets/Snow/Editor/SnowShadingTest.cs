@@ -187,7 +187,6 @@ public static class SnowShadingTest
             (ForwardPath, "SNOW_MIN_VISIBLE_HEIGHT", "Karın kenarında titreme → clip eşiği yok"),
             (DetailPath, "SampleDetailSlope", "Detay normal yanlış → eğim toplamı yok"),
             (SparklePath, "log2", "Parıltı titriyor → LOD uyarlaması atlanmış"),
-            (LightingPath, "SnowHeightAO", "İz içi AO yok → izler düz görünüyor"),
             (LightingPath, "cosPhi * cosPhi", "AO cos² ortalaması değil"),
             (LightingPath, "crustMask", "Kabuk shading'i yok"),
         };
