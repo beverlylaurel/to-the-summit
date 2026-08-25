@@ -42,6 +42,11 @@ Shader "ToTheSummit/SnowfallParticle"
             #pragma vertex Vertex
             #pragma fragment Fragment
             #pragma multi_compile_fog
+            // Gölge varyantları olmadan `mainLight.shadowAttenuation` her
+            // zaman 1 döner; tane dağın gölgesinde de güneşli kalırdı.
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
+            #pragma multi_compile _ _SHADOWS_SOFT
+            #pragma multi_compile _ _LIGHT_COOKIES
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -190,13 +195,32 @@ Shader "ToTheSummit/SnowfallParticle"
                 // Smoothness 0.2, `Emissive = _FlakeEmissive * mainLightColor
                 // * 0.04` (gece lambaların altında görünsünler).
                 //
-                // AYDINLATMA QUAD'IN KENDİ NORMALİNDEN. Uydurma bir taban
-                // katsayısı yok: "Lit Quad" aydınlatılmış bir yüzey demek,
-                // yüzeyin normali de kameraya bakan düzlemin normali.
-                Light mainLight = GetMainLight();
+                // TANE BİR YÜZEY DEĞİL, SAÇICI PARÇACIK.
+                //
+                // Önce `dot(N, L)` kullanılıyordu ve N kameraya bakan quad'ın
+                // normaliydi: tane, güneş KAMERANIN ARKASINDAYKEN en parlak
+                // çıkıyordu. Gerçekte tam tersi — buz kristali ışığı ağırlıkla
+                // İLERİ saçar; kar yağışı güneşe karşı bakınca parlar, güneş
+                // arkadayken soluktur. İşaret fiilen tersti.
+                //
+                // Henyey-Greenstein faz fonksiyonu, g = 0.55 (ileri baskın).
+                // Küçük bir izotropik taban bırakılıyor: kristal tek yönde
+                // değil, her yöne biraz saçar.
+                Light mainLight = GetMainLight(TransformWorldToShadowCoord(positionWS));
 
+                float3 kameraya = normalize(_WorldSpaceCameraPos - positionWS);
+                float cosT = dot(-kameraya, mainLight.direction);
+
+                const float g = 0.55;
+                float hg = (1.0 - g * g) / pow(max(1.0 + g * g - 2.0 * g * cosT, 1e-4), 1.5);
+                half faz = (half)(0.18 + 0.42 * hg);
+
+                // GÖLGE UYGULANIYOR. Uygulanmazsa dağın gölgesindeki tane de
+                // güneşli tane kadar parlak kalıyor ve yağış gölgenin üstünde
+                // yüzen bir tabaka gibi görünüyor.
                 half3 N = (half3)forward;
-                half3 lit = SampleSH(N) + mainLight.color * saturate(dot(N, mainLight.direction));
+                half3 lit = SampleSH(N)
+                          + mainLight.color * mainLight.shadowAttenuation * faz;
                 half3 emissive = mainLight.color * _FlakeEmissive * 0.04h;
 
                 OUT.color = float4(_FlakeTint.rgb * lit + emissive, alpha);
