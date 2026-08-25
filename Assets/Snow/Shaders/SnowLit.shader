@@ -11,21 +11,15 @@ Shader "ToTheSummit/SnowLit"
         [NoScaleOffset] _SastrugiNoise ("Sastrugi gürültüsü", 2D) = "gray" {}
 
         [Header(Yuzey dokulari)]
-        [NoScaleOffset] _SnowSurfTazeColor ("Taze - renk", 2D) = "white" {}
-        [NoScaleOffset][Normal] _SnowSurfTazeNormal ("Taze - normal", 2D) = "bump" {}
-        [NoScaleOffset] _SnowSurfTazeRough ("Taze - pürüzlülük", 2D) = "gray" {}
-        [NoScaleOffset] _SnowSurfTozColor ("Toz - renk", 2D) = "white" {}
-        [NoScaleOffset][Normal] _SnowSurfTozNormal ("Toz - normal", 2D) = "bump" {}
-        [NoScaleOffset] _SnowSurfTozRough ("Toz - pürüzlülük", 2D) = "gray" {}
-        [NoScaleOffset] _SnowSurfYerlesmisColor ("Yerleşmiş - renk", 2D) = "white" {}
-        [NoScaleOffset][Normal] _SnowSurfYerlesmisNormal ("Yerleşmiş - normal", 2D) = "bump" {}
-        [NoScaleOffset] _SnowSurfYerlesmisRough ("Yerleşmiş - pürüzlülük", 2D) = "gray" {}
-        [NoScaleOffset] _SnowSurfRuzgarColor ("Rüzgâr - renk", 2D) = "white" {}
-        [NoScaleOffset][Normal] _SnowSurfRuzgarNormal ("Rüzgâr - normal", 2D) = "bump" {}
-        [NoScaleOffset] _SnowSurfRuzgarRough ("Rüzgâr - pürüzlülük", 2D) = "gray" {}
-        _SnowSurfTileMeters ("Yüzey dokusu döşeme boyu (m)", Float) = 2.5
-        _SnowSurfStrength ("Yüzey dokusu gücü", Range(0,1)) = 0.65
 
+        // YÜZEY DOKUSU MATERYALDE DEĞİL, GLOBAL.
+        //
+        // Materyal özelliği global'i EZER. Dokular hem burada özellik
+        // hem `SnowManager`'da global olarak duruyordu; materyalde kalan
+        // `_SnowSurfStrength: 3` yüzünden kar mesh'i 3 güçle, arazi 0.9
+        // güçle çiziliyordu — izin üstü doygun mavi/hardal lekeye dönmüştü.
+        // Kar nerede olursa olsun aynı maddedir; ayarının da tek sahibi
+        // olur (`SnowSettings` → `SnowManager` → global).
         _SnowBreakupScale ("Gürültü ölçeği (1/m)", Float) = 3.0
         _SnowEdgeFadeRange ("Kenar geçiş aralığı (m)", Float) = 0.006
 

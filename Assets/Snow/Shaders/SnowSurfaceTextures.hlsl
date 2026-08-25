@@ -204,7 +204,12 @@ SnowSurfaceBlend SnowSampleSurface(float3 posWS, float rhoN, float wet, float di
     // ekranda hic gorunmuyor. Sapma ortalamadan uzaklastirilarak deseni
     // gorunur kiliyor; seviye hala 1 civarinda kaliyor, yani albedonun
     // fizikten gelen buyuklugu korunuyor.
-    half3 carpan = (half)1.0 + (renk / ortalama - (half)1.0) * (half)2.5;
+    // ÇARPANA TAVAN. Kar albedosunun uzamsal değişimi gerçekte %20'yi geçmez;
+    // beyaz bir maddenin deseni renkte değil kabartıdadır. Sınır olmadan güç
+    // büyüdükçe çarpan kanal kanal ayrışıp yüzeyi doygun mavi/hardal lekeye
+    // çeviriyordu (materyal 3 güçle çizerken görüldü).
+    half3 carpan = clamp((half)1.0 + (renk / ortalama - (half)1.0) * (half)2.5,
+                         (half3)0.8, (half3)1.2);
 
     o.albedoTint  = lerp(half3(1, 1, 1), carpan, (half)_SnowSurfStrength);
     o.roughAdd    = (puru - (half)0.5) * (half)0.25 * (half)_SnowSurfStrength;

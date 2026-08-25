@@ -2112,3 +2112,28 @@ düzleştirilme payı 0.70'ten 0.55'e indirildi.
 sıkıştırmasıyla sıfıra yaklaştığı teksellerde eğim sonsuza gidiyor ve ekranda
 izole koyu mavi noktalar çıkıyor. Eğime fiziksel tavan kondu: kar 35 dereceden
 dik mikro yüzeyde durmaz (`SNOW_SURF_EGIM_TAVANI = 0.7`).
+
+---
+
+## "İzin üstü doygun mavi/hardal leke, ortasında kara sürme"
+
+**Belirti:** kar mesh'inin çizdiği iz bölgesi fotogrametri dokusunun aşırı
+doygun hâline dönüştü; arazi normal görünürken yalnız İZ bozuktu.
+
+**Gerçek sebep — materyal global'i ezmişti.** Yüzey dokusu iki yerde birden
+tanımlıydı: `SnowLit.shader`'ın `Properties` bloğunda materyal özelliği olarak
+ve `SnowManager`'da global olarak. Unity'de materyal özelliği global'i EZER.
+Materyalde eski deneme değeri kalmıştı: `_SnowSurfStrength: 3`. Arazi global'i
+(0.9) okuyordu, mesh materyaldeki 3'ü — yani aynı kar iki farklı güçle
+çiziliyordu ve izin üstünde çarpan kanal kanal ayrışıyordu.
+
+**Ayırt eden ölçüm:** materyal dosyasında `_SnowSurfStrength: 3`; global
+`Shader.GetGlobalFloat("_SnowSurfStrength") = 0.9`.
+
+**Kalıcı çözüm:** özellikler shader'dan ve materyalden tamamen silindi. Yüzey
+dokusunun tek sahibi `SnowSettings` → `SnowManager` → global zinciri. İki
+yüzeyin farklı doku/güç görmesi artık mümkün değil.
+
+**Ayrıca kondu:** albedo çarpanına [0.8, 1.2] tavanı. Beyaz bir maddenin
+uzamsal albedo değişimi %20'yi geçmez; deseni kabartı taşır. Tavan olmadan
+yanlış bir güç değeri yüzeyi yine doygun lekeye çevirebilirdi.
