@@ -756,7 +756,13 @@ public class SnowDebugWindow : EditorWindow
         //
         // Yukseklik 24 cm: yaricapi (12 cm) batmanin uzerinde tutuyor, boylece
         // kure kar sutununu delip duz taban birakmiyor.
-        go.transform.localScale = new Vector3(0.16f, 0.24f, 0.16f);
+        // İZ GÖVDESİ BOTTAN GENİŞ.
+        //
+        // 16 cm bir bot genişliği; ama taze karda ayak batınca kenar ÇÖKER ve
+        // açılan çukur bottan belirgin geniş olur. 16 cm'lik damga ekranda
+        // ince bir çizgi olarak okunuyordu (kullanıcı bildirdi: "çok dar").
+        // Ölçüldü: duran damga 0.21 × 0.19 m — yuvarlak ama küçük.
+        go.transform.localScale = new Vector3(0.30f, 0.24f, 0.30f);
 
         var rend = go.GetComponent<MeshRenderer>();
         rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;

@@ -38,7 +38,7 @@ MonoBehaviour:
   surfRuzgarNormal: {fileID: 2800000, guid: f22dd5d03bea28547b233cb6fc2664b5, type: 3}
   surfRuzgarRough: {fileID: 2800000, guid: b2f288f8adf2b0a4c878ecdcde6545d8, type: 3}
   surfTileMeters: 2.5
-  surfStrength: 0.9
+  surfStrength: 0.35
   coverSlopeThreshold: 0.25
   coverSlopeSharpness: 1.6
   coverBreakupScale: 1.8

@@ -90,7 +90,7 @@ public class SnowSettings : ScriptableObject
     [SerializeField] float surfTileMeters = 2.5f;
 
     [Tooltip("Doku katkısının gücü. 0 = eski düz renk.")]
-    [SerializeField, Range(0f, 1f)] float surfStrength = 0.9f;
+    [SerializeField, Range(0f, 1f)] float surfStrength = 0.35f;
 
     [Header("Nesne üstü kar (spec §16)")]
     [Tooltip("Bu eğimin altındaki yüzeylerde kar tutmaz.")]

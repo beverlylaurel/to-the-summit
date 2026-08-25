@@ -59,7 +59,14 @@ public class SnowTrailBodyAlign : MonoBehaviour
     [Tooltip("Gövde yüksekliğinin yumuşama süresi (s). Yakalama kare başına " +
              "bir damga basıyor; yükseklik kare kare sıçrarsa her damga farklı " +
              "derinlikte kalır ve iz satır satır dilimlenir.")]
-    [SerializeField] float heightSmoothTime = 0.09f;
+    // YÜRÜRKEN GÖVDE ZIPLAMASIN.
+    //
+    // 0.09 s'de gövde `CharacterController`'ın adım salınımını izliyordu:
+    // her adımda biraz batıp biraz çıkıyor, iz sürekli bir oluk yerine
+    // ARALIKLI KAPSÜLLER dizisi oluyordu (kullanıcı bildirdi: "bazen böyle
+    // saçma bir iz bırakıyor"). 0.25 s salınımı süzüyor, arazi eğimini
+    // yakalayacak kadar da hızlı kalıyor.
+    [SerializeField] float heightSmoothTime = 0.25f;
 
     float yaw;
     Vector3 baseLocalPos;

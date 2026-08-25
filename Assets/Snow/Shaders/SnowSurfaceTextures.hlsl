@@ -82,7 +82,12 @@ half4 SnowSurfaceWeights(float rhoN, float wet, float disturb, float3 posWS)
 /// mavi noktalar cikiyordu (olculdu: guc 1.6'da zemin lekeli). Kar yuzeyinin
 /// mikro kabartisi 45 dereceyi gecmez — kar o egimde durmaz, akar. tan(45)=1
 /// tavan, guvenlik payiyla 0.7 (35 derece).
-#define SNOW_SURF_EGIM_TAVANI 0.7
+/// 0.35 = 19 derece. Onceki deger 0.7 (35 derece) idi ve fotogrametri
+/// normallerinin SOLUCAN desenini olduğu gibi ekrana taşıyordu: `Ruzgar` ve
+/// `Yerlesmis` haritalari kivrimli oyuklarla dolu, o egimde yuzey karanlik
+/// kivrimlarla kapaniyordu (kullanici bildirdi: "bu karaltili desen nereden
+/// geliyor"). Kar yuzeyinin mikro kabartisi bu kadar dik degil.
+#define SNOW_SURF_EGIM_TAVANI 0.35
 
 half2 SnowSurfEgimKis(half2 e)
 {
@@ -186,6 +191,14 @@ SnowSurfaceBlend SnowSampleSurface(float3 posWS, float rhoN, float wet, float di
 
     if (_SnowSurfStrength <= 0.001) return o;
 
+    // MESAFEYLE KAPANIYOR. Yuzey dokusu MIKRO detay; uzakta bir pikselin
+    // icine onlarca kabarti dusuyor ve ortalama bir gurultu olarak kaliyor.
+    // Acik kalinca gorus alanindaki butun kar ayni desenle kapaniyordu.
+    float kameraMesafe = distance(posWS, _WorldSpaceCameraPos);
+    half mesafePayi = (half)(1.0 - smoothstep(SNOW_SURF_FADE_START,
+                                              SNOW_SURF_FADE_END, kameraMesafe));
+    if (mesafePayi <= 0.01h) return o;
+
     half4 w = SnowSurfaceWeights(rhoN, wet, disturb, posWS);
     float2 uv = posWS.xz / max(_SnowSurfTileMeters, 0.01);
 
@@ -280,7 +293,7 @@ SnowSurfaceBlend SnowSampleSurface(float3 posWS, float rhoN, float wet, float di
     // gürültüyle 0.55–1.45 arasında geziniyor; desen aynı kalsa bile ekranda
     // "her yerde aynı" okunmuyor.
     half makro = (half)(0.55 + SnowValueNoise(posWS.xz * 0.025) * 0.9);
-    half guc = (half)_SnowSurfStrength * makro;
+    half guc = (half)_SnowSurfStrength * makro * mesafePayi;
 
     o.albedoTint  = lerp(half3(1, 1, 1), carpan, guc);
     o.roughAdd    = (puru - (half)0.5) * (half)0.25 * guc;

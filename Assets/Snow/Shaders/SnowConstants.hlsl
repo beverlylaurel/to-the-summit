@@ -105,6 +105,11 @@
 
 /// Çukurun kendi gölgesi. Alçak güneşte yakın duvar gölgelenmezse ayak izi
 /// tümsek gibi okunuyor (ölçüldü: 17:00'de ters görünüyordu).
+/// Yuzey dokusu MIKRO detay: yakinda var, uzakta yok. Acik kalirsa gorus
+/// alanindaki butun kar ayni desenle kapaniyor.
+#define SNOW_SURF_FADE_START           8.0
+#define SNOW_SURF_FADE_END             28.0
+
 #define SNOW_RELIEF_SHADOW_STEPS       5
 #define SNOW_RELIEF_SHADOW_STRENGTH    0.85
 
