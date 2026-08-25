@@ -178,7 +178,17 @@ void KDeform(uint3 id : SV_DispatchThreadID)
     // --- İzlerin dolması (spec §10.3) ---
     // Kar yağmıyor ve rüzgâr 4 m/s altındaysa hiç dolmaz. Yoğunluk KALIR:
     // patika kar dolduktan sonra da belli olur.
-    float fillRate = _SnowfallSWERate * SNOW_FILL_GAIN;
+    // DOLMA HIZI FİZİKTEN, UYDURMA KATSAYIDAN DEĞİL.
+    //
+    // `_SnowfallSWERate` su eşdeğeri (m/s). Kar derinliğine çevirmek için
+    // ρ_su/ρ_kar ile çarpılır — taze karda (ρ≈55) bu ≈ 18. Sabit 900 idi,
+    // yani ~50 kat hızlı: iz saniyeler içinde doluyordu.
+    //
+    // Ölçüldü: 2 sn'lik yürüyüşten hemen sonra izde 2409 teksel var, 20 sn
+    // sonra 179. En derin nokta duruyor ama izin GENİŞ kısmı siliniyor;
+    // ekranda kalan şey dar bir çekirdek (kullanıcı bildirdi: "çok dar").
+    float rhoYerel = max(SnowDensity(snow.g), 1.0);
+    float fillRate = _SnowfallSWERate * (SNOW_RHO_WATER / rhoYerel);
     fillRate += max(0.0, _WindSpeed - 4.0) * SNOW_WIND_FILL;
 
     trail.r = max(0.0, trail.r - fillRate * _SnowDeltaTime);

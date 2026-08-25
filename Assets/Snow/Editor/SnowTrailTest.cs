@@ -217,7 +217,10 @@ public static class SnowTrailTest
             rig.Deform(60f, 8.33e-7f, 0f);              // i01 = 0.60, spec §17.2 tablosu
             float afterFill = rig.Trail(Center).r;
 
-            float expectedDrop = 8.33e-7f * SnowConstants.FillGain * 60f;
+            // Dolma hizi yerel yogunluktan: SWE * (ro_su / ro_kar).
+            float rhoTest = SnowConstants.RhoMin
+                          + rig.Snow(Center).g * (SnowConstants.RhoMax - SnowConstants.RhoMin);
+            float expectedDrop = 8.33e-7f * SnowConstants.FillGain(rhoTest) * 60f;
             bool fills = Mathf.Abs((beforeFill - afterFill) - expectedDrop) < expectedDrop * 0.02f;
             all &= fills;
             r.AppendLine("  [" + M(fills) + "] YAĞIŞLA doluyor      " +

@@ -1,3 +1,4 @@
+using UnityEngine;
 // ROL: kar sisteminin FİZİKSEL sabitleri. Sanatsal ayarlar burada değil,
 // SnowSettings ScriptableObject'inde (spec §0.10).
 // Çağıran: bütün kar bileşenleri; SnowConstantsTest bu değerlerin
@@ -105,8 +106,10 @@ public static class SnowConstants
 
     // --- İzlerin dolması (spec §10.3) ---
 
-    /// Yağış hızının doldurma hızına çevrilme katsayısı.
-    public const float FillGain = 900f;
+    /// SU EŞDEĞERİNDEN KAR DERİNLİĞİNE. Sabit bir katsayı yok: `ρ_su / ρ_kar`,
+    /// yani yerel yoğunluğa bağlı (taze karda ≈ 18). Bir dönem 900 yazılıydı
+    /// ve ~50 kat hızlı dolduruyordu; iz saniyeler içinde daralıyordu.
+    public static float FillGain(float rhoKar) => SnowConstants.RhoWater / Mathf.Max(rhoKar, 1f);
 
     /// 4 m/s üstündeki her m/s'nin doldurma hızına eklediği, m/s.
     public const float WindFill = 0.0012f;

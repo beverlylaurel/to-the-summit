@@ -54,7 +54,17 @@ public class SnowTrailBodyAlign : MonoBehaviour
 
     [Tooltip("Kürenin kar YÜZEYİNE göre batması (m). Küre alt noktası yüzeyin " +
              "bu kadar altına iner; oluk derinliği buradan gelir.")]
-    [SerializeField] float surfaceSink = 0.05f;
+    // OLUĞUN DERİNLİĞİNİ BU SAYI BELİRLİYOR, `SNOW_MAX_SINK` DEĞİL.
+    //
+    // 5 cm'ken yürüyen oyuncunun izi 1-5 cm kalıyordu; 20 cm'lik çukur yalnız
+    // DURDUĞU yerde oluşuyordu (küre kendi izini okuyup derinleşiyor).
+    // Ölçüldü, 4 m'lik yürüyüşten hemen sonra: 1 cm üstü 2446 teksel, 5 cm
+    // üstü yalnız 166, 12 cm üstü 134 — yani izin neredeyse tamamı birkaç
+    // santimlik bir sıyrık. Ekranda "dar ve sığ" olarak okunuyordu.
+    //
+    // 45 cm taze karda yürüyen bir insan 20-30 cm batar; 18 cm o aralığın alt
+    // ucu ve `SNOW_MAX_SINK` (22 cm) tavanının altında kalıyor.
+    [SerializeField] float surfaceSink = 0.18f;
 
     [Tooltip("Gövde yüksekliğinin yumuşama süresi (s). Yakalama kare başına " +
              "bir damga basıyor; yükseklik kare kare sıçrarsa her damga farklı " +

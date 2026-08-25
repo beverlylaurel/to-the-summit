@@ -268,7 +268,6 @@
 #define SNOW_TRAIL_EDGE_WARP_TEXELS  1.5
 
 // --- İzlerin dolması (spec §10.3) ---
-#define SNOW_FILL_GAIN             900.0
 #define SNOW_WIND_FILL               0.0012
 
 // --- Birikme, oturma, erime (spec §11) ---
