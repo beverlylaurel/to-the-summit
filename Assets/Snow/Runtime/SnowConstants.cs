@@ -58,19 +58,6 @@ public static class SnowConstants
     /// beyazlar.
     public const float EdgeFadeRange = 0.006f;
 
-    // --- Yakalama (spec §9.1, §9.4) ---
-
-    /// Yakalama kamerasının oyuncunun altına indiği mesafe, metre.
-    public const float CaptureBelow = 3f;
-
-    /// Kameranın yukarı doğru gördüğü mesafe, metre. Far plane ikisinin toplamı.
-    public const float CaptureAbove = 3f;
-
-    /// Poisson blur yarıçapı, teksel (spec §9.4). Compute'a BURADAN gidiyor;
-    /// `SnowConstants.hlsl`'deki eşi yalnız shader içi kullanım için, ikisi
-    /// birlikte değişir. Gerekçe (çapraz gidişteki basamak) hlsl tarafında.
-    public const float BlurRadiusTexels = 2.5f;
-
     // --- İz oluşumu (spec §10.1) ---
 
     /// Gevşek karın normalize yoğunluğu.
@@ -115,10 +102,11 @@ public static class SnowConstants
     public const float WindFill = 0.0012f;
 
     /// Duruş açısı gevşemesinin kare başına geçiş sayısı. Koni geçiş başına
-    /// bir teksel yayılıyor; 22 cm derin bir iz ~12 tekselde yakınsıyor, yani
-    /// dört karede yerine oturuyor. Sonuç idempotent — sayı görünümü değil
-    /// yalnız yakınsama hızını değiştiriyor.
-    public const int ReposeIterations = 3;
+    /// bir teksel yayılıyor. Duruş yüksekliği 6 cm'den 1.5 cm'ye indirilince
+    /// omuz 0.5 tekselden 3 tekselden geniş bir yamaca döndü; 3 geçiş omzun
+    /// tam eninde kalıyordu ve yürürken kenar arkada kalıyordu. Sonuç
+    /// idempotent — sayı görünümü değil yalnız yakınsama hızını değiştiriyor.
+    public const int ReposeIterations = 6;
 
     // --- Birikme, oturma, erime (spec §11) ---
 

@@ -60,6 +60,24 @@ float SnowDentAt(float2 uv)
     return max(0.0, trail.r) * SnowInsideMask(uv);
 }
 
+/// GÖLGELEME YÜKSEKLİĞİ — sırt DAHİL. İşaretli: + aşağı, − yukarı.
+///
+/// `trail.g` karın yukarı itilmiş kısmı: oluğun iki yanındaki kabarma
+/// (ölçüldü, enine kesit: oluk 204 mm derin, yanında 40 mm sırt). Bu kabarma
+/// HESAPLANIYOR ama hiç çizilmiyordu; ekranda oluk düz kardan tek bir çizgiyle
+/// ayrılıyordu (kullanıcı bildirdi: "geçiş çok keskin, yapay duruyor").
+///
+/// SIRT YALNIZ GÖLGELEMEYE GİRİYOR, IŞIN YÜRÜYÜŞÜNE DEĞİL. Işın alanından
+/// çıkarıldığında sırt tam omuzun üstüne düşüp omuzu siliyordu; ölçüldü,
+/// `r − g`'nin genişliği 19 tekselden 12'ye çöküyordu. Işın `trail.r`'ı
+/// yürüyor (oluğun eni sabit), normal ve iz-içi gölge `r − g`'yi okuyor
+/// (dudak görünüyor).
+float SnowShadeHeightAt(float2 uv)
+{
+    float4 trail = SAMPLE_TEXTURE2D_LOD(_SnowTrailTex, sampler_LinearClamp, saturate(uv), 0);
+    return (trail.r - trail.g) * SnowInsideMask(uv);
+}
+
 /// YUMUŞATILMIŞ DERİNLİK — GÖRÜNTÜ İÇİN.
 ///
 /// Yakalama tekseli 2.3 cm ve oyma alanının kenarı bir tekselde bitiyor:
@@ -85,17 +103,17 @@ float SnowDentSmooth(float2 uv)
 {
     float2 b = SNOW_CARVE_SMOOTH_TEXELS / _SnowResolution;
 
-    float d = SnowDentAt(uv) * 0.25;
+    float d = SnowShadeHeightAt(uv) * 0.25;
 
-    d += SnowDentAt(uv + float2( b.x, 0.0)) * 0.125;
-    d += SnowDentAt(uv + float2(-b.x, 0.0)) * 0.125;
-    d += SnowDentAt(uv + float2( 0.0,  b.y)) * 0.125;
-    d += SnowDentAt(uv + float2( 0.0, -b.y)) * 0.125;
+    d += SnowShadeHeightAt(uv + float2( b.x, 0.0)) * 0.125;
+    d += SnowShadeHeightAt(uv + float2(-b.x, 0.0)) * 0.125;
+    d += SnowShadeHeightAt(uv + float2( 0.0,  b.y)) * 0.125;
+    d += SnowShadeHeightAt(uv + float2( 0.0, -b.y)) * 0.125;
 
-    d += SnowDentAt(uv + float2( b.x,  b.y)) * 0.0625;
-    d += SnowDentAt(uv + float2(-b.x,  b.y)) * 0.0625;
-    d += SnowDentAt(uv + float2( b.x, -b.y)) * 0.0625;
-    d += SnowDentAt(uv + float2(-b.x, -b.y)) * 0.0625;
+    d += SnowShadeHeightAt(uv + float2( b.x,  b.y)) * 0.0625;
+    d += SnowShadeHeightAt(uv + float2(-b.x,  b.y)) * 0.0625;
+    d += SnowShadeHeightAt(uv + float2( b.x, -b.y)) * 0.0625;
+    d += SnowShadeHeightAt(uv + float2(-b.x, -b.y)) * 0.0625;
 
     return d;
 }

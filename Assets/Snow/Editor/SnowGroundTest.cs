@@ -303,7 +303,7 @@ public static class SnowGroundTest
         {
             UnityEditor.SerializedObject so = new(manager);
 
-            string[] required = { "settings", "simCompute", "captureShader", "skyShader",
+            string[] required = { "settings", "simCompute", "skyShader",
                                   "groundHeight", "environmentSource", "followTarget",
                                   "detailNormal" };
 

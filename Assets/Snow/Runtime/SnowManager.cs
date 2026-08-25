@@ -40,9 +40,6 @@ public class SnowManager : MonoBehaviour
     [Tooltip("Süspansiyon perdeleri. Boş bırakılırsa çizilmez.")]
     [SerializeField] ComputeShader simCompute;
 
-    [Tooltip("Hidden/Snow/CaptureDepth — deformer'ların alt yüzeyini yazar.")]
-    [SerializeField] Shader captureShader;
-
     [Tooltip("Hidden/Snow/SkyDepth — kar yağışını engelleyen geometriyi yazar.")]
     [SerializeField] Shader skyShader;
 
@@ -70,14 +67,6 @@ public class SnowManager : MonoBehaviour
 
     ISnowEnvironmentSource env;
 
-    RenderTexture capture, captureBlur;
-
-    // ASSUMPTION: spec §6.2 tablosunda derinlik dokusu yok, ama §9.2 `ZWrite On`
-    // + `ZTest LEqual` istiyor — en alçak yüzeyin kazanması derinlik tamponu
-    // olmadan çözülemez. Renk kanallarında min alma (BlendOp Min) işe yaramaz:
-    // R'nin en küçüğü ile GB'nin en küçüğü FARKLI fragmanlardan gelir ve hız
-    // yanlış tekselle eşleşir. Bedeli 4 MB.
-    RenderTexture captureDepth;
     RenderTexture trail, trailTemp;
     RenderTexture snow, snowTemp;
     RenderTexture skyVis;
@@ -94,16 +83,29 @@ public class SnowManager : MonoBehaviour
     /// okunuyor; tam çözünürlükte okumak 8 MB'lık bir transfer olurdu.
     RenderTexture reduced;
 
-    Material captureMaterial;
     Material skyMaterial;
 
-    readonly SnowCaptureCamera captureCamera = new();
+    /// İZ PARÇALARI. Her deformer bu kare içinde bir doğru parçası süpürüyor;
+    /// tampon kare başına doldurulup `KDeform`'a bağlanıyor.
+    ///
+    /// Parça başına İKİ `float4`, stride 16 B. Yapı kullanılırsa tamponun
+    /// stride'ı (32) ile `Vector4[]` eleman boyu (16) ayrışıyor ve `SetData`'nın
+    /// eleman sayımı sessizce yanlış oluyor.
+    const int TrailSegmentStride = 16;
+
+    /// Aynı anda karda iz bırakan nesne sayısı için tavan. `SnowDeformerRegistry`
+    /// daha fazlasını tutabilir; bölge dışındakiler zaten eleniyor.
+    const int MaxTrailSegments = 16;
+
+    ComputeBuffer trailSegmentBuffer;
+    readonly Vector4[] trailSegmentData = new Vector4[MaxTrailSegments * 2];
+    int trailSegmentCount;
+
     readonly SnowSkyCamera skyCamera = new();
     readonly SnowfallController snowfall = new();
 
     int clearKernel = -1;
     int scrollKernel = -1;
-    int blurCaptureKernel = -1;
     int deformKernel = -1;
     int reposeKernel = -1;
     int rimBlurHKernel = -1;
@@ -183,12 +185,9 @@ public class SnowManager : MonoBehaviour
     public float SnowFraction01 { get; set; } = 1f;
     public SnowGroundHeight GroundHeight => groundHeight;
 
-    /// Bu karede bölgede deformer var mıydı. Yoksa yakalama, blur ve (sonraki
-    /// fazlarda) KDeform/KRim atlanıyor (spec §15.2).
-    public bool CaptureActive { get; private set; }
-
-    public RenderTexture CaptureTexture => capture;
-    public RenderTexture CaptureBlurTexture => captureBlur;
+    /// Bu karede bölgede iz bırakan bir nesne var mıydı. Yoksa KDeform ve
+    /// KRim atlanıyor (spec §15.2).
+    public bool CaptureActive => trailSegmentCount > 0;
     public RenderTexture TrailTexture => trail;
     public RenderTexture SnowTexture => snow;
     public RenderTexture SkyVisTexture => skyVis;
@@ -212,8 +211,6 @@ public class SnowManager : MonoBehaviour
             throw new System.InvalidOperationException($"{nameof(SnowManager)}: takip hedefi atanmadı.");
         if (groundHeight == null)
             throw new System.InvalidOperationException($"{nameof(SnowManager)}: {nameof(groundHeight)} atanmadı.");
-        if (captureShader == null)
-            throw new System.InvalidOperationException($"{nameof(SnowManager)}: {nameof(captureShader)} atanmadı.");
         if (skyShader == null)
             throw new System.InvalidOperationException($"{nameof(SnowManager)}: {nameof(skyShader)} atanmadı.");
 
@@ -230,9 +227,6 @@ public class SnowManager : MonoBehaviour
         }
 
         SnowQualityData q = settings.QualityData;
-
-        capture = Create("RT_Capture", q.Resolution, RenderTextureFormat.ARGBHalf);
-        captureBlur = Create("RT_CaptureBlur", q.Resolution, RenderTextureFormat.ARGBHalf);
 
         // RT_Trail ARGBHalf: B (kabuk) ve A (sastrugi) Faz 11–12'de doluyor ama doku
         // BAŞTAN dört kanallı açılıyor. Sonradan format değiştirmek bütün kernel'leri
@@ -257,9 +251,8 @@ public class SnowManager : MonoBehaviour
 
         // ASSUMPTION: RT_SnowTemp spec §6.2 tablosunda yok ama KScroll komşu teksel
         // okuyor ve §20 "komşu okuyan pass'lerde ping-pong" diyor — RT_Snow'un da
-        // kendi tamponuna ihtiyacı var. Başka bir dokuyu ödünç almak (örn.
-        // RT_CaptureBlur) format aynı olsa bile o dokunun içeriğini siler.
-        // Bedeli 8 MB.
+        // kendi tamponuna ihtiyacı var. Başka bir dokuyu ödünç almak format aynı
+        // olsa bile o dokunun içeriğini siler. Bedeli 8 MB.
         // Formatı RT_Snow ile AYNI olmak zorunda: `CopyTexture` ikisi arasında
         // şerit kopyalıyor ve format ayrışırsa kopya sessizce düşer.
         snowTemp = Create("RT_SnowTemp", q.Resolution, RenderTextureFormat.ARGBFloat);
@@ -283,17 +276,14 @@ public class SnowManager : MonoBehaviour
 
         rimBlur = Create("RT_RimBlur", q.Resolution, RenderTextureFormat.RHalf);
 
-        captureDepth = CreateDepth("RT_CaptureDepth", q.Resolution);
         skyDepth = CreateDepth("RT_SkyDepth", q.SkyResolution);
 
         reduced = Create("RT_SnowReduced", ReducedResolution, RenderTextureFormat.ARGBFloat);
 
-        captureMaterial = new Material(captureShader) { hideFlags = HideFlags.HideAndDontSave };
         skyMaterial = new Material(skyShader) { hideFlags = HideFlags.HideAndDontSave };
 
         clearKernel = simCompute.FindKernel("KClear");
         scrollKernel = simCompute.FindKernel("KScroll");
-        blurCaptureKernel = simCompute.FindKernel("KBlurCapture");
         deformKernel = simCompute.FindKernel("KDeform");
         reposeKernel = simCompute.FindKernel("KRepose");
         rimBlurHKernel = simCompute.FindKernel("KRimBlurH");
@@ -340,12 +330,12 @@ public class SnowManager : MonoBehaviour
 
         SnowRuntimeState.Reset();
 
-        CaptureActive = false;
+        trailSegmentCount = 0;
 
-        if (captureMaterial != null)
+        if (trailSegmentBuffer != null)
         {
-            DestroyImmediate(captureMaterial);
-            captureMaterial = null;
+            trailSegmentBuffer.Release();
+            trailSegmentBuffer = null;
         }
 
         if (skyMaterial != null)
@@ -356,9 +346,6 @@ public class SnowManager : MonoBehaviour
 
         snowfall.Reset();
 
-        Release(ref capture);
-        Release(ref captureBlur);
-        Release(ref captureDepth);
         Release(ref trail);
         Release(ref trailTemp);
         Release(ref snow);
@@ -598,8 +585,8 @@ public class SnowManager : MonoBehaviour
     // ------------------------------------------------------------------ dispatch
 
     /// SnowRenderPass tek CommandBuffer içinde çağırıyor (spec §15.2).
-    /// `restoreView` / `restoreProj`: yakalama kendi ortografik matrisini
-    /// yazdıktan sonra kameranınkini geri koyar.
+    /// `restoreView` / `restoreProj`: gökyüzü yakalaması kendi ortografik
+    /// matrisini yazdıktan sonra kameranınkini geri koyar.
     public void Dispatch(CommandBuffer cmd, Matrix4x4 restoreView, Matrix4x4 restoreProj)
     {
         if (!IsReady) return;
@@ -649,9 +636,6 @@ public class SnowManager : MonoBehaviour
             ClearTo(cmd, snow, groups, WorldSnowValue);
             ClearTo(cmd, trail, groups, Vector4.zero);
             ClearTo(cmd, trailTemp, groups, Vector4.zero);
-
-            ClearTo(cmd, capture, groups, Vector4.zero);
-            ClearTo(cmd, captureBlur, groups, Vector4.zero);
 
             pendingClear = false;
         }
@@ -705,7 +689,7 @@ public class SnowManager : MonoBehaviour
                                  WorldRhoN >= 0f ? WorldRhoN : settings.DefaultRhoN);
 
         cmd.BeginSample(SnowProfiler.MarkerNames[1]);
-        DispatchCapture(cmd, groups, restoreView, restoreProj);
+        BuildTrailSegments(cmd);
         cmd.EndSample(SnowProfiler.MarkerNames[1]);
 
         cmd.BeginSample(SnowProfiler.MarkerNames[2]);
@@ -762,7 +746,7 @@ public class SnowManager : MonoBehaviour
         // ZEMİN DOKUSU ELLE BAĞLANIYOR. `Shader.SetGlobalTexture` compute
         // kernel'ine ulaşmıyor (bu projede ölçüldü, `DECISIONS.md`).
         cmd.SetComputeTextureParam(simCompute, deformKernel, SnowShaderIDs.GroundHeightTex, ground);
-        cmd.SetComputeTextureParam(simCompute, deformKernel, SnowShaderIDs.CaptureBlur, captureBlur);
+        cmd.SetComputeBufferParam(simCompute, deformKernel, SnowShaderIDs.TrailSegments, trailSegmentBuffer);
         cmd.SetComputeTextureParam(simCompute, deformKernel, SnowShaderIDs.Trail, trail);
         cmd.SetComputeTextureParam(simCompute, deformKernel, SnowShaderIDs.TrailOut, trailTemp);
         cmd.SetComputeTextureParam(simCompute, deformKernel, SnowShaderIDs.Snow, snow);
@@ -799,7 +783,6 @@ public class SnowManager : MonoBehaviour
         // --- KRim: blur(carve) − carve ---
         cmd.SetComputeTextureParam(simCompute, rimKernel, SnowShaderIDs.Trail, trail);
         cmd.SetComputeTextureParam(simCompute, rimKernel, SnowShaderIDs.Snow, snow);
-        cmd.SetComputeTextureParam(simCompute, rimKernel, SnowShaderIDs.CaptureBlur, captureBlur);
         cmd.SetComputeTextureParam(simCompute, rimKernel, SnowShaderIDs.BlurredCarve, rimBlur);
         cmd.SetComputeTextureParam(simCompute, rimKernel, SnowShaderIDs.TrailOut, trailTemp);
         cmd.DispatchCompute(simCompute, rimKernel, groups, groups, 1);
@@ -1106,26 +1089,56 @@ public class SnowManager : MonoBehaviour
         coverageMeasured = true;
     }
 
-    // ------------------------------------------------------------------ yakalama
+    // ------------------------------------------------------------ iz parçaları
 
-    void DispatchCapture(CommandBuffer cmd, int groups, Matrix4x4 restoreView, Matrix4x4 restoreProj)
+    /// BÖLGEDEKİ DEFORMER'LARIN BU KARE SÜPÜRDÜĞÜ DOĞRU PARÇALARI.
+    ///
+    /// Yakalama kamerası, override materyali ve blur zincirinin yerini bu
+    /// tampon aldı. Parça başına 32 bayt; tipik sahnede bir tane.
+    ///
+    /// ELEME KUTUSU PARÇANIN KENDİSİNDEN: nesnenin `Renderer.bounds`'u yok
+    /// artık, sınır küreden türüyor. Bölgeye değmeyen parça yazılmıyor.
+    void BuildTrailSegments(CommandBuffer cmd)
     {
-        float areaSize = settings.QualityData.AreaSize;
-        float observerY = followTarget.position.y;
+        trailSegmentCount = 0;
 
-        // KAR YOKSA HİÇ İŞ YOK. Bölgede deformer yoksa ne çizim ne blur olur;
-        // sonraki fazlarda KDeform ve KRim de bu bayrağa bakacak (spec §15.2).
-        CaptureActive = SnowCaptureCamera.HasWork(AreaCenter, areaSize, observerY);
-        if (!CaptureActive) return;
+        Vector2 center = AreaCenter;
+        float half = settings.QualityData.AreaSize * 0.5f;
 
-        captureCamera.Record(cmd, capture, captureDepth, captureMaterial,
-                             AreaCenter, areaSize, observerY, restoreView, restoreProj);
+        for (int i = 0; i < SnowDeformerRegistry.Count && trailSegmentCount < MaxTrailSegments; i++)
+        {
+            SnowDeformer d = SnowDeformerRegistry.Get(i);
+            if (d == null) continue;
 
-        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.BlurRadiusTexels,
-                                 SnowConstants.BlurRadiusTexels);
-        cmd.SetComputeTextureParam(simCompute, blurCaptureKernel, SnowShaderIDs.Src, capture);
-        cmd.SetComputeTextureParam(simCompute, blurCaptureKernel, SnowShaderIDs.Dst, captureBlur);
-        cmd.DispatchCompute(simCompute, blurCaptureKernel, groups, groups, 1);
+            Vector3 a = d.SegmentA;
+            Vector3 b = d.SegmentB;
+            float r = d.Radius;
+
+            // Parçanın XZ sınır kutusu bölgeyle kesişmiyorsa hiç yazma.
+            float minX = Mathf.Min(a.x, b.x) - r, maxX = Mathf.Max(a.x, b.x) + r;
+            float minZ = Mathf.Min(a.z, b.z) - r, maxZ = Mathf.Max(a.z, b.z) + r;
+
+            if (maxX < center.x - half || minX > center.x + half) continue;
+            if (maxZ < center.y - half || minZ > center.y + half) continue;
+
+            int slot = trailSegmentCount * 2;
+            trailSegmentData[slot]     = new Vector4(a.x, a.y, a.z, r);
+            trailSegmentData[slot + 1] = new Vector4(b.x, b.y, b.z, 0f);
+
+            trailSegmentCount++;
+
+            // Sırt asimetrisi tek hızdan türüyor; birden çok deformer varsa
+            // sonuncusununki kalır. Sırt zaten ikinci mertebe bir süsleme.
+            cmd.SetComputeVectorParam(simCompute, SnowShaderIDs.TrailVelocityXZ,
+                                      new Vector4(d.VelocityXZ.x, d.VelocityXZ.y, 0f, 0f));
+        }
+
+        if (trailSegmentCount == 0) return;
+
+        trailSegmentBuffer ??= new ComputeBuffer(MaxTrailSegments * 2, TrailSegmentStride);
+        trailSegmentBuffer.SetData(trailSegmentData, 0, 0, trailSegmentCount * 2);
+
+        cmd.SetComputeIntParam(simCompute, SnowShaderIDs.TrailSegmentCount, trailSegmentCount);
     }
 
     void ClearTo(CommandBuffer cmd, RenderTexture target, int groups, Vector4 value)

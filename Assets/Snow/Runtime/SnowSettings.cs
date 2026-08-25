@@ -89,30 +89,6 @@ public class SnowSettings : ScriptableObject
     [Tooltip("Bir döşemenin kapladığı metre.")]
     [SerializeField] float surfTileMeters = 2.5f;
 
-    [Header("İz gövdesi")]
-
-    // BU ÜÇ SAYI SAHNEDE DURMUYOR, BURADA DURUYOR.
-    //
-    // Sahne bileşeninin alanıydılar ve bir kez şu tuzağa düşüldü: sahne
-    // dosyası Unity açıkken dışarıdan düzenlendi, Unity bellekteki kopyayı
-    // okumaya devam etti, Play ESKİ değerlerle çalıştı. İki turluk düzeltme
-    // ekrana hiç ulaşmadı ve "hâlâ aynı" olarak geri döndü.
-    //
-    // Asset'te tek sahip var; `SnowTrailBodyAlign` her açılışta buradan
-    // okuyor, sahnedeki değer artık hiçbir şey ifade etmiyor.
-
-    [Tooltip("İz gövdesinin çapı (m). Bot 10-12 cm ama taze karda kenar " +
-             "çökeceği için açılan çukur daha geniş olur.")]
-    [SerializeField] float trailBodyDiameter = 0.30f;
-
-    [Tooltip("Gövdenin kar YÜZEYİNE göre batması (m). Oluğun derinliği " +
-             "buradan geliyor; `SNOW_MAX_SINK` yalnız tavan.")]
-    [SerializeField] float trailBodySink = 0.18f;
-
-    [Tooltip("Gövde yüksekliğinin yumuşama süresi (s). Kısa olursa gövde " +
-             "adım salınımını izler ve iz aralıklı kapsüllere döner.")]
-    [SerializeField] float trailBodySmoothTime = 0.25f;
-
     [Tooltip("Doku katkısının gücü. 0 = eski düz renk.")]
     [SerializeField, Range(0f, 1f)] float surfStrength = 0.35f;
 
@@ -201,9 +177,6 @@ public class SnowSettings : ScriptableObject
     public Texture2D SurfRuzgarRough => surfRuzgarRough;
     public float SurfTileMeters => surfTileMeters;
 
-    public float TrailBodyDiameter => trailBodyDiameter;
-    public float TrailBodySink => trailBodySink;
-    public float TrailBodySmoothTime => trailBodySmoothTime;
     public float SurfStrength => surfStrength;
 
     public float CoverSlopeThreshold => coverSlopeThreshold;

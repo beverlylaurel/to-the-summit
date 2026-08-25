@@ -25,7 +25,7 @@ public static class SnowAutoWire
     /// (karakterin ayak kemiği, ateşin ısı kaynağı) burada YOK.
     static readonly string[] Required =
     {
-        "settings", "simCompute", "captureShader", "skyShader",
+        "settings", "simCompute", "skyShader",
         "groundHeight", "environmentSource", "followTarget", "detailNormal",
     };
 

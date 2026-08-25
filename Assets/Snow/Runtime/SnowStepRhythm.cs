@@ -15,14 +15,12 @@ using UnityEngine;
 ///
 /// Eskiden ayak proxy'lerini yarım sinüsle kaldırıp indiriyordu. Tek gövdeye
 /// geçilince bu anlamını yitirdi — "havadaki ayak" yok — ve zararlı hâle geldi:
-/// `SnowTrailBodyAlign` gövdeyi kar yüzeyine oturturken bu bileşen aynı
-/// `localPosition.y`'yi eziyordu. İki yazar çakışınca gövde yüksekliği kare
-/// kare salınıyor, oluk derinliği testere dişine dönüyordu (ölçüldü: beklenen
-/// localY 0.27, gerçekleşen 0.402 → 0.556). Üstüne `baseLeftY` her `OnEnable`'da
-/// öteki bileşenin çıktısını taban sanıp ofseti biriktiriyordu.
+/// gövdenin `localPosition.y`'sini başka bir bileşenle birlikte eziyordu. İki
+/// yazar çakışınca gövde yüksekliği kare kare salınıyor, oluk derinliği testere
+/// dişine dönüyordu (ölçüldü: beklenen localY 0.27, gerçekleşen 0.402 → 0.556).
 ///
-/// Gövdenin yüksekliğinin TEK sahibi `SnowTrailBodyAlign`; adım hissi oradaki
-/// adım başına sapmadan geliyor.
+/// Artık gövdenin yüksekliği ize HİÇ girmiyor: batma derinliğini kar söylüyor
+/// (`KDeform`, taşıma gücü).
 ///
 /// KAR SİSTEMİ BUNU BİLMİYOR. Ayak izi, ses ve toz bulutu bu olaya ABONE
 /// oluyor; buradan kimse çağrılmıyor.
@@ -49,10 +47,7 @@ public class SnowStepRhythm : MonoBehaviour
     /// Teşhis: şu an hangi ayak yerde (0 = sol, 1 = sağ).
     public int PlantedFoot { get; private set; }
 
-    /// Atılan toplam adım sayısı. İz gövdesi buradan adım adım sapma
-    /// türetiyor (`SnowTrailBodyAlign`); `PlantedFoot` iki değer arasında
-    /// gidip geldiği için sapma kaynağı olarak kullanılamıyor — desen
-    /// tekrar ederdi.
+    /// Atılan toplam adım sayısı. Ses ve toz bulutu buna abone.
     public int StepCount { get; private set; }
 
     /// Teşhis: yatay hız (m/s).

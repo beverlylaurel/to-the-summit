@@ -167,6 +167,33 @@ public class SnowSampler : MonoBehaviour
         return true;
     }
 
+    /// İZSİZ DÜNYANIN KAR SÜTUNU (m). ANLIK — geri okuma yok.
+    ///
+    /// İz gövdesinin oturma yüksekliği bunu okuyor. Doku örneğini (`BaseHeight`)
+    /// okusaydı KAPALI DÖNGÜ kurulurdu: gövde bastıkça yoğunluk artıyor,
+    /// `baseHeight = SWE×1000/ρ` düşüyor, gövde iniyor, daha çok oyuyor.
+    /// Arada 30 karede bir tazelenen asenkron geri okuma var, yani döngü
+    /// gecikmeli — sonuç osilatör.
+    ///
+    /// Ölçüldü: gövdenin yerel Y'si yürürken 10 mm ile 30 mm arasında düzenli
+    /// salınıyor ve izin genişliği onunla birlikte 21 tekselden 13'e inip
+    /// çıkıyor (`SYMPTOMS.md`).
+    ///
+    /// Dünya değeri yalnız yağış ve oturmayla değişiyor; gövdenin yazdığı
+    /// hiçbir şey buraya geri dönmüyor.
+    public float WorldColumnHeight
+    {
+        get
+        {
+            if (manager == null || manager.WorldSwe < 0f) return 0f;
+
+            float rho = Mathf.Lerp(SnowConstants.RhoMin, SnowConstants.RhoMax,
+                                   Mathf.Clamp01(manager.WorldRhoN));
+
+            return manager.WorldSwe * SnowConstants.RhoWater / Mathf.Max(rho, 1f);
+        }
+    }
+
     /// Doku değerlerinden oyun tarafının gördüğü hâle. Saf fonksiyon:
     /// Play'e girmeden sınanabiliyor.
     public static SnowSample Decode(Color snow, Color trail)

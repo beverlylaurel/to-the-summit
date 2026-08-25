@@ -277,7 +277,7 @@ public static class SnowTrailTest
     // ------------------------------------------------------------------- düzenek
 
     /// Kernel'leri ÜRETİMDEKİ SIRAYLA koşturan düzenek: yakalama →
-    /// KBlurCapture → KDeform → KRimBlurH → KRimBlurV → KRim. Ayrı bir sıra
+    /// KDeform → KRimBlurH → KRimBlurV → KRim. Ayrı bir sıra
     /// yazılsaydı sınama üretimi değil kendini doğrulardı.
     sealed class Rig
     {
@@ -285,12 +285,15 @@ public static class SnowTrailTest
         readonly int res;
         readonly float areaSize;
         readonly Vector2 center;
-        readonly float observerY;
 
-        readonly int kClear, kBlurCapture, kDeform, kBlurH, kBlurV, kRim;
+        readonly int kClear, kDeform, kBlurH, kBlurV, kRim;
         readonly int groups;
 
-        RenderTexture trail, trailTemp, snow, snowTemp, captureRaw, capture, rimBlur;
+        RenderTexture trail, trailTemp, snow, snowTemp, rimBlur;
+
+        /// İZ PARÇASI TAMPONU — üretimdekiyle aynı düzen.
+        ComputeBuffer segments;
+        readonly Vector4[] segmentData = new Vector4[2];
         readonly Texture2D ground;
         readonly Texture2D readOne;
 
@@ -301,10 +304,8 @@ public static class SnowTrailTest
             this.res = res;
             this.areaSize = areaSize;
             this.center = center;
-            this.observerY = observerY;
 
             kClear = sim.FindKernel("KClear");
-            kBlurCapture = sim.FindKernel("KBlurCapture");
             kDeform = sim.FindKernel("KDeform");
             kBlurH = sim.FindKernel("KRimBlurH");
             kBlurV = sim.FindKernel("KRimBlurV");
@@ -315,8 +316,7 @@ public static class SnowTrailTest
             trailTemp = Rt(res, RenderTextureFormat.ARGBHalf);
             snow = Rt(res, RenderTextureFormat.ARGBHalf);
             snowTemp = Rt(res, RenderTextureFormat.ARGBHalf);
-            captureRaw = Rt(res, RenderTextureFormat.ARGBHalf);
-            capture = Rt(res, RenderTextureFormat.ARGBHalf);
+            segments = new ComputeBuffer(2, 16);
             rimBlur = Rt(res, RenderTextureFormat.RHalf);
 
             readOne = new Texture2D(1, 1, TextureFormat.RGBAFloat, false, true)
@@ -349,7 +349,6 @@ public static class SnowTrailTest
                 new Vector4(areaSize * 2f, areaSize * 2f, 0f, 0f));
             Shader.SetGlobalFloat(SnowShaderIDs.GroundBaseY, groundY - 1f);
             Shader.SetGlobalFloat(SnowShaderIDs.GroundHeightRange, 2f);
-            Shader.SetGlobalFloat(SnowShaderIDs.SnowCaptureOriginY, observerY);
         }
 
         static RenderTexture Rt(int res, RenderTextureFormat format)
@@ -378,49 +377,25 @@ public static class SnowTrailTest
         public void ResetSnow(float swe, float rhoN) => Clear(snow, new Vector4(swe, rhoN, 0f, 0f));
         public void ClearTrail() => Clear(trail, Vector4.zero);
 
-        public void ClearCapture()
-        {
-            Clear(captureRaw, new Vector4(-9999f, 0f, 0f, 0f));
-            BlurCapture();
-        }
+        /// Bu karede iz bırakan bir şey yok.
+        public void ClearCapture() => sim.SetInt(SnowShaderIDs.TrailSegmentCount, 0);
 
-        /// Yakalama dokusuna dairesel bir alt yüzey basar, sonra ÜRETİMDEKİ
-        /// gibi KBlurCapture'dan geçirir.
+        /// TEK BİR KÜRENİN BU KAREKİ İZ PARÇASI.
+        ///
+        /// `surfaceY` artık kullanılmıyor: batma derinliğini kar söylüyor,
+        /// nesnenin yüksekliği değil. İmza korunuyor ki mevcut sınamalar
+        /// olduğu gibi çalışsın.
         public void Stamp(Vector2 worldXZ, float diameter, float surfaceY, Vector2 velocity)
         {
-            var tex = new Texture2D(res, res, TextureFormat.RGBAFloat, false, true);
-            var px = new Color[res * res];
+            segmentData[0] = new Vector4(worldXZ.x, 0f, worldXZ.y, diameter * 0.5f);
+            segmentData[1] = new Vector4(worldXZ.x, 0f, worldXZ.y, 0f);
 
-            float encoded = surfaceY - observerY;
-            float radiusTexels = diameter * 0.5f / (areaSize / res);
+            segments.SetData(segmentData);
 
-            Vector2 c = WorldToTexel(worldXZ);
-            var empty = new Color(-9999f, 0f, 0f, 0f);
-            var hit = new Color(encoded, velocity.x, velocity.y, 1f);
-
-            for (int y = 0; y < res; y++)
-            for (int x = 0; x < res; x++)
-            {
-                float dx = x + 0.5f - c.x;
-                float dy = y + 0.5f - c.y;
-                px[y * res + x] = dx * dx + dy * dy <= radiusTexels * radiusTexels ? hit : empty;
-            }
-
-            tex.SetPixels(px);
-            tex.Apply(false, false);
-            Graphics.Blit(tex, captureRaw);
-            Object.DestroyImmediate(tex);
-
-            BlurCapture();
-        }
-
-        void BlurCapture()
-        {
-            sim.SetInt(SnowShaderIDs.Resolution, res);
-            sim.SetFloat(SnowShaderIDs.BlurRadiusTexels, SnowConstants.BlurRadiusTexels);
-            sim.SetTexture(kBlurCapture, SnowShaderIDs.Src, captureRaw);
-            sim.SetTexture(kBlurCapture, SnowShaderIDs.Dst, capture);
-            sim.Dispatch(kBlurCapture, groups, groups, 1);
+            sim.SetBuffer(kDeform, SnowShaderIDs.TrailSegments, segments);
+            sim.SetInt(SnowShaderIDs.TrailSegmentCount, 1);
+            sim.SetVector(SnowShaderIDs.TrailVelocityXZ,
+                          new Vector4(velocity.x, velocity.y, 0f, 0f));
         }
 
         public void Deform(float dt, float snowfallSweRate, float windSpeed)
@@ -432,7 +407,6 @@ public static class SnowTrailTest
             sim.SetFloat(SnowShaderIDs.SnowfallSWERate, snowfallSweRate);
 
             sim.SetTexture(kDeform, SnowShaderIDs.GroundHeightTex, ground);
-            sim.SetTexture(kDeform, SnowShaderIDs.CaptureBlur, capture);
             sim.SetTexture(kDeform, SnowShaderIDs.Trail, trail);
             sim.SetTexture(kDeform, SnowShaderIDs.TrailOut, trailTemp);
             sim.SetTexture(kDeform, SnowShaderIDs.Snow, snow);
@@ -458,7 +432,6 @@ public static class SnowTrailTest
 
             sim.SetTexture(kRim, SnowShaderIDs.Trail, trail);
             sim.SetTexture(kRim, SnowShaderIDs.Snow, snow);
-            sim.SetTexture(kRim, SnowShaderIDs.CaptureBlur, capture);
             sim.SetTexture(kRim, SnowShaderIDs.BlurredCarve, rimBlur);
             sim.SetTexture(kRim, SnowShaderIDs.TrailOut, trailTemp);
             sim.Dispatch(kRim, groups, groups, 1);
@@ -567,7 +540,9 @@ public static class SnowTrailTest
         {
             Rel(ref trail); Rel(ref trailTemp);
             Rel(ref snow); Rel(ref snowTemp);
-            Rel(ref captureRaw); Rel(ref capture); Rel(ref rimBlur);
+            Rel(ref rimBlur);
+            segments?.Release();
+            segments = null;
 
             Object.DestroyImmediate(ground);
             Object.DestroyImmediate(readOne);

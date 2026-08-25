@@ -10,42 +10,11 @@ aşağıda ayrı listelenir — "şu an neyi bekliyoruz" sorusunun cevabı büt�
 alınabilsin diye. **Yeni kayıt bu üç türden birine giriyorsa aynı adımda buraya da yazılır;
 iş bitince buradan silinir.**
 
-## İzin kenar kabarması (sırt) çizilmiyor — bekleyen
+## İz gövdesi damgalar arası yolu SÜPÜRMÜYOR — KAPANDI (2026-08-25)
 
-**Karar.** `trail.g` hesaplanmaya devam ediyor ama relief yolunda çizilmiyor.
-
-**Gerekçe.** Sırt karın YUKARI itilmiş kısmı, çukurun derinliğinden çıkarılacak
-bir şey değil. Çıkarıldığında izin omzunu siliyordu (ölçüm `SYMPTOMS.md`).
-Doğru yeri yüzey yüksekliğine POZİTİF katkı; relief ışını bugün yalnız aşağı
-inen bir yükseklik alanı tarıyor, artı yönü taşıyamıyor.
-
-**Tetikleyici — geri dönülecek belirti:** izin kenarında kabarma olmadığı için
-iz "kesilmiş" görünüyorsa.
-
-**Maliyet.** Işın yürüyüşünün başlangıç yüksekliğini sırt kadar yukarı almak ve
-tavanı ona göre büyütmek. Yarım gün. Alternatifi sırdı yalnız normalde
-göstermek (geometrisiz), o daha ucuz ama sıyırtma bakışta siluete katkı vermez.
-
-## İz gövdesi damgalar arası yolu SÜPÜRMÜYOR — bekleyen
-
-**Karar.** Gövde damga başına tek poz basıyor. Düzeltme ertelendi.
-
-**Gerekçe.** İki damga arası mesafe = hız / simülasyon frekansı. 160 FPS'te
-0.75 cm, damgalar tamamen örtüşüyor ve iz sürekli çıkıyor. Belirti yalnız
-simülasyon seyrekleşince doğuyor.
-
-**Ölçüldü.** Odaksız editörde simülasyon ~2 Hz koşuyor ve damgalar 16-47 cm
-arayla düşüyor; izin genişliği o periyotla salınıyor, kenar tırtıllanıyor.
-Periyodun hızla ölçeklenmesi kaynağı kesinleştirdi (`SYMPTOMS.md`).
-
-**Tetikleyici — geri dönülecek belirti:** oyunda FPS düştüğünde (veya hızlı
-koşu/kayma eklendiğinde) izin kenarı düzenli diş göstermeye başlarsa.
-
-**Maliyet.** Gövde, iki damga arasındaki yolu kapsayacak biçimde hareket
-yönünde uzatılacak (küre → elipsoit). Uzatma miktarı SON DAMGADAN beri gidilen
-yol; o anı bilmek için kar yöneticisinden bir olay gerekiyor — bugün olmayan
-tek bağ bu. Yaklaşık yarım günlük iş.
-
+Damga kavramı kalktı: iz artık iki kare arasındaki hareketin DOĞRU PARÇASINDAN
+analitik hesaplanıyor, yani yol tanım gereği süpürülüyor. Simülasyon
+seyrekleşse bile parçalar uç uca eklendiği için izde boşluk oluşmuyor.
 ## Ova kontrastı düzeltilmiyor — irtifadan geliyor
 
 **Karar.** Düz zeminde güneş-gölge farkı ~4 diyafram kalıyor. Dokunulmadı.
@@ -1020,48 +989,23 @@ Tablo kazandı.
 
 **ASSUMPTION 2 — `RT_SnowTemp` eklendi.** §6.2 tablosunda yok ama `KScroll` komşu teksel
 okuyor ve §20 "komşu okuyan pass'lerde ping-pong" diyor. Başka bir dokuyu ödünç almak
-(örn. `RT_CaptureBlur`) o dokunun içeriğini siler. Bedeli 8 MB.
+başka bir dokuyu ödünç almak o dokunun içeriğini siler. Bedeli 8 MB.
 
 **Tetikleyici:** spec'in sonraki bir fazı bu iki dokudan birini farklı formatta
 kullanmaya kalkarsa karar yeniden açılır.
 
-## Kar Faz 2–3: URP'nin desteklemediği iki spec varsayımı (2026-08-22)
+## Kar Faz 2–3: URP varsayımları — YAKALAMA YOLU SİLİNDİ (2026-08-25)
 
-### Yakalama kamerası KAMERA DEĞİL
-
-**Ölçüm.** Spec §9.1 `Camera` + `SetReplacementShader` istiyor. URP runtime'ında
-`SetReplacementShader` / `RenderWithShader` referansı **yok** — yerleşik boru
-hattına ait bir özellik. URP'de kamera yolunu kurmak, kendi
-`ScriptableRendererData`'sını URP asset'inin renderer listesine eklemeyi
-gerektirir; bu §1.1'in yasakladığı URP asset değişikliğidir.
-
-**Karar.** Açık ortografik matris + override materyal ile `DrawRenderer`.
-Teknik birebir aynı: alttan yukarı bakan ortografik frustum, derinlik testiyle
-en alçak yüzeyin kazanması. Değişen yalnızca çizimi kimin tetiklediği. Yan
-kazanç: her şey spec §15.2'nin istediği tek CommandBuffer içinde kalıyor.
-
-**Tetikleyici:** Unity URP'ye replacement shader desteği eklerse karar yeniden
-açılabilir — ama açılmasına gerek yok, mevcut yol daha az bağımlılık taşıyor.
-
-### Yakalanan yükseklik MUTLAK DEĞİL GÖRELİ
-
-**Ölçüm.** `RT_Capture` yarım hassasiyet (spec §6.2). Bu projenin arazisi
-~4900 m'de ve `Mathf.FloatToHalf` ile ölçülen adım orada **4000 mm**. Görünür
-karın alt sınırı 4 mm (spec §8.1); mutlak dünya Y saklamak batma derinliğini
-tamamen yok ediyor. Spec küçük ölçekli bir oyun varsaymış.
-
-**Karar.** `_SnowCaptureOriginY` (gözlemcinin Y'si) çıkarılarak kodlanıyor.
-Ölçülen adım: ayak civarında (0.1 m) **0.061 mm**, hacim ucunda (3 m)
-**1.953 mm**. Çözücü taraf `SnowCaptureY()` ile tek yerden geri çeviriyor.
-
-**Tetikleyici:** yakalama hacmi ±3 m'den büyütülürse adım büyür; 6 m'de
-3.9 mm'ye çıkar ve görünür kar sınırına dayanır.
+Bu başlıkta iki karar vardı: yakalama kamerasının kamera olmaması ve yakalanan
+yüksekliğin göreli kodlanması. **İkisi de konusuz kaldı** — iz artık rasterize
+edilmiyor, analitik hesaplanıyor. `SnowCaptureCamera`, `RT_Capture`,
+`RT_CaptureBlur`, `RT_CaptureDepth`, `Hidden_SnowCaptureDepth` ve
+`KBlurCapture` silindi. Gerekçe `RATIONALE.md`, ölçüm `SYMPTOMS.md`.
 
 ### İki doku spec tablosunda yok, ikisi de zorunlu
 
 | Doku | Neden | Bedel |
 |---|---|---|
-| `RT_CaptureDepth` | §9.2 `ZWrite On` + `ZTest LEqual` istiyor; en alçak yüzeyin kazanması derinlik tamponu olmadan çözülemez. Renk kanalında `BlendOp Min` işe yaramaz — R'nin en küçüğü ile GB'nin en küçüğü farklı fragmanlardan gelir ve hız yanlış tekselle eşleşir | 4 MB |
 | `RT_RimBlur` | §10.2 iki geçişli ayrılabilir blur istiyor; ilkini `RT_TrailTemp` karşılıyor, ikincisi kendi hedefini gerektiriyor (aynı doku hem kaynak hem hedef olamaz, §20) | 2 MB |
 
 ### Sırt blur'u kutu, ağırlık uydurulmadı

@@ -66,8 +66,6 @@ public static class SnowShaderIDs
     public static readonly int SnowOut = Shader.PropertyToID("_SnowOut");
     public static readonly int Trail = Shader.PropertyToID("_Trail");
     public static readonly int TrailOut = Shader.PropertyToID("_TrailOut");
-    public static readonly int Capture = Shader.PropertyToID("_Capture");
-    public static readonly int CaptureBlur = Shader.PropertyToID("_CaptureBlur");
     public static readonly int BlurredCarve = Shader.PropertyToID("_BlurredCarve");
     public static readonly int ReducedOut = Shader.PropertyToID("_ReducedOut");
     public static readonly int CarveOut = Shader.PropertyToID("_CarveOut");
@@ -81,13 +79,13 @@ public static class SnowShaderIDs
     public static readonly int SnowDeltaTime = Shader.PropertyToID("_SnowDeltaTime");
     public static readonly int TileIndex = Shader.PropertyToID("_TileIndex");
     public static readonly int TileCount = Shader.PropertyToID("_TileCount");
-    public static readonly int BlurRadiusTexels = Shader.PropertyToID("_BlurRadiusTexels");
     public static readonly int RimBlurTexels = Shader.PropertyToID("_RimBlurTexels");
     public static readonly int GSParity = Shader.PropertyToID("_GSParity");
 
-    // --- Yakalama ---
-    public static readonly int DeformerVelocity = Shader.PropertyToID("_DeformerVelocity");
-    public static readonly int SnowCaptureOriginY = Shader.PropertyToID("_SnowCaptureOriginY");
+    // --- İz parçaları ---
+    public static readonly int TrailSegments = Shader.PropertyToID("_TrailSegments");
+    public static readonly int TrailSegmentCount = Shader.PropertyToID("_TrailSegmentCount");
+    public static readonly int TrailVelocityXZ = Shader.PropertyToID("_TrailVelocityXZ");
 
     // --- Isı kaynakları (spec §18.2) ---
     public static readonly int HeatSources = Shader.PropertyToID("_HeatSources");

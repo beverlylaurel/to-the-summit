@@ -46,27 +46,6 @@
 ///   %30 şiddette   ilk beyazlama 4.2 dk, sürekli örtü 10.6 dk
 #define SNOW_EDGE_FADE_RANGE         0.006
 
-// --- Yakalama (spec §9.1, §9.4) ---
-#define SNOW_CAPTURE_BELOW           3.0
-#define SNOW_CAPTURE_ABOVE           3.0
-/// YAKALAMA BULANIKLIĞI KENARIN YUMUŞAKLIĞINI BELİRLİYOR.
-///
-/// ESKİ GEREKÇE YANLIŞTI. "Çapraz gidişte ızgara merdiveni" deniyordu; ölçüm
-/// bunu çürüttü: kenardaki dişlerin periyodu YÜRÜME HIZIYLA ölçekleniyor
-/// (1.2 m/s'de 20 teksel, 0.3 m/s'de 7 teksel), yani ızgaradan değil damga
-/// kadansından geliyor. Izgara merdiveni olsaydı periyot hızdan bağımsız
-/// olurdu. Damga kadansı ayrı bir kayıt (`SYMPTOMS.md`).
-///
-/// Bulanıklığın gerçek işi kenarı yumuşatmak: 2.5 teksel (5.9 cm) bandı
-/// oluğun duvarını üç teksele yayıyor ve kapsama tepesini düşürmüyor
-/// (ölçüldü: en derin nokta 22.00 cm, iz 10305 teksel).
-///
-/// ÜST SINIR ÖLÇÜLDÜ. 4.0 teksel denendi ve izi ÖLDÜRDÜ: bulanıklık kapsama
-/// payını yayarken zayıflatıyor (`RT_CaptureBlur` tepe değeri 1.00 → 0.80),
-/// oyma sığlaşıyor ve iz görünürlük eşiğinin altında kalıyor — dokuda 5000
-/// teksel yerine 110 teksel kaldı. 2.0 teksel (4.7 cm) kapsamayı tam
-/// tutarken kenarı yumuşatıyor.
-#define SNOW_BLUR_RADIUS_TEXELS      2.5
 
 // --- Parıltı mesafesi ---
 
@@ -175,7 +154,7 @@
 ///
 /// Ölçülen belirti: iz dokusunda oyma tam 0.0800'de tıkanıyordu ve relief
 /// 8 cm'den derin bir çukuru hiç göremiyordu (ekranda iz "şeffaf" görünüyordu).
-#define SNOW_MAX_SINK                0.22
+#define SNOW_MAX_SINK                0.35
 
 #define SNOW_PACKED_SINK_SCALE       0.18
 /// SIKIŞMA KAZANCI — ULAŞILAN OYMANIN FONKSİYONU.
@@ -260,19 +239,42 @@
 /// yüksekliğin ÜSTÜNDE kalan pay göçüyor; altı dik kalıyor.
 ///
 /// Kohezyon yoğunlukla artıyor: taze kar az tutar, sıkışmış kar çok.
-#define SNOW_STAND_LOOSE             0.06
-#define SNOW_STAND_PACKED            0.18
+#define SNOW_STAND_LOOSE             0.015
+#define SNOW_STAND_PACKED            0.07
 
-/// DURUŞ YÜKSEKLİĞİNİN DÜZENSİZLİĞİ ve dalga boyu (1/m).
+/// KENARIN DÜZENSİZLİĞİ ve dalga boyu (1/m).
 ///
-/// Sabit yükseklik omuzun dış sınırını DÜZ bir çizgi yapıyor; iz kenarı
-/// keskin ve tekdüze çıkıyor (kullanıcı bildirdi: "iz kenarı çok keskin,
-/// istediğim dağılmaya sahip değil").
+/// Duruş yüksekliği yerel olarak dalgalanınca omzun bittiği yer de dalgalanıyor
+/// ve iz kenarı düz bir çizgi olmaktan çıkıyor.
 ///
-/// Dalga boyu 1/5.5 = 18 cm; omuz 4-9 teksel (9-21 cm). Dalga boyu omuzdan
-/// UZUN: kısa olsaydı omuzu yok ederdi (dalga boyu kuralı, `RATIONALE.md`).
-#define SNOW_STAND_NOISE             0.45
-#define SNOW_STAND_NOISE_SCALE       5.5
+/// GENLİK KÂĞITTA DOĞRULANDI. Kenarın kayması `durus × genlik / tan(38°)`:
+///   eski (durus 0.06, genlik 0.45) → ±3.5 cm = ±1.5 teksel  → ZİGZAG
+///   yeni (durus 0.015, genlik 0.50) → ±1.0 cm = ±0.4 teksel → teksel altı
+/// Aynı gürültü, dört kat küçük duruş yüksekliğiyle görünür bir dalga
+/// üretemiyor; yalnız kenarı kemiriyor.
+///
+/// Dalga boyu 1/8 = 12.5 cm = 5.3 teksel. Izgaradan uzun (taşınabiliyor),
+/// omuzdan (3 teksel) uzun (omzu yok etmiyor).
+#define SNOW_STAND_NOISE             0.50
+#define SNOW_STAND_NOISE_SCALE       8.0
+
+/// İZİN İÇİNDEKİ DÜZENSİZLİK ve dalga boyu (1/m).
+///
+/// Analitik oyma kusursuz pürüzsüz bir kâse veriyor; ekranda "dümdüz gri,
+/// hiçbir detayı yok" olarak okunuyor (kullanıcı bildirdi). Gerçekte ayağın
+/// altındaki kar tek parça çökmez: bloklar kırılır, kabuk parçalanır, taban
+/// düzensiz kalır.
+///
+/// GENLİK KENARDA SIFIR. Modülasyon oyma derinliğinin kendi oranıyla
+/// (`hedef / batma`) çarpılıyor: merkezde tam, kenarda sıfır. Bu yüzden
+/// sınırın yerini DEĞİŞTİREMEZ — zigzag üretemez.
+///
+/// Dalga boyu 1/9 = 11 cm = 4.7 teksel; ızgaradan uzun, taşınabiliyor.
+/// İkinci oktav yarım genlikte ve iki katı frekansta: 5.5 cm = 2.4 teksel,
+/// tek başına aliasing sınırında ama genliği ±2 cm olduğu için yalnız tane
+/// hissi veriyor.
+#define SNOW_TRACK_DETAIL            0.16
+#define SNOW_TRACK_DETAIL_SCALE      9.0
 
 #define SNOW_WIND_FILL               0.0012
 

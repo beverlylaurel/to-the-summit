@@ -722,11 +722,23 @@ kod taramasıyla doğrulandı.
 `GroundCoverage01`, `LooseSnowFraction`, `Stormness01`. Bunları **kimse uygulamıyor** —
 tüketiciyi bağlamak ayrı bir iştir, kar sistemi kimseyi zorlamaz.
 
-**Yakalama zinciri (Faz 2–3).** Deformer'lar `SnowDeformer` bileşeniyle kendini
-kaydediyor; bölgede deformer yoksa yakalama, blur, `KDeform`, `KRepose` ve
-`KRim` hiç koşmuyor. Zincir: alttan yukarı bakan ortografik çizim →
-`KBlurCapture` → `KDeform` (batma + dolma) → `KRepose` (duvarın göçmesi) →
-`KRimBlurH`/`KRimBlurV` → `KRim` (kenar yığılması).
+**İz zinciri.** Deformer'lar `SnowDeformer` bileşeniyle kendini kaydediyor;
+bölgede deformer yoksa `KDeform`, `KRepose` ve `KRim` hiç koşmuyor. Zincir:
+`SnowManager.BuildTrailSegments` (parça tamponu) → `KDeform` (batma + dolma) →
+`KRepose` (duvarın göçmesi) → `KRimBlurH`/`KRimBlurV` → `KRim` (kenar
+yığılması).
+
+**İz RASTERİZE EDİLMİYOR, HESAPLANIYOR.** Her deformer bir küre (merkez +
+yarıçap); iki kare arasındaki hareketi bir doğru parçası. `KDeform` tekselin
+parçaya yatay uzaklığını kapalı formülle bulup oymayı
+`batma − (R − √(R²−d²))` ile yazıyor. Yakalama kamerası, override materyali,
+`RT_Capture`, `RT_CaptureBlur` ve `KBlurCapture` **yok** — kenar üç ayrı yerde
+teksel ızgarasına takılıyordu.
+
+**Batma taşıma gücünden geliyor, nesnenin yüksekliğinden değil.** Deformer
+yalnız NEREDE ve NE KADAR GENİŞ olduğunu yayınlıyor; Y'si ize hiç girmiyor.
+Yükseklik okunursa ve o yükseklik karın durumundan türetilirse döngü kapanıyor
+(`SYMPTOMS.md`).
 
 **Simülasyon adımı geçen zamandan türüyor, `Time.deltaTime`'dan değil.** Geçiş
 her kamera için ayrı kaydediliyor ve `Time.frameCount` bunların arasında
@@ -737,8 +749,9 @@ aynı anda gelen ikinci çağrı sıfır adım alıyor.
 **İzin duvarı kohezyonun taşıyamadığı yerden göçüyor.** `KRepose` duvarın
 `SNOW_STAND_*` yüksekliğine kadarını dik bırakıyor; üstünde kalan pay
 `tan(38°) × tekselBoyu` eğimiyle komşuya yayılıyor. Duruş yüksekliği
-**yoğunluktan** geliyor (sıkışmış kar daha çok tutuyor) ve yerel bir
-gürültüyle dalgalanıyor — omuz her yerde aynı bitmiyor, iz kenarı dağılıyor.
+**yoğunluktan** geliyor (sıkışmış kar daha çok tutuyor). Duruş yüksekliğinin
+gürültüsü **kaldırıldı**: omzun bittiği yer duruş yüksekliğinin doğrudan
+fonksiyonu olduğu için kenar ±1.5 teksel dalgalanıyordu.
 Yalnız derinleştirdiği için idempotent: geçiş sayısı görünümü değil yakınsama
 hızını belirliyor. Omuz kendi kar sütununu delemiyor, sınır `KDeform`'un oyma
 sınırıyla aynı.
@@ -747,12 +760,6 @@ sınırıyla aynı.
 edilen teksel dünyaya şerit olarak yayılıp dikdörtgen bir plato üretiyordu.
 Durum dokusu bölge dışında dünyaya harmanlanıyor, iz ise sıfırlanıyor — izin
 dünya karşılığı yok.
-
-**İz gövdesinin oturma yüksekliği SIRDI OKUMAZ.** `SnowSample.BaseHeight` —
-iz öncesi kar sütunu. `Depth + SinkDepth` kullanılıyordu ve açılımında
-`trail.g` (sırt) vardı; sırt `max` ile birikip hız yönüne göre kaydığı için
-gövde onun peşinden zıplıyor, iz derinliği basamaklanıyordu. Örnek 30 karede
-bir tazelenen asenkron geri okumadan geldiği için belirti aralıklıydı.
 
 **Sıkışma oymanın SAF fonksiyonu.** `snow.g` hedefi `trail.r / SNOW_MAX_SINK`
 oranından geliyor; tabanı izsiz karın kendi yoğunluğu (`_FallbackRhoN`, compute'a
@@ -777,10 +784,6 @@ SWE ve yoğunluk; iz bölgeye özgü bir detay katmanı.
 `V / (1 - a(1-V))` uygulanıyor; kaybolan gök ışığının yerine çukurun beyaz
 duvarları geçiyor. Aynı formül `SnowAmbient`'teki kar-gök zincirinde de var,
 ayrı bir kaynak kurulmuyor.
-
-**Yakalanan yükseklik göreli.** `RT_Capture.R` mutlak dünya Y değil, gözlemciye
-göre. Sebebi ölçülmüş: yarım hassasiyetin 4900 m'deki adımı 4 metre
-(`DECISIONS.md`). Çözücü taraf `SnowCaptureY()` ile geri çeviriyor.
 
 **Birikme zinciri (Faz 5).** `SnowfallController` yağış olup olmadığına bakıp
 `SnowRuntimeState`'e yayınlıyor. **Sıcaklık kapısı yok** — yağıyorsa kardır. `_SnowfallSWERate` ve VFX tane sayısı AYNI
@@ -840,13 +843,11 @@ değeri veriyor. Yönsüz ortam kara hiç şekil vermiyor (ölçüldü: güneş
 kapatıldığında zemin sapması 0.0023). Sis URP'nin `MixFog`'undan — kendi sis hesabı yok.
 
 **İz TEK gövdeden besleniyor ve gövde DÖNEL SİMETRİK.** Oyuncunun altında
-tek bir küre (`SnowTrailBody`, 16 cm çap × 24 cm yükseklik) deformer olarak
-duruyor. Kesit daire olduğu için gidiş yönü izi hiç etkilemiyor: her damga
-aynı, ardışık damgalar tam örtüşüyor. Önce oval denendi (22×12×40, sonra
-15×24×34) ve ikisi de yön değiştikçe ize farklı profil bırakıp kenarda balık
-pulu deseni üretti. `SnowTrailBodyAlign` gövdeyi yine hareket yönüne
-hizalıyor (adım sapması ve ileride yön bağımlı bir özellik için), ama iz artık
-buna bağımlı değil.
+tek bir küre (`SnowTrailBody`, 15 cm yarıçap) deformer olarak duruyor. Kesit
+daire olduğu için gidiş yönü izi hiç etkilemiyor. Önce oval denendi (22×12×40,
+sonra 15×24×34) ve ikisi de yön değiştikçe ize farklı profil bırakıp kenarda
+balık pulu deseni üretti. Gövdenin mesh'i, ölçeği ve yüksekliği yok: yalnız
+bir transform ve `SnowDeformer`.
 
 **İZ ARAZİNİN KENDİ YÜZEYİNDE ÇİZİLİYOR — İKİNCİ YÜZEY YOK.**
 
@@ -895,52 +896,19 @@ uygulanıyor, yoksa düzleştirme çukuru da siliyordu.
 Ölçüm (06:25, 50 cm kar, tepeden bakış): mesh/arazi parlaklık oranı
 1.61 → 1.08. Gün boyu tarandığında gündüz 1.10–1.13, akşam 0.98 bandında.
 
-**Kaynak maskesi ÖRTÜŞMELİ.** `RT_Capture` MSAA'lı (4×) açılıyor; derinlik
-tamponunun örnek sayısı da eşleşiyor. Yakalama shader'ı maskeye sabit `1.0`
-yazdığı için MSAA olmadan bir teksel ya tamamen dolu ya boş oluyordu — 16 cm
-gövde 2.3 cm tekselde yalnız ~7 teksel, yuvarlak siluet köşeli bloğa raster
-ediliyordu ve her kare basılan bu blok merdiven üretiyordu. Bu KAYNAK
-sorunuydu; sonraki yumuşatmalar (blur, carve) yalnız üstünü örtüyordu.
-`RT_Capture`'a `enableRandomWrite` verilemez (MSAA ile çakışır) ve gerekmiyor:
-compute ona yalnız `KBlurCapture` kaynağı olarak OKUYOR.
+**Gövde yüksekliği ize HİÇ GİRMİYOR.** Rasterizasyon kalkınca damga kavramı
+da kalktı: iz kürenin geometrisinden analitik olarak çıkıyor ve ne kadar
+batılacağını kar söylüyor (taşıma gücü, yoğunluk, kabuk). Yükseklik
+yumuşatması, adım sapması ve `SnowTrailBodyAlign` bileşeninin tamamı silindi.
+`SnowStepRhythm` yalnız faz ve adım olayı üretiyor.
 
-**Gövde yüksekliği zamanda yumuşatılıyor.** Karakter denetleyicisinin zemine
-oturma salınımı ve kar yüzeyi okumasının gürültüsü yüksekliği kare kare
-oynatıyor (ölçüldü: batma −5.6 … −9.3 cm). Yakalama kare başına bir damga
-bastığı için her damga farklı derinlikte kalıyor ve iz sürekli bir oluk yerine
-ardışık dilimler yığını oluyordu. `heightSmoothTime` damgaları ortak bir
-yüksekliğe oturtuyor.
-
-**Yükseklik `SnowStepRhythm` tarafından YAZILMIYOR.** Ritim eskiden ayak
-proxy'lerini yarım sinüsle kaldırıyordu; tek gövdeye geçilince iki bileşen
-aynı `localPosition.y`'yi ezmeye başladı ve gövde yüksekliği sıçradı. Ritim
-artık yalnız faz ve adım olayı üretiyor; yüksekliğin tek sahibi align.
-
-**Gövde kar YÜZEYİNE oturuyor, tabana değil.** `SnowTrailBodyAlign`
-`SnowSampler`'dan kar yüksekliğini okuyup gövdeyi yüzeyin `surfaceSink` (5 cm)
-kadar altına koyuyor. Yoksa gövde oyuncunun ayağında (kar sütununun tabanında)
-kalıyor; küre 20 cm karın tamamını delip batma `enFazlaOyma` sınırına dayanınca
-geniş bir DÜZ TABAN bırakıyor (iz dikdörtgen görünüyor, ölçüldü). Yüzeye
-oturunca yalnız kürenin dar alt eğrisi kara giriyor ve oluk U kesitine
-dönüyor. Yükseklik İZ-ÖNCESİ kalınlıktan (`Depth + SinkDepth`) türetiliyor;
-tek başına `Depth` oyulmuş yüzeydir ve küre kendi izini okuyup her kare daha
-derine iner (geri besleme).
-
-**İz kenarları prosedürel gürültüyle dağılıyor.** Kapsama payının OKUNDUĞU
-teksel, iki ölçekli değer gürültüsüyle kaydırılıyor (`SNOW_TRAIL_EDGE_SCALE_A`
-40 cm leke, `_B` 11 cm tırtık); rampa taşınıyor ama biçimi bozulmuyor, iz
-kopmuyor. Gürültü kapsamayı EŞİK gibi kesmiyor — o yol denendi ve rampayı
-`1/(1-A)` kadar dikleştirip izi inceltti, kesiti dik duvara çevirdi (ölçüldü).
-Kaydırma tam sayı teksele yuvarlanamaz; `round` düzenli bir testere dişi
-üretiyor (ekrandan görüldü), ara değer dört komşudan harmanlanıyor. Gürültü
-`SnowValueNoise` — mevcut PCG3B hash'inden türeyen değer gürültüsü, ayrı doku
-bağlanmıyor. Yalnız `cap.a` (kapsama) kaydırılıyor, `cap.r` (yükseklik) değil:
-yükseklik komşudan okunursa eğimli arazide batma derinliği kayma kadar hata
-verir.
-
-**Sıkışma AÇILAN OYMAYA orantılı, geçen süreye değil.** Yerinde bekleyen
-oyuncunun altında iz derinleşmez; sıkışma ilk temasta olur ve
-`SNOW_MAX_COMPACT_PER_PASS` tavanında durur.
+**İz kenarı DURUŞ YÜKSEKLİĞİNİN gürültüsünden dağılıyor.** Kenarın nerede
+bittiğini `KRepose`'un duruş yüksekliği belirliyor; o yükseklik yerel bir değer
+gürültüsüyle dalgalanınca kenar da düz bir çizgi olmaktan çıkıyor. Kaydırma
+`durus × genlik / tan(38°)`. Aynı gürültü bir kez ZİGZAG olarak geri geldi:
+duruş yüksekliği 6 cm'ken kenar ±1.5 teksel oynuyordu. Duruş yüksekliği
+gerçeğe çekilince (gevşek kar 1.5 cm dik duvar tutar, 6 değil) aynı bağıl
+gürültü ±0.4 teksele, yani teksel altına düştü. Sayılar `RATIONALE.md`.
 
 **Arazi kar sütunu kadar YÜKSELMİYOR.** Bir dönem
 `MountainSurface.shader`'ın dört geçişinde de köşe `SnowWorldCoverHeight()`
@@ -1045,9 +1013,9 @@ takılı; hepsi `SnowSampler`'dan okuyor. Kar sistemi oyuncuyu bilmiyor.
 değil konumu da sürüyor: saltasyon rüzgâr yönünde 15 m ileri, süspansiyon rüzgâr
 üstünde 35 m ve 2.5 m yukarı, ikisi de 1 m ızgarasına snap'li (spec §18.7).
 
-**Ayak proxy'leri karda iz bırakıyor.** Oyuncuya iki `SnowDeformer` kutusu
-(`SnowFoot_L/R`, 11×6×28 cm) `SnowDebugWindow.SetupScene`'den kuruluyor.
-Yakalama pass'i alt yüzeylerini ölçüyor; kar sistemi oyuncuyu bilmiyor.
+**Ayak proxy'si karda iz bırakıyor.** Oyuncunun altında tek bir `SnowDeformer`
+(`SnowTrailBody`, 15 cm yarıçap) `SnowDebugWindow.SetupScene`'den kuruluyor.
+Mesh'i yok: yalnız konum ve yarıçap yayınlıyor. Kar sistemi oyuncuyu bilmiyor.
 
 **Quad perde YOK — iki kez denendi, ikisi de silindi.** Ne `SnowfallCurtains`
 (§17.2 uzak yağış) ne `SnowCurtainController` (§18.7 süspansiyon) duruyor.

@@ -1563,3 +1563,62 @@ F1 → "Kar yok" ile kayboluyor, çünkü o düğme kar derinliğini sıfırlıy
 **Not:** durum dokusunun aynı sorunu `SnowStateAt` içinde zaten çözülmüştü
 (bölge dışı dünyanın genel değerine harmanlanıyor). İzin dünya karşılığı yok,
 o yüzden harman değil sıfır.
+
+## İz rasterize edilmiyor, hesaplanıyor
+
+**Kural:** iz bırakan nesne bir küre olarak tanımlanır; `KDeform` tekselin iki
+kare arasında süpürülen doğru parçasına yatay uzaklığını kapalı formülle bulup
+oymayı `batma − (R − √(R²−d²))` ile yazar.
+
+**Neden:** eski yol nesnenin alt yüzeyini aşağıdan bakan ortografik bir
+yakalamaya rasterize ediyor, sonucu 4-tap Poisson ile bulanıklaştırıyor ve
+kapsama payını (`cap.a`) oyma profili olarak okuyordu (Batman GDC 2014 yolu).
+Kenar o zincirin ÜÇ ayrı yerinde teksel ızgarasına takılıyordu: rasterin kendi
+kenarı, blur'un tapları, kapsamanın eşiği.
+
+**Ölçüm:** temiz zeminde, tek prob, karakter kendi yürüdü — iz kenarı ±1.5
+teksel dalgalanıyordu, dalga boyu 5 teksel. Yakın planda yumru, uzakta testere
+dişi. Kullanıcı bunu günlerce "zigzag" ve "tarak" olarak bildirdi.
+
+**Denenip başarısız olan yol:** dört tur boyunca gövde yüksekliği, gövde
+şekli, damga kadansı ve ızgara snap'i ölçüldü; hiçbiri belirtiyi açıklamadı.
+Yol ölçüldüğünde yanal sapma **1.5 mm (0.06 teksel)** çıktı — dümdüz. Yani
+kaynak hareket değil ÇİZİM yoluydu.
+
+**Yan kazanç:** nesnenin dünya Y'si artık ize hiç girmiyor. Batma derinliğini
+kar söylüyor (taşıma gücü, yoğunluk, kabuk). Gövdenin yüksekliğini karın
+durumundan okuyup karı gövdeyle ezmek kapalı bir döngüydü ve 30 karelik
+asenkron geri okuma onu osilatöre çeviriyordu.
+
+## Duruş yüksekliği: gerçekçi değer, gürültünün genliğini de düzeltti
+
+**Kural:** `SNOW_STAND_LOOSE = 1.5 cm`, `SNOW_STAND_PACKED = 7 cm`.
+
+**Neden:** duruş yüksekliği "karın taşıyabildiği dik duvar" demek. 6 cm gevşek
+kar için fazla; taze kar o kadar dik duvar tutmaz.
+
+**Ölçüm (kâğıtta, teksel 2.34 cm, R = 15 cm, batma = 22 cm):**
+
+| duruş | göçen pay | omuz genişliği |
+|---|---|---|
+| 6 cm (eski)  | 1.0 cm | 1.3 cm = **0.5 teksel** |
+| 1.5 cm (yeni)| 5.5 cm | 7.0 cm = **3.0 teksel** |
+
+Kullanıcının "çok keskin sınırları var, kenarlarda dağılma yok" belirtisinin
+sayısal karşılığı bu: omuz yarım tekseldi, yani duvar.
+
+**Gürültünün genliği aynı sayıdan türüyor.** Kenarın kayması
+`durus × genlik / tan(38°)`:
+
+| durum | kayma |
+|---|---|
+| durus 6 cm, genlik 0.45 (eski) | ±3.5 cm = **±1.5 teksel** → görünür zigzag |
+| durus 1.5 cm, genlik 0.50 (yeni) | ±1.0 cm = **±0.4 teksel** → teksel altı |
+
+Yani gürültü bir kez kaldırıldı (zigzag üretiyordu) ve duruş yüksekliği
+düzeltildikten sonra geri kondu — çünkü aynı bağlı gürültü artık dört kat
+küçük bir yüksekliği modüle ediyor. Dalga boyu 12.5 cm (5.3 teksel): teksel
+ızgarasından uzun, omuzdan (3 teksel) uzun.
+
+**Geçiş sayısı:** omuz 0.5 tekselden 3 teksele çıkınca 3 geçiş yetmiyor —
+`KRepose` geçiş başına bir teksel yayıyor. `ReposeIterations` 6.

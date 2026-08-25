@@ -1,6 +1,6 @@
-// ROL: sahnedeki etkin SnowDeformer'ların listesi. Yakalama pass'i bu listeyi
+// ROL: sahnedeki etkin SnowDeformer'ların listesi. SnowManager bu listeyi
 // gezer; arama yapmaz.
-// Çağıran: SnowDeformer (kayıt), SnowCaptureCamera (okuma).
+// Çağıran: SnowDeformer (kayıt), SnowManager (parça tamponu).
 
 using System.Collections.Generic;
 

@@ -183,19 +183,6 @@ float SnowValueNoise(float2 p)
     return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
 }
 
-// ------------------------------------------------------------------ yakalama
-
-/// Yakalama hacminin sıfır noktası — gözlemcinin dünya Y'si.
-float _SnowCaptureOriginY;
-
-/// RT_Capture'ın R kanalı GÖRELİ tutuluyor (yarım hassasiyet, bkz.
-/// Hidden_SnowCaptureDepth). Dünya Y'sine dönüşü tek yerden geçiyor ki
-/// çözücü tarafta unutulmasın.
-float SnowCaptureY(float encoded)
-{
-    return _SnowCaptureOriginY + encoded;
-}
-
 // ------------------------------------------------------------ zemin yüksekliği
 
 TEXTURE2D(_GroundHeightTex);

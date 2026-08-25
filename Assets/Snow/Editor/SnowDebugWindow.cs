@@ -22,31 +22,10 @@ public class SnowDebugWindow : EditorWindow
     /// Her kanalın görüntüleme tavanı. rhoN/wet/disturb zaten 0..1.
     static readonly float[] ChannelRanges = { 0.60f, 1f, 1f, 1f, 1.20f };
 
-    /// Yakalama dokusunun kanalları başka şeyler ölçüyor; kendi adları ve
-    /// kendi aralıkları var. Durum dokusunun ölçeğiyle gösterilirse hepsi
-    /// beyaz patlar.
-    static readonly string[] CaptureChannelNames =
-    {
-        "R — alt yüzey Y (gözlemciye göre, m)",
-        "G — hız X (m/s)",
-        "B — hız Z (m/s)",
-        "A — maske",
-    };
-
-    /// x = gösterimden çıkarılan taban, y = aralık.
-    static readonly Vector2[] CaptureChannelScales =
-    {
-        new(-SnowConstants.CaptureBelow, SnowConstants.CaptureBelow + SnowConstants.CaptureAbove),
-        new(-6f, 12f),
-        new(-6f, 12f),
-        new(0f, 1f),
-    };
-
     enum PreviewSource
     {
         Durum,
         Iz,
-        Yakalama,
         GokyuzuGorunurlugu,
         RuzgarGolgesi,
     }
@@ -55,7 +34,6 @@ public class SnowDebugWindow : EditorWindow
     {
         "Durum (RT_Snow)",
         "İz (RT_Trail)",
-        "Yakalama (RT_CaptureBlur)",
         "Gökyüzü görünürlüğü (RT_SkyVis)",
         "Rüzgâr gölgesi (RT_WindShadow)",
     };
@@ -102,19 +80,13 @@ public class SnowDebugWindow : EditorWindow
         EnsurePreview(shown.width);
 
         bool raw = source == PreviewSource.GokyuzuGorunurlugu || source == PreviewSource.RuzgarGolgesi;
-        bool capture = source == PreviewSource.Yakalama;
-
         float worldSize = raw ? SnowConstants.SkyAreaSize : manager.Settings.QualityData.AreaSize;
         Vector2 worldCenter = manager.AreaCenter;
 
-        int captureChannel = Mathf.Min(channel, CaptureChannelScales.Length - 1);
-        Vector2 captureScale = CaptureChannelScales[captureChannel];
-
-        debugMaterial.SetFloat(SnowShaderIDs.DebugMode,
-            raw ? 5f : (capture ? captureChannel : channel));
+        debugMaterial.SetFloat(SnowShaderIDs.DebugMode, raw ? 5f : channel);
         debugMaterial.SetFloat(SnowShaderIDs.DebugRange,
-            raw ? 1f : (capture ? captureScale.y : ChannelRanges[channel]));
-        debugMaterial.SetFloat(SnowShaderIDs.DebugBias, capture ? captureScale.x : 0f);
+            raw ? 1f : ChannelRanges[channel]);
+        debugMaterial.SetFloat(SnowShaderIDs.DebugBias, 0f);
         debugMaterial.SetFloat(SnowShaderIDs.DebugGridSize, gridSize);
         debugMaterial.SetVector(SnowShaderIDs.DebugWorldCenter,
             new Vector4(worldCenter.x, worldCenter.y, 0f, 0f));
@@ -218,7 +190,6 @@ public class SnowDebugWindow : EditorWindow
     RenderTexture SourceTexture(SnowManager m) => source switch
     {
         PreviewSource.Iz => m.TrailTexture,
-        PreviewSource.Yakalama => m.CaptureBlurTexture,
         PreviewSource.GokyuzuGorunurlugu => m.SkyVisTexture,
         PreviewSource.RuzgarGolgesi => m.WindShadowTexture,
         _ => m.SnowTexture,
@@ -282,7 +253,7 @@ public class SnowDebugWindow : EditorWindow
             manager.AreaCenter.x.ToString("0.000") + " , " + manager.AreaCenter.y.ToString("0.000"));
         EditorGUILayout.LabelField("Son kaydırma",
             manager.LastScrollTexels.x + " , " + manager.LastScrollTexels.y + " teksel");
-        EditorGUILayout.LabelField("Yakalama",
+        EditorGUILayout.LabelField("İz parçaları",
             (manager.CaptureActive ? "aktif" : "boşta") +
             "   deformer " + SnowDeformerRegistry.Count);
 
@@ -331,15 +302,7 @@ public class SnowDebugWindow : EditorWindow
         bool raw = source == PreviewSource.GokyuzuGorunurlugu || source == PreviewSource.RuzgarGolgesi;
         using (new EditorGUI.DisabledScope(raw))
         {
-            if (source == PreviewSource.Yakalama)
-            {
-                channel = Mathf.Min(channel, CaptureChannelNames.Length - 1);
-                channel = EditorGUILayout.Popup("Kanal", channel, CaptureChannelNames);
-            }
-            else
-            {
-                channel = EditorGUILayout.Popup("Kanal", channel, ChannelNames);
-            }
+            channel = EditorGUILayout.Popup("Kanal", channel, ChannelNames);
         }
 
         gridSize = EditorGUILayout.Slider("Izgara (m)", gridSize, 0.25f, 8f);
@@ -364,7 +327,6 @@ public class SnowDebugWindow : EditorWindow
 
     const string SettingsPath = "Assets/Snow/Settings/SnowSettings.asset";
     const string ComputePath = "Assets/Snow/Shaders/SnowSim.compute";
-    const string CaptureShaderPath = "Assets/Snow/Shaders/Hidden_SnowCaptureDepth.shader";
     const string SkyShaderPath = "Assets/Snow/Shaders/Hidden_SnowSkyDepth.shader";
     const string SnowfallComputePath = "Assets/Snow/Shaders/SnowfallSim.compute";
     const string ParticleShaderPath = "Assets/Snow/Shaders/SnowfallParticle.shader";
@@ -554,8 +516,6 @@ public class SnowDebugWindow : EditorWindow
         managerSerialized.FindProperty("groundHeight").objectReferenceValue = ground;
         managerSerialized.FindProperty("simCompute").objectReferenceValue =
             AssetDatabase.LoadAssetAtPath<ComputeShader>(ComputePath);
-        managerSerialized.FindProperty("captureShader").objectReferenceValue =
-            AssetDatabase.LoadAssetAtPath<Shader>(CaptureShaderPath);
         managerSerialized.FindProperty("skyShader").objectReferenceValue =
             AssetDatabase.LoadAssetAtPath<Shader>(SkyShaderPath);
         managerSerialized.ApplyModifiedProperties();
@@ -647,12 +607,10 @@ public class SnowDebugWindow : EditorWindow
         return vfx;
     }
 
-    /// AYAK PROXY'LERI — IZ BIRAKAN GORUNMEZ MESH'LER (spec 1.4, 9).
+    /// AYAK PROXY'SI — IZ BIRAKAN GORUNMEZ NOKTA (spec 1.4, 9).
     ///
-    /// Yakalama pass'i nesnenin ALT YUZEYINI asagidan bakan bir kamerayla
-    /// olcuyor; kapsul tanimi ya da damga dokusu yok. Iz birakacak bir sey
-    /// olmazsa kar hic bozulmuyor — olculdu, sahnede sifir deformer vardi ve
-    /// yurumek hicbir iz birakmiyordu.
+    /// Iz birakacak bir sey olmazsa kar hic bozulmuyor — olculdu, sahnede
+    /// sifir deformer vardi ve yurumek hicbir iz birakmiyordu.
     ///
     /// IKI AYAK, ADIM FAZI YOK. Gercek ayak izi adim fazina baglanmayi
     /// gerektiriyor (hangi ayak yerde); su an iki proxy de surekli yerde,
@@ -666,12 +624,9 @@ public class SnowDebugWindow : EditorWindow
     /// olmadigi icin ayaklarin altinda iki kara leke goruluyordu (kullanici
     /// bildirdi, asagi bakinca).
     ///
-    /// Proxy'nin isi kari OYMAK; golge karakterin isi. Yakalama pass'i
-    /// `cmd.DrawRenderer` ile ACIK materyalle ciziyor (`SnowCaptureCamera`),
-    /// yani normal cizim yolundan bagimsiz — katmani opak/saydam gecislerden
-    /// cikarmak oymayi bozmuyor. Katman maskesi URP renderer varliginda
-    /// (`PC_Renderer`, `Mobile_Renderer`); spec 1.3'un yasakladigi KAMERANIN
-    /// culling mask'i degil.
+    /// Proxy'nin isi kari OYMAK; golge karakterin isi. Gövdenin artık mesh'i
+    /// yok, dolayısıyla ne çiziliyor ne gölge düşürüyor; katman yalnız
+    /// kimliklendirme için duruyor.
     static Transform EnsureTrailDeformer(FirstPersonController player)
     {
         if (player == null) return null;
@@ -702,13 +657,19 @@ public class SnowDebugWindow : EditorWindow
     ///   - "keskin dikdortgen izler" -> kup alt yuzeyi duz ve koseli
     ///   - "capraz giderken ayak izi yan cikiyor" -> kupler oyuncuyla donuyor
     ///
-    /// Kure ucunu birden kapatiyor. Alt yuzeyi merkeze dogru derinlesip
-    /// kenara dogru sigaliyor: yakalama bunu oldugu gibi olcuyor ve profil
-    /// dogal olarak yumusak bir oluk cikiyor -- damga, basinc formulu ya da
-    /// yumusatma terimi eklemeden. x ve z ayni oldugu icin donmeye de
-    /// bagimsiz; oyuncu capraz giderken iz sekli degismiyor.
+    /// Kure ucunu birden kapatiyor ve donel simetrik oldugu icin gidis yonu
+    /// izi hic etkilemiyor.
     ///
-    /// Genislik iki ayagin toplam izini karsiliyor (11 cm ayak + 22 cm ara).
+    /// ARTIK MESH YOK. Gövde çizilmiyordu bile — yalnız aşağıdan bakan
+    /// yakalamaya rasterize ediliyordu. Yakalama zinciri kaldırıldı; `KDeform`
+    /// kürenin şeklini kapalı formülle biliyor. Geriye bir transform ve
+    /// `SnowDeformer` kalıyor: NEREDE ve NE KADAR GENİŞ.
+    ///
+    /// YÜKSEKLİK DE YOK. Ne kadar batılacağını kar söylüyor. Gövdeyi kar
+    /// yüzeyine oturtan bileşen (`SnowTrailBodyAlign`) silindi: oturma
+    /// yüksekliğini karın durumundan okuyordu ve karın durumu gövdenin
+    /// bastığı yerden geliyordu — gecikmeli geri besleme, yani osilatör
+    /// (`SYMPTOMS.md`).
     static Transform EnsureTrailBody(Transform parent, Vector3 localPos, int layer)
     {
         const string Ad = "SnowTrailBody";
@@ -719,75 +680,42 @@ public class SnowDebugWindow : EditorWindow
         if (t != null)
         {
             go = t.gameObject;
+
+            // ESKİ MESH ARTIĞI TEMİZLENİYOR. Sahnede duran gövde primitive
+            // olarak kurulmuştu; çizim yolu kalkınca renderer da gereksiz.
+            var eskiR = go.GetComponent<MeshRenderer>();
+            if (eskiR != null) Object.DestroyImmediate(eskiR);
+
+            var eskiF = go.GetComponent<MeshFilter>();
+            if (eskiF != null) Object.DestroyImmediate(eskiF);
         }
         else
         {
-            go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            go.name = Ad;
+            go = new GameObject(Ad);
             go.transform.SetParent(parent, false);
-
-            // Collider deformer icin gereksiz ve oyuncunun hareketini bozar.
-            var col = go.GetComponent<Collider>();
-            if (col != null) Object.DestroyImmediate(col);
         }
+
+        var col = go.GetComponent<Collider>();
+        if (col != null) Object.DestroyImmediate(col);
 
         go.layer = layer;
         go.transform.localPosition = localPos;
         go.transform.localRotation = Quaternion.identity;
+        go.transform.localScale = Vector3.one;
 
-        // DONEL SIMETRIK: 16 cm cap, 24 cm yukseklik.
-        //
-        // Once yassi bir oval vardi (22x12x40), sonra dar bir oval (15x24x34).
-        // Ikisi de ayni belirtiyi uretti ve kullanici defalarca bildirdi:
-        // "farkli yonlere hareket ederken dikdortgen iz", "satir satir iz".
-        //
-        // Sebep OVALIN YONE BAGLI OLMASI. Yakalama kare basina bir damga
-        // basiyor; iz ardisik damgalarin birlesimi. Dairesel olmayan bir
-        // kesit, gidis yonu degistikce ize FARKLI bir profil birakiyor ve
-        // ardisik damgalarin kenarlari ust uste binince balik pulu / merdiven
-        // deseni cikiyor. Capraz gidiste en belirgin: orada hem yaw
-        // yumusamasi surerken profil doniyor hem de damga adimi teksel
-        // izgarasina 45 derece geliyor.
-        //
-        // Donel simetrik kesitte (X = Z) gidis yonu izi HIC etkilemiyor:
-        // her damga ayni daire, ardisik daireler tam ortusuyor ve birlesim
-        // duz kenarli surekli bir oluk veriyor. Yaricap (8 cm) batmadan
-        // (~5 cm) buyuk kaldigi icin kesit U olarak kaliyor.
-        //
-        // Yukseklik 24 cm: yaricapi (12 cm) batmanin uzerinde tutuyor, boylece
-        // kure kar sutununu delip duz taban birakmiyor.
-        // ÖLÇEK ARTIK ASSET'TEN. Burada yalnız yükseklik veriliyor; çapı
-        // `SnowTrailBodyAlign` her açılışta `SnowSettings`'ten yazıyor.
-        // Eski hâlinde ölçek sahnede duruyordu ve sahne dosyası dışarıdan
-        // düzenlenince Unity bellekteki kopyayla çalışmaya devam ediyordu.
-        // ESKİ AÇIKLAMA (ölçüm kaydı olarak duruyor):
+        var def = go.GetComponent<SnowDeformer>();
+        if (def == null) def = go.AddComponent<SnowDeformer>();
+
         // İZ GÖVDESİ BOTTAN GENİŞ.
         //
         // 16 cm bir bot genişliği; ama taze karda ayak batınca kenar ÇÖKER ve
         // açılan çukur bottan belirgin geniş olur. 16 cm'lik damga ekranda
         // ince bir çizgi olarak okunuyordu (kullanıcı bildirdi: "çok dar").
-        // Ölçüldü: duran damga 0.21 × 0.19 m — yuvarlak ama küçük.
-        go.transform.localScale = new Vector3(0.30f, 0.24f, 0.30f);
-
-        var rend = go.GetComponent<MeshRenderer>();
-        rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        rend.receiveShadows = false;
-
-        if (go.GetComponent<SnowDeformer>() == null)
-            go.AddComponent<SnowDeformer>();
-
-        // OVAL GOVDE HAREKET YONUNE BAKMALI. Oyuncunun rotasyonuna bagli
-        // kalsaydi capraz yuruyuste iz yana cikardi.
-        var align = go.GetComponent<SnowTrailBodyAlign>();
-        if (align == null) align = go.AddComponent<SnowTrailBodyAlign>();
-
-        var alignSo = new SerializedObject(align);
-        alignSo.FindProperty("body").objectReferenceValue =
-            parent.GetComponent<CharacterController>();
-        alignSo.ApplyModifiedProperties();
-
-        // `rhythm` burada BAGLANMIYOR: SnowStepRhythm EnsurePlayerSide'da,
-        // yani bu cagridan SONRA ekleniyor. Orada baglaniyor.
+        // 15 cm yarıçap iki ayağın toplam izini karşılıyor (11 cm ayak +
+        // 22 cm ara).
+        var defSo = new SerializedObject(def);
+        defSo.FindProperty("radius").floatValue = 0.15f;
+        defSo.ApplyModifiedProperties();
 
         EditorUtility.SetDirty(go);
         return go.transform;
@@ -819,28 +747,9 @@ public class SnowDebugWindow : EditorWindow
         rs.FindProperty("body").objectReferenceValue = go.GetComponent<CharacterController>();
         // RITIM GOVDEYI SURMUYOR, YALNIZ FAZ URETIYOR. Once iz govdesi buraya
         // ayak proxy'si olarak bagliydi; ritim onu yarim sinusle kaldirip
-        // indiriyordu. SnowTrailBodyAlign govdeyi kar yuzeyine oturtmaya
-        // baslayinca iki yazar ayni localPosition.y'yi eziyor, govde yuksekligi
-        // kare kare siciriyor ve oluk testere disine donuyordu (olculdu).
-        // Govde yuksekliginin tek sahibi align; ritim yalniz adim olayi ve faz.
+        // indiriyordu ve oluk testere disine donuyordu (olculdu). Govdenin
+        // yuksekligi artik ize hic girmiyor; ritim yalniz adim olayi ve faz.
         rs.ApplyModifiedProperties();
-
-        // Iz govdesinin adim adim sapmasi ritimden besleniyor.
-        if (izGovdesi != null)
-        {
-            var align = izGovdesi.GetComponent<SnowTrailBodyAlign>();
-            if (align != null)
-            {
-                var aso = new SerializedObject(align);
-                // KAR YUZEYINE OTURTMA icin sampler baglaniyor. Yoksa govde
-                // sabit yukseklikte kalir ve kar tabanina inip duz taban birakir.
-                aso.FindProperty("surfaceSampler").objectReferenceValue = sampler;
-                aso.FindProperty("settings").objectReferenceValue =
-                    AssetDatabase.LoadAssetAtPath<SnowSettings>(SettingsPath);
-                aso.ApplyModifiedProperties();
-                EditorUtility.SetDirty(align);
-            }
-        }
 
         // --- Ayak sesi (spec §19.1). Klipler SONRA verilecek.
         var audio = go.GetComponent<SnowFootstepAudio>();

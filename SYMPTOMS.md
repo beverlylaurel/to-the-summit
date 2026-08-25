@@ -2511,3 +2511,66 @@ düz çizgisi ve denetleyici yürüyüşünün yılanı.
 **Ders:** ÖLÇÜM ARACI GERÇEK YOLU ATLAMAMALI. Prob `cc.Move`'u çağırarak
 denetleyiciyi baypas ediyordu; belirtinin kaynağı tam olarak baypas edilen
 yerdeydi.
+
+## "Zigzag" — dört gün, gerçek sebep çizim yolunda çıktı
+
+**Kullanıcının ağzından:** "düz yürümeme rağmen iz yalpalıyor", "tarak gibi
+çıkıyor", "çapraz giderken zigzaglaşıyor", "bazen oluyor bazen olmuyor".
+
+**Yanlış çıkan şüpheliler (hepsi ölçüldü):** gövde şekli (küre), gövde ofseti,
+gövde yüksekliği salınımı, oyuncunun yolu, damga kadansı, ızgara merdiveni,
+üç ayrı filtre yarıçapı, relief ışın yürüyüşü, iz eğiminin normale katılması,
+yüzey dokuları, yoğunluk kanalı, bölge kaydırması.
+
+**Ölçüm tuzağı — BEŞ PROB AYNI ANDA.** Ölçüm bileşenleri üst üste eklenmişti ve
+her biri `cc.Move` çağırıyordu; karakter kare başına beş kez hareket ediyor,
+gövde hizası her çağrıda farklı hız görüyordu. "Periyot hızdan bağımsız, demek
+ki uzamsal" sonucu bu kirli veriden çıktı ve bir turu yaktı. Probları tek tek
+temizleyip TEK prob koşturulunca sayılar tamamen değişti.
+
+**Ayırt eden ölçüm:** temiz zeminde tek prob, karakterin kendi yürüyüşü.
+- yolun yanal sapması **1.5 mm = 0.06 teksel** — dümdüz
+- iz genişliği 15 teksel, sapma ±1, üç farklı hızda aynı
+- eksene paralel yürüyüşte 12–13, sapma ±1
+
+Yani hareket kusursuzdu; bozan ÇİZİM yoluydu.
+
+**Gerçek sebep — iki kaynak:**
+
+1. **Rasterizasyon.** İz, her kare bir küreyi aşağıdan bakan ortografik bir
+   yakalamaya çizip bulanık kapsamasını okuyarak açılıyordu. Kenar o zincirin
+   üç ayrı yerinde teksel ızgarasına takılıyordu.
+2. **Duruş yüksekliği gürültüsü.** `KRepose`'un ±%45 gürültüsü, 6 cm'lik duruş
+   yüksekliğini modüle ederken kenarı **±1.5 teksel** oynatıyordu.
+
+**Çözüm:** yakalama zinciri tamamen silindi; iz artık analitik
+(`batma − (R − √(R²−d²))`, d = doğru parçasına uzaklık). Gürültü, duruş
+yüksekliği gerçeğe çekildikten sonra (6 cm → 1.5 cm) ±0.4 teksel genlikle geri
+kondu. Sayılar `RATIONALE.md`.
+
+**Ders:** "kaynak yuvarlaksa iz nasıl zigzag olur" sorusunun cevabı, kaynağın
+yuvarlak OLMASI değil, o yuvarlağın ızgaraya nasıl yazıldığıydı. Şekli
+tartışmak dört tur yaktı; yazma yolunu ölçmek bir tur sürdü.
+
+## Sırt hesaplanıyordu ama hiç çizilmiyordu
+
+**Kullanıcının ağzından:** "kar yüzeyi ile iz arasındaki geçiş çok keskin,
+yapay duruyor".
+
+**İlk şüpheli (yanlış):** oyma profilinin kenarı fazla dik.
+
+**Ayırt eden ölçüm — enine kesit (49 cm kar, +X yürüyüş):**
+```
+derinlik (mm):  0  13  47  82 117 152 176 188 196 201 204 ... 41  8  0
+sırt     (mm):  0   0   0   0  32  34  38  40 ...  40  32 27 20 14  9  0
+```
+Oyma profili zaten yumuşaktı (her yanda 5 tekselllik rampa). Ama izin iki
+yanında **4 cm'lik bir kabarma** vardı ve o ekrana hiç ulaşmıyordu:
+`SnowDentAt` yalnız `trail.r` okuyor.
+
+**Gerçek sebep:** `trail.g` (sırt) yazılıyor, dolduruluyor, eritiliyor — ama
+hiçbir çizim yolu okumuyordu. Oluk düz kardan tek çizgiyle ayrılıyordu.
+
+**Çözüm:** normal ve iz-içi gölge `trail.r − trail.g` okuyor; ışın yürüyüşü
+`trail.r`'da kaldı. Ayrım şart: sırt ışın alanından çıkarıldığında omuzu
+siliyordu (ölçüldü, `r − g` genişliği 19 tekselden 12'ye çöküyordu).
