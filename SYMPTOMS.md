@@ -3100,3 +3100,30 @@ siliniyor — kapalı havada flat light, dağcılıkta bilinen durum.
 terimiydi ve gerekçesi "ışın uzun yol alıyor, `engel` her yerde doyuyor"du.
 Işın yürüyüşü kalkınca gerekçe de kalktı; üstelik tavan zaten güneş alçalınca
 kendiliğinden yükseliyor. Gerekçesini yitiren terim geri eklenmez.
+
+---
+
+## HUD yanlış bilgi veriyordu: iki farklı kapsama aynı adı taşıyordu
+
+**Belirti (kullanıcı, iki kare):** aynı yere bakan iki karede biri lacivert-siyah
+ve zeminde belirgin koyu lekeler var, öteki açık gri. HUD ikisinde de "Bulut
+kapsaması %0" ve "bu sütunda bulut yok" yazıyor.
+
+**Ölçüm:** aynı anda `AtmosphereController.Coverage` = **%19**,
+`CloudLayerProbe.CoverageAt(oyuncu)` = **%0**. İkisi farklı büyüklük ve HUD
+yalnız ikincisini yazıyordu.
+
+**Gerçek sebep:** koyu lekeler bulut gölgesi. Gölge oyuncunun ÜSTÜNDEKİ
+buluttan değil, GÜNEŞ YÖNÜNDEKİ buluttan geliyor. Yerel kapsama o soruyu
+hiçbir zaman cevaplamıyor — oyuncunun üstü açıkken güneş yönü kapalı olabilir.
+
+**Bu ikinci sefer.** Kodun kendi yorumu birincisini kaydetmiş: "HUD %0
+gösterirken ekranda bulut vardı ve 'bulut olmayan yerde çizgi var' sanıldı."
+Kayıt vardı ama etiket düzeltilmemişti; aynı tuzak ikinci kez yanlış teşhise
+götürdü.
+
+**Çözüm:** iki satır ayrı ayrı yazılıyor —
+`Bulut — üstünde` (yerel) ve `Bulut — gökte ... (gölge bundan gelir)` (küresel).
+
+**Ders:** bir teşhis aracının yanıltıcı olduğu bir kez ölçüldüyse, kaydı yazmak
+yetmiyor — ARACIN KENDİSİ düzeltilmeli. Yorumdaki uyarı ekranda görünmüyor.

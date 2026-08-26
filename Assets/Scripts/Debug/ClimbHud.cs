@@ -123,12 +123,24 @@ public class ClimbHud : MonoBehaviour
         float top = cloudLayer.TopAt(observer.position);
         float bottom = cloudLayer.Bottom;
 
-        // "BULUNDUGUN SUTUNDA" ACIKCA YAZILI. F1 panelindeki kapsama KURESEL surgu;
-        // bu ise hava haritasinin senin XZ'nde verdigi YEREL deger. Ikisi farkli sayi.
-        // Ayni ada sahip olmalari bir kez yanlis teshise goturdu: HUD %0 gosterirken
-        // ekranda bulut vardi ve "bulut olmayan yerde cizgi var" sanildi.
-        builder.AppendFormat("  Bulut kapsaması        %{0:F0}\n",
+        // IKI SAYI DA YAZILIYOR, CUNKU IKISI FARKLI SEY.
+        //
+        // Yerel deger hava haritasinin senin XZ'nde verdigi kapsama; kuresel
+        // deger gokyuzunun genelinde ne kadar bulut oldugu. Once yalniz yerel
+        // yaziliyordu ve "Bulut kapsamasi" diye etiketliydi -- IKI KEZ yanlis
+        // teshise goturdu:
+        //   1. HUD %0 gosterirken ekranda bulut vardi, "bulut olmayan yerde
+        //      cizgi var" sanildi.
+        //   2. HUD %0 gosterirken zeminde belirgin koyu lekeler vardi
+        //      (kullanici iki kare gonderdi). Lekeler bulut GOLGESIYDI:
+        //      kuresel kapsama %19.5 ve gunes yonundeki bulut golge dusuruyordu.
+        //
+        // Golge senin ustundeki buluttan degil, GUNES YONUNDEKI buluttan
+        // geliyor. Yerel kapsama o soruyu hicbir zaman cevaplamiyor.
+        builder.AppendFormat("  Bulut — üstünde        %{0:F0}\n",
             cloudLayer.CoverageAt(observer.position) * 100f);
+        builder.AppendFormat("  Bulut — gökte          %{0:F0}   (gölge bundan gelir)\n",
+            atmosphere.Coverage * 100f);
 
         if (float.IsPositiveInfinity(top))
             builder.AppendFormat("  Bulut katmanı          bu sütunda bulut yok\n\n");
