@@ -299,7 +299,7 @@ float2 SnowReliefOffset(float3 posWS, float3 viewDirWS, out float dentOut)
 /// tanjantı bundan küçükse ışık duvarın arkasında kalıyor. Tamamen analitik:
 /// `dent`'in sürekli fonksiyonu, hiçbir eşik ve hiçbir doku okuması yok —
 /// basamak matematiksel olarak imkânsız. Yirmi doku okuması da gitti.
-half SnowReliefShadow(float3 posWS, float3 lightDirWS, float dent)
+half SnowReliefShadow(float3 lightDirWS, float dent, float gokPay)
 {
     if (_SnowDbgNoReliefShadow > 0.5) return (half)1.0;
 
@@ -312,20 +312,32 @@ half SnowReliefShadow(float3 posWS, float3 lightDirWS, float dent)
 
     float engel = saturate(1.0 - gunesTan / max(horizonTan, 1e-4));
 
-    // GÜNEŞ ALÇAKKEN GÖLGE ZAYIFLIYOR — kontrast değil, fizik.
+    // GÖLGE TAVANI FİZİKTEN GELİYOR, SABİT DEĞİL.
     //
-    // Güneş alçakken toplam aydınlatmada direkt payı düşüyor, gök payı
-    // artıyor; gölge kontrastı azalıyor. Tam güç bırakılınca akşam izin
-    // tamamı gölgede kalıp simsiyah oluyordu (ölçüldü: 17:49, gündüz
-    // oranı 0.33).
-    float gunesYuksekligi = saturate(lightDirWS.y * 3.0);
-    float guc = lerp(SNOW_SHADOW_LOW_SUN, 1.0, gunesYuksekligi);
+    // Gölgedeki yüzey doğrudan güneşi almıyor; yalnız göğü ve çevresinden
+    // yansıyanı alıyor. Tavanın fiziksel karşılığı GÖK PAYI: difüz ışınım /
+    // (difüz + direkt). Açık öğlende ~0.15, alçak güneşte ~0.4, kapalı havada
+    // 1.0 — çağıran taraf bunu gerçek ışıktan hesaplayıp veriyor.
+    //
+    // Sabit 0.55'ti ve kapalı havada da açık öğlende de aynı gölgeyi
+    // veriyordu. Artık bulut kapsaması arttıkça gölge KENDİLİĞİNDEN siliniyor,
+    // çünkü direkt pay düşüp gök payı 1'e gidiyor.
+    //
+    // KAR ÇOK SAÇICI: gölgedeki kar gök payında kalmıyor, çevresindeki
+    // aydınlık kar ona yansıtıyor. Tek yansımalık dolgu — kar albedosu 0.85 ve
+    // gölge lekesinin çevreyi gördüğü pay ~0.5, çarpımı `SNOW_SHADOW_BOUNCE`.
+    //
+    // Kâğıtta doğrulandı: açık öğle 0.15 + 0.85×0.43 = 0.52 — eski sabit 0.55
+    // meğer AÇIK ÖĞLE için doğruymuş, yanlış olan onu her havada kullanmaktı.
+    float taban = saturate(gokPay + (1.0 - gokPay) * SNOW_SHADOW_BOUNCE);
 
-    // KAR YARI SAYDAM: engelleme tam olsa bile gölge siyaha inmiyor. Ölçülü
-    // kar gölgesi/güneş oranı açık gökte 0.5-0.6.
-    float golge = saturate(1.0 - engel * guc);
+    // `SNOW_SHADOW_LOW_SUN` SİLİNDİ. Alçak güneşte gölgeyi kısan bir telafi
+    // terimiydi; gerekçesi "ışın uzun yol alıyor ve `engel` her yerde
+    // doyuyor"du. Işın yürüyüşü kalkınca o gerekçe de kalktı ve tavan zaten
+    // güneş alçalınca kendiliğinden yükseliyor.
+    float golge = saturate(1.0 - engel);
 
-    return (half)lerp(SNOW_SHADOW_FLOOR, 1.0, golge);
+    return (half)lerp(taban, 1.0, golge);
 }
 
 /// Çukurun eğimi — normal buradan geliyor. Merkezi fark, adım bir teksel.

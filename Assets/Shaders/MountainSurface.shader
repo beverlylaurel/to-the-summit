@@ -262,10 +262,19 @@ Shader "ToTheSummit/MountainSurface"
                     // ÇUKURUN KENDİ GÖLGESİ doğrudan ışığa uygulanıyor.
                     // Ortama uygulanmıyor: gök her yönden geliyor, çukurun
                     // duvarı onu kesmiyor — o iş `occlusion` teriminin.
+                    // GÖK PAYI: difüz ışınım / (difüz + direkt). Gölge
+                    // tavanının fiziksel karşılığı bu — gölgedeki yüzey
+                    // güneşi almıyor, göğü alıyor. Kapalı havada 1'e gidiyor
+                    // ve gölge kendiliğinden siliniyor.
+                    half gokLum   = Luminance(SampleSH(half3(0, 1, 0)));
+                    half gunesLum = Luminance(mainLight.color)
+                                  * saturate(mainLight.direction.y);
+                    half gokPay   = gokLum / max(gokLum + gunesLum, 1e-4h);
+
                     Light izIsigi = mainLight;
-                    izIsigi.shadowAttenuation *= SnowReliefShadow(IN.positionWS,
-                                                                  mainLight.direction,
-                                                                  surface.snowDentDepth);
+                    izIsigi.shadowAttenuation *= SnowReliefShadow(mainLight.direction,
+                                                                  surface.snowDentDepth,
+                                                                  gokPay);
 
                     half3 karIsik = SnowDirectLight(izIsigi, karN,
                                                     inputData.viewDirectionWS, ks)

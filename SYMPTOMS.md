@@ -3066,3 +3066,37 @@ altındayken taban doğrudan güneş görmüyor; 5 cm çukurda 20°.
 **Ders:** bir görsel terim ışın yürütüyorsa, önce o terimin analitik bir
 karşılığı olup olmadığı sorulur. Işın yürüyüşü hem eşik hem örnekleme
 getiriyor; ikisi de ızgarayı görünür kılıyor.
+
+---
+
+## Gölge tavanı sabitti, atmosferden türetildi
+
+**Durum:** ışın yürüyüşü analitik horizona çevrildikten sonra kullanıcı "çok
+daha iyi oldu" dedi, ama tavan hâlâ elle konmuş bir sayıydı:
+`SNOW_SHADOW_FLOOR = 0.55`, yani her havada ve her saatte %45 koyulaşma.
+
+**Büyüklüğün fiziksel karşılığı:** gölgedeki yüzey doğrudan güneşi almıyor,
+yalnız göğü ve çevresinden yansıyanı alıyor. Tavan = GÖK PAYI, yani difüz
+ışınım / (difüz + direkt). Çağıran taraf bunu gerçek ışıktan hesaplıyor:
+`Luminance(SampleSH(+Y))` ile `Luminance(mainLight.color) · sat(dir.y)`.
+
+**Kar çok saçıcı** — gölgedeki kar gök payında kalmıyor, çevresindeki aydınlık
+kar ona yansıtıyor. Tek yansımalık dolgu: albedo 0.85 × çevreyi görme payı
+~0.5 = `SNOW_SHADOW_BOUNCE` 0.43.
+
+| koşul | gök payı | tavan | koyulaşma |
+|---|---|---|---|
+| açık öğle | 0.15 | 0.52 | %48 |
+| açık ikindi | 0.28 | 0.59 | %41 |
+| alçak güneş 15° | 0.40 | 0.66 | %34 |
+| parçalı bulut | 0.65 | 0.80 | %20 |
+| kapalı hava | 1.00 | 1.00 | **%0** |
+
+**Eski sabit meğer AÇIK ÖĞLE için doğruymuş** (0.52 ≈ 0.55); yanlış olan onu
+her koşulda kullanmaktı. Artık bulut kapsaması arttıkça gölge kendiliğinden
+siliniyor — kapalı havada flat light, dağcılıkta bilinen durum.
+
+**`SNOW_SHADOW_LOW_SUN` silindi.** Alçak güneşte gölgeyi kısan bir telafi
+terimiydi ve gerekçesi "ışın uzun yol alıyor, `engel` her yerde doyuyor"du.
+Işın yürüyüşü kalkınca gerekçe de kalktı; üstelik tavan zaten güneş alçalınca
+kendiliğinden yükseliyor. Gerekçesini yitiren terim geri eklenmez.

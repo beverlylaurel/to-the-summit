@@ -104,30 +104,23 @@
 /// çukurun tabanı doğrudan güneş görmüyor — kâğıtta doğrulandı.
 #define SNOW_CAVITY_RADIUS             0.135
 
-/// Çukurun kendi gölgesi. Alçak güneşte yakın duvar gölgelenmezse ayak izi
-/// tümsek gibi okunuyor (ölçüldü: 17:00'de ters görünüyordu).
+/// GÖLGEDEKİ KARIN ÇEVRESİNDEN ALDIĞI DOLGU.
+///
+/// Gölge tavanı artık sabit değil, gök payından geliyor (`SnowRelief.hlsl`).
+/// Ama gölgedeki kar o payda kalmıyor: kar albedosu 0.85 ve gölge lekesi
+/// çevresindeki aydınlık karın yaklaşık yarısını görüyor, çarpımı 0.43.
+///
+/// Kâğıtta: açık öğle gök payı 0.15 → tavan 0.15 + 0.85×0.43 = 0.52.
+/// Alçak güneş 0.40 → 0.66. Kapalı hava 1.0 → 1.0 (gölge yok).
+///
+/// Eski `SNOW_SHADOW_FLOOR` 0.55'ti ve MEĞER AÇIK ÖĞLE İÇİN DOĞRUYMUŞ;
+/// yanlış olan onu her havada ve her saatte kullanmaktı.
+#define SNOW_SHADOW_BOUNCE             0.43
+
 /// Yuzey dokusu MIKRO detay: yakinda var, uzakta yok. Acik kalirsa gorus
 /// alanindaki butun kar ayni desenle kapaniyor.
 #define SNOW_SURF_FADE_START           8.0
 #define SNOW_SURF_FADE_END             28.0
-/// İZ-İÇİ GÖLGENİN TABANI — KAR YARI SAYDAM.
-///
-/// Engelleme tam olsa bile gölge siyaha inmiyor: ışık kar tanelerinin
-/// arasından çok kez saçılarak çukurun içine sızıyor. Taze karın tek-saçılma
-/// albedosu 1'e çok yakın, difüzyon güçlü.
-///
-/// Eskiden gölgenin GÜCÜ 0.5'e çekilerek aynı sonuç aranıyordu; o, engellemeyi
-/// zayıflatıyor, yani kenar geçişini de siliyordu. Doğrusu engellemeyi tam
-/// bırakıp TABANI yükseltmek: gölge keskin ama karanlık değil.
-/// Ölçülü kar gölgesi/güneş oranı açık gökte 0.5–0.6; kar o kadar yüksek
-/// albedolu ki gölgeli yüzey çevre kardan ve gökten aydınlanmaya devam
-/// ediyor. 0.45 bu aralığın altındaydı.
-#define SNOW_SHADOW_FLOOR              0.55
-
-/// Güneş ufka yakınken iz-içi gölgenin gücü. Alçak güneşte ışın uzun yol
-/// alıyor ve `engel` her yerde doyuyor; gücü kısmazsak iz akşam simsiyah
-/// oluyor (ölçüldü: 17:49, gündüz oranı 0.33, iz çevresinden çok koyu).
-#define SNOW_SHADOW_LOW_SUN            0.35
 
 
 #define SNOW_LOCAL_MIN               0.002
