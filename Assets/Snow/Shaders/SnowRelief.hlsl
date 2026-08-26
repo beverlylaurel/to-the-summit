@@ -301,8 +301,6 @@ float2 SnowReliefOffset(float3 posWS, float3 viewDirWS, out float dentOut)
 /// basamak matematiksel olarak imkânsız. Yirmi doku okuması da gitti.
 half SnowReliefShadow(float3 lightDirWS, float dent, float gokPay)
 {
-    if (_SnowDbgNoReliefShadow > 0.5) return (half)1.0;
-
     // Çukurun duvar eğimi = o noktadan görünen ufkun tanjantı.
     float horizonTan = dent / SNOW_CAVITY_RADIUS;
 
@@ -361,6 +359,21 @@ half2 SnowDentSlope(float2 uv)
     return half2((dR - dL) / (2.0 * metre), (dU - dD) / (2.0 * metre));
 }
 
+/// TEŞHİS: yüzey rölyefinin her terimi ve LOD ağırlığı ayrı ayrı kapanır.
+///
+/// Alçak güneşte keskin kenarlı adacıklar bildirildi; yüzey normali teşhisi
+/// lekelerde NdotL'nin 1'e fırladığını gösterdi, yani normal orada aşırı
+/// dönüyor. Hangi terimin döndürdüğü tek turda ayrılsın.
+///
+/// `_SnowDbgNoLod` özel: `SnowOktavAgirligi` bir `saturate(... - 1.0)`,
+/// yani DOYAN bir eşik, ve `fwidth`'e bağlı olduğu için yüzey eğimiyle
+/// birlikte leke leke değişiyor. Keskin ada kenarı oradan gelebilir.
+float _SnowDbgNoFbm;
+float _SnowDbgNoRipple;
+float _SnowDbgNoSastrugi;
+float _SnowDbgNoMicro;
+float _SnowDbgNoLod;
+
 /// KAR YÜZEYİNİN KENDİ RÖLYEFİ — ÖLÇÜLMÜŞ YER ŞEKİLLERİ.
 ///
 /// [KAYNAK: Filhol & Sturm 2015, "Snow bedforms: A review, new data, and a
@@ -394,6 +407,8 @@ half2 SnowDentSlope(float2 uv)
 /// iki katı olmalı. Altına inen oktav sönümleniyor.
 float SnowOktavAgirligi(float dalgaBoyu, float pikselBoyu)
 {
+    if (_SnowDbgNoLod > 0.5) return 1.0;
+
     return saturate(dalgaBoyu / max(pikselBoyu * 2.0, 1e-5) - 1.0);
 }
 
@@ -455,9 +470,12 @@ float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi)
     // Oluşumları da kaybolmaları da saatler sürer. Ölçülen eşikler
     // (ripple 7 m/s, sastrugi 20 m/s) bir ANIN değil, bir DÖNEMİN özelliği.
 
+    if (_SnowDbgNoFbm > 0.5) h = 0.0;
+
     float2 pr = float2(dot(worldXZ, w)   / SNOW_RIPPLE_LENGTH,
                        dot(worldXZ, dik) / (SNOW_RIPPLE_LENGTH * 6.0));
 
+    if (_SnowDbgNoRipple <= 0.5)
     h += (SnowValueNoise(pr) * 2.0 - 1.0) * min(SNOW_RIPPLE_AMP * SNOW_RIPPLE_BASE, tavan)
        * SnowOktavAgirligi(SNOW_RIPPLE_LENGTH, pikselBoyu);
 
@@ -473,6 +491,7 @@ float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi)
     float ns = SnowValueNoise(ps);
     ns = ns * ns * (3.0 - 2.0 * ns);
 
+    if (_SnowDbgNoSastrugi <= 0.5)
     h += (ns - 0.5) * min(SNOW_SASTRUGI_HEIGHT * SNOW_SASTRUGI_BASE, tavan)
        * SnowOktavAgirligi(SNOW_SASTRUGI_LENGTH, pikselBoyu);
 
@@ -536,6 +555,8 @@ float SnowMikroRolyef(float2 worldXZ, float dent, float pikselBoyu)
 /// Mikro rölyefin eğimi. Adım 1 cm — en ince oktav (1.6 cm) da geçsin diye.
 half2 SnowMikroEgim(float2 worldXZ, float dent)
 {
+    if (_SnowDbgNoMicro > 0.5) return (half2)0.0;
+
     const float e = 0.01;
 
     float pikselBoyu = max(fwidth(worldXZ.x), fwidth(worldXZ.y));

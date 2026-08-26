@@ -539,22 +539,15 @@
 #define SNOW_SASTRUGI_BURY         260.0
 /// Ölçülen sastrugi derinliği 14-40 cm, sivri uç aralığı 45-90 cm.
 ///
-/// UZUNLUK 60 CM DEĞİL: 45-90 cm ölçüsü sivri uçların ENİNE aralığı,
-/// rüzgâr yönündeki dalga boyu değil. Sastrugi rüzgâr yönünde metrelerce
-/// uzar; enine ölçü `SNOW_SASTRUGI_WIDTH`'te zaten duruyor.
+/// LENGTH RÜZGÂRA DİK EKSENDE, WIDTH RÜZGÂR YÖNÜNDE (`SnowYuzeyRolyef`).
+/// Bir tur LENGTH 0.60 → 2.00 yapıldı "eğim çok dik" diye; YANLIŞ
+/// EKSENDİ ve sastrugiyi enine şişirip yönsüzleştirdi. Geri alındı.
 ///
-/// Yorum "eğim 31°" diyordu ama sayılar onu vermiyordu: sinüs için en
-/// büyük eğim `2πA/L` = 2π×0.18/0.60 = 1.88, yani **62°**. Yüzey 60 cm
-/// aralıkla testere dişine dönüyordu ve alçak güneşte NdotL lekeler
-/// hâlinde 1'e fırlıyordu — kullanıcı teşhis görünümüyle gösterdi
-/// (`SYMPTOMS.md`).
-///
-/// 2.00 m ile eğim 2π×0.18/2.0 = 0.57, yani 30° — yorumun kendi hedefi
-/// ve arazide ölçülen H/L oranı (0.05-0.10) ile uyumlu. Keskinleştirme
-/// `n²(3−2n)` bunu ~40°'ye çıkarıyor; erozyon şekli olduğu için dik
-/// olması orada doğru.
+/// O turdaki eğim ölçümü de hatalıydı: genlik `HEIGHT × BASE` ile
+/// çarpılıyor, yani 18 cm değil 4.5 cm. Gerçek eğim 2π×0.045/0.60 =
+/// 0.47, yani 25° — arazi ölçümüyle uyumlu. Sastrugi suçsuz.
 #define SNOW_SASTRUGI_HEIGHT         0.180
-#define SNOW_SASTRUGI_LENGTH         2.00
+#define SNOW_SASTRUGI_LENGTH         0.60
 #define SNOW_SASTRUGI_WIDTH          2.20
 #define SNOW_SASTRUGI_WIND_TAU     120.0
 

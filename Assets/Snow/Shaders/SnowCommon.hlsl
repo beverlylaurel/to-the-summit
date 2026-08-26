@@ -433,28 +433,9 @@ float4 SnowTrailAt(float2 uv)
 /// isiklandirmadan bagimsiz ayirir.
 float _SnowDebugDent;
 
-/// 1 iken kar ortusu maskesini ve onu kuran carpanlari renk olarak basar:
-/// kirmizi = son maske, yesil = cavity (arazinin AO'su), mavi = egim x gok.
-/// Hangi carpanin maskeyi sifirladigini tek bakista ayirir.
-float _SnowDebugCover;
-
 /// 1 iken yuzey normalini ve NdotL'yi renk olarak basar:
 /// kirmizi = duz NdotL, yesil = wrap NdotL, mavi = N.y.
 /// Lekelerin normalden gelip gelmedigini tek bakista ayirir.
 float _SnowDebugNormal;
-
-/// IZ KENARINDAKI BASAMAGIN KAYNAGINI AYIRAN ANAHTARLAR.
-///
-/// Basamak uc turdur yanlis yerde arandi (yumusatma cekirdegi, blok gurultusu,
-/// bilinear turev sureksizligi). Ucu de gercek kusurdu, ucu de duzeltildi,
-/// basamak durdu. Suphelilerin TAMAMI ayni anda kapatilabilir olmali ki
-/// sorumlu tek turda bulunsun.
-///
-/// Her biri 1 iken o katman devre disi. Hepsi kapatildiginda ekranda kalan
-/// sey compute'un yazdigi ham geometridir.
-float _SnowDbgNoTexture;        // kar doku karisimi kapali, duz albedo
-float _SnowDbgNoParallax;       // relief paralaks kaymasi sifir
-float _SnowDbgNoReliefShadow;   // cukurun kendi golgesi kapali
-float _SnowDbgNoDentNormal;     // izin normale kattigi egim kapali
 
 #endif

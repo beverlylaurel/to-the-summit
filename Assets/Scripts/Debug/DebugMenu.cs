@@ -514,14 +514,6 @@ public class DebugMenu : MonoBehaviour
                 izHam = GUILayout.Toggle(izHam, "İzin ham hâli (ışıksız, paralakssız)");
                 if (izHam != hamOnce) Shader.SetGlobalFloat(SnowDebugDentId, izHam ? 1f : 0f);
 
-                // KAR ÖRTÜSÜ MASKESİ — hangi çarpan sıfırlıyor.
-                bool kapakOnce = kapakHam;
-                kapakHam = GUILayout.Toggle(kapakHam,
-                    "Kar örtüsü maskesi (K=maske, Y=AO, M=eğim×gök)");
-
-                if (kapakHam != kapakOnce)
-                    Shader.SetGlobalFloat(SnowDebugCoverId, kapakHam ? 1f : 0f);
-
                 bool normalOnce = normalHam;
                 normalHam = GUILayout.Toggle(normalHam,
                     "Yüzey normali (K=NdotL, Y=wrap, M=N.y)");
@@ -529,12 +521,6 @@ public class DebugMenu : MonoBehaviour
                 if (normalHam != normalOnce)
                     Shader.SetGlobalFloat(SnowDebugNormalId, normalHam ? 1f : 0f);
 
-                GUILayout.Label("Kenar basamağı — katmanları tek tek kapat:");
-
-                Anahtar(ref dbgNoTexture,      DbgNoTextureId,      "  kar dokusu karışımı");
-                Anahtar(ref dbgNoParallax,     DbgNoParallaxId,     "  relief paralaksı");
-                Anahtar(ref dbgNoReliefShadow, DbgNoReliefShadowId, "  çukurun kendi gölgesi");
-                Anahtar(ref dbgNoDentNormal,   DbgNoDentNormalId,   "  izin normale kattığı eğim");
 
                 GUILayout.Label("Kar ışıklandırması — terimleri kapat:");
 
@@ -546,22 +532,14 @@ public class DebugMenu : MonoBehaviour
                 Anahtar(ref dbgNoBounce,     DbgNoBounceId,     "  kar-kar yatay transferi");
                 Anahtar(ref dbgNoShadowTint, DbgNoShadowTintId, "  gölge rengi");
 
-                // ALÇAK GÜNEŞTE KESKİN KENARLI ADACIKLAR — ŞÜPHELİLER.
-                //
-                // Kullanıcı aynı kadrajdan dört saat gönderdi: 16:12 normal,
-                // 17:34 sepia, 17:49 ve 06:20 keskin kenarlı lekeli. Tri sayısı
-                // 10k'dan 433k'ya çıkıyor, yani alçak güneşte gölge kaskadları
-                // uzayıp arazi mesh'leri gölge geçişine giriyor.
-                GUILayout.Label("Alçak güneş anomalisi — şüpheliler:");
+                GUILayout.Label("Kar yüzey rölyefi — terimleri kapat:");
 
-                bool onceGolge = anaIsikGolgesiKapali;
-                anaIsikGolgesiKapali = GUILayout.Toggle(anaIsikGolgesiKapali,
-                    "  ana ışık gölge haritası");
+                Anahtar(ref dbgNoFbm,      DbgNoFbmId,      "  fBm tabanı");
+                Anahtar(ref dbgNoRipple,   DbgNoRippleId,   "  ripple");
+                Anahtar(ref dbgNoSastrugi, DbgNoSastrugiId, "  sastrugi");
+                Anahtar(ref dbgNoMicro,    DbgNoMicroId,    "  mikro tane");
+                Anahtar(ref dbgNoLod,      DbgNoLodId,      "  oktav LOD eşiği");
 
-                if (anaIsikGolgesiKapali != onceGolge && RenderSettings.sun != null)
-                    RenderSettings.sun.shadows = anaIsikGolgesiKapali
-                                               ? LightShadows.None
-                                               : LightShadows.Soft;
 
                 if (GUILayout.Button("Ayarları geri al (sınama)"))
                 {
@@ -569,16 +547,9 @@ public class DebugMenu : MonoBehaviour
                     mgr.RefillRegion();
                     izHam = false;
                     Shader.SetGlobalFloat(SnowDebugDentId, 0f);
-                    kapakHam = false;
-                    Shader.SetGlobalFloat(SnowDebugCoverId, 0f);
                     normalHam = false;
                     Shader.SetGlobalFloat(SnowDebugNormalId, 0f);
 
-                    dbgNoTexture = dbgNoParallax = dbgNoReliefShadow = dbgNoDentNormal = false;
-                    Shader.SetGlobalFloat(DbgNoTextureId, 0f);
-                    Shader.SetGlobalFloat(DbgNoParallaxId, 0f);
-                    Shader.SetGlobalFloat(DbgNoReliefShadowId, 0f);
-                    Shader.SetGlobalFloat(DbgNoDentNormalId, 0f);
 
                     dbgNoSpec = dbgNoSparkle = dbgNoTrans = dbgNoWrap = false;
                     dbgNoAO = dbgNoBounce = dbgNoShadowTint = false;
@@ -590,9 +561,14 @@ public class DebugMenu : MonoBehaviour
                     Shader.SetGlobalFloat(DbgNoBounceId, 0f);
                     Shader.SetGlobalFloat(DbgNoShadowTintId, 0f);
 
-                    anaIsikGolgesiKapali = false;
-                    if (RenderSettings.sun != null)
-                        RenderSettings.sun.shadows = LightShadows.Soft;
+                    dbgNoFbm = dbgNoRipple = dbgNoSastrugi = false;
+                    dbgNoMicro = dbgNoLod = false;
+                    Shader.SetGlobalFloat(DbgNoFbmId, 0f);
+                    Shader.SetGlobalFloat(DbgNoRippleId, 0f);
+                    Shader.SetGlobalFloat(DbgNoSastrugiId, 0f);
+                    Shader.SetGlobalFloat(DbgNoMicroId, 0f);
+                    Shader.SetGlobalFloat(DbgNoLodId, 0f);
+
                 }
 
                 GUILayout.Space(6f);
@@ -652,10 +628,7 @@ public class DebugMenu : MonoBehaviour
 
     static readonly int SnowDebugDentId = Shader.PropertyToID("_SnowDebugDent");
 
-    /// Kar örtüsü maskesi teşhis görünümü açık mı (`_SnowDebugCover`).
-    bool kapakHam;
 
-    static readonly int SnowDebugCoverId = Shader.PropertyToID("_SnowDebugCover");
 
     /// Yüzey normali teşhis görünümü açık mı (`_SnowDebugNormal`).
     bool normalHam;
@@ -669,13 +642,21 @@ public class DebugMenu : MonoBehaviour
     /// filtrelemenin türev süreksizliği. Üçü de gerçek kusurdu, üçü de
     /// düzeltildi, basamak durdu. Şüphelilerin TAMAMI aynı anda kapatılabilir
     /// olmalı ki sorumlu tek turda bulunsun.
-    bool dbgNoTexture, dbgNoParallax, dbgNoReliefShadow, dbgNoDentNormal;
 
     /// KAR IŞIKLANDIRMASININ HER TERİMİ. Alçak güneşte keskin kenarlı
     /// adacıklar bildirildi; maske, cavity, bulut gölgesi, gölge haritası ve
     /// geometri sırayla elendi. Terimlerin TAMAMI aynı anda kapatılabilir.
     bool dbgNoSpec, dbgNoSparkle, dbgNoTrans, dbgNoWrap,
          dbgNoAO, dbgNoBounce, dbgNoShadowTint;
+
+    /// Kar yüzey rölyefinin terimleri ve oktav LOD eşiği.
+    bool dbgNoFbm, dbgNoRipple, dbgNoSastrugi, dbgNoMicro, dbgNoLod;
+
+    static readonly int DbgNoFbmId      = Shader.PropertyToID("_SnowDbgNoFbm");
+    static readonly int DbgNoRippleId   = Shader.PropertyToID("_SnowDbgNoRipple");
+    static readonly int DbgNoSastrugiId = Shader.PropertyToID("_SnowDbgNoSastrugi");
+    static readonly int DbgNoMicroId    = Shader.PropertyToID("_SnowDbgNoMicro");
+    static readonly int DbgNoLodId      = Shader.PropertyToID("_SnowDbgNoLod");
 
     static readonly int DbgNoSpecId       = Shader.PropertyToID("_SnowDbgNoSpec");
     static readonly int DbgNoSparkleId    = Shader.PropertyToID("_SnowDbgNoSparkle");
@@ -685,13 +666,7 @@ public class DebugMenu : MonoBehaviour
     static readonly int DbgNoBounceId     = Shader.PropertyToID("_SnowDbgNoBounce");
     static readonly int DbgNoShadowTintId = Shader.PropertyToID("_SnowDbgNoShadowTint");
 
-    /// Ana ışığın gölge haritası kapalı mı (teşhis).
-    bool anaIsikGolgesiKapali;
 
-    static readonly int DbgNoTextureId      = Shader.PropertyToID("_SnowDbgNoTexture");
-    static readonly int DbgNoParallaxId     = Shader.PropertyToID("_SnowDbgNoParallax");
-    static readonly int DbgNoReliefShadowId = Shader.PropertyToID("_SnowDbgNoReliefShadow");
-    static readonly int DbgNoDentNormalId   = Shader.PropertyToID("_SnowDbgNoDentNormal");
 
     /// Bir anahtarı çizer ve değiştiyse shader'a yazar.
     static bool Anahtar(ref bool durum, int id, string etiket)
