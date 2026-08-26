@@ -514,31 +514,6 @@ public class DebugMenu : MonoBehaviour
                 izHam = GUILayout.Toggle(izHam, "İzin ham hâli (ışıksız, paralakssız)");
                 if (izHam != hamOnce) Shader.SetGlobalFloat(SnowDebugDentId, izHam ? 1f : 0f);
 
-                bool normalOnce = normalHam;
-                normalHam = GUILayout.Toggle(normalHam,
-                    "Yüzey normali (K=NdotL, Y=wrap, M=N.y)");
-
-                if (normalHam != normalOnce)
-                    Shader.SetGlobalFloat(SnowDebugNormalId, normalHam ? 1f : 0f);
-
-
-                GUILayout.Label("Kar ışıklandırması — terimleri kapat:");
-
-                Anahtar(ref dbgNoSpec,       DbgNoSpecId,       "  speküler");
-                Anahtar(ref dbgNoSparkle,    DbgNoSparkleId,    "  parıltı");
-                Anahtar(ref dbgNoTrans,      DbgNoTransId,      "  arkadan sızma");
-                Anahtar(ref dbgNoWrap,       DbgNoWrapId,       "  sarmalı diffuse (düz NdotL)");
-                Anahtar(ref dbgNoAO,         DbgNoAOId,         "  ortam örtmesi (AO)");
-                Anahtar(ref dbgNoBounce,     DbgNoBounceId,     "  kar-kar yatay transferi");
-                Anahtar(ref dbgNoShadowTint, DbgNoShadowTintId, "  gölge rengi");
-
-                GUILayout.Label("Kar yüzey rölyefi — terimleri kapat:");
-
-                Anahtar(ref dbgNoFbm,      DbgNoFbmId,      "  fBm tabanı");
-                Anahtar(ref dbgNoRipple,   DbgNoRippleId,   "  ripple");
-                Anahtar(ref dbgNoSastrugi, DbgNoSastrugiId, "  sastrugi");
-                Anahtar(ref dbgNoMicro,    DbgNoMicroId,    "  mikro tane");
-                Anahtar(ref dbgNoLod,      DbgNoLodId,      "  oktav LOD eşiği");
 
 
                 if (GUILayout.Button("Ayarları geri al (sınama)"))
@@ -547,27 +522,9 @@ public class DebugMenu : MonoBehaviour
                     mgr.RefillRegion();
                     izHam = false;
                     Shader.SetGlobalFloat(SnowDebugDentId, 0f);
-                    normalHam = false;
-                    Shader.SetGlobalFloat(SnowDebugNormalId, 0f);
 
 
-                    dbgNoSpec = dbgNoSparkle = dbgNoTrans = dbgNoWrap = false;
-                    dbgNoAO = dbgNoBounce = dbgNoShadowTint = false;
-                    Shader.SetGlobalFloat(DbgNoSpecId, 0f);
-                    Shader.SetGlobalFloat(DbgNoSparkleId, 0f);
-                    Shader.SetGlobalFloat(DbgNoTransId, 0f);
-                    Shader.SetGlobalFloat(DbgNoWrapId, 0f);
-                    Shader.SetGlobalFloat(DbgNoAOId, 0f);
-                    Shader.SetGlobalFloat(DbgNoBounceId, 0f);
-                    Shader.SetGlobalFloat(DbgNoShadowTintId, 0f);
 
-                    dbgNoFbm = dbgNoRipple = dbgNoSastrugi = false;
-                    dbgNoMicro = dbgNoLod = false;
-                    Shader.SetGlobalFloat(DbgNoFbmId, 0f);
-                    Shader.SetGlobalFloat(DbgNoRippleId, 0f);
-                    Shader.SetGlobalFloat(DbgNoSastrugiId, 0f);
-                    Shader.SetGlobalFloat(DbgNoMicroId, 0f);
-                    Shader.SetGlobalFloat(DbgNoLodId, 0f);
 
                 }
 
@@ -630,10 +587,6 @@ public class DebugMenu : MonoBehaviour
 
 
 
-    /// Yüzey normali teşhis görünümü açık mı (`_SnowDebugNormal`).
-    bool normalHam;
-
-    static readonly int SnowDebugNormalId = Shader.PropertyToID("_SnowDebugNormal");
 
     /// İZ KENARINDAKİ BASAMAĞIN KAYNAĞINI AYIRAN ANAHTARLAR.
     ///
@@ -643,41 +596,9 @@ public class DebugMenu : MonoBehaviour
     /// düzeltildi, basamak durdu. Şüphelilerin TAMAMI aynı anda kapatılabilir
     /// olmalı ki sorumlu tek turda bulunsun.
 
-    /// KAR IŞIKLANDIRMASININ HER TERİMİ. Alçak güneşte keskin kenarlı
-    /// adacıklar bildirildi; maske, cavity, bulut gölgesi, gölge haritası ve
-    /// geometri sırayla elendi. Terimlerin TAMAMI aynı anda kapatılabilir.
-    bool dbgNoSpec, dbgNoSparkle, dbgNoTrans, dbgNoWrap,
-         dbgNoAO, dbgNoBounce, dbgNoShadowTint;
-
-    /// Kar yüzey rölyefinin terimleri ve oktav LOD eşiği.
-    bool dbgNoFbm, dbgNoRipple, dbgNoSastrugi, dbgNoMicro, dbgNoLod;
-
-    static readonly int DbgNoFbmId      = Shader.PropertyToID("_SnowDbgNoFbm");
-    static readonly int DbgNoRippleId   = Shader.PropertyToID("_SnowDbgNoRipple");
-    static readonly int DbgNoSastrugiId = Shader.PropertyToID("_SnowDbgNoSastrugi");
-    static readonly int DbgNoMicroId    = Shader.PropertyToID("_SnowDbgNoMicro");
-    static readonly int DbgNoLodId      = Shader.PropertyToID("_SnowDbgNoLod");
-
-    static readonly int DbgNoSpecId       = Shader.PropertyToID("_SnowDbgNoSpec");
-    static readonly int DbgNoSparkleId    = Shader.PropertyToID("_SnowDbgNoSparkle");
-    static readonly int DbgNoTransId      = Shader.PropertyToID("_SnowDbgNoTrans");
-    static readonly int DbgNoWrapId       = Shader.PropertyToID("_SnowDbgNoWrap");
-    static readonly int DbgNoAOId         = Shader.PropertyToID("_SnowDbgNoAO");
-    static readonly int DbgNoBounceId     = Shader.PropertyToID("_SnowDbgNoBounce");
-    static readonly int DbgNoShadowTintId = Shader.PropertyToID("_SnowDbgNoShadowTint");
 
 
 
-    /// Bir anahtarı çizer ve değiştiyse shader'a yazar.
-    static bool Anahtar(ref bool durum, int id, string etiket)
-    {
-        bool once = durum;
-        durum = GUILayout.Toggle(durum, etiket);
-
-        if (durum != once) Shader.SetGlobalFloat(id, durum ? 1f : 0f);
-
-        return durum;
-    }
 
     string SnowStatus()
     {

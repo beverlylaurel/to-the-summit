@@ -605,7 +605,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         //
         // Ağırlık `snowSlope`: zaten hesaplanmış, yeni terim değil. Karın
         // durduğu yer ile detayın geçerli olduğu yer aynı yer.
-        float3 detailed = SnowApplyDetailNormals(snowNormal, worldPos, freshness, 0.0,
+        float3 detailed = SnowApplyDetailNormals(snowNormal, worldPos, 0.0,
                                                  length(_WorldSpaceCameraPos - worldPos));
 
         // Doku normalini de ekle: kar dokusunun asıl bilgisi burada.
@@ -662,6 +662,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
                                               snowMask));
 
         }
+
 
         // Mikro-oyuk karın altında kalıyor — ama TAMAMEN değil.
         //

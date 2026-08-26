@@ -3282,3 +3282,64 @@ kısmak fizik aralığının altına iner. Kalan kontrastın kaynağı ölçülm
 **Ders:** genlik tek başına anlamlı değil — ölçü EĞİM, yani genlik/dalga boyu.
 Dört oktavlı bir fBm'de ince oktavlar eğimi domine ediyor: gain 0.574 genliği
 küçültüyor ama frekans iki katına çıktığı için eğim her oktavda artıyor.
+
+---
+
+## Keskin adacıkların ASIL sebebi: detay normalinin MAKRO katmanı — çift sayım
+
+**Belirti:** alçak güneşte zeminde keskin kenarlı açık/koyu adacıklar.
+Kullanıcı aynı kadrajdan dört saat gönderdi; 16:12 temiz, 17:49 ve 06:20 lekeli.
+
+**ÖNCE YANLIŞ ŞEYİ ÖLÇTÜM.** Aydınlık/gölgeli oranını (kontrast) ölçüyordum,
+oysa şikâyet kenarların KESKİNLİĞİYDİ. Doğru ölçü gradyanın 99. yüzdeliği.
+Ölçü değişince sıralama tamamen değişti:
+
+| terim | kontrast oranı | p99 gradyan |
+|---|---|---|
+| BAZ | 0.87 | 22.0 |
+| fBm kapalı | 0.88 | 20.0 |
+| doku normali kapalı | 0.93 | **3.0** |
+
+fBm kontrastı etkiliyordu ama keskinliği değil.
+
+**İki yanlış aday daha ölçümle elendi:**
+- `SNOW_SURF_EGIM_TAVANI` 0.35 → 0.20: p99 22 → 22, **hiç değişmedi**
+  (çoğu piksel zaten tavanın altında). Geri alındı.
+- `_SnowSurfStrength` 0.35 → 0.00 (ayar assetinden): p99 22 → 22, yine
+  değişmedi. Yani suçlu `normalSlope` değil, `SnowApplyDetailNormals`.
+
+**Katman taraması — sorumlu tek katman:**
+
+| koşul | p99 gradyan | oran |
+|---|---|---|
+| BAZ | 22.0 | 0.87 |
+| **makro kapalı (8 m)** | **3.0** | **0.94** |
+| mezo kapalı (0.6 m) | 22.0 | 0.87 |
+| mikro kapalı (5 cm) | 20.0 | 0.87 |
+| detay normali tamamen kapalı | 3.0 | 0.94 |
+
+Makro'yu kapatmak, TÜM detay normalini kapatmakla aynı sonucu veriyor.
+
+**Gerçek sebep — ÇİFT SAYIM.** Makro katman 8 metreye gerilmiş bir fotogrametri
+detay dokusuydu ve yorumu "rüzgâr dalgaları" diyordu. Ama rüzgâr dalgalarını
+`SnowYuzeyRolyef` zaten üretiyor: fBm (1.25 m), ripple (17 cm), sastrugi.
+Aynı ölçek iki kez modelleniyordu — biri arazide ölçülmüş verilerden
+(Filhol & Sturm), öteki fotogrametri dokusundan. Dokunun taşıdığı keskin
+desenler 8 m'ye gerilince metre boyunda adacıklar olarak okunuyordu.
+
+**Çözüm:** makro katman silindi. Mezo (0.6 m) ve mikro (5 cm) duruyor — yakın
+plan detayı onlarda ve ikisi de kenar sertliğine katkı vermiyor.
+
+**Doğrulama, üç saat, sabit koşulda (bulut 0, yağış 0, 50 cm kar, 206 m):**
+
+| saat | p99 gradyan | oran |
+|---|---|---|
+| 17:49 | 3.0 | 0.94 |
+| 12:00 | 2.0 | 0.99 |
+| 06:18 | 2.0 | 0.83 |
+
+Başlangıç 17:49: p99 **28.0**, oran 0.75.
+
+**Ders:** şikâyeti doğru büyüklüğe çevirmeden ölçme. "Keskin kenar" kontrast
+değil GRADYAN. Yanlış büyüklüğü ölçtüğüm sürece fBm suçlu görünüyordu ve iki
+tur onun üstünde harcandı.
