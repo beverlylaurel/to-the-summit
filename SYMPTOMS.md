@@ -3463,3 +3463,17 @@ yapay olarak düşük çıkıyor — bu oturumda üç teşhis o yüzden çürüd
 **Ders:** yüzey rölyefinde tek tek terimlere değil TOPLAM RMS EĞİME bakılır.
 Her terim ayrı ayrı "makul" görünüyordu; yedi tanesinin karesel toplamı fiziği
 üçe katlıyordu. Ve genlik tek başına anlamsız — ölçü `2πA/λ`.
+
+**İkinci tur — RMS 21° hâlâ fazlaydı.** Kullanıcı "çok ufak kalmış" dedi;
+kalan noktaların rengi ölçüldü (R/B 2.55 ↔ 2.35), AYNI malzeme çıktı — kaya
+değil, aynı yüzeyin gölgeli tarafı. Bütün genlikler 0.7 ile çarpıldı:
+fBm 0.015, ripple tabanı 0.24, sastrugi tabanı 0.055, mikro 0.0022/0.0011/0.0004.
+Toplam RMS **15°** — arazide ölçülen aralığın (5-15°) üst ucu.
+
+| durum | p99 gradyan | nokta/zemin |
+|---|---|---|
+| başlangıç | 28.0 | — |
+| RMS 21° | 3.0 | 0.54 |
+| RMS 15° | **2.0** | **0.80** |
+
+Noktalar hâlâ var ama zemine yaklaştı (0.54 → 0.80) ve alanları %1'in altında.
