@@ -1,0 +1,29 @@
+// ROL: verilen dunya konumlarinda `SnowYuzeyRolyef`'i calistirip sonucu
+// tampona yazar. Yalniz eslik testi kullaniyor.
+#pragma kernel KHeightProbe
+
+// URP core ONCE: `GlobalSamplers.hlsl` `SAMPLER` makrosunu oradan aliyor ve
+// eksik olursa kernel SESSIZCE derlenmiyor. `SnowSim.compute` de ayni sirayi
+// kullaniyor.
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "SnowRelief.hlsl"
+
+StructuredBuffer<float2> _ProbePositions;
+StructuredBuffer<float>  _ProbeDepths;
+StructuredBuffer<float>  _ProbeExposure;
+RWStructuredBuffer<float> _ProbeResult;
+
+int _ProbeCount;
+
+[numthreads(64, 1, 1)]
+void KHeightProbe(uint3 id : SV_DispatchThreadID)
+{
+    if ((int)id.x >= _ProbeCount) return;
+
+    // `pikselBoyu` sifir: CPU tarafinda ornekleme frekansi sonsuz ve LOD
+    // kesimi yok. Iki taraf ayni kosulda olmali, yoksa sapma LOD'dan gelir
+    // ve formul hatasi sanilir.
+    _ProbeResult[id.x] = SnowYuzeyRolyef(_ProbePositions[id.x], 0.0,
+                                         _ProbeDepths[id.x], true,
+                                         _ProbeExposure[id.x]);
+}

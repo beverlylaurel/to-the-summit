@@ -328,10 +328,21 @@ half2 SnowDentSlope(float2 uv)
 /// (`SNOW_SPARKLE_MAX_FOOTPRINT`); rölyefte kapatılmamıştı.
 float SnowPikselBoyu(float2 worldXZ)
 {
+#ifdef SHADER_STAGE_COMPUTE
+    // COMPUTE ASAMASINDA TUREV YOK. `fwidth` yalniz fragment'te tanimli ve
+    // compute'ta kullanilirsa kernel SESSIZCE derlenmiyor: `GetComputeShader
+    // Messages` bos donuyor ama `FindKernel` "kernel at index 0 is invalid"
+    // veriyor. Bir tur bu yuzden yandi.
+    //
+    // Sifir dogru deger: compute'u yalniz eslik testi kullaniyor ve orada
+    // ornekleme frekansi sonsuz kabul ediliyor (CPU ikizi de oyle yapiyor).
+    return 0.0;
+#else
     float fx = fwidth(worldXZ.x);
     float fy = fwidth(worldXZ.y);
 
     return sqrt(max(fx * fy, 1e-10));
+#endif
 }
 
 float SnowOktavAgirligi(float dalgaBoyu, float pikselBoyu)
