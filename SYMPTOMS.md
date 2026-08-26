@@ -3383,3 +3383,34 @@ aday orası.
 HİÇBİR kare güvenilir değil. Shader değişikliği edit modda
 `Logs/refresh.trigger` ile derletilir, sonra Play açılır. Bu tuzak bu oturumda
 üç ayrı teşhisi çürüttü.
+
+---
+
+## `_SNOW_QUALITY_*` hiçbir shader'da tanımlı değil — üç katman ölü kod
+
+**Ölçüm:** `grep -rn "SNOW_QUALITY" Assets/Shaders Assets/Snow/Shaders` —
+`#pragma multi_compile` listesinde bu keyword YOK. `Shader.IsKeywordEnabled`
+global olarak MEDIUM döndürüyor ama shader onu hiç görmüyor.
+
+Sonuç: `SnowDetailNormals.hlsl`'deki üç blok hiç derlenmiyor —
+- mezo (0.6 m, `#if MEDIUM || HIGH`)
+- mikro (5 cm, `#if HIGH`)
+- ezilmiş (0.25 m, `#if HIGH`)
+
+Bu, mezo genliğini 0.50 → 0.28 yapmanın p99'u neden hiç değiştirmediğini
+açıklıyor: o satır zaten çalışmıyordu.
+
+**p99 gradyan ölçümü ±4 birim gürültülü.** Aynı ayarda (`surfStrength` 0.35)
+iki ayrı koşuda 18 ve 22 okundu. Bu büyüklükteki farklar anlamsız; ancak
+28 → 17 gibi büyük değişimler güvenilir.
+
+**Bu oturumda ölçülmüş gerçek kazanç tek:** `SNOW_FBM_AMP` 0.055 → 0.022,
+RMS eğim 35° → 15° (arazide ölçülen 5-15°). p99 28 → 21.
+
+`surfStrength` (kar dokusu normali) katkısı gürültünün içinde kaldı:
+0.35 → 0.00 bir koşuda 22 → 17, ötekinde 18 → 17.
+
+**Açık kalan:** adacıklar duruyor ve kaynağı bulunamadı. Sıradaki ayırıcı
+ölçüm: normali tamamen düzleştirip (N = +Y) p99 ölçmek. 17 → ~2 düşerse
+kaynak normal; 17'de kalırsa kaynak albedo/doku rengi ve normal tarafında
+aramak boşuna.
