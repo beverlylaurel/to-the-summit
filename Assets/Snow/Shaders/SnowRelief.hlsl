@@ -448,7 +448,7 @@ float SnowOktavAgirligiKipli(float dalgaBoyu, float pikselBoyu, bool yalnizGeome
 }
 
 float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi,
-                      bool yalnizGeometri)
+                      bool yalnizGeometri, float maruziyet)
 {
     // YER ŞEKLİ KAR TABAKASINDAN DERİN OLAMAZ.
     //
@@ -460,6 +460,22 @@ float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi,
     // Tavan `karDerinligi × SNOW_BEDFORM_DEPTH_FRAC`: 50 cm karda 17 cm'e
     // kadar serbest, 5 cm karda 1.7 cm'e kırpılıyor.
     float tavan = karDerinligi * SNOW_BEDFORM_DEPTH_FRAC;
+
+    // MARUZIYET IKI SEKLI AYIRIYOR.
+    //
+    // Sastrugi EROZYON sekli ve olusumu 20 m/s ustu ruzgar istiyor; ruzgarin
+    // supurdugu acik sirtta olusuyor. Drift BIRIKME sekli ve ruzgarin
+    // yavasladigi siperde cokuyor. Ayni noktada ikisi birden olmuyor.
+    //
+    // Spec 18.0 bunu zaten soyluyor: ruzgar golgesinde asinma tamamen kapali
+    // ("curvW sifirlanir -> asinma yok, sadece birikme").
+    //
+    // YAN KAZANC — RMS EGIM BUTCESI. Iki katman ayni yerde toplansaydi
+    // yuzeyin toplam egimi olculen 5-15 derece bandini iki kat asardi
+    // (`RATIONALE.md` -> "Sastrugi arazi olcusune cikarilamadi"). Ayrildiklari
+    // icin ortalama bantta kaliyor, yerel olarak 40-50 dereceye cikiyor.
+    float sastrugiPay = maruziyet;
+    float driftPay    = 1.0 - maruziyet;
 
     // --- fBm tabanı: dört oktav, self-affine ---
     float h   = 0.0;
@@ -528,7 +544,7 @@ float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi,
     ns = ns * ns * (3.0 - 2.0 * ns);
 
     if (_SnowDbgNoSastrugi <= 0.5)
-    h += (ns - 0.5) * min(SNOW_SASTRUGI_HEIGHT * SNOW_SASTRUGI_BASE, tavan)
+    h += (ns - 0.5) * min(SNOW_SASTRUGI_HEIGHT * SNOW_SASTRUGI_BASE, tavan) * sastrugiPay
        * SnowOktavAgirligiKipli(SNOW_SASTRUGI_LENGTH, pikselBoyu, yalnizGeometri);
 
     // --- DRIFT: birikme tepecikleri, YUMUSAK ---
@@ -541,7 +557,7 @@ float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi,
                        dot(worldXZ, dik) / SNOW_DRIFT_LENGTH);
 
     if (_SnowDbgNoDrift <= 0.5)
-    h += (SnowValueNoise(pd) - 0.5) * min(SNOW_DRIFT_HEIGHT, tavan)
+    h += (SnowValueNoise(pd) - 0.5) * min(SNOW_DRIFT_HEIGHT, tavan) * driftPay
        * SnowOktavAgirligiKipli(SNOW_DRIFT_LENGTH, pikselBoyu, yalnizGeometri);
 
     return h;
@@ -554,7 +570,7 @@ float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi,
 /// `SnowShadeHeightAt`'e konunca `SnowDentSmooth` (9 tap) × `SnowDentSlope`
 /// (4 tap) = 36 çağrı × 6 gürültü = piksel başına 180 örnek oluyor. Hem kare
 /// süresi hem shader derleme süresi patlıyor.
-half2 SnowYuzeyEgim(float2 worldXZ, float karDerinligi, out float yukseklik)
+half2 SnowYuzeyEgim(float2 worldXZ, float yerY, float karDerinligi, out float yukseklik)
 {
     const float e = 0.02;
 
@@ -563,10 +579,16 @@ half2 SnowYuzeyEgim(float2 worldXZ, float karDerinligi, out float yukseklik)
     // hesaplanır ve gradyanın kendisi bozulur.
     float pikselBoyu = SnowPikselBoyu(worldXZ);
 
-    float hL = SnowYuzeyRolyef(worldXZ - float2(e, 0.0), pikselBoyu, karDerinligi, false);
-    float hR = SnowYuzeyRolyef(worldXZ + float2(e, 0.0), pikselBoyu, karDerinligi, false);
-    float hD = SnowYuzeyRolyef(worldXZ - float2(0.0, e), pikselBoyu, karDerinligi, false);
-    float hU = SnowYuzeyRolyef(worldXZ + float2(0.0, e), pikselBoyu, karDerinligi, false);
+    // Maruziyet `SampleWindShadow`'un TERSI: o fonksiyon korunakliligi
+    // olcuyor (spec 18.0: "> 0 -> golgede"). Ayni cevirme
+    // `SnowSurfaceWeights`'te de yapiliyor, iki yer ayni yonu okumak zorunda.
+    float maruziyet = 1.0 - saturate(
+        SampleWindShadow(float3(worldXZ.x, yerY, worldXZ.y)) * 1.2);
+
+    float hL = SnowYuzeyRolyef(worldXZ - float2(e, 0.0), pikselBoyu, karDerinligi, false, maruziyet);
+    float hR = SnowYuzeyRolyef(worldXZ + float2(e, 0.0), pikselBoyu, karDerinligi, false, maruziyet);
+    float hD = SnowYuzeyRolyef(worldXZ - float2(0.0, e), pikselBoyu, karDerinligi, false, maruziyet);
+    float hU = SnowYuzeyRolyef(worldXZ + float2(0.0, e), pikselBoyu, karDerinligi, false, maruziyet);
 
     // YÜKSEKLİK DE BURADAN — AYRI ÇAĞRI YAPILMIYOR.
     //

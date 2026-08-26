@@ -104,7 +104,12 @@ float SnowTessYerDegistirme(float3 posWS)
     // Terrain kose araligi / bolme faktoru = yeni kose araligi.
     float koseAraligi = SNOW_TERRAIN_VERTEX_SPACING / faktor;
 
-    return SnowYuzeyRolyef(posWS.xz, koseAraligi, SnowWorldCoverHeight(), true);
+    // Maruziyet `SampleWindShadow`'un TERSI: o fonksiyon korunakliligi
+    // olcuyor (spec 18.0: "> 0 -> golgede"). Siperde drift, acikta sastrugi.
+    float maruziyet = 1.0 - saturate(SampleWindShadow(posWS) * 1.2);
+
+    return SnowYuzeyRolyef(posWS.xz, koseAraligi, SnowWorldCoverHeight(),
+                           true, maruziyet);
 }
 
 /// Baricentrik interpolasyon + yer degistirme. Her gecis kendi `Varyings`'ini

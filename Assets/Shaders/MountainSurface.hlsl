@@ -652,7 +652,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
             // Kar tabakasının kalınlığı: yer şekilleri bundan derin olamaz.
             float karKalinligi = SnowBaseHeight(karDurum.r, yerelRho);
 
-            half2 yuzeyEgim = SnowYuzeyEgim(izPos.xz, karKalinligi, yuzeyYuksekligi)
+            half2 yuzeyEgim = SnowYuzeyEgim(izPos.xz, izPos.y, karKalinligi, yuzeyYuksekligi)
                             + SnowMikroEgim(izPos.xz, izDerinlik);
 
             surface.snowSurfaceHeight = (half)yuzeyYuksekligi;
