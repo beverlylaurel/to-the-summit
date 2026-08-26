@@ -75,6 +75,22 @@ public static class SnowConstantsTest
         ("SuspMaxHeight", "SNOW_SUSP_MAX_HEIGHT"),
         ("SprayParticlesPerM3", "SNOW_SPRAY_PARTICLES_PER_M3"),
         ("EdgeFadeRange", "SNOW_EDGE_FADE_RANGE"),
+
+        // --- Kar yuzeyi geometrisi (Gorev 9: C# ikizi) ---
+        ("TerrainVertexSpacing", "SNOW_TERRAIN_VERTEX_SPACING"),
+        ("TessMinDalga", "SNOW_TESS_MIN_DALGA"),
+        ("BedformDepthFrac", "SNOW_BEDFORM_DEPTH_FRAC"),
+        ("FbmAmp", "SNOW_FBM_AMP"),
+        ("FbmScale", "SNOW_FBM_SCALE"),
+        ("FbmGain", "SNOW_FBM_GAIN"),
+        ("RippleAmp", "SNOW_RIPPLE_AMP"),
+        ("RippleLength", "SNOW_RIPPLE_LENGTH"),
+        ("SastrugiHeight", "SNOW_SASTRUGI_HEIGHT"),
+        ("SastrugiLength", "SNOW_SASTRUGI_LENGTH"),
+        ("SastrugiWidth", "SNOW_SASTRUGI_WIDTH"),
+        ("DriftHeight", "SNOW_DRIFT_HEIGHT"),
+        ("DriftLength", "SNOW_DRIFT_LENGTH"),
+        ("DriftWidth", "SNOW_DRIFT_WIDTH"),
         ("GroupSize", "SNOW_GROUP_SIZE"),
     };
 

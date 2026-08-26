@@ -223,4 +223,40 @@ public static class SnowConstants
     /// Yer değiştirme köşe shader'ında olduğu için CPU sınırları bilmiyor.
     /// Dar bırakılırsa kar, kamera açısına göre eleniyor (§22).
     public const float MeshBoundsHeight = 600f;
+
+    // --- Kar yüzeyi geometrisi ---
+    //
+    // BU BLOK HLSL'İN İKİZİ. `SnowSurfaceHeight` bu sabitleri okuyup
+    // `SnowYuzeyRolyef`'in aynısını CPU'da hesaplıyor; fizik ve görsel aynı
+    // yüzeyi görmek zorunda. Eşliği `SnowConstantsTest` sınıyor — bir sayı
+    // tek tarafta değişirse test kırmızı verir.
+
+    /// Terrain köşe aralığı, metre. Arazi 30000 m / heightmap 4097.
+    public const float TerrainVertexSpacing = 7.32f;
+
+    /// Geometriye giren en kısa dalga boyu, metre.
+    public const float TessMinDalga = 0.50f;
+
+    /// Yer şeklinin kar tabakasının kaçta kaçına kadar inebileceği.
+    public const float BedformDepthFrac = 0.60f;
+
+    /// fBm tabanı: genlik (m), ilk oktavın frekansı, oktavlar arası oran.
+    public const float FbmAmp = 0.015f;
+    public const float FbmScale = 0.80f;
+    public const float FbmGain = 0.574f;
+
+    /// Ripple: yarı genlik (m) ve dalga boyu (m), rüzgâra dik sırtlar.
+    public const float RippleAmp = 0.006f;
+    public const float RippleLength = 0.17f;
+
+    /// Sastrugi: tepe-dip yükseklik (m), rüzgâra dik aralık, rüzgâr yönünde
+    /// uzama. LENGTH rüzgâra DİK eksende, WIDTH rüzgâr yönünde.
+    public const float SastrugiHeight = 0.20f;
+    public const float SastrugiLength = 0.60f;
+    public const float SastrugiWidth = 2.20f;
+
+    /// Drift: birikme tepecikleri. Aynı eksen kuralı sastrugi'deki gibi.
+    public const float DriftHeight = 0.30f;
+    public const float DriftLength = 0.90f;
+    public const float DriftWidth = 1.60f;
 }
