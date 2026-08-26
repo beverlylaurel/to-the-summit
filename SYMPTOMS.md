@@ -2823,3 +2823,48 @@ kullanıcının makinesinde yapılacak.
 **Kural:** parlaklık karşılaştırması yapan her kare, karşılaştırılan iki kareyi
 **aynı Play oturumunda ve arka arkaya** almalı. Saatler arayla alınmış iki kare
 farklı sahnelerdir.
+
+---
+
+## "1 cm'de iz yok, 20/50 cm'de çok geniş" — İKİ ayrı sebep, ikisi de kâğıtta çıktı
+
+**Belirti (kullanıcı):** "1cm'de ayak izi yok. 5cm'de çok hafif, neredeyse
+gözükmüyor. 20 ve 50cm'dekiler ise çok büyük geniş izler."
+
+**Ölçüm (kâğıtta, koddaki formüllerle):**
+
+| kar | batma | yayılım | iz genişliği |
+|---|---|---|---|
+| 1 cm | 0.9 cm | 0.0 cm | 23 cm |
+| 5 cm | 4.5 cm | 0.7 cm | 25 cm |
+| 20 cm | 15.0 cm | 14.1 cm | 56 cm |
+| 50 cm | 15.0 cm | 14.1 cm | 56 cm |
+
+Şikâyetin üç maddesi de tabloda duruyor. Sebepler AYRI:
+
+**Sığ kar — sıkışma yanlış referansla ölçülüyordu.** `KCompact`
+`saturate(trail.r / SNOW_MAX_SINK)` yazıyordu: 1 cm karda 0.9 / 15 = **0.06**,
+yani kar sütununun %90'ı ezilmiş olmasına rağmen yoğunluk hiç artmıyordu. Sığ
+karda iz zaten derinlikten okunamaz (0.9 cm çukur, 23 cm genişlik = 4° eğim);
+orada izi görünür kılan DOKU ve YOĞUNLUK.
+Referans mevcut karın ezilebilir payı oldu: `min(SnowBaseHeight(swe,
+_FallbackRhoN), SNOW_MAX_SINK)`. Oran 1 cm'de 0.06 → 0.90, yoğunluk 116 →
+343 kg/m³ (izsiz kar 100).
+Döngü kapanmıyor çünkü kalınlık `snow.g`'den değil SABİT referans yoğunluktan
+çıkıyor — `snow.r` (SWE) yoğunluktan bağımsız. `SnowBaseHeight(snow.r, snow.g)`
+yazılsaydı `snow.g` artınca kalınlık düşer, oran yükselir, `snow.g` yine
+artardı.
+
+**Derin kar — duvar kum gibi davranıyordu.** `SNOW_STAND_LOOSE` 4 cm'di, yani
+kar 4 cm'den yüksek duvar tutamıyor sayılıyordu ve gerisi göçüp 14 cm omuz
+açıyordu. Kar kohezyonludur: `h = 2c/(rho g)`, taze tozda c ≈ 300-1000 Pa ve
+rho ≈ 100 kg/m³ → **60 cm ile 2 m**. Kar mağarasının kazılabilmesinin sebebi bu.
+4 → 12 cm: yayılım 14.1 → 3.8 cm, iz **56 → 35 cm**.
+
+**Yan etki yakalandı:** `SNOW_STAND_PACKED` 0.07'ydi ve LOOSE 0.12'ye çıkınca
+sıralama tersine döndü — `lerp(LOOSE, PACKED, packed)` sıkışmış karda duvarı
+ALÇALTIYORDU. Sıkışmış kar daha kohezyonludur; 0.200 yapıldı.
+
+**20 ile 50 cm arasındaki batma farksızlığı hata değil.** İkisi de
+`SNOW_MAX_SINK` tavanında; taşıma gücü karın YOĞUNLUĞUNA bağlı, derinliğine
+değil. Aynı basınç aynı yoğunlukta aynı derinliğe batar.

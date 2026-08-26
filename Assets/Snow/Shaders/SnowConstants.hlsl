@@ -337,13 +337,26 @@
 /// yüksekliğin ÜSTÜNDE kalan pay göçüyor; altı dik kalıyor.
 ///
 /// Kohezyon yoğunlukla artıyor: taze kar az tutar, sıkışmış kar çok.
-/// TAZE KAR 1.5 CM'DEN FAZLA DİK DUVAR TUTAR.
 ///
-/// 1.5 cm ile duvarın neredeyse tamamı göçüyordu ve omuz 17 cm'ye ulaşıyordu.
-/// Gerçek ayak izinin kenarı bir süre dik durur — ayağın ittiği duvar
-/// SIKIŞMIŞTIR, çevredeki gevşek kar gibi davranmaz.
-#define SNOW_STAND_LOOSE             0.040
-#define SNOW_STAND_PACKED            0.07
+/// KAR KUM DEĞİL, KOHEZYONLU. Serbest duran duvar yüksekliği
+/// `h = 2c / (rho g)`; taze tozda c ≈ 300-1000 Pa ve rho ≈ 100 kg/m³ veriyor,
+/// yani **60 cm ile 2 m**. Kar mağarasının kazılabilmesinin sebebi bu.
+///
+/// Değer 4 cm'ken 20 cm karda duvarın 11 cm'i göçüyor ve 14 cm omuz açıyordu:
+/// iz 56 cm çıkıyordu (kullanıcı bildirdi: "20 ve 50 cm'dekiler çok büyük
+/// geniş izler"). 12 cm hâlâ kohezyon hesabının çok altında — muhafazakâr
+/// seçildi ki `SNOW_MAX_SINK` (15 cm) altında bir miktar göçme kalsın ve
+/// kenar bıçak gibi dik durmasın.
+///
+/// Ölçüldü (kâğıtta): 4 cm → iz 56 cm, 12 cm → iz 35 cm. Geometrik gövde
+/// (kuyruk hariç) 21 cm; bot genişliği 11 cm artı kenar çökmesi.
+#define SNOW_STAND_LOOSE             0.120
+
+/// Sıkışmış kar DAHA YÜKSEK duvar tutar, daha az değil. Aynı formülde
+/// c ≈ 5-20 kPa ve rho = 550 kg/m³ metrelerce veriyor. Değer 0.07'ydi ve
+/// `SNOW_STAND_LOOSE` 0.12'ye çıkınca sıralama TERSİNE dönmüştü:
+/// `lerp(LOOSE, PACKED, packed)` sıkışmış karda duvarı alçaltıyordu.
+#define SNOW_STAND_PACKED            0.200
 
 /// KENARIN DÜZENSİZLİĞİ ve dalga boyu (1/m).
 ///

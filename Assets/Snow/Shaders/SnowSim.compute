@@ -456,9 +456,28 @@ void KDeform(uint3 id : SV_DispatchThreadID)
     //
     // Taban izsiz karın kendi yoğunluğu (`_FallbackRhoN`); sabit bir döşeme
     // yazılırsa oyma sıfıra giderken yoğunluk sıçrar ve kenar sertleşir.
+    //
+    // REFERANS MEVCUT KARIN EZİLEBİLİR PAYI, SABİT TAVAN DEĞİL.
+    //
+    // `trail.r / SNOW_MAX_SINK` yazılıyordu ve sığ karda iz GÖRÜNMÜYORDU
+    // (kullanıcı bildirdi: "1 cm'de ayak izi yok, 5 cm'de neredeyse
+    // gözükmüyor"). Ölçüldü: 1 cm karda batma 0.9 cm, oran 0.9/15 = 0.06 —
+    // karın %90'ı ezilmiş olmasına rağmen yoğunluk hiç artmıyordu.
+    //
+    // Sıkışmanın ölçüsü mutlak batma değil, kar sütununun ne kadarının
+    // ezildiği. Sığ karda iz zaten derinlikten okunamaz (0.9 cm çukur, 23 cm
+    // genişlik = 4°'lik eğim); orada izi görünür kılan DOKU ve YOĞUNLUK.
+    //
+    // DÖNGÜ KAPANMIYOR: kalınlık `snow.g`'den değil, SABİT referans
+    // yoğunluktan çıkıyor. `SnowBaseHeight(snow.r, snow.g)` yazılsaydı
+    // `snow.g` artınca kalınlık düşer, oran yükselir, `snow.g` yine artardı.
+    // `snow.r` (SWE) yoğunluktan bağımsız.
+    float refKalinlik = SnowBaseHeight(snow.r, _FallbackRhoN);
+    float ezilebilir  = max(min(refKalinlik, SNOW_MAX_SINK), 1e-3);
+
     float hedefN = _FallbackRhoN
                  + (SNOW_PACKED_N - _FallbackRhoN)
-                   * saturate(trail.r / SNOW_MAX_SINK) * SNOW_COMPACT_GAIN;
+                   * saturate(trail.r / ezilebilir) * SNOW_COMPACT_GAIN;
 
     snow.g = max(snow.g, min(hedefN, SNOW_PACKED_N));
 
