@@ -360,6 +360,11 @@ SAMPLER(sampler_SastrugiNoise);
 /// sisteminin esintileri deseni titretiyor (spec §18.4).
 float2 _SastrugiWindDir;
 
+/// Cukurun ortalama yaricapi (m). `SnowManager.BuildTrailSegments` sahnedeki
+/// deformer parcalarindan hesapliyor — sabit degil, cunku ayak izi uc kapsul
+/// ve her birinin yaricapi ayri.
+float _SnowCavityRadius;
+
 /// SIRTLAR RÜZGÂRA DİK UZANIYOR (transverse). Dalga boyu rüzgâr yönünde
 /// KISA, sırtlar rüzgâra dik yönde UZUN. UV'ler ters yazılırsa desen 90°
 /// yanlış olur (spec §18.4, §22).

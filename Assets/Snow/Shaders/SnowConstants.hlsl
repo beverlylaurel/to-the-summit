@@ -96,14 +96,6 @@
 /// metrelerce uzayıp bulaşıyor.
 #define SNOW_RELIEF_MAX_STRETCH        3.0
 
-/// ÇUKURUN YARIÇAPI (m) — horizon açısı bundan çıkıyor.
-///
-/// Ayak izi bir çanak; duvarının eğimi `derinlik / yarıçap` ve bu, çukurun
-/// içinden görünen ufkun tanjantı. Değer izin yarı genişliği: iz 27 cm, yarısı
-/// 13.5 cm. 15 cm derinlikte horizon 48°, yani güneş 48°'nin altındayken
-/// çukurun tabanı doğrudan güneş görmüyor — kâğıtta doğrulandı.
-#define SNOW_CAVITY_RADIUS             0.135
-
 /// GÖLGEDEKİ KARIN ÇEVRESİNDEN ALDIĞI DOLGU.
 ///
 /// Gölge tavanı artık sabit değil, gök payından geliyor (`SnowRelief.hlsl`).

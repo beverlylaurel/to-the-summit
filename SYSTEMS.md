@@ -833,6 +833,11 @@ zincirine bağlandığında arazide hiçbir etkisi olmuyordu (ölçüldü: güç
 arasında ekran farkı yok). Kar yüzeyinin tamamını arazi çizdiği için doku
 oraya girmezse hiç görünmez.
 
+**Çukurun yarıçapı sahneden geliyor.** `SnowReliefShadow` ufuk açısını
+`derinlik / yarıçap`'tan buluyor; yarıçabı `SnowManager.BuildTrailSegments`
+sahnedeki deformer parçalarından ortalayıp `_SnowCavityRadius`'a yazıyor.
+Sabit değil, çünkü ayak izi üç kapsül ve her birinin yarıçapı ayrı.
+
 **Kar ↔ pozlama.** Açık günün pozlaması (`LookSettings.clearDay.exposure`)
 KAR için ayarlı, sahne ortalaması için değil. Ölçüldü: -0.15 EV'de tam güneşli
 kar 0.921 luma / 0.0151 sapma ile ACES'in omzunda eziliyor ve yüzeyin bütün

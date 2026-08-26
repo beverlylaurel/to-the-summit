@@ -94,6 +94,11 @@ public static class SnowShaderIDs
 
     // --- Sastrugi (spec §18.4) ---
     public static readonly int SastrugiWindDir = Shader.PropertyToID("_SastrugiWindDir");
+
+    /// Çukurun ortalama yarıçapı (m). `SnowReliefShadow`'un ufuk açısı bundan
+    /// çıkıyor; `SnowManager.BuildTrailSegments` sahnedeki deformer'lardan
+    /// hesaplayıp yazıyor.
+    public static readonly int CavityRadius = Shader.PropertyToID("_SnowCavityRadius");
     public static readonly int SastrugiNoise = Shader.PropertyToID("_SastrugiNoise");
 
     // --- Kar yüzeyi materyali ---

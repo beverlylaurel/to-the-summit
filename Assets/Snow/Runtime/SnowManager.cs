@@ -1120,6 +1120,16 @@ public class SnowManager : MonoBehaviour
         Vector2 center = AreaCenter;
         float half = settings.QualityData.AreaSize * 0.5f;
 
+        // ÇUKURUN YARIÇAPI SAHNEDEN GELİYOR, SABİTTEN DEĞİL.
+        //
+        // `SnowReliefShadow` çukurun ufuk açısını `derinlik / yarıçap`'tan
+        // buluyor. Yarıçap shader'da 13.5 cm sabitti ve iz o genişlikteyken
+        // doğruydu; ayak izi üç kapsüle bölününce gerçek yarıçap 3.4-5.5 cm'e
+        // indi ve sabit üç kat büyük kaldı. Ufuk tanjantı üçte bire düşünce
+        // çukurun kendi gölgesi olması gerekenden zayıf çıkıyordu.
+        float yaricapToplam = 0f;
+        int yaricapSayi = 0;
+
         for (int i = 0; i < SnowDeformerRegistry.Count; i++)
         {
             SnowDeformer d = SnowDeformerRegistry.Get(i);
@@ -1144,6 +1154,9 @@ public class SnowManager : MonoBehaviour
                 trailSegmentData[slot]     = a;
                 trailSegmentData[slot + 1] = b;
 
+                yaricapToplam += r;
+                yaricapSayi++;
+
                 trailSegmentCount++;
             }
 
@@ -1154,6 +1167,11 @@ public class SnowManager : MonoBehaviour
         }
 
         if (trailSegmentCount == 0) return;
+
+        // Ortalama, en büyük değil: üç kapsülün üçü de aynı çukurun parçası
+        // ve gölgeyi hep birlikte kuruyorlar.
+        Shader.SetGlobalFloat(SnowShaderIDs.CavityRadius,
+                              yaricapToplam / Mathf.Max(yaricapSayi, 1));
 
         trailSegmentBuffer ??= new ComputeBuffer(MaxTrailSegments * 2, TrailSegmentStride);
         trailSegmentBuffer.SetData(trailSegmentData, 0, 0, trailSegmentCount * 2);

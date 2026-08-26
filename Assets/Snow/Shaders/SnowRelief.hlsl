@@ -304,7 +304,14 @@ half SnowReliefShadow(float3 lightDirWS, float dent, float gokPay)
     if (_SnowDbgNoCavityShadow > 0.5) return (half)1.0;
 
     // Çukurun duvar eğimi = o noktadan görünen ufkun tanjantı.
-    float horizonTan = dent / SNOW_CAVITY_RADIUS;
+    //
+    // YARIÇAP SAHNEDEN GELİYOR. Sabit 13.5 cm'di ve iz tek kapsülken
+    // doğruydu; ayak izi üç kapsüle bölününce gerçek yarıçap 3.4-5.5 cm'e
+    // indi. Üç kat büyük bir yarıçap ufuk tanjantını üçte bire düşürüyor,
+    // yani çukurun kendi gölgesi olması gerekenden zayıf çıkıyordu.
+    // Alt sınır sıfıra bölmeyi engelliyor: sahnede hiç deformer yoksa global
+    // sıfır kalır ve `dent` de sıfır olduğu için 0/0 NaN üretirdi.
+    float horizonTan = dent / max(_SnowCavityRadius, 1e-3);
 
     // Güneşin yükseklik tanjantı. Yatay bileşen sıfıra giderse güneş tepede,
     // tanjant sonsuz — hiçbir duvar onu kesemez.

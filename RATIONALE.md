@@ -1830,3 +1830,40 @@ mesafede ızgara okunmuyor.
 **Yan kazanç.** Kabartı kapısı kapalıyken normal ve pürüzlülük dokuları hiç
 okunmuyor: uzakta doku erişimi on ikiden dörde iniyor. Önceden `guc`
 sıfır olsa bile on iki okuma yapılıp sonuç sıfırla çarpılıyordu.
+
+## Çukur gölgesinin yarıçapı sabitti ve üç kat büyüktü
+
+`SnowReliefShadow` ufuk tanjantını `derinlik / yarıçap`'tan buluyor. Yarıçap
+`SNOW_CAVITY_RADIUS = 0.135 m` sabitiydi ve gerekçesi "iz 27 cm, yarısı 13.5"
+diyordu — iz **tek kapsülken** doğruydu.
+
+Ayak izi üç kapsüle bölününce gerçek yarıçap değişti. Ölçüldü (sahnedeki
+`SnowFootprintDeformer`, `bootWidth = 0.11`):
+
+| Bölüm | Oran (`bol.z`) | Yarıçap |
+|---|---|---|
+| Ön taban | 1.00 | 5.5 cm |
+| Topuk | 0.84 | 4.6 cm |
+| Bel | 0.62 | 3.4 cm |
+
+Ortalama 4.5 cm — sabit **üç kat büyük**. Ufuk tanjantı üçte bire düşüyor:
+5 cm derinlikte 13.5 cm yarıçapla horizon 20°, 4.5 cm ile 48°. Yani çukurun
+kendi gölgesi alçak güneşte olması gerekenden çok zayıf çıkıyordu.
+
+Sabit silindi; `SnowManager.BuildTrailSegments` parça yarıçaplarını ortalayıp
+`_SnowCavityRadius` globaline yazıyor. Ortalama alınıyor, en büyük değil: üç
+kapsül aynı çukurun parçası ve gölgeyi birlikte kuruyorlar.
+
+Alt sınır `max(_SnowCavityRadius, 1e-3)`: sahnede hiç deformer yoksa global
+sıfır kalıyor ve `dent` de sıfır olduğu için `0/0` NaN üretirdi.
+
+## Parıltı ölçüldü, dokunulmadı
+
+`_SparkleIntensity = 7.0` ölçülmemiş bir sayı diye şüpheliydi. Ölçüldü:
+öğle, düz zemin, post kapalı — `sparkle × 7 = 0.161`, diffuse 1.747. Pay
+**%9**. Gerçek kar fotoğraflarında parıltının toplam enerji payı küçük,
+tepe noktalar parlak; bu mertebe doğru.
+
+Spekuler 150× düştüğü için parıltının GÖRELİ ağırlığı arttı ama mutlak
+değeri değişmedi. Ekranda fazla görünürse ölçülecek; şüphe tek başına
+değişiklik gerekçesi değil.
