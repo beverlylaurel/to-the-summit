@@ -528,7 +528,7 @@ float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi,
                        dot(worldXZ, dik) / (SNOW_RIPPLE_LENGTH * 6.0));
 
     if (_SnowDbgNoRipple <= 0.5)
-    h += (SnowValueNoise(pr) * 2.0 - 1.0) * min(SNOW_RIPPLE_AMP * SNOW_RIPPLE_BASE, tavan)
+    h += (SnowValueNoise(pr) * 2.0 - 1.0) * min(SNOW_RIPPLE_AMP, tavan)
        * SnowOktavAgirligiKipli(SNOW_RIPPLE_LENGTH, pikselBoyu, yalnizGeometri);
 
     // --- SASTRUGİ: rüzgâra PARALEL, keskin ---
@@ -544,7 +544,7 @@ float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi,
     ns = ns * ns * (3.0 - 2.0 * ns);
 
     if (_SnowDbgNoSastrugi <= 0.5)
-    h += (ns - 0.5) * min(SNOW_SASTRUGI_HEIGHT * SNOW_SASTRUGI_BASE, tavan) * sastrugiPay
+    h += (ns - 0.5) * min(SNOW_SASTRUGI_HEIGHT, tavan) * sastrugiPay
        * SnowOktavAgirligiKipli(SNOW_SASTRUGI_LENGTH, pikselBoyu, yalnizGeometri);
 
     // --- DRIFT: birikme tepecikleri, YUMUSAK ---

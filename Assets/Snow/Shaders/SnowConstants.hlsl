@@ -609,37 +609,45 @@
 /// görmesi ise ışık yönünden bağımsız ve öğlen de çalışıyor.
 #define SNOW_SURFACE_AO              0.50
 
-/// RIPPLE. Ölçülen: 0.5-2 cm yüksek, 10-25 cm dalga boyu, rüzgâra DİK.
-/// 17 cm ve ±1.2 cm seçildi -> eğim 8°. Kar hareket eşiği 7 m/s; altında
-/// yeni ripple oluşmuyor ama var olan siniyor, o yüzden taban 0.35.
-#define SNOW_RIPPLE_AMP              0.012
-#define SNOW_RIPPLE_LENGTH           0.17
-#define SNOW_RIPPLE_BASE             0.24
-
-/// SASTRUGİ TABANI. Oluşumu 20 m/s istiyor; oyunda o rüzgâra ancak fırtınada
-/// çıkılıyor. Taban 0.25: sakin havada yüzey plane bed'e yakın, fırtınada
-/// sastrugi alanına dönüyor.
-/// 0.08 = sakin havada gerçekten PLANE BED. 0.25 idi ve rüzgâr sıfırken
-/// bile 4.5 cm sastrugi bırakıyordu — 60 cm dalga boyunda 25° eğim, yani
-/// yüzeyin en dik tek bileşeni. Yorumun kendi hedefi "sakin havada yüzey
-/// plane bed'e yakın" diyordu ama sayı onu vermiyordu.
+/// RIPPLE. Olculen: 0.5-2 cm yuksek, 10-25 cm dalga boyu, ruzgara DIK.
 ///
-/// 0.08 ile genlik 1.44 cm, eğim 8.6° — sakin havada okunur ama yüzeyi
-/// domine etmiyor. Fırtınada rüzgâr çarpanı zaten 1'e çıkarıyor.
-#define SNOW_SASTRUGI_BASE           0.055
+/// 0.012 x BASE 0.24 = 0.29 cm idi. `BASE` `SNOW_SASTRUGI_BASE` ile ayni
+/// gerekceyle silindi: kirpmayi `tavan` (kar derinligi x 0.60) zaten yapiyor
+/// ve sig karda yer sekli ondan derin olamiyor. Iki kisit ust uste binince
+/// arazi olcusunun onda birine iniliyordu.
+///
+/// 0.006 = tepe-dip 1.2 cm, arazi araliginin ortasi. 17 cm dalga boyunda
+/// egim 2*pi*0.006/0.17 = 0.22, yani 12.5 derece.
+///
+/// Ripple 17 cm dalga boyuyla `SNOW_TESS_MIN_DALGA` (50 cm) esiginin
+/// ALTINDA: geometriye girmiyor, normal haritasinda kaliyor. Orasi dogru
+/// yeri — 11.4 cm'lik geometri tavani 17 cm'lik dalgayi tasiyamaz.
+#define SNOW_RIPPLE_AMP              0.006
+#define SNOW_RIPPLE_LENGTH           0.17
 
 #define SNOW_SASTRUGI_TAU          900.0
 #define SNOW_SASTRUGI_BURY         260.0
-/// Ölçülen sastrugi derinliği 14-40 cm, sivri uç aralığı 45-90 cm.
+/// Olculen sastrugi derinligi 15-40 cm, sivri uc araligi 45-90 cm.
+/// [KAYNAK: Filhol & Sturm 2015.]
 ///
-/// LENGTH RÜZGÂRA DİK EKSENDE, WIDTH RÜZGÂR YÖNÜNDE (`SnowYuzeyRolyef`).
-/// Bir tur LENGTH 0.60 → 2.00 yapıldı "eğim çok dik" diye; YANLIŞ
-/// EKSENDİ ve sastrugiyi enine şişirip yönsüzleştirdi. Geri alındı.
+/// 0.180 x BASE 0.055 = 1.0 cm idi, arazi olcusunun 15-40 kati altinda.
+/// `BASE` gereksiz IKINCI kisitti: kirpmayi `tavan` (kar derinligi x 0.60)
+/// zaten yapiyor ve 20 cm karda 12 cm veriyor — sastrugi ona hic degmiyordu,
+/// yani sinirlayan sey fizik degil o sabitti.
 ///
-/// O turdaki eğim ölçümü de hatalıydı: genlik `HEIGHT × BASE` ile
-/// çarpılıyor, yani 18 cm değil 4.5 cm. Gerçek eğim 2π×0.045/0.60 =
-/// 0.47, yani 25° — arazi ölçümüyle uyumlu. Sastrugi suçsuz.
-#define SNOW_SASTRUGI_HEIGHT         0.180
+/// 0.20 = arazi araliginin alt ucu. Egim 2*pi*0.10/0.60 = 1.05, yani 46
+/// derece. Karin durus acisi 38-45 derece ama sastrugi bir EROZYON sekli:
+/// ruzgar oydugu ve yuzey sertlestigi icin durus acisinin uzerinde
+/// durabiliyor.
+///
+/// Genlik artik guvenle arazi olcusunde, cunku sastrugi ve drift ayni
+/// noktada TOPLANMIYOR (`SnowYuzeyRolyef` -> maruziyet). Toplansalardi
+/// yuzeyin RMS egimi olculen 5-15 derece bandini iki kat asardi.
+///
+/// LENGTH RUZGARA DIK EKSENDE, WIDTH RUZGAR YONUNDE (`SnowYuzeyRolyef`).
+/// Bir tur LENGTH 0.60 -> 2.00 yapildi "egim cok dik" diye; YANLIS EKSENDI
+/// ve sastrugiyi enine sisirip yonsuzlestirdi. Geri alindi.
+#define SNOW_SASTRUGI_HEIGHT         0.20
 #define SNOW_SASTRUGI_LENGTH         0.60
 #define SNOW_SASTRUGI_WIDTH          2.20
 #define SNOW_SASTRUGI_WIND_TAU     120.0
