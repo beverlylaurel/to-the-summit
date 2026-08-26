@@ -147,8 +147,31 @@ Shader "ToTheSummit/MountainSurface"
                     float ici  = SnowInsideMask(SnowWorldToUV(IN.positionWS));
                     return half4(saturate(ham), saturate(ici) * 0.35h, 0.0h, 1.0h);
                 }
-
                 MountainSurface surface = BuildMountainSurface(IN.positionWS);
+
+                // TESHIS: kar ortusu maskesi ve onu kuran carpanlar.
+                //
+                // Kullanici alcak gunesde keskin kenarli bej adaciklar
+                // bildirdi. Maskenin girdilerinin hicbiri saate bagli degil,
+                // yani adaciklar HER ZAMAN var ve parlak isikta yikaniyor.
+                // Bu gorunum hangi carpanin sifirladigini tek bakista ayirir:
+                //   kirmizi = son maske
+                //   yesil   = cavity (arazinin AO'su)
+                //   mavi    = slopeMask x skyVis
+                if (_SnowDebugCover > 0.5)
+                {
+                    float3 up = _SnowUpDirection;
+                    float egim = dot(surface.normalWS, up);
+                    float egimM = saturate((egim - 0.45)
+                                / max(1.0 - 0.45, 1e-3));
+                    egimM = pow(egimM, _SnowCoverSlopeSharpness);
+
+                    float gok = SampleSkyVisibility(IN.positionWS);
+                    float cukur = saturate(surface.occlusion * 1.35 - 0.35);
+
+                    return half4((half)surface.snowMask, (half)cukur,
+                                 (half)(egimM * gok), 1.0h);
+                }
 
                 // Forward+ ışık döngüsü makroları bu değişkeni adıyla okuyor
                 InputData inputData = (InputData)0;

@@ -433,6 +433,11 @@ float4 SnowTrailAt(float2 uv)
 /// isiklandirmadan bagimsiz ayirir.
 float _SnowDebugDent;
 
+/// 1 iken kar ortusu maskesini ve onu kuran carpanlari renk olarak basar:
+/// kirmizi = son maske, yesil = cavity (arazinin AO'su), mavi = egim x gok.
+/// Hangi carpanin maskeyi sifirladigini tek bakista ayirir.
+float _SnowDebugCover;
+
 /// IZ KENARINDAKI BASAMAGIN KAYNAGINI AYIRAN ANAHTARLAR.
 ///
 /// Basamak uc turdur yanlis yerde arandi (yumusatma cekirdegi, blok gurultusu,

@@ -514,6 +514,14 @@ public class DebugMenu : MonoBehaviour
                 izHam = GUILayout.Toggle(izHam, "İzin ham hâli (ışıksız, paralakssız)");
                 if (izHam != hamOnce) Shader.SetGlobalFloat(SnowDebugDentId, izHam ? 1f : 0f);
 
+                // KAR ÖRTÜSÜ MASKESİ — hangi çarpan sıfırlıyor.
+                bool kapakOnce = kapakHam;
+                kapakHam = GUILayout.Toggle(kapakHam,
+                    "Kar örtüsü maskesi (K=maske, Y=AO, M=eğim×gök)");
+
+                if (kapakHam != kapakOnce)
+                    Shader.SetGlobalFloat(SnowDebugCoverId, kapakHam ? 1f : 0f);
+
                 GUILayout.Label("Kenar basamağı — katmanları tek tek kapat:");
 
                 Anahtar(ref dbgNoTexture,      DbgNoTextureId,      "  kar dokusu karışımı");
@@ -544,6 +552,8 @@ public class DebugMenu : MonoBehaviour
                     mgr.RefillRegion();
                     izHam = false;
                     Shader.SetGlobalFloat(SnowDebugDentId, 0f);
+                    kapakHam = false;
+                    Shader.SetGlobalFloat(SnowDebugCoverId, 0f);
 
                     dbgNoTexture = dbgNoParallax = dbgNoReliefShadow = dbgNoDentNormal = false;
                     Shader.SetGlobalFloat(DbgNoTextureId, 0f);
@@ -612,6 +622,11 @@ public class DebugMenu : MonoBehaviour
     bool izHam;
 
     static readonly int SnowDebugDentId = Shader.PropertyToID("_SnowDebugDent");
+
+    /// Kar örtüsü maskesi teşhis görünümü açık mı (`_SnowDebugCover`).
+    bool kapakHam;
+
+    static readonly int SnowDebugCoverId = Shader.PropertyToID("_SnowDebugCover");
 
     /// İZ KENARINDAKİ BASAMAĞIN KAYNAĞINI AYIRAN ANAHTARLAR.
     ///
