@@ -59,7 +59,17 @@ half4 SnowSurfaceWeights(float rhoN, float wet, float disturb, float3 posWS)
     half kuru = (half)saturate((-_TemperatureC - 2.0) / 10.0) * (half)(1.0 - saturate(wet * 2.0));
 
     // RUZGAR MARUZIYETI: siperde kalan yuzey oluk tutmaz.
-    half ruzgar = (half)saturate(SampleWindShadow(posWS) * 1.2 - 0.1);
+    //
+    // BAG TERSTI. `SampleWindShadow` KORUNAKLILIGI olcuyor — spec 18.0'in
+    // kendi yorumu "> 0 -> golgede (birikme bolgesi), 0 -> acik (erozyon
+    // mumkun)". Kod o degeri dogru orantiyla "ruzgar dokusu" agirligina
+    // baglIyordu, yani oluklu ve sastrugi cizgili dokuyu SIPERDEKI yuzeye
+    // ciziyordu. Yorumun kendisi tersini soyluyordu.
+    //
+    // Sastrugi ve oluk EROZYON sekli; spec 18.0 golgede asinmayi tamamen
+    // kapatiyor ("curvW sifirlanir -> asinma yok, sadece birikme"). Siperde
+    // kar birikir, yumusak ve duz kalir.
+    half ruzgar = (half)(1.0 - saturate(SampleWindShadow(posWS) * 1.2));
 
     // Bozulmus (uzerinden gecilmis) kar dokusunu yitirir, yerlesmise yaklasir.
     packed = max(packed, (half)saturate(disturb));

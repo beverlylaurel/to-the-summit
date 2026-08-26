@@ -399,6 +399,36 @@ half2 SnowDentSlope(float2 uv)
 ///
 /// Nyquist: bir dalganın taşınabilmesi için dalga boyu piksel boyunun en az
 /// iki katı olmalı. Altına inen oktav sönümleniyor.
+/// PİKSELİN DÜNYA AYAK İZİ — SIYIRTMA AÇIDA `max` KULLANILMAZ.
+///
+/// `max(fwidth.x, fwidth.y)` pikselin EN UZUN eksenini alıyor. Yere bakarken
+/// o eksen bakış yönünde patlıyor: kamera 1.7 m'de, 40 m ötede zemin görüş
+/// açısı 2.4° ve uzun eksen 92 cm oluyor — dik eksen hâlâ 4 cm.
+///
+/// Kâğıtta, `max` ile oktavların kesildiği mesafe:
+///   mikro    8.3 cm  ->  ~8 m
+///   ripple   17 cm   -> ~12 m
+///   sastrugi 60 cm   -> ~23 m
+///   fBm      1.25 m  -> ~34 m
+/// Kullanıcı bunu "hafif uzak zemin detaysız gözüküyor, kar zemindeki
+/// detayların render mesafesini artıralım" diye bildirdi.
+///
+/// Doku filtrelemesi bu durumda ANİZOTROPİK davranıyor: mip seviyesi KISA
+/// eksenden seçiliyor, uzun eksende çok örnek alınıyor. Tek örnekle o
+/// yapılamaz ama geometrik ortalama makul bir denge — dik bakışta iki eksen
+/// eşit olduğu için davranış `max` ile aynı kalıyor, yani titreme kontrolü
+/// bozulmuyor (titreme dik bakışta ölçülmüştü: "zemin tir tir titriyor").
+///
+/// AYNI HATA SPARKLE'DA BULUNMUŞTU ve orada tavanla kapatıldı
+/// (`SNOW_SPARKLE_MAX_FOOTPRINT`); rölyefte kapatılmamıştı.
+float SnowPikselBoyu(float2 worldXZ)
+{
+    float fx = fwidth(worldXZ.x);
+    float fy = fwidth(worldXZ.y);
+
+    return sqrt(max(fx * fy, 1e-10));
+}
+
 float SnowOktavAgirligi(float dalgaBoyu, float pikselBoyu)
 {
     if (_SnowDbgNoLod > 0.5) return 1.0;
@@ -507,7 +537,7 @@ half2 SnowYuzeyEgim(float2 worldXZ, float karDerinligi, out float yukseklik)
     // Bir pikselin dünyada kapladığı boy. Türev bir kez alınıyor; gradyan
     // örnekleri aynı LOD'u paylaşıyor, yoksa dört örnek farklı oktav setiyle
     // hesaplanır ve gradyanın kendisi bozulur.
-    float pikselBoyu = max(fwidth(worldXZ.x), fwidth(worldXZ.y));
+    float pikselBoyu = SnowPikselBoyu(worldXZ);
 
     float hL = SnowYuzeyRolyef(worldXZ - float2(e, 0.0), pikselBoyu, karDerinligi);
     float hR = SnowYuzeyRolyef(worldXZ + float2(e, 0.0), pikselBoyu, karDerinligi);
@@ -554,7 +584,7 @@ half2 SnowMikroEgim(float2 worldXZ, float dent)
 
     const float e = 0.01;
 
-    float pikselBoyu = max(fwidth(worldXZ.x), fwidth(worldXZ.y));
+    float pikselBoyu = SnowPikselBoyu(worldXZ);
 
     float mL = SnowMikroRolyef(worldXZ - float2(e, 0.0), dent, pikselBoyu);
     float mR = SnowMikroRolyef(worldXZ + float2(e, 0.0), dent, pikselBoyu);

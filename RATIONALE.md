@@ -1867,3 +1867,32 @@ tepe noktalar parlak; bu mertebe doğru.
 Spekuler 150× düştüğü için parıltının GÖRELİ ağırlığı arttı ama mutlak
 değeri değişmedi. Ekranda fazla görünürse ölçülecek; şüphe tek başına
 değişiklik gerekçesi değil.
+
+## Rüzgâr dokusu siperdeki yüzeye çiziliyordu — bağ tersti
+
+`SnowSurfaceWeights` "rüzgâr" doku ağırlığını şöyle kuruyordu:
+
+```hlsl
+// RUZGAR MARUZIYETI: siperde kalan yuzey oluk tutmaz.
+half ruzgar = saturate(SampleWindShadow(posWS) * 1.2 - 0.1);
+```
+
+`SampleWindShadow` **korunaklılığı** ölçüyor. Kendi tanımı (`SnowCommon.hlsl`,
+spec §18.0 birebir): "> 0 → rüzgâr gölgesinde (birikme bölgesi), 0 → açık
+(erozyon mümkün)". Kod o değeri **doğru orantıyla** rüzgâr dokusuna
+bağlıyordu: oluklu, sastrugi çizgili doku SİPERDEKİ yüzeye çiziliyordu.
+
+Yorumun kendisi tersini söylüyordu. İki taraf da aynı satırda duruyordu ve
+üç tur boyunca kimse okumadı.
+
+Fizik ve spec aynı yöne bakıyor: sastrugi ve oluk EROZYON şekli, spec §18.0
+gölgede aşınmayı tamamen kapatıyor ("`curvW` sıfırlanır → aşınma yok, sadece
+birikme"). Siperde kar birikir, yumuşak ve düz kalır.
+
+`ruzgar = 1.0 - saturate(SampleWindShadow(posWS) * 1.2)`. Ofset (`- 0.1`)
+düştü: ters yönde karşılığı yok.
+
+**Beklenen görsel etki büyük.** Açık arazide `wRuzgar` 0'dan 0.9'a çıkıyor.
+Doku dağılımı tersine dönüyor. `Ruzgar` haritasının kıvrımlı oyukları bir
+kez sorun çıkarmıştı (`SNOW_SURF_EGIM_TAVANI` 0.7 → 0.35 orada düşürüldü);
+eğim tavanı hâlâ 0.35 ve o düzeltme yerinde duruyor.

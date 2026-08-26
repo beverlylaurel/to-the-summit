@@ -3477,3 +3477,46 @@ Toplam RMS **15°** — arazide ölçülen aralığın (5-15°) üst ucu.
 | RMS 15° | **2.0** | **0.80** |
 
 Noktalar hâlâ var ama zemine yaklaştı (0.54 → 0.80) ve alanları %1'in altında.
+
+## "Hafif uzak zemin detaysız gözüküyor"
+
+**Belirti.** Oyuncunun yakınında kar detayı var, 10-20 m ötede yüzey düzleşiyor,
+35 m'de tamamen düz. Yürüdükçe detay geliyor. Saat 17:39, alçak güneş.
+
+**İlk şüpheli yanlıştı.** Yüzey dokusunun mesafe kapısı (`SNOW_SURF_FADE`
+8/28 m) sanıldı; 30/120'ye uzatıldı ve **ekranda hiçbir değişiklik olmadı**.
+`_SnowSurfStrength = 0.35` ile o katmanın payı zaten küçük.
+
+**Gerçek sebep.** `SnowYuzeyEgim` ve `SnowMikroEgim` piksel ayak izini
+`max(fwidth(worldXZ.x), fwidth(worldXZ.y))` ile ölçüyordu — pikselin **en
+uzun** ekseni. Yere bakarken o eksen bakış yönünde patlıyor.
+
+Kâğıtta (kamera 1.7 m, düz zemin):
+
+| Mesafe | Bakış açısı | `max(fwidth)` |
+|---|---|---|
+| 10 m | 9.6° | 5.8 cm |
+| 20 m | 4.9° | 23 cm |
+| 40 m | 2.4° | **92 cm** |
+
+40 m'de uzun eksen 92 cm, dik eksen hâlâ 4 cm. `SnowOktavAgirligi` Nyquist
+kesimini o 92 cm'e göre uyguluyor ve bütün oktavları kapatıyor:
+
+| Oktav | Dalga boyu | Kesildiği mesafe |
+|---|---|---|
+| Mikro | 8.3 cm | ~8 m |
+| Ripple | 17 cm | ~12 m |
+| Sastrugi | 60 cm | ~23 m |
+| fBm | 1.25 m | ~34 m |
+
+**Ayırt eden ölçüm.** Doku kapısını 4× uzatmak hiçbir şey değiştirmedi;
+kesim mesafeleri ise kâğıtta belirtiyle birebir örtüştü.
+
+**Aynı hata daha önce sparkle'da bulunmuştu** ve orada tavanla kapatılmıştı
+(`SNOW_SPARKLE_MAX_FOOTPRINT`, "fwidth sıyırtma açıda patlıyor"). Rölyefte
+kapatılmamıştı — aynı sınıfın ikinci kullanım yeri.
+
+**Düzeltme.** `SnowPikselBoyu` = `sqrt(fx · fy)`, geometrik ortalama. Doku
+filtrelemesi bu durumda anizotropik davranıyor: mip kısa eksenden seçiliyor.
+Dik bakışta iki eksen eşit olduğu için davranış `max` ile aynı kalıyor —
+titreme kontrolü ("zemin tir tir titriyor") o açıda ölçülmüştü ve bozulmuyor.

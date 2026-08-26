@@ -154,17 +154,25 @@
 /// "yakindaki detaylar goukuyor ama azcik ilerisi dumduz, oraya dogru
 /// yurudukce detaylar geliyor" diye bildirdi.
 ///
-/// KABARTI (normal + puruzluluk) uzakta GERCEKTEN kesilmeli. Piksel altina
-/// dusen kabarti aliasing ve titreme uretiyor; mip'lenmis bir normal haritasi
-/// duzlesip yanlis parlaklik veriyor (Toksvig sorunu). 8-28 m korunuyor.
+/// KABARTI (normal + puruzluluk) 8-28 m'de kesiliyordu ve KESIM CIZGISI
+/// EKRANDAN OKUNUYORDU: yakinda gunes goren kabarti yuzleri parlak lekeler
+/// birakiyor, 28 m'den sonra zemin birden duzlesiyordu (kullanici bildirdi:
+/// "golgeleme belirli bir yakinlik mesafesinde calisiyor zeminde").
 ///
-/// RENK DESENI KESILMEMELI. Olculdu: doku 4096^2, doseme 2.5 m -> teksel
+/// Kesmenin gerekcesi aliasing'di ama dogru degil: `SnowSurfIkiOlcek` normali
+/// EGIM UZAYINDA okuyor ve egimin mip ortalamasi dogal — mip'lenen normal
+/// duzlesiyor, patlamiyor. Uzakta detay kendiliginden zayifliyor; ustune bir
+/// de kapi koymak duzluk uretiyor.
+///
+/// 30-120 m: gecis artik ufka yakin ve tek bir cizgi olarak okunmuyor.
+///
+/// RENK DESENI DAHA DA UZAK. Olculdu: doku 4096^2, doseme 2.5 m -> teksel
 /// 0.61 mm. 28 m'de bir ekran pikseli ~89 teksel kapliyor, yani mip 6-7 —
 /// trilinear zaten ortaliyor ve desen yumusak bir lekeye donuyor. Kesmek
 /// icin bir sebep yok; kesince duzluk kaliyor. Tekrarlamayi stokastik
 /// doseme kiriyor.
-#define SNOW_SURF_KABARTI_FADE_START   8.0
-#define SNOW_SURF_KABARTI_FADE_END     28.0
+#define SNOW_SURF_KABARTI_FADE_START  30.0
+#define SNOW_SURF_KABARTI_FADE_END   120.0
 #define SNOW_SURF_RENK_FADE_START     80.0
 #define SNOW_SURF_RENK_FADE_END      250.0
 

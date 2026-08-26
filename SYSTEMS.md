@@ -810,7 +810,8 @@ kuruyor ve F0'ı kar maskesiyle kaya/nesne dielektriğinden harmanlıyor.
 Sabit 0.04 kullanıldığında kar 2.2 kat fazla speküler döndürüyordu. Üstüne DÖRT FOTOGRAMETRİ
 SETİ harmanlanıyor (`SnowSurfaceTextures.hlsl`: taze / toz / yerleşmiş /
 rüzgâr); ağırlıkları yoğunluk, sıcaklık, ıslaklık, bozulma ve rüzgâr
-maruziyetinden geliyor — yani ayrı bir kaynak kurulmuyor, mevcut duruma
+maruziyetinden geliyor — maruziyet `1 − SampleWindShadow` olarak okunuyor,
+çünkü o fonksiyon korunaklılığı ölçüyor ve oluk siperde değil açıkta oluşur — yani ayrı bir kaynak kurulmuyor, mevcut duruma
 bağlanıyor. Doku albedonun YERİNE geçmiyor, çarpan olarak giriyor: kendi
 UZAMSAL ortalamasına bölünüp 1 civarında bir katsayıya dönüşüyor, seviye
 fizikten gelmeye devam ediyor. Asıl bilgi normal haritada (ölçüldü: albedo
