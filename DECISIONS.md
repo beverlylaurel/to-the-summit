@@ -230,23 +230,6 @@ olur.
 ---
 ## Bekleyen ölçümler
 
-- **İz kenarının yumuşaklığının sınırı doku çözünürlüğü.** Ölçüldü:
-  `_SnowAreaSize` 24 m, `_SnowResolution` 1024 → teksel **2.34 cm**; 27 cm'lik
-  ayak izi yalnız **11.5 teksel** geniş. Yumuşatma bandını büyütmek çare değil —
-  tap aralığı 1 tekseli aşınca çekirdek altörnekliyor ve kenarı basamaklıyor
-  (`SYMPTOMS.md`). Üç yol var, üçü de ölçüldü:
-
-  | yol | teksel | iz | bellek | bedel |
-  |---|---|---|---|---|
-  | bugünkü (1024 / 24 m) | 2.34 cm | 11.5 teksel | 50 MB | kenar bandı izin %17'si |
-  | çözünürlük 2048 | 1.17 cm | 23 teksel | **200 MB** | +150 MB VRAM |
-  | alan 24 → 12 m | 1.17 cm | 23 teksel | 50 MB | iz ömrü 12 s → **6 s** (2 m/s'de) |
-
-  Çözünürlüğe bağlı dokular: `RT_Trail`/`RT_TrailTemp` (ARGBHalf),
-  `RT_Snow`/`RT_SnowTemp` (ARGBFloat), `RT_RimBlur` (RHalf).
-  **Karar verilmedi** — tetikleyici: kullanıcı 1.0 tap aralığıyla alınan kenarı
-  hâlâ sert bulursa. O noktada seçim VRAM ile iz ömrü arasında ve kullanıcının.
-
 - **Derleme süresi darboğazı bulunamadı.** Kullanıcı "compile süresi çok uzadı"
   dedi; ölçülenler: script derlemesi 0.8–1.9 ms, domain reload 3514 ms
   (`FinalizeReload` 2132 ms), shader import MountainSurface 143 / Sky 154 /
@@ -1852,3 +1835,23 @@ aynı görünmesi rahatsız edici hâle gelirse.
 `RT_Snow` da öyle (SWE / yoğunluk / ıslaklık / bozulma). Yaş için beşinci bir
 kanal, yani yeni bir doku gerekiyor — 1024² RHalf = 2 MB. Ya da sastrugi ile
 kabuk tek kanalda paketlenip yer açılır.
+
+## Yönlü veri lerp'leniyor — Reoriented Normal Mapping uygulanmadı (2026-08-26)
+
+`MountainSurface.hlsl` kar normalini araziye şöyle karıştırıyor:
+
+```hlsl
+surface.normalWS = normalize(lerp(n, normalize(float3(e.x, 1.0, e.y)), snowMask));
+```
+
+Batman: Arkham Origins aynı geçiş için **Reoriented Normal Mapping**
+kullanıyor [Barré-Brisebois & Hill 2012] ve sunum yönlü veriyi lerp'lemenin
+yanlış olduğunu açıkça söylüyor: iki normal arasında lineer karışım ara
+açılarda yanlış yön ve kısalmış vektör veriyor.
+
+**Şimdi uygulanmadı** çünkü aynı turda kare basamak düzeltmesi (B-spline
+filtreleme) yapıldı ve iki değişiklik birbirinin ölçümünü bozar.
+
+**Tetikleyici:** B-spline'dan sonra kenarda hâlâ yön hatası kalırsa — kar ile
+arazi sınırında normalin "yatık" görünmesi, ya da eğimli arazide izin yanlış
+yöne devrilmesi. Maliyet: birkaç satır, `SnowRelief.hlsl`'e tek fonksiyon.
