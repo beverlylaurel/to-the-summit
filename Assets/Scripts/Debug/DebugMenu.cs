@@ -521,6 +521,23 @@ public class DebugMenu : MonoBehaviour
                 Anahtar(ref dbgNoReliefShadow, DbgNoReliefShadowId, "  çukurun kendi gölgesi");
                 Anahtar(ref dbgNoDentNormal,   DbgNoDentNormalId,   "  izin normale kattığı eğim");
 
+                // ALÇAK GÜNEŞTE KESKİN KENARLI ADACIKLAR — ŞÜPHELİLER.
+                //
+                // Kullanıcı aynı kadrajdan dört saat gönderdi: 16:12 normal,
+                // 17:34 sepia, 17:49 ve 06:20 keskin kenarlı lekeli. Tri sayısı
+                // 10k'dan 433k'ya çıkıyor, yani alçak güneşte gölge kaskadları
+                // uzayıp arazi mesh'leri gölge geçişine giriyor.
+                GUILayout.Label("Alçak güneş anomalisi — şüpheliler:");
+
+                bool onceGolge = anaIsikGolgesiKapali;
+                anaIsikGolgesiKapali = GUILayout.Toggle(anaIsikGolgesiKapali,
+                    "  ana ışık gölge haritası");
+
+                if (anaIsikGolgesiKapali != onceGolge && RenderSettings.sun != null)
+                    RenderSettings.sun.shadows = anaIsikGolgesiKapali
+                                               ? LightShadows.None
+                                               : LightShadows.Soft;
+
                 if (GUILayout.Button("Ayarları geri al (sınama)"))
                 {
                     mgr.SimTimeScale = 1f;
@@ -533,6 +550,10 @@ public class DebugMenu : MonoBehaviour
                     Shader.SetGlobalFloat(DbgNoParallaxId, 0f);
                     Shader.SetGlobalFloat(DbgNoReliefShadowId, 0f);
                     Shader.SetGlobalFloat(DbgNoDentNormalId, 0f);
+
+                    anaIsikGolgesiKapali = false;
+                    if (RenderSettings.sun != null)
+                        RenderSettings.sun.shadows = LightShadows.Soft;
                 }
 
                 GUILayout.Space(6f);
@@ -600,6 +621,9 @@ public class DebugMenu : MonoBehaviour
     /// düzeltildi, basamak durdu. Şüphelilerin TAMAMI aynı anda kapatılabilir
     /// olmalı ki sorumlu tek turda bulunsun.
     bool dbgNoTexture, dbgNoParallax, dbgNoReliefShadow, dbgNoDentNormal;
+
+    /// Ana ışığın gölge haritası kapalı mı (teşhis).
+    bool anaIsikGolgesiKapali;
 
     static readonly int DbgNoTextureId      = Shader.PropertyToID("_SnowDbgNoTexture");
     static readonly int DbgNoParallaxId     = Shader.PropertyToID("_SnowDbgNoParallax");
