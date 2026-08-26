@@ -902,6 +902,42 @@ batılacağını kar söylüyor (taşıma gücü, yoğunluk, kabuk). Yükseklik
 yumuşatması, adım sapması ve `SnowTrailBodyAlign` bileşeninin tamamı silindi.
 `SnowStepRhythm` yalnız faz ve adım olayı üretiyor.
 
+**Bozulmamış kar yüzeyi DÖRT ÖLÇEKTE rölyef taşıyor.** fBm tabanı
+(1.25–0.16 m, self-affine H=0.8), ripple (rüzgâra dik, 17 cm), sastrugi
+(rüzgâra paralel, 60 cm aralık, keskin) ve mikro tane (8–1.6 cm). Ölçüler
+arazide ölçülmüş değerlerden (`RATIONALE.md`); rüzgâr eşikleri de öyle —
+sakin havada yüzey plane bed'e yakın kalıyor, fırtınada sastrugi beliriyor.
+
+Rölyef `SnowYuzeyEgim` ile DOĞRUDAN normale giriyor, `SnowDentSlope`
+üzerinden değil: o yol `saturate(izDerinlik * 20)` ağırlığıyla harmanlanıyor
+ve düz karda sıfırlanıyordu (`SYMPTOMS.md`).
+
+**Rölyef ANLIK rüzgârı okumaz, hâkim yönü okur.** Dört bağ birden anlık
+rüzgâra takılıydı ve zemin titriyordu: desen ekseni, örnekleme konumu, genlik
+ve sürüklenme. Bugün ekseni `WindField.PrevailingDirection` sürüyor (120 s
+üstel yumuşatma, sürüklenme eşiğin altında donuyor), genlik ise rüzgâr HIZINA
+değil `WeatherState`'in karlılığına bağlı. Anlık hız yalnız kar taşınımına
+girer — yüzeyin kendisine değil (`SYMPTOMS.md`, dört kaynak).
+
+**Genliğin tavanı kar KALINLIĞI.** Her ölçek `SnowBaseHeight`'ın
+`SNOW_BEDFORM_DEPTH_FRAC` payıyla kırpılıyor: 1 cm karda sastrugi yok, 20 cm'de
+tam. Önce sabit genlikti ve dört ayrı kalınlık ekranda aynı görünüyordu.
+Örtmenin gömme payı da aynı kalınlıktan geliyor (`SNOW_BURY_REF_DEPTH`).
+
+**Oktav sayısı ekran uzamına göre kırpılıyor.** Prosedürel alanlar mipmap'lenmez;
+her oktav `fwidth(worldXZ)`'e karşı Nyquist ile tartılıyor
+(`SnowOktavAgirligi`), teksel altına düşen oktav sıfırlanıyor. Aksi hâlde uzak
+yüzey aliasing'den kaynıyordu.
+
+**Öğle görünürlüğü ortam örtmesinden.** Güneş tepedeyken 7°'lik eğim NdotL'yi
+%1 değiştiriyor; yüzey düz okunuyor. Çukurların göğü daha az görmesi ışık
+yönünden bağımsız ve o saatte de çalışıyor. Terim yüzeyin YÜKSEKLİĞİNDEN
+geliyor, eğiminden değil.
+
+**Yüzey rölyefi yükseklik alanına KONMUYOR.** `SnowShadeHeightAt` bir tent
+(9 tap) ve bir gradyan (4 tap) altında; oraya konan her gürültü örneği 36 kez
+hesaplanıyor. Ayrı fonksiyon 4 örnekle geçiyor.
+
 **İz kenarı DURUŞ YÜKSEKLİĞİNİN gürültüsünden dağılıyor.** Kenarın nerede
 bittiğini `KRepose`'un duruş yüksekliği belirliyor; o yükseklik yerel bir değer
 gürültüsüyle dalgalanınca kenar da düz bir çizgi olmaktan çıkıyor. Kaydırma

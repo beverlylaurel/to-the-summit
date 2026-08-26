@@ -3236,10 +3236,18 @@ MonoBehaviour:
   m_GameObject: {fileID: 1868059825}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 091f414b153509a46ae4a4c10e18c758, type: 3}
+  m_Script: {fileID: 11500000, guid: 369862fa51a52714b87beaff25e61cde, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SnowDeformer
-  radius: 0.15
+  m_EditorClassIdentifier: Assembly-CSharp::SnowFootprintDeformer
+  radius: 0.055
+  widthWobble: 0.14
+  depthWobble: 0.2
+  wobbleLength: 0.55
+  rhythm: {fileID: 848219621}
+  stanceWidth: 0.2
+  bootLength: 0.3
+  bootWidth: 0.11
+  toeOut: 7
 --- !u!1 &2018777760
 GameObject:
   m_ObjectHideFlags: 0

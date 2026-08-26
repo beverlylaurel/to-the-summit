@@ -106,7 +106,7 @@ public static class SnowConstants
     /// omuz 0.5 tekselden 3 tekselden geniş bir yamaca döndü; 3 geçiş omzun
     /// tam eninde kalıyordu ve yürürken kenar arkada kalıyordu. Sonuç
     /// idempotent — sayı görünümü değil yalnız yakınsama hızını değiştiriyor.
-    public const int ReposeIterations = 6;
+    public const int ReposeIterations = 10;
 
     // --- Birikme, oturma, erime (spec §11) ---
 

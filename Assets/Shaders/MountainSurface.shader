@@ -147,8 +147,55 @@ Shader "ToTheSummit/MountainSurface"
                     float ici  = SnowInsideMask(SnowWorldToUV(IN.positionWS));
                     return half4(saturate(ham), saturate(ici) * 0.35h, 0.0h, 1.0h);
                 }
-
                 MountainSurface surface = BuildMountainSurface(IN.positionWS);
+
+                // PROB: yerdeki lekeler ne?
+                if (_SnowDebugProbe > 0.5)
+                {
+                    float4 psc = TransformWorldToShadowCoord(IN.positionWS);
+                    Light pL = GetMainLight(psc);
+                    float pd = dot(surface.normalWS, pL.direction);
+
+                    return half4((half)saturate(-pd * 3.0),
+                                 (half)(1.0 - pL.shadowAttenuation),
+                                 (half)(1.0 - surface.occlusion),
+                                 1.0h);
+                }
+
+                // PROB: kar ortusu maskesi.
+                if (_SnowDebugCover > 0.5)
+                {
+                    float cegim = dot(surface.normalWS, _SnowUpDirection);
+                    float cegimM = saturate((cegim - 0.45) / max(1.0 - 0.45, 1e-3));
+                    cegimM = pow(cegimM, _SnowCoverSlopeSharpness);
+
+                    float cgok = SampleSkyVisibility(IN.positionWS);
+                    float ccuk = saturate(surface.occlusion * 1.35 - 0.35);
+
+                    return half4((half)surface.snowMask, (half)ccuk,
+                                 (half)(cegimM * cgok), 1.0h);
+                }
+
+                // TESHIS: yuzey normali ve NdotL.
+                //
+                // Wrap diffuse kapatilinca lekeler AYDINLIK kaldi; diffuse
+                // sonunce aydinlik kalan yerde diffuse disi bir terim var
+                // demektir. Bu gorunum lekelerin normalden gelip gelmedigini
+                // ayirir:
+                //   kirmizi = saturate(dot(N, gunes))  -- duz NdotL
+                //   yesil   = wrap NdotL
+                //   mavi    = normalin dikligi (N.y)
+                // Lekeler kirmizida gorunuyorsa kaynak normal; yalniz
+                // maviye vurmuyorsa kaynak arazi egimi degil kar rolyefi.
+                if (_SnowDebugNormal > 0.5)
+                {
+                    Light dL = GetMainLight();
+                    float d  = dot(surface.normalWS, dL.direction);
+                    float w  = saturate((d + 0.55) / 1.55);
+
+                    return half4((half)saturate(d), (half)w,
+                                 (half)saturate(surface.normalWS.y), 1.0h);
+                }
 
                 // Forward+ ışık döngüsü makroları bu değişkeni adıyla okuyor
                 InputData inputData = (InputData)0;
@@ -262,16 +309,27 @@ Shader "ToTheSummit/MountainSurface"
                     // ÇUKURUN KENDİ GÖLGESİ doğrudan ışığa uygulanıyor.
                     // Ortama uygulanmıyor: gök her yönden geliyor, çukurun
                     // duvarı onu kesmiyor — o iş `occlusion` teriminin.
+                    // GÖK PAYI: difüz ışınım / (difüz + direkt). Gölge
+                    // tavanının fiziksel karşılığı bu — gölgedeki yüzey
+                    // güneşi almıyor, göğü alıyor. Kapalı havada 1'e gidiyor
+                    // ve gölge kendiliğinden siliniyor.
+                    half gokLum   = Luminance(SampleSH(half3(0, 1, 0)));
+                    half gunesLum = Luminance(mainLight.color)
+                                  * saturate(mainLight.direction.y);
+                    half gokPay   = gokLum / max(gokLum + gunesLum, 1e-4h);
+
                     Light izIsigi = mainLight;
-                    izIsigi.shadowAttenuation *= SnowReliefShadow(IN.positionWS,
-                                                                  mainLight.direction,
-                                                                  surface.snowDentDepth);
+                    izIsigi.shadowAttenuation *= SnowReliefShadow(mainLight.direction,
+                                                                  surface.snowDentDepth,
+                                                                  gokPay);
 
                     half3 karIsik = SnowDirectLight(izIsigi, karN,
                                                     inputData.viewDirectionWS, ks)
                                   + SnowAmbient(karN, ks,
                                                 mainLight.shadowAttenuation,
-                                                (half)surface.occlusion * gokPayi);
+                                                (half)surface.occlusion * gokPayi,
+                                                mainLight.color,
+                                                mainLight.direction);
 
                     lit = lerp(lit, karIsik, (half)surface.snowMask);
                 }

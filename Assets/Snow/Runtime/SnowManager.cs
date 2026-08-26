@@ -93,9 +93,9 @@ public class SnowManager : MonoBehaviour
     /// eleman sayımı sessizce yanlış oluyor.
     const int TrailSegmentStride = 16;
 
-    /// Aynı anda karda iz bırakan nesne sayısı için tavan. `SnowDeformerRegistry`
-    /// daha fazlasını tutabilir; bölge dışındakiler zaten eleniyor.
-    const int MaxTrailSegments = 16;
+    /// Aynı anda kar dokusuna yazılan parça sayısı için tavan. Bir yürüyen
+    /// karakter 8 parça basıyor (son 4 ayak izi × topuk + ön taban).
+    const int MaxTrailSegments = 32;
 
     ComputeBuffer trailSegmentBuffer;
     readonly Vector4[] trailSegmentData = new Vector4[MaxTrailSegments * 2];
@@ -532,10 +532,25 @@ public class SnowManager : MonoBehaviour
         // KAR ÇİZGİSİ DONMA SEVİYESİNDEN. Ayrı bir sayı tanımlanmıyor;
         // sıcaklık alanı neredeyse kar da orada başlıyor.
 
-        // Sastrugi yönü YUMUŞATILIYOR (spec §18.4, tau 120 s).
-        Vector2 rawWind = new Vector2(env.WindDirection.x, env.WindDirection.z);
+        // SASTRUGİ YÖNÜ YALNIZ KAR TAŞINIRKEN GÜNCELLENİYOR.
+        //
+        // Yumuşatma (tau 120 s) tek başına yetmiyordu: sakin havada rüzgâr
+        // vektörü küçük ve yönü rastgele dönüyor, yumuşatılmış yön de onun
+        // peşinden SÜREKLİ sürükleniyor. Yer şekilleri o eksene göre
+        // döndürüldüğü için bütün yüzey yavaşça kayıyordu (kullanıcı bildirdi:
+        // "yavaşladı ama geçmedi").
+        //
+        // Fizik: sastrugi bir kez oluşur ve DURUR; yönünü ancak kar taşıyan
+        // bir rüzgâr değiştirir. Ölçülen taşınma eşiği 7 m/s
+        // [Kochanski ve ark. 2019]. Altında yön donuyor.
+        // KAYNAK HÂKİM YÖN, ANLIK DEĞİL. `env.WindDirection` anlık hızın yönü ve
+        // fırtınada da oynuyor; `dot(worldXZ, eksen)` alanında 7 km'lik
+        // koordinatta küçük bir açı sapması deseni yüzlerce metre sürüklüyor
+        // (ölçüm `WindField.PrevailingDirection` yanında).
+        Vector2 rawWind = new Vector2(env.PrevailingWindDirection.x,
+                                      env.PrevailingWindDirection.z);
 
-        if (rawWind.sqrMagnitude > 1e-4f)
+        if (env.WindSpeed >= SnowConstants.DriftU10Loose && rawWind.sqrMagnitude > 1e-4f)
         {
             rawWind.Normalize();
 
@@ -1105,27 +1120,32 @@ public class SnowManager : MonoBehaviour
         Vector2 center = AreaCenter;
         float half = settings.QualityData.AreaSize * 0.5f;
 
-        for (int i = 0; i < SnowDeformerRegistry.Count && trailSegmentCount < MaxTrailSegments; i++)
+        for (int i = 0; i < SnowDeformerRegistry.Count; i++)
         {
             SnowDeformer d = SnowDeformerRegistry.Get(i);
             if (d == null) continue;
 
-            Vector3 a = d.SegmentA;
-            Vector3 b = d.SegmentB;
-            float r = d.Radius;
+            int n = d.SegmentCount;
 
-            // Parçanın XZ sınır kutusu bölgeyle kesişmiyorsa hiç yazma.
-            float minX = Mathf.Min(a.x, b.x) - r, maxX = Mathf.Max(a.x, b.x) + r;
-            float minZ = Mathf.Min(a.z, b.z) - r, maxZ = Mathf.Max(a.z, b.z) + r;
+            for (int k = 0; k < n && trailSegmentCount < MaxTrailSegments; k++)
+            {
+                d.GetSegment(k, out Vector4 a, out Vector4 b);
 
-            if (maxX < center.x - half || minX > center.x + half) continue;
-            if (maxZ < center.y - half || minZ > center.y + half) continue;
+                float r = a.w;
 
-            int slot = trailSegmentCount * 2;
-            trailSegmentData[slot]     = new Vector4(a.x, a.y, a.z, r);
-            trailSegmentData[slot + 1] = new Vector4(b.x, b.y, b.z, 0f);
+                // Parçanın XZ sınır kutusu bölgeyle kesişmiyorsa hiç yazma.
+                float minX = Mathf.Min(a.x, b.x) - r, maxX = Mathf.Max(a.x, b.x) + r;
+                float minZ = Mathf.Min(a.z, b.z) - r, maxZ = Mathf.Max(a.z, b.z) + r;
 
-            trailSegmentCount++;
+                if (maxX < center.x - half || minX > center.x + half) continue;
+                if (maxZ < center.y - half || minZ > center.y + half) continue;
+
+                int slot = trailSegmentCount * 2;
+                trailSegmentData[slot]     = a;
+                trailSegmentData[slot + 1] = b;
+
+                trailSegmentCount++;
+            }
 
             // Sırt asimetrisi tek hızdan türüyor; birden çok deformer varsa
             // sonuncusununki kalır. Sırt zaten ikinci mertebe bir süsleme.

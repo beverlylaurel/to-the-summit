@@ -96,15 +96,44 @@
 /// metrelerce uzayıp bulaşıyor.
 #define SNOW_RELIEF_MAX_STRETCH        3.0
 
-/// Çukurun kendi gölgesi. Alçak güneşte yakın duvar gölgelenmezse ayak izi
-/// tümsek gibi okunuyor (ölçüldü: 17:00'de ters görünüyordu).
+/// ÇUKURUN YARIÇAPI (m) — horizon açısı bundan çıkıyor.
+///
+/// Ayak izi bir çanak; duvarının eğimi `derinlik / yarıçap` ve bu, çukurun
+/// içinden görünen ufkun tanjantı. Değer izin yarı genişliği: iz 27 cm, yarısı
+/// 13.5 cm. 15 cm derinlikte horizon 48°, yani güneş 48°'nin altındayken
+/// çukurun tabanı doğrudan güneş görmüyor — kâğıtta doğrulandı.
+#define SNOW_CAVITY_RADIUS             0.135
+
+/// GÖLGEDEKİ KARIN ÇEVRESİNDEN ALDIĞI DOLGU.
+///
+/// Gölge tavanı artık sabit değil, gök payından geliyor (`SnowRelief.hlsl`).
+/// Ama gölgedeki kar o payda kalmıyor: kar albedosu 0.85 ve gölge lekesi
+/// çevresindeki aydınlık karın yaklaşık yarısını görüyor, çarpımı 0.43.
+///
+/// Kâğıtta: açık öğle gök payı 0.15 → tavan 0.15 + 0.85×0.43 = 0.52.
+/// Alçak güneş 0.40 → 0.66. Kapalı hava 1.0 → 1.0 (gölge yok).
+///
+/// Eski `SNOW_SHADOW_FLOOR` 0.55'ti ve MEĞER AÇIK ÖĞLE İÇİN DOĞRUYMUŞ;
+/// yanlış olan onu her havada ve her saatte kullanmaktı.
+#define SNOW_SHADOW_BOUNCE             0.43
+
+/// KAR-KAR YATAY TRANSFERİNİN KATSAYISI.
+///
+/// Gölgedeki kar çevresindeki aydınlık kardan ışık alıyor. Katkı
+/// `albedo × görüş payı × aydınlık kar radyansı`; aydınlık kar radyansının
+/// içinde bir albedo daha var. 0.85 × 0.5 = 0.43.
+///
+/// Kâğıtta uçlar: öğle (NdotL 0.9, gök 0.15) aydınlık 1.43 / gölgeli 0.53,
+/// oran 0.37. Şafak (NdotL 0.07, gök 0.02) aydınlık 0.12 / gölgeli 0.05,
+/// oran 0.42. İkisi de ölçülü kar gölgesi oranına (0.4-0.6) oturuyor;
+/// öncesinde şafakta 0.08'di.
+#define SNOW_LATERAL_BOUNCE            0.43
+
 /// Yuzey dokusu MIKRO detay: yakinda var, uzakta yok. Acik kalirsa gorus
 /// alanindaki butun kar ayni desenle kapaniyor.
 #define SNOW_SURF_FADE_START           8.0
 #define SNOW_SURF_FADE_END             28.0
 
-#define SNOW_RELIEF_SHADOW_STEPS       5
-#define SNOW_RELIEF_SHADOW_STRENGTH    0.5
 
 #define SNOW_LOCAL_MIN               0.002
 
@@ -154,7 +183,49 @@
 ///
 /// Ölçülen belirti: iz dokusunda oyma tam 0.0800'de tıkanıyordu ve relief
 /// 8 cm'den derin bir çukuru hiç göremiyordu (ekranda iz "şeffaf" görünüyordu).
-#define SNOW_MAX_SINK                0.35
+/// DELİĞİN BATMAYLA GENİŞLEMESİ (m yarıçap / m batma).
+///
+/// Bacak derin kara girerken kenarı itiyor, çıkarken yıkıyor; delik botun
+/// ölçüsünde kalmıyor. 0.22: 22 cm batmada 7 cm yarıçap 12 cm'ye çıkıyor.
+/// ÇÖKÜNTÜNÜN KUYRUĞU: kenardaki payı ve uzunluğu (yarıçap katı).
+///
+/// Taşıma gücü göçmesinde kayma yüzeyleri temelin dışına taşıyor; çevre kar
+/// geniş bir alanda hafifçe çöküyor. Kuyruk olmadan oyma kapsülün kenarında
+/// BİTİYOR ve iz düz kara tek bir çizgiyle bağlanıyor.
+///
+/// UZUNLUK KÂĞITTA SINIRLANDI. Önce 1.5 yarıçaptı ve toplam iz genişliği
+/// 1.3 m çıkıyordu — insan izi değil hendek (kullanıcı bildirdi: "bu genişlik
+/// haliz mi"). İnsan izi derin karda 40-55 cm.
+///
+/// 0.6 yarıçap ile (R = 8.2 cm): kuyruk 4.9 cm'de 1/e'ye, 12 cm'de %9'a
+/// iniyor. Toplam yarı-genişlik 0.10 + 0.082 + 0.12 = 30 cm, iz 60 cm.
+/// Geçiş bandı yine 5 tekselden 8 teksele çıkıyor ama iz şişmiyor.
+#define SNOW_SETTLE_TAIL             0.12
+#define SNOW_SETTLE_TAIL_LEN         0.55
+
+/// KUYRUK UZUN VE SIĞ. Önce kısa ve derindi (0.40 yarıçap, %20 pay) ve izin
+/// kenarı tek bir koyu hat olarak okunuyordu. Uzatıp sığlaştırmak geçişi
+/// yumuşatıyor ama izi ŞİŞİRMİYOR: kenarda 1.8 cm, 15 cm ötede 2 mm.
+///
+/// Menzil sabit değil: `SNOW_SETTLE_TAIL_SCALE` ile dünya uzayında kırılıyor,
+/// yoksa izin çevresine kusursuz dairesel bir hale çiziyor (`SYMPTOMS.md`).
+///
+/// 1.00'de kuyruk tek başına 6.9 cm yarıçap ekliyordu ve izin görünür
+/// genişliğinin beşte ikisiydi. 0.55 onu 5.4 cm'ye indiriyor; saçaklanma
+/// menzilde olduğu için kısalma haleyi geri getirmiyor.
+
+/// Kuyruk menzilini kıran gürültünün ölçeği (1/m). 5 = 20 cm dalga boyu.
+#define SNOW_SETTLE_TAIL_SCALE       5.0
+
+#define SNOW_HOLE_FLARE              0.08
+
+/// İZ GENİŞLİĞİ BATMAYA BAĞLI — TAVAN ONDAN SEÇİLDİ.
+///
+/// Batma arttıkça `KRepose`'un göçürdüğü duvar da yükseliyor ve omuz
+/// genişliyor: yayılım `(batma − yarıçap − duruş) / tan(38°)`. 0.35'te iz
+/// 90 cm çıkıyordu (kullanıcı bildirdi: "bu genişlik haliz mi", "hâlâ çok
+/// geniş"). Derin karda insan izi 50-60 cm.
+#define SNOW_MAX_SINK                0.15
 
 #define SNOW_PACKED_SINK_SCALE       0.18
 /// SIKIŞMA KAZANCI — ULAŞILAN OYMANIN FONKSİYONU.
@@ -171,7 +242,19 @@
 /// Doğrusu ulaşılan oymanın kar sütununa oranı: `trail.r / baseH`. İdempotent,
 /// kare sayısından ve yol geometrisinden bağımsız. Patika yine oluşuyor çünkü
 /// yoğunluk arttıkça `baseH` düşüyor ve sonraki geçişin oranı yükseliyor.
-#define SNOW_COMPACT_GAIN            0.15
+/// KAZANÇ ÖLÇÜLDÜ VE ÇOK DÜŞÜKTÜ.
+///
+/// 0.15 ile izin içindeki yoğunluk 96 kg/m³ çıkıyordu — hâlâ TAZE kar.
+/// Yürünmüş kar gerçekte 200-300 kg/m³. Sonucu ekranda şuydu: yüzey dokusu
+/// izin içinde ve dışında AYNI katmanı seçiyor (`packed = (ρ−100)/250` her
+/// ikisinde de 0), yani iz farklı bir malzeme gibi değil, aynı malzemenin
+/// gölgeli bir yaması gibi duruyordu (kullanıcı bildirdi: "izin texture'ı
+/// dışardaki karla aynı değil galiba", "uyum yok").
+///
+/// 0.60 ile yoğunluk 218 kg/m³: yürünmüş karın ortası. Doku ağırlığı 0.47,
+/// yani yerleşmiş (topaklı) katman yarı yarıya devreye giriyor; albedo
+/// 0.90 → 0.83, pürüzlülük 0.72 → 0.57. İz kararmıyor, MALZEME değiştiriyor.
+#define SNOW_COMPACT_GAIN            0.60
 
 // --- Kenar yığılması (spec §10.2) ---
 #define SNOW_RIM_VELOCITY_BIAS       0.04
@@ -190,29 +273,24 @@
 /// Tavan batmanın yarısı kadar: 8 cm oluğun kenarında 4 cm'lik yumuşak bir
 /// kabartı. Spec §10.2 "bu parça atlanırsa izler ÇUKUR gibi görünür" diyor;
 /// bir tur 2 cm'e kısıldı ve oluk gerçekten çukur gibi kaldı.
+/// Sırdın gölgelemeye giren payı. Tam yazıldığında izin çevresinde koyu bir
+/// çerçeve oluşuyordu: `KRim`'in profili 2-3 tekselde tepeye çıkıyor ve yan
+/// eğimi 30-40°'ye ulaşıyor. Gerçek bir yığın o kadar dik duramaz.
+#define SNOW_RIM_SHADE               0.35
+
 #define SNOW_RIM_MAX                 0.04
+
+/// Sırt topaklarının ölçeği (1/m). 7 = 14 cm topak; sırdın kendi genişliği
+/// `_RimBlurTexels` 7 teksel × 2.4 cm = 17 cm, yani topak sırtla aynı
+/// mertebede. Daha ince olsaydı gürültü, daha kaba olsaydı sırt yer yer
+/// tamamen kaybolurdu.
+#define SNOW_RIM_CLUMP_SCALE         7.0
+
+/// Topaklar arası en düşük sırt payı. 0 olsaydı sırt kesik kesik olurdu;
+/// 0.35 süreksizliği gösteriyor ama sırdı koparmıyor.
+#define SNOW_RIM_CLUMP_FLOOR         0.35
 #define SNOW_RIM_REF_DEPTH           0.25
 #define SNOW_RIM_BLUR_TEXELS         7.0
-
-/// Oymanın GÖRÜNTÜ için yayılma yarıçapı, teksel.
-///
-/// GEREKÇESİ DEĞİŞTİ, DEĞERİ DE. Eskiden 4 teksel (9.4 cm) idi ve işi "duvarı
-/// eğimlemek"ti: oyma DİK BASAMAK olarak yazılıyordu (0 → 80 mm → 0, ölçüldü)
-/// ve bulanıklık onu tek başına eğimlendiriyordu.
-///
-/// Basamak kaynağında düzeltildi — oymanın profilini artık yakalamanın
-/// kapsama payı veriyor ve üç tekselde yumuşakça iniyor (`KDeform`). Geriye
-/// kalan tek iş MESH'İN TAŞIYABİLECEĞİ bant genişliği: köşe aralığı 4.7 cm =
-/// 2 teksel, Nyquist bunun altındaki her şeyi merdiven yapar.
-///
-/// 4 teksel kalsaydı 19 cm'lik oluğun yarısını düzleştirirdi. Ölçüldü: oluk
-/// son görüntüyü yalnız %2.3 değiştiriyordu (lineer %5.5), oysa 48°'lik bir
-/// duvar Lambert'te %34 koyulaştırır.
-///
-/// 3.0'da bırakıldı. Bir tur "ızgara merdivenini kesmek için" diye 1.5'e
-/// indirilip geri alındı; o gerekçe ölçümle çürüdü (bkz. yakalama bulanıklığı
-/// — dişlerin kaynağı damga kadansı). Yarıçapın işi duvarı yumuşatmak.
-#define SNOW_CARVE_SMOOTH_TEXELS     3.0
 
 /// EĞİM FARKININ ADIMI, teksel.
 ///
@@ -226,6 +304,15 @@
 ///
 /// Gevşek kuru kar ~38°'ye kadar duruyor [KAYNAK: Cordonnier ve ark., EG 2018,
 /// §5.4 — talus açısı]. tan(38°) = 0.781.
+/// KAR YARI SAYDAM — ÇUKURUN GÖLGESİ MAVİYE KAYIYOR.
+///
+/// Buzun soğurma katsayısı 600 nm'de 450 nm'dekinin ~10 katı; çoklu saçılmada
+/// foton yolu uzadığı için derin bir çukurda kırmızı kaybolur, mavi kalır.
+/// Gerçek kar fotoğraflarının en tanınır özelliği bu.
+///
+/// Uç değer `SNOW_RELIEF_MAX_DEPTH`'te; sığ izde etkisi yok.
+#define SNOW_SSS_TINT                float3(0.90, 0.94, 1.00)
+
 #define SNOW_REPOSE_TAN              0.781
 
 /// DUVARIN KENDİ KENDİNE DURABİLDİĞİ YÜKSEKLİK (m).
@@ -239,8 +326,28 @@
 /// yüksekliğin ÜSTÜNDE kalan pay göçüyor; altı dik kalıyor.
 ///
 /// Kohezyon yoğunlukla artıyor: taze kar az tutar, sıkışmış kar çok.
-#define SNOW_STAND_LOOSE             0.015
-#define SNOW_STAND_PACKED            0.07
+///
+/// KAR KUM DEĞİL, KOHEZYONLU. Serbest duran duvar yüksekliği
+/// `h = 2c / (rho g)`; taze tozda c ≈ 300-1000 Pa ve rho ≈ 100 kg/m³ veriyor,
+/// yani **60 cm ile 2 m**. Kar mağarasının kazılabilmesinin sebebi bu.
+///
+/// Değer 4 cm'ken 20 cm karda duvarın 11 cm'i göçüyor ve 14 cm omuz açıyordu:
+/// iz 56 cm çıkıyordu (kullanıcı bildirdi: "20 ve 50 cm'dekiler çok büyük
+/// geniş izler"). 12 cm hâlâ kohezyon hesabının çok altında — muhafazakâr
+/// seçildi ki `SNOW_MAX_SINK` (15 cm) altında bir miktar göçme kalsın ve
+/// kenar bıçak gibi dik durmasın.
+///
+/// Ölçüldü (kâğıtta): 4 cm → iz 56 cm, 12 cm → iz 35 cm, 14 cm → iz 31 cm.
+/// 12 cm'de de "aşırı iz" bildirildi; 14 cm kohezyon hesabının hâlâ çok
+/// altında ve `SNOW_MAX_SINK`'in (15 cm) 1 cm altında kalıyor — duvarın son
+/// santimi göçüyor, kenar bıçak gibi dik durmuyor.
+#define SNOW_STAND_LOOSE             0.140
+
+/// Sıkışmış kar DAHA YÜKSEK duvar tutar, daha az değil. Aynı formülde
+/// c ≈ 5-20 kPa ve rho = 550 kg/m³ metrelerce veriyor. Değer 0.07'ydi ve
+/// `SNOW_STAND_LOOSE` 0.12'ye çıkınca sıralama TERSİNE dönmüştü:
+/// `lerp(LOOSE, PACKED, packed)` sıkışmış karda duvarı alçaltıyordu.
+#define SNOW_STAND_PACKED            0.200
 
 /// KENARIN DÜZENSİZLİĞİ ve dalga boyu (1/m).
 ///
@@ -258,23 +365,78 @@
 #define SNOW_STAND_NOISE             0.50
 #define SNOW_STAND_NOISE_SCALE       8.0
 
-/// İZİN İÇİNDEKİ DÜZENSİZLİK ve dalga boyu (1/m).
+/// DAMGA SİLUETİNİN KEMİRİLMESİ ve dalga boyu (1/m).
 ///
-/// Analitik oyma kusursuz pürüzsüz bir kâse veriyor; ekranda "dümdüz gri,
-/// hiçbir detayı yok" olarak okunuyor (kullanıcı bildirdi). Gerçekte ayağın
-/// altındaki kar tek parça çökmez: bloklar kırılır, kabuk parçalanır, taban
-/// düzensiz kalır.
+/// Kusursuz kapsül kenarı "kalıptan çıkmış" okunuyor. Yarıçap tekselin DÜNYA
+/// konumuna bağlı gürültüyle modüle ediliyor; düzensizlik zeminde sabit
+/// duruyor, damga hareket ederken kenar titremiyor.
 ///
-/// GENLİK KENARDA SIFIR. Modülasyon oyma derinliğinin kendi oranıyla
-/// (`hedef / batma`) çarpılıyor: merkezde tam, kenarda sıfır. Bu yüzden
-/// sınırın yerini DEĞİŞTİREMEZ — zigzag üretemez.
+/// ÜÇ OKTAV: 1/9 = 11.1 cm, sonra 5.6 ve 2.8 cm. Sonuncusu tekselin (2.34 cm)
+/// hemen üstünde; daha ince oktav ızgarada aliasing yapar.
 ///
-/// Dalga boyu 1/9 = 11 cm = 4.7 teksel; ızgaradan uzun, taşınabiliyor.
-/// İkinci oktav yarım genlikte ve iki katı frekansta: 5.5 cm = 2.4 teksel,
-/// tek başına aliasing sınırında ama genliği ±2 cm olduğu için yalnız tane
-/// hissi veriyor.
-#define SNOW_TRACK_DETAIL            0.16
-#define SNOW_TRACK_DETAIL_SCALE      9.0
+/// Toplam genlik (1 + 0.5 + 0.25) × 0.18 = ±%31 × 5.5 cm yarıçap = ±1.7 cm.
+/// En ince oktavın kendi payı ±0.4 cm — teksel altı, zigzag üretemez.
+#define SNOW_EDGE_BREAK              0.18
+#define SNOW_EDGE_BREAK_SCALE        9.0
+
+/// OLUĞUN ORTASINDAKİ SIRT — iki ayak arasında ezilmeyen şerit.
+///
+/// Duruş genişliği 17 cm, ayak eni 11 cm; arada ~6 cm dokunulmamış kar kalır.
+/// Tek bir kapsül bunu kendiliğinden veremez, o yüzden oyma eksende bilerek
+/// sığ bırakılıyor: çıkıntı ayrı bir geometri değil, OYULMAYAN kar.
+///
+/// KRepose SIRTI SİLMİYOR — KÂĞITTA DOĞRULANDI. `KRepose` bir maksimum
+/// filtresi; sırt tekseli komşusundan sığ olduğu için dolma riski var.
+/// Sırt 4 cm yüksek ve 7 cm yarı-genişlikte, yani yan eğimi
+/// atan(4/7) = 30° — duruş açısının (38°) ALTINDA, dolayısıyla stabil.
+/// Sayıyla: 22 cm derin komşu 3 teksel (7 cm) ötede, göçme onu
+/// 22 − 7×tan38° = 16.5 cm'e taşıyor; sırt tekseli zaten 18 cm derin,
+/// 18 > 16.5 olduğu için `max` sırta dokunmuyor.
+///
+/// Oran batmaya göre: derin karda sırt da yükseliyor, eğimi 38°'yi aşınca
+/// kısmen eriyor. Bu doğru davranış — dize kadar batılan karda iki ayak
+/// arasında sırt kalmaz.
+#define SNOW_MIDRIDGE                0.26
+#define SNOW_MIDRIDGE_WIDTH          0.085
+
+/// MİKRO RÖLYEF — üç oktav, metre cinsinden genlik ve 1/m cinsinden ölçek.
+///
+/// SİMÜLASYON ALANINA YAZILAMAZ. Denendi: `KRepose` bir MAKSİMUM filtresi ve
+/// 12 teksel menzille komşuların en derinine göre dolduruyor; 11 cm dalga
+/// boylu bir gürültüyü tamamen süpürdü (kullanıcı bildirdi: "oluğun içi çok
+/// düzenli"). Detay bu yüzden ÇİZİM tarafında.
+///
+/// ÇİZİM TARAFINDA IZGARA YOK. Değer piksel başına hesaplanıyor, 2.34 cm'lik
+/// teksel ızgarasında örneklenmiyor; dalga boyu tanenin kendi boyuna kadar
+/// inebiliyor. Kar dokusunun kendi normal haritası da aynı işi yapıyor ama o
+/// izin İÇİYLE DIŞINI ayırt etmiyor — bu alan yalnız bozulmuş karda var.
+///
+/// Dalga boyları 8.3 / 3.6 / 1.6 cm; genlikler 20 / 9 / 4 mm.
+/// MİKRO GENLİKLER — ÖLÇÜ EĞİM, YÜKSEKLİK DEĞİL.
+///
+/// 0.008/0.004/0.0015 idi; taban çarpanı (0.55) ile birlikte üç oktavın
+/// eğimleri 18°/21°/18°, RMS'i 33° — yüzeyin en büyük tek kaynağı ve
+/// arazide ölçülen kar yüzeyi RMS eğiminin (5-15°) iki katı.
+///
+/// Dalga boyları 8/4/2 cm; yakın planda ekranda birkaç piksel ediyorlar,
+/// yani dik eğim doğrudan keskin gradyana dönüşüyor. 0.4 katsayısıyla
+/// RMS 13°'ye iniyor.
+#define SNOW_MICRO_AMP_A             0.0022
+#define SNOW_MICRO_AMP_B             0.0011
+#define SNOW_MICRO_AMP_C             0.0004
+#define SNOW_MICRO_SCALE_A           12.0
+#define SNOW_MICRO_SCALE_B           27.5
+#define SNOW_MICRO_SCALE_C           62.0
+
+/// Bozulmamış kardaki mikro rölyef payı. 0 = düz kar tamamen özelliksiz.
+///
+/// Sıfırdı ve iz ile çevresi arasında detay uçurumu açılıyordu. Gerçek kar
+/// yüzeyi de pürüzlü; fark derece farkı olmalı, varlık-yokluk farkı değil.
+#define SNOW_MICRO_BASE              0.55
+
+/// Mikro rölyefin tam güce ulaştığı oyma derinliği (m). Sığ izde zayıf,
+/// derin izde tam.
+#define SNOW_MICRO_REF_DEPTH         0.06
 
 #define SNOW_WIND_FILL               0.0012
 
@@ -326,11 +488,96 @@
 /// EN DIŞ HALKANIN ETEĞİ bu kadar aşağı iniyor (rapor §5).
 ///
 // --- Sastrugi (spec §18.4) ---
+/// --- KAR YÜZEYİ YER ŞEKİLLERİ [KAYNAK: Filhol & Sturm 2015;
+///     Kochanski ve ark. 2019, The Cryosphere 13:1267] ---
+
+/// fBm TABANI. Doğal yüzeyler self-affine: `C(q) ~ q^(-2(H+1))`. Kar için
+/// H = 0.8, yani oktav başına genlik oranı 2^(-0.8) = 0.574.
+///
+/// ÖLÇÜLDÜ: GÖRÜNÜRLÜĞÜ GENLİK DEĞİL EĞİM BELİRLİYOR.
+///
+/// İlk değerler (4.5 m dalga, ±9 cm) eğim olarak 2.3° veriyordu ve ekranda
+/// yüzey dümdüz kalıyordu. Genlik 10 katına çıkarılıp bakıldığında rölyef net
+/// göründü — yani bağlantı çalışıyor, sorun eğimdi. `atan(2A/λ)` oranı
+/// belirliyor; kısa dalga boyu aynı genlikte çok daha dik.
+///
+/// Oktavlar: 1.25 / 0.63 / 0.31 / 0.16 m, genlikler 5.5 / 3.2 / 1.8 / 1.0 cm,
+/// eğimler 5.0 / 5.7 / 6.6 / 7.4°. Toplam RMS 6.9 cm.
+///
+/// Metre üstü ölçek (ölçülen "snow wave", 10-20 m) bilerek yok: bizim bölge
+/// 24 m ve o dalga boyu tek bir eğime dönüşüp yüzeyi eğik gösterir.
+/// Yer şekli genliğinin kar derinliğine oranı tavanı.
+///
+/// Sastrugi ve ripple kar tabakasını OYAN şekiller; tabakadan derin olamazlar.
+/// Bu bağ olmadan 1 cm ile 50 cm kar arasında hiçbir görsel fark kalmıyor.
+/// ÖLÇÜLDÜ: 0.35 ile 1 cm ve 5 cm ayrılmıyordu. Büyük ölçekli yüzey kontrastı
+/// (32-64 piksel bloklar) 1cm 4.65, 5cm 4.91, 20cm 6.66, 50cm 6.66 — yani
+/// yalnız sığ/derin ayrımı vardı, ara basamaklar yoktu.
+///
+/// 0.60: 5 cm karda tavan 3 cm, 20 cm'de 12 cm, 50 cm'de 30 cm. fBm'in en
+/// büyük oktavı 5.5 cm olduğu için 1/5/20 basamakları ayrışıyor.
+/// Ölçülen sastrugi derinliği 14-40 cm ve o kar tabakası 50+ cm; oran 0.3-0.8
+/// bandında, 0.60 ortası.
+#define SNOW_BEDFORM_DEPTH_FRAC      0.60
+
+/// Arazi oyuklarının tamamen gömüldüğü kar kalınlığı (m).
+#define SNOW_BURY_REF_DEPTH          0.30
+
+/// fBm TABAN GENLİĞİ — ÖLÇÜ EĞİM, YÜKSEKLİK DEĞİL.
+///
+/// 0.055 idi ve dört oktavın RMS eğimi 35° çıkıyordu; arazide ölçülen
+/// kar yüzeyi RMS eğimi 5-15°. Taban oktav tek başına 15.5°'ydi.
+///
+/// Belirti alçak güneşte görünüyordu: 35°'lik bir yüzey, güneş 2.4°'de
+/// iken NdotL'yi 0 ile 0.6 arasında gezdiriyor ve zemin keskin kenarlı
+/// açık/koyu adacıklara ayrılıyor. Anahtar taramasıyla ölçüldü: on üç
+/// terimden yalnız fBm oranı değiştirdi (0.75 → 0.86), ötekiler ±0.02.
+///
+/// 0.022 ile RMS eğim 15° — ölçülmüş aralığın üst ucu, yani rüzgârlı
+/// kar. Genliği düşürmek detayı silmiyor; detay hissi eğimden geliyor
+/// ve 15° hâlâ görünür.
+#define SNOW_FBM_AMP                 0.015
+#define SNOW_FBM_SCALE               0.80
+#define SNOW_FBM_GAIN                0.574
+
+/// Yüzey çukurlarının ortam örtmesi. Normal katkısı yalnız direkt ışıkla
+/// görünüyor; güneş tepedeyken yüzey düz okunuyor. Çukurun göğü daha az
+/// görmesi ise ışık yönünden bağımsız ve öğlen de çalışıyor.
+#define SNOW_SURFACE_AO              0.50
+
+/// RIPPLE. Ölçülen: 0.5-2 cm yüksek, 10-25 cm dalga boyu, rüzgâra DİK.
+/// 17 cm ve ±1.2 cm seçildi -> eğim 8°. Kar hareket eşiği 7 m/s; altında
+/// yeni ripple oluşmuyor ama var olan siniyor, o yüzden taban 0.35.
+#define SNOW_RIPPLE_AMP              0.012
+#define SNOW_RIPPLE_LENGTH           0.17
+#define SNOW_RIPPLE_BASE             0.24
+
+/// SASTRUGİ TABANI. Oluşumu 20 m/s istiyor; oyunda o rüzgâra ancak fırtınada
+/// çıkılıyor. Taban 0.25: sakin havada yüzey plane bed'e yakın, fırtınada
+/// sastrugi alanına dönüyor.
+/// 0.08 = sakin havada gerçekten PLANE BED. 0.25 idi ve rüzgâr sıfırken
+/// bile 4.5 cm sastrugi bırakıyordu — 60 cm dalga boyunda 25° eğim, yani
+/// yüzeyin en dik tek bileşeni. Yorumun kendi hedefi "sakin havada yüzey
+/// plane bed'e yakın" diyordu ama sayı onu vermiyordu.
+///
+/// 0.08 ile genlik 1.44 cm, eğim 8.6° — sakin havada okunur ama yüzeyi
+/// domine etmiyor. Fırtınada rüzgâr çarpanı zaten 1'e çıkarıyor.
+#define SNOW_SASTRUGI_BASE           0.055
+
 #define SNOW_SASTRUGI_TAU          900.0
 #define SNOW_SASTRUGI_BURY         260.0
-#define SNOW_SASTRUGI_HEIGHT         0.035
-#define SNOW_SASTRUGI_LENGTH         0.35
-#define SNOW_SASTRUGI_WIDTH          1.20
+/// Ölçülen sastrugi derinliği 14-40 cm, sivri uç aralığı 45-90 cm.
+///
+/// LENGTH RÜZGÂRA DİK EKSENDE, WIDTH RÜZGÂR YÖNÜNDE (`SnowYuzeyRolyef`).
+/// Bir tur LENGTH 0.60 → 2.00 yapıldı "eğim çok dik" diye; YANLIŞ
+/// EKSENDİ ve sastrugiyi enine şişirip yönsüzleştirdi. Geri alındı.
+///
+/// O turdaki eğim ölçümü de hatalıydı: genlik `HEIGHT × BASE` ile
+/// çarpılıyor, yani 18 cm değil 4.5 cm. Gerçek eğim 2π×0.045/0.60 =
+/// 0.47, yani 25° — arazi ölçümüyle uyumlu. Sastrugi suçsuz.
+#define SNOW_SASTRUGI_HEIGHT         0.180
+#define SNOW_SASTRUGI_LENGTH         0.60
+#define SNOW_SASTRUGI_WIDTH          2.20
 #define SNOW_SASTRUGI_WIND_TAU     120.0
 
 // --- İz içi AO (spec §18.5) ---

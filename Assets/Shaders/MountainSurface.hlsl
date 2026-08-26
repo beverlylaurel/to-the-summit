@@ -152,6 +152,11 @@ struct MountainSurface
     half3 emission;
     half  smoothness;
     half  occlusion;
+
+    /// Kar yüzeyinin yerel yüksekliği (m). `SnowYuzeyEgim` gradyanla birlikte
+    /// döndürüyor; ortam örtmesi bunu okuyor. Ayrı çağrı piksel başına altı
+    /// gürültü örneği daha demekti.
+    half  snowSurfaceHeight;
     float3 normalWS;
 
     /// Karın bu noktadaki payı. Parıltı bununla ağırlıklanıyor: kar mesh'i
@@ -476,6 +481,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     }
 
     surface.occlusion = lerp(1.0, exposure, _CavityStrength) * microCavity;
+    surface.snowSurfaceHeight = 0;
 
     // Diplere toz ve kırıntı birikir: çukur yalnız loş değil, MAT da. Aynı dip
     // değeri pürüzlülüğe çevrilir — bedava.
@@ -549,7 +555,18 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // Kuru kar pürüzlüdür; gerekçe `SnowLighting.hlsl` → `SnowBuildSurfaceFrom`.
         // İki yol aynı sayıyı kullanmak zorunda, yoksa aynı kar iki farklı
         // parlaklıkla çizilir.
-        half  snowRough  = lerp(0.45, 0.72, freshness);
+        // SIKIŞMIŞ KAR KOYU DEĞİL, SERT VE PARLAK.
+        //
+        // [KAYNAK: kar malzemesi kırılımı — "flatter areas scoured by the wind
+        // reveal a slightly more compacted frozen snow layer underneath" ve o
+        // alanlar daha AZ pürüzlü.] Basınç dendritleri kırıyor, kenarlar
+        // yuvarlanıyor, yüzey düzleşiyor.
+        //
+        // Aralık 0.45–0.72 iken iz yalnız KARARIYOR, karşılığında parlamıyordu
+        // ve ekranda gri bir lekeye dönüyordu (kullanıcı defalarca bildirdi).
+        // Albedo düşerken pürüzlülük de düşmeli — kaybolan yayınık ışığın
+        // yerini speküler alıyor.
+        half  snowRough  = lerp(0.28, 0.72, freshness);
 
         // YÜZEY DOKUSU BURAYA GİRİYOR.
         //
@@ -588,7 +605,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         //
         // Ağırlık `snowSlope`: zaten hesaplanmış, yeni terim değil. Karın
         // durduğu yer ile detayın geçerli olduğu yer aynı yer.
-        float3 detailed = SnowApplyDetailNormals(snowNormal, worldPos, freshness, 0.0,
+        float3 detailed = SnowApplyDetailNormals(snowNormal, worldPos, 0.0,
                                                  length(_WorldSpaceCameraPos - worldPos));
 
         // Doku normalini de ekle: kar dokusunun asıl bilgisi burada.
@@ -597,6 +614,8 @@ MountainSurface BuildMountainSurface(float3 worldPos)
                      + (float2)karYuzey.normalSlope;
             detailed = normalize(float3(e.x, 1.0, e.y));
         }
+
+        if (_SnowDbgNoTexNormal > 0.5) detailed = snowNormal;
 
         snowNormal = normalize(lerp(snowNormal, detailed, snowSlope));
 
@@ -616,6 +635,37 @@ MountainSurface BuildMountainSurface(float3 worldPos)
                                               saturate(izDerinlik * 20.0)));
         }
 
+        // KAR YÜZEYİNİN KENDİ RÖLYEFİ — İZDEN BAĞIMSIZ.
+        //
+        // KÖK HATA BURADAYDI. Yer şekilleri (fBm, ripple, sastrugi) ve mikro
+        // rölyef `SnowDentSlope` üzerinden geliyordu ve o da yukarıdaki
+        // `saturate(izDerinlik * 20.0)` ağırlığıyla harmanlanıyordu. Düz karda
+        // `izDerinlik = 0`, yani ağırlık SIFIR: eklenen her yüzey detayı
+        // ekrana hiç ulaşmıyordu (kullanıcı üç tur üst üste bildirdi:
+        // "dışarıdaki karda hiçbir detay yok").
+        //
+        // O kapı yalnız İZ için doğru — iz olmayan yerde çukur eğimi de
+        // olmamalı. Ama yüzeyin kendi rölyefi karın olduğu HER YERDE var,
+        // o yüzden ağırlığı `snowMask`.
+        {
+            float yuzeyYuksekligi;
+            // Kar tabakasının kalınlığı: yer şekilleri bundan derin olamaz.
+            float karKalinligi = SnowBaseHeight(karDurum.r, yerelRho);
+
+            half2 yuzeyEgim = SnowYuzeyEgim(izPos.xz, karKalinligi, yuzeyYuksekligi)
+                            + SnowMikroEgim(izPos.xz, izDerinlik);
+
+            surface.snowSurfaceHeight = (half)yuzeyYuksekligi;
+
+            float3 n = surface.normalWS;
+            float2 e = float2(n.x, n.z) / max(n.y, 1e-3) - (float2)yuzeyEgim;
+
+            surface.normalWS = normalize(lerp(n, normalize(float3(e.x, 1.0, e.y)),
+                                              snowMask));
+
+        }
+
+
         // Mikro-oyuk karın altında kalıyor — ama TAMAMEN değil.
         //
         // 0.7 ile düzleştirilince arazinin oyukları kar altında yok oluyordu
@@ -623,7 +673,24 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // güneşsizken 0.0023). Kar oyuğu doldurur, silmez: 15-20 cm'lik örtü
         // metrelik bir çukuru kapatmaz. Pay 0.55'e indirildi: 0.35'te zemin
         // luması 0.88'den 0.59'a düşüp güneşli kar için fazla koyu kaldı.
-        surface.occlusion = lerp(surface.occlusion, 1.0, snowMask * 0.55);
+        // GÖMME PAYI KAR KALINLIĞINDAN.
+        //
+        // Sabit 0.55'ti: 1 cm kar da 50 cm kar da arazinin oyuklarını aynı
+        // oranda gömüyordu. Fizik bunu vermiyor — santimetrelik bir örtü
+        // metrelik çukuru kapatmaz, yarım metrelik örtü kapatır.
+        //
+        // Bu, kar kalınlığının en güçlü görsel karşılığı: ince karda arazinin
+        // kendi kabartısı okunuyor, kalın karda yüzey tek parça beyaza dönüyor
+        // (kullanıcı bildirdi: "1cm, 5cm, 20cm, 50cm arasında bir fark yok").
+        //
+        // `SNOW_BURY_REF_DEPTH` = 0.30 m: o kalınlıkta gömme tam paya
+        // (0.55) ulaşıyor, altında orantılı.
+        {
+            float kalinlik = SnowBaseHeight(karDurum.r, yerelRho);
+            half gomme = (half)(0.55 * saturate(kalinlik / SNOW_BURY_REF_DEPTH));
+
+            surface.occlusion = lerp(surface.occlusion, 1.0, snowMask * gomme);
+        }
 
         // ÇUKURUN GÖRÜŞ PAYI ÇOK YANSIMAYLA TELAFİ EDİLİYOR.
         //
@@ -644,9 +711,59 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // Kar düzleştirmesinden SONRA uygulanıyor: düzleştirme çukuru silerdi.
         {
             half a = dot(snowAlbedo, half3(0.2126, 0.7152, 0.0722));
-            half V = (half)saturate(1.0 - 0.55 * izDerinlik / SNOW_RELIEF_MAX_DEPTH);
+            // ÇUKUR GÖĞÜ SANDIĞIMIZDAN GENİŞ GÖRÜYOR.
+            //
+            // Katsayı 0.55'ti ve 22 cm derinlikte görüş payını 0.65'e
+            // indiriyordu. Geometri bunu vermiyor: iz 60 cm geniş, 22 cm
+            // derin; kenardan bakıldığında yarı-açı atan(30/22) = 54°, yani
+            // gökyüzünün büyük kısmı görünüyor. Görüş payı ~0.78.
+            //
+            // Üç terim (görüş, kendi gölgesi, sıkışmış kar albedosu) çarpım
+            // hâlinde uygulanıyor; her biri ayrı ayrı makulken çarpımları izi
+            // düz karın üçte birine indiriyordu (kullanıcı bildirdi: "karın
+            // içi niye karanlık").
+            half V = (half)saturate(1.0 - 0.35 * izDerinlik / SNOW_RELIEF_MAX_DEPTH);
 
             surface.occlusion *= V / max((half)1.0 - a * ((half)1.0 - V), (half)0.05);
+        }
+
+        // YÜZEYİN KENDİ ORTAM ÖRTMESİ — IŞIKTAN BAĞIMSIZ.
+        //
+        // Normal katkısı yalnız DİREKT ışıkla görünüyor: güneş tepedeyken
+        // 7°'lik bir eğim NdotL'yi %1 değiştiriyor ve yüzey düz okunuyor
+        // (ölçüldü: 12:00, SunHeight 0.88 — rölyef görünmüyor; gece yatık
+        // ışıkta net görünüyor). Fizikte de böyle.
+        //
+        // Ama gerçek kar öğlen de okunur, çünkü çukurlar göğü daha az görür.
+        // O terim yüzeyin YÜKSEKLİĞİNDEN geliyor, eğiminden değil, ve güneş
+        // yönünden bağımsız.
+        //
+        // EN SONA KONDU. Normal bloğunun içindeyken hemen ardından gelen
+        // `lerp(occlusion, 1.0, snowMask * 0.55)` payının yarısından fazlasını
+        // siliyordu (ölçüldü: öğle karesinde etki görünmedi).
+        {
+            half cukur = (half)saturate(-surface.snowSurfaceHeight / SNOW_FBM_AMP);
+
+            surface.occlusion *= lerp((half)1.0, (half)1.0 - SNOW_SURFACE_AO,
+                                      cukur * (half)snowMask);
+        }
+
+        // ÇUKURUN İÇİ MAVİYE KAYIYOR — KAR YARI SAYDAM.
+        //
+        // Buzun soğurma katsayısı 600 nm'de 450 nm'dekinin ~10 katı. Çoklu
+        // saçılmada fotonun kat ettiği yol çukurun derinliğiyle uzuyor, yani
+        // kırmızı soğuruluyor ve geriye mavi kalıyor. Gerçek kar
+        // fotoğraflarının en tanınır özelliği bu; onsuz iz DÜZ GRİ okunuyor
+        // (kullanıcı bildirdi: "iz dümdüz gri, hiçbir detayı yok").
+        //
+        // Telafi terimi DEĞİL: yukarıdaki blok kaybolan gök ışığının
+        // ŞİDDETİNİ geri veriyor, bu ise RENGİNİ. İkisi ayrı büyüklük.
+        {
+            half derinlik01 = (half)saturate(izDerinlik / SNOW_RELIEF_MAX_DEPTH);
+
+            surface.albedo = lerp(surface.albedo,
+                                  surface.albedo * (half3)SNOW_SSS_TINT,
+                                  derinlik01 * (half)snowMask);
         }
 
 

@@ -27,6 +27,15 @@ public interface ISnowEnvironmentSource
     /// m/s.
     float WindSpeed { get; }
 
+    /// HÂKİM RÜZGÂR YÖNÜ — anlık değil.
+    ///
+    /// Yer şekilleri (sastrugi, ripple) bu ekseni kullanıyor. Anlık yön
+    /// kullanılırsa desen dünyada kayıyor: alan `dot(worldXZ, eksen)` üzerinden
+    /// kuruluyor ve dağın ortasında |worldXZ| yedi bin metre — bir hamlenin
+    /// 0.14 radyanlık sapması deseni 980 metre sürüklüyor. Aynı ölçüm
+    /// `WindField.PrevailingDirection` yanında da kayıtlı.
+    Vector3 PrevailingWindDirection { get; }
+
     // --- Gece/gündüz döngüsünden ---
 
     /// Ana directional light.

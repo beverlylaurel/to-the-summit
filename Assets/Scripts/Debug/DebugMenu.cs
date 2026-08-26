@@ -514,12 +514,59 @@ public class DebugMenu : MonoBehaviour
                 izHam = GUILayout.Toggle(izHam, "İzin ham hâli (ışıksız, paralakssız)");
                 if (izHam != hamOnce) Shader.SetGlobalFloat(SnowDebugDentId, izHam ? 1f : 0f);
 
+                GUILayout.Space(4f);
+                GUILayout.Label("PROB — lekeler ne?");
+
+                Prob(ref probLeke, ProbId,
+                     "  K=eğim güneşten kaçık  Y=gölge  M=AO");
+                Prob(ref probKapak, KapakId,
+                     "  Kar örtüsü: K=maske Y=AO M=eğim×gök");
+                Prob(ref probNormal, NormalId,
+                     "  Normal: K=NdotL Y=wrap M=N.y");
+
+                GUILayout.Space(4f);
+                GUILayout.Label("Yüzey rölyefi — kapat:");
+
+                Prob(ref kFbm,      FbmId,      "  fBm tabanı");
+                Prob(ref kRipple,   RippleId,   "  ripple");
+                Prob(ref kSastrugi, SastrugiId, "  sastrugi");
+                Prob(ref kMicro,    MicroId,    "  mikro tane");
+                Prob(ref kLod,      LodId,      "  oktav LOD eşiği");
+                Prob(ref kTexN,     TexNId,     "  kar dokusu normali");
+
+                GUILayout.Space(4f);
+                GUILayout.Label("Işıklandırma — kapat:");
+
+                Prob(ref kSpec,    SpecId,    "  speküler");
+                Prob(ref kSparkle, SparkleId, "  parıltı");
+                Prob(ref kWrap,    WrapId,    "  sarmalı diffuse");
+                Prob(ref kAO,      AOId,      "  ortam örtmesi");
+                Prob(ref kBounce,  BounceId,  "  kar-kar transferi");
+                Prob(ref kCavity,  CavityId,  "  çukurun kendi gölgesi");
+
+                if (GUILayout.Button("Probları kapat"))
+                {
+                    probLeke = probKapak = probNormal = false;
+                    kFbm = kRipple = kSastrugi = kMicro = kLod = kTexN = false;
+                    kSpec = kSparkle = kWrap = kAO = kBounce = kCavity = false;
+
+                    foreach (int id in ProbIdleri) Shader.SetGlobalFloat(id, 0f);
+                }
+
+                GUILayout.Space(4f);
+
+
+
                 if (GUILayout.Button("Ayarları geri al (sınama)"))
                 {
                     mgr.SimTimeScale = 1f;
                     mgr.RefillRegion();
                     izHam = false;
                     Shader.SetGlobalFloat(SnowDebugDentId, 0f);
+
+
+
+
                 }
 
                 GUILayout.Space(6f);
@@ -578,6 +625,59 @@ public class DebugMenu : MonoBehaviour
     bool izHam;
 
     static readonly int SnowDebugDentId = Shader.PropertyToID("_SnowDebugDent");
+
+    /// PROBLAR — yerdeki lekeleri teşhis için. Her biri tek bir terimi
+    /// kapatır ya da bir büyüklüğü doğrudan renk olarak basar.
+    bool probLeke, probKapak, probNormal;
+    bool kFbm, kRipple, kSastrugi, kMicro, kLod, kTexN;
+    bool kSpec, kSparkle, kWrap, kAO, kBounce, kCavity;
+
+    static readonly int ProbId     = Shader.PropertyToID("_SnowDebugProbe");
+    static readonly int KapakId    = Shader.PropertyToID("_SnowDebugCover");
+    static readonly int NormalId   = Shader.PropertyToID("_SnowDebugNormal");
+    static readonly int FbmId      = Shader.PropertyToID("_SnowDbgNoFbm");
+    static readonly int RippleId   = Shader.PropertyToID("_SnowDbgNoRipple");
+    static readonly int SastrugiId = Shader.PropertyToID("_SnowDbgNoSastrugi");
+    static readonly int MicroId    = Shader.PropertyToID("_SnowDbgNoMicro");
+    static readonly int LodId      = Shader.PropertyToID("_SnowDbgNoLod");
+    static readonly int TexNId     = Shader.PropertyToID("_SnowDbgNoTexNormal");
+    static readonly int SpecId     = Shader.PropertyToID("_SnowDbgNoSpec");
+    static readonly int SparkleId  = Shader.PropertyToID("_SnowDbgNoSparkle");
+    static readonly int WrapId     = Shader.PropertyToID("_SnowDbgNoWrap");
+    static readonly int AOId       = Shader.PropertyToID("_SnowDbgNoAO");
+    static readonly int BounceId   = Shader.PropertyToID("_SnowDbgNoBounce");
+    static readonly int CavityId   = Shader.PropertyToID("_SnowDbgNoCavityShadow");
+
+    static readonly int[] ProbIdleri =
+    {
+        ProbId, KapakId, NormalId,
+        FbmId, RippleId, SastrugiId, MicroId, LodId, TexNId,
+        SpecId, SparkleId, WrapId, AOId, BounceId, CavityId,
+    };
+
+    /// Bir probu çizer ve değiştiyse shader'a yazar.
+    static void Prob(ref bool durum, int id, string etiket)
+    {
+        bool once = durum;
+        durum = GUILayout.Toggle(durum, etiket);
+
+        if (durum != once) Shader.SetGlobalFloat(id, durum ? 1f : 0f);
+    }
+
+
+
+
+    /// İZ KENARINDAKİ BASAMAĞIN KAYNAĞINI AYIRAN ANAHTARLAR.
+    ///
+    /// Basamak üç tur yanlış yerde arandı — yumuşatma çekirdeğinin
+    /// altörneklemesi, kenar gürültüsünün bloklu bileşeni, bilinear
+    /// filtrelemenin türev süreksizliği. Üçü de gerçek kusurdu, üçü de
+    /// düzeltildi, basamak durdu. Şüphelilerin TAMAMI aynı anda kapatılabilir
+    /// olmalı ki sorumlu tek turda bulunsun.
+
+
+
+
 
     string SnowStatus()
     {
