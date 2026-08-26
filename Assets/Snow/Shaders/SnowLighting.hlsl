@@ -241,12 +241,18 @@ half3 SnowAmbient(float3 N, SnowSurface s, half mainShadow, half heightAO,
     // GÖLGEYE BAĞLANMIYOR. Aydınlık kar da komşusundan ışık alıyor — kar
     // sahasının gerçekten parlak olmasının sebebi bu. Gölgeye bağlansaydı
     // telafi terimi olurdu, fizik değil.
-    if (_SnowDbgNoBounce <= 0.5)
-        ambient += gunesRenk * saturate(gunesYon.y) * s.albedo * SNOW_LATERAL_BOUNCE;
-
     // YALNIZ ORTAMA. Doğrudan ışığa uygulamak gölgeyi iki kez saymaktır ve
     // izleri siyah lekelere çevirir (spec §18.5, §22).
     if (_SnowDbgNoAO <= 0.5) ambient *= heightAO;
+
+    // YATAY TRANSFER AO'NUN DIŞINDA — AO GÖĞÜ MODELLİYOR, YANI DEĞİL.
+    //
+    // Terim bir tur `heightAO` çarpımının içinde kaldı ve AO'nun düştüğü
+    // yerde birlikte söndü. Komşu kardan YANLAMASINA gelen ışık, göğün
+    // ne kadar görüldüğüyle kısılmaz: çukurun içi göğü az görür ama
+    // duvarlarını tam görür, ve o duvarlar aydınlık kardır.
+    if (_SnowDbgNoBounce <= 0.5)
+        ambient += gunesRenk * saturate(gunesYon.y) * s.albedo * SNOW_LATERAL_BOUNCE;
 
     return ambient;
 }

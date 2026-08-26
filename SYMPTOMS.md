@@ -3226,3 +3226,59 @@ yorumun kendi hedefi hem arazi ölçümü.
 **Ders:** bir yorumun yazdığı SONUÇ ile sabitlerin verdiği sonuç ayrı ayrı
 doğrulanmalı. Burada gerekçe doğru, hedef doğru, sayı yanlıştı — ve yorum
 doğru olduğu için üç tur boyunca kimse sabite bakmadı.
+
+---
+
+## Alçak güneşte keskin adacıklar — fBm'in RMS eğimi fizikten iki-üç kat fazla
+
+**Belirti (kullanıcı, aynı kadrajdan dört saat):** 16:12 normal; 17:49 ve 06:20'de
+zemin koyu ve üzerinde keskin kenarlı açık adacıklar.
+
+**Ölçüm koşulu (kullanıcının verdiği):** bulut kapsaması 0, yağış 0, 50 cm kar,
+saat 17:49, 206 m irtifa, yere bakış. Koşul HER KARE yeniden yazılıyor.
+
+**Ölçüm aracının iki kusuru önce düzeltildi:**
+1. `AtmosphereController.CoverageLocked` gerçekten kilitlemiyordu — taban
+   (`minCoverage` / `DryCoverage`) kilidin üstünden geçiyordu. 0 yazılıp 0.40
+   okunuyordu. Kilitliyken taban artık uygulanmıyor.
+2. Play modda `AssetDatabase.ImportAsset` shader'ı geçici boşaltıyor; hemen
+   ardından alınan kare sahnesiz çıkıyor. Import ayrı bir adıma alındı.
+
+**Anahtar taraması — on üç terim, aynı karede, aydınlık/gölgeli oranı:**
+
+| koşul | oran | fark |
+|---|---|---|
+| BAZ | 0.75 | — |
+| **fBm kapalı** | **0.86** | **+0.11** |
+| bounce kapalı | 0.73 | −0.02 |
+| LOD kapalı | 0.76 | +0.01 |
+| speküler / parıltı / sızma / AO / gölge rengi / ripple / sastrugi / mikro | 0.75 | ±0.00 |
+
+Tek anlamlı katkı fBm. (Wrap kapalı 0.80 çıkıyor ama zemin 64 → 12'ye
+düşüyor; ölçek değişimi, kontrast değil.)
+
+**Sebep:** fBm'in dört oktavının RMS eğimi **35°**; arazide ölçülen kar yüzeyi
+RMS eğimi 5-15°. Taban oktav tek başına 15.5°. Güneş 2.4°'deyken 35°'lik bir
+yüzey NdotL'yi 0 ile 0.6 arasında gezdiriyor ve zemin keskin adacıklara
+ayrılıyor.
+
+| oktav | genlik | dalga boyu | eğim |
+|---|---|---|---|
+| 1 | 5.50 cm | 125 cm | 15.5° |
+| 2 | 3.16 cm | 62 cm | 17.6° |
+| 3 | 1.81 cm | 31 cm | 20.0° |
+| 4 | 1.04 cm | 16 cm | 22.7° |
+
+**Çözüm:** `SNOW_FBM_AMP` 0.055 → 0.022, RMS eğim 15° (ölçülmüş aralığın üst
+ucu, rüzgârlı kar). Ölçüldü: oran **0.75 → 0.85**.
+
+**Renk kontrolü:** aydınlık RGB 100/68/40, gölgeli 87/58/33 — R/B oranı 2.54 ve
+2.66, yani AYNI malzeme. Lekeler kar/kaya sınırı değil, aynı yüzeyin aydınlanma
+farkı; kahverengilik gün batımı ışığından.
+
+**Açık kalan:** oran 0.85, lekeler azaldı ama tamamen gitmedi. fBm'i daha da
+kısmak fizik aralığının altına iner. Kalan kontrastın kaynağı ölçülmedi.
+
+**Ders:** genlik tek başına anlamlı değil — ölçü EĞİM, yani genlik/dalga boyu.
+Dört oktavlı bir fBm'de ince oktavlar eğimi domine ediyor: gain 0.574 genliği
+küçültüyor ama frekans iki katına çıktığı için eğim her oktavda artıyor.

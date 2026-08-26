@@ -514,7 +514,20 @@
 /// Arazi oyuklarının tamamen gömüldüğü kar kalınlığı (m).
 #define SNOW_BURY_REF_DEPTH          0.30
 
-#define SNOW_FBM_AMP                 0.055
+/// fBm TABAN GENLİĞİ — ÖLÇÜ EĞİM, YÜKSEKLİK DEĞİL.
+///
+/// 0.055 idi ve dört oktavın RMS eğimi 35° çıkıyordu; arazide ölçülen
+/// kar yüzeyi RMS eğimi 5-15°. Taban oktav tek başına 15.5°'ydi.
+///
+/// Belirti alçak güneşte görünüyordu: 35°'lik bir yüzey, güneş 2.4°'de
+/// iken NdotL'yi 0 ile 0.6 arasında gezdiriyor ve zemin keskin kenarlı
+/// açık/koyu adacıklara ayrılıyor. Anahtar taramasıyla ölçüldü: on üç
+/// terimden yalnız fBm oranı değiştirdi (0.75 → 0.86), ötekiler ±0.02.
+///
+/// 0.022 ile RMS eğim 15° — ölçülmüş aralığın üst ucu, yani rüzgârlı
+/// kar. Genliği düşürmek detayı silmiyor; detay hissi eğimden geliyor
+/// ve 15° hâlâ görünür.
+#define SNOW_FBM_AMP                 0.022
 #define SNOW_FBM_SCALE               0.80
 #define SNOW_FBM_GAIN                0.574
 
