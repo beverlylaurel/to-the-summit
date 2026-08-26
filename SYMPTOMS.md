@@ -2746,3 +2746,44 @@ Terimleri tek tek kısmaya başlanacaktı.
 
 **Kural:** iz/kar parlaklığı karşılaştırması yalnız `ScreenCapture` ile yapılır.
 `cam.Render()` sadece geometri/şekil bakmak için kullanılabilir.
+
+---
+
+## "Şafak ve ikindide zemin kapkara" — sistem hatası değil, DAĞIN KENDİ GÖLGESİ
+
+**Belirti (ölçüm):** saat taramasında zemin parlaklığı şafak 9.1, ikindi 13.9,
+öğle 202.7. Güneş ufkun üstündeydi (`SunHeight` 0.111 ve 0.165), yani gece
+değildi. Karlı bir yüzey alacakaranlıkta gökyüzünün mavi ışığını yansıtır,
+siyah olmaz.
+
+**İlk şüpheli (yanlış):** kar shader'ının ambient okuması. Bu oturumda eklenen
+`SNOW_SURFACE_AO` (0.50) ve `SnowReliefShadow` (taban 0.55) çarpımı 0.275 —
+tam da eksik görünen faktör kadar. Terimler tek tek kısılacaktı.
+
+**Ayırt eden ölçüm:** karın yanına standart URP Lit küre (albedo 0.85,
+`Smoothness` 0.15). Kar shader'ı suçluysa küre parlak, kar karanlık olmalıydı.
+
+| saat | küre | kar | kar/küre |
+|---|---|---|---|
+| şafak SH=0.111 | 7.6 | 10.8 | 1.41 |
+| öğle SH=0.883 | 29.0 | 54.6 | 1.88 |
+| ikindi SH=0.165 | 62.8 | 78.5 | 1.25 |
+
+Kar HER saatte standart Lit'ten parlak. Kar shader'ı ışığı yutmuyor.
+
+**Gerçek sebep:** ilk taramanın koştuğu konum yamacın gölgeli tarafındaydı.
+Alçak güneşte dağın kendisi ön planı gölgeliyor — o karelerde uzak yamaç
+aydınlık, yakın zemin karanlıktı; ikisi aynı karede duruyordu ve bu tek başına
+cevaptı. Zirveye yakın açık bir noktada aynı saatte zemin 78.5.
+
+**İki kez yanıltan ölçüm aracı:**
+1. Prob koşusu bittiğinde `fpc.enabled = true` yapılıyordu; karakter serbest
+   kalıp dağdan düştü ve sonraki ölçüm 384 m'de, sisin içinde koştu (kare
+   baştan sona düz turkuazdı — sis, gökyüzü değil). Düzeltme: ölçüm boyunca
+   konum her karede yeniden yazılıyor.
+2. Kadraj-oranıyla seçilen ölçüm blokları kamera eğimi değişince gökyüzü yerine
+   uzak araziye düşüyordu.
+
+**Kural:** parlaklık şikâyetinde önce KONUM doğrulanır. "Karanlık" bir kare,
+sahnenin karanlık olduğunu değil, kameranın karanlık bir yerde olduğunu
+gösterebilir.

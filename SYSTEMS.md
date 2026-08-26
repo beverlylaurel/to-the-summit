@@ -912,6 +912,23 @@ Rölyef `SnowYuzeyEgim` ile DOĞRUDAN normale giriyor, `SnowDentSlope`
 üzerinden değil: o yol `saturate(izDerinlik * 20)` ağırlığıyla harmanlanıyor
 ve düz karda sıfırlanıyordu (`SYMPTOMS.md`).
 
+**Rölyef ANLIK rüzgârı okumaz, hâkim yönü okur.** Dört bağ birden anlık
+rüzgâra takılıydı ve zemin titriyordu: desen ekseni, örnekleme konumu, genlik
+ve sürüklenme. Bugün ekseni `WindField.PrevailingDirection` sürüyor (120 s
+üstel yumuşatma, sürüklenme eşiğin altında donuyor), genlik ise rüzgâr HIZINA
+değil `WeatherState`'in karlılığına bağlı. Anlık hız yalnız kar taşınımına
+girer — yüzeyin kendisine değil (`SYMPTOMS.md`, dört kaynak).
+
+**Genliğin tavanı kar KALINLIĞI.** Her ölçek `SnowBaseHeight`'ın
+`SNOW_BEDFORM_DEPTH_FRAC` payıyla kırpılıyor: 1 cm karda sastrugi yok, 20 cm'de
+tam. Önce sabit genlikti ve dört ayrı kalınlık ekranda aynı görünüyordu.
+Örtmenin gömme payı da aynı kalınlıktan geliyor (`SNOW_BURY_REF_DEPTH`).
+
+**Oktav sayısı ekran uzamına göre kırpılıyor.** Prosedürel alanlar mipmap'lenmez;
+her oktav `fwidth(worldXZ)`'e karşı Nyquist ile tartılıyor
+(`SnowOktavAgirligi`), teksel altına düşen oktav sıfırlanıyor. Aksi hâlde uzak
+yüzey aliasing'den kaynıyordu.
+
 **Öğle görünürlüğü ortam örtmesinden.** Güneş tepedeyken 7°'lik eğim NdotL'yi
 %1 değiştiriyor; yüzey düz okunuyor. Çukurların göğü daha az görmesi ışık
 yönünden bağımsız ve o saatte de çalışıyor. Terim yüzeyin YÜKSEKLİĞİNDEN
