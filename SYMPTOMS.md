@@ -2876,3 +2876,36 @@ bot yarıçapı 5.5 cm (gerçek bot ölçüsü, dokunulmadı), duvar yayılımı
 0.70 → 0.55 (kuyruk 7.0 → 5.5). İz **35 → 27 cm**; sığ kar da 24 → 21 cm.
 Kuyruğun kısalması haleyi geri getirmiyor çünkü saçaklanma menzilde, uzunlukta
 değil.
+
+---
+
+## "İzin kenarları pikselimsi, border var gibi" — yumuşatma çekirdeği ALTÖRNEKLİYORDU
+
+**Belirti (kullanıcı, fotoğrafla):** "izin kenarları niye koyu gri? border var
+gibi? ayrıca niye pixelimsi bir yapı var kenarlarda? smooth geçiş nerede?"
+
+**Ayırt eden ölçüm — basamak boyu:** fotoğrafta iz ~250 px ve gerçek genişliği
+27 cm → 9.3 px/cm. Kenar basamakları ~20 px = **2.15 cm**. Ölçüldü:
+`_SnowAreaSize` 24 m, `_SnowResolution` 1024 → teksel **2.34 cm**. Basamak tam
+teksel ızgarası; blok gürültü (9 cm hücre) ya da damga kadansı olamaz.
+
+**Gerçek sebep:** `SnowDentSmooth` 9-tap çadır çekirdeği ve
+`SNOW_CARVE_SMOOTH_TEXELS` onun TAP ARALIĞI. Yarıçap 1 tekseli aştığında taplar
+arasında örneklenmeyen teksel kalıyor — filtre yumuşatmıyor, ALTÖRNEKLİYOR ve
+ızgarayla aliasing yapıp düzenli kare desen çıkarıyor. Değer bir önceki turda
+2.6'dan **5.5**'e çıkarılmıştı: taplar 5.5 teksel aralandı, aralarında 4.5
+teksel atlandı. Fonksiyonun kendi yorumu tavanı zaten söylüyordu ("yarıçap 1.5
+tekselden büyük olamaz") ve yok sayılmıştı.
+
+**Aynı hata bir turu da yakmıştı:** 2.6 → 5.5 yapıldığında "bandı genişletmek
+görüntüyü değiştirmedi" diye ölçülmüştü. Değiştirmemesinin sebebi buymuş —
+kazandığı yumuşaklığı aliasing olarak geri veriyordu. Bir düzeltmenin "etkisi
+yok" çıkması, o düzeltmenin iki zıt etkisinin birbirini götürdüğü anlamına
+gelebilir.
+
+**Çözüm:** 1.0 = 3×3 komşu teksel, klasik çadır filtresi. Bant 2 teksel ≈
+4.7 cm, 27 cm izin %17'si.
+
+**Geçişin gerçek sınırı çözünürlük.** İz bugün 11.5 teksel geniş; bir ayak izini
+11 tekselle temsil etmek yumuşak kenar için yetmiyor. Bandı büyütmek çare değil
+(Nyquist), çözüm teksel boyunu küçültmek — `DECISIONS.md`.

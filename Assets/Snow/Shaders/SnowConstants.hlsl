@@ -296,16 +296,27 @@
 /// son görüntüyü yalnız %2.3 değiştiriyordu (lineer %5.5), oysa 48°'lik bir
 /// duvar Lambert'te %34 koyulaştırır.
 ///
-/// 3.0'da bırakıldı. Bir tur "ızgara merdivenini kesmek için" diye 1.5'e
-/// indirilip geri alındı; o gerekçe ölçümle çürüdü (bkz. yakalama bulanıklığı
-/// — dişlerin kaynağı damga kadansı). Yarıçapın işi duvarı yumuşatmak.
-/// ÖLÇÜLDÜ: 2.6 teksel (6 cm) geçiş bandı, iz ise 50 cm geniş — ekranda
-/// geçiş izin %5'i, kenar tek bir koyu hat olarak okunuyor (kullanıcı
-/// defalarca bildirdi: "kenarlarda koyulaşma var, sanki border gibi").
+/// YARIÇAP TAP ARALIĞIDIR — NYQUIST ONU 1 TEKSELLE SINIRLIYOR.
 ///
-/// 5.5 teksel = 13 cm, yani izin dörtte biri. Geometri değişmiyor; değişen
-/// yalnız normalin kenarda ne kadar geniş bir bantta döndüğü.
-#define SNOW_CARVE_SMOOTH_TEXELS     5.5
+/// 9-tap çadır çekirdeğinin tapları bu yarıçap kadar aralıklı. Yarıçap 1'i
+/// aştığında taplar arasında örneklenmeyen teksel kalıyor: filtre artık
+/// yumuşatmıyor, ALTÖRNEKLİYOR. Çekirdek ızgarayla aliasing yapıp düzenli
+/// kare desen çıkarıyor.
+///
+/// Bir tur "geçiş bandı izin %5'i, kenar tek koyu hat okunuyor" diye 2.6'dan
+/// 5.5'e çıkarıldı. Taplar 5.5 teksel aralandı, aralarında 4.5 teksel atlandı
+/// ve iz kenarı TEKSEL BOYUNDA BASAMAKLANDI — kullanıcı fotoğrafla bildirdi:
+/// "niye pixelimsi bir yapı var kenarlarda". Ölçüldü: teksel 2.34 cm,
+/// fotoğraftaki basamak 2.15 cm; birebir ızgara.
+///
+/// O turda "bandı genişletmek görüntüyü değiştirmedi" diye ölçülmüştü —
+/// değiştirmemesinin sebebi buymuş: kazandığı yumuşaklığı aliasing olarak
+/// geri veriyordu.
+///
+/// 1.0 = 3x3 komşu teksel, klasik çadır filtresi. Bant 2 teksel ≈ 4.7 cm,
+/// 27 cm izin %17'si. Geçişi daha da yumuşatmanın yolu bu sayı DEĞİL, doku
+/// çözünürlüğü: iz bugün 11.5 teksel geniş (`DECISIONS.md`).
+#define SNOW_CARVE_SMOOTH_TEXELS     1.0
 
 /// EĞİM FARKININ ADIMI, teksel.
 ///
