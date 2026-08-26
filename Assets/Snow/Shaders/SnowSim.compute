@@ -105,18 +105,26 @@ float2 _TrailVelocityXZ;
 /// yani zigzag üretemez. İkinci oktav yarım genlikte, iki kat frekansta.
 float SnowKemirilmisYaricap(float2 worldXZ, float yaricap)
 {
-    // KIRILMA BLOKLU, AŞINMA SÜREKLİ — İKİSİ BİRDEN.
+    // KENAR FRAKTAL, BLOKLU DEĞİL.
     //
-    // Blok bileşeni kenarı kayma yüzeyi boyunca koparıyor (hücre içinde sabit,
-    // sınırda basamak); sürekli bileşen blokların kendi yüzeyini aşındırıyor.
-    // Yalnız sürekli kullanıldığında kenar düzgün bir dalga oluyordu
-    // (kullanıcı bildirdi: "tomurcuk yok, keskin sınırlarla bağlanıyor").
-    float blok = SnowWarpedBlockNoise(worldXZ * SNOW_EDGE_BLOCK_SCALE) * 2.0 - 1.0;
-
+    // Blok bileşeni (`floor` tabanlı hücresel gürültü) kenarı hücre içinde
+    // SABİT tutup sınırda sıçratıyordu. Hücre 9.1 cm, iz 27 cm — izin kenarı
+    // ÜÇ blokla temsil ediliyordu ve ekranda koca kare köşeler olarak
+    // okunuyordu (kullanıcı fotoğrafla bildirdi: "kenarlarda koca kareli
+    // köşeler var"). Domain warp hücreleri eğriyor ama parça parça sabit bir
+    // alanı sürekli yapmıyor; kareliğin kaynağı warp değil `floor`.
+    //
+    // Yerine üç oktavlı sürekli gürültü. Tek oktav bir tur denenip "düzgün
+    // dalga, tomurcuk yok" diye reddedilmişti — eksik olan SÜREKSİZLİK değil,
+    // ÖLÇEK ÇEŞİTLİLİĞİYDİ. Fraktal kenar hem tomurcuklu hem köşesiz.
+    //
+    // Oktavlar 11.1 / 5.6 / 2.8 cm. Sonuncusu tekselin (2.34 cm) hemen
+    // üstünde; daha ince bir oktav ızgarada aliasing yapar.
     float n1 = SnowValueNoise(worldXZ * SNOW_EDGE_BREAK_SCALE) * 2.0 - 1.0;
-    float n2 = SnowValueNoise(worldXZ * (SNOW_EDGE_BREAK_SCALE * 2.1) + 61.7) * 2.0 - 1.0;
+    float n2 = SnowValueNoise(worldXZ * (SNOW_EDGE_BREAK_SCALE * 2.0) + 61.7) * 2.0 - 1.0;
+    float n3 = SnowValueNoise(worldXZ * (SNOW_EDGE_BREAK_SCALE * 4.0) + 13.1) * 2.0 - 1.0;
 
-    float k = blok * SNOW_EDGE_BLOCK + (n1 + n2 * 0.5) * SNOW_EDGE_BREAK;
+    float k = (n1 + n2 * 0.5 + n3 * 0.25) * SNOW_EDGE_BREAK;
 
     return yaricap * (1.0 + k);
 }

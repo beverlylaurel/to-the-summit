@@ -397,21 +397,11 @@
 /// konumuna bağlı gürültüyle modüle ediliyor; düzensizlik zeminde sabit
 /// duruyor, damga hareket ederken kenar titremiyor.
 ///
-/// Dalga boyu 1/9 = 11 cm = 4.7 teksel (ızgaradan uzun). Genlik ±%18 × 5.5 cm
-/// yarıçap = ±1 cm = 0.42 teksel — teksel altı, zigzag üretemez.
-/// KENARIN KIRILMASI — blok genliği ve hücre ölçeği (1/m).
+/// ÜÇ OKTAV: 1/9 = 11.1 cm, sonra 5.6 ve 2.8 cm. Sonuncusu tekselin (2.34 cm)
+/// hemen üstünde; daha ince oktav ızgarada aliasing yapar.
 ///
-/// Taşıma gücü yenildiğinde kenar kayma yüzeyi boyunca kopuyor ve kohezyonlu
-/// kar açısal parçalara ayrılıyor. Blok bileşeni hücre içinde SABİT, sınırda
-/// basamaklı — kenarın parça parça kopmasını veren bileşen bu.
-///
-/// Hücre 1/11 = 9.1 cm = 3.9 teksel. Izgaradan büyük (temsil edilebiliyor),
-/// oluk genişliğinin (30 cm) altında (blok blok görünüyor, oluğu bozmuyor).
-/// Genlik ±%22 × 15 cm yarıçap = ±3.3 cm = ±1.4 teksel — kenarın gözle
-/// görülür biçimde kopması için gereken en küçük değer.
-#define SNOW_EDGE_BLOCK              0.08
-#define SNOW_EDGE_BLOCK_SCALE        11.0
-
+/// Toplam genlik (1 + 0.5 + 0.25) × 0.18 = ±%31 × 5.5 cm yarıçap = ±1.7 cm.
+/// En ince oktavın kendi payı ±0.4 cm — teksel altı, zigzag üretemez.
 #define SNOW_EDGE_BREAK              0.18
 #define SNOW_EDGE_BREAK_SCALE        9.0
 

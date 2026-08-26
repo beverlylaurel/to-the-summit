@@ -2909,3 +2909,20 @@ gelebilir.
 **Geçişin gerçek sınırı çözünürlük.** İz bugün 11.5 teksel geniş; bir ayak izini
 11 tekselle temsil etmek yumuşak kenar için yetmiyor. Bandı büyütmek çare değil
 (Nyquist), çözüm teksel boyunu küçültmek — `DECISIONS.md`.
+
+**İKİNCİ KAYNAK — asıl kare köşeler bundandı.** Tap aralığı düzeltildikten
+sonra kenar hâlâ basamaklıydı (kullanıcı ikinci fotoğrafla bildirdi: "kenarlarda
+koca kareli köşeler var"). `SnowKemirilmisYaricap` yarıçapı iki bileşenle
+modüle ediyordu ve biri `SnowWarpedBlockNoise`'du: `floor()` tabanlı, hücre
+içinde SABİT, sınırda sıçrayan bir alan.
+
+Ölçüldü: hücre `1/SNOW_EDGE_BLOCK_SCALE` = 9.1 cm, iz 27 cm. **İzin kenarı üç
+blokla çiziliyordu** — "koca kare köşe" tam olarak bu. Domain warp hücreleri
+eğriyor ama parça parça sabit bir alanı sürekli yapmıyor; kareliğin kaynağı
+warp değil `floor`.
+
+Blok bileşeni bir tur "kenar düzgün bir dalga oluyor, tomurcuk yok" diye
+eklenmişti. O teşhis eksikti: sorun süreksizliğin yokluğu değil, ÖLÇEK
+ÇEŞİTLİLİĞİNİN yokluğuydu — tek oktav sürekli gürültü düz bir dalga verir.
+Üç oktava çıkarıldı (11.1 / 5.6 / 2.8 cm, toplam ±%31) ve blok tamamen
+silindi. Fraktal kenar hem tomurcuklu hem köşesiz.
