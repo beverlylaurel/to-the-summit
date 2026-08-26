@@ -105,17 +105,34 @@ SnowSurface SnowBuildSurface(float rhoN, float wet, float disturb, float crust,
 ///
 /// Sarmalı NdotL: kar yarı saydam, ışık yüzeyin altına girip yandan çıkıyor.
 /// Sert bir NdotL karı plastik gösterir.
+/// TEŞHİS ANAHTARLARI — kar ışıklandırmasının her terimi tek tek kapanır.
+///
+/// Alçak güneşte keskin kenarlı bej adacıklar bildirildi ve maske, cavity,
+/// bulut gölgesi, gölge haritası, geometri sırayla elendi. Kalan yer bu
+/// dosya. Şüpheliyi tur tur aramak yerine terimlerin TAMAMI aynı anda
+/// kapatılabilir yapıldı.
+float _SnowDbgNoSpec;
+float _SnowDbgNoSparkle;
+float _SnowDbgNoTrans;
+float _SnowDbgNoWrap;
+float _SnowDbgNoAO;
+float _SnowDbgNoBounce;
+float _SnowDbgNoShadowTint;
+
 half3 SnowDirectLight(Light L, float3 N, float3 V, SnowSurface s)
 {
     const half W = 0.55;
 
     half wrapNdotL = saturate((dot(N, L.direction) + W) / (1.0 + W));
+    if (_SnowDbgNoWrap > 0.5) wrapNdotL = saturate(dot(N, L.direction));
+
     half3 diffuse = s.albedo * wrapNdotL;
 
     // Arkadan aydınlanma: ince karda ışık öbür taraftan sızıyor.
     half back  = saturate(dot(V, -L.direction));
     half trans = pow(back, 3.0) * exp(-s.snowDepth * 7.0) * _TranslucencyStrength;
-    diffuse += s.albedo * trans * half3(1.00, 1.02, 1.10);
+    if (_SnowDbgNoTrans <= 0.5)
+        diffuse += s.albedo * trans * half3(1.00, 1.02, 1.10);
 
     // SPEKÜLER URP SÖZLEŞMESİYLE. `DirectBRDFSpecular` yalnız D·V SKALERİNİ
     // döndürüyor; URP onu `brdfData.specular` ile ve `NdotL` ile çarpıyor
@@ -130,6 +147,8 @@ half3 SnowDirectLight(Light L, float3 N, float3 V, SnowSurface s)
     half NdotL = saturate(dot(N, L.direction));
     half3 spec = s.brdfData.specular
                * DirectBRDFSpecular(s.brdfData, N, L.direction, V) * NdotL;
+
+    if (_SnowDbgNoSpec > 0.5) spec = (half3)0.0;
 
     // PARILTI SADECE GÜNDÜZ. `_SunElevation01` gündöngüsünden geliyor;
     // uygulanmazsa gece kar parıldar (spec §22).
@@ -154,6 +173,8 @@ half3 SnowDirectLight(Light L, float3 N, float3 V, SnowSurface s)
 
     half3 lightCol = L.color * (L.distanceAttenuation * L.shadowAttenuation);
 
+    if (_SnowDbgNoSparkle > 0.5) sparkle = 0;
+
     return (diffuse + spec + sparkle * _SparkleIntensity) * lightCol;
 }
 
@@ -171,7 +192,8 @@ half3 SnowAmbient(float3 N, SnowSurface s, half mainShadow, half heightAO,
     half3 ambient = SampleSH(N) * s.albedo;
 
     half shadowed = 1.0 - mainShadow;
-    ambient *= lerp(half3(1, 1, 1), (half3)_ShadowTint.rgb, shadowed);
+    if (_SnowDbgNoShadowTint <= 0.5)
+        ambient *= lerp(half3(1, 1, 1), (half3)_ShadowTint.rgb, shadowed);
 
     // KAR İLE GÖK ARASINDA ÇOKLU YANSIMA.
     //
@@ -219,11 +241,12 @@ half3 SnowAmbient(float3 N, SnowSurface s, half mainShadow, half heightAO,
     // GÖLGEYE BAĞLANMIYOR. Aydınlık kar da komşusundan ışık alıyor — kar
     // sahasının gerçekten parlak olmasının sebebi bu. Gölgeye bağlansaydı
     // telafi terimi olurdu, fizik değil.
-    ambient += gunesRenk * saturate(gunesYon.y) * s.albedo * SNOW_LATERAL_BOUNCE;
+    if (_SnowDbgNoBounce <= 0.5)
+        ambient += gunesRenk * saturate(gunesYon.y) * s.albedo * SNOW_LATERAL_BOUNCE;
 
     // YALNIZ ORTAMA. Doğrudan ışığa uygulamak gölgeyi iki kez saymaktır ve
     // izleri siyah lekelere çevirir (spec §18.5, §22).
-    ambient *= heightAO;
+    if (_SnowDbgNoAO <= 0.5) ambient *= heightAO;
 
     return ambient;
 }
