@@ -3343,3 +3343,43 @@ Başlangıç 17:49: p99 **28.0**, oran 0.75.
 **Ders:** şikâyeti doğru büyüklüğe çevirmeden ölçme. "Keskin kenar" kontrast
 değil GRADYAN. Yanlış büyüklüğü ölçtüğüm sürece fBm suçlu görünüyordu ve iki
 tur onun üstünde harcandı.
+
+---
+
+## Yukarıdaki "makro katman" teşhisi ÇÜRÜDÜ — ölçüm aracı yalan söylüyordu
+
+**Ne oldu:** makro katman silindikten sonra TEMİZ bir Play oturumunda ölçüldü
+ve p99 gradyan **21** çıktı — anahtar taraması 3 vaat ediyordu.
+
+**Sebep:** anahtar taraması (`k_*`) `AssetDatabase.ImportAsset`'ten sekiz
+saniye sonra alınmıştı. Play modda import shader'ı geçici boşaltıyor; o
+pencerede alınan kare yarım yüklü sahneyi gösteriyor ve düşük gradyan veriyor.
+Aynı tuzak `SNOW_SURF_EGIM_TAVANI` ve `_SnowSurfStrength` ölçümlerini de bozmuş
+olabilir — ikisi de "etkisiz" çıkmıştı.
+
+**Temiz oturumda ölçülenler (ImportAsset yok, Play kullanıcı tarafından açıldı):**
+
+| durum | zemin | p99 gradyan | oran |
+|---|---|---|---|
+| başlangıç (fBm 0.055, makro var) | 64.0 | 28.0 | 0.75 |
+| fBm 0.022 + makro silinmiş | 63.4 | 21.0 | 0.84 |
+| üstüne mezo 0.28 + mikro 0.22 | 63.4 | 22.0 | 0.84 |
+| bulut %40 (kullanıcının kareleri) | 41.6 | 15.0 | 0.82 |
+
+**Duran gerçek:** fBm genliğini fizik aralığına çekmek p99'u 28 → 21 indirdi
+(%25). Makro katmanın silinmesi çift sayım gerekçesiyle doğru ama ölçülmüş
+katkısı ayrıştırılamadı. Mezo/mikro genliğini yarıya indirmek p99'u HİÇ
+değiştirmedi (21 → 22) — o değişiklik geri alındı.
+
+**Kalite MEDIUM:** mikro katman (`_SNOW_QUALITY_HIGH`) bu sahnede hiç
+derlenmiyor. Mezo derleniyor ama genliği keskinliği etkilemiyor, yani
+keskinlik eğim GENLİĞİNDEN değil bir SÜREKSİZLİKTEN geliyor.
+
+**Açık kalan:** adacıklar duruyor. Bir sonraki adım stokastik döşemenin hücre
+sınırları (`SnowTriangleGrid` + `SnowCellOffset`) — genlikle ölçeklenmeyen tek
+aday orası.
+
+**Ders:** Play modda `AssetDatabase.ImportAsset` çağırdıktan sonra alınan
+HİÇBİR kare güvenilir değil. Shader değişikliği edit modda
+`Logs/refresh.trigger` ile derletilir, sonra Play açılır. Bu tuzak bu oturumda
+üç ayrı teşhisi çürüttü.
