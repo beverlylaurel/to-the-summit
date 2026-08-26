@@ -1660,3 +1660,173 @@ seçiliyor ve yüzey ya tek ölçekli (tarak) ya da gürültülü çıkıyor.
 (SunHeight 0.88) 7°'lik eğim NdotL'yi %1 değiştiriyor. Yatık ışıkta
 (SunHeight 0.27) aynı yüzey net görünüyor. Işıktan bağımsız görünürlük
 çukurların ortam örtmesinden geliyor — yüzeyin yüksekliğinden, eğiminden değil.
+
+## Karın speküleri: buzun F0'ı ve gerçek pürüzlülük
+
+**Belirti.** "Kar zemininde ışığın vurma açısına göre bazen sulu zemin gibi
+gözüküyor." Daha önce aynı yüzey için "metalik bir görüntü" bildirilmişti.
+
+**İlk iki şüpheli yanlış çıktı.** Pürüzlülük aralığı iki kez daraltıldı
+(0.26/0.48 → 0.45/0.72) ve ikisinde de belirti sürdü. Daraltmak yetmiyordu
+çünkü aralığın sıkışmış ucu hâlâ yanlış mertebedeydi.
+
+**Ölçüm.** Öğle, 20 cm kar, düz zemin, post kapalı: diffuse 1.747 /
+spekuler 4.133 — spekulerin toplam içindeki payı **%70**. Karın fiziği ~%1
+söylüyor.
+
+İki çarpan birlikte:
+
+| Büyüklük | Eski | Fizik | Oran |
+|---|---|---|---|
+| F0 | 0.04 (URP dielektrik varsayılanı, n = 1.5) | 0.018 (buz, n = 1.31) | 2.2× |
+| Pürüzsüzlük (sıkışmış) | 0.72 | 0.22 | — |
+| GGX tepe yoğunluğu D(0) = 1/(πα²) | 52 | 0.75 | 69× |
+
+F0 = ((n−1)/(n+1))² ile hesaplandı; n = 1.31 buzun görünür bölgedeki kırılma
+indisi.
+
+**Neden 0.72 oraya yazılmıştı.** Gerekçe şuydu: "iz yalnız kararıyor,
+karşılığında parlamıyor; albedo düşerken pürüzlülük de düşmeli, kaybolan
+yayınık ışığın yerini speküler alıyor." Fizikte bu yanlış — sıkışmak F0'ı
+değiştirmez, yalnız yüzeyi biraz düzleştirir. İzin içi ile dışı arasındaki
+fark albedodan ve yer şeklinden gelmek zorunda, speküler patlamasından değil.
+
+**İkinci hata: aynı sayı iki yerde ayrı duruyordu.** `MountainSurface.hlsl`
+0.28, `SnowLighting.hlsl` 0.45 kullanıyordu. Yorum "iki yol aynı sayıyı
+kullanmak zorunda" diyordu ama sayı kopyalanmıştı. Aynı kar arazide ve kar
+mesh'inde iki farklı parlaklıkla çiziliyordu. Artık ikisi de
+`SNOW_ROUGH_PACKED` / `SNOW_ROUGH_FRESH` okuyor.
+
+**Uygulama.** URP'nin `InitializeBRDFData` metalik yolu F0'ı `kDielectricSpec`
+= 0.04'e sabitliyor ve dışarıdan değiştirilemiyor. `SnowInitBRDF`
+(`SnowLighting.hlsl`) `InitializeBRDFDataDirect` çağırıp reflectivity'yi
+kendisi veriyor. Kar çizen üç yol da bunu kullanıyor; F0 kar maskesiyle
+harmanlanıyor çünkü aynı pikselde kaya da olabilir.
+
+## Sarmalı diffuse: bölen (1+W)², W ölçülmüş nüfuz derinliğinden
+
+**Enerji hatası.** Wrap `(N·L + W)/(1+W)` biçiminde yazılmıştı. Kâğıtta
+yarımküre entegrali:
+
+```
+2π/(1+W) · ∫_{-W}^{1} (u+W) du = 2π/(1+W) · (1+W)²/2 = π(1+W)
+```
+
+Lambert'inki `π`. Yani wrap **(1+W) kat fazla enerji** çıkarıyor — yüzey
+aldığından çoğunu geri veriyor. W = 0.55 döneminde %55 fazlaydı. Bölen
+`(1+W)²` olmalı.
+
+Normalizasyon KONTRASTI DEĞİŞTİRMİYOR: oran her iki formda da aynı kalıyor
+(dot=0 / dot=1 oranı W'ye bağlı, bölene değil). Kontrastı belirleyen tek şey
+W. Bu yüzden "wrap kapalıyken daha iyi" belirtisi normalizasyonla kapanmaz.
+
+**W'nin fiziksel karşılığı.** Işığın kar içinde yanal yayıldığı mesafenin
+yüzeyin eğrilik yarıçapına oranı.
+
+[ÖLÇÜM: yeşil ışıkta (550 nm) karın e-katlanma derinliği 37.4 mm.]
+
+Ripple'ın eğrilik yarıçapı `R = λ²/(4π²A) = 0.17²/(4π²·0.0029) = 25 cm`.
+Oran `3.7/25 = 0.15`.
+
+Yol: 0.55 → 0.20 (kullanıcının teşhis anahtarıyla, göz kararı) → 0.15
+(ölçülmüş sayı). İlk iki değer tahmindi; üçüncüsünün arkasında bir uzunluk
+ölçüsü var.
+
+## Sastrugi arazi ölçüsüne çıkarılamadı: RMS eğim bütçesi dolu
+
+**Arazi ölçüsü.** Filhol & Sturm 2015: sastrugi 15-40 cm derin, sivri uç
+aralığı 45-90 cm. Bizde `HEIGHT × BASE = 0.180 × 0.055 = 1.0 cm` — 15-40×
+eksik.
+
+**Ama bütçe dolu.** Yüzeyin toplam RMS eğimi bileşenlerin karekök toplamı:
+
+| Bileşen | Genlik | Dalga boyu | 2πA/λ | Derece |
+|---|---|---|---|---|
+| Sastrugi | 0.5 cm | 60 cm | 0.052 | 3.0° |
+| Ripple | 0.29 cm | 17 cm | 0.106 | 6.1° |
+| fBm (4 oktav) | 1.5 cm | 1.25 m ↓ | 0.190 | 10.8° |
+| Mikro (3 oktav) | 0.12 cm ↓ | 8.3 cm ↓ | 0.163 | 9.2° |
+| **Toplam** | | | **0.277** | **15.5°** |
+
+Arazide ölçülmüş kar yüzeyi RMS eğimi 5-15°. Zaten üst sınırdayız. Sastrugiyi
+10× büyütmek toplamı 0.585'e, yani **30°**'ye çıkarıyor — iki kat aşım.
+
+**Çelişki gerçek ve çözümü sabit değiştirmek değil.** 5-15° bandı sastrugi
+OLMAYAN kar yüzeyi için; sastrugi alanında eğim gerçekten yüksek. Doğru
+mimari sastrugi genliğini rüzgâr maruziyetine bağlamak: korunaklı yamaçta
+plane bed, maruz sırtta arazi ölçüsü. Ortalama düşük kalır, sırtta 15-40 cm
+çıkar.
+
+Kodda bu bağ YOK. `SNOW_SASTRUGI_BASE`'in yorumu "fırtınada rüzgâr çarpanı
+zaten 1'e çıkarıyor" diyor ama öyle bir çarpan hiçbir yerde yazılı değil —
+`BASE` sabit bir kısıcı. Rüzgâr maruziyeti (`TerrainWindShelter`) shader'a
+global olarak da yayınlanmıyor.
+
+**Neden şimdi değiştirilmedi.** Sastrugi genliği bir tur önce 4.5 cm'den
+(25° eğim) düşürülmüştü; gerekçe kullanıcının "zemin titriyor / koyu lekeler"
+bildirimiydi. O bildirim spekülerin toplam içindeki payı %70 iken alındı.
+Aydınlatma o kadar bozukken geometriye verilen karar güvenilmez. Önce
+F0 + pürüzlülük düzeltmesi ekranda görülecek.
+
+## Kalite keyword'ü hiç derlenmiyordu — üç detay katmanı ölüydü
+
+`SnowManager.ApplyQualityKeyword` `Shader.EnableKeyword("_SNOW_QUALITY_*")`
+çağırıyordu ama **hiçbir shader'da o keyword için pragma yoktu**. Varyant
+derlenmediği için `#if defined(_SNOW_QUALITY_HIGH)` her zaman false kalıyor,
+`SnowDetailNormals`'ın üç katmanı (mezo 0.6 m, mikro 5 cm, ezilmiş 0.25 m)
+hiç çalışmıyordu. `SnowSurfaceDetailNormal` yalnız taban normalini geri
+döndürüyordu.
+
+Yan etki tesadüfen doğruydu: `SnowLighting.hlsl`'in `#if !defined(_SNOW_QUALITY_LOW)`
+bloğu (parıltı) hep açık kalıyordu — LOW da tanımsız olduğu için.
+
+`#pragma multi_compile _SNOW_QUALITY_LOW _SNOW_QUALITY_MEDIUM _SNOW_QUALITY_HIGH`
+iki shader'a eklendi. Aktif kademe Medium; mezo katmanı artık çalışıyor,
+mikro ve ezilmiş High'da açılıyor.
+
+## Sabit eşliği testi kırıktı ve neyi kontrol ettiği yanlıştı
+
+`SnowConstantsTest` "48/55" veriyordu. Yedi ayrığın hepsi **ölü C# sabitiydi**:
+`CompactGain`, `RimStrength`, `RimMax` ve beş `Sastrugi*` — hiçbiri hiçbir
+yerden okunmuyordu. Eşleşecek iki taraf yoktu, yalnız iki ayrı sayı duruyordu.
+
+Ölü sabit yanlış belge de taşıyor: C# `SastrugiLength`'i "rüzgâr yönündeki
+dalga boyu" diye tanımlıyordu, HLSL'de ise LENGTH rüzgâra DİK eksende. Bir
+tur bu yüzden yanlış eksende düzeltme yapıldı.
+
+**Testin iddiası da fazlaydı.** Her HLSL define'ının C# karşılığı olmasını
+şart koşuyordu ve 62 shader-only sabit yüzünden kalıcı olarak kırıktı. Gerçek
+risk aynı büyüklüğün iki tarafta AYRI yazılması; yalnız shader'ın okuduğu bir
+sabitin (`SNOW_ICE_F0`, `SNOW_RIPPLE_AMP`, parıltı kapıları) CPU karşılığı
+olması gerekmiyor. Artık sayılıyor ama `ok`'u bozmuyor.
+
+Ayrıca `EdgeFadeRange` gerçek bir çiftti ve tabloda yoktu — eklendi.
+`AoRadius` / `AoStrength` ölüydü — silindi.
+
+Test şimdi yeşil: 47/47.
+
+## Uzaktaki kar neden düzdü: tek kapı üç çıktıyı birden kesiyordu
+
+**Belirti.** "Oyuncu yakınındaki detaylar gözüküyor ama azıcık ilerisi
+dümdüz. Oraya doğru yürüdükçe oradaki detaylar da geliyor."
+
+**Sebep.** `SnowSampleSurface` üç çıktıyı (`albedoTint`, `roughAdd`,
+`normalSlope`) tek bir `guc` ile ölçekliyordu ve o `guc` içinde
+`SNOW_SURF_FADE 8/28` vardı. 28 m'den sonra üçü de sıfır — **yerine hiçbir
+şey gelmiyordu**. Yürüdükçe mesafe düşüyor, detay "geliyor".
+
+**Kapının gerekçesi kabartıda geçerli, renkte değil.** Ölçüldü: doku 4096²,
+döşeme 2.5 m → teksel 0.61 mm. 28 m'de bir ekran pikseli ~89 teksel kaplıyor,
+yani mip 6-7. Trilinear filtreleme deseni zaten ortalıyor ve yumuşak bir
+lekeye çeviriyor. Renk için kesmenin karşılığı yok; kesince düzlük kalıyor.
+
+Kabartı başka: piksel altına düşen normal aliasing ve titreme üretiyor, ve
+mip'lenmiş bir normal haritası düzleşip yanlış parlaklık veriyor (Toksvig).
+8-28 m korunuyor.
+
+Yeni kapı 80-250 m. Tekrarlamayı stokastik döşeme kırıyor, o yüzden uzak
+mesafede ızgara okunmuyor.
+
+**Yan kazanç.** Kabartı kapısı kapalıyken normal ve pürüzlülük dokuları hiç
+okunmuyor: uzakta doku erişimi on ikiden dörde iniyor. Önceden `guc`
+sıfır olsa bile on iki okuma yapılıp sonuç sıfırla çarpılıyordu.

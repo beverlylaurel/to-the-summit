@@ -33,6 +33,23 @@ struct SnowSurface
 /// Doku okuması dışarıda kalıyor: arazi yüzey dokusunu zaten kendi
 /// albedo/normal bloğunda okuyor, `SnowBuildSurface` içinde ikinci kez
 /// örneklenince aynı piksel için on iki doku erişimi iki katına çıkıyordu.
+/// KARIN BRDF'i BUZUN F0'INDAN KURULUYOR.
+///
+/// URP'nin `InitializeBRDFData` metalik yolu F0'i `kDielectricSpec` = 0.04'e
+/// sabitliyor; o deger cam/plastik icin (n = 1.5). Buz n = 1.31 ve F0 = 0.018.
+/// Fark 2.2 kat ve dogrudan spekuler siddetine giriyor.
+///
+/// `InitializeBRDFDataDirect` reflectivity'yi disaridan aliyor: diffuse
+/// `albedo * (1 - F0)`, spekuler F0, grazing terimi ikisinin toplami.
+void SnowInitBRDF(half3 albedo, half smoothness, half f0, inout half alpha,
+                  out BRDFData brdf)
+{
+    half oneMinus = 1.0h - f0;
+
+    InitializeBRDFDataDirect(albedo, albedo * oneMinus, half3(f0, f0, f0),
+                             f0, oneMinus, smoothness, alpha, brdf);
+}
+
 SnowSurface SnowBuildSurfaceFrom(SnowSurfaceBlend yuzey,
                                  float rhoN, float wet, float disturb, float crust,
                                  float snowDepth, float3 positionWS, float pixelFootprint)
@@ -48,17 +65,18 @@ SnowSurface SnowBuildSurfaceFrom(SnowSurfaceBlend yuzey,
     s.albedo    = lerp(ALBEDO_PACKED, ALBEDO_FRESH, freshness) * lerp(half3(1, 1, 1), TINT_WET, wet);
     // KURU KAR PÜRÜZLÜDÜR — PARLAK DEĞİL.
     //
-    // Eskiden sıkışmış kar 0.26, taze kar 0.48 pürüzlülük alıyordu; yani
-    // pürüzsüzlük 0.74 ve 0.52. Bu değerlerde speküler lob dar kalıyor ve
-    // güneş yansıması karın üstünde ARABA BOYASI gibi keskin bir parlaklık
-    // bırakıyor (kullanıcı bildirdi: "metalik bir görüntü").
+    // Aralık iki kez daraltıldı ve iki kez yetmedi: 0.26/0.48, sonra
+    // 0.45/0.72. İkisinde de sıkışmış kar pürüzsüzlük 0.55'in üstünde kaldı
+    // ve güneş yansıması ARABA BOYASI gibi keskin duruyordu (kullanıcı
+    // bildirdi: "metalik bir görüntü", sonra "ışığın vurma açısına göre
+    // bazen sulu zemin gibi").
     //
-    // Kuru karın yansıması çoklu saçılımdan gelir: geniş, sönük, yönsüze
-    // yakın. Ayna gibi davranan şey ıslak kar ve buz kabuğudur — ikisi de
-    // aşağıda ayrıca ele alınıyor.
+    // Sayı sonunda ölçüldü, tahmin edilmedi: pürüzsüzlük 0.72'de GGX tepe
+    // yoğunluğu 52 ve öğle vakti spekülerin toplam içindeki payı %70. Kar
+    // için fizik ~%1 söylüyor. Gerekçe ve uçlar `SNOW_ROUGH_PACKED`'te.
     //
     // Sıkışmış yüzey taze kardan DAHA düzgün olduğu için hâlâ daha düşük.
-    s.roughness = lerp(0.45, 0.72, freshness) * lerp(1.0, 0.62, wet);
+    s.roughness = lerp(SNOW_ROUGH_PACKED, SNOW_ROUGH_FRESH, freshness) * lerp(1.0, 0.62, wet);
 
     // YÜZEY DOKUSU. Dört fotogrametri seti durum zincirinden harmanlanıyor
     // (gerekçe `SnowSurfaceTextures.hlsl`). Albedonun SEVİYESİ yukarıdaki
@@ -86,7 +104,7 @@ SnowSurface SnowBuildSurfaceFrom(SnowSurfaceBlend yuzey,
     // `alpha` PARAMETRESİ `inout`; sabit geçilemez. Kar opak, değer geri
     // okunmuyor ama derleyicinin l-value istemesi bir yerel gerektiriyor.
     half alpha = 1.0h;
-    InitializeBRDFData(s.albedo, 0.0h, half3(0, 0, 0), 1.0h - s.roughness, alpha, s.brdfData);
+    SnowInitBRDF(s.albedo, 1.0h - s.roughness, (half)SNOW_ICE_F0, alpha, s.brdfData);
 
     return s;
 }
@@ -107,9 +125,31 @@ SnowSurface SnowBuildSurface(float rhoN, float wet, float disturb, float crust,
 /// Sert bir NdotL karı plastik gösterir.
 half3 SnowDirectLight(Light L, float3 N, float3 V, SnowSurface s)
 {
-    const half W = 0.55;
+    // WRAP GENİŞLİĞİ = ışığın kar içinde yanal yayılma mesafesinin YÜZEY
+    // EĞRİLİK YARIÇAPINA oranı.
+    //
+    // [ÖLÇÜM: yeşil ışıkta (550 nm) karın e-katlanma derinliği 37.4 mm.]
+    // Ripple'ın eğrilik yarıçapı R = lambda^2/(4*pi^2*A) = 0.17^2/(4*pi^2*0.0029)
+    // = 25 cm. Oran 3.7/25 = 0.15.
+    //
+    // 0.55 idi ve kullanıcı teşhis anahtarıyla gösterdi: wrap KAPALIYKEN
+    // görüntü daha iyi. Fazla wrap `dot`u kaydırıp bütün kontrastı dar bir
+    // banda sıkıştırıyor; güneşten kaçık yerler sönmek yerine orta griye
+    // oturuyor ve leke leke okunuyor. Önce 0.20'ye çekildi, şimdi ölçülmüş
+    // sayıya oturdu.
+    const half W = 0.15;
 
-    half wrapNdotL = saturate((dot(N, L.direction) + W) / (1.0 + W));
+    // BÖLEN (1+W)^2, (1+W) DEĞİL.
+    //
+    // Kâğıtta: wrap'li irradyansın yarımküre entegrali
+    //   2*pi/(1+W) * integral_{-W}^{1} (u+W) du = 2*pi/(1+W) * (1+W)^2/2 = pi*(1+W)
+    // Lambert'inki pi. Yani (1+W) kat FAZLA enerji çıkıyor ve yüzey aldığından
+    // çoğunu geri veriyor. Tek bölenle yazılmış hâli 0.55'te %55 fazla
+    // veriyordu.
+    //
+    // Normalizasyon KONTRASTI DEĞİŞTİRMİYOR (oran aynı kalıyor), yalnız
+    // seviyeyi düşürüyor — kontrastı düzelten şey W'nin kendisi.
+    half wrapNdotL = saturate((dot(N, L.direction) + W) / ((1.0 + W) * (1.0 + W)));
     if (_SnowDbgNoWrap > 0.5) wrapNdotL = saturate(dot(N, L.direction));
     half3 diffuse = s.albedo * wrapNdotL;
 

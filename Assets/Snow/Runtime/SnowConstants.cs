@@ -69,21 +69,10 @@ public static class SnowConstants
     /// Tam sıkışmış karda batmanın kaç katına indiği. Taze karda 1.0, patikada bu.
     public const float PackedSinkScale = 0.18f;
 
-    /// Bir basışta yoğunluğun ne kadar arttığı — AÇILAN OYMA başına, geçen
-    /// süre başına değil. `SnowConstants.hlsl`'in `SNOW_COMPACT_GAIN`'i ile
-    /// AYNI olmak zorunda.
-    public const float CompactGain = 0.15f;
-
     // --- Kenar yığılması (spec §10.2) ---
 
     /// Sırt hesabında hız yönünde kaydırma, saniye.
     public const float RimVelocityBias = 0.04f;
-
-    /// `blur(carve) − carve` farkının sırta çevrilme katsayısı.
-    public const float RimStrength = 1.8f;
-
-    /// Sırtın en fazla yüksekliği, metre.
-    public const float RimMax = 0.10f;
 
     /// Sırt yüksekliğinin ölçekleneceği referans kar derinliği, metre.
     public const float RimRefDepth = 0.25f;
@@ -203,31 +192,10 @@ public static class SnowConstants
 
     // --- Sastrugi (spec §18.4) ---
 
-    /// Sastrugi genliğinin zaman sabiti, saniye.
-    public const float SastrugiTau = 900f;
-
-    /// Taze karın sastrugiyi örtme katsayısı.
-    public const float SastrugiBury = 260f;
-
-    /// Sırtların yüksekliği, metre.
-    public const float SastrugiHeight = 0.035f;
-
-    /// Rüzgâr yönündeki dalga boyu, metre.
-    public const float SastrugiLength = 0.35f;
-
-    /// Rüzgâra dik sırt uzunluğu, metre. Length ile karıştırılırsa desen 90° yanlış olur.
-    public const float SastrugiWidth = 1.20f;
-
     /// Rüzgâr yönünün yumuşatma zaman sabiti, saniye. Ham yön gust'larla titrer.
     public const float SastrugiWindTau = 120f;
 
     // --- İz içi AO (spec §18.5) ---
-
-    /// Ufuk taramasının yarıçapı, metre.
-    public const float AoRadius = 0.10f;
-
-    /// AO'nun şiddeti. 0 = kapalı.
-    public const float AoStrength = 1f;
 
     // --- Süspansiyon perdeleri (spec §18.7) ---
 

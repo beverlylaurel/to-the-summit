@@ -533,6 +533,7 @@ public class DebugMenu : MonoBehaviour
                 Prob(ref kMicro,    MicroId,    "  mikro tane");
                 Prob(ref kLod,      LodId,      "  oktav LOD eşiği");
                 Prob(ref kTexN,     TexNId,     "  kar dokusu normali");
+                Prob(ref kDuz,      DuzId,      "  NORMALI TAMAMEN DUZLESTIR");
 
                 GUILayout.Space(4f);
                 GUILayout.Label("Işıklandırma — kapat:");
@@ -547,7 +548,7 @@ public class DebugMenu : MonoBehaviour
                 if (GUILayout.Button("Probları kapat"))
                 {
                     probLeke = probKapak = probNormal = false;
-                    kFbm = kRipple = kSastrugi = kMicro = kLod = kTexN = false;
+                    kFbm = kRipple = kSastrugi = kMicro = kLod = kTexN = kDuz = false;
                     kSpec = kSparkle = kWrap = kAO = kBounce = kCavity = false;
 
                     foreach (int id in ProbIdleri) Shader.SetGlobalFloat(id, 0f);
@@ -629,7 +630,7 @@ public class DebugMenu : MonoBehaviour
     /// PROBLAR — yerdeki lekeleri teşhis için. Her biri tek bir terimi
     /// kapatır ya da bir büyüklüğü doğrudan renk olarak basar.
     bool probLeke, probKapak, probNormal;
-    bool kFbm, kRipple, kSastrugi, kMicro, kLod, kTexN;
+    bool kFbm, kRipple, kSastrugi, kMicro, kLod, kTexN, kDuz;
     bool kSpec, kSparkle, kWrap, kAO, kBounce, kCavity;
 
     static readonly int ProbId     = Shader.PropertyToID("_SnowDebugProbe");
@@ -641,6 +642,7 @@ public class DebugMenu : MonoBehaviour
     static readonly int MicroId    = Shader.PropertyToID("_SnowDbgNoMicro");
     static readonly int LodId      = Shader.PropertyToID("_SnowDbgNoLod");
     static readonly int TexNId     = Shader.PropertyToID("_SnowDbgNoTexNormal");
+    static readonly int DuzId      = Shader.PropertyToID("_SnowDbgFlatNormal");
     static readonly int SpecId     = Shader.PropertyToID("_SnowDbgNoSpec");
     static readonly int SparkleId  = Shader.PropertyToID("_SnowDbgNoSparkle");
     static readonly int WrapId     = Shader.PropertyToID("_SnowDbgNoWrap");
@@ -651,7 +653,7 @@ public class DebugMenu : MonoBehaviour
     static readonly int[] ProbIdleri =
     {
         ProbId, KapakId, NormalId,
-        FbmId, RippleId, SastrugiId, MicroId, LodId, TexNId,
+        FbmId, RippleId, SastrugiId, MicroId, LodId, TexNId, DuzId,
         SpecId, SparkleId, WrapId, AOId, BounceId, CavityId,
     };
 

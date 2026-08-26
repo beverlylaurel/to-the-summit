@@ -129,10 +129,52 @@
 /// öncesinde şafakta 0.08'di.
 #define SNOW_LATERAL_BOUNCE            0.43
 
-/// Yuzey dokusu MIKRO detay: yakinda var, uzakta yok. Acik kalirsa gorus
-/// alanindaki butun kar ayni desenle kapaniyor.
-#define SNOW_SURF_FADE_START           8.0
-#define SNOW_SURF_FADE_END             28.0
+/// BUZUN FRESNEL TABANI (F0).
+///
+/// Buzun kirilma indisi n = 1.31. Dik gelen isinda
+/// F0 = ((n-1)/(n+1))^2 = ((0.31)/(2.31))^2 = 0.018.
+///
+/// URP'nin dielektrik varsayilani 0.04 (n = 1.5, cam/plastik). Kar o degerle
+/// cizilince yuzey 2.2 kat fazla speküler donduruyor.
+#define SNOW_ICE_F0                    0.018
+
+/// KARIN PURUZLULUGU: TABAN VE TAZE UC.
+///
+/// Kuru kar neredeyse Lambert; yansimasi coklu sacilmadan gelir, genis ve
+/// yonsuze yakin. Ayna gibi davranan sey islak kar ve buz kabugu — ikisi de
+/// kendi carpaniyla ayrica ele aliniyor (`SnowLighting.hlsl`).
+///
+/// Olculdu: sikismis kar 0.28 puruzlulukteydi (puruzsuzluk 0.72) ve GGX tepe
+/// yogunlugu D(0) = 1/(pi*alpha^2) = 52 veriyordu. Ogle vakti duz zeminde
+/// diffuse 1.747 / spekuler 4.133 — spekuler payi %70. Kar icin fizik ~%1
+/// soyluyor. Ekranda bu "sulu zemin" olarak okunuyordu.
+///
+/// 0.78 puruzsuzlukte 0.22 demek, D(0) = 0.75. Sikismis kar taze kardan biraz
+/// daha DUZ oldugu icin taze uctan dusuk kaliyor, ama 0.72 puruzsuzluk buz
+/// kabugu seviyesiydi ve kar degildi.
+#define SNOW_ROUGH_PACKED              0.78
+#define SNOW_ROUGH_FRESH               0.92
+
+/// YUZEY DOKUSUNUN IKI AYRI MESAFE KAPISI.
+///
+/// Uc cikti tek `guc` ile birlikte kesiliyordu (8-28 m) ve 28 m'den sonra
+/// kar duz beyaz kaliyordu: yerine hicbir sey gelmiyordu. Kullanici bunu
+/// "yakindaki detaylar goukuyor ama azcik ilerisi dumduz, oraya dogru
+/// yurudukce detaylar geliyor" diye bildirdi.
+///
+/// KABARTI (normal + puruzluluk) uzakta GERCEKTEN kesilmeli. Piksel altina
+/// dusen kabarti aliasing ve titreme uretiyor; mip'lenmis bir normal haritasi
+/// duzlesip yanlis parlaklik veriyor (Toksvig sorunu). 8-28 m korunuyor.
+///
+/// RENK DESENI KESILMEMELI. Olculdu: doku 4096^2, doseme 2.5 m -> teksel
+/// 0.61 mm. 28 m'de bir ekran pikseli ~89 teksel kapliyor, yani mip 6-7 —
+/// trilinear zaten ortaliyor ve desen yumusak bir lekeye donuyor. Kesmek
+/// icin bir sebep yok; kesince duzluk kaliyor. Tekrarlamayi stokastik
+/// doseme kiriyor.
+#define SNOW_SURF_KABARTI_FADE_START   8.0
+#define SNOW_SURF_KABARTI_FADE_END     28.0
+#define SNOW_SURF_RENK_FADE_START     80.0
+#define SNOW_SURF_RENK_FADE_END      250.0
 
 
 #define SNOW_LOCAL_MIN               0.002

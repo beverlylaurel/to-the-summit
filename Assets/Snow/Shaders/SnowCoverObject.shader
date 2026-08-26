@@ -50,6 +50,9 @@ Shader "ToTheSummit/SnowCoverObject"
             #pragma fragment Fragment
 
             #pragma shader_feature_local_vertex _SNOW_DISPLACEMENT_ON
+            // Gerekçe `MountainSurface.shader`. Nesne örtüsü de aynı kar
+            // ışıklandırmasını kullanıyor; parıltı kapısı oradan geliyor.
+            #pragma multi_compile _SNOW_QUALITY_LOW _SNOW_QUALITY_MEDIUM _SNOW_QUALITY_HIGH
 
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _SHADOWS_SOFT
@@ -156,7 +159,11 @@ Shader "ToTheSummit/SnowCoverObject"
 
                 BRDFData brdfData;
                 half alpha = 1.0h;
-                InitializeBRDFData(albedo, 0.0h, half3(0, 0, 0), smoothness, alpha, brdfData);
+                // Karın F0'ı buzunki (0.018), nesnenin kendi yüzeyi dielektrik
+                // (0.04). Aynı maske ikisini de geçiriyor; `MountainSurface`
+                // arazide birebir aynısını yapıyor.
+                half f0 = lerp(0.04h, (half)SNOW_ICE_F0, (half)mask);
+                SnowInitBRDF(albedo, smoothness, f0, alpha, brdfData);
 
                 float3 V = GetWorldSpaceNormalizeViewDir(IN.positionWS);
 

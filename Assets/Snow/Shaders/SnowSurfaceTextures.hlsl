@@ -191,13 +191,22 @@ SnowSurfaceBlend SnowSampleSurface(float3 posWS, float rhoN, float wet, float di
 
     if (_SnowSurfStrength <= 0.001) return o;
 
-    // MESAFEYLE KAPANIYOR. Yuzey dokusu MIKRO detay; uzakta bir pikselin
-    // icine onlarca kabarti dusuyor ve ortalama bir gurultu olarak kaliyor.
-    // Acik kalinca gorus alanindaki butun kar ayni desenle kapaniyordu.
+    // KABARTI VE RENK AYRI MESAFELERDE KAPANIYOR. Gerekce
+    // `SNOW_SURF_KABARTI_FADE_START` yaninda: piksel altina dusen kabarti
+    // aliasing uretiyor ve kesilmeli, ama renk desenini mip zaten ortaliyor.
+    // Uculu birlikte kesilince 28 m otesi duz beyaz kaliyordu.
     float kameraMesafe = distance(posWS, _WorldSpaceCameraPos);
-    half mesafePayi = (half)(1.0 - smoothstep(SNOW_SURF_FADE_START,
-                                              SNOW_SURF_FADE_END, kameraMesafe));
-    if (mesafePayi <= 0.01h) return o;
+
+    half renkPayi = (half)(1.0 - smoothstep(SNOW_SURF_RENK_FADE_START,
+                                            SNOW_SURF_RENK_FADE_END, kameraMesafe));
+    if (renkPayi <= 0.01h) return o;
+
+    half kabartiPayi = (half)(1.0 - smoothstep(SNOW_SURF_KABARTI_FADE_START,
+                                               SNOW_SURF_KABARTI_FADE_END, kameraMesafe));
+
+    // Kabarti kapaliysa normal ve puruzluluk dokularini HIC OKUMA: uzakta
+    // doku erisimi on ikiden dorde iniyor.
+    bool kabartiVar = kabartiPayi > 0.01h;
 
     half4 w = SnowSurfaceWeights(rhoN, wet, disturb, posWS);
     float2 uv = posWS.xz / max(_SnowSurfTileMeters, 0.01);
@@ -234,30 +243,46 @@ SnowSurfaceBlend SnowSampleSurface(float3 posWS, float rhoN, float wet, float di
     if (w.x > ESIK)
     {
         renk += w.x * SAMPLE_TEXTURE2D(_SnowSurfTazeColor, SNOW_SURF_SAMPLER, uv).rgb;
-        puru += w.x * SAMPLE_TEXTURE2D(_SnowSurfTazeRough, SNOW_SURF_SAMPLER, uv).r;
+
         ortToplam += w.x * half3(0.8434, 0.8965, 0.9446);
-        egim += w.x * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfTazeNormal, SNOW_SURF_SAMPLER), uv);
+        if (kabartiVar)
+        {
+            puru += w.x * SAMPLE_TEXTURE2D(_SnowSurfTazeRough, SNOW_SURF_SAMPLER, uv).r;
+            egim += w.x * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfTazeNormal, SNOW_SURF_SAMPLER), uv);
+        }
     }
     if (w.y > ESIK)
     {
         renk += w.y * SAMPLE_TEXTURE2D(_SnowSurfTozColor, SNOW_SURF_SAMPLER, uv).rgb;
-        puru += w.y * SAMPLE_TEXTURE2D(_SnowSurfTozRough, SNOW_SURF_SAMPLER, uv).r;
+
         ortToplam += w.y * half3(0.2949, 0.2990, 0.3019);
-        egim += w.y * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfTozNormal, SNOW_SURF_SAMPLER), uv);
+        if (kabartiVar)
+        {
+            puru += w.y * SAMPLE_TEXTURE2D(_SnowSurfTozRough, SNOW_SURF_SAMPLER, uv).r;
+            egim += w.y * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfTozNormal, SNOW_SURF_SAMPLER), uv);
+        }
     }
     if (w.z > ESIK)
     {
         renk += w.z * SAMPLE_TEXTURE2D(_SnowSurfYerlesmisColor, SNOW_SURF_SAMPLER, uv).rgb;
-        puru += w.z * SAMPLE_TEXTURE2D(_SnowSurfYerlesmisRough, SNOW_SURF_SAMPLER, uv).r;
+
         ortToplam += w.z * half3(0.7740, 0.8602, 0.9412);
-        egim += w.z * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfYerlesmisNormal, SNOW_SURF_SAMPLER), uv);
+        if (kabartiVar)
+        {
+            puru += w.z * SAMPLE_TEXTURE2D(_SnowSurfYerlesmisRough, SNOW_SURF_SAMPLER, uv).r;
+            egim += w.z * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfYerlesmisNormal, SNOW_SURF_SAMPLER), uv);
+        }
     }
     if (w.w > ESIK)
     {
         renk += w.w * SAMPLE_TEXTURE2D(_SnowSurfRuzgarColor, SNOW_SURF_SAMPLER, uv).rgb;
-        puru += w.w * SAMPLE_TEXTURE2D(_SnowSurfRuzgarRough, SNOW_SURF_SAMPLER, uv).r;
+
         ortToplam += w.w * half3(0.7585, 0.8271, 0.8837);
-        egim += w.w * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfRuzgarNormal, SNOW_SURF_SAMPLER), uv);
+        if (kabartiVar)
+        {
+            puru += w.w * SAMPLE_TEXTURE2D(_SnowSurfRuzgarRough, SNOW_SURF_SAMPLER, uv).r;
+            egim += w.w * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfRuzgarNormal, SNOW_SURF_SAMPLER), uv);
+        }
     }
 
     // RENK CARPAN OLARAK GIRIYOR, YERINE GECMIYOR.
@@ -293,11 +318,11 @@ SnowSurfaceBlend SnowSampleSurface(float3 posWS, float rhoN, float wet, float di
     // gürültüyle 0.55–1.45 arasında geziniyor; desen aynı kalsa bile ekranda
     // "her yerde aynı" okunmuyor.
     half makro = (half)(0.55 + SnowValueNoise(posWS.xz * 0.025) * 0.9);
-    half guc = (half)_SnowSurfStrength * makro * mesafePayi;
+    half taban = (half)_SnowSurfStrength * makro;
 
-    o.albedoTint  = lerp(half3(1, 1, 1), carpan, guc);
-    o.roughAdd    = (puru - (half)0.5) * (half)0.25 * guc;
-    o.normalSlope = egim * guc;
+    o.albedoTint  = lerp(half3(1, 1, 1), carpan, taban * renkPayi);
+    o.roughAdd    = (puru - (half)0.5) * (half)0.25 * taban * kabartiPayi;
+    o.normalSlope = egim * taban * kabartiPayi;
     return o;
 }
 

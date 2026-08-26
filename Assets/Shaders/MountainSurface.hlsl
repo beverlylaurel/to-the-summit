@@ -552,21 +552,21 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         float freshness = 1.0 - saturate((SnowDensity(yerelRho) - 100.0) / 350.0);
 
         half3 snowAlbedo = lerp(half3(0.70, 0.73, 0.79), half3(0.90, 0.92, 0.95), freshness);
-        // Kuru kar pürüzlüdür; gerekçe `SnowLighting.hlsl` → `SnowBuildSurfaceFrom`.
-        // İki yol aynı sayıyı kullanmak zorunda, yoksa aynı kar iki farklı
-        // parlaklıkla çizilir.
-        // SIKIŞMIŞ KAR KOYU DEĞİL, SERT VE PARLAK.
+        // Kuru kar pürüzlüdür; gerekçe `SnowConstants.hlsl` → `SNOW_ROUGH_PACKED`.
+        //
+        // İKİ YOL AYNI SABİTİ OKUMAK ZORUNDA. Buraya 0.28 yazılmıştı,
+        // `SnowBuildSurfaceFrom` ise 0.45 kullanıyordu — aynı kar arazide ve
+        // kar mesh'inde iki farklı parlaklıkla çiziliyordu. Yorum "aynı sayıyı
+        // kullanmak zorunda" diyordu ama sayı iki yerde ayrı duruyordu.
+        //
+        // SIKIŞMIŞ KAR KOYU DEĞİL, SERT — AMA AYNA DA DEĞİL.
         //
         // [KAYNAK: kar malzemesi kırılımı — "flatter areas scoured by the wind
         // reveal a slightly more compacted frozen snow layer underneath" ve o
         // alanlar daha AZ pürüzlü.] Basınç dendritleri kırıyor, kenarlar
-        // yuvarlanıyor, yüzey düzleşiyor.
-        //
-        // Aralık 0.45–0.72 iken iz yalnız KARARIYOR, karşılığında parlamıyordu
-        // ve ekranda gri bir lekeye dönüyordu (kullanıcı defalarca bildirdi).
-        // Albedo düşerken pürüzlülük de düşmeli — kaybolan yayınık ışığın
-        // yerini speküler alıyor.
-        half  snowRough  = lerp(0.28, 0.72, freshness);
+        // yuvarlanıyor, yüzey düzleşiyor. Düzleşiyor, camlaşmıyor: buzun F0'ı
+        // 0.018'de sabit, sıkışmak onu değiştirmiyor.
+        half  snowRough  = lerp(SNOW_ROUGH_PACKED, SNOW_ROUGH_FRESH, freshness);
 
         // YÜZEY DOKUSU BURAYA GİRİYOR.
         //
@@ -664,6 +664,11 @@ MountainSurface BuildMountainSurface(float3 worldPos)
                                               snowMask));
 
         }
+
+        // TESHIS: normal EN SONDA duzlestiriliyor ki iz egimi, yuzey rolyefi
+        // ve ARAZININ kendi normali dahil her katman ezilsin.
+        if (_SnowDbgFlatNormal > 0.5)
+            surface.normalWS = normalize(lerp(surface.normalWS, _SnowUpDirection, snowMask));
 
 
         // Mikro-oyuk karın altında kalıyor — ama TAMAMEN değil.

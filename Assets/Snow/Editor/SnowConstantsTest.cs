@@ -38,13 +38,9 @@ public static class SnowConstantsTest
         ("LooseN", "SNOW_LOOSE_N"),
         ("PackedN", "SNOW_PACKED_N"),
         ("PackedSinkScale", "SNOW_PACKED_SINK_SCALE"),
-        ("CompactGain", "SNOW_COMPACT_GAIN"),
         ("RimVelocityBias", "SNOW_RIM_VELOCITY_BIAS"),
-        ("RimStrength", "SNOW_RIM_STRENGTH"),
-        ("RimMax", "SNOW_RIM_MAX"),
         ("RimRefDepth", "SNOW_RIM_REF_DEPTH"),
         ("RimBlurTexels", "SNOW_RIM_BLUR_TEXELS"),
-        ("FillGain", "SNOW_FILL_GAIN"),
         ("WindFill", "SNOW_WIND_FILL"),
         ("SettleTau", "SNOW_SETTLE_TAU"),
         ("DisturbTau", "SNOW_DISTURB_TAU"),
@@ -73,23 +69,26 @@ public static class SnowConstantsTest
         ("CrustSolid", "SNOW_CRUST_SOLID"),
         ("CrustBreakPen", "SNOW_CRUST_BREAK_PEN"),
         ("CrustSinkScale", "SNOW_CRUST_SINK_SCALE"),
-        ("SastrugiTau", "SNOW_SASTRUGI_TAU"),
-        ("SastrugiBury", "SNOW_SASTRUGI_BURY"),
-        ("SastrugiHeight", "SNOW_SASTRUGI_HEIGHT"),
-        ("SastrugiLength", "SNOW_SASTRUGI_LENGTH"),
-        ("SastrugiWidth", "SNOW_SASTRUGI_WIDTH"),
         ("SastrugiWindTau", "SNOW_SASTRUGI_WIND_TAU"),
         ("SuspScaleH", "SNOW_SUSP_SCALE_H"),
         ("SuspAlphaBase", "SNOW_SUSP_ALPHA_BASE"),
         ("SuspMaxHeight", "SNOW_SUSP_MAX_HEIGHT"),
         ("SprayParticlesPerM3", "SNOW_SPRAY_PARTICLES_PER_M3"),
+        ("EdgeFadeRange", "SNOW_EDGE_FADE_RANGE"),
         ("GroupSize", "SNOW_GROUP_SIZE"),
     };
 
     /// TABLODA OLMAYAN, KASITLI. `SnapQuadsInt` `SnapQuads`'ın tam sayı ikizi
     /// ve HLSL karşılığı yok — shader'da bölme yapılmıyor. `MeshBoundsHeight`
     /// CPU'da mesh sınırı kuruyor, shader okumuyor.
-    static readonly string[] CsharpOnly = { "SnapQuadsInt", "MeshBoundsHeight" };
+    ///
+    /// DOKUZ ÇİFT TABLODAN ÇIKARILDI ÇÜNKÜ C# TARAFI ÖLÜYDÜ. `CompactGain`,
+    /// `RimStrength`, `RimMax` ve beş `Sastrugi*` sabiti hiçbir yerden
+    /// okunmuyordu; test "eşlik bozuk" diyordu ama eşleşecek iki taraf yoktu.
+    /// Sastrugi'de C# yorumu HLSL'in TERSİNİ söylüyordu (LENGTH'i rüzgâr
+    /// yönü sanıyordu); ölü sabit yanlış belge de taşıyor. `FillGain` bir
+    /// fonksiyon, sabit değil — `SNOW_FILL_GAIN` diye bir define hiç yok.
+    static readonly string[] CsharpOnly = { "SnapQuadsInt", "MeshBoundsHeight", "ReposeIterations" };
 
     [MenuItem("To The Summit/Kar/Sabit Eşliğini Sına", false, 60)]
     static void RunMenu() => Debug.Log(Run(out bool ok) + (ok ? "" : "\nEŞLİK BOZUK."));
@@ -159,12 +158,24 @@ public static class SnowConstantsTest
             if (!listed) { report.AppendLine($"TABLODA YOK  C# {name}"); ok = false; }
         }
 
+        // TEK TARAFLI HLSL SABİTİ HATA DEĞİL.
+        //
+        // Testin yakaladığı gerçek risk, aynı büyüklüğün iki tarafta AYRI
+        // yazılması. Yalnız shader'ın okuduğu bir sabitin (`SNOW_ICE_F0`,
+        // `SNOW_RIPPLE_AMP`, parıltı kapıları…) CPU karşılığı olmasına gerek
+        // yok; olmasını şart koşmak testi kalıcı olarak kırık tutuyordu
+        // (55 çiftin yanında 50'den fazla "TABLODA YOK" satırı). Sayılıyor
+        // ama `ok`'u bozmuyor.
+        int hlslOnly = 0;
+
         foreach (string name in defines.Keys)
         {
             bool listed = false;
             foreach ((string _, string hl) in Pairs) if (hl == name) { listed = true; break; }
-            if (!listed) { report.AppendLine($"TABLODA YOK  HLSL {name}"); ok = false; }
+            if (!listed) hlslOnly++;
         }
+
+        report.AppendLine($"Yalnız shader'da: {hlslOnly} sabit (beklenen).");
 
         ok &= GridRuleTests(report);
 

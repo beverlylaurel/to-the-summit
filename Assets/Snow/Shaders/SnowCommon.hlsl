@@ -463,4 +463,9 @@ float _SnowDbgNoBounce;
 float _SnowDbgNoTexNormal;
 float _SnowDbgNoCavityShadow;
 
+/// 1 iken kar yuzeyinin normali TAMAMEN duzlestiriliyor (dunya +Y).
+/// Lekeler burada da duruyorsa kaynak normal DEGIL.
+/// Gidiyorsa ve rolyef anahtarlari etkisizse kaynak ARAZININ kendi normali.
+float _SnowDbgFlatNormal;
+
 #endif

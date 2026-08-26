@@ -798,7 +798,16 @@ kirletildiğinde, her kare değil. Üç tüketicisi var: zemin birikmesi, nesne
 üstü kar, kar tanesi kesme.
 
 **Kar görünümü (Faz 6).** Albedo ve pürüzlülük yoğunluktan türüyor (taze
-0.90 / sıkışmış 0.70), ıslaklık ikisini de koyultuyor. Üstüne DÖRT FOTOGRAMETRİ
+0.90 / sıkışmış 0.70), ıslaklık ikisini de koyultuyor. Pürüzlülük TEK SABİT
+ÇİFTİNDEN okunuyor (`SNOW_ROUGH_PACKED` / `SNOW_ROUGH_FRESH`): arazi ve kar
+mesh'i aynı sayıyı görmek zorunda, iki yerde ayrı yazıldığında aynı kar iki
+farklı parlaklıkla çiziliyordu.
+
+**Karın F0'ı buzun F0'ı.** URP'nin dielektrik varsayılanı 0.04 (n = 1.5);
+buz n = 1.31 ve F0 = 0.018. Kar çizen üç yol da (`MountainSurface`,
+`SnowBuildSurfaceFrom`, `SnowCoverObject`) BRDF'i `SnowInitBRDF` üzerinden
+kuruyor ve F0'ı kar maskesiyle kaya/nesne dielektriğinden harmanlıyor.
+Sabit 0.04 kullanıldığında kar 2.2 kat fazla speküler döndürüyordu. Üstüne DÖRT FOTOGRAMETRİ
 SETİ harmanlanıyor (`SnowSurfaceTextures.hlsl`: taze / toz / yerleşmiş /
 rüzgâr); ağırlıkları yoğunluk, sıcaklık, ıslaklık, bozulma ve rüzgâr
 maruziyetinden geliyor — yani ayrı bir kaynak kurulmuyor, mevcut duruma
@@ -810,6 +819,13 @@ okunuyor (Heitz-Neyret altıgen ızgarası) — düz döşeme 2.5 m'de kendini t
 edip leke ızgarası üretiyordu. Eğime fiziksel tavan var (35°): normal
 haritanın mavi kanalı sıkıştırmayla sıfıra yaklaşınca `n.xy/n.z` patlıyor ve
 izole koyu mavi noktalar çıkıyordu.
+
+**Dokunun iki ayrı mesafe kapısı var.** Kabartı (normal + pürüzlülük) 8-28 m
+arasında sönüyor — piksel altına düşen kabartı aliasing üretiyor ve mip'lenmiş
+normal yanlış parlaklık veriyor. Renk deseni 80-250 m'ye kadar duruyor: mip
+onu zaten ortalıyor, kesmek için sebep yok. Üçü birlikte kesildiği dönemde
+28 m ötesi düz beyaz kalıyordu. Kabartı kapısı kapalıyken normal ve pürüzlülük
+dokuları hiç okunmuyor (uzakta on iki erişim dörde iniyor).
 
 **Doku ARAZİDE okunuyor.** Arazinin kar albedosu `MountainSurface.hlsl`
 içinde kuruluyor ve `SnowBuildSurface`'ten bağımsız; doku yalnız ışıklandırma

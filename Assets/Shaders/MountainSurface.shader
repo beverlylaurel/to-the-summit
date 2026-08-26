@@ -36,6 +36,12 @@ Shader "ToTheSummit/MountainSurface"
             // taşımıyor, elli metrede bitiyor. Ama HAREKETLİ NESNELER haritada: bisiklet,
             // oyuncu, ileride kaya ve çadır. Harita okunmadığı sürece bunların hiçbiri
             // yere gölge düşürmüyordu.
+            // KAR KALİTE KADEMESİ. `SnowManager.ApplyQualityKeyword` global
+            // keyword'ü açıyordu ama hiçbir shader'da pragma yoktu — varyant
+            // derlenmediği için `#if defined(_SNOW_QUALITY_HIGH)` hep false
+            // kalıyordu ve `SnowDetailNormals`'ın üç katmanı (mezo, mikro,
+            // ezilmiş) hiç çalışmıyordu.
+            #pragma multi_compile _SNOW_QUALITY_LOW _SNOW_QUALITY_MEDIUM _SNOW_QUALITY_HIGH
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
 
@@ -210,8 +216,14 @@ Shader "ToTheSummit/MountainSurface"
 
                 half alpha = 1.0;
                 BRDFData brdfData;
-                InitializeBRDFData(surface.albedo, 0.0, half3(0.0, 0.0, 0.0),
-                    surface.smoothness, alpha, brdfData);
+                // F0 KARLA KAYA ARASINDA HARMANLANIYOR.
+                //
+                // Kaya bir dielektrik ve URP'nin 0.04'ü (n = 1.5) ona uyuyor.
+                // Buz n = 1.31 ve F0 = 0.018 — arazide iki malzeme aynı geçişte
+                // duruyor, F0 de aynı maskeyle geçmek zorunda. Tek bir 0.04
+                // kullanılırsa kar 2.2 kat fazla speküler döndürüyor.
+                half f0 = lerp(0.04h, (half)SNOW_ICE_F0, surface.snowMask);
+                SnowInitBRDF(surface.albedo, surface.smoothness, f0, alpha, brdfData);
 
                 AmbientOcclusionFactor aoFactor = CreateAmbientOcclusionFactor(
                     float2(0.0, 0.0), surface.occlusion);
