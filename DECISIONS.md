@@ -230,6 +230,23 @@ olur.
 ---
 ## Bekleyen ölçümler
 
+- **İz kenarının yumuşaklığının sınırı doku çözünürlüğü.** Ölçüldü:
+  `_SnowAreaSize` 24 m, `_SnowResolution` 1024 → teksel **2.34 cm**; 27 cm'lik
+  ayak izi yalnız **11.5 teksel** geniş. Yumuşatma bandını büyütmek çare değil —
+  tap aralığı 1 tekseli aşınca çekirdek altörnekliyor ve kenarı basamaklıyor
+  (`SYMPTOMS.md`). Üç yol var, üçü de ölçüldü:
+
+  | yol | teksel | iz | bellek | bedel |
+  |---|---|---|---|---|
+  | bugünkü (1024 / 24 m) | 2.34 cm | 11.5 teksel | 50 MB | kenar bandı izin %17'si |
+  | çözünürlük 2048 | 1.17 cm | 23 teksel | **200 MB** | +150 MB VRAM |
+  | alan 24 → 12 m | 1.17 cm | 23 teksel | 50 MB | iz ömrü 12 s → **6 s** (2 m/s'de) |
+
+  Çözünürlüğe bağlı dokular: `RT_Trail`/`RT_TrailTemp` (ARGBHalf),
+  `RT_Snow`/`RT_SnowTemp` (ARGBFloat), `RT_RimBlur` (RHalf).
+  **Karar verilmedi** — tetikleyici: kullanıcı 1.0 tap aralığıyla alınan kenarı
+  hâlâ sert bulursa. O noktada seçim VRAM ile iz ömrü arasında ve kullanıcının.
+
 - **Derleme süresi darboğazı bulunamadı.** Kullanıcı "compile süresi çok uzadı"
   dedi; ölçülenler: script derlemesi 0.8–1.9 ms, domain reload 3514 ms
   (`FinalizeReload` 2132 ms), shader import MountainSurface 143 / Sky 154 /
