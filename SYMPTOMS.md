@@ -2967,3 +2967,31 @@ silindi.
 **Kural:** bir yükseklik alanından normal üretiliyorsa filtrelemenin C1
 sürekliliği ZORUNLUDUR. Bilinear ile alınan her normal haritası teksel boyunda
 faceted çıkar; bu ayarla düzelmez, filtre değiştirilir.
+
+---
+
+## Normal karışımındaki `lerp` — ölçüldü, sorun değil
+
+**Şüphe:** Batman: Arkham Origins sunumu yönlü veriyi lerp'lemenin yanlış
+olduğunu söylüyor ve geçiş için Reoriented Normal Mapping kullanıyor.
+`MountainSurface.hlsl` kar normalini araziye `normalize(lerp(...))` ile
+karıştırıyor.
+
+**Ölçüm — nlerp'in slerp'ten en büyük açı sapması:**
+
+| iki normal arası açı | sapma |
+|---|---|
+| 20° | 0.04° |
+| 40° | 0.32° |
+| 60° | 1.11° |
+| 90° | 4.07° |
+| 120° | 10.89° |
+
+**Sonuç: yapılmadı.** Karışan iki normal BAĞIMSIZ değil — `snowNormal` doğrudan
+`normalWS`'ten başlıyor, üstüne yalnız detay eğimleri biniyor. Aradaki açı kaya
+bump'ı kadar, yani 20-40°: sapma **0.3°**, ekranda görünmez. RNM'in çözdüğü
+problem tanjant uzayında bir detay normalini bir tabana OTURTMAK; buradaki
+işlem iki normali karıştırmak ve nlerp o iş için yeterli.
+
+**Ders:** bir kaynağın "şu yanlıştır" demesi, o yanlışın BİZİM sayılarımızda
+görünür olduğu anlamına gelmiyor. Sapma önce ölçülür.

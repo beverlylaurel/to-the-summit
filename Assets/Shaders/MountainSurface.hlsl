@@ -527,6 +527,8 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         float3 bakisWS = normalize(_WorldSpaceCameraPos - worldPos);
         float izDerinlik;
         float2 izKayma = SnowReliefOffset(worldPos, bakisWS, izDerinlik);
+        if (_SnowDbgNoParallax > 0.5) izKayma = (float2)0.0;
+
         float3 izPos = worldPos + float3(izKayma.x, 0.0, izKayma.y);
         float2 izUV = SnowWorldToUV(izPos);
 
@@ -583,6 +585,14 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         surface.snowDisturb = (half)yerelBozulma;
         surface.snowDentDepth = (half)izDerinlik;
 
+        if (_SnowDbgNoTexture > 0.5)
+        {
+            karYuzey.albedoTint  = (half3)1.0;
+            karYuzey.roughAdd    = (half)0.0;
+            karYuzey.normalSlope = (half2)0.0;
+            surface.snowBlend    = karYuzey;
+        }
+
         snowAlbedo = saturate(snowAlbedo * karYuzey.albedoTint);
         snowRough  = saturate(snowRough + karYuzey.roughAdd);
 
@@ -627,6 +637,8 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // zar zor seçiliyordu.
         {
             half2 izEgim = SnowDentSlope(izUV);
+            if (_SnowDbgNoDentNormal > 0.5) izEgim = (half2)0.0;
+
             float3 n = surface.normalWS;
             float2 e = float2(n.x, n.z) / max(n.y, 1e-3) - (float2)izEgim;
             surface.normalWS = normalize(lerp(n, normalize(float3(e.x, 1.0, e.y)),

@@ -271,6 +271,8 @@ float2 SnowReliefOffset(float3 posWS, float3 viewDirWS, out float dentOut)
 /// KIRPMA UZUNLUĞA, BİLEŞENE DEĞİL — aynı gerekçe `SnowReliefOffset`'te.
 half SnowReliefShadow(float3 posWS, float3 lightDirWS, float dent)
 {
+    if (_SnowDbgNoReliefShadow > 0.5) return (half)1.0;
+
     if (dent < 0.005) return 1.0h;
 
     // Işık yukarı bakan yön; yatay ilerleme birim derinlik başına.

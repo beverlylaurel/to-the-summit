@@ -514,12 +514,25 @@ public class DebugMenu : MonoBehaviour
                 izHam = GUILayout.Toggle(izHam, "İzin ham hâli (ışıksız, paralakssız)");
                 if (izHam != hamOnce) Shader.SetGlobalFloat(SnowDebugDentId, izHam ? 1f : 0f);
 
+                GUILayout.Label("Kenar basamağı — katmanları tek tek kapat:");
+
+                Anahtar(ref dbgNoTexture,      DbgNoTextureId,      "  kar dokusu karışımı");
+                Anahtar(ref dbgNoParallax,     DbgNoParallaxId,     "  relief paralaksı");
+                Anahtar(ref dbgNoReliefShadow, DbgNoReliefShadowId, "  çukurun kendi gölgesi");
+                Anahtar(ref dbgNoDentNormal,   DbgNoDentNormalId,   "  izin normale kattığı eğim");
+
                 if (GUILayout.Button("Ayarları geri al (sınama)"))
                 {
                     mgr.SimTimeScale = 1f;
                     mgr.RefillRegion();
                     izHam = false;
                     Shader.SetGlobalFloat(SnowDebugDentId, 0f);
+
+                    dbgNoTexture = dbgNoParallax = dbgNoReliefShadow = dbgNoDentNormal = false;
+                    Shader.SetGlobalFloat(DbgNoTextureId, 0f);
+                    Shader.SetGlobalFloat(DbgNoParallaxId, 0f);
+                    Shader.SetGlobalFloat(DbgNoReliefShadowId, 0f);
+                    Shader.SetGlobalFloat(DbgNoDentNormalId, 0f);
                 }
 
                 GUILayout.Space(6f);
@@ -578,6 +591,31 @@ public class DebugMenu : MonoBehaviour
     bool izHam;
 
     static readonly int SnowDebugDentId = Shader.PropertyToID("_SnowDebugDent");
+
+    /// İZ KENARINDAKİ BASAMAĞIN KAYNAĞINI AYIRAN ANAHTARLAR.
+    ///
+    /// Basamak üç tur yanlış yerde arandı — yumuşatma çekirdeğinin
+    /// altörneklemesi, kenar gürültüsünün bloklu bileşeni, bilinear
+    /// filtrelemenin türev süreksizliği. Üçü de gerçek kusurdu, üçü de
+    /// düzeltildi, basamak durdu. Şüphelilerin TAMAMI aynı anda kapatılabilir
+    /// olmalı ki sorumlu tek turda bulunsun.
+    bool dbgNoTexture, dbgNoParallax, dbgNoReliefShadow, dbgNoDentNormal;
+
+    static readonly int DbgNoTextureId      = Shader.PropertyToID("_SnowDbgNoTexture");
+    static readonly int DbgNoParallaxId     = Shader.PropertyToID("_SnowDbgNoParallax");
+    static readonly int DbgNoReliefShadowId = Shader.PropertyToID("_SnowDbgNoReliefShadow");
+    static readonly int DbgNoDentNormalId   = Shader.PropertyToID("_SnowDbgNoDentNormal");
+
+    /// Bir anahtarı çizer ve değiştiyse shader'a yazar.
+    static bool Anahtar(ref bool durum, int id, string etiket)
+    {
+        bool once = durum;
+        durum = GUILayout.Toggle(durum, etiket);
+
+        if (durum != once) Shader.SetGlobalFloat(id, durum ? 1f : 0f);
+
+        return durum;
+    }
 
     string SnowStatus()
     {
