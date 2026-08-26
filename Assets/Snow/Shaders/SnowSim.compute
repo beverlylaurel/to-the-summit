@@ -553,6 +553,27 @@ void KRim(uint3 id : SV_DispatchThreadID)
     // tırtıklı bir zarfa çeviriyordu — ekrandaki diken sırası buydu.
     float rimTarget = min(raised, blurCarve) * SNOW_RIM_STRENGTH * depthScale;
 
+    // SIRT SÜREKLİ BİR SET DEĞİL, KOPMUŞ TOPAKLAR.
+    //
+    // Ayak battığında çevredeki kar tek parça bir duvar gibi yükselmiyor;
+    // kayma yüzeyleri boyunca kopup KÜMELER hâlinde itiliyor [KAYNAK: Terzaghi
+    // yerel kayma göçmesi — pasif bölge süreksiz, kama kama kırılıyor].
+    //
+    // Düzgün zarf ekranda "kabartma kenarlık" gibi okunuyordu (kullanıcı:
+    // "pütürdü dağılma tomurcuklar yok"). Eksik olan genlik değil SÜREKSİZLİK.
+    //
+    // Desen DÜNYA UZAYINDA sabit: karakter yürürken topaklar zeminde duruyor,
+    // sırtla birlikte kaymıyor. Damganın UV'sine bağlansaydı sırt hareket
+    // ederken topaklar akardı.
+    //
+    // Bloklu gürültü domain warp'lı olanı: `floor()` tabanlı ham blok eksene
+    // hizalı kare hücre veriyor ve ekranda piksel gibi okunuyor (`SYMPTOMS.md`).
+    // Taban 0.35 — topak arası tamamen boşalmıyor, sırt her yerde sürekli.
+    float2 topakXZ = SnowTexelToWorld(id.xy);
+    float  topak   = SnowWarpedBlockNoise(topakXZ * SNOW_RIM_CLUMP_SCALE);
+
+    rimTarget *= SNOW_RIM_CLUMP_FLOOR + (1.0 - SNOW_RIM_CLUMP_FLOOR) * topak;
+
     rim = max(rim, min(rimTarget, SNOW_RIM_MAX));
 
     trail.r = carve;

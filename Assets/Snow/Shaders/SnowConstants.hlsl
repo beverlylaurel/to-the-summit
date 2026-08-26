@@ -192,12 +192,15 @@
 #define SNOW_SETTLE_TAIL             0.12
 #define SNOW_SETTLE_TAIL_LEN         0.70
 
-/// Kuyruk menzilini kıran gürültünün ölçeği (1/m). 5 = 20 cm dalga boyu.
-#define SNOW_SETTLE_TAIL_SCALE       5.0
-
 /// KUYRUK UZUN VE SIĞ. Önce kısa ve derindi (0.40 yarıçap, %20 pay) ve izin
 /// kenarı tek bir koyu hat olarak okunuyordu. Uzatıp sığlaştırmak geçişi
 /// yumuşatıyor ama izi ŞİŞİRMİYOR: kenarda 1.8 cm, 15 cm ötede 2 mm.
+///
+/// Menzil sabit değil: `SNOW_SETTLE_TAIL_SCALE` ile dünya uzayında kırılıyor,
+/// yoksa izin çevresine kusursuz dairesel bir hale çiziyor (`SYMPTOMS.md`).
+
+/// Kuyruk menzilini kıran gürültünün ölçeği (1/m). 5 = 20 cm dalga boyu.
+#define SNOW_SETTLE_TAIL_SCALE       5.0
 
 #define SNOW_HOLE_FLARE              0.08
 
@@ -261,6 +264,16 @@
 #define SNOW_RIM_SHADE               0.35
 
 #define SNOW_RIM_MAX                 0.04
+
+/// Sırt topaklarının ölçeği (1/m). 7 = 14 cm topak; sırdın kendi genişliği
+/// `_RimBlurTexels` 7 teksel × 2.4 cm = 17 cm, yani topak sırtla aynı
+/// mertebede. Daha ince olsaydı gürültü, daha kaba olsaydı sırt yer yer
+/// tamamen kaybolurdu.
+#define SNOW_RIM_CLUMP_SCALE         7.0
+
+/// Topaklar arası en düşük sırt payı. 0 olsaydı sırt kesik kesik olurdu;
+/// 0.35 süreksizliği gösteriyor ama sırdı koparmıyor.
+#define SNOW_RIM_CLUMP_FLOOR         0.35
 #define SNOW_RIM_REF_DEPTH           0.25
 #define SNOW_RIM_BLUR_TEXELS         7.0
 

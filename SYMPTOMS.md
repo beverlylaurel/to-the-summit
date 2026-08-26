@@ -2787,3 +2787,39 @@ cevaptı. Zirveye yakın açık bir noktada aynı saatte zemin 78.5.
 **Kural:** parlaklık şikâyetinde önce KONUM doğrulanır. "Karanlık" bir kare,
 sahnenin karanlık olduğunu değil, kameranın karanlık bir yerde olduğunu
 gösterebilir.
+
+---
+
+## Ölçüm oturumu kendini bozdu: aynı kare 106 → 21
+
+**Belirti:** izin sırtı topaklara bölündükten sonra alınan kare, değişiklikten
+önceki kareye göre beş kat karanlık çıktı (ortalama 106.2 → 21.2). İlk okuma
+"yaptığın değişiklik sahneyi kararttı" idi.
+
+**Eleme (tek-cevaplı test):** değişiklik `git stash` ile geçici geri alındı ve
+**aynı kurulumda** kare tekrar çekildi. Topaksız 23.2, topaklı 21.2 — fark yok.
+Sırt topaklaması suçlu değil.
+
+**Ölçüm boyunca kayan üç durum, üçü de sırayla yanılttı:**
+
+1. **Konum.** Ölçüm bitince `fpc.enabled = true` yapılıyordu; karakter serbest
+   kalıp dağdan düştü. Sonraki kare 1718 m yerine 204 m'de, bambaşka bir ışıkta
+   koştu. HUD'daki "Bulunduğun yükseklik" iki kareyi karşılaştırmadan **önce**
+   okunmalı.
+2. **Saat.** `tod.Paused = true` tek başına tutmuyor — ölçümün üç saniyesinde
+   oyun saati geceye ilerledi. Saat çekim karesine kadar HER KARE yeniden
+   yazılmalı.
+3. **Bulut kapsaması.** Kendi dinamiğiyle dalgalanıyor: aynı noktada bir
+   ölçümde %28, ötekinde %63, üçüncüde %82. `AtmosphereController.CoverageLocked`
+   ile kilitlendi ama parlaklık düzelmedi — `AtmosphereSettings.minCoverage`
+   (0.4) kilidin üstüne bir `max` uyguluyor.
+
+**Kapanmadı.** Üç durum da sabitlendikten sonra bile kare 21 civarında kaldı,
+`sacak.png`'nin 106'sına dönmedi. Kalan tek fark **Play oturumunun yaşı**: aynı
+oturum on iki saattir açık ve saat, hava, kapsama defalarca zorla değiştirildi.
+Bir sonraki adım Play'i kapatıp açmak ve aynı kareyi tekrar almak — o ölçüm
+kullanıcının makinesinde yapılacak.
+
+**Kural:** parlaklık karşılaştırması yapan her kare, karşılaştırılan iki kareyi
+**aynı Play oturumunda ve arka arkaya** almalı. Saatler arayla alınmış iki kare
+farklı sahnelerdir.
