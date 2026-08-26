@@ -99,6 +99,12 @@ public static class SnowShaderIDs
     /// çıkıyor; `SnowManager.BuildTrailSegments` sahnedeki deformer'lardan
     /// hesaplayıp yazıyor.
     public static readonly int CavityRadius = Shader.PropertyToID("_SnowCavityRadius");
+
+    // --- Tessellation ---
+    public static readonly int TessCameraPos = Shader.PropertyToID("_SnowTessCameraPos");
+    public static readonly int TessMax = Shader.PropertyToID("_SnowTessMax");
+    public static readonly int TessNear = Shader.PropertyToID("_SnowTessNear");
+    public static readonly int TessFar = Shader.PropertyToID("_SnowTessFar");
     public static readonly int SastrugiNoise = Shader.PropertyToID("_SastrugiNoise");
 
     // --- Kar yüzeyi materyali ---

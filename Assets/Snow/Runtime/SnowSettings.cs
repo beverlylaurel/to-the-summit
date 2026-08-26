@@ -64,6 +64,22 @@ public class SnowSettings : ScriptableObject
     [Tooltip("Parıltının parlaklığı.")]
     [SerializeField] float sparkleIntensity = 7f;
 
+    [Header("Tessellation")]
+    /// KAR YÜZEYİ GEOMETRİ, NORMAL HARİTASI DEĞİL.
+    ///
+    /// Terrain üçgenleri kameraya göre bölünüp kar yüzeyinin yüksekliği kadar
+    /// kaydırılıyor. Normal haritası silüete ve örtüşmeye katkı vermiyor;
+    /// sıyırtma açıda bir yüzeyin görünümünü tamamen o ikisi belirliyor.
+    [Tooltip("En yüksek bölme faktörü. Donanım tavanı 64; Terrain köşe " +
+             "aralığı 7.32 m olduğu için 64'te en ince geometri 11.4 cm.")]
+    [SerializeField, Range(1f, 64f)] float tessMax = 64f;
+
+    [Tooltip("Faktörün tam olduğu mesafe (m).")]
+    [SerializeField, Min(1f)] float tessNear = 15f;
+
+    [Tooltip("Faktörün 1'e indiği mesafe (m). Ötesinde bölme yok.")]
+    [SerializeField, Min(2f)] float tessFar = 60f;
+
     [Header("Yüzey dokuları")]
     /// DÖRT KAR YÜZEYİ, DÖRT FİZİKSEL DURUM.
     ///
@@ -162,6 +178,10 @@ public class SnowSettings : ScriptableObject
     public float SparkleDensity => sparkleDensity;
     public float SparkleSharpness => sparkleSharpness;
     public float SparkleIntensity => sparkleIntensity;
+
+    public float TessMax => tessMax;
+    public float TessNear => tessNear;
+    public float TessFar => tessFar;
 
     public Texture2D SurfTazeColor => surfTazeColor;
     public Texture2D SurfTazeNormal => surfTazeNormal;

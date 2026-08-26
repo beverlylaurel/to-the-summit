@@ -27,9 +27,11 @@ Shader "ToTheSummit/MountainSurface"
             Tags { "LightMode" = "UniversalForward" }
 
             HLSLPROGRAM
-            #pragma vertex Vertex
+            #pragma vertex SnowTessVertex
+            #pragma hull SnowHull
+            #pragma domain SnowDomain
             #pragma fragment Fragment
-            #pragma target 3.5
+            #pragma target 5.0
 
             // ARAZİNİN GÖLGESİ İKİ KAYNAKTAN. Dağın kendi sırtı yükseklik alanından
             // yürüyerek bulunuyor (bkz. TerrainSunShadow) — gölge haritası o mesafeyi
@@ -87,6 +89,7 @@ Shader "ToTheSummit/MountainSurface"
             /// hepsi yanlış çıktı, çünkü eksik olan tek sayı diş boyuydu.
 
             #include "MountainSurface.hlsl"
+            #include "../Snow/Shaders/SnowTessellation.hlsl"
 
             struct Attributes
             {
@@ -100,11 +103,9 @@ Shader "ToTheSummit/MountainSurface"
                 float  fogFactor   : TEXCOORD2;
             };
 
-            Varyings Vertex(Attributes IN)
+            Varyings VertexFromWS(float3 positionWS)
             {
                 Varyings OUT;
-
-                float3 positionWS = TransformObjectToWorld(IN.positionOS.xyz);
 
                 // ARAZİ DE KAR KALINLIĞI KADAR YÜKSELİYOR.
                 //
@@ -135,6 +136,22 @@ Shader "ToTheSummit/MountainSurface"
                 OUT.fogFactor = ComputeFogFactor(OUT.positionCS.z);
 
                 return OUT;
+            }
+
+            /// Hull oncesi gecis: yalniz dunya konumuna cevirir.
+            SnowTessControlPoint SnowTessVertex(Attributes IN)
+            {
+                SnowTessControlPoint o;
+                o.positionWS = TransformObjectToWorld(IN.positionOS.xyz);
+                return o;
+            }
+
+            [domain("tri")]
+            Varyings SnowDomain(SnowTessFactors factors,
+                                OutputPatch<SnowTessControlPoint, 3> patch,
+                                float3 bary : SV_DomainLocation)
+            {
+                return VertexFromWS(SnowTessKonum(patch, bary));
             }
 
             /// UniversalFragmentPBR'ın açık hali — çünkü ana ışığın gölgesini bizim

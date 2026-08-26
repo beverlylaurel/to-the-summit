@@ -561,6 +561,20 @@ public class SnowManager : MonoBehaviour
         Shader.SetGlobalVector(SnowShaderIDs.SastrugiWindDir,
             new Vector4(sastrugiWindDir.x, sastrugiWindDir.y, 0f, 0f));
 
+        // TESSELLATION ANA KAMERAYI GÖRMEK ZORUNDA.
+        //
+        // Gölge geçişinde `_WorldSpaceCameraPos` IŞIĞIN konumunu tutuyor.
+        // Bölme faktörü ondan hesaplanırsa gölge geometrisi ileri geçişinkiyle
+        // uyuşmaz ve gölge yüzeyden kayar. Dört geçişin dördü de bu globali
+        // okuyor, böylece hepsi aynı geometriyi üretiyor.
+        if (Camera.main != null)
+            Shader.SetGlobalVector(SnowShaderIDs.TessCameraPos,
+                                   Camera.main.transform.position);
+
+        Shader.SetGlobalFloat(SnowShaderIDs.TessMax, settings.TessMax);
+        Shader.SetGlobalFloat(SnowShaderIDs.TessNear, settings.TessNear);
+        Shader.SetGlobalFloat(SnowShaderIDs.TessFar, settings.TessFar);
+
         // Isı kaynakları: yalnız bölgeye değenler (spec §18.2).
         SnowHeatRegistry.Publish(AreaCenter, q.AreaSize);
 

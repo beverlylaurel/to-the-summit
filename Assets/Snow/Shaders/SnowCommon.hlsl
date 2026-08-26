@@ -365,6 +365,26 @@ float2 _SastrugiWindDir;
 /// ve her birinin yaricapi ayri.
 float _SnowCavityRadius;
 
+// --------------------------------------------------------- tessellation
+
+/// ANA KAMERANIN KONUMU. `_WorldSpaceCameraPos` GOLGE GECISINDE ISIGIN
+/// konumunu tutuyor; bolme faktoru ondan hesaplanirsa golge geometrisi ileri
+/// gecisinkiyle uyusmaz ve golge yuzeyden kayar.
+float3 _SnowTessCameraPos;
+
+/// En yuksek bolme faktoru. Donanim tavani 64; Terrain kose araligi 7.32 m
+/// oldugu icin 64'te en ince geometri 11.4 cm oluyor.
+float _SnowTessMax;
+
+/// Faktorun tam oldugu mesafe (m).
+float _SnowTessNear;
+
+/// Faktorun 1'e indigi mesafe (m) — otesinde bolme yok.
+float _SnowTessFar;
+
+/// 1 iken bolme tamamen kapali: butun kenar faktorleri 1.
+float _SnowDbgNoTess;
+
 /// SIRTLAR RÜZGÂRA DİK UZANIYOR (transverse). Dalga boyu rüzgâr yönünde
 /// KISA, sırtlar rüzgâra dik yönde UZUN. UV'ler ters yazılırsa desen 90°
 /// yanlış olur (spec §18.4, §22).
