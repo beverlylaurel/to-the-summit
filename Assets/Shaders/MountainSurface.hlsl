@@ -647,7 +647,10 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // o yüzden ağırlığı `snowMask`.
         {
             float yuzeyYuksekligi;
-            half2 yuzeyEgim = SnowYuzeyEgim(izPos.xz, yuzeyYuksekligi)
+            // Kar tabakasının kalınlığı: yer şekilleri bundan derin olamaz.
+            float karKalinligi = SnowBaseHeight(karDurum.r, yerelRho);
+
+            half2 yuzeyEgim = SnowYuzeyEgim(izPos.xz, karKalinligi, yuzeyYuksekligi)
                             + SnowMikroEgim(izPos.xz, izDerinlik);
 
             surface.snowSurfaceHeight = (half)yuzeyYuksekligi;
@@ -667,7 +670,24 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // güneşsizken 0.0023). Kar oyuğu doldurur, silmez: 15-20 cm'lik örtü
         // metrelik bir çukuru kapatmaz. Pay 0.55'e indirildi: 0.35'te zemin
         // luması 0.88'den 0.59'a düşüp güneşli kar için fazla koyu kaldı.
-        surface.occlusion = lerp(surface.occlusion, 1.0, snowMask * 0.55);
+        // GÖMME PAYI KAR KALINLIĞINDAN.
+        //
+        // Sabit 0.55'ti: 1 cm kar da 50 cm kar da arazinin oyuklarını aynı
+        // oranda gömüyordu. Fizik bunu vermiyor — santimetrelik bir örtü
+        // metrelik çukuru kapatmaz, yarım metrelik örtü kapatır.
+        //
+        // Bu, kar kalınlığının en güçlü görsel karşılığı: ince karda arazinin
+        // kendi kabartısı okunuyor, kalın karda yüzey tek parça beyaza dönüyor
+        // (kullanıcı bildirdi: "1cm, 5cm, 20cm, 50cm arasında bir fark yok").
+        //
+        // `SNOW_BURY_REF_DEPTH` = 0.30 m: o kalınlıkta gömme tam paya
+        // (0.55) ulaşıyor, altında orantılı.
+        {
+            float kalinlik = SnowBaseHeight(karDurum.r, yerelRho);
+            half gomme = (half)(0.55 * saturate(kalinlik / SNOW_BURY_REF_DEPTH));
+
+            surface.occlusion = lerp(surface.occlusion, 1.0, snowMask * gomme);
+        }
 
         // ÇUKURUN GÖRÜŞ PAYI ÇOK YANSIMAYLA TELAFİ EDİLİYOR.
         //

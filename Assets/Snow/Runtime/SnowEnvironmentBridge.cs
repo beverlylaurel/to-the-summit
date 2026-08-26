@@ -40,6 +40,10 @@ public class SnowEnvironmentBridge : MonoBehaviour, ISnowEnvironmentSource
         ? SafeHorizontal(wind.Velocity)
         : manualWindDirection.normalized;
 
+    public Vector3 PrevailingWindDirection => wind != null
+        ? wind.PrevailingDirection
+        : manualWindDirection.normalized;
+
     public float WindSpeed => wind != null
         ? new Vector2(wind.Velocity.x, wind.Velocity.z).magnitude
         : manualWindSpeed;

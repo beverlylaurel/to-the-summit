@@ -477,6 +477,23 @@
 ///
 /// Metre üstü ölçek (ölçülen "snow wave", 10-20 m) bilerek yok: bizim bölge
 /// 24 m ve o dalga boyu tek bir eğime dönüşüp yüzeyi eğik gösterir.
+/// Yer şekli genliğinin kar derinliğine oranı tavanı.
+///
+/// Sastrugi ve ripple kar tabakasını OYAN şekiller; tabakadan derin olamazlar.
+/// Bu bağ olmadan 1 cm ile 50 cm kar arasında hiçbir görsel fark kalmıyor.
+/// ÖLÇÜLDÜ: 0.35 ile 1 cm ve 5 cm ayrılmıyordu. Büyük ölçekli yüzey kontrastı
+/// (32-64 piksel bloklar) 1cm 4.65, 5cm 4.91, 20cm 6.66, 50cm 6.66 — yani
+/// yalnız sığ/derin ayrımı vardı, ara basamaklar yoktu.
+///
+/// 0.60: 5 cm karda tavan 3 cm, 20 cm'de 12 cm, 50 cm'de 30 cm. fBm'in en
+/// büyük oktavı 5.5 cm olduğu için 1/5/20 basamakları ayrışıyor.
+/// Ölçülen sastrugi derinliği 14-40 cm ve o kar tabakası 50+ cm; oran 0.3-0.8
+/// bandında, 0.60 ortası.
+#define SNOW_BEDFORM_DEPTH_FRAC      0.60
+
+/// Arazi oyuklarının tamamen gömüldüğü kar kalınlığı (m).
+#define SNOW_BURY_REF_DEPTH          0.30
+
 #define SNOW_FBM_AMP                 0.055
 #define SNOW_FBM_SCALE               0.80
 #define SNOW_FBM_GAIN                0.574

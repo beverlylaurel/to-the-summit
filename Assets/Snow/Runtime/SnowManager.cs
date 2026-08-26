@@ -532,10 +532,25 @@ public class SnowManager : MonoBehaviour
         // KAR ÇİZGİSİ DONMA SEVİYESİNDEN. Ayrı bir sayı tanımlanmıyor;
         // sıcaklık alanı neredeyse kar da orada başlıyor.
 
-        // Sastrugi yönü YUMUŞATILIYOR (spec §18.4, tau 120 s).
-        Vector2 rawWind = new Vector2(env.WindDirection.x, env.WindDirection.z);
+        // SASTRUGİ YÖNÜ YALNIZ KAR TAŞINIRKEN GÜNCELLENİYOR.
+        //
+        // Yumuşatma (tau 120 s) tek başına yetmiyordu: sakin havada rüzgâr
+        // vektörü küçük ve yönü rastgele dönüyor, yumuşatılmış yön de onun
+        // peşinden SÜREKLİ sürükleniyor. Yer şekilleri o eksene göre
+        // döndürüldüğü için bütün yüzey yavaşça kayıyordu (kullanıcı bildirdi:
+        // "yavaşladı ama geçmedi").
+        //
+        // Fizik: sastrugi bir kez oluşur ve DURUR; yönünü ancak kar taşıyan
+        // bir rüzgâr değiştirir. Ölçülen taşınma eşiği 7 m/s
+        // [Kochanski ve ark. 2019]. Altında yön donuyor.
+        // KAYNAK HÂKİM YÖN, ANLIK DEĞİL. `env.WindDirection` anlık hızın yönü ve
+        // fırtınada da oynuyor; `dot(worldXZ, eksen)` alanında 7 km'lik
+        // koordinatta küçük bir açı sapması deseni yüzlerce metre sürüklüyor
+        // (ölçüm `WindField.PrevailingDirection` yanında).
+        Vector2 rawWind = new Vector2(env.PrevailingWindDirection.x,
+                                      env.PrevailingWindDirection.z);
 
-        if (rawWind.sqrMagnitude > 1e-4f)
+        if (env.WindSpeed >= SnowConstants.DriftU10Loose && rawWind.sqrMagnitude > 1e-4f)
         {
             rawWind.Normalize();
 

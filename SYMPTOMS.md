@@ -2631,3 +2631,65 @@ başına 36 çağrı × 6 gürültü = **180 örnek**.
 
 **Çözüm:** yüzey rölyefi ayrı bir fonksiyonda, kendi 4 örnekli gradyanıyla —
 24 örnek. Yükseklik alanına yalnız izin kendisi giriyor.
+
+## Yüzey titremesi — DÖRT ayrı kaynak, dördü de rüzgâra bağlıydı
+
+**Kullanıcının ağzından:** "siyahımsı alanlar değişip duruyor, acayip hızlı",
+"zemin tir tir titriyor", "yavaşladı ama geçmedi", ve sonunda kendisi buldu:
+"rüzgârın şiddetinden etkileniyor".
+
+Yer şekilleri `dot(worldXZ, eksen)` üzerinden kuruluyor ve dağın ortasında
+|worldXZ| yedi bin metre. Eksende ya da genlikte en küçük oynama ekranda
+büyüyor.
+
+**Kaynak 1 — eksen anlık rüzgârdan.** `normalize(_WindWS.xz)`; rüzgâr 0.6 m/s
+iken vektör küçük ve yönü kare kare zıplıyor. Yumuşatılmış `_SastrugiWindDir`
+zaten vardı, yanlış olan bağlanmıştı.
+
+**Kaynak 2 — aliasing.** Prosedürel alan mip'lenmiyor; en ince oktav 1.6 cm ve
+uzakta bir piksel bundan geniş alan kaplayınca örneklenemiyor. Her oktav artık
+`fwidth` ile ölçülen piksel ayak izine göre sönüyor (Nyquist).
+
+**Kaynak 3 — genlik anlık rüzgâr şiddetinden.**
+`saturate((_WindSpeed − eşik) / aralık)`; şiddet kare kare oynadığı için
+genlik oynuyordu. Fizik de bunu yasaklıyor: sastrugi GEÇMİŞ rüzgârın izi,
+oluşumu saatler sürer.
+
+**Kaynak 4 — yumuşatılmış yön bile sürükleniyordu.** Sakin havada anlık yön
+rastgele döndüğü için 120 s'lik yumuşatma onu yavaşlatıyor ama durdurmuyordu.
+İki düzeltme: yön yalnız kar taşıma eşiğinin (7 m/s) üstünde güncelleniyor,
+VE kaynak `WindField.PrevailingDirection` (sabit hâkim yön), anlık hız yönü
+değil.
+
+**Ölçüm:** fırtınada (12.39 m/s) anlık yön `(1.00, 0.00, 0.01)`, hâkim yön
+`(1.00, 0.00, 0.00)`. O `0.01`'lik sapma 7 km'lik koordinatta deseni **70
+metre** kaydırıyor.
+
+**Ders:** `WindField.PrevailingDirection`'ın kendi yorumu bu tuzağı zaten
+kayıt altına almıştı ("bir hamlenin 0.14 radyanlık sapması deseni 980 metre
+sürüklüyordu"). Aynı hata ikinci kez yapıldı çünkü yeni kod anlık kaynağı
+okudu. DÜNYA KOORDİNATINA BAĞLI HER DESEN HÂKİM YÖNÜ KULLANMALI.
+
+## Kar kalınlığının görsel karşılığı yoktu
+
+**Kullanıcının ağzından:** "1cm, 5cm, 20cm, 50cm arasında bir fark yok, kar
+yükselmiyor, hepsinde aynı".
+
+**Ölçüm:** kar sütunu doğru hesaplanıyordu (1.0 / 5.0 / 20.0 / 50.0 cm).
+Sorun veride değil çizimdeydi.
+
+**Ölçüm aracı tuzağı:** ilk kontrast ölçümü komşu piksel farkıydı ve dört
+derinlikte de aynı çıktı (1.83–1.86). O ölçü MİKRO rölyefi görüyor ve mikro
+kar derinliğine bağlı değil. fBm'in dalga boyu 1.25 m; 32–64 piksellik
+bloklarla ölçülünce fark ortaya çıktı.
+
+**Eksik bağ:** yer şekilleri kar tabakasını OYAN şekiller, ondan derin
+olamazlar. 1 cm karda 18 cm'lik sastrugi imkânsız. Genlik tavanı
+`karDerinliği × 0.60`.
+
+**İkinci bağ:** arazi oyuklarının gömülme payı sabit 0.55'ti — 1 cm kar da
+50 cm kar da arazinin kabartısını aynı oranda gömüyordu. Santimetrelik örtü
+metrelik çukuru kapatmaz.
+
+**Sonuç (büyük ölçekli kontrast):** 1cm 4.65, 5cm 5.24, 20cm 6.63, 50cm 6.61.
+20↔50 doygun; fiziksel olarak da doğru, o iki kalınlıkta yüzey benzer görünür.

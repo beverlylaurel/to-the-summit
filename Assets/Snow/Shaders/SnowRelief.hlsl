@@ -333,26 +333,61 @@ half2 SnowDentSlope(float2 uv)
 /// frekans iki katına çıkarken genlik `2^(-H)` ile düşüyor. Kar için H = 0.8,
 /// yani oran 0.574. Bu kural olmadan oktav genlikleri elle seçiliyor ve yüzey
 /// ya tek ölçekli (tarak gibi) ya da gürültülü çıkıyor.
-float SnowYuzeyRolyef(float2 worldXZ)
+/// PİKSEL AYAK İZİ — analitik gürültünün LOD'u.
+///
+/// Prosedürel bir alan dokudan farklı olarak mip'lenmiyor: dalga boyu bir
+/// pikselin kapladığı alanın altına düştüğünde örneklenemiyor ve kamera
+/// kıpırdadıkça TİTRİYOR (kullanıcı bildirdi: "zemin tir tir titriyor").
+///
+/// Nyquist: bir dalganın taşınabilmesi için dalga boyu piksel boyunun en az
+/// iki katı olmalı. Altına inen oktav sönümleniyor.
+float SnowOktavAgirligi(float dalgaBoyu, float pikselBoyu)
 {
+    return saturate(dalgaBoyu / max(pikselBoyu * 2.0, 1e-5) - 1.0);
+}
+
+float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi)
+{
+    // YER ŞEKLİ KAR TABAKASINDAN DERİN OLAMAZ.
+    //
+    // Sastrugi ve ripple kar tabakasını OYAN şekiller; 1 cm karda 18 cm'lik
+    // bir sastrugi fiziksel olarak imkânsız. Bu bağ olmadan 1 cm ile 50 cm
+    // arasında hiçbir görsel fark kalmıyordu (kullanıcı bildirdi: "1cm, 5cm,
+    // 20cm, 50cm arasında bir fark yok").
+    //
+    // Tavan `karDerinligi × SNOW_BEDFORM_DEPTH_FRAC`: 50 cm karda 17 cm'e
+    // kadar serbest, 5 cm karda 1.7 cm'e kırpılıyor.
+    float tavan = karDerinligi * SNOW_BEDFORM_DEPTH_FRAC;
+
     // --- fBm tabanı: dört oktav, self-affine ---
     float h   = 0.0;
-    float amp = SNOW_FBM_AMP;
+    float amp = min(SNOW_FBM_AMP, tavan);
     float frq = SNOW_FBM_SCALE;
 
     [unroll]
     for (int i = 0; i < 4; ++i)
     {
-        h += (SnowValueNoise(worldXZ * frq + (float)i * 17.3) * 2.0 - 1.0) * amp;
+        h += (SnowValueNoise(worldXZ * frq + (float)i * 17.3) * 2.0 - 1.0) * amp
+           * SnowOktavAgirligi(1.0 / frq, pikselBoyu);
 
         amp *= SNOW_FBM_GAIN;
         frq *= 2.0;
     }
 
-    // --- rüzgâr ekseni ---
-    float2 w  = _WindWS.xz;
+    // --- rüzgâr ekseni: YAVAŞ TAKİP EDEN YÖN ---
+    //
+    // ANLIK `_WindWS` KULLANILAMAZ. Sakin havada (ölçüldü: 0.6 m/s) vektör
+    // küçük ve yönü kare kare zıplıyor; normalize edilince eksen çılgınca
+    // dönüyor ve bütün desen onunla dönüyordu. Ekranda aynı yere bakarken
+    // koyu lekeler sürekli yer değiştiriyordu (kullanıcı bildirdi: "siyahımsı
+    // alanlar değişip duruyor, acayip hızlı").
+    //
+    // Fizik de bunu yasaklıyor: sastrugi günlerce kalan bir şekil, anlık
+    // esintiyle dönmez. `_SastrugiWindDir` `SNOW_SASTRUGI_WIND_TAU` (120 s)
+    // ile yavaşça takip ediyor ve `SnowManager` onu zaten yayınlıyor.
+    float2 w  = _SastrugiWindDir;
     float  uz = length(w);
-    w = uz > 1e-4 ? w / uz : float2(1.0, 0.0);
+    w = uz > 1e-3 ? w / uz : float2(1.0, 0.0);
 
     float2 dik = float2(-w.y, w.x);
 
@@ -360,21 +395,26 @@ float SnowYuzeyRolyef(float2 worldXZ)
     //
     // Sırtlar rüzgâra dik olduğu için dalga rüzgâr YÖNÜNDE ilerliyor; dik
     // eksende altı kat uzun tutulup sırt hâline getiriliyor.
-    float ripplePay = SNOW_RIPPLE_BASE
-                    + (1.0 - SNOW_RIPPLE_BASE) * saturate((_WindSpeed - 4.0) / 6.0);
+    // GENLİK ANLIK RÜZGÂRA BAĞLI DEĞİL. Önce
+    // `saturate((_WindSpeed - eşik) / aralık)` ile ölçekleniyordu ve rüzgâr
+    // şiddeti kare kare oynadığı için bütün yüzey TİTRİYORDU (kullanıcı
+    // buldu: "rüzgârın şiddetinden etkileniyor").
+    //
+    // Fizik de bunu yasaklıyor: ripple ve sastrugi GEÇMİŞ rüzgârın izi.
+    // Oluşumları da kaybolmaları da saatler sürer. Ölçülen eşikler
+    // (ripple 7 m/s, sastrugi 20 m/s) bir ANIN değil, bir DÖNEMİN özelliği.
 
     float2 pr = float2(dot(worldXZ, w)   / SNOW_RIPPLE_LENGTH,
                        dot(worldXZ, dik) / (SNOW_RIPPLE_LENGTH * 6.0));
 
-    h += (SnowValueNoise(pr) * 2.0 - 1.0) * SNOW_RIPPLE_AMP * ripplePay;
+    h += (SnowValueNoise(pr) * 2.0 - 1.0) * min(SNOW_RIPPLE_AMP * SNOW_RIPPLE_BASE, tavan)
+       * SnowOktavAgirligi(SNOW_RIPPLE_LENGTH, pikselBoyu);
 
     // --- SASTRUGİ: rüzgâra PARALEL, keskin ---
     //
     // `n²(3−2n)` üst yarıyı düzleştirip alt yarıyı dikleştiriyor: sastrugi bir
     // EROZYON şekli, rüzgârüstü yüzü dik ("upwind-facing points resembling
     // anvils").
-    float sastrugiPay = SNOW_SASTRUGI_BASE
-                      + (1.0 - SNOW_SASTRUGI_BASE) * saturate((_WindSpeed - 8.0) / 12.0);
 
     float2 ps = float2(dot(worldXZ, w)   / SNOW_SASTRUGI_WIDTH,
                        dot(worldXZ, dik) / SNOW_SASTRUGI_LENGTH);
@@ -382,7 +422,8 @@ float SnowYuzeyRolyef(float2 worldXZ)
     float ns = SnowValueNoise(ps);
     ns = ns * ns * (3.0 - 2.0 * ns);
 
-    h += (ns - 0.5) * SNOW_SASTRUGI_HEIGHT * sastrugiPay;
+    h += (ns - 0.5) * min(SNOW_SASTRUGI_HEIGHT * SNOW_SASTRUGI_BASE, tavan)
+       * SnowOktavAgirligi(SNOW_SASTRUGI_LENGTH, pikselBoyu);
 
     return h;
 }
@@ -394,14 +435,19 @@ float SnowYuzeyRolyef(float2 worldXZ)
 /// `SnowShadeHeightAt`'e konunca `SnowDentSmooth` (9 tap) × `SnowDentSlope`
 /// (4 tap) = 36 çağrı × 6 gürültü = piksel başına 180 örnek oluyor. Hem kare
 /// süresi hem shader derleme süresi patlıyor.
-half2 SnowYuzeyEgim(float2 worldXZ, out float yukseklik)
+half2 SnowYuzeyEgim(float2 worldXZ, float karDerinligi, out float yukseklik)
 {
     const float e = 0.02;
 
-    float hL = SnowYuzeyRolyef(worldXZ - float2(e, 0.0));
-    float hR = SnowYuzeyRolyef(worldXZ + float2(e, 0.0));
-    float hD = SnowYuzeyRolyef(worldXZ - float2(0.0, e));
-    float hU = SnowYuzeyRolyef(worldXZ + float2(0.0, e));
+    // Bir pikselin dünyada kapladığı boy. Türev bir kez alınıyor; gradyan
+    // örnekleri aynı LOD'u paylaşıyor, yoksa dört örnek farklı oktav setiyle
+    // hesaplanır ve gradyanın kendisi bozulur.
+    float pikselBoyu = max(fwidth(worldXZ.x), fwidth(worldXZ.y));
+
+    float hL = SnowYuzeyRolyef(worldXZ - float2(e, 0.0), pikselBoyu, karDerinligi);
+    float hR = SnowYuzeyRolyef(worldXZ + float2(e, 0.0), pikselBoyu, karDerinligi);
+    float hD = SnowYuzeyRolyef(worldXZ - float2(0.0, e), pikselBoyu, karDerinligi);
+    float hU = SnowYuzeyRolyef(worldXZ + float2(0.0, e), pikselBoyu, karDerinligi);
 
     // YÜKSEKLİK DE BURADAN — AYRI ÇAĞRI YAPILMIYOR.
     //
@@ -422,13 +468,16 @@ half2 SnowYuzeyEgim(float2 worldXZ, out float yukseklik)
 /// SİMÜLASYON DOKUSUNA YAZILAMAZ: `KRepose` bir maksimum filtresi ve 10
 /// tekselllik menzille bu ölçeği tamamen süpürüyor. Burada alan analitik,
 /// teksel ızgarası devrede değil.
-float SnowMikroRolyef(float2 worldXZ, float dent)
+float SnowMikroRolyef(float2 worldXZ, float dent, float pikselBoyu)
 {
     float w = lerp(SNOW_MICRO_BASE, 1.0, saturate(dent / SNOW_MICRO_REF_DEPTH));
 
-    float n  = (SnowValueNoise(worldXZ * SNOW_MICRO_SCALE_A) * 2.0 - 1.0) * SNOW_MICRO_AMP_A;
-    n += (SnowValueNoise(worldXZ * SNOW_MICRO_SCALE_B + 13.9) * 2.0 - 1.0) * SNOW_MICRO_AMP_B;
-    n += (SnowValueNoise(worldXZ * SNOW_MICRO_SCALE_C + 71.3) * 2.0 - 1.0) * SNOW_MICRO_AMP_C;
+    float n  = (SnowValueNoise(worldXZ * SNOW_MICRO_SCALE_A) * 2.0 - 1.0) * SNOW_MICRO_AMP_A
+             * SnowOktavAgirligi(1.0 / SNOW_MICRO_SCALE_A, pikselBoyu);
+    n += (SnowValueNoise(worldXZ * SNOW_MICRO_SCALE_B + 13.9) * 2.0 - 1.0) * SNOW_MICRO_AMP_B
+       * SnowOktavAgirligi(1.0 / SNOW_MICRO_SCALE_B, pikselBoyu);
+    n += (SnowValueNoise(worldXZ * SNOW_MICRO_SCALE_C + 71.3) * 2.0 - 1.0) * SNOW_MICRO_AMP_C
+       * SnowOktavAgirligi(1.0 / SNOW_MICRO_SCALE_C, pikselBoyu);
 
     return n * w;
 }
@@ -438,10 +487,12 @@ half2 SnowMikroEgim(float2 worldXZ, float dent)
 {
     const float e = 0.01;
 
-    float mL = SnowMikroRolyef(worldXZ - float2(e, 0.0), dent);
-    float mR = SnowMikroRolyef(worldXZ + float2(e, 0.0), dent);
-    float mD = SnowMikroRolyef(worldXZ - float2(0.0, e), dent);
-    float mU = SnowMikroRolyef(worldXZ + float2(0.0, e), dent);
+    float pikselBoyu = max(fwidth(worldXZ.x), fwidth(worldXZ.y));
+
+    float mL = SnowMikroRolyef(worldXZ - float2(e, 0.0), dent, pikselBoyu);
+    float mR = SnowMikroRolyef(worldXZ + float2(e, 0.0), dent, pikselBoyu);
+    float mD = SnowMikroRolyef(worldXZ - float2(0.0, e), dent, pikselBoyu);
+    float mU = SnowMikroRolyef(worldXZ + float2(0.0, e), dent, pikselBoyu);
 
     return half2((mR - mL) / (2.0 * e), (mU - mD) / (2.0 * e));
 }
