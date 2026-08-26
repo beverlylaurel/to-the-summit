@@ -102,35 +102,63 @@ float SnowShadeHeightAt(float2 uv)
 /// Bu yumuşatma bir dönem `SnowSurfaceAt` içinde vardı; kar mesh'i silinince
 /// o fonksiyonla birlikte gitti ve relief ham tekseli okumaya başladı.
 ///
-/// ÇEKİRDEK EŞ YÖNLÜ OLMAK ZORUNDA.
+/// NORMAL BİR TÜREV OPERATÖRÜDÜR — BİLİNEAR YETMEZ.
 ///
-/// Önce merkez + YALNIZ DÖRT KÖŞEGEN tap vardı. Köşegen giden bir izde bu
-/// çekirdeğin iki tapı kenar BOYUNCA, ikisi kenarı KESEREK düşüyor; filtrenin
-/// tepkisi kenar boyunca ızgara periyoduyla modüle oluyor ve iz TIRTIL gibi
-/// dişleniyordu. Eksen hizalı izde dört tap simetrik olduğu için belirti
-/// görünmüyordu — ölçüldü: +X yürüyüşünde iz pürüzsüz, (1, 0.6) yönünde
-/// düzenli diş (kullanıcı bildirdi: "farklı yönlere giderken sıkıntılı").
+/// [KAYNAK: Wronski, "Bilinear texture filtering — artifacts, alternatives,
+/// and frequency domain analysis"; Sigg & Hadwiger, "Fast Third-Order Texture
+/// Filtering", GPU Gems 2 bölüm 20.]
 ///
-/// Tam 3x3 çadır çekirdeği: dört eksen tapı köşegenlerin kök2 katı ağırlıkta.
-/// Yarıçap 1.5 tekselden büyük olamaz, yoksa ızgara merdiveniyle birlikte
-/// oluğun 3 tekselllik duvarını da siler.
+/// Bilinear filtreleme C0 sürekli ama C1 SÜREKSİZ: birinci dereceden
+/// interpolasyonun türevi teksel içinde SABİT, teksel sınırında sıçrıyor.
+/// Yükseklikten türevle normal çıkarınca bu sıçrama doğrudan normale geçiyor
+/// ve yüzey teksel boyunda düz parçalara ayrılıyor — ekranda kare basamak.
+///
+/// Kullanıcı bunu iki tur üst üste fotoğrafla bildirdi ("niye pixelimsi bir
+/// yapı var kenarlarda", "kenarlarda koca kareli köşeler var"). İki tur yanlış
+/// yere bakıldı: önce yumuşatma yarıçapı (aliasing yapıyordu, ayrı bir hataydı),
+/// sonra kenar gürültüsünün bloklu bileşeni (o da ayrı bir hataydı). İkisi de
+/// gerçek kusurdu ama BASAMAK İKİSİNDEN DE ÖNCE, filtrelemenin kendisinden
+/// geliyordu.
+///
+/// ÖLÇÜ ARTIRMAK ÇARE DEĞİL: Batman: Arkham Origins aynı işi `Min(512, ...)`
+/// teksellik bir alanla yapıyor — bizim yarımız — ve kenarı yumuşak. Fark
+/// çözünürlükte değil, alanın C1 sürekli okunmasında.
+///
+/// KÜBİK B-SPLINE, C2 SÜREKLİ. Örnek noktalarında hem değeri hem türevi
+/// sürekli; türevin süreksizliği kalmıyor. Dört bilinear tapla alınıyor
+/// (Sigg & Hadwiger): 16 tam tap yerine 4, yani eski 9-tap çadırdan da UCUZ.
+///
+/// B-spline yumuşatıyor da — eski çadır çekirdeğinin işini ayrıca yapması
+/// gerekmiyor, o yüzden `SNOW_CARVE_SMOOTH_TEXELS` ile birlikte silindi.
 float SnowDentSmooth(float2 uv)
 {
-    float2 b = SNOW_CARVE_SMOOTH_TEXELS / _SnowResolution;
+    float2 boyut = (float2)_SnowResolution;
+    float2 koord = uv * boyut - 0.5;
+    float2 t     = floor(koord);
+    float2 f     = koord - t;
 
-    float d = SnowShadeHeightAt(uv) * 0.25;
+    float2 f2 = f * f;
+    float2 f3 = f2 * f;
 
-    d += SnowShadeHeightAt(uv + float2( b.x, 0.0)) * 0.125;
-    d += SnowShadeHeightAt(uv + float2(-b.x, 0.0)) * 0.125;
-    d += SnowShadeHeightAt(uv + float2( 0.0,  b.y)) * 0.125;
-    d += SnowShadeHeightAt(uv + float2( 0.0, -b.y)) * 0.125;
+    float2 w0 = (1.0 / 6.0) * (-f3 + 3.0 * f2 - 3.0 * f + 1.0);
+    float2 w1 = (1.0 / 6.0) * (3.0 * f3 - 6.0 * f2 + 4.0);
+    float2 w2 = (1.0 / 6.0) * (-3.0 * f3 + 3.0 * f2 + 3.0 * f + 1.0);
+    float2 w3 = (1.0 / 6.0) * f3;
 
-    d += SnowShadeHeightAt(uv + float2( b.x,  b.y)) * 0.0625;
-    d += SnowShadeHeightAt(uv + float2(-b.x,  b.y)) * 0.0625;
-    d += SnowShadeHeightAt(uv + float2( b.x, -b.y)) * 0.0625;
-    d += SnowShadeHeightAt(uv + float2(-b.x, -b.y)) * 0.0625;
+    // Komşu ağırlık çiftleri tek bir bilinear tapa katlanıyor: donanımın
+    // interpolasyonu ağırlığı kendisi taşıyor.
+    float2 s0 = w0 + w1;
+    float2 s1 = w2 + w3;
 
-    return d;
+    float2 uv0 = (t - 0.5 + w1 / s0) / boyut;
+    float2 uv1 = (t + 1.5 + w3 / s1) / boyut;
+
+    float a = SnowShadeHeightAt(float2(uv0.x, uv0.y));
+    float b = SnowShadeHeightAt(float2(uv1.x, uv0.y));
+    float c = SnowShadeHeightAt(float2(uv0.x, uv1.y));
+    float d = SnowShadeHeightAt(float2(uv1.x, uv1.y));
+
+    return lerp(lerp(a, b, s1.x), lerp(c, d, s1.x), s1.y);
 }
 
 /// IŞIN YÜRÜYÜŞÜ. Bakış ışını yüzeyin altına iner; yükseklik alanı ışının

@@ -281,43 +281,6 @@
 #define SNOW_RIM_REF_DEPTH           0.25
 #define SNOW_RIM_BLUR_TEXELS         7.0
 
-/// Oymanın GÖRÜNTÜ için yayılma yarıçapı, teksel.
-///
-/// GEREKÇESİ DEĞİŞTİ, DEĞERİ DE. Eskiden 4 teksel (9.4 cm) idi ve işi "duvarı
-/// eğimlemek"ti: oyma DİK BASAMAK olarak yazılıyordu (0 → 80 mm → 0, ölçüldü)
-/// ve bulanıklık onu tek başına eğimlendiriyordu.
-///
-/// Basamak kaynağında düzeltildi — oymanın profilini artık yakalamanın
-/// kapsama payı veriyor ve üç tekselde yumuşakça iniyor (`KDeform`). Geriye
-/// kalan tek iş MESH'İN TAŞIYABİLECEĞİ bant genişliği: köşe aralığı 4.7 cm =
-/// 2 teksel, Nyquist bunun altındaki her şeyi merdiven yapar.
-///
-/// 4 teksel kalsaydı 19 cm'lik oluğun yarısını düzleştirirdi. Ölçüldü: oluk
-/// son görüntüyü yalnız %2.3 değiştiriyordu (lineer %5.5), oysa 48°'lik bir
-/// duvar Lambert'te %34 koyulaştırır.
-///
-/// YARIÇAP TAP ARALIĞIDIR — NYQUIST ONU 1 TEKSELLE SINIRLIYOR.
-///
-/// 9-tap çadır çekirdeğinin tapları bu yarıçap kadar aralıklı. Yarıçap 1'i
-/// aştığında taplar arasında örneklenmeyen teksel kalıyor: filtre artık
-/// yumuşatmıyor, ALTÖRNEKLİYOR. Çekirdek ızgarayla aliasing yapıp düzenli
-/// kare desen çıkarıyor.
-///
-/// Bir tur "geçiş bandı izin %5'i, kenar tek koyu hat okunuyor" diye 2.6'dan
-/// 5.5'e çıkarıldı. Taplar 5.5 teksel aralandı, aralarında 4.5 teksel atlandı
-/// ve iz kenarı TEKSEL BOYUNDA BASAMAKLANDI — kullanıcı fotoğrafla bildirdi:
-/// "niye pixelimsi bir yapı var kenarlarda". Ölçüldü: teksel 2.34 cm,
-/// fotoğraftaki basamak 2.15 cm; birebir ızgara.
-///
-/// O turda "bandı genişletmek görüntüyü değiştirmedi" diye ölçülmüştü —
-/// değiştirmemesinin sebebi buymuş: kazandığı yumuşaklığı aliasing olarak
-/// geri veriyordu.
-///
-/// 1.0 = 3x3 komşu teksel, klasik çadır filtresi. Bant 2 teksel ≈ 4.7 cm,
-/// 27 cm izin %17'si. Geçişi daha da yumuşatmanın yolu bu sayı DEĞİL, doku
-/// çözünürlüğü: iz bugün 11.5 teksel geniş (`DECISIONS.md`).
-#define SNOW_CARVE_SMOOTH_TEXELS     1.0
-
 /// EĞİM FARKININ ADIMI, teksel.
 ///
 /// 1 teksel merkezi fark tam ızgara Nyquist'inde çalışıyor ve merdiveni EN ÇOK

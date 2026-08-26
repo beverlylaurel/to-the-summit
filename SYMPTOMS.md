@@ -2926,3 +2926,44 @@ eklenmişti. O teşhis eksikti: sorun süreksizliğin yokluğu değil, ÖLÇEK
 ÇEŞİTLİLİĞİNİN yokluğuydu — tek oktav sürekli gürültü düz bir dalga verir.
 Üç oktava çıkarıldı (11.1 / 5.6 / 2.8 cm, toplam ±%31) ve blok tamamen
 silindi. Fraktal kenar hem tomurcuklu hem köşesiz.
+
+---
+
+## Kare basamakların ASIL sebebi: normal bir TÜREV, bilinear filtreleme C1 süreksiz
+
+**Belirti:** iz kenarı iki tur üst üste kare basamaklıydı. Kullanıcı ikisini de
+fotoğrafla bildirdi ("niye pixelimsi bir yapı var kenarlarda", sonra
+"kenarlarda koca kareli köşeler var"), sonunda "olmuyor, olmuyor" dedi.
+
+**İki tur yanlış yere bakıldı.** Bulunanların ikisi de gerçek kusurdu ve
+düzeltildi, ama basamağı ikisi de üretmiyordu:
+1. `SNOW_CARVE_SMOOTH_TEXELS` 5.5 — çekirdek altörnekliyordu (aliasing).
+2. `SnowWarpedBlockNoise` — 9.1 cm'lik `floor` hücreleri (koca köşeler).
+
+**Gerçek sebep [KAYNAK: Wronski, "Bilinear texture filtering — artifacts,
+alternatives, and frequency domain analysis"]:** normal bir TÜREV
+OPERATÖRÜDÜR. Bilinear interpolasyon birinci dereceden; türevi teksel içinde
+SABİT, teksel sınırında sıçrıyor (C0 sürekli, C1 süreksiz). Yükseklik
+alanından türevle normal çıkarınca bu sıçrama doğrudan normale geçiyor ve
+yüzey teksel boyunda düz parçalara ayrılıyor.
+
+Yani basamak gürültüden, yumuşatmadan ya da çözünürlükten DEĞİL, alanın nasıl
+okunduğundan geliyordu. Ne kadar oktav eklenirse eklensin, çekirdek ne kadar
+düzeltilirse düzeltilsin türev parça parça sabit kaldığı sürece basamak durur.
+
+**"Çözünürlüğü artıralım" yolu ölçümle çürüdü.** Batman: Arkham Origins aynı
+işi `Min(512, ¼ × yüzey)` teksellik bir alanla yapıyor — bizim
+`_SnowResolution` 1024'ün yarısı — ve kenarı yumuşak. Bir önceki turda
+`DECISIONS.md`'ye yazılan "2048 → 200 MB VRAM" seçeneği bu yüzden gereksizdi;
+sorun çözünürlükte değildi.
+
+**Çözüm:** kübik B-spline filtreleme (C2 sürekli — örnek noktalarında hem değer
+hem türev sürekli), dört bilinear tapla
+[KAYNAK: Sigg & Hadwiger, "Fast Third-Order Texture Filtering", GPU Gems 2 §20].
+16 tam tap yerine 4; eski 9-tap çadır çekirdeğinden de ucuz. B-spline ayrıca
+yumuşattığı için çadır çekirdeğine gerek kalmadı, `SNOW_CARVE_SMOOTH_TEXELS`
+silindi.
+
+**Kural:** bir yükseklik alanından normal üretiliyorsa filtrelemenin C1
+sürekliliği ZORUNLUDUR. Bilinear ile alınan her normal haritası teksel boyunda
+faceted çıkar; bu ayarla düzelmez, filtre değiştirilir.
