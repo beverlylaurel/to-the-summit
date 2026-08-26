@@ -269,70 +269,55 @@ float2 SnowReliefOffset(float3 posWS, float3 viewDirWS, out float dentOut)
 /// karar yerine en büyük engel oranı kullanılıyor.
 ///
 /// KIRPMA UZUNLUĞA, BİLEŞENE DEĞİL — aynı gerekçe `SnowReliefOffset`'te.
+/// ÇUKURUN KENDİ GÖLGESİ — IŞIN YÜRÜMÜYOR, HORİZON ANALİTİK.
 ///
-/// İKİ SERT EŞİK VARDI — İZİN KARE KONTURU İKİSİNDEN ÇIKIYORDU.
+/// Relief mapping tek başına derinliği verir ama ışığın o derinliğe ULAŞIP
+/// ulaşmadığını söylemez. Alçak güneşte sonuç tersine döner: çukurun güneşe
+/// bakan duvarı parlar, yakın duvarı gölgelenmediği için ayak izi TÜMSEK gibi
+/// okunur (ölçüldü: 10:00'da çukur görünüyor, 17:00'de tümsek).
 ///
-/// Kullanıcı izolasyon anahtarıyla sorumluyu buldu ("çukurun kendi gölgesi
-/// yapıyormuş"). Üç tur boyunca yumuşatma çekirdeği, kenar gürültüsü ve
-/// filtreleme suçlanmıştı; üçü de gerçek kusurdu ama konturu bu fonksiyon
-/// çiziyordu.
+/// GÖK KESMESİ BURADA DEĞİL. Gök her yönden geliyor ve çukurun duvarı onu
+/// kesiyor — o iş `occlusion` teriminin. Bu fonksiyon yalnız DOĞRUDAN güneşi
+/// kesiyor.
 ///
-///   1. `if (dent < 0.005) return 1.0` — bilinear bir yükseklik alanı
-///      üzerinde bir STEP fonksiyonu. Eşiğin geçtiği yer teksel içinde
-///      lineer, yani sınır tam ızgaraya oturuyor: gölge kare kenarlı
-///      başlıyor. Artık `smoothstep` ile bir PAY, ve o pay sonuca çarpılıyor.
+/// IŞIN YÜRÜYÜŞÜ SİLİNDİ — İZİN KARE KONTURU ONDAN ÇIKIYORDU.
 ///
-///   2. `saturate((komsu - isinDerinlik) / dent)` — engelin payı çukurun
-///      KENDİ derinliğine bölünüyordu. Sığ çukurda payda küçülüp oran anında
-///      1'e fırlıyor; eşiğin bir milimetre üstünde gölge zaten tamdı. Payda
-///      artık sabit bir referans uzunluk.
+/// Eski hâl beş adımlık bir ışın yürütüyor, her adımda yükseklik alanını
+/// örnekleyip `max` ile birleştiriyordu. İçinde İKİ SERT EŞİK vardı ve ikisi
+/// de bilinear bir alan üzerinde step fonksiyonuydu, yani sınırları teksel
+/// ızgarasına oturuyordu:
+///   1. `if (dent < 0.005) return 1.0` — gölgenin başladığı yer.
+///   2. `saturate((komsu − isinDerinlik) / dent)` — payda çukurun KENDİ
+///      derinliği; sığ çukurda oran anında doyuyordu.
+/// Kullanıcı izolasyon anahtarıyla sorumluyu tek turda buldu ("çukurun kendi
+/// gölgesi yapıyormuş"). Öncesinde üç tur yumuşatma çekirdeği, kenar
+/// gürültüsü ve filtreleme suçlanmıştı — üçü de gerçek kusurdu ama konturu
+/// çizen bu fonksiyondu.
+///
+/// Yerine ÇUKURUN HORİZONU. Ayak izi bir çanak; duvarının eğimi
+/// `dent / yarıçap` ve bu, o noktadan görünen ufkun tanjantı. Güneşin
+/// tanjantı bundan küçükse ışık duvarın arkasında kalıyor. Tamamen analitik:
+/// `dent`'in sürekli fonksiyonu, hiçbir eşik ve hiçbir doku okuması yok —
+/// basamak matematiksel olarak imkânsız. Yirmi doku okuması da gitti.
 half SnowReliefShadow(float3 posWS, float3 lightDirWS, float dent)
 {
     if (_SnowDbgNoReliefShadow > 0.5) return (half)1.0;
 
-    // Sığ çukurda ışın yürütmek hem anlamsız hem pahalı; eşik duruyor ama
-    // sert değil, yumuşak bir paya dönüştü.
-    float pay = smoothstep(SNOW_RELIEF_SHADOW_FADE_IN,
-                           SNOW_RELIEF_SHADOW_FADE_OUT, dent);
+    // Çukurun duvar eğimi = o noktadan görünen ufkun tanjantı.
+    float horizonTan = dent / SNOW_CAVITY_RADIUS;
 
-    if (pay <= 0.001) return (half)1.0;
+    // Güneşin yükseklik tanjantı. Yatay bileşen sıfıra giderse güneş tepede,
+    // tanjant sonsuz — hiçbir duvar onu kesemez.
+    float gunesTan = lightDirWS.y / max(length(lightDirWS.xz), 1e-4);
 
-    // Işık yukarı bakan yön; yatay ilerleme birim derinlik başına.
-    float dikey = max(lightDirWS.y, 0.08);
-    float2 yatay = lightDirWS.xz / dikey;
-    float uzunluk = length(yatay);
-    yatay *= min(1.0, SNOW_RELIEF_MAX_STRETCH / max(uzunluk, 1e-5));
+    float engel = saturate(1.0 - gunesTan / max(horizonTan, 1e-4));
 
-    float engel = 0.0;
-
-    [unroll]
-    for (int i = 1; i <= SNOW_RELIEF_SHADOW_STEPS; ++i)
-    {
-        float t = (float)i / (float)SNOW_RELIEF_SHADOW_STEPS;
-
-        // Çukurun tabanından yukarı çıkan ışın: bu adımda yüzeyin altında
-        // kalan pay ne kadar.
-        float isinDerinlik = dent * (1.0 - t);
-        float2 uv = SnowWorldToUV(posWS + float3(yatay.x, 0, yatay.y) * (dent * t));
-        float komsu = SnowDentSmooth(uv);
-
-        engel = max(engel, saturate((komsu - isinDerinlik) / SNOW_RELIEF_SHADOW_REF));
-    }
-
-    engel *= pay;
-
-    // İZ RENKTEN DEĞİL GÖLGEDEN GÖRÜNÜR.
+    // GÜNEŞ ALÇAKKEN GÖLGE ZAYIFLIYOR — kontrast değil, fizik.
     //
-    // [KAYNAK: adli ayak izi belgeleme — "most detail in an impression
-    // photograph is visible due to small shadows within the impression".]
-    //
-    // GÜNEŞ ALÇAKKEN GÖLGE ZAYIFLIYOR. Işın yatay ilerlemesi
-    // `lightDir.xz / lightDir.y`; güneş alçaldıkça bu büyüyor ve `engel`
-    // neredeyse her yerde 1'e doyuyor. Tam güç bırakılınca akşam izin tamamı
-    // gölgede kalıp simsiyah oluyordu (ölçüldü: 17:49, gündüz oranı 0.33).
-    //
-    // Fizikte de böyle: güneş alçakken toplam aydınlatmada direkt payı
-    // düşüyor, gök payı artıyor; gölge kontrastı azalıyor.
+    // Güneş alçakken toplam aydınlatmada direkt payı düşüyor, gök payı
+    // artıyor; gölge kontrastı azalıyor. Tam güç bırakılınca akşam izin
+    // tamamı gölgede kalıp simsiyah oluyordu (ölçüldü: 17:49, gündüz
+    // oranı 0.33).
     float gunesYuksekligi = saturate(lightDirWS.y * 3.0);
     float guc = lerp(SNOW_SHADOW_LOW_SUN, 1.0, gunesYuksekligi);
 

@@ -3031,3 +3031,38 @@ mertebesi).
 **Ders:** bilinear bir alan üzerindeki HER sert eşik teksel ızgarasını görünür
 kılar. Filtrelemeyi düzeltmek yetmiyor — alanı tüketen tarafta `if`, `step`
 veya sıfıra yakın bölme varsa ızgara oradan geri geliyor.
+
+---
+
+## Çukur gölgesi: ışın yürüyüşü silindi, horizon analitik oldu
+
+**Belirti:** iki sert eşik yumuşatıldıktan sonra bile kullanıcı "çukurun kendi
+gölgesi yokken hâlâ çok daha iyi görünüyor" dedi. Yani eşikler gerçek kusurdu
+ama fonksiyonun kendisi de fazlaydı.
+
+**Ölçüm — gölgenin fiziksel karşılığı:** çukurun görüş faktörü
+`V = R²/(R²+d²)`, çoklu saçılım dolgusu `V / (1 − a(1−V))`, kar albedosu 0.85.
+
+| iz | V | etkin | koyulaşma |
+|---|---|---|---|
+| 15 cm derin / 27 cm geniş | 0.448 | 0.844 | %16 |
+| 10 cm | 0.646 | 0.924 | %8 |
+| 5 cm | 0.852 | 0.975 | %3 |
+
+Kar yüksek albedolu ve çok saçıcı; çoklu saçılım çukuru dolduruyor. Gerçek
+ayak izi "koyu delik" değil, hafif gölgeli çanak.
+
+**Asıl kazanç ışını atmak.** Beş adımlık yürüyüş, her adımda bir doku
+örneklemesi ve `max` birleştirmesi — hepsi bilinear alan üzerinde ve hepsi
+eşikli. Yerine ÇUKURUN HORİZONU: duvar eğimi `dent / SNOW_CAVITY_RADIUS`, bu
+o noktadan görünen ufkun tanjantı; güneşin tanjantı bundan küçükse ışık
+duvarın arkasında. Tamamen analitik, `dent`'in sürekli fonksiyonu, hiçbir eşik
+ve hiçbir doku okuması yok — **basamak matematiksel olarak imkânsız**. Yirmi
+doku okuması da gitti.
+
+Ölçüldü (kâğıtta, R = 13.5 cm): 15 cm çukurda horizon 48°, yani güneş 48°'nin
+altındayken taban doğrudan güneş görmüyor; 5 cm çukurda 20°.
+
+**Ders:** bir görsel terim ışın yürütüyorsa, önce o terimin analitik bir
+karşılığı olup olmadığı sorulur. Işın yürüyüşü hem eşik hem örnekleme
+getiriyor; ikisi de ızgarayı görünür kılıyor.

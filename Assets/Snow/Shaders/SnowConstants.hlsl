@@ -96,30 +96,20 @@
 /// metrelerce uzayıp bulaşıyor.
 #define SNOW_RELIEF_MAX_STRETCH        3.0
 
+/// ÇUKURUN YARIÇAPI (m) — horizon açısı bundan çıkıyor.
+///
+/// Ayak izi bir çanak; duvarının eğimi `derinlik / yarıçap` ve bu, çukurun
+/// içinden görünen ufkun tanjantı. Değer izin yarı genişliği: iz 27 cm, yarısı
+/// 13.5 cm. 15 cm derinlikte horizon 48°, yani güneş 48°'nin altındayken
+/// çukurun tabanı doğrudan güneş görmüyor — kâğıtta doğrulandı.
+#define SNOW_CAVITY_RADIUS             0.135
+
 /// Çukurun kendi gölgesi. Alçak güneşte yakın duvar gölgelenmezse ayak izi
 /// tümsek gibi okunuyor (ölçüldü: 17:00'de ters görünüyordu).
 /// Yuzey dokusu MIKRO detay: yakinda var, uzakta yok. Acik kalirsa gorus
 /// alanindaki butun kar ayni desenle kapaniyor.
 #define SNOW_SURF_FADE_START           8.0
 #define SNOW_SURF_FADE_END             28.0
-
-#define SNOW_RELIEF_SHADOW_STEPS       5
-
-/// ÇUKUR GÖLGESİNİN YUMUŞAK BAŞLANGICI (m). Altında gölge yok, üstünde tam.
-///
-/// Sert bir `dent < 0.005` eşiğiydi ve bilinear alan üzerinde step fonksiyonu
-/// olduğu için izin konturu teksel ızgarasına oturuyordu (`SYMPTOMS.md`).
-/// 2 mm ile 2 cm arası: 2 cm bir tekselin (2.34 cm) altında, yani geçiş bandı
-/// izi şişirmiyor; 2 mm altında ışın yürütmek hâlâ atlanıyor.
-#define SNOW_RELIEF_SHADOW_FADE_IN     0.002
-#define SNOW_RELIEF_SHADOW_FADE_OUT    0.020
-
-/// Engelin payını ölçen SABİT referans uzunluk (m).
-///
-/// Çukurun kendi derinliğine bölünüyordu; sığ çukurda payda küçülüp oran
-/// anında doyuyor ve gölge basamak basamak açılıyordu. 3 cm ayak izi
-/// duvarının mertebesi: o kadar yükselen bir engel tam gölge yapar.
-#define SNOW_RELIEF_SHADOW_REF         0.030
 /// İZ-İÇİ GÖLGENİN TABANI — KAR YARI SAYDAM.
 ///
 /// Engelleme tam olsa bile gölge siyaha inmiyor: ışık kar tanelerinin
