@@ -2693,3 +2693,56 @@ metrelik çukuru kapatmaz.
 
 **Sonuç (büyük ölçekli kontrast):** 1cm 4.65, 5cm 5.24, 20cm 6.63, 50cm 6.61.
 20↔50 doygun; fiziksel olarak da doğru, o iki kalınlıkta yüzey benzer görünür.
+
+---
+
+## İzin kenarı "border" gibi koyu — geçişi yumuşatınca dairesel HALE çıktı
+
+**Belirti (kullanıcı):** "kar izinde kenarlarda koyulaşma var, sanki border gibi.
+dışardaki kar ile mükemmel bir şekilde aynı karmış gibi hissettirmiyor. geçiş
+felaket kötü."
+
+**İlk şüpheli (yanlış):** normalin döndüğü bandın darlığı.
+`SNOW_CARVE_SMOOTH_TEXELS` 2.6 → 5.5 (6 cm → 13 cm) yapıldı. Ölçüldü: koyu hat
+5-10 px, iz 150 px — bandı genişletmek görüntüyü değiştirmedi. Bant zaten sorun
+değildi.
+
+**İkinci deneme (durumu kötüleştirdi):** çöküntü kuyruğu uzatılıp sığlaştırıldı
+(`SNOW_SETTLE_TAIL` 0.20 → 0.12, `SNOW_SETTLE_TAIL_LEN` 0.40 → 1.00). Geçiş
+gerçekten yumuşadı ama yerine **kusursuz dairesel bir koyu hale** geçti — üstel
+çürüme her yönde aynı mesafede bittiği için izin çevresine bir "glow" çiziyordu.
+Yapaylık azalmadı, yer değiştirdi.
+
+**Gerçek sebep:** kenarın yumuşaklığı kuyruğun UZUNLUĞUNDAN değil, kuyruğun
+DÜZENSİZLİĞİNDEN geliyor. Düzgün bir fonksiyon ne kadar uzatılırsa uzatılsın
+düzgün bir sınır çiziyor.
+
+**Çözüm:** kuyruk menzili dünya uzayında gürültüyle modüle edildi
+(`SNOW_SETTLE_TAIL_SCALE` 5 1/m = 20 cm dalga boyu, menzil 2-8 cm arası).
+Gürültü MENZİLDE, genlikte değil: genlikte olsa kuyruk yer yer kesilip lekeli
+bir desen verirdi.
+
+**Ölçüm (tam pipeline karesi, 16:19):** iz içi 93/112/124, dış kar 120/97/117 —
+aralıklar örtüşüyor. İz artık sistematik olarak koyu değil; kalan koyuluk
+çukurun kendi gölgesi.
+
+---
+
+## Ölçüm aracı yalan söylüyordu: `cam.Render()` tonemap'i atlıyor
+
+**Belirti:** kendi `RenderTexture`'ıma aldığım karelerde kar ortalaması 48/255
+çıkıyordu — kar bu kadar koyu olamaz, ama "gece" değildi (saat 16:19,
+`SunHeight` 0.38).
+
+**Şüpheli (yanlış):** shader'ın gölge/occlusion terimlerinin fazla koyulaştırması.
+Terimleri tek tek kısmaya başlanacaktı.
+
+**Gerçek sebep:** `cam.targetTexture = rt; cam.Render();` post-process yığınını
+(tonemap, pozlama) çalıştırmıyor. Okunan şey ham HDR'nin RGB24'e kırpılmışı.
+
+**Ayırt eden ölçüm:** aynı kare, aynı saat, aynı açı —
+`ScreenCapture.CaptureScreenshot` ile ortalama **163**, `cam.Render()` ile **48**.
+3.4 kat fark; ölçüm aracının kendisi hipotez üretiyordu.
+
+**Kural:** iz/kar parlaklığı karşılaştırması yalnız `ScreenCapture` ile yapılır.
+`cam.Render()` sadece geometri/şekil bakmak için kullanılabilir.

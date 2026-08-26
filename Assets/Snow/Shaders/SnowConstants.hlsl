@@ -189,8 +189,15 @@
 /// 0.6 yarıçap ile (R = 8.2 cm): kuyruk 4.9 cm'de 1/e'ye, 12 cm'de %9'a
 /// iniyor. Toplam yarı-genişlik 0.10 + 0.082 + 0.12 = 30 cm, iz 60 cm.
 /// Geçiş bandı yine 5 tekselden 8 teksele çıkıyor ama iz şişmiyor.
-#define SNOW_SETTLE_TAIL             0.20
-#define SNOW_SETTLE_TAIL_LEN         0.40
+#define SNOW_SETTLE_TAIL             0.12
+#define SNOW_SETTLE_TAIL_LEN         0.70
+
+/// Kuyruk menzilini kıran gürültünün ölçeği (1/m). 5 = 20 cm dalga boyu.
+#define SNOW_SETTLE_TAIL_SCALE       5.0
+
+/// KUYRUK UZUN VE SIĞ. Önce kısa ve derindi (0.40 yarıçap, %20 pay) ve izin
+/// kenarı tek bir koyu hat olarak okunuyordu. Uzatıp sığlaştırmak geçişi
+/// yumuşatıyor ama izi ŞİŞİRMİYOR: kenarda 1.8 cm, 15 cm ötede 2 mm.
 
 #define SNOW_HOLE_FLARE              0.08
 
@@ -275,7 +282,13 @@
 /// 3.0'da bırakıldı. Bir tur "ızgara merdivenini kesmek için" diye 1.5'e
 /// indirilip geri alındı; o gerekçe ölçümle çürüdü (bkz. yakalama bulanıklığı
 /// — dişlerin kaynağı damga kadansı). Yarıçapın işi duvarı yumuşatmak.
-#define SNOW_CARVE_SMOOTH_TEXELS     2.6
+/// ÖLÇÜLDÜ: 2.6 teksel (6 cm) geçiş bandı, iz ise 50 cm geniş — ekranda
+/// geçiş izin %5'i, kenar tek bir koyu hat olarak okunuyor (kullanıcı
+/// defalarca bildirdi: "kenarlarda koyulaşma var, sanki border gibi").
+///
+/// 5.5 teksel = 13 cm, yani izin dörtte biri. Geometri değişmiyor; değişen
+/// yalnız normalin kenarda ne kadar geniş bir bantta döndüğü.
+#define SNOW_CARVE_SMOOTH_TEXELS     5.5
 
 /// EĞİM FARKININ ADIMI, teksel.
 ///

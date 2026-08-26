@@ -391,11 +391,27 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         // KENDİSİNİN kenarda bitmesiydi.
         //
         // Kuyruk üstel: kenarda batmanın `SNOW_SETTLE_TAIL` payıyla başlıyor,
-        // `SNOW_SETTLE_TAIL_LEN` × yarıçap mesafesinde 1/e'ye düşüyor.
-        // Sürekli bir fonksiyon; gürültü içermediği için zigzag üretemez.
+        // menzil mesafesinde 1/e'ye düşüyor.
+        //
+        // MENZİL SABİT DEĞİL, GÜRÜLTÜYLE SAÇAKLANIYOR. Sabit menzil izin
+        // çevresine kusursuz dairesel bir koyu hale koyuyordu (ölçüldü,
+        // `SYMPTOMS.md`): geçiş yumuşadı ama "glow" gibi yapay okundu.
+        // Menzil dünya uzayında modüle edilince hale dağılıyor — bir yerde
+        // 2 cm, öteki yerde 8 cm sonra bitiyor.
+        //
+        // GÜRÜLTÜ MENZİLDE, GENLİKTE DEĞİL. Genlikte olsaydı kuyruk yer yer
+        // kesilip lekeli bir desen verirdi; menzilde olunca kenar hattı
+        // düzensiz ama kuyruk her yerde sürekli kalıyor.
+        //
+        // Dalga boyu 20 cm (8 teksel), menzil oynaması 2-8 cm. Büküm genliği
+        // kaynak özellik boyundan küçük — zigzag üretemez.
         float disMesafe = max(0.0, uzaklik - genisYaricap);
-        float kuyruk = batma * SNOW_SETTLE_TAIL
-                     * exp(-disMesafe / max(genisYaricap * SNOW_SETTLE_TAIL_LEN, 1e-3));
+
+        float kuyrukGurultu = SnowValueNoise(worldXZ * SNOW_SETTLE_TAIL_SCALE);
+        float menzil = genisYaricap * SNOW_SETTLE_TAIL_LEN
+                     * (0.45 + 1.10 * kuyrukGurultu);
+
+        float kuyruk = batma * SNOW_SETTLE_TAIL * exp(-disMesafe / max(menzil, 1e-3));
 
         hedef = max(hedef, kuyruk);
 
