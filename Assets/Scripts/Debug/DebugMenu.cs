@@ -514,18 +514,12 @@ public class DebugMenu : MonoBehaviour
                 izHam = GUILayout.Toggle(izHam, "İzin ham hâli (ışıksız, paralakssız)");
                 if (izHam != hamOnce) Shader.SetGlobalFloat(SnowDebugDentId, izHam ? 1f : 0f);
 
-
-
                 if (GUILayout.Button("Ayarları geri al (sınama)"))
                 {
                     mgr.SimTimeScale = 1f;
                     mgr.RefillRegion();
                     izHam = false;
                     Shader.SetGlobalFloat(SnowDebugDentId, 0f);
-
-
-
-
                 }
 
                 GUILayout.Space(6f);
@@ -584,21 +578,6 @@ public class DebugMenu : MonoBehaviour
     bool izHam;
 
     static readonly int SnowDebugDentId = Shader.PropertyToID("_SnowDebugDent");
-
-
-
-
-    /// İZ KENARINDAKİ BASAMAĞIN KAYNAĞINI AYIRAN ANAHTARLAR.
-    ///
-    /// Basamak üç tur yanlış yerde arandı — yumuşatma çekirdeğinin
-    /// altörneklemesi, kenar gürültüsünün bloklu bileşeni, bilinear
-    /// filtrelemenin türev süreksizliği. Üçü de gerçek kusurdu, üçü de
-    /// düzeltildi, basamak durdu. Şüphelilerin TAMAMI aynı anda kapatılabilir
-    /// olmalı ki sorumlu tek turda bulunsun.
-
-
-
-
 
     string SnowStatus()
     {

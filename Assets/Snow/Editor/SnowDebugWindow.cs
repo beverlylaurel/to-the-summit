@@ -709,12 +709,10 @@ public class SnowDebugWindow : EditorWindow
         // İZ GÖVDESİ BOTTAN GENİŞ.
         //
         // 16 cm bir bot genişliği; ama taze karda ayak batınca kenar ÇÖKER ve
-        // açılan çukur bottan belirgin geniş olur. 15 cm yarıçap iki ayağın
-        // toplam izini karşılıyor (11 cm ayak + 22 cm ara).
-        //
-        // AYRI AYRI AYAK İZLERİ DENENDİ VE GERİ ALINDI: adım olayı 39 cm'de
-        // bir düştüğü için iz birden beliriyordu (gerekçe `SnowDeformer`).
-        // Düzensizlik artık yola bağlı SÜREKLİ bir dalgadan geliyor.
+        // açılan çukur bottan belirgin geniş olur. 16 cm'lik damga ekranda
+        // ince bir çizgi olarak okunuyordu (kullanıcı bildirdi: "çok dar").
+        // 15 cm yarıçap iki ayağın toplam izini karşılıyor (11 cm ayak +
+        // 22 cm ara).
         var defSo = new SerializedObject(def);
         defSo.FindProperty("radius").floatValue = 0.15f;
         defSo.ApplyModifiedProperties();

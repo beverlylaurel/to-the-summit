@@ -260,7 +260,6 @@ public static class SnowCoverTest
     sealed class FakeEnvironment : ISnowEnvironmentSource
     {
         public Vector3 WindDirection { get; set; } = Vector3.right;
-        public Vector3 PrevailingWindDirection { get; set; } = Vector3.right;
         public float WindSpeed { get; set; }
         public Light Sun => null;
         public float SunElevation01 { get; set; }

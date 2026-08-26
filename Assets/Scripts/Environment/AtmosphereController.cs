@@ -427,15 +427,8 @@ public class AtmosphereController : MonoBehaviour
 
         // Tek istisna açık pencere — sürücünün nadiren açtığı o an, tabanın delinebildiği
         // tek yol.
-        //
-        // KİLİTLİYKEN TABAN UYGULANMIYOR. `CoverageLocked` bir TEŞHİS anahtarı:
-        // "kapsamayı şu değere sabitle" demek. Taban onun üstünden geçince kilit
-        // yalan söylüyordu — 0 yazılıp 0.40 okunuyordu ve ölçüm sessizce
-        // geçersizleşiyordu (`SYMPTOMS.md`). Kilitli değilken taban aynen
-        // çalışıyor; oyun davranışı değişmiyor.
-        if (!CoverageLocked)
-            coverage = Mathf.Max(coverage,
-                Mathf.Lerp(floor, settings.openCoverage, weatherDriver.ClearWindow));
+        coverage = Mathf.Max(coverage,
+            Mathf.Lerp(floor, settings.openCoverage, weatherDriver.ClearWindow));
 
         // BULUT SÜRÜKLENMESİ BURADAN ÇIKTI. Kaymayı artık hacimsel bulut sistemi
         // biriktiriyor ve rüzgârı `CloudWeatherDriver` üzerinden doğrudan okuyor; buradaki

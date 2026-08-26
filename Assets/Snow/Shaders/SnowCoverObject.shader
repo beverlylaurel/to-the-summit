@@ -189,8 +189,7 @@ Shader "ToTheSummit/SnowCoverObject"
                     }
 
                     half3 karIsik = SnowDirectLight(mainLight, karN, V, ks)
-                                  + SnowAmbient(karN, ks, mainLight.shadowAttenuation, 1.0h,
-                                                mainLight.color, mainLight.direction);
+                                  + SnowAmbient(karN, ks, mainLight.shadowAttenuation, 1.0h);
 
                     color = lerp(color, karIsik, mask);
                 }

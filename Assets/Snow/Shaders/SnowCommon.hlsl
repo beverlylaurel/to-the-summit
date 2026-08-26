@@ -161,26 +161,6 @@ float3 SnowRandCell3(int3 cell)
     return SnowRandU3(asuint(cell));
 }
 
-/// HÜCRESEL (BLOK) GÜRÜLTÜ — 0..1, hücre içinde SABİT.
-///
-/// `SnowValueNoise` dört hücreyi bilinear harmanlıyor, yani doğası gereği
-/// PÜRÜZSÜZ. Kar ise kırılır: taşıma gücü yenildiğinde kenar bir kayma yüzeyi
-/// boyunca kopuyor ve kohezyonlu kar AÇISAL parçalara ayrılıyor
-/// [KAYNAK: Terzaghi yerel kayma göçmesi — temel kenarında kama ve kayma
-/// yüzeyi; kar mekaniği literatüründe "cohesive slab breaks into angular
-/// chunks"].
-///
-/// Harmanlama olmadığı için hücre sınırında BASAMAK var — ve burada istenen
-/// tam olarak o. Kenarın düzgün bir eğri olmaktan çıkıp parça parça
-/// kopmasını sağlıyor (kullanıcı bildirdi: "pütür, dağılma, tomurcuk yok").
-///
-/// Hücre ızgarası dünya uzayında sabit; iz hareket ederken bloklar kaymıyor.
-float SnowBlockNoise(float2 p)
-{
-    return SnowRandCell3(int3((int2)floor(p), 0)).x;
-}
-
-
 /// DEĞER GÜRÜLTÜSÜ — dört hücre hash'inin bilinear karışımı.
 ///
 /// Hücre hash'i tek başına teksel teksel kırılıyor: iz kenarı lekelenmiyor,
@@ -201,24 +181,6 @@ float SnowValueNoise(float2 p)
     float d = SnowRandCell3(int3((int2)h + int2(1, 1), 0)).x;
 
     return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
-}
-
-/// BÜKÜLMÜŞ HÜCRESEL GÜRÜLTÜ — hücreler kare değil, düzensiz.
-///
-/// Ham `SnowBlockNoise` `floor()` kullandığı için hücreler EKSENE HİZALI
-/// KARE; ekranda piksel olarak okunuyor (kullanıcı bildirdi: "piksel piksel
-/// oldu"). Gerçek kar bloğu kare değil, kırık kenarlı düzensiz bir çokgen.
-///
-/// Voronoi doğru cevap ama 3×3 tohum taraması gerektiriyor ve bu alan gradyan
-/// için dört kez örnekleniyor — 36 tohum/piksel. Alan büküldüğünde aynı
-/// düzensizlik tek ek gürültüyle elde ediliyor: kare ızgara eğrilip
-/// çokgenleşiyor, keskin sınır (kırılma) korunuyor.
-float SnowWarpedBlockNoise(float2 p)
-{
-    float2 buk = float2(SnowValueNoise(p * 0.63),
-                        SnowValueNoise(p * 0.63 + 27.7)) * 2.0 - 1.0;
-
-    return SnowBlockNoise(p + buk * 0.75);
 }
 
 // ------------------------------------------------------------ zemin yüksekliği
@@ -432,10 +394,5 @@ float4 SnowTrailAt(float2 uv)
 /// kirmizi = SNOW_RELIEF_MAX_DEPTH. Verinin shader'a ulasip ulasmadigini
 /// isiklandirmadan bagimsiz ayirir.
 float _SnowDebugDent;
-
-/// 1 iken yuzey normalini ve NdotL'yi renk olarak basar:
-/// kirmizi = duz NdotL, yesil = wrap NdotL, mavi = N.y.
-/// Lekelerin normalden gelip gelmedigini tek bakista ayirir.
-float _SnowDebugNormal;
 
 #endif

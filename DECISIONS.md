@@ -230,21 +230,6 @@ olur.
 ---
 ## Bekleyen ölçümler
 
-- **Derleme süresi darboğazı bulunamadı.** Kullanıcı "compile süresi çok uzadı"
-  dedi; ölçülenler: script derlemesi 0.8–1.9 ms, domain reload 3514 ms
-  (`FinalizeReload` 2132 ms), shader import MountainSurface 143 / Sky 154 /
-  SnowSim 89 / SnowRelief 69 ms. Hiçbiri şikâyeti açıklamıyor.
-  Kalan tek şüpheli **Play'e girişte varyant derlemesi**: `Library/ShaderCache`
-  17 MB / 1750 dosya, son altı saatte 152 yeni varyant — her `.hlsl`
-  değişikliği önbelleği geçersiz kılıyor ve MountainSurface'ın 144 varyantı
-  (3 × 3 × 2 × 2 × 2 × 2) pahalı bir fragment programını yeniden derliyor.
-  **Ölçülemedi** çünkü tek doğrudan yol `ShaderUtil.CompilePass` ve
-  `System.Reflection` bu araçta yasak; ölçüm Unity Play dışındayken
-  ShaderCache silinip Play'e basılarak yapılacak.
-  **Varyant kesme denenmedi ve bilinçli:** `_ADDITIONAL_LIGHTS` /
-  `_LIGHT_COOKIES` bugün kullanılmıyor ama şimşek ve kafa lambası planlı; kesip
-  sonra sessizce bozmak yerine ölçüm bekleniyor.
-
 - **Güneş 3.03'e çıktıktan sonra yüzeyler** — arazi, kar ve bisiklet 1.5'e göre
   ayarlanmıştı; yeniden ayar gerekip gerekmediğine bakılmadı
   → [Güneş şiddeti pakete kalibre edildi](#güneş-şiddeti-pakete-kalibre-edildi-15--3030782)
@@ -1781,57 +1766,3 @@ etmiyor.
 
 **Tetikleyici:** bir düzeltme "dosyada doğru ama ekranda eski" görünüyorsa ilk
 bakılacak yer budur — `SerializedObject` ile canlı değeri oku, dosyaya güvenme.
-
-## Ayrı ayak izleri — İKİ KEZ DENENDİ, İKİSİ DE GERİ ALINDI (2026-08-25)
-
-**Karar.** İz tek bir sürekli oluk olarak açılıyor; ayrı ayak izleri yok.
-
-**Denenen 1 — adım olayında damga.** `SnowStepRhythm.Stepped`'e abone olup her
-adımda bir bot izi basan bir bileşen yazıldı. İz yarım adımda bir (39 cm)
-BİRDEN beliriyordu: damga karakter o mesafeyi aldıktan SONRA geriye basılıyor.
-Kullanıcı: "Minecraft'ta blok koyar gibi, gecikmeli." Sol/sağ ayrık damgalar
-ekranda zigzag olarak da okundu.
-
-**Denenen 2 — iki hattı sürekli süpürmek.** Ayaklar hiç yerden kalkmıyordu,
-iki paralel oluk çıktı. Kullanıcı: "ip ile iki ayağım birbirine bağlanmış."
-
-**Denenen 3 — ayak basış anında donuyor, iz her kare yazılıyor.** Gecikme ve
-sürüklenme çözüldü ama yeni belirti: her adım HALTER şekli veriyordu (iki oval
-+ aralarında bacağın yarma izinden gelen ince çubuk). Yan yürürken yarma izi
-gövdeye gittiği için düz bir çizgiye dönüyordu.
-
-**Gerekçe.** Ayrık damgaların üçü de aynı yerde tıkanıyor: iz dokusu `max` ile
-biriken KALICI bir alan, damga da tek karelik bir olay. Aradaki uyumsuzluğu
-kapatan her ek terim (yarma izi, faz yumuşatma, sabitlenmiş konum) yeni bir
-belirti üretti.
-
-**Tetikleyici — geri dönülecek belirti:** izin tek tip bir boru gibi okunması
-şikâyeti, sürekli oluğun kendi düzensizlik kaynakları (kenar kırılması, mikro
-rölyef, yol gürültüsü) yeterince güçlendirildikten sonra da sürerse.
-
-**Maliyet.** Bileşen sıfırdan yazılabilir; asıl maliyet ayrık damga ile kalıcı
-`max` alanını uzlaştıran bir tasarım bulmak.
-
-## İzin yaşı taşınamıyor — kanal yok (2026-08-25)
-
-**Karar.** Kenarın zamanla yuvarlanması uygulanmıyor; iz tek hâlde çiziliyor.
-
-**Gerekçe.** [KAYNAK: kar izi yaşlandırma — "when a track is first made the
-edge looks sharp or crisp, but begins to round SHORTLY afterwards"; ayrıca
-süblimasyon izi genişletip ayak izlerini birleştiriyor.] Görsel olarak doğru
-ve istenen bir davranış.
-
-Yaş sayacı için `snow.a` denendi: `KAccumulate` onu `SNOW_DISTURB_TAU` (900 s)
-ile söndürüyor, yani hazır bir yaş ölçeği. Ama `snow.a` AYNI ZAMANDA
-`MountainSurface`'in `yerelBozulma`'sı ve doğrudan doku harmanına giriyor —
-iz gri bir lekeye döndü (kullanıcı bildirdi: "niye böyle saçma sapan gri bir
-görüntü"). Aynı tuzağa daha önce sıkışma sayacıyla da düşülmüştü
-(`SYMPTOMS.md`).
-
-**Tetikleyici — geri dönülecek belirti:** taze izle dakikalar önce açılmış izin
-aynı görünmesi rahatsız edici hâle gelirse.
-
-**Maliyet.** `RT_Trail` dört kanalı da dolu (oyma / sırt / kabuk / sastrugi);
-`RT_Snow` da öyle (SWE / yoğunluk / ıslaklık / bozulma). Yaş için beşinci bir
-kanal, yani yeni bir doku gerekiyor — 1024² RHalf = 2 MB. Ya da sastrugi ile
-kabuk tek kanalda paketlenip yer açılır.

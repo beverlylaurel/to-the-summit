@@ -112,7 +112,7 @@ float2 SampleDetailSlope(float2 worldXZ, float tileMeters, float strength)
 ///
 /// MİKRO MESAFEYLE KAPANIYOR. Açık kalırsa TAA ile kaynayan bir yüzey
 /// oluşuyor — 16 m'de tamamen kapanmalı.
-float3 SnowApplyDetailNormals(float3 normalWS, float3 positionWS,
+float3 SnowApplyDetailNormals(float3 normalWS, float3 positionWS, float freshness,
                               float disturb, float distanceToCamera)
 {
     // TABANIN EĞİMİ KORUNUYOR. Detay katmanları taban normalinin ÜSTÜNE
@@ -133,27 +133,8 @@ float3 SnowApplyDetailNormals(float3 normalWS, float3 positionWS,
 
     float distFade = 1.0 - saturate((distanceToCamera - 6.0) / 10.0);
 
-    // MAKRO KATMAN SİLİNDİ — RÜZGÂR DALGALARINI RÖLYEF ZATEN ÜRETİYOR.
-    //
-    // 8 metreye gerilmiş bir detay dokusu, işi `SnowYuzeyRolyef`'in fBm
-    // (1.25 m), ripple (17 cm) ve sastrugi katmanlarıyla ÇAKIŞIYORDU:
-    // aynı ölçek iki kez, biri arazide ölçülmüş verilerden
-    // (Filhol & Sturm), öteki fotogrametri dokusundan.
-    //
-    // Ölçüldü (17:49, bulut 0, 50 cm kar, sabit kadraj — p99 gradyan,
-    // yani kenar sertliği):
-    //   baz                          22.0
-    //   makro kapalı                  3.0
-    //   mezo kapalı                  22.0
-    //   mikro kapalı                 20.0
-    //   detay normali tamamen kapalı  3.0
-    // Makro'yu kapatmak tüm detay normalini kapatmakla AYNI sonucu
-    // veriyordu: keskin kenarların tamamı bu katmandandı. Belirti
-    // alçak güneşte keskin kenarlı adacıklar olarak görülüyordu.
-    //
-    // Mezo (0.6 m) ve mikro (5 cm) duruyor — yakın plan detayı onlarda,
-    // ve ikisi de kenar sertliğine katkı vermiyor.
-    float2 detayEgim = (float2)0.0;
+    // Makro — rüzgâr dalgaları
+    float2 detayEgim = SampleDetailSlope(positionWS.xz, 8.0, 0.35 * freshness);
 
 #if defined(_SNOW_QUALITY_MEDIUM) || defined(_SNOW_QUALITY_HIGH)
     // Mezo — kar topakları

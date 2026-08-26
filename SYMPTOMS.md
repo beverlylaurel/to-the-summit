@@ -3477,3 +3477,27 @@ Toplam RMS **15°** — arazide ölçülen aralığın (5-15°) üst ucu.
 | RMS 15° | **2.0** | **0.80** |
 
 Noktalar hâlâ var ama zemine yaklaştı (0.54 → 0.80) ve alanları %1'in altında.
+
+---
+
+# BU DOSYADAKİ 26 AĞUSTOS KAYITLARI — KOD GERİ ALINDI
+
+Kullanıcının kararıyla 26 Ağustos'ta yapılan **bütün kod değişiklikleri**
+`3ed2842`'ye döndürüldü: yüzey yer şekilleri (fBm, ripple, sastrugi, mikro
+rölyef), kar-kar yatay transferi, wrap genişliği, gölge tavanı, HUD ayrımı,
+iz kenarı düzeltmeleri — hepsi.
+
+Gerekçe: yer şekilleri eklendikten sonra alçak güneşte keskin kenarlı koyu
+adacıklar belirdi ve bir günlük ölçüm turu sebebi kesin olarak bulamadı.
+Kullanıcı: "sen sorunu net olarak bulduğuna emin misin? yama mı yapıyorsun?"
+
+**Aşağıdaki kayıtlar SİLİNMEDİ çünkü ölçümler geçerli** — hangi yolun
+denendiğini ve neyin çürüdüğünü gösteriyorlar. Ama tarif ettikleri kod artık
+projede YOK. Bir kayıt okunurken önce koda bakılır.
+
+**Geri alınmayan tek şey bilgi:** ölçüm aracının üç tuzağı (Play modda
+`ImportAsset` sonrası kare yalan söyler, `CoverageLocked` tabanı ezmiyordu,
+`EnterPlaymode` RunCommand'dan çağrılınca Unity çöküyor) ve prob sonucu
+(koyu noktalar gölge veya AO değil, `dot(N,L)` negatif olan eğimler).
+
+Çalışılan hal `yedek-kar-yuzeyi-26agu` dalında duruyor.
