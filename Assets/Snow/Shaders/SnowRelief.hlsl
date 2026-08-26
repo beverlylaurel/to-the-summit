@@ -531,6 +531,19 @@ float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi,
     h += (ns - 0.5) * min(SNOW_SASTRUGI_HEIGHT * SNOW_SASTRUGI_BASE, tavan)
        * SnowOktavAgirligiKipli(SNOW_SASTRUGI_LENGTH, pikselBoyu, yalnizGeometri);
 
+    // --- DRIFT: birikme tepecikleri, YUMUSAK ---
+    //
+    // Sastrugi `n*n*(3-2n)` ile ust yarisi duzlestirilip alt yarisi
+    // diklestiriliyor (erozyon: dik ruzgarustu yuz). Drift'te o islem YOK —
+    // ham deger yuvarlak tepe veriyor, birikmenin kendi bicimi bu.
+
+    float2 pd = float2(dot(worldXZ, w)   / SNOW_DRIFT_WIDTH,
+                       dot(worldXZ, dik) / SNOW_DRIFT_LENGTH);
+
+    if (_SnowDbgNoDrift <= 0.5)
+    h += (SnowValueNoise(pd) - 0.5) * min(SNOW_DRIFT_HEIGHT, tavan)
+       * SnowOktavAgirligiKipli(SNOW_DRIFT_LENGTH, pikselBoyu, yalnizGeometri);
+
     return h;
 }
 

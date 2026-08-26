@@ -644,6 +644,28 @@
 #define SNOW_SASTRUGI_WIDTH          2.20
 #define SNOW_SASTRUGI_WIND_TAU     120.0
 
+/// DRIFT — BIRIKME TEPECIKLERI.
+///
+/// Sastrugi erozyon sekli: ruzgar kari OYUYOR, keskin sirt ve dik yuz
+/// birakiyor. Drift bunun tersi: ruzgarin tasidigi kar bir yerde COKUYOR ve
+/// yuvarlak, yumusak tepecik birakiyor. Ikisi ayni yerde olmuyor —
+/// `SnowYuzeyRolyef` ikisini ruzgar maruziyetiyle ayiriyor.
+///
+/// [KAYNAK: Filhol & Sturm 2015, kar yer sekilleri sinifi — olculen aralik
+/// 2 cm (ripple) ile 2.5 m (whaleback dune) arasi; drift tepecikleri bu
+/// araligin ortasinda.]
+///
+/// Genlik tepe-dip 30 cm, dalga boyu 90 cm -> egim 2*pi*0.15/0.90 = 1.05,
+/// yani 46 derece. Karin durus acisi 38-45 derece; drift o sinirin hemen
+/// ustunde duruyor cunku birikme sirasinda kar kendini destekliyor
+/// (kohezyon, `SNOW_STAND_LOOSE` ile ayni fizik).
+#define SNOW_DRIFT_HEIGHT              0.30
+#define SNOW_DRIFT_LENGTH              0.90
+
+/// Ruzgar yonundeki uzama. Drift tepecikleri ruzgar boyunca uzuyor ama
+/// sastrugi kadar degil (sastrugi 2.20 m).
+#define SNOW_DRIFT_WIDTH               1.60
+
 // --- İz içi AO (spec §18.5) ---
 
 // --- Süspansiyon perdeleri (spec §18.7) ---

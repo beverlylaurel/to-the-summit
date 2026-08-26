@@ -385,6 +385,9 @@ float _SnowTessFar;
 /// 1 iken bolme tamamen kapali: butun kenar faktorleri 1.
 float _SnowDbgNoTess;
 
+/// 1 iken drift katmani kapali.
+float _SnowDbgNoDrift;
+
 /// SIRTLAR RÜZGÂRA DİK UZANIYOR (transverse). Dalga boyu rüzgâr yönünde
 /// KISA, sırtlar rüzgâra dik yönde UZUN. UV'ler ters yazılırsa desen 90°
 /// yanlış olur (spec §18.4, §22).
