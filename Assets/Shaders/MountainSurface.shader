@@ -280,7 +280,9 @@ Shader "ToTheSummit/MountainSurface"
                                                     inputData.viewDirectionWS, ks)
                                   + SnowAmbient(karN, ks,
                                                 mainLight.shadowAttenuation,
-                                                (half)surface.occlusion * gokPayi);
+                                                (half)surface.occlusion * gokPayi,
+                                                mainLight.color,
+                                                mainLight.direction);
 
                     lit = lerp(lit, karIsik, (half)surface.snowMask);
                 }

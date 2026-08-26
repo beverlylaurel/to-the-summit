@@ -117,6 +117,18 @@
 /// yanlış olan onu her havada ve her saatte kullanmaktı.
 #define SNOW_SHADOW_BOUNCE             0.43
 
+/// KAR-KAR YATAY TRANSFERİNİN KATSAYISI.
+///
+/// Gölgedeki kar çevresindeki aydınlık kardan ışık alıyor. Katkı
+/// `albedo × görüş payı × aydınlık kar radyansı`; aydınlık kar radyansının
+/// içinde bir albedo daha var. 0.85 × 0.5 = 0.43.
+///
+/// Kâğıtta uçlar: öğle (NdotL 0.9, gök 0.15) aydınlık 1.43 / gölgeli 0.53,
+/// oran 0.37. Şafak (NdotL 0.07, gök 0.02) aydınlık 0.12 / gölgeli 0.05,
+/// oran 0.42. İkisi de ölçülü kar gölgesi oranına (0.4-0.6) oturuyor;
+/// öncesinde şafakta 0.08'di.
+#define SNOW_LATERAL_BOUNCE            0.43
+
 /// Yuzey dokusu MIKRO detay: yakinda var, uzakta yok. Acik kalirsa gorus
 /// alanindaki butun kar ayni desenle kapaniyor.
 #define SNOW_SURF_FADE_START           8.0

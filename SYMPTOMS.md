@@ -3127,3 +3127,47 @@ götürdü.
 
 **Ders:** bir teşhis aracının yanıltıcı olduğu bir kez ölçüldüyse, kaydı yazmak
 yetmiyor — ARACIN KENDİSİ düzeltilmeli. Yorumdaki uyarı ekranda görünmüyor.
+
+---
+
+## Alçak güneşte keskin kenarlı adacıklar — eksik olan KAR-KAR yatay transferi
+
+**Belirti (kullanıcı, aynı kadrajdan dört saat):** 16:12 normal, 17:34 sepia,
+17:49 ve 06:20'de zemin neredeyse siyah ve üzerinde keskin kenarlı açık
+adacıklar.
+
+**Elenen şüpheliler:**
+- **Bulut gölgesi** — kullanıcı bulut %0 iken de aynı kareyi verdi.
+- **Geometri** — Tri 10k → 433k çıkıyordu ama kadraj aynıydı; artış alçak
+  güneşte gölge kaskadlarının uzayıp 200k'lık arazi mesh'lerini gölge
+  geçişine sokması. Terrain'in kendi `shadowCastingMode`'u zaten Off.
+- **Gölge haritası (shadow acne)** — F1'e anahtar kondu, kullanıcı kapattı:
+  "hiçbir şey değiştirmiyor". Elendi.
+
+**Gerçek sebep:** alçak güneşte düz zeminde NdotL ≈ 0.07; arazinin ±5°'lik
+dalgası onu 0 ile 0.15 arasında gezdiriyor. Dolaylı ışık yetersizse NdotL'nin
+sıfıra gittiği yerler TAMAMEN kararıyor, 0.15 olanlar görünüyor — keskin
+adacıklar bu. Kar gerçekte kararmaz çünkü komşu aydınlık kardan ışık alır.
+
+**Ölçüm:** aydınlık kar ~180, gölgeli ~15 → oran **0.08**. `SnowLighting.hlsl`
+kendi kaydında aynı sayı duruyor: "zemin luması 0.0898 ↔ 0.8461, yani 1/9".
+Kâğıtta olması gereken **0.49** (albedo 0.85, gölgeli nokta yarımkürenin
+~yarısını aydınlık kar görüyor). Altı kat eksik.
+
+**Neden mevcut terim yetmiyordu:** kar-gök çoklu yansıması vardı
+(`1/(1−a·s)` = 1.29) ve bu farkı kapatmaya çalışıyordu. Yanlış yönü
+modelliyor — eksik olan dikey değil **yatay** transfer. `SampleSH` de bunu
+içeremiyor: SH statik, güneşin o anki katkısını taşımıyor, bu yüzden gölge
+güneş ne kadar parlarsa parlasın aynı kalıyordu.
+
+**Çözüm:** `ambient += güneşRenk · sat(yön.y) · albedo · SNOW_LATERAL_BOUNCE`,
+katsayı 0.85 × 0.5 = 0.43. Gölgeye BAĞLANMIYOR — aydınlık kar da komşusundan
+ışık alıyor; kar sahasının gerçekten parlak olmasının sebebi bu. Gölgeye
+bağlansaydı telafi terimi olurdu.
+
+Kâğıtta uçlar: öğle oran 0.37, şafak 0.42 — ikisi de ölçülü kar gölgesi
+aralığına (0.4-0.6) oturuyor.
+
+**Ders:** "gölge çok koyu" belirtisinde önce hangi YÖNDEN ışık geldiği sorulur.
+Dikey (gök) terimi eklemek yatay (komşu yüzey) eksiğini kapatmıyor, yalnız
+sayıyı biraz büyütüp gerçek sebebi gizliyor.
