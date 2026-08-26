@@ -2868,3 +2868,11 @@ ALÇALTIYORDU. Sıkışmış kar daha kohezyonludur; 0.200 yapıldı.
 **20 ile 50 cm arasındaki batma farksızlığı hata değil.** İkisi de
 `SNOW_MAX_SINK` tavanında; taşıma gücü karın YOĞUNLUĞUNA bağlı, derinliğine
 değil. Aynı basınç aynı yoğunlukta aynı derinliğe batar.
+
+**İkinci tur — 35 cm de geniş bulundu.** İzin yatay etki alanı üç parça:
+bot yarıçapı 5.5 cm (gerçek bot ölçüsü, dokunulmadı), duvar yayılımı 3.8 cm,
+çevre kuyruğu 7.0 cm. Kuyruk tek başına genişliğin beşte ikisiydi.
+`SNOW_STAND_LOOSE` 12 → 14 cm (yayılım 3.8 → 1.3) ve `SNOW_SETTLE_TAIL_LEN`
+0.70 → 0.55 (kuyruk 7.0 → 5.5). İz **35 → 27 cm**; sığ kar da 24 → 21 cm.
+Kuyruğun kısalması haleyi geri getirmiyor çünkü saçaklanma menzilde, uzunlukta
+değil.

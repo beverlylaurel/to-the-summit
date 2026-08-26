@@ -190,7 +190,7 @@
 /// iniyor. Toplam yarı-genişlik 0.10 + 0.082 + 0.12 = 30 cm, iz 60 cm.
 /// Geçiş bandı yine 5 tekselden 8 teksele çıkıyor ama iz şişmiyor.
 #define SNOW_SETTLE_TAIL             0.12
-#define SNOW_SETTLE_TAIL_LEN         0.70
+#define SNOW_SETTLE_TAIL_LEN         0.55
 
 /// KUYRUK UZUN VE SIĞ. Önce kısa ve derindi (0.40 yarıçap, %20 pay) ve izin
 /// kenarı tek bir koyu hat olarak okunuyordu. Uzatıp sığlaştırmak geçişi
@@ -198,6 +198,10 @@
 ///
 /// Menzil sabit değil: `SNOW_SETTLE_TAIL_SCALE` ile dünya uzayında kırılıyor,
 /// yoksa izin çevresine kusursuz dairesel bir hale çiziyor (`SYMPTOMS.md`).
+///
+/// 1.00'de kuyruk tek başına 6.9 cm yarıçap ekliyordu ve izin görünür
+/// genişliğinin beşte ikisiydi. 0.55 onu 5.4 cm'ye indiriyor; saçaklanma
+/// menzilde olduğu için kısalma haleyi geri getirmiyor.
 
 /// Kuyruk menzilini kıran gürültünün ölçeği (1/m). 5 = 20 cm dalga boyu.
 #define SNOW_SETTLE_TAIL_SCALE       5.0
@@ -348,9 +352,11 @@
 /// seçildi ki `SNOW_MAX_SINK` (15 cm) altında bir miktar göçme kalsın ve
 /// kenar bıçak gibi dik durmasın.
 ///
-/// Ölçüldü (kâğıtta): 4 cm → iz 56 cm, 12 cm → iz 35 cm. Geometrik gövde
-/// (kuyruk hariç) 21 cm; bot genişliği 11 cm artı kenar çökmesi.
-#define SNOW_STAND_LOOSE             0.120
+/// Ölçüldü (kâğıtta): 4 cm → iz 56 cm, 12 cm → iz 35 cm, 14 cm → iz 31 cm.
+/// 12 cm'de de "aşırı iz" bildirildi; 14 cm kohezyon hesabının hâlâ çok
+/// altında ve `SNOW_MAX_SINK`'in (15 cm) 1 cm altında kalıyor — duvarın son
+/// santimi göçüyor, kenar bıçak gibi dik durmuyor.
+#define SNOW_STAND_LOOSE             0.140
 
 /// Sıkışmış kar DAHA YÜKSEK duvar tutar, daha az değil. Aynı formülde
 /// c ≈ 5-20 kPa ve rho = 550 kg/m³ metrelerce veriyor. Değer 0.07'ydi ve
