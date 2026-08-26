@@ -3414,3 +3414,52 @@ RMS eğim 35° → 15° (arazide ölçülen 5-15°). p99 28 → 21.
 ölçüm: normali tamamen düzleştirip (N = +Y) p99 ölçmek. 17 → ~2 düşerse
 kaynak normal; 17'de kalırsa kaynak albedo/doku rengi ve normal tarafında
 aramak boşuna.
+
+---
+
+## ÇÖZÜLDÜ: yüzey rölyefinin toplam RMS eğimi fizikten iki-üç kat fazlaydı
+
+**Ayırt eden hesap — her terimin GERÇEK eğimi (taban çarpanlarıyla), 50 cm karda:**
+
+| terim | genlik | dalga boyu | eğim |
+|---|---|---|---|
+| fBm oktav 1 | 2.20 cm | 125 cm | 6° |
+| fBm oktav 4 | 0.42 cm | 16 cm | 10° |
+| ripple | 0.42 cm | 17 cm | 9° |
+| **sastrugi** | **4.50 cm** | **60 cm** | **25°** |
+| **mikro A** | 0.44 cm | 8 cm | **18°** |
+| **mikro B** | 0.22 cm | 4 cm | **21°** |
+| **mikro C** | 0.08 cm | 2 cm | **18°** |
+| | | **TOPLAM RMS** | **39°** |
+
+Arazide ölçülen kar yüzeyi RMS eğimi **5-15°**. Güneş 2.4°'deyken 39°'lik bir
+yüzey NdotL'yi sıfırdan geçirip zemini keskin adacıklara ayırıyor.
+
+**İki kaynak, ikisi de taban değerinden:**
+
+1. `SNOW_SASTRUGI_BASE` 0.25 → **0.08**. Rüzgâr sıfırken bile 4.5 cm sastrugi
+   bırakıyordu (25° eğim, yüzeyin en dik tek bileşeni). Sabitin kendi yorumu
+   "sakin havada yüzey plane bed'e yakın" diyordu ama sayı onu vermiyordu.
+   Yeni genlik 1.44 cm, eğim 8.6°.
+
+2. `SNOW_MICRO_AMP_A/B/C` × 0.4. Üç oktavın RMS'i 33°'ydi — tek başına en
+   büyük kaynak. Dalga boyları 8/4/2 cm, yani yakın planda ekranda birkaç
+   piksel; dik eğim doğrudan keskin gradyana dönüşüyor. Yeni RMS 13°.
+
+Toplam RMS **39° → 21°**.
+
+**Ölçüm (17:49, bulut 0, yağış 0, 50 cm kar, 206 m, sabit kadraj):**
+
+| durum | zemin | p99 gradyan | oran |
+|---|---|---|---|
+| başlangıç | 64.0 | **28.0** | 0.75 |
+| fBm 0.055 → 0.022 | 63.4 | 21.0 | 0.84 |
+| + sastrugi tabanı ve mikro | 65.1 | **3.0** | 0.88 |
+
+**Kare geçerlilik kriteri:** zemin parlaklığı 55-80 arasındaysa sahne tam
+yüklü. `ImportAsset` sonrası bozuk pencerede zemin 220'ye fırlıyor ve p99
+yapay olarak düşük çıkıyor — bu oturumda üç teşhis o yüzden çürüdü.
+
+**Ders:** yüzey rölyefinde tek tek terimlere değil TOPLAM RMS EĞİME bakılır.
+Her terim ayrı ayrı "makul" görünüyordu; yedi tanesinin karesel toplamı fiziği
+üçe katlıyordu. Ve genlik tek başına anlamsız — ölçü `2πA/λ`.

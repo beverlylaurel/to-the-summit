@@ -412,9 +412,18 @@
 /// izin İÇİYLE DIŞINI ayırt etmiyor — bu alan yalnız bozulmuş karda var.
 ///
 /// Dalga boyları 8.3 / 3.6 / 1.6 cm; genlikler 20 / 9 / 4 mm.
-#define SNOW_MICRO_AMP_A             0.008
-#define SNOW_MICRO_AMP_B             0.004
-#define SNOW_MICRO_AMP_C             0.0015
+/// MİKRO GENLİKLER — ÖLÇÜ EĞİM, YÜKSEKLİK DEĞİL.
+///
+/// 0.008/0.004/0.0015 idi; taban çarpanı (0.55) ile birlikte üç oktavın
+/// eğimleri 18°/21°/18°, RMS'i 33° — yüzeyin en büyük tek kaynağı ve
+/// arazide ölçülen kar yüzeyi RMS eğiminin (5-15°) iki katı.
+///
+/// Dalga boyları 8/4/2 cm; yakın planda ekranda birkaç piksel ediyorlar,
+/// yani dik eğim doğrudan keskin gradyana dönüşüyor. 0.4 katsayısıyla
+/// RMS 13°'ye iniyor.
+#define SNOW_MICRO_AMP_A             0.0032
+#define SNOW_MICRO_AMP_B             0.0016
+#define SNOW_MICRO_AMP_C             0.0006
 #define SNOW_MICRO_SCALE_A           12.0
 #define SNOW_MICRO_SCALE_B           27.5
 #define SNOW_MICRO_SCALE_C           62.0
@@ -546,7 +555,14 @@
 /// SASTRUGİ TABANI. Oluşumu 20 m/s istiyor; oyunda o rüzgâra ancak fırtınada
 /// çıkılıyor. Taban 0.25: sakin havada yüzey plane bed'e yakın, fırtınada
 /// sastrugi alanına dönüyor.
-#define SNOW_SASTRUGI_BASE           0.25
+/// 0.08 = sakin havada gerçekten PLANE BED. 0.25 idi ve rüzgâr sıfırken
+/// bile 4.5 cm sastrugi bırakıyordu — 60 cm dalga boyunda 25° eğim, yani
+/// yüzeyin en dik tek bileşeni. Yorumun kendi hedefi "sakin havada yüzey
+/// plane bed'e yakın" diyordu ama sayı onu vermiyordu.
+///
+/// 0.08 ile genlik 1.44 cm, eğim 8.6° — sakin havada okunur ama yüzeyi
+/// domine etmiyor. Fırtınada rüzgâr çarpanı zaten 1'e çıkarıyor.
+#define SNOW_SASTRUGI_BASE           0.08
 
 #define SNOW_SASTRUGI_TAU          900.0
 #define SNOW_SASTRUGI_BURY         260.0
