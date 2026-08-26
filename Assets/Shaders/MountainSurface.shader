@@ -173,6 +173,27 @@ Shader "ToTheSummit/MountainSurface"
                                  (half)(egimM * gok), 1.0h);
                 }
 
+                // TESHIS: yuzey normali ve NdotL.
+                //
+                // Wrap diffuse kapatilinca lekeler AYDINLIK kaldi; diffuse
+                // sonunce aydinlik kalan yerde diffuse disi bir terim var
+                // demektir. Bu gorunum lekelerin normalden gelip gelmedigini
+                // ayirir:
+                //   kirmizi = saturate(dot(N, gunes))  -- duz NdotL
+                //   yesil   = wrap NdotL
+                //   mavi    = normalin dikligi (N.y)
+                // Lekeler kirmizida gorunuyorsa kaynak normal; yalniz
+                // maviye vurmuyorsa kaynak arazi egimi degil kar rolyefi.
+                if (_SnowDebugNormal > 0.5)
+                {
+                    Light dL = GetMainLight();
+                    float d  = dot(surface.normalWS, dL.direction);
+                    float w  = saturate((d + 0.55) / 1.55);
+
+                    return half4((half)saturate(d), (half)w,
+                                 (half)saturate(surface.normalWS.y), 1.0h);
+                }
+
                 // Forward+ ışık döngüsü makroları bu değişkeni adıyla okuyor
                 InputData inputData = (InputData)0;
                 inputData.positionWS = IN.positionWS;

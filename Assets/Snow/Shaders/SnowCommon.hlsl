@@ -438,6 +438,11 @@ float _SnowDebugDent;
 /// Hangi carpanin maskeyi sifirladigini tek bakista ayirir.
 float _SnowDebugCover;
 
+/// 1 iken yuzey normalini ve NdotL'yi renk olarak basar:
+/// kirmizi = duz NdotL, yesil = wrap NdotL, mavi = N.y.
+/// Lekelerin normalden gelip gelmedigini tek bakista ayirir.
+float _SnowDebugNormal;
+
 /// IZ KENARINDAKI BASAMAGIN KAYNAGINI AYIRAN ANAHTARLAR.
 ///
 /// Basamak uc turdur yanlis yerde arandi (yumusatma cekirdegi, blok gurultusu,

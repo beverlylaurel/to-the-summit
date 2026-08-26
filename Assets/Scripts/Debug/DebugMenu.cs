@@ -522,6 +522,13 @@ public class DebugMenu : MonoBehaviour
                 if (kapakHam != kapakOnce)
                     Shader.SetGlobalFloat(SnowDebugCoverId, kapakHam ? 1f : 0f);
 
+                bool normalOnce = normalHam;
+                normalHam = GUILayout.Toggle(normalHam,
+                    "Yüzey normali (K=NdotL, Y=wrap, M=N.y)");
+
+                if (normalHam != normalOnce)
+                    Shader.SetGlobalFloat(SnowDebugNormalId, normalHam ? 1f : 0f);
+
                 GUILayout.Label("Kenar basamağı — katmanları tek tek kapat:");
 
                 Anahtar(ref dbgNoTexture,      DbgNoTextureId,      "  kar dokusu karışımı");
@@ -564,6 +571,8 @@ public class DebugMenu : MonoBehaviour
                     Shader.SetGlobalFloat(SnowDebugDentId, 0f);
                     kapakHam = false;
                     Shader.SetGlobalFloat(SnowDebugCoverId, 0f);
+                    normalHam = false;
+                    Shader.SetGlobalFloat(SnowDebugNormalId, 0f);
 
                     dbgNoTexture = dbgNoParallax = dbgNoReliefShadow = dbgNoDentNormal = false;
                     Shader.SetGlobalFloat(DbgNoTextureId, 0f);
@@ -647,6 +656,11 @@ public class DebugMenu : MonoBehaviour
     bool kapakHam;
 
     static readonly int SnowDebugCoverId = Shader.PropertyToID("_SnowDebugCover");
+
+    /// Yüzey normali teşhis görünümü açık mı (`_SnowDebugNormal`).
+    bool normalHam;
+
+    static readonly int SnowDebugNormalId = Shader.PropertyToID("_SnowDebugNormal");
 
     /// İZ KENARINDAKİ BASAMAĞIN KAYNAĞINI AYIRAN ANAHTARLAR.
     ///
