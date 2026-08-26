@@ -3171,3 +3171,58 @@ aralığına (0.4-0.6) oturuyor.
 **Ders:** "gölge çok koyu" belirtisinde önce hangi YÖNDEN ışık geldiği sorulur.
 Dikey (gök) terimi eklemek yatay (komşu yüzey) eksiğini kapatmıyor, yalnız
 sayıyı biraz büyütüp gerçek sebebi gizliyor.
+
+---
+
+## Alçak güneşte keskin adacıklar — SASTRUGİ eğimi fizikten üç kat dik
+
+**Belirti (kullanıcı, aynı kadrajdan dört saat):** 16:12 normal, 17:49 ve 06:20'de
+zemin neredeyse siyah ve üzerinde keskin kenarlı açık adacıklar. Adacıklar
+paralel şeritler hâlinde diziliydi.
+
+**Sırayla elenen şüpheliler:**
+- **Bulut gölgesi** — bulut %0 iken de aynı kare geldi.
+- **Geometri** — Tri 10k → 433k çıkıyordu ama kadraj aynıydı; artış alçak
+  güneşte gölge kaskadlarının uzamasıydı. Terrain'in `shadowCastingMode`'u Off.
+- **Gölge haritası** — F1 anahtarıyla kapatıldı, değişmedi.
+- **Kar örtüsü maskesi** — teşhis görünümünde kırmızı her yerde 1; maske ve
+  `cavity` sıfırlanmıyor, kaya görünmüyor.
+- **Wrap diffuse** — kapatılınca zemin kapkara oldu ama lekeler AYDINLIK kaldı.
+  `wrapNdotL = (dot+0.55)/1.55` her zaman `saturate(dot)`'tan büyüktür, yani
+  wrap kapatınca her yer koyulaşmalı. Lekelerin aydınlık kalması, orada
+  diffuse dışı bir terimin taşıdığını gösterdi: normali güneşten kaçık ama
+  AO'su yüksek yerler.
+
+**Ayırt eden ölçüm:** yüzey normali teşhis görünümü (kırmızı = düz NdotL,
+yeşil = wrap, mavi = N.y). Zemin mavi çıktı — N.y yüksek, NdotL ~0.13, alçak
+güneşte yatay kar için doğru. **Lekeler BEYAZ** çıktı, yani orada NdotL ≈ 1.
+Alçak güneşte NdotL'nin 1'e çıkması yüzeyin ~83° eğimli olması demek; düz
+karda imkânsız. Normal bozuktu.
+
+**Gerçek sebep — her rölyef teriminin eğimi ölçüldü:**
+
+| terim | genlik | dalga boyu | eğim |
+|---|---|---|---|
+| fBm | 5.5 cm | 125 cm | 15° |
+| ripple | 1.2 cm | 17 cm | 24° |
+| **sastrugi** | **18 cm** | **60 cm** | **62°** |
+| mikro A/B/C | 0.8–0.1 cm | 8–2 cm | 30–35° |
+
+Sastrugi'nin H/L oranı 0.30; arazide ölçülen değer **0.05–0.10**. Üç kat dik.
+60 cm aralıkla 62°'lik yüzler, yüzeyi testere dişine çeviriyor ve alçak güneşte
+NdotL leke leke 1'e fırlıyor.
+
+**Sabitin kendi yorumu hedefi doğru yazmış, sayı onu vermiyormuş:** "Yükseklik
+18 cm, aralık 60 cm -> eğim 31°". Sinüs için en büyük eğim `2πA/L` =
+2π×0.18/0.60 = 1.88, yani 62°. İki kat hata.
+
+Kökeni ölçü karışıklığı: kaynaktaki "sivri uç aralığı 45-90 cm" sastrugi'nin
+**enine** aralığı, rüzgâr yönündeki dalga boyu değil. Sastrugi rüzgâr yönünde
+metrelerce uzar; enine ölçü `SNOW_SASTRUGI_WIDTH`'te zaten duruyordu.
+
+**Çözüm:** `SNOW_SASTRUGI_LENGTH` 0.60 → 2.00 m. Eğim 29°, H/L 0.09 — hem
+yorumun kendi hedefi hem arazi ölçümü.
+
+**Ders:** bir yorumun yazdığı SONUÇ ile sabitlerin verdiği sonuç ayrı ayrı
+doğrulanmalı. Burada gerekçe doğru, hedef doğru, sayı yanlıştı — ve yorum
+doğru olduğu için üç tur boyunca kimse sabite bakmadı.

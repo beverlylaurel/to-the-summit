@@ -538,10 +538,23 @@
 #define SNOW_SASTRUGI_TAU          900.0
 #define SNOW_SASTRUGI_BURY         260.0
 /// Ölçülen sastrugi derinliği 14-40 cm, sivri uç aralığı 45-90 cm.
-/// Yükseklik 18 cm, aralık 60 cm -> eğim 31°. Erozyon şekli, dik olması
-/// doğru.
+///
+/// UZUNLUK 60 CM DEĞİL: 45-90 cm ölçüsü sivri uçların ENİNE aralığı,
+/// rüzgâr yönündeki dalga boyu değil. Sastrugi rüzgâr yönünde metrelerce
+/// uzar; enine ölçü `SNOW_SASTRUGI_WIDTH`'te zaten duruyor.
+///
+/// Yorum "eğim 31°" diyordu ama sayılar onu vermiyordu: sinüs için en
+/// büyük eğim `2πA/L` = 2π×0.18/0.60 = 1.88, yani **62°**. Yüzey 60 cm
+/// aralıkla testere dişine dönüyordu ve alçak güneşte NdotL lekeler
+/// hâlinde 1'e fırlıyordu — kullanıcı teşhis görünümüyle gösterdi
+/// (`SYMPTOMS.md`).
+///
+/// 2.00 m ile eğim 2π×0.18/2.0 = 0.57, yani 30° — yorumun kendi hedefi
+/// ve arazide ölçülen H/L oranı (0.05-0.10) ile uyumlu. Keskinleştirme
+/// `n²(3−2n)` bunu ~40°'ye çıkarıyor; erozyon şekli olduğu için dik
+/// olması orada doğru.
 #define SNOW_SASTRUGI_HEIGHT         0.180
-#define SNOW_SASTRUGI_LENGTH         0.60
+#define SNOW_SASTRUGI_LENGTH         2.00
 #define SNOW_SASTRUGI_WIDTH          2.20
 #define SNOW_SASTRUGI_WIND_TAU     120.0
 
