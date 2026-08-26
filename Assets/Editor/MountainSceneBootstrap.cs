@@ -248,6 +248,31 @@ public static class MountainSceneBootstrap
         snap.Bind(gen.GetComponent<Terrain>());
         EditorUtility.SetDirty(snap);
 
+        // KARAKTER KAR YÜZEYİNDE DURUYOR.
+        //
+        // `GroundSnap` yalnız başlangıçta ve düşünce çalışıyor; kar yüzeyi
+        // tessellation ile yükseldiği için karakterin HER KARE o yüzeyde
+        // tutulması gerekiyor. Ayrı bileşen: `GroundSnap`'in işi kurtarma,
+        // bunun işi yüzey takibi.
+        var karOfset = player.GetComponent<SnowGroundOffset>();
+        if (karOfset == null)
+        {
+            karOfset = player.gameObject.AddComponent<SnowGroundOffset>();
+            changed = true;
+        }
+
+        var karYonetici = Object.FindAnyObjectByType<SnowManager>(FindObjectsInactive.Include);
+        var karOfsetSo = new SerializedObject(karOfset);
+        var alan = karOfsetSo.FindProperty("snowManager");
+
+        if (alan.objectReferenceValue != karYonetici)
+        {
+            alan.objectReferenceValue = karYonetici;
+            karOfsetSo.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(karOfset);
+            changed = true;
+        }
+
         var camera = player.GetComponentInChildren<Camera>();
         float farClip = current.terrainSize * FarClipFactor;
         if (!Mathf.Approximately(camera.farClipPlane, farClip))

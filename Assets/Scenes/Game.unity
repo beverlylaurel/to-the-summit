@@ -1539,6 +1539,7 @@ GameObject:
   - component: {fileID: 848219618}
   - component: {fileID: 848219617}
   - component: {fileID: 848219616}
+  - component: {fileID: 848219622}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1901,8 +1902,24 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SnowStepRhythm
   body: {fileID: 848219608}
-  strideLength: 0.78
+  baseFrequency: 0.75
+  frequencyPerSpeed: 0.25
+  minStride: 0.55
   minSpeed: 0.15
+--- !u!114 &848219622
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 848219606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f999bb32a6fb99a418a172ba0a4903cf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SnowGroundOffset
+  snowManager: {fileID: 76489726}
+  smoothing: 0.06
 --- !u!1 &852782904
 GameObject:
   m_ObjectHideFlags: 0

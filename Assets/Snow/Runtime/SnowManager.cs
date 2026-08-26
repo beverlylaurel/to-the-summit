@@ -131,6 +131,27 @@ public class SnowManager : MonoBehaviour
     int lastReadbackFrame = -1;
     bool readbackPending;
 
+    /// RÜZGÂR GÖLGESİNİN CPU KOPYASI — FİZİK BUNU OKUYOR.
+    ///
+    /// Kar yüzeyi geometri olunca karakterin de o yüzeyde durması gerekiyor
+    /// (`SnowSurfaceHeight`, `SnowGroundOffset`). Yüksekliğin girdilerinden
+    /// biri rüzgâr maruziyeti ve o yalnız GPU dokusunda duruyordu.
+    ///
+    /// KOPYA YARI-STATİK, HER KARE DEĞİL. `DispatchWindShadow` alanı ancak
+    /// rüzgâr yönü 15°'den fazla döndüğünde baştan çözüyor; arada doku
+    /// değişmiyor. Kopya da iterasyonlar bitince BİR KEZ isteniyor.
+    ///
+    /// Async okuma bir kare gecikmeli ama burada önemi yok: alan zaten
+    /// saatler ölçeğinde değişiyor.
+    float[] windShadowCpu;
+    int windShadowCpuRes;
+    bool windShadowCpuIstendi;
+    Vector2 windShadowCpuCenter;
+
+    /// Dünyanın genel kar sütunu, metre. `_WorldSnowDepth` globalinin CPU
+    /// karşılığı — fizik tarafı shader globali okuyamaz.
+    public float WorldSnowDepth { get; private set; }
+
     /// İlk geri okuma gelene kadar kaplama dünyanın genel kar durumundan
     /// türetiliyor; sonra gerçek ölçüm devralıyor.
     bool coverageMeasured;
@@ -301,6 +322,10 @@ public class SnowManager : MonoBehaviour
         accumulateTile = 0;
         lastReadbackFrame = -1;
         readbackPending = false;
+
+        windShadowCpu = null;
+        windShadowCpuRes = 0;
+        windShadowCpuIstendi = false;
         coverageMeasured = false;
 
         snowfall.Reset();
@@ -528,6 +553,7 @@ public class SnowManager : MonoBehaviour
         // bozdu.
         float dunyaDerinlik = SnowBaseHeightMetre(Mathf.Max(0f, WorldSwe), dunyaRhoN);
         Shader.SetGlobalFloat(SnowShaderIDs.WorldSnowDepth, dunyaDerinlik);
+        WorldSnowDepth = dunyaDerinlik;
 
         // KAR ÇİZGİSİ DONMA SEVİYESİNDEN. Ayrı bir sayı tanımlanmıyor;
         // sıcaklık alanı neredeyse kar da orada başlıyor.
@@ -950,7 +976,21 @@ public class SnowManager : MonoBehaviour
             }
         }
 
-        if (windShadowIterationsLeft <= 0) return;
+        if (windShadowIterationsLeft <= 0)
+        {
+            // Alan yakinsadi: CPU kopyasini BIR KEZ iste. Fizik tarafi
+            // (`SnowGroundOffset`) maruziyeti buradan okuyor.
+            if (!windShadowCpuIstendi && windShadow != null)
+            {
+                windShadowCpuIstendi = true;
+                windShadowCpuCenter = skyCamera.Center;
+                cmd.RequestAsyncReadback(windShadow, OnWindShadowOkundu);
+            }
+            return;
+        }
+
+        // Alan yeniden cozuluyor; eldeki kopya bayat.
+        windShadowCpuIstendi = false;
 
         windShadowIterationsLeft--;
 
@@ -973,6 +1013,67 @@ public class SnowManager : MonoBehaviour
             cmd.DispatchCompute(simCompute, windShadowKernel, groups, groups, 1);
         }
     }
+
+    void OnWindShadowOkundu(AsyncGPUReadbackRequest request)
+    {
+        if (request.hasError) { windShadowCpuIstendi = false; return; }
+
+        // RGFloat: R = Wz (rüzgâr-etki yüzeyinin yüksekliği), G = Wsz.
+        // Fizik yalnız R'yi istiyor.
+        Unity.Collections.NativeArray<Vector2> data = request.GetData<Vector2>();
+
+        int res = Mathf.RoundToInt(Mathf.Sqrt(data.Length));
+        if (res * res != data.Length) { windShadowCpuIstendi = false; return; }
+
+        if (windShadowCpu == null || windShadowCpu.Length != data.Length)
+            windShadowCpu = new float[data.Length];
+
+        for (int i = 0; i < data.Length; i++)
+            windShadowCpu[i] = data[i].x;
+
+        windShadowCpuRes = res;
+    }
+
+    /// Bir noktadaki rüzgâr gölgesi, metre. `SampleWindShadow`'un CPU ikizi:
+    /// `max(0, Wz − y)`, yani pozitif = SİPERDE.
+    ///
+    /// Kopya gelmediyse 0 döner — açık arazi. Yanlış tarafa düşmek daha
+    /// güvenli: siper sanılan bir nokta karakteri 30 cm yukarı kaldırırdı.
+    public float WindShadowAt(Vector3 posWS)
+    {
+        if (windShadowCpu == null || windShadowCpuRes <= 0) return 0f;
+
+        float size = SnowConstants.SkyAreaSize;
+
+        float u = (posWS.x - windShadowCpuCenter.x) / size + 0.5f;
+        float v = (posWS.z - windShadowCpuCenter.y) / size + 0.5f;
+
+        if (u < 0f || u > 1f || v < 0f || v > 1f) return 0f;
+
+        // Bilinear — shader'ın `sampler_LinearClamp`'i ile aynı.
+        float fx = u * (windShadowCpuRes - 1);
+        float fy = v * (windShadowCpuRes - 1);
+
+        int x0 = Mathf.Clamp((int)fx, 0, windShadowCpuRes - 1);
+        int y0 = Mathf.Clamp((int)fy, 0, windShadowCpuRes - 1);
+        int x1 = Mathf.Min(x0 + 1, windShadowCpuRes - 1);
+        int y1 = Mathf.Min(y0 + 1, windShadowCpuRes - 1);
+
+        float tx = fx - x0;
+        float ty = fy - y0;
+
+        float a = windShadowCpu[y0 * windShadowCpuRes + x0];
+        float b = windShadowCpu[y0 * windShadowCpuRes + x1];
+        float c = windShadowCpu[y1 * windShadowCpuRes + x0];
+        float d = windShadowCpu[y1 * windShadowCpuRes + x1];
+
+        float wz = Mathf.Lerp(Mathf.Lerp(a, b, tx), Mathf.Lerp(c, d, tx), ty);
+
+        return Mathf.Max(0f, wz - posWS.y);
+    }
+
+    /// Sastrugi ekseni — `_SastrugiWindDir` globalinin CPU karşılığı.
+    public Vector2 SastrugiWindDir => sastrugiWindDir;
 
     // ---------------------------------------------------- rüzgâr taşınımı
 
