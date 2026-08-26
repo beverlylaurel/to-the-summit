@@ -424,14 +424,17 @@ Shader "ToTheSummit/MountainSurface"
             ColorMask 0
 
             HLSLPROGRAM
-            #pragma vertex Vertex
+            #pragma vertex SnowTessVertex
+            #pragma hull SnowHull
+            #pragma domain SnowDomain
             #pragma fragment ShadowFragment
-            #pragma target 3.5
+            #pragma target 5.0
             #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
             #include "MountainSurfaceInput.hlsl"
+            #include "../Snow/Shaders/SnowTessellation.hlsl"
 
             float3 _LightDirection;
             float3 _LightPosition;
@@ -439,12 +442,10 @@ Shader "ToTheSummit/MountainSurface"
             struct Attributes { float4 positionOS : POSITION; };
             struct Varyings { float4 positionCS : SV_POSITION; };
 
-            Varyings Vertex(Attributes IN)
+            Varyings VertexFromWS(float3 positionWS)
             {
                 Varyings OUT;
 
-                float3 positionWS = TransformObjectToWorld(IN.positionOS.xyz);
-                // Kar örtüsünün geometrisi: ileri geçişle aynı ofset (bkz. Vertex).
 
                 // Sapma normale göre uygulanıyor; yer değiştirmiş yüzeyin normali
                 // arazininkinden farklı, o yüzden düz yukarı değil gerçek normal.
@@ -474,6 +475,22 @@ Shader "ToTheSummit/MountainSurface"
                 return OUT;
             }
 
+            /// Hull oncesi gecis: yalniz dunya konumuna cevirir.
+            SnowTessControlPoint SnowTessVertex(Attributes IN)
+            {
+                SnowTessControlPoint o;
+                o.positionWS = TransformObjectToWorld(IN.positionOS.xyz);
+                return o;
+            }
+
+            [domain("tri")]
+            Varyings SnowDomain(SnowTessFactors factors,
+                                OutputPatch<SnowTessControlPoint, 3> patch,
+                                float3 bary : SV_DomainLocation)
+            {
+                return VertexFromWS(SnowTessKonum(patch, bary));
+            }
+
             half4 ShadowFragment(Varyings IN) : SV_Target { return 0; }
             ENDHLSL
         }
@@ -487,23 +504,40 @@ Shader "ToTheSummit/MountainSurface"
             ColorMask R
 
             HLSLPROGRAM
-            #pragma vertex Vertex
+            #pragma vertex SnowTessVertex
+            #pragma hull SnowHull
+            #pragma domain SnowDomain
             #pragma fragment DepthFragment
-            #pragma target 3.5
+            #pragma target 5.0
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "MountainSurfaceInput.hlsl"
+            #include "../Snow/Shaders/SnowTessellation.hlsl"
 
             struct Attributes { float4 positionOS : POSITION; };
             struct Varyings { float4 positionCS : SV_POSITION; };
 
-            Varyings Vertex(Attributes IN)
+            Varyings VertexFromWS(float3 positionWS)
             {
                 Varyings OUT;
-                float3 positionWS = TransformObjectToWorld(IN.positionOS.xyz);
-                // Kar örtüsünün geometrisi: ileri geçişle aynı ofset (bkz. Vertex).
                 OUT.positionCS = TransformWorldToHClip(positionWS);
                 return OUT;
+            }
+
+            /// Hull oncesi gecis: yalniz dunya konumuna cevirir.
+            SnowTessControlPoint SnowTessVertex(Attributes IN)
+            {
+                SnowTessControlPoint o;
+                o.positionWS = TransformObjectToWorld(IN.positionOS.xyz);
+                return o;
+            }
+
+            [domain("tri")]
+            Varyings SnowDomain(SnowTessFactors factors,
+                                OutputPatch<SnowTessControlPoint, 3> patch,
+                                float3 bary : SV_DomainLocation)
+            {
+                return VertexFromWS(SnowTessKonum(patch, bary));
             }
 
             half4 DepthFragment(Varyings IN) : SV_Target { return 0; }
@@ -527,12 +561,15 @@ Shader "ToTheSummit/MountainSurface"
             ZWrite On
 
             HLSLPROGRAM
-            #pragma vertex Vertex
+            #pragma vertex SnowTessVertex
+            #pragma hull SnowHull
+            #pragma domain SnowDomain
             #pragma fragment frag
-            #pragma target 3.5
+            #pragma target 5.0
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "MountainSurfaceInput.hlsl"
+            #include "../Snow/Shaders/SnowTessellation.hlsl"
 
             struct Attributes { float4 positionOS : POSITION; };
             struct Varyings
@@ -541,13 +578,28 @@ Shader "ToTheSummit/MountainSurface"
                 float3 positionWS : TEXCOORD0;
             };
 
-            Varyings Vertex(Attributes IN)
+            Varyings VertexFromWS(float3 positionWS)
             {
                 Varyings OUT;
-                OUT.positionWS = TransformObjectToWorld(IN.positionOS.xyz);
-                // Kar örtüsünün geometrisi: ileri geçişle aynı ofset (bkz. Vertex).
-                OUT.positionCS = TransformWorldToHClip(OUT.positionWS);
+                OUT.positionWS = positionWS;
+                OUT.positionCS = TransformWorldToHClip(positionWS);
                 return OUT;
+            }
+
+            /// Hull oncesi gecis: yalniz dunya konumuna cevirir.
+            SnowTessControlPoint SnowTessVertex(Attributes IN)
+            {
+                SnowTessControlPoint o;
+                o.positionWS = TransformObjectToWorld(IN.positionOS.xyz);
+                return o;
+            }
+
+            [domain("tri")]
+            Varyings SnowDomain(SnowTessFactors factors,
+                                OutputPatch<SnowTessControlPoint, 3> patch,
+                                float3 bary : SV_DomainLocation)
+            {
+                return VertexFromWS(SnowTessKonum(patch, bary));
             }
 
             half4 frag(Varyings IN) : SV_Target
