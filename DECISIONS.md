@@ -230,6 +230,21 @@ olur.
 ---
 ## Bekleyen ölçümler
 
+- **Derleme süresi darboğazı bulunamadı.** Kullanıcı "compile süresi çok uzadı"
+  dedi; ölçülenler: script derlemesi 0.8–1.9 ms, domain reload 3514 ms
+  (`FinalizeReload` 2132 ms), shader import MountainSurface 143 / Sky 154 /
+  SnowSim 89 / SnowRelief 69 ms. Hiçbiri şikâyeti açıklamıyor.
+  Kalan tek şüpheli **Play'e girişte varyant derlemesi**: `Library/ShaderCache`
+  17 MB / 1750 dosya, son altı saatte 152 yeni varyant — her `.hlsl`
+  değişikliği önbelleği geçersiz kılıyor ve MountainSurface'ın 144 varyantı
+  (3 × 3 × 2 × 2 × 2 × 2) pahalı bir fragment programını yeniden derliyor.
+  **Ölçülemedi** çünkü tek doğrudan yol `ShaderUtil.CompilePass` ve
+  `System.Reflection` bu araçta yasak; ölçüm Unity Play dışındayken
+  ShaderCache silinip Play'e basılarak yapılacak.
+  **Varyant kesme denenmedi ve bilinçli:** `_ADDITIONAL_LIGHTS` /
+  `_LIGHT_COOKIES` bugün kullanılmıyor ama şimşek ve kafa lambası planlı; kesip
+  sonra sessizce bozmak yerine ölçüm bekleniyor.
+
 - **Güneş 3.03'e çıktıktan sonra yüzeyler** — arazi, kar ve bisiklet 1.5'e göre
   ayarlanmıştı; yeniden ayar gerekip gerekmediğine bakılmadı
   → [Güneş şiddeti pakete kalibre edildi](#güneş-şiddeti-pakete-kalibre-edildi-15--3030782)
