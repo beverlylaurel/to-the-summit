@@ -6,6 +6,7 @@
 #define SNOW_TESSELLATION_INCLUDED
 
 #include "SnowCommon.hlsl"
+#include "SnowRelief.hlsl"
 
 /// Hull'a giren kontrol noktasi. Yalniz dunya konumu tasiniyor: dort gecisin
 /// dordu de `Attributes`'ta sadece `positionOS` aliyor ve geri kalan her sey
@@ -79,14 +80,31 @@ SnowTessControlPoint SnowHull(InputPatch<SnowTessControlPoint, 3> patch,
     return patch[id];
 }
 
-/// GECICI — GOREV 1 ICIN. Gercek yukseklik alani Gorev 3'te baglaniyor.
-/// Amaci altyapiyi (catlak, golge, performans) yukseklik alanindan bagimsiz
-/// dogrulamak: 1 m dalga boyu, 20 cm genlik, silueti gorunur bicimde kiriyor.
+/// KAR YUZEYININ YUKSEKLIGI — GORSEL VE FIZIK AYNI FONKSIYONU OKUYOR.
+///
+/// `SnowYuzeyRolyef` piksel ayak izi istiyor cunku analitik gurultu
+/// mip'lenmiyor. KOSE ASAMASINDA PIKSEL AYAK IZI YOK: `fwidth` yalniz
+/// fragment'te tanimli. Yerine KOSE ARALIGI veriliyor — bolme faktoru ne
+/// kadar yuksekse kose o kadar sik, yani ornekleme frekansi o kadar yuksek.
+/// Ikisi ayni isi goruyor: bir dalganin tasinabilmesi icin dalga boyu ornek
+/// araliginin iki kati olmali.
+///
+/// KAR DERINLIGI DUNYA GENELINDEN, DOKUDAN DEGIL. `SnowStateAt` kose basina
+/// bir doku okumasi demek ve bolme faktoru 64'te bu sayi patliyor. Izin
+/// yerel derinligi Gorev 8'de ayrica ele aliniyor; buradaki is kar
+/// tabakasinin KALINLIGINI vermek, cunku yer sekli ondan derin olamaz.
 float SnowTessYerDegistirme(float3 posWS)
 {
     if (_SnowDbgNoTess > 0.5) return 0.0;
 
-    return sin(posWS.x * 6.2831853) * cos(posWS.z * 6.2831853) * 0.20;
+    float d = distance(posWS, _SnowTessCameraPos);
+    float t = saturate((_SnowTessFar - d) / max(_SnowTessFar - _SnowTessNear, 1e-3));
+    float faktor = max(lerp(1.0, _SnowTessMax, t), 1.0);
+
+    // Terrain kose araligi / bolme faktoru = yeni kose araligi.
+    float koseAraligi = SNOW_TERRAIN_VERTEX_SPACING / faktor;
+
+    return SnowYuzeyRolyef(posWS.xz, koseAraligi, SnowWorldCoverHeight());
 }
 
 /// Baricentrik interpolasyon + yer degistirme. Her gecis kendi `Varyings`'ini

@@ -121,6 +121,16 @@
 /// öncesinde şafakta 0.08'di.
 #define SNOW_LATERAL_BOUNCE            0.43
 
+/// TERRAIN KOSE ARALIGI (m). Olculdu: arazi 30000 m, heightmap cozunurlugu
+/// 4097 -> 30000/4096 = 7.32 m.
+///
+/// Tessellation faktoru 64'te (donanim tavani) en ince geometri 7.32/64 =
+/// 11.4 cm. Bu bir TAVAN: alt-11-cm hicbir sey geometri olamaz, normal
+/// haritasinda kalir. `SNOW_TESS_MIN_DALGA` o tavandan tureniyor.
+///
+/// DAGIN BOYUNA BAGLI — `SCALE.md`'de kayitli.
+#define SNOW_TERRAIN_VERTEX_SPACING    7.32
+
 /// BUZUN FRESNEL TABANI (F0).
 ///
 /// Buzun kirilma indisi n = 1.31. Dik gelen isinda
