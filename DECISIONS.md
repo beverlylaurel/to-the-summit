@@ -1835,23 +1835,3 @@ aynı görünmesi rahatsız edici hâle gelirse.
 `RT_Snow` da öyle (SWE / yoğunluk / ıslaklık / bozulma). Yaş için beşinci bir
 kanal, yani yeni bir doku gerekiyor — 1024² RHalf = 2 MB. Ya da sastrugi ile
 kabuk tek kanalda paketlenip yer açılır.
-
-## Yönlü veri lerp'leniyor — Reoriented Normal Mapping uygulanmadı (2026-08-26)
-
-`MountainSurface.hlsl` kar normalini araziye şöyle karıştırıyor:
-
-```hlsl
-surface.normalWS = normalize(lerp(n, normalize(float3(e.x, 1.0, e.y)), snowMask));
-```
-
-Batman: Arkham Origins aynı geçiş için **Reoriented Normal Mapping**
-kullanıyor [Barré-Brisebois & Hill 2012] ve sunum yönlü veriyi lerp'lemenin
-yanlış olduğunu açıkça söylüyor: iki normal arasında lineer karışım ara
-açılarda yanlış yön ve kısalmış vektör veriyor.
-
-**Şimdi uygulanmadı** çünkü aynı turda kare basamak düzeltmesi (B-spline
-filtreleme) yapıldı ve iki değişiklik birbirinin ölçümünü bozar.
-
-**Tetikleyici:** B-spline'dan sonra kenarda hâlâ yön hatası kalırsa — kar ile
-arazi sınırında normalin "yatık" görünmesi, ya da eğimli arazide izin yanlış
-yöne devrilmesi. Maliyet: birkaç satır, `SnowRelief.hlsl`'e tek fonksiyon.
