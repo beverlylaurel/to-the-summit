@@ -269,11 +269,33 @@ float2 SnowReliefOffset(float3 posWS, float3 viewDirWS, out float dentOut)
 /// karar yerine en büyük engel oranı kullanılıyor.
 ///
 /// KIRPMA UZUNLUĞA, BİLEŞENE DEĞİL — aynı gerekçe `SnowReliefOffset`'te.
+///
+/// İKİ SERT EŞİK VARDI — İZİN KARE KONTURU İKİSİNDEN ÇIKIYORDU.
+///
+/// Kullanıcı izolasyon anahtarıyla sorumluyu buldu ("çukurun kendi gölgesi
+/// yapıyormuş"). Üç tur boyunca yumuşatma çekirdeği, kenar gürültüsü ve
+/// filtreleme suçlanmıştı; üçü de gerçek kusurdu ama konturu bu fonksiyon
+/// çiziyordu.
+///
+///   1. `if (dent < 0.005) return 1.0` — bilinear bir yükseklik alanı
+///      üzerinde bir STEP fonksiyonu. Eşiğin geçtiği yer teksel içinde
+///      lineer, yani sınır tam ızgaraya oturuyor: gölge kare kenarlı
+///      başlıyor. Artık `smoothstep` ile bir PAY, ve o pay sonuca çarpılıyor.
+///
+///   2. `saturate((komsu - isinDerinlik) / dent)` — engelin payı çukurun
+///      KENDİ derinliğine bölünüyordu. Sığ çukurda payda küçülüp oran anında
+///      1'e fırlıyor; eşiğin bir milimetre üstünde gölge zaten tamdı. Payda
+///      artık sabit bir referans uzunluk.
 half SnowReliefShadow(float3 posWS, float3 lightDirWS, float dent)
 {
     if (_SnowDbgNoReliefShadow > 0.5) return (half)1.0;
 
-    if (dent < 0.005) return 1.0h;
+    // Sığ çukurda ışın yürütmek hem anlamsız hem pahalı; eşik duruyor ama
+    // sert değil, yumuşak bir paya dönüştü.
+    float pay = smoothstep(SNOW_RELIEF_SHADOW_FADE_IN,
+                           SNOW_RELIEF_SHADOW_FADE_OUT, dent);
+
+    if (pay <= 0.001) return (half)1.0;
 
     // Işık yukarı bakan yön; yatay ilerleme birim derinlik başına.
     float dikey = max(lightDirWS.y, 0.08);
@@ -294,8 +316,10 @@ half SnowReliefShadow(float3 posWS, float3 lightDirWS, float dent)
         float2 uv = SnowWorldToUV(posWS + float3(yatay.x, 0, yatay.y) * (dent * t));
         float komsu = SnowDentSmooth(uv);
 
-        engel = max(engel, saturate((komsu - isinDerinlik) / max(dent, 1e-3)));
+        engel = max(engel, saturate((komsu - isinDerinlik) / SNOW_RELIEF_SHADOW_REF));
     }
+
+    engel *= pay;
 
     // İZ RENKTEN DEĞİL GÖLGEDEN GÖRÜNÜR.
     //

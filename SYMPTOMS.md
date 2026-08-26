@@ -2995,3 +2995,39 @@ işlem iki normali karıştırmak ve nlerp o iş için yeterli.
 
 **Ders:** bir kaynağın "şu yanlıştır" demesi, o yanlışın BİZİM sayılarımızda
 görünür olduğu anlamına gelmiyor. Sapma önce ölçülür.
+
+---
+
+## Kare konturun ASIL sebebi: çukur gölgesindeki İKİ SERT EŞİK
+
+**Nasıl bulundu:** F1'e beş izolasyon anahtarı kondu (kar dokusu karışımı,
+relief paralaksı, çukurun kendi gölgesi, izin normale kattığı eğim, izin ham
+hâli). Kullanıcı tek turda söyledi: **"çukurun kendi gölgesi yapıyormuş"**.
+
+**Öncesinde üç tur yanlış yerde arandı** — yumuşatma çekirdeğinin
+altörneklemesi, kenar gürültüsünün bloklu bileşeni, bilinear filtrelemenin
+türev süreksizliği. Üçü de gerçek kusurdu ve düzeltildi, ama konturu hiçbiri
+çizmiyordu. Dördüncü tahmin yapılmayıp anahtar kondu ve sorumlu bir turda çıktı.
+
+**Sebep 1 — erken çıkış bir STEP fonksiyonuydu:**
+```hlsl
+if (dent < 0.005) return 1.0h;
+```
+`dent` bilinear filtrelenmiş bir yükseklik alanı; eşiğin geçtiği yer teksel
+içinde lineer, yani sınır tam ızgaraya oturuyor. Gölge kare kenarlı başlıyor —
+"koca kareli köşeler" bu. `smoothstep(0.002, 0.020, dent)` ile bir PAYA
+çevrildi ve pay sonuca çarpılıyor. Üst sınır 2 cm, bir tekselin (2.34 cm)
+altında: geçiş bandı izi şişirmiyor.
+
+**Sebep 2 — engelin payı çukurun KENDİ derinliğine bölünüyordu:**
+```hlsl
+engel = max(engel, saturate((komsu - isinDerinlik) / max(dent, 1e-3)));
+```
+Sığ çukurda payda küçülüp oran anında 1'e fırlıyor: eşiğin bir milimetre
+üstünde gölge zaten tam. İki sert geçiş üst üste biniyordu. Payda sabit bir
+referans uzunluk oldu (`SNOW_RELIEF_SHADOW_REF` = 3 cm, ayak izi duvarının
+mertebesi).
+
+**Ders:** bilinear bir alan üzerindeki HER sert eşik teksel ızgarasını görünür
+kılar. Filtrelemeyi düzeltmek yetmiyor — alanı tüketen tarafta `if`, `step`
+veya sıfıra yakın bölme varsa ızgara oradan geri geliyor.

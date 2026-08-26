@@ -104,6 +104,22 @@
 #define SNOW_SURF_FADE_END             28.0
 
 #define SNOW_RELIEF_SHADOW_STEPS       5
+
+/// ÇUKUR GÖLGESİNİN YUMUŞAK BAŞLANGICI (m). Altında gölge yok, üstünde tam.
+///
+/// Sert bir `dent < 0.005` eşiğiydi ve bilinear alan üzerinde step fonksiyonu
+/// olduğu için izin konturu teksel ızgarasına oturuyordu (`SYMPTOMS.md`).
+/// 2 mm ile 2 cm arası: 2 cm bir tekselin (2.34 cm) altında, yani geçiş bandı
+/// izi şişirmiyor; 2 mm altında ışın yürütmek hâlâ atlanıyor.
+#define SNOW_RELIEF_SHADOW_FADE_IN     0.002
+#define SNOW_RELIEF_SHADOW_FADE_OUT    0.020
+
+/// Engelin payını ölçen SABİT referans uzunluk (m).
+///
+/// Çukurun kendi derinliğine bölünüyordu; sığ çukurda payda küçülüp oran
+/// anında doyuyor ve gölge basamak basamak açılıyordu. 3 cm ayak izi
+/// duvarının mertebesi: o kadar yükselen bir engel tam gölge yapar.
+#define SNOW_RELIEF_SHADOW_REF         0.030
 /// İZ-İÇİ GÖLGENİN TABANI — KAR YARI SAYDAM.
 ///
 /// Engelleme tam olsa bile gölge siyaha inmiyor: ışık kar tanelerinin
