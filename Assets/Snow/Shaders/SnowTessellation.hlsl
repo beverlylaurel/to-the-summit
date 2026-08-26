@@ -104,7 +104,7 @@ float SnowTessYerDegistirme(float3 posWS)
     // Terrain kose araligi / bolme faktoru = yeni kose araligi.
     float koseAraligi = SNOW_TERRAIN_VERTEX_SPACING / faktor;
 
-    return SnowYuzeyRolyef(posWS.xz, koseAraligi, SnowWorldCoverHeight());
+    return SnowYuzeyRolyef(posWS.xz, koseAraligi, SnowWorldCoverHeight(), true);
 }
 
 /// Baricentrik interpolasyon + yer degistirme. Her gecis kendi `Varyings`'ini

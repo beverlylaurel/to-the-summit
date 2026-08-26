@@ -131,6 +131,18 @@
 /// DAGIN BOYUNA BAGLI — `SCALE.md`'de kayitli.
 #define SNOW_TERRAIN_VERTEX_SPACING    7.32
 
+/// GEOMETRIYE GIREN EN KISA DALGA BOYU (m).
+///
+/// Kagitta: en ince geometri 11.4 cm (7.32 m / 64). Nyquist bir dalganin
+/// tasinabilmesi icin dalga boyunun ornek araliginin iki kati olmasini
+/// istiyor -> 22.8 cm. Guvenlik payiyla 50 cm.
+///
+/// Bunun altindaki oktavlar (ripple 17 cm, mikro 8.3 cm) YER DEGISTIRMEYE
+/// GIRMIYOR, normal haritasinda kaliyor. Girerlerse ornekleme frekansinin
+/// altinda kalip kamera kipirdadikca titrerler — belirti bir kez olculdu
+/// ("zemin tir tir titriyor").
+#define SNOW_TESS_MIN_DALGA            0.50
+
 /// BUZUN FRESNEL TABANI (F0).
 ///
 /// Buzun kirilma indisi n = 1.31. Dik gelen isinda

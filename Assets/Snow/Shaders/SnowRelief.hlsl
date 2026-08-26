@@ -437,7 +437,18 @@ float SnowOktavAgirligi(float dalgaBoyu, float pikselBoyu)
     return saturate(dalgaBoyu / max(pikselBoyu * 2.0, 1e-5) - 1.0);
 }
 
-float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi)
+/// Geometri kipinde `SNOW_TESS_MIN_DALGA`'nin altindaki oktav tamamen
+/// kapaniyor: o dalga boyu kose araliginin altinda kaliyor ve tasinamiyor.
+/// Piksel kipinde eski davranis aynen suruyor.
+float SnowOktavAgirligiKipli(float dalgaBoyu, float pikselBoyu, bool yalnizGeometri)
+{
+    if (yalnizGeometri && dalgaBoyu < SNOW_TESS_MIN_DALGA) return 0.0;
+
+    return SnowOktavAgirligi(dalgaBoyu, pikselBoyu);
+}
+
+float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi,
+                      bool yalnizGeometri)
 {
     // YER ŞEKLİ KAR TABAKASINDAN DERİN OLAMAZ.
     //
@@ -459,7 +470,7 @@ float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi)
     for (int i = 0; i < 4; ++i)
     {
         h += (SnowValueNoise(worldXZ * frq + (float)i * 17.3) * 2.0 - 1.0) * amp
-           * SnowOktavAgirligi(1.0 / frq, pikselBoyu);
+           * SnowOktavAgirligiKipli(1.0 / frq, pikselBoyu, yalnizGeometri);
 
         amp *= SNOW_FBM_GAIN;
         frq *= 2.0;
@@ -502,7 +513,7 @@ float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi)
 
     if (_SnowDbgNoRipple <= 0.5)
     h += (SnowValueNoise(pr) * 2.0 - 1.0) * min(SNOW_RIPPLE_AMP * SNOW_RIPPLE_BASE, tavan)
-       * SnowOktavAgirligi(SNOW_RIPPLE_LENGTH, pikselBoyu);
+       * SnowOktavAgirligiKipli(SNOW_RIPPLE_LENGTH, pikselBoyu, yalnizGeometri);
 
     // --- SASTRUGİ: rüzgâra PARALEL, keskin ---
     //
@@ -518,7 +529,7 @@ float SnowYuzeyRolyef(float2 worldXZ, float pikselBoyu, float karDerinligi)
 
     if (_SnowDbgNoSastrugi <= 0.5)
     h += (ns - 0.5) * min(SNOW_SASTRUGI_HEIGHT * SNOW_SASTRUGI_BASE, tavan)
-       * SnowOktavAgirligi(SNOW_SASTRUGI_LENGTH, pikselBoyu);
+       * SnowOktavAgirligiKipli(SNOW_SASTRUGI_LENGTH, pikselBoyu, yalnizGeometri);
 
     return h;
 }
@@ -539,10 +550,10 @@ half2 SnowYuzeyEgim(float2 worldXZ, float karDerinligi, out float yukseklik)
     // hesaplanır ve gradyanın kendisi bozulur.
     float pikselBoyu = SnowPikselBoyu(worldXZ);
 
-    float hL = SnowYuzeyRolyef(worldXZ - float2(e, 0.0), pikselBoyu, karDerinligi);
-    float hR = SnowYuzeyRolyef(worldXZ + float2(e, 0.0), pikselBoyu, karDerinligi);
-    float hD = SnowYuzeyRolyef(worldXZ - float2(0.0, e), pikselBoyu, karDerinligi);
-    float hU = SnowYuzeyRolyef(worldXZ + float2(0.0, e), pikselBoyu, karDerinligi);
+    float hL = SnowYuzeyRolyef(worldXZ - float2(e, 0.0), pikselBoyu, karDerinligi, false);
+    float hR = SnowYuzeyRolyef(worldXZ + float2(e, 0.0), pikselBoyu, karDerinligi, false);
+    float hD = SnowYuzeyRolyef(worldXZ - float2(0.0, e), pikselBoyu, karDerinligi, false);
+    float hU = SnowYuzeyRolyef(worldXZ + float2(0.0, e), pikselBoyu, karDerinligi, false);
 
     // YÜKSEKLİK DE BURADAN — AYRI ÇAĞRI YAPILMIYOR.
     //
