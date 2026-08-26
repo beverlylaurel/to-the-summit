@@ -79,22 +79,16 @@
 /// izin altında (ölçülen iz derinlikleri 60-80 mm).
 /// RELIEF MAPPING — iz arazinin kendi yüzeyinde sanal derinlik olarak çiziliyor.
 ///
-/// ADIM SAYISI IŞININ BOYUNDAN TÜRÜYOR, SABİT DEĞİL.
+/// IZIN EN DERIN OLABILECEGI DEGER (m) — OLCEK, ISIN YURUYUSU DEGIL.
 ///
-/// Sabit 12 adım tepeden bakışta bol, sıyırtma açıda yetersizdi: ışın 66 cm
-/// uzarken adım başına 2.4 teksel atlanıyor ve kesişim adım ızgarasına
-/// yuvarlanıyordu. Belirtisi düz bir oluğun ekranda LOB LOB, zigzaglı
-/// görünmesiydi — ve loblar uzaklaştıkça (bakış yattıkça) büyüyordu.
+/// Bir donem relief mapping'in isin boyunu ve adim sayisini bu sabit
+/// suruyordu (`SNOW_RELIEF_STEPS_MIN/MAX`, `SNOW_RELIEF_MAX_STRETCH`). Iz
+/// gercek geometri olunca isin yuruyusu tamamen kalkti ve o uc sabit oldu,
+/// silindiler.
 ///
-/// Hedef adım başına en fazla bir teksel. Tavan tepeden bakışın maliyetini
-/// değil, en yatık bakışın maliyetini sınırlıyor: 0.35 m × 3.0 / 0.023 m = 45,
-/// 32'de kesiliyor çünkü o noktadan sonra iz zaten mesafeyle küçülüyor.
-#define SNOW_RELIEF_STEPS_MIN          8
-#define SNOW_RELIEF_STEPS_MAX          32
+/// Geriye kalan tek is NORMALIZASYON: `izDerinlik / SNOW_RELIEF_MAX_DEPTH`
+/// iz-ici karartma, ortam ortmesi ve teshis gorunumunde 0-1 araligi kuruyor.
 #define SNOW_RELIEF_MAX_DEPTH          0.35
-/// Sıyırtma açıda ışın yatıyor ve XZ kayması patlıyor; tavan olmadan iz
-/// metrelerce uzayıp bulaşıyor.
-#define SNOW_RELIEF_MAX_STRETCH        3.0
 
 /// GÖLGEDEKİ KARIN ÇEVRESİNDEN ALDIĞI DOLGU.
 ///

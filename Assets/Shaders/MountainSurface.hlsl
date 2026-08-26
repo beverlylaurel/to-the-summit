@@ -519,16 +519,20 @@ MountainSurface BuildMountainSurface(float3 worldPos)
 
     if (snowMask > 0.001)
     {
-        // İZ BURADA ÇİZİLİYOR — İKİNCİ BİR YÜZEYLE DEĞİL.
+        // İZ GERÇEK GEOMETRİ — PARALAKS DEĞİL.
         //
-        // Gerekçe `SnowRelief.hlsl`. Işın yürüyüşü çukurun görünen yerini
-        // buluyor; sonraki bütün okumalar (doku, normal, gölgeleme) KAYDIRILMIŞ
-        // konumdan yapılıyor, böylece çukur üç boyutlu okunuyor.
-        float3 bakisWS = normalize(_WorldSpaceCameraPos - worldPos);
-        float izDerinlik;
-        float2 izKayma = SnowReliefOffset(worldPos, bakisWS, izDerinlik);
-        float3 izPos = worldPos + float3(izKayma.x, 0.0, izKayma.y);
+        // RELIEF MAPPING KALKTI. `SnowReliefOffset` bakış ışınını yürütüp
+        // çukurun görünen yerini buluyordu ve sonraki bütün okumalar
+        // KAYDIRILMIŞ konumdan yapılıyordu. Kar yüzeyi tessellation ile
+        // gerçek geometri olunca aynı çukur `SnowTessYerDegistirme` içinde
+        // ikinci kez oyuluyordu: iz İKİ KAT derin görünürdü.
+        //
+        // Geometri paralaksın verdiği her şeyi zaten veriyor — üstelik
+        // silüeti de kırıyor ve komşu tepeler birbirini gerçekten örtüyor.
+        // Işın yürüyüşünün 12-32 adımı da gitti.
+        float3 izPos = worldPos;
         float2 izUV = SnowWorldToUV(izPos);
+        float izDerinlik = SnowDentSmooth(izUV);
 
         // İZİN İÇİ EZİLMİŞ KARDIR — YOĞUNLUK YEREL OKUNUYOR.
         //

@@ -108,8 +108,22 @@ float SnowTessYerDegistirme(float3 posWS)
     // olcuyor (spec 18.0: "> 0 -> golgede"). Siperde drift, acikta sastrugi.
     float maruziyet = 1.0 - saturate(SampleWindShadow(posWS) * 1.2);
 
-    return SnowYuzeyRolyef(posWS.xz, koseAraligi, SnowWorldCoverHeight(),
-                           true, maruziyet);
+    float h = SnowYuzeyRolyef(posWS.xz, koseAraligi, SnowWorldCoverHeight(),
+                              true, maruziyet);
+
+    // IZ DE GEOMETRIYE GIRIYOR.
+    //
+    // Cevresindeki kar 20-30 cm tepecikler halinde yukselirken iz DUZ kalirsa
+    // gorunmez oluyor: 10 cm'lik bir cukur 30 cm'lik tepeciklerin arasinda
+    // secilmiyor. Iz de ayni geometriye girmek zorunda.
+    //
+    // BU YUZDEN `SnowReliefOffset` KALKTI (`MountainSurface.hlsl`). O
+    // fonksiyon ayni cukuru doku uzayinda paralaksla oyuyordu; ikisi birlikte
+    // kalsaydi iz IKI KAT derin gorunurdu. Gercek geometri paralaksin
+    // verdigi her seyi zaten veriyor ve ustune silueti de kiriyor.
+    h -= SnowDentSmooth(SnowWorldToUV(posWS));
+
+    return h;
 }
 
 /// Baricentrik interpolasyon + yer degistirme. Her gecis kendi `Varyings`'ini
