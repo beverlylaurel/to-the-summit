@@ -409,6 +409,19 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     float wet = _SurfaceWetness * (1.0 - exposure * 0.3);
     albedo *= 1.0 - wet * _WetDarkening;
 
+    // --- Deniz ıslaklığı: kıyı bandı (deniz spec §14) ---
+    //
+    // AD ÇAKIŞMASI VAR: yukarıdaki `wet` YAĞIŞ ıslaklığı ve `_SurfaceWetness`
+    // ile sürülüyor. Deniz bandı ayrı bir değişken; ikisi çarpışırsa yağmurlu
+    // havada kıyı iki kez koyulurdu.
+    //
+    // Seviyeyi `SeaWetnessDriver` yayınlıyor ve deniz kapalıyken çok düşük
+    // bir kota çekiyor, yani `seaWet` her yerde 0 oluyor. Deniz sistemi bu
+    // materyale HİÇBİR ŞEY yazmıyor — yalnız iki global okunuyor.
+    float seaWet = 1.0 - smoothstep(_SeaWetLevelY - _SeaWetFadeM,
+                                    _SeaWetLevelY, worldPos.y);
+    albedo = lerp(albedo, albedo * _SeaWetDarkening, seaWet);
+
     // --- Kabartı gürültüsü: prosedürel normalin hammaddesi; bu olmadan yüzey plastik
     //     görünür. Değeri karın mikro yerleşimine, gradyanı gölgelendirmeye gider —
     //     iki tüketici, tek örnekleme ---
@@ -442,6 +455,13 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     surface.emission = Alpenglow(worldPos, normalWS, altitude, albedo, exposure);
     surface.normalWS = shaded;
     surface.smoothness = lerp(_RockSmoothness, _WetSmoothness, wet);
+
+    // ISLAK KUM DAHA PARLAK. Spec §14 pürüzlülüğü 0.35 katına indiriyor;
+    // burası smoothness tutuyor, o yüzden pürüzlülüğe çevrilip geri
+    // dönülüyor — smoothness'ı doğrudan 0.65 ile çarpmak TERS yönde
+    // çalışırdı.
+    float seaRough = (1.0 - surface.smoothness) * lerp(1.0, 0.35, seaWet);
+    surface.smoothness = 1.0 - seaRough;
 
     // Maruziyet haritası ambient'i kısar: vadi dibi göğün küçük bir parçasını görür.
     // Yüz metre ölçeğinde çalışır; santimetre ölçeğinin sahibi SSAO idi ama kapatıldı —

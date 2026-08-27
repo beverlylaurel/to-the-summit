@@ -287,7 +287,19 @@ Shader "ToTheSummit/SeaLit"
                     // KENAR GURULTUYLE KIRILIYOR. Kirilmazsa kopuk bandi duz
                     // bir cizgi olur ve kiyi cizilmis gibi durur (spec 18
                     // tuzak tablosu). [KAYNAK: Crest, SIGGRAPH 2017]
-                    float breakup = SeaFoamNoise(IN.positionWS.xz * _SeaFoamBreakupTiling);
+                    //
+                    // IKI OLCEK. Ince gurultu (~3 m) kopugun kendi dokusu;
+                    // KABA gurultu (~16 m) su cizgisinin duz gorunmesini
+                    // kiriyor.
+                    //
+                    // Kaba olcek OLCUMDEN geldi: su cizgisindeki basamaklar
+                    // arazi heightmap'inin kendi cozunurlugu (4097 teksel /
+                    // 30 km = 7.3 m) ve deniz mesh'i inceltilince
+                    // DEGISMIYOR. O olcekten kucuk bir gurultu orada hicbir
+                    // sey ortmuyor.
+                    float breakup =
+                          SeaFoamNoise(IN.positionWS.xz * _SeaFoamBreakupTiling) * 0.55
+                        + SeaValueNoise(IN.positionWS.xz * (_SeaFoamBreakupTiling * 0.18)) * 0.45;
                     shoreFoam = saturate((shoreFoam - breakup * 0.45) * 2.5);
 
                     foam = max(whitecap, max(breakT * SEA_BREAK_FOAM_GAIN, shoreFoam));

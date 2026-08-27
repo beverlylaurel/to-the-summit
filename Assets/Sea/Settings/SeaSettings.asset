@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: de501d873d2cf6245af14af3d61055d4, type: 3}
   m_Name: SeaSettings
   m_EditorClassIdentifier: Assembly-CSharp::SeaSettings
+  quality: 1
   seaLevelY: 30
   deepWaterDepth: 200
   spectrumDepth: 60
@@ -25,8 +26,6 @@ MonoBehaviour:
   choppinessPerTier: {x: 1, y: 0.85, z: 0.45}
   maxShoalingGain: 2.2
   runupMaxDepth: 0.45
-  finestQuad: 0.5
-  ringCount: 7
   extinctionRgb: {x: 0.3, y: 0.08, z: 0.05}
   upwellingColor: {r: 0, g: 0.2, b: 0.3, a: 1}
   refractionStrength: 0.35
@@ -35,3 +34,5 @@ MonoBehaviour:
   shoreFoamDepth: 1.2
   foamColor: {r: 0.92, g: 0.94, b: 0.95, a: 1}
   foamRoughness: 0.85
+  foamTiling: 0.8
+  foamBreakupTiling: 0.35

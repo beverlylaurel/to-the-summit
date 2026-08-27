@@ -3577,3 +3577,45 @@ iki taraf aynı ölçeği kullanıyor.
 **Sınıf.** Bu bir NORMALİZASYON PAYDASI hatası. Aynı sınıfın diğer örneği:
 `izDerinlik / SNOW_RELIEF_MAX_DEPTH` (iz için, doğru — iz derinliği gerçekten
 o sabitle sınırlı). Bir payda değiştiğinde payın ölçeği de değişmiş olabilir.
+
+## Su çizgisi basamaklı, testere gibi — deniz mesh'i inceltilince DEĞİŞMİYOR
+
+**Kullanıcının ağzından:** "kıyı çizgisi basamaklı."
+
+**İlk şüpheli — YANLIŞ:** deniz mesh'inin quad boyu. Kıyıdaki quad'lar 2 m ve
+basamaklar da o mertebede görünüyordu.
+
+**İkinci şüpheli — YANLIŞ:** kıyı köpüğü. Köpük kapatıldı, basamaklar aynen kaldı.
+
+**Gerçek sebep:** arazi heightmap'inin kendi çözünürlüğü. 4097 teksel / 30 000 m
+= **7.3 m per teksel**. Su düzlemi o çözünürlükteki üçgenlerle kesişiyor ve görünen
+su çizgisi o kesişimin kenarı.
+
+**Ayırt eden ölçüm:** aynı kare üç durumda çekildi —
+köpüksüz, dalgasız ve High preset (deniz mesh'i 0.25 m quad, 656k üçgen).
+**Üçünde de basamaklar birebir aynı.** Deniz tarafında hiçbir şey değiştirmiyor.
+
+**Yapılan:** kıyı köpüğünün kenar gürültüsüne ~16 m ölçekli ikinci bir oktav eklendi.
+Basamağı kaldırmıyor, kamufle ediyor — o ölçekten küçük bir gürültü orada hiçbir şey
+örtmüyor. Kalıcı çözüm arazi tarafında (bkz. `DECISIONS.md`).
+
+## Ölçüm aracı bütün kademelerde aynı sabiti döndürüyor
+
+**Belirti:** dalga alanı testinde üç kademe de `-23.203130` verdi; shader hatası sanıldı.
+
+**Gerçek sebep:** `Graphics.CopyTexture` + `Texture2D.GetPixels` **farklı belleği
+konuşuyor**. Kopya GPU tarafını günceller, `GetPixels` CPU tarafını okur ve o hiç
+yazılmamıştı. Okunan sayı `Texture2D`'nin başlangıç çöpüydü.
+
+**Ayırt eden ölçüm:** `AsyncGPUReadback` ile aynı dokular okununca değerler anlamlı çıktı.
+
+**Ders:** GPU dokusu CPU'ya ancak readback ile iner. `CopyTexture` bir GPU→GPU kopya.
+
+## GPU süresi hep 0.000 ms — "deniz bedava"
+
+**Gerçek sebep:** `Recorder.gpuElapsedNanoseconds` yalnız Profiler kayıt yaparken dolu;
+kapalıyken **sessizce 0** dönüyor. Sıfır ile "ölçülemedi" ayrılamıyordu.
+
+**Yapılan:** `SeaRuntimeState.GpuTimingAvailable` bayrağı. Bayrak false iken o sayıya
+bakılmıyor.
+

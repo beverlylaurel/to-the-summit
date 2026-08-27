@@ -1189,6 +1189,58 @@ dünya noktasında kalıyor. Üç presette de bir SnapStep tam sayı teksele den
 (8 / 16 / 24) — kesirli olsaydı izler teksel altı titrerdi. Ölçüm:
 `To The Summit/Snow/Scroll Test`.
 
+### Deniz (`Assets/Sea/`)
+
+**Deniz OKUR, YAZMAZ.** Sistem içinde `RenderSettings`, `VolumeProfile` veya
+`Light.intensity` yazan tek bir satır yok.
+
+**Okuduğu:**
+
+| Ne | Nereden | Neyi sürüyor |
+|---|---|---|
+| Rüzgâr yönü + U10 | `WindField.PrevailingDirection`, `.FreeAirSpeed` | dalga spektrumu (ana girdi) |
+| Güneş yüksekliği | `TimeOfDay.SunHeight` | parıltının gece kapanması |
+| Bulut kapsaması | `AtmosphereController.Coverage` | gök yansımasının kısılması |
+| Yağış şiddeti | `WeatherState.Precipitation` | yüzey pürüzlülüğü, köpük |
+| Sıcaklık | `TemperatureField.At(y)` | yağışın kar mı yağmur mu olduğu |
+| Arazi yüksekliği | `Terrain.terrainData` (bir kez) | su derinliği alanı |
+
+`FreeAirSpeed` kullanılıyor, `Velocity` değil: yerel gust'lar spektruma girmemeli.
+Yağış türü ayrı bir değişkenle değil sıcaklıktan türüyor — ikinci kaynak kurulmadı.
+
+**Yazdığı:**
+
+- `SeaRuntimeState` — Hs, Tp, köpük şiddeti, GPU süresi. Yalnız yayın; kimse
+  okumak zorunda değil.
+- `_SeaWetLevelY`, `_SeaWetFadeM`, `_SeaWetDarkening` — kıyı ıslaklık bandı.
+  `MountainSurface.hlsl` bunları okuyor. **Deniz arazi materyaline yazmıyor**,
+  bir seviye yayınlıyor.
+
+**Okumadığı, bilinçli:**
+
+- Gökyüzü rengi. Bu projede gökyüzü hacimsel bulut sisteminden ve skybox'tan
+  geliyor; tek bir "zenit rengi" property'si yok. Elle değer + `TODO(kullanıcı)`.
+- Kendi rüzgâr noise'u yok, kendi sis hesabı yok, kendi gökyüzü modeli yok,
+  planar reflection yok.
+
+**İç zincir:**
+
+```
+WindField ──► SeaEnvironmentBridge ──► SeaSimulation ──► RT_Displacement
+                                    │                    RT_Derivatives
+                                    │                    RT_Foam
+                                    └─► SeaManager ──► global uniform'lar
+                                                       SeaRuntimeState
+Terrain ──► SeaBathymetry ──► _SeaBathyTex ──┬─► SeaLit vertex (sığ su)
+                                             └─► SeaLit fragment (kıyı maskesi, köpük)
+SeaSurface ──► görünürlük ──► SeaSimulation (görünmüyorsa compute kapalı)
+SeaManager ──► SeaWetnessDriver ──► MountainSurface.hlsl (ıslak kum)
+```
+
+**Yeni bağ (kar ↔ deniz):** arazi materyali artık İKİ ıslaklık kaynağı okuyor —
+yağış (`_SurfaceWetness`) ve deniz (`_SeaWetLevelY`). İkisi ayrı değişkende;
+çarpışsalardı yağmurlu havada kıyı iki kez koyulurdu.
+
 ## 5. Bilinçli kurallar
 
 Bunlar hata değil, karar. Yanlışlıkla "düzeltilmemeli". Her birinin gerekçesi
@@ -1244,6 +1296,12 @@ Bunlar hata değil, karar. Yanlışlıkla "düzeltilmemeli". Her birinin gerekç
   **yerleşimi** tekrar eder ve bunu büküm çözmez, harita büyür.
 
 ---
+
+- **Deniz kendi gökyüzünü, sisini ve rüzgârını kurmuyor.** Hepsi mevcut
+  sistemlerden okunuyor. İkinci bir kaynak kurulsaydı "fırtına var ama deniz
+  sakin" tipi çelişki kaçınılmazdı.
+- **Deniz görünmüyorsa hiçbir compute çalışmıyor.** Kapı `MeshRenderer.isVisible`.
+- **Kar yağarken deniz yüzeyine köpük eklenmiyor**, yalnız yağmurda.
 
 ## 6. Çelişki kontrolü
 

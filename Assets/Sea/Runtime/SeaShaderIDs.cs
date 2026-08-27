@@ -92,6 +92,7 @@ public static class SeaShaderIDs
     // --- Islak kum (spec §14) ---
     public static readonly int SeaWetLevelY = Shader.PropertyToID("_SeaWetLevelY");
     public static readonly int SeaWetFadeM = Shader.PropertyToID("_SeaWetFadeM");
+    public static readonly int SeaWetDarkening = Shader.PropertyToID("_SeaWetDarkening");
 
     // --- Teşhis ---
     public static readonly int DbgNoWaves = Shader.PropertyToID("_SeaDbgNoWaves");

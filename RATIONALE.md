@@ -2037,3 +2037,59 @@ Hedef bandın (5-15°) hâlâ üstünde. Ama o band DÜZ kar alanı için; burad
 drift ve sastrugi alanı çiziliyor ve orada eğim gerçekten yüksek. Bir sonraki
 belirtide bakılacak yer fBm (0.19) ve mikro (0.16) — ikisi birlikte 0.25 ve
 hiçbir arazi ölçümüne dayanmıyorlar.
+
+## Deniz: Phillips değil TMA spektrumu
+
+Tessendorf'un 2001'de kullandığı Phillips spektrumu yüksek dalga sayılarında kötü
+yakınsıyor ve sanatçının kazanç/filtre parametrelerini elle ayarlamasını gerektiriyor.
+Horvath'ın TMA modeli geniş bir rüzgâr hızı **ve su derinliği** aralığında elle ayar
+istemeden makul sonuç veriyor.
+
+Belirleyici olan derinlik: kıyıdan bakılan bir denizde derinlik parametresi zorunlu,
+Phillips'te yok. `[KAYNAK: Horvath 2015, DigiPro]`
+
+**Kitaigorodskii sönümünün tek satırlık hali TUZAK.** `1 − ½(2−ωh)²` parabolü
+`ωh > 2` için geri düşüyor ve `saturate` onu sıfıra kırpıyor; bütün kısa dalgaların
+enerjisi siliniyor. Ölçüldü: 60 m derinlikte kademe 1 ve 2'nin `h0` dokusu tamamen
+sıfır çıktı, oysa tepe dalga boyu 12.7 m ve tam o kademede. Doğru tanım üç dallı:
+`ωh ≥ 2` için 1.
+
+## Deniz: Schlick değil tam Fresnel
+
+Schlick yaklaşıklığı sıyırma açılarında belirgin sapıyor ve kıyıdan bakılan denizin
+karakteri tam orada. Kâğıtta: 2° bakışta F = 0.805, 6°'de 0.527, 45°'de 0.029.
+
+İki dallı tam form doğrudan Tessendorf'un örnek shader'ından; maliyeti bir `acos`,
+bir `asin` ve iki trigonometrik oran — yüzey zaten tam ekranı kaplamıyor.
+
+## Deniz: çok seviyeli clipmap değil tek ızgara
+
+Geometry clipmap kurulsaydı `[KAYNAK: Asirvatham & Hoppe, GPU Gems 2]`'nin **altı**
+parçası birlikte gerekirdi: tek sayı ızgara boyutu, 12 blok, dört `m×3` fix-up şeridi,
+dört yönelimli L-trim, dejenere üçgen çevresi, `alpha = max(αx, αy)` geçiş harmanlaması.
+Biri eksikse mesh yırtılıyor, delik açıyor veya titriyor.
+
+Yerine tek sürekli mesh: her halkanın quad boyu bir öncekinin tam 2 katı ve halkalar
+arası vertex **paylaşılıyor**, yani T-junction yapısal olarak imkânsız.
+
+**Hizalama ispatı:** tüm quad boyutları en ince quad boyutunun ikinin kuvveti katı,
+dolayısıyla en ince quad boyutuna eşit TEK bir snap adımı her halkanın vertex'lerini
+kendi kafesinde tutuyor. Seviye başına ayrı snap gerekmiyor, seviyeler arası kayma
+olamıyor.
+
+Ölçüldü: 280 833 vertex, 558 080 üçgen, yetim vertex 0, dejenere üçgen 0.
+
+**Bedeli:** üçgen sayısı yalnız halka sayısına bağlı, quad boyuna değil. Spec'in
+kalite tablosundaki üçgen sayıları (180k/480k/900k) bu mesh'te tutmuyor; kalite
+kademesi neyin ne kadar yakından çözüldüğünü değiştiriyor, kaç üçgen çizildiğini değil.
+
+## Deniz: FFT boyutu keyword değil uniform
+
+`numthreads` bir shader keyword'üne bağlansaydı her varyant için ayrı
+`GetKernelThreadGroupSizes` ve ayrı dispatch sayısı gerekirdi. Bunun yerine
+`numthreads` her zaman 256; çalışan FFT 128 ise fazla iş parçacıkları boşta döner.
+
+**Erken `return` edemezler.** `GroupMemoryBarrierWithGroupSync` ayrık bir dalda
+tanımsız davranıştır. Yalnız bellek işlemleri kapatılıyor; döngü sınırı sabit
+tamponundan geldiği için grup içinde aynı ve döngü uniform kalıyor.
+

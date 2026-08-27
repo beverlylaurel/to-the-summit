@@ -1871,3 +1871,81 @@ iz iki kat derin görünürdü.
 genişliğinin `SNOW_TESS_MIN_DALGA`'nın (50 cm) altında kalması demek olur.
 İz yarıçapı 3.4-5.5 cm; eşik izi geometriden eleyebilir. Belirti görülürse
 iz için ayrı bir eşik gerekir.
+
+## Deniz seviyesi 30 m — ÖLÇÜLEREK SEÇİLDİ
+
+**Karar.** `SeaSettings.seaLevelY = 30`.
+
+**Gerekçe.** Arazinin batı kenarında kıyı profili Z boyunca on iki kesitte ölçüldü.
+30 m'de su şeridi `z ∈ [−9000, +2000]` bandında **2.7–4.1 km** — istenen aralık.
+10 m'de 2.0 km (dar), 60 m'de 4.0 km ama dağın eteği fazla suya giriyor.
+
+**Tetikleyici.** Oyun tasarımı kıyıyı başka yere isterse veya arazi yeniden üretilirse.
+Deniz seviyesi değişince `SeaManager.RefreshBathymetry()` kendiliğinden çalışıyor
+(kontrol `Update` içinde).
+
+**Maliyet.** Arazi yeniden üretilirse kıyı çizgisi tamamen değişir; bathymetry
+otomatik tazeleniyor ama seviyenin hâlâ 2.7–4.1 km verdiği ÖLÇÜLMELİ.
+
+## Su çizgisi basamakları arazi tarafında — ERTELENDİ
+
+**Karar.** Deniz tarafında bir şey yapılmadı; köpük kenarına kaba gürültü eklenip
+kamufle edildi.
+
+**Gerekçe.** Basamakların kaynağı ölçüldü: arazi heightmap'i 4097 teksel / 30 km =
+**7.3 m per teksel** ve Unity'nin `heightmapResolution` üst sınırı 4097. Deniz mesh'i
+0.25 m quad'a (656k üçgen) inceltildiğinde basamaklar **birebir aynı** kaldı.
+
+**Tetikleyici.** Oyuncu kıyıya yaklaştığında su çizgisi hâlâ testere gibi görünüyorsa.
+
+**Maliyet ve seçenekler.** (a) kıyı bandı için ayrı, yüksek çözünürlüklü bir mesh
+şeridi; (b) araziyi bölüp kıyıda ikinci bir Terrain — ama deniz sistemi **tek terrain**
+destekliyor, o kayıt da aşağıda; (c) kıyıyı dik yapmak (kayalık sahil), basamak dikey
+yüzeyde görünmez.
+
+## Deniz: çoklu terrain DESTEKLENMİYOR
+
+**Karar.** Sahnede birden fazla `Terrain` varsa deniz sistemi kendini devre dışı
+bırakıyor ve hata basıyor.
+
+**Gerekçe.** Bathymetry tek bir arazinin heightmap'inden bake ediliyor; ikincisi
+sessizce yok sayılsaydı o bölgede deniz karanın içinden geçerdi.
+
+**Tetikleyici.** Arazi bölünürse (kıyı için ayrı terrain, bkz. yukarıdaki kayıt).
+
+**Maliyet.** Bathymetry bake'inin çoklu araziyi birleştirmesi ve
+`_SeaBathyOriginXZ/_SeaBathySizeXZ`'nin birleşik sınırı taşıması gerekir.
+
+## Deniz köpüğü DOKUSUZ — prosedürel gürültüyle
+
+**Karar.** Spec §13'ün istediği `T_Foam` / `T_FoamBreakup` dokuları üretilmedi; köpük
+deseni `SeaFoamNoise` (üç oktav value noise) ile.
+
+**Gerekçe.** Doku üretimi kredili servisten geçiyor ve `CLAUDE.md` ilk denemenin doğru
+olmasını şart koşuyor. Köpüğün nasıl görünmesi gerektiği ekranda oturmadan istem yazmak
+kredi yakardı. Planın kendisi bu alternatifi veriyor.
+
+**Tetikleyici.** Köpük yakından bakınca "gürültü" gibi duruyorsa — özellikle oyuncu
+kıyıda durduğunda.
+
+**Maliyet.** İki doku üretimi + `SeaFoamNoise`'un silinmesi. Değişecek tek yer
+`SeaLit.shader`'ın köpük bloğu.
+
+## Deniz: kapsam dışı bırakılanlar
+
+Spec §2 bunları açıkça kapsam dışı sayıyor. Hepsinin **tetikleyicisi oyuncunun suya
+girebilir hâle gelmesi**:
+
+| Ne | Geri döndüren belirti |
+|---|---|
+| Suya girme, yüzdürme | oyuncu kıyıdan denize adım atabiliyorsa |
+| Sualtı kamerası, caustics | aynı |
+| Dalga izi (tekne/oyuncu) | suda hareket eden bir şey olursa |
+| Gelgit | gün döngüsüne bağlı su seviyesi istenirse |
+| Nehir, göl | ikinci bir su gövdesi eklenirse |
+| iWave (etkileşimli dalga) | suya bir şey düşüp halka yayması istenirse |
+
+**Maliyet.** Suya girme tek başına: sualtı render yolu (ters Fresnel, sualtı sisi,
+yüzey altından gökyüzü), oyuncu fizik durumu, kamera geçişi. iWave ayrıca ikinci bir
+simülasyon katmanı.
+

@@ -65,6 +65,10 @@ sayı; her istemcide ayrı tutulursa aynı koşunun iki farklı ilerlemesi olur.
 **Maliyet:** düşük. Sürücü zaten tek yerde ve dışarıya yalnızca `WeatherState` ile
 `WindField` üzerinden yazıyor.
 
+**Denizin ikinci tüketicisi olduğu yer.** Dalga spektrumu `U10`'dan türüyor; rüzgâr
+istemciler arası ayrışırsa deniz de ayrışır — biri fırtınalı deniz görür, öteki sakin.
+Bu **yeni bir borç değil**, bu borcun kapsamını genişletiyor.
+
 ---
 
 ## 3. Zaman yerel akıyor
@@ -78,6 +82,14 @@ birden kayar: farklı gökyüzü, farklı rüzgâr, farklı bulut.
 
 **Olması gereken:** günün saati ortak koşu durumundan gelmeli, `Time.time` yerine ondan
 türeyen bir değer örneklenmeli.
+
+**Denizin de tüketicisi olduğu yer.** `SeaSimulation` dalga alanının zamanını
+`Time.time`'dan alıyor. FFT deterministik (aynı `t`, aynı spektrum, aynı yüzey), yani
+paylaşılan saat sorunu kendiliğinden çözer — ama saat paylaşılmazsa iki istemci aynı
+dalgayı farklı fazda görür. Kıyıda yan yana duran iki oyuncu için bu doğrudan görünür.
+
+Deniz **yeni borç doğurmuyor**: mesh her istemcide kendi kamerasına snap'leniyor ve
+bunun paylaşılmasına gerek yok.
 
 ---
 

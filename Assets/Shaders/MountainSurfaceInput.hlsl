@@ -54,6 +54,19 @@ CBUFFER_START(UnityPerMaterial)
     half   _Cutoff;
 CBUFFER_END
 
+// DENİZ KIYI ISLAKLIĞI (deniz spec §14).
+//
+// CBUFFER'IN **DIŞINDA**. Bunlar `Shader.SetGlobalFloat` ile yayınlanan
+// GLOBAL değerler; `UnityPerMaterial` içine konsalardı materyal başına
+// beklenir ve global yazma onlara hiç ulaşmazdı — belirti "ıslak bant hiç
+// çıkmıyor, hata da yok" olurdu.
+//
+// Yayınlayan: `SeaWetnessDriver`. Deniz kapalıyken seviye çok düşük bir
+// kota çekiliyor ve bant her yerde 0 oluyor.
+float _SeaWetLevelY;
+float _SeaWetFadeM;
+float _SeaWetDarkening;
+
 // Dağdan çıkarılan yüzey verisi (bkz. SurfaceMapBaker). Gürültü "nerede" sorusunu
 // cevaplayamaz; bu üç kanal dağın kendi biçiminden okunur.
 //   R birikim   — yukarıdan akan malzeme, çakıl oluklarda toplanır

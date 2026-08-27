@@ -1843,6 +1843,18 @@ public static class MountainSceneBootstrap
         yuzey.Bind(ayar, yuzeyShader, camera.transform);
         EditorUtility.SetDirty(yuzey);
 
+        // ISLAK KUM SÜRÜCÜSÜ. Deniz araziye dokunmuyor; iki global yayınlıyor
+        // ve arazi materyali onları okuyor (spec §14).
+        var islak = kok.GetComponent<SeaWetnessDriver>();
+        if (islak == null)
+        {
+            islak = kok.gameObject.AddComponent<SeaWetnessDriver>();
+            changed = true;
+        }
+
+        islak.Bind(ayar);
+        EditorUtility.SetDirty(islak);
+
         // BAĞLAR TAMAMLANINCA `OnEnable` TEKRAR ÇALIŞTIRILIYOR.
         //
         // `AddComponent` `OnEnable`'ı Bind'dan ÖNCE çağırıyor; bileşen ortam
@@ -1852,7 +1864,7 @@ public static class MountainSceneBootstrap
         //
         // `enabled` zaten false olanlar ATLANMIYOR — atlanacak olan tam da
         // düzeltilmesi gereken durum.
-        foreach (var b in new Behaviour[] { kok, sim, yuzey })
+        foreach (var b in new Behaviour[] { kok, sim, yuzey, islak })
         {
             b.enabled = false;
             b.enabled = true;
