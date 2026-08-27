@@ -3,10 +3,10 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
 
-/// F1 ile açılan test paneli. Esc oyunun kendi menüsüne ayrıldı.
-/// Sistemlerin içine "debug modu" kavramı sızmaz; kilitler bileşenin KENDİ test
-/// anahtarını kullanır. Bileşeni kapatmak, onu okumaya devam eden tüketicilere donmuş
-/// bir durum bırakıyor ve tek hava durumu iki kanala ayrılıyordu.
+/// The test panel opened with F1. Esc is reserved for the game's own menu.
+/// The notion of a "debug mode" does not leak into the systems; the locks use the component's
+/// OWN test switch. Disabling a component left a frozen state for the consumers that kept reading
+/// it, and a single weather state split into two channels.
 public class DebugMenu : MonoBehaviour
 {
     [SerializeField] FirstPersonController walker;
@@ -25,9 +25,9 @@ public class DebugMenu : MonoBehaviour
     [SerializeField] PerformanceHud hud;
     [SerializeField] ClimbHud climbHud;
     [SerializeField] CursorLock cursorLock;
-    [Tooltip("Rota çizgilerinin oyun görünümü katmanı.")]
+    [Tooltip("The game-view layer of the route lines.")]
     [SerializeField] RouteOverlay routeOverlay;
-    [Tooltip("Bulut ayarlarını taşıyan Volume bileşeni.")]
+    [Tooltip("The Volume component carrying the cloud settings.")]
     [SerializeField] Volume cloudVolume;
 
     [Tooltip("Bulut ayarlarini havadan suren bilesen; \"Havadan ayir\" bunu kapatiyor.")]
@@ -37,34 +37,34 @@ public class DebugMenu : MonoBehaviour
     const float ColumnWidth = 300f;
     const float Margin = 24f;
 
-    /// Oturum OYUNUN KENDİ HIZINDA ve yürüyerek başlar. Bir dönem serbest uçuş ve yüz
-    /// kat hız açık başlıyordu — arazi büyükken her açılışta uzak noktaya gitmek
-    /// gerekiyordu. Artık mesafe algısı ve bisiklet sürüşü doğru hissedilsin diye
-    /// varsayılan gerçek hız; ikisi de F1 panelinde açık duruyor.
+    /// A session starts AT THE GAME'S OWN SPEED and on foot. For a while it started with free
+    /// flight and a hundredfold speed on — with a large terrain you had to travel to a distant
+    /// point on every launch. Now the default is the real speed so that the sense of distance and
+    /// the bike ride feel right; both are still available in the F1 panel.
     const float StartSpeedMultiplier = 1f;
 
     float speedMultiplier = StartSpeedMultiplier;
     bool freeFly;
 
 
-    /// 0 kapalı · 1 bant · 2 opaklık · 3 perde yok. Şüphelilerin tamamı tek yerde:
-    /// "perde bir şey yapıyor mu", "doğru yerde mi", "gücü doğru mu" üç ayrı soru ve
-    /// üçü dışarıdan aynı görünüyor.
+    /// 0 off · 1 band · 2 opacity · 3 no curtain. Every suspect in one place:
+    /// "is the curtain doing anything", "is it in the right place", "is its strength right" are
+    /// three separate questions and all three look the same from outside.
 
     bool weatherLocked;
 
-    /// KAR ORANI: yağışın ne kadarı kar. 1 kar, 0 yağmur.
+    /// SNOW FRACTION: how much of the precipitation is snow. 1 snow, 0 rain.
     ///
-    /// Eskiden bu sürgü yağışı açıp SICAKLIĞI donmanın altına indiriyordu ve
-    /// kar/yağmur kararını `SnowfallController`'ın histerezisi veriyordu.
-    /// Histerezis kaldırılınca sürgü yalancı oldu: 0 yapılınca hiçbir şeye
-    /// dokunmuyor, kar yağmaya devam ediyordu.
+    /// This slider used to turn on the precipitation and push the TEMPERATURE below
+    /// freezing, and the snow/rain decision came from `SnowfallController`'s hysteresis.
+    /// When the hysteresis was removed the slider became a liar: set to 0 it touched
+    /// nothing and the snow kept falling.
     ///
-    /// Artık doğrudan `SnowManager.SnowFraction01`'i sürüyor — sıcaklık
-    /// karışmıyor, karar tek yerden geliyor.
+    /// It now drives `SnowManager.SnowFraction01` directly — temperature is not
+    /// involved and the decision comes from one place.
     float lockedSnowFraction = 1f;
 
-    /// Teşhis: rüzgâr taşınımı ve gölgesi ayrı ayrı kapatılabiliyor.
+    /// Diagnostic: wind transport and its shadow can be switched off separately.
     bool windTransportOff;
     bool windShadowOff;
 
@@ -74,16 +74,16 @@ public class DebugMenu : MonoBehaviour
     float lockedWindStrength = 0.5f;
     float lockedWindAngle;
 
-    /// Bulut ayarları `cloudVolume.profile` üzerinden sürülüyor — asset'in kendisi değil,
-    /// Volume'un çalışma zamanı KOPYASI. `sharedProfile`'a yazmak işe yaramıyor: sahnede
-    /// başka bir bileşen `.profile`'a dokunduğu an Volume harmanlamayı kopyadan yapmaya
-    /// başlıyor ve asset'e yazılan değer hiç okunmuyor (ölçüldü: profil 0.71, yığın 0.40).
-    /// Açılıştaki değerler geri al düğmeleri için saklanıyor.
+    /// The cloud settings are driven through `cloudVolume.profile` — the Volume's runtime COPY,
+    /// not the asset itself. Writing to `sharedProfile` does not work: the moment another
+    /// component in the scene touches `.profile`, the Volume starts blending from the copy and the
+    /// value written to the asset is never read (measured: profile 0.71, stack 0.40).
+    /// The launch values are kept for the revert buttons.
     VolumetricClouds clouds;
 
-    /// Acilistaki degerler: her satirin ↺'u ve "Bulut ayarlarini geri al" buradan okuyor.
-    /// Cizim aninda yakalanamaz — `CloudWeatherDriver` kapsama, yogunluk ve ruzgari her
-    /// karede yaziyor, ilk cizimde okunan deger zaten surulmus olan olurdu.
+    /// The launch values: every row's ↺ and "Revert cloud settings" read from here.
+    /// They cannot be captured at draw time — `CloudWeatherDriver` writes coverage, density and
+    /// wind every frame, so the value read on the first draw would already be the driven one.
     float coverageDefault;
     bool detachFromWeather;
 
@@ -91,10 +91,10 @@ public class DebugMenu : MonoBehaviour
     float timeScale = 1f;
 
     Vector2 scroll;
-    // GUIStyle SERİLEŞTİRİLMİYOR. Unity onu kaydetmeye çalıştığında içindeki font
-    // referansı derleme sonrası geçersiz kalıyor ve her yeniden yüklemede
-    // "Deleting invalid font reference" uyarısı basılıyor. Biçim zaten her
-    // kullanımda kuruluyor, saklanacak bir şey yok.
+    // GUIStyle IS NOT SERIALIZED. When Unity tries to save it the font reference inside
+    // stays invalid after a recompile and a "Deleting invalid font reference" warning is
+    // printed on every reload. The style is built at every use anyway, there is nothing
+    // to store.
     [System.NonSerialized] GUIStyle header;
     [System.NonSerialized] GUIStyle title;
 
@@ -132,10 +132,10 @@ public class DebugMenu : MonoBehaviour
             || precipitation == null || hud == null || climbHud == null
             || cursorLock == null || routeOverlay == null
             || cloudVolume == null || cloudDriver == null)
-            throw new InvalidOperationException($"{nameof(DebugMenu)}: bağımlılıklar atanmadı.");
+            throw new InvalidOperationException($"{nameof(DebugMenu)}: dependencies are not assigned.");
 
-        // Hız çarpanı yalnızca panel çizilirken uygulanıyordu; panel hiç açılmazsa
-        // başlangıç değeri de hiç etkili olmuyordu.
+        // The speed multiplier was applied only while the panel was being drawn; if the panel was
+        // never opened the initial value never took effect either.
         walker.SpeedMultiplier = speedMultiplier;
         flyer.SpeedMultiplier = speedMultiplier;
 
@@ -147,10 +147,10 @@ public class DebugMenu : MonoBehaviour
         open = false;
     }
 
-    /// BAĞLAMA `Start`'TA, `OnEnable`'DA DEĞİL. Bileşenin kendi `OnEnable`'ı henüz
-    /// çalışmamış olabiliyor ve Unity iki `OnEnable` arasında sıra garanti etmiyor.
-    /// `Start` hepsinden sonra çalışır; sürücüler değerleri `Update`'te yazdığı için
-    /// yakalanan varsayılan hâlâ havanın ezmediği hâl.
+    /// BINDING IS IN `Start`, NOT `OnEnable`. The component's own `OnEnable` may not have run yet
+    /// and Unity guarantees no order between two `OnEnable`s. `Start` runs after all of them; and
+    /// because the drivers write their values in `Update`, the captured default is still the state
+    /// the weather has not overwritten.
     void Start()
     {
         if (!cloudVolume.profile.TryGet(out clouds))
@@ -158,8 +158,8 @@ public class DebugMenu : MonoBehaviour
 
         coverageDefault = clouds.cloudCoverage.value;
 
-        // Parametrenin `overrideState`'i kapalıysa harmanlama onu atlıyor: sürgü profile
-        // yazıyor ama yığına hiç geçmiyor.
+        // If the parameter's `overrideState` is off, blending skips it: the slider writes to the
+        // profile but nothing ever reaches the stack.
         clouds.cloudCoverage.overrideState = true;
 
         detachFromWeather = !cloudDriver.enabled;
@@ -169,13 +169,13 @@ public class DebugMenu : MonoBehaviour
     {
         Time.timeScale = 1f;
 
-        // Panel açıkken bileşen kapanırsa imleç serbest kalırdı
+        // If the component was disabled while the panel was open the cursor would stay free
         if (open) cursorLock.Restore();
         open = false;
     }
 
-    /// Ölçülen ortalama derinlik (mm). `MeanRhoN` normalize yoğunluk;
-    /// `SnowDensity` ile aynı eşleme (50–550 kg/m³).
+    /// Measured mean depth (mm). `MeanRhoN` is the normalized density;
+    /// the same mapping as `SnowDensity` (50–550 kg/m³).
     static float SnowDepthMm(SnowManager mgr)
     {
         float rho = Mathf.Lerp(50f, 550f, mgr.MeanRhoN);
@@ -189,14 +189,14 @@ public class DebugMenu : MonoBehaviour
 
         if (weatherLocked) weatherDriver.IntensityOverride = lockedPrecipitation;
 
-        // Kar oranı kilitten BAĞIMSIZ sürülüyor: yağış kilidi kapalıyken de
-        // "şu an kar mı yağmur mu" denenebilmeli.
+        // The snow fraction is driven INDEPENDENTLY of the lock: it must be possible to try
+        // "is it snow or rain right now" while the precipitation lock is off too.
         if (snowManager != null) snowManager.SnowFraction01 = lockedSnowFraction;
         if (windLocked) wind.ApplyOverride(lockedWindStrength, lockedWindAngle);
 
-        // KİLİT AÇILINCA DA KOŞMALI: geçersiz kılmayı temizleyen taraf burası.
-        // `if (weatherLocked)` içine konsaydı kilit kapandığında kar sonsuza
-        // kadar dayatılmış kalırdı.
+        // IT HAS TO RUN WHEN THE LOCK OPENS TOO: this is the side that clears the override.
+        // Put inside `if (weatherLocked)`, snow would stay forced forever once the lock
+        // was switched off.
     }
 
     void Toggle()
@@ -219,7 +219,7 @@ public class DebugMenu : MonoBehaviour
 
         GUILayout.BeginArea(area);
 
-        GUILayout.Label("Test paneli — çıkmak için F1", title);
+        GUILayout.Label("Test panel — F1 to exit", title);
 
         scroll = GUILayout.BeginScrollView(scroll);
         GUILayout.BeginHorizontal();
@@ -267,16 +267,7 @@ public class DebugMenu : MonoBehaviour
         GUILayout.EndVertical();
     }
 
-    /// Başlıklı kutu açar; kapatmak için EndSection
-    /// TEŞHİS — bisiklet zeminden ne kadar yukarıda. Gölgeyle arasında boşluk görülüyor
-    /// ve iki açıklaması var: bisiklet havada duruyor ya da gölge kaydırılmış. Yükseklik
-    /// ile güneşin açısı birlikte yazılıyor çünkü alçak güneşte bir santimlik boşluk bile
-    /// gölgeyi metrelerce öteliyor — boşluğun büyüklüğü tek başına bir şey söylemiyor.
-    void LateUpdate()
-    {
-
-    }
-
+    /// Opens a titled box; close it with EndSection
     void BeginSection(string label)
     {
         GUILayout.BeginVertical(GUI.skin.box);
@@ -289,20 +280,17 @@ public class DebugMenu : MonoBehaviour
         GUILayout.Space(4f);
     }
 
-    /// BULUT AYARLARI. Degerler Volume profilinde, yani asset'te: surgu dogrudan ona
-    /// yaziyor ve Play bitince degisiklik kaliyor. Her satirin sonundaki ↺ acilistaki
-    /// degere doner.
-    /// BULUT KAPSAMASI. Panelde kalan tek bulut ayarı; gerisi ayarlandı ve profile
-    /// yazıldı, sürgü olarak durmalarına gerek yok.
+    /// CLOUD COVERAGE. The only cloud setting left in the panel; the rest were tuned and written
+    /// to the profile, they do not need to stay as sliders.
     ///
-    /// "Havadan ayır" sürgünün çalışması için şart: `CloudWeatherDriver` kapsamayı her
-    /// karede fırtınadan yazıyor, sürücü kapatılmazsa sürgünün yazdığı değer bir sonraki
-    /// karede eziliyor.
+    /// "Detach from weather" is required for the slider to work: `CloudWeatherDriver` writes the
+    /// coverage from the storm every frame, and unless the driver is switched off the value the
+    /// slider writes is overwritten on the next frame.
     void DrawClouds()
     {
         BeginSection("Bulut");
 
-        bool detach = GUILayout.Toggle(detachFromWeather, "Havadan ayır (elle ayar)");
+        bool detach = GUILayout.Toggle(detachFromWeather, "Detach from weather (manual)");
         if (detach != detachFromWeather)
         {
             detachFromWeather = detach;
@@ -331,9 +319,9 @@ public class DebugMenu : MonoBehaviour
     {
         BeginSection("Hareket");
 
-        GUILayout.Label($"Hız çarpanı {speedMultiplier:F0}×");
+        GUILayout.Label($"Speed multiplier {speedMultiplier:F0}×");
 
-        // Sürgü karesel: küçük değerlerde hassas, uçta 100×'e ulaşır
+        // The slider is quadratic: precise at small values, reaching 100× at the end
         float normalized = Mathf.Sqrt((speedMultiplier - 1f) / 99f);
         normalized = GUILayout.HorizontalSlider(normalized, 0f, 1f);
         speedMultiplier = 1f + normalized * normalized * 99f;
@@ -341,7 +329,7 @@ public class DebugMenu : MonoBehaviour
         walker.SpeedMultiplier = speedMultiplier;
         flyer.SpeedMultiplier = speedMultiplier;
 
-        bool nextFreeFly = GUILayout.Toggle(freeFly, "Serbest uçuş (Q/E)");
+        bool nextFreeFly = GUILayout.Toggle(freeFly, "Free flight (Q/E)");
         if (nextFreeFly != freeFly)
         {
             freeFly = nextFreeFly;
@@ -354,15 +342,15 @@ public class DebugMenu : MonoBehaviour
 
     string clockInput = "19:11";
 
-    /// Bir gün 24 saat, yani bir dakika `1/1440`. Saat kaydırılırken sarma yapılıyor:
-    /// 00:00'ın bir dakika öncesi 23:59.
+    /// A day is 24 hours, so one minute is `1/1440`. The clock wraps while being shifted:
+    /// one minute before 00:00 is 23:59.
     void StepMinutes(float minutes)
     {
         time.SetNormalized(time.Normalized + minutes / 1440f);
     }
 
-    /// "19:11" ya da "19.11" kabul ediliyor. Saat 0-23, dakika 0-59 dışındaysa
-    /// yazılan değer yok sayılıyor — sessizce yanlış bir saate atlamasın.
+    /// Both "19:11" and "19.11" are accepted. If the hour is outside 0-23 or the minute outside
+    /// 0-59 the entered value is ignored — so it does not silently jump to a wrong time.
     static bool TryParseClock(string text, out float normalized)
     {
         normalized = 0f;
@@ -378,7 +366,7 @@ public class DebugMenu : MonoBehaviour
 
     void DrawTimeOfDay()
     {
-        BeginSection("Günün saati");
+        BeginSection("Time of day");
 
         GUILayout.Label($"Saat {time.Clock}");
 
@@ -386,9 +374,9 @@ public class DebugMenu : MonoBehaviour
         float next = GUILayout.HorizontalSlider(value, 0f, 1f);
         if (!Mathf.Approximately(next, value)) time.SetNormalized(next);
 
-        // SÜRGÜ DAKİK DEĞİL: bir ekran pikseli ~5 dakikaya denk geliyor ve ölçüm
-        // alırken belirli bir dakikaya oturmak imkânsızdı. Yazıyla giriş ve dakika
-        // adımı bunun için.
+        // THE SLIDER IS NOT PRECISE: one screen pixel is about 5 minutes and landing on a
+        // specific minute while taking a measurement was impossible. Text entry and the
+        // minute step are there for that.
         using (new GUILayout.HorizontalScope())
         {
             GUILayout.Label("Saat gir", GUILayout.Width(56f));
@@ -403,20 +391,20 @@ public class DebugMenu : MonoBehaviour
 
         using (new GUILayout.HorizontalScope())
         {
-            if (GUILayout.Button("Şafak")) time.SetNormalized(0.25f);
-            if (GUILayout.Button("Öğle")) time.SetNormalized(0.5f);
-            if (GUILayout.Button("Batım")) time.SetNormalized(0.75f);
+            if (GUILayout.Button("Dawn")) time.SetNormalized(0.25f);
+            if (GUILayout.Button("Noon")) time.SetNormalized(0.5f);
+            if (GUILayout.Button("Sunset")) time.SetNormalized(0.75f);
             if (GUILayout.Button("Gece")) time.SetNormalized(0f);
         }
 
         time.Paused = GUILayout.Toggle(time.Paused, "Saati durdur");
 
         GUILayout.Space(6f);
-        GUILayout.Label($"Oyun hızı {timeScale:F2}×");
+        GUILayout.Label($"Game speed {timeScale:F2}×");
         timeScale = GUILayout.HorizontalSlider(timeScale, 0f, 4f);
         Time.timeScale = timeScale;
 
-        if (GUILayout.Button("Hızı normale döndür")) timeScale = 1f;
+        if (GUILayout.Button("Reset speed to normal")) timeScale = 1f;
 
         EndSection();
     }
@@ -425,13 +413,13 @@ public class DebugMenu : MonoBehaviour
     {
         BeginSection("Hava durumu");
 
-        GUILayout.Label($"Yağış {weather.Precipitation:F2}");
+        GUILayout.Label($"Precipitation {weather.Precipitation:F2}");
 
-        // Sürücü KAPATILMAZ, hedefi dışarıdan verilir. Kapatınca `StormIntensity` ve
-        // `ClearWindow` donuyor ama atmosfer onları okumaya devam ediyordu: sürgü
-        // yağışı, görüşü ve rengi sürerken bulut kapsaması kilitlenme anında kalıyor,
-        // ikisi ayrışıyordu.
-        bool nextLock = GUILayout.Toggle(weatherLocked, "Havayı elle ayarla");
+        // The driver is NOT DISABLED, its target is supplied from outside. Disabled,
+        // `StormIntensity` and `ClearWindow` froze but the atmosphere kept reading them: while the
+        // slider drove precipitation, visibility and colour, the cloud coverage stayed at the
+        // value held at the moment of the lock and the two diverged.
+        bool nextLock = GUILayout.Toggle(weatherLocked, "Set the weather manually");
         if (nextLock != weatherLocked)
         {
             weatherLocked = nextLock;
@@ -443,51 +431,51 @@ public class DebugMenu : MonoBehaviour
 
         using (new Disabled(!weatherLocked))
         {
-            // TEK SÜRGÜ. Eskiden ayrı bir "kar şiddeti" vardı ve yağışı açıp
-            // sıcaklığı donmanın altına indiriyordu; kar/yağmur kararını
-            // sıcaklık histerezisi veriyordu.
+            // A SINGLE SLIDER. There used to be a separate "snow intensity" that turned
+            // on the precipitation and pushed the temperature below freezing; the
+            // snow/rain decision came from the temperature hysteresis.
             //
-            // Yağış sıcaklıktan koparıldığında o sürgü YALANCI oldu: kar 0
-            // yapılınca `IntensityOverride`'a hiç dokunmuyor, yağış sürgüsünün
-            // yazdığı değer kalıyor ve kar yağmaya devam ediyordu. Kullanıcı
-            // ekran görüntüsüyle bildirdi.
+            // When precipitation was decoupled from temperature that slider became a
+            // LIAR: set to 0 it never touched `IntensityOverride`, the value written by
+            // the precipitation slider remained and the snow kept falling. The user
+            // reported it with a screenshot.
             //
-            // Artık yağış varsa kar var; ikinci bir sürgünün anlatacağı bir şey
-            // yok.
-            GUILayout.Label($"Yağış şiddeti {lockedPrecipitation:F2}");
+            // Now if there is precipitation there is snow; a second slider has nothing
+            // left to say.
+            GUILayout.Label($"Precipitation intensity {lockedPrecipitation:F2}");
             lockedPrecipitation = GUILayout.HorizontalSlider(lockedPrecipitation, 0f, 1f);
 
-            // KAR ORANI, KAR ŞİDDETİ DEĞİL. Şiddeti yukarıdaki sürgü veriyor;
-            // bu sürgü o yağışın kaça kar kaça yağmur bölüneceğini söylüyor.
-            // İkisi ayrı soru: "ne kadar yağıyor" ve "ne yağıyor".
-            // ANAHTAR, SÜRGÜ DEĞİL. Eşik 0.5; "karışık" diye bir durum yok,
-            // ya kar yağar ya yağmur (`SnowfallController`).
-            GUILayout.Label($"Yağış türü: {(lockedSnowFraction >= 0.5f ? "KAR" : "YAĞMUR")}" +
-                            $"   (sürgü {lockedSnowFraction:F2}, eşik 0.50)   " + SnowStatus());
+            // SNOW FRACTION, NOT SNOW INTENSITY. The intensity comes from the slider
+            // above; this one says how that precipitation splits into snow and rain.
+            // Two separate questions: "how much is falling" and "what is falling".
+            // A SWITCH, NOT A SLIDER. The threshold is 0.5; there is no "mixed" state,
+            // either snow falls or rain does (`SnowfallController`).
+            GUILayout.Label($"Precipitation type: {(lockedSnowFraction >= 0.5f ? "SNOW" : "RAIN")}" +
+                            $"   (slider {lockedSnowFraction:F2}, threshold 0.50)   " + SnowStatus());
             lockedSnowFraction = GUILayout.HorizontalSlider(lockedSnowFraction, 0f, 1f);
             GUILayout.Label(SnowStateStatus());
 
-            // HALKA SINIRI TEŞHİSİ. Halkalar ±8, ±16, ±32, ±64 m. Kusur bir
-            // halkanın kenarındaysa halka sayısı azalınca kusur da o sınırla
-            // birlikte içeri kayar.
+            // RING BOUNDARY DIAGNOSTIC. The rings are ±8, ±16, ±32, ±64 m. If the
+            // defect is at a ring's edge, lowering the ring count moves the defect
+            // inward together with that boundary.
             SnowManager mgr = snowManager;
 
-            // ---------------------------------------------- KAR SINAMA ORTAMI
+            // ------------------------------------------- SNOW TEST ENVIRONMENT
             //
-            // Birikme, oturma ve iz saat mertebesinde işliyor; gerçek zamanda
-            // beklemek dakikalar alıyor ve hata aramayı imkânsız kılıyor.
+            // Accumulation, settling and tracks work on the scale of hours; waiting in
+            // real time takes minutes and makes hunting a bug impossible.
             //
-            // Zaman çarpanı SAHTE DURUM YAZMIYOR: aynı fizik daha hızlı koşuyor
-            // (`_DeltaTimeEff` ölçekleniyor). Doldurma düğmeleri ise durumu
-            // doğrudan yazıyor — "şu derinlikte kar varken iz nasıl görünüyor"
-            // sorusunu beklemeden sormak için.
+            // The time multiplier DOES NOT WRITE A FAKE STATE: the same physics runs
+            // faster (`_DeltaTimeEff` is scaled). The fill buttons, on the other hand,
+            // write the state directly — so that "how does a track look at this snow
+            // depth" can be asked without waiting.
             if (mgr != null)
             {
                 GUILayout.Space(6f);
                 GUILayout.Label("— KAR SINAMASI —");
 
-                GUILayout.Label($"Simülasyon hızı ×{mgr.SimTimeScale:F0}   " +
-                                (mgr.SimTimeScale > 1.5f ? "HIZLANDIRILMIŞ" : "gerçek zaman"));
+                GUILayout.Label($"Simulation speed ×{mgr.SimTimeScale:F0}   " +
+                                (mgr.SimTimeScale > 1.5f ? "ACCELERATED" : "real time"));
 
                 mgr.SimTimeScale = Mathf.Round(
                     GUILayout.HorizontalSlider(mgr.SimTimeScale, 1f, 500f));
@@ -500,54 +488,54 @@ public class DebugMenu : MonoBehaviour
                 if (GUILayout.Button("50 cm"))      mgr.FillSnowDepth(0.50f);
                 GUILayout.EndHorizontal();
 
-                GUILayout.Label($"Ölçülen: örtü {SnowRuntimeState.GroundCoverage01:F3}   " +
+                GUILayout.Label($"Measured: coverage {SnowRuntimeState.GroundCoverage01:F3}   " +
                                 $"SWE {mgr.MeanSwe * 1000f:F2} mm   " +
                                 $"derinlik {SnowDepthMm(mgr):F1} mm");
 
-                // İZ HAM GÖRÜNÜMÜ — TEK CEVAPLI TEST.
+                // RAW TRACK VIEW — A SINGLE-ANSWER TEST.
                 //
-                // Işıklandırma, paralaks ve relief ışını KAPALI; ekrana yalnız
-                // iz dokusunun kendi değeri basılıyor (kırmızı = derinlik).
-                // Zigzag bu görünümde de varsa kaynak VERİDE, yoksa ÇİZİMDE.
-                // İki hipotezi ayıran başka bir gözlem yok.
+                // Lighting, parallax and the relief ray are OFF; only the track
+                // texture's own value is printed to the screen (red = depth).
+                // If the zigzag is present in this view too the source is in the DATA,
+                // otherwise in the DRAWING. No other observation separates the two hypotheses.
                 bool hamOnce = izHam;
-                izHam = GUILayout.Toggle(izHam, "İzin ham hâli (ışıksız, paralakssız)");
+                izHam = GUILayout.Toggle(izHam, "Raw track (no light, no parallax)");
                 if (izHam != hamOnce) Shader.SetGlobalFloat(SnowDebugDentId, izHam ? 1f : 0f);
 
                 GUILayout.Space(4f);
                 GUILayout.Label("PROB — lekeler ne?");
 
                 Prob(ref probLeke, ProbId,
-                     "  K=eğim güneşten kaçık  Y=gölge  M=AO");
+                     "  G=slope facing away from the sun  B=shadow  M=AO");
                 Prob(ref probKapak, KapakId,
-                     "  Kar örtüsü: K=maske Y=AO M=eğim×gök");
+                     "  Snow cover: G=mask B=AO M=slope×sky");
                 Prob(ref probNormal, NormalId,
                      "  Normal: K=NdotL Y=wrap M=N.y");
 
                 GUILayout.Space(4f);
-                GUILayout.Label("Yüzey rölyefi — kapat:");
+                GUILayout.Label("Surface relief — switch off:");
 
-                Prob(ref kFbm,      FbmId,      "  fBm tabanı");
+                Prob(ref kFbm,      FbmId,      "  fBm base");
                 Prob(ref kRipple,   RippleId,   "  ripple");
                 Prob(ref kSastrugi, SastrugiId, "  sastrugi");
                 Prob(ref kMicro,    MicroId,    "  mikro tane");
-                Prob(ref kLod,      LodId,      "  oktav LOD eşiği");
+                Prob(ref kLod,      LodId,      "  octave LOD threshold");
                 Prob(ref kTexN,     TexNId,     "  kar dokusu normali");
                 Prob(ref kDuz,      DuzId,      "  NORMALI TAMAMEN DUZLESTIR");
                 Prob(ref kTess,     TessId,     "  tessellation (geometri)");
                 Prob(ref kDrift,    DriftId,    "  drift (birikme tepecikleri)");
 
                 GUILayout.Space(4f);
-                GUILayout.Label("Işıklandırma — kapat:");
+                GUILayout.Label("Lighting — switch off:");
 
-                Prob(ref kSpec,    SpecId,    "  speküler");
-                Prob(ref kSparkle, SparkleId, "  parıltı");
-                Prob(ref kWrap,    WrapId,    "  sarmalı diffuse");
-                Prob(ref kAO,      AOId,      "  ortam örtmesi");
+                Prob(ref kSpec,    SpecId,    "  specular");
+                Prob(ref kSparkle, SparkleId, "  sparkle");
+                Prob(ref kWrap,    WrapId,    "  wrapped diffuse");
+                Prob(ref kAO,      AOId,      "  ambient occlusion");
                 Prob(ref kBounce,  BounceId,  "  kar-kar transferi");
-                Prob(ref kCavity,  CavityId,  "  çukurun kendi gölgesi");
+                Prob(ref kCavity,  CavityId,  "  the cavity's own shadow");
 
-                if (GUILayout.Button("Probları kapat"))
+                if (GUILayout.Button("Switch off the probes"))
                 {
                     probLeke = probKapak = probNormal = false;
                     kFbm = kRipple = kSastrugi = kMicro = kLod = kTexN = kDuz = kTess = kDrift = false;
@@ -560,7 +548,7 @@ public class DebugMenu : MonoBehaviour
 
 
 
-                if (GUILayout.Button("Ayarları geri al (sınama)"))
+                if (GUILayout.Button("Revert settings (test)"))
                 {
                     mgr.SimTimeScale = 1f;
                     mgr.RefillRegion();
@@ -577,14 +565,14 @@ public class DebugMenu : MonoBehaviour
 
             if (mgr != null)
             {
-                bool nextWt = GUILayout.Toggle(windTransportOff, "Rüzgâr taşınımını kapat (teşhis)");
+                bool nextWt = GUILayout.Toggle(windTransportOff, "Switch off wind transport (diagnostic)");
                 if (nextWt != windTransportOff)
                 {
                     windTransportOff = nextWt;
                     mgr.WindTransportOff = windTransportOff;
                 }
 
-                bool nextWs = GUILayout.Toggle(windShadowOff, "Rüzgâr gölgesini kapat (teşhis)");
+                bool nextWs = GUILayout.Toggle(windShadowOff, "Switch off the wind shadow (diagnostic)");
                 if (nextWs != windShadowOff)
                 {
                     windShadowOff = nextWs;
@@ -595,42 +583,42 @@ public class DebugMenu : MonoBehaviour
 
         GUILayout.Space(6f);
 
-        // Sürücü kilitliyken çalışmıyor; iki anahtarın da anlamı kalmıyor
+        // It does not run while the driver is locked; neither switch means anything then
         using (new Disabled(weatherLocked))
         {
             weatherDriver.Instant = GUILayout.Toggle(weatherDriver.Instant,
-                "Hava yüksekliğe anında uysun");
+                "Weather follows the altitude instantly");
 
-            GUILayout.Label($"Açık pencere {weatherDriver.ClearWindow:F2}  " +
-                            $"kalıntı {weatherDriver.WindowResidue:F2}");
-            GUILayout.Label($"Şiddet {weatherDriver.StormIntensity:F2}  " +
-                            $"bulut kütlesi {weatherDriver.CloudMass:F2}  " +
-                            $"tavan payı {weatherDriver.CeilingAt(walker.transform.position.y):F2}");
+            GUILayout.Label($"Clear window {weatherDriver.ClearWindow:F2}  " +
+                            $"residue {weatherDriver.WindowResidue:F2}");
+            GUILayout.Label($"Severity {weatherDriver.StormIntensity:F2}  " +
+                            $"cloud mass {weatherDriver.CloudMass:F2}  " +
+                            $"ceiling share {weatherDriver.CeilingAt(walker.transform.position.y):F2}");
             weatherDriver.ForceWindow = GUILayout.Toggle(weatherDriver.ForceWindow,
-                "Havayı zorla aç");
+                "Force the weather open");
         }
 
-        if (GUILayout.Button("Şimşek çaktır")) thunder.TriggerNow();
+        if (GUILayout.Button("Fire lightning")) thunder.TriggerNow();
 
-        // Çakmanın görünmemesi iki ayrı şey olabilir: olay hiç gelmemiştir ya da gelmiş
-        // ama çizilmemiştir. Dışarıdan ikisi aynı görünüyor, o yüzden ölçüm burada.
+        // A strike not being seen can be two different things: the event never arrived, or it
+        // arrived and was not drawn. From outside the two look the same, so the measurement is here.
         GUILayout.Label(lightning.LastDistance < 0f
-            ? "Son çakma: yok"
-            : $"Son çakma: {lightning.LastDistance:F0} m   " +
-              $"ışık {lightning.Intensity:F2}   parlama {lightning.Glow:F2}");
+            ? "Last strike: none"
+            : $"Last strike: {lightning.LastDistance:F0} m   " +
+              $"light {lightning.Intensity:F2}   glow {lightning.Glow:F2}");
 
-        lightning.Held = GUILayout.Toggle(lightning.Held, "Çakmayı sabit yak");
+        lightning.Held = GUILayout.Toggle(lightning.Held, "Hold the strike lit");
 
         EndSection();
     }
 
-    /// İz ham görünümü açık mı (`_SnowDebugDent`).
+    /// Whether the raw track view is on (`_SnowDebugDent`).
     bool izHam;
 
     static readonly int SnowDebugDentId = Shader.PropertyToID("_SnowDebugDent");
 
-    /// PROBLAR — yerdeki lekeleri teşhis için. Her biri tek bir terimi
-    /// kapatır ya da bir büyüklüğü doğrudan renk olarak basar.
+    /// PROBES — for diagnosing the patches on the ground. Each one switches off a
+    /// single term or prints a quantity directly as colour.
     bool probLeke, probKapak, probNormal;
     bool kFbm, kRipple, kSastrugi, kMicro, kLod, kTexN, kDuz, kTess, kDrift;
     bool kSpec, kSparkle, kWrap, kAO, kBounce, kCavity;
@@ -661,7 +649,7 @@ public class DebugMenu : MonoBehaviour
         SpecId, SparkleId, WrapId, AOId, BounceId, CavityId,
     };
 
-    /// Bir probu çizer ve değiştiyse shader'a yazar.
+    /// Draws one probe and writes it to the shader if it changed.
     static void Prob(ref bool durum, int id, string etiket)
     {
         bool once = durum;
@@ -673,13 +661,13 @@ public class DebugMenu : MonoBehaviour
 
 
 
-    /// İZ KENARINDAKİ BASAMAĞIN KAYNAĞINI AYIRAN ANAHTARLAR.
+    /// THE SWITCHES THAT SEPARATE THE SOURCE OF THE STEP AT A TRACK'S EDGE.
     ///
-    /// Basamak üç tur yanlış yerde arandı — yumuşatma çekirdeğinin
-    /// altörneklemesi, kenar gürültüsünün bloklu bileşeni, bilinear
-    /// filtrelemenin türev süreksizliği. Üçü de gerçek kusurdu, üçü de
-    /// düzeltildi, basamak durdu. Şüphelilerin TAMAMI aynı anda kapatılabilir
-    /// olmalı ki sorumlu tek turda bulunsun.
+    /// The step was hunted in the wrong place for three rounds — the smoothing
+    /// kernel's undersampling, the blocky component of the edge noise, the
+    /// derivative discontinuity of bilinear filtering. All three were real defects,
+    /// all three were fixed, and the step stopped. EVERY suspect has to be switchable
+    /// at once so the culprit is found in a single round.
 
 
 
@@ -690,48 +678,49 @@ public class DebugMenu : MonoBehaviour
         if (!SnowRuntimeState.IsSnowing) return "kar yok";
 
         return snowfall != null
-            ? $"yağıyor, {snowfall.AliveFlakes} tane"
-            : "yağıyor";
+            ? $"falling, {snowfall.AliveFlakes} flakes"
+            : "falling";
     }
 
-    /// DEVİR NOKTASINDAKİ BASAMAK.
+    /// THE STEP AT THE WRAP POINT.
     ///
     static float Rho(float rhoN) => Mathf.Lerp(50f, 550f, Mathf.Clamp01(rhoN));
 
     static float Depth(float swe, float rhoN) =>
         swe < 0f ? 0f : swe * 1000f / Mathf.Max(Rho(rhoN), 1f);
 
-    /// KAR DURUMU OKUNABİLİR OLMALI.
+    /// THE SNOW STATE HAS TO BE READABLE.
     ///
-    /// "Kar yok" belirtisi zincirin herhangi bir halkasında kopabilir: kar
-    /// yağmıyor, sıcaklık yüksek, ya da doku boş. Üçü de ekrandan aynı
-    /// görünüyor. Bu satır üçünü sayıyla ayırıyor.
+    /// The symptom "no snow" can break at any link of the chain: it is not snowing,
+    /// the temperature is high, or the texture is empty. All three look the same on
+    /// screen. This line separates the three with numbers.
     ///
-    /// KAR İRTİFAYA BAĞLI DEĞİL. Yükseklikten türeyen kar çizgisi kaldırıldı;
-    /// kar yağarsa tutar. Yüksekte karın çok olması sıcaklıktan geliyor.
+    /// SNOW DOES NOT DEPEND ON ALTITUDE. The snow line derived from elevation was
+    /// removed; if snow falls it settles. There being more snow high up comes from
+    /// the temperature.
     string SnowStateStatus()
     {
         float rhoN = Shader.GetGlobalFloat("_FallbackRhoN");
         float rho = Mathf.Lerp(50f, 550f, Mathf.Clamp01(rhoN));
 
-        // `GroundCoverage01` durum dokusunun geri okuması: kar varsa 1'e
-        // yakın, doku boşsa 0.
-        return $"yağıyor mu {(SnowRuntimeState.IsSnowing ? "EVET" : "hayır")}   " +
-               $"şiddet {SnowRuntimeState.SnowfallIntensity01:F2}   " +
+        // `GroundCoverage01` is the readback of the state texture: near 1 if there is
+        // snow, 0 if the texture is empty.
+        return $"snowing {(SnowRuntimeState.IsSnowing ? "YES" : "no")}   " +
+               $"intensity {SnowRuntimeState.SnowfallIntensity01:F2}   " +
                $"yeni kar ρ {rho:F0}   " +
                $"DOKUDA {SnowRuntimeState.GroundCoverage01:F2}   " +
-               $"gevşek {SnowRuntimeState.LooseSnowFraction:F2}";
+               $"loose {SnowRuntimeState.LooseSnowFraction:F2}";
     }
 
     void DrawWind()
     {
-        BeginSection("Rüzgâr");
+        BeginSection("Wind");
 
-        GUILayout.Label($"Şiddet {wind.Strength:F2}   Hız {wind.Velocity.magnitude:F1} m/s");
+        GUILayout.Label($"Severity {wind.Strength:F2}   Speed {wind.Velocity.magnitude:F1} m/s");
 
-        // Kilit taban şiddeti ve yönü sabitler; dalgalanma üstünde çalışmaya devam
-        // eder — bileşen kapatılmaz. Sürgüdeki 0.5, etrafında nefes alan bir 0.5'tir.
-        bool nextLock = GUILayout.Toggle(windLocked, "Rüzgârı elle ayarla");
+        // The lock fixes the base severity and the direction; the fluctuation keeps working on top
+        // — the component is not disabled. A 0.5 on the slider is a 0.5 that breathes around itself.
+        bool nextLock = GUILayout.Toggle(windLocked, "Set the wind manually");
         if (nextLock != windLocked)
         {
             windLocked = nextLock;
@@ -740,41 +729,41 @@ public class DebugMenu : MonoBehaviour
 
         using (new Disabled(!windLocked))
         {
-            GUILayout.Label($"Şiddet {lockedWindStrength:F2}");
+            GUILayout.Label($"Severity {lockedWindStrength:F2}");
             lockedWindStrength = GUILayout.HorizontalSlider(lockedWindStrength, 0f, 1f);
 
-            GUILayout.Label($"Yön {lockedWindAngle:F0}°");
+            GUILayout.Label($"Direction {lockedWindAngle:F0}°");
             lockedWindAngle = GUILayout.HorizontalSlider(lockedWindAngle, 0f, 360f);
         }
 
         EndSection();
     }
 
-    // (BULUT BÖLÜMLERİ SİLİNDİ — bulut sistemi baştan yazılıyor. Sürgü listesi ve
-    // hangi bağın nereye gittiği `CLOUDS_REBUILD.md`'de duruyor; yeni sistem gelince
-    // panel oradan yeniden kurulacak.)
+    // (THE CLOUD SECTIONS WERE DELETED — the cloud system is being rewritten. The slider list and
+    // where each link went are kept in `CLOUDS_REBUILD.md`; the panel will be rebuilt from there
+    // once the new system arrives.)
 
     void DrawOverlays()
     {
-        BeginSection("Neyi çiz");
+        BeginSection("What to draw");
 
-        GUILayout.Label($"Görüş mesafesi {atmosphere.Visibility:F0} m");
+        GUILayout.Label($"Visibility {atmosphere.Visibility:F0} m");
 
-        atmosphere.FogEnabled = GUILayout.Toggle(atmosphere.FogEnabled, "Yükseklik sisi");
-        precipitation.enabled = GUILayout.Toggle(precipitation.enabled, "Yağmur ve kar");
+        atmosphere.FogEnabled = GUILayout.Toggle(atmosphere.FogEnabled, "Height fog");
+        precipitation.enabled = GUILayout.Toggle(precipitation.enabled, "Rain and snow");
 
-        hud.enabled = GUILayout.Toggle(hud.enabled, "Performans göstergesi");
-        climbHud.enabled = GUILayout.Toggle(climbHud.enabled, "Tırmanış göstergesi");
+        hud.enabled = GUILayout.Toggle(hud.enabled, "Performance readout");
+        climbHud.enabled = GUILayout.Toggle(climbHud.enabled, "Climb readout");
 
-        // Bileşen değil NESNE: katman kapalı bir nesnede duruyor.
+        // The OBJECT, not the component: the layer sits on a disabled object.
         GameObject lines = routeOverlay.gameObject;
-        bool showLines = GUILayout.Toggle(lines.activeSelf, "Rota çizgileri");
+        bool showLines = GUILayout.Toggle(lines.activeSelf, "Route lines");
         if (showLines != lines.activeSelf) lines.SetActive(showLines);
 
         EndSection();
     }
 
-    /// GUI.enabled'ı kapsam boyunca kapatan yardımcı
+    /// Helper that disables GUI.enabled for the scope
     readonly struct Disabled : IDisposable
     {
         readonly bool previous;
