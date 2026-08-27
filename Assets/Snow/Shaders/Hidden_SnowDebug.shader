@@ -1,5 +1,5 @@
-// ROL: durum dokularının kanallarını teşhis penceresinde görünür hâle getirir.
-// Çağıran: SnowDebugWindow (Graphics.Blit).
+// ROLE: makes the state textures' channels visible in the diagnostic window.
+// CALLED BY: SnowDebugWindow (Graphics.Blit).
 
 Shader "Hidden/Snow/Debug"
 {
@@ -19,17 +19,17 @@ Shader "Hidden/Snow/Debug"
             SAMPLER(sampler_MainTex);
             float4 _MainTex_TexelSize;
 
-            /// 0=R 1=G 2=B 3=A 4=türetilmiş yükseklik 5=ham (SkyVis/WindShadow)
+            /// 0=R 1=G 2=B 3=A 4=derived height 5=raw (SkyVis/WindShadow)
             float  _DebugMode;
             float  _DebugRange;
 
-            /// Gösterimden önce çıkarılan değer. Yakalama dokusunun kanalları
-            /// sıfır merkezli (yükseklik gözlemciye göre, hız işaretli); bias
-            /// olmadan negatif yarı tamamen siyah kalır ve yarısı okunmaz.
+            /// The value subtracted before display. The capture texture's channels are
+            /// zero-centred (height relative to the observer, velocity signed); without the
+            /// bias the negative half stays entirely black and half of it is unreadable.
             float  _DebugBias;
 
-            /// Dünya ızgarası: içeriğin oyuncu yürürken KAYMADIĞINI kanıtlıyor.
-            /// Snap doğruysa çizgiler dünyada sabit durur (spec Faz 1 kabul kriteri).
+            /// A world grid: it proves the content DOES NOT SLIDE as the player walks.
+            /// If the snap is right the lines stand still in the world (spec Phase 1 acceptance criterion).
             float  _DebugGridSize;
             float2 _DebugWorldCenter;
             float  _DebugWorldSize;
@@ -62,7 +62,7 @@ Shader "Hidden/Snow/Debug"
                 float shown = saturate((v - _DebugBias) / max(_DebugRange, 1e-5));
                 half3 color = half3(shown, shown, shown);
 
-                // Dünya ızgarası
+                // World grid
                 float2 world = (IN.uv - 0.5) * _DebugWorldSize + _DebugWorldCenter;
                 float2 g = abs(frac(world / max(_DebugGridSize, 1e-3)) - 0.5);
                 float  gridLine = 1.0 - smoothstep(0.0, 0.02, min(g.x, g.y));

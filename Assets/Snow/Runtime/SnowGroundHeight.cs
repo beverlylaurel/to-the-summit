@@ -1,25 +1,25 @@
-// ROL: zemin yüksekliğini bir dokuya pişirir ve global olarak yayınlar (spec §7).
-// İki kaynak: Unity Terrain heightmap'i veya mesh tabanlı arazinin bake'i.
-// Çağıran: SnowManager.
+// ROLE: bakes the ground height into a texture and publishes it globally (spec §7).
+// Two sources: Unity Terrain's heightmap or a bake of the mesh-based terrain.
+// CALLED BY: SnowManager.
 
 using UnityEngine;
 
 [DisallowMultipleComponent]
 public class SnowGroundHeight : MonoBehaviour
 {
-    [Header("Bağımlılıklar")]
+    [Header("Dependencies")]
     [SerializeField] SnowSettings settings;
 
-    [Tooltip("groundSource = UnityTerrain iken kullanılacak arazi.")]
+    [Tooltip("The terrain to use when groundSource = UnityTerrain.")]
     [SerializeField] Terrain terrain;
 
-    [Tooltip("groundSource = MeshBake iken bake kamerasının merkezi.")]
+    [Tooltip("The centre of the bake camera when groundSource = MeshBake.")]
     [SerializeField] Transform bakeCenter;
 
     Texture2D terrainHeights;
     RenderTexture bakedHeights;
 
-    /// Shader'a bağlanan doku. İki yolda da aynı örnekleme kullanılıyor.
+    /// The texture bound to the shader. The same sampling is used on both paths.
     public Texture HeightTexture => settings != null && settings.GroundSource == SnowGroundSource.MeshBake
         ? (Texture)bakedHeights
         : terrainHeights;
@@ -33,7 +33,7 @@ public class SnowGroundHeight : MonoBehaviour
     {
         if (settings == null)
             throw new System.InvalidOperationException(
-                $"{nameof(SnowGroundHeight)}: {nameof(settings)} atanmadı.");
+                $"{nameof(SnowGroundHeight)}: {nameof(settings)} is not assigned.");
 
         RefreshGroundHeight();
     }
@@ -50,7 +50,7 @@ public class SnowGroundHeight : MonoBehaviour
         }
     }
 
-    /// Arazi çalışma zamanında değişirse dışarıdan çağrılır. Otomatik algılama yok
+    /// Called from outside if the terrain changes at runtime. There is no automatic detection
     /// (spec §7.1).
     public void RefreshGroundHeight()
     {
@@ -62,9 +62,9 @@ public class SnowGroundHeight : MonoBehaviour
 
     // ------------------------------------------------------------------ terrain
 
-    /// TERRAIN HEIGHTMAP'İ DOĞRUDAN ÖRNEKLENMİYOR. `terrainData.heightmapTexture`
-    /// Unity sürümleri arasında farklı ölçekleme sabitleri taşıyor ve sessiz hata
-    /// kaynağı (spec §7.1). Bir kez kendi dokumuza pişiriyoruz.
+    /// THE TERRAIN HEIGHTMAP IS NOT SAMPLED DIRECTLY. `terrainData.heightmapTexture` carries
+    /// different scaling constants between Unity versions and is a source of silent errors
+    /// (spec §7.1). We bake it into our own texture once.
     void BakeFromTerrain()
     {
         var found = FindObjectsByType<Terrain>(FindObjectsInactive.Exclude);
@@ -72,18 +72,18 @@ public class SnowGroundHeight : MonoBehaviour
         if (found.Length > 1)
             throw new System.InvalidOperationException(
                 $"{nameof(SnowGroundHeight)}: sahnede {found.Length} Terrain var. " +
-                "Çoklu terrain DESTEKLENMİYOR (spec §7.1).");
+                "Multiple terrains are NOT SUPPORTED (spec §7.1).");
 
         if (terrain == null) terrain = found.Length == 1 ? found[0] : null;
 
         if (terrain == null)
             throw new System.InvalidOperationException(
-                $"{nameof(SnowGroundHeight)}: Terrain yok. `groundSource = MeshBake` seçin.");
+                $"{nameof(SnowGroundHeight)}: there is no Terrain. Select `groundSource = MeshBake`.");
 
         TerrainData td = terrain.terrainData;
         int res = td.heightmapResolution;
 
-        // h[y, x] — indeks sırasına dikkat, spec §7.1 özellikle uyarıyor.
+        // h[y, x] — mind the index order, spec §7.1 warns about it specifically.
         float[,] h = td.GetHeights(0, 0, res, res);
 
         if (terrainHeights != null && terrainHeights.width != res)
@@ -94,15 +94,15 @@ public class SnowGroundHeight : MonoBehaviour
 
         if (terrainHeights == null)
         {
-            // TAM HASSASİYET ŞART, SPEC'TEN BİLİNÇLİ SAPMA.
+            // FULL PRECISION IS MANDATORY, A DELIBERATE DEVIATION FROM THE SPEC.
             //
-            // Spec §7.1 `RHalf` diyor ve küçük bir arazi varsayıyor. Bu dağ
-            // 8000 m; half'ın bağıl adımı 2^-11 olduğu için metre karşılığı
-            // kotla büyüyor (ölçüldü: 2000 m'de 195 cm, 8000 m'de 781 cm).
-            // Kar kalınlığı 26–45 cm — zemin iki metrelik basamaklara
-            // oturunca kar yüzeyi bloklar hâlinde çiziliyordu.
+            // Spec §7.1 says `RHalf` and assumes a small terrain. This mountain is
+            // 8000 m; because half's relative step is 2^-11 its value in metres grows
+            // with the elevation (measured: 195 cm at 2000 m, 781 cm at 8000 m).
+            // The snow thickness is 26–45 cm — with the ground sitting on two-metre
+            // steps the snow surface was drawn in blocks.
             //
-            // Bedeli: 4097² × 4 B = 67 MB. Statik, bir kez pişiyor.
+            // The cost: 4097² × 4 B = 67 MB. Static, baked once.
             terrainHeights = new Texture2D(res, res, TextureFormat.RFloat, false, true)
             {
                 name = "Tex_Ground",
@@ -134,8 +134,8 @@ public class SnowGroundHeight : MonoBehaviour
 
     // --------------------------------------------------------------- mesh bake
 
-    /// MESH TABANLI ARAZİ. Ortografik bir kamera tepeden bir kez bakar ve dünya
-    /// Y'sini yazar; doku doğrudan metre tutuyor, o yüzden taban 0 ve aralık 1.
+    /// MESH-BASED TERRAIN. An orthographic camera looks down once and writes the world
+    /// Y; the texture holds metres directly, so the base is 0 and the range 1.
     void BakeFromMesh()
     {
         float area = Mathf.Max(1f, settings.GroundBakeArea);
@@ -143,8 +143,8 @@ public class SnowGroundHeight : MonoBehaviour
 
         if (bakedHeights == null)
         {
-            // Mesh bake yolunda doku METRE tutuyor (taban 0, aralık 1); half
-            // orada da 6000 m civarında metrelerce adım verir.
+            // On the mesh bake path the texture holds METRES (base 0, range 1); half would
+            // give steps of metres around 6000 m there too.
             bakedHeights = new RenderTexture(1024, 1024, 24, RenderTextureFormat.RFloat)
             {
                 name = "Tex_Ground",
@@ -162,10 +162,10 @@ public class SnowGroundHeight : MonoBehaviour
         BaseY = 0f;
         HeightRange = 1f;
 
-        // ASSUMPTION: bake çizimi Faz 1'de yazılmıyor — spec §7.2 aynı replacement
-        // shader'ı (`Hidden/Snow/SkyDepth`) kullanmasını istiyor ve o shader Faz 5'te
-        // doğuyor. `groundSource` varsayılanı `UnityTerrain` ve bu projede tek bir
-        // Terrain var, yani Faz 1–4 bu yoldan geçmiyor. Faz 5'te doldurulacak.
+        // ASSUMPTION: the bake draw is not written in Phase 1 — spec §7.2 wants it to use the
+        // same replacement shader (`Hidden/Snow/SkyDepth`) and that shader is born in Phase 5.
+        // The `groundSource` default is `UnityTerrain` and this project has a single Terrain,
+        // so Phases 1–4 do not go through this path. It will be filled in at Phase 5.
     }
 
     // ----------------------------------------------------------------- global
@@ -178,9 +178,9 @@ public class SnowGroundHeight : MonoBehaviour
         Shader.SetGlobalVector(SnowShaderIDs.GroundOriginXZ, new Vector4(OriginXZ.x, OriginXZ.y, 0f, 0f));
         Shader.SetGlobalVector(SnowShaderIDs.GroundSizeXZ, new Vector4(SizeXZ.x, SizeXZ.y, 0f, 0f));
 
-        // Zemin normali bu adımla türetiliyor (SnowCommon → SampleGroundNormal).
-        // Kar tekseliyle örneklenirse aynı zemin tekseline düşer ve normal her
-        // yerde dümdüz yukarı çıkar.
+        // The ground normal is derived with this step (SnowCommon → SampleGroundNormal).
+        // Sampled at the snow texel it falls on the same ground texel and the normal comes
+        // out dead straight up everywhere.
         int width = tex != null ? Mathf.Max(1, tex.width) : 1;
         int height = tex != null ? Mathf.Max(1, tex.height) : 1;
 

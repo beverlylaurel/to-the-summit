@@ -1,6 +1,6 @@
-// ROL: kar yağışını engelleyen geometrinin dünya Y'sini RT_SkyVis'e yazar
+// ROLE: writes the world Y of the geometry blocking snowfall into RT_SkyVis
 // (spec §12.1).
-// Çağıran: SnowSkyCamera (override materyal olarak).
+// CALLED BY: SnowSkyCamera (as an override material).
 
 Shader "Hidden/Snow/SkyDepth"
 {
@@ -47,13 +47,13 @@ Shader "Hidden/Snow/SkyDepth"
                 return OUT;
             }
 
-            /// MUTLAK DÜNYA Y. Yakalamanın aksine burada göreli kodlama YOK:
-            /// RT_SkyVis'in kapsamı 96 m ve okuyan taraf `occlY - posWS.y`
-            /// farkını alıyor, yani iki değer de aynı mutlak eksende olmalı.
-            /// Yarım hassasiyet 4900 m'de 4 m adım veriyor ama burada ölçülen
-            /// şey santimetre değil METRE mertebesinde bir örtü yüksekliği;
-            /// eşikler 0.05–0.40 m (§12.2) olduğu için bu YETMEZ.
-            /// Bu yüzden RT_SkyVis RHalf DEĞİL RFloat açılıyor — gerekçe
+            /// ABSOLUTE WORLD Y. Unlike the capture there is NO relative encoding here:
+            /// RT_SkyVis covers 96 m and the reading side takes the difference
+            /// `occlY - posWS.y`, so both values have to be on the same absolute axis.
+            /// Half precision gives a 4 m step at 4900 m, but what is measured here is a
+            /// cover height on the order of METRES, not centimetres;
+            /// because the thresholds are 0.05–0.40 m (§12.2) that IS NOT ENOUGH.
+            /// That is why RT_SkyVis is opened as RFloat and NOT RHalf — the reasoning is in
             /// `DECISIONS.md`.
             float4 Fragment(Varyings IN) : SV_Target
             {

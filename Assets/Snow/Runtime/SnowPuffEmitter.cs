@@ -3,9 +3,9 @@
 
 using UnityEngine;
 
-/// SAYI OLCUMDEN TURUYOR (spec 19.3): 8 + 40 * derinlik * (1 - yogunluk).
-/// Sabit bir sayi kullanilsaydi sig karda da derin karda da ayni bulut
-/// cikardi ve karin ne kadar gevsek oldugu gorunmezdi.
+/// THE COUNT DERIVES FROM A MEASUREMENT (spec 19.3): 8 + 40 * depth * (1 - density).
+/// With a fixed count the same cloud would come out in shallow snow and in deep snow
+/// alike, and how loose the snow is would not show.
 [DisallowMultipleComponent]
 public class SnowPuffEmitter : MonoBehaviour
 {
@@ -17,12 +17,12 @@ public class SnowPuffEmitter : MonoBehaviour
 
 
     [Header("Tetik")]
-    [Tooltip("Adım olayının kaynağı. Boş bırakılırsa bu bileşen kendiliğinden " +
-             "hiçbir şey yapmaz; EmitFootstep() dışarıdan çağrılır.")]
+    [Tooltip("The source of the step event. Left empty, this component does nothing " +
+             "on its own; EmitFootstep() is called from outside.")]
     [SerializeField] SnowStepRhythm rhythm;
 
-    // ADIM OLAYA ABONE, ÇAĞRIYA DEĞİL. Ritim bileşeni bu sınıfı tanımıyor;
-    // yürüyüş sistemi değişse de burası değişmiyor.
+    // THE STEP IS SUBSCRIBED TO AN EVENT, NOT A CALL. The rhythm component does not know
+    // this class; the walking system can change without this changing.
     void OnEnable()
     {
         if (rhythm != null) rhythm.Stepped += OnStep;

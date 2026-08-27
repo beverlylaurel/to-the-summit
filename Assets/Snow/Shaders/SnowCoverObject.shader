@@ -1,6 +1,6 @@
-// ROL: üstünde kar biriken nesneler için materyal. YENİ bir shader'dır;
-// mevcut nesne shader'larından hiçbiri değiştirilmedi (spec §16, §1.4).
-// Hangi nesnelerin buna geçeceği kullanıcının kararı.
+// ROLE: the material for objects that collect snow on top. It is a NEW shader;
+// none of the existing object shaders were changed (spec §16, §1.4).
+// Which objects move to it is the user's decision.
 
 Shader "ToTheSummit/SnowCoverObject"
 {
@@ -8,23 +8,23 @@ Shader "ToTheSummit/SnowCoverObject"
     {
         _BaseMap ("Taban doku", 2D) = "white" {}
         _BaseColor ("Taban rengi", Color) = (1, 1, 1, 1)
-        _Smoothness ("Pürüzsüzlük", Range(0, 1)) = 0.3
+        _Smoothness ("Smoothness", Range(0, 1)) = 0.3
 
-        [NoScaleOffset] _SnowBreakup ("Kar kenar gürültüsü", 2D) = "gray" {}
+        [NoScaleOffset] _SnowBreakup ("Snow edge noise", 2D) = "gray" {}
 
-        _SnowSlopeThreshold ("Eğim eşiği", Range(0, 1)) = 0.25
-        _SnowSlopeSharpness ("Eğim keskinliği", Float) = 1.6
-        _SnowBreakupScale ("Gürültü ölçeği (1/m)", Float) = 1.8
-        _SnowBreakupStrength ("Gürültü şiddeti", Range(0, 1)) = 0.55
-        _SnowEdgeSharpness ("Kenar keskinliği", Float) = 4.0
+        _SnowSlopeThreshold ("Slope threshold", Range(0, 1)) = 0.25
+        _SnowSlopeSharpness ("Slope sharpness", Float) = 1.6
+        _SnowBreakupScale ("Noise scale (1/m)", Float) = 1.8
+        _SnowBreakupStrength ("Noise strength", Range(0, 1)) = 0.55
+        _SnowEdgeSharpness ("Edge sharpness", Float) = 4.0
 
-        _SnowThickness ("Kar kalınlığı (m)", Float) = 0.03
-        _SnowEdgeBulge ("Kenar şişmesi", Float) = 0.6
+        _SnowThickness ("Snow thickness (m)", Float) = 0.03
+        _SnowEdgeBulge ("Edge bulge", Float) = 0.6
 
         _SnowAlbedo ("Kar rengi", Color) = (0.90, 0.92, 0.95, 1)
-        _SnowSmoothness ("Kar pürüzsüzlüğü", Range(0, 1)) = 0.45
+        _SnowSmoothness ("Snow smoothness", Range(0, 1)) = 0.45
 
-        [Toggle(_SNOW_DISPLACEMENT_ON)] _SnowDisplacement ("Köşe yer değiştirmesi", Float) = 0
+        [Toggle(_SNOW_DISPLACEMENT_ON)] _SnowDisplacement ("Vertex displacement", Float) = 0
     }
 
     SubShader
@@ -50,8 +50,8 @@ Shader "ToTheSummit/SnowCoverObject"
             #pragma fragment Fragment
 
             #pragma shader_feature_local_vertex _SNOW_DISPLACEMENT_ON
-            // Gerekçe `MountainSurface.shader`. Nesne örtüsü de aynı kar
-            // ışıklandırmasını kullanıyor; parıltı kapısı oradan geliyor.
+            // The reasoning is in `MountainSurface.shader`. The object cover uses the same
+            // snow lighting; the sparkle gate comes from there.
             #pragma multi_compile _SNOW_QUALITY_LOW _SNOW_QUALITY_MEDIUM _SNOW_QUALITY_HIGH
 
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
@@ -64,8 +64,8 @@ Shader "ToTheSummit/SnowCoverObject"
             #include "SnowCover.hlsl"
             #include "SnowLighting.hlsl"
 
-            /// Arazi ıslaklığı GLOBAL olarak da yayınlanıyor (`TerrainSurface`);
-            /// örtü materyali onu okuyor ki aynı kar iki yüzeyde aynı görünsün.
+            /// The terrain wetness is also published as a GLOBAL (`TerrainSurface`);
+            /// the cover material reads it so the same snow looks the same on both surfaces.
             float _SurfaceWetness;
 
             CBUFFER_START(UnityPerMaterial)
@@ -116,9 +116,9 @@ Shader "ToTheSummit/SnowCoverObject"
                 float3 normalWS = TransformObjectToWorldNormal(IN.normalOS);
 
 #ifdef _SNOW_DISPLACEMENT_ON
-                // KÖŞE YER DEĞİŞTİRMESİ İSTEĞE BAĞLI (spec §16). Yoğun
-                // mesh'lerde açılır; düşük çözünürlüklü bir kayada köşe
-                // sayısı yetmediği için kalınlık normalden okunur.
+                // VERTEX DISPLACEMENT IS OPTIONAL (spec §16). It is turned on for dense
+                // meshes; on a low-resolution rock the vertex count is not enough, so the
+                // thickness is read from the normal.
                 float mask = SnowCoverMask(positionWS, normalWS, 1.0,
                                            _SnowSlopeThreshold, _SnowSlopeSharpness,
                                            _SnowBreakupScale, _SnowBreakupStrength,
@@ -143,8 +143,8 @@ Shader "ToTheSummit/SnowCoverObject"
 
                 float3 N = normalize(IN.normalWS);
 
-                // AO girdisi 1: nesnenin kendi AO'su varsa oradan gelir.
-                // Oyuk çarpanı olmadan kar girintilere de dolar.
+                // The AO input is 1: if the object has its own AO it comes from there.
+                // Without the cavity factor the snow fills the recesses too.
                 float mask = SnowCoverMask(IN.positionWS, N, 1.0,
                                            _SnowSlopeThreshold, _SnowSlopeSharpness,
                                            _SnowBreakupScale, _SnowBreakupStrength,
@@ -159,9 +159,9 @@ Shader "ToTheSummit/SnowCoverObject"
 
                 BRDFData brdfData;
                 half alpha = 1.0h;
-                // Karın F0'ı buzunki (0.018), nesnenin kendi yüzeyi dielektrik
-                // (0.04). Aynı maske ikisini de geçiriyor; `MountainSurface`
-                // arazide birebir aynısını yapıyor.
+                // The snow's F0 is ice's (0.018) and the object's own surface is a dielectric
+                // (0.04). The same mask passes both; `MountainSurface` does exactly the same
+                // on the terrain.
                 half f0 = lerp(0.04h, (half)SNOW_ICE_F0, (half)mask);
                 SnowInitBRDF(albedo, smoothness, f0, alpha, brdfData);
 
@@ -172,16 +172,16 @@ Shader "ToTheSummit/SnowCoverObject"
                 half3 color = LightingPhysicallyBased(brdfData, mainLight, N, V);
                 color += SampleSH(N) * albedo;
 
-                // NESNENİN KARI DA ARAZİNİN KARIYLA AYNI MADDE.
+                // AN OBJECT'S SNOW IS THE SAME SUBSTANCE AS THE TERRAIN'S.
                 //
-                // Örtü bir dönem standart URP PBR'ıyla çiziliyordu: sarmalı
-                // difüz yok, sızma yok, parıltı yok, pürüzlülük başka yoldan.
-                // Aynı kar, kayanın üstünde başka türlü parlıyordu. Kar nerede
-                // olursa olsun aynı maddedir; ışık modeli de tek olmalı.
+                // The cover was drawn with standard URP PBR for a while: no wrapped
+                // diffuse, no transmission, no sparkle, roughness by another route.
+                // The same snow shone differently on top of a rock. Snow is the same
+                // substance wherever it is; the light model has to be single too.
                 //
-                // Örtü yüzeyi dünyanın genel durumundan kuruluyor: nesnenin
-                // üstünde deformasyon dokusu yok, ölçülecek yerel yoğunluk da
-                // yok. Kalınlık `_SnowCoverThickness` (spec §16).
+                // The cover surface is built from the world's general state: there is no
+                // deformation texture on the object and no local density to measure.
+                // The thickness is `_SnowCoverThickness` (spec §16).
                 if (mask > 0.001h)
                 {
                     SnowSurface ks = SnowBuildSurface(_FallbackRhoN, _SurfaceWetness, 0.0, 0.0,

@@ -1,5 +1,5 @@
-// ROL: kar tanelerinin ve yer savrulmasının GPU simülasyonu (spec §17.1).
-// Çağıran: SnowfallRenderer.
+// ROLE: the GPU simulation of the snowflakes and the ground drift (spec §17.1).
+// CALLED BY: SnowfallRenderer.
 
 #pragma kernel KFlakeUpdate
 #pragma kernel KDriftUpdate
@@ -13,7 +13,7 @@ struct SnowFlake
     float3 position;
     float  age;
     float3 velocity;
-    float  lifetime;      // <= 0 → bu yuva kapalı
+    float  lifetime;      // <= 0 → this slot is off
     float  size;
     float  phase;
     float  frame;         // atlas karesi 0..15
@@ -24,12 +24,12 @@ RWStructuredBuffer<SnowFlake> _Flakes;
 
 uint  _FlakeCapacity;
 
-/// AÇIK YUVA SAYISI. Yoğunluk bununla ayarlanıyor: `i < _FlakeAliveCount`
-/// olan taneler sonsuza kadar dönüyor, ötekiler kapalı duruyor.
+/// THE NUMBER OF OPEN SLOTS. The density is tuned with it: particles with
+/// `i < _FlakeAliveCount` cycle forever, the rest stay off.
 ///
-/// Klasik "kare başına şu kadar doğur" yolu sayaç ve atomik gerektiriyor;
-/// bu yol ikisini de gerektirmiyor ve hacim İLK KAREDE doluyor (spec §17.1
-/// "kutunun tamamına spawn").
+/// The classic "give birth to this many per frame" route needs a counter and atomics;
+/// this route needs neither and the volume fills IN THE FIRST FRAME (spec §17.1
+/// "spawn into the whole box").
 uint  _FlakeAliveCount;
 
 float3 _SpawnCenter;
@@ -38,14 +38,14 @@ float3 _SpawnExtent;
 float  _FlakeBaseSize;
 float  _FlakeSeed;
 
-/// Doğum hash'inin tam sayı tohumu. `_FlakeSeed` türbülans alanını
-/// kaydırmak için kalıyor, hash artık ondan beslenmiyor.
+/// The integer seed of the birth hash. `_FlakeSeed` stays for shifting the turbulence
+/// field; the hash no longer feeds from it.
 uint   _FlakeSeedU;
 
 float  _SnowWetness;
 float  _SnowDeltaTime;
 
-/// Türbülans (spec §17.1): şiddet rüzgârla artıyor.
+/// Turbulence (spec §17.1): the strength rises with the wind.
 float  _TurbulenceIntensity;
 float  _TurbulenceFrequency;
 float  _TurbulenceDrag;
@@ -53,25 +53,25 @@ float  _TurbulenceDrag;
 float  _FlutterFreq;
 float  _FlutterAmp;
 
-/// Yer savrulması (spec §17.1 Sistem B).
+/// Ground drift (spec §17.1 System B).
 float3 _DriftOrigin;
 float  _DriftStripLength;
 float  _DriftStripWidth;
 
 // ------------------------------------------------------------------- rastgele
 
-/// Tane doğum rastgeleliği. Tamamı tam sayı hash'ten — `frac(sin(...))`
-/// yüz bin indiste çöküyordu (`SnowCommon.hlsl` → `SnowPcg3d`).
+/// The particle birth randomness. All of it from an integer hash — `frac(sin(...))`
+/// collapsed at a hundred thousand indices (`SnowCommon.hlsl` → `SnowPcg3d`).
 float3 SnowRand3(uint idx, uint slot)
 {
     return SnowRandU3(uint3(idx, _FlakeSeedU, slot));
 }
 
-/// Değer gürültüsünün ızgara köşesi. Hücre tam sayı; dağın tepesinde de
-/// eteğinde de aynı kalitede.
+/// The grid corner of the value noise. The cell is an integer; the same quality at the
+/// mountain's summit and at its foot.
 float SnowRand(int3 cell) { return SnowRandCell3(cell).x; }
 
-// ------------------------------------------------------------------ türbülans
+// ------------------------------------------------------------------ turbulence
 
 float SnowValueNoise(float3 p)
 {
@@ -92,7 +92,7 @@ float SnowValueNoise(float3 p)
                 lerp(lerp(n001, n101, f.x), lerp(n011, n111, f.x), f.y), f.z);
 }
 
-/// İki oktavlı vektör alanı (spec §17.1: Octaves = 2).
+/// A two-octave vector field (spec §17.1: Octaves = 2).
 float3 SnowTurbulence(float3 p)
 {
     float3 a = float3(SnowValueNoise(p),
@@ -106,9 +106,9 @@ float3 SnowTurbulence(float3 p)
     return a + b * 0.5;
 }
 
-// -------------------------------------------------------------------- örtü
+// -------------------------------------------------------------------- cover
 
-/// Bu noktanın üstündeki örtünün dünya Y'si. Örtü yoksa çok alçak bir değer.
+/// The world Y of the cover above this point. A very low value if there is no cover.
 float SnowOcclusionY(float3 posWS)
 {
     float2 uv = (posWS.xz - _SkyCenterXZ) / _SkyAreaSize + 0.5;
@@ -124,14 +124,14 @@ void SpawnFlake(uint idx, inout SnowFlake f)
     float3 r0 = SnowRand3(idx, 1u);
     float3 r1 = SnowRand3(idx, 2u);
 
-    // SPAWN KUTUSU 1 m IZGARASINA SNAP'Lİ (CPU'da). Snap yoksa kamera
-    // hareketinde doğum deseni yürüyor ve taneler kayıyormuş gibi görünüyor.
+    // THE SPAWN BOX IS SNAPPED TO A 1 m GRID (on the CPU). Without the snap the birth
+    // pattern walks as the camera moves and the particles look like they are sliding.
     f.position = _SpawnCenter + (r0 * 2.0 - 1.0) * _SpawnExtent;
 
     f.age = 0.0;
     f.lifetime = lerp(4.0, 9.0, r1.x);
 
-    // Terminal hız ıslaklıkla artıyor: sulu kar ağır ve hızlı düşüyor.
+    // The terminal velocity rises with the wetness: wet snow is heavy and falls fast.
     float dry = lerp(0.6, 1.4, r1.y);
     float wet = lerp(1.4, 3.0, r1.z);
     float terminal = lerp(dry, wet, _SnowWetness);
@@ -152,7 +152,7 @@ void KFlakeUpdate(uint3 id : SV_DispatchThreadID)
 
     SnowFlake f = _Flakes[idx];
 
-    // Kapalı yuva: hiç iş yok.
+    // A closed slot: no work at all.
     if (idx >= _FlakeAliveCount)
     {
         f.lifetime = 0.0;
@@ -165,11 +165,11 @@ void KFlakeUpdate(uint3 id : SV_DispatchThreadID)
 
     if (!respawn)
     {
-        // ZEMİN KESME (spec §17.1).
+        // GROUND CULL (spec §17.1).
         if (f.position.y < SampleGroundHeight(f.position.xz) + 0.02) respawn = true;
 
-        // ÖRTÜ KESME. Çatı/köprü altına kar yağmaması en çok fark edilen
-        // detay (spec §17.1 — "atlanmayacak").
+        // COVER CULL. Snow not falling under a roof/bridge is the most noticeable
+        // detail (spec §17.1 — "not to be skipped").
         if (SnowOcclusionY(f.position) - f.position.y > 1.5) respawn = true;
     }
 
@@ -188,22 +188,22 @@ void KFlakeUpdate(uint3 id : SV_DispatchThreadID)
     float3 turb = SnowTurbulence(f.position * _TurbulenceFrequency + _FlakeSeed) *
                   _TurbulenceIntensity;
 
-    // Sürüklenme: hıza doğru üstel yaklaşma. Ani sıçrama yok.
+    // Drag: an exponential approach towards the speed. No sudden jump.
     f.velocity = lerp(f.velocity, target + turb, 1.0 - exp(-_TurbulenceDrag * dt));
 
     f.position += f.velocity * dt;
 
-    // SALINIM: tane düz düşmüyor, yatayda savruluyor. Sulu karda sönüyor.
+    // OSCILLATION: the particle does not fall straight, it swings horizontally. It dies out in wet snow.
     float2 flutter = float2(sin(f.age * _FlutterFreq + f.phase),
                             cos(f.age * _FlutterFreq * 0.83 + f.phase));
 
     f.position.xz += flutter * _FlutterAmp * (1.0 - _SnowWetness) * dt;
 
-    // Ömrün ilk ve son %8'inde alpha rampası — taneler birden belirmiyor.
+    // An alpha ramp over the first and last 8% of the lifetime — the particles do not appear suddenly.
     float t = saturate(f.age / max(f.lifetime, 1e-3));
     float life = saturate(t / 0.08) * saturate((1.0 - t) / 0.08);
 
-    // Saçakta yumuşak geçiş.
+    // A soft transition at the fringe.
     float occl = 1.0 - smoothstep(0.0, 0.5, SnowOcclusionY(f.position) - f.position.y);
 
     f.alpha = life * occl;
@@ -211,10 +211,10 @@ void KFlakeUpdate(uint3 id : SV_DispatchThreadID)
     _Flakes[idx] = f;
 }
 
-// -------------------------------------------------------------- yer savrulması
+// -------------------------------------------------------------- ground drift
 
-/// SALTASYON KATMANI 1–5 cm (spec §18.7) [KAYNAK: Pomeroy & Gray 1990].
-/// Daha yükseğe doğurmak süspansiyon katmanıdır ve ayrı bir sistemdir.
+/// THE SALTATION LAYER IS 1–5 cm (spec §18.7) [SOURCE: Pomeroy & Gray 1990].
+/// Giving birth higher is the suspension layer and a separate system.
 void SpawnDrift(uint idx, inout SnowFlake f)
 {
     float3 r0 = SnowRand3(idx, 11u);
@@ -223,7 +223,7 @@ void SpawnDrift(uint idx, inout SnowFlake f)
     float2 wind = normalize(_WindWS.xz + 1e-5);
     float2 side = float2(-wind.y, wind.x);
 
-    // Rüzgâr ÜSTÜNDE bir şeritte doğuyor, rüzgârla kameraya doğru geliyor.
+    // It is born in a strip UPWIND and comes towards the camera with the wind.
     float2 planar = _DriftOrigin.xz
                   - wind * (r0.x * _DriftStripLength)
                   + side * ((r0.y * 2.0 - 1.0) * _DriftStripWidth);
@@ -273,7 +273,7 @@ void KDriftUpdate(uint3 id : SV_DispatchThreadID)
 
     float groundY = SampleGroundHeight(f.position.xz);
 
-    // Yerden yükseldikçe soluyor: saltasyon yüzeye yapışık bir katman.
+    // It fades as it rises from the ground: saltation is a layer hugging the surface.
     float height = f.position.y - groundY;
     float fade = 1.0 - saturate(height / 0.30);
 
@@ -327,7 +327,7 @@ void KBurstUpdate(uint3 id : SV_DispatchThreadID)
 
     f.position += f.velocity * dt;
 
-    // Zemine carpinca sonuyor; sekmiyor - omur zaten kisa.
+    // It dies on hitting the ground; it does not bounce - the lifetime is short anyway.
     float groundY = SampleGroundHeight(f.position.xz);
     if (f.position.y < groundY) f.position.y = groundY;
 

@@ -1,55 +1,55 @@
-// ROL: karakteri kar yüzeyinin üstünde tutar. Arazi collider'ı kayayı
-// temsil ediyor; kar onun üstünde geometri olarak yükseliyor.
-// Çağıran: yok — kendi başına çalışıyor, bağımlılıkları Inspector'dan.
+// ROLE: keeps the character on top of the snow surface. The terrain collider represents
+// the rock; the snow rises above it as geometry.
+// CALLED BY: nobody — it runs on its own, its dependencies come from the Inspector.
 
 using System;
 using UnityEngine;
 
-/// KARAKTER ÇİZİLEN YÜZEYDE DURUYOR, KAYANIN ÜSTÜNDE DEĞİL.
+/// THE CHARACTER STANDS ON THE DRAWN SURFACE, NOT ON THE ROCK.
 ///
-/// `CharacterController` arazi collider'ının üstünde duruyor ve o collider
-/// heightmap'ten geliyor — 7.32 m çözünürlükte, karsız. Kar yüzeyi
-/// tessellation ile 15-30 cm yükselince karakter o kadar gömülü kalıyor.
+/// `CharacterController` stands on the terrain collider and that collider comes from the
+/// heightmap — at 7.32 m resolution, without snow. When the snow surface rises 15-30 cm
+/// with tessellation the character stays that far buried.
 ///
-/// BU HATA BİR KEZ YAPILDI. `MountainSurface.shader` yorumu: "ayak 205.539,
-/// kaya 205.489, çizilen yüzey 205.98 — karakter yarım metre gömülü
-/// başlıyordu ve göz kar yüzeyinin altında kalıyordu." O tur kar
-/// yüksekliğinin geometriden tamamen çıkarılmasıyla bitti.
+/// THIS MISTAKE WAS MADE ONCE. The `MountainSurface.shader` comment: "the foot at 205.539,
+/// the rock at 205.489, the drawn surface at 205.98 — the character started half a metre
+/// buried and the eye stayed below the snow surface." That round ended with the snow
+/// height being removed from the geometry entirely.
 ///
-/// Okunan fonksiyon shader'ın kullandığının ikizi (`SnowSurfaceHeight`) ve
-/// eşliği `SnowHeightParityTest` ile sınanıyor: 512 örnek, tolerans 1 mm.
+/// The function read is the twin of the one the shader uses (`SnowSurfaceHeight`) and
+/// their parity is tested by `SnowHeightParityTest`: 512 samples, 1 mm tolerance.
 ///
-/// YALNIZ YERDEYKEN. Havadayken (zıplama, düşüş) yüzey düzeltmesi
-/// uygulanmıyor; uygulansaydı karakter havada yukarı çekilirdi.
+/// ONLY WHILE GROUNDED. While airborne (jumping, falling) the surface correction is not
+/// applied; applied, the character would be pulled upward in mid-air.
 [RequireComponent(typeof(CharacterController))]
 [DisallowMultipleComponent]
 public class SnowGroundOffset : MonoBehaviour
 {
-    [Tooltip("Kar yöneticisi. Kar derinliği ve rüzgâr maruziyeti buradan " +
-             "okunuyor; boş bırakılırsa karakter kayanın üstünde kalır.")]
+    [Tooltip("The snow manager. The snow depth and the wind exposure are read from here; " +
+             "left empty the character stays on the rock.")]
     [SerializeField] SnowManager snowManager;
 
-    [Tooltip("Yüzey düzeltmesinin yumuşama zaman sabiti (s). Sıfır = anında.")]
+    [Tooltip("Smoothing time constant of the surface correction (s). Zero = instant.")]
     [SerializeField, Min(0f)] float smoothing = 0.06f;
 
     CharacterController controller;
 
-    /// O an uygulanmış olan düzeltme. Karakter yürürken yüzey yüksekliği
-    /// değişiyor; fark ANINDA uygulanırsa kamera zıplıyor.
+    /// The correction currently applied. As the character walks the surface height
+    /// changes; applied INSTANTLY the camera jumps.
     float uygulanan;
 
     void Awake() => controller = GetComponent<CharacterController>();
 
     void OnEnable() => uygulanan = 0f;
 
-    /// LATEUPDATE, UPDATE DEĞİL. `FirstPersonController` hareketi `Update`'te
-    /// yapıyor; düzeltme ondan sonra gelmeli, yoksa bir kare geriden gider.
+    /// LATEUPDATE, NOT UPDATE. `FirstPersonController` moves in `Update`; the correction
+    /// has to come after it, otherwise it runs one frame behind.
     void LateUpdate()
     {
         if (snowManager == null) return;
 
-        // Havadayken yüzey düzeltmesi yok: karakter zıplarken yukarı
-        // çekilmemeli. Düzeltme yavaşça sıfıra dönüyor ki iniş yumuşasın.
+        // No surface correction while airborne: the character must not be pulled up while
+        // jumping. The correction returns to zero slowly so the landing is soft.
         float hedef = controller.isGrounded ? YuzeyYuksekligi() : 0f;
 
         float k = smoothing > 0f
@@ -61,8 +61,8 @@ public class SnowGroundOffset : MonoBehaviour
 
         if (Mathf.Abs(fark) > 1e-5f)
         {
-            // Kontrolcü kapalıyken taşınıyor: `Move` çarpışma çözerdi ve
-            // karakter kendi kapsülüyle zemine takılıp titrerdi.
+            // Moved with the controller disabled: `Move` would resolve collisions and the
+            // character would snag on the ground with its own capsule and shake.
             controller.enabled = false;
             transform.position += new Vector3(0f, fark, 0f);
             controller.enabled = true;
@@ -87,6 +87,6 @@ public class SnowGroundOffset : MonoBehaviour
     {
         if (snowManager == null && Application.isPlaying)
             throw new InvalidOperationException(
-                $"{nameof(SnowGroundOffset)}: {nameof(snowManager)} atanmadı.");
+                $"{nameof(SnowGroundOffset)}: {nameof(snowManager)} is not assigned.");
     }
 }

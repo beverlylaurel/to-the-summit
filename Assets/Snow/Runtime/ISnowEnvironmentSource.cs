@@ -1,7 +1,7 @@
-// ROL: Kar sisteminin dış dünyadan okuduğu her şey. Oyunun mevcut hava, rüzgâr
-// ve gece/gündüz sistemleri bu arayüzü implemente eder.
-// Kar sistemi bu değerleri ASLA yazmaz.
-// Çağıran: SnowManager ve alt bileşenleri.
+// ROLE: everything the snow system reads from the outside world. The game's existing
+// weather, wind and day/night systems implement this interface.
+// The snow system NEVER writes these values.
+// CALLED BY: SnowManager and its subcomponents.
 
 using UnityEngine;
 
@@ -13,48 +13,48 @@ public enum PrecipitationKind
     Sleet,
 }
 
-/// TEK KAPI. Hiçbir kar dosyası `RenderSettings.fog`, kendi gündöngüsü veya kendi
-/// rüzgâr gürültüsünü kullanmaz; hepsi buradan okur (spec §3.1).
+/// A SINGLE DOOR. No snow file uses `RenderSettings.fog`, its own day cycle or its own
+/// wind noise; they all read from here (spec §3.1).
 ///
-/// Kendi rüzgârını, kendi güneşini, kendi sisini kuran her satır bir hatadır.
+/// Every line setting up its own wind, its own sun or its own fog is a mistake.
 public interface ISnowEnvironmentSource
 {
-    // --- Rüzgâr (mevcut rüzgâr sisteminden) ---
+    // --- Wind (from the existing wind system) ---
 
-    /// Normalize, dünya uzayı, yatay.
+    /// Normalized, world space, horizontal.
     Vector3 WindDirection { get; }
 
     /// m/s.
     float WindSpeed { get; }
 
-    /// HÂKİM RÜZGÂR YÖNÜ — anlık değil.
+    /// THE PREVAILING WIND DIRECTION — not the instantaneous one.
     ///
-    /// Yer şekilleri (sastrugi, ripple) bu ekseni kullanıyor. Anlık yön
-    /// kullanılırsa desen dünyada kayıyor: alan `dot(worldXZ, eksen)` üzerinden
-    /// kuruluyor ve dağın ortasında |worldXZ| yedi bin metre — bir hamlenin
-    /// 0.14 radyanlık sapması deseni 980 metre sürüklüyor. Aynı ölçüm
-    /// `WindField.PrevailingDirection` yanında da kayıtlı.
+    /// The landforms (sastrugi, ripple) use this axis. With the instantaneous direction
+    /// the pattern slides across the world: the field is built on `dot(worldXZ, axis)`
+    /// and in the middle of the mountain |worldXZ| is seven thousand metres — a gust's
+    /// 0.14 radian deviation drags the pattern by 980 metres. The same measurement is
+    /// also recorded next to `WindField.PrevailingDirection`.
     Vector3 PrevailingWindDirection { get; }
 
-    // --- Gece/gündüz döngüsünden ---
+    // --- From the day/night cycle ---
 
     /// Ana directional light.
     Light Sun { get; }
 
-    /// 0 = ufuk altı, 1 = tepe.
+    /// 0 = below the horizon, 1 = at the zenith.
     float SunElevation01 { get; }
 
-    /// Celsius. Gündöngüsü + mevsim bunu sürer.
+    /// Celsius. The day cycle + the season drive it.
     float TemperatureC { get; }
 
-    // --- Yağış (mevcut yağmur sisteminden) ---
+    // --- Precipitation (from the existing rain system) ---
 
     PrecipitationKind PrecipKind { get; }
 
-    /// 0..1, mevcut sistemin şiddet değeri.
+    /// 0..1, the existing system's intensity value.
     float PrecipIntensity01 { get; }
 
-    // --- Sis (sadece okunur, kar tanesi fade'i için) ---
+    // --- Fog (read only, for the snowflake fade) ---
 
     /// 0..1 normalize, mevcut sis sisteminden.
     float FogDensity01 { get; }

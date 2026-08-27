@@ -1,5 +1,5 @@
-// ROL: karın parıltısı (spec §14.4).
-// Çağıran: SnowLighting.hlsl.
+// ROLE: the snow's sparkle (spec §14.4).
+// CALLED BY: SnowLighting.hlsl.
 
 #ifndef SNOW_SPARKLE_INCLUDED
 #define SNOW_SPARKLE_INCLUDED
@@ -10,25 +10,25 @@
 // tek satirlik eksik include'du.
 #include "SnowCommon.hlsl"
 
-/// MESAFEDE TİTREMEYEN PARILTI
-/// [KAYNAK: Bowles & Wang, "Sparkly but not too Sparkly!", SIGGRAPH 2015].
+/// A SPARKLE THAT DOES NOT FLICKER WITH DISTANCE
+/// [SOURCE: Bowles & Wang, "Sparkly but not too Sparkly!", SIGGRAPH 2015].
 ///
-/// Naif parıltı uzakta korkunç titrer: bir pikselin içine yüzlerce kristal
-/// düşer ve hangisinin parladığı kare kare değişir. Çözüm yoğunluğu EKRAN
-/// UZAYINDA sabit tutmak — hücre boyu piksel ayak izine göre LOD'lanıyor,
-/// eşik de aynı oranda gevşiyor.
+/// A naive sparkle flickers horribly at distance: hundreds of crystals fall inside a
+/// single pixel and which of them flashes changes frame to frame. The answer is to keep
+/// the density constant IN SCREEN SPACE — the cell size is LODed against the pixel
+/// footprint, and the threshold loosens by the same ratio.
 
-/// AYNI ÇÖKME BURADA DA VARDI. Hücre `floor(posWS.xz / cellSize)`; 6000 m'lik
-/// dağda ve milimetrik hücrede girdi milyonlara çıkıyor, `frac(sin(...))`
-/// orada tekrar eden değer üretiyor. Tam sayı hash'te bu sınır yok
+/// THE SAME COLLAPSE WAS HERE TOO. The cell is `floor(posWS.xz / cellSize)`; on a 6000 m
+/// mountain with a millimetre cell the input goes into the millions and `frac(sin(...))`
+/// produces a repeating value there. An integer hash has no such limit
 /// (`SnowCommon.hlsl` → `SnowPcg3d`).
 float3 SnowHash33(int3 cell)
 {
     return SnowRandCell3(cell);
 }
 
-/// Bir kristal hücresinin mikro normali. Aşağı bakanlar yukarı çevriliyor —
-/// yüzeyin altına bakan bir kristal parlayamaz.
+/// The micro normal of one crystal cell. Those facing down are turned up —
+/// a crystal facing into the surface cannot flash.
 float3 SparkleCellNormal(float2 cell)
 {
     float3 r = SnowHash33(int3((int2)cell, 17));
@@ -40,19 +40,19 @@ half SnowSparkle(float3 posWS, float3 V, float3 L, float pixelFootprint)
 {
     float3 H = normalize(V + L);
 
-    // SINIRLANAN ŞEY LOD DEĞİL, AYAK İZİ.
+    // WHAT IS CLAMPED IS NOT THE LOD BUT THE FOOTPRINT.
     //
-    // Bowles & Wang hücreyi piksel ayak izine göre büyütüp yoğunluğu ekran
-    // uzayında sabit tutuyor. Bir dönem LOD iki seviyeyle sınırlandı, çünkü
-    // uzakta İRİ DİKDÖRTGEN lekeler çıkıyordu. O sınır belirtiyi kapattı ama
-    // parıltıyı da öldürdü: hücre büyüyemeyince `cellsPerPixel` şişiyor,
-    // `pTarget` sıfıra iniyor ve eşik 1'e dayanıyor — uzakta hiçbir kristal
-    // parlamıyor (kullanıcı bildirdi: "sadece çok yakında görünüyor").
+    // Bowles & Wang grow the cell with the pixel footprint and keep the density
+    // constant in screen space. At one point the LOD was limited to two levels, because
+    // LARGE RECTANGULAR patches appeared at distance. That limit closed the symptom but
+    // killed the sparkle too: with the cell unable to grow, `cellsPerPixel` inflates,
+    // `pTarget` falls to zero and the threshold presses against 1 — no crystal flashes
+    // at distance at all (the user reported it: "it only shows very close up").
     //
-    // Dikdörtgenlerin gerçek sebebi ayak izinin kendisi: `fwidth(posWS.xz)`
-    // sıyırtma açıda patlıyor, hücre metrelerce oluyor ve tek hücre onlarca
-    // pikseli kaplıyor. Ayak izine tavan konunca hücre en fazla birkaç
-    // santim kalıyor — 30 m'de bir iki piksel, yani leke değil parıltı.
+    // The rectangles' real cause is the footprint itself: `fwidth(posWS.xz)` explodes at
+    // a grazing angle, the cell becomes metres wide and a single cell covers dozens of
+    // pixels. With a ceiling on the footprint the cell stays a few centimetres at most —
+    // one or two pixels at 30 m, i.e. a sparkle rather than a patch.
     float fp = clamp(pixelFootprint, _SparkleCellSize, SNOW_SPARKLE_MAX_FOOTPRINT);
     float lodF = max(log2(fp / _SparkleCellSize), 0.0);
     int   l0 = (int)floor(lodF);

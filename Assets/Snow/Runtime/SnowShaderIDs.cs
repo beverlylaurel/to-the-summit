@@ -1,18 +1,18 @@
-// ROL: bütün shader property adlarının tek yeri (spec §0.8). String tabanlı
-// SetFloat("_X") her karede hash hesaplıyor ve allocation yapıyor; ID'ler bir
-// kez çözülüp saklanıyor.
-// Çağıran: bütün kar bileşenleri.
+// ROLE: the single place for every shader property name (spec §0.8). A string-based
+// SetFloat("_X") hashes the string every frame and allocates; the IDs are resolved once
+// and stored.
+// CALLED BY: every snow component.
 
 using UnityEngine;
 
 public static class SnowShaderIDs
 {
-    // --- Bölge ve dünya eşlemesi (SnowCommon.hlsl) ---
+    // --- Region and world mapping (SnowCommon.hlsl) ---
     public static readonly int SnowAreaCenter = Shader.PropertyToID("_SnowAreaCenter");
     public static readonly int SnowAreaSize = Shader.PropertyToID("_SnowAreaSize");
     public static readonly int SnowResolution = Shader.PropertyToID("_SnowResolution");
 
-    // --- Zemin yüksekliği ---
+    // --- Ground height ---
     public static readonly int GroundHeightTex = Shader.PropertyToID("_GroundHeightTex");
     public static readonly int GroundOriginXZ = Shader.PropertyToID("_GroundOriginXZ");
     public static readonly int GroundSizeXZ = Shader.PropertyToID("_GroundSizeXZ");
@@ -20,7 +20,7 @@ public static class SnowShaderIDs
     public static readonly int GroundBaseY = Shader.PropertyToID("_GroundBaseY");
     public static readonly int GroundHeightRange = Shader.PropertyToID("_GroundHeightRange");
 
-    // --- Çevre: mevcut sistemlerden okunup yayınlanan değerler (spec §3) ---
+    // --- Environment: values read from the existing systems and published (spec §3) ---
     public static readonly int WindWS = Shader.PropertyToID("_WindWS");
     public static readonly int WindSpeed = Shader.PropertyToID("_WindSpeed");
     public static readonly int TemperatureC = Shader.PropertyToID("_TemperatureC");
@@ -29,32 +29,32 @@ public static class SnowShaderIDs
     public static readonly int RainOnSnow01 = Shader.PropertyToID("_RainOnSnow01");
     public static readonly int SnowUpDirection = Shader.PropertyToID("_SnowUpDirection");
 
-    // --- Yağış ---
+    // --- Precipitation ---
     public static readonly int SnowfallSWERate = Shader.PropertyToID("_SnowfallSWERate");
     public static readonly int SnowWetness = Shader.PropertyToID("_SnowWetness");
     public static readonly int SnowCoverage = Shader.PropertyToID("_SnowCoverage");
 
-    // --- Örtü ayarları (spec §16). Arazi ve nesneler AYNI sayıları okusun diye
-    // global; iki yerde ayrı tutulsaydı sınırda çelişirlerdi.
+    // --- Cover settings (spec §16). Global so the terrain and the objects read the SAME
+    // numbers; kept separately in two places they would contradict at the boundary.
     public static readonly int CoverSlopeSharpness = Shader.PropertyToID("_SnowCoverSlopeSharpness");
     public static readonly int CoverBreakupStrength = Shader.PropertyToID("_SnowCoverBreakupStrength");
     public static readonly int CoverEdgeSharpness = Shader.PropertyToID("_SnowCoverEdgeSharpness");
     public static readonly int CoverThickness = Shader.PropertyToID("_SnowCoverThickness");
 
-    /// Dünyanın kar sütunu, metre. Arazi kar ışıklandırmasının derinliği;
-    /// `_SnowCoverThickness` NESNE üstündeki ince örtü için ve arazi için
-    /// yanlış büyüklük.
+    /// The world's snow column, in metres. The depth of the terrain snow lighting;
+    /// `_SnowCoverThickness` is for the thin cover on an OBJECT and is the wrong
+    /// magnitude for the terrain.
     public static readonly int WorldSnowDepth = Shader.PropertyToID("_WorldSnowDepth");
     public static readonly int SnowAccum = Shader.PropertyToID("_SnowAccum");
     public static readonly int SnowLineY = Shader.PropertyToID("_SnowLineY");
 
-    // --- Durum dokuları ---
+    // --- State textures ---
     public static readonly int SnowStateTex = Shader.PropertyToID("_SnowStateTex");
     public static readonly int SnowTrailTex = Shader.PropertyToID("_SnowTrailTex");
     public static readonly int SnowSkyVisTex = Shader.PropertyToID("_SnowSkyVisTex");
     public static readonly int SnowWindShadowTex = Shader.PropertyToID("_SnowWindShadowTex");
 
-    // --- Gökyüzü görünürlüğü ---
+    // --- Sky visibility ---
     public static readonly int SkyCenterXZ = Shader.PropertyToID("_SkyCenterXZ");
     public static readonly int SkyAreaSize = Shader.PropertyToID("_SkyAreaSize");
     public static readonly int SkyResolution = Shader.PropertyToID("_SkyResolution");
@@ -82,12 +82,12 @@ public static class SnowShaderIDs
     public static readonly int RimBlurTexels = Shader.PropertyToID("_RimBlurTexels");
     public static readonly int GSParity = Shader.PropertyToID("_GSParity");
 
-    // --- İz parçaları ---
+    // --- Trail segments ---
     public static readonly int TrailSegments = Shader.PropertyToID("_TrailSegments");
     public static readonly int TrailSegmentCount = Shader.PropertyToID("_TrailSegmentCount");
     public static readonly int TrailVelocityXZ = Shader.PropertyToID("_TrailVelocityXZ");
 
-    // --- Isı kaynakları (spec §18.2) ---
+    // --- Heat sources (spec §18.2) ---
     public static readonly int HeatSources = Shader.PropertyToID("_HeatSources");
     public static readonly int HeatParams = Shader.PropertyToID("_HeatParams");
     public static readonly int HeatCount = Shader.PropertyToID("_HeatCount");
@@ -95,9 +95,9 @@ public static class SnowShaderIDs
     // --- Sastrugi (spec §18.4) ---
     public static readonly int SastrugiWindDir = Shader.PropertyToID("_SastrugiWindDir");
 
-    /// Çukurun ortalama yarıçapı (m). `SnowReliefShadow`'un ufuk açısı bundan
-    /// çıkıyor; `SnowManager.BuildTrailSegments` sahnedeki deformer'lardan
-    /// hesaplayıp yazıyor.
+    /// The pit's mean radius (m). `SnowReliefShadow`'s horizon angle follows from it;
+    /// `SnowManager.BuildTrailSegments` computes it from the deformers in the scene
+    /// and writes it.
     public static readonly int CavityRadius = Shader.PropertyToID("_SnowCavityRadius");
 
     // --- Tessellation ---
@@ -107,12 +107,12 @@ public static class SnowShaderIDs
     public static readonly int TessFar = Shader.PropertyToID("_SnowTessFar");
     public static readonly int SastrugiNoise = Shader.PropertyToID("_SastrugiNoise");
 
-    // --- Kar yüzeyi materyali ---
+    // --- Snow surface material ---
     public static readonly int FallbackSWE = Shader.PropertyToID("_FallbackSWE");
-    // KOT KAR CIZGISI. Yukaridaki `_SnowLineY` KARAKTER ustu birikmenin
-    // kendi cizgisi (spec 16.1) ve MaterialPropertyBlock ile veriliyor; bu
-    // ise ARAZININ hangi kottan yukarisinin karli oldugu, global. Ayni ada
-    // konsalardi property block globali ezerdi.
+    // THE ELEVATION SNOW LINE. The `_SnowLineY` above is the snow line of the
+    // accumulation ON A CHARACTER (spec 16.1) and is supplied with a MaterialPropertyBlock;
+    // this one is which elevation of the TERRAIN is snowy upward, and it is global. Given
+    // the same name, the property block would override the global.
     public static readonly int FallbackRhoN = Shader.PropertyToID("_FallbackRhoN");
     public static readonly int SnowBreakup = Shader.PropertyToID("_SnowBreakup");
     public static readonly int SnowDetailNormal = Shader.PropertyToID("_SnowDetailNormal");
@@ -126,7 +126,7 @@ public static class SnowShaderIDs
     public static readonly int SnowAORadius = Shader.PropertyToID("_SnowAORadius");
     public static readonly int SnowAOStrength = Shader.PropertyToID("_SnowAOStrength");
 
-    // --- Kar yağışı (Faz 8) ---
+    // --- Snowfall (Phase 8) ---
     public static readonly int Flakes = Shader.PropertyToID("_Flakes");
     public static readonly int FlakeCapacity = Shader.PropertyToID("_FlakeCapacity");
     public static readonly int FlakeAliveCount = Shader.PropertyToID("_FlakeAliveCount");
@@ -151,20 +151,20 @@ public static class SnowShaderIDs
     public static readonly int BurstWindPull = Shader.PropertyToID("_BurstWindPull");
     public static readonly int BurstGrowth = Shader.PropertyToID("_BurstGrowth");
 
-    // --- Uzak kaskad ve kalıcılık (Faz 10) ---
+    // --- Far cascade and persistence (Phase 10) ---
     public static readonly int BlockBuffer = Shader.PropertyToID("_BlockBuffer");
     public static readonly int BlockOrigin = Shader.PropertyToID("_BlockOrigin");
     public static readonly int BlockTexels = Shader.PropertyToID("_BlockTexels");
     public static readonly int BlockStored = Shader.PropertyToID("_BlockStored");
 
-    // --- Rüzgâr gölgesi ve taşınım (Faz 12) ---
+    // --- Wind shadow and transport (Phase 12) ---
     public static readonly int WindShadow = Shader.PropertyToID("_WindShadow");
     public static readonly int SkyVisY = Shader.PropertyToID("_SkyVisY");
     public static readonly int SnowRW = Shader.PropertyToID("_SnowRW");
     public static readonly int TrailRW = Shader.PropertyToID("_TrailRW");
 
 
-    // --- Teşhis penceresi ---
+    // --- Diagnostic window ---
     public static readonly int DebugMode = Shader.PropertyToID("_DebugMode");
     public static readonly int DebugRange = Shader.PropertyToID("_DebugRange");
     public static readonly int DebugBias = Shader.PropertyToID("_DebugBias");

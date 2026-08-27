@@ -3,16 +3,16 @@
 
 using UnityEngine;
 
-/// PUSKURTME MIKTARI UYDURULMUYOR, SIMULASYONDAN TURUYOR (spec 18.6)
-/// [KAYNAK: Sumner, O'Brien & Hodgins, CGF 1999].
+/// THE SPRAY AMOUNT IS NOT INVENTED, IT DERIVES FROM THE SIMULATION (spec 18.6)
+/// [SOURCE: Sumner, O'Brien & Hodgins, CGF 1999].
 ///
-/// Birim zamanda yerinden edilen kar hacmi V = genislik x batma x hiz.
-/// Ucunun ucu de elimizde: batma SnowSampler'dan, hiz hareket kaynagindan,
-/// temas genisligi deformer proxy'sinden. Sabit bir oran kullanilsaydi
-/// yavaslayinca da hizlanınca da ayni bulut cikardi.
+/// The volume of snow displaced per unit time is V = width x sinking x speed.
+/// All three are in hand: the sinking from SnowSampler, the speed from the motion
+/// source, the contact width from the deformer proxy. With a fixed rate the same
+/// cloud would come out whether you slowed down or sped up.
 ///
-/// MEVCUT HAREKET KODUNA SATIR EKLENMEDI (spec 18.6, 1.4). Hiz kaynagi
-/// Inspector'dan atanan bir Transform'un konum farkindan olculuyor.
+/// NO LINE WAS ADDED TO THE EXISTING MOTION CODE (spec 18.6, 1.4). The speed source
+/// is measured from the position difference of a Transform assigned in the Inspector.
 [DisallowMultipleComponent]
 public class SnowSprayController : MonoBehaviour
 {

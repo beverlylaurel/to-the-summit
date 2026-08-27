@@ -1,43 +1,43 @@
-// ROL: nesne üstü kar maskesinin okuduğu iki globali yayınlar.
-// Çağıran: sahne (SnowManager'ın yanında).
+// ROLE: publishes the two globals the object snow mask reads.
+// CALLED BY: the scene (next to SnowManager).
 
 using UnityEngine;
 
-/// TEK SAHİP. `_SnowCoverage` ve `_SnowUpDirection`'ı yalnız bu bileşen
-/// yazıyor. İki yerden yazılsaydı hangisinin kazandığı çalışma sırasına
-/// kalırdı ve belirti "bazı nesneler karlanmıyor" olurdu.
+/// A SINGLE OWNER. `_SnowCoverage` and `_SnowUpDirection` are written by this component
+/// only. Written from two places, which one wins would depend on the execution order and
+/// the symptom would be "some objects do not get snow".
 ///
-/// Zeminde ne kadar kar varsa nesnelerde de o kadar (spec §16) — kaplama
-/// `SnowRuntimeState`'ten geliyor, ayrı bir ölçüm yapılmıyor.
+/// However much snow is on the ground, that much is on the objects (spec §16) — the
+/// coverage comes from `SnowRuntimeState`, no separate measurement is made.
 [DisallowMultipleComponent]
 public class SnowCoverageDriver : MonoBehaviour
 {
-    [Tooltip("Karın biriktiği yön. Dünya yukarısı dışında bir şey vermek "
-             + "yalnız yerçekimi yönü değişen sahnelerde anlamlı.")]
+    [Tooltip("The direction snow settles from. Giving anything other than world up "
+             + "only means something in scenes where the gravity direction changes.")]
     [SerializeField] Vector3 upDirection = Vector3.up;
 
-    [Tooltip("Kaplamanın nesnelere yansırken çarpıldığı katsayı. 1 = zeminle "
-             + "birebir aynı.")]
+    [Tooltip("The coefficient the coverage is multiplied by as it carries to the objects. "
+             + "1 = exactly the same as the ground.")]
     [SerializeField, Range(0f, 2f)] float coverageScale = 1f;
 
-    [Tooltip("Örtü ayarlarının kaynağı. Arazi ve nesneler aynı sayıları okuyor.")]
+    [Tooltip("The source of the cover settings. The terrain and the objects read the same numbers.")]
     [SerializeField] SnowSettings settings;
 
-    [Tooltip("Dünya karını okuyan yönetici. Örtü GECİKMESİZ buradan türüyor.")]
+    [Tooltip("The manager reading the world snow. The cover derives from here WITH NO LAG.")]
     [SerializeField] SnowManager snowManager;
 
-    /// ÖRTÜ DÜNYA KARINDAN, GERİ OKUMADAN DEĞİL.
+    /// THE COVER COMES FROM THE WORLD SNOW, NOT FROM A READBACK.
     ///
-    /// Eskiden `SnowRuntimeState.GroundCoverage01` okunuyordu; o değer async
-    /// GPU geri okumasından geliyor ve otuz karede bir tazeleniyor. Kar mesh'i
-    /// ANINDA güncellendiği için arada oyuncunun çevresinde görünür bir KARE
-    /// kalıyordu: içerisi yeni durumu, dışarısı otuz kare önceki durumu
-    /// gösteriyordu (kullanıcı iki kez bildirdi — bir kez içerisi beyaz dışarısı
-    /// siyah, bir kez tam tersi).
+    /// `SnowRuntimeState.GroundCoverage01` used to be read; that value comes from an async
+    /// GPU readback and refreshes once every thirty frames. Because the snow mesh updates
+    /// IMMEDIATELY, a visible SQUARE was left around the player in between: the inside
+    /// showed the new state and the outside the state from thirty frames ago (the user
+    /// reported it twice — once with the inside white and the outside black, once the
+    /// other way round).
     ///
-    /// `SnowManager.WorldSwe` aynı yağıştan CPU'da entegre ediliyor, gecikmesi
-    /// yok. Eğri yüzey shader'ının kullandığıyla aynı: `SNOW_MIN_VISIBLE_HEIGHT`
-    /// eşiği ve `SNOW_EDGE_FADE_RANGE` bandı.
+    /// `SnowManager.WorldSwe` is integrated on the CPU from the same precipitation and has
+    /// no lag. The curve is the same as the surface shader's: the `SNOW_MIN_VISIBLE_HEIGHT`
+    /// threshold and the `SNOW_EDGE_FADE_RANGE` band.
     float DunyaOrtusu()
     {
         if (snowManager == null || snowManager.WorldSwe < 0f)
@@ -60,10 +60,10 @@ public class SnowCoverageDriver : MonoBehaviour
 
         if (settings == null) return;
 
-        // ÖRTÜ AYARLARI DA BURADAN. Arazinin kar katmanı ile nesne shader'ı
-        // aynı sayıları okumak zorunda; ayrışırlarsa sınırda iki farklı kar
-        // görünür (ölçüldü: arazi derinlikten, mesh örtüden okurken kenarda
-        // 45 cm'lik hendek — `SYMPTOMS.md`).
+        // THE COVER SETTINGS COME FROM HERE TOO. The terrain's snow layer and the object
+        // shader have to read the same numbers; if they diverge, two different snows show
+        // at the boundary (measured: with the terrain reading from the depth and the mesh
+        // from the cover, a 45 cm ditch at the edge — `SYMPTOMS.md`).
         Shader.SetGlobalFloat(SnowShaderIDs.CoverSlopeSharpness, settings.CoverSlopeSharpness);
         Shader.SetGlobalFloat(SnowShaderIDs.CoverBreakupStrength, settings.CoverBreakupStrength);
         Shader.SetGlobalFloat(SnowShaderIDs.CoverEdgeSharpness, settings.CoverEdgeSharpness);
@@ -72,7 +72,7 @@ public class SnowCoverageDriver : MonoBehaviour
 
     void OnDisable()
     {
-        // Bileşen kapanınca nesnelerin üstünde donmuş bir kar kalmasın.
+        // So no frozen snow is left on the objects when the component is switched off.
         Shader.SetGlobalFloat(SnowShaderIDs.SnowCoverage, 0f);
     }
 }

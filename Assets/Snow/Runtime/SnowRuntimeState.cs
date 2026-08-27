@@ -1,40 +1,40 @@
-// ROL: Kar sisteminin dışarıya bildirdiği durum. Salt okunur.
-// Mevcut hava/ses/gameplay sistemleri bunları okuyabilir.
-// Çağıran: SnowfallController ve SnowManager yazar; dışarısı yalnız okur.
+// ROLE: the state the snow system announces to the outside. Read-only.
+// The existing weather/audio/gameplay systems may read these.
+// CALLED BY: SnowfallController and SnowManager write; the outside only reads.
 
-/// YAYINLAR, UYGULAMAZ (spec §3.3).
+/// IT PUBLISHES, IT DOES NOT APPLY (spec §3.3).
 ///
-/// Kar sistemi `Stormness01`'i kullanıp sisi, güneş şiddetini veya ambient'i
-/// DEĞİŞTİRMEZ. Sadece yayınlar. Mevcut sis sistemi isterse okuyup kendi
-/// kararını verir. Kar sistemi içinde `RenderSettings`, `VolumeProfile` veya
-/// `Light.intensity` yazan tek bir satır olmayacak.
+/// The snow system does not use `Stormness01` to CHANGE the fog, the sun intensity or
+/// the ambient. It only publishes. The existing fog system may read it and make its own
+/// decision. There will not be a single line inside the snow system writing to
+/// `RenderSettings`, `VolumeProfile` or `Light.intensity`.
 public static class SnowRuntimeState
 {
-    /// 0..1 aktif kar şiddeti.
+    /// 0..1 the active snowfall intensity.
     public static float SnowfallIntensity01 { get; internal set; }
 
     /// 0..1 zeminde ne kadar kar var.
     public static float GroundCoverage01 { get; internal set; }
 
-    /// 0..1 savrulabilir gevşek kar.
+    /// 0..1 loose snow that can be drifted.
     public static float LooseSnowFraction { get; internal set; }
 
-    /// 0..1 rüzgâr × yağış.
+    /// 0..1 wind × precipitation.
     public static float Stormness01 { get; internal set; }
 
-    /// Kar yağıyor mu (spec §3.4).
+    /// Whether it is snowing (spec §3.4).
     public static bool IsSnowing { get; internal set; }
 
-    /// YAĞMURUN AĞIRLIĞI. 1 = yağmur tam güçte, 0 = susturuldu.
+    /// THE RAIN'S WEIGHT. 1 = rain at full strength, 0 = silenced.
     ///
-    /// Kar başlayınca 1'den 0'a rampa iniyor; kar şiddeti ancak bu SIFIRA
-    /// ULAŞTIKTAN sonra yükselmeye başlıyor. İkisi asla aynı anda görünmüyor
-    /// — çapraz soldurma yumuşak geçiş değil, iki yağışın üst üste
-    /// binmesidir (`DECISIONS.md`).
+    /// When the snow starts a ramp descends from 1 to 0; the snow intensity only starts
+    /// rising after this REACHES ZERO. The two are never visible at the same time
+    /// — a crossfade is not a soft transition but two precipitations laid on top of
+    /// each other (`DECISIONS.md`).
     public static float RainWeight01 { get; internal set; } = 1f;
 
-    /// Oyun kapanırken veya sistem devre dışı kalırken sıfırlanıyor — statik
-    /// alanlar Play oturumları arasında yaşıyor ve bayat değer okutuyor.
+    /// It is reset when the game closes or the system is disabled — static fields live
+    /// between Play sessions and hand out a stale value.
     internal static void Reset()
     {
         SnowfallIntensity01 = 0f;

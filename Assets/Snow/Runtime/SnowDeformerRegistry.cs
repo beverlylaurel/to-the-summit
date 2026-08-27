@@ -1,19 +1,19 @@
-// ROL: sahnedeki etkin SnowDeformer'ların listesi. SnowManager bu listeyi
-// gezer; arama yapmaz.
-// Çağıran: SnowDeformer (kayıt), SnowManager (parça tamponu).
+// ROLE: the list of active SnowDeformers in the scene. SnowManager walks this list;
+// it does not search.
+// CALLED BY: SnowDeformer (registration), SnowManager (the piece buffer).
 
 using System.Collections.Generic;
 
-/// ARAMA YOK, KAYIT VAR. `FindObjectsByType` her karede sahneyi tarar ve
-/// allocation yapar (spec §0.8). Bileşen kendini kaydeder; liste her zaman
-/// güncel ve gezinme bedava.
+/// NO SEARCH, A REGISTRY. `FindObjectsByType` scans the scene every frame and
+/// allocates (spec §0.8). The component registers itself; the list is always
+/// current and walking it is free.
 ///
-/// Spec §18.2'deki `SnowHeatRegistry` ile aynı desen — orada da statik kayıt
-/// isteniyor, burada da.
+/// The same pattern as `SnowHeatRegistry` in spec §18.2 — a static registry is
+/// wanted there too, and here.
 public static class SnowDeformerRegistry
 {
-    /// 64: bir sahnede aynı anda karda iz bırakan nesne sayısı için fazlasıyla
-    /// yeterli. Aşılırsa liste büyür, hata olmaz — sadece bir kerelik allocation.
+    /// 64: more than enough for the number of objects leaving marks in the snow at once in a
+    /// scene. If it is exceeded the list grows, there is no error — only a one-off allocation.
     const int InitialCapacity = 64;
 
     static readonly List<SnowDeformer> Active = new(InitialCapacity);
@@ -30,8 +30,8 @@ public static class SnowDeformerRegistry
 
     public static void Unregister(SnowDeformer deformer) => Active.Remove(deformer);
 
-    /// Editör alanı yeniden yüklenmediğinde (Play mode domain reload kapalı)
-    /// statik liste eski oturumdan kalır ve ölü referans taşır.
+    /// When the editor domain is not reloaded (Play mode domain reload off) the static list
+    /// survives from the previous session and carries dead references.
     [UnityEngine.RuntimeInitializeOnLoadMethod(
         UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetOnLoad() => Active.Clear();

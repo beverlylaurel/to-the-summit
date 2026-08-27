@@ -1,21 +1,21 @@
-// ROL: bölgeden çıkan kar bloklarını saklar, geri dönülünce yazar
-// (spec §21 Faz 10) [KAYNAK: Rockstar patenti US11534688B2].
-// Çağıran: SnowManager (Dispatch içinden).
+// ROLE: stores the snow blocks leaving the region and writes them back on return
+// (spec §21 Phase 10) [SOURCE: Rockstar patent US11534688B2].
+// CALLED BY: SnowManager (from inside Dispatch).
 
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-/// İZLER BÖLGEDEN ÇIKINCA KAYBOLMASIN.
+/// SO TRACKS DO NOT VANISH WHEN THEY LEAVE THE REGION.
 ///
-/// Bölge 16 m. Oyuncu yirmi metre yürüyüp geri dönünce açtığı patika yok
-/// olmuştu — tırmanışta aynı hattı defalarca kullanan bir oyunda bu en çok
-/// göze batan eksik.
+/// The region is 16 m. Walking twenty metres and coming back, the path the player had
+/// opened was gone — in a game where the same line is used again and again on a climb
+/// that is the most noticeable gap.
 ///
-/// ASSUMPTION: blok İNDİRGENMİŞ çözünürlükte saklanıyor. Spec 4×4 m blok
-/// diyor ama aritmetiğini yapmıyor: tam çözünürlükte bir blok 256×256 teksel
-/// yani yarım hassasiyette 256 KB, LRU 512 blokla 128 MB eder. Dörde
-/// indirgenince (6.25 cm/teksel) blok 32 KB ve toplam 16 MB.
+/// ASSUMPTION: the block is stored at REDUCED resolution. The spec says a 4×4 m block
+/// but does not do the arithmetic: at full resolution a block is 256×256 texels, i.e.
+/// 256 KB at half precision, and with an LRU of 512 blocks that is 128 MB. Reduced by
+/// four (6.25 cm/texel) a block is 32 KB and the total 16 MB.
 [DisallowMultipleComponent]
 public class SnowPersistence : MonoBehaviour
 {
@@ -23,7 +23,7 @@ public class SnowPersistence : MonoBehaviour
     const float BlockMeters = 4f;
     const int MaxBlocks = 512;
 
-    /// Saklanan bloğun kenarı, teksel.
+    /// The edge of a stored block, in texels.
     const int StoredSide = 64;
     const int StoredValues = StoredSide * StoredSide * 4;
 
@@ -54,9 +54,9 @@ public class SnowPersistence : MonoBehaviour
     void OnEnable()
     {
         if (manager == null)
-            throw new System.InvalidOperationException($"{nameof(SnowPersistence)}: {nameof(manager)} atanmadı.");
+            throw new System.InvalidOperationException($"{nameof(SnowPersistence)}: {nameof(manager)} is not assigned.");
         if (simCompute == null)
-            throw new System.InvalidOperationException($"{nameof(SnowPersistence)}: compute atanmadı.");
+            throw new System.InvalidOperationException($"{nameof(SnowPersistence)}: the compute is not assigned.");
 
         blockBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                                          StoredSide * StoredSide, 4 * sizeof(float));
@@ -82,7 +82,7 @@ public class SnowPersistence : MonoBehaviour
         blockBuffer = null;
     }
 
-    /// SnowManager tek CommandBuffer içinde çağırıyor (spec §15.2).
+    /// SnowManager calls it inside a single CommandBuffer (spec §15.2).
     public void Dispatch(CommandBuffer cmd)
     {
         if (blockBuffer == null || !manager.IsReady) return;
@@ -94,15 +94,15 @@ public class SnowPersistence : MonoBehaviour
 
         RefreshCoverage(q);
 
-        // GİRENLER ÖNCE. Aynı karede hem yazıp hem okumak, yazılan bloğu
-        // geri okumak olurdu.
+        // THE INCOMING ONES FIRST. Writing and reading in the same frame would mean reading
+        // back the block that was just written.
         for (int i = 0; i < entered.Count; i++)
             Unpack(cmd, entered[i], q, blockTexels);
 
         if (!packPending) RequestPack(cmd, q, blockTexels);
     }
 
-    /// Bölgenin kapsadığı blokları günceller; yeni girenleri toplar.
+    /// Updates the blocks the region covers; collects the ones newly entering.
     void RefreshCoverage(SnowQualityData q)
     {
         previous.Clear();
@@ -126,8 +126,8 @@ public class SnowPersistence : MonoBehaviour
             var key = new Vector2Int(x, y);
             covered.Add(key);
 
-            // TAMAMEN İÇERDE Mİ. Kısmen içerdeki bloğu paketlemek, dışarıda
-            // kalan yarısını kenar değeriyle saklamak olurdu.
+            // IS IT FULLY INSIDE. Packing a partly-inside block would mean storing the half
+            // that stays outside with the edge value.
             float bx = x * BlockMeters;
             float by = y * BlockMeters;
 
@@ -203,7 +203,7 @@ public class SnowPersistence : MonoBehaviour
         Touch(key);
     }
 
-    /// Bloğun bölge dokusundaki sol alt köşesi, teksel.
+    /// The block's bottom-left corner in the region texture, in texels.
     Vector2Int BlockOrigin(Vector2Int key, SnowQualityData q)
     {
         Vector2 center = manager.AreaCenter;
@@ -222,8 +222,8 @@ public class SnowPersistence : MonoBehaviour
     {
         if (blocks.TryGetValue(key, out ushort[] existing)) return existing;
 
-        // EN ESKİ ATILIYOR. Sınırsız büyüseydi uzun bir tırmanışta bellek
-        // sürekli artardı ve belirtisi saatler sonra gelen bir çökme olurdu.
+        // THE OLDEST IS DROPPED. Growing without bound, the memory would keep rising through
+        // a long climb and the symptom would be a crash arriving hours later.
         if (blocks.Count >= MaxBlocks)
         {
             LinkedListNode<Vector2Int> oldest = recency.Last;

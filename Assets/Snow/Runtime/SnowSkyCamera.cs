@@ -1,25 +1,25 @@
-// ROL: kar yağışını engelleyen geometriyi tepeden çizip RT_SkyVis'i üretir.
-// Çağıran: SnowManager (Dispatch içinden, yalnız kirliyken).
+// ROLE: draws the geometry blocking snowfall from above and produces RT_SkyVis.
+// CALLED BY: SnowManager (from inside Dispatch, only while dirty).
 
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-/// HER KARE DEĞİL (spec §12.1). Harita yalnız bölge merkezi 4 m'den fazla
-/// kaydığında veya `MarkDirty()` çağrıldığında yenileniyor. Statik geometrinin
-/// silueti kare kare değişmiyor; her kare çizmek bedava bir maliyet olurdu.
+/// NOT EVERY FRAME (spec §12.1). The map is refreshed only when the region centre
+/// moves more than 4 m or `MarkDirty()` is called. The silhouette of static geometry
+/// does not change frame to frame; drawing it every frame would be a cost for nothing.
 ///
-/// Yakalama kamerasıyla aynı sebeple KAMERA BİLEŞENİ DEĞİL: URP replacement
-/// shader desteklemiyor (ölçüldü) ve kamera yolu URP asset değişikliği
-/// gerektiriyor (spec §1.1 yasaklıyor).
+/// NOT A CAMERA COMPONENT, for the same reason as the capture camera: URP does not
+/// support replacement shaders (measured) and the camera path requires a change to the
+/// URP asset (spec §1.1 forbids it).
 public sealed class SnowSkyCamera
 {
-    /// Aşağı bakıyor: ileri yön −Y (spec §12.1).
+    /// It looks down: the forward direction is −Y (spec §12.1).
     static readonly Quaternion LookDown = Quaternion.Euler(90f, 0f, 0f);
 
     static readonly Matrix4x4 FlipZ = Matrix4x4.Scale(new Vector3(1f, 1f, -1f));
 
-    /// Kamera bölgenin bu kadar üstünde duruyor; altındaki her şeyi görsün.
+    /// The camera stands this far above the region; it should see everything below it.
     const float Height = 300f;
 
     const float NearClip = 0.05f;
@@ -30,15 +30,15 @@ public sealed class SnowSkyCamera
     Vector2 bakedCenter;
     bool dirty = true;
 
-    /// Haritanın merkezinin dünya XZ'si — örnekleme bunu okuyor.
+    /// The world XZ of the map's centre — the sampling reads this.
     public Vector2 Center => bakedCenter;
 
     public int OccluderCount => occluders.Count;
 
     public void MarkDirty() => dirty = true;
 
-    /// Sahnedeki engelleri bir kez tarar. Engeller statik; her karede aramak
-    /// hem allocation hem boşa iş olurdu (spec §0.8).
+    /// Scans the obstacles in the scene once. The obstacles are static; searching every frame
+    /// would be both an allocation and wasted work (spec §0.8).
     public void Rescan(int layer)
     {
         occluders.Clear();
@@ -49,7 +49,7 @@ public sealed class SnowSkyCamera
         dirty = true;
     }
 
-    /// Yenileme gerekiyor mu. Bölge merkezi eşikten fazla kaydıysa evet.
+    /// Whether a refresh is needed. Yes if the region centre moved past the threshold.
     public bool NeedsRefresh(Vector2 areaCenter) =>
         dirty || (areaCenter - bakedCenter).sqrMagnitude >
                  SnowConstants.SkyMoveThreshold * SnowConstants.SkyMoveThreshold;
@@ -70,9 +70,9 @@ public sealed class SnowSkyCamera
 
         cmd.SetRenderTarget(target, depth);
 
-        // Arka plan −9999: "burada örtü yok". Örnekleme `occlY − posWS.y`
-        // farkına bakıyor; çok alçak bir değer farkı negatif yapıyor ve
-        // görünürlük 1 kalıyor.
+        // The background is −9999: "there is no cover here". The sampling looks at the
+        // difference `occlY − posWS.y`; a very low value makes the difference negative and
+        // the visibility stays 1.
         cmd.ClearRenderTarget(true, true, new Color(-9999f, 0f, 0f, 0f), 1f);
 
         cmd.SetViewProjectionMatrices(view, proj);

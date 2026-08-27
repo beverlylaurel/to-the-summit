@@ -1,5 +1,5 @@
-// ROL: kar simülasyon geçişini URP renderer'ına takar.
-// Çağıran: URP renderer asset'i (PC_Renderer).
+// ROLE: hooks the snow simulation pass into the URP renderer.
+// CALLED BY: the URP renderer asset (PC_Renderer).
 
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
@@ -10,8 +10,8 @@ public class SnowRendererFeature : ScriptableRendererFeature
 
     public override void Create()
     {
-        // OPAK ÇİZİMDEN ÖNCE (spec §15.2): zemin mesh'i ve nesne kaplaması durum
-        // dokularını aynı karede okuyacak; simülasyon onlardan önce bitmeli.
+        // BEFORE THE OPAQUE DRAW (spec §15.2): the ground mesh and the object cover will read the
+        // state textures in the same frame; the simulation has to finish before them.
         simPass = new SnowRenderPass
         {
             renderPassEvent = RenderPassEvent.BeforeRenderingOpaques
@@ -22,8 +22,8 @@ public class SnowRendererFeature : ScriptableRendererFeature
     {
         if (renderingData.cameraData.camera.cameraType == CameraType.Preview) return;
 
-        // KAR YOKSA HİÇ İŞ YOK (spec §15.2). Yönetici devre dışıysa geçiş
-        // kaydedilmiyor; yaz aylarında oyun kar sistemi yokmuş gibi davranmalı.
+        // NO SNOW, NO WORK AT ALL (spec §15.2). If the manager is disabled the pass is not
+        // recorded; in summer the game has to behave as if the snow system did not exist.
         if (SnowManager.Active == null || !SnowManager.Active.IsReady) return;
 
         renderer.EnqueuePass(simPass);

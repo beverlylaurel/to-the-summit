@@ -1,13 +1,13 @@
-// ROL: Oyunun mevcut hava/ışık sistemlerini ISnowEnvironmentSource'a bağlar.
-// Çağıran: SnowManager, Inspector'dan atanarak.
+// ROLE: binds the game's existing weather/light systems to ISnowEnvironmentSource.
+// CALLED BY: SnowManager, assigned from the Inspector.
 
 using UnityEngine;
 
-/// KAR MEVCUT HAVAYA BAĞLI (spec §3.1, §3.2).
+/// THE SNOW IS TIED TO THE EXISTING WEATHER (spec §3.1, §3.2).
 ///
-/// Her alan gerçek sistemden okunuyor. Bir referans atanmamışsa o alan
-/// manuel değere düşüyor — sistem yarım kurulmuş sahnede de çalışsın diye.
-/// Kar sistemi bu değerlerin HİÇBİRİNİ yazmıyor.
+/// Every field is read from the real system. If a reference is not assigned that field
+/// falls back to a manual value — so the system works in a half-built scene too.
+/// The snow system writes NONE of these values.
 public class SnowEnvironmentBridge : MonoBehaviour, ISnowEnvironmentSource
 {
     [Header("Mevcut sistemler")]
@@ -18,17 +18,17 @@ public class SnowEnvironmentBridge : MonoBehaviour, ISnowEnvironmentSource
     [SerializeField] WeatherState weather;
     [SerializeField] AtmosphereController atmosphere;
 
-    [Tooltip("Sıcaklık irtifaya bağlı — hangi noktadan okunacak.")]
+    [Tooltip("The temperature depends on altitude — which point it is read at.")]
     [SerializeField] Transform observer;
 
-    [Header("Görüş → sis yoğunluğu")]
-    [Tooltip("Bu görüş mesafesinde sis tam (yoğunluk 1).")]
+    [Header("Visibility → fog density")]
+    [Tooltip("At this visibility the fog is full (density 1).")]
     [SerializeField] float fogFullVisibility = 60f;
 
-    [Tooltip("Bu görüş mesafesinde sis yok (yoğunluk 0).")]
+    [Tooltip("At this visibility there is no fog (density 0).")]
     [SerializeField] float fogClearVisibility = 20000f;
 
-    [Header("Referans atanmadıysa kullanılacak değerler")]
+    [Header("Values used when no reference is assigned")]
     [SerializeField] Vector3 manualWindDirection = Vector3.right;
     [SerializeField] float manualWindSpeed = 3f;
     [SerializeField] float manualTemperatureC = -4f;
@@ -58,10 +58,10 @@ public class SnowEnvironmentBridge : MonoBehaviour, ISnowEnvironmentSource
         ? temperature.At(observer.position.y)
         : manualTemperatureC;
 
-    /// PROJEDE YAĞIŞIN "TÜRÜ" KAVRAMI YOK. Yağış varsa `Rain` bildiriliyor;
-    /// karın kar olduğu kararı `SnowfallController`'ın sıcaklık histerezisinde
-    /// (spec §3.4). Burada tür tahmin edilirse iki ayrı yerde iki farklı karar
-    /// olurdu.
+    /// THE PROJECT HAS NO NOTION OF A PRECIPITATION "KIND". If there is precipitation,
+    /// `Rain` is reported; the decision that the snow is snow lives in
+    /// `SnowfallController`'s temperature hysteresis (spec §3.4). Guessing the kind here
+    /// would put two different decisions in two separate places.
     public PrecipitationKind PrecipKind => weather != null
         ? (PrecipIntensity01 > 0.001f ? PrecipitationKind.Rain : PrecipitationKind.None)
         : manualPrecipKind;
@@ -70,22 +70,23 @@ public class SnowEnvironmentBridge : MonoBehaviour, ISnowEnvironmentSource
         ? Mathf.Clamp01(weather.Precipitation)
         : manualPrecipIntensity;
 
-    /// GÖRÜŞ METRE, SİS 0..1. Dönüşüm burada yapılıyor çünkü sınırlar bu
-    /// projeye ait; sis sistemine dokunulmuyor.
+    /// VISIBILITY IS IN METRES, FOG IS 0..1. The conversion happens here because the
+    /// bounds belong to this project; the fog system is not touched.
     ///
-    /// EŞLEME GÖRÜŞTE DEĞİL SÖNÜMLEMEDE DOĞRUSAL.
-    /// `[KAYNAK: Koschmieder — görüş V ile sönümleme σ ters orantılı,
-    /// σ = 3.912 / V]`.
+    /// THE MAPPING IS LINEAR IN THE EXTINCTION, NOT IN THE VISIBILITY.
+    /// `[SOURCE: Koschmieder — the visibility V and the extinction σ are inversely
+    /// proportional, σ = 3.912 / V]`.
     ///
-    /// Önceki hâli görüş mesafesinde doğrusaldı ve fiziksel olarak ters
-    /// sonuç veriyordu: 1150 m görüşte sis yoğunluğu 0.95 çıkıyordu — yani
-    /// "neredeyse tam sis". 1150 m berrak bir havadır. Aradaki her şey sise
-    /// boğuluyordu; uzak yağış perdesi alpha'sını 0.10'dan 0.043'e düşürüp
-    /// görünmez kılan da buydu (ölçüldü, `SYMPTOMS.md`).
+    /// The previous form was linear in the visibility distance and gave a physically
+    /// inverted result: at 1150 m of visibility the fog density came out 0.95 — i.e.
+    /// "almost full fog". 1150 m is clear weather. Everything in between was drowned in
+    /// fog; that is also what dropped the distant precipitation curtain's alpha from 0.10
+    /// to 0.043 and made it invisible (measured, `SYMPTOMS.md`).
     ///
-    /// 3.912 sabiti hem pay hem paydada olduğu için sadeleşiyor; 1/V yetiyor.
+    /// Because the constant 3.912 appears in both the numerator and the denominator it
+    /// cancels; 1/V is enough.
     ///
-    /// Uçlar:
+    /// The ends:
     ///        60 m -> 1.00      200 m -> 0.30      1150 m -> 0.05
     ///       100 m -> 0.60      500 m -> 0.11     20000 m -> 0.00
     public float FogDensity01

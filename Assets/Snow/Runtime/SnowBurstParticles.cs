@@ -1,27 +1,27 @@
-// ROL: kısa ömürlü patlama tipi tanelerin havuzu — ayak tozu (spec §19.3) ve
-// kar püskürtme (spec §18.6) bunu paylaşıyor.
-// Çağıran: SnowPuffEmitter, SnowSprayController.
+// ROLE: the pool of short-lived burst particles — the footstep puff (spec §19.3) and
+// the snow spray (spec §18.6) share it.
+// CALLED BY: SnowPuffEmitter, SnowSprayController.
 
 using UnityEngine;
 using UnityEngine.Rendering;
 
-/// DOĞUM CPU'DA, ENTEGRASYON GPU'DA.
+/// BIRTH ON THE CPU, INTEGRATION ON THE GPU.
 ///
-/// Patlama tanelerinin doğum yeri ve hızı oyunun kendi olaylarından geliyor
-/// (ayak nereye bastı, hangi hızla). O bilgi zaten CPU'da; GPU'ya taşıyıp
-/// orada doğurmak fazladan bir tampon ve bir kernel demek olurdu.
+/// The birth place and velocity of the burst particles come from the game's own events
+/// (where the foot landed, at what speed). That information is already on the CPU;
+/// carrying it to the GPU and giving birth there would mean an extra buffer and a kernel.
 ///
-/// Yuvalar sırayla kullanılıyor. Havuz dolduğunda en eskiler üzerine
-/// yazılıyor — patlama taneleri kısa ömürlü, kaybolan zaten ölmek üzereydi.
+/// The slots are used in order. When the pool fills, the oldest are overwritten —
+/// burst particles are short-lived, and the one lost was about to die anyway.
 [DisallowMultipleComponent]
 public class SnowBurstParticles : MonoBehaviour
 {
-    /// Tane başına 12 float (SnowfallSim.compute'taki `SnowFlake`).
+    /// 12 floats per particle (`SnowFlake` in SnowfallSim.compute).
     const int Stride = 12 * sizeof(float);
     const int Floats = 12;
     const int ThreadGroupSize = 64;
 
-    [Header("Bağımlılıklar")]
+    [Header("Dependencies")]
     [SerializeField] ComputeShader snowfallCompute;
     [SerializeField] Material material;
 
@@ -29,15 +29,15 @@ public class SnowBurstParticles : MonoBehaviour
     [SerializeField] int capacity = 3000;
 
     [Header("Fizik")]
-    [Tooltip("Yerçekimi çarpanı. Kar tanesi hafif, sürüklenme baskın (spec §18.6).")]
+    [Tooltip("Gravity multiplier. A snow grain is light and drag dominates (spec §18.6).")]
     [SerializeField] float gravityScale = 0.35f;
 
     [SerializeField] float drag = 2.5f;
 
-    [Tooltip("Rüzgârın tanesi ne kadar sürüklediği.")]
+    [Tooltip("How much the wind drags the grain.")]
     [SerializeField] float windPull = 0.25f;
 
-    [Tooltip("Ömür boyunca boyutun büyüme hızı (dağılma).")]
+    [Tooltip("How fast the size grows over the lifetime (dispersal).")]
     [SerializeField] float growth = 0.6f;
 
     GraphicsBuffer buffer;
@@ -50,16 +50,16 @@ public class SnowBurstParticles : MonoBehaviour
 
     public int Capacity => capacity;
 
-    /// Kaç tanenin canlı SAYILDIĞI. Kesin değil (GPU'da ölenler burada
-    /// düşmüyor); yalnız çizim ve dispatch kapısı için.
+    /// How many particles are COUNTED as alive. Not exact (those dying on the GPU are not
+    /// subtracted here); only for the draw and dispatch gate.
     public int LiveEstimate => liveEstimate;
 
     void OnEnable()
     {
         if (snowfallCompute == null)
-            throw new System.InvalidOperationException($"{nameof(SnowBurstParticles)}: compute atanmadı.");
+            throw new System.InvalidOperationException($"{nameof(SnowBurstParticles)}: the compute is not assigned.");
         if (material == null)
-            throw new System.InvalidOperationException($"{nameof(SnowBurstParticles)}: materyal atanmadı.");
+            throw new System.InvalidOperationException($"{nameof(SnowBurstParticles)}: the material is not assigned.");
 
         buffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, capacity, Stride);
         buffer.SetData(new float[capacity * Floats]);
@@ -80,7 +80,7 @@ public class SnowBurstParticles : MonoBehaviour
         liveEstimate = 0;
     }
 
-    /// Tek tane doğurur. Çağıran kaç tane istediğine kendi karar veriyor.
+    /// Gives birth to a single particle. The caller decides how many it wants.
     public void Emit(Vector3 position, Vector3 velocity, float size, float lifetime)
     {
         if (buffer == null) return;
@@ -104,7 +104,7 @@ public class SnowBurstParticles : MonoBehaviour
         liveEstimate = Mathf.Min(liveEstimate + 1, capacity);
     }
 
-    /// SnowManager tek CommandBuffer içinde çağırıyor (spec §15.2).
+    /// SnowManager calls it inside a single CommandBuffer (spec §15.2).
     public void Dispatch(CommandBuffer cmd)
     {
         if (buffer == null || liveEstimate == 0) return;

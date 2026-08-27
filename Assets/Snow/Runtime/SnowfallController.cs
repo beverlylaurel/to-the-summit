@@ -1,20 +1,20 @@
-// ROL: mevcut yağış şiddetinden kar yağışını türetir ve durumu yayınlar.
-// Çağıran: SnowManager (LateUpdate).
+// ROLE: derives the snowfall from the existing precipitation intensity and publishes the state.
+// CALLED BY: SnowManager (LateUpdate).
 
 using UnityEngine;
 
-/// TEK KAYNAK, TEK ŞİDDET (spec §17.2).
+/// ONE SOURCE, ONE INTENSITY (spec §17.2).
 ///
-/// VFX yoğunluğu ile `_SnowfallSWERate` AYNI `i01` değerinden türüyor. Ayrı
-/// kaynaklardan gelselerdi belirti "yoğun kar yağıyor ama zemin birikmiyor"
-/// olurdu ve ikisinden hangisinin yanlış olduğu ekrandan anlaşılmazdı.
+/// The VFX density and `_SnowfallSWERate` derive from the SAME `i01` value. Coming from
+/// separate sources the symptom would be "heavy snow is falling but nothing accumulates"
+/// and which of the two was wrong could not be told from the screen.
 public sealed class SnowfallController
 {
     public float SnowfallSweRate { get; private set; }
     public float FlakeRate { get; private set; }
 
-    /// Tanenin ıslaklığı — VFX terminal hızını ve salınımını bundan alıyor
-    /// (spec §17.1). Yağış sıcaklıktan koparıldığı için tane her zaman kuru.
+    /// The grain's wetness — the VFX takes its terminal velocity and oscillation from it
+    /// (spec §17.1). Because precipitation is decoupled from temperature the grain is always dry.
     public float Wetness { get; private set; }
 
     public void Reset()
@@ -24,41 +24,40 @@ public sealed class SnowfallController
         Wetness = 0f;
     }
 
-    /// KAR ORANI GİRDİ, SICAKLIKTAN TÜREMİYOR.
+    /// THE SNOW FRACTION IS AN INPUT, IT DOES NOT DERIVE FROM TEMPERATURE.
     ///
-    /// `snowFraction01` yağışın ne kadarının kar olduğu: 1 tamamen kar,
-    /// 0 tamamen yağmur, arası karışık. Varsayılan 1 — "yağış varsa kar
-    /// yağar" kuralı.
+    /// `snowFraction01` is how much of the precipitation is snow: 1 all snow,
+    /// 0 all rain, mixed in between. The default is 1 — the rule "if there is
+    /// precipitation, snow falls".
     ///
-    /// Eskiden bu kararı §3.4'ün sıcaklık histerezisi veriyordu ve kaldırıldı.
-    /// Yerine sıcaklık KONMADI: karar dışarıdan geliyor, böylece hava sistemi
-    /// (ya da F1 sürgüsü) ne isterse onu sürüyor ve kar sistemi kimseyi
-    /// zorlamıyor.
+    /// This decision used to be made by §3.4's temperature hysteresis and it was removed.
+    /// Temperature WAS NOT PUT in its place: the decision comes from outside, so the weather
+    /// system (or the F1 slider) drives whatever it wants and the snow system forces
+    /// nobody.
     public void Tick(ISnowEnvironmentSource env, float snowFraction01)
     {
         float snowShare = Mathf.Clamp01(snowFraction01);
 
-        // YAĞIŞ VARSA KAR VAR. Sıcaklık kapısı yok.
+        // IF THERE IS PRECIPITATION THERE IS SNOW. No temperature gate.
         //
-        // Eskiden §3.4'ün histerezisi vardı: 0.5 °C altı kar, 2.0 °C üstü
-        // yağmur. Kaldırıldı — kar çizgisi kaldırılırken konan kuralın aynısı
-        // geçerli: yağıyorsa kardır, tutar.
+        // §3.4's hysteresis used to be here: below 0.5 °C snow, above 2.0 °C
+        // rain. It was removed — the same rule as the one applied when the snow line was
+        // removed: if it falls it is snow, and it settles.
         bool precipActive = env.PrecipKind != PrecipitationKind.None;
 
-        // KESKİN SINIR: YA KAR YA YAĞMUR, ASLA İKİSİ BİRDEN.
+        // A HARD BOUNDARY: EITHER SNOW OR RAIN, NEVER BOTH.
         //
-        // Eskiden pay ikisine BÖLÜNÜYORDU (kar 0.5 → yarı kar yarı yağmur) ve
-        // gerekçe "toplamları bir olduğu için üst üste binemezler"di. O akıl
-        // yürütme yanlış: toplamın bir olması ikisinin AYNI ANDA ÇİZİLMESİNİ
-        // engellemiyor, yalnız ikisini de yarı şiddette çiziyor. Ekranda kar ve
-        // yağmur iç içe yağıyordu (kullanıcı bildirdi).
+        // The share used to be SPLIT between the two (snow 0.5 → half snow, half rain) and
+        // the reasoning was "because they sum to one they cannot overlap". That reasoning
+        // was wrong: summing to one does not stop them BEING DRAWN AT THE SAME TIME, it
+        // only draws both at half intensity. On screen snow and rain fell into each other
+        // (the user reported it).
         //
-        // Gerçekte de karışık yağış (sulusepken) ayrı bir olgudur, karla
-        // yağmurun üst üste bindirilmesi değil. Onu istersek kendi taneciği
-        // olur; şimdilik eşik.
+        // In reality mixed precipitation (sleet) is its own phenomenon, not snow and rain
+        // superposed. If we want it, it gets its own particle; for now, a threshold.
         //
-        // Sürgü artık ANAHTAR: 0.5 ve üstü kar, altı yağmur. Şiddet
-        // BÖLÜNMÜYOR — hangisi kazanırsa yağışın tamamını alıyor.
+        // The slider is now a SWITCH: 0.5 and above is snow, below is rain. The intensity is
+        // NOT SPLIT — whichever wins takes all of the precipitation.
         bool karYagiyor = snowShare >= 0.5f;
 
         SnowRuntimeState.IsSnowing = precipActive && karYagiyor;
@@ -73,8 +72,8 @@ public sealed class SnowfallController
         SnowfallSweRate = Mathf.Lerp(0f, SnowConstants.MaxSweRate, i01);
         FlakeRate = Mathf.Lerp(0f, SnowConstants.MaxFlakeRate, i01);
 
-        // KURU KAR. Islaklık sıcaklıktan türüyordu; yağış sıcaklıktan
-        // koparıldı, kaynağı kalmadı.
+        // DRY SNOW. The wetness used to derive from the temperature; precipitation was
+        // decoupled from temperature and it has no source left.
         Wetness = 0f;
 
         Shader.SetGlobalFloat(SnowShaderIDs.SnowfallSWERate, SnowfallSweRate);

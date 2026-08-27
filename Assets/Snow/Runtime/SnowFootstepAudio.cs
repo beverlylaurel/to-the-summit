@@ -1,33 +1,33 @@
-// ROL: adımın hangi kar sesini çalacağını seçer ve çalar (spec §19.1).
-// Çağıran: karakterin adım olayı.
+// ROLE: chooses which snow sound a step plays and plays it (spec §19.1).
+// CALLED BY: the character's step event.
 
 using UnityEngine;
 
-/// Karın üstündeki adımın ses türü (spec §19.1).
+/// The sound type of a step on snow (spec §19.1).
 public enum SnowFootstepSurface
 {
-    /// Kar yok — mevcut zemin sesi çalmalı, kar sistemi karışmıyor.
+    /// No snow — the existing ground sound should play, the snow system does not interfere.
     None,
     Packed,
     Shallow,
     Powder,
     Deep,
 
-    /// Sağlam kabuk: üstünde neredeyse hiç batmadan yürünüyor (spec §18.3).
+    /// A solid crust: it is walked on with almost no sinking (spec §18.3).
     Crust,
 }
 
-/// PROJENİN İLK AYAK SESİ SİSTEMİ. Spec §19.1 "mevcut ayak sesi sistemine
-/// yeni bir yüzey tipi olarak eklenir" diyor ama projede ayak sesi sistemi
-/// YOK. Bu yüzden burada yalnız KAR sesleri var; kar yoksa `None` dönüyor ve
-/// karar çağırana bırakılıyor.
+/// THE PROJECT'S FIRST FOOTSTEP SYSTEM. Spec §19.1 says "it is added to the existing
+/// footstep system as a new surface type", but the project HAS no footstep system.
+/// So there are only SNOW sounds here; with no snow it returns `None` and the decision
+/// is left to the caller.
 ///
-/// Klip atanmamışsa hiçbir şey çalmıyor — sessiz kalmak yanlış ses çalmaktan
-/// iyidir.
+/// With no clip assigned nothing plays — staying silent is better than playing the
+/// wrong sound.
 [DisallowMultipleComponent]
 public class SnowFootstepAudio : MonoBehaviour
 {
-    [Header("Bağımlılıklar")]
+    [Header("Dependencies")]
     [SerializeField] SnowSampler sampler;
     [SerializeField] AudioSource source;
 
@@ -36,12 +36,12 @@ public class SnowFootstepAudio : MonoBehaviour
 
 
     [Header("Tetik")]
-    [Tooltip("Adım olayının kaynağı. Boş bırakılırsa bu bileşen kendiliğinden " +
-             "hiçbir şey yapmaz; PlayFootstep() dışarıdan çağrılır.")]
+    [Tooltip("The source of the step event. Left empty, this component does nothing " +
+             "on its own; PlayFootstep() is called from outside.")]
     [SerializeField] SnowStepRhythm rhythm;
 
-    // ADIM OLAYA ABONE, ÇAĞRIYA DEĞİL. Ritim bileşeni bu sınıfı tanımıyor;
-    // yürüyüş sistemi değişse de burası değişmiyor.
+    // THE STEP IS SUBSCRIBED TO AN EVENT, NOT A CALL. The rhythm component does not know
+    // this class; the walking system can change without this changing.
     void OnEnable()
     {
         if (rhythm != null) rhythm.Stepped += OnStep;
@@ -55,34 +55,34 @@ public class SnowFootstepAudio : MonoBehaviour
     void OnStep(int foot) => PlayFootstep();
 
     [Header("Klipler")]
-    [Tooltip("KLİPLER SONRA VERİLECEK. Boş dizi sessiz kalıyor; yüzey seçimi " +
-             "ve tetikleme klip olmadan da çalışıyor, yalnız ses çıkmıyor.")]
+    [Tooltip("THE CLIPS WILL BE SUPPLIED LATER. An empty array stays silent; the surface " +
+             "selection and the triggering work without clips, only no sound comes out.")]
     [SerializeField] AudioClip[] packed;
     [SerializeField] AudioClip[] shallow;
     [SerializeField] AudioClip[] powder;
     [SerializeField] AudioClip[] deep;
     [SerializeField] AudioClip[] crust;
 
-    [Tooltip("Islak varyantlar. Boşsa kuru klipler çalıyor.")]
+    [Tooltip("Wet variants. If empty the dry clips play.")]
     [SerializeField] AudioClip[] packedWet;
     [SerializeField] AudioClip[] shallowWet;
     [SerializeField] AudioClip[] powderWet;
     [SerializeField] AudioClip[] deepWet;
 
-    /// Son adımda seçilen yüzey — teşhis için.
+    /// The surface chosen on the last step — for diagnostics.
     public SnowFootstepSurface LastSurface { get; private set; }
 
-    /// YÜZEY SEÇİMİ SPEC §19.1 TABLOSU BİREBİR. Sıra önemli: sığ ve sıkışmış
-    /// kontrolü toz kontrolünden ÖNCE geliyor, yoksa ince ama gevşek kar
-    /// "toz" sayılır ve derin kar sesi çalar.
+    /// THE SURFACE SELECTION IS SPEC §19.1's TABLE EXACTLY. The order matters: the shallow
+    /// and compacted checks come BEFORE the powder check, otherwise thin but loose snow
+    /// counts as "powder" and the deep snow sound plays.
     public static SnowFootstepSurface SelectSurface(SnowSample sample)
     {
         if (!sample.Valid) return SnowFootstepSurface.None;
 
         if (sample.Depth < 0.02f) return SnowFootstepSurface.None;
 
-        // KABUK ÖNCE. Kabuklu yüzeyde altındaki karın derinliği ne olursa
-        // olsun duyulan ses kabuğun sesidir (spec §18.3).
+        // THE CRUST FIRST. On a crusted surface, whatever the depth of the snow beneath,
+        // the sound heard is the crust's (spec §18.3).
         if (sample.Crust > SnowConstants.CrustSolid) return SnowFootstepSurface.Crust;
 
         if (sample.Depth < 0.08f && sample.Density01 > 0.55f) return SnowFootstepSurface.Packed;
@@ -92,11 +92,11 @@ public class SnowFootstepAudio : MonoBehaviour
         return SnowFootstepSurface.Deep;
     }
 
-    /// Islak varyant eşiği (spec §19.1).
+    /// The wet variant threshold (spec §19.1).
     public static bool IsWet(SnowSample sample) => sample.Wetness > 0.55f;
 
-    /// Karakterin adım olayından çağrılıyor. `false` dönerse kar sesi yok;
-    /// çağıran kendi zemin sesini çalmalı.
+    /// Called from the character's step event. If it returns `false` there is no snow sound;
+    /// the caller should play its own ground sound.
     public bool PlayFootstep()
     {
         Vector3 p = footAnchor != null ? footAnchor.position : transform.position;

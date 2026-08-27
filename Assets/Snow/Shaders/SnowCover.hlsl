@@ -1,5 +1,5 @@
-// ROL: nesnelerin üstünde kar birikmesinin maskesi ve uygulanması (spec §16).
-// Çağıran: SnowCoverObject.shader; mevcut nesne shader'ları isterse.
+// ROLE: the mask and the application of snow settling on objects (spec §16).
+// CALLED BY: SnowCoverObject.shader; and existing object shaders if they want it.
 
 #ifndef SNOW_COVER_INCLUDED
 #define SNOW_COVER_INCLUDED
@@ -7,25 +7,25 @@
 #include "SnowCommon.hlsl"
 #include "../../Shaders/StochasticTiling.hlsl"
 
-/// Zeminde ne kadar kar varsa nesnelerde de o kadar. `SnowCoverageDriver`
-/// besliyor; ayrı bir kaynak kurulmuyor.
+/// However much snow is on the ground, that much is on the objects. `SnowCoverageDriver`
+/// feeds it; no separate source is set up.
 float _SnowCoverage;
 
-/// ÖRTÜ AYARLARI GLOBAL (spec §16). Arazinin kar katmanı da nesne shader'ı da
-/// bunları okuyor; `SnowCoverageDriver` tek sahibi.
+/// THE COVER SETTINGS ARE GLOBAL (spec §16). Both the terrain's snow layer and the object
+/// shader read them; `SnowCoverageDriver` is their sole owner.
 float _SnowCoverSlopeSharpness;
 float _SnowCoverBreakupStrength;
 float _SnowCoverEdgeSharpness;
 float _SnowCoverThickness;
 
-/// KAR YATAYA YAKIN YÜZEYLERDE BİRİKİR
-/// [KAYNAK: Company of Heroes 2, KGC 2013].
+/// SNOW SETTLES ON SURFACES CLOSE TO HORIZONTAL
+/// [SOURCE: Company of Heroes 2, KGC 2013].
 ///
-/// Dört çarpan: eğim, gökyüzünü görme, oyuk (AO), ve gürültü. Gökyüzü
-/// çarpanı olmadan çatının ALTI da karlanır — en çok fark edilen hata.
-/// ÖRNEKLEME DIŞARIDA. `SAMPLE_TEXTURE2D` örtük türev kullanıyor ve compute
-/// shader'da derlenmiyor; gürültü parametre olarak alınınca maskenin mantığı
-/// hem fragman'dan hem sınamadan aynen çağrılabiliyor.
+/// Four factors: slope, sky visibility, cavity (AO) and noise. Without the sky
+/// factor the UNDERSIDE of a roof gets snow too — the most noticeable error.
+/// THE SAMPLING IS OUTSIDE. `SAMPLE_TEXTURE2D` uses implicit derivatives and does not
+/// compile in a compute shader; with the noise taken as a parameter the mask's logic
+/// can be called identically from the fragment and from the test.
 float SnowCoverMaskWithNoise(float3 posWS, float3 N, float ao, float noise01,
                              float slopeThreshold, float slopeSharpness,
                              float breakupStrength, float edgeSharpness)
@@ -49,7 +49,7 @@ float SnowCoverMask(float3 posWS, float3 N, float ao,
                     float slopeThreshold, float slopeSharpness,
                     float breakupScale, float breakupStrength, float edgeSharpness)
 {
-    // STOKASTİK DÖŞEME — düz döşemenin ızgarası burada da görünüyordu.
+    // STOCHASTIC TILING — a plain tiling's grid was visible here too.
     float noise = SampleStochasticMask(TEXTURE2D_ARGS(_SnowBreakup, sampler_SnowBreakup),
                                        posWS.xz * breakupScale);
 
@@ -58,8 +58,8 @@ float SnowCoverMask(float3 posWS, float3 N, float ao,
                                   breakupStrength, edgeSharpness);
 }
 
-/// Maskenin kenarını şişirerek kar birikintisinin kalınlığını gösteriyor.
-/// Sadece normal işi — geometri değişmiyor.
+/// Shows the thickness of the snow drift by swelling the mask's edge.
+/// Only a normal's work — the geometry does not change.
 float3 SnowCoverNormal(float3 N, float mask, float edgeBulge)
 {
     float3 up = _SnowUpDirection;

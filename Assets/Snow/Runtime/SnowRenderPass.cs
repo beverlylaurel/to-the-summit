@@ -1,15 +1,15 @@
-// ROL: kar sisteminin bütün çizim ve compute dispatch'lerini TEK CommandBuffer
-// içinde, opak çizimden önce kuyruğa alır (spec §15.2).
-// Çağıran: SnowRendererFeature.
+// ROLE: queues all of the snow system's draws and compute dispatches in a SINGLE
+// CommandBuffer, before the opaque draw (spec §15.2).
+// CALLED BY: SnowRendererFeature.
 
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
 
-/// TEK GEÇİŞ, TEK TAMPON. `Graphics.ExecuteCommandBuffer` ayrı ayrı
-/// çağrılmıyor: her çağrı kendi senkronizasyon noktasını getiriyor ve
-/// dispatch'lerin arasına boşluk açıyor.
+/// ONE PASS, ONE BUFFER. `Graphics.ExecuteCommandBuffer` is not called
+/// separately: every call brings its own synchronization point and opens a gap
+/// between the dispatches.
 public class SnowRenderPass : ScriptableRenderPass
 {
     class PassData
@@ -24,21 +24,21 @@ public class SnowRenderPass : ScriptableRenderPass
         SnowManager manager = SnowManager.Active;
         if (manager == null || !manager.IsReady) return;
 
-        using var builder = renderGraph.AddUnsafePass<PassData>("Kar Simülasyonu", out PassData passData);
+        using var builder = renderGraph.AddUnsafePass<PassData>("Snow Simulation", out PassData passData);
 
         UniversalCameraData cameraData = frameData.Get<UniversalCameraData>();
 
         passData.Manager = manager;
 
-        // KAMERA MATRİSLERİ GEÇİŞE TAŞINIYOR. Yakalama kendi ortografik
-        // matrisini yazıyor; geri koyacak değeri buradan alıyor. GPU'ya
-        // çevrilmemiş halleri veriliyor — `SetViewProjectionMatrices` çevirmeyi
-        // kendi yapıyor.
+        // THE CAMERA MATRICES ARE CARRIED INTO THE PASS. The capture writes its own
+        // orthographic matrix; it takes the value to restore from here. They are given
+        // unconverted to GPU form — `SetViewProjectionMatrices` does the conversion
+        // itself.
         passData.View = cameraData.GetViewMatrix();
         passData.Projection = cameraData.GetProjectionMatrix();
 
-        // Compute'lar RenderGraph'in tanımadığı kalıcı RT'lere yazıyor; grafın
-        // kaynak takibi bu geçişi "kimse okumuyor" diye eleyebilir.
+        // The computes write to persistent RTs the RenderGraph does not know about; the graph's
+        // resource tracking could cull this pass as "nobody reads it".
         builder.AllowPassCulling(false);
 
         builder.SetRenderFunc((PassData data, UnsafeGraphContext context) =>
