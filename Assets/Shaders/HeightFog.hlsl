@@ -1,55 +1,55 @@
 #ifndef TOTHESUMMIT_HEIGHT_FOG_INCLUDED
 #define TOTHESUMMIT_HEIGHT_FOG_INCLUDED
 
-// Yükseklik sisi. Havanın kendi hesabı — hangi yüzeyin çizildiğinden bağımsız.
+// Height fog. The air's own computation — independent of which surface is drawn.
 //
-// Unity'nin sisi yükseklikten bağımsız: zirvede de etekte de aynı yoğunlukta kalıyor ve
-// tırmanmanın görsel karşılığı doğmuyordu. Bu yüzden hiç kullanılmıyor, sönüm burada
-// hesaplanıyor.
+// Unity's fog is height independent: it stays at the same density at the summit and at
+// the foot, and climbing had no visual consequence. That is why it is never used and the
+// attenuation is computed here.
 //
-// Ayrı dosyada duruyor çünkü tek bir yüzeyin özelliği değil: dağ, kaya, props, ne
-// çizilirse çizilsin aynı havanın içinde duruyor. Yüzey shader'ının içinde kalırsa
-// ikinci bir yüzey geldiğinde ya kopyalanır ya da o yüzey sissiz kalır — ikisi de
-// aynı havada iki farklı görünürlük demek.
+// It lives in its own file because it is not a property of any one surface: the mountain,
+// rock, props, whatever is drawn stands in the same air. Kept inside a surface shader it
+// would either be copied when a second surface arrived or that surface would go unfogged —
+// both mean two different visibilities in the same air.
 //
-// Yoğunluk modeli AYRI DOSYADA: froxel hacmini süren compute shader onu include
-// ediyor, bu dosyayı edemiyor. Gerekçe orada yazılı.
+// The density model lives in a SEPARATE FILE: the compute shader driving the froxel volume
+// includes it and cannot include this one. The reasoning is written there.
 #include "VolumetricFogShared.hlsl"
 
-// Sabit tamponun dışında: AtmosphereController bunları global olarak yazıyor.
+// Outside the constant buffer: AtmosphereController writes these globally.
 float4 _HeightFogColor;
-float4 _HeightFogShadowColor; // güneşin karşı ufku: Dünya'nın gölgesi, gökyüzüyle ortak
-float4 _HeightFogZenith;   // göğün tepe rengi: ışın dikleştikçe hava buna kararır
-float4 _HeightFogSunColor; // gök, güneş yönünde, ufkun 2° üstü
-float3 _SunDirection;      // AtmosphereController global yazar; gökyüzü ve bulut da okur
+float4 _HeightFogShadowColor; // the anti-solar horizon: Earth's shadow, shared with the sky
+float4 _HeightFogZenith;   // the sky's zenith color: the air darkens toward it as the ray steepens
+float4 _HeightFogSunColor; // the sky toward the sun, 2° above the horizon
+float3 _SunDirection;      // AtmosphereController writes it globally; sky and clouds read it too
 
-// Şimşek: LightningFlash yazar, bulut ve gökyüzü de aynı değeri okur.
+// Lightning: LightningFlash writes it, cloud and sky read the same value.
 //
-// Bulut birleştirme geçişi bu dosyayı include ediyor ve `VolumetricCloudsDefs.hlsl`
-// aynı globali kendi bildiriyor. İkisi tek derleme biriminde buluşunca yeniden bildirim
-// hatası çıkar; orada bildirilmişse burada atlanıyor. Değer ve davranış aynı.
+// The cloud compositing pass includes this file and `VolumetricCloudsDefs.hlsl` declares
+// the same global itself. When both meet in one compilation unit a redeclaration error
+// follows; if it was declared there it is skipped here. Value and behaviour are identical.
 #ifndef URP_VOLUMETRIC_CLOUDS_DEFINES_HLSL
 float4 _LightningFlash;
-float4 _LightningPosition;   // xyz çakmanın dünya konumu, w leke yarıçapı
+float4 _LightningPosition;   // xyz world position of the flash, w blob radius
 #endif
 
-/// Sisin çakmadan aldığı pay. Bulut kadar almaz: bulut kütlesi kilometrelerce derin ve
-/// çakma onun içinde, sis ise ince ve boşalmanın altında kalıyor.
+/// The fog's share of the flash. Less than the cloud's: the cloud mass is kilometres deep
+/// with the flash inside it, while the fog is thin and sits below the discharge.
 static const float LightningFogScatter = 0.6;
 
-/// ŞİMŞEK SAÇILMA TABLOSU — `[Dobashi 2001, §4.4]`. `LightningLutBaker` pişiriyor.
-/// Eksenler İŞARETLİ KAREKÖK; fırıncıdaki eşlemenin TERSİ burada, ikisi ayrışırsa
-/// tablo kayar.
+/// LIGHTNING SCATTERING TABLE — `[Dobashi 2001, §4.4]`. Baked by `LightningLutBaker`.
+/// The axes are SIGNED SQUARE ROOT; the mapping here is the INVERSE of the baker's, and
+/// if the two drift apart the table shifts.
 TEXTURE2D(_LightningScatterLut);
 SAMPLER(sampler_LightningScatterLut);
 float _LightningScatterT;
 
-/// KANAL BOYUNCA NOKTA KAYNAKLAR. `LightningFlash` dolduruyor; boşalma noktasından
-/// yamaca kadar eşit aralıkla. Tek kaynakta parlama küre gibi duruyor ve kolun nereye
-/// uzandığını anlatmıyor.
-/// Berrak havanın sönümü, kanal başına. Tabloyu pişiren `LightningLutBaker` ile AYNI
-/// model: 550 nm'de 30 km görüş, Rayleigh (λ⁻⁴). Tıkama düzeltmesi bunu istiyor.
-/// Sırasıyla 675 / 520 / 460 nm.
+/// POINT SOURCES ALONG THE CHANNEL. Filled in by `LightningFlash`; evenly spaced from the
+/// discharge point down to the slope. With a single source the glow looks like a sphere and
+/// says nothing about where the bolt reaches.
+/// Clear-air extinction, per channel. The SAME model as `LightningLutBaker`, which bakes
+/// the table: 30 km visibility at 550 nm, Rayleigh (lambda^-4). The occlusion correction needs it.
+/// 675 / 520 / 460 nm respectively.
 static const float3 LightningExtinction = float3(1.469313e-05, 4.171729e-05, 6.812369e-05);
 
 #ifndef URP_VOLUMETRIC_CLOUDS_DEFINES_HLSL
@@ -58,19 +58,19 @@ float4 _LightningSources[LIGHTNING_MAX_SOURCES];
 float _LightningSourceCount;
 #endif
 
-/// Çakmanın çevresindeki parlama: ışık havadaki partiküllerden saçılıp göze ulaşıyor.
+/// The glow around a flash: light scattered by particles in the air reaching the eye.
 ///
-/// BU TERİM YEREL SİSLE ÇARPILMAZ, EKLENİR. Eskiden `_LightningFlash.rgb * 0.6` olarak
-/// `AirColor`'ın içine giriyordu ve sisin opaklığıyla ağırlıklanıyordu — yani berrak
-/// havada parlama SIFIRDI. Oysa saçılan şey her zaman var olan HAVA; makalenin bütün
-/// konusu bu (§3.2, atmosfer partikülleri). Sis ayrı bir ortam ve kendi yolundan geçiyor.
+/// THIS TERM IS ADDED, NOT MULTIPLIED BY THE LOCAL FOG. It used to enter `AirColor` as
+/// `_LightningFlash.rgb * 0.6` and was weighted by the fog's opacity — so in clear air the
+/// glow was ZERO. But what scatters is the AIR, which is always there; that is the whole
+/// subject of the paper (§3.2, atmospheric particles). Fog is a separate medium with its own path.
 ///
-/// `u` ve `v` bakış noktasının, kaynağın orijininde duran yerel sistemdeki koordinatları
+/// `u` and `v` are the view point's coordinates in the local system centred on the source
 /// (Denklem 7): `u = -d (g·e)`, `v = √(d²-u²)`.
 ///
-/// SINIRI: makale gibi burada da ARAZİ TIKAMASI yok. Kaynağın önündeki yamaç parlamayı
-/// kesmiyor. Makale de kesmiyor (§4.5 piksel yoğunluğu doğrudan toplam). Belirti
-/// görülürse ışın mesafesine göre kırpma eklenir.
+/// LIMIT: like the paper, there is no TERRAIN OCCLUSION here. A slope in front of the source
+/// does not cut the glow. The paper does not cut it either (§4.5, pixel intensity is a direct
+/// sum). If the symptom shows, clipping by ray distance is added.
 float3 LightningScatter(float3 cameraPos, float3 worldPos)
 {
     if (_LightningFlash.a <= 1e-5) return 0.0;
@@ -93,20 +93,20 @@ float3 LightningScatter(float3 cameraPos, float3 worldPos)
         float d = length(toSource);
         if (d < 1.0) continue;
 
-        // İŞARET: `u = +d (g·e)`, eksisi DEĞİL.
+        // SIGN: `u = +d (g·e)`, NOT minus.
         //
-        // Makalenin Denklem 7'si iki biçim veriyor — `d cos θ` ve `-d (g·e)` — ve ikisi
-        // çelişiyor. Hangisinin doğru olduğu Denklem 5'in integral sınırından çıkıyor:
-        // integral `-T`'den `u_eye`'a gidiyor ve `t = u_eye - u` gözle P arasındaki
-        // mesafe, yani NEGATİF OLAMAZ. Demek ki kaynak (u=0) gözün ÖNÜNDEYSE
-        // `u_eye > 0` olmak zorunda.
+        // The paper's Equation 7 gives two forms — `d cos θ` and `-d (g·e)` — and they
+        // contradict. Which is right follows from the integration limits of Equation 5:
+        // the integral runs from `-T` to `u_eye` and `t = u_eye - u` is the distance
+        // between the eye and P, i.e. it CANNOT BE NEGATIVE. So if the source (u=0) is in
+        // front of the eye, `u_eye > 0` must hold.
         //
-        // Eksili biçimde parlama çakmanın olduğu yerde değil TAM TERSİ yönde beliriyordu
-        // (ölçüldü: yanlış yönde tablo 348x, doğru yönde 0.1x).
+        // With the minus form the glow appeared not where the flash was but in EXACTLY the
+        // opposite direction (measured: 348x in the wrong direction, 0.1x in the right one).
         float u = d * dot(toSource / d, e);
         float v = sqrt(max(d * d - u * u, 0.0));
 
-        // Fırıncının `işaret(t)·t²·T` eşlemesinin tersi.
+        // The inverse of the baker's `sign(t)·t²·T` mapping.
         float tu = sign(u) * sqrt(min(abs(u) / T, 1.0));
         float tv = sqrt(min(v / T, 1.0));
 
@@ -115,20 +115,21 @@ float3 LightningScatter(float3 cameraPos, float3 worldPos)
         float3 full = SAMPLE_TEXTURE2D_LOD(_LightningScatterLut,
                                            sampler_LightningScatterLut, uv, 0).rgb;
 
-        // ARAZİ TIKAMASI. Tablo ışının TAMAMINI integre ediyor; yüzeyin ARKASINDA kalan
-        // kısım görünmemeli. Araya giren dağın üstünde parlama, altında da parlama
-        // çıkıyordu ve göz bunu "dağ saydam" diye okuyordu.
+        // TERRAIN OCCLUSION. The table integrates the WHOLE ray; the part BEHIND the surface
+        // must not show. There was glow above an intervening mountain and glow below it too,
+        // and the eye read that as "the mountain is transparent".
         //
-        // Kâğıtta çıkıyor. Integrand `exp(-k(s + u_eye - u))` ve `u_eye` dışarı
-        // alınabiliyor: `I(x,v) = e^(-k·x)·G(x,v)`. Yüzeye kadar olan parça iki tam
-        // integralin farkı:
+        // It falls out on paper. The integrand is `exp(-k(s + u_eye - u))` and `u_eye` can be
+        // factored out: `I(x,v) = e^(-k·x)·G(x,v)`. The part up to the surface is the
+        // difference of two full integrals:
         //
-        //     görünen = I(u_eye, v) - I(u_eye - L, v) · e^(-k·L)
+        //     visible = I(u_eye, v) - I(u_eye - L, v) · e^(-k·L)
         //
-        // Sayısal olarak doğrulandı: beş ayrı geometride doğrudan hesapla fark %0.000.
+        // Verified numerically: in five different geometries the difference from a direct
+        // computation was 0.000%.
         //
-        // Gök pikselinde L uzak düzlem, `u_eye - L` tablonun dışına düşüyor ve ikinci
-        // terim sıfıra gidiyor — yani gökte davranış değişmiyor.
+        // On a sky pixel L is the far plane, `u_eye - L` falls outside the table and the
+        // second term goes to zero — so nothing changes in the sky.
         float ub = u - len;
         float tub = sign(ub) * sqrt(min(abs(ub) / T, 1.0));
         float2 uvBack = float2(tub, tv) * 0.5 + 0.5;
@@ -139,46 +140,46 @@ float3 LightningScatter(float3 cameraPos, float3 worldPos)
         sum += max(full - behind * exp(-LightningExtinction * len), 0.0);
     }
 
-    // ENERJİ KAYNAKLARA BÖLÜNÜYOR (Denklem 6'daki `I_k · Δl` payı). Toplamı sayıya
-    // bölmek toplam parlaklığı sabit tutuyor: kaynak sayısı değişince sahne aydınlanıp
-    // kararmıyor, yalnız parlamanın DAĞILIMI değişiyor.
+    // THE ENERGY IS SPLIT ACROSS THE SOURCES (the `I_k · dl` share in Equation 6). Dividing
+    // the sum by the count keeps the total brightness constant: changing the number of
+    // sources does not brighten or darken the scene, only the DISTRIBUTION of the glow changes.
     return _LightningFlash.rgb * (sum / count) * LightningFogScatter;
 }
 
-// TimeOfDay yayınlıyor. Burada bildiriliyor çünkü sis dosyası yüzeyden ÖNCE include
-// ediliyor. İkinci bir isim uydurulmuştu; o global gelmediğinde değer sıfır kalıyor,
-// perde "güneş alçak" sanılıp ham gök mavisine boyanıyordu.
+// Published by TimeOfDay. Declared here because the fog file is included BEFORE the
+// surface. A second name had been invented; when that global did not arrive the value
+// stayed zero and the curtain, assumed to mean "the sun is low", was painted raw sky blue.
 float _SunHeight;
 
-// BULUT SİSTEMİ SÖKÜLDÜ — burada yalnız iki iz kaldı.
+// THE CLOUD SYSTEM WAS REMOVED — only two traces remain here.
 //
-// `_CloudBottom` bildirimi DURUYOR: şimşek shader'ı (`LightningBolt.shader`) çakmayı
-// bulut tabanı küresiyle kesiştiriyor ve globali oradan okuyor. Kendi bildirimini
-// açarsa derleyici çakışıyor.
+// The `_CloudBottom` declaration STAYS: the lightning shader (`LightningBolt.shader`)
+// intersects the flash with the cloud base sphere and reads the global from there. If it
+// opened its own declaration the compiler would clash.
 //
-// `CloudShadowAt` SİLİNDİ. Yer bulut gölgesi artık bulut sisteminin kendi yolundan
-// geliyor: `VolumetricCloudsURP` gölgeyi ana ışığın cookie dokusuna yazıyor, URP de
-// onu `_LIGHT_COOKIES` açık olan her yüzeye uyguluyor.
+// `CloudShadowAt` WAS DELETED. The ground cloud shadow now comes through the cloud system's
+// own path: `VolumetricCloudsURP` writes the shadow into the main light's cookie texture and
+// URP applies it to every surface with `_LIGHT_COOKIES` enabled.
 //
-// Sözleşme böylece kendiliğinden sağlanıyor (`CLOUDS_REBUILD.md` madde 1): gölge,
-// gökyüzünü çizen yoğunluk alanının ta kendisinden türüyor. İkinci bir yaklaşım yok,
-// dolayısıyla "gökte bulut yokken yerde gölge" durumu da yok.
-float _CloudBottom;        // katmanın tabanı (metre)
+// The contract is then satisfied by construction (`CLOUDS_REBUILD.md` item 1): the shadow
+// derives from the very density field that draws the sky. There is no second approach, and
+// therefore no "shadow on the ground with no cloud in the sky".
+float _CloudBottom;        // base of the layer (metres)
 
-/// Yükseklik sisi: ışının kat ettiği yol boyunca yoğunluk integrali.
+/// Height fog: the density integral along the path the ray travels.
 ///
-/// Sabit yoğunluklu sis bunu yapamaz — zirveden vadiye bakarken de vadiden zirveye
-/// bakarken de aynı miktarı uygular, oysa ilkinde ışın yoğun katmana giriyor,
-/// ikincisinde ondan çıkıyor.
+/// Constant density fog cannot do this — it applies the same amount looking down from the
+/// summit into the valley as looking up from the valley, while in the first case the ray
+/// enters the dense layer and in the second it leaves it.
 ///
-/// İnversiyon tavanı profili keskinleştirdiği için integralin kapalı çözümü kalmıyor;
-/// yol boyunca birkaç örnek alınıyor. Sekiz örnek, tavanın kestiği yeri gözle görülür
-/// bir basamak bırakmadan yakalıyor.
-/// Işın boyunca yoğunluk integrali, bank çarpanı olmadan. Bankı çağıran seçer:
-/// arazi yol boyunca örnekler, bulut peçesi yalnız kameranın yerelinden okur.
-/// Sis ve sürüklenen kar TEK TARAMADA. İkisi ayrı döngüdeyken aynı ışın, aynı `t`
-/// değerlerinde iki kez taranıyordu — sonuç birebir aynı, maliyet iki katı.
-/// Sürüklenen kar ayrı dönüyor çünkü rengi ve sönüm eğrisi sisinkinden farklı.
+/// Because the inversion ceiling sharpens the profile there is no closed solution for the
+/// integral; a few samples are taken along the path. Eight samples catch where the ceiling
+/// cuts without leaving a visible step.
+/// The density integral along the ray, without the bank multiplier. The caller chooses the
+/// bank: the terrain samples along the path, the cloud veil reads only the camera's locality.
+/// Fog and drifting snow IN ONE SWEEP. With two separate loops the same ray was swept twice
+/// at the same `t` values — identical result, twice the cost.
+/// Drifting snow returns separately because its color and falloff curve differ from the fog's.
 float HeightFogIntegral(float3 cameraPos, float3 worldPos)
 {
 
@@ -203,8 +204,8 @@ float HeightFogIntegral(float3 cameraPos, float3 worldPos)
         sum += FogDensityAt(lerp(startHeight, endHeight, t));
     }
 
-    // `FogDensityAt` artık mutlak yoğunluk veriyor: dışarıda ikinci bir çarpım yok,
-    // yoksa iki katmandan biri iki kez ölçeklenirdi.
+    // `FogDensityAt` now returns absolute density: there is no second multiplication
+    // outside, otherwise one of the two layers would be scaled twice.
     return distance * sum / Steps;
 }
 
@@ -215,60 +216,60 @@ float HeightFogAmount(float3 cameraPos, float3 worldPos)
     return saturate(1.0 - exp(-integral));
 }
 
-/// Gökyüzüne giden ışının sis OPTİK DERİNLİĞİ. Arazi yolu sonlu ve örnekle integre
-/// ediliyor; gök yolu sonsuz — her katmanın üstel profili kapalı biçimde integre
-/// edilir. Gök sislenmeden atmosfer tek olmuyordu: sis yalnız araziye uygulanınca
-/// çorbanın içinde yukarı bakan oyuncu yıldız görüyordu, banklar da önlerinde arazi
-/// yokken hiç çizilmiyordu.
+/// The fog OPTICAL DEPTH of a ray going to the sky. The terrain path is finite and
+/// integrated by sampling; the sky path is infinite — each layer's exponential profile is
+/// integrated in closed form. Without fogging the sky the atmosphere was not one: with fog
+/// applied only to the terrain a player looking up inside the soup saw stars, and banks were
+/// never drawn where there was no terrain in front of them.
 ///
-/// Metre yerine derinlik döndürüyor: üç katmanın yoğunlukları farklı, tek bir "yol"
-/// sayısını dışarıda tek bir yoğunlukla çarpmak üçünü birden temsil edemez.
-/// `maxPath` her katmanın KENDİ yoluna ayrı ayrı uygulanır — güneş kadranı sonsuz
-/// yolla söndürülmesin diye (bkz. Sky.shader).
+/// It returns depth rather than metres: the three layers have different densities and
+/// multiplying a single "path" number by a single density outside cannot represent all three.
+/// `maxPath` is applied to EACH layer's OWN path separately — so the sun disc is not
+/// extinguished by an infinite path (see Sky.shader).
 float SkyFogDepth(float3 cameraPos, float3 dir, float maxPath)
 {
-    // DENETİM: bu fonksiyonun KENDİ kapalı formülü var, `FogDensityAt`'i çağırmıyor —
-    // dolayısıyla oradaki denetim kapısı buraya ULAŞMIYOR. Kapı ayrıca konuluyor, yoksa
-    // gökyüzü tek yerde eski yoğunlukta kalır ve araç "gökte delik var" diye YALAN
-    // söylerdi.
+    // DIAGNOSTIC: this function has its OWN closed formula and does not call `FogDensityAt` —
+    // so the diagnostic gate there DOES NOT REACH here. The gate is placed separately,
+    // otherwise the sky would stay at the old density in one place and the tool would LIE
+    // with "there is a hole in the sky".
     //
     float h0 = cameraPos.y - _HeightFogBase;
 
-    // Ufka inen ışın: eğim sıfıra dayandıkça yol yatay kapasiteye oturur (~100 km
-    // eşdeğeri). Ufuk her havada hava rengine doyar — gerçekte de öyle.
+    // A ray descending to the horizon: as the slope approaches zero the path settles on the
+    // horizontal capacity (~100 km equivalent). The horizon saturates to the air color in every weather — as it does in reality.
     //
-    // İNEN IŞIN İÇİN AYRI İNTEGRAL DENENDİ VE GERİ ALINDI. "Aşağı giden ışın altındaki
-    // kolonu geçer" fiziksel olarak doğru ama BURAYA uygulanamaz: bu fonksiyon yalnız
-    // GÖKYÜZÜ pikselleri için çalışıyor ve ufkun altında gökyüzü yok — orada arazi var,
-    // ya da arazinin bittiği boşluk. Terim eklendiğinde sırayla şunlar çıktı: ufukta
-    // 87 kat sıçrama, ince siyah çizgi, alt yarının tamamen hava rengine doyması.
-    // Gerekçesi ortadan kalktığı için terim de kalktı.
-    // SERT KIRPMA YERİNE YUMUŞAK TABAN. `max(dir.y, 0.02)` sürekli ama TÜREVİ ufkun
-    // 1.15° üstünde kırılıyor; göz o kırılmayı Mach bandı olarak okuyor ve ufka yapışık,
-    // kamerayla gelen ince bir çizgi bırakıyor. Gece göğü koyulaşınca görünür oluyor.
+    // A SEPARATE INTEGRAL FOR DESCENDING RAYS WAS TRIED AND REVERTED. "A downward ray
+    // crosses the column beneath it" is physically true but does not apply HERE: this
+    // function only runs for SKY pixels and there is no sky below the horizon — there is
+    // terrain there, or the void where the terrain ends. With the term added, in order:
+    // an 87x jump at the horizon, a thin black line, the whole lower half saturating to the air color.
+    // Its justification disappeared, so the term did too.
+    // A SOFT FLOOR INSTEAD OF A HARD CLAMP. `max(dir.y, 0.02)` is continuous but its
+    // DERIVATIVE breaks 1.15° above the horizon; the eye reads that break as a Mach band and
+    // it leaves a thin line stuck to the horizon, travelling with the camera. It becomes visible as the night sky darkens.
     //
-    // `sqrt(y² + taban²)` aynı tabanı veriyor ama her mertebeden sürekli: y büyükken
-    // y'ye, y sıfırken tabana gidiyor, arada kırılma yok. Ufkun ALTI değişmiyor —
-    // negatif y sıfıra kırpıldığı için orada değer yine tam olarak taban.
+    // `sqrt(y² + floor²)` gives the same floor but is continuous to every order: it goes to
+    // y for large y and to the floor at y zero, with no break in between. BELOW the horizon
+    // nothing changes — negative y is clamped to zero, so the value there is exactly the floor.
     const float HorizonFloor = 0.02;
     float up = max(dir.y, 0.0);
     float s = sqrt(up * up + HorizonFloor * HorizonFloor);
 
     float k = _HeightFogFalloff;
 
-    // Sınır tabakası inversiyonda BİTER: üstünde kalan pay artık serbest katmanın işi.
+    // The boundary layer ENDS at the inversion: whatever is above belongs to the free layer.
     float boundaryPath = h0 < _FogInversionHeight
         ? (exp(-k * h0) - exp(-k * _FogInversionHeight)) / (k * s)
         : 0.0;
 
-    // İkisinin de tavanı yok; profilleri kendileri bitiriyor.
+    // Neither has a ceiling; their profiles end themselves.
     float seaPath = exp(-_FogSeaFalloff * max(0.0, h0)) / (_FogSeaFalloff * s);
     float freePath = exp(-_FogFreeFalloff * max(0.0, h0)) / (_FogFreeFalloff * s);
 
-    // Sürüklenen kar yalnız kameranın çevresinden okunuyor: katman araziye yapışık ve
-    // arazi yükseklik alanı ışın boyunca kapalı biçimde integre edilemez. Göğe giden
-    // ışın zaten katmanı birkaç on metrede terk ediyor; uzaktaki sırtın perdesi arazi
-    // yolunda hesaplanıyor.
+    // Drifting snow is only read from around the camera: the layer clings to the terrain and
+    // the terrain height field cannot be integrated in closed form along the ray. A ray going
+    // to the sky leaves the layer within a few tens of metres anyway; the curtain of a distant
+    // ridge is computed on the terrain path.
     float sky = _HeightFogDensity * min(boundaryPath, maxPath)
               + _FogSeaDensity * min(seaPath, maxPath)
               + _FogFreeDensity * min(freePath, maxPath);
@@ -278,88 +279,88 @@ float SkyFogDepth(float3 cameraPos, float3 dir, float maxPath)
 
 float SkyFogAmount(float3 cameraPos, float3 dir)
 {
-    // DENETİM: erken çıkış kapalı — gerekçe `HeightFogIntegral`'dekiyle aynı.
+    // DIAGNOSTIC: the early exit is disabled — same reasoning as in `HeightFogIntegral`.
     if (_HeightFogDensity <= 0.0 && _FogSeaDensity <= 0.0 && _FogFreeDensity <= 0.0)
         return 0.0;
 
-    // Kameranın önündeki bank boş gökte görünür bir leke bırakır: "vadide gezen sis"
-    // ancak gök de sislenince var olabiliyor.
+    // A bank in front of the camera leaves a visible patch in the empty sky: "fog wandering
+    // through the valley" can only exist once the sky is fogged too.
     //
-    // BU ÇARPAN KALDIRILDI VE GERİ KONDU. "İki örnek sonsuz yolu temsil edemez"
-    // gerekçesi doğru, ama kaldırınca çarpan sabit 1 oluyor ve bankın kıstığı yerlerde
-    // gök sisi artıyor — gece göğünde mavi aydınlık olarak çıktı. Örnekleme sorunu
-    // ayrı bir iş; gerekçesi doğru diye doğrulanmamış bir değişiklik yığının içinde
-    // kalamaz.
+    // THIS MULTIPLIER WAS REMOVED AND PUT BACK. "Two samples cannot represent an infinite
+    // path" is a correct argument, but removing it makes the multiplier a constant 1 and the
+    // sky fog rises where the bank thins it — it showed up as blue brightness in the night
+    // sky. Sampling is a separate job; a change that is right in principle but unverified
+    // cannot stay inside the stack.
     float2 ahead = cameraPos.xz + normalize(dir.xz + 0.0001) * 900.0;
     float bank = (FogBankAt(cameraPos.xz) + FogBankAt(ahead)) * 0.5;
 
     return saturate(1.0 - exp(-SkyFogDepth(cameraPos, dir, 1e9) * bank));
 }
 
-/// Havanın kendi rengi: gökyüzü gradyanının ta kendisi. Gökyüzü de sis de bunu çağırır
-/// — tek formül, iki tüketici; tam sislenen arazi gökten ayırt edilemez. Sis ayrı bir
-/// renk taşıdığı sürece her hava/saat köşesinde yeni bir "parlayan karton dağ" çıkıyor
-/// ve elle yamanıyordu.
+/// The air's own color: the sky gradient itself. Both the sky and the fog call it
+/// — one formula, two consumers; fully fogged terrain is indistinguishable from the sky. As
+/// long as the fog carried a separate color, every weather/hour corner produced a new
+/// "glowing cardboard mountain" and got patched by hand.
 ///
-/// Kızıllık güneşin bulunduğu yönde yoğunlaşır; karşı ufukta Dünya'nın gölgesi
-/// yükselir (mavi-mor, ayrıca karanlık — ışık yatay gelirken o yöne düşmez). Ayrışma
-/// yalnız güneş ufka yakınken. Yükseldikçe tepe rengine kararır.
+/// The redness concentrates in the direction of the sun; on the anti-solar horizon Earth's
+/// shadow rises (blue-violet, and darker — with the light arriving horizontally it does not
+/// fall that way). The split only happens while the sun is near the horizon. Higher up it darkens to the zenith color.
 float3 AirColor(float3 direction)
 {
     float3 sunward = normalize(float3(_SunDirection.x, 0.0, _SunDirection.z) + 0.0001);
     float3 viewFlat = normalize(float3(direction.x, 0.0, direction.z) + 0.0001);
     float towardSun = smoothstep(-0.85, 0.85, dot(viewFlat, sunward));
 
-    // Yatay yönün ANLAMLI olduğu bölge. İki koşul birden: kutuplara (tam yukarı, tam
-    // aşağı) yaklaşınca azimut tanımsızlaşır; ve ufkun ALTINDA gökyüzü bandı diye bir
-    // şey yoktur — aşağı bakan ışın yerin üstündeki havayı görür, göğün güneş bandını
-    // değil. İkincisi eksikti: bant nadir'e doğru bir noktaya toplanıp şafakta yere
-    // bakınca koni bırakıyordu. Ufuk seviyesinde 1, 14.5° aşağıda 0 — ufka yakın uzak
-    // arazi sıcaklığını korur, dik aşağıda yapıyı söndürür.
+    // The region where the horizontal direction is MEANINGFUL. Two conditions at once: near
+    // the poles (straight up, straight down) the azimuth becomes undefined; and BELOW the
+    // horizon there is no such thing as a sky band — a downward ray sees the air above the
+    // ground, not the sky's sun band. The second was missing: the band collected to a point
+    // toward the nadir and left a cone when looking at the ground at dawn. 1 at horizon level,
+    // 0 at 14.5° below — near the horizon distant terrain keeps its warmth, steeply down the structure dies out.
     float azimuth = saturate(length(direction.xz) * 3.0)
                   * saturate(direction.y * 4.0 + 1.0);
     towardSun = lerp(0.5, towardSun, azimuth);
 
     float lowSun = 1.0 - saturate(abs(_SunDirection.y) / 0.3);
 
-    // Alacakaranlık paleti — sayılar Python simülasyonundan (dusk_palette_sim.py,
-    // "canlı" varyantı): zincirin tamamı — süzülmüş güneş, controller karışımları,
-    // bu formül, altın saat kademesi, ACES — ekransız çizilip referans batış
-    // fotoğrafının rampasına oturtuldu.
+    // Twilight palette — the numbers come from a Python simulation (dusk_palette_sim.py,
+    // the "vivid" variant): the whole chain — the filtered sun, the controller's mixes,
+    // this formula, the golden hour grading, ACES — was plotted without a screen and fitted
+    // to the ramp of a reference sunset photograph.
     //
-    // Batış göğü tek renk değildir: güneşin çevresi ALTIN, açıldıkça turuncuya ve
-    // kızıla iner, karşı yarı soğuk gri-maviye düşer. Altın, süzülmüş güneş renginden
-    // çarpımla üretilemez — o renkte yeşil tükenmiştir, çarpım sarı çıkaramaz; altın
-    // ucu açık yazılır, kızıl ucu süzülmüş güneşten gelir, arası kendiliğinden turuncu.
-    // Bantlar towardSun'dan değil ham açıdan türer: towardSun 0.85'te doyuyor ve bant
-    // sanılandan üç kat geniş çıkıp parlaklığı ekrana bakılamaz hâle getiriyordu.
-    // Aynı kapı buna da: altın ucu towardSun'dan bağımsız hesaplanıyor, kapısız
-    // kalınca koniyi tek başına üretmeye yetiyor.
+    // A sunset sky is not one color: around the sun it is GOLD, opening out it falls to
+    // orange and red, and the opposite half drops to a cold grey-blue. Gold cannot be produced
+    // by multiplying the filtered sun color — green is exhausted in that color and a product
+    // cannot yield yellow; the gold end is written explicitly, the red end comes from the filtered sun, and orange follows on its own.
+    // The bands derive from the raw angle rather than towardSun: towardSun saturates at 0.85
+    // and the band came out three times wider than intended, making the brightness unwatchable.
+    // The same gate applies here: the gold end is computed independently of towardSun, and
+    // ungated it is enough on its own to produce the cone.
     float sunDot = saturate(dot(viewFlat, sunward)) * azimuth;
-    // Altın ucu bir tık kısık: tam parlak altın, güneş tarafını gözü alacak kadar
-    // dolduruyordu. Ay tarafı gölge renginden gelir, bu kısma ondan bağımsız.
-    // ALTIN UCU AÇIK YAZILIR — fizik örneği değil. Denendi ve ölçüldü: güneş tam
-    // ufuktayken (06:00) gök örneği luminans 0.151, bu sabit 0.571 — 3.8 kat. Ekranda
-    // şafak tamamen sönüyordu.
+    // The gold end is turned down a notch: full bright gold filled the sun side enough to
+    // hurt the eye. The moon side comes from the shadow color, independent of this part.
+    // THE GOLD END IS WRITTEN EXPLICITLY — it is not a physics sample. Tried and measured:
+    // with the sun exactly on the horizon (06:00) the sky sample's luminance was 0.151 and
+    // this constant 0.571 — a factor of 3.8. On screen dawn went out completely.
     //
-    // Sebep modelin hatası değil, KAPSAMI: `Atmosphere` temiz atmosferi çiziyor
-    // (Bruneton'un pristine Mie katsayısı). Şafağın altın patlaması ise AEROSOLÜN işi —
-    // toz, nem, is. Güneş çevresindeki hâleyi kuran Mie saçılması gerçek havada
-    // bizimkinden kat kat güçlü. Yani bu sabit bir sanatçı uydurması değil, tozlu bir
-    // atmosferin yaklaşık karşılığı; aerosol modellenirse fizik yerini alır.
+    // The cause is not an error in the model but its SCOPE: `Atmosphere` draws a clean
+    // atmosphere (Bruneton's pristine Mie coefficient). The golden burst of dawn is the work
+    // of AEROSOL — dust, moisture, soot. The Mie scattering that builds the halo around the
+    // sun is many times stronger in real air than in ours. So this constant is not an artistic
+    // invention but the approximate equivalent of a dusty atmosphere; model the aerosol and physics takes its place.
     //
-    // Sabit yalnız güneşin TAM azimutunda baskın: `pow(sunDot, 1.8)` ile sönüyor,
-    // çeperde fizik örneği devrede ve o saatle ilerliyor.
-    // TON GÜNEŞİN YÜKSEKLİĞİYLE KIZILLAŞIR. Tek bir altın sabit, güneş ufkun on
-    // derece üstündeyken de dibindeyken de aynı sarıyı veriyordu — batımda kızıllık
-    // hiç gelmiyordu.
+    // The constant only dominates at the sun's EXACT azimuth: it dies out with `pow(sunDot, 1.8)`,
+    // and at the periphery the physics sample is in charge and tracks the hour.
+    // THE TONE REDDENS WITH THE SUN'S ELEVATION. A single gold constant gave the same yellow
+    // whether the sun was ten degrees above the horizon or right on it — at sunset the redness
+    // never arrived.
     //
-    // Fizik: kızıllık YOL UZUNLUĞUNDAN doğar. Güneş alçaldıkça ışık atmosferde daha
-    // uzun yol alır, önce mavi sonra yeşil süpürülür, geriye kırmızı kalır. Sabitin
-    // parlaklığı bilinçli abartma olarak kalıyor (bkz. DECISIONS.md), ama TONU artık
-    // güneşin yüksekliğini izliyor.
+    // The physics: redness comes from PATH LENGTH. As the sun drops the light travels further
+    // through the atmosphere, blue is swept out first and then green, leaving red. The
+    // constant's brightness stays a deliberate exaggeration (see DECISIONS.md), but its TONE
+    // now follows the sun's elevation.
     //
-    // Kızıl uç yeşili sarıdan üçte iki oranında kısıyor: (0.9, 0.52) → (0.85, 0.20).
+    // The red end cuts green to two thirds of the yellow: (0.9, 0.52) -> (0.85, 0.20).
     // Mavi zaten ihmal edilebilir.
     float3 gold = lerp(float3(0.9, 0.52, 0.11), float3(0.85, 0.20, 0.05),
                        1.0 - smoothstep(0.0, 0.09, _SunHeight));
@@ -373,50 +374,50 @@ float3 AirColor(float3 direction)
                           lerp(_HeightFogShadowColor.rgb, warm, towardSun),
                           lowSun);
 
-    // Üs 0.55 → 0.35: sıcaklık ufka yakın kalmalı. Yüksek üs ufuk rengini göğün
-    // yarısına kadar taşıyıp bandı sanılandan çok geniş gösteriyordu.
+    // Exponent 0.55 -> 0.35: the warmth has to stay near the horizon. A high exponent carried
+    // the horizon color halfway up the sky and made the band far wider than intended.
     //
-    // Üssün 0'daki eğimi SONSUZ: göz hizasının ilk yarım derecesinde harman sıfırdan
-    // 0.15'e sıçrıyor, altında `saturate` ile kırpılıyor. Ufuk sıcak, zenit koyu mavi
-    // olduğu için o kırılma Mach bandı gibi düz bir çizgi bırakıyor. Gökyüzünde
-    // farkedilmiyordu; arazi puslanınca hava rengi uzak dağın üstünde de baskın oldu ve
-    // çizgi dağın içinden geçiyormuş gibi, "dağ şeffafmış gibi" göründü.
+    // The exponent's slope at 0 is INFINITE: within the first half degree of eye level the
+    // blend jumps from zero to 0.15, and below it is clamped by `saturate`. With a warm horizon
+    // and a deep blue zenith that break leaves a straight line like a Mach band. It was not
+    // noticeable in the sky; once the terrain hazed the air color also dominated over the
+    // distant mountain and the line looked like it passed through it, "as if the mountain were transparent".
     //
-    // Üs korunur — sıcaklığın ufka yakın kalması ondan geliyor. Yalnız ilk üç derece
-    // smoothstep'le C1 sürekli hâle getirilir; 3.4°'nin üstünde eğri birebir aynı.
-    // Üs 0.55 → 0.35: sıcaklık ufka yakın kalmalı. Yüksek üs ufuk rengini göğün
-    // yarısına kadar taşıyıp bandı sanılandan çok geniş gösteriyordu.
+    // The exponent is kept — the warmth staying near the horizon comes from it. Only the first
+    // three degrees are made C1 continuous with a smoothstep; above 3.4° the curve is identical.
+    // Exponent 0.55 -> 0.35: the warmth has to stay near the horizon. A high exponent carried
+    // the horizon color halfway up the sky and made the band far wider than intended.
     //
-    // BU EĞRİ DEĞİŞTİRİLDİ VE GERİ ALINDI. Sıfırdaki eğimi sonsuz olduğu için
-    // `y(1+k)/(y+k)` ile değiştirilmişti; sonlu eğim doğru ama eğri göğün geniş bir
-    // bandında daha AZ zenit veriyor (y=0.05'te 0.208, eskisi 0.305). Gece ufuk rengi
-    // parlak mavi olduğu için sonuç "havada mavi aydınlık" oldu ve ufuk bozuldu.
-    // Sonsuz eğimin bıraktığı basamak `smoothstep` ile zaten yumuşatılmış durumda.
+    // THIS CURVE WAS CHANGED AND REVERTED. Because its slope at zero is infinite it had been
+    // replaced with `y(1+k)/(y+k)`; a finite slope is correct but the curve gives LESS zenith
+    // over a wide band of the sky (0.208 at y=0.05 versus 0.305 before). With a bright blue
+    // horizon color at night the result was "blue brightness in the air" and the horizon broke.
+    // The step left by the infinite slope is already softened with `smoothstep`.
     float rise = pow(saturate(direction.y), 0.35)
                * smoothstep(0.0, 0.06, direction.y);
 
     float3 air = lerp(horizon, _HeightFogZenith.rgb, saturate(rise));
 
-    // Karşı yarı kararır ama simsiyah değil: gerçek karşı ufuk yumuşak mor-gridir
+    // The opposite half darkens but is not pitch black: a real anti-solar horizon is a soft grey-violet
     air *= lerp(1.0, lerp(0.55, 1.0, towardSun), lowSun);
 
-    // İleri saçılım, çift lob: geniş pus parlaması + dar parlak çekirdek. Sisin
-    // içinden güneş keskin disk olarak değil ışıyan bir yumak olarak görünür —
-    // şafak sisindeki güneş budur; sis denizinin üstüne çıkınca gerçek disk döner.
+    // Forward scattering, a double lobe: a broad haze glow plus a narrow bright core. Through
+    // fog the sun appears not as a sharp disc but as a glowing ball — that is the sun in dawn
+    // fog; climb above the fog sea and the real disc returns.
     float sunUp = smoothstep(-0.08, 0.12, _SunDirection.y);
     float alignment = saturate(dot(direction, normalize(_SunDirection + 0.0001)));
-    // Dar lob ölçülü: büyütülünce diskin oturduğu yeri dolduruyor ve güneşin
-    // kendisi kendi parlamasının içinde kayboluyordu
-    // DAR LOB SİSTE SÖNER, GENİŞ HÂLE KALIR. Dar lob güneş DİSKİNİN doğrudan
-    // görüntüsü; yoğun siste disk sönmüş olmalı, geriye yalnız çok saçılmanın kurduğu
-    // geniş hâle kalır. İkisi aynı katsayıyla durunca fırtınada güneş, görüş 140 m
-    // olmasına rağmen keskin ve gözü alan bir leke bırakıyordu.
+    // The narrow lobe is kept measured: enlarged it filled the place the disc sits in and the
+    // sun itself disappeared inside its own glow
+    // THE NARROW LOBE DIES IN FOG, THE BROAD HALO REMAINS. The narrow lobe is the direct image
+    // of the sun's DISC; in dense fog the disc must be extinguished, leaving only the broad
+    // halo built by multiple scattering. With both on the same coefficient the sun left a sharp,
+    // blinding blob in a storm despite 140 m of visibility.
     //
-    // Sönüm sisin KENDİ kolon optik derinliğinden: `τ = β/k`, yani taban yoğunluğunun
-    // seyrelme katsayısına oranı — ikisi de mevcut, uydurma sayı yok. Kâğıtta:
+    // The extinction comes from the fog's OWN column optical depth: `tau = beta/k`, the ratio of
+    // base density to falloff coefficient — both already exist, no invented number. On paper:
     //   berrak 25 km  → τ=0.09  → disk 0.91 (neredeyse tam)
-    //   yağışlı 1.5 km→ τ=1.51  → disk 0.22
-    //   fırtına 140 m → τ=16.2  → disk 0.00 (tamamen sönük)
+    //   rain 1.5 km  -> tau=1.51  -> disc 0.22
+    //   storm 140 m  -> tau=16.2  -> disc 0.00 (fully extinguished)
     float discVisibility = exp(-_HeightFogDensity / max(_HeightFogFalloff, 1e-6));
 
     float forward = pow(alignment, 8.0) * 0.05
@@ -426,41 +427,41 @@ float3 AirColor(float3 direction)
     return air;
 }
 
-/// Kamera ile bir nokta arasındaki sis YOLU: geçirgenlik ve in-scattering ayrı ayrı.
+/// The fog PATH between the camera and a point: transmittance and in-scattering separately.
 ///
-/// Sis şimşeği de saçar. Rengi sabit tutulunca fırtınada — yani şimşeğin çaktığı tek
-/// havada — görüş yedi yüz metreye düşüyor ve arazinin büyük kısmı o değişmeyen rengin
-/// altında kalıyordu: yüzey aydınlansa bile üstü örtülü olduğu için hiçbir şey
-/// görünmüyordu. Gerçekte tam tersi olur, çakma anında sisin kendisi içeriden parlar.
+/// Fog scatters lightning too. With its color held constant, in a storm — the only weather
+/// lightning strikes in — visibility drops to seven hundred metres and most of the terrain
+/// stayed under that unchanging color: even when the surface lit up, nothing showed because
+/// it was covered. In reality the opposite happens, at the moment of a strike the fog itself glows from within.
 ///
-/// Ayrı durmalarının sebebi, sisi uygulaması gereken tek şeyin opak yüzey olmaması.
-/// Bulut da kameradan bir mesafede duruyor ve önündeki sis onu da söndürmek zorunda —
-/// ama bulut ÖNCEDEN çarpılmış (premultiplied) geliyor, kendi kapsamasını taşıyor.
-/// `renk × T + saçılım` formülü ona olduğu gibi uygulanamaz; saçılım payının bulutun
-/// kapsadığı orana göre ölçeklenmesi gerekiyor. Çağıran bunu ancak iki parçayı ayrı
-/// alırsa yapabilir.
+/// They are kept separate because an opaque surface is not the only thing that has to apply
+/// fog. A cloud also stands at a distance from the camera and the fog in front of it has to
+/// attenuate it too — but the cloud arrives PREMULTIPLIED, carrying its own coverage.
+/// The `color x T + scattering` formula cannot be applied to it as is; the scattering share
+/// has to be scaled by how much the cloud covers. The caller can only do that if it gets the
+/// two parts separately.
 ///
-/// Yol renkte DOĞRUSAL — perde ve sis sırayla binse bile. Bu yüzden ayrıştırma bir
-/// yaklaştırma değil, aynı ifadenin açılmış hâli.
+/// The path is LINEAR in color — even when a curtain and fog stack in sequence. So the
+/// decomposition is not an approximation, it is the same expression written out.
 void FogPath(float3 cameraPos, float3 worldPos, out float3 scattering, out float transmittance)
 {
-    // Çakma buradan ÇIKARILDI: sisin opaklığıyla çarpılıyordu ve berrak havada
-    // parlama yok oluyordu. Artık `LightningScatter` ile toplama giriyor.
+    // The flash was TAKEN OUT of here: it was multiplied by the fog's opacity and the glow
+    // vanished in clear air. It now enters the sum through `LightningScatter`.
     float3 air = AirColor(normalize(worldPos - cameraPos));
 
-    // HACİM VE KUYRUK. Froxel hacmi 0–`far` arasını gölgelenmiş olarak taşıyor; ötesini
-    // analitik integral sürüyor. İkisi de AYNI yoğunluk modelini okuduğu için sınırda
-    // yapı değişmiyor (`VolumetricFogShared.hlsl`).
+    // THE VOLUME AND THE TAIL. The froxel volume carries 0-`far` with shadowing; beyond it the
+    // analytic integral takes over. Because both read the SAME density model the structure
+    // does not change at the boundary (`VolumetricFogShared.hlsl`).
     //
-    // Kompozisyon Beer-Lambert gereği: geçirgenlikler çarpılır, in-scattering öndekinin
-    // geçirgenliğiyle ağırlıklanıp toplanır. Bu yüzden ayrıca bir blend penceresi
-    // gerekmiyor — geçiş yapı gereği sürekli.
+    // The composition follows Beer-Lambert: transmittances multiply, in-scattering is weighted
+    // by the transmittance in front of it and summed. No separate blend window is needed —
+    // the transition is continuous by construction.
     float3 volumeScatter = 0.0;
     float volumeTransmittance = 1.0;
     float3 tailStart = cameraPos;
 
-    // Hacim yoksa `_FogVolumeDepth` sıfır kalır; o zaman kuyruk kameradan başlar ve
-    // davranış hacim öncesiyle BİREBİR aynı olur. Doğrulama basamağı bu.
+    // With no volume `_FogVolumeDepth` stays zero; the tail then starts at the camera and the
+    // behaviour is IDENTICAL to before the volume existed. That is the verification step.
     if (_FogVolumeDepth.z > 0.0)
     {
         float viewDepth = dot(worldPos - cameraPos, _FogCameraForward.xyz);
@@ -476,18 +477,18 @@ void FogPath(float3 cameraPos, float3 worldPos, out float3 scattering, out float
             volumeScatter = volume.rgb;
             volumeTransmittance = volume.a;
 
-            // Kuyruk hacmin bittiği yerden başlıyor. Yön ileri eksene izdüşümü 1 olacak
-            // şekilde ölçekli, yani `dir · derinlik` doğrudan o derinlikteki nokta.
+            // The tail starts where the volume ends. The direction is scaled so its forward-axis
+            // projection is 1, i.e. `dir · depth` is directly the point at that depth.
             float3 dir = (worldPos - cameraPos) / max(viewDepth, 1e-4);
             tailStart = cameraPos + dir * min(viewDepth, _FogVolumeDepth.y);
         }
     }
 
-    // KANAL BAŞINA SÖNÜM KALDIRILDI (`_HeightFogChroma`). Rayleigh'in maviyi kırmızıdan
-    // önce süpürmesi gerçek ama artık onun SAHİBİ gökyüzü paketinin hava perspektifi:
-    // aynı atmosferi iki yerden modellemek çift sayım demek. Bu dosyanın taşıdığı ortam
-    // YEREL — vadi sisi, banklar, sürüklenen kar — ve su damlası baskın olduğu için
-    // sönümü zaten nötr (Mie renk seçmez).
+    // PER-CHANNEL EXTINCTION WAS REMOVED (`_HeightFogChroma`). Rayleigh sweeping blue before
+    // red is real, but its OWNER is now the sky package's aerial perspective: modelling the
+    // same atmosphere in two places means double counting. The medium this file carries is
+    // LOCAL — valley fog, banks, drifting snow — and because water droplets dominate its
+    // extinction is neutral anyway (Mie does not pick a color).
     float integral = HeightFogIntegral(tailStart, worldPos)
                    * FogBankPath(tailStart.xz, worldPos.xz);
 
@@ -499,8 +500,8 @@ void FogPath(float3 cameraPos, float3 worldPos, out float3 scattering, out float
                + LightningScatter(cameraPos, worldPos);
 }
 
-/// Çizilmiş rengi havanın içine oturtur. Çağıran tarafın miktarı ayrıca alıp lerp'i
-/// kendi yazmasına gerek yok — o iki satır her yüzeyde birebir aynı olurdu.
+/// Places the drawn color inside the air. The caller does not need to take the amount
+/// separately and write the lerp itself — those two lines would be identical on every surface.
 float3 ApplyHeightFog(float3 color, float3 cameraPos, float3 worldPos)
 {
     float3 scattering;

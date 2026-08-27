@@ -2,51 +2,51 @@
 // yeniden derlemiyor; bu satir degistikce derleme zorlanir)
 Shader "ToTheSummit/BikeSurface"
 {
-    // PROSEDÜREL YÜZEY. Model doku dosyası olmadan geliyor ve UV'si yok (FBX'te tek bir
-    // UV katmanı bile bulunmuyor — ölçüldü). Bütün desen konumdan türüyor.
+    // PROCEDURAL SURFACE. The model arrives with no texture file and no UVs (there is not
+    // a single UV layer in the FBX — measured). The whole pattern derives from position.
     //
-    // DESEN NESNE UZAYINDA, DÜNYA UZAYINDA DEĞİL. Bisiklet hareket eden bir nesne:
-    // dünya uzayında örneklenseydi sürerken desen yüzeyin üstünde kayardı — boya
-    // bisikletle gitmez, dünyada asılı kalırdı. Nesne uzayı bunu kökten çözüyor.
-    // Ölçek de düzeltiliyor: parça dönüşümlerinde yüz kat ölçek var, ham nesne uzayında
-    // bir metrelik desen bir santime düşerdi.
+    // THE PATTERN IS IN OBJECT SPACE, NOT WORLD SPACE. The bike is a moving object:
+    // sampled in world space the pattern would slide across the surface while riding —
+    // paint does not travel with the bike, it would hang in the world. Object space fixes
+    // that at the root. The scale is corrected too: the part transforms carry a factor of
+    // a hundred, and in raw object space a one-metre pattern would shrink to a centimetre.
     //
-    // AŞINMA SEBEPLİ, RASTGELE DEĞİL: toz yukarı bakan yüzeyde birikiyor, boya yukarıda
-    // güneşten soluyor, kir aşağıda topluyor. Yön dünya yukarısından okunuyor çünkü
-    // sebebi yerçekimi.
+    // WEAR HAS CAUSES, IT IS NOT RANDOM: dust settles on upward-facing surfaces, paint
+    // fades in the sun up top, dirt collects below. The direction is read from world up
+    // because the cause is gravity.
     //
-    // GEÇİŞLER YUMUŞAK. Her karışım smoothstep ile ve genlikler düşük; sert eşik keskin
-    // leke bırakıyor ve yüzey "gürültü uygulanmış plastik" gibi okunuyor.
+    // TRANSITIONS ARE SOFT. Every mix uses smoothstep and the amplitudes are low; a hard
+    // threshold leaves sharp blotches and the surface reads as "plastic with noise on it".
     Properties
     {
         _BaseColor       ("Renk", Color) = (0.45, 0.12, 0.08, 1)
         _Metallic        ("Metaliklik", Range(0,1)) = 0
-        _Smoothness      ("Parlaklık", Range(0,1)) = 0.45
+        _Smoothness      ("Smoothness", Range(0,1)) = 0.45
 
-        _Variation       ("Renk oynaması", Range(0,0.3)) = 0.06
-        _Grain           ("İnce doku (parlaklıkta)", Range(0,0.5)) = 0.15
-        _Brushed         ("Fırça izi", Range(0,1)) = 0
+        _Variation       ("Color variation", Range(0,0.3)) = 0.06
+        _Grain           ("Fine grain (in smoothness)", Range(0,0.5)) = 0.15
+        _Brushed         ("Brushed marks", Range(0,1)) = 0
 
         _DustColor       ("Toz rengi", Color) = (0.62, 0.60, 0.55, 1)
-        _Dust            ("Toz miktarı", Range(0,1)) = 0.25
-        _DustScale       ("Toz ölçeği (metre)", Range(0.02, 1)) = 0.18
+        _Dust            ("Dust amount", Range(0,1)) = 0.25
+        _DustScale       ("Dust scale (metres)", Range(0.02, 1)) = 0.18
 
-        _Fade            ("Güneş soldurması", Range(0,1)) = 0.2
+        _Fade            ("Sun fading", Range(0,1)) = 0.2
         _Grime           ("Alt kir", Range(0,1)) = 0.25
 
-        // Tekerlek tek parça geliyor: lastik, jant ve göbek aynı mesh'te. Ayrı materyal
-        // atanamıyor, o yüzden ayrım YARIÇAPTAN yapılıyor.
+        // The wheel arrives as one piece: tyre, rim and hub in the same mesh. Separate
+        // materials cannot be assigned, so the split is made BY RADIUS.
         _WheelMode       ("Tekerlek modu", Float) = 0
-        _WheelCentre     ("Göbek (nesne uzayı, metre)", Vector) = (0,0,0,0)
-        _WheelAxis       ("Dönme ekseni (nesne uzayı)", Vector) = (0,1,0,0)
-        _WheelRadius     ("Dış yarıçap (metre)", Float) = 0.36
+        _WheelCentre     ("Hub (object space, metres)", Vector) = (0,0,0,0)
+        _WheelAxis       ("Rotation axis (object space)", Vector) = (0,1,0,0)
+        _WheelRadius     ("Outer radius (metres)", Float) = 0.36
         _TireColor       ("Lastik rengi", Color) = (0.07, 0.07, 0.08, 1)
         _RimColor        ("Jant rengi", Color) = (0.58, 0.59, 0.61, 1)
 
-        // ELLE BOYANAN YÜZEY köşede duruyor, materyalde değil: renk köşe renginde,
-        // örtme gücü onun alfasında, yüzeyin ışığa cevabı ikinci UV kanalında. Renk
-        // materyalde tutulsaydı bir yeri boyayıp rengini değiştirmek daha önce aynı
-        // yuvayla boyanmış her yeri değiştirirdi.
+        // THE HAND-PAINTED SURFACE lives in the vertices, not in the material: the color
+        // is in the vertex color, the coverage in its alpha, the surface's light response
+        // in the second UV channel. Held in the material, painting one spot and changing
+        // its color would change every other spot painted with the same slot.
     }
 
     SubShader
@@ -70,18 +70,18 @@ Shader "ToTheSummit/BikeSurface"
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
             #pragma multi_compile_fog
 
-            // EKRAN UZAYI ÖRTÜŞME GÖLGESİ. Bildirilmezse kuytular kararmıyor: çamurluk
-            // altı, sepet içi ve kadro araları gökyüzü ışığını açık yüzeyle aynı alıyor
+            // SCREEN SPACE AMBIENT OCCLUSION. Without the declaration the recesses do not
+            // darken: under the mudguard, inside the basket and between the frame tubes
             // ve bisiklet fazla parlak duruyor.
             #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            // AYNI HAVA. Bisiklet Unity'nin kendi sisini çağırıyordu (`ComputeFogFactor` /
-            // `MixFog`) — sahnede `m_Fog: 0` olduğu için o çağrı ÖLÜYDÜ ve bisiklet hiç
-            // sis yemiyordu: fırtınada dağ beyazlarken bisiklet net duruyordu. Unity sisi
-            // zaten yükseklikten bağımsız, bu yüzden projede hiç kullanılmıyor.
+            // THE SAME AIR. The bike used to call Unity's own fog (`ComputeFogFactor` /
+            // `MixFog`) — with `m_Fog: 0` in the scene that call was DEAD and the bike took
+            // no fog at all: in a storm the mountain went white while the bike stayed sharp.
+            // Unity's fog is height independent anyway, which is why the project never uses it.
             #include "HeightFog.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
@@ -122,8 +122,8 @@ Shader "ToTheSummit/BikeSurface"
                 float2 surface    : TEXCOORD4;
             };
 
-            /// Metrik nesne uzayı: nesne uzayı, dönüşümün ölçeğiyle çarpılmış. Desen
-            /// nesneye yapışık kalıyor ama ölçüsü metrede kalıyor.
+            /// Metric object space: object space multiplied by the transform's scale. The
+            /// pattern stays stuck to the object while its size stays in metres.
             float3 MetricObject(float3 positionOS)
             {
                 float scale = length(float3(unity_ObjectToWorld._m00,
@@ -152,9 +152,9 @@ Shader "ToTheSummit/BikeSurface"
                 return frac(sin(dot(cell, float3(127.1, 311.7, 74.7))) * 43758.5453);
             }
 
-            /// Değer gürültüsü, BEŞİNCİ DERECE yumuşatmayla. Üçüncü derece (3t²-2t³)
-            /// hücre sınırlarında ikinci türevi kırıyor ve ışık altında ızgara gibi
-            /// okunuyordu; beşinci derece o kırılmayı bırakmıyor.
+            /// Value noise with QUINTIC smoothing. The cubic form (3t²-2t³) breaks the
+            /// second derivative at cell boundaries and read as a grid under light;
+            /// the quintic form does not leave that break.
             float Noise(float3 position)
             {
                 float3 cell = floor(position);
@@ -170,8 +170,8 @@ Shader "ToTheSummit/BikeSurface"
                             lerp(lerp(n001, n101, f.x), lerp(n011, n111, f.x), f.y), f.z);
             }
 
-            /// Dört katman. Genlikler ikiye bölünüyor, yani en kaba katman deseni
-            /// belirliyor ve incesi yalnız kıpırdatıyor — tek katman lekeli duruyor.
+            /// Four octaves. The amplitudes halve, so the coarsest layer sets the pattern
+            /// and the finer ones only disturb it — a single layer looks blotchy.
             float Fbm(float3 position)
             {
                 return Noise(position) * 0.53
@@ -189,15 +189,15 @@ Shader "ToTheSummit/BikeSurface"
                 half metallic = _Metallic;
                 half smoothness = _Smoothness;
 
-                // TEKERLEK: lastik, jant ve göbek tek mesh'te geldiği için ayrım
-                // yarıçaptan. Geçişler yarıçapın yüzde biriyle yumuşatılıyor; keskin
-                // olsaydı dönerken titreşen bir halka olurdu.
+                // WHEEL: because the tyre, rim and hub come in one mesh the split is made
+                // by radius. The transitions are softened by one percent of the radius; sharp
+                // they would be a ring that flickers as it turns.
                 if (_WheelMode > 0.5)
                 {
-                    // Dönme ekseni DIŞARIDAN veriliyor. Modelin kendi ekseni ile Unity'nin
-                    // ekseni aynı değil: FBX Z-yukarı geliyor, Unity dönüşü transform'a
-                    // koyuyor ve mesh verisi kendi düzeninde kalıyor. Eksen varsayıldığında
-                    // yarıçap yerine şerit hesaplanıyordu.
+                    // The rotation axis is supplied FROM OUTSIDE. The model's own axis and
+                    // Unity's are not the same: the FBX arrives Z-up, Unity puts the rotation
+                    // on the transform and the mesh data stays in its own convention. With an
+                    // assumed axis a stripe was computed instead of a radius.
                     float3 axis = normalize(_WheelAxis.xyz);
                     float3 offset = p - _WheelCentre.xyz;
                     float3 radial = offset - axis * dot(offset, axis);
@@ -216,9 +216,9 @@ Shader "ToTheSummit/BikeSurface"
                     smoothness = lerp(0.5, 0.18, tire);
                 }
 
-                // ELLE BOYANAN YÜZEY. Renk köşeden geliyor, örtme gücü alfadan: her
-                // fırça darbesi kendi rengini taşıyor. Yüzeyin ışığa cevabı ikinci UV
-                // kanalındaki yuva numarasından — mat, yarı mat, metalik.
+                // THE HAND-PAINTED SURFACE. The color comes from the vertex, the coverage
+                // from the alpha: every brush stroke carries its own color. The surface's
+                // light response comes from the slot number in the second UV channel — matte, semi-matte, metallic.
                 half cover = saturate(input.paint.a);
 
                 if (cover > 0.002)
@@ -232,35 +232,35 @@ Shader "ToTheSummit/BikeSurface"
                     smoothness = lerp(smoothness, paintSmooth, cover);
                 }
 
-                // Renk oynaması: tek düz renk boyanmış plastik gibi duruyor. Genlik
-                // küçük ve ölçek büyük — göze desen olarak değil derinlik olarak giriyor.
+                // Color variation: a single flat color looks like painted plastic. The
+                // amplitude is small and the scale large — the eye reads it as depth, not as a pattern.
                 float variation = (Fbm(p * 3.1) - 0.5) * _Variation;
                 albedo *= 1.0 + variation;
 
                 float up = saturate(normalWS.y);
 
-                // Boya yukarı bakan yüzeyde güneşten soluyor. Karesi alınmıyor: solma
-                // eğik yüzeyde de oluyor, yalnız yatayda değil.
+                // Paint fades in the sun on upward-facing surfaces. Not squared: fading
+                // happens on sloped surfaces too, not only horizontal ones.
                 float fade = up * _Fade;
                 albedo = lerp(albedo, saturate(albedo * 1.3 + 0.02), fade);
 
-                // Kir aşağıda topluyor: çamur sıçraması ve el değmeyen yüzler.
+                // Dirt collects below: mud splash and faces nobody touches.
                 float grime = saturate(-normalWS.y) * _Grime
                             * (0.45 + Fbm(p * 9.0) * 0.7);
                 albedo = lerp(albedo, albedo * 0.5, grime);
 
-                // Toz yatay yüzeyde birikiyor. Eşik değil rampa: dik yüzeyde sıfır,
-                // yatayda tam, arası yumuşak.
+                // Dust settles on horizontal surfaces. A ramp, not a threshold: zero on a
+                // vertical face, full on a horizontal one, soft in between.
                 float dust = smoothstep(0.25, 0.95, up) * _Dust
                            * (0.5 + Fbm(p / max(0.02, _DustScale)) * 0.8);
                 albedo = lerp(albedo, _DustColor.rgb, saturate(dust));
 
-                // İnce doku PARLAKLIKTA, renkte değil. Gerçek boyada ve metalde göze
-                // çarpan şey rengin lekelenmesi değil, yansımanın kıpırdaması.
+                // The fine grain lives in SMOOTHNESS, not in color. What catches the eye on
+                // real paint and metal is not the color blotching but the reflection wavering.
                 float grain = (Fbm(p * 60.0) - 0.5) * _Grain;
 
-                // Fırça izi: bir eksende uzatılmış gürültü. Krom ve alüminyumda yüzey
-                // izleri hep bir yöne bakar.
+                // Brushed marks: noise stretched along one axis. Surface marks on chrome
+                // and aluminium always face one way.
                 float brushed = (Fbm(float3(p.x * 90.0, p.y * 6.0, p.z * 90.0)) - 0.5)
                               * _Brushed * 0.35;
 
@@ -274,7 +274,7 @@ Shader "ToTheSummit/BikeSurface"
                 lighting.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 lighting.bakedGI = SampleSH(normalWS);
 
-                // Örtüşme gölgesi ekran uzayında hesaplanıyor; hangi pikselden okunacağı
+                // Ambient occlusion is computed in screen space; which pixel it is read from
                 // buradan veriliyor.
                 lighting.normalizedScreenSpaceUV =
                     GetNormalizedScreenSpaceUV(input.positionCS);
@@ -321,9 +321,9 @@ Shader "ToTheSummit/BikeSurface"
                 output.positionCS = TransformWorldToHClip(
                     ApplyShadowBias(positionWS, normalWS, _LightDirection));
 
-                // Yakın düzleme kırpma: URP'nin kendi gölge geçişiyle aynı. Olmadığında
-                // ışığa çok yakın yüzeyler gölge haritasından düşüyor ve nesne gölgesiz
-                // görünüyor.
+                // Near plane clipping: the same as URP's own shadow pass. Without it surfaces
+                // very close to the light fall out of the shadow map and the object appears
+                // without a shadow.
                 #if UNITY_REVERSED_Z
                     output.positionCS.z = min(output.positionCS.z,
                         output.positionCS.w * UNITY_NEAR_CLIP_VALUE);

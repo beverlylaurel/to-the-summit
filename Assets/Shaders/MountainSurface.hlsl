@@ -1,20 +1,20 @@
 #ifndef MOUNTAIN_SURFACE_INCLUDED
 #define MOUNTAIN_SURFACE_INCLUDED
 
-// Dağ yüzeyinin tarifi. Yalnızca "burada ne var" sorusunu cevaplar; ışık hesabı
-// UniversalFragmentPBR'a ait. Gölge, derinlik ve normal geçişleri de URP'nin kendi
-// dosyalarından geliyor — kafa lambası gibi ek ışıklar bedava çalışsın diye.
+// The description of the mountain surface. It only answers "what is here"; the light
+// computation belongs to UniversalFragmentPBR. The shadow, depth and normal passes also
+// come from URP's own files — so extra lights like a headlamp work for free.
 
 #include "MountainSurfaceInput.hlsl"
 
-// Dünya koordinatı binlerce metreye çıkıyor. sin tabanlı hash o ölçekte float
-// hassasiyetini tüketip piksel piksel gürültüye dönüşür; hücre indeksi önce küçük
-// bir periyoda katlanır, tekrar kilometrelerce ötede kalır.
+// World coordinates reach thousands of metres. A sin-based hash exhausts float precision
+// at that scale and turns into per-pixel noise; the cell index is first folded into a small
+// period, so the repeat stays kilometres away.
 float MountainHash(float3 p)
 {
-    // Tohum burada uygulanıyor, çağrı yerlerinde değil.
-    // `_PatternSeed`. Ölçekli koordinata eklendiği için her katman farklı dünya
-    // mesafesi kadar kayıyor; katmanlar birbirinden bağımsız yenileniyor.
+    // The seed is applied here, not at the call sites.
+    // `_PatternSeed`. Because it is added to the scaled coordinate every layer shifts by a
+    // different world distance; the layers refresh independently of each other.
     p = fmod(abs(p + _PatternSeed.xyz), 512.0);
     p = frac(p * 0.1031);
     p += dot(p, p.yzx + 33.33);
@@ -35,10 +35,10 @@ float MountainNoise(float3 p)
                 lerp(lerp(n001, n101, f.x), lerp(n011, n111, f.x), f.y), f.z);
 }
 
-/// Değer + ANALİTİK GRADYAN, tek örneklemede. Sonlu farkla eğim çıkarmak aynı
-/// gürültüyü 3 kez örneklemek demek (8 hash × 3); türev kapalı formda zaten
-/// elimizdeki 8 köşeden çıkıyor.
-///   n = trilinear(köşeler, u),  u = f²(3−2f),  du/df = 6f(1−f)
+/// Value + ANALYTIC GRADIENT in a single sample. Extracting the slope with a finite
+/// difference means sampling the same noise 3 times (8 hashes x 3); the derivative in
+/// closed form already falls out of the 8 corners we have.
+///   n = trilinear(corners, u),  u = f²(3-2f),  du/df = 6f(1-f)
 float MountainNoiseD(float3 p, out float3 grad)
 {
     float3 i = floor(p), f = frac(p);
@@ -68,8 +68,8 @@ float MountainNoiseD(float3 p, out float3 grad)
          + k7 * u.x * u.y * u.z;
 }
 
-/// fbm + gradyan. Oktav başına koordinat 2.03 ile ölçeklendiği için gradyan da
-/// aynı çarpanla büyür (zincir kuralı).
+/// fbm + gradient. Because the coordinate is scaled by 2.03 per octave the gradient grows
+/// by the same factor (chain rule).
 float MountainFbmD(float3 p, int octaves, out float3 grad)
 {
     float sum = 0.0, amp = 0.5, freq = 1.0;
@@ -89,16 +89,16 @@ float MountainFbmD(float3 p, int octaves, out float3 grad)
     return sum;
 }
 
-// Gürültü 3D olarak dünya konumundan örnekleniyor: hiçbir projeksiyon yok, dolayısıyla
-// dik yamaçta gerilme de yok. Triplanar yalnızca 2D doku eşlemesi için gerekir.
+// The noise is sampled in 3D from the world position: no projection at all, and therefore
+// no stretching on a steep face. Triplanar is only needed for 2D texture mapping.
 float MountainFbm(float3 p, int octaves)
 {
     float sum = 0.0, amp = 0.5;
 
-    // [unroll]: oktav sayısı her çağrı yerinde SABİT bir sayı (2 ya da 3) ama döngü
-    // dinamik yazıldığı için derleyici açamıyordu — her oktav için dallanma, döngü
-    // sayacı ve register tutuluyordu. Açılınca `i >= octaves` derleme zamanında
-    // çözülüyor ve gövde düz koda iniyor. Sonuç bit düzeyinde aynı.
+    // [unroll]: the octave count is a CONSTANT at every call site (2 or 3), but because the
+    // loop was written dynamically the compiler could not unroll it — a branch, a loop
+    // counter and a register were kept per octave. Unrolled, `i >= octaves` resolves at
+    // compile time and the body drops to straight-line code. The result is bit identical.
     [unroll]
     for (int i = 0; i < 4; i++)
     {
@@ -110,35 +110,35 @@ float MountainFbm(float3 p, int octaves)
     return sum;
 }
 
-/// Jeolojik bantlar: yatay katmanlar, tektonikle bükülmüş. Bükülme olmadan düz çizgiler
-/// çıkar ve dağ pastadan kesilmiş gibi görünür.
+/// Geological banding: horizontal layers bent by tectonics. Without the bending they come
+/// out as straight lines and the mountain looks like a slice of cake.
 float MountainBand(float3 worldPos)
 {
     float warp = (MountainFbm(worldPos * _BandWarpScale, 2) - 0.5) * _BandWarp;
     float band = (worldPos.y + warp) / max(_BandThickness, 1.0);
 
-    // Üçgen dalga: katmanlar arasında yumuşak gidip gelme
+    // Triangle wave: a smooth back and forth between the layers
     return abs(frac(band) * 2.0 - 1.0);
 }
 
-// KAR DURUMU BURADAN OKUNUYOR. Dağın karı ile kar mesh'inin karı AYNI
-// zincirden geliyor (yakın bölge → uzak kaskad → kar çizgisi); ayrı bir
-// "arazi karı" sayısı yok, o yüzden sınırda çelişemezler.
+// THE SNOW STATE IS READ FROM HERE. The mountain's snow and the snow mesh's snow come from
+// the SAME chain (near region -> far cascade -> snow line); there is no separate "terrain
+// snow" number, so they cannot contradict at the boundary.
 //
-// Kar sistemi sahnede yoksa bu globaller sıfır kalıyor ve katman
-// kendiliğinden kapanıyor — ek bir anahtar gerekmiyor.
+// With the snow system absent from the scene these globals stay zero and the layer turns
+// itself off — no extra switch is needed.
 #include "../Snow/Shaders/SnowCommon.hlsl"
 
-// Detay normalleri spec §14.2'nin kendi tablosundan. Dağ tarafında yalnız
-// MACRO katmanı (8 m tile, rüzgâr dalgaları) açılıyor: kalite keyword'leri
-// burada tanımlı değil, o yüzden Meso/Micro blokları derlenmiyor.
+// The detail normals come from spec §14.2's own table. On the mountain side only the MACRO
+// layer (8 m tile, wind waves) is enabled: the quality keywords are not defined here, so the
+// Meso/Micro blocks are not compiled.
 //
-// Bu bir kısıtlama değil, doğru yer: Meso 0.6 m ve Micro 0.05 m yakın alan
-// detayı ve o alanı zaten kar mesh'i (clipmap, 128 m) tam katmanla çiziyor.
-// Dağ katmanı 128 m'nin ötesinde başlıyor, orada ikisi de alt piksel.
+// That is not a limitation but the right place: Meso is 0.6 m and Micro 0.05 m near-field
+// detail, and that area is already drawn with the full stack by the snow mesh (clipmap,
+// 128 m). The mountain layer starts beyond 128 m, where both are sub-pixel.
 //
-// Macro'nun tile'ı 8 m — arazi heightmap'inin tekseli 7.32 m. Düz beyaz karın
-// teşhir ettiği o basamak ölçeğini kıran katman tam bu.
+// Macro's tile is 8 m — the terrain heightmap's texel is 7.32 m. This is exactly the layer
+// that breaks the step scale flat white snow puts on display.
 #include "../Snow/Shaders/SnowDetailNormals.hlsl"
 #include "../Snow/Shaders/SnowCover.hlsl"
 #include "../Snow/Shaders/SnowSparkle.hlsl"
@@ -153,91 +153,92 @@ struct MountainSurface
     half  smoothness;
     half  occlusion;
 
-    /// Kar yüzeyinin yerel yüksekliği (m). `SnowYuzeyEgim` gradyanla birlikte
-    /// döndürüyor; ortam örtmesi bunu okuyor. Ayrı çağrı piksel başına altı
-    /// gürültü örneği daha demekti.
+    /// Local height of the snow surface (m). `SnowYuzeyEgim` returns it together with the
+    /// gradient; ambient occlusion reads it. A separate call would have meant six more
+    /// noise samples per pixel.
     half  snowSurfaceHeight;
     float3 normalWS;
 
-    /// Karın bu noktadaki payı. Parıltı bununla ağırlıklanıyor: kar mesh'i
-    /// parıldayıp arazi parıldamayınca sınır çizgi hâlinde görünüyordu.
+    /// The snow's share at this point. The sparkle is weighted by it: with the snow mesh
+    /// sparkling and the terrain not, the boundary showed up as a line.
     half  snowMask;
 
-    /// Karın YEREL durumu, ışıklandırma bloğuna taşınıyor. İzin içi sıkışmış
-    /// kar; ışık da o yoğunluğu görmek zorunda, yoksa yüzey ezilmiş görünüp
-    /// ışığı bakir kar gibi yansıtır.
+    /// The snow's LOCAL state, carried into the lighting block. Compacted snow inside a
+    /// trail; the light has to see that density too, otherwise the surface looks crushed
+    /// but reflects light like virgin snow.
     half snowRhoN;
     half snowWet;
     half snowDisturb;
 
-    /// İzin o pikseldeki derinliği (m). Işıklandırma bloğu çukurun kendi
-    /// gölgesini bununla hesaplıyor.
+    /// The trail's depth at that pixel (m). The lighting block computes the cavity's own
+    /// shadow from it.
     half snowDentDepth;
 
-    /// Yüzey dokusunun harmanı, BİR KEZ okunmuş hâliyle taşınıyor.
+    /// The surface texture blend, carried in its READ-ONCE form.
     ///
-    /// Işıklandırma bloğu da aynı harmanı istiyor; orada yeniden örneklenseydi
-    /// aynı piksel için on iki doku erişimi iki katına çıkardı. Kar mesh'i ile
-    /// arazinin AYNI dokuyu görmesi zorunlu: mesh yalnız yerel sapmayı çiziyor,
-    /// düz alanı arazi çiziyor, iki yüzey farklı doku görürse sınır ayrışır.
+    /// The lighting block wants the same blend; resampled there, the twelve texture fetches
+    /// for the same pixel would double. The snow mesh and the terrain MUST see the SAME
+    /// texture: the mesh only draws the local deviation, the terrain draws the flat area,
+    /// and if the two surfaces saw different textures the boundary would separate.
     SnowSurfaceBlend snowBlend;
 };
 
-/// Arazinin güneş gölgesi, pişirilmiş ufuk haritasından.
+/// The terrain's sun shadow, from the baked horizon map.
 ///
-/// Nokta gölgededir ancak ve ancak güneş, o yöndeki ufuk açısının altındaysa. Ufuk
-/// açısı alanı pürüzsüz ve dağla birlikte sabit; güneşin azimutuna komşu iki yön
-/// okunup harmanlanır, yükseklik açısı ufukla karşılaştırılır. İki doku okuması,
-/// sıfır rastgelelik.
+/// A point is in shadow if and only if the sun is below the horizon angle in that direction.
+/// The horizon angle field is smooth and fixed with the mountain; the two directions
+/// neighbouring the sun's azimuth are read and blended, and the elevation angle is compared
+/// with the horizon. Two texture reads, zero randomness.
 ///
-/// Işın yürüyüşü denendi ve iki kez geri alındı: tek ışın artı eşik, kenarda ya jilet
-/// ya nokta üretiyor — gürültüyü çözecek zamansal birikim yok. Gölge haritası ondan
-/// önce denendi: üçgen silüetlerin gölgesi sırtlarda testere dişiydi. İkisinin de
-/// kökü aynıydı, gölgeyi örneklenmiş bir yüzeyden türetmek; ufuk haritası onu
-/// pürüzsüz bir açı alanından türetiyor.
+/// Ray marching was tried and reverted twice: a single ray plus a threshold produces either
+/// a razor edge or dots — there is no temporal accumulation to resolve the noise. A shadow
+/// map was tried before that: the shadows of triangle silhouettes were sawtoothed on the
+/// ridges. Both had the same root, deriving the shadow from a sampled surface; the horizon
+/// map derives it from a smooth angle field.
 ///
-/// Yarı gölge, güneşin ufka açısal yakınlığından: ufkun hemen üstünde alacakaranlık
-/// bandı, altında tam gölge. Gerçekte de dağ gölgesinin kenarı böyle yumuşar.
+/// The penumbra comes from the sun's angular proximity to the horizon: a twilight band just
+/// above the horizon, full shadow below. That is how the edge of a mountain shadow really softens.
 float TerrainSunShadow(float3 worldPos, float3 sunDir)
 {
-    // UFUK ALTINDA HEMEN BIRAKMIYOR — ALPENGLOW İÇİN.
+    // IT DOES NOT RELEASE IMMEDIATELY BELOW THE HORIZON — FOR THE ALPENGLOW.
     //
-    // Eskiden `sunDir.y < 0.0` ile kesiliyordu: güneş ufka değdiği AN arazi
-    // kendi gölgesini tamamen kapatıyor, gün batımından sonraki alpenglow
-    // boyunca vadi dipleri ve sırt arkaları sırtlarla aynı parlaklıkta
-    // kalıyordu — derinlik hissi bir karede kayboluyor.
+    // It used to be cut with `sunDir.y < 0.0`: the MOMENT the sun touched the horizon the
+    // terrain closed its own shadow completely, and through the alpenglow after sunset
+    // valley floors and the backs of ridges stayed as bright as the ridges themselves —
+    // the sense of depth vanished in a single frame.
     //
-    // Işığın kendi yönü zaten söndürüyor; buradaki kapının işi yalnız ufuk
-    // haritasının anlamsız açı okumasını engellemek. O yüzden sınır ufkun
-    // biraz ALTINA çekildi ve arada gölge yumuşakça bırakılıyor.
+    // The light's own direction already extinguishes it; the gate here only exists to stop
+    // the horizon map from being read at a meaningless angle. So the limit was pulled a
+    // little BELOW the horizon and the shadow is released softly in between.
     if (sunDir.y < -0.035) return 1.0;
 
-    // −0.035 ile 0 arasında gölge sönerek çekiliyor: sert bir açma/kapama
-    // gün batımında görünür bir sıçrama yapardı.
+    // Between -0.035 and 0 the shadow fades out: a hard on/off would make a visible jump
+    // at sunset.
     float horizonFade = saturate(sunDir.y / 0.035 + 1.0);
 
     float2 uv = (worldPos.xz - _TerrainOrigin.xz) / _TerrainSize.xz;
 
-    // PİŞİRİLMİŞ ALANIN DIŞINDA GÖLGE YOK. Ufuk haritası yalnız arazinin kapladığı
-    // kutu için pişiriliyor. Dışarıda uv [0,1]'den çıkıyor ve dokunun sarma kipi ne
-    // verirse o okunuyordu; yüksek bir ufuk okununca `smoothstep` SIFIR dönüyor, yani
-    // doğrudan güneş tamamen kesiliyor.
+    // NO SHADOW OUTSIDE THE BAKED AREA. The horizon map is only baked for the box the
+    // terrain covers. Outside it the uv leaves [0,1] and whatever the texture's wrap mode
+    // returned was read; reading a high horizon made `smoothstep` return ZERO, i.e. the
+    // direct sun was cut entirely.
     //
-    // Belirti: ovada, gündüz, zemin simsiyah. Ölçüm zinciri sırayla eledi — sis
-    // (hacim probu zeminde kırmızı: `renk × 1 + 0`), froxel hacmi, bulut gölgesi
-    // cookie'si, gölge haritası (`_TerrainShadowReceive` anahtarı hiçbir şey
-    // değiştirmedi çünkü BU yolu kesmiyor). Yüzey probu `renk × 8` ile de siyah kaldı:
-    // yüzeye giren değer zaten sıfırdı.
+    // The symptom: on the plain, in daylight, the ground was pitch black. The measurement
+    // chain eliminated them in order — the fog (the volume probe was red on the ground:
+    // `color x 1 + 0`), the froxel volume, the cloud shadow cookie, the shadow map (the
+    // `_TerrainShadowReceive` switch changed nothing because it does not cut THIS path).
+    // The surface probe stayed black with `color x 8` too: the value entering the surface
+    // was already zero.
     //
-    // Gece/gündüz kapısı da buradan: fonksiyon `sunDir.y < 0` iken 1.0 dönüyor, yani
-    // gölge yalnız güneş ufkun üstündeyken hesaplanıyor. Belirtinin 08:02'de başlayıp
-    // 19:11'de bitmesinin sebebi bu — kullanıcı sınırı dakikasıyla ölçtü.
+    // The day/night gate is here as well: the function returns 1.0 while `sunDir.y < 0`, so
+    // the shadow is only computed while the sun is above the horizon. That is why the
+    // symptom started at 08:02 and ended at 19:11 — the user measured the boundary to the minute.
     //
-    // Dışarıda doğru cevap "engel yok": pişirilmiş arazi orada bitiyor ve güneşi
-    // kesecek bir kütle de yok. Ufuk sıfır sayılır, yüzey tam aydınlanır.
+    // Outside, the right answer is "no obstacle": the baked terrain ends there and there
+    // is no mass to cut the sun. The horizon counts as zero and the surface is fully lit.
     if (any(uv != saturate(uv))) return 1.0;
 
-    // Azimut hangi iki pişirilmiş yönün arasında?
+    // Which two baked directions is the azimuth between?
     const float TwoPi = 6.2831853;
     float sector = atan2(sunDir.z, sunDir.x) / TwoPi * 16.0;
     sector += sector < 0.0 ? 16.0 : 0.0;
@@ -253,58 +254,58 @@ float TerrainSunShadow(float3 worldPos, float3 sunDir)
     float horizon = lerp(a0, a1, blend) * 1.5707963;
     float elevation = FastASin(saturate(sunDir.y));
 
-    // Yarı gölgenin açısal genişliği (radyan): ufkun altına az, üstüne geniş —
-    // gölgenin içi dolu kalır, kenarı alacakaranlık gibi açılır
+    // The angular width of the penumbra (radians): little below the horizon, wide above —
+    // the shadow's interior stays solid while its edge opens like twilight
     return lerp(1.0, smoothstep(horizon - 0.02, horizon + 0.10, elevation), horizonFade);
 }
 
-/// Alpenglow: ayrı bir ışık değil, kızıllaşmış güneşin KENDİSİ — vadi Dünya'nın
-/// gölgesine girmişken yüksek yüzeyler hâlâ doğrudan ışık alır. Zirvenin pembe-kızıl
-/// parlaması budur.
+/// Alpenglow: not a separate light but the reddened sun ITSELF — while the valley has
+/// entered Earth's shadow, high surfaces still receive direct light. That is the pink-red
+/// glow of a summit.
 ///
-/// Güneş ufuktayken pay arazi gölgesine kapılanır: gölgedeki yamaç parlamaz. Eski
-/// hâli gölgesiz emisyondu ve şafakta sahneyi düz, gözü alan bir vuruşla yakıyordu —
-/// ışık, ışık gibi davranmalı. Batımdan sonra kalan pay artçı parıltıdır (atmosferde
-/// saçılmış ışık): gölgesiz ama cılız.
+/// While the sun is on the horizon the share is gated by the terrain shadow: a slope in
+/// shadow does not glow. It used to be shadowless emission and at dawn it burned the scene
+/// with a flat, blinding hit — light has to behave like light. What remains after sunset is
+/// the afterglow (light scattered in the atmosphere): shadowless but faint.
 half3 Alpenglow(float3 worldPos, float3 normalWS, float altitude, half3 albedo,
                 float exposure)
 {
     if (_SurfaceDawnStrength <= 0.001) return 0.0;
 
-    // Doğrudan faz mı, artçı parıltı mı: güneş ufkun üstünde mi?
+    // Direct phase or afterglow: is the sun above the horizon?
     float directPhase = smoothstep(-0.02, 0.06, _SurfaceDawnDir.y);
 
-    // DÜNYA GÖLGESİ TIRMANIR. Alpenglow'u tanınabilir yapan şey, gölge çizgisinin
-    // yamaçta yukarı yürümesidir: vadi önce söner, ışık zirveye çekilir. Sabit bir
-    // irtifa bandı bunu veremiyordu — dağın tamamı birlikte pembeleşip birlikte
-    // sönüyordu, yapay duran şey buydu.
+    // EARTH'S SHADOW CLIMBS. What makes an alpenglow recognisable is the shadow line
+    // walking up the slope: the valley goes out first and the light withdraws to the summit.
+    // A fixed altitude band could not do that — the whole mountain turned pink together and
+    // went out together, and that was what looked artificial.
     //
-    // Gölgenin üst sınırı güneşin ufuk altı açısından çıkar: h = R(1/cosθ − 1),
-    // küçük açıda ≈ R·θ²/2. _SurfaceDawnDir.y güneş yüksekliğinin sinüsü, yani
-    // θ ≈ −y. Zirvemiz ~2100 m: gösteri 0° ile −1.5° arasında geçer.
-    //   0.5° → 240 m,  1.0° → 975 m,  1.5° → 2190 m
+    // The shadow's upper limit follows from the sun's angle below the horizon:
+    // h = R(1/cosθ - 1), which for small angles is ~ R·θ²/2. `_SurfaceDawnDir.y` is the sine
+    // of the sun's elevation, so θ ~ -y. Our summit is ~2100 m: the show runs between 0° and -1.5°.
+    //   0.5° -> 240 m,  1.0° -> 975 m,  1.5° -> 2190 m
     float below = max(0.0, -_SurfaceDawnDir.y);
     float shadowHeight = 6371000.0 * 0.5 * below * below;
 
-    // Sınır keskin değil: gölge kenarı atmosferde birkaç yüz metreye yayılır.
+    // The boundary is not sharp: the shadow edge spreads over a few hundred metres in the atmosphere.
     float lit = lerp(smoothstep(shadowHeight - 300.0, shadowHeight + 300.0, altitude),
                      1.0, directPhase);
     if (lit <= 0.0) return 0.0;
 
-    // YÖN yalnız doğrudan fazda. Güneş battıktan sonra aydınlatan şey noktasal bir
-    // kaynak değil, kızıla boyanmış BÜTÜN GÖKYÜZÜ. Yönlü sönüm o fazda fiziksel
-    // karşılığı olmayan bir maskeye dönüşüp parlamayı tek yamaca hapsediyordu.
+    // DIRECTION only in the direct phase. After the sun has set what illuminates is not a
+    // point source but the WHOLE SKY painted red. Directional falloff in that phase becomes
+    // a mask with no physical counterpart and confined the glow to a single slope.
     float facing = saturate(dot(normalWS, _SurfaceDawnDir.xyz) * 0.5 + 0.5);
     facing = lerp(1.0, facing, _AlpenglowFacing * directPhase);
 
-    // Yüzey rengi parlamayı etkiler ama tamamen belirlemez: kar kızıla boyanır, koyu
-    // kaya daha az yakalar. Doğrudan albedo ile çarpmak bazalt gibi koyu bir yüzeyde
-    // parlamayı görünmezliğe itiyor.
+    // The surface color affects the glow but does not fully determine it: snow is painted
+    // red, dark rock catches less. Multiplying by the albedo directly pushes the glow into
+    // invisibility on a dark surface like basalt.
     half3 receptivity = lerp(0.45, albedo, 0.65);
 
-    // GÖLGELEME de faza bağlı. Doğrudan fazda güneş gölgesi doğru ölçü. Batıştan
-    // sonra kaynak gökyüzü olduğu için güneş yönlü gölge anlamsız — o noktanın
-    // gökyüzünü ne kadar gördüğü (maruziyet) doğru ölçüdür: çukur az alır, sırt çok.
+    // SHADOWING depends on the phase too. In the direct phase the sun shadow is the right
+    // measure. After sunset the source is the sky, so a sun-directional shadow is
+    // meaningless — the right measure is how much of the sky that point sees (exposure): a hollow gets little, a ridge a lot.
     float shade = TerrainSunShadow(worldPos, _SurfaceDawnDir.xyz);
     float gate = lerp(lerp(0.25, 1.0, exposure), shade, directPhase);
 
@@ -312,14 +313,14 @@ half3 Alpenglow(float3 worldPos, float3 normalWS, float altitude, half3 albedo,
          * (_SurfaceDawnStrength * lit * facing * gate);
 }
 
-/// Yüzey haritalarını kübik B-spline ile okur — dört bilinear okumanın ağırlıklı
-/// birleşimi.
+/// Reads the surface maps with a cubic B-spline — the weighted combination of four bilinear
+/// reads.
 ///
-/// Bilinear yetmiyor: kar maskesi bu kanalların çarpımına dar bir eşik vuruyor ve
-/// bilinear alanların eş değer çizgileri texel köşelerinde X biçiminde kırılıyor —
-/// maske kenarı 17 metrelik ızgaranın kristal desenini giyiyordu. Teşhisle kesinlendi:
-/// desen hiçbir bileşen kanalında yok, yalnız eşiklenmiş sonuçta. B-spline alanı C1
-/// kurar; eş değer çizgileri kırıksız, kristal yapısal olarak imkânsız.
+/// Bilinear is not enough: the snow mask puts a narrow threshold on the product of these
+/// channels and the iso-lines of bilinear fields break into an X shape at texel corners —
+/// the mask edge was wearing the crystal pattern of the 17 metre grid. Confirmed by
+/// diagnostic: the pattern is in none of the component channels, only in the thresholded
+/// result. A B-spline field is C1; its iso-lines have no breaks and the crystal is structurally impossible.
 float4 SampleSurfaceMaps(float2 uv)
 {
     float2 t = uv * _SurfaceMapsSize.xy - 0.5;
@@ -351,7 +352,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     float2 uv = (worldPos.xz - _TerrainOrigin.xz) / _TerrainSize.xz;
     float4 maps = SampleSurfaceMaps(uv);
 
-    // Zemin normali köşe normalinden değil, pişirilmiş dokudan
+    // The ground normal comes from the baked texture, not from the vertex normal
     float2 packed = SAMPLE_TEXTURE2D(_GroundNormals, sampler_GroundNormals, uv).rg * 2.0 - 1.0;
     float3 normalWS = float3(packed.x,
                              sqrt(saturate(1.0 - dot(packed, packed))), packed.y);
@@ -360,37 +361,37 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     float concavity  = maps.g;
     float exposure   = maps.b;
 
-    // Eğim, köşe normalinden değil pişirilmiş haritadan. Köşe normalleri 4 metrelik
-    // ızgarada yaşıyor ve aralarının doldurulması, eş değer çizgileri paylaşılan
-    // köşegenler boyunca kıvrılan bir alan üretiyor. Işıkta görünmüyor — eşik görünür
-    // kılıyor: yamaç eğim sınırının bandındayken kar ve çakıl maskeleri o kafes boyunca
-    // açılıp kapanıyor ve yüzeye baklava deseni çıkıyordu. Haritanın texel'i ızgaranın
-    // dört katı geniş, desen taşıyamaz.
+    // The slope comes from the baked map rather than the vertex normal. Vertex normals live
+    // on a 4 metre grid and filling in between them produces a field whose iso-lines curve
+    // along the shared diagonals. It is invisible in light — the threshold makes it visible:
+    // with a slope in the band of the slope limit, the snow and gravel masks opened and
+    // closed along that lattice and a diamond pattern appeared on the surface. The map's
+    // texel is four times wider than the grid and cannot carry the pattern.
     float slope = maps.a;
 
     float altitude = worldPos.y - _TerrainOrigin.y;
     float grain = MountainFbm(worldPos * _GrainScale, 3);
 
-    // --- Kaya: iki ton, jeolojik bantlarla harmanlanıyor ---
+    // --- Rock: two tones, blended with geological banding ---
     float band = MountainBand(worldPos);
     float rockMix = saturate(band * _BandContrast + (grain - 0.5) * _GrainStrength);
     float3 albedo = lerp(_RockPrimary.rgb, _RockSecondary.rgb, rockMix);
 
-    // --- Rakım tonu: altta toprak, üstte buzul aşındırması ---
+    // --- Altitude tint: soil below, glacial scouring above ---
     float lowland = 1.0 - smoothstep(0.0, _LowlandCeiling, altitude);
     float alpine = smoothstep(_AlpineFloor, _AlpineFloor + 1200.0, altitude);
     albedo = lerp(albedo, _LowlandTint.rgb, lowland * _AltitudeTintStrength);
     albedo = lerp(albedo, _AlpineTint.rgb, alpine * _AltitudeTintStrength);
 
-    // --- Oksit: demir damarları katmanları izler, serbest gezmez ---
+    // --- Oxide: iron veins follow the layers, they do not wander freely ---
     float vein = MountainFbm(worldPos * _OxideScale, 2);
     float oxide = smoothstep(0.55, 0.85, vein) * (1.0 - band) * _OxideAmount;
     albedo = lerp(albedo, _OxideColor.rgb, saturate(oxide));
 
-    // --- Liken: nem oyuklarda tutunur, güneş kurutur, rakım sınırlar ---
+    // --- Lichen: moisture clings in hollows, the sun dries it, altitude limits it ---
     float moisture = smoothstep(_LichenMoistureBias, 1.0, concavity);
     float shelter = 1.0 - exposure;
-    // Öğle güneşi kullanılıyor: anlık güneşe bağlanırsa liken gün içinde yanıp söner
+    // The noon sun is used: tied to the instantaneous sun the lichen would blink through the day
     float sunFacing = saturate(dot(normalWS, _SurfaceSunDir.xyz) * 0.5 + 0.5);
     float dried = lerp(1.0, 1.0 - sunFacing, _LichenSunSensitivity);
     float alive = 1.0 - smoothstep(_LichenCeiling - 600.0, _LichenCeiling, altitude);
@@ -399,35 +400,35 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     float lichen = saturate((moisture * 0.6 + shelter * 0.4) * dried * alive * patchy) * _LichenAmount;
     albedo = lerp(albedo, _LichenColor.rgb, lichen);
 
-    // --- Çakıl: yukarıdan akan malzeme oluklarda toplanır, dikte tutunmaz ---
+    // --- Gravel: material flowing from above collects in gullies, it does not cling to steep faces ---
     float screeFit = smoothstep(cos(radians(_ScreeSlopeLimit)) - 0.12,
                                 cos(radians(_ScreeSlopeLimit)) + 0.08, slope);
     float scree = smoothstep(_ScreeRange.x, _ScreeRange.y, deposition) * screeFit * _ScreeAmount;
     albedo = lerp(albedo, _ScreeColor.rgb * (0.8 + grain * 0.4), scree);
 
-    // --- Islaklık: yağış kayayı koyultur ve parlatır ---
+    // --- Wetness: precipitation darkens and glosses the rock ---
     float wet = _SurfaceWetness * (1.0 - exposure * 0.3);
     albedo *= 1.0 - wet * _WetDarkening;
 
-    // --- Deniz ıslaklığı: kıyı bandı (deniz spec §14) ---
+    // --- Sea wetness: the shore band (sea spec §14) ---
     //
-    // AD ÇAKIŞMASI VAR: yukarıdaki `wet` YAĞIŞ ıslaklığı ve `_SurfaceWetness`
-    // ile sürülüyor. Deniz bandı ayrı bir değişken; ikisi çarpışırsa yağmurlu
-    // havada kıyı iki kez koyulurdu.
+    // THERE IS A NAME COLLISION: the `wet` above is PRECIPITATION wetness driven by
+    // `_SurfaceWetness`. The sea band is a separate variable; colliding, the shore
+    // would darken twice in rainy weather.
     //
-    // Seviyeyi `SeaWetnessDriver` yayınlıyor ve deniz kapalıyken çok düşük
-    // bir kota çekiyor, yani `seaWet` her yerde 0 oluyor. Deniz sistemi bu
-    // materyale HİÇBİR ŞEY yazmıyor — yalnız iki global okunuyor.
+    // The level is published by `SeaWetnessDriver`, and while the sea is off it pulls it
+    // to a very low elevation, so `seaWet` is 0 everywhere. The sea system writes
+    // NOTHING into this material — only two globals are read.
     float seaWet = 1.0 - smoothstep(_SeaWetLevelY - _SeaWetFadeM,
                                     _SeaWetLevelY, worldPos.y);
     albedo = lerp(albedo, albedo * _SeaWetDarkening, seaWet);
 
-    // --- Kabartı gürültüsü: prosedürel normalin hammaddesi; bu olmadan yüzey plastik
-    //     görünür. Değeri karın mikro yerleşimine, gradyanı gölgelendirmeye gider —
-    //     iki tüketici, tek örnekleme ---
-    // Eğim ANALİTİK: sonlu fark üç örnekleme istiyordu (8 hash × 3), türev tek
-    // örneklemenin içinden çıkıyor. bx = ∂f/∂x · e, çünkü sonlu fark birinci
-    // mertebeden bunun aynısı.
+    // --- Bump noise: the raw material of the procedural normal; without it the surface
+    //     looks like plastic. Its value goes to the snow's micro placement and its gradient
+    //     to the shading — two consumers, one sample ---
+    // The slope is ANALYTIC: a finite difference wanted three samples (8 hashes x 3), while
+    // the derivative falls out of a single sample. bx = df/dx · e, because to first order a
+    // finite difference is exactly that.
     float e = 0.35;
     float3 bumpGrad;
     float here = MountainFbmD(worldPos * _BumpScale, 2, bumpGrad);
@@ -456,23 +457,23 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     surface.normalWS = shaded;
     surface.smoothness = lerp(_RockSmoothness, _WetSmoothness, wet);
 
-    // ISLAK KUM DAHA PARLAK. Spec §14 pürüzlülüğü 0.35 katına indiriyor;
-    // burası smoothness tutuyor, o yüzden pürüzlülüğe çevrilip geri
-    // dönülüyor — smoothness'ı doğrudan 0.65 ile çarpmak TERS yönde
-    // çalışırdı.
+    // WET SAND IS GLOSSIER. Spec §14 cuts the roughness to 0.35 of its value; this code
+    // holds smoothness, so it is converted to roughness and back — multiplying smoothness
+    // by 0.65 directly would work in the OPPOSITE direction.
     float seaRough = (1.0 - surface.smoothness) * lerp(1.0, 0.35, seaWet);
     surface.smoothness = 1.0 - seaRough;
 
-    // Maruziyet haritası ambient'i kısar: vadi dibi göğün küçük bir parçasını görür.
-    // Yüz metre ölçeğinde çalışır; santimetre ölçeğinin sahibi SSAO idi ama kapatıldı —
-    // derinlik tamponundan arazi üçgenlerinin kırıklarını gölgeliyordu (bkz. DECISIONS).
+    // The exposure map scales the ambient down: a valley floor sees only a small part of the
+    // sky. It works at the hundred-metre scale; the centimetre scale was owned by SSAO but
+    // that was turned off — from the depth buffer it was shading the breaks of the terrain
+    // triangles (see DECISIONS).
     //
-    // O ölçeğin telafisi mikro-oyuk — kabartının DEĞERİNDEN değil EĞRİLİĞİNDEN:
-    // değeri karartmak gürültünün alçak bölgelerini metre ölçekli kirli yamalar
-    // hâlinde boyuyordu (denendi, geri alındı). Çukurun tanımı ikinci türevdir:
-    // çevresi kendinden yüksek nokta dip'tir, yalnız orası loşlaşır. İki ek örnek
-    // yalnız yakın alanda alınır — SSAO'nun kapsadığı ölçek de zaten buydu, uzak
-    // dağ dokunulmaz. Kar kalınlaştıkça kabartıyla birlikte gömülür.
+    // That scale is compensated by the micro-cavity — from the bump's CURVATURE, not its
+    // VALUE: darkening the value painted the low regions of the noise as metre-scale dirty
+    // patches (tried, reverted). The definition of a hollow is the second derivative: a
+    // point lower than its surroundings is a pit, and only that dims. The two extra samples
+    // are only taken in the near field — which was also the scale SSAO covered; the distant
+    // mountain is untouched. As the snow thickens it is buried along with the bump.
     float microCavity = 1.0;
     float cavityDip = 0.0;
     float cavityRange = 1.0 - smoothstep(20.0, 50.0, length(_WorldSpaceCameraPos - worldPos));
@@ -481,12 +482,12 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         float bx2 = MountainFbm((worldPos - float3(e, 0, 0)) * _BumpScale, 2) - here;
         float bz2 = MountainFbm((worldPos - float3(0, 0, e)) * _BumpScale, 2) - here;
 
-        // Laplasyen: (f(+e)+f(-e)-2f) iki eksenin toplamı; pozitif = çukur
+        // Laplacian: (f(+e)+f(-e)-2f) summed over two axes; positive = a pit
         float coarseDip = saturate((bx + bx2 + bz + bz2) * 6.0);
 
-        // İnce çatlak oktavı: kabartının ~3 metrelik çukurlarının altına ~1 metrelik
-        // yarık ölçeği. Kayaya asıl "çatlak dibi" hissini bu verir; yalnız yakın
-        // alanda örneklendiği için uzak dağa maliyeti yok.
+        // A fine crack octave: a ~1 metre fissure scale beneath the bump's ~3 metre hollows.
+        // This is what gives rock the real "bottom of a crack" feel; because it is only
+        // sampled in the near field it costs the distant mountain nothing.
         float fineScale = _BumpScale * 3.0;
         const float fe = 0.12;
         float fineLap = MountainFbm((worldPos + float3(fe, 0, 0)) * fineScale, 2)
@@ -503,34 +504,34 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     surface.occlusion = lerp(1.0, exposure, _CavityStrength) * microCavity;
     surface.snowSurfaceHeight = 0;
 
-    // Diplere toz ve kırıntı birikir: çukur yalnız loş değil, MAT da. Aynı dip
-    // değeri pürüzlülüğe çevrilir — bedava.
+    // Dust and debris collect at the bottom: a hollow is not only dim, it is also MATTE. The
+    // same pit value is converted into roughness — for free.
     surface.smoothness *= 1.0 - cavityDip * 1.2;
 
-    // ------------------------------------------------------------------ kar
+    // ----------------------------------------------------------------- snow
     //
-    // YERİNDEN OYNATMA YOK, bu bir gölgeleme katmanı. Deforme olan gerçek kar
-    // yalnız oyuncunun çevresindeki 24 m'lik bölgede (kar mesh'i).
+    // NO DISPLACEMENT, this is a shading layer. The real snow that deforms only exists in
+    // the 24 m region around the player (the snow mesh).
     //
-    // ARAZİNİN KARI DERİNLİK DEĞİL ÖRTÜ (spec §16).
+    // THE TERRAIN'S SNOW IS COVER, NOT DEPTH (spec §16).
     //
-    // Eskiden `SnowStateAt`'ten DERİNLİK okunuyordu. O fonksiyon bölgenin
-    // içinde durum dokusunu, dışında `_FallbackSWE`'yi veriyor — iki ayrı
-    // sayı. Kar mesh'i ise kenarında kalınlığı sıfıra indiriyor (spec §8.3).
-    // İkisi üst üste gelince mesh'in dış 2 metresinde HENDEK kalıyordu:
-    // mesh 0 cm gösterirken arazi 45 cm boyuyordu. Oyuncunun çevresindeki
-    // kare o hendeğin çerçevesiydi (ölçüldü — kalınlık probu, `SYMPTOMS.md`).
+    // It used to read DEPTH from `SnowStateAt`. That function returns the state texture
+    // inside the region and `_FallbackSWE` outside — two separate numbers. The snow mesh
+    // meanwhile drops its thickness to zero at its edge (spec §8.3). Overlapped, a TRENCH
+    // remained in the outer 2 metres of the mesh: the mesh showed 0 cm while the terrain
+    // painted 45 cm. The square around the player was the frame of that trench (measured —
+    // thickness probe, `SYMPTOMS.md`).
     //
-    // Spec'in kendi yolu: arazi örtüsü GLOBAL SKALER `_SnowCoverage`'dan
-    // gelir ve kalınlığı `_SnowCoverThickness` (4 cm). Her yerde aynı sayı,
-    // bölge sınırı diye bir şey yok.
+    // The spec's own path: the terrain cover comes from the GLOBAL SCALAR `_SnowCoverage`
+    // and its thickness is `_SnowCoverThickness` (4 cm). The same number everywhere, and
+    // there is no such thing as a region boundary.
 
-    // EĞİM: dik kayada kar durmaz. 0.45 ≈ 63° yatıklık.
+    // SLOPE: snow does not hold on steep rock. 0.45 ~ 63° of inclination.
     float snowSlope = saturate((normalWS.y - 0.45) / 0.35);
 
-    // KENAR KIRILMASI DAĞIN KENDİ GÜRÜLTÜSÜNDEN. Yeni doku eklenmiyor —
-    // kayanın kabartısı zaten orada ve kar sınırı ona oturunca düz kesilmiş
-    // bir çizgi gibi durmuyor.
+    // THE EDGE BREAKUP COMES FROM THE MOUNTAIN'S OWN NOISE. No new texture is added —
+    // the rock's bump is already there, and with the snow boundary settling on it the
+    // boundary does not look like a straight cut.
     float snowBreak = MountainFbm(worldPos * _BumpScale * 0.35, 2) * 0.5 + 0.5;
 
     float snowMask = SnowCoverMaskWithNoise(worldPos, normalWS, surface.occlusion, snowBreak,
@@ -539,32 +540,32 @@ MountainSurface BuildMountainSurface(float3 worldPos)
 
     if (snowMask > 0.001)
     {
-        // İZ GERÇEK GEOMETRİ — PARALAKS DEĞİL.
+        // THE TRAIL IS REAL GEOMETRY — NOT PARALLAX.
         //
-        // RELIEF MAPPING KALKTI. `SnowReliefOffset` bakış ışınını yürütüp
-        // çukurun görünen yerini buluyordu ve sonraki bütün okumalar
-        // KAYDIRILMIŞ konumdan yapılıyordu. Kar yüzeyi tessellation ile
-        // gerçek geometri olunca aynı çukur `SnowTessYerDegistirme` içinde
-        // ikinci kez oyuluyordu: iz İKİ KAT derin görünürdü.
+        // RELIEF MAPPING WAS REMOVED. `SnowReliefOffset` marched the view ray to find
+        // where the hollow appeared, and every later read was taken from the SHIFTED
+        // position. Once the snow surface became real geometry through tessellation the
+        // same hollow was carved a second time inside `SnowTessYerDegistirme`: the trail
+        // looked TWICE as deep.
         //
-        // Geometri paralaksın verdiği her şeyi zaten veriyor — üstelik
-        // silüeti de kırıyor ve komşu tepeler birbirini gerçekten örtüyor.
-        // Işın yürüyüşünün 12-32 adımı da gitti.
+        // The geometry already gives everything parallax gave — and it breaks the
+        // silhouette too, so neighbouring bumps really do occlude each other. The ray
+        // march's 12-32 steps went with it.
         float3 izPos = worldPos;
         float2 izUV = SnowWorldToUV(izPos);
         float izDerinlik = SnowDentSmooth(izUV);
 
-        // İZİN İÇİ EZİLMİŞ KARDIR — YOĞUNLUK YEREL OKUNUYOR.
+        // THE INSIDE OF A TRAIL IS CRUSHED SNOW — THE DENSITY IS READ LOCALLY.
         //
-        // Eskiden yoğunluk her yerde dünyanın genel değeriydi (`_FallbackRhoN`)
-        // ve durum dokusu okunmuyordu; gerekçe "bölge sınırında tazelik sıçrar
-        // ve kare geri gelir" idi. O gerekçe ikinci yüzey varken geçerliydi:
-        // sınır artık yok, çünkü çizen shader tek.
+        // The density used to be the world's general value everywhere (`_FallbackRhoN`)
+        // and the state texture was not read; the reasoning was "freshness jumps at the
+        // region boundary and the square comes back". That reasoning held while there was
+        // a second surface: there is no boundary any more, because one shader draws it all.
         //
-        // Sıçrama riski `SnowInsideMask` ile kapalı: bölge kenarında yerel
-        // değer dünyanınkine yumuşak geçiyor. Kazanç, ayak izinin İÇİNİN
-        // gerçekten sıkışmış görünmesi — kar basılınca yoğunlaşır, albedosu
-        // düşer, pürüzlülüğü artar.
+        // The jump risk is closed by `SnowInsideMask`: at the region edge the local value
+        // transitions smoothly into the world's. The gain is that the INSIDE of a footprint
+        // really looks compacted — pressed snow densifies, its albedo drops and its
+        // roughness rises.
         float4 karDurum = SnowStateAt(izUV);
         float bolgeIci  = SnowInsideMask(izUV);
 
@@ -572,34 +573,34 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         float yerelIslak = lerp(_SurfaceWetness, max(_SurfaceWetness, karDurum.b), bolgeIci);
         float yerelBozulma = karDurum.a * bolgeIci;
 
-        // Spec §14.1: albedo ve pürüzlülük TAZELİKTEN, tazelik de yoğunluktan.
+        // Spec §14.1: albedo and roughness come from FRESHNESS, and freshness from density.
         float freshness = 1.0 - saturate((SnowDensity(yerelRho) - 100.0) / 350.0);
 
         half3 snowAlbedo = lerp(half3(0.70, 0.73, 0.79), half3(0.90, 0.92, 0.95), freshness);
-        // Kuru kar pürüzlüdür; gerekçe `SnowConstants.hlsl` → `SNOW_ROUGH_PACKED`.
+        // Dry snow is rough; the reasoning is in `SnowConstants.hlsl` -> `SNOW_ROUGH_PACKED`.
         //
-        // İKİ YOL AYNI SABİTİ OKUMAK ZORUNDA. Buraya 0.28 yazılmıştı,
-        // `SnowBuildSurfaceFrom` ise 0.45 kullanıyordu — aynı kar arazide ve
-        // kar mesh'inde iki farklı parlaklıkla çiziliyordu. Yorum "aynı sayıyı
-        // kullanmak zorunda" diyordu ama sayı iki yerde ayrı duruyordu.
+        // TWO PATHS MUST READ THE SAME CONSTANT. 0.28 had been written here while
+        // `SnowBuildSurfaceFrom` used 0.45 — the same snow was drawn at two different
+        // brightnesses on the terrain and on the snow mesh. The comment said "they have to
+        // use the same number" but the number sat separately in two places.
         //
-        // SIKIŞMIŞ KAR KOYU DEĞİL, SERT — AMA AYNA DA DEĞİL.
+        // COMPACTED SNOW IS NOT DARK, IT IS HARD — BUT IT IS NOT A MIRROR EITHER.
         //
-        // [KAYNAK: kar malzemesi kırılımı — "flatter areas scoured by the wind
-        // reveal a slightly more compacted frozen snow layer underneath" ve o
-        // alanlar daha AZ pürüzlü.] Basınç dendritleri kırıyor, kenarlar
-        // yuvarlanıyor, yüzey düzleşiyor. Düzleşiyor, camlaşmıyor: buzun F0'ı
-        // 0.018'de sabit, sıkışmak onu değiştirmiyor.
+        // [SOURCE: snow material breakdown — "flatter areas scoured by the wind reveal a
+        // slightly more compacted frozen snow layer underneath", and those areas are LESS
+        // rough.] Pressure breaks the dendrites, the edges round off and the surface
+        // flattens. It flattens, it does not vitrify: ice's F0 is fixed at 0.018 and
+        // compaction does not change it.
         half  snowRough  = lerp(SNOW_ROUGH_PACKED, SNOW_ROUGH_FRESH, freshness);
 
-        // YÜZEY DOKUSU BURAYA GİRİYOR.
+        // THE SURFACE TEXTURE ENTERS HERE.
         //
-        // Arazinin kar albedosu bu blokta kuruluyor, `SnowBuildSurface`'ten
-        // bağımsız; doku yalnız oraya bağlandığında arazide HİÇBİR etkisi
-        // olmuyordu (ölçüldü: güç 0 ile 3 arasında ekran farkı yok).
+        // The terrain's snow albedo is built in this block, independent of
+        // `SnowBuildSurface`; wired only into that one, the texture had NO effect at all on
+        // the terrain (measured: no screen difference between strength 0 and 3).
         //
-        // Kar mesh'i de aynı harmanı kullanıyor. İkisi aynı dokuyu görmek
-        // zorunda: mesh yalnız yerel sapmayı çiziyor, düz alanı arazi çiziyor.
+        // The snow mesh uses the same blend. The two must see the same texture: the mesh
+        // only draws the local deviation, the terrain draws the flat area.
         SnowSurfaceBlend karYuzey = SnowSampleSurface(izPos, yerelRho, yerelIslak, yerelBozulma);
         surface.snowBlend   = karYuzey;
         surface.snowRhoN    = (half)yerelRho;
@@ -613,26 +614,26 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         surface.albedo     = lerp(surface.albedo, snowAlbedo, snowMask);
         surface.smoothness = lerp(surface.smoothness, 1.0 - snowRough, snowMask);
 
-        // Kar kayanın kabartısını GÖMÜYOR: normal düzleşip geometrik normale
-        // dönüyor. Kar altındaki çatlağı göstermek kar değil, ıslak kaya olur.
+        // Snow BURIES the rock's bump: the normal flattens toward the geometric normal.
+        // Showing a crack under the snow makes it wet rock, not snow.
         float3 snowNormal = normalWS;
 
-        // Spec §14.2 Macro katmanı. `disturb` sıfır: dağda iz yok, ezilmiş kar
-        // katmanının burada karşılığı da yok.
+        // Spec §14.2's Macro layer. `disturb` is zero: there is no trail on the mountain and
+        // the crushed snow layer has no counterpart here either.
         //
-        // DETAY YALNIZ YATAYA YAKIN YÜZEYDE. Spec'in kendi ön koşulu:
-        // `WorldNormalToTangentPacked` tanjant çerçevesini dünya +Y'ye
-        // sabitliyor ve gerekçesini "kar yüzeyi yataya yakın" diye yazıyor.
-        // Kar MESH'i için doğru; dağda değil. Düzlemsel XZ örneklemesi dik
-        // yamaçta dikey olarak eziliyor ve yüzeyde akan siyah şeritler
-        // bırakıyor (ölçüldü: şeritler yalnız eğimin dikleştiği bantta).
+        // DETAIL ONLY ON NEAR-HORIZONTAL SURFACES. The spec's own precondition:
+        // `WorldNormalToTangentPacked` pins the tangent frame to world +Y and gives its
+        // reasoning as "the snow surface is near horizontal". True for the snow MESH; not on
+        // the mountain. A planar XZ sampling is squashed vertically on a steep face and
+        // leaves black streaks running down the surface (measured: the streaks appear only
+        // in the band where the slope steepens).
         //
-        // Ağırlık `snowSlope`: zaten hesaplanmış, yeni terim değil. Karın
-        // durduğu yer ile detayın geçerli olduğu yer aynı yer.
+        // The weight is `snowSlope`: already computed, not a new term. Where snow holds and
+        // where the detail is valid are the same place.
         float3 detailed = SnowApplyDetailNormals(snowNormal, worldPos, 0.0,
                                                  length(_WorldSpaceCameraPos - worldPos));
 
-        // Doku normalini de ekle: kar dokusunun asıl bilgisi burada.
+        // Add the texture normal too: the real information of the snow texture is here.
         {
             float2 e = float2(detailed.x, detailed.z) / max(detailed.y, 1e-3)
                      + (float2)karYuzey.normalSlope;
@@ -645,12 +646,12 @@ MountainSurface BuildMountainSurface(float3 worldPos)
 
         surface.normalWS = normalize(lerp(surface.normalWS, snowNormal, snowMask));
 
-        // ÇUKURUN EĞİMİ NORMALE EN SON GİRİYOR.
+        // THE CAVITY'S SLOPE ENTERS THE NORMAL LAST.
         //
-        // `snowMask` harmanının İÇİNE konsaydı maskeyle sulanırdı; iz bir
-        // ışıklandırma katmanı değil, yüzeyin kendi biçimi — kar oradaysa
-        // çukur da oradadır. Ölçüldü: harmanın içindeyken 22 cm'lik iz ekranda
-        // zar zor seçiliyordu.
+        // Placed INSIDE the `snowMask` blend it would be watered down by the mask; a trail
+        // is not a lighting layer but the surface's own shape — if the snow is there, so is
+        // the hollow. Measured: inside the blend a 22 cm trail was barely discernible on
+        // screen.
         {
             half2 izEgim = SnowDentSlope(izUV);
             float3 n = surface.normalWS;
@@ -659,21 +660,20 @@ MountainSurface BuildMountainSurface(float3 worldPos)
                                               saturate(izDerinlik * 20.0)));
         }
 
-        // KAR YÜZEYİNİN KENDİ RÖLYEFİ — İZDEN BAĞIMSIZ.
+        // THE SNOW SURFACE'S OWN RELIEF — INDEPENDENT OF THE TRAIL.
         //
-        // KÖK HATA BURADAYDI. Yer şekilleri (fBm, ripple, sastrugi) ve mikro
-        // rölyef `SnowDentSlope` üzerinden geliyordu ve o da yukarıdaki
-        // `saturate(izDerinlik * 20.0)` ağırlığıyla harmanlanıyordu. Düz karda
-        // `izDerinlik = 0`, yani ağırlık SIFIR: eklenen her yüzey detayı
-        // ekrana hiç ulaşmıyordu (kullanıcı üç tur üst üste bildirdi:
-        // "dışarıdaki karda hiçbir detay yok").
+        // THE ROOT BUG WAS HERE. The bedforms (fBm, ripple, sastrugi) and the micro relief
+        // came through `SnowDentSlope`, and that was blended with the
+        // `saturate(trailDepth * 20.0)` weight above. On flat snow `trailDepth = 0`, i.e. the
+        // weight is ZERO: every surface detail added never reached the screen at all (the
+        // user reported it three rounds in a row: "there is no detail at all in the snow outside").
         //
-        // O kapı yalnız İZ için doğru — iz olmayan yerde çukur eğimi de
-        // olmamalı. Ama yüzeyin kendi rölyefi karın olduğu HER YERDE var,
-        // o yüzden ağırlığı `snowMask`.
+        // That gate is only right for the TRAIL — where there is no trail there should be no
+        // cavity slope either. But the surface's own relief exists EVERYWHERE there is snow,
+        // so its weight is `snowMask`.
         {
             float yuzeyYuksekligi;
-            // Kar tabakasının kalınlığı: yer şekilleri bundan derin olamaz.
+            // Thickness of the snow layer: the bedforms cannot be deeper than this.
             float karKalinligi = SnowBaseHeight(karDurum.r, yerelRho);
 
             half2 yuzeyEgim = SnowYuzeyEgim(izPos.xz, izPos.y, karKalinligi, yuzeyYuksekligi)
@@ -689,31 +689,31 @@ MountainSurface BuildMountainSurface(float3 worldPos)
 
         }
 
-        // TESHIS: normal EN SONDA duzlestiriliyor ki iz egimi, yuzey rolyefi
-        // ve ARAZININ kendi normali dahil her katman ezilsin.
+        // DIAGNOSTIC: the normal is flattened LAST so that every layer is crushed —
+        // the trail slope, the surface relief and the TERRAIN's own normal.
         if (_SnowDbgFlatNormal > 0.5)
             surface.normalWS = normalize(lerp(surface.normalWS, _SnowUpDirection, snowMask));
 
 
-        // Mikro-oyuk karın altında kalıyor — ama TAMAMEN değil.
+        // The micro-cavity is buried under the snow — but NOT COMPLETELY.
         //
-        // 0.7 ile düzleştirilince arazinin oyukları kar altında yok oluyordu
-        // ve kar tek parça beyaz kalıyordu (ölçüldü: zemin sapması 0.010,
-        // güneşsizken 0.0023). Kar oyuğu doldurur, silmez: 15-20 cm'lik örtü
-        // metrelik bir çukuru kapatmaz. Pay 0.55'e indirildi: 0.35'te zemin
-        // luması 0.88'den 0.59'a düşüp güneşli kar için fazla koyu kaldı.
-        // GÖMME PAYI KAR KALINLIĞINDAN.
+        // Flattened with 0.7 the terrain's hollows vanished under the snow and the snow
+        // stayed one solid white (measured: ground deviation 0.010, 0.0023 with no sun).
+        // Snow fills a hollow, it does not erase it: a 15-20 cm cover does not close a
+        // metre-scale pit. The share was lowered to 0.55: at 0.35 the ground luma fell from
+        // 0.88 to 0.59 and stayed too dark for sunlit snow.
+        // THE BURIAL SHARE COMES FROM THE SNOW THICKNESS.
         //
-        // Sabit 0.55'ti: 1 cm kar da 50 cm kar da arazinin oyuklarını aynı
-        // oranda gömüyordu. Fizik bunu vermiyor — santimetrelik bir örtü
-        // metrelik çukuru kapatmaz, yarım metrelik örtü kapatır.
+        // It was a fixed 0.55: 1 cm of snow buried the terrain's hollows as much as 50 cm
+        // did. Physics does not give that — a centimetre cover does not close a metre pit, a
+        // half-metre cover does.
         //
-        // Bu, kar kalınlığının en güçlü görsel karşılığı: ince karda arazinin
-        // kendi kabartısı okunuyor, kalın karda yüzey tek parça beyaza dönüyor
-        // (kullanıcı bildirdi: "1cm, 5cm, 20cm, 50cm arasında bir fark yok").
+        // This is the strongest visual consequence of snow thickness: in thin snow the
+        // terrain's own bump reads, in thick snow the surface turns into solid white (the
+        // user reported: "there is no difference between 1cm, 5cm, 20cm and 50cm").
         //
-        // `SNOW_BURY_REF_DEPTH` = 0.30 m: o kalınlıkta gömme tam paya
-        // (0.55) ulaşıyor, altında orantılı.
+        // `SNOW_BURY_REF_DEPTH` = 0.30 m: at that thickness the burial reaches the full
+        // share (0.55), below it proportionally.
         {
             float kalinlik = SnowBaseHeight(karDurum.r, yerelRho);
             half gomme = (half)(0.55 * saturate(kalinlik / SNOW_BURY_REF_DEPTH));
@@ -721,73 +721,72 @@ MountainSurface BuildMountainSurface(float3 worldPos)
             surface.occlusion = lerp(surface.occlusion, 1.0, snowMask * gomme);
         }
 
-        // ÇUKURUN GÖRÜŞ PAYI ÇOK YANSIMAYLA TELAFİ EDİLİYOR.
+        // THE CAVITY'S VIEW FACTOR IS COMPENSATED BY MULTIPLE SCATTERING.
         //
-        // Çukur göğü dar bir açıdan görüyor: görüş payı `V` derinlikle düşüyor.
-        // Ama kaybolan gök ışığının yerine ÇUKURUN KENDİ DUVARLARI geçiyor ve
-        // o duvarlar beyaz. Albedo `a` olan bir kovukta denge:
+        // A hollow sees the sky through a narrow angle: the view factor `V` falls with
+        // depth. But THE CAVITY'S OWN WALLS take the place of the lost sky light, and those
+        // walls are white. The equilibrium in a cavity of albedo `a`:
         //
-        //     kazanç = V / (1 - a(1 - V))
+        //     gain = V / (1 - a(1 - V))
         //
-        // Aynı çok yansıma formülü kar-gök zincirinde de kullanılıyor
-        // (`SnowLighting.hlsl` → `SnowAmbient`), ayrı bir kaynak kurulmuyor.
+        // The same multiple-scattering formula is used in the snow-sky chain as well
+        // (`SnowLighting.hlsl` -> `SnowAmbient`); no separate source is created.
         //
-        // Sayılarla: a = 0.91, V = 0.65 iken kazanç 0.95 — yalnız %5 koyu.
-        // Telafi olmadan aynı V doğrudan uygulanıyordu ve BEYAZ YÜZEYİ DÜZ
-        // ORANLA KARARTMAK onu GRİ yapıyordu (kullanıcı bildirdi: "kar izi
-        // gri?? niye gri onu da bilmiyorum").
+        // With numbers: at a = 0.91 and V = 0.65 the gain is 0.95 — only 5% darker. Without
+        // the compensation the same V was applied directly, and DARKENING A WHITE SURFACE BY
+        // A FLAT RATIO turned it GREY (the user reported: "the snow trail is grey?? I don't
+        // know why it's grey either").
         //
-        // Kar düzleştirmesinden SONRA uygulanıyor: düzleştirme çukuru silerdi.
+        // It is applied AFTER the snow flattening: the flattening would erase the hollow.
         {
             half a = dot(snowAlbedo, half3(0.2126, 0.7152, 0.0722));
-            // ÇUKUR GÖĞÜ SANDIĞIMIZDAN GENİŞ GÖRÜYOR.
+            // A HOLLOW SEES MORE OF THE SKY THAN WE ASSUMED.
             //
-            // Katsayı 0.55'ti ve 22 cm derinlikte görüş payını 0.65'e
-            // indiriyordu. Geometri bunu vermiyor: iz 60 cm geniş, 22 cm
-            // derin; kenardan bakıldığında yarı-açı atan(30/22) = 54°, yani
-            // gökyüzünün büyük kısmı görünüyor. Görüş payı ~0.78.
+            // The coefficient was 0.55 and at 22 cm of depth it dropped the view factor to
+            // 0.65. The geometry does not support that: the trail is 60 cm wide and 22 cm
+            // deep; seen from the edge the half-angle is atan(30/22) = 54°, so most of the
+            // sky is visible. The view factor is ~0.78.
             //
-            // Üç terim (görüş, kendi gölgesi, sıkışmış kar albedosu) çarpım
-            // hâlinde uygulanıyor; her biri ayrı ayrı makulken çarpımları izi
-            // düz karın üçte birine indiriyordu (kullanıcı bildirdi: "karın
-            // içi niye karanlık").
+            // Three terms (view factor, its own shadow, compacted snow albedo) are applied
+            // as a product; each is reasonable on its own while their product dropped the
+            // trail to a third of flat snow (the user reported: "why is the inside of the
+            // snow dark").
             half V = (half)saturate(1.0 - 0.35 * izDerinlik / SNOW_RELIEF_MAX_DEPTH);
 
             surface.occlusion *= V / max((half)1.0 - a * ((half)1.0 - V), (half)0.05);
         }
 
-        // YÜZEYİN KENDİ ORTAM ÖRTMESİ — IŞIKTAN BAĞIMSIZ.
+        // THE SURFACE'S OWN AMBIENT OCCLUSION — INDEPENDENT OF THE LIGHT.
         //
-        // Normal katkısı yalnız DİREKT ışıkla görünüyor: güneş tepedeyken
-        // 7°'lik bir eğim NdotL'yi %1 değiştiriyor ve yüzey düz okunuyor
-        // (ölçüldü: 12:00, SunHeight 0.88 — rölyef görünmüyor; gece yatık
-        // ışıkta net görünüyor). Fizikte de böyle.
+        // The normal's contribution is only visible with DIRECT light: with the sun overhead
+        // a 7° slope changes NdotL by 1% and the surface reads flat (measured: 12:00,
+        // SunHeight 0.88 — no relief visible; clearly visible at night under grazing light).
+        // That is how it is in physics too.
         //
-        // Ama gerçek kar öğlen de okunur, çünkü çukurlar göğü daha az görür.
-        // O terim yüzeyin YÜKSEKLİĞİNDEN geliyor, eğiminden değil, ve güneş
-        // yönünden bağımsız.
+        // But real snow reads at noon as well, because hollows see less of the sky. That
+        // term comes from the surface's HEIGHT, not its slope, and is independent of the sun
+        // direction.
         //
-        // EN SONA KONDU. Normal bloğunun içindeyken hemen ardından gelen
-        // `lerp(occlusion, 1.0, snowMask * 0.55)` payının yarısından fazlasını
-        // siliyordu (ölçüldü: öğle karesinde etki görünmedi).
+        // IT WAS PUT LAST. Inside the normal block, the `lerp(occlusion, 1.0,
+        // snowMask * 0.55)` share that followed immediately erased more than half of it
+        // (measured: no effect visible in the noon frame).
         {
-            // PAYDA YÜZEY RÖLYEFİNİN GERÇEK TAVANI, fBm GENLİĞİ DEĞİL.
+            // THE DENOMINATOR IS THE SURFACE RELIEF'S REAL CEILING, NOT THE fBm AMPLITUDE.
             //
-            // `SNOW_FBM_AMP` (1.5 cm) yazılıydı ve o YALNIZ fBm katmanının
-            // genliği. `snowSurfaceHeight` ise bütün katmanların toplamı;
-            // drift (15 cm) ve sastrugi (20 cm) arazi ölçüsüne çıkınca
-            // 10 cm'lik sıradan bir çukur `saturate(0.10/0.015)` = 6.67'den
-            // 1.0'a doyuyordu.
+            // `SNOW_FBM_AMP` (1.5 cm) was written there and that is ONLY the fBm layer's
+            // amplitude. `snowSurfaceHeight` meanwhile is the sum of every layer; once the
+            // drift (15 cm) and sastrugi (20 cm) reached terrain scale, an ordinary 10 cm
+            // hollow saturated to 1.0 from `saturate(0.10/0.015)` = 6.67.
             //
-            // Sonucu: her çukur TAM karartma alıyor, ara ton kalmıyor ve
-            // yüzey iki tonlu, keskin kenarlı lekelere bölünüyordu. Komşu
-            // doygun çukurlar birleşince lekeler onlarca metreye çıkıyordu
-            // (kullanıcı bildirdi: "bu nasıl bir gölgelendirme aklım almıyor",
-            // ve sorumluyu kendi buldu: "kar yüzeyinin kendi gölgesi o").
+            // The consequence: every hollow took FULL darkening, no mid tones remained and
+            // the surface broke into two-tone blotches with hard edges. Neighbouring
+            // saturated hollows merged and the blotches grew to tens of metres (the user
+            // reported: "I can't get my head round this shading", and found the culprit
+            // himself: "that's the snow surface's own shadow").
             //
-            // Doğru payda rölyefin kendi tavanı — `SnowYuzeyRolyef` zaten
-            // yüksekliği oraya kırpıyor. 50 cm karda 30 cm; aynı 10 cm'lik
-            // çukur 0.33 veriyor ve ara tonlar geri geliyor.
+            // The right denominator is the relief's own ceiling — `SnowYuzeyRolyef` already
+            // clips the height there. In 50 cm of snow that is 30 cm; the same 10 cm hollow
+            // gives 0.33 and the mid tones come back.
             float rolyefTavan = SnowBaseHeight(karDurum.r, yerelRho)
                               * SNOW_BEDFORM_DEPTH_FRAC;
 
@@ -798,16 +797,16 @@ MountainSurface BuildMountainSurface(float3 worldPos)
                                       cukur * (half)snowMask);
         }
 
-        // ÇUKURUN İÇİ MAVİYE KAYIYOR — KAR YARI SAYDAM.
+        // THE INSIDE OF A HOLLOW SHIFTS TOWARD BLUE — SNOW IS TRANSLUCENT.
         //
-        // Buzun soğurma katsayısı 600 nm'de 450 nm'dekinin ~10 katı. Çoklu
-        // saçılmada fotonun kat ettiği yol çukurun derinliğiyle uzuyor, yani
-        // kırmızı soğuruluyor ve geriye mavi kalıyor. Gerçek kar
-        // fotoğraflarının en tanınır özelliği bu; onsuz iz DÜZ GRİ okunuyor
-        // (kullanıcı bildirdi: "iz dümdüz gri, hiçbir detayı yok").
+        // Ice's absorption coefficient at 600 nm is ~10 times its value at 450 nm. In
+        // multiple scattering the path a photon travels grows with the hollow's depth, so
+        // red is absorbed and blue remains. This is the most recognisable feature of real
+        // snow photographs; without it a trail reads as FLAT GREY (the user reported: "the
+        // trail is dead grey, it has no detail at all").
         //
-        // Telafi terimi DEĞİL: yukarıdaki blok kaybolan gök ışığının
-        // ŞİDDETİNİ geri veriyor, bu ise RENGİNİ. İkisi ayrı büyüklük.
+        // It is NOT a compensation term: the block above returns the INTENSITY of the lost
+        // sky light, this one returns its COLOR. They are two different quantities.
         {
             half derinlik01 = (half)saturate(izDerinlik / SNOW_RELIEF_MAX_DEPTH);
 

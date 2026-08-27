@@ -10,15 +10,15 @@ Shader "ToTheSummit/MountainSurface"
             "Queue" = "Geometry"
             "RenderPipeline" = "UniversalPipeline"
 
-            // Unity terrain'i özel bir yoldan çiziyor ve nesne başına ışık verisini
-            // yalnızca kendini terrain uyumlu ilan eden shader'lara veriyor. Etiket
-            // olmadan unity_LightData sıfır kalıyor, doğrudan güneş tamamen kesiliyor
-            // ve geriye yalnızca ambient kalıyor.
+            // Unity draws terrain through a special path and only gives per-object light
+            // data to shaders that declare themselves terrain compatible. Without the tag
+            // unity_LightData stays zero, direct sunlight is cut entirely and only ambient
+            // remains.
             "TerrainCompatible" = "True"
         }
 
-        // Terrain kendi materyalini instancing ile çizebiliyor; kapalı olsa bile
-        // varyantın bulunması gerekiyor.
+        // Terrain can draw its own material with instancing; even when it is off the
+        // variant has to exist.
         Cull Back
 
         Pass
@@ -33,60 +33,59 @@ Shader "ToTheSummit/MountainSurface"
             #pragma fragment Fragment
             #pragma target 5.0
 
-            // ARAZİNİN GÖLGESİ İKİ KAYNAKTAN. Dağın kendi sırtı yükseklik alanından
-            // yürüyerek bulunuyor (bkz. TerrainSunShadow) — gölge haritası o mesafeyi
-            // taşımıyor, elli metrede bitiyor. Ama HAREKETLİ NESNELER haritada: bisiklet,
-            // oyuncu, ileride kaya ve çadır. Harita okunmadığı sürece bunların hiçbiri
-            // yere gölge düşürmüyordu.
-            // KAR KALİTE KADEMESİ. `SnowManager.ApplyQualityKeyword` global
-            // keyword'ü açıyordu ama hiçbir shader'da pragma yoktu — varyant
-            // derlenmediği için `#if defined(_SNOW_QUALITY_HIGH)` hep false
-            // kalıyordu ve `SnowDetailNormals`'ın üç katmanı (mezo, mikro,
-            // ezilmiş) hiç çalışmıyordu.
+            // THE TERRAIN'S SHADOW COMES FROM TWO SOURCES. The mountain's own ridges are
+            // found by marching the height field (see TerrainSunShadow) — the shadow map
+            // does not carry that distance, it ends at fifty metres. But MOVING OBJECTS are
+            // in the map: the bike, the player, later rocks and tents. As long as the map
+            // was not read, none of them cast a shadow on the ground.
+            // SNOW QUALITY TIER. `SnowManager.ApplyQualityKeyword` enabled the global
+            // keyword but no shader had the pragma — the variant was never compiled so
+            // `#if defined(_SNOW_QUALITY_HIGH)` was always false and the three layers of
+            // `SnowDetailNormals` (meso, micro, crushed) never ran.
             #pragma multi_compile _SNOW_QUALITY_LOW _SNOW_QUALITY_MEDIUM _SNOW_QUALITY_HIGH
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
 
-            // Renderer Forward+ modunda: ışıklar kümelerle dağıtılıyor ve nesne başına
-            // ışık verisi doldurulmuyor. Bu keyword bildirilmezse GetMainLight() eski
-            // dala düşüp doldurulmamış unity_LightData'yı okuyor, güneş tamamen kesiliyor.
+            // The renderer is in Forward+ mode: lights are distributed in clusters and the
+            // per-object light data is not filled in. Without this keyword GetMainLight()
+            // falls to the old branch, reads the unfilled unity_LightData and the sun is cut entirely.
             #pragma multi_compile_fragment _ _CLUSTER_LIGHT_LOOP
             #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
-            // Bulut gölgesi bu anahtarla geliyor: bulut sistemi gölgeyi ana ışığın cookie
-            // dokusuna yazıyor, URP de onu burada uyguluyor.
+            // The cloud shadow arrives through this keyword: the cloud system writes the
+            // shadow into the main light's cookie texture and URP applies it here.
             #pragma multi_compile_fragment _ _LIGHT_COOKIES
-            // EKRAN UZAYI ÖRTÜŞME GÖLGESİ ARAZİDE OKUNMUYOR. Derinlik tamponundan
-            // çalışıyor ve arazi örgüsünün üçgen yüzeylerini yüzey kıvrımı sanıp zemine
-            // yumuşak kafes çizgileri çiziyor (bkz. `DECISIONS.md` — SSAO kapalı).
-            // Büyük ölçekli oyuk gölgesini pişmiş maruziyet kanalı zaten veriyor.
+            // SCREEN SPACE AMBIENT OCCLUSION IS NOT READ ON THE TERRAIN. It works from the
+            // depth buffer and mistakes the triangle faces of the terrain mesh for surface
+            // curvature, drawing soft lattice lines on the ground (see `DECISIONS.md` — SSAO off).
+            // The baked exposure channel already provides large-scale cavity shading.
             //
-            // Özellik boru hattında AÇIK: yakın plan nesneler (bisiklet, ekipman, çadır)
-            // onu okuyor ve kuytuları kararıyor. Anahtar burada bildirilmediği için
-            // arazi etkilenmiyor.
+            // It is ON in the feature pipeline: near objects (the bike, equipment, tents)
+            // read it and their recesses darken. Because the keyword is not declared here
+            // the terrain is unaffected.
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            /// TEŞHİS ANAHTARI — TERS MANTIK, BİLEREK.
+            /// DIAGNOSTIC SWITCH — INVERTED LOGIC, DELIBERATELY.
             ///
-            /// Eskiden `_TerrainShadowReceive` idi (1 = açık) ve yalnız
-            /// `DebugMenu.Update()` yazıyordu. Panel sahnede yoksa ya da
-            /// kapalıysa global hiç yazılmıyor, Unity globalleri SIFIR
-            /// başlıyor ve arazi gölgesiz çiziliyordu — build'de oynanışın
-            /// tamamı gölgesiz.
+            /// It used to be `_TerrainShadowReceive` (1 = on) and only
+            /// `DebugMenu.Update()` wrote it. With the panel absent from the
+            /// scene or disabled the global was never written, Unity globals
+            /// start at ZERO and the terrain was drawn without shadows — the
+            /// whole of gameplay unshadowed in a build.
             ///
-            /// Ters mantıkla varsayılan doğru tarafa düşüyor: kimse yazmazsa
-            /// 0 kalır, 0 da "kapatma" demek.
+            /// With inverted logic the default falls on the right side: if
+            /// nobody writes it, it stays 0, and 0 means "do not disable".
             float _TerrainShadowOff;
-            /// GEÇİCİ. Aydınlık-gölge sınırının etrafına ince renk şeritleri basıyor.
-            /// Soru "zikzak var mı" ve cevabı parlaklıkla değil BİÇİMLE veriliyor:
-            /// normal alanı düzgünse şeritler ince ve akıcı, doku ızgarasına oturmuşsa
-            /// dikdörtgen bloklar. Blok mu şerit mi -- tek bakışta ayrılıyor.
-            /// GEÇİCİ CETVEL. Dünya koordinatında ızgara çizgileri basıyor: 10 m
-            /// camgöbeği, 100 m kırmızı, 1000 m sarı. Testerenin KAÇ METRE olduğunu
-            /// tahminle değil sayarak bulmak için — beş tur katman tahmin edildi ve
-            /// hepsi yanlış çıktı, çünkü eksik olan tek sayı diş boyuydu.
+            /// TEMPORARY. Prints thin color stripes around the light-shadow boundary.
+            /// The question is "is there a zigzag" and it is answered by SHAPE rather than
+            /// brightness: with a smooth normal field the stripes are thin and flowing, and
+            /// if it has settled on the texture grid they are rectangular blocks. Block or stripe — separable at a glance.
+            /// TEMPORARY RULER. Prints grid lines in world coordinates: 10 m cyan,
+            /// 100 m red, 1000 m yellow. To find out HOW MANY METRES the sawtooth was by
+            /// counting rather than guessing — five rounds of layers were guessed and all of
+            /// them were wrong, because the one missing number was the tooth size.
 
             #include "MountainSurface.hlsl"
             #include "../Snow/Shaders/SnowTessellation.hlsl"
@@ -107,29 +106,19 @@ Shader "ToTheSummit/MountainSurface"
             {
                 Varyings OUT;
 
-                // ARAZİ DE KAR KALINLIĞI KADAR YÜKSELİYOR.
+                // THE TERRAIN DOES NOT RISE BY THE SNOW COLUMN.
                 //
-                // Kar mesh'i yerel kar sütunu kadar yükseliyordu, arazi ise
-                // yerinde kalıyordu: bölge sınırında kar derinliğiyle
-                // ÖLÇEKLENEN bir basamak. Kenar rampası 2 m; 1 cm karda %0.5
-                // eğim (görünmez), 20 cm'de %10, 50 cm'de %25. Belirti tam
-                // olarak böyle bildirildi — ince karda yok, kalın karda var.
+                // It used to, and there was no counterpart on the physics side:
+                // the `CharacterController` stands on the terrain collider, i.e.
+                // on the ROCK. Measured: foot 205.539, rock 205.489, drawn
+                // surface 205.98 — the character started half a metre buried and
+                // the eye sat below the snow surface (user: "the character
+                // spawns inside the ground", "the trail is in the air").
                 //
-                // Yükseltme kar örtüsü maskesiyle ağırlıklanmıyor: maske
-                // fragman'da, burada yalnız konum var. Kar çizgisinin altında
-                // `_FallbackSWE` zaten sıfır, dolayısıyla yükseltme de sıfır.
-                // ARAZİ KAR SÜTUNU KADAR YÜKSELMİYOR.
-                //
-                // Yükseltiliyordu ve fizik tarafında karşılığı yoktu:
-                // `CharacterController` arazi collider'ının, yani KAYANIN
-                // üstünde duruyor. Ölçüldü: ayak 205.539, kaya 205.489,
-                // çizilen yüzey 205.98 — karakter yarım metre gömülü
-                // başlıyordu ve göz kar yüzeyinin altında kalıyordu
-                // (kullanıcı: "karakter spawnı yerin içinde", "iz havada").
-                //
-                // Kar yüksekliğini artık YALNIZ kar mesh'i taşıyor; mesh
-                // bölge kenarında `SnowEdgeFade` ile arazi kotuna iniyor.
-                // Uzakta yarım metrelik kot farkı zaten seçilmiyor.
+                // Snow height is now carried ONLY by the snow mesh; the mesh
+                // descends to the terrain elevation at the region edge with
+                // `SnowEdgeFade`. Half a metre of elevation difference is not
+                // discernible at distance anyway.
 
                 OUT.positionWS = positionWS;
                 OUT.positionCS = TransformWorldToHClip(positionWS);
@@ -154,16 +143,16 @@ Shader "ToTheSummit/MountainSurface"
                 return VertexFromWS(SnowTessKonum(patch, bary));
             }
 
-            /// UniversalFragmentPBR'ın açık hali — çünkü ana ışığın gölgesini bizim
-            /// yürüyüşümüz veriyor ve hazır fonksiyonun içine dışarıdan gölge
-            /// enjekte etmenin bir yolu yok. Parçalar yine URP'nin kendi fonksiyonları:
-            /// BRDF, ışık başına katkı, SSAO birleşimi. Kaybedilen tek şey yansıma
-            /// küresi örneklemesi — sahnede yansıma küresi yok, yüzey de mat.
+            /// UniversalFragmentPBR written out — because our own march provides the main
+            /// light's shadow and there is no way to inject a shadow from outside into the
+            /// ready-made function. The parts are still URP's own functions: BRDF,
+            /// per-light contribution, SSAO combination. The only thing lost is reflection
+            /// probe sampling — there is no reflection probe in the scene and the surface is matte.
             half4 Fragment(Varyings IN) : SV_Target
             {
-                // TESHIS: izin derinligi dogrudan ekrana. Isiklandirmadan ONCE
-                // donuluyor, cunku kar isigi `lit`i tamamen yeniden kuruyor ve
-                // albedo'ya yazilan teshis rengi orada kayboluyor.
+                // DIAGNOSTIC: the trail depth straight to the screen. It returns BEFORE
+                // lighting, because the snow lighting rebuilds `lit` entirely and the
+                // diagnostic color written into the albedo is lost there.
                 if (_SnowDebugDent > 0.5)
                 {
                     float ham = SnowDentAt(SnowWorldToUV(IN.positionWS)) / SNOW_RELIEF_MAX_DEPTH;
@@ -220,7 +209,7 @@ Shader "ToTheSummit/MountainSurface"
                                  (half)saturate(surface.normalWS.y), 1.0h);
                 }
 
-                // Forward+ ışık döngüsü makroları bu değişkeni adıyla okuyor
+                // The Forward+ light loop macros read this variable by name
                 InputData inputData = (InputData)0;
                 inputData.positionWS = IN.positionWS;
                 float3 shadingNormal = surface.normalWS;
@@ -233,39 +222,39 @@ Shader "ToTheSummit/MountainSurface"
 
                 half alpha = 1.0;
                 BRDFData brdfData;
-                // F0 KARLA KAYA ARASINDA HARMANLANIYOR.
+                // F0 IS BLENDED BETWEEN SNOW AND ROCK.
                 //
-                // Kaya bir dielektrik ve URP'nin 0.04'ü (n = 1.5) ona uyuyor.
-                // Buz n = 1.31 ve F0 = 0.018 — arazide iki malzeme aynı geçişte
-                // duruyor, F0 de aynı maskeyle geçmek zorunda. Tek bir 0.04
-                // kullanılırsa kar 2.2 kat fazla speküler döndürüyor.
+                // Rock is a dielectric and URP's 0.04 (n = 1.5) fits it. Ice is
+                // n = 1.31 and F0 = 0.018 — on the terrain the two materials sit
+                // in the same pass, so F0 has to cross with the same mask. Using
+                // a single 0.04 makes the snow return 2.2 times too much specular.
                 half f0 = lerp(0.04h, (half)SNOW_ICE_F0, surface.snowMask);
                 SnowInitBRDF(surface.albedo, surface.smoothness, f0, alpha, brdfData);
 
                 AmbientOcclusionFactor aoFactor = CreateAmbientOcclusionFactor(
                     float2(0.0, 0.0), surface.occlusion);
 
-                // Arazinin kendi gölgesi yükseklik alanından. Işığa sırtı dönük piksel
-                // yürümüyor: katkısı zaten sıfır, kırk adım boşa giderdi.
+                // The terrain's own shadow from the height field. A pixel with its back to
+                // the light does not march: its contribution is already zero and forty steps would be wasted.
                 Light mainLight = GetMainLight();
                 mainLight.shadowAttenuation =
                     dot(inputData.normalWS, mainLight.direction) > 0.0
                         ? TerrainSunShadow(IN.positionWS, mainLight.direction)
                         : 1.0;
 
-                // Hareketli nesnelerin gölgesi haritadan ve arazininkiyle ÇARPILIYOR:
-                // ikisi ayrı olay — biri sırtın arkasında kalmak, öteki üstünde bir cisim
-                // durmak. Aynı kanaldan gidiyorlar çünkü ikisi de doğrudan güneşi kesiyor.
-                // TEŞHİS ANAHTARI: `_TerrainShadowOff` birken gölge haritası hiç
-                // okunmuyor. Arazi ekranın çoğunu kaplıyor ve bu okuma piksel başına
-                // yapılıyor — kare süresindeki payı ancak kapatıp ölçerek bilinir.
+                // The shadow of moving objects comes from the map and is MULTIPLIED with the
+                // terrain's: two separate phenomena — one is being behind a ridge, the other
+                // is having an object above you. They go through the same channel because
+                // both cut the direct sun.
+                // DIAGNOSTIC SWITCH: with `_TerrainShadowOff` at one the shadow map is never
+                // read. The terrain covers most of the screen and this read happens per pixel — its share of the frame time can only be known by turning it off and measuring.
                 if (_TerrainShadowOff < 0.5)
                     mainLight.shadowAttenuation *=
                         MainLightRealtimeShadow(TransformWorldToShadowCoord(IN.positionWS));
 
-                // BULUT GÖLGESİ bulut sisteminin kendi cookie dokusundan geliyor; gökyüzünü
-                // çizen yoğunluk alanının ta kendisi. Doğrudan güneşi kesiyor, gökten gelen
-                // dolaylı ışığa dokunmuyor — arazi gölgesiyle aynı kanaldan.
+                // THE CLOUD SHADOW comes from the cloud system's own cookie texture; the very
+                // density field that draws the sky. It cuts the direct sun and does not touch
+                // the indirect light from the sky — through the same channel as the terrain shadow.
             #ifdef _LIGHT_COOKIES
                 mainLight.color *= SampleMainLightCookie(IN.positionWS);
             #endif
@@ -274,74 +263,72 @@ Shader "ToTheSummit/MountainSurface"
                 lit += LightingPhysicallyBased(brdfData, mainLight,
                     inputData.normalWS, inputData.viewDirectionWS) * aoFactor.directAmbientOcclusion;
 
-                // ARAZİNİN KARI DA KARIN KENDİ IŞIKLANDIRMASINI KULLANIYOR.
+                // THE TERRAIN'S SNOW ALSO USES THE SNOW'S OWN LIGHTING.
                 //
-                // Eskiden kar mesh'i sarmal NdotL + arkadan sızma + `_ShadowTint`'li
-                // ortam kullanıyordu, arazinin kar katmanı ise URP'nin standart
-                // PBR'ını. Aynı kar, iki model. Ölçüldü: bölge sınırının iki
-                // yakası arasında %2.3 parlaklık farkı (iç 0.8318, dış 0.8132) —
-                // düz beyaz bir alanda bu fark KESKİN ÇİZGİ olarak okunuyor ve
-                // oyuncuyu takip eden 24 m'lik kareyi çiziyordu.
+                // The snow mesh used to use wrapped NdotL + back translucency + ambient with
+                // `_ShadowTint`, while the terrain's snow layer used URP's standard PBR. The
+                // same snow, two models. Measured: a 2.3% brightness difference across the
+                // two sides of the region boundary (inside 0.8318, outside 0.8132) — over a
+                // flat white field that difference reads as a HARD LINE and drew the 24 m
+                // square that followed the player.
                 //
-                // Kar nerede olursa olsun aynı maddedir; ışıklandırması da tek
-                // yerden gelir. Kaya tarafı standart PBR'da kalıyor, iki sonuç
-                // `snowMask` ile harmanlanıyor.
+                // Snow is the same material wherever it is; its lighting comes from one place
+                // too. The rock side stays on standard PBR and the two results are blended
+                // with `snowMask`.
                 if (surface.snowMask > 0.001)
                 {
-                    // Arazi tarafında iz yok, kabuk yok; yoğunluk dünyanın
-                    // genel değeri. Derinlik örtü kalınlığı — mesh'te ölçülen
-                    // sütun, burada sabit.
-                    // DERİNLİK DÜNYANIN KAR SÜTUNU. `_SnowCoverThickness` (4 cm)
-                    // NESNELERİN üstündeki ince örtü için (spec §16); arazi
-                    // onunla ışıklandırılınca kar mesh'inin gördüğü ~50 cm'lik
-                    // sütundan farklı çıkıyordu. Derinlik `SnowAmbient`'ın sızma
-                    // terimini `exp(-derinlik·7)` ile sürüyor.
+                    // On the terrain side there is no trail and no crust; the density is the
+                    // world's general value. The depth is the cover thickness — a column
+                    // measured on the mesh, constant here.
+                    // THE DEPTH IS THE WORLD'S SNOW COLUMN. `_SnowCoverThickness` (4 cm) is
+                    // for the thin cover ON OBJECTS (spec §16); lighting the terrain with it
+                    // gave a different result from the ~50 cm column the snow mesh sees. The
+                    // depth drives `SnowAmbient`'s translucency term through `exp(-depth·7)`.
                     //
-                    // AO da mesh tarafındaki gibi bağlanıyor: orada
-                    // `SnowHeightAO`, burada yüzeyin kendi örtülmesi. Sabit 1.0
-                    // arazinin oyuklarını yok sayıyordu.
+                    // AO is wired the same way as on the mesh side: `SnowHeightAO` there,
+                    // the surface's own occlusion here. A constant 1.0 ignored the terrain's
+                    // hollows.
                     //
-                    // İkisi birlikte ölçüldü: mesh/arazi parlaklık oranı
-                    // 1.61 kattan 1.16 kata indi (24 m'lik kare belirtisi).
-                    // Doku harmanı `BuildSurface` içinde BİR KEZ okundu ve
-                    // `surface.snowBlend` ile taşındı; burada yeniden
-                    // örneklenmiyor.
-                    // Yoğunluk, ıslaklık ve bozulma YEREL: izin içi sıkışmış
-                    // kar, dışı bakir. `BuildSurface` ikisini de okudu ve
-                    // struct'ta taşıdı.
+                    // The two were measured together: the mesh/terrain brightness ratio fell
+                    // from 1.61x to 1.16x (the 24 m square symptom).
+                    // The texture blend was read ONCE in `BuildSurface` and carried through
+                    // `surface.snowBlend`; it is not resampled here.
+                    // Density, wetness and disturbance are LOCAL: compacted snow inside the
+                    // trail, virgin snow outside. `BuildSurface` read both and carried them
+                    // in the struct.
                     SnowSurface ks = SnowBuildSurfaceFrom(surface.snowBlend,
                                                           surface.snowRhoN, surface.snowWet,
                                                           surface.snowDisturb, 0.0,
                                                           _WorldSnowDepth, IN.positionWS,
                                                           length(fwidth(IN.positionWS.xz)));
 
-                    // NORMAL BURADA TEKRAR EKLENMİYOR. Yüzey dokusunun eğimi
-                    // `MountainSurface.hlsl` içinde `surface.normalWS`'e zaten
-                    // giriyor ve `inputData.normalWS` oradan geliyor; burada
-                    // ikinci kez eklenirse kabartı iki kat çıkar.
+                    // THE NORMAL IS NOT ADDED AGAIN HERE. The surface texture's slope already
+                    // enters `surface.normalWS` inside `MountainSurface.hlsl` and
+                    // `inputData.normalWS` comes from there; added a second time the bump
+                    // would come out double.
                     float3 karN = inputData.normalWS;
 
-                    // ORTAM IŞIĞI GÖK GÖRÜNÜRLÜĞÜYLE KISILIYOR.
+                    // AMBIENT LIGHT IS SCALED BY SKY VISIBILITY.
                     //
-                    // `SampleSH` bu sahnede YÖNSÜZ: ölçüldü, yukarı ve aşağı
-                    // aynı değeri veriyor (0.223, 0.293, 0.420) çünkü PBSky'ın
-                    // yer terimi yok, gökyüzü ufkun altında da çiziliyor. Yönsüz
-                    // ortam kara hiçbir şekil vermiyor: güneş kapatıldığında
-                    // ekran sapması 0.00232'ye düşüyor, yani kar düz beyaz kâğıt.
+                    // `SampleSH` is DIRECTIONLESS in this scene: measured, up and down give
+                    // the same value (0.223, 0.293, 0.420) because PBSky has no ground term
+                    // and the sky is drawn below the horizon too. Directionless ambient gives
+                    // snow no shape at all: with the sun off, the screen's deviation falls to
+                    // 0.00232, i.e. the snow is flat white paper.
                     //
-                    // Bir noktaya ulaşan gök ışınımı, göğü GÖREBİLDİĞİ kadardır.
-                    // Dağın kendi ufku bunu zaten ölçüyor (`SampleSkyVisibility`,
-                    // kar maskesi de aynı büyüklüğü kullanıyor). Ortama
-                    // bağlanınca çukur ve yamaç ayrışıyor.
+                    // The sky radiance reaching a point is as much as it CAN SEE of the sky.
+                    // The mountain's own horizon already measures that (`SampleSkyVisibility`,
+                    // which the snow mask uses as well). Tied to the ambient, hollows and
+                    // slopes separate.
                     half gokPayi = (half)SampleSkyVisibility(IN.positionWS);
 
-                    // ÇUKURUN KENDİ GÖLGESİ doğrudan ışığa uygulanıyor.
-                    // Ortama uygulanmıyor: gök her yönden geliyor, çukurun
-                    // duvarı onu kesmiyor — o iş `occlusion` teriminin.
-                    // GÖK PAYI: difüz ışınım / (difüz + direkt). Gölge
-                    // tavanının fiziksel karşılığı bu — gölgedeki yüzey
-                    // güneşi almıyor, göğü alıyor. Kapalı havada 1'e gidiyor
-                    // ve gölge kendiliğinden siliniyor.
+                    // THE CAVITY'S OWN SHADOW is applied to the direct light. It is not
+                    // applied to the ambient: the sky comes from every direction and the
+                    // cavity wall does not cut it — that is the `occlusion` term's job.
+                    // THE SKY SHARE: diffuse irradiance / (diffuse + direct). That is the
+                    // physical meaning of the shadow ceiling — a surface in shadow does not
+                    // get the sun, it gets the sky. In overcast it goes to 1 and the shadow
+                    // erases itself.
                     half gokLum   = Luminance(SampleSH(half3(0, 1, 0)));
                     half gunesLum = Luminance(mainLight.color)
                                   * saturate(mainLight.direction.y);
@@ -363,25 +350,25 @@ Shader "ToTheSummit/MountainSurface"
                     lit = lerp(lit, karIsik, (half)surface.snowMask);
                 }
 
-                // KARDAN YANSIYAN GÜNEŞ. Gölgedeki bir noktanın çevresini güneş vuran
-                // kar sarıyor ve o ışık hiç sayılmıyordu: sahnede GI yok, ortam yalnız
-                // gökyüzü probundan geliyor. Kar albedosu 0.8 olduğu için eksik olan
-                // terim gökyüzünden BÜYÜK.
+                // SUN REFLECTED OFF THE SNOW. A point in shadow is surrounded by snow the
+                // sun is hitting, and that light was never counted: there is no GI in the
+                // scene and the ambient comes only from the sky probe. With a snow albedo of
+                // 0.8 the missing term is LARGER than the sky's.
                 //
-                // Ölçüm (renk probu 2, 15:00): güneş-gölge farkı 3.5-5 diyafram; açık
-                // havada kar için gerçek değer 2-3.5. Fark 1-1.5 stop.
+                // Measurement (color probe 2, 15:00): the sun-shadow difference was 3.5-5
+                // stops; the real value for snow in clear weather is 2-3.5. A gap of 1-1.5 stops.
                 //
-                // GÖRÜŞ FAKTÖRÜ DERS KİTABI, UYDURMA KATSAYI YOK. Eğimli bir yüzeyin
-                // gökyüzünü görme oranı (1+cosβ)/2, kalanı zemin: (1-cosβ)/2. cosβ
-                // normalin Y'si. Düz zeminde sıfır — düz zemin başka zemin görmez,
-                // doğrusu da bu.
+                // THE VIEW FACTOR IS TEXTBOOK, NO INVENTED COEFFICIENT. The fraction of the
+                // sky a sloped surface sees is (1+cosβ)/2, the rest is ground: (1-cosβ)/2.
+                // cosβ is the normal's Y. Zero on flat ground — flat ground sees no other
+                // ground, which is correct.
                 //
-                // GÖLGE ÇARPANI UYGULANMIYOR ve bu bilinçli: yansıyan ışık ÇEVREDEN
-                // geliyor, çevre bu nokta gölgedeyken de güneş alıyor olabilir. Zaten
-                // meselenin tamamı bu.
+                // THE SHADOW MULTIPLIER IS NOT APPLIED and that is deliberate: the reflected
+                // light comes FROM THE SURROUNDINGS, and the surroundings may well be in sun
+                // while this point is in shadow. That is the entire point.
                 //
-                // Gece kendiliğinden sönüyor: `direction.y` sıfıra iniyor ve güneşin
-                // şiddeti artık hava kütlesi sönümünü taşıyor.
+                // It fades out at night by itself: `direction.y` drops to zero and the sun's
+                // intensity already carries the air mass attenuation.
                 float groundView = (1.0 - saturate(shadingNormal.y)) * 0.5;
                 float3 horizontalIrradiance = mainLight.color * saturate(mainLight.direction.y);
                 lit += surface.albedo * horizontalIrradiance * groundView
@@ -400,8 +387,8 @@ Shader "ToTheSummit/MountainSurface"
 
                 half4 color = half4(lit, 1.0);
 
-                // Unity'nin sisi yerine yükseklik sisi: yoğunluk alçakta toplanır,
-                // yükseldikçe seyrelir. İkisi birlikte uygulanırsa sönüm iki kez sayılır.
+                // Height fog instead of Unity's: density collects low and thins with
+                // altitude. Applied together the attenuation would be counted twice.
                 color.rgb = ApplyHeightFog(color.rgb, _WorldSpaceCameraPos, IN.positionWS);
 
                 return color;
@@ -409,11 +396,11 @@ Shader "ToTheSummit/MountainSurface"
             ENDHLSL
         }
 
-        // Gölge ve derinlik geçişleri ELLE YAZILDI: URP'nin hazır dosyaları gölge sapması
-        // gibi tuzaklarını da beraberinde getiriyor.
+        // The shadow and depth passes are WRITTEN BY HAND: URP's ready-made files bring
+        // their traps, such as shadow bias, along with them.
         //
-        // Sapma yine URP'nin kendi fonksiyonuyla (`ApplyShadowBias`) uygulanıyor —
-        // elle yazılan yalnız köşe akışı.
+        // The bias is still applied with URP's own function (`ApplyShadowBias`) — only the
+        // vertex flow is written by hand.
         Pass
         {
             Name "ShadowCaster"
@@ -447,8 +434,8 @@ Shader "ToTheSummit/MountainSurface"
                 Varyings OUT;
 
 
-                // Sapma normale göre uygulanıyor; yer değiştirmiş yüzeyin normali
-                // arazininkinden farklı, o yüzden düz yukarı değil gerçek normal.
+                // The bias is applied along the normal; the displaced surface's normal differs
+                // from the terrain's, so it is the real normal rather than straight up.
                 float2 uv = (positionWS.xz - _TerrainOrigin.xz) / _TerrainSize.xz;
                 float2 packed = SAMPLE_TEXTURE2D_LOD(_GroundNormals, sampler_GroundNormals,
                                                      uv, 0).rg * 2.0 - 1.0;
@@ -544,15 +531,15 @@ Shader "ToTheSummit/MountainSurface"
             ENDHLSL
         }
 
-        // SSAO Source: DepthNormals okuyor; bu geçiş olmadan normal tamponu boş kalır
-        // ve ambient occlusion terrain üzerinde çöp okur.
+        // SSAO Source: it reads DepthNormals; without this pass the normal buffer stays empty
+        // and ambient occlusion reads garbage over the terrain.
         //
-        // Standart geçiş KÖŞE normalini yazar; SSAO onu okuyunca arazi örgüsünün
-        // üçgen kırıklarını "yüzey kıvrımı" sanıp gölgeliyor ve zeminde, örgüyü
-        // andıran yumuşak kafes çizgileri beliriyordu — 30 metrelik falloff'uyla
-        // yalnız yakında, dünyaya çakılı, saatten bağımsız. Uzun bir eleme avının
-        // sonunda bulundu. Işıklandırmanın kullandığı pürüzsüz pişmiş normal yazılır:
-        // iki tüketici aynı yüzeyi görür, çelişemezler.
+        // The standard pass writes the VERTEX normal; reading it, SSAO mistakes the triangle
+        // breaks of the terrain mesh for "surface curvature" and shades them, and soft
+        // lattice lines resembling the mesh appeared on the ground — with its 30 metre
+        // falloff, only up close, nailed to the world, independent of the hour. It was found
+        // at the end of a long elimination hunt. The smooth baked normal that lighting uses
+        // is written instead: two consumers see the same surface and cannot contradict.
         Pass
         {
             Name "DepthNormals"
@@ -610,8 +597,8 @@ Shader "ToTheSummit/MountainSurface"
                 float3 baseNormal = normalize(float3(packed.x,
                     sqrt(saturate(1.0 - dot(packed, packed))), packed.y));
 
-                // SSAO bu tamponu okuyor: kar birikintisinin eğimi burada da olmalı,
-                // yoksa kabartının dibinde olması gereken gölge hiç oluşmaz.
+                // SSAO reads this buffer: the slope of the snow deposition has to be here
+                // too, otherwise the shadow that belongs at the foot of a bump never forms.
                 return half4(baseNormal, 0.0);
             }
             ENDHLSL
