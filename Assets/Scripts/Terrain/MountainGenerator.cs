@@ -1,14 +1,14 @@
 using System;
 using UnityEngine;
 
-/// Prosedürel dağ yükseklik haritası. Tüm parametreler MountainSettings asset'inden gelir.
+/// Procedural mountain heightmap. Every parameter comes from the MountainSettings asset.
 [RequireComponent(typeof(Terrain))]
 public class MountainGenerator : MonoBehaviour
 {
     [SerializeField] MountainSettings settings;
 
-    /// Yükseklik kuşağı başına eğim dağılımı. Sıra: yürünebilir (0-30°), zorlu (30-45°),
-    /// tırmanma (45-70°), duvar (70°+). Yüzde cinsinden.
+    /// Slope distribution per elevation band. Order: walkable (0-30°), hard (30-45°),
+    /// climbing (45-70°), wall (70°+). In percent.
     [System.Serializable]
     public struct SlopeBand
     {
@@ -21,13 +21,13 @@ public class MountainGenerator : MonoBehaviour
 
     public const int AltitudeBandCount = 4;
 
-    // Türetilmiş veri: her kurulum çalışmasında Generate ya da Measure yeniden
-    // hesaplıyor ve tüketiciler (sürücü bağlama, rapor, Tuner) hep o hesaptan sonra
-    // okuyor. Serileştirilirken her hesap sahneyi kirletiyordu — Play'e her basış
-    // commit'e eğim istatistiği farkı olarak giriyordu.
+    // Derived data: Generate or Measure recomputes it on every setup run and the consumers
+    // (driver binding, report, Tuner) always read it after that computation. Serialized, every
+    // computation dirtied the scene — every press of Play entered the commit as a difference in
+    // the slope statistics.
     [System.NonSerialized] public SlopeBand[] bands = new SlopeBand[AltitudeBandCount];
     [System.NonSerialized] public float meanSlopeDegrees;
-    /// Üretilen arazinin gerçek zirvesi (metre). terrainHeight yalnızca tavandır.
+    /// The real summit of the generated terrain (metres). terrainHeight is only a ceiling.
     [System.NonSerialized] public float peakAltitude;
     [System.NonSerialized] public float groundAltitude;
     [HideInInspector] public string lastBuildSignature;
@@ -47,20 +47,20 @@ public class MountainGenerator : MonoBehaviour
 
     public MountainSettings Settings => settings;
 
-    /// Çözünürlüğün taşıyabildiği oktav sayısı. Fazlası aliasing üretir.
+    /// The number of octaves the resolution can carry. More than that produces aliasing.
     public int EffectiveOctaves => effectiveOctaves;
 
     public void Bind(MountainSettings source) => settings = source;
 
     public void Generate() => Generate(settings.heightmapResolution);
 
-    /// <param name="resolution">Önizleme için düşük çözünürlük verilebilir.</param>
+    /// <param name="resolution">A lower resolution may be given for a preview.</param>
     public void Generate(int resolution)
     {
         if (settings == null)
-            throw new System.InvalidOperationException($"{nameof(MountainGenerator)}: ayarlar atanmadı.");
+            throw new System.InvalidOperationException($"{nameof(MountainGenerator)}: settings are not assigned.");
         if (settings.heightProfile == null || settings.heightProfile.length == 0)
-            throw new System.InvalidOperationException($"{nameof(MountainGenerator)}: profil eğrisi boş.");
+            throw new System.InvalidOperationException($"{nameof(MountainGenerator)}: the profile curve is empty.");
 
         var terrain = GetComponent<Terrain>();
         var data = terrain.terrainData;
@@ -68,7 +68,7 @@ public class MountainGenerator : MonoBehaviour
         data.heightmapResolution = resolution;
         data.size = new Vector3(settings.terrainSize, settings.terrainHeight, settings.terrainSize);
 
-        // Boyut değişse de dağın zirvesi origin'de kalsın
+        // The summit stays at the origin even if the size changes
         transform.position = new Vector3(-settings.terrainSize * 0.5f, 0f, -settings.terrainSize * 0.5f);
 
         InitRandomState();
@@ -78,13 +78,13 @@ public class MountainGenerator : MonoBehaviour
         var heights = new float[res, res];
         float inv = 1f / (res - 1f);
 
-        // SATIR SATIR PARALEL. Dört bin kare örnek tek çekirdekte yaklaşık yarım dakika
-        // sürüyordu; her hücre birbirinden bağımsız hesaplanıyor ve paylaşılan hiçbir
-        // durum yok, yani bölünmesi bedava.
+        // PARALLEL ROW BY ROW. Four thousand squared samples took about half a minute on a single
+        // core; every cell is computed independently of the others and there is no shared state,
+        // so splitting it is free.
         //
-        // İKİ ŞART SAĞLANDI. Bir: `AnimationCurve.Evaluate` iş parçacığı güvenli değil
-        // (içinde önbellek tutuyor), o yüzden profil eğrisi önce diziye pişiriliyor.
-        // İki: arazi türü ağırlıkları paylaşılan bir alandaydı, yığına taşındı.
+        // TWO CONDITIONS WERE MET. One: `AnimationCurve.Evaluate` is not thread safe (it keeps a
+        // cache inside), so the profile curve is baked into an array first. Two: the landform
+        // weights were in a shared field; they were moved to the stack.
         BakeProfileLut();
 
         System.Threading.Tasks.Parallel.For(0, res, z =>
@@ -104,42 +104,42 @@ public class MountainGenerator : MonoBehaviour
         ComputeSlopeStats(heights, res);
     }
 
-    /// Sivri uçları törpüler: komşu ortalamasının üstüne taşan hücreler, taşmalarının
-    /// bir oranı kadar aşağı çekilir.
+    /// Files down the sharp tips: cells rising above the average of their neighbours are pulled
+    /// down by a fraction of how far they overshoot.
     ///
-    /// Sırt gürültüsünün katlaması her tepeyi tek örneklik bir diş olarak üretiyor ve
-    /// sırt çizgileri testereye dönüyordu. İçbükeyler taşma üretmediği için vadiler ile
-    /// yamaçlar el değmeden kalır; geniş sırtın kendi kavisi dört metre ölçekte küçük
-    /// taşma ürettiği için büyük form neredeyse hiç kıpırdamaz.
+    /// The folding of the ridge noise produced every peak as a single-sample tooth and the ridge
+    /// lines turned into a saw. Because concavities produce no overshoot, valleys and slopes are
+    /// left untouched; and because a broad ridge's own curvature produces only a small overshoot
+    /// at the sample scale, the large form barely moves.
     ///
-    /// Törpü ORANSALDIR, eşikli değil. Eşikli sürüm denendi ve yanlıştı: her dişi
-    /// eşiğin hemen altına tıraşlıyor, geriye eşit boyda mini piramitlerden bir tarla
-    /// kalıyordu — tekdüzelik, düzensiz büyük dişlerden daha belirgin bir desen.
-    /// Oransalda büyük diş çok, küçük diş az iner; düzensizlik korunur.
+    /// The filing is PROPORTIONAL, not thresholded. A thresholded version was tried and was wrong:
+    /// it shaved every tooth to just below the threshold and what was left was a field of
+    /// equal-sized mini pyramids — uniformity, a more visible pattern than irregular large teeth.
+    /// Proportionally a large tooth comes down a lot and a small one a little; the irregularity is kept.
     ///
-    /// Termal erozyondan farkı: malzeme taşımaz, açıya bakmaz. Erozyon güçlendirilerek
-    /// denendi ve dağı moloz konilerine çevirdi — sorun yamacın dikliği değil, ucun
-    /// sivriliğiydi.
+    /// How it differs from thermal erosion: it moves no material and does not look at the angle.
+    /// Erosion was tried with the strength raised and it turned the mountain into scree cones —
+    /// the problem was not the steepness of the slope but the sharpness of the tip.
     void FileCrests(float[,] heights, int res)
     {
         if (settings.crestSoftening <= 0f) return;
 
-        // Pencere iki örnek yarıçaplı. Bir örneklik pencere yalnızca tek örneklik sivri
-        // uçları görüyor; ızgaraya çapraz uzanan keskin bir sırt ise iki-üç örneklik
-        // basamaklara bölünüyor (her basamak bir quad) ve dar pencereden sağ çıkıyordu.
-        // Yakında tam çözünürlük o merdiveni gösteriyor, uzakta LOD köşeleri atlayıp
-        // silueti düzleştiriyor — "dişler yaklaşınca beliriyor"un sebebi buydu.
+        // The window is two samples in radius. A one-sample window only sees single-sample sharp
+        // tips; a sharp ridge running diagonally across the grid is broken into two- or three-sample
+        // steps (each step a quad) and survived the narrow window. Up close the full resolution
+        // showed that staircase and far away the LOD skipped the corners and flattened the
+        // silhouette — that was the reason for "the teeth appear as you get closer".
         const int Iterations = 4;
         const int Radius = 2;
 
-        // TÖRPÜ YALNIZ DAĞA UYGULANIYOR. Ovada da çalışıyordu ve tepecikleri siliyordu:
-        // pencere yarıçapı 2 örnek, yani 21 metre — ovanın en ince tepeciğinin tam boyu.
-        // O boyuttaki bir kabartı pencere içinde tamamen "fazlalık" sayılıyor ve dört
-        // turda 0.45^4 = %4'e iniyordu. Ölçüldü: ova katmanı ±5 metre üretiyor, araziye
-        // 1.7 metre olarak varıyordu.
+        // THE FILING IS APPLIED TO THE MOUNTAIN ONLY. It ran on the plain as well and erased the
+        // hummocks there: the window is 2 samples in radius, i.e. 37 metres across — the whole size
+        // of the plain's thinnest hummock. A bump that size counted as entirely "excess" inside the
+        // window and came down to 0.45^4 = 4% over four rounds. Measured: the plain layer produces
+        // ±5 metres and arrived on the terrain as 1.7 metres.
         //
-        // Törpünün işi ızgaraya çapraz keskin sırtların merdivenleşmesini önlemek; o
-        // sorun dağın dik yüzlerinde var, düzlükte yok.
+        // The filing's job is to prevent sharp ridges running diagonally across the grid from
+        // becoming staircases; that problem exists on the mountain's steep faces, not on the flat.
         float centre = (res - 1) * 0.5f;
         float skirt = settings.mountainRadius * (res - 1);
 
@@ -149,9 +149,9 @@ public class MountainGenerator : MonoBehaviour
         {
             System.Array.Copy(heights, next, heights.Length);
 
-            // SATIR SATIR PARALEL. Dört tur, hücre başına yirmi beş örnek, dört bin
-            // kare ızgara: bir buçuk milyar okuma. Her satır yalnız `heights`ten okuyup
-            // `next`e yazıyor, yani bölünmesi güvenli.
+            // PARALLEL ROW BY ROW. Four rounds, twenty-five samples per cell, a four thousand
+            // squared grid: one and a half billion reads. Every row only reads from `heights` and
+            // writes to `next`, so splitting it is safe.
             System.Threading.Tasks.Parallel.For(Radius, res - Radius, z =>
             {
             for (int x = Radius; x < res - Radius; x++)
@@ -170,8 +170,8 @@ public class MountainGenerator : MonoBehaviour
                 float offsetX = x - centre, offsetZ = z - centre;
                 float distance = Mathf.Sqrt(offsetX * offsetX + offsetZ * offsetZ);
 
-                // Etek çizgisinin dışında sıfıra iniyor; geçiş bandı ovaya taşmasın
-                // diye dar tutuldu.
+                // It falls to zero outside the foot line; the transition band was kept narrow so
+                // it does not spill onto the plain.
                 float strength = settings.crestSoftening
                     * (1f - Mathf.SmoothStep(skirt * 0.92f, skirt * 1.08f, distance));
 
@@ -183,16 +183,16 @@ public class MountainGenerator : MonoBehaviour
         }
     }
 
-    /// Termal erozyon: talus açısını aşan yamaçlardaki malzeme aşağı komşulara akar.
-    /// Keskin kırıklar moloz yamacına döner, büyük ölçekli form korunur.
+    /// Thermal erosion: material on slopes exceeding the talus angle flows to the neighbours below.
+    /// Sharp fractures turn into scree slopes, the large-scale form is preserved.
     void Erode(float[,] heights, int res)
     {
         if (settings.erosionIterations <= 0) return;
 
         float cellSize = settings.terrainSize / (res - 1f);
 
-        // Talus açısının normalize yükseklik cinsinden karşılığı: iki komşu arasında
-        // taşınmadan durabilen en büyük fark
+        // The talus angle expressed in normalized height: the largest difference two neighbours
+        // can hold without material moving
         float maxDelta = Mathf.Tan(settings.talusAngle * Mathf.Deg2Rad)
                          * cellSize / settings.terrainHeight;
 
@@ -202,17 +202,16 @@ public class MountainGenerator : MonoBehaviour
         {
             System.Array.Clear(delta, 0, delta.Length);
 
-            // EROZYON PARALEL DEĞİL. Denendi ve geri alındı: her hücre komşu SATIRLARA
-            // da yazıyor (`delta[z-1, x]`, `delta[z+1, x]`), yani satırlar bağımsız
-            // değil. Bölünürse iki iş parçacığı aynı hücreyi aynı anda güncelliyor ve
-            // taşınan malzemenin bir kısmı kayboluyor — sessiz, yerel, tekrarlanamayan
-            // bir bozulma.
+            // THE EROSION IS NOT PARALLEL. It was tried and reverted: every cell writes to
+            // neighbouring ROWS too (`delta[z-1, x]`, `delta[z+1, x]`), so the rows are not
+            // independent. Split, two threads update the same cell at the same time and part of
+            // the moved material is lost — a silent, local, unreproducible corruption.
             for (int z = 1; z < res - 1; z++)
             for (int x = 1; x < res - 1; x++)
             {
                 float h = heights[z, x];
 
-                // Dört komşuya bak; talus açısını aşan farkların toplamını ölç
+                // Look at the four neighbours; measure the sum of the differences exceeding the talus angle
                 float e0 = Excess(h, heights[z, x - 1], maxDelta);
                 float e1 = Excess(h, heights[z, x + 1], maxDelta);
                 float e2 = Excess(h, heights[z - 1, x], maxDelta);
@@ -221,7 +220,7 @@ public class MountainGenerator : MonoBehaviour
 
                 if (excess <= 0f) continue;
 
-                // Taşan malzemeyi eğimle orantılı dağıt
+                // Distribute the overflowing material in proportion to the slope
                 float moved = Mathf.Min(excess, (h - LowestNeighbour(heights, x, z)) * 0.5f)
                               * settings.erosionRate;
                 if (moved <= 0f) continue;
@@ -254,8 +253,8 @@ public class MountainGenerator : MonoBehaviour
         return lowest;
     }
 
-    /// Bozuk değer araziye tek örneklik çukurlar olarak yansır ve fark edilmesi zordur.
-    /// Sessizce geçmesin diye üretim sonrası doğrulanır.
+    /// A corrupt value shows up on the terrain as single-sample pits and is hard to notice.
+    /// It is verified after generation so it does not pass silently.
     static void VerifyFinite(float[,] heights, int res)
     {
         for (int z = 0; z < res; z++)
@@ -264,11 +263,11 @@ public class MountainGenerator : MonoBehaviour
             float h = heights[z, x];
             if (float.IsNaN(h) || float.IsInfinity(h))
                 throw new System.InvalidOperationException(
-                    $"{nameof(MountainGenerator)}: yükseklik haritasında geçersiz değer ({x}, {z}) = {h}");
+                    $"{nameof(MountainGenerator)}: invalid value in the heightmap ({x}, {z}) = {h}");
         }
     }
 
-    /// Mevcut araziyi yeniden üretmeden ölçer.
+    /// Measures the current terrain without regenerating it.
     public void Measure()
     {
         var data = GetComponent<Terrain>().terrainData;
@@ -278,8 +277,8 @@ public class MountainGenerator : MonoBehaviour
         ComputeSlopeStats(data.GetHeights(0, 0, res, res), res);
     }
 
-    /// Örnekleme hızının üstündeki gürültü aliasing üretir: tek örneklik rastgele
-    /// sıçramalar, yani benek ve çukur. En ince dalgaboyu en az bu kadar örnek geniş olmalı.
+    /// Noise above the sampling rate produces aliasing: single-sample random jumps, i.e. specks
+    /// and pits. The finest wavelength has to be at least this many samples wide.
     const float MinSamplesPerWavelength = 4f;
 
     const int OctaveCeiling = 12;
@@ -316,7 +315,7 @@ public class MountainGenerator : MonoBehaviour
         InitPeaks(rng);
     }
 
-    /// Yan tepeler ana zirvenin çevresine dağıtılır; omuz ve ikincil doruk hissi verir
+    /// The side peaks are spread around the main summit; they give a sense of shoulders and secondary tops
     void InitPeaks(System.Random rng)
     {
         peaks = new Peak[settings.secondaryPeaks];
@@ -324,7 +323,7 @@ public class MountainGenerator : MonoBehaviour
 
         for (int i = 0; i < peaks.Length; i++)
         {
-            // Eşit aralıklı taban açı + rastgele sapma: kümelenme de olsun, boşluk da
+            // An evenly spaced base angle plus a random deviation: so there are both clusters and gaps
             float angle = angleStep * (i + (float)rng.NextDouble() * 0.7f - 0.35f);
             float distance = settings.mountainRadius * settings.peakSpread
                              * (0.6f + (float)rng.NextDouble() * 0.8f);
@@ -343,13 +342,13 @@ public class MountainGenerator : MonoBehaviour
     static Vector2 RandomOffset(System.Random rng)
         => new((float)rng.NextDouble() * 10000f, (float)rng.NextDouble() * 10000f);
 
-    /// PROFİL EĞRİSİ DİZİYE PİŞİYOR. `AnimationCurve.Evaluate` iş parçacığı güvenli
-    /// değil: içinde son aranan anahtarı önbelleğe alıyor ve iki iş parçacığı aynı anda
-    /// çağırınca yanlış değer dönebiliyor. Üretim paralelleştirilince bu bir kilitlenme
-    /// değil, sessiz bozulma olurdu — arazide rastgele yerlerde yanlış yükseklik.
+    /// THE PROFILE CURVE IS BAKED INTO AN ARRAY. `AnimationCurve.Evaluate` is not thread safe:
+    /// it caches the last key it looked up and calling it from two threads at once can return a
+    /// wrong value. With generation parallelized this would not be a deadlock but a silent
+    /// corruption — a wrong height at random places on the terrain.
     ///
-    /// İki bin örnek, eğrinin kendi çözünürlüğünün çok üstünde; ayrıca dizi okuması
-    /// eğri değerlendirmesinden birkaç kat hızlı.
+    /// Two thousand samples is far above the curve's own resolution; and an array read is several
+    /// times faster than a curve evaluation.
     const int ProfileLutSize = 2048;
     float[] profileLut;
 
@@ -360,7 +359,7 @@ public class MountainGenerator : MonoBehaviour
             profileLut[i] = settings.heightProfile.Evaluate(i / (ProfileLutSize - 1f));
     }
 
-    /// Pişmiş profil eğrisinden okuma, ara değerlemeli.
+    /// A read from the baked profile curve, interpolated.
     float ProfileAt(float t)
     {
         float x = Mathf.Clamp01(t) * (ProfileLutSize - 1);
@@ -371,7 +370,7 @@ public class MountainGenerator : MonoBehaviour
 
     float SampleHeight(float u, float v)
     {
-        // Domain warp: koordinatları bozarak simetriyi kırar, doğal sırtlar verir
+        // Domain warp: distorting the coordinates breaks the symmetry and gives natural ridges
         float wx = Mathf.PerlinNoise(u * settings.warpFrequency + warpOffsetA.x,
                                      v * settings.warpFrequency + warpOffsetA.y) - 0.5f;
         float wz = Mathf.PerlinNoise(u * settings.warpFrequency + warpOffsetB.x,
@@ -398,15 +397,15 @@ public class MountainGenerator : MonoBehaviour
 
         RidgedFbm(su, sv, out float low, out float detail);
 
-        // Sırt etkisi yükseklikle güçlenir: etek yumuşak kalır, zirve sivrilir
+        // The ridge effect strengthens with height: the foot stays soft, the summit sharpens
         float influence = settings.ridgeInfluence
                           * Mathf.Lerp(settings.ridgeFootDamping, 1f, profile);
 
-        // Çarpanın ortalaması 1'de tutulur; sırt gürültüsü dağı sistematik olarak alçaltmaz
+        // The multiplier's mean is kept at 1; the ridge noise must not systematically lower the mountain
         float h = profile * (1f + influence * (low - 0.5f));
 
-        // Teras yalnızca düşük frekanslı ana forma uygulanır. İnce detay kuantalanırsa
-        // gürültü bant sınırlarını geçtiği her yerde tek örneklik çukurlar oluşur.
+        // The terracing is applied only to the low-frequency main form. If the fine detail is
+        // quantized, single-sample pits form wherever the noise crosses a band boundary.
         h = ApplyTerraces(h, su, sv, profile);
         h += profile * influence * detail;
 
@@ -414,39 +413,38 @@ public class MountainGenerator : MonoBehaviour
 
         h = settings.baseHeight + h * (1f - settings.baseHeight);
 
-        // OVA en son ekleniyor: genlikleri gerçek metre cinsinden verilmiş ve taban
-        // ölçeklemesinden geçerse küçülürler.
+        // THE PLAIN is added last: its amplitudes are given in real metres and would shrink if
+        // they went through the base scaling.
         h += Foreland(su, sv, profile);
 
         return Mathf.Clamp01(h);
     }
 
-    /// DAĞIN ÖNÜ. Arazi üreteci radyal bir dağ yapıyor ve yarıçapın dışında profil
-    /// sıfıra iniyor: geriye dümdüz bir tabla kalıyordu.
+    /// THE MOUNTAIN'S FOREGROUND. The terrain generator makes a radial mountain and the profile
+    /// falls to zero outside the radius: what was left was a perfectly flat table.
     ///
-    /// TEK GÜRÜLTÜ DEĞİL, BEŞ ARAZİ TÜRÜ. Önceki sürüm her yere aynı gürültüyü uygulayıp
-    /// genliğini yer yer değiştiriyordu; sonuç "her yer birbirine benziyor" oldu ve
-    /// haklıydı: karakteri değişmeyen bir alanın genliğini oynatmak farklı yer üretmiyor,
-    /// aynı yerin yüksek ve alçak hâlini üretiyor.
+    /// NOT ONE NOISE BUT FIVE LANDFORMS. The previous version applied the same noise everywhere
+    /// and varied its amplitude from place to place; the result was "everywhere looks the same",
+    /// and rightly so: varying the amplitude of an area whose character does not change does not
+    /// produce a different place, it produces a high and a low version of the same place.
     ///
-    /// Gerçek bir dağ önü bölgelere ayrılır ve bölgeler BİRBİRİNE BENZEMEZ:
-    ///   moren tarlası - kaotik höyükler, kapalı çukurlar, yönsüz
-    ///   sel ovası     - neredeyse düz, örgülü sığ yataklar
-    ///   teraslar      - basamaklı düzlükler, aralarında kısa dik yükseltiler
-    ///   oyuk yamacı   - sık paralel dereler, keskin sırtlar
-    ///   blok alanı    - kaya düşüğü önü, iri ve düzensiz
+    /// A real mountain foreground is divided into regions and the regions DO NOT RESEMBLE each other:
+    ///   moraine field - chaotic mounds, closed hollows, no direction
+    ///   outwash plain - almost flat, braided shallow beds
+    ///   terraces      - stepped flats with short steep rises between them
+    ///   gullied slope - dense parallel streams, sharp ridges
+    ///   block field   - the apron below a rockfall, coarse and irregular
     ///
-    /// Hangi türün nerede olduğu düşük frekanslı bir alandan geliyor (~2200 m), yani
-    /// beş kilometrelik bir rota iki üç bölge geçiyor. Sınırlar bükülmüş: keskin daireler
-    /// yapay okunuyor.
+    /// Which landform is where comes from a low-frequency field (~2200 m), so a five kilometre
+    /// route crosses two or three regions. The boundaries are warped: sharp circles read as artificial.
     ///
-    /// ALT SINIR 20 METRE. Arazi ızgarası 4.28 m/örnek ve bir özellik en az dört beş
-    /// örnek istiyor. Kaya, blok, taş yığını gibi metre ölçeğindeki her şey buradan
-    /// çıkamaz; onlar ayrı model olarak gelir.
+    /// THE LOWER BOUND IS 36 METRES. The terrain grid is 7.32 m/sample and a feature wants at
+    /// least four or five samples. Nothing at the metre scale — rock, block, stone pile — can come
+    /// out of here; those arrive as separate models.
     float Foreland(float su, float sv, float profile)
     {
-        // Dağın eteğine yaklaşınca sönüyor: orada arazi zaten dağın kendi formundan
-        // geliyor ve iki kaynak üst üste binerse etek kabarcıklanıyor.
+        // It fades as the mountain's foot is approached: the terrain there already comes from the
+        // mountain's own form and if two sources overlap the foot blisters.
         float outside = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(profile / 0.12f));
         if (outside <= 0.001f) return 0f;
 
@@ -454,8 +452,8 @@ public class MountainGenerator : MonoBehaviour
         float dz = sv - 0.5f;
         float radius = Mathf.Sqrt(dx * dx + dz * dz);
 
-        // Bölge sınırları bükülüyor: bükülmemiş düşük frekanslı gürültü yuvarlak
-        // lekeler veriyor ve geçişler daire yayı gibi okunuyor.
+        // The region boundaries are warped: unwarped low-frequency noise gives round patches and
+        // the transitions read like circular arcs.
         float warpU = (SignedNoise(su * Frequency(900f) + 3.7f,
                                          sv * Frequency(900f) + 8.1f) * 0.5f) * 0.06f;
         float warpV = (SignedNoise(su * Frequency(900f) + 51.2f,
@@ -464,16 +462,16 @@ public class MountainGenerator : MonoBehaviour
         float ru = su + warpU;
         float rv = sv + warpV;
 
-        // ALÜVYON YELPAZESİ her bölgede var: dereler malzemeyi aşağı taşır, ova etekten
-        // dışarı doğru alçalır. Bir tür değil, zeminin genel eğilimi.
+        // AN ALLUVIAL FAN exists in every region: streams carry material downhill and the plain
+        // falls away from the foot. Not a landform, the general tendency of the ground.
         float beyond = Mathf.Max(0f, radius - settings.mountainRadius);
         float metres = -beyond * settings.forelandFanDrop
                      / Mathf.Max(0.01f, 0.707f - settings.mountainRadius);
 
-        // Tür ağırlıkları: her tür kendi düşük frekanslı alanına sahip, en yükseği
-        // baskın çıkıyor. Üs 5'ti ve kazanan payın ancak %70'ini alıyordu: kalan %30
-        // öteki dört türe dağılıp birbirini götürüyor, bölge karakteri siliniyordu.
-        // Onuncu kuvvette kazananın payı %95'e çıkıyor, sınırlar yine yumuşak.
+        // Landform weights: each landform has its own low-frequency field and the highest one
+        // wins. The exponent was 5 and the winner only took 70% of the share: the remaining 30%
+        // spread over the other four and cancelled each other out, erasing the region's character.
+        // At the tenth power the winner's share rises to 95% and the boundaries are still soft.
         Span<float> landformWeights = stackalloc float[LandformCount];
 
         float total = 0f;
@@ -493,29 +491,29 @@ public class MountainGenerator : MonoBehaviour
                 + landformWeights[3] / total * GullySlope(ru, rv)
                 + landformWeights[4] / total * BoulderApron(ru, rv);
 
-        // ORTAK TEPECİK KATMANI. Bölge türü ne olursa olsun zemin pürüzlü: sel ovasında
-        // çakıl barı, terasta tümsek, moren tarlasında höyük. Ölçüldü — bu katman
-        // olmadan sel ovası ve teras bölgelerinde 60 metrede yalnız 1.5 metre kabartı
-        // kalıyor ve tepeler 160 metre arayla düşüyor; yürüyen için orası düzlük.
+        // A SHARED HUMMOCK LAYER. Whatever the region's landform is, the ground is rough: a gravel
+        // bar on the outwash plain, a bump on a terrace, a mound on the moraine field. Measured —
+        // without this layer the outwash plain and terrace regions have only 1.5 metres of relief
+        // over 60 metres and the peaks fall 160 metres apart; for someone walking, that is flat ground.
         //
-        // Dalga boyları 34 ve 21 metre: yanından geçilen, üstüne çıkılmayan boyut.
-        // Yirmi metrenin altına inilmiyor, arazi ızgarası (4.28 m) çözemiyor.
+        // The wavelengths are 34 and 21 metres: the size you walk past, not the size you climb
+        // over. It does not go below thirty-six metres, the terrain grid (7.32 m) cannot resolve it.
         metres += Bumps(ru, rv);
 
         return metres / Mathf.Max(1f, settings.terrainHeight) * outside;
     }
 
-    /// TEPECİKLER. Her arazi türünün üstüne binen ortak pürüz. Yürürken yanından
-    /// geçilen kabartılar; tırmanılacak engel değil, zeminin dokusu.
+    /// HUMMOCKS. The shared roughness that rides on top of every landform. Bumps you walk past;
+    /// not an obstacle to be climbed, the ground's texture.
     ///
-    /// Yoğunluk YAMALI: gerçek arazi her yerde aynı pürüzlülükte değil, bir yamaç taşlı
-    /// ve tümsekli, yanındaki çayır düz. Tek tip pürüz "gürültü uygulanmış düzlük"
-    /// olarak okunuyor.
+    /// The density is PATCHY: real terrain is not equally rough everywhere — one slope is stony
+    /// and bumpy, the meadow beside it is flat. Uniform roughness reads as "flat ground with noise
+    /// applied".
     float Bumps(float u, float v)
     {
-        // Üç ölçek: 55, 32 ve 21 metre. Tek ölçekte tepecikler aynı boyda çıkıyor ve
-        // "aynı damganın tekrarı" olarak okunuyor; üç ölçek üst üste binince büyüklük
-        // dağılımı doğal oluyor - iri, orta ve küçük yan yana.
+        // Three scales: 55, 32 and 21 metres. At a single scale the hummocks all come out the same
+        // size and read as "the same stamp repeated"; superposing three scales makes the size
+        // distribution natural - coarse, medium and small side by side.
         float wide = SignedNoise(u * Frequency(95f) + 5.5f, v * Frequency(95f) + 9.2f);
         float mid = SignedNoise(u * Frequency(58f) + 44.1f, v * Frequency(58f) + 12.7f);
         float fine = SignedNoise(u * Frequency(37f) + 77.3f, v * Frequency(37f) + 51.8f);
@@ -527,18 +525,18 @@ public class MountainGenerator : MonoBehaviour
              * density * settings.hummockHeight * 0.7f;
     }
 
-    /// MOREN TARLASI. Buzulun bıraktığı kaotik höyükler ve aralarındaki kapalı çukurlar.
-    /// Yönsüz: sırt yok, yay yok, sadece yığın. Yürürken en yorucu zemin - düz bir hat
-    /// tutamazsın, sürekli inip çıkarsın.
+    /// MORAINE FIELD. The chaotic mounds a glacier left behind and the closed hollows between them.
+    /// No direction: no ridges, no arcs, just piles. The most tiring ground to walk - you cannot
+    /// hold a straight line, you are constantly going up and down.
     float MoraineField(float u, float v)
     {
-        // SİNÜS YOK. Yaylar `sin(yarıçap / aralık)` ile üretiliyordu ve tanımı gereği
-        // tekrar ediyordu: eşit aralıklı, eşit boylu sırtlar. Konsantrik bir desene
-        // teğetten bakınca ufukta aynı üçgen tekrar tekrar görünüyor - testere dişi.
-        // Büküm eklemek düzeni gizliyor, kaldırmıyor.
+        // NO SINE. The arcs were produced with `sin(radius / spacing)` and repeated by definition:
+        // evenly spaced ridges of equal height. Looking tangentially at a concentric pattern, the
+        // same triangle appeared again and again on the horizon - a saw tooth.
+        // Adding a warp hides the order, it does not remove it.
         //
-        // Yerine sırt gürültüsü: iki farklı ölçekte, birbirine bakmayan iki alan.
-        // Hiçbir sırt ötekinin aynı değil, aralıkları da eşit değil.
+        // In its place, ridge noise: two fields at two different scales that do not look at each
+        // other. No ridge is the same as another and their spacings are not equal either.
         float coarse = SignedNoise(u * Frequency(430f) + 11.7f,
                                    v * Frequency(430f) + 4.1f);
         float ridgeCoarse = Mathf.Pow(1f - Mathf.Abs(coarse), 2.5f);
@@ -547,23 +545,23 @@ public class MountainGenerator : MonoBehaviour
                                 v * Frequency(190f) + 28.5f);
         float ridgeMid = Mathf.Pow(1f - Mathf.Abs(mid), 3f);
 
-        // İki sırt ailesi TOPLANMIYOR, en yükseği alınıyor: toplandığında kesiştikleri
-        // yerde iki kat yükseliyor ve kesişme noktaları düzenli bir ızgara kuruyor.
+        // The two ridge families are NOT SUMMED, the highest is taken: summed, they rise twice as
+        // high where they cross and the crossing points form a regular grid.
         float ridges = Mathf.Max(ridgeCoarse, ridgeMid * 0.75f);
 
-        // Höyükler: iki ölçek, yönsüz ve sık.
+        // Mounds: two scales, directionless and dense.
         float mound = SignedNoise(u * Frequency(88f) + 5.5f,
                                   v * Frequency(88f) + 9.2f) * 0.65f
                     + SignedNoise(u * Frequency(44f) + 44.1f,
                                   v * Frequency(44f) + 12.7f) * 0.4f;
 
-        // KAPALI ÇUKURLAR (buzul kazanı): moren tarlasının imzası. Erimiş buz bloğunun
-        // bıraktığı çanaklar; suyla dolarsa gölcük olur.
+        // CLOSED HOLLOWS (kettle holes): the moraine field's signature. The basins left by a melted
+        // block of ice; filled with water they become ponds.
         float kettle = UnitNoise(u * Frequency(160f) + 71.9f,
                                  v * Frequency(160f) + 33.2f);
         float basin = -Mathf.Pow(Mathf.Clamp01(1f - Mathf.Abs(kettle - 0.5f) * 2.6f), 3f) * 7f;
 
-        // Sırt yüksekliği yerden yere değişiyor: kimi belirgin, kimi silinmiş.
+        // The ridge height varies from place to place: some pronounced, some erased.
         float relief = Mathf.Lerp(0.3f, 1.4f, UnitNoise(u * Frequency(520f) + 45.9f,
                                                         v * Frequency(520f) + 12.1f));
 
@@ -571,13 +569,13 @@ public class MountainGenerator : MonoBehaviour
              + mound * settings.hummockHeight + basin;
     }
 
-    /// SEL OVASI. Buzul suyunun taşıdığı çakılın yaydığı düzlük: neredeyse dümdüz,
-    /// üstünde örgülü sığ yataklar. Hızlı yürünen, açık, sade olması gereken zemin -
-    /// kolay rotanın karakteri bu.
+    /// OUTWASH PLAIN. The flat spread by the gravel that glacial meltwater carried: almost dead
+    /// flat, with braided shallow beds on it. The ground that has to be fast to walk, open and
+    /// plain - this is the character of the easy route.
     float OutwashPlain(float u, float v)
     {
-        // Örgülü yataklar: sığ ve geniş, birbirine karışıyor. Derinlik bir metrenin
-        // altında; buradan geçmek yavaşlatmaz, sadece zemin düz olmaktan çıkar.
+        // Braided beds: shallow and wide, merging into each other. The depth is under a metre;
+        // crossing here does not slow you down, it only stops the ground being flat.
         float braid = UnitNoise(u * Frequency(120f) + 17.3f,
                                         v * Frequency(120f) + 61.5f);
         float cut = -Mathf.Pow(Mathf.Clamp01(1f - Mathf.Abs(braid - 0.5f) * 2f), 3f) * 1.6f;
@@ -588,27 +586,27 @@ public class MountainGenerator : MonoBehaviour
         return cut + ripple;
     }
 
-    /// TERASLAR. Eski dere seviyelerinin bıraktığı basamaklı düzlükler: geniş düz
-    /// alanlar, aralarında kısa ve dik yükseltiler. Kamp kurulacak yerler bunlar;
-    /// yürüyüş kolay ama basamağı bulmak gerekiyor.
+    /// TERRACES. The stepped flats left by old stream levels: wide flat areas with short steep
+    /// rises between them. These are the places camps are pitched; walking is easy but you have
+    /// to find the step.
     float Terraces(float u, float v)
     {
-        // EŞİT BASAMAK YOK. `floor(x * 5)` ile kuantalanıyordu: beş basamak, her biri
-        // 5.2 metre, hepsi birbirinin aynı. Doğada teras yükseklikleri dereye, zamana
-        // ve malzemeye göre değişir; eşit basamak merdiven olarak okunuyor.
+        // NO EQUAL STEPS. It was quantized with `floor(x * 5)`: five steps, each 5.2 metres, all
+        // identical. In nature terrace heights vary with the stream, the time and the material;
+        // equal steps read as a staircase.
         //
-        // Basamak kenarları artık bir gürültünün kendi eşiklerinden geçtiği yerlerde:
-        // yükseklikler de aralıklar da düzensiz.
+        // The step edges are now where a noise crosses its own thresholds: both the heights and
+        // the spacings are irregular.
         float field = UnitNoise(u * Frequency(1400f) + 13.1f,
                                 v * Frequency(1400f) + 47.6f);
 
-        // Düzlükler: alanı kendi gradyanına göre bastırmak yerine, yumuşak bir
-        // basamak fonksiyonundan geçiriyorum. Eşik yerden yere kayıyor, yani iki
-        // düzlük arası mesafe sabit değil.
+        // The flats: instead of suppressing the area by its own gradient I pass it through a soft
+        // step function. The threshold slides from place to place, so the distance between two
+        // flats is not constant.
         float shift = UnitNoise(u * Frequency(760f) + 5.1f,
                                 v * Frequency(760f) + 88.3f);
 
-        // Dört eşik, konumu ve yüksekliği ayrı ayrı kaydırılmış.
+        // Four thresholds, each shifted separately in position and in height.
         float terrace = 0f;
         terrace += Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.22f + shift * 0.10f,
                                                               0.30f + shift * 0.10f, field)) * 9f;
@@ -619,15 +617,15 @@ public class MountainGenerator : MonoBehaviour
         terrace += Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.84f - shift * 0.06f,
                                                               0.88f - shift * 0.06f, field)) * 5f;
 
-        // Düzlükler tam düz değil: ince pürüz kalıyor.
+        // The flats are not perfectly flat: a fine roughness remains.
         float grain = SignedNoise(u * Frequency(46f) + 6.2f,
                                   v * Frequency(46f) + 19.9f) * 0.55f;
 
         return terrace + grain;
     }
 
-    /// OYUK YAMACI. Sık, paralel dere yatakları ve aralarındaki keskin sırtlar. Yatağa
-    /// inip çıkmak yavaşlatır; boyunca gitmek hızlıdır ama yönü arazi dayatır.
+    /// GULLIED SLOPE. Dense parallel stream beds and the sharp ridges between them. Going down
+    /// into a bed and back out slows you; going along one is fast but the terrain dictates your direction.
     float GullySlope(float u, float v)
     {
         float gully = UnitNoise(u * Frequency(260f) + 71.2f,
@@ -635,18 +633,18 @@ public class MountainGenerator : MonoBehaviour
 
         float ridge = 1f - Mathf.Abs(gully - 0.5f) * 2f;
 
-        // Yatak tabanlı, kenarları dik: altıncı kuvvet tabana genişlik bırakıyor.
+        // Bed-floored with steep sides: the sixth power leaves width at the floor.
         float cut = -Mathf.Pow(Mathf.Clamp01(ridge), 4f) * settings.channelDepth;
 
-        // Sırtların kendisi de yükseliyor: oyuk kazıldıkça arası sırt olarak kalıyor.
+        // The ridges themselves rise too: as the gullies are cut, what is between them stays as a ridge.
         float crest = Mathf.Pow(Mathf.Clamp01(1f - ridge), 2f) * 6f;
 
         return cut + crest;
     }
 
-    /// BLOK ALANI. Yamaçtan dökülen iri malzemenin önü: düzensiz, iri taneli, yönsüz.
-    /// En yavaş yürünen zemin. Metre ölçeğindeki blokların kendisi buradan çıkmaz;
-    /// bu, onların üstünde durduğu dalgalı taban.
+    /// BLOCK FIELD. The apron of coarse material shed from the slope: irregular, coarse grained,
+    /// directionless. The slowest ground to walk. The metre-scale blocks themselves do not come
+    /// from here; this is the undulating floor they stand on.
     float BoulderApron(float u, float v)
     {
         float lump = (SignedNoise(u * Frequency(95f) + 88.1f,
@@ -654,39 +652,39 @@ public class MountainGenerator : MonoBehaviour
                    + (SignedNoise(u * Frequency(41f) + 39.7f,
                                         v * Frequency(41f) + 71.3f) * 0.5f) * 1.0f;
 
-        // Yığın önü dağdan uzaklaştıkça alçalır: kaynağa yakın kalın, ucunda incelir.
+        // The apron lowers with distance from the mountain: thick near the source, thinning at its end.
         float taper = UnitNoise(u * Frequency(700f) + 4.4f,
                                         v * Frequency(700f) + 9.9f);
 
         return lump * settings.hummockHeight * Mathf.Lerp(0.6f, 1.8f, taper);
     }
 
-    /// Frekans = arazi boyu / istenen dalga boyu. Sayıyı doğrudan yazmak yerine
-    /// metreden türetmek, dağın boyu değiştiğinde özelliklerin gerçek boyunu koruyor.
-    /// Alt sınır 20 m: arazi ızgarası 4.28 m/örnek ve daha ince olan örtüşür.
-    /// İŞARETLİ GÜRÜLTÜ, -1 ile 1 arası. `Mathf.PerlinNoise` teorik olarak 0-1 döndürüyor
-    /// ama kütlesi 0.30-0.70 arasında toplanıyor: `(n - 0.5)` yazınca elde edilen genlik
-    /// beklenen ±0.5 değil, gerçekte ±0.22 oluyor ve her katman sessizce yarıya iniyor.
+    /// SIGNED NOISE, between -1 and 1. `Mathf.PerlinNoise` theoretically returns 0-1 but its mass
+    /// gathers between 0.30 and 0.70: writing `(n - 0.5)` gives an amplitude that is not the
+    /// expected ±0.5 but really ±0.22, and every layer silently halves.
     ///
-    /// Ölçek 2.2 o daralmayı geri açıyor, kırpma da uçlardaki nadir taşmayı kesiyor.
-    /// Bu düzeltme olmadan "5 metrelik tepecik" araziye 1.4 metre olarak iniyordu.
+    /// The 2.2 scale opens that narrowing back up, and the clamp cuts the rare overshoot at the
+    /// ends. Without this correction a "5 metre hummock" arrived on the terrain as 1.4 metres.
     static float SignedNoise(float x, float y) =>
         Mathf.Clamp(Mathf.PerlinNoise(x, y) * 2.2f - 1.1f, -1f, 1f);
 
-    /// Aynı düzeltmenin 0-1 aralığındaki hâli. Eşik ve maske hesapları bunu okuyor:
-    /// daralmış bir dağılıma eşik koymak, eşiği fiilen aralığın dışına atıyordu.
+    /// The same correction in the 0-1 range. Threshold and mask computations read this: putting a
+    /// threshold on a narrowed distribution effectively threw the threshold outside the range.
     static float UnitNoise(float x, float y) =>
         Mathf.Clamp01(Mathf.PerlinNoise(x, y) * 2.2f - 0.6f);
 
-    /// Arazi türü sayısı. Ağırlıklar YIĞINDA tutuluyor: paylaşılan bir alan olsaydı
-    /// paralel üretimde iş parçacıkları birbirinin ağırlıklarını ezerdi.
+    /// The number of landforms. The weights are kept ON THE STACK: as a shared field, threads
+    /// would overwrite each other's weights during parallel generation.
     const int LandformCount = 5;
 
+    /// Frequency = terrain size / desired wavelength. Deriving it from metres rather than writing
+    /// the number directly keeps a feature's real size when the mountain's size changes.
+    /// The lower bound is 36 m: the terrain grid is 7.32 m/sample and anything finer aliases.
     float Frequency(float wavelength) =>
         settings.terrainSize / Mathf.Max(36f, wavelength);
 
-    /// Ana koninin profili. Taban daire olursa eş-yükseklik çizgileri de daire olur ve
-    /// teraslar iç içe halka gibi görünür — yarıçap açıya göre bozulur.
+    /// The main cone's profile. With a circular base the contour lines are circles too and the
+    /// terraces look like concentric rings — the radius is distorted by angle.
     float MainProfile(float su, float sv)
     {
         float dx = su - 0.5f;
@@ -706,19 +704,19 @@ public class MountainGenerator : MonoBehaviour
 
     float ApplyTerraces(float h, float su, float sv, float profile)
     {
-        // Dağın dışında teras yok. Izgara kayması yükseklik sıfırken bile değer ürettiği
-        // için düz araziyi çukurlaştırıyordu.
+        // No terraces outside the mountain. Because the grid shift produced a value even at zero
+        // height, it was pitting the flat terrain.
         if (profile <= 0.001f) return h;
 
-        // Etekte hızla tam güce ulaşsın; yalnızca dağın bittiği yerde sönsün
+        // It should reach full strength quickly at the foot; it should only fade where the mountain ends
         float footFade = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(profile / 0.08f));
 
-        // Teras gücü yere göre değişir: bir yamaçta belirgin sahanlıklar, başka yamaçta düz eğim
+        // The terrace strength varies by place: pronounced benches on one slope, a plain gradient on another
         float variation = footFade * Mathf.Lerp(1f, Mathf.PerlinNoise(
             su * settings.terraceVariationFrequency + terraceOffset.x,
             sv * settings.terraceVariationFrequency + terraceOffset.y), settings.terraceVariation);
 
-        // Bant kotları yere göre kayar; sabit kot halka deseni üretiyor
+        // The band elevations shift by place; a fixed elevation produces a ring pattern
         float offset = (Mathf.PerlinNoise(
             su * settings.terraceOffsetFrequency + gridOffset.x,
             sv * settings.terraceOffsetFrequency + gridOffset.y) - 0.5f) * settings.terraceOffsetAmount;
@@ -729,8 +727,8 @@ public class MountainGenerator : MonoBehaviour
         return h;
     }
 
-    /// Yüksekliği basamaklara böler. Izgara kaydırıldığı için bantlar her yerde
-    /// aynı kotta oluşmaz — gerçek kaya bantları gibi yamaçtan yamaca kayar.
+    /// Splits the height into steps. Because the grid is shifted, the bands do not form at the
+    /// same elevation everywhere — they shift from slope to slope like real rock bands.
     float Terrace(float h, int bands, float strength, float offset)
     {
         if (strength <= 0f) return h;
@@ -752,9 +750,9 @@ public class MountainGenerator : MonoBehaviour
         return start + (h - start) * (1f - settings.summitFlatness);
     }
 
-    /// Ridged multifractal: perlin'in mutlak değeri ters çevrilir, keskin sırtlar oluşur.
-    /// <paramref name="low"/> yalnızca ilk oktavlar (0-1 aralığında) — teras buna uygulanır.
-    /// <paramref name="detail"/> kalan yüksek frekanslı oktavlar, ortalaması sıfıra yakın.
+    /// Ridged multifractal: the absolute value of perlin is inverted, forming sharp ridges.
+    /// <paramref name="low"/> is only the first octaves (in the 0-1 range) — the terracing is applied to this.
+    /// <paramref name="detail"/> is the remaining high-frequency octaves, with a mean near zero.
     void RidgedFbm(float u, float v, out float low, out float detail)
     {
         float norm = 0f;
@@ -764,14 +762,14 @@ public class MountainGenerator : MonoBehaviour
 
         int count = Mathf.Clamp(effectiveOctaves, 1, octaveOffsets.Length);
 
-        // Teras yalnızca kaba yarıya uygulanır; ince detay kuantalanırsa benek oluşur
+        // The terracing is applied only to the coarse half; quantizing the fine detail produces specks
         int split = Mathf.Clamp(count / 2, 1, count);
 
         for (int i = 0; i < count; i++)
         {
             float n = Mathf.PerlinNoise(u * freq + octaveOffsets[i].x, v * freq + octaveOffsets[i].y);
 
-            // PerlinNoise nadiren 0-1 dışına taşar; taban negatife düşerse kesirli üs NaN üretir
+            // PerlinNoise rarely goes outside 0-1; if the base falls negative a fractional exponent produces NaN
             n = Mathf.Pow(Mathf.Max(0f, 1f - Mathf.Abs(n * 2f - 1f)), settings.ridgeSharpness);
 
             norm += amp;
@@ -794,8 +792,8 @@ public class MountainGenerator : MonoBehaviour
         detail = highSum / norm;
     }
 
-    /// Eğim bütçesi. Alan ağırlıklı tek bir histogram dağın geniş eteği tarafından
-    /// domine edildiği için ölçüm yükseklik kuşaklarına bölünür.
+    /// The slope budget. Because a single area-weighted histogram is dominated by the mountain's
+    /// wide foot, the measurement is split into elevation bands.
     void ComputeSlopeStats(float[,] heights, int res)
     {
         float cellSize = settings.terrainSize / (res - 1f);
@@ -815,7 +813,7 @@ public class MountainGenerator : MonoBehaviour
 
             for (int x = 0; x < res - 1; x++)
             {
-                // Dağın dışındaki düz arazi ölçüme girmemeli, yürünebilir oranını şişirir
+                // Flat terrain outside the mountain must not enter the measurement, it inflates the walkable share
                 float du = x * inv - 0.5f;
                 if (Mathf.Sqrt(du * du + dv * dv) > settings.mountainRadius) continue;
 
@@ -862,10 +860,11 @@ public class MountainGenerator : MonoBehaviour
         }
 
         meanSlopeDegrees = allCount > 0 ? (float)(allSum / allCount) : 0f;
-        // ÖLÇEK ARAZİDEN OKUNUYOR, AYARDAN DEĞİL. `settings.terrainHeight` eski
-        // prosedürel kurulumun sayısıydı (6189); arazi elle yapılmaya başlayınca tavan
-        // 8000'e çıktı ve ikisi ayrıştı. Zirve 6001 m yerine 4642 m okunuyor, hava
-        // kuşakları o yanlış boydan türüyor ve dağ baştan aşağı karla kaplanıyordu.
+        // THE SCALE IS READ FROM THE TERRAIN, NOT FROM THE SETTINGS. `settings.terrainHeight` was
+        // the old procedural setup's number (6189); once the terrain started being made by hand
+        // the ceiling rose to 8000 and the two diverged. The summit was read as 4642 m instead of
+        // 6001 m, the weather bands derived from that wrong height and the mountain was covered in
+        // snow from top to bottom.
         float top = GetComponent<Terrain>().terrainData.size.y;
         peakAltitude = highest * top;
         groundAltitude = lowest * top;
