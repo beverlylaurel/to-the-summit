@@ -33,28 +33,28 @@ public class VolumetricClouds : VolumeComponent, IPostProcessComponent
     private CloudPresetsParameter m_CloudPreset = new(CloudPresets.Cloudy, overrideState: false);
 
     /// <summary>
-    /// Hava haritası. R seyrek kapsama, G yoğun kapsama, B azami bulut yüksekliği `[H18 s.11]`.
+    /// Weather map. R sparse coverage, G dense coverage, B maximum cloud height `[H18 p.11]`.
     /// </summary>
-    [Tooltip("Hava haritası. R seyrek kapsama, G yoğun kapsama, B azami bulut yüksekliği.")]
+    [Tooltip("Weather map. R sparse coverage, G dense coverage, B maximum cloud height.")]
     public TextureParameter cloudMap = new(null);
 
     /// <summary>
-    /// Hava haritasının dünyada kapladığı kenar uzunluğu (metre). Harita bu periyotla döşeniyor.
+    /// Edge length the weather map covers in the world (metres). The map tiles with this period.
     /// </summary>
-    [Tooltip("Hava haritasının dünyada kapladığı kenar uzunluğu (metre).")]
+    [Tooltip("Edge length the weather map covers in the world (metres).")]
     public MinFloatParameter cloudMapSize = new(48000.0f, 1000.0f);
 
     /// <summary>
-    /// Küresel kapsama. 0.5'e kadar yalnız seyrek yerleşim; üstünde yoğun harita devreye giriyor `[H18 s.11]`.
+    /// Global coverage. Up to 0.5 only the sparse layout; above it the dense map comes in `[H18 p.11]`.
     /// </summary>
-    [Tooltip("Küresel kapsama. 0.5'e kadar yalnız seyrek yerleşim, üstünde gök kapanmaya başlıyor.")]
+    [Tooltip("Global coverage. Only sparse layout up to 0.5; above it the sky starts to close.")]
     public ClampedFloatParameter cloudCoverage = new(0.5f, 0.0f, 1.0f);
 
     /// <summary>
-    /// Örs miktarı. Şekil fonksiyonunu üs olarak değiştiriyor, yoğunluk fonksiyonunu da
-    /// birlikte azaltıyor — yoksa tepe fazla yoğun kalıyor `[H18 s.17]`.
+    /// Anvil amount. It changes the shape function as an exponent and reduces the density
+    /// function along with it — otherwise the top stays too dense `[H18 p.17]`.
     /// </summary>
-    [Tooltip("Örs miktarı. Kümülonimbüs tepesini yayar; küresel kapsamayla birlikte çalışır.")]
+    [Tooltip("Anvil amount. Spreads the cumulonimbus top; works together with global coverage.")]
     public ClampedFloatParameter anvilAmount = new(0.0f, 0.0f, 1.0f);
 
     /// <summary>
@@ -64,14 +64,14 @@ public class VolumetricClouds : VolumeComponent, IPostProcessComponent
     public ClampedFloatParameter densityMultiplier = new(0.4f, 0.0f, 1.0f);
 
     /// <summary>
-    /// SÖNÜM KATSAYISI: birim yoğunlukta metre başına sönüm (m⁻¹). Işın boyunca
-    /// `exp(−yoğunluk × katsayı × adım)` olarak uygulanıyor.
+    /// EXTINCTION COEFFICIENT: extinction per metre at unit density (m^-1). Applied along the
+    /// ray as `exp(-density x coefficient x step)`.
     ///
-    /// Büyüdükçe bulut opaklaşıyor ve kontrast artıyor `[N22 s.164]`. Makaledeki
-    /// 5/10/20 karşılaştırması normalize yolda ölçülmüş, metre cinsine doğrudan
-    /// çevrilemez; portun 0.04'ü varsayılan olarak korundu.
+    /// The larger it is the more opaque the cloud and the higher the contrast `[N22 p.164]`.
+    /// The paper's 5/10/20 comparison was measured on a normalized path and cannot be
+    /// converted to metres directly; the port's 0.04 was kept as the default.
     /// </summary>
-    [Tooltip("Birim yoğunlukta metre başına sönüm (m⁻¹). Büyüdükçe bulut opaklaşır, kontrast artar.")]
+    [Tooltip("Extinction per metre at unit density (m^-1). The larger it is the more opaque the cloud and the higher the contrast.")]
     public ClampedFloatParameter extinctionCoefficient = new(0.04f, 0.005f, 0.2f);
 
     /// <summary>

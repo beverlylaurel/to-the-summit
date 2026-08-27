@@ -470,8 +470,8 @@ class VolumetricCloudsEditor : VolumeComponentEditor
                 m_AltitudeRange.overrideState.boolValue = m_CloudPreset.overrideState.boolValue;
             }
 
-            // Hava haritası ön ayarlardan sürülmüyor; değişim denetiminin dışında duruyor ki
-            // haritayı atamak ön ayarı Custom'a çevirmesin.
+            // The weather map is not driven by the presets; it sits outside the change check
+            // so that assigning a map does not switch the preset to Custom.
             PropertyField(m_CloudMap);
             PropertyField(m_CloudMapSize);
             PropertyField(m_CloudCoverage);

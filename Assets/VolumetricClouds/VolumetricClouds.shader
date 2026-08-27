@@ -176,10 +176,10 @@ Shader "Hidden/Sky/VolumetricClouds"
             Name "Volumetric Clouds Combine"
 			Tags { "LightMode" = "Volumetric Clouds" }
 
-            // ÇAKMA. İki "Combine" geçişi var; C# `pass: hasAtmosphericScattering ? 7 : 1`
-            // diye seçiyor. Bu 1 numaralı, hava perspektifi KAPALIYKEN çalışan yol.
-            // Sis İKİSİNDE DE var — biri sissiz kalırsa ayarın kapanması bulutları
-            // sessizce hamlaştırır.
+            // FLASH. There are two "Combine" passes; C# picks with
+            // `pass: hasAtmosphericScattering ? 7 : 1`. This is number 1, the path that runs
+            // while aerial perspective is OFF. Fog is in BOTH — if one is left unfogged,
+            // turning the setting off silently flattens the clouds.
             Blend One SrcAlpha, Zero One
 
             HLSLPROGRAM
@@ -203,9 +203,9 @@ Shader "Hidden/Sky/VolumetricClouds"
 
             SAMPLER(s_linear_clamp_sampler);
 
-            // ÇAKMA. Bulutun kendi derinliği — sis onu kendi mesafesiyle söndürsün diye.
-            // 7 numaralı geçiş bunları zaten bildiriyordu; hava perspektifi kapalıyken
-            // çalışan bu yol sissiz kalıyordu.
+            // FLASH. The cloud's own depth — so the fog attenuates it by its own distance.
+            // Pass number 7 already declared these; this path, which runs while aerial
+            // perspective is off, was left unfogged.
             SAMPLER(s_point_clamp_sampler);
             float4 _ScreenResolution;
             TEXTURE2D_X_FLOAT(_VolumetricCloudsDepthTexture);
@@ -233,15 +233,15 @@ Shader "Hidden/Sky/VolumetricClouds"
 
             #ifdef _OUTPUT_CLOUDS_DEPTH
                 float depth = SAMPLE_TEXTURE2D_X_LOD(_VolumetricCloudsDepthTexture, s_point_clamp_sampler, screenUV, 0).r;
-                // KENAR HALKASINA MESAFE UYDURULMUYOR. Eskiden buraya uzak duzlemin bir
-                // tik berisi (`CLOUDS_RAW_FAR_CLIP_VALUE`) yaziliyordu. O sahte mesafe
-                // (~70 km) sisi doyurup bulut cevresinde SIYAH KONTUR birakiyordu;
-                // olculdu, F1 "Bulut sisini KAPAT" ile kontur gidiyor. Bilinear renk
-                // uzak duzlem derinligiyle uyusmayan bir bleed halkasi biraktigi icin
-                // `edgeOfClouds` orada tetikleniyordu. Uydurma kalkinca halka pikseli
-                // uzak duzlem derinligini korur, `hasCloud` false olur ve saydam bleed
-                // rengi sissiz gecer. Combine gecisi derinlik YAZMIYOR
-                // (`Blend One SrcAlpha`) — uydurmanin baska islevi de yoktu.
+                // NO INVENTED DISTANCE FOR THE EDGE RING. A tick short of the far plane
+                // (`CLOUDS_RAW_FAR_CLIP_VALUE`) used to be written here. That fake distance
+                // (~70 km) saturated the fog and left a BLACK OUTLINE around the clouds;
+                // measured, F1 "Turn cloud fog OFF" removed the outline. Because the bilinear
+                // color left a bleed ring that did not match the far plane depth,
+                // `edgeOfClouds` was triggered there. With the invention gone the ring pixel
+                // keeps the far plane depth, `hasCloud` is false and the transparent bleed
+                // color passes unfogged. The combine pass DOES NOT WRITE depth
+                // (`Blend One SrcAlpha`) — the invention had no other function either.
             #else
                 // Derinlik cikisi kapaliyken bulut mesafesi bilinmiyor. Uydurmak (eski
                 // hal) ekrani KOCAMAN siyah lekelerle dolduruyordu (olculdu). Mesafe
@@ -251,9 +251,9 @@ Shader "Hidden/Sky/VolumetricClouds"
 
                 PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenResolution.zw, depth, UNITY_MATRIX_I_VP, UNITY_MATRIX_V);
 
-                // Bulut mesafesi gercek derinlikten kuruluyor (yukarida). Kenar
-                // halkasi uzak duzlem derinligini korudugu icin hasCloud false olur
-                // ve sissiz gecer; govdede gercek mesafeyle sislenir.
+                // The cloud distance is built from the real depth (above). Because the edge
+                // ring keeps the far plane depth, `hasCloud` is false and it passes unfogged;
+                // in the body it is fogged by the real distance.
                 bool hasCloud = depth != UNITY_RAW_FAR_CLIP_VALUE;
 
                 if (hasCloud)
@@ -264,9 +264,9 @@ Shader "Hidden/Sky/VolumetricClouds"
                     float fogTransmittance;
                     FogPath(camPos, posInput.positionWS, fogScattering, fogTransmittance);
 
-                    // Bulutun kendi isigi mesafe boyunca soner; sis dolgusu bulutun
-                    // arkadaki sahneyi ORTTUGU (`1 - w`) oranda eklenir — saydam yerde
-                    // arkadaki yuzey kendi yolundaki sisi zaten aldi, ikinci kez almaz.
+                    // The cloud's own light fades along the distance; the fog fill is added in
+                    // proportion to how much the cloud COVERS the scene behind it (`1 - w`) —
+                    // where it is transparent the surface behind already took the fog along its own path and does not take it twice.
                     half cloudCover = 1.0 - cloudsColor.w;
                     half edgeFog = lerp(1.0, fogTransmittance, cloudCover);
 
@@ -661,9 +661,9 @@ Shader "Hidden/Sky/VolumetricClouds"
             #include "./VolumetricCloudsDefs.hlsl"
             #include "./VolumetricCloudsUpscale.hlsl"
 
-            // ÇAKMA. Bulut da kameradan bir mesafede duruyor, önündeki sis onu da
-            // söndürmek zorunda. `VolumetricCloudsDefs.hlsl`'den SONRA include ediliyor:
-            // ikisi `_LightningFlash`'i paylaşıyor, sıra bozulursa yeniden bildirim hatası.
+            // FLASH. A cloud also stands at a distance from the camera and the fog in front of
+            // it has to attenuate it too. Included AFTER `VolumetricCloudsDefs.hlsl`: the two
+            // share `_LightningFlash`, and out of order it is a redeclaration error.
             #include "../Shaders/HeightFog.hlsl"
 
 
@@ -678,22 +678,23 @@ Shader "Hidden/Sky/VolumetricClouds"
                 half4 cloudsColor = SAMPLE_TEXTURE2D_X_LOD(_VolumetricCloudsLightingTexture, s_linear_clamp_sampler, screenUV, 0).rgba;
             #endif
 
-                // ÇAKMA. Derinlik hesabı hava perspektifi dalının içindeydi; sis de aynı
-                // noktayı istediği için dışarı alındı. İki ortamın aynı mesafeden
-                // uygulanması şart — ayrı mesafeler bulut kenarında sınır bırakır.
+                // FLASH. The depth computation used to be inside the aerial perspective
+                // branch; because the fog wants the same point it was moved out. The two media
+                // MUST be applied from the same distance — separate distances leave a seam at
+                // the cloud edge.
                 //
                 // We don't force enabling clouds depth, but it's required to achieve physically accurate results
             #ifdef _OUTPUT_CLOUDS_DEPTH
                 float depth = SAMPLE_TEXTURE2D_X_LOD(_VolumetricCloudsDepthTexture, s_point_clamp_sampler, screenUV, 0).r;
-                // KENAR HALKASINA MESAFE UYDURULMUYOR. Eskiden buraya uzak duzlemin bir
-                // tik berisi (`CLOUDS_RAW_FAR_CLIP_VALUE`) yaziliyordu. O sahte mesafe
-                // (~70 km) sisi doyurup bulut cevresinde SIYAH KONTUR birakiyordu;
-                // olculdu, F1 "Bulut sisini KAPAT" ile kontur gidiyor. Bilinear renk
-                // uzak duzlem derinligiyle uyusmayan bir bleed halkasi biraktigi icin
-                // `edgeOfClouds` orada tetikleniyordu. Uydurma kalkinca halka pikseli
-                // uzak duzlem derinligini korur, `hasCloud` false olur ve saydam bleed
-                // rengi sissiz gecer. Combine gecisi derinlik YAZMIYOR
-                // (`Blend One SrcAlpha`) — uydurmanin baska islevi de yoktu.
+                // NO INVENTED DISTANCE FOR THE EDGE RING. A tick short of the far plane
+                // (`CLOUDS_RAW_FAR_CLIP_VALUE`) used to be written here. That fake distance
+                // (~70 km) saturated the fog and left a BLACK OUTLINE around the clouds;
+                // measured, F1 "Turn cloud fog OFF" removed the outline. Because the bilinear
+                // color left a bleed ring that did not match the far plane depth,
+                // `edgeOfClouds` was triggered there. With the invention gone the ring pixel
+                // keeps the far plane depth, `hasCloud` is false and the transparent bleed
+                // color passes unfogged. The combine pass DOES NOT WRITE depth
+                // (`Blend One SrcAlpha`) — the invention had no other function either.
             #else
                 // Derinlik cikisi kapaliyken bulut mesafesi bilinmiyor. Uydurmak (eski
                 // hal) ekrani KOCAMAN siyah lekelerle dolduruyordu (olculdu). Mesafe
@@ -716,11 +717,11 @@ Shader "Hidden/Sky/VolumetricClouds"
                 }
             #endif
 
-                // Bulut mesafesi gercek derinlikten kuruluyor (yukarida). Kenar
-                // halkasi uzak duzlem derinligini korudugu icin hasCloud false olur
-                // ve sissiz gecer; govdede gercek mesafeyle sislenir. Ustteki hava
-                // perspektifi ile cift sayim yok: o homojen atmosfer, bu yerel sis
-                // (vadi / bank / suruklenen kar), sinir bilincli (karar 2).
+                // The cloud distance is built from the real depth (above). Because the edge
+                // ring keeps the far plane depth, `hasCloud` is false and it passes unfogged;
+                // in the body it is fogged by the real distance. There is no double counting
+                // with the aerial perspective above: that is the homogeneous atmosphere, this
+                // is local fog (valley / bank / drifting snow), and the boundary is deliberate (decision 2).
                 bool hasCloud = depth != UNITY_RAW_FAR_CLIP_VALUE;
 
                 if (hasCloud)
@@ -731,9 +732,9 @@ Shader "Hidden/Sky/VolumetricClouds"
                     float fogTransmittance;
                     FogPath(camPos, posInput.positionWS, fogScattering, fogTransmittance);
 
-                    // Bulutun kendi isigi mesafe boyunca soner; sis dolgusu bulutun
-                    // arkadaki sahneyi ORTTUGU (`1 - w`) oranda eklenir — saydam yerde
-                    // arkadaki yuzey kendi yolundaki sisi zaten aldi, ikinci kez almaz.
+                    // The cloud's own light fades along the distance; the fog fill is added in
+                    // proportion to how much the cloud COVERS the scene behind it (`1 - w`) —
+                    // where it is transparent the surface behind already took the fog along its own path and does not take it twice.
                     half cloudCover = 1.0 - cloudsColor.w;
                     half edgeFog = lerp(1.0, fogTransmittance, cloudCover);
 

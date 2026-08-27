@@ -28,30 +28,30 @@ half3 EvaluateVolumetricCloudsAmbientProbe(half3 normalWS)
 #define CLOUD_DENSITY_TRESHOLD 0.001
 // Number of steps before we start the large steps
 #define EMPTY_STEPS_BEFORE_LARGE_STEPS 8
-// İKİ LOBLU HENYEY-GREENSTEIN. g0 = 0.8 ileri saçılım (gümüş kenar), g1 = −0.5 geri
-// saçılım (ters açıdaki bulut ölü görünmesin).
+// TWO-LOBE HENYEY-GREENSTEIN. g0 = 0.8 forward scattering (the silver edge), g1 = -0.5
+// back scattering (so a cloud at the opposite angle does not look dead).
 //
-// Portta ikisi TOPLANIYORDU. Her HG küre üzerinde 1'e integre olduğu için toplam 2
-// ediyordu, yani enerji korunmuyordu. Brief normalize birleştirmeyi şart koşuyor;
-// `lerp` iki lobu ağırlıklı ortalıyor ve integral 1'de kalıyor.
+// In the port the two were SUMMED. Because each HG integrates to 1 over the sphere the sum
+// came to 2, i.e. energy was not conserved. The brief requires a normalized combination;
+// `lerp` takes a weighted average of the two lobes and the integral stays at 1.
 //
-// KARIŞIM 0.5 → 0.15, ÖLÇÜMLE. Belirti: şafakta güneşten uzak bulutlar yeterince
-// kararmıyordu. 0.5, Frostbite'ın brief'teki varsayılanıydı ve bu sahnede hiç
-// doğrulanmamıştı; geri lob 90°'de ileri lobun ÜÇ KATI olduğu için uzak alanı tek
-// başına ayakta tutuyordu. Durak konturuyla ölçüldü: deste 3 durağa sıkışmış,
-// %70'i tek bant içinde.
+// THE MIX WENT 0.5 -> 0.15, BY MEASUREMENT. The symptom: at dawn, clouds away from the sun
+// did not darken enough. 0.5 was Frostbite's default in the brief and had never been
+// verified in this scene; because the back lobe is THREE TIMES the forward lobe at 90° it
+// was holding the far field up on its own. Measured with a stop contour: the deck was
+// squeezed into 3 stops, 70% of it inside a single band.
 //
-//   karışım   15°     90°     oran
-//   0.50      0.503   0.0282  17.8×
-//   0.15      0.842   0.0180  46.8×
+//   mix       15°     90°     ratio
+//   0.50      0.503   0.0282  17.8x
+//   0.15      0.842   0.0180  46.8x
 //
-// İleri lobun eksantrikliğine DOKUNULMADI: g düşünce tepe az iner ama lob genişler ve
-// uzak alan yükselir — 0.60'ta 90° değeri 0.0337, yani düzeltmeden önceki hâlinden
-// bile parlak. Kaldıraç orada değil.
+// The forward lobe's eccentricity was NOT TOUCHED: lowering g drops the peak a little but
+// widens the lobe and raises the far field — at 0.60 the 90° value is 0.0337, brighter even
+// than before the correction. The lever is not there.
 //
-// `lerp` ağırlıklı ortalama olduğu için karışımı düşürmek ileri lobun payını yükseltti
-// ve güneş çevresi 1.7 kat parladı; o taraf `LookSettings`'te bloom eşiğiyle karşılandı
-// (1.10 → 2.00, diğer ön ayarlar aynı oranla).
+// Because `lerp` is a weighted average, lowering the mix raised the forward lobe's share and
+// the area around the sun brightened 1.7x; that side was handled with the bloom threshold in
+// `LookSettings` (1.10 -> 2.00, the other presets by the same ratio).
 #define FORWARD_ECCENTRICITY 0.8
 #define BACKWARD_ECCENTRICITY -0.5
 #define PHASE_LOBE_BLEND 0.15
@@ -92,8 +92,8 @@ struct VolumetricRayResult
     half ambient;
     // Transmittance through the clouds
     half transmittance;
-    // Çakmanın kütle içinde biriktirdiği parlama. Ayrı tutuluyor çünkü rengi güneşin de
-    // ortamın da değil, çakmanın kendisinin.
+    // The glow the flash accumulates inside the mass. Kept separate because its color belongs
+    // neither to the sun nor to the ambient, but to the flash itself.
     half glow;
     // Mean distance of the clouds
     float meanDistance;
@@ -152,9 +152,9 @@ float ConvertCloudDepth(float3 position)
     return hClip.z / hClip.w;
 }
 
-// Kare basina degisen terim YOK. Zamansal birikim ancak ayni piksel kareler boyunca
-// ayni ornegi okursa yakinsar; portun zaman terimi her karede yeni desen uretiyordu,
-// yakinsama hic olmuyor ve titreme olarak gorunuyordu.
+// There is NO per-frame varying term. Temporal accumulation only converges if the same pixel
+// reads the same sample across frames; the port's time term produced a new pattern every
+// frame, convergence never happened and it showed up as flicker.
 float GenerateRandomFloat(float2 screenUV)
 {
     return GenerateHashedRandomFloat(uint3(screenUV * _ScreenSize.xy, 0));
@@ -340,8 +340,8 @@ half DensityFadeValue(float distanceToCamera)
     return saturate((distanceToCamera - _FadeInStart) * rcp(_FadeInStart + _FadeInDistance));
 }
 
-// Bir ornegin dunyada kapladigi en buyuk boy (m): ekran pikselinin o mesafedeki
-// izdusumu ile isin adiminin buyugu. Gurultu bundan ince olamaz.
+// The largest size one sample covers in the world (m): the larger of the screen pixel's
+// projection at that distance and the ray step. The noise cannot be finer than this.
 float SampleFootprint(float distanceToCamera, float stepSize)
 {
     return max(distanceToCamera * _PixelFootprintScale * _ScreenSize.w, stepSize);
@@ -355,9 +355,9 @@ float BandLimitMip(float footprint, float repeatMeters, float resolution)
     return max(0.0, log2(footprint * rcp(voxelSize)));
 }
 
-// Sekil ve erozyon gurultusu icin bant siniri. Portta erozyon mip'i 3-100 km arasina
-// sabitlenmisti: ekran cozunurlugu, gorus acisi ve gurultu olcegi degisince tutmuyordu,
-// uzak bulutlar bu yuzden pikselleniyordu.
+// The band limit for the shape and erosion noise. In the port the erosion mip was pinned
+// between 3-100 km: it did not hold as the screen resolution, field of view and noise scale
+// changed, which is why distant clouds pixelated.
 float ShapeMipOffset(float distanceToCamera, float stepSize)
 {
     return BandLimitMip(SampleFootprint(distanceToCamera, stepSize),
@@ -402,16 +402,16 @@ struct CloudCoverageData
     half rainClouds;
     // Maximal cloud height
     half maxCloudHeight;
-    // Hava haritasının yoğunluk kanalı (`w_d`) — `DensityAlter` bunu okuyor `[H18 Ek B.3]`
+    // The weather map's density channel (`w_d`) — `DensityAlter` reads it `[H18 App B.3]`
     half mapDensity;
 };
 
 // Function that evaluates the coverage data for a given point in planet space
 void GetCloudCoverageData(float3 positionPS, out CloudCoverageData data)
 {
-    // Hava haritası dünya XZ'sinde döşeniyor; periyodu `_CloudMapTiling.xy` taşıyor.
-    // Kamera kayması burada uygulanıyor: gölge yolu da bu fonksiyonu çağırıyor ve iki yolun
-    // aynı dünya noktasını okuması gerekiyor.
+    // The weather map tiles over world XZ; `_CloudMapTiling.xy` carries the period.
+    // The camera offset is applied here: the shadow path calls this function too and both
+    // paths have to read the same world point.
     float2 cloudMapPositionWS = positionPS.xz;
 #ifndef _LOCAL_VOLUMETRIC_CLOUDS
     cloudMapPositionWS += _WorldSpaceCameraPos.xz;
@@ -419,10 +419,10 @@ void GetCloudCoverageData(float3 positionPS, out CloudCoverageData data)
     float2 cloudMapUV = cloudMapPositionWS * _CloudMapTiling.xy + _CloudMapTiling.zw;
     half4 cloudMapData = SAMPLE_TEXTURE2D_LOD(_CloudMapTexture, s_linear_repeat_sampler, cloudMapUV, 0);
 
-    // `[H18 s.11]`: kapsama sürgüsü İKİ harita arasında geçiyor. 0.5'e kadar yalnız seyrek
-    // yerleşim (R); üstünde yoğun harita (G) devreye girip göğü kapatıyor.
+    // `[H18 p.11]`: the coverage slider crosses between TWO maps. Up to 0.5 only the sparse
+    // layout (R); above it the dense map (G) comes in and closes the sky.
     data.coverage = max(cloudMapData.x, saturate(_CloudCoverage - 0.5) * cloudMapData.y * 2.0);
-    // Yağmur bulutu v1'de bağlanmıyor; sigmaT sabit kalıyor (bkz. `CLOUDS_REBUILD.md`).
+    // The rain cloud is not wired in v1; sigmaT stays constant (see `CLOUDS_REBUILD.md`).
     data.rainClouds = 0.0;
     data.maxCloudHeight = cloudMapData.z;
     data.mapDensity = cloudMapData.w;
@@ -434,9 +434,9 @@ half DensityRemap(half x, half a, half b, half c, half d)
     return (((x - a) * rcp(b - a)) * (d - c)) + c;
 }
 
-/// ŞEKİL DEĞİŞTİREN yükseklik fonksiyonu `[H18 Ek B.2]`. Tabanı biraz, tepeyi çok
-/// yuvarlıyor. Örs şekli ÜS olarak değiştiriyor, çarpan olarak değil; `_AnvilAmount = 0`
-/// iken üs 1'e sadeleşip terim düşüyor.
+/// The SHAPE-ALTERING height function `[H18 App B.2]`. It rounds the base a little and the
+/// top a lot. The anvil changes it as an EXPONENT, not as a multiplier; with
+/// `_AnvilAmount = 0` the exponent reduces to 1 and the term drops out.
 half HeightAlter(half percentHeight, half maxCloudHeight)
 {
     half value = saturate(DensityRemap(percentHeight, 0.0, 0.07, 0.0, 1.0));
@@ -447,24 +447,25 @@ half HeightAlter(half percentHeight, half maxCloudHeight)
     return value;
 }
 
-/// DETAY DEĞİŞTİRİCİ `[H18 Ek B.5]`. İki şey yapıyor:
+/// DETAIL ALTERER `[H18 App B.5]`. It does two things:
 ///
-/// 1. Tabanda düz, tepede ters Worley — geçiş ilk %20'de (`SAT(p_h × 5)`). Alçakta tüylü,
-///    yüksekte yuvarlak yapı çıkıyor. Portta sabit `1 - detail` idi, her yükseklikte aynı.
-/// 2. Kazıma miktarı küresel kapsamayla AZALIYOR (`0.35 × e^(−g_c × 0.75)`). Portta
-///    kapsamayla ARTIYORDU (`0.75 × WM_c`) — ters yöndeydi. Kapalı havada ince yapı
-///    gereksiz, makale bunu ölçüp azaltıyor.
+/// 1. Plain Worley at the base, inverted at the top — the transition is in the first 20%
+///    (`SAT(p_h x 5)`). Low down the structure comes out wispy, high up rounded. In the port
+///    it was a fixed `1 - detail`, the same at every height.
+/// 2. The scraping amount DECREASES with global coverage (`0.35 x e^(-g_c x 0.75)`). In the
+///    port it INCREASED with coverage (`0.75 x WM_c`) — the wrong direction. In overcast
+///    weather fine structure is unnecessary and the paper measures that and reduces it.
 ///
-/// Kullanıcının erozyon sürgüsü bunun üstünde ayrı çarpan: 1.0'da makaleyle birebir.
+/// The user's erosion slider is a separate multiplier on top: at 1.0 it matches the paper exactly.
 half DetailModifier(half detail, half percentHeight)
 {
     half modifier = lerp(detail, 1.0 - detail, saturate(percentHeight * 5.0));
     return modifier * 0.35 * exp(-_CloudCoverage * 0.75);
 }
 
-/// YOĞUNLUK DEĞİŞTİREN yükseklik fonksiyonu `[H18 Ek B.3]`. Tabanı tüylü, tepeyi geçişli
-/// yapıyor; küresel yoğunluk (`g_d`) çağıran tarafta çarpılıyor. Örs eklenince yoğunluk
-/// modeli de değişmek ZORUNDA — yoksa tepe fazla yoğun kalıyor `[H18 s.17]`.
+/// The DENSITY-ALTERING height function `[H18 App B.3]`. It makes the base wispy and the top
+/// gradual; global density (`g_d`) is multiplied in by the caller. Once an anvil is added the
+/// density model MUST change too — otherwise the top stays too dense `[H18 p.17]`.
 half DensityAlter(half percentHeight, half mapDensity)
 {
     half value = percentHeight;
@@ -505,8 +506,8 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
     // Evaluate the normalized height of the position within the cloud volume
     properties.height = EvaluateNormalizedCloudHeight(positionPS);
 
-    // Kapsama, kamera kayması UYGULANMADAN okunuyor: kaymayı `GetCloudCoverageData` kendisi
-    // yapıyor, burada da yapılırsa iki kere eklenir.
+    // The coverage is read WITHOUT the camera offset applied: `GetCloudCoverageData` applies
+    // the offset itself, and applied here as well it would be added twice.
     CloudCoverageData cloudCoverageData;
     GetCloudCoverageData(positionPS, cloudCoverageData);
 
@@ -519,16 +520,16 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
     positionPS.xz += _WorldSpaceCameraPos.xz;
 #endif
 
-    // DOSEME KIRICI. Taban gurultusu dunyada birkac kilometrede aynen tekrar ediyor:
-    // yakindan bir-iki tekrar gorunur ve goz secmez, zirveden yuzlercesi ayni anda
-    // gorunur ve kafes okunur.
+    // TILING BREAKER. The base noise repeats verbatim every few kilometres in the world: up
+    // close one or two repeats are visible and the eye does not pick them out, from the summit
+    // hundreds are visible at once and the lattice reads.
     //
-    // KIRICININ PERIYODU GORUS MENZILINDEN UZUN OLMAK ZORUNDA. Kucuk periyotlu bir
-    // bukum tekrari gizlemiyor, kendi kafesini ekliyor. 48 km hava haritasinin
-    // periyoduyla ayni; ikisi hizali olmazsa iki ayri desen ust uste biniyor.
+    // THE BREAKER'S PERIOD MUST BE LONGER THAN THE VIEW RANGE. A warp with a small period does
+    // not hide the repeat, it adds a lattice of its own. 48 km is the same as the weather
+    // map's period; unaligned, two separate patterns would overlay each other.
     //
-    // Genlik dosemenin yarisi: daha buyugu ornekleme koordinatini katliyor ve gurultu
-    // kendi uzerine biniyor. Gradyan 0.23'te kaliyor, yani uzay katlanmiyor.
+    // The amplitude is half the tile: any larger and it folds the sampling coordinate and the
+    // noise overlaps itself. The gradient stays at 0.23, i.e. space does not fold.
     const float TILE_BREAK_PERIOD = 48000.0;
     const float TILE_BREAK_AMPLITUDE = 1400.0;
     float2 tileBreakPhase = positionPS.xz * (6.2831853 / TILE_BREAK_PERIOD);
@@ -560,23 +561,23 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
     // Combine with the low frequency noise, we want less shaping for large clouds
     lowFrequencyNoise = lerp(1.0, lowFrequencyNoise, shapeFactor);
 
-    // `[H18 s.14-16]`: şekil gürültüsü ÖNCE şekil-yükseklik fonksiyonuyla çarpılıyor,
-    // kapsama remap'ine öyle giriyor.
+    // `[H18 p.14-16]`: the shape noise is FIRST multiplied by the shape-height function and
+    // enters the coverage remap that way.
     lowFrequencyNoise *= HeightAlter(properties.height, cloudCoverageData.maxCloudHeight);
-    // `[H18 s.14]`: remap sınırı `1 − g_c × WM_c`. Kapsama sürgüsü zincire BURADAN giriyor;
-    // portta bu bağ yoktu, sürgünün alt yarısı bu yüzden hiçbir şey yapmıyordu.
+    // `[H18 p.14]`: the remap limit is `1 - g_c x WM_c`. The coverage slider enters the chain
+    // HERE; the port had no such link, which is why the lower half of the slider did nothing.
     half base_cloud = 1.0 - _CloudCoverage * cloudCoverageData.coverage.x;
-    // `× coverage²` KALDIRILDI. Portun kendi terimiydi, `[H18]`'de karşılığı yok: kapsama
-    // zaten remap sınırından (`1 − g_c × WM_c`) giriyor, kare almak ikinci kez cezalandırıyordu.
-    // Kapsaması 0.6'ya inen bölge 0.36'ya düşüyor, remap sınırıyla birleşince tam delik
-    // açılıyordu — kapalı gökte bile boşluklar bu yüzden çıkıyordu.
+    // `x coverage²` WAS REMOVED. It was the port's own term with no counterpart in `[H18]`:
+    // coverage already enters through the remap limit (`1 - g_c x WM_c`) and squaring punished
+    // it a second time. A region whose coverage fell to 0.6 dropped to 0.36, and combined with
+    // the remap limit it opened a full hole — which is why gaps appeared even in an overcast sky.
     base_cloud = saturate(DensityRemap(lowFrequencyNoise, base_cloud, 1.0, 0.0, 1.0));
 
     // Weight the ambient occlusion's contribution
     properties.ambientOcclusion = densityErosionAO.z;
 
-    // SÖNÜM KATSAYISI: birim yoğunlukta metre başına sönüm (m⁻¹). Yağmur bulutunda üç
-    // katına çıkıyor — portun 0.04 → 0.12'si aynı orandı, artık ayardan türüyor `[N22 s.164]`.
+    // EXTINCTION COEFFICIENT: extinction per metre at unit density (m^-1). It triples in a
+    // rain cloud — the port's 0.04 -> 0.12 was the same ratio, and it now derives from the setting `[N22 p.164]`.
     properties.sigmaT = _ExtinctionCoefficient * lerp(1.0, 3.0, cloudCoverageData.rainClouds);
 
     // The ambient occlusion value that is baked is less relevant if there is shaping or erosion, small hack to compensate that
@@ -591,28 +592,29 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
         half erosionNoise = DetailModifier(detail, properties.height);
         erosionNoise = lerp(0.0, erosionNoise, erosionFactor);
         properties.ambientOcclusion = saturate(properties.ambientOcclusion - sqrt(erosionNoise * _ErosionOcclusion));
-        // ÇIKARMA, BÖLME DEĞİL `[N22 s.34]`:
+        // SUBTRACTION, NOT DIVISION `[N22 p.34]`:
         //     saturate(cloud_noise_composite - (1.0 - dimensional_profile))
         //
-        // `DensityRemap(x, n, 1, 0, 1)` = `(x − n) / (1 − n)`. Pay doğruydu, bölme
-        // fazlaydı: kenar bandını normalize edip yoğunluğu hızla 1'e çıkarıyor.
-        // `NUBIS_NOTES.md` bunu kapsama zinciri için zaten yazmıştı — "keskin kenarların
-        // matematiksel kaynağı bu" — ama düzeltme yalnız kapsamaya uygulanmıştı,
-        // erozyon tarafında bölme kalmıştı.
+        // `DensityRemap(x, n, 1, 0, 1)` = `(x - n) / (1 - n)`. The numerator was right, the
+        // division was extra: it normalizes the edge band and pushes the density quickly to 1.
+        // `NUBIS_NOTES.md` had already written this for the coverage chain — "this is the
+        // mathematical source of the hard edges" — but the fix had only been applied to the
+        // coverage, and the division was still there on the erosion side.
         //
-        // Belirti: ince bulutta piksel ölçeğinde benek. Taban yoğunluk küçükken bölme
-        // sonucu ikiliye çeviriyor — `erosionNoise > base_cloud` olan yer 0, olmayan yer
-        // dolu, ara değer yok. Çözünürlükle ilgisi olmadığı ölçüldü: `resolutionScale`
-        // 0.5 ve 1.0'da, `upscaleMode` Bilinear ve Bilateral'da ekran birebir aynı.
+        // The symptom: pixel-scale speckle in thin cloud. With a small base density the
+        // division turns the result binary — where `erosionNoise > base_cloud` it is 0,
+        // elsewhere solid, with no value in between. It was measured to be unrelated to
+        // resolution: at `resolutionScale` 0.5 and 1.0, and with `upscaleMode` Bilinear and
+        // Bilateral, the screen is identical.
         base_cloud = saturate(base_cloud - erosionNoise);
 
         #if defined(_CLOUDS_MICRO_EROSION)
-        // Mikro erozyonun makalede karşılığı yok, portun kendi eklemesi. Aynı yükseklik ve
-        // kapsama davranışını kullanıyor ki iki detay katmanı ters yönlere çalışmasın.
+        // Micro erosion has no counterpart in the paper, it is the port's own addition. It uses
+        // the same height and coverage behaviour so the two detail layers do not work against each other.
         float3 fineCoords = AnimateErosionNoisePosition(positionPS) / (NOISE_TEXTURE_NORMALIZATION_FACTOR) * _MicroErosionScale;
         half fine = SAMPLE_TEXTURE3D_LOD(_ErosionNoise, s_linear_repeat_sampler, fineCoords, CLOUD_DETAIL_MIP_OFFSET + erosionMipOffset).x;
         half fineNoise = lerp(0.0, DetailModifier(fine, properties.height), microDetailFactor);
-        // Mikro katman da çıkarma: iki detay katmanı aynı cebirle çalışmalı.
+        // The micro layer subtracts too: the two detail layers have to use the same algebra.
         base_cloud = saturate(base_cloud - fineNoise);
         #endif
     }
@@ -629,22 +631,22 @@ void EvaluateCloudProperties(float3 positionPS, float noiseMipOffset, float eros
     // Make sure we do not send any negative values
     base_cloud = max(0, base_cloud);
 
-    // `[H18 s.14-16]`: yoğunluk-yükseklik fonksiyonu zincirin EN SONUNDA çarpan. Portta
-    // eğri dokusunun `.x` kanalı remap sınırının içindeydi; yerini `DensityAlter` aldı.
+    // `[H18 p.14-16]`: the density-height function is the LAST multiplier in the chain. In the
+    // port the `.x` channel of the curve texture was inside the remap limit; `DensityAlter` took its place.
     properties.density = base_cloud * DensityAlter(properties.height, cloudCoverageData.mapDensity)
                        * _DensityMultiplier;
 }
 
 // Function that evaluates the transmittance to the sun at a given cloud position
-/// GÜNEŞ GEÇİRGENLİĞİNİN TABANI `[H18 Ek B.6]`, `Attenuation`.
+/// THE FLOOR OF SUN TRANSMITTANCE `[H18 App B.6]`, `Attenuation`.
 ///
-/// Saf Beer-Lambert bulut içinde sıfıra iniyor: `sigmaT` 0.04, ışık adımı 1000 m, tipik
-/// yoğunluk 0.2 → `extinction ≈ 16`, `exp(−16) = 1.1e−7`. İkinci oktav bile `exp(−8.4)`.
-/// Bulut içi yalnız ortam ışığıyla kalıyor ve kapkara çıkıyor.
+/// Pure Beer-Lambert goes to zero inside a cloud: `sigmaT` 0.04, a light step of 1000 m and a
+/// typical density of 0.2 give `extinction ~ 16`, `exp(-16) = 1.1e-7`. Even the second octave
+/// is `exp(-8.4)`. The cloud interior is left with ambient light alone and comes out pitch black.
 ///
-/// Gerçek bulut kara değil çünkü ışık içeride çok kez saçılıyor. HZD bunu tabanla
-/// karşılıyor: `exp(−b × a_c) × 0.7`, `b = 6`, `a_c = 0.2` `[H18 s.58]` → 0.211.
-/// Güneşe bakarken kelepçe gevşiyor, yarıya iniyor.
+/// A real cloud is not black because light scatters many times inside it. HZD handles that
+/// with a floor: `exp(-b x a_c) x 0.7`, `b = 6`, `a_c = 0.2` `[H18 p.58]` -> 0.211. Looking
+/// toward the sun the clamp relaxes and halves.
 half SunTransmittanceFloor(half cosAngle)
 {
     const half beer = 6.0;
@@ -855,30 +857,31 @@ void EvaluateCloud(CloudProperties cloudProperties, half3 rayDirection,
     // Compute the powder effect
     half powderEffect = PowderEffect(cloudProperties.density, cosAngle, _PowderEffectIntensity);
 
-    // ÇAKMA IŞIN YÜRÜYÜŞÜNÜN İÇİNDE. Bindirme geçişinde değil burada: orada parlama
-    // kütlenin İÇİNDEN değil üstünden biniyordu. Titreme kaygısı yok çünkü kaynak
-    // konumları çakma başına bir kez yazılıyor, kare kare değişmiyor `[N22 s.180]`.
+    // THE FLASH IS INSIDE THE RAY MARCH. Not in the compositing pass: there the glow rode on
+    // top of the mass rather than coming from INSIDE it. There is no flicker concern because
+    // the source positions are written once per flash and do not change frame to frame `[N22 p.180]`.
     //
-    // DÜŞÜŞ 1/r², SEZGİSEL ÜS DEĞİL. Eskiden `pow(1 - d/R, 12)` vardı: on ikinin
-    // fiziksel bir karşılığı yok, uydurma bir eğriydi. `[Dobashi 2001]` Denklem 9
-    // kaynaktan metaball'a ulaşan ışığı `I·exp(-τ)/r²` veriyor.
+    // FALLOFF IS 1/r², NOT AN INTUITIVE EXPONENT. It used to be `pow(1 - d/R, 12)`: the twelve
+    // has no physical counterpart, it was an invented curve. `[Dobashi 2001]` Equation 9 gives
+    // the light reaching a metaball from a source as `I·exp(-tau)/r²`.
     //
-    // Kullanılan biçim `R²/(r² + R²)`: uzakta 1/r²'ye gidiyor, r=0'da ıraksamıyor
-    // (nokta kaynak idealleştirmesi orada geçersiz), ve R'de tam olarak YARIYA iniyor —
-    // `glowRadius` ayarının zaten belgelenmiş anlamı bu ("çakma noktasından bu kadar
-    // uzakta parlama yarıya iner").
+    // The form used is `R²/(r² + R²)`: it goes to 1/r² at distance, does not diverge at r=0
+    // (the point source idealisation is invalid there), and at R it drops exactly by HALF —
+    // which is the already documented meaning of the `glowRadius` setting ("at this distance
+    // from the strike point the glow halves").
     //
-    // KAYNAKLARIN TAMAMI, tek nokta değil. Sis sekiz kaynağa bakıyordu, bulut tek
-    // noktaya; iki sistem aynı çakmayı farklı yerde görüyordu.
+    // ALL OF THE SOURCES, not a single point. The fog looked at eight sources and the cloud at
+    // one point; the two systems saw the same flash in different places.
     //
-    // YÜKSEKLİK GRADYANI KALDIRILDI. Nubis'in sanat tercihiydi (üstteki bulut daha çok
-    // parlasın); artık dikey yapı GEOMETRİDEN geliyor — kaynaklar buluttan yere dizili.
+    // THE HEIGHT GRADIENT WAS REMOVED. It was Nubis's artistic choice (let the cloud above glow
+    // more); the vertical structure now comes FROM THE GEOMETRY — the sources are lined up from
+    // the cloud down to the ground.
     //
-    // OPTİK DERİNLİK τ YAKLAŞIK. Denklem 10 kaynakla nokta arasındaki yoğunluk
-    // integralini istiyor; makale onu küp-ekran yöntemiyle çözüyor ve o yöntem
-    // metaball'a özgü, buraya taşınamıyor (spec §8.1). Yerine yerel yoğunluk vekil
-    // alınıyor: yoğun yer daha az geçirir. Makale de τ hesabının pahalılığını kabul
-    // edip LOD seçiminde ondan vazgeçmişti (Koşul 11 yerine 12).
+    // THE OPTICAL DEPTH tau IS APPROXIMATE. Equation 10 wants the density integral between the
+    // source and the point; the paper solves it with a cube-screen method and that method is
+    // specific to metaballs and cannot be carried here (spec §8.1). A local density proxy is
+    // used instead: a denser place transmits less. The paper also accepted the cost of the tau
+    // computation and gave it up in the LOD selection (Condition 12 instead of 11).
     float3 currentPositionWS = currentPositionPS + _PlanetCenterPosition;
 
     half radius = max(_LightningPosition.w, 1.0);

@@ -237,14 +237,14 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
 
         // Store the current enable state of volumetric clouds in a global shader keyword
         bool isDebugger = DebugManager.instance.isAnyDebugUIActive;
-        // Yigin edit modunda HENUZ YOK olabiliyor. Create() renderer yeniden
-        // yaratildiginda inspector cizerken de kosuyor; orada VolumeManager
-        // baslatilmamis oluyor ve bu satir NullReference atiyordu. Atinca
-        // ScriptableRenderer kurulumu yarida kaliyor: kalici yerel ayirmalar sizdi
-        // ve renderer yarim kurulu kaldi.
+        // The stack CAN STILL BE ABSENT in edit mode. Create() also runs while the inspector
+        // is drawn when the renderer is recreated; VolumeManager is not initialized there and
+        // this line threw a NullReference. Once it threw, the ScriptableRenderer setup was
+        // left half done: persistent local allocations leaked and the renderer stayed
+        // partially built.
         //
-        // Yigin yoksa hacim kapali sayiliyor; gecis yine de kuruluyor, Create()
-        // oyun basladiginda yigin hazirken tekrar kosuyor.
+        // With no stack the volume counts as off; the pass is still created, and Create() runs
+        // again when the game starts and the stack is ready.
         var stack = VolumeManager.instance.stack;
         VolumetricClouds cloudsVolume = stack != null ? stack.GetComponent<VolumetricClouds>() : null;
         bool isVolumeActive = cloudsVolume != null && cloudsVolume.IsActive() && (!isDebugger || renderingDebugger);
@@ -559,36 +559,38 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
 
             cloudsMaterial.SetFloat(numPrimarySteps, cloudsVolume.numPrimarySteps.value);
             cloudsMaterial.SetFloat(numLightSteps, cloudsVolume.numLightSteps.value);
-            // ÇAKMA. Bölen 8 → 4. Adım boyu katman kalınlığından türüyor ve menzil
-            // `numPrimarySteps × adım`. 8'de katman 2781 m için adım 348 m, menzil
-            // 80 × 348 = 27,8 km. Dik bakışta ışın katmanı 2781 m'de geçiyor, yani
-            // bütçenin onda birini kullanıyor; UFKA doğru bakınca katmanın içinde
-            // onlarca kilometre kalıyor ve 27,8 km'yi aşıyor. Aştığı yerde yürüyüş
-            // bitiyor, geçirgenlik son adımda donuyor ve komşu piksellerde bu farklı
-            // yerde olduğu için ekranda yatay kesik bantlar kalıyor.
+            // FLASH. The divisor went 8 -> 4. The step size derives from the layer thickness
+            // and the range is `numPrimarySteps x step`. At 8, a 2781 m layer gives a 348 m
+            // step and a range of 80 x 348 = 27.8 km. Looking straight down the ray crosses the
+            // layer in 2781 m, i.e. it uses a tenth of the budget; looking toward the HORIZON
+            // it stays inside the layer for tens of kilometres and exceeds 27.8 km. Where it
+            // exceeds, the march ends, the transmittance freezes at the last step, and because
+            // that happens at a different place in neighbouring pixels horizontal broken bands
+            // remain on screen.
             //
-            // Belirti ufka yapışık, kesikli, kapsama 0'da kayboluyor, gece de gündüz de
-            // var — hepsi menzil bitmesiyle tutarlı, aydınlatmayla değil.
+            // The symptom sticks to the horizon, is broken up, disappears at coverage 0, and
+            // occurs both at night and during the day — all consistent with the range running
+            // out, not with lighting.
             //
-            // ÇAKMA (ikinci tur). Bölen 4 → 6 ve adım sayısı 80 → 128.
+            // FLASH (second round). The divisor went 4 -> 6 and the step count 80 -> 128.
             //
-            // 4'te adım inceliği katman kalınlığına bağlıydı ve katman kalınlaşınca
-            // (hava/dağdan sürülüyor, 2000 → 3298 m) adım 500 m'den 824 m'ye çıktı. Boş
-            // alanda yürüyüş adımı İKİYE KATLADIĞI için sıçrama 1.6 km'ye ulaştı ve ince
-            // bulutların içinden atlamaya başladı: uzaktakiler hiç örneklenmiyor, yalnız
-            // yaklaşınca beliriyorlardı.
+            // At 4 the step fineness depended on the layer thickness, and as the layer
+            // thickened (driven by weather/mountain, 2000 -> 3298 m) the step went from 500 m
+            // to 824 m. Because the march step DOUBLES in empty space the jump reached 1.6 km
+            // and it started skipping through thin clouds: distant ones were never sampled and
+            // only appeared as you approached.
             //
-            // PROBLA ÖLÇÜLDÜ: 3618 m'de, kapsama %99 iken gökyüzünün tamamı MAVİ —
-            // yani ışın hacmin içinden geçiyor ama hiçbir yerde yoğunluk bulmuyor.
-            // Kırmızı (kesişme yok) ya da turuncu (geometri engeli) değil.
+            // MEASURED WITH A PROBE: at 3618 m with coverage at 99% the whole sky was BLUE —
+            // i.e. the ray passes through the volume but finds no density anywhere. Not red (no
+            // intersection) and not orange (geometry blocking).
             //
-            // 6'da adım 550 m, 128 adımla menzil 70 km: hem eskisinden ince hem
-            // uzağa gidiyor. Bedeli kare süresi — adım sayısı %60 arttı.
+            // At 6 the step is 550 m and with 128 steps the range is 70 km: finer than before
+            // and reaching further. The cost is frame time — the step count rose 60%.
             cloudsMaterial.SetFloat(maxStepSize, cloudsVolume.altitudeRange.value / 6.0f);
 
-            // Dikey gorus acisinin tanjanti. Shader bunu `_ScreenSize.w` ile carpip bir
-            // ekran pikselinin metre basina dunya boyunu buluyor; gurultu bant siniri
-            // buradan turuyor, cozunurluk ve gorus acisi degisince kendiliginden kayiyor.
+            // Tangent of the vertical field of view. The shader multiplies it by `_ScreenSize.w`
+            // to find the world size in metres of one screen pixel; the noise band limit derives
+            // from that and shifts on its own as the resolution and field of view change.
             cloudsMaterial.SetFloat(pixelFootprintScale,
                 2.0f * Mathf.Tan(camera.fieldOfView * 0.5f * Mathf.Deg2Rad));
 
@@ -683,7 +685,7 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
             Vector3 cameraPosPS = camera.transform.position - new Vector3(0.0f, -actualEarthRad, 0.0f);
             cloudsMaterial.SetFloat(cloudnearPlane, max(GetCloudNearPlane(cameraPosPS, bottomAltitude, highestAltitude), camera.nearClipPlane));
 
-            // Hava haritası dünya XZ'sinde döşeniyor: kenar uzunluğunun tersi periyodu veriyor.
+            // The weather map tiles over world XZ: the inverse of the edge length gives the period.
             if (cloudsVolume.cloudMap.value == null)
             {
                 if (!isCloudMapPrinted) { Debug.LogError("Volumetric Clouds URP: Cloud map is empty."); isCloudMapPrinted = true; }
@@ -726,11 +728,12 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
                 cloudsMaterial.SetVector(sunColor, mainLightColor);
             }
 
-            // Ön ayarın HER KAREDE yeniden uygulanması kaldırıldı. `cloudPreset` setter'ı
-            // `ApplyCurrentCloudPreset()` çağırıyor; o da yoğunluk, şekil ve erozyon
-            // değerlerini ön ayardan yığına geri yazıyordu. Harmanlama profilden yığına her
-            // kare yazıyor, hemen ardından bu satır üzerine yazıyordu: sürgüler ölüydü.
-            // Ön ayarı editör seçim anında uyguluyor, değerler profilde serileşiyor.
+            // Reapplying the preset EVERY FRAME was removed. The `cloudPreset` setter calls
+            // `ApplyCurrentCloudPreset()`, and that wrote the density, shape and erosion values
+            // from the preset back into the stack. Blending writes from the profile into the
+            // stack every frame and this line overwrote it immediately afterwards: the sliders
+            // were dead. The preset is now applied at the moment of selection in the editor and
+            // the values serialize into the profile.
 
             UpdateMaterialProperties(camera);
             denoiseClouds = cloudsVolume.temporalAccumulationFactor.value >= 0.01f;
@@ -751,8 +754,8 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
 
             var pixels = customLutColorArray;
 
-            // `.x` (yoğunluk eğrisi) artık okunmuyor: yerini `DensityAlter` aldı `[H18 Ek B.3]`.
-            // Kalan iki kanal shader'da kullanılıyor — `.y` erozyon, `.z` ortam örtmesi.
+            // `.x` (the density curve) is no longer read: `DensityAlter` took its place `[H18 App B.3]`.
+            // The remaining two channels are used in the shader — `.y` erosion, `.z` ambient occlusion.
             var erosionCurve = clouds.erosionCurve.value;
             var ambientOcclusionCurve = clouds.ambientOcclusionCurve.value;
             if (erosionCurve == null || erosionCurve.length == 0)
@@ -785,19 +788,19 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
             {
                 SphericalHarmonicsL2 ambientProbe = RenderSettings.ambientProbe;
 
-                // ÇAKMA — GERİ ALINDI. Buraya bir dönem `× π` konmuştu: froxel sisinde
-                // ölçülmüş 3.15 oranı buluta BENZETME yoluyla taşınmıştı. Ölçüm değildi,
-                // varsayımdı ve iki yönden de yanlıştı.
+                // FLASH — REVERTED. A `x pi` was placed here for a while: the 3.15 ratio measured
+                // in the froxel fog had been carried over to the cloud BY ANALOGY. It was not a
+                // measurement but an assumption, and it was wrong in two ways.
                 //
-                // Yön yanlıştı: katılımcı ortam için ışınım → radyans dönüşümü `L = E/π`,
-                // yani bölme. Sisteki 3.15 ise ham SH katsayısı (`sh[c,0] - sh[c,6]`) ile
-                // sis rengi arasında ölçülmüştü; bulutun okuduğu büyüklük o değil.
+                // The direction was wrong: for a participating medium the irradiance -> radiance
+                // conversion is `L = E/pi`, i.e. a division. And the 3.15 in the fog was measured
+                // between the raw SH coefficient (`sh[c,0] - sh[c,6]`) and the fog color; that is
+                // not the quantity the cloud reads.
                 //
-                // Ölçüldü: doğrudan/ortam oranı şafakta 34.2:1, öğlen 6.5:1 (sönüm
-                // öncesi). Işık payı probu her saatte ve her yönde doğrudan terimi
-                // baskın gösterdi — yani ortam terimi fazı boğmuyor, π'nin geri
-                // alınması bir belirtiyi düzeltmek için değil, ölçülmemiş bir
-                // varsayımı kaldırmak için.
+                // Measured: the direct/ambient ratio is 34.2:1 at dawn and 6.5:1 at noon (before
+                // extinction). The light share probe showed the direct term dominant at every
+                // hour and in every direction — so the ambient term is not drowning the phase,
+                // and removing the pi is not to fix a symptom but to remove an unmeasured assumption.
 
                 cloudsMaterial.SetVector(shAr, new Vector4(ambientProbe[0, 3], ambientProbe[0, 1], ambientProbe[0, 2], ambientProbe[0, 0] - ambientProbe[0, 6]));
                 cloudsMaterial.SetVector(shAg, new Vector4(ambientProbe[1, 3], ambientProbe[1, 1], ambientProbe[1, 2], ambientProbe[1, 0] - ambientProbe[1, 6]));
