@@ -2,239 +2,213 @@ using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-/// Yağışı tek draw call ile çizer. Tanecik konumları CPU'da tutulmaz;
-/// vertex shader zaman + rüzgâr kaymasından üretir.
-///
-/// de damlanın taneye dönüşmesi değil, ikisinin bir arada bulunmasıdır.
+/// Draws the precipitation in a single draw call. The particle positions are not kept on the
+/// CPU; the vertex shader produces them from time + the wind drift.
 public class PrecipitationRenderer : MonoBehaviour
 {
     [SerializeField] WeatherState weather;
     [SerializeField] WindField wind;
     [SerializeField] Shader shader;
-    [Tooltip("Bulut katmanının tek kaynağı. Yağış kalın sütunların altına düşer.")]
+    [Tooltip("The single source of the cloud layer. Precipitation falls under the thick columns.")]
     [SerializeField] CloudLayerProbe cloudLayer;
-    [Tooltip("Yağışın örnekleneceği nokta — oyuncu.")]
+    [Tooltip("The point the precipitation is sampled at — the player.")]
     [SerializeField] Transform observer;
 
-    [Tooltip("Garg-Nayar iz veritabanının kare başına çalışma kümesi. Boşsa yağmur " +
-             "izleri veritabanından değil eski prosedürel yoldan çizilir.")]
+    [Tooltip("The per-frame working set of the Garg-Nayar streak database. If empty, rain " +
+             "streaks are drawn the old procedural way rather than from the database.")]
     [SerializeField] RainStreakWorkingSet streaks;
 
-    [Tooltip("Güneş yönünün kaynağı. İz görünümü ışık yönüne güçlü bağlı — makalenin " +
-             "Senaryo 1'i aynı sahneyi 60° ve 10° azimutta belirgin farklı gösteriyor.")]
+    [Tooltip("The source of the sun direction. A streak's look depends strongly on the light " +
+             "direction — the paper's Scenario 1 shows the same scene noticeably different at 60° and 10° azimuth.")]
     [SerializeField] TimeOfDay timeOfDay;
 
-    /// Kameranın pozlama süresi (saniye). Hem izin BOYUNU (veritabanı kırpması) hem
-    /// ŞEFFAFLIĞINI belirliyor: `α = 2r₀/(v·T_exp)`, kısa pozlamada iz daha opak.
-    /// Kare süresinden TÜREMİYOR — türeseydi yağmurun görüntüsü fps ile değişirdi.
+    /// The camera's exposure time (seconds). It sets both the streak's LENGTH (the database
+    /// crop) and its TRANSPARENCY: `α = 2r₀/(v·T_exp)`, a short exposure gives a more opaque streak.
+    /// It DOES NOT DERIVE from the frame time — if it did, the rain's look would change with fps.
     const float ExposureTime = 1f / 60f;
 
-    /// Veritabanının pişirildiği salınım periyodu. `T_db = 1/60`, r₀ = 1.6 mm damlanın
-    /// `2π/ω₂`'si (`rain-spec.md` §5.3).
+    /// The oscillation period the database was baked at. `T_db = 1/60`, the `2π/ω₂` of an
+    /// r₀ = 1.6 mm drop (`rain-spec.md` §5.3).
     const float DatabasePeriod = 1f / 60f;
 
-    /// KALİBRASYON — ÖLÇÜLDÜ. Veritabanı izleri kendi render kurulumunun radyansında
-    /// (kaynak 10 m'de); bizim güneşimiz o kaynak değil, mutlak seviye taşınmıyor.
-    /// `rain-spec.md` §11.3.5 bu katsayıyı zorunlu kılıyor.
+    /// CALIBRATION — MEASURED. The database streaks are in the radiance of their own render
+    /// setup (source at 10 m); our sun is not that source and the absolute level does not carry over.
+    /// `rain-spec.md` §11.3.5 makes this coefficient mandatory.
     ///
-    /// HEDEF ORAN 1 DEĞİL — İLK KALİBRASYON MANTIK HATASIYDI.
+    /// THE TARGET RATIO IS NOT 1 — THE FIRST CALIBRATION WAS A LOGICAL ERROR.
     ///
-    /// Oran ardındaki gökle eşitlenecek diye 3'e ayarlanmıştı. Ama arka planıyla aynı
-    /// parlaklıktaki bir şey tanım gereği GÖRÜNMEZ: göğe bakınca arka plan gök, damla da
-    /// gök parlaklığında, kontrast sıfır. Kullanıcı "havaya bakarken damlalar
-    /// gözükmüyor" dedi.
+    /// The ratio had been set to 3 so it would match the sky behind it. But something at the same
+    /// brightness as its background is INVISIBLE by definition: looking at the sky, the background
+    /// is the sky and the drop is at the sky's brightness, so the contrast is zero. The user said
+    /// "I cannot see the drops when I look up".
     ///
-    /// Damla ışık üretmiyor ama arka planından parlak OLABİLİR ve olur: geniş bir katı
-    /// açıdan (gök kubbesinin tamamı dahil) topladığı ışığı kameraya kırıyor, oysa
-    /// örttüğü arka plan çok daha küçük bir katı açı. `[Tatarchuk 2006, §3.6.1]`:
+    /// A drop produces no light but it CAN be brighter than its background, and it is: it refracts
+    /// into the camera the light it gathers from a wide solid angle (the whole sky dome included),
+    /// while the background it covers is a much smaller solid angle. `[Tatarchuk 2006, §3.6.1]`:
     /// "a drop tends to be much brighter than its background".
     ///
-    /// Kâğıtta kontrast `α × (oran − 1)`, α ortanca 0.377:
-    ///   oran 1.0 → 0.00  görünmez
-    ///   oran 1.5 → 0.19  zayıf
-    ///   oran 2.0 → 0.38  net
-    ///   oran 3.0 → 0.75  güçlü
+    /// On paper the contrast is `α × (ratio − 1)`, with a median α of 0.377:
+    ///   ratio 1.0 → 0.00  invisible
+    ///   ratio 1.5 → 0.19  weak
+    ///   ratio 2.0 → 0.38  clear
+    ///   ratio 3.0 → 0.75  strong
     ///
-    /// Ölçülen: ×1'de oran 0.16-0.36, ×3'te ortanca 0.8. Oranı 2.0'a taşımak için
+    /// Measured: at ×1 the ratio is 0.16-0.36, at ×3 the median is 0.8. To carry the ratio to 2.0,
     /// 3 × 2.0/0.8 = 7.5.
     const float SourceScale = 7.5f;
 
-    /// TANECİK YOĞUNLUKLARI, damla/m³. Shader temsil payını KONUMDAN türetiyor:
-    /// `N(r) = 1000 / yoğunluk(r)`, yoğunluk = dış + (iç kutunun kapsadığı yerde) iç.
+    /// PARTICLE DENSITIES, drops/m³. The shader derives the representation share FROM THE
+    /// POSITION: `N(r) = 1000 / density(r)`, density = outer + (where the inner box covers) inner.
     ///
-    /// Payın konumdan türemesi zorunlu: aynı noktadaki iki tanecik hangi kutudan
-    /// geldiğine bakılmaksızın AYNI sayıda gerçek damlayı temsil etmeli, yoksa aynı
+    /// The share has to derive from the position: two particles at the same point must represent
+    /// the SAME number of real drops regardless of which box they came from.
     ///
-    /// Şiddetli yağmurun gerçek yoğunluğu ~1000/m³. Dış kutuda 2.03, iç kutunun
-    /// içinde 2.03 + 14.47 = 16.5 → temsil payı 491'den 61'e iniyor. Yani yakın damla
-    /// gerçeğe çok daha yakın bir kümeyi taşıyor.
+    /// The real density of heavy rain is ~1000/m³. In the outer box it is 2.03, and inside the
+    /// inner box 2.03 + 14.47 = 16.5 → the representation share drops from 491 to 61. So a near
+    /// drop carries a cluster far closer to reality.
     ///
-    /// Kaplamaya giriyor, geometriye değil: `α_eff = 1 − (1−α)^N`.
+    /// It enters the coverage, not the geometry: `α_eff = 1 − (1−α)^N`.
     static float OuterDensity =>
         (PrecipitationParticles - NearParticles) / (BoxSize.x * BoxSize.y * BoxSize.z);
 
     static float NearDensity =>
         NearParticles / (NearBoxSize.x * NearBoxSize.y * NearBoxSize.z);
 
-    /// Teşhis kipi F1 panelinden sürülüyor, Inspector'dan değil.
+    // The settings are deliberately not serialized: once in the Inspector the component in the
+    // scene freezes on the old values and a change in code has no effect.
 
-    /// Teşhiste quad'ın büyütme katsayısı. 24 m'deki iz fiziksel ölçekte 0.4 × 12
-    /// piksel; 40 kat büyütme onu 16 × 480'e çıkarıyor, yani desen okunur oluyor.
-
-    // Ayarlar bilerek serileştirilmiyor: Inspector'a girince sahnedeki bileşen eski
-    // değerlerle donuyor ve koddaki değişiklik etkisiz kalıyor.
-
-    // alanı kaplamadığı için aynı bütçenin kameraya daha sıkı paketlenmesi gerekir.
-    /// Yağış kutusu 48 m; kamera merkezde sarılıyor, yani görünür yarıçap 24 m.
+    /// The precipitation box is 48 m; it wraps with the camera at the centre, so the visible
+    /// radius is 24 m.
     ///
-    /// TARİH: 48 → 20 → 12 → 19 → 24 → 32 → 48. Her adım ölçümle, ama ilk beş adım
-    /// `widen` üssü 0.5 iken ölçülmüştü. Üs 0.35'e inince (bkz. `Precipitation.shader`,
-    /// kalınlık telafisi) tablo değişti ve daralmanın gerekçesi ortadan kalktı.
+    /// HISTORY: 48 → 20 → 12 → 19 → 24 → 32 → 48. Every step was measured, but the first five were
+    /// measured while the `widen` exponent was 0.5. When the exponent came down to 0.35 (see
+    /// `Precipitation.shader`, the thickness compensation) the table changed and the reason for
+    /// narrowing disappeared.
     ///
-    /// ÜS 0.35 İLE TARANDI (şiddet 0.4, 250 000 tanecik, 20 000 örnek):
+    /// SWEPT WITH EXPONENT 0.35 (intensity 0.4, 250 000 particles, 20 000 samples):
     ///
-    ///    32 m → yarıçap 16 m, ortanca alfa 0.352, görünmez %7.2
-    ///    48 m → yarıçap 24 m, ortanca alfa 0.352, görünmez %7.2   ← seçilen
-    ///    64 m → yarıçap 32 m, ortanca alfa 0.318, görünmez %7.7
-    ///   100 m → yarıçap 50 m, ortanca alfa 0.272, görünmez %8.3
+    ///    32 m → radius 16 m, median alpha 0.352, invisible 7.2%
+    ///    48 m → radius 24 m, median alpha 0.352, invisible 7.2%   ← chosen
+    ///    64 m → radius 32 m, median alpha 0.318, invisible 7.7%
+    ///   100 m → radius 50 m, median alpha 0.272, invisible 8.3%
     ///
-    /// 32 → 48 BEDAVA: opaklık hiç değişmiyor, yarıçap 1.5 kat artıyor. Sebep temsil
-    /// payının doyuma girmiş olması — kutu büyüyünce hem mesafe cezası hem doyum payı
-    /// artıyor ve ikisi 48'e kadar birbirini götürüyor. Bedel 64 m'de başlıyor.
+    /// 32 → 48 IS FREE: the opacity does not change at all and the radius grows by 1.5×. The
+    /// reason is that the representation share has saturated — as the box grows, both the distance
+    /// penalty and the saturation share rise and the two cancel each other out to 48. The cost
+    /// begins at 64 m.
     ///
-    /// Dolgu maliyeti de artmıyor: tanecik sayısı sabit, taneler uzaklaştıkça ekranda
-    /// küçülüyor.
+    /// The fill cost does not rise either: the particle count is fixed and the grains shrink on
+    /// screen as they get further away.
     ///
-    /// KALINLIK ARTIK KUTUYU BELİRLEMİYOR. Bir dönem kutu bunun için daraltılmıştı:
-    /// damlanın gerçek kalınlığı ancak quad 1.2 piksellik raster tabanını aştığında
-    /// ekrana ulaşıyor ve 3 mm'lik damla için o sınır 2.6 m. Ama hacim r³ ile büyüdüğü
-    /// için o yakınlıkta 32 m'de zaten damlaların yalnız %0.2'si vardı (48 m'de %0.07)
-    /// — ikisi de sıfır sayılır. Ekrandaki kalınlık kademelenmesini gerçek genişlik
-    /// değil, `pow(widen, -0.35)` parlaklık telafisi taşıyor ve o mesafeden bağımsız
-    /// çalışıyor.
+    /// THE THICKNESS NO LONGER SETS THE BOX. The box was narrowed for it at one point: a drop's
+    /// real thickness only reaches the screen once the quad exceeds the 1.2 pixel raster floor, and
+    /// for a 3 mm drop that limit is 2.6 m. But because the volume grows with r³, even at 32 m only
+    /// 0.2% of the drops were that close (0.07% at 48 m) — both count as zero. The thickness
+    /// gradation on screen is carried not by the real width but by the `pow(widen, -0.35)`
+    /// brightness compensation, and that works independently of the distance.
     ///
-    /// YARIÇAPI BÜYÜTMENİN TEK GERÇEK SINIRI 64 m'de: orada opaklık %10 düşüyor.
-    /// Daha uzağı tanecikle değil, sisin yağıştan gelen görüş mesafesi taşıyor
-    /// (`AtmosphereController`, 18000·R^−0.70).
+    /// THE ONLY REAL LIMIT ON GROWING THE RADIUS IS AT 64 m: the opacity drops 10% there.
+    /// Anything further is carried not by particles but by the fog's precipitation-driven
+    /// visibility (`AtmosphereController`, 18000·R^−0.70).
     static readonly Vector3 BoxSize = new(48f, 48f, 48f);
 
-    /// İÇ KUTU. Yağış kutusu kameranın etrafında PERİYODİK olarak sarıyor ve periyodik
-    /// bir döşeme yoğunluk gradyanı taşıyamaz — yani tek kutuyla "yakında sık, uzakta
-    /// seyrek" kurulamaz. Hacim `r³` ile büyüdüğü için bütçenin neredeyse tamamı uzağa
-    /// gidiyordu: 48 m'lik tek kutuda 5 metrenin içinde 1 188 tanecik vardı, yani
-    /// binde beş. Oysa oyuncunun TEK TEK DAMLA olarak okuduğu hacim orası.
+    /// THE INNER BOX. The precipitation box wraps PERIODICALLY around the camera, and a periodic
+    /// tiling cannot carry a density gradient — that is, a single box cannot give "dense near,
+    /// sparse far". Because the volume grows with `r³`, almost the whole budget went far away:
+    /// in a single 48 m box there were 1 188 particles within 5 metres, i.e. five in a thousand.
+    /// Yet that is the volume the player reads as INDIVIDUAL DROPS.
     ///
-    /// Çözüm iç içe kutu: ikisi de kamerada merkezli, ikisi de kendi içinde tekdüze ve
-    /// kendi kutusuna sarıyor. İç kutunun kapsadığı yerde yoğunluklar TOPLANIYOR, yani
-    /// yakın alan kendiliğinden sıklaşıyor. Hareket her iki kutuda da tam doğru kalıyor
-    /// çünkü her biri kendi kaymasıyla integre ediliyor.
+    /// The answer is nested boxes: both centred on the camera, each uniform within itself and each
+    /// wrapping to its own box. Where the inner box covers, the densities are SUMMED, so the near
+    /// field grows dense on its own. The motion stays exactly right in both boxes because each is
+    /// integrated with its own drift.
     ///
-    /// ÜS TARANDI. Önce sürekli radyal dağılım (`yoğunluk ∝ r^-p`) ölçüldü; en iyi
-    /// `p = 1`, yani `1/r`. Sonra kutu şemasıyla ne kadarının yakalandığı ölçüldü
-    /// (şiddet 1.0, ekran kaplaması kilopiksel):
+    /// THE EXPONENT WAS SWEPT. First a continuous radial distribution (`density ∝ r^-p`) was
+    /// measured; the best was `p = 1`, i.e. `1/r`. Then how much of that the box scheme captures
+    /// was measured (intensity 1.0, screen coverage in kilopixels):
     ///
-    ///   tek kutu 48          5 m içi  87   toplam  934
-    ///   48 + 12, iç %5       5 m içi 194   toplam 1027
-    ///   48 + 12, iç %10      5 m içi 227   toplam 1033   ← seçilen
-    ///   48 + 12, iç %20      5 m içi 265   toplam 1003   (ortanca alfa düşüyor)
-    ///   48 + 16 + 6          5 m içi 221   toplam 1061   (üçüncü kutu kayda değmiyor)
+    ///   single box 48        within 5 m  87   total  934
+    ///   48 + 12, inner 5%    within 5 m 194   total 1027
+    ///   48 + 12, inner 10%   within 5 m 227   total 1033   ← chosen
+    ///   48 + 12, inner 20%   within 5 m 265   total 1003   (the median alpha falls)
+    ///   48 + 16 + 6          within 5 m 221   total 1061   (a third box is not worth it)
     ///
-    /// %10'da yakın alan kaplaması İKİ BUÇUK KAT, toplam %11 artıyor ve ortanca alfa
-    /// değişmiyor. %20'de yakın biraz daha artıyor ama toplam ve ortanca düşüyor.
+    /// At 10% the near-field coverage is TWO AND A HALF TIMES larger, the total rises 11% and the
+    /// median alpha does not change. At 20% the near field rises a little more but the total and
+    /// the median fall.
     static readonly Vector3 NearBoxSize = new(12f, 12f, 12f);
 
-    /// sıkışınca yoğunluk kareyle artıyor. Uzaklık sönümü de kutu boyundan türüyor
-    /// (yarısında biter), yani kutuyu daraltmak görünür bölgeyi de yoğunlaştırıyor.
-    /// 90 ve 45 metrede taneler ayırt edilemeyecek kadar seyrekti — uzağı zaten
-    /// hacimsel perde taşıyor, yakın katmanın işi oyuncunun çevresi.
-
-    /// fiziksel boyun ~100 katı. Bilerek: gerçek boyda her tane piksel altına düşer ve
-    /// tek tek görünmez olur — o zaten uzak perdenin işi. Yakın katmanın işi taneyi
-    /// GÖSTERMEK, sayısını değil hareketini okutmak.
-
-    /// Katmanın yerden kalınlığı (metre). Tane yüksekliği bunun içinde küpsel
-    /// dağılıyor: çoğu yere yapışık, seyrek olanı yukarıda.
-    /// Ayrı bir mesh yerine tek mesh büyütüldü — iki sistem aynı anda çalışabilsin diye.
-    /// 90 000'den çıkarıldı. Ölçüldü: 48 m küp kutuda 90 000 tanecik 0.8 damla/m³
-    /// demek; şiddetli yağmurun gerçek yoğunluğu Marshall-Palmer'a göre ~1000/m³.
-    /// Yani eski tavan gerçekte orta şiddetin bile altındaydı ve %50 ÇİSELTİ gibi
-    /// okunuyordu (kullanıcı bildirdi).
+    /// Raised from 90 000. Measured: 90 000 particles in a 48 m cube box means 0.8 drops/m³, while
+    /// the real density of heavy rain is ~1000/m³ by Marshall-Palmer. So the old ceiling was
+    /// really below even moderate intensity and read as 50% DRIZZLE (the user reported it).
     ///
-    /// Damlayı şişirmek yerine sayı artırıldı: temsil payını büyütmek izi kalınlaştırıp
-    /// gerçekçiliği bozuyor, sayı ise doğrudan eksik olan büyüklük.
+    /// The count was raised rather than the drop inflated: growing the representation share
+    /// thickens the streak and breaks the realism, while the count is directly the quantity that
+    /// was missing.
     const int PrecipitationParticles = 250000;
 
-    /// İç kutuya düşen pay. Mesh'te İLK `NearParticles` tanecik iç kutuda, kalanı dış
-    /// kutuda; bayrak vertex konumunun `y`'sinde taşınıyor.
+    /// The share falling to the inner box. In the mesh the FIRST `NearParticles` particles are in
+    /// the inner box and the rest in the outer; the flag is carried in the vertex position's `y`.
     const int NearParticles = 25000;
-
-    /// seçilemeyecek kadar sıkışınca okunuyor. 40.000'de metrekareye ~70 tane düşüyordu
-    /// ve göz her birini ayırt ediyordu — "taneli", "toz değil". Kutuyu daraltmak
-    /// çözmez: uzaklık sönümü kutu boyundan türüyor, daraltınca toz birkaç metrede
-    /// bitip baloncuk gibi görünüyor. Tek doğru kaldıraç sayı.
 
     const int ParticleCount = PrecipitationParticles;
 
     const int PrecipitationSubMesh = 0;
-    /// Şiddetin çizilen tanecik sayısına dönüşüm eğrisi — MARSHALL-PALMER'DAN.
+    /// The curve converting intensity into the number of particles drawn — FROM MARSHALL-PALMER.
     ///
-    /// Dağılımda `N₀` sabit ve `Λ = 4.1·R^(−0.21)`, yani toplam damla sayısı
-    /// `N = N₀/Λ ∝ R^0.21`. Yağış şiddetlenince damla SAYISI neredeyse hiç artmıyor;
-    /// artan şey damla BOYU. Sağanağı sağanak yapan iri ve hızlı damlalardır.
+    /// In the distribution `N₀` is constant and `Λ = 4.1·R^(−0.21)`, so the total drop count is
+    /// `N = N₀/Λ ∝ R^0.21`. As the rain hardens the NUMBER of drops barely rises; what rises is
+    /// the drop SIZE. What makes a downpour a downpour is large, fast drops.
     ///
-    /// Eskiden 1.6'ydı, yani sayı şiddetle sert büküyordu. Şiddet zaten Λ üzerinden
-    /// boyu da sürüyor — çifte sayım. Ölçüldü: şiddet 0.30'da yalnız %14 tanecik
-    /// çiziliyordu (36k) ve hafif yağmur ekranda yok oluyordu.
+    /// It used to be 1.6, i.e. the count bent hard with the intensity. The intensity already drives
+    /// the size through Λ — double counting. Measured: at intensity 0.30 only 14% of the particles
+    /// were drawn (36k) and light rain vanished from the screen.
     const float DensityExponent = 0.21f;
-    // karşılığı yok. 0.45'te bütçenin yarısından fazlası hiçbir işe yaramadan eleniyor
     const int MeshSeed = 1;
 
-    // Yağmur. Damla boyutu hem düşme hızını hem rüzgâra direncini belirler:
-    // ince serpinti yanlamasına uçar, iri damla dik iner. Ölçekler shader'da
-    // damla başına uygulanır, buradaki değerler bandın uçlarıdır.
-    /// Terminal hız — Gunn & Kinzer ölçümlerinin Atlas bağıntısı:
-    ///   `v(D) = 9.65 − 10.3·exp(−0.6·D)`,  D = çap (mm)
+    // Rain. The drop size sets both the fall speed and the resistance to wind:
+    // fine drizzle flies sideways, a large drop comes down steeply. The scales are applied
+    // per drop in the shader; the values here are the ends of the band.
+    /// Terminal velocity — the Atlas relation of Gunn & Kinzer's measurements:
+    ///   `v(D) = 9.65 − 10.3·exp(−0.6·D)`,  D = diameter (mm)
     ///
-    /// Çap bandı 0.5-5 mm, yani hız 2.02-9.14 m/s.
+    /// The diameter band is 0.5-5 mm, so the speed is 2.02-9.14 m/s.
     ///
-    /// ESKİDEN 16 m/s'YE ABARTILIYORDU ve gerekçesi yazılıydı: "tanecikler 16-24 m
-    /// uzakta olduğundan açısal hız düşük kalıyor". O abartı eski görsel modele aitti.
-    /// Artık İZİN BOYU fiziksel terminal hızdan çiziliyor (`v·T_exp`); hareket başka
-    /// hızda olursa damla kat ettiği yoldan kısa iz bırakır — ölçüldü, 16'ya karşı 9.14,
-    /// yani iz gerçek yolun %57'si kadardı.
+    /// IT USED TO BE EXAGGERATED TO 16 m/s and the reason was written down: "the particles are
+    /// 16-24 m away so the angular speed stays low". That exaggeration belonged to the old visual
+    /// model. The STREAK LENGTH is now drawn from the physical terminal velocity (`v·T_exp`); if
+    /// the motion runs at a different speed the drop leaves a streak shorter than the path it
+    /// travelled — measured, 16 against 9.14, so the streak was 57% of the real path.
     ///
-    /// Hız damla başına hesaplanamıyor: rüzgâr sürüklenmesi CPU'da sınıf başına integre
-    /// ediliyor. Sınıfın temsilci yarıçapından türüyor, shader'daki formülün aynısı.
+    /// The speed cannot be computed per drop: the wind drift is integrated per class on the CPU.
+    /// It derives from the class's representative radius, the same formula as in the shader.
     static float TerminalVelocity(float t)
     {
         float diameterMm = 0.5f + 4.5f * t;
         return 9.65f - 10.3f * Mathf.Exp(-0.6f * diameterMm);
     }
-    /// RÜZGÂRIN SINIR TABAKASI SHADER'DA, BURADA DEĞİL.
+    /// THE WIND'S BOUNDARY LAYER IS IN THE SHADER, NOT HERE.
     ///
-    /// Kayma sınıf başına burada integre ediliyor ve tek vektör yüksekliğe göre
-    /// değişemez. Bir denemede sınıf başına dört yükseklik bandı kuruldu; ÖLÇÜMLE
-    /// ELENDİ: bantların kaymaları zamanla sınırsız ayrışıyor (30 sn'de 101 m) ve
-    /// kutuya sarılınca aradaki fark rastgele bir sayıya dönüşüyor. Düşen damla
-    /// bantlar arasında geçerken o fark ona 21 m/s'ye kadar sahte yatay hız olarak
-    /// biniyordu.
+    /// The drift is integrated per class here and a single vector cannot vary with height. One
+    /// attempt set up four height bands per class; it was ELIMINATED BY MEASUREMENT: the bands'
+    /// drifts diverge without bound over time (101 m in 30 s) and once wrapped to the box the
+    /// difference between them turns into a random number. As a falling drop crossed from one band
+    /// to another, that difference rode on it as a false horizontal speed of up to 21 m/s.
     ///
-    /// Doğrusu kapalı biçimde ve damla başına: `Precipitation.shader`, `WIND_LAG_TOP`
-    /// çevresi. Burada yalnız SERBEST AKIŞ kayması durur.
-    const float RainWindFactor = 0.85f;   // iri damlanın yediği rüzgâr oranı
-    const float RainWindLightFactor = 1f; // ince damla rüzgârı tam yer
-    // Hız sürekli olsaydı her damla kaymayı farklı ölçekle çarpardı ve sarma noktası
-    // kutunun katı olmaktan çıkıp damlaları zıplatırdı. Sınıf başına ayrı kayma tutulur.
+    /// The right way is in closed form and per drop: `Precipitation.shader`, around `WIND_LAG_TOP`.
+    /// Only the FREE STREAM drift lives here.
+    const float RainWindFactor = 0.85f;   // the share of the wind a large drop takes
+    const float RainWindLightFactor = 1f; // a fine drop takes the wind in full
+    // Were the speed continuous, every drop would multiply the drift by a different scale and the
+    // wrap point would stop being a multiple of the box and make the drops jump. A separate drift
+    // is kept per class.
     const int RainSpeedClasses = 8;
     static readonly Color RainColor = new(0.78f, 0.83f, 0.92f, 0.42f);
 
-    // Girdap genlikleri. Dingin havada tanecikler neredeyse düz iner; genlik
-    // rüzgârdan ölçeklenir, kendi zamanlayıcısını kurmaz
+    // Vortex amplitudes. In calm air the particles come down almost straight; the amplitude is
+    // scaled from the wind and does not set up its own timer
     const float RainTurbulenceCalm = 0.03f;
     const float RainTurbulenceStorm = 0.25f;
-    // gölgelendirici havanın rengini bununla çarpıp parlatıyor, böylece şafakta turuncu,
-    // gece koyu, şimşekte parlak oluyor. Sabit beyaz, kapalı gökyüzünün önünde patlayıp
-    // yıldız gibi duruyordu.
 
     static readonly int BoxSizeId = Shader.PropertyToID("_BoxSize");
     static readonly int StreakPointId = Shader.PropertyToID("_StreakPoint");
@@ -254,8 +228,9 @@ public class PrecipitationRenderer : MonoBehaviour
     static readonly int NearBoxSizeId = Shader.PropertyToID("_NearBoxSize");
     static readonly int RainDirectionsId = Shader.PropertyToID("_RainDirections");
 
-    /// Atmosfer yazıyor, burada yalnız OKUNUYOR: rüzgâr eşiği geçilmediyse toz alt
-    /// parçası hiç çizilmesin diye. İkinci bir eşik hesabı kurmak iki sistemi ayırırdı.
+    /// The atmosphere writes it, here it is only READ: so that if the wind threshold has not been
+    /// crossed the dust submesh is not drawn at all. Setting up a second threshold computation
+    /// would split the two systems.
     static readonly int DensityId = Shader.PropertyToID("_Density");
     static readonly int PrecipitationId = Shader.PropertyToID("_Precipitation");
     static readonly int RainTurbulenceId = Shader.PropertyToID("_RainTurbulence");
@@ -272,14 +247,15 @@ public class PrecipitationRenderer : MonoBehaviour
     float density;
     float precipitation;
 
-    /// bir şey varsa hangisinin olduğu başka türlü ayrılamıyor.
+    /// FOR THE F1 PANEL. The intensity and the density are read separately: with something on
+    /// screen there is no other way to tell which of the two it came from.
     public float DebugRainIntensity => precipitation;
     public float DebugDensity => density;
     float localFactor = 1f;
 
-    /// Yağış artık gökten tek parça düşmüyor: kaynağı tepedeki bulut kolonudur.
-    /// Bulut sistemine tek yönlü, salt okunur bir bağ — yağış hangi bulutun yağdığını
-    /// sormaz, yalnız "şu an başımın üstünde ne kadar var" değerini okur.
+    /// The precipitation no longer falls from the sky as one sheet: its source is the cloud column
+    /// overhead. A one-way, read-only link to the cloud system — the precipitation does not ask
+    /// which cloud is raining, it only reads "how much is above me right now".
     public void Bind(WeatherState state, WindField windField, Shader precipitationShader,
                      CloudLayerProbe layer, Transform eye,
                      RainStreakWorkingSet streakSet, TimeOfDay clock)
@@ -296,20 +272,20 @@ public class PrecipitationRenderer : MonoBehaviour
     void OnEnable()
     {
         if (weather == null)
-            throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(weather)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(weather)} is not assigned.");
         if (wind == null)
-            throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(wind)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(wind)} is not assigned.");
         if (shader == null)
-            throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(shader)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(shader)} is not assigned.");
         if (cloudLayer == null)
-            throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(cloudLayer)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(cloudLayer)} is not assigned.");
         if (observer == null)
-            throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(observer)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(observer)} is not assigned.");
 
         RefreshDensity();
 
-        // Süzülmüş hız sıfırdan başlarsa ilk karelerde yön vektörü sıfıra normalize
-        // olur ve shader'da NaN üretir; düşme hızıyla başlatılır.
+        // If the filtered speed starts from zero the direction vector normalizes to zero in the
+        // first frames and produces NaN in the shader; it is initialized with the fall speed.
         for (int i = 0; i < RainSpeedClasses; i++)
         {
             float t = i / (RainSpeedClasses - 1f);
@@ -318,11 +294,13 @@ public class PrecipitationRenderer : MonoBehaviour
         }
     }
 
-    /// Yön ve BÜYÜKLÜK tek vektörde: `xyz` birim yön, `w` bileşke hız (m/s).
+    /// The direction and the MAGNITUDE in one vector: `xyz` the unit direction, `w` the resultant
+    /// speed (m/s).
     ///
-    /// Büyüklük shader'a lazım çünkü damla başına yön sapması bir ORAN: türbülans
-    /// hız dalgalanmasının bileşke hıza oranı. Normalize edilmiş yön tek başına o
-    /// oranı kuramaz — payda kaybolur ve sapma dingin havada da fırtınadaki kadar
+    /// The shader needs the magnitude because the per-drop direction deviation is a RATIO: the
+    /// turbulence is the ratio of the speed fluctuation to the resultant speed. A normalized
+    /// direction alone cannot form that ratio — the denominator is lost and the deviation would be
+    /// as large in calm air as in a storm.
     static Vector4 WithSpeed(Vector3 velocity)
     {
         float speed = velocity.magnitude;
@@ -330,13 +308,13 @@ public class PrecipitationRenderer : MonoBehaviour
         return new Vector4(direction.x, direction.y, direction.z, speed);
     }
 
-    /// İZ VERİTABANINI KARE BAŞINA HAZIRLAR — `[Garg 2006, §5]`.
+    /// PREPARES THE STREAK DATABASE PER FRAME — `[Garg 2006, §5]`.
     ///
-    /// Üç açı da burada belirleniyor ve üçü de FARKLI şeye bağlı:
-    ///   ışığın yüksekliği — güneşin damlanın düşüş eksenine göre açısı
-    ///   ışığın azimutu   — aynı açının kameranın eksenine göre bileşeni
-    ///   `θ_v`            — kameranın bakışıyla düşüş yönü arasındaki açı (shader'da,
-    ///                      damla başına, çünkü ekranın her yerinde farklı)
+    /// All three angles are determined here and all three depend on something DIFFERENT:
+    ///   the light's elevation — the sun's angle relative to the drop's fall axis
+    ///   the light's azimuth   — the component of that angle relative to the camera's axis
+    ///   `θ_v`                 — the angle between the camera's view and the fall direction (in the
+    ///                           shader, per drop, because it differs across the screen)
     void UpdateStreaks(Vector3 rainVelocity)
     {
         if (streaks == null || timeOfDay == null) return;
@@ -360,8 +338,8 @@ public class PrecipitationRenderer : MonoBehaviour
         material.SetFloatArray(StreakDcamFractionId, streaks.DcamHeightFraction);
         material.SetFloat(StreakExposureId, ExposureTime);
         material.SetFloat(StreakDbPeriodId, DatabasePeriod);
-        // GÜNEŞ DİSKİNİN RADYANSI. `TimeOfDay` rengi 1'e normalize tutuyor ve şiddeti
-        // ayrı taşıyor; çarpımları gerçek büyüklük (`TimeOfDay` içinde yazılı).
+        // THE SUN DISC'S RADIANCE. `TimeOfDay` keeps the colour normalized to 1 and carries the
+        // intensity separately; their product is the real magnitude (written down inside `TimeOfDay`).
         Color sun = timeOfDay.CurrentSunColor * timeOfDay.SunIntensity;
         material.SetVector(StreakSunRadianceId, new Vector4(sun.r, sun.g, sun.b, 1f));
 
@@ -374,35 +352,35 @@ public class PrecipitationRenderer : MonoBehaviour
         if (mesh != null) Destroy(mesh);
     }
 
-    /// YOĞUNLUK OLAYDA DEĞİL, HER KARE.
+    /// THE DENSITY IS PER FRAME, NOT ON AN EVENT.
     ///
-    /// Eskiden `WeatherState.Changed` olayında bir kez hesaplanıyordu. Ama
-    /// girdilerinden biri `SnowRuntimeState.RainWeight01` ve o kar oranı
-    /// sürgüsüyle değişiyor — sürgü hava olayı YAYINLAMIYOR. Sonuç: kar oranı
-    /// 1'ken bile yağmur son olaydaki yoğunlukta çizilmeye devam ediyordu
-    /// (ölçüldü: `RainWeight01 = 0` iken ekran yağmur izleriyle doluydu).
+    /// It used to be computed once in the `WeatherState.Changed` event. But one of its
+    /// inputs is `SnowRuntimeState.RainWeight01` and that changes with the snow fraction
+    /// slider — and the slider PUBLISHES NO weather event. The result: even with the snow
+    /// fraction at 1, the rain kept being drawn at the density of the last event
+    /// (measured: with `RainWeight01 = 0` the screen was full of rain streaks).
     void RefreshDensity()
     {
         WeatherState state = weather;
         if (state == null) return;
 
-        // KAR YAĞARKEN YAĞMUR SUSUYOR (kar spec §3.4, §17.1).
+        // WHILE SNOW FALLS THE RAIN GOES QUIET (snow spec §3.4, §17.1).
         //
-        // `SnowRuntimeState` kar sisteminin YAYINLADIĞI durum; okumak
-        // sistemler arası çağrı değil, ilan edilmiş arayüz. Kar sistemi de
-        // buradan hiçbir şey okumuyor — bağ tek yönlü.
+        // `SnowRuntimeState` is the state the snow system PUBLISHES; reading it is not
+        // a call between systems but a declared interface. The snow system reads nothing
+        // from here either — the link is one-way.
         float rainIntensity = state.Precipitation * SnowRuntimeState.RainWeight01;
 
-        // MARSHALL-PALMER SIFIRDA GEÇERSİZ, KAPI ŞART.
+        // MARSHALL-PALMER IS INVALID AT ZERO, A GATE IS MANDATORY.
         //
-        // `N ∝ R^0.21` eğrisi sıfıra yakın çok dik: şiddet 0.001'de bile yoğunluk 0.234
-        // çıkıyor, yani taneciklerin dörtte biri çiziliyor. Hava yumuşatmayla sıfıra
-        // YAKLAŞIYOR ama oturmuyor; sonuç, panel "yağış 0,00" gösterirken ekranda
-        // yağmur olması (kullanıcı bildirdi, çap probuyla görüldü).
+        // The `N ∝ R^0.21` curve is very steep near zero: even at intensity 0.001 the density comes
+        // out 0.234, i.e. a quarter of the particles are drawn. The weather APPROACHES zero with
+        // smoothing but never settles on it; the result was rain on screen while the panel showed
+        // "precipitation 0.00" (the user reported it, seen with the diameter probe).
         //
-        // Bağıntı R > 0 için doğru ama R → 0'da yağış OLAYININ kendisi bitmeli. Kapı
-        // şiddetin en alt diliminde: 0.05 altı çiseleme bile değil (R < 2.5 mm/sa),
-        // orada damla sayısı sıfıra iniyor.
+        // The relation is right for R > 0, but at R → 0 the precipitation EVENT itself has to end.
+        // The gate is in the intensity's lowest slice: below 0.05 is not even drizzle (R < 2.5 mm/h),
+        // and the drop count goes to zero there.
         density = Mathf.Pow(rainIntensity, DensityExponent)
                 * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.05f, rainIntensity));
 
@@ -414,19 +392,19 @@ public class PrecipitationRenderer : MonoBehaviour
         EnsureResources();
         RefreshDensity();
 
-        // BAĞ 4: yağış o SÜTUNUN kapsamasıyla ölçekleniyor — komşu bulut yağmazken bunun
-        // altında yağabilsin diye. Sütunun tepesinin üstündeysen hiç yağmıyor; tavan
-        // kesimini `AltitudeWeatherDriver` yapıyor, burada yalnız yatay dağılım var.
+        // LINK 4: the precipitation is scaled by THAT COLUMN's coverage — so it can rain under this
+        // one while the neighbouring cloud does not. Above the column's top it does not rain at all;
+        // the ceiling cut is `AltitudeWeatherDriver`'s job, only the horizontal distribution is here.
         localFactor = cloudLayer.CoverageAt(observer.position);
 
-        // İnce serpinti yavaş düşüp rüzgârı tam yer, iri damla hızlı inip direnir.
-        // Aradaki bütün açılar böylece kendiliğinden dolar.
+        // Fine drizzle falls slowly and takes the wind in full, a large drop comes down fast and
+        // resists. Every angle in between fills in on its own.
         //
-        // Damla rüzgâr değişimine anında uyamaz: gevşeme süresi terminal hız / g —
-        // ince serpinti hamleye çabuk döner, iri damla geç. Hız süzülmeden alınınca
-        // her hamle bütün yağmuru aynı karede tek parça yatırıyordu: karton perde.
-        // Konum da iz yönü de aynı süzülmüş hızdan türer; ayrışırlarsa iz, damlanın
-        // gittiği yönden başka bir yöne uzar.
+        // A drop cannot follow a change in the wind instantly: the relaxation time is terminal
+        // velocity / g — fine drizzle turns into a gust quickly, a large drop late. Taken without
+        // filtering, every gust laid the whole rain over in the same frame as one sheet: a cardboard
+        // curtain. Both the position and the streak direction derive from the same filtered speed;
+        // if they diverge the streak stretches in a direction other than the one the drop is going.
         for (int i = 0; i < RainSpeedClasses; i++)
         {
             float t = i / (RainSpeedClasses - 1f);
@@ -441,31 +419,32 @@ public class PrecipitationRenderer : MonoBehaviour
             rainDriftsNear[i] = Advance(rainDriftsNear[i], rainVelocities[i], NearBoxSize);
             rainDirections[i] = WithSpeed(rainVelocities[i]);
         }
-        // daha küçük, havanın hızına anında oturuyor. Dikey kayma yok, çünkü tanenin
-        // yerden yüksekliği kutudan değil arazi yüzeyinden türüyor.
+        // smaller, and settles on the air's speed instantly. There is no vertical drift, because a
+        // grain's height above the ground derives from the terrain surface, not from the box.
 
-        // Tanecik esintiyi anında yer: sürekli şiddet değil, o andaki hız neyse o.
-        // Hız zaten Velocity üzerinden esintili geliyordu; dönme ve türbülans sürekli
-        // şiddette kalınca aynı tane hızlanırken dönmesi sabit kalıyordu.
+        // The particle takes the gust instantly: not the sustained severity but whatever the speed is
+        // at that moment. The speed already arrived with the gust through Velocity; with the rotation
+        // and the turbulence left on the sustained severity, the same grain sped up while its spin stayed fixed.
         float felt = Mathf.Clamp01(wind.Strength * (1f + wind.Gust));
 
-        // Dönme rüzgârdan gelir: dingin havada süzülür, fırtınada savrulup hızlı döner.
-        // Açı birikerek gider; shader'da zamanla çarpılsaydı rüzgâr her değiştiğinde
-        // taneler fazdan fazla sıçrardı
-        // Sarma yok: her tane açıyı farklı katsayıyla çarptığı için sarma noktası
-        // her tanede başka yere düşer ve sıçrama görünür. Saatler sonra bile
-        // float hassasiyeti binde bir radyan seviyesinde, göze çarpmaz
+        // The spin comes from the wind: in calm air it glides, in a storm it is thrown about and spins fast.
+        // The angle accumulates; multiplied by time in the shader, the grains would jump in phase
+        // every time the wind changed.
+        // No wrapping: because every grain multiplies the angle by a different coefficient, the wrap
+        // point falls somewhere different on every grain and the jump is visible. Even hours later
+        // the float precision is at the level of a thousandth of a radian, which is not noticeable.
 
-        // Girdap alanının rüzgârla sürüklenme ötelemesi (Taylor: türbülans ortalama
-        // akışla taşınır). Sarılmıyor: alanın içinde 0.7-0.9 gibi karışık frekans
-        // çarpanları var, hiçbir periyot hepsine ortak gelmiyor ve sarma anı
-        // girdapları görünür biçimde ışınlıyor. Sarmamak yalnızca sin argümanını
-        // büyütür — shader zaten _Time.y ile aynı büyüklükte argüman kullanıyor.
+        // The vortex field's drift offset with the wind (Taylor: turbulence is carried by the mean
+        // flow). It is not wrapped: the field contains mixed frequency coefficients like 0.7-0.9 and
+        // no period is common to all of them, so the moment of wrapping visibly teleports the
+        // vortices. Not wrapping only grows the sin argument — the shader already uses an argument
+        // of the same magnitude with _Time.y.
         windSweep += wind.Velocity * Time.deltaTime;
 
         material.SetVector(BoxSizeId, BoxSize);
-        // KOŞULSUZ: temsil payı buradan türüyor ve `UpdateStreaks`'in önünde dört erken
-        // çıkış var. Uniform yazılmazsa HLSL varsayılanı sıfır olur, yoğunluk tabana
+        // UNCONDITIONAL: the representation share derives from here and there are four early exits
+        // ahead of `UpdateStreaks`. If the uniform is not written the HLSL default is zero and the
+        // density collapses to the floor.
         material.SetVector(RainDensityId, new Vector4(OuterDensity, NearDensity, 0f, 0f));
         material.SetVector(NearBoxSizeId, NearBoxSize);
         material.SetVectorArray(RainDriftsId, rainDrifts);
@@ -483,8 +462,8 @@ public class PrecipitationRenderer : MonoBehaviour
         Draw();
     }
 
-    /// Kayma birikerek gider; kendi kutusunun katına sararak float hassasiyetini korur.
-    /// Yanlış kutuya sarmak tanecikleri dünyada kayar gösterir.
+    /// The drift accumulates; it wraps to a multiple of its own box to preserve float precision.
+    /// Wrapping to the wrong box makes the particles slide across the world.
     static Vector3 Advance(Vector3 drift, Vector3 velocity, Vector3 box)
     {
         drift += velocity * Time.deltaTime;
@@ -494,20 +473,20 @@ public class PrecipitationRenderer : MonoBehaviour
             Mathf.Repeat(drift.z, box.z));
     }
 
-    /// Play mode'da yeniden derleme mesh ve materyali düşürebilir; kullanım anında doğrulanır.
+    /// A recompile in Play mode can drop the mesh and the material; they are verified at the point of use.
     void EnsureResources()
     {
         if (mesh == null) mesh = BuildMesh();
         if (material == null) material = new Material(shader);
     }
 
-    /// İKİ ALT PARÇA, İKİ AYRI ÇİZİM. Kapalı olan sistem hiç gönderilmiyor: rüzgâr
-    /// eşiğin altındayken 80.000 toz quad'ı, yağış yokken 90.000 yağış quad'ı vertex
-    /// shader'a hiç girmiyor. Tek çizimken kapalı sistemin bütün taneleri işlenip
-    /// sıfır boyutla eleniyordu — görünmeyen şeyin tam maliyeti ödeniyordu.
+    /// DRAWN DIRECTLY, AND ONLY WHEN THERE IS SOMETHING TO DRAW. Below the density threshold
+    /// nothing is submitted at all: with no precipitation, 250 000 quads never enter the vertex
+    /// shader. Drawn unconditionally, every particle of a system that is off was processed and then
+    /// culled at zero size — the full cost of something invisible.
     ///
-    /// `MeshRenderer` yerine doğrudan çizim: bileşen bütün alt parçaları gönderir,
-    /// hangisinin atlanacağını seçemez.
+    /// `Graphics.RenderMesh` rather than a `MeshRenderer`: a renderer component submits the mesh
+    /// every frame and cannot be told to skip it.
     void Draw()
     {
         var parameters = new RenderParams(material)
@@ -519,8 +498,8 @@ public class PrecipitationRenderer : MonoBehaviour
             reflectionProbeUsage = ReflectionProbeUsage.Off,
             motionVectorMode = MotionVectorGenerationMode.ForceNoMotion,
 
-            // Konumlar shader'da üretiliyor; gerçek sınır hesaplanamaz. Kamera etrafında
-            // sarıldıkları için her zaman görünür kabul ediliyorlar.
+            // The positions are produced in the shader; real bounds cannot be computed. Because they
+            // wrap around the camera they are always taken as visible.
             worldBounds = new Bounds(Vector3.zero, Vector3.one * 100000f)
         };
 
@@ -530,9 +509,9 @@ public class PrecipitationRenderer : MonoBehaviour
             Graphics.RenderMesh(parameters, mesh, PrecipitationSubMesh, transform);
     }
 
-    /// Her tanecik bir quad. Köşe bilgisi UV0'da, tanecik tohumu UV1/UV2'de, tanecik
-    /// TÜRÜ vertex konumunun x'inde. Konum kanalı başka türlü kullanılmıyor; shader
-    /// dünya konumunu tohumdan üretir.
+    /// Every particle is a quad. The corner information is in UV0, the particle seed in UV1/UV2, and
+    /// the particle TYPE in the vertex position's x. The position channel is not otherwise used; the
+    /// shader produces the world position from the seed.
     Mesh BuildMesh()
     {
         int vertexCount = ParticleCount * 4;
@@ -550,12 +529,12 @@ public class PrecipitationRenderer : MonoBehaviour
             var xy = new Vector2((float)random.NextDouble(), (float)random.NextDouble());
             var zw = new Vector2((float)random.NextDouble(), (float)random.NextDouble());
 
-            // Tanecik türü vertex konumunun x'inde taşınıyor. Konum kanalı zaten boştu
-            // (shader dünya konumunu tohumdan üretiyor), yani ek bir vertex akışı
-            // açmadan bayrak taşınabiliyor.
+            // The particle type is carried in the vertex position's x. The position channel was empty
+            // anyway (the shader produces the world position from the seed), so the flag can be
+            // carried without opening an extra vertex stream.
             float kind = i < PrecipitationParticles ? 0f : 1f;
 
-            // İç kutu bayrağı `y`'de. `x` zaten tür için kullanılıyor, `z` boş kalıyor.
+            // The inner box flag is in `y`. `x` is already used for the type and `z` stays empty.
             float near = i < NearParticles ? 1f : 0f;
 
             int v = i * 4;
@@ -589,7 +568,7 @@ public class PrecipitationRenderer : MonoBehaviour
         built.SetIndices(indices, 0, PrecipitationParticles * 6,
                          MeshTopology.Triangles, PrecipitationSubMesh, false);
 
-        // Konumlar shader'da üretildiği için hesaplanan sınırlar anlamsız; culling'i kapat
+        // Because the positions are produced in the shader the computed bounds are meaningless; culling is off
         built.bounds = new Bounds(Vector3.zero, Vector3.one * 100000f);
         return built;
     }

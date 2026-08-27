@@ -1,53 +1,54 @@
 using UnityEngine;
 
-/// Atmosferin ışığa ne yaptığını hesaplar — SALT MATEMATİK, Unity bağımlılığı yok.
+/// Computes what the atmosphere does to light — PURE MATHS, no Unity dependency.
 ///
-/// Renk burada SEÇİLMEZ. Şafağın turuncusu, alacakaranlığın moru, gecenin maviliği
-/// hep aynı üç bileşenin optik derinliğinden çıkar:
+/// THE COLOUR IS NOT CHOSEN HERE. Dawn's orange, twilight's purple and the night's blue all
+/// fall out of the optical depth of the same three components:
 ///
-///   Rayleigh — hava molekülleri. λ⁻⁴ ile gider, yani maviyi kırmızıdan ~7 kat fazla
-///              saçar. Gündüz göğü mavi yapan, batışta huzmeyi turuncuya çeviren bu.
-///   Mie      — aerosol. Dalga boyundan bağımsız, ileri yönde keskin saçar (g = 0.8).
-///              Güneşin çevresindeki beyaz hâle ve puslu havanın süt rengi buradan.
-///   Ozon     — Chappuis bandı. 500-700 nm'yi (yeşil-turuncu) yutar, maviyi neredeyse
-///              hiç tutmaz. Alacakaranlığın MORU bundandır; Rayleigh değil.
+///   Rayleigh — air molecules. It goes as λ⁻⁴, so it scatters blue about 7 times more than
+///              red. This is what makes the daytime sky blue and turns the beam orange at sunset.
+///   Mie      — aerosol. Independent of wavelength, sharply forward scattering (g = 0.8).
+///              The white halo around the sun and the milky colour of hazy air come from here.
+///   Ozone    — the Chappuis band. It absorbs 500-700 nm (green to orange) and holds almost no
+///              blue. Twilight's PURPLE comes from this; not from Rayleigh.
 ///
-/// Kritik ayrım: güneş ufkun altındayken huzme atmosfere 20-25 km'den TEĞET girer.
-/// Orada hava seyrek (Rayleigh ölçek yüksekliği 8 km) ama ozon katmanı tam oradadır
-/// (tepe 25 km). Rayleigh doyarken ozon yolu uzamaya devam eder — denge devrilir ve
-/// renk turuncudan pembeye, oradan mora geçer. Sıra kodlanmaz, bu geometriden doğar.
+/// The critical distinction: with the sun below the horizon the beam enters the atmosphere
+/// TANGENTIALLY at 20-25 km. The air is thin there (the Rayleigh scale height is 8 km) but the
+/// ozone layer sits exactly at that altitude (peak 25 km). While Rayleigh saturates the ozone path
+/// keeps growing — the balance tips and the colour goes from orange to pink and on to purple. The
+/// order is not coded, it is born from this geometry.
 ///
-/// Katsayılar: Bruneton & Neyret, Precomputed Atmospheric Scattering (2008).
+/// Coefficients: Bruneton & Neyret, Precomputed Atmospheric Scattering (2008).
 public static class Atmosphere
 {
-    /// Ham gök radyansını sahne birimlerine taşıyan TEK kazanç. İki ayrı sabit vardı
-    /// (`AtmosphereController` gökyüzü rengi için, `TimeOfDay` pozlama seviyesi için)
-    /// ve aynı adı taşıdıkları hâlde farklı işler yapıyorlardı: biri değişince öteki
-    /// yerinde kalıyor, gökyüzü ile ondan türeyen değer birbirinden ayrışıyordu.
-    /// Değeri zenit parlaklığına göre kalibre edildi (bkz. SkyRadiance).
+    /// The SINGLE gain carrying the raw sky radiance into scene units. There used to be two
+    /// separate constants (`AtmosphereController` for the sky colour, `TimeOfDay` for the exposure
+    /// level) and although they carried the same name they did different jobs: changing one left
+    /// the other in place, and the sky and the value derived from it drifted apart.
+    /// Its value is calibrated against the zenith brightness (see SkyRadiance).
     public const float SceneGain = 3.6f;
 
     public const float PlanetRadius = 6360000f;
     public const float AtmosphereRadius = 6420000f;
 
-    // Deniz seviyesinde saçılma/soğurma katsayıları (1/m).
+    // Scattering/absorption coefficients at sea level (1/m).
     // Rayleigh: 1.24062e-6 / λ⁴, λ = 680 / 550 / 440 nm.
     static readonly Vector3 RayleighBeta = new(5.80e-6f, 13.56e-6f, 33.10e-6f);
     const float RayleighScaleHeight = 8000f;
 
-    // Mie üç kanalda eşit: aerosol partikülü dalga boyundan büyük, ayrım yapmaz.
-    // Sönüm saçılmadan büyük (albedo 0.9): aerosol bir miktar da yutar.
+    // Mie is equal in all three channels: an aerosol particle is larger than the wavelength and
+    // does not discriminate. Extinction is larger than scattering (albedo 0.9): aerosol also absorbs.
     const float MieBeta = 3.996e-6f;
     const float MieExtinction = MieBeta / 0.9f;
     const float MieScaleHeight = 1200f;
 
-    /// Ozon TEPE yoğunluğundaki soğurma. Yeşil en yüksek — Chappuis bandı 600 nm
-    /// civarında tepe yapıyor. Maviyi tutmaması alacakaranlığı mora çeviren şey.
+    /// Absorption at the ozone layer's PEAK density. Green is the highest — the Chappuis band
+    /// peaks around 600 nm. That it does not hold blue is what turns twilight purple.
     static readonly Vector3 OzoneBeta = new(0.650e-6f, 1.881e-6f, 0.085e-6f);
-    const float OzonePeak = 25000f;    // katmanın tepe kotu
-    const float OzoneWidth = 15000f;   // çadır profilinin yarı genişliği
+    const float OzonePeak = 25000f;    // the layer's peak elevation
+    const float OzoneWidth = 15000f;   // half width of the tent profile
 
-    /// Verilen kottaki bağıl yoğunluklar. Ozon çadır profili: tepede 1, ±15 km'de 0.
+    /// Relative densities at the given elevation. The ozone tent profile: 1 at the peak, 0 at ±15 km.
     static void Densities(float altitude, out float rayleigh, out float mie, out float ozone)
     {
         rayleigh = Mathf.Exp(-altitude / RayleighScaleHeight);
@@ -55,11 +56,11 @@ public static class Atmosphere
         ozone = Mathf.Max(0f, 1f - Mathf.Abs(altitude - OzonePeak) / OzoneWidth);
     }
 
-    /// Işının küresel atmosferden çıkana (ya da yere çarpana) kadar kat ettiği yol
-    /// boyunca optik derinlik. Yere çarpıyorsa sonsuz sayılır: o yönden ışık gelmez.
+    /// The optical depth along the path the ray travels until it leaves the spherical atmosphere
+    /// (or hits the ground). If it hits the ground it counts as infinite: no light comes from that direction.
     ///
-    /// Küresel geometri şart: düzlem yaklaşımı ufka yakın açılarda hava kütlesini
-    /// kat kat yanlış veriyor ve batış rengi tam orada belirleniyor.
+    /// Spherical geometry is mandatory: the planar approximation gets the air mass wrong by orders
+    /// of magnitude at angles near the horizon, and the sunset colour is decided exactly there.
     static bool OpticalDepth(float startAltitude, Vector3 direction, int steps,
                              out Vector3 depth)
     {
@@ -69,7 +70,7 @@ public static class Atmosphere
         float top = RaySphere(origin, direction, AtmosphereRadius);
         if (top <= 0f) return false;
 
-        // Yere çarpan ışın: kaynak görünmüyor.
+        // A ray hitting the ground: the source is not visible.
         if (BelowHorizon(startAltitude, direction)) return false;
 
         float step = top / steps;
@@ -87,42 +88,44 @@ public static class Atmosphere
         return true;
     }
 
-    /// Işın yerin altına mı bakıyor?
+    /// Does the ray look below the ground?
     ///
-    /// Küre kesişimi esastır — ufka yakın saatlerdeki görünüm ona göre kalibre edildi.
-    /// Ama o hesap gezegen ölçeğinde güvenilmez: `|origin|² − R²` iki 4·10¹³ sayının
-    /// farkı ve float32'nin o büyüklükteki adımı ~4·10⁶. Gözlemci deniz seviyesindeyken
-    /// sonuç yuvarlama gürültüsü ve işareti güneşin yüksekliğine göre değişiyordu —
-    /// güneş 27°'de çalışıyor, 29°'de "yere çarptı" sayılıp huzme sıfırlanıyor, sahne
-    /// kararıyordu. Kesintili olduğu için eşik gibi de görünmüyordu.
+    /// The sphere intersection is the reference — the look at the hours near the horizon was
+    /// calibrated against it. But that computation is unreliable at planetary scale:
+    /// `|origin|² − R²` is the difference of two 4·10¹³ numbers and float32's step at that
+    /// magnitude is ~4·10⁶. With the observer at sea level the result was rounding noise and its
+    /// sign varied with the sun's elevation — it worked with the sun at 27°, and at 29° the ray
+    /// counted as "hit the ground", the beam was zeroed and the scene went dark. Because it was
+    /// discontinuous it did not even look like a threshold.
     ///
-    /// Çözüm: küre hesabı tamamen bırakılır, soru AÇIYLA sorulur — sadeleşme yok,
-    /// sonuç donanımdan ve derleyiciden bağımsız.
+    /// The fix: drop the sphere computation entirely and ask the question with an ANGLE — no
+    /// cancellation, and the result is independent of the hardware and the compiler.
     ///
-    /// Eşiğe pay EKLENMEZ. Eklenmişti ve sert bir aç/kapa üretiyordu: güneş 5°'yi
-    /// geçtiği anda huzme ve ufuk örnekleri topluca sıfırlanıp geri geliyordu, ekranda
-    /// 17:37 civarında bıçak gibi bir sıçrama bırakıyordu. Alçak güneşin kısılması
-    /// ayrı ve SÜREKLİ bir çarpanın işi (`LowSunFade`).
+    /// NO MARGIN IS ADDED to the threshold. One was, and it produced a hard on/off: the moment
+    /// the sun crossed 5° the beam and the horizon samples were zeroed and came back together,
+    /// leaving a knife-edge jump on screen around 17:37. Reining in a low sun is the job of a
+    /// separate and CONTINUOUS multiplier (`LowSunFade`).
 
     static bool BelowHorizon(float altitude, Vector3 direction)
         => direction.y < HorizonDipSine(altitude);
 
-    /// Ufkun çöküş açısının sinüsü (negatif: gözlemci yükseldikçe ufuk aşağı kayar).
+    /// The sine of the horizon's dip angle (negative: the horizon drops as the observer rises).
     static float HorizonDipSine(float altitude)
     {
         float ratio = Mathf.Clamp01(PlanetRadius / (PlanetRadius + altitude));
         return -Mathf.Sqrt(Mathf.Max(0f, 1f - ratio * ratio));
     }
 
-    /// ALÇAK GÜNEŞ KISICISI — görünüm kararı. Ufukta sıfır, beş derecede tam.
+    /// THE LOW SUN LIMITER — a look decision. Zero at the horizon, full at five degrees.
     ///
-    /// Fizik ufka yakınken güçlü ve kızıl bir gök veriyor; istenen şafak ondan ölçülü.
-    /// Kısma tek yerden gelir ve HUZME, GÜNEŞ RENGİ ve UFUK ÖRNEKLERİ üçüne birden
-    /// uygulanır — biri kısılıp öteki kısılmayınca bulutlar bir anda pembeleşiyordu
-    /// (`Tint()` normalize ettiği için renk, huzme sönse bile tam doygun kalıyor).
+    /// The physics gives a strong and red sky near the horizon; the dawn we want is more measured
+    /// than that. The limiting comes from one place and is applied to all three of the BEAM, the
+    /// SUN COLOUR and the HORIZON SAMPLES — with one reined in and the other not, the clouds went
+    /// pink all at once (because `Tint()` normalizes, the colour stays fully saturated even when
+    /// the beam has died).
     ///
-    /// Sürekli olmak zorunda: eşik olarak kurulduğunda güneş o açıyı geçtiği anda
-    /// sahne toptan sıçrıyordu.
+    /// It has to be continuous: built as a threshold, the whole scene jumped the moment the sun
+    /// crossed that angle.
     public static float LowSunFade(float altitude, Vector3 direction)
     {
         float dip = HorizonDipSine(altitude);
@@ -130,24 +133,24 @@ public static class Atmosphere
             Mathf.InverseLerp(dip, dip + LowSunFadeSine, direction.y));
     }
 
-    /// Kısıcının tam güce ulaştığı yükseklik (sinüs). 0.0872 ≈ 5°.
+    /// The elevation at which the limiter reaches full strength (sine). 0.0872 ≈ 5°.
     public const float LowSunFadeSine = 0.0872f;
 
-    /// Işının küreye girdiği ilk pozitif uzaklık; kesişmiyorsa -1.
+    /// The first positive distance at which the ray enters the sphere; −1 if it does not intersect.
     ///
-    /// FELAKET SADELEŞME KORUMASI. `c = |origin|² - radius²` gezegen ölçeğinde iki
-    /// 4·10¹³ sayının farkı ve float32'nin o büyüklükteki adımı ~4·10⁶ — kaynak tam
-    /// yüzeydeyken (deniz seviyesindeki gözlemci, yer küresi) c teorik olarak sıfır ama
-    /// hesabın kendisi gürültü. Ardından `t1 = -b + sqrt(b·b - c)` de teorik olarak
-    /// sıfır; `sqrt(b·b)` bir ulp yukarı yuvarlanınca t1 küçük bir POZİTİF sayı çıkıyor
-    /// ve yukarı giden ışın "yere çarptı" sayılıyordu. Yuvarlamanın yönü b'ye, yani
-    /// güneşin yüksekliğine bağlı olduğu için hata kesintili: güneş 27°'de çalışıyor,
-    /// 29°'de huzme sıfırlanıp sahne kararıyordu. Bulut kotundaki çağrılar etkilenmiyor
-    /// çünkü orada c ≈ 3·10¹⁰, gürültünün çok üstünde.
+    /// CATASTROPHIC CANCELLATION GUARD. `c = |origin|² - radius²` is the difference of two
+    /// 4·10¹³ numbers at planetary scale and float32's step at that magnitude is ~4·10⁶ — with the
+    /// source exactly on the surface (an observer at sea level, the Earth sphere) c is
+    /// theoretically zero but the computation itself is noise. Then `t1 = -b + sqrt(b·b - c)` is
+    /// also theoretically zero; when `sqrt(b·b)` rounds one ulp up, t1 comes out a small POSITIVE
+    /// number and a ray going upward counted as "hit the ground". Because the rounding direction
+    /// depends on b, i.e. on the sun's elevation, the error is discontinuous: it worked with the
+    /// sun at 27°, and at 29° the beam was zeroed and the scene went dark. Calls at cloud altitude
+    /// are unaffected because c ≈ 3·10¹⁰ there, far above the noise.
     ///
-    /// Çözüm hesapla değil geometriyle: kaynak küre yüzeyinde ya da dışındaysa (c ≥ 0)
-    /// ışın ancak küreye DOĞRU giderse kesişebilir. b ≥ 0 ise uzaklaşıyordur, kesişme
-    /// yoktur — köke hiç girmeye gerek yok.
+    /// The fix is geometric, not numerical: if the source is on or outside the sphere (c ≥ 0) the
+    /// ray can only intersect if it goes TOWARDS the sphere. If b ≥ 0 it is moving away and there
+    /// is no intersection — the square root never has to be entered.
     static float RaySphere(Vector3 origin, Vector3 direction, float radius)
     {
         float b = Vector3.Dot(origin, direction);
@@ -163,10 +166,10 @@ public static class Atmosphere
         return t0 > 0f ? t0 : (t1 > 0f ? t1 : -1f);
     }
 
-    /// Gözlemciye ULAŞAN doğrudan ışığın çarpanı, kanal başına. Güneş ufkun altındaysa
-    /// ya da ışın yere çarpıyorsa sıfır. Normalizasyon YOK: hem renk hem sönüm burada,
-    /// birlikte. Parlaklığı geri kazanmak için en parlak kanalı 1'e çekmek — eski hâl —
-    /// batışı sönmeyen bir kızıla kilitliyor ve göz alıyordu.
+    /// The multiplier of the direct light REACHING the observer, per channel. Zero if the sun is
+    /// below the horizon or the ray hits the ground. NO normalization: the colour and the
+    /// extinction are both here, together. Recovering the brightness by pulling the brightest
+    /// channel to 1 — the old state — locks the sunset into a red that never dies and dazzles.
     public static Vector3 BeamTransmittance(float altitude, Vector3 sunDirection, int steps = 24)
     {
         float visible = DiscVisibility(altitude, sunDirection);
@@ -174,8 +177,9 @@ public static class Atmosphere
 
         Vector3 direction = sunDirection;
 
-        // Işın yere çarpıyor ama disk hâlâ kısmen görünüyorsa (kırılma) yolu teğetten
-        // ölçeriz: geometrik ufku sıyıran ışının rengi, batmakta olan güneşin rengidir.
+        // If the ray hits the ground but the disc is still partly visible (refraction) we measure
+        // the path along the tangent: the colour of a ray grazing the geometric horizon is the
+        // colour of a setting sun.
         if (BelowHorizon(altitude, direction))
             direction = GrazingDirection(altitude, sunDirection);
 
@@ -187,25 +191,26 @@ public static class Atmosphere
     }
 
 
-    /// Atmosferik kırılma ufukta ışığı yaklaşık 0.57° yukarı büker: güneş gerçekte
-    /// battıktan sonra da bir süre görünür. Diskin kendisi de 0.53° geniştir, yani
-    /// batış bir an değil bir geçiştir.
+    /// Atmospheric refraction bends the light about 0.57° upward at the horizon: the sun stays
+    /// visible for a while after it has really set. The disc itself is also 0.53° wide, so a
+    /// sunset is not a moment but a passage.
     const float HorizonRefraction = 0.00995f;   // 0.57° radyan
     const float SunDiscRadius = 0.00463f;       // 0.265° radyan
 
-    /// Diskin ufuk üstünde kalan payı, 0-1. Ölçü GEOMETRİK ufka göre alınır: gözlemci
-    /// yükseldikçe ufuk çöker (bulut kotunda 1.64°) ve güneş oradan daha erken görünür.
+    /// The share of the disc above the horizon, 0-1. The measure is taken against the GEOMETRIC
+    /// horizon: as the observer rises the horizon drops (1.64° at cloud altitude) and the sun
+    /// becomes visible from there earlier.
     ///
-    /// Eski hâlde `OpticalDepth` yere çarpan ışını sıfırlıyordu ve geçiş genişliği TAM
-    /// SIFIRDI: bir karede huzme 0.106, sonrakinde 0. Huzme yalnız ışığın şiddetini
-    /// değil rengini de taşıdığı için güneş diski, arazinin şafak rengi, bulutun dusk
-    /// tonu ve palet aynı anda siyaha atlıyordu.
+    /// In the old state `OpticalDepth` zeroed a ray hitting the ground and the transition width
+    /// was EXACTLY ZERO: the beam was 0.106 in one frame and 0 in the next. Because the beam
+    /// carries not only the light's intensity but its colour, the sun disc, the terrain's dawn
+    /// colour, the cloud's dusk tone and the palette all jumped to black at once.
     static float DiscVisibility(float altitude, Vector3 sunDirection)
     {
         float dip = HorizonDip(altitude);
         float elevation = Mathf.Asin(Mathf.Clamp(sunDirection.y, -1f, 1f));
 
-        // Ufkun ÜSTÜNDEKİ pay: pozitif = disk merkezi ufkun üstünde.
+        // The share ABOVE the horizon: positive = the disc's centre is above the horizon.
         float margin = elevation - dip;
 
         return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(
@@ -213,37 +218,38 @@ public static class Atmosphere
             -HorizonRefraction + SunDiscRadius, margin));
     }
 
-    /// Gözlemcinin kotundan geometrik ufkun yükseklik açısı (negatif: aşağı çöker).
+    /// The elevation angle of the geometric horizon from the observer's altitude (negative: it drops).
     static float HorizonDip(float altitude)
         => -Mathf.Acos(Mathf.Clamp01(PlanetRadius / (PlanetRadius + altitude)));
 
-    /// Aynı azimutta, ufku tam sıyıran yön. Yere çarpan ışının yerine bu kullanılır;
-    /// teğet yol atmosferin en uzun kesitidir, batışın kızılı oradan gelir.
+    /// The direction at the same azimuth that exactly grazes the horizon. It is used in place of a
+    /// ray that hits the ground; the tangent path is the atmosphere's longest section and the
+    /// sunset's red comes from there.
     static Vector3 GrazingDirection(float altitude, Vector3 sunDirection)
     {
         Vector3 flat = new(sunDirection.x, 0f, sunDirection.z);
         flat = flat.sqrMagnitude > 1e-8f ? flat.normalized : Vector3.forward;
 
-        // Küçük bir pay yukarı: tam teğette küre kesişimi sayısal olarak bıçak sırtında.
+        // A small margin upward: at the exact tangent the sphere intersection is numerically on a knife edge.
         float dip = HorizonDip(altitude) + 1e-4f;
         return flat * Mathf.Cos(dip) + Vector3.up * Mathf.Sin(dip);
     }
 
-    /// Gökyüzünün gözlemciye saçtığı ışık. Güneş battıktan sonra manzarayı aydınlatan
-    /// şey budur — doğrudan huzme değil. Alpenglow'un kaynağı da bu: zirve, kızıla
-    /// boyanmış gökten ışık alır.
+    /// The light the sky scatters to the observer. This is what lights the landscape after the sun
+    /// has set — not the direct beam. It is also the source of the alpenglow: the summit takes
+    /// light from a sky painted red.
     ///
-    /// İki bileşen toplanır. TEK saçılma: her nokta için güneşe giden yolun
-    /// geçirgenliği, oradaki saçılma katsayısı ve faz fonksiyonu. ÇOK saçılma:
-    /// ikinci ve sonraki saçılmalar yönü unutur, izotropik gelir ve `MultipleScattering`
-    /// tablosundan okunur.
+    /// Two components are summed. SINGLE scattering: for each point, the transmittance along the
+    /// path to the sun, the scattering coefficient there and the phase function. MULTIPLE
+    /// scattering: the second and later scatterings forget the direction, arrive isotropically and
+    /// are read from the `MultipleScattering` table.
     ///
-    /// Çok saçılma olmadan batış ufkunun doygunluğu 0.98'e çıkıyordu — mavi kanal
-    /// 0.005'te kalıyor, ekrandaki renk turuncu değil neredeyse saf kırmızı oluyordu.
-    /// Gerçek batış ufku 0.5-0.7 doygunluktadır; maviyi geri dolduran şey tam olarak
-    /// çok saçılmadır. Eksikliği ayrıca gökyüzünü topyekûn karartıyor ve kaybı telafi
-    /// eden kazanç, en parlak yeri — güneş tarafındaki ufku — 1.0'ın iki katına
-    /// taşıyıp ton eşlemede kırptırıyordu.
+    /// Without multiple scattering the sunset horizon's saturation rose to 0.98 — the blue channel
+    /// stayed at 0.005 and the colour on screen was not orange but almost pure red. A real sunset
+    /// horizon is at 0.5-0.7 saturation; what fills the blue back in is exactly multiple
+    /// scattering. Its absence also darkened the sky as a whole, and the gain compensating for that
+    /// loss carried the brightest place — the horizon on the sun's side — to twice 1.0 and had it
+    /// clipped by the tone mapping.
     public static Vector3 SkyRadiance(float altitude, Vector3 viewDirection,
                                       Vector3 sunDirection, int steps = 16)
     {
@@ -279,10 +285,10 @@ public static class Atmosphere
             Vector3 viewTransmittance = new(
                 Mathf.Exp(-viewDepth.x), Mathf.Exp(-viewDepth.y), Mathf.Exp(-viewDepth.z));
 
-            // Bu noktaya güneşten DOĞRUDAN ışık ulaşıyor mu? Yere çarpıyorsa hiç —
-            // ama bu noktayı tamamen atlamak yanlıştı: gölgedeki hava, komşusundan
-            // saçılan ışıkla hâlâ parlar. Alacakaranlığın simsiyah olmasının sebebi
-            // o atlamaydı; çok saçılma orada da katkı verir.
+            // Does direct light from the sun reach this point? None if it hits the ground —
+            // but skipping the point entirely was wrong: air in shadow still glows with the
+            // light scattered from its neighbours. That skip was the reason twilight came out
+            // pitch black; multiple scattering contributes there too.
             Vector3 scatteringIsotropic = RayleighBeta * r + Vector3.one * (MieBeta * m);
 
             if (OpticalDepth(h, sunDirection, 8, out Vector3 sunDepth))
@@ -298,7 +304,7 @@ public static class Atmosphere
                 accumulated += Vector3.Scale(transmittance, scattering) * step;
             }
 
-            // Çok saçılma izotropik: faz fonksiyonu yok, güneş yolu Ψ'nin içinde.
+            // Multiple scattering is isotropic: no phase function, the sun path is inside Ψ.
             Vector3 psi = MultipleScattering(h, sunDirection);
             accumulated += Vector3.Scale(viewTransmittance,
                                          Vector3.Scale(scatteringIsotropic, psi)) * step;
@@ -307,35 +313,35 @@ public static class Atmosphere
         return accumulated;
     }
 
-    // --- Çok saçılma (Hillaire 2020, "A Scalable and Production Ready Sky and
+    // --- Multiple scattering (Hillaire 2020, "A Scalable and Production Ready Sky and
     //     Atmosphere Rendering Technique") ---
     //
-    // Işık atmosferde bir kez saçılıp durmaz. İkinci saçılmadan sonra geldiği yönü
-    // unutur; toplamı izotropik bir kaynak gibi davranır. Sonsuz mertebe, geometrik
-    // seri olarak kapanır: Ψ = L₂ / (1 − f), f = bir saçılmanın geri dönen payı.
+    // Light does not scatter once in the atmosphere and stop. After the second scattering it
+    // forgets the direction it came from; the sum behaves like an isotropic source. The infinite
+    // order closes as a geometric series: Ψ = L₂ / (1 − f), f = the share one scattering returns.
     //
-    // Tablo (kot × güneş yüksekliği) bir kez kurulur. İki eksen de yeter: Ψ izotropik
-    // olduğu için BAKIŞ yönünden bağımsızdır — asıl ucuzluk buradan gelir.
+    // The table (elevation × sun elevation) is built once. Two axes are enough: because Ψ is
+    // isotropic it does not depend on the VIEW direction — that is where the real saving comes from.
     const int MsAltitudes = 16;
 
-    /// AÇI EKSENİ İNCE OLMAK ZORUNDA. Eksen sin(güneş yüksekliği) üzerinde düzgün
-    /// bölünüyor; 24 kutuda kutu başına 5° düşüyor. Alacakaranlık derecede ~2.24 kat
-    /// söndüğü için bir kutu 28 katlık değişimi kapsıyor ve bilineer ara değer orada
-    /// çaresiz kalıyordu: güneş −6°'deyken gök, doğuştaki değerin 0.041'i çıkıyordu —
-    /// gerçek 0.0085, yani 4.8 kat fazla parlak. 48'de 0.0039'a iniyor.
+    /// THE ANGLE AXIS HAS TO BE FINE. The axis is divided uniformly over sin(sun elevation); at 24
+    /// bins that is 5° per bin. Because twilight fades about 2.24× per degree, one bin spans a
+    /// factor of 28 and bilinear interpolation was helpless there: with the sun at −6° the sky came
+    /// out at 0.041 of its value at sunrise — the truth is 0.0085, i.e. 4.8 times too bright. At 48
+    /// it comes down to 0.0039.
     ///
-    /// Ölçüldü ve ayrıştırıldı: yön sayısı (16→32) ve adım sayısı (12→24) hiçbir şey
-    /// değiştirmiyor, kot ekseni (16→24) de öyle. Kazancın TAMAMI bu eksende. 48'in
-    /// ötesi de kazandırmıyor — 64 ve 96'daki oynama yakınsama değil, 16 yönlü
-    /// örneklemenin gürültüsü.
+    /// Measured and separated: the direction count (16→32) and the step count (12→24) change
+    /// nothing, and neither does the elevation axis (16→24). ALL of the gain is on this axis.
+    /// Beyond 48 there is nothing to gain either — the movement at 64 and 96 is not convergence but
+    /// the noise of the 16-direction sampling.
     ///
-    /// Gündüz etkilenmiyor: güneş +5° ve üstünde fark %2.5'in altında.
+    /// Daytime is unaffected: at +5° and above the difference is under 2.5%.
     const int MsAngles = 48;
     const float MsTopAltitude = 60000f;
     static Vector3[] msTable;
 
-    /// Küre üzerine düzgün dağılmış yönler (Fibonacci sarmalı). Rastgele örnekleme
-    /// aynı sayıda yönle daha gürültülü çıkıyor ve tablo kotlar arası zıplıyor.
+    /// Directions spread evenly over the sphere (a Fibonacci spiral). Random sampling comes out
+    /// noisier for the same number of directions and the table jumps between elevations.
     static Vector3 SphereDirection(int index, int count)
     {
         float y = 1f - 2f * (index + 0.5f) / count;
@@ -353,7 +359,7 @@ public static class Atmosphere
 
         for (int a = 0; a < MsAngles; a++)
         {
-            // Güneşin dikey bileşeni −1..1; yatayı kalanı tamamlar.
+            // The sun's vertical component is −1..1; the horizontal makes up the rest.
             float sinSun = MsAngles > 1 ? -1f + 2f * a / (MsAngles - 1f) : 0f;
             Vector3 sun = new(Mathf.Sqrt(Mathf.Max(0f, 1f - sinSun * sinSun)), sinSun, 0f);
 
@@ -363,7 +369,7 @@ public static class Atmosphere
                 Vector3 origin = new(0f, PlanetRadius + altitude, 0f);
 
                 Vector3 second = Vector3.zero;   // L₂ — ikinci mertebe
-                Vector3 transfer = Vector3.zero; // f  — geri dönen pay
+                Vector3 transfer = Vector3.zero; // f — the share that comes back
 
                 for (int d = 0; d < Directions; d++)
                 {
@@ -420,9 +426,9 @@ public static class Atmosphere
         }
     }
 
-    /// Verilen kotta ve güneş yüksekliğinde izotropik çok saçılma kaynağı.
-    /// İki eksende bilineer: tablo kaba olduğu için ara değer şart, yoksa
-    /// gökyüzü güneş yükseldikçe kademe kademe zıplıyor.
+    /// The isotropic multiple scattering source at the given elevation and sun elevation.
+    /// Bilinear on both axes: because the table is coarse the interpolation is mandatory, otherwise
+    /// the sky jumps in steps as the sun rises.
     static Vector3 MultipleScattering(float altitude, Vector3 sunDirection)
     {
         if (msTable == null) BuildMultipleScattering();
@@ -439,8 +445,8 @@ public static class Atmosphere
         return Vector3.Lerp(lower, upper, tk);
     }
 
-    /// Henyey-Greenstein: aerosol ışığı ileri yönde keskin saçar. Güneşin çevresindeki
-    /// beyaz hâlenin ve puslu havada batışın "patlamasının" sebebi.
+    /// Henyey-Greenstein: aerosol scatters light sharply forward. The reason for the white halo
+    /// around the sun and for the sunset "exploding" in hazy air.
     static float MiePhase(float cosTheta, float g)
     {
         float g2 = g * g;
