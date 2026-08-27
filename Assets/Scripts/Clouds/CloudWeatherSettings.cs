@@ -1,21 +1,22 @@
 using UnityEngine;
 
-/// Dünya durumunun bulut ayarlarına nasıl çevrileceği. Sayılar `CloudWeatherDriver`'ın
-/// içine gömülmüyor: aynı sürücü farklı ayarla tekrar kullanılabilsin diye asset.
+/// How the world state is translated into cloud settings. The numbers are not buried inside
+/// `CloudWeatherDriver`: it is an asset so the same driver can be reused with different settings.
 ///
-/// Sakin uçtaki değerler bilerek profildeki onaylanmış görüntüyle aynı — fırtına sıfırken
-/// bağ eklenmemiş gibi görünüyor, böylece bağın ne kattığı ayırt edilebiliyor.
-[CreateAssetMenu(menuName = "To The Summit/Bulut Hava Ayarları")]
+/// The values at the calm end deliberately match the approved look in the profile — with the
+/// storm at zero it looks as though no link had been added, which makes it possible to tell
+/// what the link contributes.
+[CreateAssetMenu(menuName = "To The Summit/Cloud Weather Settings")]
 public class CloudWeatherSettings : ScriptableObject
 {
-    // KAPSAMA BURADA YOK. Kuralı `AtmosphereController` tutuyor (fırtına kütlesi, kuru
-    // hava ritmi, açık pencere, test kilidi) ve bulut onu olduğu gibi tüketiyor. Buraya
-    // ikinci bir eşleme konsaydı gökyüzü ile bulut çelişebilirdi.
+    // COVERAGE IS NOT HERE. `AtmosphereController` holds its rule (storm mass, dry air rhythm,
+    // clear window, test lock) and the cloud consumes it as is. A second mapping placed here
+    // would let the sky and the cloud contradict each other.
 
-    [Header("Yoğunluk")]
-    [Tooltip("Fırtına yokken yoğunluk çarpanı.")]
+    [Header("Density")]
+    [Tooltip("Density multiplier with no storm.")]
     [Range(0f, 1f)] public float calmDensity = 0.4f;
 
-    [Tooltip("Tam fırtınada yoğunluk çarpanı.")]
+    [Tooltip("Density multiplier in a full storm.")]
     [Range(0f, 1f)] public float stormDensity = 0.6f;
 }

@@ -1,27 +1,27 @@
 using System;
 using UnityEngine;
 
-/// TEKERLEKLERİ DÖNDÜRÜR. Kontrolcüden ayrı, çünkü fizik ile görsel ayrı kalmalı:
-/// bisiklet modelsiz de çalışıyor, model değişince fizik değişmiyor.
+/// TURNS THE WHEELS. Separate from the controller, because physics and visuals have to stay
+/// apart: the bike works with no model, and changing the model does not change the physics.
 ///
-/// Dönüş hızı YOL HIZINDAN türüyor, sabit bir çarpandan değil: ω = v / r. Tekerlek
-/// yarıçapı ayar asset'inde, yani 26 inç tekerlekli bir bisiklet aynı hızda daha hızlı
-/// döner — kendiliğinden doğru.
+/// The rotation rate derives FROM THE ROAD SPEED, not from a fixed multiplier: omega = v / r.
+/// The wheel radius lives in the settings asset, so a bike with 26 inch wheels turns faster at
+/// the same speed — correct by construction.
 ///
-/// CO-OP'TA GÖRÜNÜR. Uzaktaki oyuncunun tekerleği de dönüyor; dönüş hızı yalnız o
-/// oyuncunun konumundan türediği için ağ üzerinden ayrıca gönderilecek bir şey yok.
+/// VISIBLE IN CO-OP. A distant player's wheel turns too; because the rotation rate derives only
+/// from that player's position there is nothing extra to send over the network.
 public class BikeWheels : MonoBehaviour
 {
     [SerializeField] BikeController bike;
     [SerializeField] BikeSettings settings;
 
-    [Tooltip("Ön tekerlek. Kendi ekseninde dönüyor, direksiyonla ayrıca çevrilmiyor — " +
-             "gidon açısı bisikletin kendi dönüşünde zaten var.")]
+    [Tooltip("Front wheel. It turns on its own axis and is not steered separately — " +
+             "the handlebar angle is already in the bike's own rotation.")]
     [SerializeField] Transform frontWheel;
     [SerializeField] Transform rearWheel;
 
-    [Tooltip("Tekerleğin döndüğü yerel eksen. Meshy'den gelen modelde eksen X ya da Z " +
-             "olabiliyor; ayarlanabilir olması modeli yeniden ihraç etmekten ucuz.")]
+    [Tooltip("Local axis the wheel turns about. In the model coming from Meshy the axis can " +
+             "be X or Z; making it adjustable is cheaper than re-exporting the model.")]
     [SerializeField] Vector3 spinAxis = Vector3.right;
 
     float angle;
@@ -39,15 +39,15 @@ public class BikeWheels : MonoBehaviour
     void OnEnable()
     {
         if (bike == null || settings == null)
-            throw new InvalidOperationException($"{nameof(BikeWheels)}: bağımlılıklar atanmadı.");
+            throw new InvalidOperationException($"{nameof(BikeWheels)}: dependencies are not assigned.");
     }
 
     void LateUpdate()
     {
         float radius = Mathf.Max(0.05f, settings.wheelRadius);
 
-        // Açı BİRİKTİRİLİYOR, her karede sıfırdan kurulmuyor: `Rotate` çağrısı kayan
-        // nokta hatası biriktiriyor ve uzun sürüşte tekerlek ekseninden kayıyor.
+        // The angle is ACCUMULATED rather than rebuilt from zero every frame: the `Rotate` call
+        // accumulates floating point error and over a long ride the wheel drifts off its axis.
         angle += bike.Speed / radius * Mathf.Rad2Deg * Time.deltaTime;
         angle %= 360f;
 

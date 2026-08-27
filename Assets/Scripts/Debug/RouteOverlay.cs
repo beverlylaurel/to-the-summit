@@ -1,24 +1,24 @@
 using System;
 using UnityEngine;
 
-/// ROTA ÇİZGİLERİ OYUN GÖRÜNÜMÜNDE. Fırça hatları yalnız Scene View'da çiziyor; oyunun
-/// içinden bakınca üç hat birbirinden ayırt edilemiyor — hepsi aynı ova, aynı zemin.
+/// ROUTE LINES IN THE GAME VIEW. The brush strokes only draw in the Scene View; seen from
+/// inside the game the three routes are indistinguishable — all the same plain, the same ground.
 ///
-/// Rota tasarımı oyunun içinden doğrulanmak zorunda: hattın nereden geçtiği, nereye
-/// çıktığı ve öteki hatlardan nasıl ayrıldığı ancak oyuncunun gözünden görülür.
+/// Route design has to be verified from inside the game: where a route runs, where it comes out
+/// and how it differs from the others is only visible through the player's eyes.
 ///
-/// GEÇİCİ. Rota kesinleşip arazi ona göre şekillenince silinir.
+/// TEMPORARY. Once the route is settled and the terrain is shaped to it this is deleted.
 public class RouteOverlay : MonoBehaviour
 {
     [SerializeField] MountainRoute route;
     [SerializeField] Terrain terrain;
 
-    /// Çizginin zeminden yüksekliği (metre). İki metreydi ve yürürken göz hizasında
-    /// bir duvar gibi görüşü kesiyordu. Yirmi santim onu zeminin üstünde tutuyor ama
-    /// yola serilmiş bırakıyor.
+    /// Height of the line above the ground (metres). It was two metres and while walking it cut
+    /// the view like a wall at eye level. Twenty centimetres keeps it above the ground while
+    /// leaving it laid out on the path.
     const float Lift = 0.2f;
 
-    /// Çizgi kalınlığı (metre). Kilometrelerce uzaktan okunabilmeli.
+    /// Line thickness (metres). It has to be readable from kilometres away.
     const float Width = 6f;
 
     static readonly Color RoadColor = new(0.9f, 0.88f, 0.82f);
@@ -35,9 +35,9 @@ public class RouteOverlay : MonoBehaviour
 
     Transform holder;
 
-    /// HAT BAŞINA MATERYAL. Tek materyal kullanılıp renk `startColor`'dan veriliyordu
-    /// ama `URP/Unlit` köşe rengini okumuyor: bütün hatlar materyalin beyazıyla
-    /// çiziliyor ve birbirinden ayırt edilemiyordu.
+    /// A MATERIAL PER ROUTE. A single material was used with the color given through
+    /// `startColor`, but `URP/Unlit` does not read the vertex color: every route was drawn in
+    /// the material's white and they could not be told apart.
     readonly System.Collections.Generic.List<Material> materials = new();
 
     public void Bind(MountainRoute routeRef, Terrain terrainRef)
@@ -49,7 +49,7 @@ public class RouteOverlay : MonoBehaviour
     void OnEnable()
     {
         if (route == null || terrain == null)
-            throw new InvalidOperationException($"{nameof(RouteOverlay)}: bağımlılıklar atanmadı.");
+            throw new InvalidOperationException($"{nameof(RouteOverlay)}: dependencies are not assigned.");
 
         Build();
     }
@@ -107,9 +107,9 @@ public class RouteOverlay : MonoBehaviour
         line.startColor = color;
         line.endColor = color;
 
-        // Gölge YOK: çizgi bir arazi parçası değil, bir gösterge. Gölge düşürdüğünde
-        // zeminde kendi izini bırakıyor ve rotanın gerçekten orada bir şey olduğu
-        // izlenimi veriyor.
+        // NO shadow: the line is not a piece of terrain, it is an indicator. Casting a shadow it
+        // leaves its own mark on the ground and gives the impression that there really is
+        // something there along the route.
         line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         line.receiveShadows = false;
 

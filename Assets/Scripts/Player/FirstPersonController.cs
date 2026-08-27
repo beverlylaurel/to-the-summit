@@ -1,42 +1,42 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-/// Yürüme, koşma, zıplama ve yerçekimi. Bakış MouseLook'un işi.
+/// Walking, running, jumping and gravity. Looking is MouseLook's job.
 [RequireComponent(typeof(CharacterController))]
 public class FirstPersonController : MonoBehaviour
 {
     [Header("Hareket")]
     public float walkSpeed = 2.2f;
     public float sprintSpeed = 4f;
-    [Tooltip("Havadayken yön değiştirme etkisi (0 = yok, 1 = tam kontrol).")]
+    [Tooltip("Air control while airborne (0 = none, 1 = full control).")]
     [Range(0f, 1f)] public float airControl = 0.4f;
 
     [Header("Fizik")]
-    [Tooltip("Dünya yerçekimi. Abartılı bir değer (-20) zıplamayı çevik gösteriyordu " +
-             "ama düşüşü de iki kat hızlandırıyor: ileride düşme hasarı bu ivmeden " +
-             "türeyecek ve yanlış ivme yanlış hasar verir.")]
+    [Tooltip("World gravity. An exaggerated value (-20) made the jump look agile " +
+             "but it also doubles the fall speed: fall damage will derive from this " +
+             "acceleration later, and a wrong acceleration gives wrong damage.")]
     public float gravity = -9.81f;
-    [Tooltip("Dikey sıçrama yüksekliği (metre). Ayakta duran bir insan yaklaşık 0.4 m " +
-             "çıkar; ağır bot, seferi kıyafet ve sırt yüküyle daha az. 1.1 m " +
-             "insanüstüydü — oyuncu kendi boyunun üstüne kalkıyordu.")]
+    [Tooltip("Vertical jump height (metres). A standing person clears about 0.4 m; " +
+             "less with heavy boots, expedition clothing and a pack. 1.1 m was " +
+             "superhuman — the player was rising above their own height.")]
     public float jumpHeight = 0.4f;
-    [Tooltip("Bu açının üstündeki yamaçlara yürünemez. Tırmanma sistemi buradan devreye girecek.")]
+    [Tooltip("Slopes steeper than this angle cannot be walked. The climbing system will take over from here.")]
     [Range(20f, 80f)] public float slopeLimit = 45f;
     public float stepOffset = 0.4f;
 
     CharacterController controller;
     Vector3 velocity;
 
-    /// Kontrolcü karın üstünde asılı duruyor: kapsül çıplak araziye değiyor olmadığı
-    /// için `isGrounded` yanlış döner. Yürüme ve zıplama bu bayrağı da saymak zorunda.
+    /// The controller is hanging above the snow: because the capsule is not touching bare
+    /// terrain, `isGrounded` returns false. Walking and jumping have to count this flag too.
 
-    /// Kendi kapsülünü ayıklamak için: zemin ışını oyuncunun içinden başlıyor ve
-    /// filtrelenmezse ilk çarptığı şey kendi çarpışma hacmi oluyor.
+    /// For filtering out its own capsule: the ground ray starts inside the player and,
+    /// unfiltered, the first thing it hits is their own collision volume.
     readonly RaycastHit[] groundHits = new RaycastHit[4];
-    /// ZEMİNE BASIYOR MU.
+    /// WHETHER THEY ARE ON THE GROUND.
     public bool OnGround => controller != null && controller.isGrounded;
 
-    /// Test amaçlı hız çarpanı. Normal oyunda 1.
+    /// Speed multiplier for testing. 1 in normal play.
     public float SpeedMultiplier { get; set; } = 1f;
 
     void Awake()
@@ -48,12 +48,12 @@ public class FirstPersonController : MonoBehaviour
 
     void Update()
     {
-        // Serbest uçuş açıkken kontrolcü kapalı: ikisi AYNI CharacterController'ı
-        // kullanıyor ve uçuş onu devre dışı bırakıyor. Kapalı kontrolcüye Move
-        // çağırmak her karede hata basıyordu — yürüyüş o sırada zaten susmalı.
+        // While free flight is on the controller is off: both use the SAME CharacterController
+        // and flight disables it. Calling Move on a disabled controller printed an error every
+        // frame — walking should already be silent at that point.
         if (!controller.enabled) return;
 
-        // İmleç serbestken girdi oyuna değil arayüze ait
+        // While the cursor is free the input belongs to the UI, not the game
         if (Cursor.lockState == CursorLockMode.Locked) Move();
 
         ApplyGravity();

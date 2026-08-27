@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.Profiling;
 
-/// Tek bir ölçüm anının verisi. Sampler üretir, dinleyenler tüketir.
+/// The data of a single measurement moment. The sampler produces it, listeners consume it.
 public readonly struct PerformanceSnapshot
 {
     public readonly float InstantFps;
@@ -33,11 +33,11 @@ public readonly struct PerformanceSnapshot
     }
 }
 
-/// Performans metriklerini toplar. Kimseyi tanımaz, sadece yayınlar.
+/// Collects performance metrics. It knows nobody, it only publishes.
 public class PerformanceSampler : MonoBehaviour
 {
     [SerializeField] float refreshInterval = 0.25f;
-    [Tooltip("1% low hesabı için tutulan kare sayısı.")]
+    [Tooltip("Number of frames kept for the 1% low computation.")]
     [SerializeField] int sampleCapacity = 512;
 
     public event Action<PerformanceSnapshot> Sampled;
@@ -57,8 +57,8 @@ public class PerformanceSampler : MonoBehaviour
         lastSampleTime = Time.realtimeSinceStartup;
     }
 
-    /// Play mode'da script derlenince domain reload olur ve Awake tekrar çalışmaz.
-    /// Tamponların varlığı ve boyutu bu yüzden kullanım anında doğrulanır.
+    /// In play mode a script compile triggers a domain reload and Awake does not run again.
+    /// The existence and size of the buffers are therefore verified at the point of use.
     void EnsureBuffers()
     {
         if (frameTimes == null || frameTimes.Length != sampleCapacity)
@@ -96,7 +96,7 @@ public class PerformanceSampler : MonoBehaviour
         float now = Time.realtimeSinceStartup;
         float elapsed = Mathf.Max(0.0001f, now - lastSampleTime);
 
-        // GC toplaması sonrası düşüş olur; sadece büyümeyi raporla
+        // A drop follows a GC collection; report growth only
         float growthMbPerSec = Mathf.Max(0f, (managedBytes - lastManagedBytes) / (1024f * 1024f) / elapsed);
 
         lastManagedBytes = managedBytes;
@@ -128,7 +128,7 @@ public class PerformanceSampler : MonoBehaviour
         return sum / filled * 1000f;
     }
 
-    /// En kötü %1 karenin ortalaması; takılmaları ortalama FPS gizler, bu gizlemez
+    /// The average of the worst 1% of frames; average FPS hides stutters, this does not
     float OnePercentLowFps()
     {
         if (filled == 0) return 0f;

@@ -1,27 +1,27 @@
 using UnityEngine;
 
-/// BİR YÜZEYİN BÜTÜN HARİTALARI. Kar, kaya, çakıl, toprak — hepsi aynı yapıdan.
+/// EVERY MAP OF ONE SURFACE. Snow, rock, gravel, soil — all from the same structure.
 ///
-/// Shader'a "sekiz ayrı doku" geçirmek yerine tek asset geçiliyor. Kar için elle
-/// yazılan on iki alan ikinci yüzeyde yirmi dört, üçüncüde otuz altı olurdu; o noktada
-/// bir harita eklemek her dosyaya dokunmak demek.
+/// Instead of passing "eight separate textures" to the shader, a single asset is passed. The
+/// twelve fields written by hand for snow would have been twenty-four on a second surface and
+/// thirty-six on a third; at that point adding one map means touching every file.
 ///
-/// Haritalar STOKASTİK DÖNÜŞÜMDEN geçmiş hâlleriyle duruyor (Gauss histogramı + ters
-/// LUT). Ham doku sahnede kullanılmıyor: stokastik döşeme ancak Gauss uzayında
-/// kontrastı koruyor.
-[CreateAssetMenu(menuName = "To The Summit/Yüzey Malzemesi", fileName = "Surface")]
+/// The maps are stored in their STOCHASTICALLY TRANSFORMED form (Gaussian histogram + inverse
+/// LUT). The raw texture is not used in the scene: stochastic tiling only preserves contrast in
+/// Gaussian space.
+[CreateAssetMenu(menuName = "To The Summit/Surface Material", fileName = "Surface")]
 public class SurfaceMaterialSet : ScriptableObject
 {
-    [Tooltip("Kaynak klasör (proje dışı olabilir). `TextureIngest` bu klasörden " +
-             "haritaları çıkarıp projeye alıyor; kayıt burada durur ki doku " +
-             "yenilendiğinde nereden geldiği aranmasın.")]
+    [Tooltip("Source folder (may be outside the project). `TextureIngest` extracts the " +
+             "maps from this folder into the project; the record stays here so that when " +
+             "a texture is refreshed nobody has to hunt for where it came from.")]
     public string sourceFolder;
 
-    [Tooltip("Proje içi dosya ön eki, örn. `RockCliff`. Haritalar bu adın " +
-             "sonuna _Normal/_Roughness/_Height eklenerek aranır.")]
+    [Tooltip("In-project file prefix, e.g. `RockCliff`. The maps are looked up by " +
+             "appending _Normal/_Roughness/_Height to this name.")]
     public string assetPrefix;
 
-    [Header("Stokastik dönüşümlü haritalar")]
+    [Header("Stochastically transformed maps")]
     public Texture2D normal;
     public Texture2D normalLut;
     public Texture2D roughness;
@@ -29,17 +29,17 @@ public class SurfaceMaterialSet : ScriptableObject
     public Texture2D height;
     public Texture2D heightLut;
 
-    [Header("Ölçüm")]
-    [Tooltip("Işık pişmişliği: renk parlaklığı ile yüzey eğimi arasındaki korelasyon. " +
-             "0.3'ün üstü, dokuya yönlü güneş gömülü demek — albedo olarak " +
-             "kullanılamaz. `TextureIngest` ölçüp buraya yazıyor.")]
+    [Header("Measurement")]
+    [Tooltip("Baked lighting: the correlation between color brightness and surface slope. " +
+             "Above 0.3 means directional sun is baked into the texture — it cannot be " +
+             "used as an albedo. `TextureIngest` measures it and writes it here.")]
     public float bakedLightCorrelation;
 
-    [Tooltip("Yönlülük: normalin x ve y saçılım oranı. 1.0 yönsüz (toz kar), " +
-             "0.7 altı belirgin yönlü (katmanlı kaya, damarlı yüzey).")]
+    [Tooltip("Directionality: the ratio of the normal's x and y spread. 1.0 is " +
+             "directionless (powder snow), below 0.7 clearly directional (layered rock, veined surface).")]
     public float anisotropy;
 
-    /// Sahnede kullanılabilir mi. Eksik harita varsa shader dalı hiç açılmaz.
+    /// Whether it can be used in the scene. With a map missing the shader branch never opens.
     public bool IsComplete =>
         normal != null && normalLut != null &&
         roughness != null && roughnessLut != null &&

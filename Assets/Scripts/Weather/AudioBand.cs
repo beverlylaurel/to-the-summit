@@ -1,21 +1,21 @@
 using System;
 using UnityEngine;
 
-/// Tek bir ses bandı. Varyasyon listesinden döngüsel klip çalar; seviye, parlaklık ve
-/// perde dışarıdan verilir.
+/// A single audio band. Plays looping clips from a variation list; level, brightness and pitch
+/// are supplied from outside.
 ///
-/// Seviye asimetrik yumuşatılır: yükselirken hızlı, düşerken yavaş. Rüzgâr fiziksel
-/// olarak böyle davranır — esinti aniden gelir, yavaşça çekilir.
+/// The level is smoothed asymmetrically: fast on the way up, slow on the way down. Wind behaves
+/// that way physically — a gust arrives suddenly and withdraws slowly.
 ///
-/// Varyasyonlar arası geçiş iki kaynak arasında çapraz sönümlemeyle yapılır. Bandın
-/// susmasını beklemek işe yaramıyordu: dingin band ancak şiddet uca dayandığında
-/// susuyor, yani pratikte ilk klip sonsuza kadar dönüyordu.
+/// The transition between variations is a crossfade between two sources. Waiting for the band to
+/// fall silent did not work: a calm band only falls silent when the intensity reaches the
+/// extreme, so in practice the first clip looped forever.
 public class AudioBand
 {
     const float MinCutoff = 400f;
     const float MaxCutoff = 22000f;
-    /// Bu seviyenin altındaki kaynak duraklatılır: sıfır sesle çalmak klibi çözmeye
-    /// devam eder, yani duyulmayan bir band bedava değildir.
+    /// A source below this level is paused: playing at zero volume keeps decoding the clip, so
+    /// an inaudible band is not free.
     const float SilenceThreshold = 0.004f;
     const float CrossfadeSeconds = 4f;
     const float MinHoldSeconds = 30f;
@@ -28,17 +28,17 @@ public class AudioBand
     readonly float releaseSeconds;
 
     int currentIndex = -1;
-    int active;          // o an ön planda olan kaynak
-    float blend;         // 0 tamamen active, 1 tamamen diğeri
+    int active;          // the source currently in the foreground
+    float blend;         // 0 fully active, 1 fully the other one
     float holdTimer;
     float level;
 
-    /// Her band kendi objesinde durur: Unity'de alçak geçiren filtre objedeki tüm
-    /// kaynakların karışımına uygulanır, band başına filtre ancak böyle mümkün olur.
+    /// Each band lives on its own object: in Unity a low-pass filter applies to the mix of every
+    /// source on the object, and a per-band filter is only possible this way.
     public AudioBand(Transform parent, string name, AudioClip[] clips, float attack, float release)
     {
         if (clips == null || clips.Length == 0)
-            throw new ArgumentException($"{nameof(AudioBand)}: klip listesi boş.");
+            throw new ArgumentException($"{nameof(AudioBand)}: the clip list is empty.");
 
         variations = clips;
         attackSeconds = attack;
@@ -66,9 +66,9 @@ public class AudioBand
         holdTimer = UnityEngine.Random.Range(MinHoldSeconds, MaxHoldSeconds);
     }
 
-    /// <param name="target">Hedef seviye (0-1).</param>
-    /// <param name="brightness">0 boğuk, 1 tam açık. Alçak geçiren filtreyi sürer.</param>
-    /// <param name="pitch">Perde çarpanı. 1 = klibin kendi perdesi.</param>
+    /// <param name="target">Target level (0-1).</param>
+    /// <param name="brightness">0 muffled, 1 fully open. Drives the low-pass filter.</param>
+    /// <param name="pitch">Pitch multiplier. 1 = the clip's own pitch.</param>
     public void Drive(float target, float brightness, float pitch)
     {
         target = Mathf.Clamp01(target);
@@ -79,19 +79,19 @@ public class AudioBand
 
         AdvanceCrossfade();
 
-        // Eşit güç: iki kaynağın toplam enerjisi geçiş boyunca sabit kalır,
-        // doğrusal karışım ortada belirgin bir çukur bırakırdı
+        // Equal power: the total energy of the two sources stays constant through the
+        // transition, while a linear mix would leave a clear dip in the middle
         SetLevel(sources[active], level * Mathf.Cos(blend * Mathf.PI * 0.5f));
         SetLevel(sources[1 - active], level * Mathf.Sin(blend * Mathf.PI * 0.5f));
 
         foreach (var source in sources) source.pitch = pitch;
 
-        // Kesim frekansı logaritmik ölçekte kaydırılır; kulak frekansı böyle algılar
+        // The cutoff frequency is shifted on a logarithmic scale; that is how the ear perceives frequency
         filter.cutoffFrequency = MinCutoff * Mathf.Pow(MaxCutoff / MinCutoff, Mathf.Clamp01(brightness));
     }
 
-    /// Duyulmayan kaynak duraklatılır; klip çözme maliyeti ancak böyle biter.
-    /// Duraklatma konumu koruduğu için geri açıldığında kaldığı yerden devam eder.
+    /// An inaudible source is paused; only that ends the clip decoding cost.
+    /// Because pausing preserves the position it resumes where it left off when turned back on.
     static void SetLevel(AudioSource source, float volume)
     {
         source.volume = volume;
@@ -107,7 +107,7 @@ public class AudioBand
     {
         if (variations.Length == 1) return;
 
-        // Geçiş sürüyor: tamamlandığında roller değişir, eski kaynak susar
+        // A transition is in progress: when it completes the roles swap and the old source falls silent
         if (blend > 0f)
         {
             blend = Mathf.MoveTowards(blend, 1f, Time.deltaTime / CrossfadeSeconds);

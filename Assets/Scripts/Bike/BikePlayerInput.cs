@@ -2,19 +2,19 @@ using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-/// KLAVYE GİRDİSİNİ BİSİKLETE AKTARIR. Ayrı bileşen olmasının sebebi: girdi okuma
-/// projeden projeye değişen tek parça. Kontrolcünün içine gömülseydi her yeni projede
-/// kontrolcü de değişirdi.
+/// PASSES KEYBOARD INPUT TO THE BIKE. The reason it is a separate component: reading input is
+/// the one piece that changes from project to project. Buried inside the controller, the
+/// controller would change with every new project too.
 ///
-/// Aynı bisikleti bir yapay zekâ sürecekse bu bileşen kapatılır, yerine kendi
-/// `SetInput` çağrısını yapan bir başkası konur. Kontrolcüye dokunulmaz.
+/// If an AI is to ride the same bike this component is disabled and another one that makes its
+/// own `SetInput` call takes its place. The controller is not touched.
 [RequireComponent(typeof(BikeController))]
 public class BikePlayerInput : MonoBehaviour
 {
     [SerializeField] BikeController bike;
 
-    [Tooltip("Pedal otomatik mi çevrilsin. Açıkken oyuncu ileri tuşuna basmadan da " +
-             "tempo korunuyor; uzun düzlüklerde tuş basılı tutmak yormasın diye.")]
+    [Tooltip("Whether the pedals turn automatically. While on, the tempo is kept without the " +
+             "player holding the forward key; so long flats do not tire the hand.")]
     [SerializeField] bool autoPedal;
 
     void Reset() => bike = GetComponent<BikeController>();
@@ -31,8 +31,8 @@ public class BikePlayerInput : MonoBehaviour
         var keyboard = Keyboard.current;
         if (keyboard == null) return;
 
-        // İmleç serbestken girdi oyuna değil arayüze ait — projenin yürüyüş
-        // kontrolcüsüyle aynı kural.
+        // While the cursor is free the input belongs to the UI, not the game — the same rule
+        // as the project's walking controller.
         if (Cursor.lockState != CursorLockMode.Locked)
         {
             bike.SetInput(BikeInput.Coasting);
@@ -46,8 +46,8 @@ public class BikePlayerInput : MonoBehaviour
         float throttle = keyboard.wKey.isPressed || autoPedal ? 1f : 0f;
         float brake = keyboard.sKey.isPressed ? 1f : 0f;
 
-        // Fren basılıyken pedal çevrilmiyor: ikisi aynı anda gerçek değil ve hızı
-        // belirsiz bir dengeye sokuyor.
+        // The pedals do not turn while the brake is held: the two at once is not real and puts
+        // the speed into an ambiguous equilibrium.
         if (brake > 0f) throttle = 0f;
 
         bike.SetInput(new BikeInput

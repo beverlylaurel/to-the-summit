@@ -1,6 +1,6 @@
 using UnityEngine;
 
-/// Kare hızını sabitler. VSync açıkken targetFrameRate yok sayıldığı için VSync kapatılır.
+/// Pins the frame rate. VSync is turned off because targetFrameRate is ignored while it is on.
 public class FrameRateCap : MonoBehaviour
 {
     [SerializeField] int targetFrameRate = 244;

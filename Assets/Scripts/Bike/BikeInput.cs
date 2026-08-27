@@ -1,29 +1,29 @@
 using UnityEngine;
 
-/// BİSİKLETE VERİLEN GİRDİ. Kontrolcü klavyeyi, gamepad'i ya da yapay zekâyı BİLMİYOR;
-/// yalnız bu yapıyı okuyor.
+/// THE INPUT GIVEN TO THE BIKE. The controller KNOWS NOTHING about the keyboard, the gamepad
+/// or an AI; it only reads this struct.
 ///
-/// Neden ayrı: girdi okuma projeden projeye değişen tek şey. Kontrolcünün içine
-/// gömülseydi her yeni projede kontrolcü de değişirdi. Böylece aynı bisiklet oyuncunun
-/// elinde de, bir NPC'nin altında da, kayıttan oynatmada da çalışıyor.
+/// Why it is separate: reading input is the one thing that changes from project to project.
+/// Buried inside the controller, the controller would change with every new project too. This
+/// way the same bike works under the player's hands, under an NPC, and in a replay.
 public struct BikeInput
 {
-    /// Pedal çevirme, 0-1. Bir tam güç demek değil: sürücünün ne kadar bastığı.
+    /// Pedalling, 0-1. It does not mean full power: it is how hard the rider is pushing.
     public float throttle;
 
     /// Fren, 0-1.
     public float brake;
 
-    /// Direksiyon, -1 sol, +1 sağ.
+    /// Steering, -1 left, +1 right.
     public float steer;
 
-    /// Sprint basılı mı. Güç `steadyPower` yerine `sprintPower` oluyor.
+    /// Whether sprint is held. The power becomes `sprintPower` instead of `steadyPower`.
     public bool sprint;
 
     public static BikeInput Coasting => default;
 
-    /// Ölçüleri güvenli aralığa çekiyor: dışarıdan gelen değere güvenilmiyor, çünkü
-    /// girdi kaynağı kontrolcünün dışında ve başka bir projede başka bir şey olacak.
+    /// Pulls the values into a safe range: the incoming value is not trusted, because the
+    /// input source lives outside the controller and will be something else in another project.
     public BikeInput Sanitised() => new()
     {
         throttle = Mathf.Clamp01(throttle),

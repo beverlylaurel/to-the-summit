@@ -2,8 +2,8 @@ using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-/// Fare bakışı. Yaw gövdeye, pitch kamera pivotuna uygulanır.
-/// Hareket sisteminden bağımsızdır: yürürken de serbest uçarken de aynı şekilde çalışır.
+/// Mouse look. Yaw is applied to the body, pitch to the camera pivot.
+/// It is independent of the movement system: it works the same while walking and while free flying.
 public class MouseLook : MonoBehaviour
 {
     [SerializeField] Transform cameraPivot;
@@ -19,7 +19,7 @@ public class MouseLook : MonoBehaviour
     void OnEnable()
     {
         if (cameraPivot == null)
-            throw new InvalidOperationException($"{nameof(MouseLook)}: {nameof(cameraPivot)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(MouseLook)}: {nameof(cameraPivot)} is not assigned.");
 
         pitch = cameraPivot.localEulerAngles.x;
         if (pitch > 180f) pitch -= 360f;
@@ -27,7 +27,7 @@ public class MouseLook : MonoBehaviour
 
     void Update()
     {
-        // İmleç serbestken girdi oyuna değil arayüze ait
+        // While the cursor is free the input belongs to the UI, not the game
         if (Cursor.lockState != CursorLockMode.Locked) return;
 
         var mouse = Mouse.current;

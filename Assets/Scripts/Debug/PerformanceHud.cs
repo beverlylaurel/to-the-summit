@@ -2,7 +2,7 @@ using System;
 using System.Text;
 using UnityEngine;
 
-/// Sol üstte metrikleri ve watchdog uyarılarını çizer. Kendisi ölçüm yapmaz.
+/// Draws the metrics and watchdog warnings in the top left. It measures nothing itself.
 public class PerformanceHud : MonoBehaviour
 {
     [SerializeField] PerformanceSampler sampler;
@@ -19,10 +19,10 @@ public class PerformanceHud : MonoBehaviour
     readonly StringBuilder builder = new();
     readonly GUIContent content = new();
     string metrics = "";
-    // GUIStyle SERİLEŞTİRİLMİYOR. Unity onu kaydetmeye çalıştığında içindeki font
-    // referansı derleme sonrası geçersiz kalıyor ve her yeniden yüklemede
-    // "Deleting invalid font reference" uyarısı basılıyor. Biçim zaten her
-    // kullanımda kuruluyor, saklanacak bir şey yok.
+    // THE GUIStyle IS NOT SERIALIZED. When Unity tries to save it the font reference inside
+    // becomes invalid after a compile and every reload prints a "Deleting invalid font
+    // reference" warning. The style is built at every use anyway, so there is nothing to
+    // store.
     [System.NonSerialized] GUIStyle style;
 
     public void Bind(PerformanceSampler source, PerformanceWatchdog monitor)
@@ -34,7 +34,7 @@ public class PerformanceHud : MonoBehaviour
     void OnEnable()
     {
         if (sampler == null)
-            throw new InvalidOperationException($"{nameof(PerformanceHud)}: {nameof(sampler)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(PerformanceHud)}: {nameof(sampler)} is not assigned.");
 
         sampler.Sampled += Format;
     }
@@ -77,7 +77,7 @@ public class PerformanceHud : MonoBehaviour
         }
     }
 
-    /// Paneli metne sığacak yükseklikte çizer, bir sonraki panelin y değerini döndürür
+    /// Draws the panel tall enough for its text and returns the y for the next panel
     float DrawPanel(float y, string text, Color textColor)
     {
         content.text = text;

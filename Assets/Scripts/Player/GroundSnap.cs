@@ -1,19 +1,19 @@
 using System;
 using UnityEngine;
 
-/// Oyuncuyu zemine oturtur ve orada tutar.
+/// Places the player on the ground and keeps them there.
 ///
-/// Sahnedeki kayıtlı konum, arazi her yeniden üretildiğinde geçersiz kalıyor: havada
-/// veya zemin altında. Bu yüzden konum sahneye güvenilerek değil, her başlangıçta
-/// ölçülerek belirlenir. Zeminin altına düşülürse tekrar oturtulur.
+/// The position stored in the scene becomes invalid every time the terrain is regenerated:
+/// either in the air or below the ground. So the position is not taken on trust from the
+/// scene but measured at every start. If the player falls below the ground they are placed again.
 [RequireComponent(typeof(CharacterController))]
 public class GroundSnap : MonoBehaviour
 {
     [SerializeField] Terrain terrain;
-    [Tooltip("Işının başlayacağı yükseklik (metre).")]
+    [Tooltip("Height the ray starts from (metres).")]
     [SerializeField] float probeHeight = 500f;
     [SerializeField] float clearance = 0.1f;
-    [Tooltip("Zeminin bu kadar altına düşülürse yeniden oturtulur.")]
+    [Tooltip("Falling this far below the ground triggers another placement.")]
     [SerializeField] float rescueDepth = 30f;
 
     CharacterController controller;
@@ -25,14 +25,14 @@ public class GroundSnap : MonoBehaviour
     void Start()
     {
         if (terrain == null)
-            throw new InvalidOperationException($"{nameof(GroundSnap)}: {nameof(terrain)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(GroundSnap)}: {nameof(terrain)} is not assigned.");
 
         Snap();
     }
 
     void Update()
     {
-        // Arazi altına kaçtıysa kurtar. Düşüş fark edilmeden sonsuza gitmesin.
+        // Rescue if they slipped under the terrain. A fall must not go on forever unnoticed.
         float floor = terrain.transform.position.y - rescueDepth;
         if (transform.position.y < floor) Snap();
     }
@@ -41,8 +41,8 @@ public class GroundSnap : MonoBehaviour
     {
         Vector3 position = ClampInsideTerrain(transform.position);
 
-        // Kendi kapsülü ışını engellemesin: kontrolcü kapalıyken ölçülür.
-        // Açıkken ışın önce oyuncunun kendi çarpışmasına çarpıyor ve zemin hiç görülmüyordu.
+        // Do not let their own capsule block the ray: it is measured with the controller
+        // disabled. While enabled the ray hit the player's own collider first and the ground was never seen.
         controller.enabled = false;
 
         var origin = new Vector3(position.x, position.y + probeHeight, position.z);
@@ -53,7 +53,7 @@ public class GroundSnap : MonoBehaviour
         }
         else
         {
-            // Işın boşa gittiyse yükseklik haritasına düş
+            // If the ray missed, fall back to the height map
             position.y = terrain.SampleHeight(position) + terrain.transform.position.y + clearance;
         }
 
@@ -61,7 +61,7 @@ public class GroundSnap : MonoBehaviour
         controller.enabled = true;
     }
 
-    /// Arazi dışında kalan konum altında zemin bulamaz; sınırların içine çekilir
+    /// A position outside the terrain finds no ground below it; it is pulled inside the bounds
     Vector3 ClampInsideTerrain(Vector3 position)
     {
         Vector3 origin = terrain.transform.position;

@@ -1,32 +1,33 @@
 using System;
 using UnityEngine;
 
-/// Arazinin rüzgâra ne kadar açık olduğunu ölçer ve `WindField`'e iter.
+/// Measures how exposed the terrain is to the wind and pushes it into `WindField`.
 ///
-/// Rüzgâr araziyi bilmez — bilmemeli de, kaynak olarak kalmalı. Ama arazi rüzgârı bilir:
-/// sırt tepeyi aşan havayı sıkıştırıp hızlandırır, oyuk keser. Dağda hissedilen en büyük
-/// farklardan biri budur ve rüzgâr global olduğu sürece hiç oluşmuyordu.
+/// The wind does not know the terrain — nor should it, it has to remain a source. But the
+/// terrain knows the wind: a ridge compresses and accelerates the air crossing it, a hollow cuts
+/// it. That is one of the biggest differences felt on a mountain and it never formed at all
+/// while the wind was global.
 ///
-/// ÖLÇÜM KENDİ HESABI DEĞİL, PİŞMİŞ HARİTA. Burada rüzgâr ekseninde iki yükseklik
-/// örneği alınıp kabartma hesaplanıyordu; aynı soruyu ("bu nokta rüzgârdan ne kadar
-/// korunaklı") başka bir sistem de cevaplarsa ikisi ayrışır — yüzeyin
-/// rüzgâraltı yığını saydığı yerde oyuncu tam rüzgâr hissedebiliyordu. Aynı büyüklük
-/// için iki kaynak olmaz.
+/// THE MEASUREMENT IS NOT ITS OWN COMPUTATION BUT A BAKED MAP. Two height samples along the wind
+/// axis used to be taken here and the relief computed; if another system answers the same
+/// question ("how sheltered is this point from the wind") the two diverge — the player could
+/// feel full wind where the surface counted a leeward drift. There cannot be two sources for the
+/// same quantity.
 ///
-/// Pişmiş harita aynı fiziği daha iyi kuruyor: eğim VE eğrilik, 103 metrelik Gauss
-/// çekirdeği, hâkim rüzgâr ekseni (bkz. `SurfaceMapBaker.BakeWindWeight`). Buradaki
-/// iki nokta örneği tek bir kayanın üstünde "sırt" sanabiliyordu.
+/// The baked map builds the same physics better: slope AND curvature, a 103 metre Gaussian
+/// kernel, the prevailing wind axis (see `SurfaceMapBaker.BakeWindWeight`). The two-point sample
+/// here could mistake a single boulder for a ridge.
 [RequireComponent(typeof(WindField))]
 public class TerrainWindShelter : MonoBehaviour
 {
-    [Tooltip("Maruziyetin ölçüleceği yer. Oyuncunun kendisi.")]
+    [Tooltip("Where the exposure is measured. The player themselves.")]
     [SerializeField] Transform observer;
-    [Tooltip("Birikim ağırlığı haritasını tutan bileşen.")]
+    [Tooltip("The component holding the deposition weight map.")]
     [SerializeField] TerrainSurface surface;
     [SerializeField] WindField wind;
 
-    /// Maruziyetin varış süresi (saniye). Anlık okunursa oyuncu bir adım atınca rüzgâr
-    /// zıplıyor; hava kütlesi o kadar çabuk yön değiştirmez.
+    /// Arrival time of the exposure (seconds). Read instantaneously the wind jumps when the
+    /// player takes a single step; an air mass does not change direction that fast.
     const float Smoothing = 1.5f;
 
     float exposure = 0.6f;
@@ -34,11 +35,11 @@ public class TerrainWindShelter : MonoBehaviour
     void OnEnable()
     {
         if (observer == null)
-            throw new InvalidOperationException($"{nameof(TerrainWindShelter)}: {nameof(observer)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(TerrainWindShelter)}: {nameof(observer)} is not assigned.");
         if (surface == null)
-            throw new InvalidOperationException($"{nameof(TerrainWindShelter)}: {nameof(surface)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(TerrainWindShelter)}: {nameof(surface)} is not assigned.");
         if (wind == null)
-            throw new InvalidOperationException($"{nameof(TerrainWindShelter)}: {nameof(wind)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(TerrainWindShelter)}: {nameof(wind)} is not assigned.");
     }
 
     public void Bind(Transform target, TerrainSurface terrainSurface, WindField field)
@@ -50,9 +51,9 @@ public class TerrainWindShelter : MonoBehaviour
 
     void Update()
     {
-        // Harita BİRİKİM ağırlığı taşıyor (0.67-2.0); rüzgâr hızı çarpanı onun tersi
-        // (0.5-1.5). Maruziyet sözleşmesi 0-1, ortası 0.5 — çarpandan yarım çıkarınca
-        // birebir oturuyor.
+        // The map carries the DEPOSITION weight (0.67-2.0); the wind speed multiplier is its
+        // inverse (0.5-1.5). The exposure contract is 0-1 with 0.5 in the middle — subtracting a
+        // half from the multiplier lines them up exactly.
         float windSpeedFactor = 1f / surface.WindWeightAt(observer.position);
         float target = Mathf.Clamp01(windSpeedFactor - 0.5f);
 

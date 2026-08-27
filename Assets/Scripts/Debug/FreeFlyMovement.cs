@@ -1,8 +1,8 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-/// Test amaçlı serbest uçuş. Yerçekimi ve çarpışma yok.
-/// Açıkken FirstPersonController kapatılır; ikisi aynı CharacterController'ı kullanır.
+/// Free flight for testing. No gravity and no collision.
+/// While enabled FirstPersonController is disabled; both use the same CharacterController.
 [RequireComponent(typeof(CharacterController))]
 public class FreeFlyMovement : MonoBehaviour
 {

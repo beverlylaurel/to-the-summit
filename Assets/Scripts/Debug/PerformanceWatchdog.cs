@@ -16,22 +16,22 @@ public readonly struct PerformanceAlert
     }
 }
 
-/// Sampler'ı dinler, eşik aşımlarını uyarıya çevirir. Çizim yapmaz.
+/// Listens to the sampler and turns threshold breaches into warnings. It draws nothing.
 public class PerformanceWatchdog : MonoBehaviour
 {
     [SerializeField] PerformanceSampler sampler;
 
-    [Header("Eşikler")]
+    [Header("Thresholds")]
     [SerializeField] float warningFps = 60f;
     [SerializeField] float criticalFps = 30f;
-    [Tooltip("1% low, ortalamanın bu oranının altına düşerse takılma uyarısı.")]
+    [Tooltip("A stutter warning if the 1% low falls below this fraction of the average.")]
     [SerializeField] float stutterRatio = 0.5f;
-    [Tooltip("Saniyede bu kadar MB managed bellek büyümesi = her karede çöp üretiliyor.")]
+    [Tooltip("This many MB of managed memory growth per second = garbage produced every frame.")]
     [SerializeField] float gcGrowthMbPerSec = 1f;
     [SerializeField] int drawCallLimit = 2000;
     [SerializeField] int triangleLimit = 4000000;
     [SerializeField] long memoryLimitMb = 6000;
-    [Tooltip("Koşul geçtikten sonra uyarı ekranda ne kadar kalsın.")]
+    [Tooltip("How long a warning stays on screen after the condition has passed.")]
     [SerializeField] float holdSeconds = 3f;
 
     readonly Dictionary<string, PerformanceAlert> latest = new();
@@ -46,7 +46,7 @@ public class PerformanceWatchdog : MonoBehaviour
     void OnEnable()
     {
         if (sampler == null)
-            throw new InvalidOperationException($"{nameof(PerformanceWatchdog)}: {nameof(sampler)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(PerformanceWatchdog)}: {nameof(sampler)} is not assigned.");
 
         sampler.Sampled += Evaluate;
     }
@@ -63,19 +63,19 @@ public class PerformanceWatchdog : MonoBehaviour
         if (s.AverageFps < criticalFps)
             Raise("fps", $"FPS kritik: {s.AverageFps:F0}", AlertSeverity.Critical, now);
         else if (s.AverageFps < warningFps)
-            Raise("fps", $"FPS düşük: {s.AverageFps:F0}", AlertSeverity.Warning, now);
+            Raise("fps", $"FPS low: {s.AverageFps:F0}", AlertSeverity.Warning, now);
 
         if (s.AverageFps > 0f && s.OnePercentLowFps < s.AverageFps * stutterRatio)
-            Raise("stutter", $"Takılma: 1% low {s.OnePercentLowFps:F0} / ort {s.AverageFps:F0}", AlertSeverity.Warning, now);
+            Raise("stutter", $"Stutter: 1% low {s.OnePercentLowFps:F0} / avg {s.AverageFps:F0}", AlertSeverity.Warning, now);
 
         if (s.ManagedGrowthMbPerSec > gcGrowthMbPerSec)
-            Raise("gc", $"GC baskısı: {s.ManagedGrowthMbPerSec:F1} MB/sn", AlertSeverity.Warning, now);
+            Raise("gc", $"GC pressure: {s.ManagedGrowthMbPerSec:F1} MB/s", AlertSeverity.Warning, now);
 
         if (s.DrawCalls > drawCallLimit)
-            Raise("draw", $"Draw call yüksek: {s.DrawCalls}", AlertSeverity.Warning, now);
+            Raise("draw", $"Draw calls high: {s.DrawCalls}", AlertSeverity.Warning, now);
 
         if (s.Triangles > triangleLimit)
-            Raise("tri", $"Üçgen yüksek: {s.Triangles / 1000}k", AlertSeverity.Warning, now);
+            Raise("tri", $"Triangles high: {s.Triangles / 1000}k", AlertSeverity.Warning, now);
 
         if (s.TotalMemoryMb > memoryLimitMb)
             Raise("mem", $"Bellek kritik: {s.TotalMemoryMb} MB", AlertSeverity.Critical, now);
@@ -89,7 +89,7 @@ public class PerformanceWatchdog : MonoBehaviour
         lastSeen[key] = now;
     }
 
-    /// Süresi dolan uyarıları düşürür. Kısa dalgalanmalarda yanıp sönmeyi önler.
+    /// Drops warnings whose time has expired. Prevents flicker on short fluctuations.
     void Refresh(float now)
     {
         expired.Clear();
