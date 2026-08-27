@@ -12,7 +12,7 @@ public class LookTunerWindow : EditorWindow
     float storm = 0.8f;
     float day = 0.6f;
 
-    [MenuItem("To The Summit/Görünüm Ayarları", false, 100)]
+    [MenuItem("To The Summit/Look Settings", false, 100)]
     static void Open() => GetWindow<LookTunerWindow>("Görünüm").minSize = new Vector2(340f, 420f);
 
     void OnEnable() => Acquire();

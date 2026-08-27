@@ -64,6 +64,8 @@ Shader "ToTheSummit/SeaLit"
             float  _SeaShoreFoamDepth;
             float4 _SeaFoamColor;
             float  _SeaFoamRoughness;
+            float  _SeaFoamTiling;
+            float  _SeaFoamBreakupTiling;
 
             struct Attributes
             {
@@ -227,9 +229,23 @@ Shader "ToTheSummit/SeaLit"
 
                 if (_SeaDbgNoFoam <= 0.5)
                 {
-                    // 1. TEPE KOPUGU. Jacobian'dan; sonumu compute'ta
-                    //    tasiniyor (spec 13.2).
-                    float whitecap = SeaSampleFoam(IN.positionWS.xz);
+                    // 1. TEPE KOPUGU, KATLANMA YONUNDE UZATILIYOR.
+                    //
+                    // `e-` ozvektoru yuzeyin hangi yatay yonde katlandigini
+                    // gosteriyor (spec 13.2, Tessendorf denklem 48). Desen o
+                    // yonde uzatilmazsa kopuk her yonde ayni ve dalgayla
+                    // ilgisiz gorunuyor.
+                    float2 foldDir;
+                    float whitecap = SeaSampleFoam(IN.positionWS.xz, foldDir);
+
+                    float angle = atan2(foldDir.y, foldDir.x);
+                    float sn, cs; sincos(angle, sn, cs);
+                    float2x2 rot = float2x2(cs, -sn, sn, cs);
+
+                    float2 foamUV = mul(rot, IN.positionWS.xz * _SeaFoamTiling);
+                    foamUV.x *= 0.35;
+
+                    whitecap = saturate(whitecap * (0.55 + 0.75 * SeaFoamNoise(foamUV)));
 
                     // 2. KIRILMA KOPUGU (spec 8.3). Dalga yuksekliginin su
                     //    derinligine orani kirilma indeksini asiyorsa dalga
@@ -248,13 +264,28 @@ Shader "ToTheSummit/SeaLit"
                     float shoreFoam = 1.0 - smoothstep(0.0, _SeaShoreFoamDepth, effDepth);
                     shoreFoam *= 0.4 + 0.6 * _SeaShoreFoamPhase;
 
-                    foam = saturate(max(whitecap,
-                                        max(breakT * SEA_BREAK_FOAM_GAIN, shoreFoam)));
+                    // KENAR GURULTUYLE KIRILIYOR. Kirilmazsa kopuk bandi duz
+                    // bir cizgi olur ve kiyi cizilmis gibi durur (spec 18
+                    // tuzak tablosu). [KAYNAK: Crest, SIGGRAPH 2017]
+                    float breakup = SeaFoamNoise(IN.positionWS.xz * _SeaFoamBreakupTiling);
+                    shoreFoam = saturate((shoreFoam - breakup * 0.45) * 2.5);
+
+                    foam = max(whitecap, max(breakT * SEA_BREAK_FOAM_GAIN, shoreFoam));
+
+                    // YAGMUR KOPUK EKLIYOR, KAR EKLEMIYOR. Ayrim kopruden
+                    // geliyor: `_SeaPrecipIntensity01` yalniz yagmurda dolu
+                    // (spec 13.5).
+                    foam = saturate(foam + _SeaPrecipIntensity01 * 0.06);
                 }
 
-                // KOPUK FRESNEL'DEN SONRA. Kopuk opak, sacan bir yuzey;
-                // altindaki suyun yansimasini gostermiyor (spec 12.6, 18).
-                color = lerp(color, _SeaFoamColor.rgb, foam * 0.9);
+                // KOPUK FRESNEL'DEN SONRA. Kopuk SACAN bir yuzey; altindaki
+                // suyun gok yansimasini gostermiyor (spec 12.6, 18).
+                //
+                // Isik: gunes yayinik payi + gok. Gok radyansi zaten
+                // `skyRefl`'de duruyor; yarim kure payi olarak 0.35 ile
+                // aliniyor [KALIBRASYON].
+                float3 foamLight = mainLight.color * saturate(dot(N, L)) + skyRefl * 0.35;
+                color = lerp(color, _SeaFoamColor.rgb * foamLight, foam * 0.9);
 
                 // SIS URP'NIN KENDI FONKSIYONUYLA (spec 3.5). Kendi sis
                 // hesabi YAZILMIYOR.

@@ -1,6 +1,6 @@
 // ROL: kar sisteminin çalışması için gereken proje koşullarını KONTROL EDER ve
 // raporlar. Hiçbirini otomatik düzeltmez (spec §1.1, §1.2).
-// Çağıran: menü — To The Summit/Kar/Proje Kontrolü.
+// Çağıran: menü — To The Summit/Snow/Project Check.
 
 using System.Text;
 using UnityEditor;
@@ -18,7 +18,7 @@ public static class SnowProjectCheck
     public const string DeformerLayer = "SnowDeformer";
     public const string OccluderLayer = "SnowOccluder";
 
-    [MenuItem("To The Summit/Kar/Proje Kontrolü", false, 48)]
+    [MenuItem("To The Summit/Snow/Project Check", false, 48)]
     static void RunMenu() => Debug.Log(Run());
 
     public static string Run()

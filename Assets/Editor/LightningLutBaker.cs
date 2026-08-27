@@ -95,7 +95,7 @@ static class LightningLutBaker
         if (!File.Exists(AssetPath)) Bake();
     }
 
-    [MenuItem("To The Summit/Şimşek/Saçılma tablosunu pişir")]
+    [MenuItem("To The Summit/Lightning/Bake Scatter Table")]
     static void Bake()
     {
         var tex = new Texture2D(Resolution, Resolution, TextureFormat.RGBAFloat, false, true)
@@ -220,7 +220,7 @@ static class LightningLutBaker
         return sum * step;
     }
 
-    [MenuItem("To The Summit/Şimşek/Saçılma tablosunu DOĞRULA")]
+    [MenuItem("To The Summit/Lightning/VERIFY Scatter Table")]
     static void Verify()
     {
         var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(AssetPath);

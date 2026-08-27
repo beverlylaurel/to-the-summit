@@ -1,6 +1,6 @@
 // ROL: kar yağışını ÖLÇER — tane simülasyonu, doğum kutusu, zemin ve örtü
 // kesme, rüzgâr sürüklenmesi, yoğunluk eşlemesi, savrulma eşiği, atlas.
-// Çağıran: menü — To The Summit/Kar/Yağış Sınaması.
+// Çağıran: menü — To The Summit/Snow/Precipitation Test.
 
 using System.Text;
 using UnityEditor;
@@ -26,7 +26,7 @@ public static class SnowfallTest
     /// kayardı — "düşmüyor" diye yanlış ölçülürdü (bir kez oldu).
     const float GroundY = 50f;
 
-    [MenuItem("To The Summit/Kar/Yağış Sınaması", false, 57)]
+    [MenuItem("To The Summit/Snow/Precipitation Test", false, 57)]
     static void RunMenu() => Debug.Log(Run(out _));
 
     public static string Run(out bool ok)

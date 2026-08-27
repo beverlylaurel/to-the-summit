@@ -25,7 +25,7 @@ public static class RainStreakImporter
     const string SourceFolder = "Tools/rain/packed";
     const string AssetPath = "Assets/Rain/RainStreakDatabase.asset";
 
-    [MenuItem("To The Summit/Yağmur/İz veritabanını kur", false, 40)]
+    [MenuItem("To The Summit/Rain/Set Up Streak Database", false, 40)]
     static void Import()
     {
         var indexFiles = Directory.GetFiles(SourceFolder, "*.index.txt");

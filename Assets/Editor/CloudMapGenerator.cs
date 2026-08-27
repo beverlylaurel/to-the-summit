@@ -46,7 +46,7 @@ public static class CloudMapGenerator
     const float DenseThreshold = 0.0f;
     const float DenseEdge = 0.40f;
 
-    [MenuItem("To The Summit/Bulut/Hava Haritasını Üret", false, 40)]
+    [MenuItem("To The Summit/Clouds/Bake Weather Map", false, 40)]
     public static void Generate()
     {
         CreateOrUpdate();

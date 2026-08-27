@@ -118,20 +118,69 @@ float2 SeaSampleSlope(float2 posXZ)
     return egim;
 }
 
-/// Tepe kopugu yogunlugu. Kademeler arasi EN BUYUK — kopuk ortulme,
-/// ortalama degil.
-float SeaSampleFoam(float2 posXZ)
+/// Tepe kopugu yogunlugu ve KATLANMA YONU.
+///
+/// Kademeler arasi EN BUYUK aliniyor — kopuk ortulme, ortalama degil.
+/// Yon, kopugu KAZANAN kademeden geliyor: baska kademenin yonu alinsaydi
+/// desen kopugun uzandigi yonle ilgisiz cikardi.
+float SeaSampleFoam(float2 posXZ, out float2 katlanmaYonu)
 {
     float f = 0.0;
+    katlanmaYonu = float2(1.0, 0.0);
 
     [unroll]
     for (int s = 0; s < SEA_TIER_COUNT; ++s)
     {
         float2 uv = posXZ / _SeaPatchSizes[s];
-        f = max(f, SAMPLE_TEXTURE2D_ARRAY(_SeaFoam, sampler_SeaFoam, uv, s).r);
+        float k = SAMPLE_TEXTURE2D_ARRAY(_SeaFoam, sampler_SeaFoam, uv, s).r;
+
+        if (k > f)
+        {
+            f = k;
+            katlanmaYonu = SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives,
+                                                  sampler_SeaDerivatives, uv, s).zw;
+        }
     }
 
     return f;
+}
+
+// ------------------------------------------------------------- gurultu
+
+/// PROSEDUREL KOPUK DESENI — DOKU YOK.
+///
+/// Spec 13 `T_Foam` ve `T_FoamBreakup` dokularini istiyor. Bu projede
+/// doku uretimi kredili servisten geciyor ve `CLAUDE.md` ilk denemenin
+/// dogru olmasini sart kosuyor; kopugun nasil gorunmesi gerektigi ekranda
+/// oturmadan istem yazmak kredi yakardi. Plan bu alternatifi kendisi
+/// veriyor. Doku takilinca bu fonksiyon silinir.
+float SeaHash21(float2 p)
+{
+    p = frac(p * float2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return frac(p.x * p.y);
+}
+
+float SeaValueNoise(float2 p)
+{
+    float2 i = floor(p);
+    float2 f = frac(p);
+    f = f * f * (3.0 - 2.0 * f);
+
+    float a = SeaHash21(i);
+    float b = SeaHash21(i + float2(1.0, 0.0));
+    float c = SeaHash21(i + float2(0.0, 1.0));
+    float d = SeaHash21(i + float2(1.0, 1.0));
+
+    return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
+}
+
+/// Uc oktav. Kopuk hem iri kume hem ince kabarcik tasiyor.
+float SeaFoamNoise(float2 p)
+{
+    return SeaValueNoise(p)        * 0.60
+         + SeaValueNoise(p * 2.37) * 0.30
+         + SeaValueNoise(p * 5.13) * 0.10;
 }
 
 // -------------------------------------------------------- karmasik sayi

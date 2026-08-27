@@ -1,6 +1,6 @@
 // ROL: kar püskürtmesini ve savrulma eşiğini ÖLÇER — V̇ formülü, eşiğin
 // gevşek/sıkışmış kar arasında kayması.
-// Çağıran: menü — To The Summit/Kar/Püskürtme Sınaması.
+// Çağıran: menü — To The Summit/Snow/Spray Test.
 
 using System.Text;
 using UnityEditor;
@@ -19,7 +19,7 @@ public static class SnowSprayTest
 
     const float GroundY = 100f;
 
-    [MenuItem("To The Summit/Kar/Püskürtme Sınaması", false, 61)]
+    [MenuItem("To The Summit/Snow/Spray Test", false, 61)]
     static void RunMenu() => Debug.Log(Run(out _));
 
     public static string Run(out bool ok)

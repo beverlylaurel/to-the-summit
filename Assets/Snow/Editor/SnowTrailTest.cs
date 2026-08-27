@@ -1,6 +1,6 @@
 // ROL: iz oluşumunu ÖLÇER — carve kalıcılığı, sırtın izin ETRAFINDA olması,
 // hareket yönünde asimetri, derinlik ölçeği, patika oluşumu, dolma, rüzgâr eşiği.
-// Çağıran: menü — To The Summit/Kar/İz Sınaması.
+// Çağıran: menü — To The Summit/Snow/Trail Test.
 
 using System.Text;
 using UnityEditor;
@@ -32,7 +32,7 @@ public static class SnowTrailTest
 
     static readonly Vector2 Center = new(-7494f, -4327.5f);
 
-    [MenuItem("To The Summit/Kar/İz Sınaması", false, 52)]
+    [MenuItem("To The Summit/Snow/Trail Test", false, 52)]
     static void RunMenu() => Debug.Log(Run(out _));
 
     public static string Run(out bool ok)

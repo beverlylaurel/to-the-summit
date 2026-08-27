@@ -122,4 +122,15 @@ public class SeaSettings : ScriptableObject
     /// Köpük saçan bir yüzey, parlak değil. [KALİBRASYON]
     public Color foamColor = new Color(0.92f, 0.94f, 0.95f);
     [Range(0f, 1f)] public float foamRoughness = 0.85f;
+
+    /// Tepe köpüğü deseninin dünya ölçeği (1/m). Desen katlanma yönünde
+    /// uzatılıyor. [KALİBRASYON]
+    [Tooltip("Tepe köpüğü deseni ölçeği (1/m).")]
+    [Range(0.05f, 4f)] public float foamTiling = 0.8f;
+
+    /// KIYI KÖPÜĞÜNÜN KENARI GÜRÜLTÜYLE KIRILIYOR. Kırılmazsa köpük bandı
+    /// düz bir çizgi olur ve kıyı çizgisi çizilmiş gibi durur
+    /// (spec §18 tuzak tablosu). [KAYNAK: Crest, SIGGRAPH 2017]
+    [Tooltip("Kıyı köpüğü kenar gürültüsünün ölçeği (1/m).")]
+    [Range(0.05f, 2f)] public float foamBreakupTiling = 0.35f;
 }

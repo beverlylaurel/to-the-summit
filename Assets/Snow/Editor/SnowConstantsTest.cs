@@ -1,6 +1,6 @@
 // ROL: SnowConstants.cs ile SnowConstants.hlsl'in BİREBİR aynı değerleri
 // taşıdığını doğrular (spec §0.10, Faz 0 kabul kriteri).
-// Çağıran: menü — To The Summit/Kar/Sabit Eşliğini Sına, ve SnowProjectCheck.
+// Çağıran: menü — To The Summit/Snow/Test Constant Parity, ve SnowProjectCheck.
 
 using System;
 using System.Collections.Generic;
@@ -106,7 +106,7 @@ public static class SnowConstantsTest
     /// fonksiyon, sabit değil — `SNOW_FILL_GAIN` diye bir define hiç yok.
     static readonly string[] CsharpOnly = { "SnapQuadsInt", "MeshBoundsHeight", "ReposeIterations" };
 
-    [MenuItem("To The Summit/Kar/Sabit Eşliğini Sına", false, 60)]
+    [MenuItem("To The Summit/Snow/Test Constant Parity", false, 60)]
     static void RunMenu() => Debug.Log(Run(out bool ok) + (ok ? "" : "\nEŞLİK BOZUK."));
 
     /// Raporu döndürür; `ok` bütün çiftlerin eşleştiğini söyler.

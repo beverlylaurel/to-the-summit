@@ -1,6 +1,6 @@
 // ROL: oyun tarafı API'sini ÖLÇER — örnek çözümleme, ayak sesi yüzey seçimi,
 // hız çarpanı, toz sayısı, pencere eşlemesi.
-// Çağıran: menü — To The Summit/Kar/Oynanış Sınaması.
+// Çağıran: menü — To The Summit/Snow/Gameplay Test.
 
 using System.Text;
 using UnityEditor;
@@ -11,7 +11,7 @@ using UnityEngine;
 /// her satır kendi eşiğinin iki yakasından deneniyor.
 public static class SnowGameplayTest
 {
-    [MenuItem("To The Summit/Kar/Oynanış Sınaması", false, 58)]
+    [MenuItem("To The Summit/Snow/Gameplay Test", false, 58)]
     static void RunMenu() => Debug.Log(Run(out _));
 
     public static string Run(out bool ok)

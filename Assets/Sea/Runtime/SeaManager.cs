@@ -175,6 +175,8 @@ public class SeaManager : MonoBehaviour
         Shader.SetGlobalFloat(SeaShaderIDs.ShoreFoamDepth, settings.shoreFoamDepth);
         Shader.SetGlobalColor(SeaShaderIDs.FoamColor, settings.foamColor);
         Shader.SetGlobalFloat(SeaShaderIDs.FoamRoughness, settings.foamRoughness);
+        Shader.SetGlobalFloat(SeaShaderIDs.FoamTiling, settings.foamTiling);
+        Shader.SetGlobalFloat(SeaShaderIDs.FoamBreakupTiling, settings.foamBreakupTiling);
     }
 
     /// TEPE PERİYODU SPEKTRUMDAN TÜRÜYOR.

@@ -1,6 +1,6 @@
 // ROL: nesne ve karakter üstü karı ÖLÇER — eğim eşiği, gökyüzü örtüsü,
 // oyuk çarpanı, kaplama bağı ve karakterde birikme/temizlenme.
-// Çağıran: menü — To The Summit/Kar/Kaplama Sınaması.
+// Çağıran: menü — To The Summit/Snow/Coverage Test.
 
 using System.Text;
 using UnityEditor;
@@ -14,7 +14,7 @@ public static class SnowCoverTest
     const string KernelPath = "Assets/Snow/Editor/SnowTestKernels.compute";
     const string ShaderPath = "Assets/Snow/Shaders/SnowCoverObject.shader";
 
-    [MenuItem("To The Summit/Kar/Kaplama Sınaması", false, 56)]
+    [MenuItem("To The Summit/Snow/Coverage Test", false, 56)]
     static void RunMenu() => Debug.Log(Run(out _));
 
     public static string Run(out bool ok)

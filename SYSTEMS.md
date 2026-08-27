@@ -1187,7 +1187,7 @@ compute ile koşuyor.
 pencere `SnapStep` (0.25 m) ızgarasına oturuyor ve kaydığında içerik `KScroll` ile aynı
 dünya noktasında kalıyor. Üç presette de bir SnapStep tam sayı teksele denk geliyor
 (8 / 16 / 24) — kesirli olsaydı izler teksel altı titrerdi. Ölçüm:
-`To The Summit/Kar/Kaydırma Sınaması`.
+`To The Summit/Snow/Scroll Test`.
 
 ## 5. Bilinçli kurallar
 

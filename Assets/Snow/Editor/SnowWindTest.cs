@@ -1,5 +1,5 @@
 // ROL: rüzgâr gölgesini, taşınımı, sastrugiyi ve ısı kaynaklarını ÖLÇER.
-// Çağıran: menü — To The Summit/Kar/Rüzgâr Sınaması.
+// Çağıran: menü — To The Summit/Snow/Wind Test.
 
 using System.Text;
 using UnityEditor;
@@ -25,7 +25,7 @@ public static class SnowWindTest
 
     static readonly Vector2 Center = Vector2.zero;
 
-    [MenuItem("To The Summit/Kar/Rüzgâr Sınaması", false, 60)]
+    [MenuItem("To The Summit/Snow/Wind Test", false, 60)]
     static void RunMenu() => Debug.Log(Run(out _));
 
     public static string Run(out bool ok)

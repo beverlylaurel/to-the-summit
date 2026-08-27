@@ -1,6 +1,6 @@
 // ROL: SeaConstants.cs ile SeaConstants.hlsl'in BİREBİR aynı değerleri
 // taşıdığını doğrular (deniz spec §0.10, Faz 0 kabul kriteri).
-// Çağıran: menü — To The Summit/Deniz/Sabit Eşliğini Sına.
+// Çağıran: menü — To The Summit/Sea/Test Constant Parity.
 
 using System;
 using System.Collections.Generic;
@@ -63,7 +63,7 @@ public static class SeaConstantsTest
     /// hesapladığı ama shader'ın okumadığı bir sabit çıkarsa buraya girer.
     static readonly string[] CsharpOnly = { };
 
-    [MenuItem("To The Summit/Deniz/Sabit Eşliğini Sına", false, 80)]
+    [MenuItem("To The Summit/Sea/Test Constant Parity", false, 80)]
     static void RunMenu() => Debug.Log(Run(out bool ok) + (ok ? "" : "\nEŞLİK BOZUK."));
 
     public static string Run(out bool ok)

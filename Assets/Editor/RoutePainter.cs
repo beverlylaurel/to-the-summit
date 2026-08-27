@@ -71,7 +71,7 @@ public class RoutePainter : EditorWindow
     Vector3 lastPaint;
     bool hasLastPaint;
 
-    [MenuItem("To The Summit/Rota Fırçası", false, 40)]
+    [MenuItem("To The Summit/Route Brush", false, 40)]
     static void Open() => GetWindow<RoutePainter>("Rota Fırçası").Show();
 
     void OnEnable()

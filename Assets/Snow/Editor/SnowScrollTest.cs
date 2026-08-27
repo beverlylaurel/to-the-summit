@@ -1,6 +1,6 @@
 // ROL: bölge kaydırmasının ve snap ızgarasının doğruluğunu ÖLÇER. Göz kararı
 // yok — her sınamanın tek doğru cevabı var, sayı olarak basılıyor.
-// Çağıran: menü — To The Summit/Kar/Kaydırma Sınaması.
+// Çağıran: menü — To The Summit/Snow/Scroll Test.
 
 using System.Collections.Generic;
 using System.Text;
@@ -23,7 +23,7 @@ public static class SnowScrollTest
 
     static readonly Vector4 Edge = new(-1f, -2f, -3f, -4f);
 
-    [MenuItem("To The Summit/Kar/Kaydırma Sınaması", false, 49)]
+    [MenuItem("To The Summit/Snow/Scroll Test", false, 49)]
     static void RunMenu() => Debug.Log(Run(out _));
 
     public static string Run(out bool ok)

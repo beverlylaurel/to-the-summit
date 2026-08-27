@@ -1,6 +1,6 @@
 // ROL: birikme, erime, yağmur etkisi, gökyüzü örtüsü, rüzgâr dağıtımı ve
 // yağış histerezisini ÖLÇER. Play gerekmiyor.
-// Çağıran: menü — To The Summit/Kar/Birikme Sınaması.
+// Çağıran: menü — To The Summit/Snow/Accumulation Test.
 
 using System.Text;
 using UnityEditor;
@@ -21,7 +21,7 @@ public static class SnowAccumulationTest
 
     static readonly Vector2 Center = new(-7494f, -4327.5f);
 
-    [MenuItem("To The Summit/Kar/Birikme Sınaması", false, 54)]
+    [MenuItem("To The Summit/Snow/Accumulation Test", false, 54)]
     static void RunMenu() => Debug.Log(Run(out _));
 
     public static string Run(out bool ok)

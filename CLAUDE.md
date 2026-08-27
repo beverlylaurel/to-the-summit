@@ -9,6 +9,15 @@ Karlı, fırtınalı bir dağa tırmanma oyunu. Unity 6000.5.6f1, URP, birinci �
 - Claude bir şeyi otomatikleştirebiliyorsa otomatikleştirir. Kullanıcıya "şu menüye tıkla" demek son çaredir.
 - Sahne kurulumu `Assets/Editor/MountainSceneBootstrap.cs` üzerinden koddan yönetilir. Elle sahne düzenleme yok.
 
+## Dil
+
+**Kaynak dosyaların içi tamamen İngilizce.** Tanımlayıcı, yorum, log metni,
+menü yolu, sahne nesnesi adı, shader property adı — hepsi. Türkçe karakter
+`Assets/` altında hiçbir `.cs`, `.shader`, `.hlsl`, `.compute` dosyasında
+geçmez.
+
+Belgeler (`*.md`) ve commit mesajları Türkçe kalır; onlar kullanıcı için.
+
 ## Kod mimarisi
 
 React component mantığı geçerlidir: her parça kendi içinde kapalı, dışarıdan gelen parametreyle çalışır, başka parçalara bağımlı değildir.

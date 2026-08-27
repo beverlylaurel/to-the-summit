@@ -160,7 +160,7 @@ public static class BikeBootstrap
         return true;
     }
 
-    [MenuItem("To The Summit/Model/Bisiklet/Sahneye Kur", false, 120)]
+    [MenuItem("To The Summit/Model/Bicycle/Set Up In Scene", false, 120)]
     static void Build()
     {
         Dictionary<string, Material> materials = BuildMaterials();

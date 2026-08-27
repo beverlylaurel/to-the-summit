@@ -71,7 +71,7 @@ public class VertexBrush : EditorWindow
 
     bool painting;
 
-    [MenuItem("To The Summit/Model/Bisiklet/Malzeme Fırçası", false, 124)]
+    [MenuItem("To The Summit/Model/Bicycle/Material Brush", false, 124)]
     static void Open() => GetWindow<VertexBrush>("Malzeme Fırçası").Show();
 
     void OnEnable()

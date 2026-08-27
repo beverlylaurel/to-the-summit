@@ -1,6 +1,6 @@
 // ROL: kar shading'inin iki zor formülünü ÖLÇER — parıltının mesafede
 // sabit kalması ve Reoriented Normal Mapping'in kimlik özellikleri.
-// Çağıran: menü — To The Summit/Kar/Shading Sınaması.
+// Çağıran: menü — To The Summit/Snow/Shading Test.
 
 using System.Text;
 using UnityEditor;
@@ -25,7 +25,7 @@ public static class SnowShadingTest
     const string ForwardPath = "Assets/Snow/Shaders/SnowLitForwardPass.hlsl";
     const string DetailPath = "Assets/Snow/Shaders/SnowDetailNormals.hlsl";
 
-    [MenuItem("To The Summit/Kar/Shading Sınaması", false, 55)]
+    [MenuItem("To The Summit/Snow/Shading Test", false, 55)]
     static void RunMenu() => Debug.Log(Run(out _));
 
     public static string Run(out bool ok)

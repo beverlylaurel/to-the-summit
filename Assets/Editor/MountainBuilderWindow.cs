@@ -287,7 +287,7 @@ public class MountainBuilderWindow : EditorWindow
     float[] strokeSnapshot;
     int sx0, sz0, sx1, sz1;
 
-    [MenuItem("To The Summit/Arazi/Dağ Yapımı", false, 12)]
+    [MenuItem("To The Summit/Terrain/Mountain Builder", false, 12)]
     static void Open()
     {
         var w = GetWindow<MountainBuilderWindow>("Dağ Yapımı");

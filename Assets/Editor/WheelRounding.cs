@@ -32,7 +32,7 @@ public static class WheelRounding
     ///
     /// DİKKAT: elle boyanan malzeme maskesi de bu mesh'lerin içinde. Sıfırlamak boyamayı
     /// da siler.
-    [MenuItem("To The Summit/Model/Bisiklet/Üretilen Mesh'leri Sıfırla", false, 125)]
+    [MenuItem("To The Summit/Model/Bicycle/Reset Generated Meshes", false, 125)]
     static void Reset()
     {
         if (!AssetDatabase.IsValidFolder(Folder))

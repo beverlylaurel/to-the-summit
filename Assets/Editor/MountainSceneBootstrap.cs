@@ -121,7 +121,7 @@ public static class MountainSceneBootstrap
     /// kullanıcı doğru gölgelendirmeyi ancak Play'e girip çıkınca görüyordu.
     public static void Rebuild() => RegenerateTerrain();
 
-    [MenuItem("To The Summit/Arazi/Araziyi Yeniden Üret", false, 20)]
+    [MenuItem("To The Summit/Terrain/Regenerate Terrain", false, 20)]
     static void RegenerateTerrain()
     {
         var gen = Object.FindAnyObjectByType<MountainGenerator>();
@@ -434,7 +434,7 @@ public static class MountainSceneBootstrap
         if (streakDatabase == null)
             Debug.LogWarning(
                 $"İz veritabanı yok: {RainStreakDatabasePath}. Menü: " +
-                "To The Summit/Yağmur/İz veritabanını kur");
+                "To The Summit/Rain/Set Up Streak Database");
 
         // HER KOŞUDA VARLIĞI GARANTİ EDİLİYOR, yalnız sahne yaratılırken değil.
         // Sahne zaten varsa yaratma bloğu hiç çalışmıyor ve arama null dönüyordu.
@@ -1794,7 +1794,7 @@ public static class MountainSceneBootstrap
         var kok = Object.FindAnyObjectByType<SeaManager>(FindObjectsInactive.Include);
         if (kok == null)
         {
-            kok = new GameObject("Deniz").AddComponent<SeaManager>();
+            kok = new GameObject("Sea").AddComponent<SeaManager>();
             changed = true;
         }
 
@@ -1831,7 +1831,7 @@ public static class MountainSceneBootstrap
         var yuzey = Object.FindAnyObjectByType<SeaSurface>(FindObjectsInactive.Include);
         if (yuzey == null)
         {
-            var go = new GameObject("Deniz Yuzeyi",
+            var go = new GameObject("Sea Surface",
                                     typeof(MeshFilter), typeof(MeshRenderer));
             yuzey = go.AddComponent<SeaSurface>();
             changed = true;

@@ -26,7 +26,7 @@ public class SurfaceMapWindow : EditorWindow
     // Toolbar, açıklama kutusu ve kenar boşlukları için görüntünün üstünde kalan yer
     const float ChromeHeight = 110f;
 
-    [MenuItem("To The Summit/Arazi/Yüzey Haritaları", false, 22)]
+    [MenuItem("To The Summit/Terrain/Surface Maps", false, 22)]
     static void Open()
     {
         var window = GetWindow<SurfaceMapWindow>("Yüzey Haritaları");

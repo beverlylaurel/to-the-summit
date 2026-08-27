@@ -28,7 +28,7 @@ public static class SnowVfxBuilder
     const string Folder = "Assets/Snow/VFX";
     const string EditorAsm = "Unity.VisualEffectGraph.Editor";
 
-    [MenuItem("To The Summit/Kar/VFX Grafiklerini Üret", false, 62)]
+    [MenuItem("To The Summit/Snow/Generate VFX Graphs", false, 62)]
     static void BuildAll()
     {
         var r = new StringBuilder();
@@ -860,7 +860,7 @@ public static class SnowVfxBuilder
     /// Menüden açılıyor; üretim kapalı koşuyor.
     static bool Dump;
 
-    [MenuItem("To The Summit/Kar/VFX Grafiklerini Üret (döküm)", false, 63)]
+    [MenuItem("To The Summit/Snow/Generate VFX Graphs (dump)", false, 63)]
     static void BuildAllWithDump()
     {
         Dump = true;

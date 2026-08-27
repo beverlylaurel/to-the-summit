@@ -84,6 +84,8 @@ public static class SeaShaderIDs
     public static readonly int ShoreFoamDepth = Shader.PropertyToID("_SeaShoreFoamDepth");
     public static readonly int FoamColor = Shader.PropertyToID("_SeaFoamColor");
     public static readonly int FoamRoughness = Shader.PropertyToID("_SeaFoamRoughness");
+    public static readonly int FoamTiling = Shader.PropertyToID("_SeaFoamTiling");
+    public static readonly int FoamBreakupTiling = Shader.PropertyToID("_SeaFoamBreakupTiling");
 
     // --- Islak kum (spec §14) ---
     public static readonly int SeaWetLevelY = Shader.PropertyToID("_SeaWetLevelY");

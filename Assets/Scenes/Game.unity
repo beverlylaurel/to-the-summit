@@ -205,7 +205,7 @@ GameObject:
   - component: {fileID: 76489738}
   - component: {fileID: 76489737}
   m_Layer: 0
-  m_Name: Kar Sistemi
+  m_Name: Snow System
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -860,7 +860,7 @@ GameObject:
   - component: {fileID: 360528741}
   - component: {fileID: 360528740}
   m_Layer: 0
-  m_Name: Deniz Yuzeyi
+  m_Name: Sea Surface
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -875,7 +875,7 @@ Transform:
   m_GameObject: {fileID: 360528738}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -11600, y: 30, z: -6255}
+  m_LocalPosition: {x: -7494, y: 30, z: -4327.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2527,7 +2527,7 @@ GameObject:
   - component: {fileID: 1259083604}
   - component: {fileID: 1259083607}
   m_Layer: 0
-  m_Name: Deniz
+  m_Name: Sea
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

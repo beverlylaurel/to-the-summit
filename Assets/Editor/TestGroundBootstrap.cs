@@ -36,7 +36,7 @@ public static class TestGroundBootstrap
     /// soruyor, iptal edilirse geçiş yapılmıyor.
     static bool AskToSave() => EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
 
-    [MenuItem("To The Summit/Sahne/Test Sahnesi _F6", false, 1)]
+    [MenuItem("To The Summit/Scene/Test Scene _F6", false, 1)]
     public static void Open()
     {
         if (!AskToSave()) return;
@@ -47,14 +47,14 @@ public static class TestGroundBootstrap
 
     /// Oyun sahnesine dönüş. Menüde iki komşu satır: gidiş ve dönüş aynı yerde
     /// durmazsa "nasıl döneceğim" sorusu her seferinde tekrar sorulur.
-    [MenuItem("To The Summit/Sahne/Oyun Sahnesi _F5", false, 0)]
+    [MenuItem("To The Summit/Scene/Game Scene _F5", false, 0)]
     public static void OpenMain()
     {
         if (!AskToSave()) return;
         EditorSceneManager.OpenScene(MainScenePath);
     }
 
-    [MenuItem("To The Summit/Sahne/Test Sahnesini Yeniden Kur", false, 2)]
+    [MenuItem("To The Summit/Scene/Rebuild Test Scene", false, 2)]
     public static void Recreate()
     {
         if (File.Exists(ScenePath)) AssetDatabase.DeleteAsset(ScenePath);

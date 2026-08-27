@@ -45,7 +45,7 @@ public static class SeaSpectrumTest
         public float baskinYon;
     }
 
-    [MenuItem("To The Summit/Deniz/Dalga Alanını Sına")]
+    [MenuItem("To The Summit/Sea/Test Wave Field")]
     public static void Sina()
     {
         var ayar = AssetDatabase.LoadAssetAtPath<SeaSettings>(

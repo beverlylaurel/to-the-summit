@@ -1,6 +1,6 @@
 // ROL: uzak kaskadı ve kalıcılığı ÖLÇER — kaskadın birikmesi ve kayması,
 // blok paketleme/açma turu, yarım hassasiyetin taşıdığı çözünürlük.
-// Çağıran: menü — To The Summit/Kar/Kalıcılık Sınaması.
+// Çağıran: menü — To The Summit/Snow/Persistence Test.
 
 using System.Text;
 using UnityEditor;
@@ -23,7 +23,7 @@ public static class SnowPersistenceTest
     const int StoredSide = 64;
 
 
-    [MenuItem("To The Summit/Kar/Kalıcılık Sınaması", false, 59)]
+    [MenuItem("To The Summit/Snow/Persistence Test", false, 59)]
     static void RunMenu() => Debug.Log(Run(out _));
 
     public static string Run(out bool ok)

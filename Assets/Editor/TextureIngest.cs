@@ -33,7 +33,7 @@ public static class TextureIngest
     /// zaten albedo almıyoruz ama normal haritası da şüpheli hale gelir.
     const float BakedLightWarning = 0.3f;
 
-    [MenuItem("To The Summit/Doku/Doku Al...", false, 60)]
+    [MenuItem("To The Summit/Textures/Fetch Texture...", false, 60)]
     static void IngestMenu()
     {
         string source = EditorUtility.OpenFolderPanel("Doku klasörü", "", "");

@@ -1,6 +1,6 @@
 // ROL: kar yüzeyi yükseklik fonksiyonunun GPU ve CPU sürümlerinin aynı
 // sonucu verdiğini doğrular.
-// Çağıran: menü (To The Summit/Kar/Yükseklik Eşliğini Sına).
+// Çağıran: menü (To The Summit/Snow/Test Height Parity).
 
 using System.Text;
 using UnityEditor;
@@ -24,7 +24,7 @@ public static class SnowHeightParityTest
     /// demektir, yuvarlama değil.
     const float ToleransMetre = 0.001f;
 
-    [MenuItem("To The Summit/Kar/Yükseklik Eşliğini Sına", false, 61)]
+    [MenuItem("To The Summit/Snow/Test Height Parity", false, 61)]
     static void RunMenu() => Debug.Log(Run(out bool ok) + (ok ? "" : "\nEŞLİK BOZUK."));
 
     public static string Run(out bool ok)

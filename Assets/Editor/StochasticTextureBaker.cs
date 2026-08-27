@@ -33,7 +33,7 @@ public static class StochasticTextureBaker
         ("Height", false)
     };
 
-    [MenuItem("To The Summit/Doku/Yüzey Dokularını Yeniden Pişir", false, 61)]
+    [MenuItem("To The Summit/Textures/Rebake Surface Textures", false, 61)]
     static void Rebake()
     {
         if (File.Exists(MarkerPath)) File.Delete(MarkerPath);

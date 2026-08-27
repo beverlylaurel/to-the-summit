@@ -1,6 +1,6 @@
 // ROL: kar sisteminin teşhis penceresi — durum dokularının kanallarını gösterir,
 // bölge/snap sayılarını yazar. Bir de sahneyi kuran düğme.
-// Çağıran: menü — To The Summit/Kar/Kar Teşhisi.
+// Çağıran: menü — To The Summit/Snow/Snow Diagnostics.
 
 using System.IO;
 using UnityEditor;
@@ -47,7 +47,7 @@ public class SnowDebugWindow : EditorWindow
     Material debugMaterial;
     RenderTexture preview;
 
-    [MenuItem("To The Summit/Kar/Kar Teşhisi", false, 50)]
+    [MenuItem("To The Summit/Snow/Snow Diagnostics", false, 50)]
     static void Open() => GetWindow<SnowDebugWindow>("Kar Teşhisi").minSize = new Vector2(420f, 560f);
 
     void OnDisable()
@@ -308,7 +308,7 @@ public class SnowDebugWindow : EditorWindow
         gridSize = EditorGUILayout.Slider("Izgara (m)", gridSize, 0.25f, 8f);
         // IZGARA BİR TEST DEĞİL, ÖLÇEK ÇUBUĞU. Faz 1'de dokular boş — içinde
         // ızgarayla kıyaslanacak hiçbir şey yok. Kaydırma doğruluğu göz kararıyla
-        // değil `To The Summit/Kar/Kaydırma Sınaması` ile ölçülüyor.
+        // değil `To The Summit/Snow/Scroll Test` ile ölçülüyor.
         EditorGUILayout.HelpBox(
             "Yeşil ızgara DÜNYAYA çakılı, ölçek çubuğudur. Kaydırma doğruluğu " +
             "menüdeki \"Kaydırma Sınaması\" ile ölçülür — gözle değil.",
@@ -343,7 +343,7 @@ public class SnowDebugWindow : EditorWindow
     /// sabit, altı yardımcı metot peşinden sürüklendi — kazancı yoktu.
     /// Kurulumu menüden koşturur. Pencereyi açıp düğmeye basmak yerine tek
     /// komut; otomatik kurulum yeni bir bileşeni henüz tanımıyorken gerekiyor.
-    [MenuItem("To The Summit/Kar/Sahneyi Kur", false, 51)]
+    [MenuItem("To The Summit/Snow/Set Up Scene", false, 51)]
     static void SetupSceneMenu() => SetupScene();
 
     public static void SetupScene()
@@ -374,7 +374,7 @@ public class SnowDebugWindow : EditorWindow
 
         if (manager == null)
         {
-            var host = new GameObject("Kar Sistemi");
+            var host = new GameObject("Snow System");
             manager = host.AddComponent<SnowManager>();
         }
 

@@ -24,7 +24,7 @@ using UnityEngine.Experimental.Rendering;
 ///         hepsi çalışma kümesinde duruyor.
 public class RainStreakWorkingSet : MonoBehaviour
 {
-    [Tooltip("Pişmiş iz veritabanı. `To The Summit/Yağmur/İz veritabanını kur` üretiyor.")]
+    [Tooltip("Pişmiş iz veritabanı. `To The Summit/Rain/Set Up Streak Database` üretiyor.")]
     [SerializeField] RainStreakDatabase database;
 
     /// ÇÖZÜNÜRLÜK SEVİYESİ — `[Garg 2006, §5]`: "the resolution level with textures of

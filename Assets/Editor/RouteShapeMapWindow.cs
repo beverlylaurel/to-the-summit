@@ -23,7 +23,7 @@ public class RouteShapeMapWindow : EditorWindow
 
     Texture2D mask;
 
-    [MenuItem("To The Summit/Arazi/Tesviye Haritası", false, 27)]
+    [MenuItem("To The Summit/Terrain/Contour Map", false, 27)]
     static void Open() => GetWindow<RouteShapeMapWindow>("Tesviye Haritası").Show();
 
     void OnGUI()
