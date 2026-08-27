@@ -28,6 +28,14 @@ float  _SeaLevelY;
 
 // --- Bathymetry (spec 9) ---
 TEXTURE2D(_SeaBathyTex);
+
+// KENDI ORNEKLEYICISI.
+//
+// `sampler_LinearClamp` URP'nin ic ornekleyicisi ve YALNIZ parca/vertex
+// asamasinda tanimli; compute'ta "undeclared identifier" veriyor ve
+// kernel SESSIZCE gecersiz kaliyor — `HasKernel` yine True donuyor, hata
+// ancak dispatch'te "Kernel at index (0) is invalid" olarak cikiyor.
+SAMPLER(sampler_SeaBathyTex);
 float2 _SeaBathyOriginXZ;
 float2 _SeaBathySizeXZ;
 float  _SeaBathyResolution;
@@ -83,7 +91,16 @@ float2 SeaExpI(float theta)
 /// [KAYNAK: Tessendorf 2004 denklem 31 ve 32]
 float SeaOmega(float k, float depth)
 {
-    return sqrt(SEA_G * k * tanh(k * depth));
+    // TANH ARGUMANI KIRPILIYOR.
+    //
+    // Derleyici `tanh`'i (e^x - e^-x)/(e^x + e^-x) olarak aciyor; x ~ 88'i
+    // gecince e^x tasip inf oluyor ve inf/inf = NaN cikiyor. Olculdu:
+    // 60 m derinlikte |n| > 112 olan butun tekseller NaN, oradan butun
+    // FFT alanina yayiliyor.
+    //
+    // 20'de tanh zaten 1'e 1e-17 yakin — kirpma fiziksel bir sey
+    // degistirmiyor, sadece tasmayi engelliyor.
+    return sqrt(SEA_G * k * tanh(min(k * depth, 20.0)));
 }
 
 /// DONGU KUANTIZASYONU.
@@ -114,7 +131,7 @@ float SeaSampleDepth(float2 posXZ)
     // uzaniyor; disarisi sabit derinlik.
     if (any(uv < 0.0) || any(uv > 1.0)) return _SeaDeepWaterDepth;
 
-    return SAMPLE_TEXTURE2D_LOD(_SeaBathyTex, sampler_LinearClamp, uv, 0).r;
+    return SAMPLE_TEXTURE2D_LOD(_SeaBathyTex, sampler_SeaBathyTex, uv, 0).r;
 }
 
 /// Taban egimi (tan theta). Kirilma indeksi bundan tureniyor (spec 8.3).

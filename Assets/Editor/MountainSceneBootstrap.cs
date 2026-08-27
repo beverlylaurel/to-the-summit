@@ -70,6 +70,10 @@ public static class MountainSceneBootstrap
     const string SurfaceShaderPath = "Assets/Shaders/MountainSurface.shader";
     const string PrecipitationShaderPath = "Assets/Shaders/Precipitation.shader";
     const string RainStreakDatabasePath = "Assets/Rain/RainStreakDatabase.asset";
+    const string SeaSettingsPath = "Assets/Sea/Settings/SeaSettings.asset";
+    const string SeaSurfaceShaderPath = "Assets/Sea/Shaders/SeaLit.shader";
+    const string SeaSpectrumPath = "Assets/Sea/Shaders/SeaSpectrum.compute";
+    const string SeaFftPath = "Assets/Sea/Shaders/SeaFFT.compute";
     const string SkyShaderPath = "Assets/Shaders/Sky.shader";
     const string SkyMaterialPath = "Assets/Settings/Sky.mat";
     const string FogComputePath = "Assets/Shaders/VolumetricFog.compute";
@@ -617,6 +621,9 @@ public static class MountainSceneBootstrap
 
         EnsureTerrainSurface(gen, regenerated, ref changed);
         Phase("yüzey haritaları");
+
+        EnsureSea(gen, camera, weatherState, windField, atmosphere, thermometer, ref changed);
+        Phase("deniz");
 
         EnsureRouteOverlay(gen, ref changed);
         EnsureClimbHud(player, gen, ref changed);
@@ -1754,6 +1761,101 @@ public static class MountainSceneBootstrap
 
         EditorUtility.SetDirty(surface);
     }
+
+    /// DENİZ SAHNEYE KODDAN KURULUYOR.
+    ///
+    /// İlk kurulum tek seferlik bir editör komutuyla yapılmıştı; sahne bir
+    /// daha kurulunca kaybolurdu. `CLAUDE.md`: elle sahne düzenleme yok.
+    ///
+    /// Sıra: köprü → yönetici → simülasyon → yüzey. Yönetici bathymetry'yi
+    /// köprüsüz kuramıyor, yüzey de deniz seviyesini yöneticinin ayarından
+    /// okuyor.
+    static void EnsureSea(MountainGenerator gen, Camera camera,
+                          WeatherState weatherState, WindField windField,
+                          AtmosphereController atmosphere,
+                          TemperatureField thermometer, ref bool changed)
+    {
+        var ayar = AssetDatabase.LoadAssetAtPath<SeaSettings>(SeaSettingsPath);
+        if (ayar == null)
+            throw new System.InvalidOperationException($"Ayar bulunamadı: {SeaSettingsPath}");
+
+        var yuzeyShader = AssetDatabase.LoadAssetAtPath<Shader>(SeaSurfaceShaderPath);
+        if (yuzeyShader == null)
+            throw new System.InvalidOperationException($"Shader bulunamadı: {SeaSurfaceShaderPath}");
+
+        var spektrum = AssetDatabase.LoadAssetAtPath<ComputeShader>(SeaSpectrumPath);
+        var fft = AssetDatabase.LoadAssetAtPath<ComputeShader>(SeaFftPath);
+        if (spektrum == null || fft == null)
+            throw new System.InvalidOperationException(
+                $"Compute bulunamadı: {SeaSpectrumPath} / {SeaFftPath}");
+
+        var kok = Object.FindAnyObjectByType<SeaManager>(FindObjectsInactive.Include);
+        if (kok == null)
+        {
+            kok = new GameObject("Deniz").AddComponent<SeaManager>();
+            changed = true;
+        }
+
+        var kopru = kok.GetComponent<SeaEnvironmentBridge>();
+        if (kopru == null)
+        {
+            kopru = kok.gameObject.AddComponent<SeaEnvironmentBridge>();
+            changed = true;
+        }
+
+        var zaman = Object.FindAnyObjectByType<TimeOfDay>();
+
+        // GÜNEŞ `TimeOfDay`'İN KENDİ IŞIĞI. Sahnedeki ilk directional light
+        // alınsaydı ŞİMŞEK ışığı seçilirdi — ilk kurulumda tam bu oldu.
+        var zamanSo = new SerializedObject(zaman);
+        var gunes = zamanSo.FindProperty("sun").objectReferenceValue as Light;
+
+        kopru.Bind(windField, weatherState, zaman, atmosphere, thermometer, gunes);
+        EditorUtility.SetDirty(kopru);
+
+        kok.Bind(ayar, kopru, gen.GetComponent<Terrain>());
+        EditorUtility.SetDirty(kok);
+
+        var sim = kok.GetComponent<SeaSimulation>();
+        if (sim == null)
+        {
+            sim = kok.gameObject.AddComponent<SeaSimulation>();
+            changed = true;
+        }
+
+        sim.Bind(ayar, kopru, spektrum, fft);
+        EditorUtility.SetDirty(sim);
+
+        var yuzey = Object.FindAnyObjectByType<SeaSurface>(FindObjectsInactive.Include);
+        if (yuzey == null)
+        {
+            var go = new GameObject("Deniz Yuzeyi",
+                                    typeof(MeshFilter), typeof(MeshRenderer));
+            yuzey = go.AddComponent<SeaSurface>();
+            changed = true;
+        }
+
+        // MESH KAMERAYI TAKİP EDİYOR, OYUNCUYU DEĞİL: kamera denizden
+        // uzaklaşsa bile ufuk doğru kalıyor (spec §10.3).
+        yuzey.Bind(ayar, yuzeyShader, camera.transform);
+        EditorUtility.SetDirty(yuzey);
+
+        // BAĞLAR TAMAMLANINCA `OnEnable` TEKRAR ÇALIŞTIRILIYOR.
+        //
+        // `AddComponent` `OnEnable`'ı Bind'dan ÖNCE çağırıyor; bileşen ortam
+        // kaynağını bulamayıp kendini devre dışı bırakıyor. Ölçüldü:
+        // `SeaSimulation.enabled` false kaldı, kernel indeksleri -1'de kaldı
+        // ve ilk `Update` "Invalid kernelIndex (-1)" attı.
+        //
+        // `enabled` zaten false olanlar ATLANMIYOR — atlanacak olan tam da
+        // düzeltilmesi gereken durum.
+        foreach (var b in new Behaviour[] { kok, sim, yuzey })
+        {
+            b.enabled = false;
+            b.enabled = true;
+        }
+    }
+
     static void EnsureRouteOverlay(MountainGenerator gen, ref bool changed)
     {
         var overlay = Object.FindAnyObjectByType<RouteOverlay>(FindObjectsInactive.Include);

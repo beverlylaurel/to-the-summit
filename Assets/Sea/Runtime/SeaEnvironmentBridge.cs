@@ -58,6 +58,23 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
     [Tooltip("Bu sıcaklığın üstünde yağış yağmur sayılır (°C). Arası sulu kar.")]
     [SerializeField] float rainThresholdC = 2f;
 
+    /// KURULUM KODDAN. Sahne `MountainSceneBootstrap` üzerinden kuruluyor,
+    /// elle bağlama yok.
+    ///
+    /// Güneş `TimeOfDay`'in KENDİ ışığı olmak zorunda: ilk kurulumda sahnedeki
+    /// ilk directional light seçilmişti ve o ŞİMŞEK ışığı çıktı.
+    public void Bind(WindField windField, WeatherState weatherState,
+                     TimeOfDay time, AtmosphereController atmosphereController,
+                     TemperatureField temperatureField, Light sun)
+    {
+        wind = windField;
+        weather = weatherState;
+        timeOfDay = time;
+        atmosphere = atmosphereController;
+        temperature = temperatureField;
+        sunLight = sun;
+    }
+
     // ------------------------------------------------------------ rüzgâr
 
     public Vector3 WindDirection

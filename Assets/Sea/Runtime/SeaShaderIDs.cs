@@ -36,6 +36,20 @@ public static class SeaShaderIDs
     public static readonly int Foam = Shader.PropertyToID("_SeaFoam");
     public static readonly int FoamPrev = Shader.PropertyToID("_SeaFoamPrev");
 
+    // --- Compute yazma hedefleri (spec §11.1) ---
+    //
+    // AYRI AD. Aynı doku hem `RWTexture2DArray` hem `Texture2DArray` olarak
+    // bağlanamıyor; compute'un yazdığı ad `RW` sonekli, yüzey shader'ının
+    // okuduğu ad soneksiz.
+    public static readonly int H0RW = Shader.PropertyToID("_SeaH0RW");
+    public static readonly int SpectrumHtRW = Shader.PropertyToID("_SeaSpectrumHtRW");
+    public static readonly int SpectrumSlopeRW = Shader.PropertyToID("_SeaSpectrumSlopeRW");
+    public static readonly int DisplacementRW = Shader.PropertyToID("_SeaDisplacementRW");
+    public static readonly int DerivativesRW = Shader.PropertyToID("_SeaDerivativesRW");
+
+    /// Kademe bandı üst sınırları (rad/m).
+    public static readonly int TierCutoffK = Shader.PropertyToID("_SeaTierCutoffK");
+
     public static readonly int PatchSizes = Shader.PropertyToID("_SeaPatchSizes");
     public static readonly int TierWeights = Shader.PropertyToID("_SeaTierWeights");
     public static readonly int ChoppinessPerTier = Shader.PropertyToID("_SeaChoppinessPerTier");

@@ -1,0 +1,166 @@
+// ROL: spektrum dokularini uzam alanina ceviren ters FFT ve son toplama.
+// Cagiran: SeaSimulation.
+
+#pragma kernel KIFFTHorizontal
+#pragma kernel KIFFTVertical
+#pragma kernel KAssemble
+
+#include "SeaCommon.hlsl"
+
+RWTexture2DArray<float4> _SeaSpectrumHtRW;
+RWTexture2DArray<float4> _SeaSpectrumSlopeRW;
+RWTexture2DArray<float4> _SeaDisplacementRW;
+RWTexture2DArray<float4> _SeaDerivativesRW;
+
+// PING-PONG DOKUSU YOK.
+//
+// Spec 11.1 `RT_PingPong` listeliyor cunku adim adim dispatch eden bir FFT
+// varsayiyor (8 adim x 2 boyut x 3 kademe = 48 dispatch). Burada butun
+// satir paylasilan bellege aliniyor ve sekiz adim TEK dispatch'te
+// bitiyor — ara doku gereksiz, kademe basina iki dispatch kaliyor.
+// Spec'in kendi hedefi de dispatch sayisini indirmek (6.8).
+//
+// Iki spektrum dokusu AYNI kernelde donusturuluyor: ayri dispatch edilse
+// birinin bayat kalma ihtimali dogar ve Jacobian ile displacement farkli
+// zamanlardan gelir.
+groupshared float4 gHt[SEA_FFT_SIZE];
+groupshared float4 gSlope[SEA_FFT_SIZE];
+
+/// float4'un iki karmasik yarisini ayni twiddle ile carpar.
+float4 SeaCMul2(float2 w, float4 v)
+{
+    return float4(SeaCMul(w, v.xy), SeaCMul(w, v.zw));
+}
+
+/// TEK SATIRLIK TERS FFT, paylasilan bellekte.
+///
+/// Cooley-Tukey, zaman ayriklamasi. Twiddle usu ARTI isaretli ve 1/N
+/// normalizasyonu YOK: Tessendorf'un toplami h(x) = SUM h~(k) e^{ikx}
+/// tam olarak bu — normalize edilirse dalga yuksekligi N kat kuculur.
+void SeaIFFTSatir(uint tid, uint3 koordBase, bool dikey, uint slice)
+{
+    uint N = (uint)SEA_FFT_SIZE;
+
+    // Bit-ters permutasyon. Zaman ayriklamasi girdiyi bu sirada bekliyor.
+    uint kaynak = reversebits(tid) >> (32u - (uint)SEA_FFT_LOG2);
+
+    uint3 okuma = dikey ? uint3(koordBase.x, kaynak, slice)
+                        : uint3(kaynak, koordBase.y, slice);
+
+    gHt[tid]    = _SeaSpectrumHtRW[okuma];
+    gSlope[tid] = _SeaSpectrumSlopeRW[okuma];
+
+    GroupMemoryBarrierWithGroupSync();
+
+    for (uint s = 1u; s <= (uint)SEA_FFT_LOG2; s++)
+    {
+        uint m  = 1u << s;
+        uint mh = m >> 1u;
+
+        // Ciftin ALT elemanini tutan is parcacigi kelebegi yapiyor; ust
+        // elemani tutan bekliyor. Ayni iki hucreye tek is parcacigi
+        // dokundugu icin adim ici yaris yok.
+        if ((tid & mh) == 0u)
+        {
+            uint k = tid & (mh - 1u);
+            float2 w = SeaExpI(SEA_TWO_PI * (float)k / (float)m);
+
+            float4 aH = gHt[tid];
+            float4 bH = SeaCMul2(w, gHt[tid + mh]);
+            gHt[tid]      = aH + bH;
+            gHt[tid + mh] = aH - bH;
+
+            float4 aS = gSlope[tid];
+            float4 bS = SeaCMul2(w, gSlope[tid + mh]);
+            gSlope[tid]      = aS + bS;
+            gSlope[tid + mh] = aS - bS;
+        }
+
+        GroupMemoryBarrierWithGroupSync();
+    }
+
+    uint3 yazma = dikey ? uint3(koordBase.x, tid, slice)
+                        : uint3(tid, koordBase.y, slice);
+
+    _SeaSpectrumHtRW[yazma]    = gHt[tid];
+    _SeaSpectrumSlopeRW[yazma] = gSlope[tid];
+}
+
+// Dispatch (1, N, SEA_TIER_COUNT): id = (is parcacigi, satir, kademe).
+[numthreads(SEA_FFT_SIZE, 1, 1)]
+void KIFFTHorizontal(uint3 id : SV_DispatchThreadID)
+{
+    SeaIFFTSatir(id.x, uint3(0u, id.y, 0u), false, id.z);
+}
+
+// Dispatch (1, N, SEA_TIER_COUNT): id = (is parcacigi, sutun, kademe).
+[numthreads(SEA_FFT_SIZE, 1, 1)]
+void KIFFTVertical(uint3 id : SV_DispatchThreadID)
+{
+    SeaIFFTSatir(id.x, uint3(id.y, 0u, 0u), true, id.z);
+}
+
+// --------------------------------------------------------------- toplama
+
+[numthreads(8, 8, 1)]
+void KAssemble(uint3 id : SV_DispatchThreadID)
+{
+    uint N = (uint)SEA_FFT_SIZE;
+    if (id.x >= N || id.y >= N) return;
+
+    uint tier = id.z;
+
+    // ISARET PERMUTASYONU. Frekans indisi -N/2..N/2-1 arasindayken doku
+    // 0..N-1 tutuyor; N/2'lik kaydirma uzam alaninda (-1)^(x+z) demek.
+    // Atlanirsa yuzey satranc tahtasi gibi cikar.
+    float isaret = 1.0 - 2.0 * (float)((id.x + id.y) & 1u);
+
+    float4 ht    = _SeaSpectrumHtRW[uint3(id.xy, tier)]    * isaret;
+    float4 slope = _SeaSpectrumSlopeRW[uint3(id.xy, tier)] * isaret;
+
+    // Paketi ac: IFFT(A + iB).x = A, .y = B.
+    float dx    = ht.x;
+    float dz    = ht.y;
+    float h     = ht.z;
+    float dDxdz = ht.w;
+
+    float slopeX = slope.x;
+    float slopeZ = slope.y;
+    float dDxdx  = slope.z;
+    float dDzdz  = slope.w;
+
+    // KADEME BASINA CHOPPINESS. Yuksek dalga sayilarinda tam choppiness
+    // cirpintiyi sikistirip dugumlenmeye yol aciyor (spec 6.7).
+    float lambda = _SeaChoppiness * _SeaChoppinessPerTier[tier];
+
+    dx    *= lambda;
+    dz    *= lambda;
+    dDxdx *= lambda;
+    dDzdz *= lambda;
+    dDxdz *= lambda;
+
+    // JACOBIAN. J < 0 yuzeyin kendi icinden gectigi, yani katlandigi yer.
+    // lambda yukarida turevlere zaten carpildi.
+    // [KAYNAK: Tessendorf 2004 4.6 denklem 45-49]
+    float Jxx = 1.0 + dDxdx;
+    float Jzz = 1.0 + dDzdz;
+    float Jxz = dDxdz;
+    float J   = Jxx * Jzz - Jxz * Jxz;
+
+    // Ozdegerler ANALITIK — sayisal cozum gerekmiyor.
+    float ort  = 0.5 * (Jxx + Jzz);
+    float fark = 0.5 * sqrt((Jxx - Jzz) * (Jxx - Jzz) + 4.0 * Jxz * Jxz);
+    float Jm   = ort - fark;
+
+    // Ozvektor e-: katlanmanin gerceklestigi YATAY YON. Kopuk dokusu bu
+    // yonde uzatiliyor (spec 13.2).
+    //
+    // Bolen isaretiyle korunuyor: max(Jxz, eps) yazilsaydi negatif Jxz
+    // eps'e cikar ve yon 90 derece yanlis donerdi.
+    float bolen = abs(Jxz) < 1e-6 ? (Jxz < 0.0 ? -1e-6 : 1e-6) : Jxz;
+    float qm = (Jm - Jxx) / bolen;
+    float2 em = normalize(float2(1.0, qm));
+
+    _SeaDisplacementRW[uint3(id.xy, tier)] = float4(dx, h, dz, J);
+    _SeaDerivativesRW[uint3(id.xy, tier)]  = float4(slopeX, slopeZ, em.x, em.y);
+}
