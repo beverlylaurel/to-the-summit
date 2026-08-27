@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de501d873d2cf6245af14af3d61055d4, type: 3}
+  m_Name: SeaSettings
+  m_EditorClassIdentifier: Assembly-CSharp::SeaSettings
+  seaLevelY: 30
+  deepWaterDepth: 200
+  spectrumDepth: 60
+  fetch: 12000
+  swell: 0.72
+  smallWaveCutoff: 0.15
+  loopPeriod: 200
+  patchSizes: {x: 512, y: 128, z: 24}
+  tierWeights: {x: 1, y: 1, z: 1}
+  choppiness: 1.1
+  choppinessPerTier: {x: 1, y: 0.85, z: 0.45}
+  maxShoalingGain: 2.2
+  runupMaxDepth: 0.45
+  finestQuad: 0.5
+  ringCount: 7
+  extinctionRgb: {x: 0.3, y: 0.08, z: 0.05}
+  upwellingColor: {r: 0, g: 0.2, b: 0.3, a: 1}
+  refractionStrength: 0.35
+  roughnessCalm: 0.02
+  roughnessRough: 0.14
+  shoreFoamDepth: 1.2
+  foamColor: {r: 0.92, g: 0.94, b: 0.95, a: 1}
+  foamRoughness: 0.85
