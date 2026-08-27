@@ -1,8 +1,8 @@
 using System;
 using UnityEngine;
 
-/// Dağ yüzeyi materyalini sürer. Görünüm kararlarını vermez — onlar ayarlarda ve
-/// shader'da. Buradaki tek iş, paylaşılan atmosfer durumunu materyale aktarmak.
+/// Drives the mountain surface material. It makes no look decisions — those live in the
+/// settings and in the shader. The only job here is passing the shared atmosphere state to the material.
 [ExecuteAlways]
 [RequireComponent(typeof(Terrain))]
 public class TerrainSurface : MonoBehaviour
@@ -13,12 +13,12 @@ public class TerrainSurface : MonoBehaviour
     [SerializeField] TimeOfDay time;
 
     [SerializeField] Texture2D surfaceMaps;
-    [Tooltip("Arazinin rüzgârı hızlandırma/yavaşlatma ağırlığı. Hâkim rüzgâr yönüne "
-             + "göre pişiyor; rüzgâr korunaklılığı bunu okuyor.")]
+    [Tooltip("How much the terrain speeds the wind up or slows it down. It is baked against "
+             + "the prevailing wind direction; the wind shelter reads it.")]
     [SerializeField] Texture2D windWeight;
     [SerializeField] Texture2D groundNormals;
     [SerializeField] Texture2DArray horizon;
-    [Tooltip("Arazi yüksekliği dokusu. Sis katmanları yerden yüksekliği buradan okuyor.")]
+    [Tooltip("Terrain height texture. The fog layers read the height above ground from it.")]
     [SerializeField] Texture2D terrainHeights;
     [SerializeField] Shader surfaceShader;
 
@@ -57,9 +57,9 @@ public class TerrainSurface : MonoBehaviour
     static readonly int ScreeRangeId = Shader.PropertyToID("_ScreeRange");
     static readonly int ScreeSlopeLimitId = Shader.PropertyToID("_ScreeSlopeLimit");
     static readonly int PatternSeedId = Shader.PropertyToID("_PatternSeed");
-    /// Yüzey başına altı doku. Son ekler shader'daki DECLARE_SURFACE_DETAIL
-    /// makrosunun ürettikleriyle birebir; iki yerde ayrı yazılsaydı bir harita
-    /// eklendiğinde biri sessizce boş kalırdı.
+    /// Six textures per surface. The suffixes match exactly what the shader's
+    /// DECLARE_SURFACE_DETAIL macro produces; written out separately in two places, one map
+    /// would silently stay empty when another was added.
     static readonly string[] SurfaceMapSuffixes =
         { "Normal", "NormalLut", "Rough", "RoughLut", "Height", "HeightLut" };
     static readonly int SandAlbedoId = Shader.PropertyToID("_SandAlbedo");
@@ -90,9 +90,10 @@ public class TerrainSurface : MonoBehaviour
 
     static readonly int TerrainHeightMapId = Shader.PropertyToID("_TerrainHeightMap");
     static readonly int TerrainHeightAreaId = Shader.PropertyToID("_TerrainHeightArea");
-    /// Atmosfer yazıyor, burada yalnız OKUNUYOR: rüzgâr eşiği geçildi mi ve ne kadar.
-    /// Eşik kuralı atmosferin ayarında duruyor; burada ikinci kez kurmak iki sistemi
-    /// ayırırdı. `PrecipitationRenderer` de aynı sebeple globalden okuyor.
+    /// The atmosphere writes it, here it is only READ: whether the wind threshold was crossed
+    /// and by how much. The threshold rule lives in the atmosphere's settings; building it a
+    /// second time here would split the two systems. `PrecipitationRenderer` reads the global
+    /// for the same reason.
     static readonly int WetnessId = Shader.PropertyToID("_SurfaceWetness");
     static readonly int WindDirId = Shader.PropertyToID("_SurfaceWindDir");
     static readonly int SunDirId = Shader.PropertyToID("_SurfaceSunDir");
@@ -101,12 +102,12 @@ public class TerrainSurface : MonoBehaviour
     int appliedRevision = -1;
     float wetness;
 
-    /// Arazinin yatay genişliği (metre). Yüzey haritası UV'si buradan türüyor;
-    /// her sorguda bileşen aranmasın diye saklanıyor.
+    /// The terrain's horizontal span (metres). The surface map's UV derives from it; kept here
+    /// so the component is not looked up on every query.
     float terrainSpan;
 
-    /// Genişlik materyal kurulumunda yazılıyor ama okuyanlar daha erken çalışabiliyor
-    /// (rüzgâr sığınağı ilk karede soruyor). Sıfırsa arazinin kendi verisinden alınır.
+    /// The span is written during material setup, but its readers can run earlier (the wind
+    /// shelter asks on the first frame). At zero it is taken from the terrain's own data.
     float TerrainSpan
     {
         get
@@ -118,14 +119,9 @@ public class TerrainSurface : MonoBehaviour
 
     public TerrainMaterialSettings Settings => settings;
 
-    /// Yüzey haritasının EĞİM kanalı (1 düz, 0 dik) verilen dünya konumunda.
-    /// Kar derinliğinin CPU ikizi buradan okuyor; haritayı ve arazi sınırlarını bu
-    /// bileşen tutuyor, dışarı ikinci bir kopya çıkarmıyor.
-    ///
-    /// Okuma bilinear ve mip 0 — shader tarafındaki `SampleSurfaceMapsFast` de öyle.
-    /// Arazinin rüzgâr ağırlığı verilen dünya konumunda, 0.67-2.0. 1 nötr.
-    /// Rüzgârüstü ve dışbükey yüzeyde rüzgâr hızlanır, rüzgâraltı ve içbükeyde yavaşlar
-    /// (Liston & Sturm). Harita bayta sığsın diye yarıya bölünmüş saklanıyor.
+    /// The terrain's wind weight at the given world position, 0.67-2.0. 1 is neutral.
+    /// On windward and convex surfaces the wind speeds up, on leeward and concave ones it slows
+    /// down (Liston & Sturm). The map is stored halved so it fits in a byte.
     public float WindWeightAt(Vector3 worldPos)
     {
         Vector3 origin = transform.position;
@@ -134,6 +130,11 @@ public class TerrainSurface : MonoBehaviour
                                            (worldPos.z - origin.z) / span).r * 2f;
     }
 
+    /// The surface map's SLOPE channel (1 flat, 0 steep) at the given world position.
+    /// The CPU twin of the snow depth reads it; this component holds the map and the terrain
+    /// bounds and hands no second copy outside.
+    ///
+    /// The read is bilinear and mip 0 — so is `SampleSurfaceMapsFast` on the shader side.
     public float SlopeAt(Vector3 worldPos)
     {
         Vector3 origin = transform.position;
@@ -158,13 +159,12 @@ public class TerrainSurface : MonoBehaviour
         terrainHeights = heightMap;
         surfaceShader = shader;
 
-        // Eski materyal YOK EDİLİYOR. Sadece referansı bırakmak sızıntıydı: kurulum
-        // betiği her derlemede yeniden bağlıyor ve her seferinde bir materyal daha
-        // sahipsiz kalıyordu. `hideFlags = DontSave` onları sahneden gizliyor, bellekten
-        // değil.
+        // THE OLD MATERIAL IS DESTROYED. Merely dropping the reference was a leak: the setup
+        // script rebinds on every compile and one more material was left ownerless each time.
+        // `hideFlags = DontSave` hides them from the scene, not from memory.
         DestroyOwned(material);
-        material = null;          // yeniden bağlanınca materyal de yenilensin
-        appliedRevision = -1;     // yeni materyale ayarlar baştan yazılır
+        material = null;          // rebinding should refresh the material too
+        appliedRevision = -1;     // the settings are written to the new material from scratch
     }
 
     void OnDisable()
@@ -174,8 +174,8 @@ public class TerrainSurface : MonoBehaviour
         material = null;
     }
 
-    /// Çalışma anında `Destroy`, editörde `DestroyImmediate`. Editörde `Destroy` bir
-    /// sonraki kareye erteleniyor ve o kare hiç gelmeyebiliyor.
+    /// `Destroy` at runtime, `DestroyImmediate` in the editor. In the editor `Destroy` is
+    /// deferred to the next frame and that frame may never come.
     static void DestroyOwned(UnityEngine.Object owned)
     {
         if (owned == null) return;
@@ -191,38 +191,38 @@ public class TerrainSurface : MonoBehaviour
 
         float precipitation = weather != null ? weather.Precipitation : 0f;
 
-        // Islanma hızlı, kuruma yavaş: yağmur dininde kaya bir süre koyu kalır
+        // Wetting is fast, drying is slow: when the rain stops the rock stays dark for a while
         float target = precipitation;
         float duration = target > wetness ? 8f : Mathf.Max(1f, settings.dryingSeconds);
         wetness = Mathf.Lerp(wetness, target, 1f - Mathf.Exp(-Time.deltaTime / duration));
         material.SetFloat(WetnessId, wetness);
 
-        // ISLAKLIK GLOBAL DE YAYINLANIYOR. Nesnelerin üstündeki kar
-        // (`SnowCoverObject`) başka bir materyalde; aynı ıslaklığı görmezse
-        // aynı kar kayanın üstünde kuru, zeminde ıslak çıkar.
+        // THE WETNESS IS PUBLISHED AS A GLOBAL TOO. The snow on objects
+        // (`SnowCoverObject`) is on another material; if it does not see the same wetness,
+        // the same snow comes out dry on a rock and wet on the ground.
         Shader.SetGlobalFloat(WetnessId, wetness);
 
-        // HÂKİM yön, anlık hız değil. Yüzey deseni bu eksene
-        // oturuyor; eksen esintiyle oynayınca desen dünyada sürükleniyordu (alan
-        // `dot(worldXZ, windAxis)` üzerinden kuruluyor, bkz. WindField).
+        // The PREVAILING direction, not the instantaneous speed. The surface pattern sits on
+        // this axis; when the axis moved with the gust the pattern dragged across the world
+        // (the field is built on `dot(worldXZ, windAxis)`, see WindField).
         Vector3 windDir = wind != null ? wind.PrevailingDirection : Vector3.right;
-        // Şiddet w'de: desen yalnızca yön değil güç de istiyor — dingin havada
-        // yüzey taranmamış kalır, fırtınada çizgilenir.
+        // The severity is in w: the pattern wants not only a direction but a strength — in calm
+        // weather the surface stays uncombed, in a storm it is streaked.
         material.SetVector(WindDirId, new Vector4(windDir.x, windDir.y, windDir.z,
             wind != null ? wind.Strength : 0f));
 
-        // Anlık güneş değil öğle güneşi: liken yıllık güneşlenmeye göre yerleşir,
-        // gün içinde yanıp sönmez
+        // The noon sun, not the instantaneous one: lichen settles according to the yearly
+        // sunlight and does not blink through the day
         material.SetVector(SunDirId, time != null ? time.NoonSunDirection : Vector3.up);
 
         ApplyAlpenglow();
     }
 
-    /// Tohumdan üç eksende kaydırma. Aynı tohum → aynı yüzey; co-op'ta senkronlanacak
-    /// bir şey yok çünkü paylaşılan durum yok.
+    /// A shift on three axes from the seed. The same seed → the same surface; there is nothing
+    /// to synchronize in co-op because there is no shared state.
     static Vector4 PatternOffset(int seed)
     {
-        // Küçük tamsayı karıştırıcı; ardışık tohumlar ilişkisiz kaydırma versin diye.
+        // A small integer mixer, so consecutive seeds give unrelated shifts.
         uint h = (uint)seed * 2654435761u;
         float x = (h & 0xFFu) * 2f;
         float y = ((h >> 8) & 0xFFu) * 2f;
@@ -230,30 +230,30 @@ public class TerrainSurface : MonoBehaviour
         return new Vector4(x, y, z, 0f);
     }
 
-    /// Şafak ve batımda ufuktan gelen kızıl ışık. Rengi ve zamanlaması TimeOfDay'den
-    /// gelir; ayrı bir zamanlayıcı kurulsaydı gökyüzüyle çelişirdi.
+    /// The red light coming from the horizon at dawn and dusk. Its colour and timing come from
+    /// TimeOfDay; a separate timer would contradict the sky.
     void ApplyAlpenglow()
     {
         if (time == null)
         {
             material.SetFloat(DawnStrengthId, 0f);
 
-            // Yön de yazılır: yazılmazsa materyalde en son ne kaldıysa o durur ve
-            // bu yönü okuyan her şey (yüzey pırıltısı, gece
-            // matlaşması) gündüz sanır. Ufkun altı = kaynak yok.
+            // The direction is written too: without it, whatever was last left in the material
+            // stays, and everything reading this direction (surface sparkle, night
+            // dulling) takes it for daytime. Below the horizon = no source.
             material.SetVector(DawnDirId, Vector3.down);
             return;
         }
 
-        // Ufuk çarpanı zaten şafak ve batımda tepe yapıyor. Kareyle daraltmak
-        // parlamayı o iki ana sıkıştırıyor; geniş bırakılırsa öğlene kadar sürüyor.
+        // The horizon factor already peaks at dawn and sunset. Squaring it compresses the glow
+        // into those two moments; left wide it lasts until noon.
         float horizon = time.HorizonFactor * time.HorizonFactor;
 
-        // Güneş ufkun altına indikçe kızıllık bir süre daha sürer, sonra biter
-        // Pencere daraldı: aydınlanmanın sınırını artık Dünya'nın gölgesi çiziyor
-        // (shader'da h ≈ R·θ²/2). Zirve ~2100 m ve gölge o kotu güneş −1.5°'deyken
-        // (SunHeight ≈ −0.026) geçiyor; ondan sonra ortada aydınlanacak yüzey
-        // kalmıyor. Eski −0.18 sınırı gece boyunca boşuna güç taşıyordu.
+        // The red lingers a while as the sun drops below the horizon, then ends.
+        // The window narrowed: the limit of the lighting is now drawn by the Earth's shadow
+        // (h ≈ R·θ²/2 in the shader). The summit is ~2100 m and the shadow crosses that
+        // elevation with the sun at −1.5° (SunHeight ≈ −0.026); after that there is no surface
+        // left to light. The old −0.18 limit carried power through the night for nothing.
         float alive = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-0.05f, 0.05f, time.SunHeight));
 
         material.SetColor(DawnColorId, time.CurrentSunColor);
@@ -262,26 +262,26 @@ public class TerrainSurface : MonoBehaviour
         material.SetFloat(AlpenglowFacingId, settings.alpenglowFacing);
     }
 
-    /// Play mode'da yeniden derleme materyali düşürebilir; kullanım anında doğrulanır.
-    /// Bağımlılık kontrolü de burada: ExecuteAlways bileşende OnEnable, bileşen sahneye
-    /// eklendiği anda yani Bind'den önce çalışıyor.
+    /// A recompile in Play mode can drop the material; it is verified at the point of use.
+    /// The dependency check is here too: on an ExecuteAlways component `OnEnable` runs the
+    /// moment the component is added to the scene, i.e. before `Bind`.
     ///
-    /// REFERANSIN YAŞAMASI YETMİYOR, İÇİ DE DOLU OLMALI. Shader yeniden içe
-    /// aktarıldığında materyal nesnesi ayakta kalıyor ama üzerine yazılmış tüm
-    /// değerler siliniyor. `_TerrainSize` sıfıra düşünce yüzey uv'si
-    /// `(pos - origin) / 0` oluyor ve arazinin TAMAMI NaN basıyor — ölçüldü:
-    /// 162674 pikselin 162674'ü. Ekranda arazi simsiyah, kar mesh'i normal.
-    /// `ApplySettings` de kurtarmıyor, `appliedRevision` eşit kaldığı için atlıyor.
+    /// THE REFERENCE SURVIVING IS NOT ENOUGH, IT HAS TO BE FULL. When the shader is
+    /// reimported the material object stays alive but every value written to it is erased.
+    /// When `_TerrainSize` falls to zero the surface uv becomes `(pos - origin) / 0` and the
+    /// WHOLE terrain prints NaN — measured: 162674 of 162674 pixels. On screen the terrain is
+    /// pitch black and the snow mesh is normal.
+    /// `ApplySettings` does not save it either, it skips because `appliedRevision` stayed equal.
     void EnsureMaterial()
     {
         if (material != null && material.HasVector(TerrainSizeId)) return;
 
         if (settings == null)
-            throw new InvalidOperationException($"{nameof(TerrainSurface)}: {nameof(settings)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(TerrainSurface)}: {nameof(settings)} is not assigned.");
         if (surfaceShader == null)
-            throw new InvalidOperationException($"{nameof(TerrainSurface)}: {nameof(surfaceShader)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(TerrainSurface)}: {nameof(surfaceShader)} is not assigned.");
         if (surfaceMaps == null)
-            throw new InvalidOperationException($"{nameof(TerrainSurface)}: yüzey haritaları atanmadı.");
+            throw new InvalidOperationException($"{nameof(TerrainSurface)}: the surface maps are not assigned.");
         var terrain = GetComponent<Terrain>();
         appliedRevision = -1;
         material = new Material(surfaceShader) { hideFlags = HideFlags.DontSave };
@@ -295,12 +295,12 @@ public class TerrainSurface : MonoBehaviour
         material.SetVector(TerrainOriginId, transform.position);
         material.SetVector(TerrainSizeId, terrain.terrainData.size);
 
-        // Kar mesh'i de aynı gölgeyi okusun (gerekçe alan tanımlarının yanında).
+        // The snow mesh should read the same shadow (the reasoning sits next to the field definitions).
         terrainSpan = terrain.terrainData.size.x;
 
-        // Arazi yüksekliği GLOBAL: sis ve gökyüzü de okuyor, yalnız yüzeyin ayarı değil.
-        // xy köşe konumu, z genişlik, w yükseklik ölçeği — dokudaki 0-1 değer bununla
-        // metreye çevriliyor, dönüşüm tek yerde duruyor.
+        // The terrain height is a GLOBAL: the fog and the sky read it too, it is not only the
+        // surface's setting. xy is the corner position, z the span, w the height scale — the
+        // 0-1 value in the texture is converted to metres with it, and the conversion lives in one place.
         Vector3 size = terrain.terrainData.size;
         Shader.SetGlobalTexture(TerrainHeightMapId, terrainHeights);
         Shader.SetGlobalVector(TerrainHeightAreaId, new Vector4(
@@ -338,11 +338,12 @@ public class TerrainSurface : MonoBehaviour
         material.SetFloat(OxideScaleId, settings.oxideScale);
         material.SetFloat(ScreeAmountId, settings.screeAmount);
         material.SetVector(ScreeRangeId, settings.screeRange);
-        // TOHUM GLOBAL, materyal alanı DEĞİL: iki hash kökü iki ayrı dosyada ve biri
-        // yer değiştirme geçişinde okunuyor. Materyale yazılırsa o geçiş göremez.
+        // THE SEED IS A GLOBAL, NOT A MATERIAL FIELD: the two hash roots are in two separate
+        // files and one of them is read in the displacement stage. Written to the material,
+        // that stage would not see it.
         //
-        // Kaydırma tohumdan TÜRETİLİYOR, elle girilmiyor: üç eksen birbirinden bağımsız
-        // ve 512'lik hash sarmasının içinde kalıyor (`MountainHash`'te `fmod(..., 512)`).
+        // The shift is DERIVED from the seed, not entered by hand: the three axes are
+        // independent of each other and stay inside the 512 hash wrap (`fmod(..., 512)` in `MountainHash`).
         Shader.SetGlobalVector(PatternSeedId, PatternOffset(settings.patternSeed));
 
         material.SetFloat(ScreeSlopeLimitId, settings.screeSlopeLimit);

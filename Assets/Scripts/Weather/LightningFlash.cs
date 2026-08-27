@@ -1,20 +1,21 @@
 using System;
 using UnityEngine;
 
-/// Şimşeği dünyaya yerleştirir ve aydınlatmasını sürer: kendi yönlü ışığını ve gökyüzü
-/// ile bulutun okuduğu parlama değerlerini yazar.
+/// Places the lightning in the world and drives its lighting: it writes its own directional light
+/// and the glow values the sky and the cloud read.
 ///
-/// Ne zaman çakacağını ve ne kadar uzakta olduğunu bilmez — `ThunderPlayer` söyler.
-/// Havayı, rüzgârı, saati okumaz; tetikleyen taraf zaten okuyor. Buranın rastgeleliği
-/// yalnızca çakmanın hangi yönde olduğu ve kaç geri vuruş yaptığı.
+/// It does not know when it will strike or how far away it is — `ThunderPlayer` tells it.
+/// It does not read the weather, the wind or the clock; the side that triggers it already does.
+/// The randomness here is only which direction the strike is in and how many return strokes it makes.
 ///
-/// Işık yönlü kalıyor. Çakma bulutun içinde, yani iki kilometrenin üstünde: beş yüz metre
-/// ötede çakan bir şimşeğin ayağının dibindeki kayaya uzaklığı 2550 m, üç kilometre
-/// ötedekine 3900 m — arazi boyunca yalnızca 2.3 kat fark. Buna karşılık menzili tüm
-/// sahneyi kaplayan bir nokta ışık Forward+ kümelemesini işlevsiz bırakırdı. Baskın ipucu
-/// olan "yakın çakma kör eder, uzak çakma soluk kalır" mesafenin karesinden geliyor ve o
-/// bedava; yön de artık gerçek konumdan türüyor. Yere inen kolun değme noktasındaki nokta
-/// ışık `LightningBolt`'un işi — orası gerçekten yakın olduğu için menzili dar tutulabiliyor.
+/// The light stays directional. The strike is inside the cloud, i.e. above two kilometres: a bolt
+/// striking five hundred metres away is 2550 m from the rock at its foot and one three kilometres
+/// away 3900 m — only a 2.3× difference across the terrain. Against that, a point light whose
+/// range covered the whole scene would make the Forward+ clustering useless. The dominant cue,
+/// "a near strike blinds and a distant one stays faint", comes from the inverse square of the
+/// distance and that is free; the direction now derives from the real position too. The point
+/// light at the contact point of the bolt reaching the ground is `LightningBolt`'s job — that one
+/// really is nearby, so its range can be kept narrow.
 [RequireComponent(typeof(Light))]
 public class LightningFlash : MonoBehaviour
 {
@@ -25,15 +26,15 @@ public class LightningFlash : MonoBehaviour
     static readonly int SourcesId = Shader.PropertyToID("_LightningSources");
     static readonly int SourceCountId = Shader.PropertyToID("_LightningSourceCount");
 
-    /// KANAL BOYUNCA KAÇ NOKTA KAYNAK. Makale 50 kullanıyor ama çevrimdışı render için
-    /// `[Dobashi 2001, §5.1]`; bizde piksel başına o kadar tablo örneklemesi pahalı.
+    /// HOW MANY POINT SOURCES ALONG THE CHANNEL. The paper uses 50, but for offline rendering
+    /// `[Dobashi 2001, §5.1]`; for us that many table lookups per pixel is expensive.
     ///
-    /// Sekiz, kanalın şeklini taşımaya yetiyor: tek kaynakta parlama küre gibi duruyor
-    /// ve kolun nereye uzandığını anlatmıyor. Sayı arttıkça kazanç hızla azalıyor çünkü
-    /// tablo zaten yumuşak.
+    /// Eight is enough to carry the channel's shape: with a single source the glow looks like a
+    /// sphere and says nothing about where the bolt reaches. The gain falls off quickly as the
+    /// number rises, because the table is smooth anyway.
     const int SourceCount = 8;
 
-    /// Bir çakmanın taşıyabileceği en fazla geri vuruş sayısı
+    /// The most return strokes one strike can carry
     const int MaxStrokes = 3;
 
     [SerializeField] ThunderPlayer thunder;
@@ -42,29 +43,29 @@ public class LightningFlash : MonoBehaviour
     [SerializeField] Transform observer;
     [SerializeField] LightningSettings settings;
 
-    /// Atmosferik saçılma tablosu (`LightningLutBaker` pişiriyor). Sis ve gök buradan
-    /// okuyor; tablo statik olduğu için bir kez yazılıyor, kare kare değil.
-    /// Kanalın nerede bittiğini bilmek için: kaynaklar buluttan YERE dağılıyor.
-    /// Sabit bir boy kullanmak, dik yamaçta kanalı arazinin içine gömüyordu.
+    /// The atmospheric scattering table (`LightningLutBaker` bakes it). The fog and the sky read
+    /// from it; because the table is static it is written once, not frame by frame.
+    /// To know where the channel ends: the sources are spread from the cloud to the GROUND.
+    /// Using a fixed length buried the channel inside the terrain on a steep slope.
     [SerializeField] Terrain terrain;
 
     [SerializeField] Texture2D scatterLut;
     [SerializeField] float scatterCutoff = 9000f;
 
-    /// Çakmanın dünyadaki yeri ve ne kadar sürdüğü. Kolu çizen taraf buradan besleniyor:
-    /// konumu ikinci kez seçseydi ışık bir yerde, kol başka bir yerde olurdu.
+    /// The strike's place in the world and how long it lasts. The side drawing the bolt is fed
+    /// from here: choosing the position a second time would put the light in one place and the bolt in another.
     public event Action<LightningStrike> Placed;
 
-    /// Çakmayı tepe değerinde dondurur. Bir çakma 0.1 saniye sürüyor; "şurası aydınlandı
-    /// mı" sorusunu altı karede cevaplamak mümkün değil. Test anahtarı.
+    /// Freezes the strike at its peak value. A strike lasts 0.1 seconds; answering "did that place
+    /// light up" within six frames is impossible. A test switch.
     public bool Held { get; set; }
 
-    /// Son çakmanın uzaklığı (metre). Hiç çakmadıysa -1.
+    /// The last strike's distance (metres). −1 if there has been none.
     public float LastDistance { get; private set; } = -1f;
 
-    /// Şu andaki ışık şiddeti ve bulut parlaması. Panelde okunuyor: bir çakmanın
-    /// görünmemesi ya olayın hiç gelmemesinden ya da çizilmemesinden olabilir, ikisi
-    /// dışarıdan aynı görünüyor.
+    /// The current light intensity and cloud glow. Read in the panel: a strike not being seen can
+    /// come either from the event never arriving or from it not being drawn, and the two look the
+    /// same from outside.
     public float Intensity => flash != null ? flash.intensity : 0f;
     public float Glow { get; private set; }
 
@@ -83,8 +84,8 @@ public class LightningFlash : MonoBehaviour
     Vector3 origin;
     readonly Vector4[] sources = new Vector4[SourceCount];
 
-    /// Sahne kurulumu ışığı da buradan yapılandırır: biçimi bileşenin kendi işi,
-    /// kurulum betiğine dağılmamalı.
+    /// The scene setup configures the light from here too: its shape is the component's own job
+    /// and should not spread into the setup script.
     public void Bind(ThunderPlayer source, AtmosphereController air, Transform eye,
         LightningSettings tuning, CloudLayerProbe layer, Texture2D lut, float cutoff,
         Terrain ground)
@@ -103,9 +104,9 @@ public class LightningFlash : MonoBehaviour
         var light = GetComponent<Light>();
         light.type = LightType.Directional;
 
-        // Gölge kapalı. URP ana yönlü ışığı en parlak olana göre seçiyor; çakma anında
-        // güneşten parlak olan bu ışık ana ışığı devralır ve dağın gölgeleri bir kare
-        // boyunca yer değiştirir. Gölgesiz kalınca yalnızca ek ışık olarak toplanıyor.
+        // Shadows off. URP picks the main directional light by whichever is brightest; at the
+        // moment of a strike this light, brighter than the sun, takes over as the main light and
+        // the mountain's shadows shift for a frame. Without shadows it is only summed as an extra light.
         light.shadows = LightShadows.None;
         light.color = tuning.flashColor;
         light.intensity = 0f;
@@ -115,7 +116,7 @@ public class LightningFlash : MonoBehaviour
     {
         if (thunder == null || atmosphere == null || observer == null || settings == null)
             throw new InvalidOperationException(
-                $"{nameof(LightningFlash)}: bağımlılıklar atanmadı.");
+                $"{nameof(LightningFlash)}: dependencies are not assigned.");
 
         flash = GetComponent<Light>();
         flash.color = settings.flashColor;
@@ -156,15 +157,15 @@ public class LightningFlash : MonoBehaviour
         Apply(Envelope(elapsed));
     }
 
-    /// distance: çakmanın metre cinsinden uzaklığı
+    /// distance: the strike's distance in metres
     void OnStruck(float distance)
     {
         float nearness = 1f - Mathf.SmoothStep(0f, 1f,
             Mathf.InverseLerp(settings.nearDistance, settings.farDistance, distance));
 
-        // Yön oyuncunun baktığı tarafa ağırlıklı. Tamamen rastgele dağıtmak "doğru" ama
-        // görüş açısı gökyüzünün beşte birini gördüğü için çakmaların çoğu arkada kalıyor
-        // ve fırtına boş görünüyordu. Kaçırılan bir şimşek hiç çakmamış demektir.
+        // The direction is weighted towards where the player is looking. Distributing it entirely
+        // at random is "correct", but because the field of view sees a fifth of the sky most
+        // strikes fell behind and the storm looked empty. A lightning bolt missed is one that never struck.
         float look = Mathf.Atan2(observer.forward.z, observer.forward.x);
         float spread = Mathf.Lerp(Mathf.PI, Mathf.PI * 0.28f, settings.forwardBias);
         float bearing = look + UnityEngine.Random.Range(-spread, spread);
@@ -173,21 +174,21 @@ public class LightningFlash : MonoBehaviour
         Vector3 strike = new Vector3(eye.x + Mathf.Cos(bearing) * distance, 0f,
                                      eye.z + Mathf.Sin(bearing) * distance);
 
-        // Şimşek bulutun içinde boşalır. Katmanın alt çeyreğine yerleşiyor: kanal aşağı
-        // doğru büyüdüğü için görünen boşalma tabana yakın oluyor. Tepe ÇAKMA SÜTUNUNDAN
-        // okunuyor; sütun boşsa katmanın azami tepesi kullanılıyor.
+        // Lightning discharges inside the cloud. It is placed in the layer's lower quarter: because
+        // the channel grows downward, the visible discharge ends up near the base. The top is read
+        // FROM THE STRIKE'S COLUMN; if the column is empty the layer's maximum top is used.
         float top = cloudLayer.TopAt(strike);
         if (float.IsPositiveInfinity(top)) top = cloudLayer.MaxTop;
         strike.y = Mathf.Lerp(cloudLayer.Bottom, top, 0.25f);
         origin = strike;
 
-        // KAYNAKLAR KANAL BOYUNCA. Tek kaynak bütün kolu temsil edince parlama küre
-        // gibi duruyor ve kolun nereye uzandığını anlatmıyor; makalenin yöntemi zaten
-        // kolları nokta kaynak dizisine çevirmek (§3.2).
+        // THE SOURCES RUN ALONG THE CHANNEL. With a single source representing the whole bolt the
+        // glow looks like a sphere and says nothing about where the bolt reaches; the paper's
+        // method is exactly to turn the bolts into an array of point sources (§3.2).
         //
-        // Uç noktalar: boşalma noktası (bulutun alt çeyreği) ve yamacın kendisi.
-        // Enerji kaynaklara BÖLÜNÜYOR (shader toplamı sayıya bölüyor), yani toplam
-        // parlaklık değişmiyor — değişen yalnız nereye dağıldığı.
+        // The end points: the discharge point (the cloud's lower quarter) and the slope itself.
+        // The energy is DIVIDED among the sources (the shader divides the sum by the count), so
+        // the total brightness does not change — only where it is spread.
         float groundY = terrain != null
             ? terrain.SampleHeight(strike) + terrain.transform.position.y
             : cloudLayer.Bottom - 1000f;
@@ -200,14 +201,14 @@ public class LightningFlash : MonoBehaviour
             sources[i] = new Vector4(p.x, p.y, p.z, 0f);
         }
 
-        // ÇAKMA BAŞINA BİR KEZ. Konum çakma boyunca değişmiyor; her karede sekiz vektör
-        // yazmak boşuna. `Apply` kare kare yalnız ŞİDDETİ güncelliyor.
+        // ONCE PER STRIKE. The position does not change through the strike; writing eight vectors
+        // every frame is pointless. `Apply` updates only the INTENSITY frame by frame.
         Shader.SetGlobalVectorArray(SourcesId, sources);
         Shader.SetGlobalFloat(SourceCountId, SourceCount);
 
-        // Ters kare sönüm: şiddet referans mesafede verilmiş, gerçek mesafeye taşınıyor.
-        // Yakınında patlayan şimşeğin gözü kamaştırması bundan — ton eşleme orada beyaza
-        // doyuyor, ki bakan göz de öyle yapıyor.
+        // Inverse square fade: the intensity is given at a reference distance and carried to the
+        // real one. That is why lightning bursting nearby dazzles — the tone mapping saturates to
+        // white there, which is what a watching eye does too.
         float reach = Vector3.Distance(eye, origin);
         float reference = Mathf.Max(1f, settings.referenceDistance);
         peakIntensity = settings.intensityAtReference * (reference * reference)
@@ -217,11 +218,11 @@ public class LightningFlash : MonoBehaviour
         decayTau = Mathf.Max(0.001f,
             Mathf.Lerp(settings.distantDecay, settings.closeDecay, nearness));
 
-        // Işık çakmadan göze gelir; yönlü ışığın baktığı yön o yolun kendisi.
+        // The light comes from the strike to the eye; the direction the directional light faces is that path itself.
         transform.rotation = Quaternion.LookRotation((eye - origin).normalized);
 
-        // Tek bir sönümlü parlama plastik duruyor: gerçek şimşek aynı kanaldan birkaç
-        // kez boşalır ve göze çırpınan bir ışık olarak ulaşır.
+        // A single damped glow looks plastic: real lightning discharges through the same channel
+        // several times and reaches the eye as a flickering light.
         strokeCount = UnityEngine.Random.Range(1, MaxStrokes + 1);
 
         float when = 0f;
@@ -229,7 +230,7 @@ public class LightningFlash : MonoBehaviour
         {
             strokeTime[i] = when;
 
-            // İlk boşalma en güçlüsü, sonrakiler zayıflar
+            // The first discharge is the strongest, the later ones weaken
             strokeAmplitude[i] = i == 0 ? 1f : UnityEngine.Random.Range(0.35f, 0.9f);
             when += UnityEngine.Random.Range(settings.strokeGap.x, settings.strokeGap.y);
         }
@@ -242,8 +243,8 @@ public class LightningFlash : MonoBehaviour
         Placed?.Invoke(new LightningStrike(origin, cloudLayer.Bottom, distance, nearness, duration));
     }
 
-    /// Vuruşların örtüşen sönümleri. Toplamak yerine en güçlüsü alınıyor: üst üste
-    /// binen iki vuruş toplandığında tepe değeri aşıp beyaza doyuruyor.
+    /// The overlapping fades of the strokes. The strongest is taken rather than summing them: two
+    /// overlapping strokes summed exceed the peak value and saturate to white.
     float Envelope(float t)
     {
         float value = 0f;
@@ -260,10 +261,10 @@ public class LightningFlash : MonoBehaviour
         return value;
     }
 
-    /// TABLO BİR KEZ YAZILIYOR. Statik bir asset; her karede global yazmak boşuna.
-    /// Yazılmazsa sis örneklemesi boş dokudan okur ve parlama tamamen kaybolur — bu
-    /// yüzden `Bind` ve `OnEnable` ikisinden de çağrılıyor (bileşen sahnede hazır
-    /// dururken `Bind` çalışmayabiliyor).
+    /// THE TABLE IS WRITTEN ONCE. It is a static asset; writing a global every frame is pointless.
+    /// If it is not written the fog samples an empty texture and the glow disappears entirely — so
+    /// it is called from both `Bind` and `OnEnable` (with the component sitting ready in the
+    /// scene, `Bind` may not run).
     void PublishLut()
     {
         if (scatterLut != null) Shader.SetGlobalTexture(ScatterLutId, scatterLut);
@@ -274,44 +275,45 @@ public class LightningFlash : MonoBehaviour
     {
         flash.intensity = peakIntensity * value;
 
-        // rgb önceden çarpılmış: gökyüzü ve bulut aynı değeri okuyor, rengi ayrıca
-        // seçmiyorlar. w gerekirse şiddeti tek başına verir.
+        // rgb is premultiplied: the sky and the cloud read the same value and do not pick the
+        // colour separately. w gives the intensity on its own if needed.
         Glow = peakGlow * value;
 
         Color glow = settings.flashColor * (peakGlow * value);
         Shader.SetGlobalVector(FlashId, new Vector4(glow.r, glow.g, glow.b, peakGlow * value));
 
-        // Konum ve lekenin yarıçapı. Bulut, ışın yönünü katmanla kesip bulduğu dünya
-        // noktasının buraya uzaklığına göre parlıyor — yani denizde gerçekten bir yer
-        // aydınlanıyor, bir yön değil.
+        // The position and the patch's radius. The cloud glows according to the distance from here
+        // of the world point it finds by intersecting the ray direction with the layer — so a real
+        // place on the sea lights up, not a direction.
         Shader.SetGlobalVector(PositionId,
             new Vector4(origin.x, origin.y, origin.z, Mathf.Max(1f, settings.glowRadius)));
 
     }
 }
 
-/// Bir çakmanın dünyadaki karşılığı. Konumu tek yer seçiyor, kolu çizen taraf onu okuyor.
+/// A strike's counterpart in the world. One place picks the position and the side drawing the bolt reads it.
 public readonly struct LightningStrike
 {
-    /// Buluttaki boşalma noktası. Parlamanın kaynağı burası.
+    /// The discharge point in the cloud. This is the source of the glow.
     public readonly Vector3 Origin;
 
-    /// Bulut tabanının kotu. Görünür kanal buradan aşağıda başlar: kütlenin içindeki
-    /// bölüm zaten buluttan görünmez, oradan başlatmak kanalı bulutun önüne asıyor.
+    /// The elevation of the cloud base. The visible channel starts below it: the part inside the
+    /// mass is invisible from the cloud anyway, and starting there hangs the channel in front of the cloud.
     public readonly float CloudBase;
 
-    /// Çakmanın **yer** uzaklığı (metre): fırtınanın kaç metre ötede olduğu.
+    /// The strike's **ground** distance (metres): how many metres away the storm is.
     ///
-    /// Buradaki sayı gözle boşalma noktası arasındaki üç boyutlu mesafe **değil**. İkisi
-    /// karıştırılınca kol hiç çizilmedi: çakma bulutun içinde, yani iki buçuk kilometrenin
-    /// üstünde duruyor, dolayısıyla üç boyutlu mesafe yatayda sıfıra gelse bile o
-    /// yüksekliğin altına inmiyor ve "kolu şu mesafeye kadar çiz" koşulu daima aşılıyordu.
+    /// The number here is **not** the three-dimensional distance between the eye and the discharge
+    /// point. Confusing the two meant the bolt was never drawn: the strike is inside the cloud,
+    /// i.e. above two and a half kilometres, so even with the horizontal distance at zero the
+    /// three-dimensional distance never falls below that height and the condition "draw the bolt
+    /// up to this distance" was always exceeded.
     public readonly float Distance;
 
-    /// 0 uzak, 1 yakın
+    /// 0 distant, 1 near
     public readonly float Nearness;
 
-    /// Parlamanın toplam süresi (saniye)
+    /// The glow's total duration (seconds)
     public readonly float Duration;
 
     public LightningStrike(Vector3 origin, float cloudBase, float distance, float nearness,

@@ -1,34 +1,34 @@
 using UnityEngine;
 
-/// Rüzgâr vektörünü üretir. Yağış onu tüketen ilk sistem, tek sahibi değil —
-/// tırmanma ve ses de buradan okuyacak.
+/// Produces the wind vector. The precipitation is the first system to consume it, not its sole
+/// owner — the climbing and the audio will read from here too.
 ///
-/// Hız iki zaman ölçeğinden oluşur: yavaş taban (havanın kendisi) ve hızlı esinti.
-/// Ne kadar eseceğini dışarıdan gelen Severity belirler; yükseklik ve fırtına
-/// mantığı havanın yönetmenine aittir, burada değil.
+/// The speed is made of two time scales: a slow base (the air itself) and a fast gust.
+/// How hard it blows is set by the Severity coming from outside; the altitude and storm logic
+/// belong to the weather's director, not here.
 public class WindField : MonoBehaviour
 {
     [SerializeField] WindSettings settings;
 
-    /// 0 = neredeyse durgun, 1 = tam fırtına. Havanın yönetmeni yazar.
+    /// 0 = almost still, 1 = a full storm. The weather's director writes it.
     public float Severity { get; set; } = 0.3f;
 
-    /// ARAZİ MARUZİYETİ. 1 = açık sırt, 0 = korunaklı oyuk. Dışarıdan itiliyor:
-    /// rüzgâr araziyi bilmez, ama arazi rüzgârı bilir. `AltitudeWeatherDriver`
-    /// `Severity`'yi nasıl sürüyorsa `TerrainWindShelter` de bunu öyle sürer.
+    /// TERRAIN EXPOSURE. 1 = an open ridge, 0 = a sheltered hollow. Pushed from outside:
+    /// the wind does not know the terrain, but the terrain knows the wind. `TerrainWindShelter`
+    /// drives this the way `AltitudeWeatherDriver` drives `Severity`.
     ///
-    /// Rüzgâr global olduğu sürece sırtın tepesi ile vadinin dibi aynı esiyordu;
-    /// oysa dağda hissedilen farkın en büyüğü budur.
+    /// As long as the wind was global, the top of a ridge and the floor of a valley blew the same;
+    /// yet that is the biggest difference felt on a mountain.
     public float Exposure { get; set; } = 0.6f;
 
-    /// HÂKİM rüzgâr yönü, birim vektör. Anlık `Velocity`'den ayrı: esinti ve yalpa
-    /// içermiyor.
+    /// The PREVAILING wind direction, a unit vector. Separate from the instantaneous `Velocity`:
+    /// it contains no gust and no wobble.
     ///
-    /// Yüzey deseni bunu okur, `Velocity`'yi değil. İkisi karıştırılınca
-    /// desen dünyada kayıyor: alan `dot(worldXZ, windAxis)` üzerinden kuruluyor ve
-    /// dağın ortasında |worldXZ| yedi bin metre — bir hamlenin 0.14 radyanlık sapması
-    /// deseni 980 metre sürüklüyordu (gövde 45 m). Tanecik, ses ve savrulma anlık
-    /// rüzgârı okumaya devam ediyor.
+    /// The surface pattern reads this, not `Velocity`. Confusing the two makes the
+    /// pattern slide across the world: the field is built on `dot(worldXZ, windAxis)` and in the
+    /// middle of the mountain |worldXZ| is seven thousand metres — a gust's 0.14 radian deviation
+    /// dragged the pattern by 980 metres (the body is 45 m). Particles, audio and drift keep
+    /// reading the instantaneous wind.
     public Vector3 PrevailingDirection
     {
         get
@@ -40,53 +40,51 @@ public class WindField : MonoBehaviour
 
     float PrevailingAngle => settings.prevailingDegrees * Mathf.Deg2Rad;
 
-    /// Dünya uzayında rüzgâr hızı (m/s). Dikey bileşen yok.
+    /// The wind speed in world space (m/s). There is no vertical component.
     public Vector3 Velocity { get; private set; }
 
-    /// 0-1 sürekli şiddet, esinti içermez. Severity 1'de tam 1'e ulaşır.
-    /// Yavaş tepki veren sistemler bunu okur: görüş sekiz saniyelik bir esintiyle
-    /// açılıp kapanmaz, bulut katmanı esintiyle inip kalkmaz.
+    /// The sustained severity 0-1, gust excluded. It reaches exactly 1 at Severity 1.
+    /// Slow-responding systems read this: the visibility does not open and close with an eight
+    /// second gust, and the cloud layer does not rise and fall with one.
     public float Strength { get; private set; }
 
-    /// SERBEST HAVA HIZI (m/s): yalnız `Severity`'den türer. Arazi maruziyeti ve esinti
-    /// UYGULANMAZ.
+    /// THE FREE-AIR SPEED (m/s): it derives from `Severity` alone. Terrain exposure and the gust
+    /// ARE NOT APPLIED.
     ///
-    /// Bulut katmanı bunu okur. `Strength` maruziyetle ölçekleniyor; onu okusaydı oyuncu
-    /// kayanın arkasına geçtiğinde iki kilometre yukarıdaki bulut yavaşlardı.
+    /// The cloud layer reads this. `Strength` is scaled by the exposure; had the layer read that,
+    /// the cloud two kilometres up would slow down whenever the player stepped behind a rock.
     public float FreeAirSpeed => Mathf.Lerp(settings.calmSpeed, settings.stormSpeed,
         ShapeSeverity(overrideActive ? overrideSeverity : Mathf.Clamp01(Severity)));
 
-    /// ŞİDDET → HIZ EĞRİSİ. Doğrusal değil, kare.
+    /// SEVERITY → SPEED CURVE. Not linear but quartic.
     ///
-    /// Bu bir fizik yasası değil, DAĞILIM kararı — açıkça öyle. Şiddetin kendisi
-    /// Perlin'den geliyor ve zamanın çoğunu orta bantta geçiriyor. Doğrusal eşlemede
-    /// "yarı yarıya rüzgâr" doğrudan 8 m/s, yani Beaufort 5 demekti ve oyun sürekli
-    /// sert esintide geçiyordu.
+    /// This is not a law of physics but a DISTRIBUTION decision — openly so. The severity itself
+    /// comes from Perlin and spends most of its time in the middle band. In a linear mapping
+    /// "half wind" meant 8 m/s outright, i.e. Beaufort 5, and the game was permanently in a
+    /// strong breeze.
     ///
-    /// Belirti yağmurda okundu: 0.57 şiddette rüzgâr 8.5 m/s ve 1 mm'lik damla
-    /// yataydan 25° iniyordu — fizik doğru, rüzgâr fazlaydı. Kullanıcı "yatayda
-    /// hareket eden damlalar var" dedi; ölçüm sürüklenmeyi doğruladı (F1 → rüzgâr
-    /// sürüklenmesi kapatılınca bitti).
+    /// The symptom was read in the rain: at severity 0.57 the wind was 8.5 m/s and a 1 mm drop
+    /// came down 25° from the horizontal — the physics was right, the wind was too much. The user
+    /// said "there are drops moving horizontally"; the measurement confirmed the drift (F1 → it
+    /// stopped once the wind drift was switched off).
     ///
-    /// UÇLAR SABİT: 0 → calmSpeed, 1 → stormSpeed. Yalnız orta bant iniyor:
+    /// THE ENDS ARE FIXED: 0 → calmSpeed, 1 → stormSpeed. Only the middle band comes down:
     ///
-    ///   şiddet 0.25 → 5.0 yerine 2.0 m/s
-    ///   şiddet 0.50 → 8.0 yerine 2.8 m/s
-    ///   şiddet 0.75 → 11.0 yerine 5.8 m/s
-    ///   şiddet 0.90 → 12.8 yerine 9.9 m/s
+    ///   severity 0.25 → 2.0 m/s instead of 5.0
+    ///   severity 0.50 → 2.8 m/s instead of 8.0
+    ///   severity 0.75 → 5.8 m/s instead of 11.0
+    ///   severity 0.90 → 9.9 m/s instead of 12.8
     ///
-    /// ÜS 4 SÜRGÜYLE BULUNDU, hesapla değil — doğru değer tercih. Sürgü F1'deydi,
-    /// değer bulununca silindi.
+    /// THE EXPONENT 4 WAS FOUND WITH A SLIDER, not by calculation — the right value is a
+    /// preference. The slider was in F1 and was deleted once the value was found.
     ///
-    /// EŞİKLER KORUNUYOR: `Strength` de bu hızdan türüyor, yani rüzgâr
-    /// eşiği (0.22) artık şiddet ~0.56'da açılıyor, tam blizzard ~0.87'de. Fırtına
-    /// olay oluyor, kural değil.
+    /// APPLIED IN ONE PLACE, AND THE THRESHOLDS ARE PRESERVED. `Strength` derives from this speed
+    /// too, so every wind-dependent system (the fog closing in, the drifting snow threshold, the
+    /// vortex amplitude, the audio, the cloud speed) comes down together — the wind threshold
+    /// (0.22) now opens at severity ~0.56 and a full blizzard at ~0.87. Tuned separately, the
+    /// weather would contradict itself.
     ///
-    /// Dingin hava kural, fırtına olay olur.
-    ///
-    /// TEK YERDE UYGULANIR. `Strength` de bu hızdan türüyor, yani rüzgâra bağlı bütün
-    /// sistemler (sis kapanması, sürüklenen kar eşiği, girdap genliği, ses, bulut
-    /// hızı) birlikte iniyor. Ayrı ayrı ayarlanırsa hava kendi içinde çelişir.
+    /// Calm air is the rule, a storm is an event.
     static float ShapeSeverity(float severity)
     {
         float s = Mathf.Clamp01(severity);
@@ -94,12 +92,12 @@ public class WindField : MonoBehaviour
         return sq * sq;
     }
 
-    /// Sürekli şiddetin üstüne binen anlık sapma, -1..1. Duyulan ve görülen şey budur.
+    /// The instantaneous deviation riding on the sustained severity, −1..1. This is what is heard and seen.
     ///
-    /// Tek bir sayı ikisini birden taşıyamıyordu: esinti fırtına hızını aştığında
-    /// normalize şiddet kırpılıyor, ama hız kırpılmıyordu. Sonuçta tanecikler
-    /// hızlanmaya devam ederken ses ve görüş tavana yapışık kalıyordu — aynı rüzgârı
-    /// iki tüketici farklı şiddette görüyordu.
+    /// A single number could not carry both: when the gust exceeded the storm speed the normalized
+    /// severity was clamped but the speed was not. The result was that the particles kept speeding
+    /// up while the audio and the visibility stayed pinned to the ceiling — two consumers seeing
+    /// the same wind at different severities.
     public float Gust { get; private set; }
 
     bool overrideActive;
@@ -112,13 +110,12 @@ public class WindField : MonoBehaviour
     {
         if (settings == null)
             throw new System.InvalidOperationException(
-                $"{nameof(WindField)}: {nameof(settings)} atanmadı.");
+                $"{nameof(WindField)}: {nameof(settings)} is not assigned.");
     }
 
-    /// Test için taban şiddeti ve yönü sabitler; dalgalanma (taban salınımı + esinti)
-    /// üstünde çalışmaya devam eder. Eski kilit Gust'ı sıfırlayıp bileşeni kapatıyordu:
-    /// gerçek rüzgâr hiç düz esmez, sürgü hangi değerde olursa olsun ölü bir rüzgâr
-    /// test ediliyordu.
+    /// For testing, fixes the base severity and the direction; the fluctuation (base oscillation +
+    /// gust) keeps working on top. The old lock zeroed the Gust and disabled the component: real
+    /// wind never blows flat, so whatever value the slider held, a dead wind was being tested.
     public void ApplyOverride(float strength, float angleDegrees)
     {
         overrideActive = true;
@@ -126,60 +123,60 @@ public class WindField : MonoBehaviour
         overrideAngle = angleDegrees * Mathf.Deg2Rad;
     }
 
-    /// Kilidi kaldırır: şiddet yeniden Severity'den, yön kendi kaymasından gelir.
+    /// Releases the lock: the severity comes from Severity again and the direction from its own drift.
     public void ClearOverride() => overrideActive = false;
 
     void Update()
     {
         float t = Time.time;
 
-        // Sürekli hız yalnızca Severity'den gelir. Gürültü artık bu değeri üretmiyor,
-        // üstüne binen sapmayı üretiyor: tam fırtına Perlin'in ne verdiğinden bağımsız
+        // The sustained speed comes from Severity alone. The noise no longer produces this value,
+        // it produces the deviation riding on top: a full storm regardless of what Perlin gives
         float severity = ShapeSeverity(
             overrideActive ? overrideSeverity : Mathf.Clamp01(Severity));
         float sustained = Mathf.Lerp(settings.calmSpeed, settings.stormSpeed, severity);
 
-        // MARUZİYET SÜREKLİ HIZI ÖLÇEKLER, hamleyi değil: sırt rüzgârı hızlandırır,
-        // oyuk keser. Hamlenin oransal yapısı ikisinde de aynı — korunaklı yerde de
-        // rüzgâr nefes alır, sadece küçük eser.
+        // EXPOSURE SCALES THE SUSTAINED SPEED, not the gust: a ridge speeds the wind up and a
+        // hollow cuts it. The gust's proportional structure is the same in both — in a sheltered
+        // place the wind breathes too, it just blows small.
         //
-        // Kilitliyken devre dışı: test sürgüsü ne verdiyse o olmalı, arazi karıştırmasın.
+        // Disabled while locked: whatever the test slider gives is what it should be, the terrain must not interfere.
         if (!overrideActive)
             sustained *= Mathf.Lerp(settings.shelteredFactor, settings.exposedFactor,
                                     Mathf.Clamp01(Exposure));
 
-        // Yavaş katman: havanın genel hali, dakikalar ölçeğinde
+        // The slow layer: the air's general state, on the scale of minutes
         float slow = Mathf.PerlinNoise(t * settings.baseFrequency, 0f) * 2f - 1f;
 
-        // Hızlı katman: esintiler, saniyeler ölçeğinde. İşaret korunarak karesi
-        // alınır: Perlin'in simetrik salınımı rüzgârı soluyormuş gibi gösteriyordu.
-        // Gerçek anemometre grafiği testere gibidir — sivri hamleler, arada sakin
-        // platolar. Kare alma tepeleri sivriltir, ortaları platoya yatırır; 1.4
-        // kaybolan genliği geri koyar.
+        // The fast layer: gusts, on the scale of seconds. It is squared with the sign preserved:
+        // Perlin's symmetric oscillation made the wind look like it was breathing.
+        // A real anemometer trace looks like a saw — sharp gusts with calm plateaus in between.
+        // Squaring sharpens the peaks and lays the middles into plateaus; the 1.4 puts back the
+        // amplitude that is lost.
         float fast = Mathf.PerlinNoise(t * settings.gustFrequency, 37f) * 2f - 1f;
         fast = fast * Mathf.Abs(fast) * 1.4f;
 
-        // Sarsıntı katmanı: saniye altı çarpmalar. Esinti 12 saniyelik dalga;
-        // ceketi dalgalandıran 1-3 saniyelik türbülans tepesi bu katmandan gelir.
+        // The buffet layer: sub-second hits. The gust is a 12 second wave; the 1-3 second
+        // turbulence peak that ripples a jacket comes from this layer.
         float flicker = Mathf.PerlinNoise(t * settings.flickerFrequency, 71f) * 2f - 1f;
 
-        // Fırtına hamleyi sertleştirir: aynı oransal esinti dingin günde nazik,
-        // fırtınada hırçın vurur.
+        // A storm hardens the gust: the same proportional gust is gentle on a calm day and hits
+        // fiercely in a storm.
         float buffet = Mathf.Lerp(0.75f, 1.25f, severity);
 
-        // Katmanlar toplanır, çarpılmaz: çarpılınca genlikler birbirini büyütüyor ve
-        // tavan 1.75 katına çıkıyordu. Şiddet yükseldiğinde esinti fırtına hızını aşıyor,
-        // normalize değer kırpılıyor ve zirvede rüzgâr nefes almayı bırakıyordu.
-        // Alt sınır -1: sürgüler birden sonuna açılırsa hız ters yöne dönmesin.
+        // The layers are summed, not multiplied: multiplied, the amplitudes magnify each other and
+        // the ceiling rose to 1.75×. As the severity rose the gust exceeded the storm speed, the
+        // normalized value was clamped and the wind stopped breathing at the summit.
+        // The lower bound is −1: if the sliders are opened all the way at once the speed must not reverse.
         Gust = Mathf.Clamp(slow * settings.baseVariation
              + (fast * settings.gustAmount + flicker * settings.flickerAmount) * buffet,
              -1f, 1f);
 
         float speed = sustained * (1f + Gust);
 
-        // Yön HÂKİM eksenin etrafında oynuyor, serbest dönmüyor. Yüzeydeki kar
-        // birikintisi bu eksene oturuyor ve eksen kayarsa bütün desen dünyada
-        // sürükleniyor (bkz. WindSettings.directionSpread).
+        // The direction plays around the PREVAILING axis, it does not turn freely. The snow drift
+        // on the surface sits on this axis and if the axis slides the whole pattern drags across
+        // the world (see WindSettings.directionSpread).
         float prevailing = PrevailingAngle;
         float wander = Mathf.PerlinNoise(0f, t * settings.directionDrift) * 2f - 1f;
 
@@ -187,9 +184,8 @@ public class WindField : MonoBehaviour
             ? overrideAngle
             : prevailing + wander * settings.directionSpread * Mathf.Deg2Rad;
 
-        // Hamle yönü de kımıldatır: her esinti birkaç derece saptırır, rüzgâr
-        // yalpalar. Kilitliyken de geçerli — sabitlenen yön, esintinin etrafında
-        // oynadığı eksendir.
+        // The gust moves the direction too: every gust deviates it by a few degrees and the wind
+        // wobbles. It holds while locked as well — what is fixed is the axis the gust plays around.
         angle += fast * 0.14f;
 
         Velocity = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * speed;

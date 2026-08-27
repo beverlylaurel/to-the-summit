@@ -1,122 +1,122 @@
 using UnityEngine;
 
-/// Dağın tüm üretim parametreleri. Bootstrap ve tuner penceresi aynı asset'e bakar.
+/// Every generation parameter of the mountain. The bootstrap and the tuner window look at the same asset.
 [CreateAssetMenu(fileName = "MountainSettings", menuName = "To The Summit/Mountain Settings")]
 public class MountainSettings : ScriptableObject
 {
     [Header("Boyut")]
-    [Tooltip("2^n + 1 olmalı: 513, 1025, 2049, 4097 (Unity maksimumu).")]
+    [Tooltip("Must be 2^n + 1: 513, 1025, 2049, 4097 (Unity's maximum).")]
     public int heightmapResolution = 4097;
-    [Tooltip("Metre. Tabanın bir kenarı.")]
+    [Tooltip("Metres. One edge of the base.")]
     public float terrainSize = 8192f;
-    [Tooltip("Metre. Zirvenin maksimum yüksekliği.")]
+    [Tooltip("Metres. The summit's maximum height.")]
     public float terrainHeight = 2100f;
     public int seed = 1;
 
     [Header("Genel Form")]
-    [Tooltip("Dağ eteğinin haritaya oranı. Dışarısı düz başlangıç arazisi.")]
+    [Tooltip("The mountain foot's share of the map. Outside it is the flat starting terrain.")]
     [Range(0.1f, 0.48f)] public float mountainRadius = 0.38f;
-    [Tooltip("Dağın silüeti. X: merkezden uzaklık (0 zirve, 1 etek). Y: yükseklik.")]
+    [Tooltip("The mountain's silhouette. X: distance from the centre (0 summit, 1 foot). Y: height.")]
     public AnimationCurve heightProfile;
-    [Tooltip("Dağın etrafındaki zemin seviyesi (0-1).")]
+    [Tooltip("The ground level around the mountain (0-1).")]
     [Range(0f, 0.2f)] public float baseHeight = 0.03f;
-    [Tooltip("Tabanın daireden sapması. 0 = kusursuz daire, halka desenleri belirginleşir.")]
+    [Tooltip("The base's deviation from a circle. 0 = a perfect circle, and the ring patterns stand out.")]
     [Range(0f, 0.6f)] public float radialDistortion = 0.3f;
-    [Tooltip("Taban bozulmasının açısal frekansı. Küçük = birkaç geniş çıkıntı.")]
+    [Tooltip("Angular frequency of the base distortion. Small = a few wide lobes.")]
     [Range(0.5f, 8f)] public float radialFrequency = 2.5f;
 
-    [Header("İkincil Zirveler")]
-    [Tooltip("Ana zirvenin çevresine eklenen omuz ve yan tepe sayısı.")]
+    [Header("Secondary peaks")]
+    [Tooltip("The number of shoulders and side peaks added around the main summit.")]
     [Range(0, 8)] public int secondaryPeaks = 3;
-    [Tooltip("Yan tepelerin merkeze uzaklığı, dağ yarıçapının oranı olarak.")]
+    [Tooltip("The side peaks' distance from the centre, as a share of the mountain radius.")]
     [Range(0.1f, 0.9f)] public float peakSpread = 0.45f;
-    [Tooltip("Yan tepelerin yükseklik aralığı, ana zirvenin oranı olarak.")]
+    [Tooltip("The side peaks' height range, as a share of the main summit.")]
     public Vector2 peakHeightRange = new(0.45f, 0.75f);
-    [Tooltip("Yan tepelerin genişlik aralığı, dağ yarıçapının oranı olarak.")]
+    [Tooltip("The side peaks' width range, as a share of the mountain radius.")]
     public Vector2 peakRadiusRange = new(0.25f, 0.45f);
 
-    [Header("Sırtlar (Ridged Noise)")]
-    [Tooltip("Oktav sayısı ayar değil: çözünürlüğün taşıyabileceği kadarı otomatik kullanılır. " +
-             "Fazlası aliasing, yani benek ve çukur üretir.")]
+    [Header("Ridges (ridged noise)")]
+    [Tooltip("The octave count is not a setting: as many as the resolution can carry are used " +
+             "automatically. More than that means aliasing, i.e. specks and pits.")]
     [Range(0.5f, 8f)] public float baseFrequency = 2.5f;
     [Range(1.5f, 3f)] public float lacunarity = 2.1f;
     [Range(0.2f, 0.8f)] public float gain = 0.42f;
-    [Tooltip("0 = pürüzsüz koni, 1 = tamamen sırtlarla parçalanmış.")]
+    [Tooltip("0 = a smooth cone, 1 = completely broken up by ridges.")]
     [Range(0f, 1f)] public float ridgeInfluence = 0.65f;
-    [Tooltip("Etekte sırt etkisinin çarpanı. Düşük = etek yumuşak, zirve sivri.")]
+    [Tooltip("The multiplier of the ridge effect at the foot. Low = a soft foot and a sharp summit.")]
     [Range(0f, 1f)] public float ridgeFootDamping = 0.35f;
-    [Tooltip("Sırtların keskinliği. 1 = yuvarlak tepeler, 3 = bıçak sırtı.")]
+    [Tooltip("The sharpness of the ridges. 1 = rounded tops, 3 = a knife edge.")]
     [Range(0.5f, 3f)] public float ridgeSharpness = 2f;
 
     [Header("Domain Warp (organik bozma)")]
     [Range(0f, 0.6f)] public float warpStrength = 0.35f;
     [Range(0.5f, 8f)] public float warpFrequency = 2.5f;
-    [Tooltip("İkinci kademe bozma. Büyük ölçekli kıvrımların üstüne ince kıvrım ekler.")]
+    [Tooltip("Second-stage warping. It adds a fine fold on top of the large-scale folds.")]
     [Range(0f, 0.3f)] public float warpDetailStrength = 0.08f;
     [Range(2f, 20f)] public float warpDetailFrequency = 9f;
 
-    [Header("Kaya Bantları / Sahanlıklar")]
-    [Tooltip("Geniş sahanlıklar.")]
+    [Header("Rock bands / benches")]
+    [Tooltip("Wide benches.")]
     [Range(0f, 1f)] public float coarseTerraceStrength = 0.4f;
     [Range(2, 40)] public int coarseTerraceBands = 8;
-    [Tooltip("Orta ölçek çentikler.")]
+    [Tooltip("Mid-scale notches.")]
     [Range(0f, 1f)] public float fineTerraceStrength = 0.22f;
     [Range(4, 120)] public int fineTerraceBands = 40;
-    [Tooltip("Büyük = bantlar daha dik, sahanlıklar daha düz.")]
+    [Tooltip("Large = steeper bands and flatter benches.")]
     [Range(1f, 4.5f)] public float terraceSharpness = 3f;
-    [Tooltip("Bant kotlarının yere göre kayması. 0 = her yerde aynı kotta (halka deseni).")]
+    [Tooltip("How far the band elevations shift from place to place. 0 = the same elevation everywhere (a ring pattern).")]
     [Range(0f, 1f)] public float terraceOffsetAmount = 0.8f;
     [Range(0.5f, 8f)] public float terraceOffsetFrequency = 2.5f;
-    [Tooltip("Teras gücünün yere göre değişimi. 1 = bazı yamaçlar tamamen basamaksız.")]
+    [Tooltip("How the terrace strength varies by place. 1 = some slopes have no steps at all.")]
     [Range(0f, 1f)] public float terraceVariation = 0.6f;
     [Range(0.5f, 8f)] public float terraceVariationFrequency = 3.5f;
 
-    [Header("Tepe törpüsü")]
-    [Tooltip("Sivri uçların her turda ne kadar yumuşatılacağı. 0 = kapalı. Oransal: " +
-             "büyük diş çok, küçük diş az iner, düzensizlik korunur. Eşikli törpü " +
-             "denendi ve yanlıştı — her dişi eşiğin hemen altına tıraşlayıp eşit boyda " +
-             "mini piramitlerden bir tarla bırakıyordu; tekdüzelik desen olarak okunur.")]
+    [Header("Tip filing")]
+    [Tooltip("How much the sharp tips are softened each round. 0 = off. Proportional: " +
+             "a large tooth comes down a lot and a small one a little, so the irregularity is " +
+             "kept. A thresholded file was tried and was wrong — it shaved every tooth to just " +
+             "below the threshold and left a field of equal-sized mini pyramids; uniformity reads as a pattern.")]
     [Range(0f, 1f)] public float crestSoftening = 0.4f;
 
     [Header("Termal Erozyon")]
-    [Tooltip("0 = kapalı. Keskin kırıkları moloz yamacına çevirir, büyük formu bozmaz.")]
+    [Tooltip("0 = off. It turns sharp fractures into scree slopes without breaking the large form.")]
     [Range(0, 40)] public int erosionIterations = 12;
-    [Tooltip("Malzemenin durabildiği en dik açı. Bunu aşan yamaçlar aşağı akar.")]
+    [Tooltip("The steepest angle the material can hold at. Slopes above it flow downhill.")]
     [Range(30f, 70f)] public float talusAngle = 48f;
-    [Tooltip("Her iterasyonda taşan malzemenin ne kadarı hareket etsin.")]
+    [Tooltip("How much of the overflowing material moves each iteration.")]
     [Range(0.1f, 0.9f)] public float erosionRate = 0.5f;
 
     [Header("Zirve")]
-    [Tooltip("Zirvenin düzleştiği yükseklik oranı. 1 = düzleştirme yok.")]
+    [Tooltip("The height fraction at which the summit flattens. 1 = no flattening.")]
     [Range(0.5f, 1f)] public float summitPlateauStart = 1f;
-    [Tooltip("Zirve platosunun düzlüğü. 0 = sivri, 1 = tamamen düz.")]
+    [Tooltip("The flatness of the summit plateau. 0 = sharp, 1 = completely flat.")]
     [Range(0f, 1f)] public float summitFlatness = 0.5f;
 
-    /// Parametreler değişti mi anlamak için. Bootstrap gereksiz yeniden üretimi bununla atlar.
-    /// Üretim tarifinin sürümü. Tarif yalnızca ayarlardan ibaret değil: kodun kendisi de
-    /// tarifin parçası. Törpü penceresi bir sabitte genişletildiğinde imza değişmedi ve
-    /// dağ yeniden üretilmedi — düzeltme diskte, ekranda eski dağ. Üretim kodu her
-    /// değiştiğinde bu sayı artırılır.
-    [Header("Ova (dağın önü)")]
-    [Tooltip("Ovanın dağdan uzaklaştıkça alçalma miktarı (metre). Dağın önü düz değildir: " +
-             "dereler malzemeyi aşağı taşır ve etekten dışarı doğru hafif bir yelpaze " +
-             "eğimi bırakır. Sıfır = dümdüz tabla.")]
+    /// To tell whether the parameters changed. The bootstrap uses it to skip a needless regeneration.
+    /// The version of the generation recipe. The recipe is not only the settings: the code itself
+    /// is part of it. When the filing window was widened in a constant the signature did not
+    /// change and the mountain was not regenerated — the fix was on disk and the old mountain on
+    /// screen. This number is incremented every time the generation code changes.
+    [Header("Plain (the mountain's foreground)")]
+    [Tooltip("How far the plain falls away from the mountain (metres). The mountain's foreground " +
+             "is not flat: streams carry material downhill and leave a slight fan gradient " +
+             "running outward from the foot. Zero = a dead flat table.")]
     [Range(0f, 200f)] public float forelandFanDrop = 60f;
 
-    [Tooltip("Moren sırtlarının yüksekliği (metre). Buzulun geri çekilirken bıraktığı " +
-             "yaylar; dağa göre konsantrik dizilirler.")]
+    [Tooltip("The height of the moraine ridges (metres). The arcs a glacier leaves behind as it " +
+             "retreats; they line up concentrically around the mountain.")]
     [Range(0f, 40f)] public float moraineHeight = 20f;
 
-    [Tooltip("İki moren sırtı arası mesafe (metre).")]
+    [Tooltip("The distance between two moraine ridges (metres).")]
     [Range(100f, 1500f)] public float moraineSpacing = 420f;
 
-    [Tooltip("Dere yataklarının derinliği (metre). Dağdan dışarı doğru inen oyuklar; " +
-             "yolun köprü ya da geçit istediği yerler bunlar.")]
+    [Tooltip("The depth of the stream beds (metres). Gullies running outward from the mountain; " +
+             "these are the places the road wants a bridge or a ford.")]
     [Range(0f, 30f)] public float channelDepth = 14f;
 
-    [Tooltip("Tepeciklerin yüksekliği (metre). Yürürken yanından geçilen kabartılar; "
-             + "tırmanılacak engel değil, zeminin karakteri. Üç ölçekte dağılır (90/42/21 m) ve "
-             + "yamalı uygulanır: bir yer pürüzlü, yanı düz.")]
+    [Tooltip("The height of the hummocks (metres). Bumps you walk past; "
+             + "not an obstacle to be climbed, the character of the ground. They are spread over "
+             + "three scales (90/42/21 m) and applied patchily: one place is rough, the next is flat.")]
     [Range(0f, 15f)] public float hummockHeight = 8f;
 
     const int RecipeVersion = 14;
@@ -151,8 +151,8 @@ public class MountainSettings : ScriptableObject
         return string.Join(";", parts);
     }
 
-    /// Form parametrelerini makul aralıklarda rastgeleler. Boyut, yükseklik ve
-    /// çözünürlük korunur — onlar tasarım kararı, varyasyon konusu değil.
+    /// Randomizes the form parameters within sensible ranges. The size, height and resolution
+    /// are preserved — those are design decisions, not a matter of variation.
     public void Randomize(System.Random rng)
     {
         seed = rng.Next(1, 100000);
@@ -194,7 +194,7 @@ public class MountainSettings : ScriptableObject
         talusAngle = Range(rng, 38f, 60f);
         erosionRate = Range(rng, 0.35f, 0.7f);
 
-        // Çoğu dağın zirvesi sivridir; plato ara sıra çıksın
+        // Most mountains have a sharp summit; a plateau should come up only occasionally
         summitPlateauStart = rng.NextDouble() < 0.3 ? Range(rng, 0.80f, 0.95f) : 1f;
         summitFlatness = Range(rng, 0.2f, 0.7f);
     }
@@ -202,9 +202,9 @@ public class MountainSettings : ScriptableObject
     static float Range(System.Random rng, float min, float max)
         => min + (float)rng.NextDouble() * (max - min);
 
-    /// Etekte yayvan, yukarı çıktıkça dikleşen, zirvede sivri varsayılan silüet.
-    /// Teğetler hesaplanarak verilir; nokta sürüklenince eğri şişmesin diye
-    /// tuner'daki "Eğriyi düzelt" düğmesi teğetleri Auto moduna alır.
+    /// The default silhouette: splayed at the foot, steepening upward, sharp at the summit.
+    /// The tangents are computed and supplied; so the curve does not bulge when a point is
+    /// dragged, the tuner's "Fix the curve" button puts the tangents back into Auto mode.
     public static AnimationCurve DefaultProfile()
     {
         var curve = new AnimationCurve(

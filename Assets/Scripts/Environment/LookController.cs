@@ -3,47 +3,47 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-/// Hava ve günün saatine göre renk düzenlemesini sürer.
-/// Hava sistemi ve gün döngüsü birbirini tanımaz; ikisini burada tüketiyoruz.
+/// Drives the colour grading according to the weather and the time of day.
+/// The weather system and the day cycle do not know each other; the two are consumed here.
 [ExecuteAlways]
 [RequireComponent(typeof(Volume))]
 public class LookController : MonoBehaviour
 {
-    /// POZLAMA UYUMU. Göz karanlığa açılır ama farkın tamamını kapatmaz; `adaptShare`
-    /// kapatılan pay, `exposureCap` açılabilecek en fazla durak.
+    /// EXPOSURE ADAPTATION. The eye opens up in the dark but does not close the whole
+    /// difference; `adaptShare` is the share it closes, `exposureCap` the most stops it can open.
     ///
-    /// Tavan 0.6'ydı ve o sayı gökyüzü FİZİKSEL OLARAK kararmıyorken ayarlanmıştı. Çifte
-    /// güneş sönümü kaldırılıp alacakaranlık gerçek seviyesine inince 0.6 EV hiçbir şeyi
-    /// açmaz oldu: gök verisi vardı ama ekranda zifiri karanlık görünüyordu.
+    /// The cap was 0.6, and that number was tuned while the sky was not PHYSICALLY darkening.
+    /// Once the double sun attenuation was removed and twilight came down to its real level,
+    /// 0.6 EV opened nothing: the sky data was there but the screen looked pitch black.
     [Header("Pozlama uyumu")]
-    [Tooltip("Karanlıkta açılabilecek en fazla durak (EV).")]
+    [Tooltip("The most stops that can be opened in darkness (EV).")]
     [SerializeField, Range(0f, 6f)] float exposureCap = 2.5f;
 
-    /// 0.35'TE KALIYOR. Bir ara 0.60'a çıkarıldı: gece göğü ton eğrisinin dibinde
-    /// oturuyordu, veri tüm görüş alanında 1 duraktan az değişirken ekranda "siyah
-    /// bölge / normal gök" diye ikiye ayrılıyordu ve +1 EV bunu kapatıyordu.
+    /// IT STAYS AT 0.35. It was raised to 0.60 for a while: the night sky sat at the bottom of
+    /// the tone curve, and while the data varied by less than one stop across the whole field of
+    /// view the screen split into "a black region / a normal sky", and +1 EV closed that.
     ///
-    /// AMA POZLAMA YANLIŞ ALET. Karanlık ucu kaldırırken parlak ucu da kaldırdı; ay
-    /// ışığındaki kar ve tüm gece sahnesi gereğinden aydınlık oldu. Karanlık ucu tek
-    /// başına kaldıran şey ton eğrisidir: gece profilinde kontrast düşürüldü.
-    [Tooltip("Işık farkının kapatılan payı. 1 = tam normalizasyon, şafağı öğlene çevirir.")]
+    /// BUT EXPOSURE IS THE WRONG TOOL. Lifting the dark end lifted the bright end too; snow in
+    /// moonlight and the whole night scene became brighter than they should be. What lifts the
+    /// dark end on its own is the tone curve: the contrast was lowered in the night profile.
+    [Tooltip("The share of the light difference that is closed. 1 = full normalization, which turns dawn into noon.")]
     [SerializeField, Range(0f, 1f)] float adaptShare = 0.35f;
 
-    /// Karanlığa açılma zaman sabiti (saniye). Rodopsin yenilenmesi yavaş.
+    /// The time constant of opening to darkness (seconds). Rhodopsin regeneration is slow.
     const float AdaptToDarkSeconds = 2.5f;
 
-    /// Aydınlığa kısılma zaman sabiti (saniye). Gözbebeği hızlı kapanır.
+    /// The time constant of closing to light (seconds). The pupil closes fast.
     const float AdaptToLightSeconds = 0.5f;
 
-    /// O anki pozlama uyumu. Hedefe yumuşayarak varıyor.
+    /// The current exposure adaptation. It reaches the target by smoothing.
     float adapt;
 
     [SerializeField] LookSettings look;
     [SerializeField] WeatherState weather;
     [SerializeField] TimeOfDay time;
 
-    [Header("Önizleme (yalnızca editörde)")]
-    [Tooltip("Açıkken hava ve saat sistemleri yerine aşağıdaki değerler kullanılır.")]
+    [Header("Preview (editor only)")]
+    [Tooltip("While on, the values below are used instead of the weather and clock systems.")]
     [SerializeField] bool preview;
     [SerializeField, Range(0f, 1f)] float previewStorm = 0.8f;
     [SerializeField, Range(0f, 1f)] float previewDay = 0.6f;
@@ -67,7 +67,7 @@ public class LookController : MonoBehaviour
         Initialize();
     }
 
-    /// Önizleme değerlerini dışarıdan sürmek için (ayar penceresi kullanır)
+    /// For driving the preview values from outside (the settings window uses it)
     public void SetPreview(bool enabled, float storm, float day)
     {
         preview = enabled;
@@ -76,8 +76,8 @@ public class LookController : MonoBehaviour
         Apply();
     }
 
-    /// ExecuteAlways yüzünden OnEnable, AddComponent anında çalışır — o an Bind henüz
-    /// çağrılmamış olabilir. Kurulum bu yüzden ikisinden hangisi önce gelirse orada yapılır.
+    /// Because of ExecuteAlways, OnEnable runs the moment AddComponent is called — at which
+    /// point Bind may not have been called yet. So the setup happens in whichever comes first.
     void OnEnable() => Initialize();
 
     void Initialize()
@@ -90,8 +90,8 @@ public class LookController : MonoBehaviour
 
     void Update() => Apply();
 
-    /// Volume profilinde gereken efektler yoksa eklenir. Profil asset olarak diskte durur,
-    /// bu yüzden bir kez eklenir ve kalıcıdır.
+    /// The effects needed are added to the Volume profile if they are missing. The profile lives
+    /// on disk as an asset, so they are added once and stay.
     void EnsureOverrides()
     {
         var profile = GetComponent<Volume>().profile;
@@ -109,8 +109,8 @@ public class LookController : MonoBehaviour
         tonemapping.mode.value = TonemappingMode.ACES;
     }
 
-    /// Ortam probe'unun zenit yönündeki parlaklığı. Gökyüzü paketi probe'u her kare
-    /// gökyüzünden pişiriyor, yani bu sahnenin GERÇEK gök aydınlığı.
+    /// The ambient probe's brightness in the zenith direction. The sky package bakes the probe
+    /// from the sky every frame, so this is the scene's REAL sky brightness.
     static readonly Vector3[] ZenithDirection = { Vector3.up };
     static readonly Color[] ZenithResult = new Color[1];
 
@@ -146,61 +146,61 @@ public class LookController : MonoBehaviour
 
         var profile = look.Evaluate(storm, day, horizon);
 
-        // POZLAMA UYUMU. Işık artık fizikten geliyor ve şafakta huzme geçirgenliği
-        // 0.11'e, gece sıfıra iniyor — fizik doğru ama sabit pozlamada ekran sönük
-        // kalıyor. Gerçek hayatta şafak bulutlarının parlak görünmesinin sebebi ışığın
-        // güçlü olması değil, gözün o karanlığa göre AÇILMASIDIR; fotoğrafta da
-        // pozlama göğe göre ayarlanır.
+        // EXPOSURE ADAPTATION. The light now comes from physics and at dawn the beam
+        // transmittance falls to 0.11 and at night to zero — the physics is right, but at a fixed
+        // exposure the screen stays dim. In real life the reason dawn clouds look bright is not
+        // that the light is strong but that the eye OPENS UP to that darkness; in photography the
+        // exposure is set for the sky too.
         //
-        // Seviye ekrandan okunmuyor: sahnenin ışığını zaten biliyoruz (huzme + gök).
-        // Öğle 0 EV, karanlık saatlerde yukarı açılır. Log2 çünkü pozlama EV cinsinden.
-        // KAYNAK DEĞİŞTİ: eskiden `Atmosphere` modelinden (`BeamLevel`, `SkyLevel`,
-        // `MoonLevel`) okunuyordu. O model artık IŞIĞI SÜRMÜYOR — soğurmanın sahibi
-        // gökyüzü paketi, model yalnız sis ve bulut tonunu besliyor. Pozlama, sahneyi
-        // aydınlatmayan bir modele göre açılıp kapanıyordu; şafakta ışık tam şiddetteyken
-        // model hâlâ "karanlık" dediği için fazladan açıyordu.
+        // The level is not read from the screen: we already know the scene's light (beam + sky).
+        // Noon is 0 EV and it opens upward in the dark hours. Log2 because exposure is in EV.
+        // THE SOURCE CHANGED: it used to be read from the `Atmosphere` model (`BeamLevel`,
+        // `SkyLevel`, `MoonLevel`). That model NO LONGER DRIVES THE LIGHT — the absorption
+        // belongs to the sky package and the model only feeds the fog and cloud tone. The
+        // exposure was opening and closing according to a model that does not light the scene; at
+        // dawn the light was at full strength while the model still said "dark", so it opened extra.
         //
-        // Şimdi iki GERÇEK büyüklük okunuyor, ikisi de öğlen 1'e normalize:
-        //   güneş   — yönlü ışığın şiddeti / kalibrasyon sabiti
-        //   gökyüzü — ortam probe'unun zenit parlaklığı / öğlen ölçümü
+        // Two REAL quantities are read now, both normalized to 1 at noon:
+        //   sun — the directional light's intensity / a calibration constant
+        //   sky — the ambient probe's zenith brightness / the noon measurement
         //
-        // Uçlar kâğıtta: öğlen 1 → uyum 0 EV. Gece güneş ~0.07, gök ~0.03 → tavan 0.6 EV.
-        // Şafakta güneş ufku geçer geçmez 1'e çıkıyor → uyum 0, fazladan açma yok.
+        // The ends on paper: noon 1 → adaptation 0 EV. At night the sun is ~0.07 and the sky ~0.03
+        // → the 0.6 EV cap. At dawn the sun goes to 1 the moment it crosses the horizon → adaptation 0, no extra opening.
         const float ReferenceSunIntensity = 3.030782f;
         const float ReferenceSkyLuminance = 0.148f;
 
-        // `SurfaceLightLevel` iki cismin DÜZ ZEMİNE ulaşan katkısını topluyor; her biri
-        // kendi yüksekliğiyle çarpılı. Şiddet tek başına yanıltıyordu: güneş ufkun
-        // altındayken şiddeti hâlâ büyük ama zemine hiç ulaşmıyor (`N·L` negatif).
-        // Çarpansız hâlde 18:30'da uyum 0.81 EV'de kalıyor ve sahne zifiri görünüyordu.
+        // `SurfaceLightLevel` sums the two bodies' contribution reaching FLAT GROUND, each
+        // multiplied by its own elevation. The intensity alone was misleading: with the sun below
+        // the horizon its intensity is still large but none of it reaches the ground (`N·L` is
+        // negative). Without the multiplier the adaptation stayed at 0.81 EV at 18:30 and the scene looked pitch black.
         float lightLevel = time != null
             ? Mathf.Max(time.SurfaceLightLevel / ReferenceSunIntensity,
                         AmbientZenithLuminance() / ReferenceSkyLuminance)
             : 1f;
 
-        // UYUM KISMİDİR. Farkın tamamını kapatmak (tam normalizasyon) şafağı öğlene
-        // çeviriyordu — Unreal'in belgelerinde de aynı tuzak anlatılıyor: alt sınır
-        // düşük tutulunca kamera gece sahnesini "yetersiz pozlanmış" sanıp gündüz gibi
-        // gösteriyor. Göz de öyle çalışmaz: karanlığa açılır ama farkın ancak yarısını
-        // kapatır, geri kalanı karanlık olarak KALIR.
+        // THE ADAPTATION IS PARTIAL. Closing the whole difference (full normalization) turned
+        // dawn into noon — Unreal's documentation describes the same trap: with the lower bound
+        // kept low the camera takes a night scene for "underexposed" and shows it like daylight.
+        // The eye does not work that way either: it opens to the dark but closes only about half
+        // the difference, and the rest STAYS dark.
         //
-        // ALT SINIR 0.02 → 0.0005. Eskiden `lightLevel` 0.02'de kırpılıyordu, yani
-        // uyum en fazla 5.6 durak görebiliyordu; gerçek gece bundan çok daha aşağıda ve
-        // kırpma alacakaranlığı tek bir seviyeye düzlüyordu.
+        // THE LOWER BOUND WENT 0.02 → 0.0005. `lightLevel` used to be clamped at 0.02, so the
+        // adaptation could see at most 5.6 stops; real night is far below that and the clamp
+        // flattened twilight into a single level.
         float adaptTarget = Mathf.Clamp(adaptShare * -Mathf.Log(Mathf.Max(0.0005f, lightLevel), 2f),
                                         0f, exposureCap);
 
-        // GÖZ ANINDA UYUM SAĞLAMAZ, VE İKİ YÖNDE AYNI HIZDA DA SAĞLAMAZ.
+        // THE EYE DOES NOT ADAPT INSTANTLY, AND NOT AT THE SAME RATE IN BOTH DIRECTIONS.
         //
-        // Hedef doğrudan yazılıyordu: şimşek çakınca ya da gölgeden güneşe
-        // çıkınca ekran parlaklığı TEK KAREDE sıçrıyordu.
+        // The target was written directly: when lightning struck or when stepping
+        // from shade into the sun the screen brightness jumped IN A SINGLE FRAME.
         //
-        // İnsan gözünde karanlığa uyum (rodopsin yenilenmesi) aydınlığa
-        // uyumdan kat kat yavaştır. Simetrik yumuşatma ikisini de ortalar ve
-        // ikisi de yanlış olur.
+        // In the human eye, adaptation to darkness (rhodopsin regeneration) is many
+        // times slower than adaptation to light. Symmetric smoothing averages the two
+        // and both come out wrong.
         //
-        // `adapt` ARTIYORSA karanlığa açılıyoruz — yavaş. Azalıyorsa
-        // aydınlığa kısılıyoruz — hızlı.
+        // If `adapt` is RISING we are opening to the dark — slow. If it is falling we
+        // are closing to the light — fast.
         float tau = adaptTarget > adapt ? AdaptToDarkSeconds : AdaptToLightSeconds;
         adapt = Mathf.Lerp(adapt, adaptTarget,
                            1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(0.01f, tau)));
@@ -213,13 +213,13 @@ public class LookController : MonoBehaviour
         Set(whiteBalance.temperature, profile.temperature);
         Set(whiteBalance.tint, profile.tint);
 
-        // VİNYET YOK. Ekran köşelerini karartmak oyuncuyla dünya arasına duvar koyuyor
-        // ve hareket hâlinde belli oluyor. Merkeze odaklama işini bizde fizik yapıyor:
-        // hava perspektifi, üç katmanlı sis, mesafeyle mavileşme.
+        // NO VIGNETTE. Darkening the screen corners puts a wall between the player and the world
+        // and it shows while moving. Focusing on the centre is done by physics here: aerial
+        // perspective, three-layer fog, blueing with distance.
         //
-        // Yerine GÖLGE SOĞUTMASI: kasvet gölgeden gelir. Gölgede kalan her şey mavileşip
-        // ağırlaşırken güneş gören yüzey sıcaklığını korur — kontrast parlaklıkta değil
-        // RENKTE. Global sıcaklık kaydırması bunu veremez, şafağı da soğutur.
+        // In its place, SHADOW COOLING: gloom comes from the shade. Everything left in shadow
+        // turns blue and heavy while a sunlit surface keeps its warmth — the contrast is not in
+        // brightness but in COLOUR. A global temperature shift cannot do this, it would cool the dawn as well.
         shadows.shadows.overrideState = true;
         shadows.shadows.value = new Vector4(
             Mathf.Lerp(1f, 0.92f, profile.shadowChill),

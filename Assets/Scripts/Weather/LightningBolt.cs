@@ -1,13 +1,14 @@
 using UnityEngine;
 
-/// Yakın çakmalarda buluttan yere inen görünür kanalı çizer.
+/// Draws the visible channel running from the cloud to the ground on near strikes.
 ///
-/// Nerede çakıldığına karar vermez: `LightningFlash` yerleştiriyor, burası okuyor. Konumu
-/// ikinci kez seçseydi ışık bir yerde, kol başka bir yerde olurdu.
+/// It does not decide where the strike happened: `LightningFlash` places it and this reads it.
+/// Choosing the position a second time would put the light in one place and the bolt in another.
 ///
-/// Yalnızca yakın çakmalarda çizilir. Gerçekte de uzak şimşek kolunu göstermez — araya
-/// giren bulut ve hava kanalı yutar, geriye denizin aydınlanması kalır. Kolun görünmesi
-/// mesafenin kendisi hakkında bilgi taşıyor, o yüzden mesafeden bağımsız çizilmemeli.
+/// It is only drawn on near strikes. Distant lightning does not show its channel in reality
+/// either — the cloud and air in between swallow it and what is left is the sea lighting up. The
+/// bolt being visible carries information about the distance itself, so it must not be drawn
+/// independently of the distance.
 public class LightningBolt : MonoBehaviour
 {
     [SerializeField] LightningFlash flash;
@@ -15,22 +16,22 @@ public class LightningBolt : MonoBehaviour
     [SerializeField] LightningSettings settings;
     [SerializeField] Material material;
 
-    /// Kol bir AĞAÇ: ana kanal ve ondan doğan kuşaklar. Kaç çizgi gerekeceği çakmaya
-    /// göre değişiyor (dallanma olasılıksal), o yüzden havuz — her çakmada nesne
-    /// yaratmak çöp üretirdi.
+    /// The bolt is a TREE: the main channel and the generations born from it. How many lines are
+    /// needed varies with the strike (branching is probabilistic), hence a pool — creating
+    /// objects on every strike would produce garbage.
     readonly System.Collections.Generic.List<LineRenderer> lines = new();
     int usedLines;
     Light contact;
 
-    /// TEK TAMPON YETİYOR. Dal, ebeveyninin İZLENMİŞ noktalarından doğuyor; ama doğum
-    /// noktası tamponu yeniden kullanmadan önce Vector3 olarak KOPYALANIP kuyruğa
-    /// yazılıyor. Kuyruk değer taşıyor, tampona referans değil.
+    /// A SINGLE BUFFER IS ENOUGH. A branch is born from its parent's TRACED points; but the
+    /// point of birth is COPIED as a Vector3 into the queue before the buffer is reused. The
+    /// queue carries values, not a reference to the buffer.
     Vector3[] points;
 
     readonly System.Collections.Generic.Queue<Branch> pending = new();
 
-    /// Bir dalın doğum bilgisi. Ebeveyninden türeyen her şey burada; izleme sırası
-    /// geldiğinde bunlardan geometri üretiliyor.
+    /// A branch's birth data. Everything derived from its parent is here; when its turn to be
+    /// traced comes, the geometry is produced from these.
     struct Branch
     {
         public Vector3 from;
@@ -59,7 +60,7 @@ public class LightningBolt : MonoBehaviour
     {
         if (flash == null || terrain == null || settings == null || material == null)
             throw new System.InvalidOperationException(
-                $"{nameof(LightningBolt)}: bağımlılıklar atanmadı.");
+                $"{nameof(LightningBolt)}: dependencies are not assigned.");
 
         Build();
         flash.Placed += OnPlaced;
@@ -72,11 +73,11 @@ public class LightningBolt : MonoBehaviour
         Hide();
     }
 
-    /// Çizgiler ve değme ışığı bir kez kurulur; her çakmada yeniden yaratmak çöp üretir.
+    /// The lines and the contact light are built once; recreating them on every strike produces garbage.
     ///
-    /// İki ayrı koşul, tek bayrak değil. Diziler ayardaki düğüm sayısına bağlı, nesneler
-    /// ise yalnızca bir kez kurulmalı. Bunları "kanal var mı" sorusunun arkasına
-    /// toplamak, sonradan eklenen bir dizinin sessizce ayrılmadan kalmasına yol açtı.
+    /// Two separate conditions, not one flag. The arrays depend on the node count in the
+    /// settings, while the objects should only be built once. Gathering these behind the single
+    /// question "is there a channel" led to an array added later silently staying unallocated.
     void Build()
     {
         int count = settings.boltSegments + 1;
@@ -85,8 +86,8 @@ public class LightningBolt : MonoBehaviour
 
         if (lines.Count > 0) return;
 
-        // Değme noktasındaki ışık nokta ışık olabiliyor: yönlü olanın aksine burası
-        // gerçekten yakında, menzili birkaç yüz metrede kalıyor ve kümelemeyi boğmuyor.
+        // The light at the contact point can be a point light: unlike the directional one, this
+        // really is nearby, its range stays a few hundred metres and it does not choke the clustering.
         var lit = new GameObject("Contact");
         lit.transform.SetParent(transform, false);
         contact = lit.AddComponent<Light>();
@@ -97,7 +98,7 @@ public class LightningBolt : MonoBehaviour
         contact.intensity = 0f;
     }
 
-    /// Havuzdan çizgi verir, yoksa yaratır. Tavan `boltMaxLines`.
+    /// Hands out a line from the pool, creating one if there is none. The ceiling is `boltMaxLines`.
     LineRenderer TakeLine()
     {
         if (usedLines < lines.Count) return lines[usedLines++];
@@ -135,9 +136,9 @@ public class LightningBolt : MonoBehaviour
             return;
         }
 
-        // Kanal bulut **tabanından** aşağı iner ve yere değer. Boşalmanın kütle içinde
-        // kalan bölümü zaten görünmez; oradan başlatmak kanalı bulutun önüne asıyordu.
-        // Bitiş noktasını yamacın kendisi belirliyor, sabit bir kot değil.
+        // The channel descends from the cloud **base** and touches the ground. The part of the
+        // discharge that stays inside the mass is invisible anyway; starting there hung the
+        // channel in front of the cloud. The end point is set by the slope itself, not a fixed elevation.
         Vector3 top = new(strike.Origin.x, strike.CloudBase, strike.Origin.z);
         Vector3 foot = new(top.x, terrain.SampleHeight(top) + terrain.transform.position.y, top.z);
 
@@ -146,8 +147,8 @@ public class LightningBolt : MonoBehaviour
         contact.transform.position = foot;
         contact.range = settings.groundRange;
 
-        // MESAFE SÖNÜMÜ. Kolun görünmesi mesafe bilgisi taşıyor; sert kesme yerine
-        // sönerek kaybolması hem gerçekçi hem sınırın nerede olduğunu belli etmiyor.
+        // DISTANCE FADE. The bolt being visible carries distance information; fading out rather
+        // than a hard cut is both realistic and does not give away where the limit is.
         distanceFade = 1f - Mathf.SmoothStep(0f, 1f,
             Mathf.InverseLerp(settings.boltFullDistance, settings.boltDistance,
                               strike.Distance));
@@ -157,26 +158,26 @@ public class LightningBolt : MonoBehaviour
         active = true;
     }
 
-    /// İki nokta arasına kanal örer.
+    /// Weaves a channel between two points.
     ///
-    /// Sapma bir **yürüyüş**: her adımın kayması bir öncekini sürdürüyor. Her noktayı düz
-    /// çizginin etrafında bağımsız kaydırmak testere dişi üretiyordu — ardışık iki nokta
-    /// karşıt uçlara düşüyor, kanal keskin ve düzenli bir zikzağa dönüşüyordu. Gerçek
-    /// kanal öyle değil: iyonlaşan yol kendi yönünü taşır, kıvrımları birbirine bağlıdır.
+    /// The deviation is a **walk**: each step's offset continues the previous one. Offsetting every
+    /// point independently around the straight line produced saw teeth — two consecutive points
+    /// fell to opposite ends and the channel turned into a sharp, regular zigzag. A real channel
+    /// is not like that: the ionizing path carries its own direction and its bends are linked.
     ///
-    /// Kayma kanala dik düzlemde kalıyor; eksen boyunca savurmak kanalı kendi üstüne
-    /// katlıyor ve inişi geri sarıyordu. Uçlarda sıfıra iniyor: buluttan çıktığı ve yere
-    /// değdiği noktalar sabit kalmalı.
+    /// The offset stays in the plane perpendicular to the channel; throwing it along the axis
+    /// folded the channel onto itself and rewound its descent. It goes to zero at the ends: the
+    /// points where it leaves the cloud and touches the ground have to stay fixed.
     ///
-    /// Tampon dışarıdan veriliyor: ana kanalın noktaları çatallar yerleşirken hâlâ
-    /// okunuyor, aynı diziye yazmak onları bozardı.
+    /// The buffer is supplied from outside: the main channel's points are still being read while
+    /// the forks are being placed, and writing to the same array would corrupt them.
     void Trace(LineRenderer line, Vector3 from, Vector3 to, float waviness, Vector3[] buffer)
     {
         int count = buffer.Length;
 
-        // Sapma kanalın kendi uzunluğuna göre ölçekleniyor. Mutlak metre verilince
-        // çatallar — ki ana kanaldan kat kat kısalar — oransal olarak iki kat kıvrımlı
-        // çıkıyor ve keskin kırılma düğüm aralığına yaklaşıp testere dişine dönüyordu.
+        // The deviation is scaled by the channel's own length. Given in absolute metres the forks
+        // — which are many times shorter than the main channel — come out proportionally twice as
+        // bent, and the sharp break approached the node spacing and turned into saw teeth.
         float wander = waviness * Vector3.Distance(from, to);
 
         Vector3 axis = (to - from).normalized;
@@ -184,12 +185,13 @@ public class LightningBolt : MonoBehaviour
         if (side.sqrMagnitude < 0.5f) side = Vector3.Normalize(Vector3.Cross(axis, Vector3.right));
         Vector3 other = Vector3.Cross(axis, side);
 
-        // Sönümlü yürüyüş: hıza rastgele bir dürtü ekleniyor, hem hız hem kayma merkeze
-        // doğru çekiliyor. Çekme olmadan kanal düz çizgiden koparak uzaklaşıyor.
+        // A damped walk: a random impulse is added to the velocity, and both the velocity and the
+        // offset are pulled back towards the centre. Without the pull the channel breaks away from
+        // the straight line and wanders off.
         //
-        // Yürüyüş çağıranın tamponuna yazılıyor, ikinci bir diziye değil. Ayrı bir dizi
-        // tutmak döngünün bir dizinin boyuna göre dönüp başkasını indekslemesi demekti;
-        // ikisinin uzunluğu iki ayrı yerde belirlendiği için eşleşmedikleri anda patlıyor.
+        // The walk is written into the caller's buffer, not a second array. Keeping a separate
+        // array meant the loop iterating over one array's length while indexing another; because
+        // their lengths were set in two different places, it blows up the moment they do not match.
         var drift = Vector2.zero;
         var speed = Vector2.zero;
         float widest = 0f;
@@ -203,14 +205,14 @@ public class LightningBolt : MonoBehaviour
             widest = Mathf.Max(widest, drift.magnitude);
         }
 
-        // Genlik sonradan ölçekleniyor: sönüm katsayıları kaymanın ne kadar büyüyeceğini
-        // doğrudan söylemiyor, ayardaki metre değeri ise söylemeli.
+        // The amplitude is scaled afterwards: the damping coefficients do not say directly how
+        // large the offset will grow, while the metre value in the settings must.
         float scale = widest > 0.001f ? wander / widest : 0f;
 
-        // İkinci ölçek: her düğümde bağımsız, keskin ve küçük bir kırılma. Yürüyüş tek
-        // başına düşük frekanslı — geniş, yumuşak bir yay veriyor ve kanal cansız
-        // duruyor. Yalnızca bu ikinci ölçek kullanılınca da testere dişi çıkıyordu.
-        // Gerçek kanalda ikisi birden var: geniş salınımın üstüne binen çıtırtı.
+        // A second scale: an independent, sharp, small break at every node. The walk alone is low
+        // frequency — it gives a wide, soft arc and the channel looks lifeless. Using only this
+        // second scale produced saw teeth as well.
+        // A real channel has both: a crackle riding on a wide oscillation.
         float kink = wander * settings.boltKink;
 
         for (int i = 1; i < count - 1; i++)
@@ -238,7 +240,7 @@ public class LightningBolt : MonoBehaviour
     {
         if (!active) return;
 
-        // Işık donduruldıysa kanal da donar: ikisi aynı çakmanın parçası
+        // If the light is frozen the channel freezes too: both are parts of the same strike
         if (!flash.Held) elapsed += Time.deltaTime;
 
         if (elapsed >= life)
@@ -247,16 +249,18 @@ public class LightningBolt : MonoBehaviour
             return;
         }
 
-        // Kanal parlamanın kendisinden daha kısa yaşar: ışık bulutta dağılıp sönerken
-        // kanal çoktan sönmüş oluyor. Kare kare titriyor — boşalma sürekli değil.
+        // The channel lives shorter than the glow itself: while the light scatters through the
+        // cloud and dies, the channel has long gone out. It flickers frame to frame — the
+        // discharge is not continuous.
         float remaining = 1f - elapsed / life;
         float flicker = flash.Held ? 1f : remaining * remaining * Random.Range(0.55f, 1f);
 
         SetVisible(true);
         contact.intensity = settings.groundIntensity * flicker * distanceFade;
 
-        // Ana kanal en parlak, her kuşak sönük. Boşalmanın gücü dallandıkça azalıyor;
-        // hepsini aynı parlaklıkta çizmek ağacı düz bir tel yumağına çeviriyordu.
+        // The main channel is the brightest and every generation dimmer. The discharge's power
+        // falls with each branching; drawing them all at the same brightness turned the tree into
+        // a flat ball of wire.
         var tint = settings.flashColor * (flicker * distanceFade);
         for (int i = 0; i < usedLines; i++)
             lines[i].startColor = lines[i].endColor = tint * lineTint[i];
@@ -276,13 +280,13 @@ public class LightningBolt : MonoBehaviour
             lines[i].enabled = visible && i < usedLines;
     }
 
-    /// AĞACI ÜRETİR. Reed & Wyvill: dal ebeveyninden ortalama 16 derece sapar (normal
-    /// dağılım), her kuşakta kalınlık/olasılık/uzunluk azalır, kıvrımlılık ARTAR.
+    /// BUILDS THE TREE. Reed & Wyvill: a branch deviates from its parent by 16 degrees on average
+    /// (normal distribution), and at every generation the thickness/probability/length fall while
+    /// the sinuosity RISES.
     ///
-    /// Genişlik-öncelikli kuyruk, özyineleme değil: ağacın büyüklüğü olasılıksal ve
-    /// yığın derinliği önceden bilinmiyor. Kuyruk aynı zamanda bütçe tavanını doğal
-    /// yerde uyguluyor — tavan dolunca kalan dallar hiç doğmuyor, yarım kalmış bir dal
-    /// kalmıyor.
+    /// A breadth-first queue, not recursion: the tree's size is probabilistic and the stack depth
+    /// is not known in advance. The queue also applies the budget ceiling in the natural place —
+    /// once the ceiling is full the remaining branches are never born and no half-finished branch is left.
     void GrowTree(Vector3 top, Vector3 foot)
     {
         usedLines = 0;
@@ -304,14 +308,14 @@ public class LightningBolt : MonoBehaviour
             var branch = pending.Dequeue();
 
             var line = TakeLine();
-            if (line == null) break;              // bütçe doldu
+            if (line == null) break;              // the budget is full
 
             line.widthMultiplier = branch.width;
             EnsureTintCapacity();
             lineTint[usedLines - 1] = Mathf.Pow(0.7f, branch.generation);
 
-            // ANA KANAL YERE DEĞER, dallar havada biter. Kanalın bitiş noktası yamacın
-            // kendisi; dalın bitişi yönü ve boyu.
+            // THE MAIN CHANNEL TOUCHES THE GROUND, the branches end in the air. The channel's end
+            // point is the slope itself; a branch's end is its direction and length.
             Vector3 target = branch.generation == 0
                 ? foot
                 : branch.from + branch.direction * branch.distance;
@@ -320,12 +324,12 @@ public class LightningBolt : MonoBehaviour
 
             if (branch.generation >= settings.boltGenerations) continue;
 
-            // ÇOCUKLAR EBEVEYNİN İZLENMİŞ NOKTALARINDAN doğuyor — düz çizgiden değil.
-            // Düz çizgiden doğarlarsa kıvrımlı kanalın yanında havada asılı kalıyorlar.
-            // Noktalar KOPYALANIYOR: tampon bir sonraki dalda yeniden yazılacak.
-            // BEKLENEN SAYI düğüm başına olasılığa çevriliyor. Aday düğüm sayısı
-            // `boltSegments`'e bağlı; olasılığı doğrudan vermek dal sayısını çözünürlüğe
-            // bağlıyordu.
+            // THE CHILDREN ARE BORN FROM THE PARENT'S TRACED POINTS — not from the straight line.
+            // Born from the straight line they hang in the air beside the bent channel.
+            // The points are COPIED: the buffer will be overwritten on the next branch.
+            // THE EXPECTED COUNT is converted into a per-node probability. The number of candidate
+            // nodes depends on `boltSegments`; giving the probability directly tied the branch
+            // count to the resolution.
             int candidates = points.Length - 2;
             float perNode = candidates > 0 ? branch.chance / candidates : 0f;
 
@@ -351,14 +355,15 @@ public class LightningBolt : MonoBehaviour
         SetVisible(true);
     }
 
-    /// Dalın yönü: ebeveyninden ORTALAMA 16 derece sapar, sapma normal dağılır.
+    /// The branch's direction: it deviates from its parent by 16 degrees ON AVERAGE, with the
+    /// deviation normally distributed.
     ///
-    /// Sabit açı (eski hâl) her çatalı aynı koniye diziyordu ve ağaç şemsiye gibi
-    /// duruyordu. Normal dağılım Reed & Wyvill'in tek ampirik gözlemi: doğadaki dallar
-    /// bu değer etrafında toplanıyor, kuyrukta nadiren sert sapanlar var.
+    /// A fixed angle (the old state) lined every fork up on the same cone and the tree looked like
+    /// an umbrella. The normal distribution is Reed & Wyvill's single empirical observation:
+    /// branches in nature gather around this value, with rare sharp deviations in the tail.
     ///
-    /// Tavan var çünkü normal dağılımın kuyruğu sınırsız: kırpılmazsa bir dal geri
-    /// yukarı, bulutun içine dönebiliyor.
+    /// There is a cap because the normal distribution's tail is unbounded: unclipped, a branch can
+    /// turn back upward into the cloud.
     Vector3 ChildDirection(Vector3 parent)
     {
         float deg = settings.boltBranchAngle + Gaussian() * settings.boltBranchSpread;
@@ -371,9 +376,9 @@ public class LightningBolt : MonoBehaviour
         return (Quaternion.AngleAxis(deg, axis.normalized) * parent).normalized;
     }
 
-    /// Box-Muller. Unity'de normal dağılım yok; `Random.value` düzgün dağılıyor ve
-    /// düzgün dağılımla 16 derece "ortalama" kurulamaz — ortalama etrafında toplanma
-    /// olmaz, bant olur.
+    /// Box-Muller. Unity has no normal distribution; `Random.value` is uniform and a 16 degree
+    /// "average" cannot be built from a uniform distribution — there is no gathering around the
+    /// mean, only a band.
     static float Gaussian()
     {
         float u1 = Mathf.Max(Random.value, 1e-6f);

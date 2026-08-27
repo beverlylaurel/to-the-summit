@@ -1,22 +1,23 @@
 using System;
 using UnityEngine;
 
-/// BİSİKLET. Projeden bağımsız: rota, arazi, hava ve kar sistemlerini bilmiyor, onlar da
-/// bunu bilmiyor. Bağımlılığı yalnız Unity — bir `CharacterController`, bir `LayerMask`,
-/// bir ayar asset'i. Başka bir projeye klasör olarak taşınır ve çalışır.
+/// THE BIKE. Independent of the project: it does not know the route, terrain, weather or snow
+/// systems, and they do not know it. Its only dependency is Unity — a `CharacterController`, a
+/// `LayerMask`, a settings asset. Moved to another project as a folder, it works.
 ///
-/// HIZ TABLODAN DEĞİL FİZİKTEN GELİYOR. "Yolda 5 m/s, patikada 4" diye yazılsaydı her
-/// eğim için yeni bir kural gerekirdi ve arazi değiştiğinde hepsi yalan olurdu. Burada
-/// sürücünün GÜCÜ veriliyor; hız güç, kütle, eğim ve dirençlerin dengesinden çıkıyor:
+/// THE SPEED COMES FROM PHYSICS, NOT FROM A TABLE. Written as "5 m/s on the road, 4 on a path",
+/// every gradient would need a new rule and they would all become lies once the terrain changed.
+/// Here the rider's POWER is given; the speed comes out of the balance of power, mass, gradient
+/// and resistances:
 ///
-///     P = v · (Crr·m·g + m·g·sin(eğim) + ½·ρ·CdA·v²)
+///     P = v · (Crr·m·g + m·g·sin(gradient) + ½·ρ·CdA·v²)
 ///
-/// Sonuç kendiliğinden doğru davranıyor: düzde hızlı, %10 yokuşta yürüme temposunda,
-/// inişte fren gerektirecek kadar hızlı. Tek satır "yokuşta yavaşla" kuralı yok.
+/// The result behaves correctly on its own: fast on the flat, at walking pace on a 10% climb,
+/// fast enough on a descent to need braking. There is no single "slow down uphill" rule.
 ///
-/// KİNEMATİK, RIGIDBODY DEĞİL. Arazi üstünde tekerlek fiziği kurmak zıplama, takılma ve
-/// tahmin edilemez tepme getiriyor; `CharacterController` çarpışmayı çözüyor, hareketi
-/// bu bileşen hesaplıyor. Ayrıca bu, oyuncunun yürüyüş kontrolcüsüyle aynı model.
+/// KINEMATIC, NOT A RIGIDBODY. Building wheel physics on terrain brings bouncing, snagging and
+/// unpredictable kicks; `CharacterController` resolves the collision and this component computes
+/// the motion. It is also the same model as the player's walking controller.
 [RequireComponent(typeof(CharacterController))]
 public class BikeController : MonoBehaviour
 {
@@ -25,35 +26,35 @@ public class BikeController : MonoBehaviour
     CharacterController controller;
     BikeInput input;
 
-    /// Zemine dik yüzey normali. Eğim ve yatma bundan türüyor.
+    /// The surface normal perpendicular to the ground. The gradient and the lean derive from it.
     Vector3 groundNormal = Vector3.up;
 
     float verticalSpeed;
     float lean;
 
-    /// Yol boyunca hız (m/s). Geriye gitmek yok: bisiklet geri pedallanmaz.
+    /// Speed along the road (m/s). No going backwards: a bike is not pedalled in reverse.
     public float Speed { get; private set; }
 
-    /// Gidiş yönündeki eğim (oran, 0.10 = %10 yokuş yukarı).
+    /// The gradient in the direction of travel (a ratio, 0.10 = a 10% climb).
     public float Grade { get; private set; }
 
     public bool Grounded { get; private set; }
 
-    /// Görsel yatma açısı (derece). Gövde modeli bunu okuyor; kontrolcü kendisi hiçbir
-    /// mesh döndürmüyor — görsel ile fizik ayrı kalsın diye.
+    /// The visual lean angle (degrees). The body model reads it; the controller itself rotates no
+    /// mesh — so that the visual and the physics stay apart.
     public float LeanAngle => lean;
 
-    /// Ayardaki en büyük yatma açısı. Görsel bileşenler yatmayı ORANA çevirmek için
-    /// okuyor; ayarın kendisini dışarı açmak, her tüketicinin istediği alanı okumasına
-    /// kapı açardı.
+    /// The largest lean angle in the settings. The visual components read it to convert the lean
+    /// into a RATIO; exposing the settings themselves would open the door to every consumer
+    /// reading whatever field it liked.
     public float MaxLean => settings != null ? settings.maxLean : 1f;
 
-    /// Zeminin yuvarlanma direnci. Oyun dünyası biliyorsa (asfalt, çakıl, kar) buradan
-    /// verir; vermezse ayardaki değer geçerli. Bisiklet zemin TÜRLERİNİ bilmiyor,
-    /// yalnız sayıyı okuyor.
+    /// The ground's rolling resistance. If the game world knows it (asphalt, gravel, snow) it
+    /// supplies it here; if not, the value in the settings holds. The bike does not know ground
+    /// TYPES, it only reads the number.
     public float RollingResistance { get; set; } = -1f;
 
-    /// Ayar asset'i dışarıdan da verilebiliyor: aynı sahnede iki farklı bisiklet.
+    /// The settings asset can be supplied from outside too: two different bikes in the same scene.
     public void Bind(BikeSettings source) => settings = source;
 
     public void SetInput(BikeInput value) => input = value.Sanitised();
@@ -67,17 +68,17 @@ public class BikeController : MonoBehaviour
     void OnEnable()
     {
         if (settings == null)
-            throw new InvalidOperationException($"{nameof(BikeController)}: ayar atanmadı.");
+            throw new InvalidOperationException($"{nameof(BikeController)}: the settings are not assigned.");
     }
 
-    /// TEKERLEK YERE OTURTULUYOR. Kapsül modele göre kuruluyor ama modelin kökle arasında
-    /// pay kalabiliyor: ölçüldü, kapsülün tabanı çarpışmanın yedi santim üstünde (deri
-    /// payı kadar, doğru) iken modelin altı kapsülün otuz beş santim üstündeydi. Yani
-    /// fizik doğru yerde duruyor, görüntü havada asılı kalıyordu.
+    /// THE WHEEL IS SET ON THE GROUND. The capsule is built from the model, but there can be a
+    /// gap between the model and the root: measured, the capsule's base was seven centimetres
+    /// above the collision (the skin width, correct) while the model's bottom was thirty-five
+    /// centimetres above the capsule. So the physics stood in the right place and the image hung in the air.
     ///
-    /// Kurulum betiği bunu bir kez yapıyor ama sahnede eski konum kalabiliyor; burada her
-    /// açılışta yeniden ölçülüyor. Kapsül kapatılıp açılıyor çünkü `CharacterController`
-    /// açıkken doğrudan konum ataması bir sonraki karede geri alınıyor.
+    /// The setup script does this once but the old position can survive in the scene; here it is
+    /// remeasured on every launch. The capsule is switched off and on because while
+    /// `CharacterController` is enabled a direct position assignment is undone on the next frame.
     void Start()
     {
         var renderers = GetComponentsInChildren<Renderer>();
@@ -101,13 +102,13 @@ public class BikeController : MonoBehaviour
         controller.enabled = true;
     }
 
-    /// ÇARPIŞMA KAPSÜLÜ MODELDEN ÖLÇÜLÜYOR. Kurulum betiği bunu bir kez yazıyordu ve
-    /// sahnede kalan eski değerler geçerli oluyordu: kapsülün tabanı modelin altından
-    /// kırk santim aşağıda kalınca bisiklet havada duruyor, gölgesi altında bir metre
-    /// ötede çıkıyordu.
+    /// THE COLLISION CAPSULE IS MEASURED FROM THE MODEL. The setup script used to write this once
+    /// and the old values left in the scene took precedence: with the capsule's base forty
+    /// centimetres below the model's bottom the bike stood in the air and its shadow came out a
+    /// metre away beneath it.
     ///
-    /// Ölçü her açılışta yeniden alınıyor: model değişse de, sahnedeki bileşen eski
-    /// kalsa da kapsül modele oturuyor.
+    /// The measurement is taken again on every launch: whether the model changed or the component
+    /// in the scene stayed old, the capsule sits on the model.
     void FitCapsule()
     {
         var renderers = GetComponentsInChildren<Renderer>();
@@ -122,8 +123,8 @@ public class BikeController : MonoBehaviour
         controller.height = height;
         controller.radius = Mathf.Min(0.3f, height * 0.4f);
 
-        // Merkez modelin ALTINDAN ölçülüyor: kök ile modelin tabanı arasında pay varsa
-        // kapsül o payı da hesaba katıyor.
+        // The centre is measured from the BOTTOM of the model: if there is a gap between the root
+        // and the model's base, the capsule accounts for that gap too.
         controller.center = new Vector3(0f, bottom + height * 0.5f, 0f);
     }
 
@@ -140,9 +141,8 @@ public class BikeController : MonoBehaviour
 
     // ------------------------------------------------------------------- zemin
 
-    /// Zemin normali ve eğim. Işın kontrolcünün TABANINDAN biraz yukarıdan atılıyor:
-    /// tam tabandan atılan ışın eğimli zeminde yüzeyin içinde başlıyor ve hiçbir şeye
-    /// çarpmıyor.
+    /// The ground normal and the gradient. The ray is cast slightly above the controller's BASE:
+    /// a ray cast from the base exactly starts inside the surface on sloping ground and hits nothing.
     void ReadGround()
     {
         Grounded = controller.isGrounded;
@@ -158,8 +158,8 @@ public class BikeController : MonoBehaviour
         }
         else groundNormal = Vector3.up;
 
-        // Gidiş yönündeki eğim: yatayda bir metre ilerlerken kaç metre yükseliyoruz.
-        // Yüzey normalinden kapalı biçimde çıkıyor, ikinci bir ışın gerekmiyor.
+        // The gradient in the direction of travel: how many metres we rise per metre forward.
+        // It follows in closed form from the surface normal, no second ray is needed.
         var forward = new Vector2(transform.forward.x, transform.forward.z);
         if (forward.sqrMagnitude < 1e-6f || Mathf.Abs(groundNormal.y) < 1e-3f)
         {
@@ -173,17 +173,17 @@ public class BikeController : MonoBehaviour
 
     // -------------------------------------------------------------- direksiyon
 
-    /// Dönüş YATMADAN geliyor, gidon açısından değil. Bisiklet virajı yatarak alır ve
-    /// yarıçapı hız belirler: r = v² / (g·tan(yatma)). Yani hızlıyken geniş, yavaşken
-    /// dar dönüyor — sabit bir "dönüş hızı" sayısı bunu asla veremezdi.
+    /// The turn comes from the LEAN, not from a handlebar angle. A bike takes a corner by leaning
+    /// and the radius is set by the speed: r = v² / (g·tan(lean)). So it turns wide when fast and
+    /// tight when slow — a fixed "turn rate" number could never give that.
     ///
-    /// Duran bisiklette formül sonsuza gidiyor; `maxYawRate` gidonun fiziksel sınırı
-    /// olarak devreye giriyor.
+    /// On a stationary bike the formula goes to infinity; `maxYawRate` steps in as the
+    /// handlebar's physical limit.
     void Steer(float dt)
     {
         float targetLean = input.steer * settings.maxLean;
 
-        // Yatma anında değil, yumuşayarak: gerçek bir sürücü gövdesini kaydırıyor.
+        // The lean is not instantaneous but smoothed: a real rider shifts their body.
         lean = Mathf.Lerp(lean, targetLean,
             1f - Mathf.Exp(-dt / Mathf.Max(0.01f, settings.leanSmoothing)));
 
@@ -205,8 +205,8 @@ public class BikeController : MonoBehaviour
         float mass = Mathf.Max(1f, settings.mass);
         float crr = RollingResistance >= 0f ? RollingResistance : settings.rollingResistance;
 
-        // İTME. Güç bölü hız, ama düşük hızda bu sonsuza gidiyor — duruştan kalkarken
-        // 230 W bölü sıfır. Tekerleğin zemine aktarabildiği en büyük kuvvet sınır.
+        // THRUST. Power divided by speed, but at low speed that goes to infinity — 230 W divided
+        // by zero when pulling away. The largest force the wheel can transfer to the ground is the limit.
         float power = input.sprint ? settings.sprintPower : settings.steadyPower;
         power *= input.throttle;
 
@@ -214,28 +214,28 @@ public class BikeController : MonoBehaviour
             ? Mathf.Min(power / Speed, settings.maxDriveForce)
             : settings.maxDriveForce * input.throttle;
 
-        // DİRENÇLER. Yuvarlanma hızdan bağımsız, sürükleme hızın karesiyle, yerçekimi
-        // eğimden. Üçü de bisikleti yavaşlatan gerçek kuvvetler; hiçbiri "oynanış için"
-        // eklenmiş bir katsayı değil.
+        // RESISTANCES. Rolling is independent of speed, drag goes with the square of it, gravity
+        // with the gradient. All three are real forces slowing the bike; none of them is a
+        // coefficient added "for gameplay".
         float rolling = crr * mass * Mathf.Abs(settings.gravity);
         float drag = 0.5f * settings.airDensity * settings.dragArea * Speed * Speed;
 
-        // Eğim kuvveti: yokuş yukarı fren, aşağı itme. sin(atan(eğim)) kapalı biçimde.
+        // The gradient force: braking uphill, pushing downhill. sin(atan(gradient)) in closed form.
         float slope = mass * settings.gravity * Grade / Mathf.Sqrt(1f + Grade * Grade);
 
-        // Havadayken pedal işe yaramıyor, yuvarlanma direnci de yok.
+        // While airborne the pedals do nothing, and there is no rolling resistance either.
         if (!Grounded) { drive = 0f; rolling = 0f; }
 
         float force = drive + slope - rolling - drag;
         Speed += force / mass * dt;
 
-        // FREN AYRI: kuvvet değil doğrudan yavaşlama. Fren gücü tekerleğin kilitlenme
-        // sınırına dayanıyor ve kütleyle ölçeklenmiyor — bisiklette ön takla sınırı
-        // kütleden değil geometriden geliyor.
+        // BRAKING IS SEPARATE: not a force but a deceleration directly. The braking power is
+        // limited by the wheel's locking point and does not scale with mass — on a bike the endo
+        // limit comes from the geometry, not from the mass.
         if (Grounded && input.brake > 0f)
             Speed -= settings.brakeDeceleration * input.brake * dt;
 
-        // Geri gitmek yok. Tavan inişte fren refleksinin yerine geçiyor.
+        // No going backwards. The ceiling stands in for the braking reflex on a descent.
         Speed = Mathf.Clamp(Speed, 0f, settings.comfortMaxSpeed);
     }
 
@@ -243,8 +243,8 @@ public class BikeController : MonoBehaviour
 
     void Move(float dt)
     {
-        // Yön zemine yatırılıyor: yokuşta ileri gitmek yamaç boyunca gitmek demek,
-        // yatay ileri değil. Yoksa dik yamaçta bisiklet zemine gömülüyor.
+        // The direction is laid onto the ground: going forward on a slope means going along the
+        // slope, not horizontally forward. Otherwise the bike sinks into the ground on a steep slope.
         Vector3 along = Vector3.ProjectOnPlane(transform.forward, groundNormal).normalized;
         if (along.sqrMagnitude < 1e-6f) along = transform.forward;
 
