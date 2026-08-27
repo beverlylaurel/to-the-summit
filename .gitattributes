@@ -16,3 +16,4 @@ Assets/Terrain/**/*.asset filter=lfs diff=lfs merge=lfs -text
 Assets/Settings/Cloud*Noise.asset filter=lfs diff=lfs merge=lfs -text
 Assets/Rain/*.asset filter=lfs diff=lfs merge=lfs -text
 Assets/Rain/RainStreakDatabase.asset filter=lfs diff=lfs merge=lfs -text
+Assets/Textures/**/*.png filter=lfs diff=lfs merge=lfs -text
