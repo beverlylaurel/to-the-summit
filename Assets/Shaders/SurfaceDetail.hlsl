@@ -32,7 +32,8 @@ struct SurfaceDetail
 };
 
 /// A single surface read. `sharedSampler` is shared by every surface — the number
-/// of samplers is limited in hardware and they all want the same settings (Repeat,
+/// of samplers is limited in hardware and they all want the same settings
+/// (Repeat, trilinear, aniso).
 #define SAMPLE_SURFACE_DETAIL(name, sharedSampler, uv, ddxUV, ddyUV, result)          \
 {                                                                                     \
     float4 n = SampleStochastic(TEXTURE2D_ARGS(_##name##Normal, sharedSampler),       \
@@ -92,7 +93,8 @@ float2 SurfacePlanarUV(float3 worldPos, float3 normalWS, float scale)
 }
 
 /// Rotates a UV onto an axis. Directional textures (wind sastrugi, layered rock)
-/// are drawn along a fixed direction in the world; they have to line up with the
+/// are drawn along a fixed direction in the world; they have to be aligned with the real
+/// direction in the scene.
 void SurfaceAlignUV(float2 axis, inout float2 uv, inout float2 ddxUV, inout float2 ddyUV)
 {
     float2 perpendicular = float2(-axis.y, axis.x);
