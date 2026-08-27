@@ -2,7 +2,7 @@ using System;
 using System.Text;
 using UnityEngine;
 
-/// Sağ üstte tırmanış ve hava durumunu çizer. Kendisi hiçbir şeyi sürmez, yalnızca okur.
+/// Draws the climb and weather state at the top right. It drives nothing itself, it only reads.
 public class ClimbHud : MonoBehaviour
 {
     [SerializeField] Transform observer;
@@ -22,16 +22,16 @@ public class ClimbHud : MonoBehaviour
     const float PaddingY = 5f;
     const float Margin = 10f;
 
-    // OnGUI saniyede 120 kez çağrılır (Layout + Repaint). Metni orada kurmak kare
-    // başına string çöpü üretiyordu; PerformanceHud'daki gibi ayrık aralıkla hazırlanır.
+    // OnGUI is called 120 times a second (Layout + Repaint). Building the text there produced
+    // string garbage every frame; as in PerformanceHud it is prepared at a discrete interval.
     const float RefreshInterval = 0.1f;
 
     readonly StringBuilder builder = new();
     readonly GUIContent content = new();
-    // GUIStyle SERİLEŞTİRİLMİYOR. Unity onu kaydetmeye çalıştığında içindeki font
-    // referansı derleme sonrası geçersiz kalıyor ve her yeniden yüklemede
-    // "Deleting invalid font reference" uyarısı basılıyor. Biçim zaten her
-    // kullanımda kuruluyor, saklanacak bir şey yok.
+    // GUIStyle IS NOT SERIALIZED. When Unity tries to save it the font reference inside
+    // stays invalid after a recompile and a "Deleting invalid font reference" warning is
+    // printed on every reload. The style is built at every use anyway, there is nothing
+    // to store.
     [System.NonSerialized] GUIStyle style;
     string readout = "";
     float nextRefresh;
@@ -59,7 +59,7 @@ public class ClimbHud : MonoBehaviour
             || wind == null || time == null || atmosphere == null || surface == null
             || cloudLayer == null
             || temperature == null)
-            throw new InvalidOperationException($"{nameof(ClimbHud)}: bağımlılıklar atanmadı.");
+            throw new InvalidOperationException($"{nameof(ClimbHud)}: dependencies are not assigned.");
     }
 
     void Update()
@@ -78,93 +78,94 @@ public class ClimbHud : MonoBehaviour
 
         builder.Clear();
 
-        // Bütün kotlar zemine göre. Yükseklik göreli, kuşak sınırları mutlak yazılınca
-        // ikisi karşılaştırılamıyordu: "2114 m'deyim, fırtına 4709 m'de" iki farklı
-        // sıfır noktasından ölçülmüş iki sayıydı.
-        builder.AppendFormat("TIRMANIŞ\n");
-        builder.AppendFormat("  Bulunduğun yükseklik   {0:F0} m\n", altitude);
-        builder.AppendFormat("  Zirve                  {0:F0} m   (%{1:F0} tamamlandı)\n",
+        // All elevations are relative to the ground. With the altitude relative and the band
+        // boundaries written as absolute, the two could not be compared: "I am at 2114 m, the
+        // storm is at 4709 m" were two numbers measured from two different zero points.
+        builder.AppendFormat("CLIMB\n");
+        builder.AppendFormat("  Your altitude          {0:F0} m\n", altitude);
+        builder.AppendFormat("  Summit                 {0:F0} m   ({1:F0}% complete)\n",
             summit - ground, Mathf.Clamp01(altitude / (summit - ground)) * 100f);
-        builder.AppendFormat("  Havanın gördüğü kot    {0:F0} m\n\n",
+        builder.AppendFormat("  Altitude weather sees  {0:F0} m\n\n",
             weatherDriver.ProgressAltitude - ground);
 
-        // SICAKLIK. Ölçülen ve hissedilen ayrı yazılıyor: rüzgâr termometreyi
-        // değiştirmez, insanı değiştirir. Donma seviyesi de aynı kaynaktan türüyor —
-        // üç satır tek modelin üç yüzü.
+        // TEMPERATURE. Measured and felt are printed separately: the wind does not change the
+        // thermometer, it changes the person. The freezing level derives from the same source —
+        // three lines, three faces of one model.
         builder.AppendFormat("SICAKLIK\n");
-        builder.AppendFormat("  Ölçülen                {0:F1} °C\n",
+        builder.AppendFormat("  Measured               {0:F1} °C\n",
             temperature.At(observer.position.y));
-        builder.AppendFormat("  Hissedilen             {0:F1} °C   (rüzgâr soğuğu)\n",
+        builder.AppendFormat("  Felt                   {0:F1} °C   (wind chill)\n",
             temperature.FeltAt(observer.position.y));
         builder.AppendFormat("  Donma seviyesi         {0:F0} m\n\n",
             temperature.FreezingLevel - ground);
 
-        builder.AppendFormat("HAVA KUŞAKLARI\n");
-        builder.AppendFormat("  Sürekli fırtına        {0:F0} m\n\n",
+        builder.AppendFormat("WEATHER BANDS\n");
+        builder.AppendFormat("  Permanent storm        {0:F0} m\n\n",
             weatherDriver.BlizzardAltitude - ground);
 
-        builder.AppendFormat("YAĞIŞ\n");
-        builder.AppendFormat("  Şiddet                 {0:F2}\n", weather.Precipitation);
-        builder.AppendFormat("  Açık pencere           {0:F2}   (1 = hava açıldı)\n\n",
+        builder.AppendFormat("PRECIPITATION\n");
+        builder.AppendFormat("  Severity               {0:F2}\n", weather.Precipitation);
+        builder.AppendFormat("  Clear window           {0:F2}   (1 = the weather cleared)\n\n",
             weatherDriver.ClearWindow);
 
-        builder.AppendFormat("RÜZGÂR\n");
-        builder.AppendFormat("  Sürekli şiddet         {0:F2}\n", wind.Strength);
-        builder.AppendFormat("  Anlık esinti           {0:+0.00;-0.00}\n", wind.Gust);
-        builder.AppendFormat("  Hız                    {0:F1} m/s\n\n", wind.Velocity.magnitude);
+        builder.AppendFormat("WIND\n");
+        builder.AppendFormat("  Sustained severity     {0:F2}\n", wind.Strength);
+        builder.AppendFormat("  Instantaneous gust     {0:+0.00;-0.00}\n", wind.Gust);
+        builder.AppendFormat("  Speed                  {0:F1} m/s\n\n", wind.Velocity.magnitude);
 
-        builder.AppendFormat("GÖRÜŞ\n");
-        builder.AppendFormat("  Görüş mesafesi         {0:F0} m\n", atmosphere.Visibility);
-        // "Kaplama" değil "kapsama": bu, katmanın ne kadarının bulut olduğu — göğün ne
-        // kadarının kapandığı değil. Zirvede %95 yazarken gökyüzü açık olabiliyor, çünkü
-        // oyuncu katmanın üstüne çıkmış oluyor. O yüzden nerede durduğu da yazılıyor.
-        // Kotlar bulut sisteminin KENDİ verisinden: aynı Volume ayarları, aynı hava
-        // haritası. Atmosferin `CloudTop`/`CloudBottom`'ı silinen sisteme aitti.
+        builder.AppendFormat("VISIBILITY\n");
+        builder.AppendFormat("  Visibility             {0:F0} m\n", atmosphere.Visibility);
+        // "Coverage", not "cover": this is how much of the LAYER is cloud — not how much of the
+        // sky is closed. It can read 95% at the summit while the sky is clear, because the player
+        // has climbed above the layer. That is why where they stand is printed too.
+        // The elevations come from the cloud system's OWN data: the same Volume settings, the same
+        // weather map. The atmosphere's `CloudTop`/`CloudBottom` belonged to the deleted system.
         float top = cloudLayer.TopAt(observer.position);
         float bottom = cloudLayer.Bottom;
 
-        // IKI SAYI DA YAZILIYOR, CUNKU IKISI FARKLI SEY.
+        // BOTH NUMBERS ARE PRINTED, BECAUSE THEY ARE DIFFERENT THINGS.
         //
-        // Yerel deger hava haritasinin senin XZ'nde verdigi kapsama; kuresel
-        // deger gokyuzunun genelinde ne kadar bulut oldugu. Once yalniz yerel
-        // yaziliyordu ve "Bulut kapsamasi" diye etiketliydi -- IKI KEZ yanlis
-        // teshise goturdu:
-        //   1. HUD %0 gosterirken ekranda bulut vardi, "bulut olmayan yerde
-        //      cizgi var" sanildi.
-        //   2. HUD %0 gosterirken zeminde belirgin koyu lekeler vardi
-        //      (kullanici iki kare gonderdi). Lekeler bulut GOLGESIYDI:
-        //      kuresel kapsama %19.5 ve gunes yonundeki bulut golge dusuruyordu.
+        // The local value is the coverage the weather map gives at your XZ; the global
+        // value is how much cloud there is across the sky in general. At first only the
+        // local one was printed and it was labelled "Cloud coverage" -- it led to a wrong
+        // diagnosis TWICE:
+        //   1. The HUD showed 0% while there was cloud on screen, and it was taken for
+        //      "there is a line where there is no cloud".
+        //   2. The HUD showed 0% while there were clear dark patches on the ground
+        //      (the user sent two frames). The patches were cloud SHADOW:
+        //      the global coverage was 19.5% and the cloud in the sun's direction was
+        //      casting a shadow.
         //
-        // Golge senin ustundeki buluttan degil, GUNES YONUNDEKI buluttan
-        // geliyor. Yerel kapsama o soruyu hicbir zaman cevaplamiyor.
-        builder.AppendFormat("  Bulut — üstünde        %{0:F0}\n",
+        // The shadow comes not from the cloud above you but from the cloud IN THE SUN'S
+        // DIRECTION. The local coverage never answers that question.
+        builder.AppendFormat("  Cloud — above you      {0:F0}%\n",
             cloudLayer.CoverageAt(observer.position) * 100f);
-        builder.AppendFormat("  Bulut — gökte          %{0:F0}   (gölge bundan gelir)\n",
+        builder.AppendFormat("  Cloud — in the sky     {0:F0}%   (the shadow comes from this)\n",
             atmosphere.Coverage * 100f);
 
         if (float.IsPositiveInfinity(top))
-            builder.AppendFormat("  Bulut katmanı          bu sütunda bulut yok\n\n");
+            builder.AppendFormat("  Cloud layer            no cloud in this column\n\n");
         else
         {
-            string place = observer.position.y > top ? "üstündesin"
-                         : observer.position.y < bottom ? "altındasın"
-                         : "içindesin";
-            builder.AppendFormat("  Bulut katmanı          {0:F0} – {1:F0} m   ({2})\n\n",
+            string place = observer.position.y > top ? "you are above it"
+                         : observer.position.y < bottom ? "you are below it"
+                         : "you are inside it";
+            builder.AppendFormat("  Cloud layer            {0:F0} – {1:F0} m   ({2})\n\n",
                 bottom - ground, top - ground, place);
         }
 
         builder.AppendFormat("ZAMAN\n");
         builder.AppendFormat("  Saat                   {0}\n", time.Clock);
-        builder.AppendFormat("  Gündüz oranı           {0:F2}   (0 gece, 1 tam gündüz)", time.DayFactor);
+        builder.AppendFormat("  Day factor             {0:F2}   (0 night, 1 full day)", time.DayFactor);
 
         readout = builder.ToString();
     }
 
     void OnGUI()
     {
-        // Sabit genişlikli yazı: sayılar sütun hâlinde hizalanıyor, orantılı yazıda
-        // her satır kayıp okunmaz hale geliyordu. Sarma kapalı, çünkü sarılan satır
-        // hizayı bozuyor — panel zaten en uzun satıra göre ölçülü.
+        // A fixed-width font: the numbers line up in columns, in a proportional font every line
+        // was offset and became unreadable. Wrapping is off, because a wrapped line breaks the
+        // alignment — the panel is already sized to the longest line.
         style ??= new GUIStyle(GUI.skin.label)
         {
             font = Font.CreateDynamicFontFromOSFont("Consolas", FontSize),
