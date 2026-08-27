@@ -3534,3 +3534,46 @@ tessellation ile bölünüp gerçek yükseklik kadar kaydırılıyor.
 tutmadı. Üçüncüde durup "bu ayar sınıfı belirtiyi kapatabilir mi" diye
 sorulmalıydı — cevap hayırdı, çünkü hiçbir gölgelendirme ayarı silüet
 üretemez.
+
+## "Bu nasıl bir gölgelendirme aklım almıyor"
+
+**Belirti.** Kar yüzeyinde keskin kenarlı, düz, onlarca metre büyüklüğünde
+koyu lekeler. Ara ton yok — yüzey iki tonlu. Bulut gölgesine benziyor ama
+değil.
+
+**İlk şüphelim yanlıştı.** Lekelerin boyutuna bakıp "hiçbir kar katmanı 50 m
+ölçekte desen üretmiyor, bulut gölgesi olmalı" dedim. Kullanıcı düzeltti:
+*"bulutla alakası yok. kar yüzeyinin kendi gölgesi o!"*
+
+**Gerçek sebep.** `MountainSurface.hlsl`, çukur ortam örtmesi:
+
+```hlsl
+half cukur = saturate(-surface.snowSurfaceHeight / SNOW_FBM_AMP);
+```
+
+`SNOW_FBM_AMP` = 1.5 cm ve o **yalnız fBm katmanının** genliği.
+`snowSurfaceHeight` ise bütün katmanların toplamı. Drift (15 cm) ve sastrugi
+(20 cm) arazi ölçüsüne çıkınca payda 10 kat küçük kaldı:
+
+| Çukur | Eski `cukur01` | Yeni |
+|---|---|---|
+| 2 cm | **1.00** | 0.07 |
+| 10 cm | **1.00** | 0.34 |
+| 20 cm | **1.00** | 0.68 |
+
+**Her çukur tam doygun.** Ara ton kalmıyor, yüzey iki tonlu lekelere
+bölünüyor, komşu doygun çukurlar birleşince lekeler onlarca metreye çıkıyor.
+
+**Ayırt eden ölçüm.** Lekelerin boyutu (20-50 m) hiçbir katmanın dalga boyuna
+uymuyordu — bu beni yanlış yöne itti. Doğru soru "hangi katman bu ölçekte
+desen üretir" değil, **"hangi terim doygunlaşıp komşuları birleştirir"**
+olmalıydı. `saturate` doyduğunda desen ölçeği kaybolur; çıktının ölçeğine
+bakarak girdinin ölçeği aranmaz.
+
+**Düzeltme.** Payda rölyefin gerçek tavanı: `kar derinliği ×
+SNOW_BEDFORM_DEPTH_FRAC`. `SnowYuzeyRolyef` yüksekliği zaten oraya kırpıyor —
+iki taraf aynı ölçeği kullanıyor.
+
+**Sınıf.** Bu bir NORMALİZASYON PAYDASI hatası. Aynı sınıfın diğer örneği:
+`izDerinlik / SNOW_RELIEF_MAX_DEPTH` (iz için, doğru — iz derinliği gerçekten
+o sabitle sınırlı). Bir payda değiştiğinde payın ölçeği de değişmiş olabilir.

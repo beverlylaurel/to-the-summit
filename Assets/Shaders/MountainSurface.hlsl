@@ -751,7 +751,28 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // `lerp(occlusion, 1.0, snowMask * 0.55)` payının yarısından fazlasını
         // siliyordu (ölçüldü: öğle karesinde etki görünmedi).
         {
-            half cukur = (half)saturate(-surface.snowSurfaceHeight / SNOW_FBM_AMP);
+            // PAYDA YÜZEY RÖLYEFİNİN GERÇEK TAVANI, fBm GENLİĞİ DEĞİL.
+            //
+            // `SNOW_FBM_AMP` (1.5 cm) yazılıydı ve o YALNIZ fBm katmanının
+            // genliği. `snowSurfaceHeight` ise bütün katmanların toplamı;
+            // drift (15 cm) ve sastrugi (20 cm) arazi ölçüsüne çıkınca
+            // 10 cm'lik sıradan bir çukur `saturate(0.10/0.015)` = 6.67'den
+            // 1.0'a doyuyordu.
+            //
+            // Sonucu: her çukur TAM karartma alıyor, ara ton kalmıyor ve
+            // yüzey iki tonlu, keskin kenarlı lekelere bölünüyordu. Komşu
+            // doygun çukurlar birleşince lekeler onlarca metreye çıkıyordu
+            // (kullanıcı bildirdi: "bu nasıl bir gölgelendirme aklım almıyor",
+            // ve sorumluyu kendi buldu: "kar yüzeyinin kendi gölgesi o").
+            //
+            // Doğru payda rölyefin kendi tavanı — `SnowYuzeyRolyef` zaten
+            // yüksekliği oraya kırpıyor. 50 cm karda 30 cm; aynı 10 cm'lik
+            // çukur 0.33 veriyor ve ara tonlar geri geliyor.
+            float rolyefTavan = SnowBaseHeight(karDurum.r, yerelRho)
+                              * SNOW_BEDFORM_DEPTH_FRAC;
+
+            half cukur = (half)saturate(-surface.snowSurfaceHeight
+                                        / max(rolyefTavan, 1e-4));
 
             surface.occlusion *= lerp((half)1.0, (half)1.0 - SNOW_SURFACE_AO,
                                       cukur * (half)snowMask);
