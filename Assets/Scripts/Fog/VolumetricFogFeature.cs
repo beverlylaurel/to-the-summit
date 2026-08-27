@@ -5,24 +5,24 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
 
-/// VOLUMETRİK SİS — Wronski 2014 froxel hacmini süren render geçişi.
+/// VOLUMETRIC FOG — the render pass driving Wronski 2014's froxel volume.
 ///
-/// İki compute dispatch: hacmi doldur, ışın boyunca birik. Sonuç `_FogScatteringVolume`
-/// olarak global bağlanıyor; `HeightFog.hlsl` onu her yüzey shader'ında örnekliyor.
-/// Ayrı bir uygulama geçişi YOK — sis zaten yüzeylerin içinde uygulanıyordu, ikinci bir
-/// yol açmak aynı havayı iki kez uygulamak olurdu.
+/// Two compute dispatches: fill the volume, integrate along the ray. The result is bound globally
+/// as `_FogScatteringVolume`; `HeightFog.hlsl` samples it in every surface shader.
+/// There is NO separate apply pass — the fog was already applied inside the surfaces, and opening
+/// a second path would mean applying the same air twice.
 ///
-/// GEÇİŞ NOKTASI opak çizimden hemen önce: gölge haritaları ve ışık cookie'si o an hazır,
-/// opak yüzeyler de hacmi okuyabiliyor.
+/// THE INJECTION POINT is just before the opaque draw: the shadow maps and the light cookie are
+/// ready by then, and the opaque surfaces can read the volume too.
 public class VolumetricFogFeature : ScriptableRendererFeature
 {
     [SerializeField] ComputeShader compute;
     [SerializeField] VolumetricFogSettings settings;
 
-    /// GÖKYÜZÜNE SİS AYRI GEÇİŞTE. Gökyüzünü PBSky paketi çiziyor ve bizim sisimizden
-    /// haberi yok; pakete çağrı eklemek yama olurdu. Bu geçiş derinliğe bakıp yalnız
-    /// hiçbir şeye çarpmamış pikselleri sisliyor — delik gökyüzüne özel değil,
-    /// `ApplyHeightFog` çağırmayan her şeyde var.
+    /// FOG ON THE SKY IS A SEPARATE PASS. The sky is drawn by the PBSky package and it knows
+    /// nothing of our fog; adding a call into the package would be a patch. This pass looks at the
+    /// depth and fogs only the pixels that hit nothing — the hole is not specific to the sky, it
+    /// exists on everything that does not call `ApplyHeightFog`.
     [SerializeField] Shader skyFogShader;
 
     FogPass pass;
@@ -40,32 +40,32 @@ public class VolumetricFogFeature : ScriptableRendererFeature
         {
             skyFogMaterial = CoreUtils.CreateEngineMaterial(skyFogShader);
 
-            // BULUTLARDAN ÖNCE. Bu geçiş yalnız GÖĞÜ sisliyor, sonsuz yol için.
+            // BEFORE THE CLOUDS. This pass fogs only the SKY, for the infinite path.
             //
-            // Bir ara bulutlardan sonraya alınmıştı: o zaman gökyüzü sisleniyor, hemen
-            // ardından bulutlar üstünü boyuyordu ve fırtınada gök %83 bulut olduğu için
-            // beyazlama hiç görünmüyordu. Geçişi öne almak belirtiyi gideriyordu ama
-            // sebebi değil — bulut sislenmediği için gökyüzüyle birlikte sisleniyordu,
-            // yani SONSUZ mesafeden. Bulut 2 km'de duruyor.
+            // At one point it was moved after the clouds: the sky was fogged and the clouds
+            // painted over it immediately after, and because the sky is 83% cloud in a storm the
+            // whitening was never seen. Moving the pass earlier removed the symptom but not its
+            // cause — because the cloud was not fogged it was being fogged together with the sky,
+            // i.e. from an INFINITE distance. The cloud stands at 2 km.
             //
-            // Doğru kural: her katman KENDİ mesafesiyle bir kez sislenir. Arazi kendi
-            // shader'ında, bulut birleştirme geçişinde (`FogPath`), gök burada. Bu geçiş
-            // bulutun önüne dönünce üçü de tek uygulama alıyor, çift sayım kalmıyor.
+            // The right rule: every layer is fogged once with ITS OWN distance. The terrain in its
+            // own shader, the cloud in the compositing pass (`FogPath`), the sky here. With this
+            // pass back in front of the cloud all three get a single application and no double counting is left.
             skyPass = new SkyFogPass(skyFogMaterial)
             {
-                // PAKETİN OPAK GEÇİŞİNDEN SONRA, BULUTLARDAN ÖNCE.
+                // AFTER THE PACKAGE'S OPAQUE PASS, BEFORE THE CLOUDS.
                 //
-                // `AfterRenderingSkybox`ta bu geçiş paketin `Opaque Atmospheric
-                // Scattering` geçişinin ÖNÜNE düşüyordu. Siluet pikselinde ikisi
-                // çakışıyor: bu geçiş `ZTest Equal` ile o pikseli "gök" sayıp sisliyor,
-                // paket ise derinlik dokusundan "geometri" sayıp kendi hava
-                // perspektifini biniyor. Sonuç tek piksellik bir şeritte çift işlem —
-                // normal oyunda koyu kontur, sis denetiminde macentanın üstüne bindiği
-                // için beyaz kontur. Dağın gövdesi düz kalıyor çünkü orada çakışma yok.
+                // At `AfterRenderingSkybox` this pass fell IN FRONT OF the package's `Opaque
+                // Atmospheric Scattering` pass. On a silhouette pixel the two overlap: this pass
+                // counts that pixel as "sky" with `ZTest Equal` and fogs it, while the package
+                // counts it as "geometry" from the depth texture and lays its own aerial
+                // perspective on top. The result was a double application in a one-pixel strip —
+                // a dark outline in normal play, and a white one in the fog inspection because it
+                // rode on top of the magenta. The mountain's body stayed flat because there is no overlap there.
                 //
-                // `+2` paketin geçişinden sonraya düşürüyor ama hâlâ
-                // `BeforeRenderingTransparents`taki bulutlardan önce — her katmanın
-                // kendi mesafesiyle bir kez sislenmesi kuralı korunuyor.
+                // The `+2` drops it after the package's pass but still before the clouds in
+                // `BeforeRenderingTransparents` — the rule that every layer is fogged once with
+                // its own distance is preserved.
                 renderPassEvent = RenderPassEvent.AfterRenderingSkybox + 2
             };
         }
@@ -91,8 +91,8 @@ public class VolumetricFogFeature : ScriptableRendererFeature
         skyFogMaterial = null;
     }
 
-    /// Gökyüzü piksellerine sisi uygulayan tam ekran geçiş. Karışım shader'da:
-    /// `sonuç = hedef × T + saçılım`.
+    /// The full-screen pass applying the fog to the sky pixels. The blend is in the shader:
+    /// `result = target × T + scattering`.
     class SkyFogPass : ScriptableRenderPass
     {
         readonly Material material;
@@ -109,14 +109,14 @@ public class VolumetricFogFeature : ScriptableRendererFeature
         {
             var resources = frameData.Get<UniversalResourceData>();
 
-            using var builder = renderGraph.AddRasterRenderPass<PassData>("Gökyüzü Sisi", out var passData);
+            using var builder = renderGraph.AddRasterRenderPass<PassData>("Sky Fog", out var passData);
 
             passData.material = material;
 
             builder.SetRenderAttachment(resources.activeColorTexture, 0);
 
-            // Derinlik EKLENTİ olarak bağlanıyor, doku olarak değil: seçim `ZTest Equal`
-            // ile yapılıyor ve okuma yok, yalnız test.
+            // The depth is bound as an ATTACHMENT, not as a texture: the selection is made with
+            // `ZTest Equal` and there is no read, only a test.
             builder.SetRenderAttachmentDepth(resources.activeDepthTexture, AccessFlags.Read);
             builder.AllowPassCulling(false);
 
@@ -150,8 +150,8 @@ public class VolumetricFogFeature : ScriptableRendererFeature
         static readonly int ShadowmapSizeId = Shader.PropertyToID("_MainLightShadowmapSize");
         static readonly int CascadeRadiiId = Shader.PropertyToID("_CascadeShadowSplitSphereRadii");
 
-        /// Kademe bölme küreleri. Kademeli gölgede hangi kademenin okunacağı bunlardan
-        /// çıkıyor; geçilmezse hepsi sıfır olur ve her nokta ilk kademeye düşer.
+        /// The cascade split spheres. Which cascade to read in a cascaded shadow follows from
+        /// them; if they are not passed they are all zero and every point falls into the first cascade.
         static readonly int[] CascadeSphereIds =
         {
             Shader.PropertyToID("_CascadeShadowSplitSpheres0"),
@@ -166,9 +166,9 @@ public class VolumetricFogFeature : ScriptableRendererFeature
         readonly ComputeShader compute;
         readonly VolumetricFogSettings settings;
 
-        /// KERNEL'LER GEÇ ÇÖZÜLÜYOR. Kurucuda çözülünce, compute o an derlenmemişse
-        /// `FindKernel` −1 döndürüyor ve o değer önbellekte kalıyor: shader sonradan
-        /// düzelse bile geçiş her karede "Kernel at index (0) is invalid" basıyor.
+        /// THE KERNELS ARE RESOLVED LATE. Resolved in the constructor, if the compute was not
+        /// compiled at that moment `FindKernel` returns −1 and that value stays in the cache: even
+        /// once the shader is fixed the pass prints "Kernel at index (0) is invalid" every frame.
         int densityKernel = -1;
         int marchKernel = -1;
         readonly Vector4[] cornerRays = new Vector4[4];
@@ -192,9 +192,9 @@ public class VolumetricFogFeature : ScriptableRendererFeature
             settings = fogSettings;
         }
 
-        /// Kernel'ler hazır mı. Compute derlenmemişse geçiş sessizce atlanıyor —
-        /// hata zaten shader derleyicisinden Console'a düşüyor, her karede tekrar
-        /// basmanın bilgi değeri yok.
+        /// Whether the kernels are ready. If the compute did not compile the pass is silently
+        /// skipped — the error already reaches the Console from the shader compiler and printing
+        /// it again every frame carries no information.
         bool ResolveKernels()
         {
             if (densityKernel >= 0 && marchKernel >= 0) return true;
@@ -214,12 +214,11 @@ public class VolumetricFogFeature : ScriptableRendererFeature
             if (scatteringVolume != null) { scatteringVolume.Release(); scatteringVolume = null; }
         }
 
-        /// 3B hacimler KALICI, geçiş grafiğinin geçici havuzunda değil: `_FogScatteringVolume`
-        /// global olarak bağlanıyor ve opak çizim boyunca yaşaması gerekiyor.
+        /// The 3D volumes are PERSISTENT, not in the render graph's transient pool:
+        /// `_FogScatteringVolume` is bound globally and has to live through the opaque draw.
         ///
-        /// FORMAT DESTEĞİ KONTROL EDİLİYOR: `R16G16B16A16_SFloat` üzerinde random write
-        /// desteği platforma göre değişiyor. Sessizce yanlış formata düşmek yerine açıkça
-        /// fırlatılıyor.
+        /// FORMAT SUPPORT IS CHECKED: random write support on `R16G16B16A16_SFloat` varies by
+        /// platform. Rather than silently falling back to a wrong format it throws explicitly.
         void EnsureVolumes()
         {
             int w = settings.Width, h = settings.Height, d = settings.SliceCount;
@@ -255,10 +254,10 @@ public class VolumetricFogFeature : ScriptableRendererFeature
             return volume;
         }
 
-        /// Frustum köşe ışınları, ileri eksene izdüşümü 1 olacak şekilde.
-        /// `worldPos = cameraPos + ray · viewDepth` bu sayede doğrudan çalışıyor;
-        /// normalize edilseydi köşelerde derinlik merkeze göre uzar, dilimler düzlem
-        /// yerine küresel kabuk olurdu.
+        /// The frustum corner rays, scaled so their projection onto the forward axis is 1.
+        /// `worldPos = cameraPos + ray · viewDepth` works directly thanks to that; normalized, the
+        /// depth at the corners would stretch relative to the centre and the slices would be
+        /// spherical shells instead of planes.
         void UpdateCornerRays(Camera camera)
         {
             Transform t = camera.transform;
@@ -288,9 +287,9 @@ public class VolumetricFogFeature : ScriptableRendererFeature
                 Mathf.Log(far / near), d);
             var size = new Vector4(w, h, 1f / w, 1f / h);
 
-            // Zamansal kayma: sekiz kareye yayılan sabit dizi. Wronski jitter'ı
-            // aliasing'i gürültüye takas etmek için öneriyor (spec §6.2); TAA açık
-            // olduğu için gürültü zaten zamanda dağılıyor.
+            // Temporal jitter: a fixed sequence spread over eight frames. Wronski recommends the
+            // jitter to trade aliasing for noise (spec §6.2); because TAA is on, the noise is
+            // already dispersed in time.
             frame = (frame + 1) & 7;
             var jitter = new Vector4(Halton(frame + 1, 2) - 0.5f, 0f, 0f, 0f);
 
@@ -302,12 +301,12 @@ public class VolumetricFogFeature : ScriptableRendererFeature
             cmd.SetGlobalVectorArray(CornerRaysId, cornerRays);
             cmd.SetGlobalVector(JitterId, jitter);
             cmd.SetGlobalVector(CameraForwardId, data.camera.transform.forward);
-            // SİS DENETİMİ. İKİ KEZ YAZILIYOR ve bu zorunlu: `cmd.SetGlobal...` compute'a
-            // ULAŞMIYOR (bu dosyanın kendi dersi). Yalnız global yazılsaydı arazi ve gök
-            // macentaya döner, hacim eski rengiyle kalır ve araç yalan söylerdi.
+            // THE FOG INSPECTION. IT IS WRITTEN TWICE and that is required: `cmd.SetGlobal...`
+            // DOES NOT REACH the compute (this file's own lesson). Written only as a global, the
+            // terrain and sky would turn magenta while the volume kept its old colour and the tool would lie.
 
-            // Uniform'lar KERNEL'E DEĞİL shader'a yazılıyor; iki kernel de aynı değerleri
-            // görüyor, tek yazım yeter.
+            // The uniforms are written to the SHADER, not to a kernel; both kernels see the same
+            // values, so writing them once is enough.
             cmd.SetComputeVectorParam(compute, VolumeDepthId, depth);
             cmd.SetComputeVectorParam(compute, VolumeSizeId, size);
             cmd.SetComputeVectorArrayParam(compute, CornerRaysId, cornerRays);
@@ -318,37 +317,34 @@ public class VolumetricFogFeature : ScriptableRendererFeature
             UpdateAmbientSH();
             cmd.SetComputeVectorArrayParam(compute, AmbientSHId, ambientSH);
 
-            // ANA IŞIK AÇIKÇA GEÇİYOR. `_MainLightColor` ve `_MainLightPosition`'ı URP
-            // KOMUT TAMPONU üzerinden yazıyor; compute dispatch'i o durumu görmüyor ve
-            // doğrudan ışık terimi sessizce SIFIR kalıyordu — gölgelenecek ışık olmayınca
-            // huzme de doğmuyordu. `Shader.SetGlobalX` ile yazılan globaller (sis
-            // yoğunluğu, sis rengi) ulaşıyor; ayrım tam olarak burada.
+            // THE MAIN LIGHT IS PASSED EXPLICITLY. URP writes `_MainLightColor` and
+            // `_MainLightPosition` through the COMMAND BUFFER; the compute dispatch does not see
+            // that state and the direct light term was silently staying ZERO — with no light to
+            // shadow, no beam was born either. Globals written with `Shader.SetGlobalX` (the fog
+            // density, the fog colour) do reach it; the distinction is exactly here.
             cmd.SetComputeVectorParam(compute, LightDirectionId, data.lightDirection);
             cmd.SetComputeVectorParam(compute, LightColorId, data.lightColor);
 
             int groupsX = Mathf.CeilToInt(w / (float)GroupSize);
             int groupsY = Mathf.CeilToInt(h / (float)GroupSize);
 
-            // DOKULAR KERNEL'E AÇIKÇA BAĞLANIYOR. `Shader.SetGlobalTexture` materyalleri
-            // besliyor ama compute kernel'leri global doku tablosunu OKUMUYOR; bağlanmazsa
-            // Unity "Property is not set" basıp kernel'i geçersiz sayıyor.
-            //
-            // yapışması için, kar profili de rüzgârın kaldıracak kar bulup bulmadığı için.
+            // THE TEXTURES ARE BOUND TO THE KERNEL EXPLICITLY. `Shader.SetGlobalTexture` feeds
+            // materials, but compute kernels DO NOT READ the global texture table; unbound, Unity
+            // prints "Property is not set" and treats the kernel as invalid.
             BindGlobalTexture(cmd, densityKernel, TerrainHeightMapId, "_TerrainHeightMap");
             BindGlobalTexture(cmd, densityKernel, CookieTextureId, "_MainLightCookieTexture");
 
-            // ANA IŞIĞIN GÖLGESİ. `MainLightRealtimeShadow` compute içinde çağrılıyor
-            // (varyant `_MAIN_LIGHT_SHADOWS_CASCADE` sabit) ama gölge haritası kernel'e
-            // BAĞLANMIYORDU: Unity "Property (_MainLightShadowmapTexture) at kernel
-            // index (0) is not set" basıyordu ve sis, arazinin kestiği ışığı hiç
-            // görmüyordu — hacimde huzme yoktu, sadece cookie'den gelen bulut gölgesi
-            // vardı.
+            // THE MAIN LIGHT'S SHADOW. `MainLightRealtimeShadow` is called inside the compute
+            // (the variant `_MAIN_LIGHT_SHADOWS_CASCADE` is fixed) but the shadow map WAS NOT
+            // BEING BOUND to the kernel: Unity printed "Property (_MainLightShadowmapTexture) at
+            // kernel index (0) is not set" and the fog never saw the light the terrain cut — there
+            // were no beams in the volume, only the cloud shadow coming from the cookie.
             //
-            // Doku tek başına yetmiyor: kademeli gölgede doğru kademeyi seçmek için
-            // bölme küreleri, örnekleme için de matris dizisi ve parametreler gerekiyor.
-            // Hepsi URP tarafından KOMUT TAMPONUYLA yazılıyor, yani compute onları
-            // kendiliğinden görmüyor — bu dosyanın kendi dersi, ışık rengi ve cookie
-            // matrisi için de aynısı yapılmıştı.
+            // The texture alone is not enough: choosing the right cascade in a cascaded shadow
+            // needs the split spheres, and sampling needs the matrix array and the parameters.
+            // All of them are written by URP THROUGH THE COMMAND BUFFER, so the compute does not
+            // see them on its own — this file's own lesson, and the same was done for the light
+            // colour and the cookie matrix.
             BindGlobalTexture(cmd, densityKernel, ShadowmapId, "_MainLightShadowmapTexture");
 
             Matrix4x4[] worldToShadow = Shader.GetGlobalMatrixArray(WorldToShadowId);
@@ -366,8 +362,8 @@ public class VolumetricFogFeature : ScriptableRendererFeature
                 cmd.SetComputeVectorParam(compute, CascadeSphereIds[i],
                     Shader.GetGlobalVector(CascadeSphereIds[i]));
 
-            // Cookie matrisi de komut tamponuyla yazılıyor; sıfır okunursa UV sabit
-            // kalır ve bulut gölgesi yapı yerine tek bir çarpana düşer.
+            // The cookie matrix is written through the command buffer too; read as zero the UV
+            // stays fixed and the cloud shadow falls to a single multiplier instead of structure.
             Matrix4x4 cookieMatrix = Shader.GetGlobalMatrix(CookieMatrixId);
             cmd.SetComputeMatrixParam(compute, CookieMatrixId, cookieMatrix);
 
@@ -382,9 +378,9 @@ public class VolumetricFogFeature : ScriptableRendererFeature
 
         }
 
-        /// Global doku tablosundan okuyup kernel'e bağlar. Doku henüz üretilmemişse
-        /// (arazi pişmeden ilk kareler) siyah doku bağlanıyor — bağlamamak kernel'i
-        /// tamamen geçersiz kılardı.
+        /// Reads from the global texture table and binds to the kernel. If the texture has not
+        /// been produced yet (the first frames before the terrain is baked) a black texture is
+        /// bound — not binding would make the kernel entirely invalid.
         void BindGlobalTexture(CommandBuffer cmd, int kernel, int id, string name)
         {
             Texture texture = Shader.GetGlobalTexture(name);
@@ -392,12 +388,12 @@ public class VolumetricFogFeature : ScriptableRendererFeature
                                        texture != null ? texture : Texture2D.blackTexture);
         }
 
-        /// ORTAM SH'si ELLE PAKETLENİYOR. `unity_SHAr` ve kardeşleri `UnityPerDraw`
-        /// sabit tamponunda duruyor ve compute dispatch'i o tamponu bağlamıyor — orada
-        /// okunsalardı sıfır gelir, gölgeli sis simsiyah çıkardı.
+        /// THE AMBIENT SH IS PACKED BY HAND. `unity_SHAr` and its siblings live in the
+        /// `UnityPerDraw` constant buffer and the compute dispatch does not bind that buffer — read
+        /// there they would come out zero and shadowed fog would be pitch black.
         ///
-        /// Paketleme Unity'nin kendi düzeni: `(L1z, L1x, L1y, L0 − L2_2)`. Kaynak
-        /// `RenderSettings.ambientProbe`, yani gökyüzünden pişen tek durum.
+        /// The packing is Unity's own layout: `(L1z, L1x, L1y, L0 − L2_2)`. The source is
+        /// `RenderSettings.ambientProbe`, i.e. the single state baked from the sky.
         void UpdateAmbientSH()
         {
             SphericalHarmonicsL2 probe = RenderSettings.ambientProbe;
@@ -407,8 +403,8 @@ public class VolumetricFogFeature : ScriptableRendererFeature
                                            probe[c, 0] - probe[c, 6]);
         }
 
-        /// Halton dizisi: ardışık örnekler birbirinden uzak düşüyor, rastgele sayıda
-        /// olduğu gibi kümelenmiyor.
+        /// A Halton sequence: consecutive samples fall far from each other, they do not cluster
+        /// the way random numbers do.
         static float Halton(int index, int radix)
         {
             float result = 0f, fraction = 1f / radix;
@@ -432,8 +428,8 @@ public class VolumetricFogFeature : ScriptableRendererFeature
             passData.pass = this;
             passData.camera = cameraData.camera;
 
-            // Ana ışık URP'nin kendi seçiminden okunuyor: gökyüzü ve bulut da aynı ışığı
-            // kullanıyor, üçü ayrışmasın.
+            // The main light is read from URP's own choice: the sky and the cloud use the same
+            // light, so the three do not diverge.
             var lightData = frameData.Get<UniversalLightData>();
             passData.lightDirection = new Vector4(0f, 1f, 0f, 0f);
             passData.lightColor = Vector4.zero;
