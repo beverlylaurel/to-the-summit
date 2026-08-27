@@ -657,16 +657,30 @@
 /// 2 cm (ripple) ile 2.5 m (whaleback dune) arasi; drift tepecikleri bu
 /// araligin ortasinda.]
 ///
-/// Genlik tepe-dip 30 cm, dalga boyu 90 cm -> egim 2*pi*0.15/0.90 = 1.05,
-/// yani 46 derece. Karin durus acisi 38-45 derece; drift o sinirin hemen
-/// ustunde duruyor cunku birikme sirasinda kar kendini destekliyor
-/// (kohezyon, `SNOW_STAND_LOOSE` ile ayni fizik).
+/// BIRIKME SEKLI DURUS ACISINI ASAMAZ.
+///
+/// Ilk deger 30 cm / 90 cm idi -> egim 2*pi*0.15/0.90 = 1.05, yani 46 derece.
+/// Karin durus acisi 38-45 derece ve BIRIKME o aciyi asamaz: asan malzeme
+/// akar. (Sastrugi asabiliyor cunku o bir EROZYON sekli — ruzgar oyuyor ve
+/// yuzey sertlesiyor.)
+///
+/// Belirti: alcak gunes ve kapali havada tepeciklerin golgeleri uzun, keskin
+/// ve neredeyse siyah seritler halinde cikiyordu (kullanici bildirdi:
+/// "tepeciklerin golgelerinde sorun var, bu ne boyle"). Izolasyon anahtariyla
+/// sorumlu tek turda bulundu: drift.
+///
+/// GENLIK DEGIL DALGA BOYU DEGISTI. Genligi kesmek tepecikleri yok ederdi;
+/// dalga boyunu uzatmak onlari BUYUK ama YUMUSAK yapiyor — birikme sekilleri
+/// zaten oyle. [KAYNAK: Filhol & Sturm 2015 — dune olcegi 1-5 m.]
+///
+/// 30 cm / 2.00 m -> egim 2*pi*0.15/2.00 = 0.471, yani 25 derece. Durus
+/// acisinin belirgin altinda ve olculen kar yuzeyi bandina yaklasiyor.
 #define SNOW_DRIFT_HEIGHT              0.30
-#define SNOW_DRIFT_LENGTH              0.90
+#define SNOW_DRIFT_LENGTH              2.00
 
-/// Ruzgar yonundeki uzama. Drift tepecikleri ruzgar boyunca uzuyor ama
-/// sastrugi kadar degil (sastrugi 2.20 m).
-#define SNOW_DRIFT_WIDTH               1.60
+/// Ruzgar yonundeki uzama. Oran korunuyor (LENGTH'in 1.6 kati): drift
+/// tepecikleri ruzgar boyunca uzuyor ama sastrugi kadar degil.
+#define SNOW_DRIFT_WIDTH               3.20
 
 // --- İz içi AO (spec §18.5) ---
 

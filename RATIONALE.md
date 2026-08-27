@@ -1974,3 +1974,40 @@ her anahtar tek değişken):
 
 Ders: compute kernel'i geçersizse önce include sırasına ve fragment-only
 içsel fonksiyonlara bakılır, formüle değil.
+
+
+## Drift eğimi duruş açısını aşıyordu
+
+**Belirti.** Alçak güneşte (17:39, bulut %60) tepeciklerin gölgeleri uzun,
+keskin ve neredeyse siyah şeritler hâlinde çıkıyordu. Kullanıcı: "tepeciklerin
+gölgelerinde sorun var, bu ne böyle."
+
+**Sorumlu tek turda bulundu.** F1 izolasyon anahtarı: drift.
+
+**Kâğıtta.** 30 cm genlik / 90 cm dalga boyu → eğim `2π·0.15/0.90 = 1.05`,
+yani **46.3°**. Karın duruş açısı 38-45° ve **birikme o açıyı aşamaz** — aşan
+malzeme akar. (Sastrugi aşabiliyor çünkü erozyon şekli: rüzgâr oyuyor, yüzey
+sertleşiyor.)
+
+**Genlik değil dalga boyu değişti.** Genliği kesmek tepecikleri yok ederdi;
+dalga boyunu uzatmak onları BÜYÜK ama YUMUŞAK yapıyor — birikme şekilleri
+zaten öyle. [KAYNAK: Filhol & Sturm 2015, dune ölçeği 1-5 m.]
+
+30 cm / 2.00 m → eğim `2π·0.15/2.00 = 0.471`, yani **25.2°**.
+
+**Görev 6'daki "ayrım bütçeyi çözdü" iddiası fazlaydı.** Ayrım yalnız uçlarda
+çalışıyor (maruziyet 0 veya 1); ortada iki katman da kısmi ve genlikleri
+karekök toplanıyor. Maruziyet 0.5'te ölçülen toplam:
+
+| Bileşen | Eğim katkısı |
+|---|---|
+| Sastrugi (yarım) | 0.524 |
+| Drift (yarım, düzeltilmiş) | 0.236 |
+| Ripple | 0.222 |
+| fBm | 0.190 |
+| Mikro | 0.160 |
+| **Toplam RMS** | **33.6°** |
+
+Arazide ölçülmüş kar yüzeyi RMS eğimi 5-15°. Hâlâ iki kat fazla ve baskın
+bileşen artık **sastrugi** (46° eğim). Kullanıcı ondan şikâyet etmedi, o
+yüzden bu turda dokunulmadı — bir sonraki belirtinin ilk şüphelisi o.

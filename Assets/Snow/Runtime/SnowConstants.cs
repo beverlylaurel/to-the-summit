@@ -257,6 +257,6 @@ public static class SnowConstants
 
     /// Drift: birikme tepecikleri. Aynı eksen kuralı sastrugi'deki gibi.
     public const float DriftHeight = 0.30f;
-    public const float DriftLength = 0.90f;
-    public const float DriftWidth = 1.60f;
+    public const float DriftLength = 2.00f;
+    public const float DriftWidth = 3.20f;
 }
