@@ -1,5 +1,6 @@
-// ROL: spektrum dokularini uzam alanina ceviren ters FFT ve son toplama.
-// Cagiran: SeaSimulation.
+// ROLE: the inverse FFT that turns the spectrum textures into the spatial
+// domain, plus the final assembly.
+// CALLED BY: SeaSimulation.
 
 #pragma kernel KIFFTHorizontal
 #pragma kernel KIFFTVertical
@@ -12,70 +13,71 @@ RWTexture2DArray<float4> _SeaSpectrumSlopeRW;
 RWTexture2DArray<float4> _SeaDisplacementRW;
 RWTexture2DArray<float4> _SeaDerivativesRW;
 
-// PING-PONG DOKUSU YOK.
+// NO PING-PONG TEXTURE.
 //
-// Spec 11.1 `RT_PingPong` listeliyor cunku adim adim dispatch eden bir FFT
-// varsayiyor (8 adim x 2 boyut x 3 kademe = 48 dispatch). Burada butun
-// satir paylasilan bellege aliniyor ve sekiz adim TEK dispatch'te
-// bitiyor — ara doku gereksiz, kademe basina iki dispatch kaliyor.
-// Spec'in kendi hedefi de dispatch sayisini indirmek (6.8).
+// Spec 11.1 lists `RT_PingPong` because it assumes an FFT dispatched step by
+// step (8 steps x 2 dimensions x 3 tiers = 48 dispatches). Here the whole row
+// is pulled into shared memory and the eight steps finish in a SINGLE
+// dispatch — the intermediate texture is unnecessary and two dispatches per
+// tier remain. Spec 6.8's own goal is to lower the dispatch count.
 //
-// Iki spektrum dokusu AYNI kernelde donusturuluyor: ayri dispatch edilse
-// birinin bayat kalma ihtimali dogar ve Jacobian ile displacement farkli
-// zamanlardan gelir.
+// Both spectrum textures are transformed in the SAME kernel: dispatched
+// separately one of them could go stale and the Jacobian and the
+// displacement would come from different moments in time.
 groupshared float4 gHt[SEA_FFT_SIZE];
 groupshared float4 gSlope[SEA_FFT_SIZE];
 
-/// float4'un iki karmasik yarisini ayni twiddle ile carpar.
+/// Multiplies both complex halves of a float4 by the same twiddle.
 float4 SeaCMul2(float2 w, float4 v)
 {
     return float4(SeaCMul(w, v.xy), SeaCMul(w, v.zw));
 }
 
-/// TEK SATIRLIK TERS FFT, paylasilan bellekte.
+/// SINGLE-ROW INVERSE FFT, in shared memory.
 ///
-/// Cooley-Tukey, zaman ayriklamasi. Twiddle usu ARTI isaretli ve 1/N
-/// normalizasyonu YOK: Tessendorf'un toplami h(x) = SUM h~(k) e^{ikx}
-/// tam olarak bu — normalize edilirse dalga yuksekligi N kat kuculur.
-void SeaIFFTSatir(uint tid, uint3 koordBase, bool dikey, uint slice)
+/// Cooley-Tukey, decimation in time. The twiddle exponent is POSITIVE and
+/// there is NO 1/N normalization: Tessendorf's sum h(x) = SUM h~(k) e^{ikx}
+/// is exactly this — normalize it and the wave height shrinks by a factor N.
+void SeaIFFTRow(uint tid, uint3 coordBase, bool vertical, uint slice)
 {
     uint N     = _SeaFftSize;
     uint log2N = _SeaFftLog2;
 
-    // FAZLA IS PARCACIGI BARIYERLERE GIRMEYE DEVAM EDIYOR.
+    // THE EXTRA THREADS KEEP ENTERING THE BARRIERS.
     //
-    // `numthreads` her zaman SEA_FFT_SIZE (256) ama calisan FFT 128
-    // olabilir. Fazlalari erken `return` etseydi bariyer AYRIK bir dalda
-    // kalirdi ve `GroupMemoryBarrierWithGroupSync` orada tanimsizdir.
-    // Bunun yerine yalniz BELLEK islemleri kapatiliyor; dongu ve
-    // bariyerler butun grup icin ayni.
-    bool aktif = tid < N;
+    // `numthreads` is always SEA_FFT_SIZE (256) but the running FFT may be
+    // 128. Had the extras returned early the barrier would sit on a DIVERGENT
+    // branch, and `GroupMemoryBarrierWithGroupSync` is undefined there.
+    // Instead only the MEMORY operations are disabled; the loop and the
+    // barriers are the same for the whole group.
+    bool active = tid < N;
 
-    if (aktif)
+    if (active)
     {
-        // Bit-ters permutasyon. Zaman ayriklamasi girdiyi bu sirada bekliyor.
-        uint kaynak = reversebits(tid) >> (32u - log2N);
+        // Bit-reversal permutation. Decimation in time expects the input in
+        // this order.
+        uint source = reversebits(tid) >> (32u - log2N);
 
-        uint3 okuma = dikey ? uint3(koordBase.x, kaynak, slice)
-                            : uint3(kaynak, koordBase.y, slice);
+        uint3 read = vertical ? uint3(coordBase.x, source, slice)
+                              : uint3(source, coordBase.y, slice);
 
-        gHt[tid]    = _SeaSpectrumHtRW[okuma];
-        gSlope[tid] = _SeaSpectrumSlopeRW[okuma];
+        gHt[tid]    = _SeaSpectrumHtRW[read];
+        gSlope[tid] = _SeaSpectrumSlopeRW[read];
     }
 
     GroupMemoryBarrierWithGroupSync();
 
-    // `log2N` sabit tamponundan geliyor, yani grup icinde AYNI — dongu
-    // uniform, bariyer guvenli.
+    // `log2N` comes from the constant buffer, i.e. it is the SAME across the
+    // group — the loop is uniform and the barrier is safe.
     for (uint s = 1u; s <= log2N; s++)
     {
         uint m  = 1u << s;
         uint mh = m >> 1u;
 
-        // Ciftin ALT elemanini tutan is parcacigi kelebegi yapiyor; ust
-        // elemani tutan bekliyor. Ayni iki hucreye tek is parcacigi
-        // dokundugu icin adim ici yaris yok.
-        if (aktif && (tid & mh) == 0u)
+        // The thread holding the LOWER element of the pair performs the
+        // butterfly; the one holding the upper element waits. A single thread
+        // touches both cells, so there is no race within a step.
+        if (active && (tid & mh) == 0u)
         {
             uint k = tid & (mh - 1u);
             float2 w = SeaExpI(SEA_TWO_PI * (float)k / (float)m);
@@ -94,30 +96,30 @@ void SeaIFFTSatir(uint tid, uint3 koordBase, bool dikey, uint slice)
         GroupMemoryBarrierWithGroupSync();
     }
 
-    if (!aktif) return;
+    if (!active) return;
 
-    uint3 yazma = dikey ? uint3(koordBase.x, tid, slice)
-                        : uint3(tid, koordBase.y, slice);
+    uint3 write = vertical ? uint3(coordBase.x, tid, slice)
+                           : uint3(tid, coordBase.y, slice);
 
-    _SeaSpectrumHtRW[yazma]    = gHt[tid];
-    _SeaSpectrumSlopeRW[yazma] = gSlope[tid];
+    _SeaSpectrumHtRW[write]    = gHt[tid];
+    _SeaSpectrumSlopeRW[write] = gSlope[tid];
 }
 
-// Dispatch (1, N, SEA_TIER_COUNT): id = (is parcacigi, satir, kademe).
+// Dispatch (1, N, SEA_TIER_COUNT): id = (thread, row, tier).
 [numthreads(SEA_FFT_SIZE, 1, 1)]
 void KIFFTHorizontal(uint3 id : SV_DispatchThreadID)
 {
-    SeaIFFTSatir(id.x, uint3(0u, id.y, 0u), false, id.z);
+    SeaIFFTRow(id.x, uint3(0u, id.y, 0u), false, id.z);
 }
 
-// Dispatch (1, N, SEA_TIER_COUNT): id = (is parcacigi, sutun, kademe).
+// Dispatch (1, N, SEA_TIER_COUNT): id = (thread, column, tier).
 [numthreads(SEA_FFT_SIZE, 1, 1)]
 void KIFFTVertical(uint3 id : SV_DispatchThreadID)
 {
-    SeaIFFTSatir(id.x, uint3(id.y, 0u, 0u), true, id.z);
+    SeaIFFTRow(id.x, uint3(id.y, 0u, 0u), true, id.z);
 }
 
-// --------------------------------------------------------------- toplama
+// --------------------------------------------------------------- assembly
 
 [numthreads(8, 8, 1)]
 void KAssemble(uint3 id : SV_DispatchThreadID)
@@ -127,15 +129,15 @@ void KAssemble(uint3 id : SV_DispatchThreadID)
 
     uint tier = id.z;
 
-    // ISARET PERMUTASYONU. Frekans indisi -N/2..N/2-1 arasindayken doku
-    // 0..N-1 tutuyor; N/2'lik kaydirma uzam alaninda (-1)^(x+z) demek.
-    // Atlanirsa yuzey satranc tahtasi gibi cikar.
-    float isaret = 1.0 - 2.0 * (float)((id.x + id.y) & 1u);
+    // SIGN PERMUTATION. The frequency index runs over -N/2..N/2-1 while the
+    // texture holds 0..N-1; the N/2 shift means (-1)^(x+z) in the spatial
+    // domain. Skip it and the surface comes out like a chess board.
+    float sign = 1.0 - 2.0 * (float)((id.x + id.y) & 1u);
 
-    float4 ht    = _SeaSpectrumHtRW[uint3(id.xy, tier)]    * isaret;
-    float4 slope = _SeaSpectrumSlopeRW[uint3(id.xy, tier)] * isaret;
+    float4 ht    = _SeaSpectrumHtRW[uint3(id.xy, tier)]    * sign;
+    float4 slope = _SeaSpectrumSlopeRW[uint3(id.xy, tier)] * sign;
 
-    // Paketi ac: IFFT(A + iB).x = A, .y = B.
+    // Unpack: IFFT(A + iB).x = A, .y = B.
     float dx    = ht.x;
     float dz    = ht.y;
     float h     = ht.z;
@@ -146,8 +148,8 @@ void KAssemble(uint3 id : SV_DispatchThreadID)
     float dDxdx  = slope.z;
     float dDzdz  = slope.w;
 
-    // KADEME BASINA CHOPPINESS. Yuksek dalga sayilarinda tam choppiness
-    // cirpintiyi sikistirip dugumlenmeye yol aciyor (spec 6.7).
+    // CHOPPINESS PER TIER. Full choppiness at high wave numbers compresses
+    // the chop and leads to knotting (spec 6.7).
     float lambda = _SeaChoppiness * _SeaChoppinessPerTier[tier];
 
     dx    *= lambda;
@@ -156,26 +158,26 @@ void KAssemble(uint3 id : SV_DispatchThreadID)
     dDzdz *= lambda;
     dDxdz *= lambda;
 
-    // JACOBIAN. J < 0 yuzeyin kendi icinden gectigi, yani katlandigi yer.
-    // lambda yukarida turevlere zaten carpildi.
-    // [KAYNAK: Tessendorf 2004 4.6 denklem 45-49]
+    // JACOBIAN. J < 0 marks where the surface passes through itself, i.e.
+    // where it folds. Lambda has already been applied to the derivatives.
+    // [SOURCE: Tessendorf 2004 4.6 equations 45-49]
     float Jxx = 1.0 + dDxdx;
     float Jzz = 1.0 + dDzdz;
     float Jxz = dDxdz;
     float J   = Jxx * Jzz - Jxz * Jxz;
 
-    // Ozdegerler ANALITIK — sayisal cozum gerekmiyor.
-    float ort  = 0.5 * (Jxx + Jzz);
-    float fark = 0.5 * sqrt((Jxx - Jzz) * (Jxx - Jzz) + 4.0 * Jxz * Jxz);
-    float Jm   = ort - fark;
+    // The eigenvalues are ANALYTIC — no numerical solve needed.
+    float mean = 0.5 * (Jxx + Jzz);
+    float spread = 0.5 * sqrt((Jxx - Jzz) * (Jxx - Jzz) + 4.0 * Jxz * Jxz);
+    float Jm   = mean - spread;
 
-    // Ozvektor e-: katlanmanin gerceklestigi YATAY YON. Kopuk dokusu bu
-    // yonde uzatiliyor (spec 13.2).
+    // Eigenvector e-: the HORIZONTAL DIRECTION the fold happens along. The
+    // foam pattern is stretched along it (spec 13.2).
     //
-    // Bolen isaretiyle korunuyor: max(Jxz, eps) yazilsaydi negatif Jxz
-    // eps'e cikar ve yon 90 derece yanlis donerdi.
-    float bolen = abs(Jxz) < 1e-6 ? (Jxz < 0.0 ? -1e-6 : 1e-6) : Jxz;
-    float qm = (Jm - Jxx) / bolen;
+    // The divisor keeps its sign: written as max(Jxz, eps) a negative Jxz
+    // would jump to eps and the direction would be 90 degrees wrong.
+    float divisor = abs(Jxz) < 1e-6 ? (Jxz < 0.0 ? -1e-6 : 1e-6) : Jxz;
+    float qm = (Jm - Jxx) / divisor;
     float2 em = normalize(float2(1.0, qm));
 
     _SeaDisplacementRW[uint3(id.xy, tier)] = float4(dx, h, dz, J);

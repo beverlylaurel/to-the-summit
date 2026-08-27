@@ -1,34 +1,33 @@
-// ROL: deniz yuzeyinin tek izgara mesh'ini uretir. Baslangicta bir kez.
-// Cagiran: SeaSurface (Awake).
+// ROLE: builds the single-grid mesh of the sea surface. Once at start-up.
+// CALLED BY: SeaSurface (Awake).
 
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-/// TEK IZGARA, TEK DRAW CALL — ÇOK SEVİYELİ CLIPMAP DEĞİL.
+/// ONE GRID, ONE DRAW CALL — NOT A MULTI-LEVEL CLIPMAP.
 ///
-/// Geometry clipmap kurulsaydı `[KAYNAK: Asirvatham & Hoppe, GPU Gems 2
-/// Bölüm 2]`'nin şu parçalarının **hepsi** gerekirdi ve hiçbiri
-/// atlanamazdı: tek sayı ızgara boyutu, 12 blok (`m = (n+1)/4`), dört
-/// `m×3` fix-up şeridi, dört yönelimli L-trim, dejenere üçgen çevresi,
-/// `alpha = max(αx, αy)` geçiş harmanlaması. Biri eksikse mesh yırtılır,
-/// delik açar veya titrer.
+/// A geometry clipmap would have needed **all** of these parts from
+/// `[SOURCE: Asirvatham & Hoppe, GPU Gems 2 Chapter 2]`, none of them
+/// skippable: an odd grid size, 12 blocks (`m = (n+1)/4`), four `m×3` fix-up
+/// strips, four oriented L-trims, a degenerate triangle skirt and
+/// `alpha = max(ax, ay)` transition blending. Miss one and the mesh tears,
+/// opens holes or shimmers.
 ///
-/// Bunun yerine tek, sürekli mesh. Merkeze yakın quad'lar küçük,
-/// uzaklaştıkça ikinin kuvveti adımlarla büyük.
+/// Instead: one continuous mesh. Quads near the centre are small and grow in
+/// power-of-two steps with distance.
 ///
-/// **HİZALAMA İSPATI (spec §10.1).** Tüm quad boyutları en ince quad
-/// boyutunun ikinin kuvveti katı. Dolayısıyla en ince quad boyutuna eşit
-/// TEK BİR snap adımı, her halkanın vertex'lerini kendi kafesinde tutuyor.
-/// Seviye başına ayrı snap gerekmez, dolayısıyla seviyeler arası kayma da
-/// olamaz.
+/// **ALIGNMENT PROOF (spec §10.1).** Every quad size is a power-of-two
+/// multiple of the finest quad size. Therefore a SINGLE snap step equal to
+/// the finest quad size keeps every ring's vertices on its own lattice. No
+/// per-level snap is needed, so no inter-level drift is possible.
 public static class SeaMeshBuilder
 {
-    /// Halka başına quad sayısı (kenar boyunca). Halka 0 dolu kare, ötekiler
-    /// halka. Spec §10.2 tablosu bu sayıdan çıkıyor:
-    ///   halka 0: 0.5 m quad, 128×128 → 32 m yarıçap
-    ///   halka 1: 1.0 m quad, halka   → 96 m
-    ///   ...her halka bir öncekinin tam 2 katı
+    /// Quads per ring (along one edge). Ring 0 is a solid square, the rest
+    /// are rings. The spec §10.2 table follows from this number:
+    ///   ring 0: 0.5 m quads, 128x128 -> 32 m radius
+    ///   ring 1: 1.0 m quads, a ring  -> 96 m
+    ///   ...each ring exactly twice the previous one
     public const int QuadPerSide = 128;
 
     public static Mesh Build(float finestQuad, int ringCount)
@@ -36,108 +35,112 @@ public static class SeaMeshBuilder
         var vertices = new List<Vector3>(300000);
         var indices = new List<int>(1200000);
 
-        // Vertex paylaşımı için: dünya konumundan indekse. Halkalar arası
-        // vertex PAYLAŞILIYOR — T-junction ve dolayısıyla dikiş yapısal
-        // olarak imkânsız oluyor (spec §10.2).
+        // For vertex sharing: world position to index. Vertices ARE SHARED
+        // across rings — which makes T-junctions, and therefore seams,
+        // structurally impossible (spec §10.2).
         var lookup = new Dictionary<long, int>(400000);
 
-        // --- Halka 0: dolu kare ---
+        // --- Ring 0: solid square ---
         float q0 = finestQuad;
-        int yari0 = QuadPerSide / 2;
+        int half0 = QuadPerSide / 2;
 
-        for (int z = -yari0; z < yari0; z++)
-            for (int x = -yari0; x < yari0; x++)
-                QuadEkle(vertices, indices, lookup,
-                         x * q0, z * q0, q0, q0);
+        for (int z = -half0; z < half0; z++)
+            for (int x = -half0; x < half0; x++)
+                AddQuad(vertices, indices, lookup,
+                        x * q0, z * q0, q0, q0);
 
-        // --- Halka 1..N: her biri bir öncekinin iki katı quad ---
-        float icYaricap = yari0 * q0;
+        // --- Rings 1..N: each with quads twice the previous size ---
+        float innerRadius = half0 * q0;
 
-        for (int halka = 1; halka < ringCount; halka++)
+        for (int ring = 1; ring < ringCount; ring++)
         {
-            float q = finestQuad * (1 << halka);
+            float q = finestQuad * (1 << ring);
 
-            // Bu halkanın dış yarıçapı: iç yarıçap + QuadPerSide/2 × quad
-            int adim = QuadPerSide / 2;
-            float disYaricap = icYaricap + adim * q;
+            // Outer radius of this ring: inner radius + QuadPerSide/2 x quad
+            int step = QuadPerSide / 2;
+            float outerRadius = innerRadius + step * q;
 
-            // İç kareyi çevreleyen halka: dış kareden iç kareyi çıkar.
-            int disAdim = Mathf.RoundToInt(disYaricap / q);
-            int icAdim = Mathf.RoundToInt(icYaricap / q);
+            // The ring surrounding the inner square: outer square minus inner.
+            int outerSteps = Mathf.RoundToInt(outerRadius / q);
+            int innerSteps = Mathf.RoundToInt(innerRadius / q);
 
-            for (int z = -disAdim; z < disAdim; z++)
-                for (int x = -disAdim; x < disAdim; x++)
+            for (int z = -outerSteps; z < outerSteps; z++)
+                for (int x = -outerSteps; x < outerSteps; x++)
                 {
-                    // İç kare bu halkaya ait değil — bir önceki halka çizdi.
-                    if (x >= -icAdim && x < icAdim && z >= -icAdim && z < icAdim)
+                    // The inner square does not belong to this ring — the
+                    // previous ring already drew it.
+                    if (x >= -innerSteps && x < innerSteps &&
+                        z >= -innerSteps && z < innerSteps)
                         continue;
 
-                    QuadEkle(vertices, indices, lookup, x * q, z * q, q, q);
+                    AddQuad(vertices, indices, lookup, x * q, z * q, q, q);
                 }
 
-            icYaricap = disYaricap;
+            innerRadius = outerRadius;
         }
 
         var mesh = new Mesh
         {
             name = "SeaSurfaceGrid",
 
-            // Vertex sayısı 65535'i aşıyor (spec §10.2).
+            // The vertex count exceeds 65535 (spec §10.2).
             indexFormat = IndexFormat.UInt32,
         };
 
         mesh.SetVertices(vertices);
         mesh.SetTriangles(indices, 0);
 
-        // NORMAL VE TANJANT YOK. Normal fragment shader'da FFT eğim
-        // dokusundan geliyor (spec §10.5); mesh'te taşımak boşuna bant
-        // genişliği.
+        // NO NORMALS AND NO TANGENTS. The normal comes from the FFT slope
+        // texture in the fragment shader (spec §10.5); carrying it in the
+        // mesh would be wasted bandwidth.
         mesh.RecalculateBounds();
 
-        // BOUNDS ELLE GENİŞLETİLİYOR. Displacement vertex shader'da olduğu
-        // için CPU sınırları bilmiyor; dar bırakılırsa deniz kamera açısına
-        // göre kayboluyor (spec §10.2, §18 tuzak tablosu).
-        float yariBoy = icYaricap * 2f;
-        mesh.bounds = new Bounds(Vector3.zero, new Vector3(yariBoy, 400f, yariBoy));
+        // THE BOUNDS ARE WIDENED BY HAND. Displacement happens in the vertex
+        // shader, so the CPU does not know the real extents; left narrow the
+        // sea disappears depending on camera angle (spec §10.2, §18 pitfall
+        // table).
+        float halfSize = innerRadius * 2f;
+        mesh.bounds = new Bounds(Vector3.zero, new Vector3(halfSize, 400f, halfSize));
 
         mesh.UploadMeshData(false);
 
         return mesh;
     }
 
-    /// Bir quad'ı iki üçgen olarak ekler. Köşeler paylaşılıyor: aynı dünya
-    /// konumundaki vertex bir kez oluşturulup indeksi tekrar kullanılıyor.
-    static void QuadEkle(List<Vector3> vertices, List<int> indices,
-                         Dictionary<long, int> lookup,
-                         float x, float z, float w, float d)
+    /// Adds one quad as two triangles. Corners are shared: a vertex at a
+    /// given world position is created once and its index reused.
+    static void AddQuad(List<Vector3> vertices, List<int> indices,
+                        Dictionary<long, int> lookup,
+                        float x, float z, float w, float d)
     {
-        int a = VertexIndeksi(vertices, lookup, x, z);
-        int b = VertexIndeksi(vertices, lookup, x + w, z);
-        int c = VertexIndeksi(vertices, lookup, x + w, z + d);
-        int e = VertexIndeksi(vertices, lookup, x, z + d);
+        int a = VertexIndex(vertices, lookup, x, z);
+        int b = VertexIndex(vertices, lookup, x + w, z);
+        int c = VertexIndex(vertices, lookup, x + w, z + d);
+        int e = VertexIndex(vertices, lookup, x, z + d);
 
         indices.Add(a); indices.Add(e); indices.Add(b);
         indices.Add(b); indices.Add(e); indices.Add(c);
     }
 
-    /// Dünya konumundan vertex indeksi. Aynı konum ikinci kez istenirse
-    /// mevcut indeks dönüyor — vertex paylaşımı burada oluyor.
+    /// Vertex index from a world position. Asking for the same position a
+    /// second time returns the existing index — this is where vertex sharing
+    /// happens.
     ///
-    /// Anahtar milimetreye yuvarlanmış tam sayı çifti: kayan nokta
-    /// karşılaştırması yerine tam sayı, çünkü quad boyutları ikinin kuvveti
-    /// katı ve toplama hatası birikmiyor.
-    static int VertexIndeksi(List<Vector3> vertices, Dictionary<long, int> lookup,
-                             float x, float z)
+    /// The key is a pair of integers rounded to millimetres: integers rather
+    /// than a floating point comparison, because the quad sizes are
+    /// power-of-two multiples and no summation error accumulates.
+    static int VertexIndex(List<Vector3> vertices, Dictionary<long, int> lookup,
+                           float x, float z)
     {
         long ix = Mathf.RoundToInt(x * 1000f);
         long iz = Mathf.RoundToInt(z * 1000f);
-        long anahtar = (ix << 32) ^ (iz & 0xFFFFFFFFL);
+        long key = (ix << 32) ^ (iz & 0xFFFFFFFFL);
 
-        if (lookup.TryGetValue(anahtar, out int idx)) return idx;
+        if (lookup.TryGetValue(key, out int idx)) return idx;
 
         idx = vertices.Count;
         vertices.Add(new Vector3(x, 0f, z));
-        lookup[anahtar] = idx;
+        lookup[key] = idx;
 
         return idx;
     }

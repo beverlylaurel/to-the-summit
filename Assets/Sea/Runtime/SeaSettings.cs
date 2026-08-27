@@ -1,133 +1,135 @@
-// ROL: deniz sisteminin ayarlari. Kodda gomulu sayi yok; asset olarak
-// disaridan veriliyor (CLAUDE.md — ayarlar ScriptableObject'e tasinir).
-// Cagiran: SeaManager, SeaSimulation, SeaBathymetry, SeaMeshBuilder.
+// ROLE: settings of the sea system. No numbers buried in code; supplied from
+// outside as an asset (CLAUDE.md — settings move into a ScriptableObject).
+// CALLED BY: SeaManager, SeaSimulation, SeaBathymetry, SeaMeshBuilder.
 
 using UnityEngine;
 
-/// KADEME BOYUTLARI SABİT DEĞİL AYAR.
+/// PATCH SIZES ARE A SETTING, NOT A CONSTANT.
 ///
-/// Spec §6.6 üç kademeyi `[KALİBRASYON]` işaretliyor ve kalite presetine göre
-/// değişiyorlar; `SeaConstants`'a konmadılar. İkinin kuvveti kuralı ise
-/// `[KAYNAK]` — çözünürlük burada değil, `SeaConstants.FftSize`'da.
-[CreateAssetMenu(menuName = "To The Summit/Deniz Ayarları", fileName = "SeaSettings")]
+/// Spec §6.6 marks all three tiers `[CALIBRATION]` and they change with the
+/// quality preset, so they did not go into `SeaConstants`. The power-of-two
+/// rule is `[SOURCE]` though — the resolution lives in
+/// `SeaConstants.FftSize`, not here.
+[CreateAssetMenu(menuName = "To The Summit/Sea Settings", fileName = "SeaSettings")]
 public class SeaSettings : ScriptableObject
 {
-    [Header("Kalite")]
-    /// KALITE KADEMESI FFT ÇÖZÜNÜRLÜĞÜNÜ, KADEME SAYISINI VE MESH'İ SÜRER.
-    /// Sayılar `SeaQuality.Of` tablosunda (spec §15.3); burada yalnız hangi
-    /// kademede olduğumuz duruyor.
-    [Tooltip("Kalite kademesi. Sayılar SeaQuality tablosunda.")]
+    [Header("Quality")]
+    /// THE QUALITY TIER DRIVES FFT RESOLUTION, TIER COUNT AND THE MESH.
+    /// The numbers live in the `SeaQuality.Of` table (spec §15.3); only which
+    /// tier we are on is stored here.
+    [Tooltip("Quality tier. The numbers live in the SeaQuality table.")]
     public SeaQualityPreset quality = SeaQualityPreset.Medium;
 
-    [Header("Deniz seviyesi")]
-    /// DENİZ SEVİYESİ ÖLÇÜLEREK SEÇİLDİ.
+    [Header("Sea level")]
+    /// THE SEA LEVEL WAS CHOSEN BY MEASUREMENT.
     ///
-    /// Arazinin batı kenarında kıyı profili Z boyunca on iki kesitte ölçüldü.
-    /// 30 m'de su şeridi z ∈ [−9000, +2000] bandında 2.7–4.1 km — istenen
-    /// aralık. 10 m'de 2.0 km (dar), 60 m'de 4.0 km ama dağın eteği fazla
-    /// suya giriyor.
-    [Tooltip("Deniz yüzeyinin dünya Y koordinatı (m).")]
+    /// The shore profile along the western edge of the terrain was measured
+    /// at twelve cross sections along Z. At 30 m the water strip is 2.7–4.1 km
+    /// in the band z in [-9000, +2000] — the range we wanted. At 10 m it is
+    /// 2.0 km (too narrow); at 60 m it is 4.0 km but too much of the
+    /// mountain's foot goes under water.
+    [Tooltip("World Y coordinate of the sea surface (m).")]
     public float seaLevelY = 30f;
 
-    [Tooltip("Arazi dışında varsayılan su derinliği (m). Ufka kadar açık deniz.")]
+    [Tooltip("Default water depth outside the terrain (m). Open sea to the horizon.")]
     [Min(10f)] public float deepWaterDepth = 200f;
 
-    [Header("Spektrum")]
-    /// FFT tek bir derinlik değeriyle çalışıyor; yerel derinlik değişimi
-    /// mesh üzerinde uygulanıyor (spec §6.4).
-    [Tooltip("Spektrumun varsaydığı ortalama derinlik (m).")]
+    [Header("Spectrum")]
+    /// The FFT works with a single depth value; local depth variation is
+    /// applied on the mesh (spec §6.4).
+    [Tooltip("Mean depth the spectrum assumes (m).")]
     [Min(1f)] public float spectrumDepth = 60f;
 
-    /// Rüzgârın su üzerinde estiği mesafe. Deniz alanı ~250 km², yani
-    /// karakteristik uzunluk ~15 km; fetch onun mertebesinde.
-    [Tooltip("Fetch — rüzgârın su üzerinde estiği mesafe (m).")]
+    /// The distance the wind blows over water. The sea area is ~250 km², so
+    /// its characteristic length is ~15 km; the fetch is of that order.
+    [Tooltip("Fetch — the distance the wind blows over water (m).")]
     [Min(100f)] public float fetch = 12000f;
 
-    /// Kıyıdan bakılan denizde düzenli dalga trenleri isteniyor.
-    /// [KAYNAK: Horvath 2015 "swell" parametresi]
-    [Tooltip("Ölü dalga payı. 0 = yerel çırpıntı, 1 = uzak fırtına dalgası.")]
+    /// A sea viewed from the shore wants regular wave trains.
+    /// [SOURCE: Horvath 2015 "swell" parameter]
+    [Tooltip("Swell fraction. 0 = local chop, 1 = distant storm swell.")]
     [Range(0f, 1f)] public float swell = 0.72f;
 
-    /// [KAYNAK: Tessendorf 2004 denklem 41]
-    [Tooltip("Küçük dalga kesme uzunluğu (m).")]
+    /// [SOURCE: Tessendorf 2004 equation 41]
+    [Tooltip("Small wave cutoff length (m).")]
     [Min(0.01f)] public float smallWaveCutoff = 0.15f;
 
-    /// Tüm frekanslar bunun katına yuvarlanıyor. ZORUNLU: uzun oyun
-    /// oturumlarında `t` büyüdükçe float hassasiyeti kaybını engelliyor.
-    /// [KAYNAK: Tessendorf 2004 §4.2]
-    [Tooltip("Döngü periyodu (s). Simülasyon bu sürede tekrar ediyor.")]
+    /// Every frequency is rounded to a multiple of this. MANDATORY: it
+    /// prevents loss of float precision as `t` grows over a long session.
+    /// [SOURCE: Tessendorf 2004 §4.2]
+    [Tooltip("Loop period (s). The simulation repeats over this interval.")]
     [Min(10f)] public float loopPeriod = 200f;
 
-    [Header("Kademeler (spec §6.6)")]
-    /// ÜÇ KADEME. Tek bir yama hem 200 m'lik ölü dalgayı hem 20 cm'lik
-    /// çırpıntıyı taşıyamaz. `dx` değerleri `U²/g`'den 10–1000 kat küçük
-    /// olmalı (spec §6.6); U = 8 m/s için U²/g = 6.52 m.
+    [Header("Tiers (spec §6.6)")]
+    /// THREE TIERS. A single patch cannot carry both a 200 m swell and a
+    /// 20 cm chop. The `dx` values must be 10–1000 times smaller than `U²/g`
+    /// (spec §6.6); for U = 8 m/s, U²/g = 6.52 m.
     ///
-    ///   kademe 0: 512 m / 256 = 2.00 m  → oran  3.3 (bilerek düşük, yalnız
-    ///                                     uzun dalga taşıyor)
-    ///   kademe 1: 128 m / 256 = 0.50 m  → oran 13.0
-    ///   kademe 2:  24 m / 256 = 0.094 m → oran 69.4
-    [Tooltip("Her kademenin dünyada kapladığı kare (m).")]
+    ///   tier 0: 512 m / 256 = 2.00 m  -> ratio  3.3 (deliberately low, it
+    ///                                    only carries long waves)
+    ///   tier 1: 128 m / 256 = 0.50 m  -> ratio 13.0
+    ///   tier 2:  24 m / 256 = 0.094 m -> ratio 69.4
+    [Tooltip("The square each tier covers in the world (m).")]
     public Vector3 patchSizes = new Vector3(512f, 128f, 24f);
 
-    [Tooltip("Kademelerin toplama ağırlığı.")]
+    [Tooltip("Summation weight of each tier.")]
     public Vector3 tierWeights = new Vector3(1f, 1f, 1f);
 
-    /// Choppy displacement ölçeği. Dalga tepelerini keskinleştirip çukurları
-    /// genişletiyor — FFT temsilini gerçekçi kılan doğrusal olmayan davranış.
-    /// [KAYNAK: Tessendorf 2004 denklem 44]
-    [Tooltip("Choppy displacement ölçeği.")]
+    /// Choppy displacement scale. It sharpens the crests and broadens the
+    /// troughs — the nonlinear behaviour that makes the FFT representation
+    /// look real. [SOURCE: Tessendorf 2004 equation 44]
+    [Tooltip("Choppy displacement scale.")]
     [Range(0f, 2f)] public float choppiness = 1.1f;
 
-    /// KADEME BAŞINA FARKLI. Yüksek dalga sayılarında tam choppiness
-    /// çırpıntıyı sıkıştırıp düğümlenmeye yol açıyor (spec §6.7).
-    [Tooltip("Kademe başına choppiness çarpanı.")]
+    /// DIFFERENT PER TIER. Full choppiness at high wave numbers compresses
+    /// the chop and leads to knotting (spec §6.7).
+    [Tooltip("Choppiness multiplier per tier.")]
     public Vector3 choppinessPerTier = new Vector3(1f, 0.85f, 0.45f);
 
-    [Header("Sığ su (spec §8)")]
-    /// Green yasası çok sığ suda sınırsıza gidiyor; gerçekte kırılma devreye
-    /// giriyor. [KALİBRASYON]
-    [Tooltip("Sığlaşma kazancının üst sınırı.")]
+    [Header("Shallow water (spec §8)")]
+    /// Green's law goes to infinity in very shallow water; in reality
+    /// breaking takes over. [CALIBRATION]
+    [Tooltip("Upper bound of the shoaling gain.")]
     [Range(1f, 5f)] public float maxShoalingGain = 2.2f;
 
-    /// Kabarma bandının su seviyesini yükselttiği en büyük değer (m).
-    /// Islak kum bandı bununla nefes alıyor. [KALİBRASYON]
-    [Tooltip("Kabarma (run-up) bandının derinlik katkısı (m).")]
+    /// The largest amount by which the run-up band raises the water level (m).
+    /// The wet sand band breathes with it. [CALIBRATION]
+    [Tooltip("Depth contribution of the run-up band (m).")]
     [Range(0f, 2f)] public float runupMaxDepth = 0.45f;
 
-    [Header("Optik (spec §12)")]
-    /// Kırmızı en hızlı, mavi en yavaş sönümleniyor — suyun mavi
-    /// görünmesinin sebebi. Kıyı suyu için. [KALİBRASYON]
-    [Tooltip("Sönüm katsayısı, kanal başına (1/m).")]
+    [Header("Optics (spec §12)")]
+    /// Red decays fastest, blue slowest — the reason water looks blue.
+    /// Tuned for coastal water. [CALIBRATION]
+    [Tooltip("Extinction coefficient per channel (1/m).")]
     public Vector3 extinctionRgb = new Vector3(0.30f, 0.08f, 0.05f);
 
-    /// [KAYNAK: Tessendorf 2004 §6.3 örnek shader — upwelling = (0, 0.2, 0.3)]
-    [Tooltip("Yukarı ışıma rengi.")]
+    /// [SOURCE: Tessendorf 2004 §6.3 sample shader — upwelling = (0, 0.2, 0.3)]
+    [Tooltip("Upwelling color.")]
     public Color upwellingColor = new Color(0.00f, 0.20f, 0.30f);
 
-    [Tooltip("Refraksiyon saptırma gücü.")]
+    [Tooltip("Refraction offset strength.")]
     [Range(0f, 2f)] public float refractionStrength = 0.35f;
 
-    /// Sakin ve fırtınalı yüzey pürüzlülüğü; rüzgâr hızıyla harmanlanıyor.
+    /// Calm and stormy surface roughness; blended by wind speed.
     [Range(0f, 0.5f)] public float roughnessCalm = 0.02f;
     [Range(0f, 0.5f)] public float roughnessRough = 0.14f;
 
-    [Header("Köpük (spec §13)")]
-    [Tooltip("Kıyı köpüğünün göründüğü derinlik (m).")]
+    [Header("Foam (spec §13)")]
+    [Tooltip("Depth at which shore foam appears (m).")]
     [Min(0.1f)] public float shoreFoamDepth = 1.2f;
 
-    /// Köpük saçan bir yüzey, parlak değil. [KALİBRASYON]
+    /// Foam is a scattering surface, not a glossy one. [CALIBRATION]
     public Color foamColor = new Color(0.92f, 0.94f, 0.95f);
     [Range(0f, 1f)] public float foamRoughness = 0.85f;
 
-    /// Tepe köpüğü deseninin dünya ölçeği (1/m). Desen katlanma yönünde
-    /// uzatılıyor. [KALİBRASYON]
-    [Tooltip("Tepe köpüğü deseni ölçeği (1/m).")]
+    /// World scale of the whitecap pattern (1/m). The pattern is stretched
+    /// along the fold direction. [CALIBRATION]
+    [Tooltip("Whitecap pattern scale (1/m).")]
     [Range(0.05f, 4f)] public float foamTiling = 0.8f;
 
-    /// KIYI KÖPÜĞÜNÜN KENARI GÜRÜLTÜYLE KIRILIYOR. Kırılmazsa köpük bandı
-    /// düz bir çizgi olur ve kıyı çizgisi çizilmiş gibi durur
-    /// (spec §18 tuzak tablosu). [KAYNAK: Crest, SIGGRAPH 2017]
-    [Tooltip("Kıyı köpüğü kenar gürültüsünün ölçeği (1/m).")]
+    /// THE SHORE FOAM EDGE IS BROKEN UP WITH NOISE. Without it the foam band
+    /// becomes a straight line and the shoreline looks drawn on
+    /// (spec §18 pitfall table). [SOURCE: Crest, SIGGRAPH 2017]
+    [Tooltip("Scale of the shore foam edge noise (1/m).")]
     [Range(0.05f, 2f)] public float foamBreakupTiling = 0.35f;
 }

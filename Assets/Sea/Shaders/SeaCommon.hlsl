@@ -1,47 +1,47 @@
-// ROL: deniz compute ve yuzey shader'larinin paylastigi tanimlar, globaller
-// ve ortak fonksiyonlar.
-// Cagiran: SeaSpectrum.compute, SeaFFT.compute, SeaFoam.compute, SeaLit.shader
+// ROLE: declarations, globals and shared functions used by both the sea
+// compute shaders and the surface shader.
+// CALLED BY: SeaSpectrum.compute, SeaFFT.compute, SeaFoam.compute, SeaLit.shader
 
 #ifndef SEA_COMMON_INCLUDED
 #define SEA_COMMON_INCLUDED
 
-// URP CORE ONCE.
+// URP CORE FIRST.
 //
-// `SAMPLER` makrosu buradan geliyor. Eksikse compute kernel SESSIZCE
-// derlenmiyor: `GetComputeShaderMessages` bos doner ama `FindKernel`
-// "kernel at index 0 is invalid" verir. Kar sisteminde bir tur bu yuzden
-// yandi (`RATIONALE.md` — "Compute shader'da iki sessiz derleme tuzagi").
+// The `SAMPLER` macro comes from here. Without it a compute kernel SILENTLY
+// fails to compile: `GetComputeShaderMessages` returns empty but `FindKernel`
+// reports "kernel at index 0 is invalid". The snow system burned a round on
+// this (`RATIONALE.md` — "Two silent compile traps in compute shaders").
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "SeaConstants.hlsl"
 
-// ------------------------------------------------------------- globaller
+// ---------------------------------------------------------------- globals
 
-/// Ruzgar yonu * hizi (m/s). Spektrumun ANA girdisi; `SeaManager` her frame
-/// yaziyor. Deniz kendi ruzgar noise'unu KURMUYOR (spec 3.4).
+/// Wind direction * speed (m/s). The MAIN input of the spectrum; `SeaManager`
+/// writes it every frame. The sea DOES NOT build its own wind noise (spec 3.4).
 float2 _SeaWindWS;
 
-/// Dongü kuantize edilmis zaman (s).
+/// Loop-quantized time (s).
 float  _SeaTime;
 
-/// Deniz yuzeyinin dunya Y koordinati.
+/// World Y coordinate of the sea surface.
 float  _SeaLevelY;
 
 // --- Bathymetry (spec 9) ---
 TEXTURE2D(_SeaBathyTex);
 
-// KENDI ORNEKLEYICISI.
+// ITS OWN SAMPLER.
 //
-// `sampler_LinearClamp` URP'nin ic ornekleyicisi ve YALNIZ parca/vertex
-// asamasinda tanimli; compute'ta "undeclared identifier" veriyor ve
-// kernel SESSIZCE gecersiz kaliyor — `HasKernel` yine True donuyor, hata
-// ancak dispatch'te "Kernel at index (0) is invalid" olarak cikiyor.
+// `sampler_LinearClamp` is URP's internal sampler and is defined ONLY in the
+// fragment/vertex stages; in compute it reports "undeclared identifier" and
+// the kernel stays SILENTLY invalid — `HasKernel` still returns True and the
+// error only surfaces at dispatch as "Kernel at index (0) is invalid".
 SAMPLER(sampler_SeaBathyTex);
 float2 _SeaBathyOriginXZ;
 float2 _SeaBathySizeXZ;
 float  _SeaBathyResolution;
 float  _SeaDeepWaterDepth;
 
-// --- Kademe parametreleri (spec 6.6) ---
+// --- Tier parameters (spec 6.6) ---
 float3 _SeaPatchSizes;
 float3 _SeaTierWeights;
 float3 _SeaChoppinessPerTier;
@@ -49,29 +49,30 @@ float3 _SeaChoppinessPerTier;
 float _SeaSpectrumDepth;
 float _SeaMaxShoalingGain;
 
-/// CALISAN FFT boyutu ve log2'si. Kalite presetinden geliyor;
-/// `SEA_FFT_SIZE` yalniz ust sinir.
+/// The RUNNING FFT size and its log2. Comes from the quality preset;
+/// `SEA_FFT_SIZE` is only the upper bound.
 uint _SeaFftSize;
 uint _SeaFftLog2;
+
 float _SeaFetch;
 float _SeaSwell;
 float _SeaSmallWaveCutoff;
 float _SeaLoopPeriod;
 float _SeaChoppiness;
 
-// --- Teshis ---
+// --- Diagnostics ---
 float _SeaDbgNoWaves;
 float _SeaDbgNoShallow;
 float _SeaDbgNoFoam;
 float _SeaDbgNoRefraction;
 
-// ------------------------------------------------------- dalga alani
+// ------------------------------------------------------------- wave field
 
-// FFT CIKTISI. `SeaSimulation` her frame yaziyor.
+// FFT OUTPUT. `SeaSimulation` writes it every frame.
 //
-// ORNEKLEME DUNYA KOORDINATINDAN, `frac()` YOK. Dokular
-// `wrapMode = Repeat` ile kuruluyor ve donanim zaten tekrarliyor;
-// `frac()` eklemek teksel sinirlarinda dikis yaratiyor (spec 10.4).
+// SAMPLED FROM WORLD COORDINATES, NO `frac()`. The textures are created with
+// `wrapMode = Repeat` and the hardware already repeats; adding `frac()`
+// creates a seam at texel boundaries (spec 10.4).
 TEXTURE2D_ARRAY(_SeaDisplacement);
 SAMPLER(sampler_SeaDisplacement);
 
@@ -81,11 +82,12 @@ SAMPLER(sampler_SeaDerivatives);
 TEXTURE2D_ARRAY(_SeaFoam);
 SAMPLER(sampler_SeaFoam);
 
-/// Uc kademenin displacement toplami. w = kademeler arasi EN KUCUK Jacobian.
+/// Sum of the three tiers' displacement. w = the SMALLEST Jacobian across
+/// the tiers.
 ///
-/// En kucugu aliniyor cunku katlanma tek bir kademede olsa bile yuzey
-/// katlanmis sayilir; ortalama alinsaydi ince cirpintinin katlanmasi kaba
-/// kademenin duzlugunde erirdi.
+/// The smallest is taken because a fold in a single tier still means the
+/// surface has folded; averaging would dissolve a fold in the fine chop into
+/// the flatness of the coarse tier.
 float4 SeaSampleDisplacement(float2 posXZ)
 {
     float3 disp = 0.0;
@@ -104,34 +106,35 @@ float4 SeaSampleDisplacement(float2 posXZ)
     return float4(disp, jac);
 }
 
-/// Uc kademenin egim toplami. Normal bundan kuruluyor — MERKEZI FARK
-/// KULLANILMIYOR, egim zaten FFT ile uretiliyor ve o daha dogru
+/// Sum of the three tiers' slope. The normal is built from this — NO CENTRAL
+/// DIFFERENCE: the slope already comes from the FFT and that is more accurate
 /// (spec 6.7, 10.5).
 float2 SeaSampleSlope(float2 posXZ)
 {
-    float2 egim = 0.0;
+    float2 slope = 0.0;
 
     [unroll]
     for (int s = 0; s < SEA_TIER_COUNT; ++s)
     {
         float2 uv = posXZ / _SeaPatchSizes[s];
-        egim += SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives,
-                                       sampler_SeaDerivatives, uv, s).xy
-              * _SeaTierWeights[s];
+        slope += SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives,
+                                        sampler_SeaDerivatives, uv, s).xy
+               * _SeaTierWeights[s];
     }
 
-    return egim;
+    return slope;
 }
 
-/// Tepe kopugu yogunlugu ve KATLANMA YONU.
+/// Whitecap foam density and the FOLD DIRECTION.
 ///
-/// Kademeler arasi EN BUYUK aliniyor — kopuk ortulme, ortalama degil.
-/// Yon, kopugu KAZANAN kademeden geliyor: baska kademenin yonu alinsaydi
-/// desen kopugun uzandigi yonle ilgisiz cikardi.
-float SeaSampleFoam(float2 posXZ, out float2 katlanmaYonu)
+/// The LARGEST value across tiers is taken — foam is coverage, not an
+/// average. The direction comes from the tier that WON: taking another
+/// tier's direction would make the pattern unrelated to the direction the
+/// foam actually stretches in.
+float SeaSampleFoam(float2 posXZ, out float2 foldDirection)
 {
     float f = 0.0;
-    katlanmaYonu = float2(1.0, 0.0);
+    foldDirection = float2(1.0, 0.0);
 
     [unroll]
     for (int s = 0; s < SEA_TIER_COUNT; ++s)
@@ -142,23 +145,23 @@ float SeaSampleFoam(float2 posXZ, out float2 katlanmaYonu)
         if (k > f)
         {
             f = k;
-            katlanmaYonu = SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives,
-                                                  sampler_SeaDerivatives, uv, s).zw;
+            foldDirection = SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives,
+                                                   sampler_SeaDerivatives, uv, s).zw;
         }
     }
 
     return f;
 }
 
-// ------------------------------------------------------------- gurultu
+// ------------------------------------------------------------------ noise
 
-/// PROSEDUREL KOPUK DESENI — DOKU YOK.
+/// PROCEDURAL FOAM PATTERN — NO TEXTURE.
 ///
-/// Spec 13 `T_Foam` ve `T_FoamBreakup` dokularini istiyor. Bu projede
-/// doku uretimi kredili servisten geciyor ve `CLAUDE.md` ilk denemenin
-/// dogru olmasini sart kosuyor; kopugun nasil gorunmesi gerektigi ekranda
-/// oturmadan istem yazmak kredi yakardi. Plan bu alternatifi kendisi
-/// veriyor. Doku takilinca bu fonksiyon silinir.
+/// Spec 13 asks for `T_Foam` and `T_FoamBreakup` textures. In this project
+/// texture generation goes through a paid service and `CLAUDE.md` requires
+/// the first attempt to be right; writing a prompt before the foam had
+/// settled on screen would have burned credits. The plan offers this
+/// alternative itself. Once the textures exist this function is deleted.
 float SeaHash21(float2 p)
 {
     p = frac(p * float2(123.34, 456.21));
@@ -180,7 +183,7 @@ float SeaValueNoise(float2 p)
     return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
 }
 
-/// Uc oktav. Kopuk hem iri kume hem ince kabarcik tasiyor.
+/// Three octaves. Foam carries both coarse clumps and fine bubbles.
 float SeaFoamNoise(float2 p)
 {
     return SeaValueNoise(p)        * 0.60
@@ -188,15 +191,15 @@ float SeaFoamNoise(float2 p)
          + SeaValueNoise(p * 5.13) * 0.10;
 }
 
-// -------------------------------------------------------- karmasik sayi
+// -------------------------------------------------------- complex numbers
 
-/// Karmasik carpim.
+/// Complex multiply.
 float2 SeaCMul(float2 a, float2 b)
 {
     return float2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
 
-/// Karmasik eslenik.
+/// Complex conjugate.
 float2 SeaConj(float2 a)
 {
     return float2(a.x, -a.y);
@@ -210,60 +213,60 @@ float2 SeaExpI(float theta)
     return float2(c, s);
 }
 
-// -------------------------------------------------------------- fizik
+// ---------------------------------------------------------------- physics
 
-/// SIG SU DISPERSIYONU.
+/// SHALLOW WATER DISPERSION.
 ///
-/// omega^2 = g*k*tanh(k*D). Taban cok derinse tanh 1'e gider ve derin su
-/// bagintisina indirgenir — yani tek formul her iki durumu da kapsiyor.
-/// **Derin su bagintisi AYRICA YAZILMIYOR** (spec 6.4, 17).
-/// [KAYNAK: Tessendorf 2004 denklem 31 ve 32]
+/// omega^2 = g*k*tanh(k*D). When the bottom is very deep tanh goes to 1 and
+/// this reduces to the deep-water relation — one formula covers both cases.
+/// **The deep-water relation is NOT WRITTEN SEPARATELY** (spec 6.4, 17).
+/// [SOURCE: Tessendorf 2004 equations 31 and 32]
 float SeaOmega(float k, float depth)
 {
-    // TANH ARGUMANI KIRPILIYOR.
+    // THE TANH ARGUMENT IS CLAMPED.
     //
-    // Derleyici `tanh`'i (e^x - e^-x)/(e^x + e^-x) olarak aciyor; x ~ 88'i
-    // gecince e^x tasip inf oluyor ve inf/inf = NaN cikiyor. Olculdu:
-    // 60 m derinlikte |n| > 112 olan butun tekseller NaN, oradan butun
-    // FFT alanina yayiliyor.
+    // The compiler expands `tanh` as (e^x - e^-x)/(e^x + e^-x); past x ~ 88
+    // e^x overflows to inf and inf/inf gives NaN. Measured: at 60 m depth
+    // every texel with |n| > 112 was NaN, and it spread from there across the
+    // whole FFT field.
     //
-    // 20'de tanh zaten 1'e 1e-17 yakin — kirpma fiziksel bir sey
-    // degistirmiyor, sadece tasmayi engelliyor.
+    // At 20 tanh is already within 1e-17 of 1 — the clamp changes nothing
+    // physical, it only prevents the overflow.
     return sqrt(SEA_G * k * tanh(min(k * depth, 20.0)));
 }
 
-/// DONGU KUANTIZASYONU.
+/// LOOP QUANTIZATION.
 ///
-/// Butun frekanslar temel frekansin kati olmali ki simulasyon T saniyede
-/// tekrarlasin. ZORUNLU: alanin GPU'da yeniden hesaplanmadan tekrarlanabilir
-/// olmasini saglar ve uzun oturumlarda `t` buyudukce float hassasiyeti
-/// kaybini engeller.
-/// [KAYNAK: Tessendorf 2004 4.2 denklem 34, 35]
+/// Every frequency must be a multiple of the fundamental so the simulation
+/// repeats every T seconds. MANDATORY: it makes the field repeatable without
+/// recomputing on the GPU and prevents loss of float precision as `t` grows
+/// over long sessions.
+/// [SOURCE: Tessendorf 2004 4.2 equations 34, 35]
 float SeaQuantizeOmega(float omega)
 {
     float omega0 = SEA_TWO_PI / _SeaLoopPeriod;
     return floor(omega / omega0) * omega0;
 }
 
-// --------------------------------------------------------- bathymetry
+// ------------------------------------------------------------- bathymetry
 
-/// Su derinligi (m). >0 su, <0 kara.
+/// Water depth (m). >0 water, <0 land.
 ///
-/// Terrain heightmap'i shader'da DOGRUDAN ORNEKLENMIYOR — Unity surumleri
-/// arasinda olcekleme sabitleri degisiyor. CPU'da bir kez bake ediliyor
+/// The terrain heightmap is NOT SAMPLED DIRECTLY in a shader — the scaling
+/// constants change between Unity versions. It is baked once on the CPU
 /// (spec 9).
 float SeaSampleDepth(float2 posXZ)
 {
     float2 uv = (posXZ - _SeaBathyOriginXZ) / _SeaBathySizeXZ;
 
-    // Arazi disi = acik deniz. Deniz mesh'i araziden buyuk ve ufka kadar
-    // uzaniyor; disarisi sabit derinlik.
+    // Outside the terrain = open sea. The sea mesh is larger than the terrain
+    // and reaches the horizon; beyond it the depth is constant.
     if (any(uv < 0.0) || any(uv > 1.0)) return _SeaDeepWaterDepth;
 
     return SAMPLE_TEXTURE2D_LOD(_SeaBathyTex, sampler_SeaBathyTex, uv, 0).r;
 }
 
-/// Taban egimi (tan theta). Kirilma indeksi bundan tureniyor (spec 8.3).
+/// Bottom slope (tan theta). The breaker index follows from it (spec 8.3).
 float SeaSampleBottomSlope(float2 posXZ)
 {
     float e = _SeaBathySizeXZ.x / _SeaBathyResolution;
@@ -274,79 +277,80 @@ float SeaSampleBottomSlope(float2 posXZ)
     return length(float2(dx, dz)) / (2.0 * e);
 }
 
-// ------------------------------------------------------- sig su donusumu
+// ------------------------------------------------- shallow water transform
 
-/// SIGLASMA — GENLIK ARTISI.
+/// SHOALING — AMPLITUDE GROWTH.
 ///
-/// Yavas degisen bir egim uzerinde ilerleyen dalganin genligi h^(-1/4) ile
-/// orantili buyur. [KAYNAK: Green yasasi]
+/// A wave travelling over a slowly varying slope grows in amplitude
+/// proportionally to h^(-1/4). [SOURCE: Green's law]
 float SeaShoalingGain(float depthLocal, float depthRef)
 {
     float d = max(depthLocal, SEA_MIN_DEPTH);
 
-    // `max(..., 0)` derleyici uyarisi icin: `d` zaten pozitif ve `depthRef`
-    // de oyle, yani oran negatif olamaz — ama derleyici bunu goremiyor ve
-    // "pow will not work for negative f" uyarisi veriyor.
+    // The `max(..., 0)` is for a compiler warning: `d` is already positive
+    // and so is `depthRef`, so the ratio cannot be negative — but the
+    // compiler cannot see that and emits "pow will not work for negative f".
     return pow(max(depthRef / d, 0.0), 0.25);
 }
 
-/// KIRILMA DERINLIK INDEKSI, EGIME BAGLI.
+/// BREAKER DEPTH INDEX, SLOPE DEPENDENT.
 ///
-/// Sabit 0.78 KULLANILMIYOR (spec 8.3, 17): cok hafif egimlerde alt sinir
-/// 0.55'e iniyor, dik sahillerde 1.0'in ustune cikiyor.
-/// [KAYNAK: McCowan 1894; Nelson 1983; DNV 2017; Galvin 1969; Weggel 1972]
+/// A fixed 0.78 IS NOT USED (spec 8.3, 17): on very mild slopes the lower
+/// bound drops to 0.55, on steep shores it rises above 1.0.
+/// [SOURCE: McCowan 1894; Nelson 1983; DNV 2017; Galvin 1969; Weggel 1972]
 float SeaBreakerIndex(float slope)
 {
     return lerp(SEA_GAMMA_MILD, SEA_GAMMA_STEEP, saturate(slope / 0.10));
 }
 
-// ---------------------------------------------------- yuzey deformasyonu
+// -------------------------------------------------------- surface deform
 
-struct SeaSurfaceNokta
+struct SeaSurfacePoint
 {
     float3 posWS;
     float  depth;
     float  jacobian;
 };
 
-/// SIG SU DONUSUMU (spec 8) — vertex asamasi.
+/// SHALLOW WATER TRANSFORM (spec 8) — vertex stage.
 ///
-/// ILERI VE DERINLIK GECISI AYNI FONKSIYONU CAGIRIYOR. Ayri yazilsalardi
-/// derinlik tamponu ile renk tamponu farkli bir yuzey gorurdu ve deniz
-/// kendi golgesine takilirdi.
+/// THE FORWARD AND DEPTH PASSES CALL THE SAME FUNCTION. Written separately,
+/// the depth buffer and the color buffer would see different surfaces and the
+/// sea would catch on its own depth test.
 ///
-/// Derinlik SAPTIRILMAMIS xz'den okunuyor: yatay displacement dalganin
-/// kendi hareketi, tabani tasimiyor (spec 10.4).
-SeaSurfaceNokta SeaDeform(float3 posWS)
+/// Depth is read from the UNDISPLACED xz: horizontal displacement is the
+/// wave's own motion, it does not move the sea bed (spec 10.4).
+SeaSurfacePoint SeaDeform(float3 posWS)
 {
-    SeaSurfaceNokta o;
+    SeaSurfacePoint o;
     o.depth = SeaSampleDepth(posWS.xz);
 
-    float4 alan = SeaSampleDisplacement(posWS.xz);
-    float3 disp = _SeaDbgNoWaves > 0.5 ? 0.0 : alan.xyz;
-    o.jacobian  = alan.w;
+    float4 field = SeaSampleDisplacement(posWS.xz);
+    float3 disp  = _SeaDbgNoWaves > 0.5 ? 0.0 : field.xyz;
+    o.jacobian   = field.w;
 
     if (_SeaDbgNoShallow <= 0.5)
     {
         float slope = SeaSampleBottomSlope(posWS.xz);
 
-        // SIGLASMA. Green yasasi cok sig suda sinirsiza gidiyor; tavan
-        // konuyor, gerceginde kirilma devreye giriyor (spec 8.1).
+        // SHOALING. Green's law goes to infinity in very shallow water; a
+        // ceiling is applied, in reality breaking takes over (spec 8.1).
         float shoal = min(SeaShoalingGain(o.depth, _SeaSpectrumDepth),
                           _SeaMaxShoalingGain);
 
-        // YATAY DISPLACEMENT SIG SUDA SONUYOR: dalga dikelesir, yatayda
-        // yayilmaz (spec 8.2).
+        // HORIZONTAL DISPLACEMENT DIES OUT IN SHALLOW WATER: the wave
+        // steepens instead of spreading horizontally (spec 8.2).
         float chopScale = saturate(o.depth / SEA_CHOP_FADE_DEPTH);
 
-        // KIYI SONUMU. Derinlik sifira giderken dalga yuksekligi de sifira
-        // gitmeli, yoksa mesh araziyle kesisip titriyor (spec 8.4).
+        // SHORE DAMPING. As depth goes to zero the wave height must go to
+        // zero too, otherwise the mesh intersects the terrain and flickers
+        // (spec 8.4).
         float shoreFade = smoothstep(0.0, SEA_SHORE_FADE_DEPTH, o.depth);
 
         disp.y  *= shoal * shoreFade;
         disp.xz *= chopScale * shoreFade;
 
-        // KIRILMA YUKSEKLIK SINIRI, EGIME BAGLI (spec 8.3).
+        // BREAKING HEIGHT LIMIT, SLOPE DEPENDENT (spec 8.3).
         float gamma = SeaBreakerIndex(slope);
         float hMax  = gamma * o.depth * 0.5;
         disp.y = sign(disp.y) * min(abs(disp.y), hMax);

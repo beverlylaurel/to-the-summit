@@ -1,37 +1,37 @@
-// ROL: TMA spektrumundan baslangic Fourier genliklerini ve zamana bagli
-// spektrumu uretir. IFFT girdisi burada hazirlanir.
-// Cagiran: SeaSimulation.
+// ROLE: builds the initial Fourier amplitudes and the time-dependent
+// spectrum from the TMA spectrum. The IFFT input is prepared here.
+// CALLED BY: SeaSimulation.
 
 #pragma kernel KInitialSpectrum
 #pragma kernel KTimeSpectrum
 
 #include "SeaCommon.hlsl"
 
-// h0(k) ve h0*(-k). xy = h0(k), zw = conj(h0(-k)).
+// h0(k) and h0*(-k). xy = h0(k), zw = conj(h0(-k)).
 RWTexture2DArray<float4> _SeaH0RW;
 
-// IFFT girdileri. PAKETLEME: iki GERCEK alan tek karmasik kanala konuyor.
+// IFFT inputs. PACKING: two REAL fields go into one complex channel.
 //
 //   C = A + i*B  =>  IFFT(C).x = A(x),  IFFT(C).y = B(x)
 //
-// A ve B gercek oldugu surece bu tam olarak calisiyor ve FFT sayisini
-// yariya indiriyor. Spec 11.1 iki ARGBHalf doku veriyor; sekiz gercek alan
-// ancak bu paketlemeyle o iki dokuya siginiyor.
+// As long as A and B are real this is exact, and it halves the number of
+// FFTs. Spec 11.1 provides two ARGBHalf textures; eight real fields only fit
+// into those two through this packing.
 //
-//   _SeaSpectrumHtRW.xy    = paket(Dx,      Dz)
-//   _SeaSpectrumHtRW.zw    = paket(h,       dDx/dz)
-//   _SeaSpectrumSlopeRW.xy = paket(egim x,  egim z)
-//   _SeaSpectrumSlopeRW.zw = paket(dDx/dx,  dDz/dz)
+//   _SeaSpectrumHtRW.xy    = pack(Dx,       Dz)
+//   _SeaSpectrumHtRW.zw    = pack(h,        dDx/dz)
+//   _SeaSpectrumSlopeRW.xy = pack(slope x,  slope z)
+//   _SeaSpectrumSlopeRW.zw = pack(dDx/dx,   dDz/dz)
 RWTexture2DArray<float4> _SeaSpectrumHtRW;
 RWTexture2DArray<float4> _SeaSpectrumSlopeRW;
 
-/// Kademe bandi ust siniri (rad/m). Kademe i, k < _SeaTierCutoffK[i] ve
-/// k >= _SeaTierCutoffK[i-1] olan dalgalari tasiyor.
+/// Upper bound of a tier's band (rad/m). Tier i carries waves with
+/// k < _SeaTierCutoffK[i] and k >= _SeaTierCutoffK[i-1].
 float4 _SeaTierCutoffK;
 
-// ------------------------------------------------------------- rastgele
+// ------------------------------------------------------------------ random
 
-/// Tam sayi hash'i. [KAYNAK: Wang hash / PCG karistirma adimlari]
+/// Integer hash. [SOURCE: Wang hash / PCG mixing steps]
 uint SeaHash(uint x)
 {
     x ^= 2747636419u;
@@ -48,12 +48,12 @@ float SeaRand01(uint seed)
     return SeaHash(seed) * (1.0 / 4294967296.0);
 }
 
-/// BAGIMSIZ IKI GAUSS, ortalama 0 standart sapma 1.
+/// TWO INDEPENDENT GAUSSIANS, mean 0 standard deviation 1.
 ///
-/// DUZ UNIFORM KULLANILMIYOR. Spec 6.1: uretec Gauss degilse butun sistem
-/// SESSIZCE yanlis sonuc verir — yuzey duzenli desen gosterir ve hata
-/// haftalarca baska yerde aranir.
-/// [KAYNAK: Box-Muller donusumu]
+/// A PLAIN UNIFORM IS NOT USED. Spec 6.1: if the generator is not Gaussian
+/// the whole system SILENTLY produces a wrong result — the surface shows a
+/// regular pattern and the bug gets hunted somewhere else for weeks.
+/// [SOURCE: Box-Muller transform]
 float2 SeaGauss(uint seed)
 {
     float u1 = max(SeaRand01(seed), 1e-7);
@@ -65,32 +65,34 @@ float2 SeaGauss(uint seed)
     return float2(r * cos(theta), r * sin(theta));
 }
 
-// ------------------------------------------------------------- spektrum
+// ---------------------------------------------------------------- spectrum
 
-/// JONSWAP tepe frekansi (rad/s).
+/// JONSWAP peak frequency (rad/s).
 ///
 /// omega_p = 22 * (g^2 / (U10 * F))^(1/3)
 ///
-/// SPEC'TE USS DUSMUS (6.2 satirinda "22 * (g^2/(U10*F))" yaziyor). Boyut
-/// denetimi ussun 1/3 oldugunu soyluyor: g^2/(U*F) birimi 1/s^3, kupkoku
-/// 1/s = rad/s. Ussuz hali rad/s vermiyor.
-/// Saglama (U=8 m/s, F=12 km): 22*(96.24/96000)^(1/3) = 2.20 rad/s,
-/// Tp = 2.86 s. Bagimsiz JONSWAP bagintisi f_p = 3.5 (g/U)(gF/U^2)^-0.33
-/// ayni girdilerle 2.26 rad/s veriyor — ust uste dusuyor.
-/// [KAYNAK: Horvath 2015 / JONSWAP]
+/// THE EXPONENT IS MISSING IN THE SPEC (§6.2 writes "22 * (g^2/(U10*F))").
+/// A dimensional check says the exponent is 1/3: g^2/(U*F) has units 1/s^3,
+/// and its cube root is 1/s = rad/s. Without the exponent it does not yield
+/// rad/s.
+/// Check (U=8 m/s, F=12 km): 22*(96.24/96000)^(1/3) = 2.20 rad/s,
+/// Tp = 2.86 s. The independent JONSWAP relation
+/// f_p = 3.5 (g/U)(gF/U^2)^-0.33 gives 2.26 rad/s for the same inputs — they
+/// agree.
+/// [SOURCE: Horvath 2015 / JONSWAP]
 float SeaPeakOmega(float u10, float fetch)
 {
     return 22.0 * pow(max(SEA_G * SEA_G / (u10 * fetch), 1e-12), 1.0 / 3.0);
 }
 
-/// JONSWAP spektrumu. [KAYNAK: Horvath 2015 / JONSWAP]
+/// JONSWAP spectrum. [SOURCE: Horvath 2015 / JONSWAP]
 float SeaJonswap(float omega, float omegaP, float u10, float fetch)
 {
     float alpha = 0.076 * pow(max(u10 * u10 / (fetch * SEA_G), 1e-12), 0.22);
 
     float sigma = omega <= omegaP ? SEA_JONSWAP_SIGMA_LO : SEA_JONSWAP_SIGMA_HI;
-    float fark  = omega - omegaP;
-    float r     = exp(-(fark * fark) / (2.0 * sigma * sigma * omegaP * omegaP));
+    float delta = omega - omegaP;
+    float r     = exp(-(delta * delta) / (2.0 * sigma * sigma * omegaP * omegaP));
 
     float w4 = omegaP / omega;
     w4 = w4 * w4 * w4 * w4;
@@ -100,35 +102,34 @@ float SeaJonswap(float omega, float omegaP, float u10, float fetch)
          * pow(SEA_JONSWAP_GAMMA, r);
 }
 
-/// KITAIGORODSKII DERINLIK SONUMU, DALLANMASIZ.
+/// KITAIGORODSKII DEPTH ATTENUATION, THREE BRANCHES.
 ///
-/// Kiyidan bakilan bir deniz icin derinlik parametresi ZORUNLU (spec 6.2);
-/// Phillips spektrumu bu yuzden kullanilmiyor.
-/// [KAYNAK: Horvath 2015 — TMA]
+/// The depth parameter is MANDATORY for a sea viewed from the shore
+/// (spec 6.2); that is why the Phillips spectrum is not used.
+///
+/// THE SPEC'S SINGLE-LINE FORM IS A TRAP. It carries the parabola
+/// `1 - 0.5(2-wh)^2` past wh > 2 as well; the parabola peaks at wh = 2 and
+/// then FALLS BACK, and `saturate` clamps it to 0. The result: the energy of
+/// every short wave is erased. Measured — at 60 m depth the h0 texture of
+/// tiers 1 and 2 came out entirely zero, while the peak wavelength is 12.7 m
+/// and sits in exactly those tiers.
+///
+/// Kitaigorodskii's definition is 1 for wh >= 2.
+/// [SOURCE: Bouws et al. 1985 (TMA); Horvath 2015]
 float SeaKitaigorodskii(float omega, float h)
 {
     float omegaH = omega * sqrt(h / SEA_G);
 
-    // UC DAL, IKI DEGIL.
-    //
-    // Spec 6.2'nin tek satirlik hali `1 - 0.5(2-wh)^2` parabolunu wh > 2
-    // icin de suruyor; parabol tepesini wh = 2'de yapip GERI DUSUYOR ve
-    // saturate onu 0'a kirpiyor. Sonuc: butun kisa dalgalarin enerjisi
-    // siliniyor. Olculdu — 60 m derinlikte kademe 1 ve 2'nin h0 dokusu
-    // tamamen sifir cikti; tepe dalga boyu 12.7 m ve o kademede.
-    //
-    // Kitaigorodskii'nin tanimi wh >= 2 icin 1'dir.
-    // [KAYNAK: Bouws ve ark. 1985 (TMA); Horvath 2015]
     if (omegaH <= 1.0) return 0.5 * omegaH * omegaH;
     if (omegaH <  2.0) return 1.0 - 0.5 * (2.0 - omegaH) * (2.0 - omegaH);
     return 1.0;
 }
 
-/// YONSEL YAYILMA NORMALIZASYON SABITI Q(s).
+/// DIRECTIONAL SPREADING NORMALIZATION CONSTANT Q(s).
 ///
-/// Q(s) = Gamma(s+1) / (2 sqrt(pi) Gamma(s+1/2)); HLSL'de gamma yok.
-/// Makale bu ifadenin parcali polinom yaklasikligini veriyor.
-/// [KAYNAK: Horvath 2015 — normalizasyon carpani yaklasikligi]
+/// Q(s) = Gamma(s+1) / (2 sqrt(pi) Gamma(s+1/2)); HLSL has no gamma
+/// function. The paper gives a piecewise polynomial approximation of it.
+/// [SOURCE: Horvath 2015 — normalization factor approximation]
 float SeaSpreadNorm(float s)
 {
     float s2 = s * s;
@@ -141,34 +142,34 @@ float SeaSpreadNorm(float s)
     return -4.80e-8 * s4 + 1.07e-5 * s3 - 9.53e-4 * s2 + 5.90e-2 * s + 3.93e-1;
 }
 
-/// YONSEL YAYILMA D(omega, theta). [KAYNAK: Horvath 2015]
+/// DIRECTIONAL SPREADING D(omega, theta). [SOURCE: Horvath 2015]
 float SeaDirectionalSpread(float omega, float omegaP, float theta,
                            float thetaWind, float u10, float swell)
 {
-    float oran = omega / omegaP;
+    float ratio = omega / omegaP;
 
     float s;
-    if (oran < 1.05)
+    if (ratio < 1.05)
     {
-        s = 6.97 * pow(oran, 4.06);
+        s = 6.97 * pow(ratio, 4.06);
     }
     else
     {
         float mu = -2.33 - 1.45 * (u10 * omegaP / SEA_G - 1.17);
-        s = 9.77 * pow(oran, mu);
+        s = 9.77 * pow(ratio, mu);
     }
 
-    // Olu dalga payi: dalgalari paralel trenlere uzatiyor.
-    s += 16.0 * tanh(oran) * swell * swell;
+    // Swell fraction: stretches the waves into parallel trains.
+    s += 16.0 * tanh(ratio) * swell * swell;
 
-    float yariAci = 0.5 * (theta - thetaWind);
-    return SeaSpreadNorm(s) * pow(max(abs(cos(yariAci)), 1e-6), 2.0 * s);
+    float halfAngle = 0.5 * (theta - thetaWind);
+    return SeaSpreadNorm(s) * pow(max(abs(cos(halfAngle)), 1e-6), 2.0 * s);
 }
 
-/// d(omega)/dk. omega^2 = g k tanh(kD) turevinden.
+/// d(omega)/dk, from the derivative of omega^2 = g k tanh(kD).
 float SeaDOmegaDk(float k, float depth, float omega)
 {
-    // `SeaOmega` ile ayni kirpma: `cosh` de e^x uzerinden aciliyor.
+    // Same clamp as in `SeaOmega`: `cosh` also expands through e^x.
     float kd = min(k * depth, 20.0);
     float th = tanh(kd);
     float ch = cosh(kd);
@@ -178,22 +179,22 @@ float SeaDOmegaDk(float k, float depth, float omega)
 
 // -------------------------------------------------------- KInitialSpectrum
 
-/// Bir dalga sayisi vektoru icin genlik karesi Ph(k) * dk^2.
+/// Amplitude squared Ph(k) * dk^2 for one wave vector.
 ///
 /// Ph(k) = S_TMA(omega, h) * D(omega, theta) * (domega/dk) / k   (spec 6.3)
-/// Ayrik FFT genligi icin dkx*dkz carpani ekleniyor.
+/// The dkx*dkz factor is added for the discrete FFT amplitude.
 float SeaSpectrumPower(float2 k, float patchSize, float2 wind, uint tier)
 {
     float kLen = length(k);
     if (kLen < 1e-6) return 0.0;
 
-    // KADEME BANDI. Uc kademe ayni k araligini tasisa enerji uc kez
-    // sayilirdi. Kural: bir kademe, yamasina EN AZ DORT tam periyot sigan
-    // dalga boyunu tasiyor (lambda <= L/4); daha uzun olan kaba kademeye
-    // devrediliyor. Dort [KALIBRASYON].
-    float ustSinir = _SeaTierCutoffK[tier];
-    float altSinir = tier == 0u ? 0.0 : _SeaTierCutoffK[max(tier, 1u) - 1u];
-    if (kLen < altSinir || kLen >= ustSinir) return 0.0;
+    // TIER BAND. If all three tiers carried the same k range the energy would
+    // be counted three times. The rule: a tier carries a wavelength only if
+    // AT LEAST FOUR full periods fit in its patch (lambda <= L/4); anything
+    // longer is handed to a coarser tier. The four is a [CALIBRATION].
+    float upper = _SeaTierCutoffK[tier];
+    float lower = tier == 0u ? 0.0 : _SeaTierCutoffK[max(tier, 1u) - 1u];
+    if (kLen < lower || kLen >= upper) return 0.0;
 
     float u10 = max(length(wind), 0.5);
     float thetaWind = atan2(wind.y, wind.x);
@@ -209,7 +210,7 @@ float SeaSpectrumPower(float2 k, float patchSize, float2 wind, uint tier)
 
     float ph = sTma * d * SeaDOmegaDk(kLen, _SeaSpectrumDepth, omega) / kLen;
 
-    // Kucuk dalga bastirma. [KAYNAK: Tessendorf 2004 denklem 41]
+    // Small wave suppression. [SOURCE: Tessendorf 2004 equation 41]
     float l = _SeaSmallWaveCutoff;
     ph *= exp(-kLen * kLen * l * l);
 
@@ -228,36 +229,34 @@ void KInitialSpectrum(uint3 id : SV_DispatchThreadID)
 
     float dk = SEA_TWO_PI / patchSize;
 
-    // n, m indisleri -N/2 .. N/2-1 araliginda (spec 6.1).
+    // The n, m indices run over -N/2 .. N/2-1 (spec 6.1).
     float2 n = float2(id.xy) - (float)(N / 2u);
     float2 k = n * dk;
 
-    // Aynanin KENDI gauss'lari cekiliyor — h0(-k) bagimsiz olmali,
-    // h0(k)'dan turetilemez.
-    uint2 ayna = (N - id.xy) % N;
-    float2 nAyna = float2(ayna) - (float)(N / 2u);
-    float2 kAyna = nAyna * dk;
+    uint2 mirror = (N - id.xy) % N;
+    float2 nMirror = float2(mirror) - (float)(N / 2u);
+    float2 kMirror = nMirror * dk;
 
-    // AYNA TEKSELIN TOHUMU AYNI FORMULDEN GELMEK ZORUNDA.
+    // THE MIRROR TEXEL'S SEED MUST COME FROM THE SAME FORMULA.
     //
-    // h(x) gercek olsun diye h~(-k) = conj(h~(k)) gerekiyor. Bu ancak
-    // teksel k'nin "h0(-k)" olarak kullandigi deger, teksel -k'nin kendi
-    // xy'sine yazdigi degerle BIREBIR AYNI ise saglaniyor. Ayri tohum
-    // blogu kullanilirsa iliski kopuyor ve yuzey gercek olmuyor —
-    // mean(h) sifirdan uzaklasir (spec 6.8 kabul kriteri).
-    uint tabanA = ((tier * N + id.y)   * N + id.x)   * 4u;
-    uint tabanB = ((tier * N + ayna.y) * N + ayna.x) * 4u;
+    // For h(x) to be real we need h~(-k) = conj(h~(k)). That only holds if
+    // the value texel k uses as "h0(-k)" is EXACTLY the value texel -k writes
+    // into its own xy. With a separate seed block the relation breaks and the
+    // surface is not real — mean(h) drifts away from zero (spec 6.8
+    // acceptance criterion).
+    uint seedA = ((tier * N + id.y)     * N + id.x)     * 4u;
+    uint seedB = ((tier * N + mirror.y) * N + mirror.x) * 4u;
 
-    float2 ksiA = SeaGauss(tabanA);
-    float2 ksiB = SeaGauss(tabanB);
+    float2 xiA = SeaGauss(seedA);
+    float2 xiB = SeaGauss(seedB);
 
-    // h0(k) = (1/sqrt(2)) (ksi_r + i ksi_i) sqrt(Ph(k))   (spec 6.1)
-    float2 h0     = (1.0 / sqrt(2.0)) * ksiA
-                  * sqrt(SeaSpectrumPower(k,     patchSize, _SeaWindWS, tier));
-    float2 h0Ayna = (1.0 / sqrt(2.0)) * ksiB
-                  * sqrt(SeaSpectrumPower(kAyna, patchSize, _SeaWindWS, tier));
+    // h0(k) = (1/sqrt(2)) (xi_r + i xi_i) sqrt(Ph(k))   (spec 6.1)
+    float2 h0       = (1.0 / sqrt(2.0)) * xiA
+                    * sqrt(SeaSpectrumPower(k,       patchSize, _SeaWindWS, tier));
+    float2 h0Mirror = (1.0 / sqrt(2.0)) * xiB
+                    * sqrt(SeaSpectrumPower(kMirror, patchSize, _SeaWindWS, tier));
 
-    _SeaH0RW[uint3(id.xy, tier)] = float4(h0, SeaConj(h0Ayna));
+    _SeaH0RW[uint3(id.xy, tier)] = float4(h0, SeaConj(h0Mirror));
 }
 
 // ----------------------------------------------------------- KTimeSpectrum
@@ -276,38 +275,39 @@ void KTimeSpectrum(uint3 id : SV_DispatchThreadID)
 
     float4 h0Pair = _SeaH0RW[uint3(id.xy, tier)];
 
-    // DONGU KUANTIZASYONU ZORUNLU (spec 6.5): butun frekanslar temel
-    // frekansin kati olmali ki alan T saniyede tekrarlasin ve uzun
-    // oturumda float hassasiyeti kaybolmasin.
+    // LOOP QUANTIZATION IS MANDATORY (spec 6.5): every frequency must be a
+    // multiple of the fundamental so the field repeats every T seconds and
+    // float precision survives a long session.
     float omega = SeaQuantizeOmega(SeaOmega(kLen, _SeaSpectrumDepth));
 
-    float2 faz = SeaExpI(omega * _SeaTime);
+    float2 phase = SeaExpI(omega * _SeaTime);
 
     // h(k,t) = h0(k) e^{iwt} + h0*(-k) e^{-iwt}
-    // Bu bicim eslenik ozelligini koruyor; bozulursa yuzey duz kaliyor.
-    float2 ht = SeaCMul(h0Pair.xy, faz) + SeaCMul(h0Pair.zw, SeaConj(faz));
+    // This form preserves the conjugate property; break it and the surface
+    // stays flat.
+    float2 ht = SeaCMul(h0Pair.xy, phase) + SeaCMul(h0Pair.zw, SeaConj(phase));
 
-    float2 birim = kLen < 1e-6 ? float2(0.0, 0.0) : k / kLen;
+    float2 unit = kLen < 1e-6 ? float2(0.0, 0.0) : k / kLen;
 
-    // EGIM SONLU FARKLA HESAPLANMIYOR (spec 6.7): sonlu fark kucuk dalga
-    // boylarinda egimi kotu yaklasikliyor.
-    //   egim      : i k h
-    //   dispX/dispZ: -i (k/|k|) h
-    //   dDx/dx     : i kx * dispX = (kx^2 / |k|) h      (gercek katsayi)
-    //   dDz/dz     : (kz^2 / |k|) h
-    //   dDx/dz     : (kx kz / |k|) h
+    // THE SLOPE IS NOT COMPUTED BY FINITE DIFFERENCE (spec 6.7): a finite
+    // difference approximates the slope badly at short wavelengths.
+    //   slope        : i k h
+    //   dispX/dispZ  : -i (k/|k|) h
+    //   dDx/dx       : i kx * dispX = (kx^2 / |k|) h      (a real coefficient)
+    //   dDz/dz       : (kz^2 / |k|) h
+    //   dDx/dz       : (kx kz / |k|) h
     float2 slopeX = SeaCMul(float2(0.0, k.x), ht);
     float2 slopeZ = SeaCMul(float2(0.0, k.y), ht);
 
-    float2 dispX = SeaCMul(float2(0.0, -birim.x), ht);
-    float2 dispZ = SeaCMul(float2(0.0, -birim.y), ht);
+    float2 dispX = SeaCMul(float2(0.0, -unit.x), ht);
+    float2 dispZ = SeaCMul(float2(0.0, -unit.y), ht);
 
     float invK = kLen < 1e-6 ? 0.0 : 1.0 / kLen;
     float2 dDxdx = ht * (k.x * k.x * invK);
     float2 dDzdz = ht * (k.y * k.y * invK);
     float2 dDxdz = ht * (k.x * k.y * invK);
 
-    // Paketleme: C = A + i*B.
+    // Packing: C = A + i*B.
     _SeaSpectrumHtRW[uint3(id.xy, tier)] = float4(
         dispX.x - dispZ.y, dispX.y + dispZ.x,
         ht.x    - dDxdz.y, ht.y    + dDxdz.x);

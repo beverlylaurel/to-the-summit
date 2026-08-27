@@ -1,24 +1,24 @@
-// ROL: arazi yuksekliginden su derinligi alani cikarir. Bir kez bake edilir.
-// Cagiran: SeaManager (Awake ve RefreshBathymetry).
+// ROLE: derives the water depth field from terrain height. Baked once.
+// CALLED BY: SeaManager (Awake and RefreshBathymetry).
 
 using System;
 using UnityEngine;
 
-/// SU DERİNLİĞİ CPU'DA BİR KEZ BAKE EDİLİYOR.
+/// WATER DEPTH IS BAKED ONCE ON THE CPU.
 ///
-/// `terrainData.heightmapTexture` shader'da doğrudan örneklenmiyor: Unity
-/// sürümleri arasında ölçekleme sabitleri değişiyor (spec §9). CPU'da bir kez
-/// bake etmek belirsizliği ortadan kaldırıyor.
+/// `terrainData.heightmapTexture` is not sampled directly in a shader: the
+/// scaling constants change between Unity versions (spec §9). Baking once on
+/// the CPU removes that uncertainty.
 ///
-/// Sığlaşma (§8.1), kırılma (§8.3) ve kıyı sönümü (§8.4) her teksel için
-/// derinlik istiyor; hepsi bu dokudan okuyor.
+/// Shoaling (§8.1), breaking (§8.3) and shore damping (§8.4) all need a depth
+/// per texel; every one of them reads this texture.
 public static class SeaBathymetry
 {
-    /// Su derinliği dokusu. `>0` su, `<0` kara.
+    /// Water depth texture. `>0` water, `<0` land.
     ///
-    /// `RHalf` yeterli: derinlik aralığı 0–200 m ve yarım hassasiyet orada
-    /// 0.1 m'den ince çözüyor. `Float` iki kat bant genişliği, görsel fark
-    /// yok (spec §15.2).
+    /// `RHalf` is enough: the depth range is 0–200 m and half precision
+    /// resolves finer than 0.1 m there. `Float` would be twice the bandwidth
+    /// with no visual difference (spec §15.2).
     public static Texture2D Bake(Terrain terrain, float seaLevelY)
     {
         if (terrain == null)
@@ -27,7 +27,7 @@ public static class SeaBathymetry
         TerrainData td = terrain.terrainData;
         int res = td.heightmapResolution;
 
-        // GetHeights [y, x] SIRALI dönüyor — indeks sırasına dikkat (spec §9).
+        // GetHeights returns [y, x] ORDERED — mind the index order (spec §9).
         float[,] hm = td.GetHeights(0, 0, res, res);
 
         var tex = new Texture2D(res, res, TextureFormat.RHalf, false, true)
@@ -39,21 +39,21 @@ public static class SeaBathymetry
         };
 
         var px = new Color[res * res];
-        float tabanY = terrain.transform.position.y;
-        float yukseklik = td.size.y;
+        float baseY = terrain.transform.position.y;
+        float height = td.size.y;
 
         for (int y = 0; y < res; y++)
         {
-            int satir = y * res;
+            int row = y * res;
 
             for (int x = 0; x < res; x++)
             {
-                float kot = tabanY + hm[y, x] * yukseklik;
+                float elevation = baseY + hm[y, x] * height;
 
-                // Doku pikseli (x, y) ← derinlik. Heightmap [y, x] okundu,
-                // yani satır Z eksenine karşılık geliyor ve UV ile birebir
-                // örtüşüyor.
-                px[satir + x] = new Color(seaLevelY - kot, 0f, 0f, 1f);
+                // Texture pixel (x, y) <- depth. The heightmap was read as
+                // [y, x], so the row corresponds to the Z axis and lines up
+                // one to one with UV.
+                px[row + x] = new Color(seaLevelY - elevation, 0f, 0f, 1f);
             }
         }
 
@@ -63,9 +63,9 @@ public static class SeaBathymetry
         return tex;
     }
 
-    /// Ölçüm: dokunun beklenen değerleri verdiğini doğrular. Üç bilinen
-    /// nokta yeterli — kara, su, arazi dışı.
-    public static string Dogrula(Terrain terrain, float seaLevelY, Texture2D tex)
+    /// Measurement: verifies the texture holds the expected values. Three
+    /// known points are enough — land, water, outside the terrain.
+    public static string Verify(Terrain terrain, float seaLevelY, Texture2D tex)
     {
         TerrainData td = terrain.terrainData;
         Vector3 o = terrain.transform.position;
@@ -73,29 +73,29 @@ public static class SeaBathymetry
         int res = td.heightmapResolution;
         float[,] hm = td.GetHeights(0, 0, res, res);
 
-        // En alçak ve en yüksek nokta
-        float enAz = float.MaxValue, enCok = float.MinValue;
+        // Lowest and highest point
+        float lowest = float.MaxValue, highest = float.MinValue;
 
         for (int y = 0; y < res; y += 8)
             for (int x = 0; x < res; x += 8)
             {
-                float kot = o.y + hm[y, x] * td.size.y;
-                if (kot < enAz) enAz = kot;
-                if (kot > enCok) enCok = kot;
+                float elevation = o.y + hm[y, x] * td.size.y;
+                if (elevation < lowest) lowest = elevation;
+                if (elevation > highest) highest = elevation;
             }
 
-        int su = 0, toplam = 0;
+        int water = 0, total = 0;
 
         for (int y = 0; y < res; y += 8)
             for (int x = 0; x < res; x += 8)
             {
-                toplam++;
-                if (o.y + hm[y, x] * td.size.y < seaLevelY) su++;
+                total++;
+                if (o.y + hm[y, x] * td.size.y < seaLevelY) water++;
             }
 
-        return $"bathymetry {res}x{res} | deniz seviyesi {seaLevelY:F1} m\n" +
-               $"  arazi kotu {enAz:F1} .. {enCok:F1} m\n" +
-               $"  en derin su {seaLevelY - enAz:F1} m\n" +
-               $"  su altinda kalan alan %{100f * su / toplam:F1}";
+        return $"bathymetry {res}x{res} | sea level {seaLevelY:F1} m\n" +
+               $"  terrain elevation {lowest:F1} .. {highest:F1} m\n" +
+               $"  deepest water {seaLevelY - lowest:F1} m\n" +
+               $"  area below water {100f * water / total:F1}%";
     }
 }

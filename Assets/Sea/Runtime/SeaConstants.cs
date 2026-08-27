@@ -1,75 +1,77 @@
-// ROL: deniz sisteminin butun sabitleri, C# tarafi. `SeaConstants.hlsl` ile
-// BIREBIR ayni degerleri tasiyor; esligi `SeaConstantsTest` siniyor.
-// Cagiran: SeaManager, SeaSimulation, SeaBathymetry.
+// ROLE: every constant of the sea system, C# side. Carries EXACTLY the same
+// values as `SeaConstants.hlsl`; `SeaConstantsTest` verifies the parity.
+// CALLED BY: SeaManager, SeaSimulation, SeaBathymetry.
 
-/// SAYININ TEK KAYNAĞI OLMAK ZORUNDA.
+/// A NUMBER MUST HAVE A SINGLE SOURCE.
 ///
-/// Kar sisteminde aynı sabit iki dosyada ayrı yazılmıştı (`MountainSurface`
-/// 0.28, `SnowBuildSurfaceFrom` 0.45) ve aynı kar iki farklı parlaklıkla
-/// çiziliyordu. Yorum "iki yol aynı sayıyı kullanmak zorunda" diyordu ama
-/// sayı kopyalanmıştı. Burada eşliği test sınıyor.
+/// In the snow system the same constant was written separately in two files
+/// (`MountainSurface` 0.28, `SnowBuildSurfaceFrom` 0.45) and the same snow
+/// was drawn at two different brightnesses. A comment claimed "both paths
+/// must use the same number" — but the number had been copied. Here a test
+/// verifies the parity.
 public static class SeaConstants
 {
-    // --- Fizik ---
+    // --- Physics ---
 
-    /// Yerçekimi. [KAYNAK: Tessendorf 2004 §4.2]
+    /// Gravity. [SOURCE: Tessendorf 2004 §4.2]
     public const float G = 9.81f;
 
     public const float TwoPi = 6.28318530718f;
 
-    /// Suyun kırılma indisi. [KAYNAK: Tessendorf 2004 §6.1.2]
+    /// Index of refraction of water. [SOURCE: Tessendorf 2004 §6.1.2]
     public const float WaterIor = 1.34f;
 
-    /// Su hacminin toplu yansıtması. [KAYNAK: Tessendorf 2004 §7.1]
+    /// Bulk reflectivity of the water volume. [SOURCE: Tessendorf 2004 §7.1]
     public const float BulkReflectivity = 0.04f;
 
-    // --- Spektrum (JONSWAP / TMA) ---
+    // --- Spectrum (JONSWAP / TMA) ---
 
-    /// Tepe keskinliği. [KAYNAK: Horvath 2015 / JONSWAP]
+    /// Peak sharpness. [SOURCE: Horvath 2015 / JONSWAP]
     public const float JonswapGamma = 3.30f;
 
-    /// Tepe genişliği; ω tepe frekansının altında ve üstünde farklı.
-    /// [KAYNAK: JONSWAP]
+    /// Peak width; different below and above the peak frequency.
+    /// [SOURCE: JONSWAP]
     public const float JonswapSigmaLo = 0.07f;
     public const float JonswapSigmaHi = 0.09f;
 
-    /// Derin su dikliği sınırı. [KAYNAK: Michell 1893]
+    /// Deep-water steepness limit. [SOURCE: Michell 1893]
     public const float MichellSteepness = 0.142f;
 
-    // --- Sığ su ve kırılma ---
+    // --- Shallow water and breaking ---
 
-    /// Sıfıra bölmeyi engelleyen taban derinliği (m). [KALİBRASYON]
+    /// Floor depth that prevents division by zero (m). [CALIBRATION]
     public const float MinDepth = 0.05f;
 
-    /// Kıyı çizgisinde dalga sönümü (m). [KALİBRASYON]
+    /// Wave damping at the shoreline (m). [CALIBRATION]
     public const float ShoreFadeDepth = 0.60f;
 
-    /// Yatay displacement'ın sığ suda söndüğü derinlik (m). [KALİBRASYON]
+    /// Depth at which horizontal displacement dies out in shallow water (m).
+    /// [CALIBRATION]
     public const float ChopFadeDepth = 8.00f;
 
-    /// Kırılma derinlik indeksi, eğime bağlı alt ve üst uç.
-    /// [KAYNAK: DNV 2017; Galvin 1969 / Weggel 1972]
+    /// Breaker depth index, lower and upper end of the slope-dependent range.
+    /// [SOURCE: DNV 2017; Galvin 1969 / Weggel 1972]
     public const float GammaMild = 0.55f;
     public const float GammaSteep = 1.10f;
 
-    /// Kırılmanın ürettiği köpük kazancı. [KALİBRASYON]
+    /// Foam gain produced by breaking. [CALIBRATION]
     public const float BreakFoamGain = 1.60f;
 
-    // --- Köpük (Jacobian) ---
+    // --- Foam (Jacobian) ---
 
-    /// Jacobian eşiği ve geçiş aralığı. [KAYNAK: Tessendorf 2004 §4.6]
+    /// Jacobian threshold and transition range. [SOURCE: Tessendorf 2004 §4.6]
     public const float FoamJThreshold = 0.55f;
     public const float FoamJRange = 0.55f;
 
-    /// Köpüğün sönüm hızı (1/s). [KALİBRASYON]
+    /// Foam decay rate (1/s). [CALIBRATION]
     public const float FoamDecay = 0.28f;
 
-    // --- FFT ve ızgara ---
+    // --- FFT and grid ---
 
-    /// FFT ızgara boyutu. [KAYNAK: Tessendorf 2004 §4.4]
+    /// FFT grid size. [SOURCE: Tessendorf 2004 §4.4]
     public const int FftSize = 256;
     public const int FftLog2 = 8;
 
-    /// Kademe sayısı. [KAYNAK: Tessendorf 2004 §4.4; Dupuy & Bruneton 2012]
+    /// Number of tiers. [SOURCE: Tessendorf 2004 §4.4; Dupuy & Bruneton 2012]
     public const int TierCount = 3;
 }

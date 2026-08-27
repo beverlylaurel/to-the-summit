@@ -1,5 +1,5 @@
-// ROL: Jacobian'dan tepe kopugu uretir ve sonumunu tasir.
-// Cagiran: SeaSimulation.
+// ROLE: produces whitecap foam from the Jacobian and carries its decay.
+// CALLED BY: SeaSimulation.
 
 #pragma kernel KFoam
 
@@ -11,12 +11,12 @@ RWTexture2DArray<float>  _SeaFoamPrevRW;
 
 float _SeaDeltaTime;
 
-/// KOPUK ANINDA OLUSUR, YAVAS KAYBOLUR.
+/// FOAM APPEARS INSTANTLY AND FADES SLOWLY.
 ///
-/// Dogrudan atama YAPILMIYOR (spec 18 tuzak tablosu: "kopuk aninda
-/// kayboluyor / sonum yerine dogrudan atama yapilmis"). Yeni deger hedefin
-/// ve sonumlenmis eski degerin BUYUGU: kabaran tepe kopugu aninda basiyor,
-/// tepe gecince iz kaliyor.
+/// NO direct assignment (spec 18 pitfall table: "foam disappears instantly /
+/// a direct assignment was used instead of decay"). The new value is the
+/// LARGER of the target and the decayed previous value: a rising crest gets
+/// foam at once, and a trail remains after the crest passes.
 [numthreads(8, 8, 1)]
 void KFoam(uint3 id : SV_DispatchThreadID)
 {
@@ -25,12 +25,12 @@ void KFoam(uint3 id : SV_DispatchThreadID)
 
     float J = _SeaDisplacementRW[id].w;
 
-    // Esik J < 0'dan ONCE basliyor ki kopuk yumusak girsin; J = 0 anini
-    // beklemek kopugu bicak gibi aciyor.
-    float hedef = saturate((SEA_FOAM_J_THRESHOLD - J) / SEA_FOAM_J_RANGE);
+    // The threshold starts BEFORE J < 0 so foam enters smoothly; waiting for
+    // the exact J = 0 moment opens foam like a knife edge.
+    float target = saturate((SEA_FOAM_J_THRESHOLD - J) / SEA_FOAM_J_RANGE);
 
-    float onceki  = _SeaFoamPrevRW[id];
-    float sonraki = max(hedef, onceki - SEA_FOAM_DECAY * _SeaDeltaTime);
+    float previous = _SeaFoamPrevRW[id];
+    float next     = max(target, previous - SEA_FOAM_DECAY * _SeaDeltaTime);
 
-    _SeaFoamRW[id] = saturate(sonraki);
+    _SeaFoamRW[id] = saturate(next);
 }

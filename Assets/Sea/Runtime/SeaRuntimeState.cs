@@ -1,41 +1,42 @@
-// ROL: denizin YAYINLADIGI durum. Baska sistemler okuyabilir; deniz
-// hicbirini uygulamiyor.
-// Cagiran: SeaManager (yazar), HUD ve ses sistemleri (okur).
+// ROLE: state the sea PUBLISHES. Other systems may read it; the sea
+// applies none of it.
+// CALLED BY: SeaManager (writes), HUD and audio systems (read).
 
-/// DENİZ YAYINLAR, UYGULAMAZ.
+/// THE SEA PUBLISHES, IT DOES NOT APPLY.
 ///
-/// Spec §3.3. Buradaki değerleri kimse okumak zorunda değil; deniz onları
-/// yazıp geçiyor. `RenderSettings`, `VolumeProfile` veya `Light.intensity`'ye
-/// dokunmuyor — Faz 1 kabul kriteri bunu kod aramasıyla doğruluyor.
+/// Spec §3.3. Nobody has to read these values; the sea writes them and
+/// moves on. It never touches `RenderSettings`, `VolumeProfile` or
+/// `Light.intensity` — the Phase 1 acceptance criterion verifies that with
+/// a code search.
 public static class SeaRuntimeState
 {
-    /// Belirgin dalga yüksekliği Hs (m). En yüksek üçte birlik dalgaların
-    /// ortalaması; oşinografide denizin "kaç metre" olduğunu söyleyen sayı.
+    /// Significant wave height Hs (m). Mean of the highest third of the
+    /// waves; the number oceanography uses to say how "big" a sea is.
     public static float SignificantWaveHeight { get; internal set; }
 
-    /// Tepe periyodu Tp (s). Spektrumun en çok enerji taşıdığı periyot.
+    /// Peak period Tp (s). The period carrying most of the spectrum's energy.
     public static float PeakPeriod { get; internal set; }
 
-    /// Açık denizde tepe köpüğünün kapladığı alan oranı.
+    /// Fraction of open water covered by whitecap foam.
     public static float WhitecapCoverage01 { get; internal set; }
 
-    /// Kıyı köpüğünün o andaki şiddeti. Kabarma (run-up) fazından türüyor.
+    /// Current strength of the shore foam. Derived from the run-up phase.
     public static float ShoreFoamIntensity01 { get; internal set; }
 
-    /// Deniz sistemi çalışıyor mu. `SeaManager` bir `ISeaEnvironmentSource`
-    /// bulamazsa false kalıyor.
+    /// Whether the sea system is running. Stays false if `SeaManager`
+    /// cannot find an `ISeaEnvironmentSource`.
     public static bool Active { get; internal set; }
 
-    /// Dalga alanı O KARE hesaplandı mı. Deniz görünmüyorsa bütün compute
-    /// pass'leri düşüyor (spec §15.2) ve bu false oluyor. Profiler'ın
-    /// "görünmezken maliyet" ölçümü buna bakıyor.
+    /// Whether the wave field was computed THIS frame. When the sea is not
+    /// visible every compute pass is skipped (spec §15.2) and this goes
+    /// false. The profiler's "cost while hidden" measurement reads it.
     public static bool SimulationActive { get; internal set; }
 
-    /// Son simülasyon adımının GPU süresi (ms). `SeaProfiler` yazıyor.
+    /// GPU time of the last simulation step (ms). Written by `SeaProfiler`.
     public static float SimulationGpuMs { get; internal set; }
 
-    /// GPU zamanlaması gerçekten geliyor mu. Profiler kayıt yapmıyorsa
-    /// `SimulationGpuMs` sessizce 0 kalır; bu bayrak olmadan "bedava" ile
-    /// "ölçülemedi" ayrılamaz.
+    /// Whether GPU timing is actually arriving. With the profiler not
+    /// recording, `SimulationGpuMs` silently stays 0; without this flag
+    /// "free" cannot be told apart from "not measured".
     public static bool GpuTimingAvailable { get; internal set; }
 }

@@ -1,6 +1,6 @@
-// ROL: SeaConstants.cs ile SeaConstants.hlsl'in BİREBİR aynı değerleri
-// taşıdığını doğrular (deniz spec §0.10, Faz 0 kabul kriteri).
-// Çağıran: menü — To The Summit/Sea/Test Constant Parity.
+// ROLE: verifies that SeaConstants.cs and SeaConstants.hlsl carry EXACTLY
+// the same values (sea spec §0.10, Phase 0 acceptance criterion).
+// CALLED BY: menu — To The Summit/Sea/Test Constant Parity.
 
 using System;
 using System.Collections.Generic;
@@ -12,25 +12,26 @@ using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 
-/// SABİT AYRIŞMASI SESSİZDİR. Spektrum GPU'da bir γ ile, kırılma kararı
-/// CPU'da başka bir γ ile çalışırsa belirti "bazen oluyor bazen olmuyor"
-/// olur ve hangi tarafın yanlış olduğu ekrandan anlaşılmaz.
+/// CONSTANT DRIFT IS SILENT. If the spectrum runs with one gamma on the GPU
+/// and the breaking decision with another on the CPU, the symptom is "it
+/// happens sometimes" and the screen cannot tell you which side is wrong.
 ///
-/// `SnowConstantsTest`'in birebir uyarlaması. O testte öğrenilen iki ders
-/// buraya da taşındı:
+/// A direct adaptation of `SnowConstantsTest`. Two lessons learned there
+/// carried over:
 ///
-/// 1. **Eşleşme tablosu ELLE tutulur.** Otomatik ad dönüşümü yanıltıcı:
-///    `GammaMild → SEA_GAMMA_MILD` tutuyor ama `FftSize → SEA_FFT_SIZE` ile
-///    `FoamJThreshold → SEA_FOAM_J_THRESHOLD` aynı kurala uymuyor.
-/// 2. **Tek taraflı HLSL sabiti HATA DEĞİL.** Yalnız shader'ın okuduğu bir
-///    sabitin CPU karşılığı olmasına gerek yok; şart koşmak testi kalıcı
-///    olarak kırık tutuyordu.
+/// 1. **The pairing table is maintained BY HAND.** Automatic name conversion
+///    misleads: `GammaMild -> SEA_GAMMA_MILD` works but `FftSize ->
+///    SEA_FFT_SIZE` and `FoamJThreshold -> SEA_FOAM_J_THRESHOLD` do not
+///    follow the same rule.
+/// 2. **An HLSL-only constant IS NOT AN ERROR.** A constant only the shader
+///    reads does not need a CPU counterpart; demanding one kept the test
+///    permanently red.
 public static class SeaConstantsTest
 {
     const string HlslPath = "Assets/Sea/Shaders/SeaConstants.hlsl";
 
-    /// C# alan adı → HLSL define adı. Yeni sabit eklenince buraya da
-    /// eklenecek; eklenmezse test "tabloda yok" diye kırmızı yanar.
+    /// C# field name -> HLSL define name. A new constant has to be added
+    /// here too; if it is not, the test goes red with "not in the table".
     static readonly (string csharp, string hlsl)[] Pairs =
     {
         ("G", "SEA_G"),
@@ -59,12 +60,12 @@ public static class SeaConstantsTest
         ("TierCount", "SEA_TIER_COUNT"),
     };
 
-    /// Tabloda olmayan, kasıtlı C# sabitleri. Şu an yok; ileride CPU'nun
-    /// hesapladığı ama shader'ın okumadığı bir sabit çıkarsa buraya girer.
+    /// Deliberately C#-only constants. Currently none; if a constant the CPU
+    /// computes but the shader never reads appears, it goes here.
     static readonly string[] CsharpOnly = { };
 
     [MenuItem("To The Summit/Sea/Test Constant Parity", false, 80)]
-    static void RunMenu() => Debug.Log(Run(out bool ok) + (ok ? "" : "\nEŞLİK BOZUK."));
+    static void RunMenu() => Debug.Log(Run(out bool ok) + (ok ? "" : "\nPARITY BROKEN."));
 
     public static string Run(out bool ok)
     {
@@ -74,13 +75,13 @@ public static class SeaConstantsTest
         if (!File.Exists(HlslPath))
         {
             ok = false;
-            return "SeaConstants.hlsl bulunamadı: " + HlslPath;
+            return "SeaConstants.hlsl not found: " + HlslPath;
         }
 
         Dictionary<string, double> defines = ParseDefines(File.ReadAllText(HlslPath));
 
-        // C# tarafındaki bütün sabitleri yansımayla oku — elle listelemek
-        // unutulan bir alanı sessizce dışarıda bırakırdı.
+        // Read every C#-side constant by reflection — listing them by hand
+        // would silently leave out a forgotten field.
         var csharp = new Dictionary<string, double>();
         foreach (FieldInfo f in typeof(SeaConstants).GetFields(BindingFlags.Public | BindingFlags.Static))
         {
@@ -95,25 +96,26 @@ public static class SeaConstantsTest
         {
             if (!csharp.TryGetValue(cs, out double a))
             {
-                report.AppendLine($"EKSİK  C#   {cs}");
+                report.AppendLine($"MISSING  C#   {cs}");
                 ok = false;
                 continue;
             }
 
             if (!defines.TryGetValue(hl, out double b))
             {
-                report.AppendLine($"EKSİK  HLSL {hl}");
+                report.AppendLine($"MISSING  HLSL {hl}");
                 ok = false;
                 continue;
             }
 
-            // Göreli tolerans: küçük sayılarda mutlak eşik yanıltır.
+            // Relative tolerance: an absolute threshold misleads on small
+            // numbers.
             double scale = Math.Max(Math.Abs(a), Math.Abs(b));
             double tolerance = scale > 0.0 ? scale * 1e-6 : 1e-12;
 
             if (Math.Abs(a - b) > tolerance)
             {
-                report.AppendLine($"AYRIK  {cs} = {a} , {hl} = {b}");
+                report.AppendLine($"DIVERGED  {cs} = {a} , {hl} = {b}");
                 ok = false;
                 continue;
             }
@@ -121,16 +123,16 @@ public static class SeaConstantsTest
             matched++;
         }
 
-        // C# tarafında olup tabloda olmayan sabit: ya unutulmuş ya ölü.
+        // A C#-side constant missing from the table: either forgotten or dead.
         foreach (string name in csharp.Keys)
         {
             bool listed = false;
             foreach ((string cs, string _) in Pairs) if (cs == name) { listed = true; break; }
             foreach (string only in CsharpOnly) if (only == name) { listed = true; break; }
-            if (!listed) { report.AppendLine($"TABLODA YOK  C# {name}"); ok = false; }
+            if (!listed) { report.AppendLine($"NOT IN TABLE  C# {name}"); ok = false; }
         }
 
-        // Tek taraflı HLSL sabiti hata değil — yalnız sayılıyor.
+        // An HLSL-only constant is not an error — it is only counted.
         int hlslOnly = 0;
         foreach (string name in defines.Keys)
         {
@@ -140,11 +142,11 @@ public static class SeaConstantsTest
         }
 
         if (hlslOnly > 0)
-            report.AppendLine($"Yalnız shader'da: {hlslOnly} sabit (beklenen).");
+            report.AppendLine($"Shader only: {hlslOnly} constants (expected).");
 
         report.Insert(0, ok
-            ? $"Deniz sabit eşliği TAMAM — {matched}/{Pairs.Length} çift birebir aynı.\n"
-            : $"Deniz sabit eşliği BOZUK — {matched}/{Pairs.Length} çift eşleşti.\n");
+            ? $"Sea constant parity OK — {matched}/{Pairs.Length} pairs identical.\n"
+            : $"Sea constant parity BROKEN — {matched}/{Pairs.Length} pairs matched.\n");
 
         return report.ToString();
     }

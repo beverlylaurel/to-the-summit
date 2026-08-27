@@ -1,48 +1,49 @@
-// ROL: Deniz sisteminin dis dunyadan okudugu her sey. Oyunun mevcut hava,
-// ruzgar, bulut ve gece/gunduz sistemleri bu arayuzu implemente ediyor.
-// Deniz sistemi bu degerleri ASLA yazmiyor.
-// Cagiran: SeaManager.
+// ROLE: everything the sea system reads from the outside world. The game's
+// existing weather, wind, cloud and day/night systems implement this
+// interface. The sea system NEVER writes these values.
+// CALLED BY: SeaManager.
 
 using UnityEngine;
 
 public enum SeaPrecipitationKind { None, Rain, Snow, Sleet }
 
-/// DENİZ SÜRMEZ, OKUR.
+/// THE SEA DOES NOT DRIVE, IT READS.
 ///
-/// Spec §3'ün temel kuralı. Deniz sistemi içinde `RenderSettings`,
-/// `VolumeProfile` veya `Light.intensity` yazan tek bir satır olmayacak;
-/// Faz 1 kabul kriteri bunu kod aramasıyla doğruluyor.
+/// The core rule of spec §3. There will not be a single line inside the sea
+/// system that writes `RenderSettings`, `VolumeProfile` or
+/// `Light.intensity`; the Phase 1 acceptance criterion verifies that with a
+/// code search.
 public interface ISeaEnvironmentSource
 {
-    // --- Rüzgâr: dalga spektrumunun ANA girdisi (spec §6) ---
+    // --- Wind: the MAIN input of the wave spectrum (spec §6) ---
 
-    /// Normalize, dünya uzayı, yatay.
+    /// Normalized, world space, horizontal.
     Vector3 WindDirection { get; }
 
-    /// m/s, 10 m referans yüksekliği (U10).
+    /// m/s at the 10 m reference height (U10).
     float WindSpeed { get; }
 
-    // --- Gece/gündüz ---
+    // --- Day and night ---
 
     Light Sun { get; }
 
-    /// `saturate(dot(-sunForward, up))`. Güneş parıltısının gece kapanma
-    /// kapısı buradan (spec §12.5).
+    /// `saturate(dot(-sunForward, up))`. The night gate for sun glitter
+    /// comes from here (spec §12.5).
     float SunElevation01 { get; }
 
-    // --- Atmosfer: su yüzeyi yansımasının girdisi (spec §12) ---
+    // --- Atmosphere: the input to surface reflection (spec §12) ---
 
-    /// Zenit gökyüzü rengi.
+    /// Zenith sky color.
     Color SkyColor { get; }
 
     Color HorizonColor { get; }
 
-    /// 0 açık, 1 kapalı.
+    /// 0 clear, 1 overcast.
     float CloudCover01 { get; }
 
     float FogDensity01 { get; }
 
-    // --- Yağış: köpük ve yüzey pürüzlülüğü (spec §13) ---
+    // --- Precipitation: foam and surface roughness (spec §13) ---
 
     SeaPrecipitationKind PrecipKind { get; }
 

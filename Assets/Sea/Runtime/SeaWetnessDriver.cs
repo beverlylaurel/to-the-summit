@@ -1,32 +1,34 @@
-// ROL: kiyi islaklik bandini global uniform olarak yayinlar. Arazi
-// materyali okuyor; deniz araziye DOKUNMUYOR.
-// Cagiran: yok — kendi basina calisiyor, bagimliliklari Inspector'dan.
+// ROLE: publishes the shore wetness band as global uniforms. The terrain
+// material reads them; the sea NEVER TOUCHES the terrain.
+// CALLED BY: nobody — runs on its own, dependencies come from the Inspector.
 
 using System;
 using UnityEngine;
 
-/// DENİZ ARAZİYİ BOYAMIYOR, BİR SEVİYE YAYINLIYOR.
+/// THE SEA DOES NOT PAINT THE TERRAIN, IT PUBLISHES A LEVEL.
 ///
-/// Spec §14. Buradan çıkan tek şey iki `float`: ıslak bandın üst kotu ve
-/// bandın kalınlığı. Arazi materyali onları okuyup kendi albedo ve
-/// pürüzlülüğünü ayarlıyor. Deniz sistemi arazi materyaline hiçbir şey
-/// yazmıyor — tersi olsaydı iki sistem birbirini ezerdi.
+/// Spec §14. All that leaves this component is two floats: the top elevation
+/// of the wet band and the band's thickness. The terrain material reads them
+/// and adjusts its own albedo and roughness. The sea system writes nothing
+/// into the terrain material — the other way round the two systems would
+/// overwrite each other.
 ///
-/// **BANT DALGALARLA NEFES ALIYOR.** Üst kot kabarma (run-up) fazından
-/// türüyor: dalga kıyıya ilerleyince bant genişliyor, çekilince daralıyor.
+/// **THE BAND BREATHES WITH THE WAVES.** The top elevation follows the run-up
+/// phase: as a wave advances up the shore the band widens, as it withdraws it
+/// narrows.
 [ExecuteAlways]
 [DisallowMultipleComponent]
 public class SeaWetnessDriver : MonoBehaviour
 {
     [SerializeField] SeaSettings settings;
 
-    /// Islak bandın yumuşama kalınlığı (m). Bu kadar yükselince ıslaklık
-    /// sıfıra iniyor. [KALİBRASYON]
-    [Tooltip("Islak bandın yumuşama kalınlığı (m).")]
+    /// Fade thickness of the wet band (m). Wetness reaches zero this far
+    /// above the level. [CALIBRATION]
+    [Tooltip("Fade thickness of the wet band (m).")]
     [Range(0.05f, 2f)] public float fadeMeters = 0.35f;
 
-    /// Islak kumun kuru kuma göre koyuluğu. [KALİBRASYON]
-    [Tooltip("Islak yüzeyin albedo çarpanı. 1 = hiç koyulmuyor.")]
+    /// How much darker wet sand is than dry sand. [CALIBRATION]
+    [Tooltip("Albedo multiplier of the wet surface. 1 = no darkening.")]
     [Range(0.2f, 1f)] public float darkening = 0.55f;
 
     public void Bind(SeaSettings source)
@@ -38,22 +40,23 @@ public class SeaWetnessDriver : MonoBehaviour
     {
         if (settings == null)
             throw new InvalidOperationException(
-                $"{nameof(SeaWetnessDriver)}: {nameof(settings)} atanmadı.");
+                $"{nameof(SeaWetnessDriver)}: {nameof(settings)} is not assigned.");
     }
 
     void OnDisable()
     {
-        // DENİZ KAPANINCA BANT DA KAPANIYOR.
+        // WHEN THE SEA SHUTS DOWN THE BAND SHUTS DOWN TOO.
         //
-        // Seviye olduğu gibi bırakılsaydı deniz sistemi kaldırıldığında
-        // arazinin kıyı bandı kalıcı olarak ıslak kalırdı ve sebebi
-        // arazide aranırdı.
-        Kapat();
+        // Left as it was, removing the sea system would leave the terrain's
+        // shore band permanently wet and the cause would be hunted for in
+        // the terrain.
+        Disable();
     }
 
-    static void Kapat()
+    static void Disable()
     {
-        // Arazinin altında kalan bir kot: `smoothstep` her yerde 0 veriyor.
+        // An elevation below the terrain: `smoothstep` then returns 0
+        // everywhere.
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetLevelY, -100000f);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetFadeM, 1f);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetDarkening, 1f);
@@ -65,12 +68,12 @@ public class SeaWetnessDriver : MonoBehaviour
 
         if (!SeaRuntimeState.Active)
         {
-            Kapat();
+            Disable();
             return;
         }
 
-        // Kabarma fazı 0..1; bandın üst kotu deniz seviyesinin o kadar
-        // üstünde (spec §8.5).
+        // The run-up phase is 0..1; the top of the band sits that far above
+        // sea level (spec §8.5).
         float runup = settings.runupMaxDepth * SeaRuntimeState.ShoreFoamIntensity01;
 
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetLevelY, settings.seaLevelY + runup);

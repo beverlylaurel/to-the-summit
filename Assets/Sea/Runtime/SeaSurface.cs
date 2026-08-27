@@ -1,21 +1,22 @@
-// ROL: deniz mesh'ini kurar, kameraya snap'ler, materyalini yonetir.
-// Cagiran: yok — kendi basina calisiyor, bagimliliklari Inspector'dan.
+// ROLE: builds the sea mesh, snaps it to the camera, manages its material.
+// CALLED BY: nobody — runs on its own, dependencies come from the Inspector.
 
 using System;
 using UnityEngine;
 
-/// DENİZ MESH'İ KAMERAYI TAKİP EDİYOR, OYUNCUYU DEĞİL.
+/// THE SEA MESH FOLLOWS THE CAMERA, NOT THE PLAYER.
 ///
-/// Kamera denizden uzaklaşsa bile ufuk doğru kalıyor (spec §10.3).
+/// The horizon stays correct even when the camera moves away from the sea
+/// (spec §10.3).
 ///
-/// **SNAP ADIMI EN İNCE QUAD BOYUTU.** Tüm quad boyutları onun ikinin
-/// kuvveti katı olduğu için tek bir snap adımı her halkanın vertex'lerini
-/// kendi kafesinde tutuyor (spec §10.1 hizalama ispatı).
+/// **THE SNAP STEP IS THE FINEST QUAD SIZE.** Because every quad size is a
+/// power-of-two multiple of it, a single snap step keeps every ring's
+/// vertices on its own lattice (spec §10.1 alignment proof).
 ///
-/// `SnapStep` FFT teksel boyutuyla ilişkili OLMAK ZORUNDA DEĞİL — FFT
-/// dokusu dünya koordinatından örnekleniyor, mesh vertex konumundan değil.
-/// Kar sistemindeki `SnapStep / texelSize` tam sayı kuralı burada geçerli
-/// değil (spec §10.3 bunu açıkça söylüyor).
+/// The snap step DOES NOT HAVE TO relate to the FFT texel size — the FFT
+/// texture is sampled from world coordinates, not from mesh vertex positions.
+/// The snow system's `SnapStep / texelSize` integer rule does not apply here
+/// (spec §10.3 says so explicitly).
 [ExecuteAlways]
 [DisallowMultipleComponent]
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
@@ -24,7 +25,7 @@ public class SeaSurface : MonoBehaviour
     [SerializeField] SeaSettings settings;
     [SerializeField] Shader surfaceShader;
 
-    [Tooltip("Mesh'in takip edeceği kamera. Boşsa Camera.main kullanılır.")]
+    [Tooltip("Camera the mesh follows. Camera.main is used when empty.")]
     [SerializeField] Transform followCamera;
 
     MeshFilter filter;
@@ -37,12 +38,12 @@ public class SeaSurface : MonoBehaviour
 
     public SeaSettings Settings => settings;
 
-    /// DENİZ KAMERANIN GÖRÜŞ ALANINDA MI.
+    /// WHETHER THE SEA IS INSIDE A CAMERA'S VIEW.
     ///
-    /// `MeshRenderer.isVisible` herhangi bir kameranın (Scene view dahil)
-    /// gördüğünü söylüyor. Mesh yoksa "görünüyor" sayılıyor: yokluğunu
-    /// görünmezlikle karıştırmak simülasyonu kalıcı olarak susturur ve
-    /// belirti "deniz donuk" olur.
+    /// `MeshRenderer.isVisible` reports whether ANY camera (including the
+    /// scene view) sees it. With no mesh it counts as "visible": confusing
+    /// absence with invisibility would silence the simulation permanently and
+    /// the symptom would be "the sea is frozen".
     public bool IsVisible => meshRenderer == null || meshRenderer.isVisible;
 
     public void Bind(SeaSettings source, Shader shader, Transform cam)
@@ -60,10 +61,10 @@ public class SeaSurface : MonoBehaviour
 
     void OnDisable()
     {
-        Temizle();
+        Cleanup();
     }
 
-    void Temizle()
+    void Cleanup()
     {
         if (mesh != null)
         {
@@ -81,11 +82,11 @@ public class SeaSurface : MonoBehaviour
         builtRings = -1;
     }
 
-    /// MATERYAL VE MESH `Update`'TE GARANTİ EDİLİYOR.
+    /// THE MATERIAL AND MESH ARE GUARANTEED IN `Update`.
     ///
-    /// `AssetDatabase.ImportAsset` runtime'da kurulan materyalleri düşürüyor;
-    /// `TerrainSurface` bunu yaşadı ve arazi magenta çıktı. Aynı desen:
-    /// her karede varlık kontrol ediliyor, yoksa yeniden kuruluyor.
+    /// `AssetDatabase.ImportAsset` drops materials created at runtime;
+    /// `TerrainSurface` hit this and the terrain turned magenta. Same pattern
+    /// here: existence is checked every frame and rebuilt when missing.
     void Update()
     {
         if (settings == null) return;
@@ -97,14 +98,14 @@ public class SeaSurface : MonoBehaviour
 
     void EnsureMesh()
     {
-        // MESH KALITE KADEMESINDEN. Ayarda ayrı bir alan tutulsaydı preset
-        // ile mesh ayrışır ve "Low seçtim ama üçgen sayısı düşmedi" durumu
-        // çıkardı (spec §15.3).
-        SeaQuality.Levels seviye = SeaQuality.Of(settings.quality);
+        // THE MESH COMES FROM THE QUALITY TIER. With a separate field in the
+        // settings the preset and the mesh would drift apart and produce
+        // "I picked Low but the triangle count did not drop" (spec §15.3).
+        SeaQuality.Levels level = SeaQuality.Of(settings.quality);
 
         if (mesh != null &&
-            Mathf.Approximately(builtQuad, seviye.FinestQuad) &&
-            builtRings == seviye.RingCount)
+            Mathf.Approximately(builtQuad, level.FinestQuad) &&
+            builtRings == level.RingCount)
         {
             if (filter.sharedMesh == mesh) return;
             filter.sharedMesh = mesh;
@@ -116,13 +117,13 @@ public class SeaSurface : MonoBehaviour
             if (Application.isPlaying) Destroy(mesh); else DestroyImmediate(mesh);
         }
 
-        mesh = SeaMeshBuilder.Build(seviye.FinestQuad, seviye.RingCount);
+        mesh = SeaMeshBuilder.Build(level.FinestQuad, level.RingCount);
         mesh.hideFlags = HideFlags.DontSave;
 
         filter.sharedMesh = mesh;
 
-        builtQuad = seviye.FinestQuad;
-        builtRings = seviye.RingCount;
+        builtQuad = level.FinestQuad;
+        builtRings = level.RingCount;
     }
 
     void EnsureMaterial()
@@ -131,15 +132,16 @@ public class SeaSurface : MonoBehaviour
 
         if (surfaceShader == null)
             throw new InvalidOperationException(
-                $"{nameof(SeaSurface)}: {nameof(surfaceShader)} atanmadı.");
+                $"{nameof(SeaSurface)}: {nameof(surfaceShader)} is not assigned.");
 
         if (material == null)
             material = new Material(surfaceShader) { hideFlags = HideFlags.DontSave };
 
         meshRenderer.sharedMaterial = material;
 
-        // GÖLGE YOK. Deniz düz bir yüzey; kendi gölgesini düşürmesi hem
-        // maliyet hem yanlış (dalga gölgesi shader'da, geometriden değil).
+        // NO SHADOWS. The sea is a flat surface; casting its own shadow is
+        // both a cost and wrong (wave shadowing lives in the shader, not in
+        // the geometry).
         meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         meshRenderer.receiveShadows = true;
     }
@@ -151,11 +153,11 @@ public class SeaSurface : MonoBehaviour
 
         if (cam == null) return;
 
-        float adim = SeaQuality.Of(settings.quality).FinestQuad;
+        float step = SeaQuality.Of(settings.quality).FinestQuad;
 
         Vector3 c = cam.position;
-        float sx = Mathf.Floor(c.x / adim) * adim;
-        float sz = Mathf.Floor(c.z / adim) * adim;
+        float sx = Mathf.Floor(c.x / step) * step;
+        float sz = Mathf.Floor(c.z / step) * step;
 
         transform.position = new Vector3(sx, settings.seaLevelY, sz);
         transform.rotation = Quaternion.identity;

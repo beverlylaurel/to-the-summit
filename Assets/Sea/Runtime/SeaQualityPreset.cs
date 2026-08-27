@@ -1,26 +1,27 @@
-// ROL: kalite kademeleri ve her kademenin sayilari. Spec 15.3 tablosu.
-// Cagiran: SeaSimulation, SeaSurface, SeaManager.
+// ROLE: quality tiers and the numbers behind each one. Spec 15.3 table.
+// CALLED BY: SeaSimulation, SeaSurface, SeaManager.
 
 using UnityEngine;
 
 public enum SeaQualityPreset { Low, Medium, High }
 
-/// SPEC 15.3 TABLOSU, TEK YERDE.
+/// THE SPEC 15.3 TABLE, IN ONE PLACE.
 ///
-/// Sayilar iki yerde durursa (bir SeaSimulation'da bir SeaSurface'te) biri
-/// degisip oteki kalir ve mesh ile dalga alani farkli kaliteye gider.
+/// If the numbers lived in two places (one in SeaSimulation, one in
+/// SeaSurface) one of them would change and the other would not, and the
+/// mesh would end up at a different quality than the wave field.
 public static class SeaQuality
 {
     public readonly struct Levels
     {
-        /// FFT izgara boyutu. `SeaConstants.FftSize` bunun UST SINIRI —
-        /// compute'un `numthreads` degeri oradan geliyor ve degismiyor;
-        /// bu deger dokunun boyutu ve donusumun uzunlugu.
+        /// FFT grid size. `SeaConstants.FftSize` is its UPPER BOUND — the
+        /// compute shader's `numthreads` comes from there and never changes;
+        /// this is the texture size and the length of the transform.
         public readonly int FftSize;
         public readonly int FftLog2;
 
-        /// Kac kademe hesaplaniyor. Kullanilmayan kademenin agirligi sifir
-        /// ve dispatch'i hic yapilmiyor.
+        /// How many tiers are computed. The weight of an unused tier is zero
+        /// and its dispatch never happens.
         public readonly int TierCount;
 
         public readonly int RingCount;
@@ -37,32 +38,33 @@ public static class SeaQuality
         }
     }
 
-    /// | Ayar          | Low  | Medium | High |
+    /// | Setting       | Low  | Medium | High |
     /// | FFT           | 128  | 256    | 256  |
-    /// | Kademe        | 2    | 3      | 3    |
-    /// | Halka 0 quad  | 1.0  | 0.5    | 0.25 |
-    /// | Halka         | 6    | 7      | 8    |
+    /// | Tiers         | 2    | 3      | 3    |
+    /// | Ring 0 quad   | 1.0  | 0.5    | 0.25 |
+    /// | Rings         | 6    | 7      | 8    |
     ///
-    /// HALKA SAYISI SPEC TABLOSUNDAN SAPIYOR — ÖLÇÜLDÜ.
+    /// THE RING COUNT DEVIATES FROM THE SPEC TABLE — MEASURED.
     ///
-    /// Spec §15.3 üçü için de 5/7/7 veriyor. Bu projenin mesh'i tek ızgara
-    /// (spec §10.1'in izin verdiği sapma) ve dış yarıçapı
-    /// `64 · quad · (2^halka − 1)`. Tabloyu birebir uygulayınca:
+    /// Spec §15.3 gives 5/7/7. This project's mesh is a single grid (the
+    /// deviation §10.1 allows) and its outer radius is
+    /// `64 · quad · (2^rings − 1)`. Applying the table verbatim gives:
     ///
-    ///   Low  (1.00 m, 5 halka) → 1984 m
-    ///   High (0.25 m, 7 halka) → 2032 m
+    ///   Low  (1.00 m, 5 rings) -> 1984 m
+    ///   High (0.25 m, 7 rings) -> 2032 m
     ///
-    /// İkisi de ufka yetişmiyor; deniz iki kilometrede kesik bir kenarla
-    /// bitiyor (spec §10.6 kontrol 6 tam bunu yakalıyor). Halka sayısı
-    /// yarıçap ~4 km'de kalacak şekilde seçildi:
+    /// Neither reaches the horizon; the sea would end with a cut edge two
+    /// kilometres out (spec §10.6 check 6 catches exactly this). The ring
+    /// count was chosen to keep the radius near 4 km:
     ///
-    ///   Low  (1.00 m, 6 halka) → 4032 m
-    ///   Med  (0.50 m, 7 halka) → 4064 m
-    ///   High (0.25 m, 8 halka) → 4080 m
+    ///   Low  (1.00 m, 6 rings) -> 4032 m
+    ///   Med  (0.50 m, 7 rings) -> 4064 m
+    ///   High (0.25 m, 8 rings) -> 4080 m
     ///
-    /// Üçgen sayısı da spec'in 180k/480k/900k'sına uymuyor: tek ızgarada
-    /// üçgen sayısı yalnız HALKA sayısına bağlı, quad boyuna değil. Quad
-    /// boyu neyin ne kadar yakından çözüldüğünü belirliyor.
+    /// The triangle counts do not match the spec's 180k/480k/900k either: in
+    /// a single grid the triangle count depends only on the RING count, not
+    /// on the quad size. The quad size decides how closely things are
+    /// resolved.
     public static Levels Of(SeaQualityPreset preset)
     {
         switch (preset)
@@ -73,21 +75,21 @@ public static class SeaQuality
         }
     }
 
-    /// Mesh'in dış yarıçapı (m). Halka 0 dolu kare, her halka bir öncekinin
-    /// iki katı quad taşıyor ve kenar başına `SeaMeshBuilder.QuadPerSide`
-    /// quad var.
+    /// Outer radius of the mesh (m). Ring 0 is a solid square, each ring
+    /// carries quads twice the size of the previous one, and there are
+    /// `SeaMeshBuilder.QuadPerSide` quads per side.
     public static float OuterRadius(SeaQualityPreset preset)
     {
         Levels l = Of(preset);
         return (SeaMeshBuilder.QuadPerSide / 2) * l.FinestQuad * ((1 << l.RingCount) - 1);
     }
 
-    /// KEYWORD `multi_compile` ILE ESLESMEK ZORUNDA.
+    /// THE KEYWORD MUST MATCH A `multi_compile`.
     ///
-    /// `Shader.EnableKeyword` ile acilan bir keyword shader'da
-    /// `#pragma multi_compile` olarak tanimli degilse varyant HIC
-    /// derlenmiyor ve `#if defined(...)` sessizce false kaliyor. Kar
-    /// sisteminde uc detay katmani tam bu yuzden hic calismamisti.
+    /// A keyword enabled with `Shader.EnableKeyword` but not declared as
+    /// `#pragma multi_compile` in the shader means the variant is NEVER
+    /// compiled and `#if defined(...)` silently stays false. In the snow
+    /// system three detail layers never ran for exactly this reason.
     public static string Keyword(SeaQualityPreset preset)
     {
         switch (preset)
@@ -103,7 +105,7 @@ public static class SeaQuality
         "_SEA_QUALITY_LOW", "_SEA_QUALITY_MEDIUM", "_SEA_QUALITY_HIGH",
     };
 
-    /// Global keyword kurulur; digerleri kapatilir.
+    /// Enables the global keyword and disables the others.
     public static void Apply(SeaQualityPreset preset)
     {
         string wanted = Keyword(preset);

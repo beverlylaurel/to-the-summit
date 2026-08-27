@@ -1,28 +1,29 @@
-// ROL: dalga alaninin sayisal dogrulamasi. Spec 6.8 ve 7'nin kabul
-// kriterlerini olcuyor.
-// Cagiran: menu — To The Summit/Deniz/Dalga Alanini Sina
+// ROLE: numeric verification of the wave field. Measures the acceptance
+// criteria of spec 6.8 and 7.
+// CALLED BY: menu — To The Summit/Sea/Test Wave Field
 
 using System.Text;
 using UnityEngine;
 using UnityEditor;
 using UnityEngine.Rendering;
 
-/// FFT SESSİZCE YANLIŞ ÇALIŞIR.
+/// AN FFT FAILS SILENTLY.
 ///
-/// RNG Gauss değilse yüzey düzenli desen verir; eşlenik simetri bozuksa
-/// yüzey düz kalır. İkisi de ekranda "biraz tuhaf" görünür ve haftalarca
-/// yanlış yerde aranır. Bu yüzden kabul kriteri **sayı**, göz değil.
+/// If the RNG is not Gaussian the surface shows a regular pattern; if the
+/// conjugate symmetry is broken the surface stays flat. Both look only
+/// "slightly odd" on screen and get hunted in the wrong place for weeks. That
+/// is why the acceptance criterion here is a **number**, not an eye.
 public static class SeaSpectrumTest
 {
-    /// Rüzgârı bilinen bir değere sabitleyen ortam. Hava sisteminden
-    /// gelseydi ölçüm tekrarlanabilir olmazdı.
-    sealed class SabitOrtam : ISeaEnvironmentSource
+    /// An environment that pins the wind to a known value. Coming from the
+    /// weather system the measurement would not be repeatable.
+    sealed class FixedEnvironment : ISeaEnvironmentSource
     {
-        public Vector3 yon = Vector3.right;
-        public float hiz = 8f;
+        public Vector3 direction = Vector3.right;
+        public float speed = 8f;
 
-        public Vector3 WindDirection => yon;
-        public float WindSpeed => hiz;
+        public Vector3 WindDirection => direction;
+        public float WindSpeed => speed;
 
         public Light Sun => null;
         public float SunElevation01 => 0.5f;
@@ -34,274 +35,283 @@ public static class SeaSpectrumTest
         public float PrecipIntensity01 => 0f;
     }
 
-    struct Olcum
+    struct Measurement
     {
-        public float ortalamaH;
+        public float meanH;
         public float rmsH;
-        public float rmsEgim;
-        public float katlanmaOrani;
-        public float enKucukJ;
-        public float ruzgarBandiOrani;
-        public float baskinYon;
+        public float rmsSlope;
+        public float foldFraction;
+        public float minJ;
+        public float windBandFraction;
+        public float dominantAngle;
     }
 
     [MenuItem("To The Summit/Sea/Test Wave Field")]
-    public static void Sina()
+    public static void Run()
     {
-        var ayar = AssetDatabase.LoadAssetAtPath<SeaSettings>(
+        var settings = AssetDatabase.LoadAssetAtPath<SeaSettings>(
             "Assets/Sea/Settings/SeaSettings.asset");
-        var spek = AssetDatabase.LoadAssetAtPath<ComputeShader>(
+        var spectrum = AssetDatabase.LoadAssetAtPath<ComputeShader>(
             "Assets/Sea/Shaders/SeaSpectrum.compute");
         var fft = AssetDatabase.LoadAssetAtPath<ComputeShader>(
             "Assets/Sea/Shaders/SeaFFT.compute");
-        var kopuk = AssetDatabase.LoadAssetAtPath<ComputeShader>(
+        var foam = AssetDatabase.LoadAssetAtPath<ComputeShader>(
             "Assets/Sea/Shaders/SeaFoam.compute");
 
-        if (ayar == null || spek == null || fft == null || kopuk == null)
+        if (settings == null || spectrum == null || fft == null || foam == null)
         {
-            Debug.LogError("Deniz testi: ayar veya compute shader bulunamadı.");
+            Debug.LogError("Sea test: settings or a compute shader was not found.");
             return;
         }
 
-        var ortam = new SabitOrtam();
+        var env = new FixedEnvironment();
 
-        // NESNE PASİF KURULUYOR. Aktifken `AddComponent` `OnEnable`'ı
-        // hemen çalıştırıyor ve `Bind` henüz olmadığı için bileşen kendini
-        // devre dışı bırakıyor.
+        // THE OBJECT IS CREATED INACTIVE. While active, `AddComponent` runs
+        // `OnEnable` immediately and, with no `Bind` yet, the component
+        // disables itself.
         var go = new GameObject("SeaSpectrumTest") { hideFlags = HideFlags.HideAndDontSave };
         go.SetActive(false);
 
         var sim = go.AddComponent<SeaSimulation>();
-        sim.Bind(ayar, ortam, spek, fft, kopuk);
+        sim.Bind(settings, env, spectrum, fft, foam);
 
         go.SetActive(true);
 
-        var rapor = new StringBuilder();
-        rapor.AppendLine("DALGA ALANI ÖLÇÜMÜ");
-        rapor.AppendLine();
+        var report = new StringBuilder();
+        report.AppendLine("WAVE FIELD MEASUREMENT");
+        report.AppendLine();
 
-        int hata = 0;
+        int failures = 0;
 
-        // --- 1. Eşlenik simetri ve enerji, U10 = 8 m/s ---
-        ortam.hiz = 8f;
-        ortam.yon = Vector3.right;
-        sim.Adim(0f);
+        // --- 1. Conjugate symmetry and energy, U10 = 8 m/s ---
+        env.speed = 8f;
+        env.direction = Vector3.right;
+        sim.Step(0f);
 
-        rapor.AppendLine("U10 = 8 m/s, yön = +X");
-        rapor.AppendLine("kademe |  mean(h)  |  rms(h)  | rms(eğim) |  J<0   | rüzgâr bandı");
+        report.AppendLine("U10 = 8 m/s, direction = +X");
+        report.AppendLine("tier |  mean(h)  |  rms(h)  | rms(slope) |  J<0   | wind band");
 
         for (int k = 0; k < SeaConstants.TierCount; k++)
         {
-            Olcum o = Olc(sim, k);
-            rapor.AppendLine($"   {k}   | {o.ortalamaH,9:F6} | {o.rmsH,8:F4} | {o.rmsEgim,9:F4} |" +
-                             $" {o.katlanmaOrani,5:P1} | {o.ruzgarBandiOrani,5:P1}");
+            Measurement m = Measure(sim, k);
+            report.AppendLine($"  {k}  | {m.meanH,9:F6} | {m.rmsH,8:F4} | {m.rmsSlope,10:F4} |" +
+                              $" {m.foldFraction,5:P1} | {m.windBandFraction,5:P1}");
 
-            // Spec §6.8: eşlenik simetri bozuksa ortalama sıfırdan uzaklaşır.
-            if (Mathf.Abs(o.ortalamaH) >= 1e-3f)
+            // Spec §6.8: broken conjugate symmetry drives the mean away from
+            // zero.
+            if (Mathf.Abs(m.meanH) >= 1e-3f)
             {
-                rapor.AppendLine($"  KIRMIZI kademe {k}: |mean(h)| = {Mathf.Abs(o.ortalamaH):E3}" +
-                                 " >= 1e-3. Eşlenik simetri bozuk (spec §6.8).");
-                hata++;
+                report.AppendLine($"  RED tier {k}: |mean(h)| = {Mathf.Abs(m.meanH):E3}" +
+                                  " >= 1e-3. Conjugate symmetry is broken (spec §6.8).");
+                failures++;
             }
 
-            // Spec §7 / plan Faz 3 Adım 3: katlanma oranı beklenen bant.
-            if (o.katlanmaOrani > 0.20f)
+            // Spec §7 / plan Phase 3 Step 3: expected folding band.
+            if (m.foldFraction > 0.20f)
             {
-                rapor.AppendLine($"  KIRMIZI kademe {k}: J<0 oranı %{o.katlanmaOrani * 100f:F1}" +
-                                 " > %20. Choppiness çok yüksek, yüzey düğümlenir.");
-                hata++;
+                report.AppendLine($"  RED tier {k}: J<0 fraction {m.foldFraction * 100f:F1}%" +
+                                  " > 20%. Choppiness is too high, the surface will knot.");
+                failures++;
             }
         }
 
-        rapor.AppendLine();
+        report.AppendLine();
 
-        // --- 2. Rüzgâr şiddeti dalga yüksekliğini artırmalı ---
-        ortam.hiz = 3f; sim.Adim(0f);
-        float rms3 = ToplamRms(sim);
+        // --- 2. Stronger wind must raise the wave height ---
+        env.speed = 3f; sim.Step(0f);
+        float rms3 = TotalRms(sim);
 
-        ortam.hiz = 15f; sim.Adim(0f);
-        float rms15 = ToplamRms(sim);
+        env.speed = 15f; sim.Step(0f);
+        float rms15 = TotalRms(sim);
 
-        // KATLANMA FIRTINADA ÖLÇÜLÜYOR.
+        // FOLDING IS MEASURED IN A STORM.
         //
-        // U10 = 8'de deniz uysal (Hs ≈ 0.7 m) ve J<0 doğal olarak sıfır.
-        // Choppiness'in gerçekten iş yaptığı ancak dik dalgada görülüyor.
-        float katlanma15 = 0f;
-        float enKucukJ15 = float.MaxValue;
+        // At U10 = 8 the sea is gentle (Hs ~ 0.7 m) and J<0 is naturally zero.
+        // Choppiness only shows it is doing work on a steep wave.
+        float fold15 = 0f;
+        float minJ15 = float.MaxValue;
         for (int k = 0; k < SeaConstants.TierCount; k++)
         {
-            Olcum o = Olc(sim, k);
-            katlanma15 = Mathf.Max(katlanma15, o.katlanmaOrani);
-            enKucukJ15 = Mathf.Min(enKucukJ15, o.enKucukJ);
+            Measurement m = Measure(sim, k);
+            fold15 = Mathf.Max(fold15, m.foldFraction);
+            minJ15 = Mathf.Min(minJ15, m.minJ);
         }
 
-        rapor.AppendLine($"rms(h) toplam:  U10=3 → {rms3:F4} m,  U10=15 → {rms15:F4} m," +
-                         $"  oran {rms15 / Mathf.Max(rms3, 1e-6f):F2}×");
+        report.AppendLine($"total rms(h):  U10=3 -> {rms3:F4} m,  U10=15 -> {rms15:F4} m," +
+                          $"  ratio {rms15 / Mathf.Max(rms3, 1e-6f):F2}x");
 
-        rapor.AppendLine($"U10=15'te en yüksek J<0 oranı: %{katlanma15 * 100f:F2}," +
-                         $" en küçük J = {enKucukJ15:F3}");
+        report.AppendLine($"at U10=15 the highest J<0 fraction: {fold15 * 100f:F2}%," +
+                          $" min(J) = {minJ15:F3}");
 
-        // ÖLÇÜT `J < 0` DEĞİL, `min(J) < 1`.
+        // THE CRITERION IS `min(J) < 1`, NOT `J < 0`.
         //
-        // Plan Faz 3 "J<0 oranı %0 ise choppiness etkisizdir" diyordu; o
-        // ölçüt açık okyanus için doğru ama bu deniz 12 km fetch'li ve
-        // U10=15'te bile Hs ≈ 1.4 m. Ölçüldü: min(J) = 0.568 — zincir
-        // çalışıyor, yüzey gerçekten kesiliyor, sadece katlanacak kadar
-        // dikleşmiyor. Displacement bağlı olmasaydı min(J) tam 1.000
-        // olurdu; ayırt eden sayı bu.
+        // Plan Phase 3 said "a J<0 fraction of 0% means choppiness is
+        // ineffective"; that criterion is right for the open ocean but this
+        // sea has a 12 km fetch and even at U10=15 Hs is about 1.4 m.
+        // Measured: min(J) = 0.568 — the chain works, the surface really is
+        // being sheared, it just does not steepen enough to fold. Were the
+        // displacement not connected min(J) would be exactly 1.000; that is
+        // the number that separates the two cases.
         //
-        // Sonuç: açık denizde beyaz köpük bu havada seyrek. Kıyı köpüğü
-        // (spec §13.3) baskın kaynak olacak.
-        if (enKucukJ15 > 0.9f)
+        // Consequence: whitecaps are rare in this weather on the open sea.
+        // Shore foam (spec §13.3) will be the dominant source.
+        if (minJ15 > 0.9f)
         {
-            rapor.AppendLine($"  KIRMIZI: fırtınada min(J) = {enKucukJ15:F3} > 0.9." +
-                             " Displacement türevleri Jacobian'a bağlı değil (spec §7).");
-            hata++;
+            report.AppendLine($"  RED: in a storm min(J) = {minJ15:F3} > 0.9." +
+                              " Displacement derivatives are not feeding the Jacobian" +
+                              " (spec §7).");
+            failures++;
         }
 
         if (rms15 <= rms3 * 1.5f)
         {
-            rapor.AppendLine("  KIRMIZI: rüzgâr beş katına çıktı, dalga yüksekliği" +
-                             " 1.5 kat bile artmadı. Spektrum rüzgâra bağlı değil.");
-            hata++;
+            report.AppendLine("  RED: the wind went up fivefold and the wave height did" +
+                              " not even grow 1.5x. The spectrum is not tied to the wind.");
+            failures++;
         }
 
-        // --- 3. Rüzgâr yönü dalga yönünü çevirmeli ---
-        ortam.hiz = 8f;
-        ortam.yon = Vector3.right;  sim.Adim(0f);
-        float yonX = Olc(sim, 1).baskinYon;
+        // --- 3. A change of wind direction must turn the waves ---
+        env.speed = 8f;
+        env.direction = Vector3.right;   sim.Step(0f);
+        float angleX = Measure(sim, 1).dominantAngle;
 
-        ortam.yon = Vector3.forward; sim.Adim(0f);
-        float yonZ = Olc(sim, 1).baskinYon;
+        env.direction = Vector3.forward; sim.Step(0f);
+        float angleZ = Measure(sim, 1).dominantAngle;
 
-        float donme = Mathf.Abs(Mathf.DeltaAngle(yonX * Mathf.Rad2Deg, yonZ * Mathf.Rad2Deg));
-        rapor.AppendLine($"baskın eğim yönü: +X rüzgârda {yonX * Mathf.Rad2Deg,7:F1}°," +
-                         $" +Z rüzgârda {yonZ * Mathf.Rad2Deg,7:F1}°, fark {donme:F1}°");
+        float turned = Mathf.Abs(Mathf.DeltaAngle(angleX * Mathf.Rad2Deg, angleZ * Mathf.Rad2Deg));
+        report.AppendLine($"dominant slope direction: {angleX * Mathf.Rad2Deg,7:F1}° with +X wind," +
+                          $" {angleZ * Mathf.Rad2Deg,7:F1}° with +Z wind, difference {turned:F1}°");
 
-        if (donme < 45f)
+        if (turned < 45f)
         {
-            rapor.AppendLine("  KIRMIZI: rüzgâr 90° döndü, dalga yönü 45°'den az döndü." +
-                             " Yönsel yayılma rüzgâra bağlı değil.");
-            hata++;
+            report.AppendLine("  RED: the wind turned 90° and the wave direction turned" +
+                              " less than 45°. Directional spreading is not tied to the wind.");
+            failures++;
         }
 
-        // --- 4. Swell yönsel yoğunlaşmayı artırmalı ---
-        ortam.yon = Vector3.right;
+        // --- 4. Swell must increase directional concentration ---
+        env.direction = Vector3.right;
 
-        float eskiSwell = ayar.swell;
-        ayar.swell = 0f;    sim.Adim(0f); float bant0 = Olc(sim, 1).ruzgarBandiOrani;
-        ayar.swell = 1f;    sim.Adim(0f); float bant1 = Olc(sim, 1).ruzgarBandiOrani;
-        ayar.swell = eskiSwell;
+        float previousSwell = settings.swell;
+        settings.swell = 0f; sim.Step(0f); float band0 = Measure(sim, 1).windBandFraction;
+        settings.swell = 1f; sim.Step(0f); float band1 = Measure(sim, 1).windBandFraction;
+        settings.swell = previousSwell;
 
-        rapor.AppendLine($"rüzgâr bandı (±30°) enerji payı: swell=0 → %{bant0 * 100f:F1}," +
-                         $" swell=1 → %{bant1 * 100f:F1}");
+        report.AppendLine($"energy share in the wind band (±30°): swell=0 -> {band0 * 100f:F1}%," +
+                          $" swell=1 -> {band1 * 100f:F1}%");
 
-        if (bant1 <= bant0 + 0.02f)
+        if (band1 <= band0 + 0.02f)
         {
-            rapor.AppendLine("  KIRMIZI: swell yönsel yoğunlaşmayı artırmadı." +
-                             " Paralel dalga trenleri oluşmaz.");
-            hata++;
+            report.AppendLine("  RED: swell did not increase directional concentration." +
+                              " Parallel wave trains will not form.");
+            failures++;
         }
 
         Object.DestroyImmediate(go);
 
-        rapor.AppendLine();
-        rapor.AppendLine(hata == 0 ? "SONUÇ: geçti." : $"SONUÇ: {hata} kırmızı.");
+        report.AppendLine();
+        report.AppendLine(failures == 0 ? "RESULT: passed." : $"RESULT: {failures} red.");
 
-        if (hata == 0) Debug.Log(rapor.ToString());
-        else Debug.LogError(rapor.ToString());
+        if (failures == 0) Debug.Log(report.ToString());
+        else Debug.LogError(report.ToString());
     }
 
-    /// Tex2DArray dilimini CPU'ya indirir. `RGBAFloat` isteniyor: yarım
-    /// hassasiyet ölçümün kendi gürültüsü olurdu.
-    static Color[] Oku(RenderTexture rt, int dilim, int N)
+    /// Reads one Tex2DArray slice back to the CPU. `RGBAFloat` is requested:
+    /// half precision would be noise of the measurement's own making.
+    static Color[] Read(RenderTexture rt, int slice, int n)
     {
-        var istek = AsyncGPUReadback.Request(rt, 0, 0, N, 0, N, dilim, 1,
-                                             TextureFormat.RGBAFloat);
-        istek.WaitForCompletion();
+        var request = AsyncGPUReadback.Request(rt, 0, 0, n, 0, n, slice, 1,
+                                               TextureFormat.RGBAFloat);
+        request.WaitForCompletion();
 
-        if (istek.hasError)
+        if (request.hasError)
             throw new System.InvalidOperationException(
-                "Deniz testi: GPU okuması başarısız.");
+                "Sea test: the GPU readback failed.");
 
-        return istek.GetData<Color>().ToArray();
+        return request.GetData<Color>().ToArray();
     }
 
-    static float ToplamRms(SeaSimulation sim)
+    static float TotalRms(SeaSimulation sim)
     {
-        float kare = 0f;
+        float sumSquares = 0f;
         for (int k = 0; k < SeaConstants.TierCount; k++)
         {
-            float r = Olc(sim, k).rmsH;
-            kare += r * r;
+            float r = Measure(sim, k).rmsH;
+            sumSquares += r * r;
         }
-        return Mathf.Sqrt(kare);
+        return Mathf.Sqrt(sumSquares);
     }
 
-    /// Bir kademeyi CPU'ya indirip ölçer.
+    /// Reads one tier back to the CPU and measures it.
     ///
-    /// `Graphics.CopyTexture` + `GetPixels` KULLANILMIYOR. O ikisi farklı
-    /// belleği konuşuyor: kopya GPU tarafını günceller, `GetPixels` CPU
-    /// tarafını okur. Sonuç sessizce sabit çıkıyor — ilk ölçümde bütün
-    /// kademeler aynı -23.20 değerini verdi ve bu shader hatası sanıldı.
-    static Olcum Olc(SeaSimulation sim, int kademe)
+    /// `Graphics.CopyTexture` + `GetPixels` IS NOT USED. Those two speak to
+    /// different memory: the copy updates the GPU side, `GetPixels` reads the
+    /// CPU side. The result comes out silently constant — in the first
+    /// measurement all tiers returned the same -23.20 and that was mistaken
+    /// for a shader bug.
+    ///
+    /// The size comes from the TEXTURE, not from `SeaConstants.FftSize`: on
+    /// the Low preset the running FFT is 128 and a readback of 256 would
+    /// request more than the texture holds.
+    static Measurement Measure(SeaSimulation sim, int tier)
     {
-        int N = SeaConstants.FftSize;
+        int n = sim.Displacement.width;
 
-        Color[] d = Oku(sim.Displacement, kademe, N);
-        Color[] e = Oku(sim.Derivatives, kademe, N);
+        Color[] d = Read(sim.Displacement, tier, n);
+        Color[] e = Read(sim.Derivatives, tier, n);
 
-        double toplamH = 0, kareH = 0, kareEgim = 0;
-        int katlanan = 0;
-        float enKucukJ = float.MaxValue;
+        double sumH = 0, sumH2 = 0, sumSlope2 = 0;
+        int folded = 0;
+        float minJ = float.MaxValue;
 
-        // BASKIN YÖN KOVARYANSTAN, ORTALAMADAN DEĞİL.
+        // THE DOMINANT DIRECTION COMES FROM THE COVARIANCE, NOT THE MEAN.
         //
-        // Dalga eğimi işaret bakımından simetrik: tepe kadar çukur var, o
-        // yüzden sx'in ortalaması rüzgâr ne olursa olsun sıfıra gidiyor.
-        // Yön ancak eğim kovaryansının ana ekseninden çıkıyor.
+        // Wave slope is symmetric in sign: there is as much trough as crest,
+        // so the mean of sx goes to zero whatever the wind does. The direction
+        // only falls out of the principal axis of the slope covariance.
         double Sxx = 0, Szz = 0, Sxz = 0;
-        double bantIci = 0, bantToplam = 0;
+        double inBand = 0, bandTotal = 0;
 
         for (int i = 0; i < d.Length; i++)
         {
             float h = d[i].g;
-            toplamH += h;
-            kareH += (double)h * h;
+            sumH += h;
+            sumH2 += (double)h * h;
 
-            if (d[i].a < 0f) katlanan++;
-            enKucukJ = Mathf.Min(enKucukJ, d[i].a);
+            if (d[i].a < 0f) folded++;
+            minJ = Mathf.Min(minJ, d[i].a);
 
             float sx = e[i].r;
             float sz = e[i].g;
-            double enerji = (double)sx * sx + (double)sz * sz;
-            kareEgim += enerji;
+            double energy = (double)sx * sx + (double)sz * sz;
+            sumSlope2 += energy;
 
             Sxx += (double)sx * sx;
             Szz += (double)sz * sz;
             Sxz += (double)sx * sz;
 
-            float uzunluk = Mathf.Sqrt((float)enerji);
-            if (uzunluk > 1e-5f)
+            float length = Mathf.Sqrt((float)energy);
+            if (length > 1e-5f)
             {
-                bantToplam += enerji;
+                bandTotal += energy;
 
-                // Rüzgâr +X iken bant |theta| < 30°; yön testinde bu ölçüm
-                // kullanılmıyor, swell testinde rüzgâr hep +X.
-                float cos = Mathf.Abs(sx) / uzunluk;
-                if (cos > 0.8660254f) bantIci += enerji;
+                // With the wind on +X the band is |theta| < 30°; the direction
+                // test does not use this measure, and in the swell test the
+                // wind is always +X.
+                float cos = Mathf.Abs(sx) / length;
+                if (cos > 0.8660254f) inBand += energy;
             }
         }
 
-        return new Olcum
+        return new Measurement
         {
-            ortalamaH = (float)(toplamH / d.Length),
-            rmsH = Mathf.Sqrt((float)(kareH / d.Length)),
-            rmsEgim = Mathf.Sqrt((float)(kareEgim / d.Length)),
-            katlanmaOrani = katlanan / (float)d.Length,
-            enKucukJ = enKucukJ,
-            ruzgarBandiOrani = bantToplam > 0 ? (float)(bantIci / bantToplam) : 0f,
-            baskinYon = 0.5f * Mathf.Atan2((float)(2.0 * Sxz), (float)(Sxx - Szz)),
+            meanH = (float)(sumH / d.Length),
+            rmsH = Mathf.Sqrt((float)(sumH2 / d.Length)),
+            rmsSlope = Mathf.Sqrt((float)(sumSlope2 / d.Length)),
+            foldFraction = folded / (float)d.Length,
+            minJ = minJ,
+            windBandFraction = bandTotal > 0 ? (float)(inBand / bandTotal) : 0f,
+            dominantAngle = 0.5f * Mathf.Atan2((float)(2.0 * Sxz), (float)(Sxx - Szz)),
         };
     }
 }

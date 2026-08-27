@@ -1,25 +1,26 @@
-// ROL: deniz sisteminin yasam dongusu. Ortam degerlerini global olarak
-// yayinlar, bathymetry'yi bake eder, SeaRuntimeState'i doldurur.
-// Cagiran: yok — kendi basina calisiyor, bagimliliklari Inspector'dan.
+// ROLE: lifecycle of the sea system. Publishes environment values as
+// globals, bakes the bathymetry, fills in SeaRuntimeState.
+// CALLED BY: nobody — runs on its own, dependencies come from the Inspector.
 
 using System;
 using UnityEngine;
 
-/// DENİZ SÜRMEZ, OKUR.
+/// THE SEA DOES NOT DRIVE, IT READS.
 ///
-/// Bu sınıf içinde `RenderSettings`, `VolumeProfile` veya `Light.intensity`
-/// yazan tek bir satır yok ve olmayacak (spec §3.3, Faz 1 kabul kriteri).
-/// Yazdığı tek şey `Shader.SetGlobal*` ve `SeaRuntimeState`.
+/// There is not, and will not be, a single line in this class that writes
+/// `RenderSettings`, `VolumeProfile` or `Light.intensity` (spec §3.3, Phase 1
+/// acceptance criterion). All it writes is `Shader.SetGlobal*` and
+/// `SeaRuntimeState`.
 [ExecuteAlways]
 [DisallowMultipleComponent]
 public class SeaManager : MonoBehaviour
 {
     [SerializeField] SeaSettings settings;
 
-    [Tooltip("Ortam kaynağı. Bulunamazsa sistem hata basıp devre dışı kalır.")]
+    [Tooltip("Environment source. Without it the system logs an error and disables itself.")]
     [SerializeField] SeaEnvironmentBridge environment;
 
-    [Tooltip("Su derinliği bu araziden çıkarılıyor.")]
+    [Tooltip("Water depth is derived from this terrain.")]
     [SerializeField] Terrain terrain;
 
     ISeaEnvironmentSource env;
@@ -42,26 +43,26 @@ public class SeaManager : MonoBehaviour
 
         if (env == null)
         {
-            // KENDİ VARSAYILANINI UYDURMUYOR (spec §3.2).
-            Debug.LogError($"{nameof(SeaManager)}: {nameof(environment)} atanmadı. " +
-                           "Deniz sistemi devre dışı.");
+            // IT DOES NOT INVENT ITS OWN DEFAULT (spec §3.2).
+            Debug.LogError($"{nameof(SeaManager)}: {nameof(environment)} is not assigned. " +
+                           "Sea system disabled.");
             SeaRuntimeState.Active = false;
             enabled = false;
             return;
         }
 
         if (settings == null)
-            throw new InvalidOperationException($"{nameof(SeaManager)}: {nameof(settings)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(SeaManager)}: {nameof(settings)} is not assigned.");
 
         if (terrain == null)
-            throw new InvalidOperationException($"{nameof(SeaManager)}: {nameof(terrain)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(SeaManager)}: {nameof(terrain)} is not assigned.");
 
-        // ÇOKLU TERRAIN DESTEKLENMİYOR (spec §9, §17).
-        var hepsi = FindObjectsByType<Terrain>(FindObjectsSortMode.None);
-        if (hepsi.Length > 1)
+        // MULTIPLE TERRAINS ARE NOT SUPPORTED (spec §9, §17).
+        var all = FindObjectsByType<Terrain>(FindObjectsSortMode.None);
+        if (all.Length > 1)
         {
-            Debug.LogError($"{nameof(SeaManager)}: sahnede {hepsi.Length} Terrain var. " +
-                           "Deniz sistemi tek terrain destekliyor. Devre dışı.");
+            Debug.LogError($"{nameof(SeaManager)}: the scene has {all.Length} Terrains. " +
+                           "The sea system supports a single terrain. Disabled.");
             SeaRuntimeState.Active = false;
             enabled = false;
             return;
@@ -74,10 +75,10 @@ public class SeaManager : MonoBehaviour
     void OnDisable()
     {
         SeaRuntimeState.Active = false;
-        BathymetryBirak();
+        ReleaseBathymetry();
     }
 
-    void BathymetryBirak()
+    void ReleaseBathymetry()
     {
         if (bathymetry == null) return;
 
@@ -86,10 +87,10 @@ public class SeaManager : MonoBehaviour
         bakedSeaLevel = float.NaN;
     }
 
-    /// Arazi veya deniz seviyesi değişirse çağrılır (spec §9).
+    /// Called when the terrain or the sea level changes (spec §9).
     public void RefreshBathymetry()
     {
-        BathymetryBirak();
+        ReleaseBathymetry();
 
         bathymetry = SeaBathymetry.Bake(terrain, settings.seaLevelY);
         bakedSeaLevel = settings.seaLevelY;
@@ -99,27 +100,28 @@ public class SeaManager : MonoBehaviour
     {
         if (env == null || settings == null || terrain == null) return;
 
-        // Deniz seviyesi Inspector'dan değişirse derinlik alanı bayat kalır.
+        // If the sea level is changed from the Inspector the depth field goes
+        // stale.
         if (!Mathf.Approximately(bakedSeaLevel, settings.seaLevelY))
             RefreshBathymetry();
 
-        OrtamiYayinla();
-        BathymetryYayinla();
-        AyarlariYayinla();
-        DurumuGuncelle();
+        PublishEnvironment();
+        PublishBathymetry();
+        PublishSettings();
+        UpdateState();
     }
 
-    /// RÜZGÂR SPEKTRUMUN ANA GİRDİSİ (spec §3.4).
+    /// WIND IS THE MAIN INPUT OF THE SPECTRUM (spec §3.4).
     ///
-    /// Deniz kendi rüzgâr noise'unu veya gust simülasyonunu KURMUYOR;
-    /// köprüden geleni yayınlıyor.
-    void OrtamiYayinla()
+    /// The sea DOES NOT build its own wind noise or gust simulation; it
+    /// publishes what comes over the bridge.
+    void PublishEnvironment()
     {
         Vector3 w = env.WindDirection * env.WindSpeed;
         Shader.SetGlobalVector(SeaShaderIDs.SeaWindWS, new Vector4(w.x, w.z, 0f, 0f));
 
-        // DÖNGÜ KUANTİZE ZAMAN. `Time.time` doğrudan verilseydi uzun
-        // oturumda float hassasiyeti kaybolurdu (spec §6.5).
+        // LOOP-QUANTIZED TIME. Handing over `Time.time` directly would lose
+        // float precision over a long session (spec §6.5).
         float t = Application.isPlaying ? Time.time : 0f;
         Shader.SetGlobalFloat(SeaShaderIDs.SeaTime, Mathf.Repeat(t, settings.loopPeriod));
 
@@ -128,14 +130,14 @@ public class SeaManager : MonoBehaviour
         Shader.SetGlobalColor(SeaShaderIDs.HorizonColor, env.HorizonColor);
         Shader.SetGlobalFloat(SeaShaderIDs.CloudCover01, env.CloudCover01);
 
-        // Kar yağarken deniz yüzeyine köpük eklenmiyor — yalnız yağmur
-        // (spec §13.5).
-        float yagmur = env.PrecipKind == SeaPrecipitationKind.Rain
-                     ? env.PrecipIntensity01 : 0f;
-        Shader.SetGlobalFloat(SeaShaderIDs.PrecipIntensity01, yagmur);
+        // Falling snow does not add foam to the sea surface — only rain
+        // does (spec §13.5).
+        float rain = env.PrecipKind == SeaPrecipitationKind.Rain
+                   ? env.PrecipIntensity01 : 0f;
+        Shader.SetGlobalFloat(SeaShaderIDs.PrecipIntensity01, rain);
     }
 
-    void BathymetryYayinla()
+    void PublishBathymetry()
     {
         if (bathymetry == null) return;
 
@@ -150,22 +152,22 @@ public class SeaManager : MonoBehaviour
         Shader.SetGlobalFloat(SeaShaderIDs.SeaLevelY, settings.seaLevelY);
     }
 
-    void AyarlariYayinla()
+    void PublishSettings()
     {
-        SeaQuality.Levels seviye = SeaQuality.Of(settings.quality);
+        SeaQuality.Levels level = SeaQuality.Of(settings.quality);
         SeaQuality.Apply(settings.quality);
 
-        // KULLANILMAYAN KADEMENİN AĞIRLIĞI SIFIR.
+        // THE WEIGHT OF AN UNUSED TIER IS ZERO.
         //
-        // Low'da üçüncü kademe hiç hesaplanmıyor; ağırlığı sıfırlanmazsa
-        // yüzey o kademenin BAYAT dokusunu okur ve donmuş bir çırpıntı
-        // katmanı görünür.
-        Vector3 agirlik = settings.tierWeights;
-        if (seviye.TierCount < 3) agirlik.z = 0f;
-        if (seviye.TierCount < 2) agirlik.y = 0f;
+        // On Low the third tier is never computed; without zeroing its weight
+        // the surface would read that tier's STALE texture and a frozen chop
+        // layer would show.
+        Vector3 weight = settings.tierWeights;
+        if (level.TierCount < 3) weight.z = 0f;
+        if (level.TierCount < 2) weight.y = 0f;
 
         Shader.SetGlobalVector(SeaShaderIDs.PatchSizes, settings.patchSizes);
-        Shader.SetGlobalVector(SeaShaderIDs.TierWeights, agirlik);
+        Shader.SetGlobalVector(SeaShaderIDs.TierWeights, weight);
         Shader.SetGlobalVector(SeaShaderIDs.ChoppinessPerTier, settings.choppinessPerTier);
 
         Shader.SetGlobalFloat(SeaShaderIDs.SpectrumDepth, settings.spectrumDepth);
@@ -191,15 +193,15 @@ public class SeaManager : MonoBehaviour
         Shader.SetGlobalFloat(SeaShaderIDs.FoamBreakupTiling, settings.foamBreakupTiling);
     }
 
-    /// TEPE PERİYODU SPEKTRUMDAN TÜRÜYOR.
+    /// THE PEAK PERIOD FOLLOWS FROM THE SPECTRUM.
     ///
-    /// JONSWAP tepe frekansı `ωp = 22 (g² / (U₁₀ F))^(1/3)` ve `Tp = 2π/ωp`.
-    /// [KAYNAK: Horvath 2015 / JONSWAP]
+    /// JONSWAP peak frequency `wp = 22 (g² / (U10 F))^(1/3)` and `Tp = 2pi/wp`.
+    /// [SOURCE: Horvath 2015 / JONSWAP]
     ///
-    /// Belirgin dalga yüksekliği Hs, fetch-sınırlı büyümeden:
-    /// `Hs ≈ 0.0016 (g F / U₁₀²)^(1/2) U₁₀² / g`.
-    /// [KAYNAK: JONSWAP fetch-sınırlı büyüme bağıntısı]
-    void DurumuGuncelle()
+    /// Significant wave height Hs, from fetch-limited growth:
+    /// `Hs ~ 0.0016 (g F / U10²)^(1/2) U10² / g`.
+    /// [SOURCE: JONSWAP fetch-limited growth relation]
+    void UpdateState()
     {
         float u = Mathf.Max(env.WindSpeed, 0.1f);
         float g = SeaConstants.G;
@@ -208,17 +210,17 @@ public class SeaManager : MonoBehaviour
         float omegaP = 22f * Mathf.Pow(g * g / (u * f), 1f / 3f);
         SeaRuntimeState.PeakPeriod = SeaConstants.TwoPi / Mathf.Max(omegaP, 1e-4f);
 
-        float boyutsuzFetch = g * f / (u * u);
+        float dimensionlessFetch = g * f / (u * u);
         SeaRuntimeState.SignificantWaveHeight =
-            0.0016f * Mathf.Sqrt(boyutsuzFetch) * u * u / g;
+            0.0016f * Mathf.Sqrt(dimensionlessFetch) * u * u / g;
 
         Shader.SetGlobalFloat(SeaShaderIDs.PeakPeriod, SeaRuntimeState.PeakPeriod);
 
-        // Kabarma fazı: kırılan dalga kıyıya ilerleyip geri çekiliyor
-        // (spec §8.5). Periyot spektrumun tepe periyoduna bağlı.
+        // Run-up phase: a breaking wave advances up the shore and withdraws
+        // (spec §8.5). Its period follows the spectrum's peak period.
         float t = Application.isPlaying ? Time.time : 0f;
-        float faz = t * (SeaConstants.TwoPi / Mathf.Max(SeaRuntimeState.PeakPeriod, 0.1f));
-        float runup = Mathf.Sin(faz) * 0.5f + 0.5f;
+        float phase = t * (SeaConstants.TwoPi / Mathf.Max(SeaRuntimeState.PeakPeriod, 0.1f));
+        float runup = Mathf.Sin(phase) * 0.5f + 0.5f;
 
         SeaRuntimeState.ShoreFoamIntensity01 = runup;
         Shader.SetGlobalFloat(SeaShaderIDs.ShoreFoamPhase, runup);

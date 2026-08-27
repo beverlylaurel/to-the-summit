@@ -1,16 +1,16 @@
-// ROL: dalga alanini uretir. Spektrum ve IFFT compute'larini surer, sonucu
-// global doku olarak yayinlar.
-// Cagiran: yok — kendi basina calisiyor, bagimliliklari Inspector'dan.
+// ROLE: produces the wave field. Drives the spectrum and IFFT compute
+// shaders and publishes the result as global textures.
+// CALLED BY: nobody — runs on its own, dependencies come from the Inspector.
 
 using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-/// DALGA ALANI HER FRAME, SPEKTRUM SADECE RÜZGÂR DEĞİŞİNCE.
+/// THE WAVE FIELD EVERY FRAME, THE SPECTRUM ONLY WHEN THE WIND CHANGES.
 ///
-/// `KInitialSpectrum` pahalı ve rüzgâr sabitken sonucu değişmiyor; her
-/// frame çalıştırmak boşuna (spec §15.2). Eşikler orada verildi:
-/// hız 0.25 m/s, yön 3°.
+/// `KInitialSpectrum` is expensive and its result does not change while the
+/// wind is steady; running it every frame is waste (spec §15.2). The
+/// thresholds come from there: 0.25 m/s of speed, 3° of direction.
 [ExecuteAlways]
 [DisallowMultipleComponent]
 public class SeaSimulation : MonoBehaviour
@@ -21,7 +21,7 @@ public class SeaSimulation : MonoBehaviour
     [SerializeField] ComputeShader fftShader;
     [SerializeField] ComputeShader foamShader;
 
-    [Tooltip("Deniz görünmüyorsa hiçbir compute çalışmıyor (spec §15.2).")]
+    [Tooltip("When the sea is not visible no compute runs at all (spec §15.2).")]
     [SerializeField] SeaSurface surface;
 
     ISeaEnvironmentSource env;
@@ -32,8 +32,8 @@ public class SeaSimulation : MonoBehaviour
     RenderTexture displacement;
     RenderTexture derivatives;
 
-    // KOPUK PING-PONG. Sonum onceki karenin degerini okuyor; tek dokuya
-    // hem okuyup hem yazmak yaris yaratirdi.
+    // FOAM PING-PONG. The decay reads the previous frame's value; reading and
+    // writing a single texture would create a race.
     RenderTexture foamA;
     RenderTexture foamB;
 
@@ -46,9 +46,13 @@ public class SeaSimulation : MonoBehaviour
 
     float lastWindSpeed = float.NaN;
     Vector3 lastWindDir = Vector3.zero;
-    Vector4 lastSpectrumAyar = Vector4.zero;
+    Vector4 lastSpectrumSignature = Vector4.zero;
 
-    /// Faz 2 sayısal doğrulaması bu dokuyu okuyor.
+    int builtFftSize = -1;
+    float lastFoamTime = float.NaN;
+    SeaProfiler profiler;
+
+    /// The Phase 2 numeric verification reads these textures.
     public RenderTexture Displacement => displacement;
     public RenderTexture Derivatives => derivatives;
     public RenderTexture H0 => h0;
@@ -63,12 +67,12 @@ public class SeaSimulation : MonoBehaviour
         Bind(source, (ISeaEnvironmentSource)bridge, spectrum, fft, foam);
     }
 
-    /// ARAYÜZ ÜZERİNDEN BAĞLAMA.
+    /// BINDING THROUGH THE INTERFACE.
     ///
-    /// `ISeaEnvironmentSource` tam da bunun için var: rüzgârı bilinen bir
-    /// değere sabitleyip dalga alanını ölçebilmek. Sayısal doğrulama
-    /// (`SeaSpectrumTest`) bu yolu kullanıyor — rüzgâr hava sisteminden
-    /// gelseydi ölçüm tekrarlanabilir olmazdı.
+    /// `ISeaEnvironmentSource` exists exactly for this: pinning the wind to a
+    /// known value so the wave field can be measured. The numeric
+    /// verification (`SeaSpectrumTest`) uses this path — if the wind came
+    /// from the weather system the measurement would not be repeatable.
     public void Bind(SeaSettings source, ISeaEnvironmentSource bridge,
                      ComputeShader spectrum, ComputeShader fft, ComputeShader foam)
     {
@@ -81,32 +85,32 @@ public class SeaSimulation : MonoBehaviour
 
     void OnEnable()
     {
-        // `Bind` arayüz üzerinden çağrıldıysa serileştirilmiş köprü boş
-        // olabilir; o durumda üzerine yazılmıyor.
+        // If `Bind` was called through the interface the serialized bridge
+        // may be empty; in that case it is not overwritten.
         if (env == null) env = environment;
 
         if (env == null)
         {
-            Debug.LogError($"{nameof(SeaSimulation)}: {nameof(environment)} atanmadı. " +
-                           "Dalga alanı üretilmiyor.");
+            Debug.LogError($"{nameof(SeaSimulation)}: {nameof(environment)} is not assigned. " +
+                           "The wave field is not produced.");
             enabled = false;
             return;
         }
 
         if (settings == null)
-            throw new InvalidOperationException($"{nameof(SeaSimulation)}: {nameof(settings)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(SeaSimulation)}: {nameof(settings)} is not assigned.");
         if (spectrumShader == null)
-            throw new InvalidOperationException($"{nameof(SeaSimulation)}: {nameof(spectrumShader)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(SeaSimulation)}: {nameof(spectrumShader)} is not assigned.");
         if (fftShader == null)
-            throw new InvalidOperationException($"{nameof(SeaSimulation)}: {nameof(fftShader)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(SeaSimulation)}: {nameof(fftShader)} is not assigned.");
         if (foamShader == null)
-            throw new InvalidOperationException($"{nameof(SeaSimulation)}: {nameof(foamShader)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(SeaSimulation)}: {nameof(foamShader)} is not assigned.");
 
-        // KERNEL VARLIĞI AÇIKÇA SINANIYOR.
+        // KERNEL EXISTENCE IS CHECKED EXPLICITLY.
         //
-        // `GetComputeShaderMessages` boş dönerken `FindKernel` yine de
-        // patlayabiliyor — kar sisteminde bir tur bu yüzden yandı. Hata
-        // yutulmuyor, doğrudan fırlıyor.
+        // `GetComputeShaderMessages` can come back empty while `FindKernel`
+        // still throws — the snow system burned a round on that. The error is
+        // not swallowed; it is thrown straight away.
         kInitial = spectrumShader.FindKernel("KInitialSpectrum");
         kTime = spectrumShader.FindKernel("KTimeSpectrum");
         kFftH = fftShader.FindKernel("KIFFTHorizontal");
@@ -114,31 +118,31 @@ public class SeaSimulation : MonoBehaviour
         kAssemble = fftShader.FindKernel("KAssemble");
         kFoam = foamShader.FindKernel("KFoam");
 
-        DokulariKur();
+        CreateTextures();
 
-        // Rüzgâr eşiği ilk karede kesin tetiklensin.
+        // Make sure the wind threshold fires on the very first frame.
         lastWindSpeed = float.NaN;
     }
 
     void OnDisable()
     {
-        DokulariBirak();
+        ReleaseTextures();
     }
 
-    /// `GetTemporary` KULLANILMIYOR (spec §15.2). Dokular bir kez kuruluyor,
-    /// `OnDisable`'da bırakılıyor.
-    RenderTexture Kur(string ad, RenderTextureFormat format)
+    /// `GetTemporary` IS NOT USED (spec §15.2). Textures are created once and
+    /// released in `OnDisable`.
+    RenderTexture Create(string label, RenderTextureFormat format)
     {
         int n = SeaQuality.Of(settings.quality).FftSize;
 
         var rt = new RenderTexture(n, n, 0, format)
         {
-            name = ad,
+            name = label,
             enableRandomWrite = true,
             filterMode = FilterMode.Bilinear,
 
-            // ZORUNLU: mesh yüzeyi dünya koordinatından örneklüyor ve yama
-            // sınırını geçince doku tekrar etmeli (spec §10.4).
+            // MANDATORY: the mesh surface samples from world coordinates and
+            // the texture must repeat past the patch boundary (spec §10.4).
             wrapMode = TextureWrapMode.Repeat,
 
             useMipMap = false,
@@ -151,57 +155,54 @@ public class SeaSimulation : MonoBehaviour
         return rt;
     }
 
-    int builtFftSize = -1;
-    SeaProfiler profiler;
-
-    void DokulariKur()
+    void CreateTextures()
     {
-        DokulariBirak();
+        ReleaseTextures();
         builtFftSize = SeaQuality.Of(settings.quality).FftSize;
 
-        // Yarım hassasiyet FFT için yeterli; `Float` iki kat bant genişliği
-        // ve görsel fark yok (spec §6.8).
-        h0 = Kur("Sea_H0", RenderTextureFormat.ARGBHalf);
-        spectrumHt = Kur("Sea_SpectrumHt", RenderTextureFormat.ARGBHalf);
-        spectrumSlope = Kur("Sea_SpectrumSlope", RenderTextureFormat.ARGBHalf);
-        displacement = Kur("Sea_Displacement", RenderTextureFormat.ARGBHalf);
-        derivatives = Kur("Sea_Derivatives", RenderTextureFormat.ARGBHalf);
+        // Half precision is enough for the FFT; `Float` would be twice the
+        // bandwidth with no visual difference (spec §6.8).
+        h0 = Create("Sea_H0", RenderTextureFormat.ARGBHalf);
+        spectrumHt = Create("Sea_SpectrumHt", RenderTextureFormat.ARGBHalf);
+        spectrumSlope = Create("Sea_SpectrumSlope", RenderTextureFormat.ARGBHalf);
+        displacement = Create("Sea_Displacement", RenderTextureFormat.ARGBHalf);
+        derivatives = Create("Sea_Derivatives", RenderTextureFormat.ARGBHalf);
 
-        foamA = Kur("Sea_FoamA", RenderTextureFormat.RHalf);
-        foamB = Kur("Sea_FoamB", RenderTextureFormat.RHalf);
+        foamA = Create("Sea_FoamA", RenderTextureFormat.RHalf);
+        foamB = Create("Sea_FoamB", RenderTextureFormat.RHalf);
 
-        // KOPUK BIRIKIMLI: ilk karenin "onceki" degeri tanimli olmali.
-        // Yeni `RenderTexture`'in icerigi belirsiz; temizlenmezse kopuk
-        // rastgele bir seviyeden sonumlenmeye baslar.
-        Temizle(foamA);
-        Temizle(foamB);
+        // FOAM ACCUMULATES: the first frame's "previous" value must be
+        // defined. A fresh `RenderTexture` has undefined contents; without
+        // clearing, foam starts decaying from a random level.
+        Clear(foamA);
+        Clear(foamB);
     }
 
-    static void Temizle(RenderTexture rt)
+    static void Clear(RenderTexture rt)
     {
-        var eski = RenderTexture.active;
+        var previous = RenderTexture.active;
 
-        for (int dilim = 0; dilim < SeaConstants.TierCount; dilim++)
+        for (int slice = 0; slice < SeaConstants.TierCount; slice++)
         {
-            Graphics.SetRenderTarget(rt, 0, CubemapFace.Unknown, dilim);
+            Graphics.SetRenderTarget(rt, 0, CubemapFace.Unknown, slice);
             GL.Clear(false, true, Color.clear);
         }
 
-        RenderTexture.active = eski;
+        RenderTexture.active = previous;
     }
 
-    void DokulariBirak()
+    void ReleaseTextures()
     {
-        Birak(ref h0);
-        Birak(ref spectrumHt);
-        Birak(ref spectrumSlope);
-        Birak(ref displacement);
-        Birak(ref derivatives);
-        Birak(ref foamA);
-        Birak(ref foamB);
+        Release(ref h0);
+        Release(ref spectrumHt);
+        Release(ref spectrumSlope);
+        Release(ref displacement);
+        Release(ref derivatives);
+        Release(ref foamA);
+        Release(ref foamB);
     }
 
-    static void Birak(ref RenderTexture rt)
+    static void Release(ref RenderTexture rt)
     {
         if (rt == null) return;
 
@@ -214,18 +215,18 @@ public class SeaSimulation : MonoBehaviour
     {
         if (env == null || settings == null) return;
 
-        // KALITE DEĞİŞİNCE DOKULAR YENİDEN KURULUYOR. Boyut değiştiği için
-        // eskisi olduğu gibi kullanılamaz.
+        // A QUALITY CHANGE REBUILDS THE TEXTURES. Their size changes, so the
+        // old ones cannot be used as they are.
         if (displacement == null || !displacement.IsCreated()
             || builtFftSize != SeaQuality.Of(settings.quality).FftSize)
-            DokulariKur();
+            CreateTextures();
 
-        // DENİZ GÖRÜNMÜYORSA HİÇBİR ŞEY ÇALIŞMIYOR (spec §15.2).
+        // WHEN THE SEA IS NOT VISIBLE NOTHING RUNS (spec §15.2).
         //
-        // Kamera denizden çevrilince compute pass'lerinin tamamı düşüyor.
-        // `surface` bağlanmamışsa kapı açık bırakılıyor — görünürlük
-        // bilinmiyorsa simülasyonu susturmak sessiz bir "deniz donuk"
-        // hatası olurdu.
+        // Turning the camera away from the sea drops every compute pass. If
+        // `surface` is not bound the gate is left open — silencing the
+        // simulation when visibility is unknown would be a quiet "the sea is
+        // frozen" bug.
         if (surface != null && !surface.IsVisible)
         {
             SeaRuntimeState.SimulationActive = false;
@@ -235,134 +236,133 @@ public class SeaSimulation : MonoBehaviour
 
         SeaRuntimeState.SimulationActive = true;
 
-        Adim(Application.isPlaying ? Time.time : 0f);
+        Step(Application.isPlaying ? Time.time : 0f);
     }
 
-    /// Bir simülasyon adımı. Editör testi de bunu çağırıyor.
-    public void Adim(float zaman)
+    /// One simulation step. The editor test calls this too.
+    public void Step(float time)
     {
         profiler ??= new SeaProfiler("Sea.Simulation");
         profiler.Begin();
-        AdimIcerik(zaman);
+        StepBody(time);
         profiler.End();
     }
 
-    void AdimIcerik(float zaman)
+    void StepBody(float time)
     {
-        Vector3 yon = env.WindDirection;
-        float hiz = env.WindSpeed;
+        Vector3 direction = env.WindDirection;
+        float speed = env.WindSpeed;
 
-        // RÜZGÂR TEK GİRDİ DEĞİL.
+        // WIND IS NOT THE ONLY INPUT.
         //
-        // Spec §15.2 yalnız rüzgâr eşiğini veriyor ama `h0` swell, fetch,
-        // derinlik ve kesme uzunluğuna da bağlı. Yalnız rüzgâra bakılırsa
-        // Inspector'dan swell değiştirmek hiçbir şey yapmıyor — ölçüldü,
-        // swell 0 ile 1 arasında yönsel yoğunlaşma birebir aynı çıktı.
-        Vector4 ayarImza = new Vector4(settings.swell, settings.fetch,
-                                       settings.spectrumDepth,
-                                       settings.smallWaveCutoff);
+        // Spec §15.2 only gives the wind threshold, but `h0` also depends on
+        // swell, fetch, depth and cutoff length. Watching the wind alone
+        // means changing swell from the Inspector does nothing — measured:
+        // with swell 0 versus 1 the directional concentration came out
+        // exactly the same.
+        Vector4 signature = new Vector4(settings.swell, settings.fetch,
+                                        settings.spectrumDepth,
+                                        settings.smallWaveCutoff);
 
-        bool kirli = float.IsNaN(lastWindSpeed)
-                  || Mathf.Abs(hiz - lastWindSpeed) > 0.25f
-                  || Vector3.Angle(yon, lastWindDir) > 3f
-                  || ayarImza != lastSpectrumAyar;
+        bool dirty = float.IsNaN(lastWindSpeed)
+                  || Mathf.Abs(speed - lastWindSpeed) > 0.25f
+                  || Vector3.Angle(direction, lastWindDir) > 3f
+                  || signature != lastSpectrumSignature;
 
-        AyarlariYaz(spectrumShader, yon, hiz);
-        AyarlariYaz(fftShader, yon, hiz);
+        WriteSettings(spectrumShader, direction, speed);
+        WriteSettings(fftShader, direction, speed);
 
-        if (kirli)
+        if (dirty)
         {
-            BaslangicSpektrumu();
-            lastWindSpeed = hiz;
-            lastWindDir = yon;
-            lastSpectrumAyar = ayarImza;
+            InitialSpectrum();
+            lastWindSpeed = speed;
+            lastWindDir = direction;
+            lastSpectrumSignature = signature;
         }
 
-        // DÖNGÜ KUANTİZE ZAMAN. `Time.time` doğrudan verilirse uzun
-        // oturumda float hassasiyeti kayboluyor (spec §6.5).
+        // LOOP-QUANTIZED TIME. Handing over `Time.time` directly loses float
+        // precision over a long session (spec §6.5).
         spectrumShader.SetFloat(SeaShaderIDs.SeaTime,
-                                Mathf.Repeat(zaman, settings.loopPeriod));
+                                Mathf.Repeat(time, settings.loopPeriod));
 
-        SeaQuality.Levels seviye = SeaQuality.Of(settings.quality);
-        int grup = seviye.FftSize / 8;
+        SeaQuality.Levels level = SeaQuality.Of(settings.quality);
+        int groups = level.FftSize / 8;
 
         spectrumShader.SetTexture(kTime, SeaShaderIDs.H0RW, h0);
         spectrumShader.SetTexture(kTime, SeaShaderIDs.SpectrumHtRW, spectrumHt);
         spectrumShader.SetTexture(kTime, SeaShaderIDs.SpectrumSlopeRW, spectrumSlope);
-        spectrumShader.Dispatch(kTime, grup, grup, seviye.TierCount);
+        spectrumShader.Dispatch(kTime, groups, groups, level.TierCount);
 
-        FftGecisi(kFftH);
-        FftGecisi(kFftV);
+        FftPass(kFftH);
+        FftPass(kFftV);
 
         fftShader.SetTexture(kAssemble, SeaShaderIDs.SpectrumHtRW, spectrumHt);
         fftShader.SetTexture(kAssemble, SeaShaderIDs.SpectrumSlopeRW, spectrumSlope);
         fftShader.SetTexture(kAssemble, SeaShaderIDs.DisplacementRW, displacement);
         fftShader.SetTexture(kAssemble, SeaShaderIDs.DerivativesRW, derivatives);
-        fftShader.Dispatch(kAssemble, grup, grup, seviye.TierCount);
+        fftShader.Dispatch(kAssemble, groups, groups, level.TierCount);
 
-        Kopuk(zaman);
+        FoamPass(time);
 
         Shader.SetGlobalTexture(SeaShaderIDs.Displacement, displacement);
         Shader.SetGlobalTexture(SeaShaderIDs.Derivatives, derivatives);
         Shader.SetGlobalTexture(SeaShaderIDs.Foam, foamA);
     }
 
-    float sonKopukZamani = float.NaN;
-
-    /// KOPUK SONUMU GERCEK GECEN SUREYE BAGLI.
+    /// FOAM DECAY FOLLOWS THE ACTUAL ELAPSED TIME.
     ///
-    /// `Time.deltaTime` kullanilamiyor: editor testi `Adim`'i kendi
-    /// zamaniyla cagiriyor ve orada kare yok. Zaman farki cagiranin
-    /// verdigi degerden cikariliyor.
-    void Kopuk(float zaman)
+    /// `Time.deltaTime` cannot be used: the editor test calls `Step` with its
+    /// own time and there are no frames there. The delta is derived from the
+    /// value the caller passed in.
+    void FoamPass(float time)
     {
-        float dt = float.IsNaN(sonKopukZamani) ? 0f : Mathf.Max(zaman - sonKopukZamani, 0f);
-        sonKopukZamani = zaman;
+        float dt = float.IsNaN(lastFoamTime) ? 0f : Mathf.Max(time - lastFoamTime, 0f);
+        lastFoamTime = time;
 
-        // Dongu basa sarinca fark negatif olur; yukaridaki `Max` onu
-        // sifira cekiyor, kopuk o karede yalniz hedefe basiyor.
+        // When the loop wraps the difference goes negative; the `Max` above
+        // clamps it to zero and foam only jumps to its target that frame.
         foamShader.SetFloat(SeaShaderIDs.DeltaTime, dt);
 
         foamShader.SetTexture(kFoam, SeaShaderIDs.DisplacementRW, displacement);
         foamShader.SetTexture(kFoam, SeaShaderIDs.FoamRW, foamB);
         foamShader.SetTexture(kFoam, SeaShaderIDs.FoamPrevRW, foamA);
 
-        SeaQuality.Levels seviye = SeaQuality.Of(settings.quality);
-        int grup = seviye.FftSize / 8;
-        foamShader.Dispatch(kFoam, grup, grup, seviye.TierCount);
+        SeaQuality.Levels level = SeaQuality.Of(settings.quality);
+        int groups = level.FftSize / 8;
+        foamShader.Dispatch(kFoam, groups, groups, level.TierCount);
 
         (foamA, foamB) = (foamB, foamA);
     }
 
-    void BaslangicSpektrumu()
+    void InitialSpectrum()
     {
-        SeaQuality.Levels seviye = SeaQuality.Of(settings.quality);
-        int grup = seviye.FftSize / 8;
+        SeaQuality.Levels level = SeaQuality.Of(settings.quality);
+        int groups = level.FftSize / 8;
 
         spectrumShader.SetTexture(kInitial, SeaShaderIDs.H0RW, h0);
-        spectrumShader.Dispatch(kInitial, grup, grup, seviye.TierCount);
+        spectrumShader.Dispatch(kInitial, groups, groups, level.TierCount);
     }
 
-    void FftGecisi(int kernel)
+    void FftPass(int kernel)
     {
         fftShader.SetTexture(kernel, SeaShaderIDs.SpectrumHtRW, spectrumHt);
         fftShader.SetTexture(kernel, SeaShaderIDs.SpectrumSlopeRW, spectrumSlope);
 
-        // Grup başına bir satır. İş parçacığı sayısı her zaman
-        // `SEA_FFT_SIZE`; çalışan FFT daha küçükse fazlalar boşta döner
-        // ama bariyerlere girmeye devam eder (`SeaFFT.compute`).
-        SeaQuality.Levels seviye = SeaQuality.Of(settings.quality);
-        fftShader.Dispatch(kernel, 1, seviye.FftSize, seviye.TierCount);
+        // One row per group. The thread count is always `SEA_FFT_SIZE`; when
+        // the running FFT is smaller the extra threads spin idle but keep
+        // entering the barriers (`SeaFFT.compute`).
+        SeaQuality.Levels level = SeaQuality.Of(settings.quality);
+        fftShader.Dispatch(kernel, 1, level.FftSize, level.TierCount);
     }
 
-    /// COMPUTE SHADER GLOBALLERİ AYRI YAZILIYOR.
+    /// COMPUTE SHADER GLOBALS ARE WRITTEN SEPARATELY.
     ///
-    /// `Shader.SetGlobal*` compute shader'a güvenilir biçimde ulaşmıyor;
-    /// değerler doğrudan compute'a yazılıyor. `SeaManager`'ın yayınladığı
-    /// globaller yüzey shader'ı için.
-    void AyarlariYaz(ComputeShader cs, Vector3 yon, float hiz)
+    /// `Shader.SetGlobal*` does not reach a compute shader reliably; the
+    /// values are written straight onto the compute shader. The globals
+    /// `SeaManager` publishes are for the surface shader.
+    void WriteSettings(ComputeShader cs, Vector3 direction, float speed)
     {
-        Vector3 w = yon * hiz;
+        Vector3 w = direction * speed;
         cs.SetVector(SeaShaderIDs.SeaWindWS, new Vector4(w.x, w.z, 0f, 0f));
 
         cs.SetVector(SeaShaderIDs.PatchSizes, settings.patchSizes);
@@ -374,32 +374,33 @@ public class SeaSimulation : MonoBehaviour
         cs.SetFloat(SeaShaderIDs.SmallWaveCutoff, settings.smallWaveCutoff);
         cs.SetFloat(SeaShaderIDs.LoopPeriod, settings.loopPeriod);
 
-        cs.SetVector(SeaShaderIDs.TierCutoffK, KademeSinirlari());
+        cs.SetVector(SeaShaderIDs.TierCutoffK, TierBandLimits());
 
-        SeaQuality.Levels seviye = SeaQuality.Of(settings.quality);
-        cs.SetInt(SeaShaderIDs.FftSize, seviye.FftSize);
-        cs.SetInt(SeaShaderIDs.FftLog2, seviye.FftLog2);
+        SeaQuality.Levels level = SeaQuality.Of(settings.quality);
+        cs.SetInt(SeaShaderIDs.FftSize, level.FftSize);
+        cs.SetInt(SeaShaderIDs.FftLog2, level.FftLog2);
     }
 
-    /// KADEME BANDI SINIRLARI.
+    /// TIER BAND LIMITS.
     ///
-    /// Üç kademe aynı `k` aralığını taşısa enerji üç kez sayılırdı. Kural:
-    /// bir kademe, yamasına en az dört tam periyot sığan dalga boyunu
-    /// taşıyor (λ ≤ L/4); daha uzunu bir kaba kademeye devrediliyor.
+    /// If all three tiers carried the same `k` range the energy would be
+    /// counted three times. The rule: a tier carries a wavelength only if at
+    /// least four full periods fit in its patch (lambda <= L/4); anything
+    /// longer is handed to a coarser tier.
     ///
-    ///   kademe 0: λ > 32 m       (k < 0.196)
-    ///   kademe 1: λ 6 – 32 m     (k 0.196 – 1.047)
-    ///   kademe 2: λ < 6 m        (k > 1.047)
+    ///   tier 0: lambda > 32 m     (k < 0.196)
+    ///   tier 1: lambda 6 – 32 m   (k 0.196 – 1.047)
+    ///   tier 2: lambda < 6 m      (k > 1.047)
     ///
-    /// En kaba kademenin uzun ucu sınırlanmıyor — üstünde kademe yok.
-    /// Dört [KALİBRASYON].
-    Vector4 KademeSinirlari()
+    /// The long end of the coarsest tier is not limited — there is no tier
+    /// above it. The four is a [CALIBRATION].
+    Vector4 TierBandLimits()
     {
         Vector3 L = settings.patchSizes;
 
-        float s0 = 4f * SeaConstants.TwoPi / Mathf.Max(L.y, 1f);
-        float s1 = 4f * SeaConstants.TwoPi / Mathf.Max(L.z, 1f);
+        float b0 = 4f * SeaConstants.TwoPi / Mathf.Max(L.y, 1f);
+        float b1 = 4f * SeaConstants.TwoPi / Mathf.Max(L.z, 1f);
 
-        return new Vector4(s0, s1, 1e9f, 0f);
+        return new Vector4(b0, b1, 1e9f, 0f);
     }
 }

@@ -1,37 +1,39 @@
-// ROL: deniz simulasyonunun GPU maliyetini olcup yayinlar.
-// Cagiran: SeaSimulation (Adim icinde sarar).
+// ROLE: measures and publishes the GPU cost of the sea simulation.
+// CALLED BY: SeaSimulation (wraps its step).
 
 using UnityEngine;
 using UnityEngine.Profiling;
 
-/// GPU SÜRESİ `CustomSampler` İLE, CPU SÜRESİYLE DEĞİL.
+/// GPU TIME VIA `CustomSampler`, NOT VIA CPU TIME.
 ///
-/// `Stopwatch` compute dispatch'i ölçmez: `Dispatch` komutu kuyruğa atıp
-/// hemen dönüyor, GPU işi sonra yapıyor. Ölçülen sayı sürücünün komut
-/// yazma süresi olur ve gerçek maliyetin onda biri çıkar.
+/// A `Stopwatch` does not measure a compute dispatch: `Dispatch` queues the
+/// command and returns immediately, the GPU does the work later. What you
+/// would measure is the driver's command-writing time, about a tenth of the
+/// real cost.
 ///
-/// `CustomSampler.Create(ad, collectGpuData: true)` GPU tarafını da
-/// topluyor ve `Recorder.gpuElapsedNanoseconds` gerçek süreyi veriyor.
+/// `CustomSampler.Create(name, collectGpuData: true)` also collects the GPU
+/// side, and `Recorder.gpuElapsedNanoseconds` gives the real duration.
 ///
-/// **SAYI BİR KARE GECİKMELİ.** GPU o kareyi bitirmeden değer okunamıyor;
-/// `Recorder` bir önceki karenin sonucunu döndürüyor. Ani değişimde
-/// (kalite kademesi, kamera çevirme) bir kare eski değer görünür.
+/// **THE NUMBER LAGS BY ONE FRAME.** The value cannot be read before the
+/// GPU finishes that frame; `Recorder` returns the previous frame's result.
+/// On a sudden change (quality preset, turning the camera away) one frame
+/// of stale value shows.
 public sealed class SeaProfiler
 {
     readonly CustomSampler sampler;
     readonly Recorder recorder;
 
-    /// Son karenin GPU süresi (ms).
+    /// GPU time of the last frame (ms).
     public float GpuMs { get; private set; }
 
-    /// ÖLÇÜM GERÇEKTEN GELİYOR MU.
+    /// WHETHER THE MEASUREMENT IS ACTUALLY ARRIVING.
     ///
-    /// `Recorder.gpuElapsedNanoseconds` yalnız Profiler kayıt yaparken
-    /// dolu; kapalıyken SESSİZCE 0 dönüyor. Ölçüldü: editörde Profiler
-    /// penceresi kapalıyken üç kalite kademesi de 0.000 ms gösterdi ve bu
-    /// "deniz bedava" gibi okundu.
+    /// `Recorder.gpuElapsedNanoseconds` is only populated while the profiler
+    /// is recording; otherwise it SILENTLY returns 0. Measured: with the
+    /// profiler window closed in the editor all three quality presets showed
+    /// 0.000 ms, and that read as "the sea is free".
     ///
-    /// Sıfır ile "ölçülemedi" ayrılmadan bu sayıya bakılmaz.
+    /// Do not look at that number without separating zero from "not measured".
     public bool Available { get; private set; }
 
     public SeaProfiler(string name)
@@ -49,8 +51,8 @@ public sealed class SeaProfiler
 
         long ns = recorder.gpuElapsedNanoseconds;
 
-        // Bir kez bile dolu geldiyse ölçüm var demektir; sonraki gerçek
-        // sıfırlar (deniz görünmüyor) bunu geri almıyor.
+        // One populated sample means measurement works; later genuine zeros
+        // (the sea is not visible) do not take that back.
         if (ns > 0) Available = true;
 
         GpuMs = ns * 1e-6f;
@@ -59,9 +61,10 @@ public sealed class SeaProfiler
         SeaRuntimeState.GpuTimingAvailable = Available;
     }
 
-    /// Deniz görünmediği kare. Ölçüm yapılmıyor ama YAYINLANAN DEĞER
-    /// sıfırlanıyor — yoksa panel son görünür karenin süresini gösterip
-    /// "görünmezken de pahalı" yanılgısı yaratır.
+    /// A frame where the sea is not visible. Nothing is measured, but the
+    /// PUBLISHED value is cleared — otherwise the panel would keep showing
+    /// the last visible frame's time and suggest "expensive even when
+    /// hidden".
     public void Skipped()
     {
         GpuMs = 0f;

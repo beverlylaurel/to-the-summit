@@ -1,32 +1,32 @@
-// ROL: bu oyunun hava/ruzgar/gundongu/atmosfer sistemlerini deniz sistemine
-// baglar. Yalnizca OKUR.
-// Cagiran: SeaManager (ISeaEnvironmentSource olarak).
+// ROLE: connects this game's weather / wind / day-night / atmosphere systems
+// to the sea system. READS ONLY.
+// CALLED BY: SeaManager (as an ISeaEnvironmentSource).
 
 using UnityEngine;
 
-/// KÖPRÜ TAHMİN EDİLMEZ, ÖLÇÜLÜR.
+/// THE BRIDGE IS MEASURED, NOT GUESSED.
 ///
-/// Spec §3.2: "Kullanıcının oyununa özel yapıştırıcı. Sen bunu tahmin
-/// etmeye çalışma." Aşağıdaki bağlar bu projenin gerçek API'sinden ölçüldü:
+/// Spec §3.2: "Glue specific to the user's game. Do not try to guess it."
+/// The bindings below were measured against this project's real API:
 ///
-///   WindField.PrevailingDirection  → WindDirection
-///   WindField.FreeAirSpeed         → WindSpeed  (m/s, serbest hava)
-///   TimeOfDay.SunHeight            → SunElevation01  (SunDirection.y)
-///   AtmosphereController.Coverage  → CloudCover01
-///   WeatherState.Precipitation     → PrecipIntensity01
-///   TemperatureField.At(y)         → PrecipKind (kar/yağmur ayrımı)
+///   WindField.PrevailingDirection  -> WindDirection
+///   WindField.FreeAirSpeed         -> WindSpeed  (m/s, free air)
+///   TimeOfDay.SunHeight            -> SunElevation01  (SunDirection.y)
+///   AtmosphereController.Coverage  -> CloudCover01
+///   WeatherState.Precipitation     -> PrecipIntensity01
+///   TemperatureField.At(y)         -> PrecipKind (snow / rain split)
 ///
-/// GÖK RENGİ BAĞLANMADI. Bu projede gökyüzü hacimsel bulut sisteminden ve
-/// skybox'tan geliyor; tek bir "zenit rengi" property'si yok. Manuel değer
-/// kullanılıyor ve `TODO(kullanici)` bırakıldı — spec §3.2 bunu açıkça
-/// izin veriyor: "Manuel varsayılan değerlerle sistem baştan sona çalışır."
+/// SKY COLOR IS NOT BOUND. In this project the sky comes from the volumetric
+/// cloud system and the skybox; there is no single "zenith color" property. A
+/// manual value is used and a `TODO(user)` was left — spec §3.2 explicitly
+/// allows it: "With manual default values the system works end to end."
 ///
-/// BAĞIMLILIK INSPECTOR'DAN. `FindObjectOfType` ve singleton yok
-/// (`CLAUDE.md`). Bağlanmamış bir kaynak manuel değere düşüyor.
+/// DEPENDENCIES COME FROM THE INSPECTOR. No `FindObjectOfType`, no singletons
+/// (`CLAUDE.md`). An unbound source falls back to its manual value.
 [DisallowMultipleComponent]
 public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
 {
-    [Header("Oyunun mevcut sistemleri")]
+    [Header("The game's existing systems")]
     [SerializeField] WindField wind;
     [SerializeField] WeatherState weather;
     [SerializeField] TimeOfDay timeOfDay;
@@ -34,15 +34,15 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
     [SerializeField] TemperatureField temperature;
     [SerializeField] Light sunLight;
 
-    [Header("Köprü kurulana kadar manuel değerler (spec §3.2)")]
+    [Header("Manual values until the bridge is wired (spec §3.2)")]
     [SerializeField] Vector3 manualWindDirection = new Vector3(1f, 0f, 0f);
     [SerializeField] float manualWindSpeed = 8f;
 
-    /// TODO(kullanici): gökyüzü rengi bu projede tek bir property'de
-    /// durmuyor. Hacimsel bulut sistemi veya skybox'tan bir zenit/ufuk rengi
-    /// çıkarılabilirse buraya bağlanmalı.
+    /// TODO(user): sky color does not live in a single property in this
+    /// project. If a zenith / horizon color can be extracted from the
+    /// volumetric cloud system or the skybox, it should be bound here.
     ///
-    /// Varsayılan [KAYNAK: Tessendorf 2004 §6.3 örnek shader —
+    /// Default [SOURCE: Tessendorf 2004 §6.3 sample shader —
     /// `sky = color(0.69, 0.84, 1)`].
     [SerializeField] Color manualSkyColor = new Color(0.69f, 0.84f, 1.00f);
     [SerializeField] Color manualHorizonColor = new Color(0.80f, 0.86f, 0.92f);
@@ -50,19 +50,21 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
     [SerializeField, Range(0f, 1f)] float manualCloudCover = 0.3f;
     [SerializeField, Range(0f, 1f)] float manualFogDensity = 0.2f;
 
-    /// Yağışın kar mı yağmur mu olduğu sıcaklıktan türüyor — ayrı bir
-    /// "yağış türü" değişkeni yok ve kurulmuyor (ikinci kaynak olurdu).
-    [Tooltip("Bu sıcaklığın altında yağış kar sayılır (°C).")]
+    /// Whether precipitation is snow or rain follows from temperature —
+    /// there is no separate "precipitation kind" variable and none will be
+    /// created (it would be a second source of truth).
+    [Tooltip("Below this temperature precipitation counts as snow (°C).")]
     [SerializeField] float snowThresholdC = 0f;
 
-    [Tooltip("Bu sıcaklığın üstünde yağış yağmur sayılır (°C). Arası sulu kar.")]
+    [Tooltip("Above this temperature precipitation counts as rain (°C). Sleet in between.")]
     [SerializeField] float rainThresholdC = 2f;
 
-    /// KURULUM KODDAN. Sahne `MountainSceneBootstrap` üzerinden kuruluyor,
-    /// elle bağlama yok.
+    /// SET UP FROM CODE. The scene is built through
+    /// `MountainSceneBootstrap`; nothing is wired by hand.
     ///
-    /// Güneş `TimeOfDay`'in KENDİ ışığı olmak zorunda: ilk kurulumda sahnedeki
-    /// ilk directional light seçilmişti ve o ŞİMŞEK ışığı çıktı.
+    /// The sun must be `TimeOfDay`'s OWN light: the first setup picked the
+    /// first directional light in the scene and that turned out to be the
+    /// LIGHTNING light.
     public void Bind(WindField windField, WeatherState weatherState,
                      TimeOfDay time, AtmosphereController atmosphereController,
                      TemperatureField temperatureField, Light sun)
@@ -75,7 +77,7 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
         sunLight = sun;
     }
 
-    // ------------------------------------------------------------ rüzgâr
+    // -------------------------------------------------------------- wind
 
     public Vector3 WindDirection
     {
@@ -90,24 +92,25 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
         }
     }
 
-    /// U10 — 10 m referans yüksekliğindeki rüzgâr hızı.
+    /// U10 — wind speed at the 10 m reference height.
     ///
-    /// `FreeAirSpeed` serbest hava hızı; arazi maruziyeti (`TerrainWindShelter`)
-    /// uygulanmamış hâli. Deniz açık su üstünde, yani siper yok — doğru olan
-    /// bu. `Velocity.magnitude` kullanılsaydı yerel gust'lar spektruma
-    /// girerdi ve spec §3.4 onu yasaklıyor.
+    /// `FreeAirSpeed` is the free-air speed, before terrain exposure
+    /// (`TerrainWindShelter`) is applied. The sea sits over open water, so
+    /// there is no shelter — this is the correct one. Using
+    /// `Velocity.magnitude` would feed local gusts into the spectrum and
+    /// spec §3.4 forbids that.
     public float WindSpeed => wind != null ? wind.FreeAirSpeed : manualWindSpeed;
 
-    // ------------------------------------------------------- gece/gündüz
+    // --------------------------------------------------------- day/night
 
     public Light Sun => sunLight;
 
-    /// `TimeOfDay.SunHeight` zaten `SunDirection.y`, yani güneşin yükseklik
-    /// sinüsü. `saturate` gece negatifi kesiyor.
+    /// `TimeOfDay.SunHeight` is already `SunDirection.y`, i.e. the sine of
+    /// the sun's elevation. `saturate` cuts the negative night values.
     public float SunElevation01 =>
         timeOfDay != null ? Mathf.Clamp01(timeOfDay.SunHeight) : 0.5f;
 
-    // ---------------------------------------------------------- atmosfer
+    // -------------------------------------------------------- atmosphere
 
     public Color SkyColor => manualSkyColor;
 
@@ -116,11 +119,11 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
     public float CloudCover01 =>
         atmosphere != null ? Mathf.Clamp01(atmosphere.Coverage) : manualCloudCover;
 
-    /// Sis yoğunluğu deniz tarafından yalnız bilgi olarak okunuyor; sisin
-    /// kendisi URP'nin `MixFog`'uyla uygulanıyor (spec §3.5).
+    /// Fog density is read by the sea for information only; the fog itself is
+    /// applied with URP's `MixFog` (spec §3.5).
     public float FogDensity01 => manualFogDensity;
 
-    // ------------------------------------------------------------- yağış
+    // ----------------------------------------------------- precipitation
 
     public SeaPrecipitationKind PrecipKind
     {
@@ -131,7 +134,7 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
 
             if (temperature == null) return SeaPrecipitationKind.Rain;
 
-            // Deniz seviyesindeki sıcaklık — deniz orada.
+            // Temperature at sea level — that is where the sea is.
             float c = temperature.At(transform.position.y);
 
             if (c <= snowThresholdC) return SeaPrecipitationKind.Snow;
