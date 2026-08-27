@@ -137,7 +137,11 @@ float SeaSampleBottomSlope(float2 posXZ)
 float SeaShoalingGain(float depthLocal, float depthRef)
 {
     float d = max(depthLocal, SEA_MIN_DEPTH);
-    return pow(depthRef / d, 0.25);
+
+    // `max(..., 0)` derleyici uyarisi icin: `d` zaten pozitif ve `depthRef`
+    // de oyle, yani oran negatif olamaz — ama derleyici bunu goremiyor ve
+    // "pow will not work for negative f" uyarisi veriyor.
+    return pow(max(depthRef / d, 0.0), 0.25);
 }
 
 /// KIRILMA DERINLIK INDEKSI, EGIME BAGLI.

@@ -1,0 +1,333 @@
+// ROL: deniz yuzeyinin cizimi. Sig su donusumu (vertex) + optik (fragment).
+// Cagiran: SeaSurface (materyal olarak).
+
+Shader "ToTheSummit/SeaLit"
+{
+    Properties
+    {
+        // Bos — butun degerler global uniform. Materyal basina property yok,
+        // yani SRP Batcher uyumu icin CBUFFER da bos (spec 15.2).
+    }
+
+    SubShader
+    {
+        // OPAK CIZILIYOR. Seffaflik hissi refraksiyon ve sogurmadan geliyor,
+        // alpha'dan degil. Alpha blend TAA'da hayalet birakiyor ve siralama
+        // sorunu cikariyor (spec 12.6, 18).
+        Tags
+        {
+            "RenderType" = "Opaque"
+            "Queue" = "Transparent-1"
+            "RenderPipeline" = "UniversalPipeline"
+        }
+
+        ZWrite On
+        Cull Back
+        Blend Off
+
+        Pass
+        {
+            Name "SeaForward"
+            Tags { "LightMode" = "UniversalForward" }
+
+            HLSLPROGRAM
+            #pragma vertex SeaVertex
+            #pragma fragment SeaFragment
+            #pragma target 4.5
+
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile_fog
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl"
+
+            #include "SeaCommon.hlsl"
+
+            // Optik globalleri
+            float3 _SeaExtinctionRGB;
+            float4 _SeaUpwellingColor;
+            float  _SeaRefractionStrength;
+            float  _SeaRoughnessCalm;
+            float  _SeaRoughnessRough;
+
+            float4 _SeaSkyColor;
+            float4 _SeaHorizonColor;
+            float  _SeaCloudCover01;
+            float  _SeaSunElevation01;
+            float  _SeaPrecipIntensity01;
+
+            float  _SeaMaxShoalingGain;
+            float  _SeaRunupMaxDepth;
+            float  _SeaShoreFoamPhase;
+            float  _SeaShoreFoamDepth;
+            float4 _SeaFoamColor;
+            float  _SeaFoamRoughness;
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float3 positionWS : TEXCOORD0;
+                float4 screenPos  : TEXCOORD1;
+                float  fogCoord   : TEXCOORD2;
+            };
+
+            Varyings SeaVertex(Attributes IN)
+            {
+                Varyings OUT;
+
+                float3 posWS = TransformObjectToWorld(IN.positionOS.xyz);
+                posWS.y = _SeaLevelY;
+
+                // KIYI MASKESI VERTEX'TE DEGIL FRAGMENT'TE.
+                //
+                // Vertex'te hesaplanip fragment'e interpole edilince kiyi
+                // cizgisi quad sinirlarina takiliyor ve BASAMAKLI cikiyor —
+                // olculdu, 120 m mesafede 2 m'lik quad'lar gorunur basamak
+                // birakti. Fragment'te her piksel kendi derinligini okuyor.
+                //
+                // Vertex asamasinda derinlik yine de gerekiyor: sig su
+                // donusumu (siglasma, kirilma, kiyi sonumu) geometriyi
+                // orada deforme ediyor.
+                float depth = SeaSampleDepth(posWS.xz);
+
+                // --- SIG SU DONUSUMU (spec 8) ---
+                //
+                // Dalga alani henuz yok (Faz 2'de gelecek); su an yalniz
+                // donusum zinciri kurulu ve sifir displacement uzerinde
+                // calisiyor. FFT baglaninca buraya `disp` girecek.
+                float3 disp = 0.0;
+
+                if (_SeaDbgNoShallow <= 0.5)
+                {
+                    float slope     = SeaSampleBottomSlope(posWS.xz);
+                    float shoal     = min(SeaShoalingGain(depth, _SeaSpectrumDepth),
+                                          _SeaMaxShoalingGain);
+                    float chopScale = saturate(depth / SEA_CHOP_FADE_DEPTH);
+
+                    // KIYI SONUMU. Su derinligi sifira giderken dalga
+                    // yuksekligi de sifira gitmeli, yoksa mesh araziyle
+                    // kesisip titriyor (spec 8.4).
+                    float shoreFade = smoothstep(0.0, SEA_SHORE_FADE_DEPTH, depth);
+
+                    disp.y  *= shoal * shoreFade;
+                    disp.xz *= chopScale * shoreFade;
+
+                    // KIRILMA YUKSEKLIK SINIRI (spec 8.3).
+                    float gamma = SeaBreakerIndex(slope);
+                    float hMax  = gamma * depth * 0.5;
+                    disp.y = sign(disp.y) * min(abs(disp.y), hMax);
+                }
+
+                posWS.xz += disp.xz;
+                posWS.y  += disp.y;
+
+                OUT.positionWS = posWS;
+                OUT.positionCS = TransformWorldToHClip(posWS);
+                OUT.screenPos  = ComputeScreenPos(OUT.positionCS);
+                OUT.fogCoord   = ComputeFogFactor(OUT.positionCS.z);
+
+                return OUT;
+            }
+
+            /// TAM FRESNEL — SCHLICK DEGIL.
+            ///
+            /// Schlick siyirma acilarda belirgin sapiyor ve deniz
+            /// goruntusunde asil karakter tam orada (spec 12.1, Tessendorf
+            /// 6.2 Sekil 24). Iki dalli yapi dogrudan Tessendorf'un ornek
+            /// shader'indan.
+            float SeaFresnel(float3 N, float3 V)
+            {
+                float cosThetaI = abs(dot(V, N));
+                float thetaI    = acos(saturate(cosThetaI));
+                float sinThetaT = sin(thetaI) / SEA_WATER_IOR;
+
+                if (sinThetaT >= 1.0) return 1.0;      // tam ic yansima
+
+                float thetaT = asin(sinThetaT);
+
+                if (thetaI < 1e-4)
+                {
+                    float r = (SEA_WATER_IOR - 1.0) / (SEA_WATER_IOR + 1.0);
+                    return r * r;
+                }
+
+                float fs = sin(thetaT - thetaI) / sin(thetaT + thetaI);
+                float ts = tan(thetaT - thetaI) / tan(thetaT + thetaI);
+
+                return 0.5 * (fs * fs + ts * ts);
+            }
+
+            /// SU HACMI SOGURMASI.
+            ///
+            /// Kirmizi en hizli, mavi en yavas sonumleniyor — suyun mavi
+            /// gorunmesinin sebebi. [KAYNAK: Tessendorf 2004 7.1]
+            float3 SeaVolumeColor(float pathLength)
+            {
+                return exp(-_SeaExtinctionRGB * pathLength);
+            }
+
+            half4 SeaFragment(Varyings IN) : SV_Target
+            {
+                // KARA USTU ATILIYOR — her piksel kendi derinligini okuyor,
+                // boylece kiyi cizgisi quad sinirina takilmiyor.
+                float depth = SeaSampleDepth(IN.positionWS.xz);
+                clip(depth);
+
+                float3 V = normalize(_WorldSpaceCameraPos - IN.positionWS);
+
+                // --- NORMAL ---
+                //
+                // Dalga alani gelince FFT egim dokusundan okunacak (spec
+                // 10.5, merkezi fark KULLANILMIYOR). Su an duz.
+                float3 N = float3(0, 1, 0);
+
+                float2 screenUV = IN.screenPos.xy / IN.screenPos.w;
+
+                // --- SU KALINLIGI (spec 12.3) ---
+                float sceneEyeDepth = LinearEyeDepth(SampleSceneDepth(screenUV), _ZBufferParams);
+                float thickness = max(sceneEyeDepth - IN.screenPos.w, 0.0);
+
+                // --- REFRAKSIYON ---
+                float3 refracted = _SeaUpwellingColor.rgb;
+
+                if (_SeaDbgNoRefraction <= 0.5)
+                {
+                    float dist = length(_WorldSpaceCameraPos - IN.positionWS);
+                    float2 refrOffset = N.xz * _SeaRefractionStrength / max(dist, 1.0);
+                    float2 refrUV = screenUV + refrOffset;
+
+                    // SAPTIRMA KONTROLU. Sapmis ornegin derinligi yuzeyden
+                    // sigsa saptirmayi iptal et; yoksa kiyida su, onundeki
+                    // kayanin rengini "icine ceker" (spec 12.3).
+                    float sapmisDerinlik = LinearEyeDepth(SampleSceneDepth(refrUV), _ZBufferParams);
+                    if (sapmisDerinlik < IN.screenPos.w) refrUV = screenUV;
+
+                    refracted = SampleSceneColor(refrUV);
+                }
+
+                float3 volume = SeaVolumeColor(thickness);
+                float3 belowSurface = lerp(_SeaUpwellingColor.rgb, refracted * volume, volume);
+
+                // --- GOK YANSIMASI (spec 12.4) ---
+                //
+                // Deniz KENDI GOKYUZU MODELINI KURMUYOR. Oyunun zaten bir
+                // atmosferi var ve iki kaynak celisirdi.
+                float3 R = reflect(-V, N);
+                float3 skyRefl = lerp(_SeaHorizonColor.rgb, _SeaSkyColor.rgb, saturate(R.y));
+                skyRefl = lerp(skyRefl, skyRefl * 0.62, _SeaCloudCover01);
+
+                // --- GUNES PARILTISI (spec 12.5) ---
+                Light mainLight = GetMainLight();
+                float3 L = mainLight.direction;
+                float3 H = normalize(V + L);
+
+                float dist2 = length(_WorldSpaceCameraPos - IN.positionWS);
+                float roughness = lerp(_SeaRoughnessCalm, _SeaRoughnessRough,
+                                       saturate(length(_SeaWindWS) / 20.0));
+
+                // Yagmurda yuzey puruzlenir (spec 13.5).
+                roughness = lerp(roughness, 0.22, _SeaPrecipIntensity01 * 0.7);
+
+                // UZAKTAKI PARILTI YAYINIK. Uzaktaki dalgalar kameranin
+                // cozemedigi olcekte oldugu icin parilti yayiliyor
+                // [KAYNAK: Tessendorf 2004 6 giris].
+                roughness = lerp(roughness, 0.35, saturate((dist2 - 200.0) / 1500.0));
+
+                float spec = pow(saturate(dot(N, H)), max(2.0 / (roughness * roughness), 2.0));
+
+                // GECE PARILTI YOK (spec 12.5, 18 tuzak).
+                spec *= saturate(_SeaSunElevation01 * 20.0);
+
+                float3 glitter = mainLight.color * spec;
+
+                // --- BIRLESTIRME (spec 12.6) ---
+                float F = SeaFresnel(N, V);
+                float3 color = lerp(belowSurface, skyRefl, F) + glitter;
+
+                // --- KOPUK (spec 13) ---
+                //
+                // Jacobian kopugu Faz 3'te gelecek. Su an yalniz KIYI
+                // kopugu var: sig suda ve kabarma bandinda.
+                float foam = 0.0;
+
+                if (_SeaDbgNoFoam <= 0.5)
+                {
+                    float runupDepth = _SeaRunupMaxDepth * _SeaShoreFoamPhase;
+                    float effDepth = depth + runupDepth;
+
+                    float shoreFoam = 1.0 - smoothstep(0.0, _SeaShoreFoamDepth, effDepth);
+                    shoreFoam *= 0.4 + 0.6 * _SeaShoreFoamPhase;
+
+                    foam = saturate(shoreFoam);
+                }
+
+                // KOPUK FRESNEL'DEN SONRA. Kopuk opak, sacan bir yuzey;
+                // altindaki suyun yansimasini gostermiyor (spec 12.6, 18).
+                color = lerp(color, _SeaFoamColor.rgb, foam * 0.9);
+
+                // SIS URP'NIN KENDI FONKSIYONUYLA (spec 3.5). Kendi sis
+                // hesabi YAZILMIYOR.
+                color = MixFog(color, IN.fogCoord);
+
+                return half4(color, 1.0);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "SeaDepthOnly"
+            Tags { "LightMode" = "DepthOnly" }
+
+            ZWrite On
+            ColorMask R
+
+            HLSLPROGRAM
+            #pragma vertex SeaDepthVertex
+            #pragma fragment SeaDepthFragment
+            #pragma target 4.5
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "SeaCommon.hlsl"
+
+            struct Attributes { float4 positionOS : POSITION; };
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float3 positionWS : TEXCOORD0;
+            };
+
+            Varyings SeaDepthVertex(Attributes IN)
+            {
+                Varyings OUT;
+
+                float3 posWS = TransformObjectToWorld(IN.positionOS.xyz);
+                posWS.y = _SeaLevelY;
+
+                OUT.positionWS = posWS;
+                OUT.positionCS = TransformWorldToHClip(posWS);
+
+                return OUT;
+            }
+
+            half4 SeaDepthFragment(Varyings IN) : SV_Target
+            {
+                // Ileri gecisle AYNI maske — yoksa derinlik tamponu ile renk
+                // tamponu farkli kiyi cizgisi gorur.
+                clip(SeaSampleDepth(IN.positionWS.xz));
+                return 0;
+            }
+            ENDHLSL
+        }
+    }
+
+    Fallback Off
+}
