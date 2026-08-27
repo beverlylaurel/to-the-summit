@@ -1,37 +1,36 @@
-// ROL: kar yüzeyinin yüksekliğini CPU'da verir. `SnowRelief.hlsl` içindeki
-// `SnowYuzeyRolyef`'in birebir ikizi.
-// Çağıran: GroundSnap (karakteri yüzeye oturtur).
+// ROLE: gives the snow surface's height on the CPU. The exact twin of
+// `SnowYuzeyRolyef` inside `SnowRelief.hlsl`.
+// CALLED BY: GroundSnap (seats the character on the surface).
 
 using UnityEngine;
 
-/// GÖRSEL VE FİZİK AYNI YÜZEYİ GÖRMEK ZORUNDA.
+/// THE VISUAL AND THE PHYSICS HAVE TO SEE THE SAME SURFACE.
 ///
-/// Kar yüksekliği bir kez geometriye konmuş ve fizik tarafında karşılığı
-/// olmadığı için geri alınmıştı: "ayak 205.539, kaya 205.489, çizilen yüzey
-/// 205.98 — karakter yarım metre gömülü başlıyordu" (`MountainSurface.shader`
-/// yorumu). Bu sınıf o boşluğu kapatıyor.
+/// The snow height was once put into the geometry and reverted because it had no
+/// counterpart on the physics side: "the foot at 205.539, the rock at 205.489, the drawn
+/// surface at 205.98 — the character started half a metre buried" (the
+/// `MountainSurface.shader` comment). This class closes that gap.
 ///
-/// DUBLİKASYON BİLİNÇLİ VE SINANIYOR. Aynı formül iki dilde iki kez
-/// yazılıyor; sapma `SnowHeightParityTest` ile yakalanıyor. Alternatifler
-/// daha kötü: GPU'dan async geri okuma bir kare gecikmeli (karakter geçen
-/// karenin yüzeyinde durur), senkron okuma boru hattını durdurup kare
-/// süresini patlatır.
+/// THE DUPLICATION IS DELIBERATE AND TESTED. The same formula is written twice in two
+/// languages; the divergence is caught by `SnowHeightParityTest`. The alternatives are
+/// worse: an async readback from the GPU is a frame late (the character stands on last
+/// frame's surface), and a synchronous read stalls the pipeline and blows up the frame time.
 ///
-/// CO-OP: fonksiyon SAF. Girdisi yalnız dünya konumu, kar derinliği, rüzgâr
-/// yönü ve maruziyet; kare sayacı, `Time` ve yerel rastgelelik YOK. Bu yüzden
-/// her istemci aynı XZ'de aynı yüksekliği hesaplıyor ve ağ üzerinden yükseklik
-/// paylaşmak gerekmiyor. Kural `COOP.md`'de yazılı ve bozulamaz.
+/// CO-OP: the function is PURE. Its inputs are only the world position, the snow depth, the
+/// wind direction and the exposure; there is NO frame counter, no `Time` and no local
+/// randomness. So every client computes the same height at the same XZ and there is no need
+/// to share heights over the network. The rule is written in `COOP.md` and cannot be broken.
 ///
-/// TEŞHİS ANAHTARLARI OKUNMUYOR. `_SnowDbgNoFbm` ve kardeşleri yalnız görsel
-/// teşhis içindir; fizik onları görseydi anahtarı açan oyuncu zeminin içine
-/// düşerdi.
+/// THE DIAGNOSTIC SWITCHES ARE NOT READ. `_SnowDbgNoFbm` and its siblings are for visual
+/// diagnosis only; had the physics seen them, a player turning the switch on would fall
+/// through the ground.
 public static class SnowSurfaceHeight
 {
-    // --- PCG3D hash: `SnowCommon.hlsl` → `SnowPcg3d` ikizi ---
+    // --- PCG3D hash: the twin of `SnowCommon.hlsl` → `SnowPcg3d` ---
     //
-    // [KAYNAK: Jarzynski & Olano, JCGT 2020, "Hash Functions for GPU
-    // Rendering".] `frac(sin(dot(p,k)))` büyük girdide çöküyor; tam sayı
-    // hash'in o sınırı yok.
+    // [SOURCE: Jarzynski & Olano, JCGT 2020, "Hash Functions for GPU
+    // Rendering".] `frac(sin(dot(p,k)))` collapses on large inputs; an integer
+    // hash has no such limit.
     static void Pcg3d(ref uint x, ref uint y, ref uint z)
     {
         unchecked
@@ -48,9 +47,8 @@ public static class SnowSurfaceHeight
         }
     }
 
-    /// `SnowRandCell3(int3(cx, cy, 0)).x` ikizi — yalnız birinci bileşen
-    /// kullanılıyor, ötekiler hesaplanmak zorunda çünkü karışım aşamaları
-    /// üçünü birbirine bağlıyor.
+    /// The twin of `SnowRandCell3(int3(cx, cy, 0)).x` — only the first component is used,
+    /// the others have to be computed because the mixing stages tie all three together.
     static float RandCell(int cx, int cy)
     {
         // `asuint`: int bitlerini uint olarak yeniden yorumla.
@@ -86,11 +84,11 @@ public static class SnowSurfaceHeight
         return Mathf.Lerp(Mathf.Lerp(a, b, fx), Mathf.Lerp(c, d, fx), fy);
     }
 
-    /// `SnowRelief.hlsl` → `SnowOktavAgirligiKipli` ikizi.
+    /// The twin of `SnowRelief.hlsl` → `SnowOktavAgirligiKipli`.
     ///
-    /// CPU'da `pikselBoyu` sıfır: örnekleme frekansı sonsuz, Nyquist kesimi
-    /// yok. Geometri eşiği yine uygulanıyor — fizik yüzeyi GEOMETRİK yüzeyle
-    /// aynı olmak zorunda, normal haritasındaki ince oktavlarla değil.
+    /// On the CPU `pikselBoyu` is zero: the sampling frequency is infinite and there is no
+    /// Nyquist cut. The geometry threshold is still applied — the physics surface has to be
+    /// the same as the GEOMETRIC surface, not the fine octaves in the normal map.
     static float OktavAgirligi(float dalgaBoyu, float pikselBoyu, bool yalnizGeometri)
     {
         if (yalnizGeometri && dalgaBoyu < SnowConstants.TessMinDalga) return 0f;
@@ -98,10 +96,10 @@ public static class SnowSurfaceHeight
         return Mathf.Clamp01(dalgaBoyu / Mathf.Max(pikselBoyu * 2.0f, 1e-5f) - 1.0f);
     }
 
-    /// `SnowRelief.hlsl` → `SnowYuzeyRolyef` ikizi.
+    /// The twin of `SnowRelief.hlsl` → `SnowYuzeyRolyef`.
     ///
-    /// Sıra HLSL'dekiyle aynı olmak zorunda: tavan → fBm dört oktav → ripple
-    /// → sastrugi → drift. Kayan noktada toplama sırası sonucu değiştiriyor.
+    /// The order has to be the same as in HLSL: ceiling → fBm four octaves → ripple
+    /// → sastrugi → drift. In floating point the order of summation changes the result.
     public static float Rolyef(Vector2 worldXZ, float karDerinligi,
                                Vector2 sastrugiWindDir, float maruziyet,
                                float pikselBoyu = 0f, bool yalnizGeometri = true)
@@ -111,7 +109,7 @@ public static class SnowSurfaceHeight
         float sastrugiPay = maruziyet;
         float driftPay    = 1f - maruziyet;
 
-        // --- fBm tabanı: dört oktav, self-affine ---
+        // --- the fBm base: four octaves, self-affine ---
         float h   = 0f;
         float amp = Mathf.Min(SnowConstants.FbmAmp, tavan);
         float frq = SnowConstants.FbmScale;
@@ -126,7 +124,7 @@ public static class SnowSurfaceHeight
             frq *= 2f;
         }
 
-        // --- rüzgâr ekseni ---
+        // --- the wind axis ---
         Vector2 w = sastrugiWindDir;
         float uz = w.magnitude;
         w = uz > 1e-3f ? w / uz : new Vector2(1f, 0f);
@@ -136,13 +134,13 @@ public static class SnowSurfaceHeight
         float boyunca = worldXZ.x * w.x + worldXZ.y * w.y;
         float enine   = worldXZ.x * dik.x + worldXZ.y * dik.y;
 
-        // --- RIPPLE: rüzgâra dik sırtlar ---
+        // --- RIPPLE: ridges perpendicular to the wind ---
         h += (ValueNoise(boyunca / SnowConstants.RippleLength,
                          enine / (SnowConstants.RippleLength * 6f)) * 2f - 1f)
            * Mathf.Min(SnowConstants.RippleAmp, tavan)
            * OktavAgirligi(SnowConstants.RippleLength, pikselBoyu, yalnizGeometri);
 
-        // --- SASTRUGİ: rüzgâra paralel, keskin ---
+        // --- SASTRUGI: parallel to the wind, sharp ---
         float ns = ValueNoise(boyunca / SnowConstants.SastrugiWidth,
                               enine / SnowConstants.SastrugiLength);
         ns = ns * ns * (3f - 2f * ns);
@@ -150,7 +148,7 @@ public static class SnowSurfaceHeight
         h += (ns - 0.5f) * Mathf.Min(SnowConstants.SastrugiHeight, tavan) * sastrugiPay
            * OktavAgirligi(SnowConstants.SastrugiLength, pikselBoyu, yalnizGeometri);
 
-        // --- DRIFT: birikme tepecikleri, yumuşak ---
+        // --- DRIFT: deposition mounds, soft ---
         h += (ValueNoise(boyunca / SnowConstants.DriftWidth,
                          enine / SnowConstants.DriftLength) - 0.5f)
            * Mathf.Min(SnowConstants.DriftHeight, tavan) * driftPay
@@ -159,18 +157,18 @@ public static class SnowSurfaceHeight
         return h;
     }
 
-    /// Dünya konumundan doğrudan yükseklik.
+    /// The height directly from a world position.
     ///
-    /// Kar derinliği ve rüzgâr gölgesi DIŞARIDAN geliyor: bu sınıf saf kalmak
-    /// zorunda (co-op kuralı) ve `SnowManager`'a bağımlı olmamalı — sistemler
-    /// birbirini doğrudan çağırmıyor (`CLAUDE.md`).
+    /// The snow depth and the wind shadow come FROM OUTSIDE: this class has to stay pure
+    /// (the co-op rule) and must not depend on `SnowManager` — systems do not call each
+    /// other directly (`CLAUDE.md`).
     public static float RolyefDunya(Vector3 posWS, float karDerinligi,
                                     float ruzgarGolgesi, Vector2 sastrugiWindDir)
     {
         if (karDerinligi <= 0f) return 0f;
 
-        // Maruziyet `SampleWindShadow`'un tersi: o fonksiyon korunaklılığı
-        // ölçüyor. Katsayı `SnowTessellation.hlsl` ile aynı olmak zorunda.
+        // The exposure is the inverse of `SampleWindShadow`: that function measures
+        // shelteredness. The coefficient has to be the same as in `SnowTessellation.hlsl`.
         float maruziyet = 1f - Mathf.Clamp01(ruzgarGolgesi * 1.2f);
 
         return Rolyef(new Vector2(posWS.x, posWS.z), karDerinligi,

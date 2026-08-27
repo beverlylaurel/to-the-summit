@@ -1,63 +1,63 @@
-// ROL: yürüyüşün ayak fazını üretir ve adım anında olay yayınlar.
-// Çağıran: sahne (oyuncunun üstünde).
+// ROLE: produces the walk's foot phase and raises an event at the moment of a step.
+// CALLED BY: the scene (on the player).
 
 using System;
 using UnityEngine;
 
-/// ADIM MESAFEDEN ÇIKIYOR, ZAMANDAN DEĞİL.
+/// THE STEP COMES FROM DISTANCE, NOT FROM TIME.
 ///
-/// Sabit bir zamanlayıcı hız değişince yanlış ritim verir: yavaş yürürken
-/// ayaklar kayar, koşarken adım sıklığı yetişmez. Alınan yol biriktiriliyor;
-/// her `strideLength` metrede bir adım düşüyor. Hız arttıkça adım kendiliğinden
-/// sıklaşıyor.
+/// A fixed timer gives the wrong rhythm once the speed changes: walking slowly the feet
+/// slide, running the step rate cannot keep up. The distance travelled is accumulated;
+/// a step falls every `strideLength` metres. As the speed rises the steps grow more
+/// frequent on their own.
 ///
-/// GÖVDEYİ SÜRMÜYOR, YALNIZ FAZ ÜRETİYOR.
+/// IT DOES NOT DRIVE THE BODY, IT ONLY PRODUCES A PHASE.
 ///
-/// Eskiden ayak proxy'lerini yarım sinüsle kaldırıp indiriyordu. Tek gövdeye
-/// geçilince bu anlamını yitirdi — "havadaki ayak" yok — ve zararlı hâle geldi:
-/// gövdenin `localPosition.y`'sini başka bir bileşenle birlikte eziyordu. İki
-/// yazar çakışınca gövde yüksekliği kare kare salınıyor, oluk derinliği testere
-/// dişine dönüyordu (ölçüldü: beklenen localY 0.27, gerçekleşen 0.402 → 0.556).
+/// It used to raise and lower the foot proxies with a half sine. Once we moved to a single
+/// body that lost its meaning — there is no "foot in the air" — and it became harmful:
+/// it overwrote the body's `localPosition.y` together with another component. With two
+/// writers colliding the body height oscillated frame to frame and the groove depth turned
+/// into saw teeth (measured: expected localY 0.27, actual 0.402 → 0.556).
 ///
-/// Artık gövdenin yüksekliği ize HİÇ girmiyor: batma derinliğini kar söylüyor
-/// (`KDeform`, taşıma gücü).
+/// The body's height no longer enters the trail AT ALL: the sinking depth is told by the
+/// snow (`KDeform`, the bearing capacity).
 ///
-/// KAR SİSTEMİ BUNU BİLMİYOR. Ayak izi, ses ve toz bulutu bu olaya ABONE
-/// oluyor; buradan kimse çağrılmıyor.
+/// THE SNOW SYSTEM DOES NOT KNOW THIS. The footprint, the sound and the dust puff
+/// SUBSCRIBE to this event; nobody is called from here.
 [DisallowMultipleComponent]
 public class SnowStepRhythm : MonoBehaviour
 {
     [Header("Kaynak")]
-    [Tooltip("Hızın okunduğu gövde.")]
+    [Tooltip("The body the speed is read from.")]
     [SerializeField] CharacterController body;
 
-    [Header("Yürüyüş")]
-    [Tooltip("Durma sınırındaki adım frekansı (çevrim/saniye).")]
+    [Header("Walking")]
+    [Tooltip("The step frequency at the standing limit (cycles/second).")]
     [SerializeField, Min(0.1f)] float baseFrequency = 0.75f;
 
-    [Tooltip("Hızın frekansa katkısı (çevrim/saniye başına m/s).")]
+    [Tooltip("The speed's contribution to the frequency (cycles/second per m/s).")]
     [SerializeField, Min(0f)] float frequencyPerSpeed = 0.25f;
 
-    [Tooltip("Adım uzunluğunun alt sınırı (m). Çok yavaş yürürken adımlar " +
-             "sonsuz kısalmasın.")]
+    [Tooltip("The lower bound of the stride length (m). Walking very slowly the steps " +
+             "must not shorten without bound.")]
     [SerializeField, Min(0.05f)] float minStride = 0.55f;
 
-    [Tooltip("Bu hızın altında yürüme sayılmıyor; ayaklar yerde kalıyor.")]
+    [Tooltip("Below this speed it does not count as walking; the feet stay on the ground.")]
     [SerializeField] float minSpeed = 0.15f;
 
-    /// Adım düştüğünde yayınlanıyor. 0 = sol, 1 = sağ.
+    /// Raised when a step falls. 0 = left, 1 = right.
     public event Action<int> Stepped;
 
-    /// Teşhis: adım döngüsünün neresindeyiz (0..1).
+    /// Diagnostic: where we are in the step cycle (0..1).
     public float Phase01 { get; private set; }
 
-    /// Teşhis: şu an hangi ayak yerde (0 = sol, 1 = sağ).
+    /// Diagnostic: which foot is on the ground right now (0 = left, 1 = right).
     public int PlantedFoot { get; private set; }
 
-    /// Atılan toplam adım sayısı. Ses ve toz bulutu buna abone.
+    /// The total number of steps taken. The sound and the dust puff subscribe to it.
     public int StepCount { get; private set; }
 
-    /// Teşhis: yatay hız (m/s).
+    /// Diagnostic: horizontal speed (m/s).
     public float Speed { get; private set; }
 
     float travelled;
@@ -73,23 +73,23 @@ public class SnowStepRhythm : MonoBehaviour
         {
             travelled += Speed * Time.deltaTime;
 
-            // ADIM UZUNLUĞU HIZDAN TÜRÜYOR, SABİT DEĞİL.
+            // THE STRIDE LENGTH DERIVES FROM THE SPEED, IT IS NOT FIXED.
             //
-            // Sabit 0.78 m yazılıydı ve hız ne olursa olsun yarım adım 39 cm
-            // düşüyordu. İnsan yürüyüşünde sabit olan uzunluk değil FREKANS:
-            // bacak bir sarkaç gibi salınıyor ve daha hızlı gitmek için önce
-            // adım uzuyor, sonra sıklaşıyor.
+            // A fixed 0.78 m was written and, whatever the speed, half a stride came
+            // down at 39 cm. What is constant in human walking is not the length but the
+            // FREQUENCY: the leg swings like a pendulum, and to go faster the stride first
+            // lengthens and then quickens.
             //
-            // 2.2 m/s'de gerçek adım ~1.1 m; sabit 0.78 ile izler 39 cm arayla
-            // düşüyor ama ayak izinin toplam boyu (bot 30 cm + iki uçta omuz
-            // ve kuyruk) 62 cm — izler örtüşüyordu (kullanıcı bildirdi:
-            // "adımlar birbirine çok yakın, aralarında boşluk yok").
-            // FREKANS DA HIZLA ARTIYOR, YALNIZ UZUNLUK DEĞİL.
+            // At 2.2 m/s a real stride is ~1.1 m; with a fixed 0.78 the marks fall 39 cm
+            // apart while a footprint's total length (a 30 cm boot plus the shoulder and
+            // tail at both ends) is 62 cm — the marks overlapped (the user reported it:
+            // "the steps are too close together, there is no gap between them").
+            // THE FREQUENCY RISES WITH THE SPEED TOO, NOT ONLY THE LENGTH.
             //
-            // Sabit frekansla 2.2 m/s'de adım 2.3 m çıkıyor — absürt. Gerçek
-            // yürüyüşte hızlanma ikisine BİRDEN gidiyor: hem adım uzuyor hem
-            // sıklaşıyor. 1.4 m/s'de çevrim 1.1 Hz ve adım 1.3 m; 2.2 m/s'de
-            // 1.3 Hz ve 1.7 m.
+            // At a fixed frequency the stride comes out 2.3 m at 2.2 m/s — absurd. In real
+            // walking the speeding up goes to BOTH: the stride lengthens and quickens.
+            // At 1.4 m/s the cycle is 1.1 Hz and the stride 1.3 m; at 2.2 m/s
+            // 1.3 Hz and 1.7 m.
             float frekans = Mathf.Max(0.1f, baseFrequency + frequencyPerSpeed * Speed);
             float stride = Mathf.Max(minStride, Speed / frekans);
             float half = Mathf.Max(0.05f, stride * 0.5f);
@@ -106,7 +106,7 @@ public class SnowStepRhythm : MonoBehaviour
         }
         else
         {
-            // DURUNCA FAZ SIFIRLANIYOR; yeni yürüyüş adımın başından başlıyor.
+            // THE PHASE RESETS ON STOPPING; a new walk starts from the beginning of a step.
             travelled = 0f;
             Phase01 = 0f;
         }

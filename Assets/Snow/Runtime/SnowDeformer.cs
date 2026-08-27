@@ -1,79 +1,79 @@
-// ROL: bu nesnenin karda iz bırakmasını sağlar. Kendini bir veya birkaç
-// kapsül parçası olarak tarif eder.
-// Çağıran: SnowDeformerRegistry (kayıt), SnowManager (parça tamponu).
+// ROLE: makes this object leave a mark in the snow. It describes itself as one or more
+// capsule pieces.
+// CALLED BY: SnowDeformerRegistry (registration), SnowManager (the piece buffer).
 
 using UnityEngine;
 
-/// İZ RASTERİZE EDİLMİYOR, HESAPLANIYOR.
+/// THE TRAIL IS NOT RASTERIZED, IT IS COMPUTED.
 ///
-/// Eski hâl nesnenin alt yüzeyini aşağıdan bakan ortografik bir yakalamaya
-/// ÇİZİYORDU (Batman GDC 2014 yolu). Gerçek şekli bedavaya veriyordu ama
-/// kenarı üç ayrı yerde teksel ızgarasına takıyordu: rasterin kendi kenarı,
-/// Poisson blur'un dört tapı, kapsama payının eşiği. Ölçüldü: düz yürüyüşte
-/// iz kenarı ±1.5 teksel dalgalanıyor — yakında yumru, uzakta testere dişi.
+/// The old form DREW the object's underside into an orthographic capture looking up from
+/// below (the Batman GDC 2014 route). It gave the real shape for free but the edge snagged
+/// on the texel grid in three separate places: the raster's own edge, the Poisson blur's
+/// four taps, and the coverage share's threshold. Measured: walking straight, the trail's
+/// edge wobbles by ±1.5 texels — lumpy up close, saw teeth at distance.
 ///
-/// Yeni hâl: nesne bir KAPSÜL (iki uç + yarıçap). `KDeform` tekselin kapsüle
-/// yatay uzaklığını kapalı formülle bulup oymayı o uzaklığın sürekli
-/// fonksiyonu olarak yazıyor. Izgara yok, raster yok, blur yok, eşik yok.
+/// The new form: the object is a CAPSULE (two ends + a radius). `KDeform` finds the texel's
+/// horizontal distance to the capsule in closed form and writes the excavation as a
+/// continuous function of that distance. No grid, no raster, no blur, no threshold.
 ///
-/// YÜKSEKLİK YAYINLANMIYOR. Ne kadar batılacağını kar söylüyor (taşıma gücü,
-/// yoğunluk, kabuk); nesne yalnız NEREDE olduğunu ve yükü ne kadar
-/// yoğunlaştırdığını. Nesnenin Y'si okunsaydı ve o Y karın durumundan
-/// türetilseydi döngü kapanırdı — bir kez kapandı (`SYMPTOMS.md`).
+/// THE HEIGHT IS NOT PUBLISHED. How far it sinks is told by the snow (bearing capacity,
+/// density, crust); the object only says WHERE it is and how much it compacts the load.
+/// Had the object's Y been read and had that Y been derived from the snow's state, a loop
+/// would close — it closed once (`SYMPTOMS.md`).
 ///
-/// AYRI AYRI AYAK İZLERİ DENENDİ VE GERİ ALINDI. Adım olayı yarım adımda bir
-/// (39 cm) düşüyor ve iz o anda BİRDEN beliriyordu — kullanıcı bunu "Minecraft'ta
-/// blok koyar gibi, gecikmeli" diye bildirdi. Üstüne sol/sağ ayrık damgalar
-/// ekranda zigzag olarak okunuyordu. Düzensizlik ayrık damgadan değil, SÜREKLİ
-/// bir alandan gelmeli.
+/// SEPARATE FOOTPRINTS WERE TRIED AND REVERTED. The step event falls every half stride
+/// (39 cm) and the mark appeared ALL AT ONCE at that moment — the user reported it as
+/// "like placing a block in Minecraft, delayed". On top of that, separate left/right stamps
+/// read as a zigzag on screen. The irregularity has to come from a CONTINUOUS field, not
+/// from a discrete stamp.
 [ExecuteAlways]
 [DisallowMultipleComponent]
 public class SnowDeformer : MonoBehaviour
 {
-    [Tooltip("Karı ezen kapsülün yarıçapı (m).")]
+    [Tooltip("The radius of the capsule crushing the snow (m).")]
     [SerializeField, Min(0.01f)] float radius = 0.15f;
 
-    [Tooltip("Yol boyunca yarıçabın oynama payı (0 = sabit).")]
+    [Tooltip("How much the radius varies along the path (0 = fixed).")]
     [SerializeField, Range(0f, 0.5f)] float widthWobble = 0.16f;
 
-    [Tooltip("Yol boyunca batmanın oynama payı (0 = sabit).")]
+    [Tooltip("How much the sinking varies along the path (0 = fixed).")]
     [SerializeField, Range(0f, 0.5f)] float depthWobble = 0.22f;
 
-    [Tooltip("Oynamanın dalga boyu (m). Adım uzunluğu mertebesinde olmalı.")]
+    [Tooltip("The wavelength of the variation (m). It should be of the order of a stride.")]
     [SerializeField, Min(0.05f)] float wobbleLength = 0.55f;
 
     Vector3 prevPosition;
     Vector3 segmentA, segmentB;
 
-    /// Kat edilen yatay yol (m). Düzensizlik ZAMANA değil YOLA bağlı: durunca
-    /// iz oynamıyor, yavaş yürüyünce de aynı deseni veriyor.
+    /// The horizontal distance travelled (m). The irregularity depends on DISTANCE, not on
+    /// TIME: standing still the mark does not move, and walking slowly gives the same pattern.
     float travelled;
 
     public float Radius => radius;
 
-    /// Yatay hız (m/s). Sırtın hareket yönünde asimetrik olmasını sağlıyor
+    /// Horizontal speed (m/s). It makes the ridge asymmetric along the direction of motion
     /// (spec §10.2).
     public Vector2 VelocityXZ { get; private set; }
 
-    /// Bu karede kar dokusuna yazılacak parça sayısı.
+    /// The number of pieces to be written to the snow texture this frame.
     public virtual int SegmentCount => 1;
 
-    /// `a.xyz` başlangıç, `a.w` yarıçap; `b.xyz` bitiş, `b.w` batma çarpanı.
+    /// `a.xyz` the start, `a.w` the radius; `b.xyz` the end, `b.w` the sinking multiplier.
     ///
-    /// GENİŞLİK VE DERİNLİK YOL BOYUNCA DALGALANIYOR — SÜREKLİ, ANİ DEĞİL.
+    /// THE WIDTH AND THE DEPTH FLUCTUATE ALONG THE PATH — CONTINUOUSLY, NOT ABRUPTLY.
     ///
-    /// Sabit yarıçap ve sabit batma boru gibi tek tip bir oluk veriyor
-    /// (kullanıcı bildirdi: "gerçekte bir yönde ilerlerken iz bu kadar düzenli
-    /// mi olur?"). Gerçek yürüyüşte her basış biraz farklı yere, biraz farklı
-    /// derinliğe iniyor ve oluk boyunca genişleyip daralıyor.
+    /// A fixed radius and a fixed sinking give a uniform groove like a pipe
+    /// (the user reported it: "is a trail really this regular when you walk in one
+    /// direction?"). In real walking every footfall lands in a slightly different place at a
+    /// slightly different depth, and the groove widens and narrows along its length.
     ///
-    /// Modülasyon KAT EDİLEN YOLA bağlı ve SÜREKLİ. Ayrık damga denendi
-    /// (adım başına bir iz) ve reddedildi: iz 39 cm'de bir birden beliriyordu.
-    /// Sürekli bir dalga aynı düzensizliği veriyor ama izin ucu her karede
-    /// bir tık daha uzuyor — belirme yok.
+    /// The modulation depends on the DISTANCE TRAVELLED and is CONTINUOUS. A discrete stamp
+    /// was tried (one mark per step) and rejected: the mark appeared all at once every 39 cm.
+    /// A continuous wave gives the same irregularity but the trail's tip grows one notch
+    /// longer every frame — nothing appears out of nowhere.
     public virtual void GetSegment(int index, out Vector4 a, out Vector4 b)
     {
-        // İki uçta ayrı örnek: parçanın kendisi de boyunca daralıp genişliyor.
+        // A separate sample at each end: the piece itself narrows and widens along its length.
         float wA = Dalga(travelled - Vector3.Distance(segmentA, segmentB));
         float wB = Dalga(travelled);
 
@@ -84,15 +84,15 @@ public class SnowDeformer : MonoBehaviour
         b = new Vector4(segmentB.x, segmentB.y, segmentB.z, derinlik);
     }
 
-    /// SİNÜS DEĞİL DEĞER GÜRÜLTÜSÜ, −1..1.
+    /// VALUE NOISE, NOT A SINE, −1..1.
     ///
-    /// Önce iki sinüsün toplamıydı ve tam PERİYODİKTİ: desen 55 cm'de bir
-    /// birebir tekrar ediyordu (kullanıcı bildirdi: "çok düzenli desene sahip,
-    /// hep aynı izi çıkarıyor"). İki farklı frekanslı sinüs "düzensiz" değil,
-    /// yalnız daha uzun periyotlu.
+    /// It was the sum of two sines first and it was exactly PERIODIC: the pattern repeated
+    /// itself identically every 55 cm (the user reported it: "it has a very regular pattern,
+    /// it always makes the same mark"). Two sines at different frequencies are not
+    /// "irregular", only longer in period.
     ///
-    /// Değer gürültüsü hash'ten geliyor: tekrar etmiyor ama yola bağlı olduğu
-    /// için tekrarlanabilir — aynı yol aynı izi verir, geri sarma bozulmaz.
+    /// The value noise comes from a hash: it does not repeat, but because it depends on the
+    /// distance it is reproducible — the same path gives the same trail and rewinding is not broken.
     float Dalga(float s)
     {
         float u = s / Mathf.Max(0.05f, wobbleLength);
@@ -102,8 +102,8 @@ public class SnowDeformer : MonoBehaviour
               + Gurultu(u * 4.61f + 37.9f) * 0.12f) * 2f - 1f;
     }
 
-    /// Bir boyutlu değer gürültüsü, 0..1. İki tam sayı hücresinin hash'i
-    /// smoothstep'lenmiş kesirle harmanlanıyor.
+    /// One-dimensional value noise, 0..1. The hashes of two integer cells are blended with a
+    /// smoothstepped fraction.
     static float Gurultu(float u)
     {
         float h = Mathf.Floor(u);
@@ -135,13 +135,12 @@ public class SnowDeformer : MonoBehaviour
 
     protected virtual void OnDisable() => SnowDeformerRegistry.Unregister(this);
 
-    /// PARÇA SAKLANIYOR, TÜRETİLMİYOR.
+    /// THE PIECE IS STORED, NOT DERIVED.
     ///
-    /// `SnowManager` parçayı çizim zamanında okuyor; o an bu bileşenin
-    /// `LateUpdate`'i çalışmış da olabilir çalışmamış da. Parça burada
-    /// saklandığı için okuma sırası sonucu değiştirmiyor: en kötü ihtimalle
-    /// bir kare eski parça kullanılır ve parçalar uç uca eklendiği için izde
-    /// boşluk oluşmaz.
+    /// `SnowManager` reads the piece at draw time; at that moment this component's
+    /// `LateUpdate` may or may not have run. Because the piece is stored here the read order
+    /// does not change the result: at worst a one-frame-old piece is used, and because the
+    /// pieces are joined end to end no gap forms in the trail.
     protected virtual void LateUpdate()
     {
         Vector3 p = transform.position;

@@ -1,70 +1,71 @@
-// ROL: izi iki ayrı ayak izi olarak açar. Her ayak üç kapsül: topuk, bel,
-// ön taban. Ayak basış anında dünyada sabitleniyor, kalkana kadar orada.
-// Çağıran: SnowDeformerRegistry (kayıt), SnowManager (parça tamponu).
+// ROLE: opens the trail as two separate footprints. Each foot is three capsules: heel,
+// arch, forefoot. The foot is pinned in the world at the moment it lands, and stays there
+// until it lifts.
+// CALLED BY: SnowDeformerRegistry (registration), SnowManager (the piece buffer).
 
 using UnityEngine;
 
-/// AYAK İZİ HER YERİ EŞİT DERİN DEĞİL.
+/// A FOOTPRINT IS NOT EQUALLY DEEP EVERYWHERE.
 ///
-/// [KAYNAK: ayak izi çizim rehberleri — "a foot would push deeper into only
+/// [SOURCE: footprint drawing guides — "a foot would push deeper into only
 /// SOME of the snow while stepping", "distinct toes and heel marks".]
-/// Ağırlık topuğa ve ön tabana biniyor; aradaki bel (arch) yere neredeyse
-/// değmiyor ve orada kar sığ kalıyor. Tek tip bir kapsül bu yüzden yapay
-/// okunuyor.
+/// The weight rides on the heel and the forefoot; the arch in between barely touches the
+/// ground and the snow stays shallow there. A single uniform capsule therefore reads as
+/// artificial.
 ///
-/// Her ayak ÜÇ KAPSÜL:
-///   ön taban — geniş, derin
-///   bel      — dar, SIĞ
-///   topuk    — orta genişlik, derin
+/// Each foot is THREE CAPSULES:
+///   forefoot — wide, deep
+///   arch     — narrow, SHALLOW
+///   heel     — medium width, deep
 ///
-/// ÖNCEKİ ÜÇ DENEME VE NEDEN BAŞARISIZ OLDUKLARI:
+/// THE THREE EARLIER ATTEMPTS AND WHY THEY FAILED:
 ///
-/// 1. Adım olayında tek damga. İz yarım adımda bir (39 cm) BİRDEN
-///    beliriyordu: damga karakter o mesafeyi aldıktan SONRA basılıyor
-///    (kullanıcı: "Minecraft'ta blok koyar gibi, gecikmeli").
-/// 2. İki hattı sürekli süpürmek. Ayaklar hiç yerden kalkmıyor, iki paralel
-///    oluk çıktı (kullanıcı: "ip ile iki ayağım birbirine bağlanmış").
-/// 3. Sabit ayak + bacağın yarma izi. Gecikme çözüldü ama her adım HALTER
-///    şekli verdi: iki oval, aralarında yarma izinden gelen ince çubuk. Yan
-///    yürürken o çubuk düz bir çizgiye dönüyordu.
+/// 1. A single stamp on the step event. The mark appeared ALL AT ONCE every half stride
+///    (39 cm): the stamp is pressed AFTER the character has covered that distance
+///    (the user: "like placing a block in Minecraft, delayed").
+/// 2. Sweeping two lines continuously. The feet never left the ground and two parallel
+///    grooves came out (the user: "my two feet are tied together with a rope").
+/// 3. A fixed foot plus the leg's ploughing mark. The delay was solved but every step gave
+///    a DUMBBELL shape: two ovals with a thin bar from the ploughing mark between them.
+///    Walking sideways that bar turned into a straight line.
 ///
-/// Buradaki yol 3'ün düzeltilmişi: yarma izi YOK (halterin çubuğu oydu),
-/// ayak tek kapsül değil üç kapsül (topakların yerine gerçek bot silueti).
-/// Konum basış anında donuyor ama İZ o andan itibaren HER KARE yazılıyor —
-/// gecikmeyi kapatan şey bu.
+/// What is here is a corrected version of 3: there is NO ploughing mark (that was the
+/// dumbbell's bar), and the foot is not one capsule but three (a real boot silhouette
+/// instead of blobs). The position freezes at the moment of landing but the MARK is written
+/// EVERY FRAME from that moment on — that is what closes the delay.
 [DisallowMultipleComponent]
 public class SnowFootprintDeformer : SnowDeformer
 {
     [Header("Kaynak")]
-    [Tooltip("Adım olayının okunduğu ritim.")]
+    [Tooltip("The rhythm the step event is read from.")]
     [SerializeField] SnowStepRhythm rhythm;
 
-    [Header("Duruş")]
-    [Tooltip("İki ayağın merkezleri arası mesafe (m). İnsan duruşunda ~0.20.")]
+    [Header("Stance")]
+    [Tooltip("The distance between the two feet's centres (m). ~0.20 in a human stance.")]
     [SerializeField, Min(0.02f)] float stanceWidth = 0.20f;
 
-    [Tooltip("Bot tabanının uzunluğu (m).")]
+    [Tooltip("The length of the boot sole (m).")]
     [SerializeField, Min(0.05f)] float bootLength = 0.30f;
 
-    [Tooltip("Bot tabanının genişliği (m).")]
+    [Tooltip("The width of the boot sole (m).")]
     [SerializeField, Min(0.03f)] float bootWidth = 0.11f;
 
-    [Tooltip("Ayak ucunun gidiş yönünden dışa dönme açısı (derece).")]
+    [Tooltip("The toe's outward angle from the direction of travel (degrees).")]
     [SerializeField, Range(0f, 20f)] float toeOut = 7f;
 
-    /// BOT TABANININ ÜÇ BÖLÜMÜ.
+    /// THE THREE SECTIONS OF THE BOOT SOLE.
     ///
-    /// Değerler bot uzunluğunun ve genişliğinin oranı. Ölçüler gerçek bir
-    /// tabandan: ön taban en geniş yer, bel belirgin biçimde dar, topuk
-    /// ikisinin arasında.
-    ///   x = merkezin ayak ekseni üzerindeki yeri (boy oranı, + ileri)
-    ///   y = bölümün boyu (boy oranı)
-    ///   z = yarıçap (genişliğin yarısına oran)
-    ///   w = batma payı
+    /// The values are ratios of the boot's length and width. The measures come from a real
+    /// sole: the forefoot is the widest place, the arch markedly narrow, the heel between
+    /// the two.
+    ///   x = the centre's place along the foot axis (a ratio of the length, + forward)
+    ///   y = the section's length (a ratio of the length)
+    ///   z = the radius (a ratio of half the width)
+    ///   w = the sinking share
     static readonly Vector4[] Bolumler =
     {
-        new(+0.30f, 0.44f, 1.00f, 1.00f),   // ön taban
-        new(+0.02f, 0.26f, 0.62f, 0.45f),   // bel — SIĞ
+        new(+0.30f, 0.44f, 1.00f, 1.00f),   // forefoot
+        new(+0.02f, 0.26f, 0.62f, 0.45f),   // arch — SHALLOW
         new(-0.31f, 0.34f, 0.84f, 0.95f),   // topuk
     };
 
@@ -81,7 +82,7 @@ public class SnowFootprintDeformer : SnowDeformer
 
     public override void GetSegment(int index, out Vector4 a, out Vector4 b)
     {
-        // Taban sınıf yol dalgalanmasını veriyor (genişlik ve derinlik).
+        // The base class supplies the path's fluctuation (width and depth).
         base.GetSegment(index, out Vector4 tabanA, out Vector4 tabanB);
 
         Ayak ayak = index < Bolumler.Length ? sol : sag;
@@ -96,8 +97,8 @@ public class SnowFootprintDeformer : SnowDeformer
         Vector3 pa = orta - ileri3 * yari;
         Vector3 pb = orta + ileri3 * yari;
 
-        // Havadaki ayak iz bırakmıyor: batma çarpanı sıfır, `KDeform` orada
-        // hiçbir şey yazmıyor.
+        // A foot in the air leaves no mark: the sinking multiplier is zero and `KDeform`
+        // writes nothing there.
         float basinc = ayak.basili ? tabanB.w * bol.w : 0f;
 
         a = new Vector4(pa.x, pa.y, pa.z, yaricap);
@@ -131,8 +132,8 @@ public class SnowFootprintDeformer : SnowDeformer
 
         if (rhythm == null) return;
 
-        // DURUNCA İKİ AYAK DA YERE İNİYOR. Ritim hız eşiğinin altında fazı
-        // sıfırlıyor; orada havada asılı bir ayak bırakmak yanlış olur.
+        // ON STOPPING BOTH FEET COME DOWN. The rhythm resets the phase below the speed
+        // threshold; leaving a foot hanging in the air there would be wrong.
         if (rhythm.Speed <= 0.001f)
         {
             if (!sol.basili) Yerlestir(ref sol, true);
@@ -143,7 +144,7 @@ public class SnowFootprintDeformer : SnowDeformer
         }
     }
 
-    /// Adım düştü: bu ayak yere basıyor, öteki kalkıyor.
+    /// A step fell: this foot is on the ground, the other lifts.
     void Bas(int ayak)
     {
         if (ayak == 0)
@@ -160,11 +161,11 @@ public class SnowFootprintDeformer : SnowDeformer
         }
     }
 
-    /// Ayağı gövdenin yanına, gidiş yönüne göre yerleştirir.
+    /// Places the foot beside the body, according to the direction of travel.
     ///
-    /// YÖN HIZDAN, BAKIŞTAN DEĞİL. Oyuncu yana kayarken (A/D) gövde ileri
-    /// bakmaya devam ediyor ama ayaklar gidiş yönüne dönüyor. Bakışa
-    /// bağlansaydı yan yürüyüşte izler yürüyüş hattına dik çıkardı.
+    /// THE DIRECTION COMES FROM THE VELOCITY, NOT THE GAZE. While the player strafes (A/D)
+    /// the body keeps facing forward but the feet turn to the direction of travel. Tied to
+    /// the gaze, the marks would come out perpendicular to the walking line when strafing.
     void Yerlestir(ref Ayak ayak, bool solMu)
     {
         Vector3 ileri3 = new Vector3(VelocityXZ.x, 0f, VelocityXZ.y);
@@ -180,7 +181,7 @@ public class SnowFootprintDeformer : SnowDeformer
 
         var sag3 = new Vector3(ileri3.z, 0f, -ileri3.x);
 
-        // Ayak ucu dışa dönük: sol ayak sola, sağ ayak sağa.
+        // The toe points outward: the left foot to the left, the right foot to the right.
         float rad = (solMu ? -toeOut : toeOut) * Mathf.Deg2Rad;
         float c = Mathf.Cos(rad), s = Mathf.Sin(rad);
 

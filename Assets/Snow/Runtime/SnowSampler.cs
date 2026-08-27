@@ -1,26 +1,25 @@
-// ROL: kar durumunu CPU tarafına verir. Oyuncunun çevresindeki küçük bir
-// bölgeyi bloklamadan geri okur (spec §19).
-// Çağıran: SnowFootstepAudio, SnowMovementModifier, SnowSprayController.
+// ROLE: hands the snow state to the CPU side. It reads back a small region around the
+// player without blocking (spec §19).
+// CALLED BY: SnowFootstepAudio, SnowMovementModifier, SnowSprayController.
 
 using UnityEngine;
 using UnityEngine.Rendering;
 
-/// Bir noktadaki karın oyun tarafına görünen hâli (spec §19).
+/// The snow at a point as the game side sees it (spec §19).
 public struct SnowSample
 {
-    /// Kar yüzeyinin zeminden yüksekliği (m). İZ AÇILDIKTAN SONRAKİ hâli.
+    /// The snow surface's height above the ground (m). The state AFTER a trail has been opened.
     public float Depth;
 
-    /// İZ AÇILMADAN ÖNCEKİ kar sütunu (m). Yalnız yağış ve oturmayla değişir,
-    /// yani saniyeler ölçeğinde sabittir.
+    /// The snow column BEFORE a trail is opened (m). It changes only with precipitation and
+    /// settling, i.e. it is constant on the scale of seconds.
     ///
-    /// `Depth + SinkDepth` bunun yerine kullanılıyordu ve `trail.g`'yi (sırt)
-    /// içeriyordu. Sırt `max` ile birikiyor ve konumu hız yönüne göre
-    /// kaydırılıyor; gövdenin oturma yüksekliği onun peşinden 4 cm zıplayıp
-    /// izin derinliğini basamaklandırıyordu.
+    /// `Depth + SinkDepth` was used instead and it included `trail.g` (the ridge). The ridge
+    /// accumulates with `max` and its position is offset along the velocity direction; the
+    /// body's settling height followed it, jumped by 4 cm and stepped the trail's depth.
     public float BaseHeight;
 
-    /// Bu noktadaki oyulma (m) — batma derinliği.
+    /// The excavation at this point (m) — the sinking depth.
     public float SinkDepth;
 
     /// 0 = toz, 1 = buz gibi.
@@ -28,22 +27,22 @@ public struct SnowSample
 
     public float Wetness;
 
-    /// Yüzey kabuğunun sağlamlığı (spec §18.3). `RT_Trail.B`.
+    /// The strength of the surface crust (spec §18.3). `RT_Trail.B`.
     public float Crust;
 
     public bool Valid;
 }
 
-/// BLOKLAMAYAN OKUMA (spec §19). `GetData` çağırmak GPU'yu bekletiyor ve
-/// kare süresini ikiye katlıyor; `AsyncGPUReadback` iki kare gecikmeyle
-/// aynı veriyi veriyor. Ayak sesi ve hız çarpanı için iki kare fark etmez.
+/// A NON-BLOCKING READ (spec §19). Calling `GetData` stalls the GPU and doubles the frame
+/// time; `AsyncGPUReadback` gives the same data with two frames of lag. For the footstep
+/// sound and the speed multiplier two frames make no difference.
 [DisallowMultipleComponent]
 public class SnowSampler : MonoBehaviour
 {
-    /// Okunan pencerenin kenarı, teksel (spec §19).
+    /// The edge of the window read, in texels (spec §19).
     const int Window = 64;
 
-    /// Kaç karede bir istek (spec §19).
+    /// One request every this many frames (spec §19).
     const int Interval = 4;
 
     [SerializeField] SnowManager manager;
@@ -72,9 +71,9 @@ public class SnowSampler : MonoBehaviour
     void OnEnable()
     {
         if (manager == null)
-            throw new System.InvalidOperationException($"{nameof(SnowSampler)}: {nameof(manager)} atanmadı.");
+            throw new System.InvalidOperationException($"{nameof(SnowSampler)}: {nameof(manager)} is not assigned.");
         if (followTarget == null)
-            throw new System.InvalidOperationException($"{nameof(SnowSampler)}: takip hedefi atanmadı.");
+            throw new System.InvalidOperationException($"{nameof(SnowSampler)}: the follow target is not assigned.");
 
         snowReady = false;
         trailReady = false;
@@ -112,7 +111,7 @@ public class SnowSampler : MonoBehaviour
             TextureFormat.RGBAFloat, OnTrailRead);
     }
 
-    /// Pencerenin sol alt köşesi, teksel. Doku sınırlarının dışına taşmıyor.
+    /// The window's bottom-left corner, in texels. It does not go outside the texture bounds.
     public static Vector2Int WindowOrigin(Vector3 worldPos, Vector2 areaCenter,
                                           float areaSize, int resolution)
     {
@@ -156,8 +155,8 @@ public class SnowSampler : MonoBehaviour
         int tx = Mathf.RoundToInt(uv.x * cachedResolution) - windowOrigin.x;
         int ty = Mathf.RoundToInt(uv.y * cachedResolution) - windowOrigin.y;
 
-        // Pencere dışında veri yok. Uydurmak yerine geçersiz dönüyoruz —
-        // "kar yok" demek yanlış olurdu, "bilmiyoruz" doğru.
+        // There is no data outside the window. Rather than inventing it we return invalid —
+        // saying "there is no snow" would be wrong, "we do not know" is right.
         if (tx < 0 || tx >= Window || ty < 0 || ty >= Window) return false;
 
         Color s = snowCache[ty * Window + tx];
@@ -167,20 +166,20 @@ public class SnowSampler : MonoBehaviour
         return true;
     }
 
-    /// İZSİZ DÜNYANIN KAR SÜTUNU (m). ANLIK — geri okuma yok.
+    /// THE SNOW COLUMN OF THE TRAIL-FREE WORLD (m). INSTANTANEOUS — no readback.
     ///
-    /// İz gövdesinin oturma yüksekliği bunu okuyor. Doku örneğini (`BaseHeight`)
-    /// okusaydı KAPALI DÖNGÜ kurulurdu: gövde bastıkça yoğunluk artıyor,
-    /// `baseHeight = SWE×1000/ρ` düşüyor, gövde iniyor, daha çok oyuyor.
-    /// Arada 30 karede bir tazelenen asenkron geri okuma var, yani döngü
-    /// gecikmeli — sonuç osilatör.
+    /// The trail body's settling height reads this. Had it read the texture sample
+    /// (`BaseHeight`) a CLOSED LOOP would form: as the body presses the density rises,
+    /// `baseHeight = SWE×1000/ρ` falls, the body sinks and excavates more.
+    /// In between there is an async readback refreshing once every 30 frames, so the loop is
+    /// delayed — the result is an oscillator.
     ///
-    /// Ölçüldü: gövdenin yerel Y'si yürürken 10 mm ile 30 mm arasında düzenli
-    /// salınıyor ve izin genişliği onunla birlikte 21 tekselden 13'e inip
-    /// çıkıyor (`SYMPTOMS.md`).
+    /// Measured: the body's local Y oscillates regularly between 10 mm and 30 mm while
+    /// walking and the trail's width rises and falls with it from 21 texels to 13
+    /// (`SYMPTOMS.md`).
     ///
-    /// Dünya değeri yalnız yağış ve oturmayla değişiyor; gövdenin yazdığı
-    /// hiçbir şey buraya geri dönmüyor.
+    /// The world value changes only with precipitation and settling; nothing the body writes
+    /// comes back here.
     public float WorldColumnHeight
     {
         get
@@ -194,8 +193,8 @@ public class SnowSampler : MonoBehaviour
         }
     }
 
-    /// Doku değerlerinden oyun tarafının gördüğü hâle. Saf fonksiyon:
-    /// Play'e girmeden sınanabiliyor.
+    /// From the texture values to what the game side sees. A pure function:
+    /// it can be tested without entering Play.
     public static SnowSample Decode(Color snow, Color trail)
     {
         float rho = Mathf.Lerp(SnowConstants.RhoMin, SnowConstants.RhoMax,
