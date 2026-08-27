@@ -333,7 +333,7 @@ Shader "ToTheSummit/SeaLit"
                     // dimmed it; the foam still read as one solid sheet. It
                     // now EATS INTO the coverage from below, so the pattern
                     // has holes and the foam breaks into clumps.
-                    float bubbles = SeaFoamNoise(foamUV);
+                    float bubbles = SeaFoamBubbles(foamUV);
                     whitecap = saturate((whitecap - (1.0 - bubbles) * 0.35) * 1.4);
 
                     // 2. BREAKING FOAM (spec 8.3). When the ratio of wave
@@ -390,15 +390,39 @@ Shader "ToTheSummit/SeaLit"
                     float bandDepth = effDepth / max(_SeaShoreFoamDepth, 1e-3);
                     bandDepth += (breakup - 0.5) * 0.9;
 
-                    float shoreFoam = 1.0 - smoothstep(0.15, 1.0, bandDepth);
+                    float band = 1.0 - smoothstep(0.15, 1.0, bandDepth);
 
-                    // Fine bubbles inside the band, at the whitecap's scale.
-                    float shoreBubbles = SeaFoamNoise(IN.positionWS.xz * _SeaFoamTiling * 1.7);
-                    shoreFoam *= 0.55 + 0.65 * shoreBubbles;
+                    // THE SWASH SWEEPS AND DRAINS — AND THE FOAM HAS A MEMORY
+                    // OF IT WITHOUT A MEMORY BUFFER.
+                    //
+                    // The band used to be scaled by the phase, so the whole
+                    // strip just brightened and dimmed in place: no bore ran
+                    // up, nothing was left behind. Real shore foam does two
+                    // things — the bore arrives and lays fresh foam, then the
+                    // water drains and leaves a lacy residue that fades.
+                    //
+                    // A residue needs history, and history normally needs a
+                    // persistent texture. It is not needed here: the swash is
+                    // PERIODIC, so "how long ago was this point last under
+                    // water" is known in closed form. For a cosine surge the
+                    // covered window is symmetric about the peak, so the phase
+                    // at which the water leaves a point follows from an acos.
+                    float reach = saturate(depth / max(_SeaShoreFoamDepth, 1e-3));
+                    float surge = 0.5 - 0.5 * cos(SEA_TWO_PI * phase);
 
-                    // The swash carries the foam: at the top of the surge the
-                    // band is thickest, as it drains a lacy residue is left.
-                    shoreFoam *= 0.45 + 0.55 * phase;
+                    // Fresh foam: where the bore stands right now.
+                    float fresh = 1.0 - smoothstep(surge - 0.30, surge + 0.10, reach);
+
+                    // Residue: time since the water drained off this point,
+                    // measured in swash cycles.
+                    float halfWindow = acos(clamp(1.0 - 2.0 * reach, -1.0, 1.0)) / SEA_TWO_PI;
+                    float since = frac(phase - (1.0 - halfWindow));
+                    float residue = exp(-since * 2.4);
+
+                    float shoreFoam = band * max(fresh, residue * 0.55);
+
+                    // Bubbles inside the band, at the whitecap's scale.
+                    shoreFoam *= 0.55 + 0.65 * SeaFoamBubbles(IN.positionWS.xz * _SeaFoamTiling * 1.7);
 
                     foam = max(whitecap, max(breakT * SEA_BREAK_FOAM_GAIN, shoreFoam));
 

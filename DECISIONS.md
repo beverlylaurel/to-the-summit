@@ -1916,20 +1916,24 @@ sessizce yok sayılsaydı o bölgede deniz karanın içinden geçerdi.
 **Maliyet.** Bathymetry bake'inin çoklu araziyi birleştirmesi ve
 `_SeaBathyOriginXZ/_SeaBathySizeXZ`'nin birleşik sınırı taşıması gerekir.
 
-## Deniz köpüğü DOKUSUZ — prosedürel gürültüyle
+## Deniz köpüğü DOKUSUZ — hücresel gürültüyle
 
-**Karar.** Spec §13'ün istediği `T_Foam` / `T_FoamBreakup` dokuları üretilmedi; köpük
-deseni `SeaFoamNoise` (üç oktav value noise) ile.
+**Karar.** Spec §13'ün istediği `T_Foam` / `T_FoamBreakup` dokuları üretilmedi. Köpüğün
+kabarcık yapısı **Worley (hücresel) gürültüden** geliyor (`SeaFoamBubbles`); su
+çizgisinin düzensizliği için value noise (`SeaFoamNoise`) kalıyor.
 
 **Gerekçe.** Doku üretimi kredili servisten geçiyor ve `CLAUDE.md` ilk denemenin doğru
-olmasını şart koşuyor. Köpüğün nasıl görünmesi gerektiği ekranda oturmadan istem yazmak
-kredi yakardı. Planın kendisi bu alternatifi veriyor.
+olmasını şart koşuyor. Ama asıl gerekçe artık başka: **value noise köpük değildir.**
+Kaç oktav konursa konsun yumuşak tepeler alanı üretir; köpük ise birbirine sıkışmış
+yuvarlak kabarcıklar ve aralarındaki ince duvarlardır. Kullanıcının "kâğıt gibi"
+dediği şeyin bir parçası buydu. Hücresel alan tam olarak o yapıyı tarif ediyor ve
+doku istemiyor.
 
-**Tetikleyici.** Köpük yakından bakınca "gürültü" gibi duruyorsa — özellikle oyuncu
-kıyıda durduğunda.
+**Tetikleyici.** Kabarcıklar yakından tekrar ediyor görünüyorsa ya da hücre boyu tek
+tip okunuyorsa — o zaman fotoğraf tabanlı doku gerekir.
 
-**Maliyet.** İki doku üretimi + `SeaFoamNoise`'un silinmesi. Değişecek tek yer
-`SeaLit.shader`'ın köpük bloğu.
+**Maliyet.** Piksel başına iki hücresel oktav (18 hash). Yalnız köpüğün olduğu yerde
+ödeniyor.
 
 ## Deniz: kapsam dışı bırakılanlar
 

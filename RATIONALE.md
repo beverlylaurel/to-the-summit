@@ -2277,3 +2277,41 @@ kenar çizgiyle bitmek yerine yamalara dağılıyor.
   köpük hiç speküler almıyordu, kırılan tepenin ıslak parlaklığı yoktu.
 - **Kabarma tek çizgi hâlinde ilerlemiyor.** Kıyı boyunca yavaş bir alan
   fazı kaydırıyor: bir koy dolarken yanındaki boşalıyor.
+
+
+## Köpüğün kabarcığı ve kıyının izi — dokusuz ve tampon-suz
+
+### Kabarcık: value noise köpük değildir
+
+Köpük deseni üç oktav value noise'tan geliyordu. Value noise kaç oktav konursa
+konsun **yumuşak tepeler alanı** üretir; köpük ise birbirine sıkışmış yuvarlak
+kabarcıklar ve aralarındaki ince duvarlardır. "Kâğıt gibi" şikâyetinin bir
+parçası bu: desen boya lekesi gibi okunuyordu.
+
+Worley (hücresel) alan tam olarak o yapıyı tarif ediyor. İki ölçek üst üste
+(iri kabarcıkların arasına küçükleri sıkışıyor), sonuç kareleniyor ki duvarlar
+ince kalsın — doğrusal sönüm her kabarcığı yumuşak bir tümseğe çeviriyor ve
+kütle yine boyaya dönüyor. Doku gerekmiyor.
+
+### Kıyı izi: periyodik bir olayın hafızası hesaplanır, saklanmaz
+
+Kıyı köpüğü faza göre yalnız **parlayıp sönüyordu**: şerit yerinde duruyor, ne
+bir dalga çıkıyor ne geriye bir şey kalıyordu. Gerçek kıyı köpüğü iki iş yapar —
+dalga gelir taze köpüğü serer, sonra su çekilir ve solan dantel bir kalıntı
+bırakır.
+
+Kalıntı geçmiş ister, geçmiş de normalde kalıcı bir doku ister (kamera-göreli
+bir RT, her kare kaydırma ve sönüm). **Gerekmedi:** kabarma PERİYODİK, yani "bu
+nokta en son ne zaman suyun altındaydı" kapalı biçimde biliniyor. Kosinüs
+kabarmasında bir noktanın örtülü kaldığı pencere tepe etrafında simetrik, o
+yüzden suyun o noktadan çekildiği faz bir `acos` ile çıkıyor.
+
+    reach      = derinlik / bant derinliği
+    surge      = 0.5 - 0.5 cos(2π faz)
+    taze       = bore'un şu anda durduğu yer
+    yarıPencere= acos(1 - 2 reach) / 2π
+    geçenSüre  = frac(faz - (1 - yarıPencere))
+    kalıntı    = exp(-geçenSüre × 2.4)
+
+Bedeli bir `acos` ve bir `exp`. Kazanç: kamera-göreli bir RT, yeniden izdüşüm
+ve kare kare sönüm dispatch'i yok.

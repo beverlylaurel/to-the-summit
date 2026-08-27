@@ -157,11 +157,11 @@ float SeaSampleFoam(float2 posXZ, out float2 foldDirection)
 
 /// PROCEDURAL FOAM PATTERN — NO TEXTURE.
 ///
-/// Spec 13 asks for `T_Foam` and `T_FoamBreakup` textures. In this project
-/// texture generation goes through a paid service and `CLAUDE.md` requires
-/// the first attempt to be right; writing a prompt before the foam had
-/// settled on screen would have burned credits. The plan offers this
-/// alternative itself. Once the textures exist this function is deleted.
+/// Spec 13 asks for `T_Foam` and `T_FoamBreakup` textures. The foam pattern is
+/// built procedurally instead: value noise here for the waterline's irregular
+/// outline, and a CELLULAR field (`SeaFoamBubbles`) for the bubble structure.
+/// The reasoning is in `DECISIONS.md` — value noise cannot describe foam at
+/// any octave count, and the cellular field needs no texture at all.
 float SeaHash21(float2 p)
 {
     p = frac(p * float2(123.34, 456.21));
@@ -189,6 +189,58 @@ float SeaFoamNoise(float2 p)
     return SeaValueNoise(p)        * 0.60
          + SeaValueNoise(p * 2.37) * 0.30
          + SeaValueNoise(p * 5.13) * 0.10;
+}
+
+/// Two 2D random offsets for a cell.
+float2 SeaHash22(float2 p)
+{
+    float3 q = frac(p.xyx * float3(127.1, 311.7, 74.7));
+    q += dot(q, q.yzx + 34.23);
+    return frac(float2(q.x * q.y, q.y * q.z));
+}
+
+/// WORLEY (CELLULAR) F1 — the distance to the nearest scattered point.
+///
+/// FOAM IS NOT VALUE NOISE. Value noise is a smooth hill field; whatever the
+/// octaves, it produces soft clouds. Foam is a packed mass of BUBBLES: round
+/// cells crowded against each other with thin walls between them. That is
+/// exactly what a cellular field describes, and it is the reason foam built
+/// from value noise reads as a wash of paint rather than a surface.
+float SeaCellular(float2 p)
+{
+    float2 cell = floor(p);
+    float2 f    = frac(p);
+
+    float best = 1e9;
+
+    [unroll]
+    for (int y = -1; y <= 1; ++y)
+    [unroll]
+    for (int x = -1; x <= 1; ++x)
+    {
+        float2 offset = float2(x, y);
+        float2 point0 = offset + SeaHash22(cell + offset);
+        float2 d      = point0 - f;
+        best = min(best, dot(d, d));
+    }
+
+    return sqrt(best);
+}
+
+/// BUBBLE FIELD, 0..1. High where a bubble's body is, low on the walls
+/// between them.
+///
+/// Two scales: big bubbles with small ones packed into the gaps, which is how
+/// real foam is graded. The result is squared to leave the walls thin — a
+/// linear falloff makes every bubble a soft blob and the mass turns back into
+/// a wash.
+float SeaFoamBubbles(float2 p)
+{
+    float coarse = 1.0 - SeaCellular(p);
+    float fine   = 1.0 - SeaCellular(p * 2.9 + 17.3);
+
+    float bubbles = coarse * 0.65 + fine * 0.35;
+    return saturate(bubbles * bubbles * 1.35);
 }
 
 // -------------------------------------------------------- complex numbers
