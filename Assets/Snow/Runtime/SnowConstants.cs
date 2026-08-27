@@ -252,11 +252,11 @@ public static class SnowConstants
     /// Sastrugi: tepe-dip yükseklik (m), rüzgâra dik aralık, rüzgâr yönünde
     /// uzama. LENGTH rüzgâra DİK eksende, WIDTH rüzgâr yönünde.
     public const float SastrugiHeight = 0.20f;
-    public const float SastrugiLength = 0.60f;
+    public const float SastrugiLength = 0.90f;
     public const float SastrugiWidth = 2.20f;
 
     /// Drift: birikme tepecikleri. Aynı eksen kuralı sastrugi'deki gibi.
-    public const float DriftHeight = 0.30f;
-    public const float DriftLength = 2.00f;
-    public const float DriftWidth = 3.20f;
+    public const float DriftHeight = 0.15f;
+    public const float DriftLength = 0.90f;
+    public const float DriftWidth = 1.60f;
 }

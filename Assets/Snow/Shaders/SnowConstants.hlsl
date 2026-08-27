@@ -629,10 +629,17 @@
 /// zaten yapiyor ve 20 cm karda 12 cm veriyor — sastrugi ona hic degmiyordu,
 /// yani sinirlayan sey fizik degil o sabitti.
 ///
-/// 0.20 = arazi araliginin alt ucu. Egim 2*pi*0.10/0.60 = 1.05, yani 46
-/// derece. Karin durus acisi 38-45 derece ama sastrugi bir EROZYON sekli:
-/// ruzgar oydugu ve yuzey sertlestigi icin durus acisinin uzerinde
-/// durabiliyor.
+/// 0.20 = arazi araliginin alt ucu. LENGTH ONUNLA BIRLIKTE UST UCA CIKTI.
+///
+/// 0.60 aralikla egim 2*pi*0.10/0.60 = 1.05, yani 46 derece ve alcak gunes
+/// golgesi 1.13 m. Sastrugi bir EROZYON sekli, durus acisini asabiliyor —
+/// ama 46 derece RMS olarak fazla ve DRIFT'TE OLCULEN belirtiyi ayni sekilde
+/// uretir (uzun keskin golge seritleri). Drift 46 -> 27.6 dereceye
+/// indirilirken sastrugi ayni hatayla birakilmadi.
+///
+/// 0.90 aralikla egim 2*pi*0.10/0.90 = 0.698, yani 35 derece; golge 1.13 ->
+/// 0.85 m. Arazi araligi 45-90 cm ve 0.90 onun UST ucu — olcunun disina
+/// cikilmadi, icinde en genis deger secildi.
 ///
 /// Genlik artik guvenle arazi olcusunde, cunku sastrugi ve drift ayni
 /// noktada TOPLANMIYOR (`SnowYuzeyRolyef` -> maruziyet). Toplansalardi
@@ -642,7 +649,7 @@
 /// Bir tur LENGTH 0.60 -> 2.00 yapildi "egim cok dik" diye; YANLIS EKSENDI
 /// ve sastrugiyi enine sisirip yonsuzlestirdi. Geri alindi.
 #define SNOW_SASTRUGI_HEIGHT         0.20
-#define SNOW_SASTRUGI_LENGTH         0.60
+#define SNOW_SASTRUGI_LENGTH         0.90
 #define SNOW_SASTRUGI_WIDTH          2.20
 #define SNOW_SASTRUGI_WIND_TAU     120.0
 
@@ -673,14 +680,29 @@
 /// dalga boyunu uzatmak onlari BUYUK ama YUMUSAK yapiyor — birikme sekilleri
 /// zaten oyle. [KAYNAK: Filhol & Sturm 2015 — dune olcegi 1-5 m.]
 ///
-/// 30 cm / 2.00 m -> egim 2*pi*0.15/2.00 = 0.471, yani 25 derece. Durus
-/// acisinin belirgin altinda ve olculen kar yuzeyi bandina yaklasiyor.
-#define SNOW_DRIFT_HEIGHT              0.30
-#define SNOW_DRIFT_LENGTH              2.00
+/// IKI TUR OLCULDU, ORTAK PAYDA GENLIKTI.
+///
+/// 1. tur  30 cm / 90 cm  -> egim 46 derece. Belirti: uzun keskin golge
+///                            seritleri.
+/// 2. tur  30 cm / 2.00 m -> egim 25 derece. Egim duzeldi ama TEPECIKLER
+///                            BUYUDU ve golgeleri metrelerce genis amip
+///                            lekelerine dondu (kullanici: "cok tuhaf
+///                            duruyor"). Dalga boyunu uzatmak golgenin
+///                            BOYUNU degil ALANINI buyutuyor — golge boyu
+///                            yukseklige bagli, genisligi tepeye.
+///
+/// Iki turun ortak paydasi 30 cm genlikti. Referans goruntudeki tepecikler
+/// 40-100 cm aralikli; 2-3 m olcek "snow wave" bolgesi (10-20 m) ile dune
+/// arasi, kar YUZEYI degil.
+///
+/// 15 cm / 90 cm -> egim 2*pi*0.075/0.90 = 0.524, yani 27.6 derece. Durus
+/// acisinin (38-45) altinda, arazi araliginin (15-40 cm derin) alt ucunda,
+/// ve alcak gunes golgesi 0.15/tan(10) = 85 cm — metrelerce degil.
+#define SNOW_DRIFT_HEIGHT              0.15
+#define SNOW_DRIFT_LENGTH              0.90
 
-/// Ruzgar yonundeki uzama. Oran korunuyor (LENGTH'in 1.6 kati): drift
-/// tepecikleri ruzgar boyunca uzuyor ama sastrugi kadar degil.
-#define SNOW_DRIFT_WIDTH               3.20
+/// Ruzgar yonundeki uzama, LENGTH'in 1.6 kati.
+#define SNOW_DRIFT_WIDTH               1.60
 
 // --- İz içi AO (spec §18.5) ---
 

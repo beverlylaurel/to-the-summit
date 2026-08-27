@@ -2008,6 +2008,32 @@ karekök toplanıyor. Maruziyet 0.5'te ölçülen toplam:
 | Mikro | 0.160 |
 | **Toplam RMS** | **33.6°** |
 
-Arazide ölçülmüş kar yüzeyi RMS eğimi 5-15°. Hâlâ iki kat fazla ve baskın
-bileşen artık **sastrugi** (46° eğim). Kullanıcı ondan şikâyet etmedi, o
-yüzden bu turda dokunulmadı — bir sonraki belirtinin ilk şüphelisi o.
+Arazide ölçülmüş kar yüzeyi RMS eğimi 5-15°.
+
+**İkinci tur: dalga boyunu uzatmak yanlıştı.** 30 cm / 2.00 m eğimi 25°'ye
+indirdi ama tepecikleri büyüttü; gölgeler metrelerce geniş amip lekelerine
+döndü (kullanıcı: "çok tuhaf duruyor"). Dalga boyu gölgenin BOYUNU değil
+ALANINI değiştiriyor — boy yüksekliğe bağlı, genişlik tepeye.
+
+İki turun ortak paydası **genlikti**. Referans görüntüdeki tepecikler 40-100
+cm aralıklı; 2-3 m ölçek "snow wave" (10-20 m) ile dune arası, kar yüzeyi
+değil.
+
+**Üçüncü tur: genlik yarıya, dalga boyu geri.** 15 cm / 90 cm → eğim 27.6°,
+alçak güneş gölgesi 85 cm.
+
+**Sastrugi de aynı hataydı ve aynı turda düzeltildi.** 20 cm / 60 cm → 46.3°,
+gölge 1.13 m — drift'in ilk hâliyle birebir aynı. Erozyon şekli olduğu için
+duruş açısını aşabilir ama 46° RMS olarak fazla ve aynı belirtiyi üretirdi.
+Aralık 0.60 → 0.90 (arazi ölçüsünün üst ucu, dışına çıkılmadı): eğim 34.9°.
+
+| | Eğim | Alçak güneş gölgesi |
+|---|---|---|
+| Drift | 46.3° → **27.6°** | 1.70 m → **0.85 m** |
+| Sastrugi | 46.3° → **34.9°** | 1.13 m → **0.85 m** |
+| **Toplam RMS** | 39° → **28.8°** | |
+
+Hedef bandın (5-15°) hâlâ üstünde. Ama o band DÜZ kar alanı için; burada
+drift ve sastrugi alanı çiziliyor ve orada eğim gerçekten yüksek. Bir sonraki
+belirtide bakılacak yer fBm (0.19) ve mikro (0.16) — ikisi birlikte 0.25 ve
+hiçbir arazi ölçümüne dayanmıyorlar.
