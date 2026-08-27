@@ -33,10 +33,11 @@ public interface ISeaEnvironmentSource
 
     // --- Atmosphere: the input to surface reflection (spec §12) ---
 
-    /// Zenith sky color.
-    Color SkyColor { get; }
-
-    Color HorizonColor { get; }
+    /// THE SKY COLOUR IS NOT ASKED FOR ANY MORE. It used to be two constants
+    /// entered by hand and the sea reflected a blue that did not exist under a
+    /// grey sky. The surface now reflects the environment probe — the sky that
+    /// is really drawn. Coverage is still needed: the volumetric clouds are a
+    /// render feature drawn after the skybox and never enter the probe.
 
     /// 0 clear, 1 overcast.
     float CloudCover01 { get; }

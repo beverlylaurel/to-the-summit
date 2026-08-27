@@ -1228,8 +1228,10 @@ Yağış türü ayrı bir değişkenle değil sıcaklıktan türüyor — ikinci
 
 **Okumadığı, bilinçli:**
 
-- Gökyüzü rengi. Bu projede gökyüzü hacimsel bulut sisteminden ve skybox'tan
-  geliyor; tek bir "zenit rengi" property'si yok. Elle değer + `TODO(kullanıcı)`.
+- Gökyüzü rengini SAYI olarak okumuyor. Yüzey doğrudan ortam yansıma
+  probe'unu örnekliyor (`GlossyEnvironmentReflection`), yani gerçekten çizilen
+  gökyüzünü. Eskiden elle girilmiş iki sabit renk vardı ve deniz gri gökyüzünün
+  altında mavi yansıtıyordu; gerekçe `RATIONALE.md` → "Deniz plastik görünüyordu".
 - Kendi rüzgâr noise'u yok, kendi sis hesabı yok, kendi gökyüzü modeli yok,
   planar reflection yok.
 

@@ -27,8 +27,6 @@ public static class SeaSpectrumTest
 
         public Light Sun => null;
         public float SunElevation01 => 0.5f;
-        public Color SkyColor => Color.gray;
-        public Color HorizonColor => Color.gray;
         public float CloudCover01 => 0f;
         public float FogDensity01 => 0f;
         public SeaPrecipitationKind PrecipKind => SeaPrecipitationKind.None;

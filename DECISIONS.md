@@ -1949,3 +1949,19 @@ girebilir hâle gelmesi**:
 yüzey altından gökyüzü), oyuncu fizik durumu, kamera geçişi. iWave ayrıca ikinci bir
 simülasyon katmanı.
 
+
+
+## Deniz yansımasında bulut telafisi — geçici
+
+**Karar:** deniz yüzeyi ortam probe'unu yansıtıyor, ama probe'da hacimsel
+bulutlar yok (skybox'tan sonra çizilen bir render özelliği). Kapsamaya göre
+yansıma gri ve sönük bir kubbeye çekiliyor (`SeaLit.shader`, `overcast` terimi).
+
+**Gerekçe:** aksi hâlde fırtınada deniz mavi gökyüzü yansıtıyor. Terim tek
+satır ve fiziksel karşılığı var: bulut katmanı gökyüzünü gri difüz bir kubbeyle
+değiştirir.
+
+**Tetikleyici:** bulutlar bir yansıma probe'una ya da bir gökyüzü küpüne
+girdiğinde terim SİLİNİR — telafi teriminin gerekçesi ortadan kalkar.
+
+**Maliyet:** bir `dot` ve bir `lerp`.

@@ -63,8 +63,6 @@ Shader "ToTheSummit/SeaLit"
             float  _SeaRoughnessCalm;
             float  _SeaRoughnessRough;
 
-            float4 _SeaSkyColor;
-            float4 _SeaHorizonColor;
             float  _SeaCloudCover01;
             float  _SeaSunElevation01;
             float  _SeaPrecipIntensity01;
@@ -205,34 +203,89 @@ Shader "ToTheSummit/SeaLit"
                 }
             #endif
 
-                float3 volume = SeaVolumeColor(thickness);
-                float3 belowSurface = lerp(_SeaUpwellingColor.rgb, refracted * volume, volume);
-
-                // --- SKY REFLECTION (spec 12.4) ---
-                //
-                // The sea DOES NOT BUILD ITS OWN SKY MODEL. The game already
-                // has an atmosphere and two sources would contradict.
-                float3 R = reflect(-V, N);
-                float3 skyRefl = lerp(_SeaHorizonColor.rgb, _SeaSkyColor.rgb, saturate(R.y));
-                skyRefl = lerp(skyRefl, skyRefl * 0.62, _SeaCloudCover01);
-
-                // --- SUN GLITTER (spec 12.5) ---
                 Light mainLight = GetMainLight();
                 float3 L = mainLight.direction;
-                float3 H = normalize(V + L);
 
-                float roughness = lerp(_SeaRoughnessCalm, _SeaRoughnessRough,
-                                       saturate(length(_SeaWindWS) / 20.0));
+                // --- SURFACE ROUGHNESS ---
+                //
+                // It is read before the reflection, because BOTH the sun lobe and
+                // the environment lookup want it. Read separately the sea would
+                // have a sharp sun and a blurred sky, or the reverse.
+                float perceptualRoughness =
+                    lerp(_SeaRoughnessCalm, _SeaRoughnessRough,
+                         saturate(length(_SeaWindWS) / 20.0));
 
                 // Rain roughens the surface (spec 13.5).
-                roughness = lerp(roughness, 0.22, _SeaPrecipIntensity01 * 0.7);
+                perceptualRoughness = lerp(perceptualRoughness, 0.22,
+                                           _SeaPrecipIntensity01 * 0.7);
 
                 // DISTANT GLITTER IS DIFFUSE. Far waves live below what the
                 // camera can resolve, so the glitter spreads out
                 // [SOURCE: Tessendorf 2004 6 introduction].
-                roughness = lerp(roughness, 0.35, saturate((dist - 200.0) / 1500.0));
+                perceptualRoughness = lerp(perceptualRoughness, 0.35,
+                                           saturate((dist - 200.0) / 1500.0));
 
-                float spec = pow(saturate(dot(N, H)), max(2.0 / (roughness * roughness), 2.0));
+                // --- THE WATER BODY'S OWN COLOUR ---
+                //
+                // WHAT COMES OUT OF THE WATER IS LIGHT THAT WENT IN. The upwelling
+                // colour used to be written as a constant, so the sea stayed the
+                // same turquoise at night and under a storm — a colour with no
+                // light behind it. It is now treated as an albedo: the sky
+                // irradiance and the sun lay on top of it.
+                float3 waterLight = SampleSH(float3(0, 1, 0))
+                                  + mainLight.color * saturate(L.y);
+                float3 upwelling = _SeaUpwellingColor.rgb * waterLight;
+
+                float3 volume = SeaVolumeColor(thickness);
+                float3 belowSurface = lerp(upwelling, refracted * volume, volume);
+
+                // --- SKY REFLECTION (spec 12.4) ---
+                //
+                // THE REAL SKY IS REFLECTED, NOT AN INVENTED COLOUR. Two constants
+                // used to be read (`_SeaSkyColor`, `_SeaHorizonColor`) and they
+                // came from hand-entered fields on `SeaEnvironmentBridge`: under a
+                // grey storm sky the sea reflected a blue that did not exist, and
+                // at grazing angles — where Fresnel goes to 1 and the surface is
+                // ALL reflection — the horizon stayed turquoise instead of taking
+                // the sky's colour. That is what made the surface read as plastic.
+                //
+                // The scene already bakes the environment every frame
+                // (`SkyAmbientBaker` -> `DynamicGI.UpdateEnvironment()`), so the
+                // reflection probe is the sky that is really drawn. One source.
+                float3 R = reflect(-V, N);
+                float3 skyRefl = GlossyEnvironmentReflection(R, IN.positionWS,
+                                                             perceptualRoughness,
+                                                             1.0, screenUV);
+
+                // THE PROBE CARRIES THE SKY BUT NOT THE CLOUDS. The volumetric
+                // clouds are a render feature drawn after the skybox, so they never
+                // enter the baked cube and an overcast sky still arrives here as
+                // blue. Coverage pulls the reflection towards a grey, dimmer dome —
+                // which is what a cloud layer physically is. The term goes away the
+                // day the clouds reach a probe (`DECISIONS.md`).
+                float3 overcast = dot(skyRefl, float3(0.299, 0.587, 0.114)) * 0.85;
+                skyRefl = lerp(skyRefl, overcast, _SeaCloudCover01 * 0.85);
+
+                // --- SUN GLITTER (spec 12.5) ---
+                //
+                // GGX, NOT A BLINN LOBE. `pow(dot(N,H), 2/r^2)` is a shape with no
+                // grazing tail: the glitter path stayed the same width whatever the
+                // angle, and a surface whose highlight does not stretch reads as
+                // plastic. GGX's long tail is exactly the sun path that stretches
+                // out on a real sea.
+                float3 H = normalize(V + L);
+                float a  = perceptualRoughness * perceptualRoughness;
+                float a2 = a * a;
+
+                float NoH = saturate(dot(N, H));
+                float NoV = saturate(dot(N, V));
+                float NoL = saturate(dot(N, L));
+
+                float d = (NoH * a2 - NoH) * NoH + 1.0;
+                float D = a2 / (PI * d * d + 1e-7);
+                float Vis = 0.5 / max(1e-4, lerp(2.0 * NoL * NoV, NoL + NoV, a));
+
+                float spec = D * Vis * NoL;
 
                 // NO GLITTER AT NIGHT (spec 12.5, 18 pitfall).
                 spec *= saturate(_SeaSunElevation01 * 20.0);
@@ -240,8 +293,12 @@ Shader "ToTheSummit/SeaLit"
                 float3 glitter = mainLight.color * spec;
 
                 // --- COMBINE (spec 12.6) ---
+                //
+                // THE SUN LOBE IS ALSO WEIGHTED BY FRESNEL. It used to be added
+                // raw, so looking straight down — where the surface reflects almost
+                // nothing — the sun still burned on it.
                 float F = SeaFresnel(N, V);
-                float3 color = lerp(belowSurface, skyRefl, F) + glitter;
+                float3 color = lerp(belowSurface, skyRefl, F) + glitter * F;
 
                 // --- FOAM (spec 13) — THREE SOURCES ---
                 float foam = 0.0;

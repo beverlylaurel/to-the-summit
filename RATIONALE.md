@@ -2130,3 +2130,35 @@ yerler kaybediyor: yamalanma yalnız gürültüden değil arazinin kendisinden d
 `cos(6°) + 0.06 = 1.05` ve hiçbir yüzey oraya varamıyor — maske dümdüz zeminde bile
 0.73'te doyuyordu. CPU `cos(sınır ± 3°)` gönderiyor, pencere sınır nerede olursa
 olsun üç derece kalıyor.
+
+
+## Deniz plastik görünüyordu: yansıyan gökyüzü uydurmaydı
+
+Kullanıcının ifadesi: "denizin yüzeyi plastik gibi", "denizin renkleri berbat".
+
+Ölçüldü, kod okunarak: `SeaEnvironmentBridge.SkyColor` ve `HorizonColor`
+`[SerializeField]` iki sabit döndürüyordu — `(0.69, 0.84, 1.00)` ve
+`(0.80, 0.86, 0.92)`. Deniz gerçek gökyüzünü hiç okumuyordu.
+
+İki belirti buradan çıkıyor:
+
+1. **Ufukta renk yanlış.** Sıyırma açısında Fresnel 1'e gider, yani yüzey
+   TAMAMEN yansımadır ve ufuktaki denizin rengi göğün rengi OLMAK ZORUNDADIR.
+   Kaydedilen karede gök gri, deniz ufka kadar turkuaz. Fiziksel olarak imkânsız.
+2. **Plastiklik.** Sabit bir yansıma + tek Blinn lobu (`pow(dot(N,H), 2/r²)`)
+   plastik tarifidir: yansıma açıyla değişmiyor, speküler sıyırmada uzamıyor.
+
+Düzeltme, ikinci bir kaynak KURMADAN: sahne zaten her karede ortamı pişiriyor
+(`SkyAmbientBaker` → `DynamicGI.UpdateEnvironment()`), yani yansıma probe'u
+gerçekten çizilen gökyüzü. `GlossyEnvironmentReflection` onu pürüzlülüğe göre
+örnekliyor. Güneş lobu GGX'e çevrildi ve Fresnel ile ağırlıklandırıldı —
+eskiden ham toplanıyordu, yani dik aşağı bakarken bile güneş yüzeyde yanıyordu.
+
+Su kütlesinin rengi de sabitti; artık albedo gibi davranıyor ve gök ışınımıyla
+güneş üstüne biniyor. Eskiden gece de aynı turkuazdı — arkasında ışık olmayan
+bir renk.
+
+**Bilinen sınır:** hacimsel bulutlar skybox'tan SONRA çizilen bir render
+özelliği, yani pişen küpe girmiyorlar. Kapalı gökyüzü probe'a hâlâ mavi olarak
+ulaşıyor. Kapsama yansımayı gri ve sönük bir kubbeye çekiyor; bulutlar bir
+probe'a girdiği gün bu terim silinir (`DECISIONS.md`).

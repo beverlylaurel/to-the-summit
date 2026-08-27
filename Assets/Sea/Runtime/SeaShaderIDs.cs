@@ -13,8 +13,6 @@ public static class SeaShaderIDs
     public static readonly int SeaWindWS = Shader.PropertyToID("_SeaWindWS");
     public static readonly int SeaTime = Shader.PropertyToID("_SeaTime");
     public static readonly int SunElevation01 = Shader.PropertyToID("_SeaSunElevation01");
-    public static readonly int SkyColor = Shader.PropertyToID("_SeaSkyColor");
-    public static readonly int HorizonColor = Shader.PropertyToID("_SeaHorizonColor");
     public static readonly int CloudCover01 = Shader.PropertyToID("_SeaCloudCover01");
     public static readonly int PrecipIntensity01 = Shader.PropertyToID("_SeaPrecipIntensity01");
 

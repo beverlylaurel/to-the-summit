@@ -126,8 +126,6 @@ public class SeaManager : MonoBehaviour
         Shader.SetGlobalFloat(SeaShaderIDs.SeaTime, Mathf.Repeat(t, settings.loopPeriod));
 
         Shader.SetGlobalFloat(SeaShaderIDs.SunElevation01, env.SunElevation01);
-        Shader.SetGlobalColor(SeaShaderIDs.SkyColor, env.SkyColor);
-        Shader.SetGlobalColor(SeaShaderIDs.HorizonColor, env.HorizonColor);
         Shader.SetGlobalFloat(SeaShaderIDs.CloudCover01, env.CloudCover01);
 
         // Falling snow does not add foam to the sea surface — only rain

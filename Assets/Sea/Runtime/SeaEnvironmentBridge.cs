@@ -44,9 +44,6 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
     ///
     /// Default [SOURCE: Tessendorf 2004 §6.3 sample shader —
     /// `sky = color(0.69, 0.84, 1)`].
-    [SerializeField] Color manualSkyColor = new Color(0.69f, 0.84f, 1.00f);
-    [SerializeField] Color manualHorizonColor = new Color(0.80f, 0.86f, 0.92f);
-
     [SerializeField, Range(0f, 1f)] float manualCloudCover = 0.3f;
     [SerializeField, Range(0f, 1f)] float manualFogDensity = 0.2f;
 
@@ -111,10 +108,6 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
         timeOfDay != null ? Mathf.Clamp01(timeOfDay.SunHeight) : 0.5f;
 
     // -------------------------------------------------------- atmosphere
-
-    public Color SkyColor => manualSkyColor;
-
-    public Color HorizonColor => manualHorizonColor;
 
     public float CloudCover01 =>
         atmosphere != null ? Mathf.Clamp01(atmosphere.Coverage) : manualCloudCover;
