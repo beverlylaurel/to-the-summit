@@ -118,6 +118,31 @@ Asıl iş mutlak dünya zamanının ağdan gelmesi — o zaten gerekecek (bkz. m
 
 ---
 
+## 7. Ayak izi yerel simülasyon
+
+`SnowManager` izi kendi GPU dokusuna yazıyor (`RT_SnowTrail`) ve o doku
+tamamen yerel: kimin yazdığı, kimin yaydığı, kimin otorite olduğu tanımlı
+değil. Tek oyuncuda doğru — iz yazan da okuyan da aynı makine.
+
+**Olması gereken:** iz dünyaya çakılı bir harita ve paylaşılan bir durum.
+İkinci oyuncunun izi birincide görünmeli, ve iki oyuncu aynı yere basınca
+kar iki kez sıkışmalı.
+
+**Neden şimdi büyüdü:** iz artık yalnız gölgelendirme değil, GERÇEK GEOMETRİ
+(`SnowTessYerDegistirme` içinde `SnowDentSmooth`). Karakter kendi izinin
+üstünde duruyor. İz senkronize değilse iki oyuncu farklı zeminde yürür —
+görsel uyuşmazlık değil, konum uyuşmazlığı.
+
+**Maliyet:** deformasyon bölgesi 24 m ve kamerayla kayıyor. Paylaşım o
+bölgenin durumu değil, DEFORMER OLAYLARI üzerinden kurulmalı (kim, nerede,
+hangi yarıçapla bastı) — bölge içeriği her istemcide aynı olaylardan
+deterministik olarak yeniden üretilir.
+
+**Bu madde daha önce "henüz yazılmadı" bölümündeydi ve orada kalmıştı;
+ayak izi yazıldığı hâlde satır taşınmamıştı.**
+
+---
+
 ## Henüz yazılmadı, ama bu katmanı isteyecek
 
 Bunlar borç değil — ortada düzeltilecek kod yok. Ama ağ katmanını **tasarlayan** kişinin
@@ -126,7 +151,6 @@ yeniden kuruluyor.
 
 | Ne | Ne isteyecek | Ayrıntı |
 |---|---|---|
-| **Kar üzerinde ayak izi** | Oyuncunun araziye yazdığı, dünyaya çakılı bir harita. Kimin tuttuğu, kimin yaydığı, kimin otorite olduğu | `DECISIONS.md` → "Ayak izi ertelendi" |
 | **Tırmanma ve ip** | Oyuncular arası fiziksel bağ; iki oyuncunun aynı ipe asılı olması | `DECISIONS.md` → "Oynanış mekaniği netleşmeden koda başlanmaz" |
 | **Envanter ve ekipman** | Oyuncu durumu, kayıp/ölüm senkronu | aynı madde |
 | **Kamp ve sığınak** | Paylaşılan etkileşimli obje, ortak koşu durumu | aynı madde |
@@ -140,6 +164,17 @@ Bu satırlardan biri yazıldığı gün karşılığı yukarıdaki borç listesi
 Bunlar ağ eklendiğinde olduğu gibi kalabilir; listeye tekrar girmesinler:
 
 - **Terrain üretimi** — tohumdan deterministik, her istemcide aynı dağ çıkar
+- **Kar yüzeyi tessellation'ı ve yer değiştirmesi** — tamamen yerel görüntü;
+  her istemci kendi kamerasına göre bölüyor, dünya aynı kalıyor.
+
+  **AMA BİR KURAL DOĞURDU.** Kar yüzeyi yükseklik fonksiyonu
+  (`SnowYuzeyRolyef` ve C# ikizi `SnowSurfaceHeight`) **saf kalmak zorunda**:
+  girdisi yalnız dünya konumu, kar durumu ve rüzgâr maruziyeti. Kare sayacı,
+  `Time` veya yerel rastgelelik girerse iki oyuncu farklı zeminde yürür —
+  karakter konumu ağ üzerinde paylaşıldığı için bu doğrudan uyuşmazlık olur.
+
+  Şu an temiz. "Rüzgârla dalgalanan yüzey" gibi bir özellik eklenirse borç
+  anında doğar ve bu satır borç listesine taşınır.
 - **Yüzey haritaları** — terrain'den türüyor, ayrıca taşınmaları gerekmez
 - **Gölgelendiriciler, tanecik biçimi, ses karışımı, post-process** — tamamı yerel görüntü
 - **Ayar asset'leri** — build'in parçası, çalışma zamanında değişmiyorlar

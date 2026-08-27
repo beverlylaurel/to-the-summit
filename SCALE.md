@@ -204,3 +204,27 @@ başka bir yol (ayrı yakın-plan mesh'i) gerekir.
 (24 m), texel boyu (4.7 cm), ayak ölçüleri, adım aralığı, iz derinliği. Hepsi gerçek
 dünya büyüklüğü; dağın boyuyla ilgileri yok.
 
+
+## Tessellation — elle bakılacak
+
+`SNOW_TERRAIN_VERTEX_SPACING` (7.32 m) dağın boyundan ve heightmap
+çözünürlüğünden türüyor: `terrainSize / (heightmapResolution − 1)`.
+
+Dağ büyütülür veya küçültülürse **kendiliğinden kaymaz**, sabit yanlış kalır.
+Sonucu `SNOW_TESS_MIN_DALGA`'yı da bozar: eşik o aralıktan hesaplanmış.
+
+Dağ boyu değiştiğinde ikisi birden elden geçirilir:
+
+    en ince geometri     = SNOW_TERRAIN_VERTEX_SPACING / 64
+    SNOW_TESS_MIN_DALGA ≈ en ince geometri × 4     (Nyquist × 2 güvenlik payı)
+
+Sabit C# tarafında da duruyor (`SnowConstants.TerrainVertexSpacing`) ve
+`SnowConstantsTest` ikisini karşılaştırıyor — tek tarafta düzeltmek testi
+kırar, yani unutulamaz.
+
+`tessNear` / `tessFar` (15 / 60 m) **bilerek mutlaktır**: oyuncunun gözünden
+mesafe, dağın boyuyla ilgisi yok.
+
+Yer şekli genlikleri (`SNOW_DRIFT_HEIGHT`, `SNOW_SASTRUGI_HEIGHT`,
+`SNOW_RIPPLE_AMP`) de **bilerek mutlak** — arazide ölçülmüş santimetreler,
+dağ ne kadar büyürse büyüsün kar tanesi büyümüyor.

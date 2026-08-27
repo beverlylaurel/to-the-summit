@@ -1896,3 +1896,81 @@ düştü: ters yönde karşılığı yok.
 Doku dağılımı tersine dönüyor. `Ruzgar` haritasının kıvrımlı oyukları bir
 kez sorun çıkarmıştı (`SNOW_SURF_EGIM_TAVANI` 0.7 → 0.35 orada düşürüldü);
 eğim tavanı hâlâ 0.35 ve o düzeltme yerinde duruyor.
+
+## Kar yüzeyi neden geometri oldu
+
+**Belirti.** "Hafif uzak zemin detaysız gözüküyor. Kar zeminindeki detayların
+render mesafesini artıralım."
+
+İki tur boyunca doku ve LOD kapıları suçlandı; ikisi de gerçek kusurdu ama
+belirtiyi kapatmadı. Sebep yapısal: **normal haritası silüete ve örtüşmeye
+katkı vermiyor.** Sıyırtma açıda bir yüzeyin görünümünü tamamen o ikisi
+belirliyor — tepenin arkası görünmüyorsa yüzey vardır, gölgelendirme ne
+derse desin.
+
+**Bu iş bir kez denenmiş ve fizik yüzünden geri alınmış.**
+`MountainSurface.shader` yorumu: *"ayak 205.539, kaya 205.489, çizilen yüzey
+205.98 — karakter yarım metre gömülü başlıyordu."* O tur kar yüksekliğinin
+geometriden tamamen çıkarılmasıyla bitti.
+
+Bu turda fizik uyumu işin **parçası**: `SnowSurfaceHeight` (C# ikizi) +
+`SnowHeightParityTest` (512 örnek, 0.02 mm sapma) + `SnowGroundOffset`
+(karakteri her kare yüzeye oturtuyor). Üçü olmadan aynı yere çıkılırdı.
+
+**Neden ayrı kar mesh'i değil.** Kullanıcı kararı: mesh bu projede iki kez
+sorun çıkardı. Tessellation ayrı bir nesne üretmiyor, Terrain'in kendi
+üçgenlerini bölüyor.
+
+**Ölçek tavanı.** Terrain köşe aralığı 7.32 m (30 km / 4096), donanım bölme
+tavanı 64 → en ince geometri 11.4 cm. Bu aşılamaz; alt-11-cm her şey normal
+haritasında kalıyor ve orada kalması doğru.
+
+**Ölçülen değerler** (edit modda, ayrı kamera, tek değişken `_SnowDbgNoTess`):
+
+| Aşama | Açık-kapalı fark |
+|---|---|
+| Görev 3 — gerçek alan bağlandı, genlikler eski | %16.95 |
+| Görev 5 — drift eklendi | drift tek başına %29.54 |
+| Görev 7 — genlikler arazi ölçüsünde | %48.72 |
+
+İkili test (sabit 2 m yer değiştirme, kamera zeminin 1 m üstünde): tess açık
+%45.4 gökyüzü (kamera yüzeyin içinde kaldı), kapalı %0. Yer değiştirmenin
+uçtan uca uygulandığının kesin kanıtı.
+
+## Drift ve sastrugi neden ayrıldı
+
+Sastrugi **erozyon** şekli — rüzgâr karı oyuyor, keskin sırt ve dik yüz
+bırakıyor, oluşumu 20 m/s üstü rüzgâr istiyor. Drift **birikme** şekli —
+rüzgârın yavaşladığı siperde çöküyor, yuvarlak ve yumuşak. Spec §18.0 zaten
+rüzgâr gölgesinde aşınmayı tamamen kapatıyor.
+
+**Bu ayrım RMS eğim bütçesini çözdü.** İkisi aynı noktada toplansaydı yüzeyin
+toplam eğimi ölçülen 5-15° bandını iki kat aşardı — bir tur önce ölçülüp
+"Sastrugi arazi ölçüsüne çıkarılamadı" diye yazılmıştı. Ayrıldıkları için
+`SNOW_SASTRUGI_BASE` ve `SNOW_RIPPLE_BASE` kısıtları güvenle silinebildi ve
+genlikler arazi ölçüsüne çıktı.
+
+**Ölçülen ayrım** (sahte rüzgâr gölgesi dokusu: sol yarı siper, sağ yarı açık;
+her anahtar tek değişken):
+
+| Anahtar | SOL (siper) | SAĞ (açık) |
+|---|---|---|
+| Drift | 43217 piksel | 0 |
+| Sastrugi | 1 piksel | 227 |
+
+## Compute shader'da iki sessiz derleme tuzağı
+
+`SnowHeightProbe.compute` yazılırken iki kez kernel "geçersiz" çıktı ve
+`GetComputeShaderMessages` **boş döndü**. Hata mesajı yok, yalnız
+`FindKernel` başarısız.
+
+1. **`fwidth` compute aşamasında tanımsız.** `SnowPikselBoyu` onu
+   kullanıyordu. `SHADER_STAGE_COMPUTE` altında 0 döndürülüyor — doğru değer,
+   çünkü compute'u yalnız eşlik testi kullanıyor ve orada örnekleme frekansı
+   sonsuz.
+2. **`SAMPLER` makrosu URP core `Common.hlsl`'den geliyor.**
+   `GlobalSamplers.hlsl` ondan önce include edilirse aynı sessiz hata.
+   `SnowSim.compute` zaten doğru sırayı kullanıyordu.
+
+Ders: compute kernel'i geçersizse önce include sırasına ve fragment-only
+içsel fonksiyonlara bakılır, formüle değil.

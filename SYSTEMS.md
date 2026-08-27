@@ -821,6 +821,39 @@ edip leke ızgarası üretiyordu. Eğime fiziksel tavan var (35°): normal
 haritanın mavi kanalı sıkıştırmayla sıfıra yaklaşınca `n.xy/n.z` patlıyor ve
 izole koyu mavi noktalar çıkıyordu.
 
+**Kar yüzeyi GEOMETRİ.** Terrain üçgenleri donanım tessellation'ı ile
+kameraya göre bölünüyor (`SnowTessellation.hlsl`), yeni köşeler
+`SnowYuzeyRolyef`'in verdiği yükseklik kadar dünya +Y yönünde kayıyor. Dört
+geçiş de (ForwardLit, ShadowCaster, DepthOnly, DepthNormals) aynı hull/domain'i
+kullanıyor — biri eksik kalsa gölge yüzeyden kayardı.
+
+Kenar bölme faktörü **yalnız kenarın iki ucundan** hesaplanıyor; komşu patch
+aynı iki köşeyi gördüğü için aynı faktörü üretiyor ve çatlak matematiksel
+olarak imkânsız oluyor.
+
+Bölme faktörü **ana kameranın** konumundan (`_SnowTessCameraPos`) geliyor,
+`_WorldSpaceCameraPos`'tan değil: gölge geçişinde o değişken ışığın konumunu
+tutuyor.
+
+**50 cm eşiği.** Geometriye yalnız dalga boyu 50 cm'den uzun katmanlar giriyor
+(fBm, drift, sastrugi). Ripple (17 cm) ve mikro (8.3 cm) normal haritasında
+kalıyor — en ince geometri 11.4 cm ve altındaki dalga taşınamıyor.
+
+**Drift ↔ sastrugi rüzgâr maruziyetiyle ayrılıyor.** Siperde birikme
+tepecikleri (yuvarlak, 30 cm), açıkta erozyon sırtları (keskin, 20 cm). Aynı
+noktada ikisi birden olmuyor; yüzeyin toplam eğimi bu yüzden ölçülen 5-15°
+bandında kalırken yerel olarak 40-50°'ye çıkabiliyor.
+
+**Ayak izi de geometri.** `SnowReliefOffset` (doku uzayında paralaks) kalktı;
+aynı çukur iki kez oyulurdu. İz `SnowDentSmooth` ile yer değiştirmeye giriyor,
+yani izin yanındaki kabarma da gerçek geometri.
+
+**Fizik aynı fonksiyonu okuyor.** `SnowGroundOffset` karakteri
+`SnowSurfaceHeight`'a göre kaldırıyor; o sınıf `SnowYuzeyRolyef`'in C# ikizi
+ve eşliği `SnowHeightParityTest` ile sınanıyor (512 örnek, tolerans 1 mm).
+`SnowManager.WindShadowAt` rüzgâr gölgesinin CPU kopyasını veriyor — kopya
+alan yakınsayınca bir kez isteniyor, rüzgâr 15° dönünce yenileniyor.
+
 **Dokunun iki ayrı mesafe kapısı var.** Kabartı (normal + pürüzlülük) 8-28 m
 arasında sönüyor — piksel altına düşen kabartı aliasing üretiyor ve mip'lenmiş
 normal yanlış parlaklık veriyor. Renk deseni 80-250 m'ye kadar duruyor: mip

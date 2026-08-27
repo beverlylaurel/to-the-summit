@@ -1835,3 +1835,39 @@ aynı görünmesi rahatsız edici hâle gelirse.
 `RT_Snow` da öyle (SWE / yoğunluk / ıslaklık / bozulma). Yaş için beşinci bir
 kanal, yani yeni bir doku gerekiyor — 1024² RHalf = 2 MB. Ya da sastrugi ile
 kabuk tek kanalda paketlenip yer açılır.
+
+## Kar yüzeyi geometrisi: tessellation, ayrı mesh değil
+
+**Karar (2026-08-27).** Kar yüzeyinin alt-metre tepecikleri donanım
+tessellation'ı ile Terrain üçgenleri bölünerek üretiliyor. Ayrı bir kar
+mesh'i kurulmuyor.
+
+**Gerekçe.** Kullanıcı kararı: *"mesh asla istemiyorum. mesh bize her zaman
+sorun çıkardı."* Tessellation ayrı nesne üretmiyor, mevcut geometriyi bölüyor.
+
+**Maliyet.** En ince geometri 11.4 cm ile sınırlı (Terrain köşe aralığı 7.32 m
+÷ donanım tavanı 64). Ripple (17 cm) ve mikro (8.3 cm) oktavları geometriye
+giremiyor, normal haritasında kalıyorlar.
+
+**TETİKLEYİCİ — hangi belirtide geri dönülür.** Tepecikler 11.4 cm tavanı
+yüzünden geometrik olarak fazla yumuşak kalırsa. O durumda tek çıkar yol
+Terrain heightmap çözünürlüğünü artırmak (4097 → 8193, köşe aralığı 3.66 m,
+en ince geometri 5.7 cm); bellek dört katına çıkar ve `SCALE.md`'deki iki
+sabit elden geçer.
+
+## Relief mapping silindi, iz geometriye taşındı
+
+**Karar (2026-08-27).** `SnowReliefOffset` ve ışın yürüyüşü kaldırıldı; ayak
+izi `SnowTessYerDegistirme` içinde gerçek geometri olarak oyuluyor.
+
+**Gerekçe.** Çevresindeki kar 20-30 cm tepecikler hâlinde yükselirken iz düz
+kalırsa görünmez oluyor. İkisi birden kalsaydı aynı çukur iki kez oyulur ve
+iz iki kat derin görünürdü.
+
+**Ne kaybedildi.** Işın yürüyüşünün 12-32 adımı ve üç sabit
+(`SNOW_RELIEF_STEPS_MIN/MAX`, `SNOW_RELIEF_MAX_STRETCH`). 95 satır kod.
+
+**TETİKLEYİCİ.** İzin kenarında geometrik basamak görülürse — o, izin
+genişliğinin `SNOW_TESS_MIN_DALGA`'nın (50 cm) altında kalması demek olur.
+İz yarıçapı 3.4-5.5 cm; eşik izi geometriden eleyebilir. Belirti görülürse
+iz için ayrı bir eşik gerekir.

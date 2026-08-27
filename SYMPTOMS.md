@@ -3520,3 +3520,17 @@ kapatılmamıştı — aynı sınıfın ikinci kullanım yeri.
 filtrelemesi bu durumda anizotropik davranıyor: mip kısa eksenden seçiliyor.
 Dik bakışta iki eksen eşit olduğu için davranış `max` ile aynı kalıyor —
 titreme kontrolü ("zemin tir tir titriyor") o açıda ölçülmüştü ve bozulmuyor.
+
+**BU DÜZELTME DE BELİRTİYİ KAPATMADI.** Kullanıcı bildirdi: "bi değişiklik
+olmadı ki". Doku kapısı gibi bu da gerçek bir kusurdu ama sebep değildi.
+
+**Gerçek sebep yapısaldı: normal haritası silüete ve örtüşmeye katkı
+vermiyor.** Sıyırtma açıda bir yüzeyin görünümünü tamamen o ikisi belirliyor;
+hangi LOD ayarı yapılırsa yapılsın düz bir üçgen düz görünür. Çözüm
+`RATIONALE.md` → "Kar yüzeyi neden geometri oldu": Terrain üçgenleri
+tessellation ile bölünüp gerçek yükseklik kadar kaydırılıyor.
+
+**Ders.** Aynı belirtiye üç ayrı LOD/fade düzeltmesi yapıldı ve üçü de
+tutmadı. Üçüncüde durup "bu ayar sınıfı belirtiyi kapatabilir mi" diye
+sorulmalıydı — cevap hayırdı, çünkü hiçbir gölgelendirme ayarı silüet
+üretemez.
