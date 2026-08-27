@@ -241,6 +241,17 @@ dağ ne kadar büyürse büyüsün kar tanesi büyümüyor.
 | `patchSizes` (512/128/24 m) | **bilerek mutlak** | Dalga boyu ölçeği; fiziksel deniz özelliği. |
 | Bathymetry çözünürlüğü | **kendiliğinden ölçeklenir** | Arazi heightmap'inden geliyor (şu an 7.3 m/teksel). Arazi boyu değişince teksel boyu da değişir — su çizgisinin basamak boyu da. |
 
+### Kıyı kumu
+
+| Sayı | Kategori | Not |
+|---|---|---|
+| `sandBandAbove` = 1.6 m | **elle bakılacak** | Dağın boyuna değil **kıyının eğimine** bağlı. Ölçülen ortalama eğim 2.14° → 1 m ≈ 27 m yer; kuru şerit ~43 m. Kıyı yeniden oyulursa yeniden ölçülmeli. |
+| `sandBandBelow` = 1.2 m | **elle bakılacak** | Aynı gerekçe; su altındaki sığ taban ~32 m. |
+| `sandFade` = 0.6 m | **elle bakılacak** | Aynı gerekçe; geçiş ~16 m. |
+| `sandSlopeLimit` = 6° | **elle bakılacak** | Bandın en dik örneği 5.13° ölçüldü. Kıyı dikleşirse sınır anlamsızlaşır (her yer kum) ya da kum tamamen kaybolur. |
+| `sandPatchScale` = 900 m | **bilerek mutlak** | Bir kum koyunun kıyı boyunca uzunluğu; yürüyüş mesafesi ölçüsü, dağın boyuyla ilgisi yok. |
+| `sandTexScale` = 2 m | **bilerek mutlak** | Dokunun gerçek fiziksel boyu. |
+
 **Dağın boyu değişirse deniz için sorulacak tek soru:** kıyı şeridi hâlâ 3–4 km mi?
 Cevabı ölçmek için batı kenarında Z boyunca kesit alıp `30 − zemin > 0` bandının
 genişliğine bakılır.

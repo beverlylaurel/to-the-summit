@@ -406,6 +406,68 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     float scree = smoothstep(_ScreeRange.x, _ScreeRange.y, deposition) * screeFit * _ScreeAmount;
     albedo = lerp(albedo, _ScreeColor.rgb * (0.8 + grain * 0.4), scree);
 
+    // --- Sand: part of the shore, not all of it ---
+    //
+    // Three conditions have to hold AT ONCE, and that is what leaves part of the coast
+    // as rock: the elevation inside the band, a slope gentle enough for sand to hold,
+    // and the patch field open at that point. A steep shore stays a rock headland; a
+    // gentle one with the patch open becomes a bay of sand.
+    //
+    // The band hangs from `_SeaLevelY` — the STILL-water level — not from
+    // `_SeaWetLevelY`: that one carries the run-up and moves with every wave.
+    float sandTop    = _SeaLevelY + _SandBandAbove;
+    float sandBottom = _SeaLevelY - _SandBandBelow;
+    float sandBand = (1.0 - smoothstep(sandTop - _SandFade, sandTop, worldPos.y))
+                   * smoothstep(sandBottom, sandBottom + _SandFade, worldPos.y);
+
+    // The patch scale is in metres and asks for a wavelength; `MountainFbm` wants a
+    // frequency, hence the reciprocal. Two octaves: the boundary should undulate, not fray.
+    float sandPatch = MountainFbm(float3(worldPos.x, 0.0, worldPos.z)
+                                  * (1.0 / max(1.0, _SandPatchScale)), 2);
+
+    // THE SLOPE WINDOW ARRIVES AS TWO COSINES, it is not built here. The rock and gravel
+    // masks add a fixed +-0.08 to `cos(limit)`, which works at their 38 degrees but breaks
+    // at a shallow limit: `cos(6 deg) + 0.06` is 1.05 and no surface can reach it, so the
+    // mask saturated at 0.73 even on dead flat ground. The CPU sends `cos(limit +- 3 deg)`
+    // and the window is the same three degrees wherever the limit sits.
+    float sandFit = smoothstep(_SandSlopeCos.x, _SandSlopeCos.y, slope);
+
+    float sand = sandBand * sandFit * _SandAmount
+               * smoothstep(_SandPatchThreshold - 0.12, _SandPatchThreshold + 0.12, sandPatch);
+
+    // THE DERIVATIVES ARE TAKEN OUTSIDE THE BRANCH. `ddx`/`ddy` are undefined in
+    // divergent control flow, and at the edge of the band one quad really does diverge.
+    // Taken here and handed to `SAMPLE_TEXTURE2D_GRAD`, the mip is correct in both branches.
+    float2 sandUV = worldPos.xz / max(0.01, _SandTexScale);
+    float2 sandDX = ddx(sandUV);
+    float2 sandDY = ddy(sandUV);
+
+    // The rock's own relief is faded out by the same mask further down, so the two do not add up.
+    float2 sandSlopeXZ = float2(0.0, 0.0);
+    float sandSmoothness = 0.0;
+
+    UNITY_BRANCH
+    if (sand > 0.002)
+    {
+        half3 sandColor = SAMPLE_TEXTURE2D_GRAD(_SandAlbedo, sampler_SandAlbedo,
+                                                sandUV, sandDX, sandDY).rgb * _SandTint.rgb;
+        half sandOcc = SAMPLE_TEXTURE2D_GRAD(_SandAO, sampler_SandAlbedo,
+                                             sandUV, sandDX, sandDY).r;
+        half sandRough = SAMPLE_TEXTURE2D_GRAD(_SandRough, sampler_SandAlbedo,
+                                               sandUV, sandDX, sandDY).r;
+        half4 sandNrm = SAMPLE_TEXTURE2D_GRAD(_SandNormal, sampler_SandAlbedo,
+                                              sandUV, sandDX, sandDY);
+
+        albedo = lerp(albedo, sandColor * sandOcc, sand);
+        sandSmoothness = 1.0 - sandRough;
+
+        // The map is OpenGL convention: X is the world X tilt, Y the world Z tilt. The
+        // ground here is nearly flat by definition (the slope limit lets nothing steep in),
+        // so the tangent frame is the world frame and no basis has to be built.
+        float3 n = UnpackNormalScale(sandNrm, _SandNormalStrength);
+        sandSlopeXZ = n.xy;
+    }
+
     // --- Wetness: precipitation darkens and glosses the rock ---
     float wet = _SurfaceWetness * (1.0 - exposure * 0.3);
     albedo *= 1.0 - wet * _WetDarkening;
@@ -439,7 +501,10 @@ MountainSurface BuildMountainSurface(float3 worldPos)
 
     float2 gradient = float2(-bx, -bz);
 
-    float2 shaped = gradient * rockRelief;
+    // The rock relief and the sand relief are CROSSFADED, not summed: the sand map already
+    // carries its own dimples and grain, and adding the procedural rock bump on top would
+    // leave the beach with two conflicting reliefs at two different scales.
+    float2 shaped = lerp(gradient * rockRelief, sandSlopeXZ, sand);
 
     float3 shaded = normalize(normalWS + float3(shaped.x, 0.0, shaped.y));
 
@@ -456,6 +521,10 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     surface.emission = Alpenglow(worldPos, normalWS, altitude, albedo, exposure);
     surface.normalWS = shaded;
     surface.smoothness = lerp(_RockSmoothness, _WetSmoothness, wet);
+
+    // The sand's own roughness map replaces the rock's; the sea wetness below then makes the
+    // wet strip glossier on top of it, which is the order it happens in reality too.
+    surface.smoothness = lerp(surface.smoothness, sandSmoothness, sand);
 
     // WET SAND IS GLOSSIER. Spec §14 cuts the roughness to 0.35 of its value; this code
     // holds smoothness, so it is converted to roughness and back — multiplying smoothness

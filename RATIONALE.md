@@ -2093,3 +2093,40 @@ kademesi neyin ne kadar yakından çözüldüğünü değiştiriyor, kaç üçge
 tanımsız davranıştır. Yalnız bellek işlemleri kapatılıyor; döngü sınırı sabit
 tamponundan geldiği için grup içinde aynı ve döngü uniform kalıyor.
 
+
+
+## Kum bandı metreyle tanımlı ama görünen şey yerdeki genişliği
+
+Kıyı kumu, deniz kotunun altında ve üstünde bir yükseklik bandı olarak tanımlı.
+Bandı doğrudan metre olarak seçmek yanıltıcı: ekranda görünen, bandın **yerdeki**
+genişliği ve o genişliği kıyının eğimi belirliyor.
+
+**Ölçüldü** (30×30 km arazi, deniz kotu 30 m, 1400² örnek):
+
+| Büyüklük | Değer |
+|---|---|
+| Bant içindeki ortalama eğim | 2.14° |
+| Bant içindeki en dik örnek | 5.13° |
+| 1 m yükseklik ≈ yerde | ~27 m |
+
+Kesitlerde ±9/−6 m'lik bir bant 293–720 m genişliğinde çıkıyordu (bir kesitte,
+neredeyse düz bir alanda 6527 m). O bir kumsal değil, kum ovası.
+
+Seçilen: **üstte 1.6 m, altta 1.2 m, geçiş 0.6 m** → kuru şerit ~43 m, su altındaki
+sığ taban ~32 m. Gerçek bir kumsalın fırtına bermi bu mertebede.
+
+**Bu sayı dağın boyuna değil, kıyının eğimine bağlı.** Kıyı yeniden oyulursa
+yeniden ölçülmeli (`SCALE.md`).
+
+## Kum eğim sınırı 6°, duruş açısı 34° değil
+
+Kum ~34°'ye kadar durur; sınır oraya konsaydı bu kıyıda **hiç** devreye girmezdi —
+bandın en dik örneği 5.13°. Eğim o hâlde bir koşul olmaktan çıkıyor ve kıyının
+tamamı tek tip kum oluyor. 6°'de yatık şeritler tam kum alıyor, 5° civarındaki
+yerler kaybediyor: yamalanma yalnız gürültüden değil arazinin kendisinden de geliyor.
+
+**Pencere kosinüs olarak CPU'da hesaplanıyor.** Kaya ve çakıl maskeleri
+`cos(sınır) ± 0.08` yazıyor; bu 38°'de çalışıyor ama sığ bir sınırda kırılıyor:
+`cos(6°) + 0.06 = 1.05` ve hiçbir yüzey oraya varamıyor — maske dümdüz zeminde bile
+0.73'te doyuyordu. CPU `cos(sınır ± 3°)` gönderiyor, pencere sınır nerede olursa
+olsun üç derece kalıyor.

@@ -68,6 +68,7 @@ public static class MountainSceneBootstrap
     const string BoltShaderPath = "Assets/Shaders/LightningBolt.shader";
     const string BoltMaterialPath = "Assets/Settings/LightningBolt.mat";
     const string SurfaceShaderPath = "Assets/Shaders/MountainSurface.shader";
+    const string SandTexturePath = "Assets/Textures/Sand";
     const string PrecipitationShaderPath = "Assets/Shaders/Precipitation.shader";
     const string RainStreakDatabasePath = "Assets/Rain/RainStreakDatabase.asset";
     const string SeaSettingsPath = "Assets/Sea/Settings/SeaSettings.asset";
@@ -1749,7 +1750,7 @@ public static class MountainSceneBootstrap
 
         var surface = SurfaceComponent(gen, ref changed);
         surface.Bind(
-            LoadOrCreateTerrainMaterialSettings(),
+            BindSandTextures(LoadOrCreateTerrainMaterialSettings()),
             Object.FindAnyObjectByType<WeatherState>(),
             Object.FindAnyObjectByType<WindField>(),
             Object.FindAnyObjectByType<TimeOfDay>(),
@@ -1902,6 +1903,41 @@ public static class MountainSceneBootstrap
         settings = ScriptableObject.CreateInstance<T>();
         AssetDatabase.CreateAsset(settings, path);
         AssetDatabase.SaveAssets();
+
+        return settings;
+    }
+
+    /// THE SAND MAPS ARE BOUND FROM CODE TOO. Dragged in by hand, the settings asset can
+    /// silently come up empty between one scene setup and the next; the shader reads a missing
+    /// texture as black and the shore goes dark. Missing maps are not swallowed — they throw
+    /// here, because a shore without sand should be a decision, not an accident.
+    static TerrainMaterialSettings BindSandTextures(TerrainMaterialSettings settings)
+    {
+        Texture2D Load(string name) =>
+            AssetDatabase.LoadAssetAtPath<Texture2D>($"{SandTexturePath}/{name}.png");
+
+        Texture2D albedo = Load("T_Sand_Albedo");
+        Texture2D normal = Load("T_Sand_Normal");
+        Texture2D rough = Load("T_Sand_Roughness");
+        Texture2D ao = Load("T_Sand_AO");
+
+        if (albedo == null || normal == null || rough == null || ao == null)
+            throw new System.InvalidOperationException(
+                $"Kum dokuları bulunamadı: {SandTexturePath}");
+
+        if (settings.sandAlbedo == albedo && settings.sandNormal == normal
+            && settings.sandRoughness == rough && settings.sandAO == ao)
+            return settings;
+
+        settings.sandAlbedo = albedo;
+        settings.sandNormal = normal;
+        settings.sandRoughness = rough;
+        settings.sandAO = ao;
+
+        // Without bumping the revision, `TerrainSurface.ApplySettings` skips and the maps
+        // never reach the material.
+        settings.revision++;
+        EditorUtility.SetDirty(settings);
 
         return settings;
     }

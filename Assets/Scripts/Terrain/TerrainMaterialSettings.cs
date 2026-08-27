@@ -15,7 +15,7 @@ public class TerrainMaterialSettings : ScriptableObject
 
     void OnValidate() => revision++;
 
-    [Header("Kaya")]
+    [Header("Rock")]
     public Color rockPrimary = new(0.13f, 0.14f, 0.16f);
     [Tooltip("The secondary rock that shows in the geological bands.")]
     public Color rockSecondary = new(0.27f, 0.26f, 0.24f);
@@ -25,7 +25,7 @@ public class TerrainMaterialSettings : ScriptableObject
     [Tooltip("The rock's gloss. Wet rock goes above this.")]
     [Range(0f, 1f)] public float rockSmoothness = 0.12f;
 
-    [Header("Jeolojik bantlar")]
+    [Header("Geological bands")]
     [Tooltip("The thickness of one band (metres).")]
     public float bandThickness = 130f;
     [Tooltip("How much the bands are bent by tectonics (metres). Zero = artificial straight lines.")]
@@ -69,6 +69,66 @@ public class TerrainMaterialSettings : ScriptableObject
     public Vector2 screeRange = new(0.62f, 0.88f);
     [Tooltip("The steepest angle gravel can hold on (degrees).")]
     [Range(10f, 60f)] public float screeSlopeLimit = 38f;
+
+    /// SAND — PART OF THE SHORE, NOT ALL OF IT.
+    ///
+    /// The band is tied to `_SeaLevelY`, the still-water level `SeaManager` publishes: a beach
+    /// belongs to the sea's level, not to the run-up. The wet band (`_SeaWetLevelY`) breathes
+    /// with every wave and a beach does not move that fast.
+    ///
+    /// Three conditions have to hold at once, and that is what makes only PART of the coast
+    /// sandy: the elevation has to be inside the band, the slope has to be gentle enough for the
+    /// sand to hold, and the patch field has to be open there. Where the shore is steep it stays
+    /// rock — a headland; where it is gentle and the patch is open, it is a bay of sand.
+    [Header("Sand — the shore")]
+    [Tooltip("Master switch. Zero leaves the whole shore as rock.")]
+    [Range(0f, 1f)] public float sandAmount = 1f;
+    [Tooltip("Sand albedo. Ground054 (ambientCG, CC0).")]
+    public Texture2D sandAlbedo;
+    [Tooltip("Sand normal, OpenGL convention (+Y up).")]
+    public Texture2D sandNormal;
+    [Tooltip("Sand roughness. Linear, the R channel is read.")]
+    public Texture2D sandRoughness;
+    [Tooltip("Sand ambient occlusion. Linear, the R channel is read.")]
+    public Texture2D sandAO;
+    [Tooltip("The real size of one tile (metres). The texture is a beach sand set; the dimples " +
+             "on it are ten to fifteen centimetres, so a two metre tile puts them at their own size.")]
+    public float sandTexScale = 2f;
+    [Tooltip("Tint multiplied over the albedo. White = the texture's own colour.")]
+    public Color sandTint = Color.white;
+    /// THE BAND IS IN METRES OF ELEVATION, BUT WHAT IS SEEN IS ITS WIDTH ON THE GROUND.
+    /// Measured on this coast: the mean slope inside the shore band is 2.14° and the steepest
+    /// 5.13°, so one metre of elevation is about 27 metres of ground. A 9 m band came out
+    /// 293-720 m wide — a sand plain, not a beach. At 1.6 m the dry strip is about 43 m, which
+    /// is the width of a real beach.
+    ///
+    /// This number is TIED TO THE SHORE'S GRADIENT, not to the mountain's height: if the coast
+    /// is recarved steeper or gentler it has to be measured again (`SCALE.md`).
+    [Tooltip("How far above sea level the sand reaches (metres). About 43 m of ground on this " +
+             "coast; the storm berm of a real beach is that order.")]
+    public float sandBandAbove = 1.6f;
+    [Tooltip("How far below sea level the sand reaches (metres). The shallow bottom is seen " +
+             "through the water, and a rock floor right at the waterline reads wrong.")]
+    public float sandBandBelow = 1.2f;
+    [Tooltip("The fade thickness at both ends of the band (metres). Zero gives a drawn line.")]
+    public float sandFade = 0.6f;
+    /// SIX DEGREES, NOT THE ANGLE OF REPOSE. Sand holds up to about 34°, but nothing on this
+    /// shore is anywhere near that: the steepest sample in the band is 5.13°. A limit at the
+    /// angle of repose would never fire and the slope would stop being a condition at all.
+    /// At 6° the flatter stretches take full sand and the steeper ones lose it — the patchiness
+    /// then comes from the terrain itself, not only from the patch field.
+    [Tooltip("The slope at which sand starts to be lost (degrees). It fades out over ±3° " +
+             "around this value.")]
+    [Range(2f, 45f)] public float sandSlopeLimit = 6f;
+    [Tooltip("The length of a sandy bay along the coast (metres). Nine hundred metres means " +
+             "walking the shore alternates between two or three bays and headlands.")]
+    public float sandPatchScale = 900f;
+    [Tooltip("The share of the eligible shore that is sandy. 1 = the whole band is sand, " +
+             "0 = none of it.")]
+    [Range(0f, 1f)] public float sandCoverage = 0.55f;
+    [Tooltip("The strength of the sand normal. The procedural rock relief is faded out by the " +
+             "same mask, so the two do not add up.")]
+    [Range(0f, 2f)] public float sandNormalStrength = 1f;
 
     /// The procedural surface's seed. The rock band, the oxide, the lichen, the grain, the
     /// fracture and the accumulation shape are all tied to world coordinates; without changing

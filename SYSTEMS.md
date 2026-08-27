@@ -526,6 +526,13 @@ pişmeden önce.
 rüzgâr yönü ve şiddeti (`WindField.PrevailingDirection` / `Strength`), öğle güneşi
 (`TimeOfDay.NoonSunDirection` — liken yıllık güneşlenmeye yerleşir), gün içi güneş
 rengi ve yönü (alpenglow).
+**Kum için okur:** `_SeaLevelY` — durgun deniz kotu. Kum bandı bu kotun altında ve
+üstünde dar bir aralık; eğim ve yama alanı da sağlanmalı, üçü birden tuttuğu yerde kum
+var. Bu yüzden kıyının **bir kısmı** kum: dik kıyı kayalık burun kalır, yatık ve yama
+açık olan yer kum koyu olur.
+**Kum için okumaz:** `_SeaWetLevelY`'yi. O kabarmayla nefes alıyor; bant ona bağlansaydı
+kumsalın sınırı her dalgada metrelerce kayardı. Islaklık kumun **üstüne** biniyor —
+sıra: kum → yağış ıslaklığı → deniz ıslaklığı.
 **Okumaz:** anlık rüzgâr yönünü — yüzey deseni hâkim yönden kurulur.
 **Artık okumuyor:** kar kuşağı kotlarını. `AltitudeWeatherDriver` ve `TemperatureField`
 bağları 2026-08-22'de söküldü — kar silinince öksüz kalmışlardı.
@@ -1215,6 +1222,9 @@ Yağış türü ayrı bir değişkenle değil sıcaklıktan türüyor — ikinci
 - `_SeaWetLevelY`, `_SeaWetFadeM`, `_SeaWetDarkening` — kıyı ıslaklık bandı.
   `MountainSurface.hlsl` bunları okuyor. **Deniz arazi materyaline yazmıyor**,
   bir seviye yayınlıyor.
+- `_SeaLevelY` — durgun su kotu (`SeaManager`). Kum bandı bundan sarkıyor,
+  `_SeaWetLevelY`'den değil: o kabarma payını taşıyor ve her dalgada oynuyor,
+  kumsal o hızda yer değiştirmez.
 
 **Okumadığı, bilinçli:**
 
@@ -1235,6 +1245,7 @@ Terrain ──► SeaBathymetry ──► _SeaBathyTex ──┬─► SeaLit ve
                                              └─► SeaLit fragment (kıyı maskesi, köpük)
 SeaSurface ──► görünürlük ──► SeaSimulation (görünmüyorsa compute kapalı)
 SeaManager ──► SeaWetnessDriver ──► MountainSurface.hlsl (ıslak kum)
+SeaManager ──► _SeaLevelY ──────────► MountainSurface.hlsl (kum bandı)
 ```
 
 **Yeni bağ (kar ↔ deniz):** arazi materyali artık İKİ ıslaklık kaynağı okuyor —

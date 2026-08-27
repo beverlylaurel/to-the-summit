@@ -34,6 +34,12 @@ CBUFFER_START(UnityPerMaterial)
     float2 _ScreeRange;
     float _WetDarkening, _WetSmoothness, _BumpStrength, _BumpScale, _CavityStrength;
 
+    float4 _SandTint;
+    float _SandAmount, _SandTexScale, _SandNormalStrength;
+    float _SandBandAbove, _SandBandBelow, _SandFade;
+    float _SandPatchScale, _SandPatchThreshold;
+    float2 _SandSlopeCos;
+
     float4 _TerrainOrigin;   // xyz corner position
     float4 _TerrainSize;     // xyz boyut
 
@@ -66,6 +72,18 @@ CBUFFER_END
 float _SeaWetLevelY;
 float _SeaWetFadeM;
 float _SeaWetDarkening;
+
+// STILL-WATER LEVEL, published by `SeaManager`. The sand band hangs from this, not
+// from `_SeaWetLevelY`: that one carries the run-up and rises and falls with every
+// wave, and a beach does not move at that rate.
+float _SeaLevelY;
+
+// Sand maps of the shore. Outside the CBUFFER because textures always are; the
+// scalars that go with them are inside `UnityPerMaterial`.
+TEXTURE2D(_SandAlbedo);      SAMPLER(sampler_SandAlbedo);
+TEXTURE2D(_SandNormal);
+TEXTURE2D(_SandRough);
+TEXTURE2D(_SandAO);
 
 // Surface data extracted from the mountain (see SurfaceMapBaker). Noise cannot
 // answer "where"; these three channels are read from the mountain's own shape.

@@ -38,9 +38,26 @@ MonoBehaviour:
   screeAmount: 0.6
   screeRange: {x: 0.62, y: 0.88}
   screeSlopeLimit: 38
+  sandAmount: 1
+  sandAlbedo: {fileID: 2800000, guid: da67750357924138855cc9acac5a957e, type: 3}
+  sandNormal: {fileID: 2800000, guid: b714f891022c42d39df43e6c2cf7f8a2, type: 3}
+  sandRoughness: {fileID: 2800000, guid: 8e04aecfa770461abc5e51544ba81cbc, type: 3}
+  sandAO: {fileID: 2800000, guid: eb7e6a3d3bc1410c955d1d0d829b5d8e, type: 3}
+  sandTexScale: 2
+  sandTint: {r: 1, g: 1, b: 1, a: 1}
+  sandBandAbove: 1.6
+  sandBandBelow: 1.2
+  sandFade: 0.6
+  sandSlopeLimit: 6
+  sandPatchScale: 900
+  sandCoverage: 0.55
+  sandNormalStrength: 1
+  patternSeed: 2
   wetDarkening: 0.45
   wetSmoothness: 0.6
   dryingSeconds: 120
   bumpStrength: 0.9
   bumpScale: 0.3
+  alpenglowStrength: 0.35
+  alpenglowFacing: 0.7
   cavityStrength: 0.55

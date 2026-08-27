@@ -62,6 +62,21 @@ public class TerrainSurface : MonoBehaviour
     /// eklendiğinde biri sessizce boş kalırdı.
     static readonly string[] SurfaceMapSuffixes =
         { "Normal", "NormalLut", "Rough", "RoughLut", "Height", "HeightLut" };
+    static readonly int SandAlbedoId = Shader.PropertyToID("_SandAlbedo");
+    static readonly int SandNormalId = Shader.PropertyToID("_SandNormal");
+    static readonly int SandRoughId = Shader.PropertyToID("_SandRough");
+    static readonly int SandAOId = Shader.PropertyToID("_SandAO");
+    static readonly int SandTintId = Shader.PropertyToID("_SandTint");
+    static readonly int SandAmountId = Shader.PropertyToID("_SandAmount");
+    static readonly int SandTexScaleId = Shader.PropertyToID("_SandTexScale");
+    static readonly int SandNormalStrengthId = Shader.PropertyToID("_SandNormalStrength");
+    static readonly int SandBandAboveId = Shader.PropertyToID("_SandBandAbove");
+    static readonly int SandBandBelowId = Shader.PropertyToID("_SandBandBelow");
+    static readonly int SandFadeId = Shader.PropertyToID("_SandFade");
+    static readonly int SandSlopeCosId = Shader.PropertyToID("_SandSlopeCos");
+    static readonly int SandPatchScaleId = Shader.PropertyToID("_SandPatchScale");
+    static readonly int SandPatchThresholdId = Shader.PropertyToID("_SandPatchThreshold");
+
     static readonly int WetDarkeningId = Shader.PropertyToID("_WetDarkening");
     static readonly int WetSmoothnessId = Shader.PropertyToID("_WetSmoothness");
     static readonly int BumpStrengthId = Shader.PropertyToID("_BumpStrength");
@@ -332,10 +347,54 @@ public class TerrainSurface : MonoBehaviour
 
         material.SetFloat(ScreeSlopeLimitId, settings.screeSlopeLimit);
 
+        ApplySand();
+
         material.SetFloat(WetDarkeningId, settings.wetDarkening);
         material.SetFloat(WetSmoothnessId, settings.wetSmoothness);
         material.SetFloat(BumpStrengthId, settings.bumpStrength);
         material.SetFloat(BumpScaleId, settings.bumpScale);
         material.SetFloat(CavityStrengthId, settings.cavityStrength);
+    }
+
+    /// The shore sand. The maps come from the settings asset; the elevation of the band does
+    /// NOT — the shader reads `_SeaLevelY`, the global the sea publishes. Copying the level
+    /// into the material here would give the beach a second source and the two could diverge
+    /// the moment the sea level was moved.
+    void ApplySand()
+    {
+        // WITHOUT MAPS THE SAND IS OFF, AND IT IS SILENT. A missing texture reads as black in
+        // the shader; the shore would go dark and the cause would be hunted for in the light.
+        bool ready = settings.sandAlbedo != null && settings.sandNormal != null
+                  && settings.sandRoughness != null && settings.sandAO != null;
+
+        material.SetFloat(SandAmountId, ready ? settings.sandAmount : 0f);
+        if (!ready) return;
+
+        material.SetTexture(SandAlbedoId, settings.sandAlbedo);
+        material.SetTexture(SandNormalId, settings.sandNormal);
+        material.SetTexture(SandRoughId, settings.sandRoughness);
+        material.SetTexture(SandAOId, settings.sandAO);
+
+        material.SetColor(SandTintId, settings.sandTint);
+        material.SetFloat(SandTexScaleId, settings.sandTexScale);
+        material.SetFloat(SandNormalStrengthId, settings.sandNormalStrength);
+        material.SetFloat(SandBandAboveId, settings.sandBandAbove);
+        material.SetFloat(SandBandBelowId, settings.sandBandBelow);
+        material.SetFloat(SandFadeId, settings.sandFade);
+        // THE SLOPE WINDOW IS SENT AS TWO COSINES. Built in the shader as `cos(limit) ± 0.08`
+        // — the way the rock and gravel masks do it — it breaks at a shallow limit:
+        // `cos(6°) + 0.06` is 1.05, which no surface reaches, and the mask saturated at 0.73
+        // even on dead flat ground. Here the window is ±3° of angle wherever the limit sits.
+        material.SetVector(SandSlopeCosId, new Vector4(
+            Mathf.Cos((settings.sandSlopeLimit + 3f) * Mathf.Deg2Rad),
+            Mathf.Cos(Mathf.Max(0f, settings.sandSlopeLimit - 3f) * Mathf.Deg2Rad), 0f, 0f));
+        material.SetFloat(SandPatchScaleId, settings.sandPatchScale);
+
+        // COVERAGE IS A SHARE, THE SHADER WANTS A THRESHOLD. `MountainFbm` gathers its mass
+        // between roughly 0.30 and 0.70. The shader's transition is ±0.12 wide, so the two ends
+        // are placed a full transition OUTSIDE that mass: at 0 coverage the whole band sits below
+        // the transition (no sand anywhere), at 1 it sits above it (the whole shore is sand).
+        material.SetFloat(SandPatchThresholdId,
+            Mathf.Lerp(0.85f, 0.15f, settings.sandCoverage));
     }
 }
