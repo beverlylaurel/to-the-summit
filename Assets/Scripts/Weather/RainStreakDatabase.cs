@@ -1,63 +1,63 @@
 using System;
 using UnityEngine;
 
-/// GARG-NAYAR IZ VERİTABANI — `[Garg 2006]`, `rain-spec.md` §5.
+/// GARG-NAYAR STREAK DATABASE — `[Garg 2006]`, `rain-spec.md` §5.
 ///
-/// Yağmur izinin görünümü ışık yönü, bakış yönü ve damlanın salınımının karmaşık bir
-/// fonksiyonu; ray-tracing gerektiriyor. Makalenin çözümü: offline render et, sakla,
-/// çalışma zamanında ara. Bu asset o aramanın veri tarafı.
+/// The look of a rain streak is a complicated function of light direction, view direction and
+/// the drop's oscillation; it needs ray tracing. The paper's answer: render offline, store, look
+/// up at runtime. This asset is the data side of that lookup.
 ///
-/// ÜÇ AÇISAL EKSEN artı salınım varyantı:
-///   `v` — ışığın DİKEY açısı, damlanın düşüş eksenine göre  (10 değer)
-///   `h` — ışığın YATAY açısı                                 (9 değer)
-///   `dcam` — kameranın dikliğinden sapması, `θ_v = 90° − dcam` (5 değer)
-///   `osc` — salınım varyantı, damla başına rastgele            (10 değer)
+/// THREE ANGULAR AXES plus an oscillation variant:
+///   `v` — the light's VERTICAL angle relative to the drop's fall axis  (10 values)
+///   `h` — the light's HORIZONTAL angle                                 (9 values)
+///   `dcam` — the camera's deviation from vertical, `θ_v = 90° − dcam`  (5 values)
+///   `osc` — oscillation variant, random per drop                      (10 values)
 ///
-/// `dcam` HER SEVİYEDE AYRI DİZİ. İzin boyu kamera açısıyla kısalıyor (ölçüldü,
-/// `size16`: 525/494/405/272/108 — oranı `cos(dcam)`), çünkü bakış yönü damlanın
-/// düşüş yönüne dik değilse iz ekranda kısalır. Hepsini tek diziye doldurmak %40 boş
-/// piksel demekti.
+/// `dcam` GETS ITS OWN ARRAY AT EVERY LEVEL. The streak shortens with the camera angle
+/// (measured, `size16`: 525/494/405/272/108 — the ratio is `cos(dcam)`), because if the view
+/// direction is not perpendicular to the drop's fall direction the streak is shorter on screen.
+/// Packing them all into one array meant 40% empty pixels.
 ///
-/// İKİ AYDINLATMA. `point` yönlü kaynak (güneş), `ambient` kapalı gökyüzü. Makale
-/// ikisini AYRI hesaplayıp topluyor (`§6.3.3`); ikisi farklı görünüyor — ambient izin
-/// tamamını yumuşak dolduruyor, yönlü kaynak ince keskin bir filament bırakıyor.
-[CreateAssetMenu(fileName = "RainStreakDatabase", menuName = "To The Summit/Yağmur İz Veritabanı")]
+/// TWO LIGHTINGS. `point` is a directional source (the sun), `ambient` an overcast sky. The paper
+/// computes the two SEPARATELY and sums them (`§6.3.3`); they look different — ambient fills the
+/// whole streak softly, a directional source leaves a thin sharp filament.
+[CreateAssetMenu(fileName = "RainStreakDatabase", menuName = "To The Summit/Rain Streak Database")]
 public class RainStreakDatabase : ScriptableObject
 {
-    /// Bir kamera açısı için tüm çözünürlük seviyeleri.
+    /// All resolution levels for one camera angle.
     [Serializable]
     public class CameraAngle
     {
-        [Tooltip("Kameranın diklikten sapması (derece). θ_v = 90° − bu.")]
+        [Tooltip("The camera's deviation from vertical (degrees). θ_v = 90° − this.")]
         public int Dcam;
 
-        [Tooltip("Yönlü kaynak dizileri, `Sizes` ile aynı sırada. Dilim indeksi " +
+        [Tooltip("Directional source arrays, in the same order as `Sizes`. The slice index " +
                  "((v * 9) + h) * 10 + osc.")]
         public Texture2DArray[] Point;
 
-        [Tooltip("Ambient dizileri, `Sizes` ile aynı sırada. Dilim indeksi osc.")]
+        [Tooltip("Ambient arrays, in the same order as `Sizes`. The slice index is osc.")]
         public Texture2DArray[] Ambient;
 
-        [Tooltip("Varlık tablosu, 900 giriş. 0 olan (v,h,osc) veritabanında YOK — " +
-                 "uç dikey açılarda iz dejenere olduğu için render edilmemiş. " +
-                 "Interpolasyon o komşuyu atlayıp ağırlıkları yeniden normalize eder.")]
+        [Tooltip("Presence table, 900 entries. A 0 means that (v,h,osc) is NOT in the " +
+                 "database — at extreme vertical angles the streak degenerates and was " +
+                 "not rendered. Interpolation skips that neighbour and renormalizes the weights.")]
         public byte[] Present;
     }
 
-    [Tooltip("İz genişlikleri (piksel), artan sırada. Damlanın ekrana düşen iz " +
-             "genişliğinden hemen büyük olan seçilir (`§6.3`).")]
+    [Tooltip("Streak widths (pixels), ascending. The one just above the drop's on-screen " +
+             "streak width is chosen (`§6.3`).")]
     public int[] Sizes;
 
-    [Tooltip("Işığın dikey açı ekseni (derece).")]
+    [Tooltip("The light's vertical angle axis (degrees).")]
     public int[] Vertical;
 
-    [Tooltip("Işığın yatay açı ekseni (derece).")]
+    [Tooltip("The light's horizontal angle axis (degrees).")]
     public int[] Horizontal;
 
-    [Tooltip("Kamera açısı başına diziler, `dcam` artan sırada.")]
+    [Tooltip("Arrays per camera angle, `dcam` ascending.")]
     public CameraAngle[] Angles;
 
-    /// Dilim indeksi — dizideki sıra pişiricide sabit, isim aranmıyor.
+    /// Slice index — the order in the array is fixed by the baker, no name lookup.
     public static int SliceIndex(int vIndex, int hIndex, int osc) =>
         (vIndex * 9 + hIndex) * 10 + osc;
 }

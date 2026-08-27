@@ -1,8 +1,8 @@
 using System;
 using UnityEngine;
 
-/// Rastgele aralıklarla şimşek çaktırır. Yağış şiddeti arttıkça sıklaşır ve yakınlaşır,
-/// Çakma anında olay yayar, sesi ise arkadan gelir.
+/// Fires lightning at random intervals. As the precipitation intensifies it grows more frequent
+/// and closer. It raises an event at the moment of the strike; the sound arrives afterwards.
 [RequireComponent(typeof(AudioSource), typeof(AudioLowPassFilter))]
 public class ThunderPlayer : MonoBehaviour
 {
@@ -13,14 +13,15 @@ public class ThunderPlayer : MonoBehaviour
     [SerializeField] AudioClip[] distant;
     [SerializeField] AudioClip[] close;
 
-    /// Havada sesin hızı (m/sn). Bir ayar değil, bir sabit.
+    /// The speed of sound in air (m/s). Not a setting, a constant.
     const float SpeedOfSound = 340f;
 
-    /// Çakmanın uzaklığı, metre. Sesten önce yayılır — ışık anında gelir, ses yolda.
+    /// The distance of the strike, metres. Published before the sound — the light arrives
+    /// instantly, the sound is on its way.
     ///
-    /// Mesafeyi burası seçiyor ve tek kaynak burası: hem ses gecikmesi hem çakmanın
-    /// dünyadaki yeri bundan türüyor. İkisi ayrı seçilseydi bir buçuk saniye sonra
-    /// gürleyen bir gürültü, sekiz yüz metre ötede çakmış bir ışığa ait olurdu.
+    /// The distance is chosen here and this is the only source: both the audio delay and the
+    /// strike's place in the world derive from it. Chosen separately, a rumble arriving one and a
+    /// half seconds later would belong to a flash eight hundred metres away.
     public event Action<float> Struck;
 
     AudioSource source;
@@ -29,7 +30,7 @@ public class ThunderPlayer : MonoBehaviour
     int lastDistantIndex = -1;
     int lastCloseIndex = -1;
 
-    // Yolda olan gürültü: çakma oldu, ses henüz ulaşmadı
+    // A rumble in flight: the strike happened, the sound has not arrived yet
     AudioClip pendingClip;
     float pendingDelay;
     float pendingVolume;
@@ -49,18 +50,18 @@ public class ThunderPlayer : MonoBehaviour
     void OnEnable()
     {
         if (weather == null || settings == null)
-            throw new InvalidOperationException($"{nameof(ThunderPlayer)}: bağımlılıklar atanmadı.");
+            throw new InvalidOperationException($"{nameof(ThunderPlayer)}: dependencies are not assigned.");
         if (distant == null || distant.Length == 0 || close == null || close.Length == 0)
-            throw new InvalidOperationException($"{nameof(ThunderPlayer)}: klip listeleri boş.");
+            throw new InvalidOperationException($"{nameof(ThunderPlayer)}: the clip lists are empty.");
 
         source = GetComponent<AudioSource>();
         source.playOnAwake = false;
         source.loop = false;
         source.spatialBlend = 0f;
 
-        // Gürültüler PlayOneShot ile çalınıyor, kaynağın kendi klibi kullanılmıyor.
-        // Ama alçak geçiren filtresi olan klipsiz bir kaynak Unity'yi uyarı basmaya
-        // itiyor; playOnAwake kapalı olduğu için atanan klip kendiliğinden çalmaz.
+        // The rumbles are played with PlayOneShot; the source's own clip is not used.
+        // But a clipless source carrying a low-pass filter makes Unity print a warning;
+        // because playOnAwake is off the assigned clip does not play by itself.
         source.clip = distant[0];
 
         filter = GetComponent<AudioLowPassFilter>();
@@ -86,7 +87,7 @@ public class ThunderPlayer : MonoBehaviour
         Strike();
     }
 
-    /// Test için beklemeden çaldırır
+    /// Fires without waiting, for testing
     public void TriggerNow() => Strike();
 
     void Reschedule()
@@ -97,20 +98,20 @@ public class ThunderPlayer : MonoBehaviour
 
     void Strike()
     {
-        // Önceki çakmanın sesi hâlâ yoldaysa bırakılmaz, hemen ulaştırılır: üst üste
-        // binen gürültü fırtınada olağan, sessizce düşürülen bir atım değil.
+        // If the previous strike's sound is still in flight it is not dropped, it is delivered
+        // at once: overlapping rumbles are normal in a storm, a silently dropped strike is not.
         if (pendingClip != null) Boom();
 
-        // Yakın gürültü yalnızca yağış sertleştiğinde: etekte uzak ve sakin kalır.
+        // A near rumble only once the precipitation hardens: at the foot it stays distant and calm.
         //
-        // Eşikten sonra hızlı tırmanır. Doğrusal eğri eşiğin hemen üstünde neredeyse
-        // sıfır kalıyordu: 0.65'te kırkta bir. Oysa fırtına eşiği geçtiyse yakın çakma
-        // artık istisna değil. Karekök eğriyi başta dikleştirip uçta doyuruyor.
-        // EŞİK SERT KESME. Altında olasılık "az" değil TAM SIFIR — dinginde yakın çakma
-        // hiç olmaz, tasarım da bunu istiyor: sakin yağmurda uzaktan gürleme duyulur,
-        // kol görünmez. Ama eşik 0.6'dayken 0.56'lık şiddetli yağmur da sıfır alıyordu
-        // ve kol pratikte hiç görünmüyordu (kırk çakma denendi, kırkı da uzak).
-        // 0.45'e indi: 0.56'da yakın çakma %38, 0.85'te %72.
+        // Past the threshold it climbs fast. A linear curve stayed nearly zero just above the
+        // threshold: one in forty at 0.65. But if the storm has crossed the threshold a near
+        // strike is no longer an exception. A square root steepens the curve early and saturates it.
+        // THE THRESHOLD IS A HARD CUT. Below it the probability is not "small" but EXACTLY ZERO —
+        // in calm weather a near strike never happens, and the design wants that: in quiet rain
+        // distant rumbling is heard, no bolt is seen. But with the threshold at 0.6 a heavy 0.56
+        // rain also got zero and the bolt was practically never seen (forty strikes tried, all
+        // forty distant). It came down to 0.45: at 0.56 a near strike is 38%, at 0.85 it is 72%.
         float closeChance = Mathf.Sqrt(Mathf.InverseLerp(settings.closeThreshold, 1f, weather.Precipitation))
                             * settings.closeChanceAtPeak;
         bool isClose = UnityEngine.Random.value < closeChance;
@@ -121,10 +122,10 @@ public class ThunderPlayer : MonoBehaviour
 
         float fade = 1f;
 
-        // Hafif yağışta gürültü de sönük olmalı; şiddetle birlikte güçlenir
+        // In light precipitation the rumble should be faint too; it strengthens with the intensity
         fade *= Mathf.Lerp(0.45f, 1f, weather.Precipitation);
 
-        // Aynı klip her atımda farklı mesafeden geliyormuş gibi duyulsun
+        // So the same clip is heard as if it came from a different distance every strike
         Vector2 cutoff = isClose ? settings.closeCutoff : settings.distantCutoff;
         pendingCutoff = UnityEngine.Random.Range(cutoff.x, cutoff.y);
 
@@ -138,11 +139,11 @@ public class ThunderPlayer : MonoBehaviour
 
         pendingDelay = distance / SpeedOfSound;
 
-        // Işık önce. Ses yolda.
+        // Light first. Sound in flight.
         Struck?.Invoke(distance);
     }
 
-    /// Sesin ulaştığı an
+    /// The moment the sound arrives
     void Boom()
     {
         filter.cutoffFrequency = pendingCutoff;

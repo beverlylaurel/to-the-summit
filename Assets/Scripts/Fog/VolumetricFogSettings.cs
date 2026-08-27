@@ -1,52 +1,51 @@
 using UnityEngine;
 
-/// Froxel sis hacminin ayarları. Sayılar Wronski 2014'ten ve kâğıtta hesaptan geliyor;
-/// gerekçeler `.claude/PRPs/plans/volumetric-fog.plan.md` → "Kâğıtta hesaplanan sayılar".
+/// Settings of the froxel fog volume. The numbers come from Wronski 2014 and from calculations
+/// on paper; the reasoning is in `.claude/PRPs/plans/volumetric-fog.plan.md` -> "Numbers computed on paper".
 ///
-/// Yoğunluk BURADA DEĞİL: onun sahibi `AtmosphereController` ve `AtmosphereSettings`.
-/// Havanın nerede ne kadar yoğun olduğu hava durumundan türüyor; bu asset yalnız hacmin
-/// kendi geometrisini ve ışık tepkisini taşıyor. İkisi karışırsa sis iki kaynaktan
-/// sürülür.
+/// DENSITY IS NOT HERE: it is owned by `AtmosphereController` and `AtmosphereSettings`.
+/// Where the air is how dense derives from the weather; this asset only carries the volume's own
+/// geometry and light response. Mixed together, the fog would be driven from two sources.
 [CreateAssetMenu(menuName = "To The Summit/Volumetrik Sis", fileName = "VolumetricFogSettings")]
 public class VolumetricFogSettings : ScriptableObject
 {
     [Header("Hacim")]
-    [Tooltip("Hacmin ekran eksenindeki çözünürlüğü. Wronski 160x90 kullanıyor ve maliyet " +
-             "ekran çözünürlüğünden BAĞIMSIZ kalıyor.")]
+    [Tooltip("Resolution of the volume along the screen axes. Wronski uses 160x90 and the cost " +
+             "stays INDEPENDENT of the screen resolution.")]
     [SerializeField, Range(80, 320)] int width = 160;
 
     [SerializeField, Range(45, 180)] int height = 90;
 
-    [Tooltip("Derinlik dilimi sayısı. Wronski 64 veya 128 kullanıyor (platforma bağlı).")]
+    [Tooltip("Number of depth slices. Wronski uses 64 or 128 (platform dependent).")]
     [SerializeField, Range(32, 128)] int sliceCount = 64;
 
-    /// MENZİL 1000 m. Wronski'nin doğruladığı menzil 50–128 m; uzun menzil için
-    /// "üstel dağılım veya kademeli yaklaşım" diyor ama kademeliyi TANIMLAMIYOR.
-    /// Kademeli yerine tek hacim + analitik kuyruk seçildi (`DECISIONS.md`, karar 1).
+    /// THE RANGE IS 1000 m. The range Wronski verified is 50-128 m; for a longer range he says
+    /// "an exponential distribution or a cascaded approach" but DOES NOT DEFINE the cascaded one.
+    /// A single volume plus an analytic tail was chosen instead (`DECISIONS.md`, decision 1).
     ///
-    /// Üstel dağılım sayesinde menzil sekiz katına çıkarken yakın alan hassasiyeti
-    /// düşmüyor: ilk 128 metreye 46 dilim düşüyor, Wronski'nin tüm hacmi 64 dilimle o
-    /// mesafeye yaydığı yerde.
-    [Tooltip("Hacmin başladığı görüş uzayı derinliği (metre).")]
+    /// Thanks to the exponential distribution the range grows eightfold without losing near-field
+    /// precision: 46 slices fall in the first 128 metres, where Wronski spreads his entire volume
+    /// over that distance with 64.
+    [Tooltip("View space depth the volume starts at (metres).")]
     [SerializeField, Range(0.1f, 5f)] float nearDistance = 0.5f;
 
-    [Tooltip("Hacmin bittiği derinlik (metre). Ötesini analitik kuyruk sürüyor.")]
+    [Tooltip("Depth the volume ends at (metres). Beyond it the analytic tail takes over.")]
     [SerializeField, Range(100f, 4000f)] float farDistance = 1000f;
 
-    [Header("Işık tepkisi")]
-    /// Sisin KENDİ anizotropisi. Gökyüzü paketinin `_AerosolAnisotropy`'sinden ayrı,
-    /// çünkü farklı ortam: sis su damlacığı (ileri saçılım belirgin ama bulut kadar
-    /// değil), gökyüzününki toz aerosolü.
+    [Header("Light response")]
+    /// The fog's OWN anisotropy. Separate from the sky package's `_AerosolAnisotropy`, because it
+    /// is a different medium: fog is water droplets (forward scattering is clear but not as much
+    /// as a cloud), the sky's is dust aerosol.
     [Tooltip("Henyey-Greenstein anizotropisi. 0 izotropik, 1 tamamen ileri.")]
     [SerializeField, Range(0f, 0.95f)] float anisotropy = 0.6f;
 
-    /// Ortam katkısı ortam probe'undan, yani gökyüzünden pişen tek durumdan geliyor.
-    /// Atmosferin in-scattering'ini buraya ayrıca eklemek çift sayım olur — homojen
-    /// atmosferin sahibi gökyüzü paketi (`DECISIONS.md`, karar 2).
-    [Tooltip("Gölgeli sisin ortam ışığından aldığı pay.")]
+    /// The ambient contribution comes from the ambient probe, i.e. the single state baked from
+    /// the sky. Adding the atmosphere's in-scattering here as well would be double counting — the
+    /// homogeneous atmosphere is owned by the sky package (`DECISIONS.md`, decision 2).
+    [Tooltip("Share of ambient light shadowed fog receives.")]
     [SerializeField, Range(0f, 2f)] float ambientDimmer = 1f;
 
-    [Tooltip("Ana ışığın sise katkısı.")]
+    [Tooltip("The main light's contribution to the fog.")]
     [SerializeField, Range(0f, 2f)] float lightDimmer = 1f;
 
     public int Width => width;

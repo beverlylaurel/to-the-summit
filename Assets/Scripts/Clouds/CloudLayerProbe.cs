@@ -1,21 +1,21 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-/// BULUT KATMANININ TEK KAYNAĞI. Bulutları çizen sistem bir render özelliği; oyun
-/// tarafındaki tüketiciler (yağış kesimi, tırmanma göstergesi) ona doğrudan soramaz.
-/// Bu bileşen aynı Volume ayarlarını ve aynı hava haritasını okuyup kotları veriyor.
+/// THE SINGLE SOURCE OF THE CLOUD LAYER. The system drawing the clouds is a render feature;
+/// consumers on the game side (precipitation cutoff, climb HUD) cannot ask it directly.
+/// This component reads the same Volume settings and the same weather map and provides the elevations.
 ///
-/// Sözleşme: gökyüzünü çizen veri neyse burada okunan da odur. İkinci bir yaklaşım
-/// kurulmuyor — kurulursa gökte bulut olmayan yerde tavan çıkar.
+/// The contract: whatever data draws the sky is what is read here. No second approach is
+/// built — if one were, a ceiling would appear where there is no cloud in the sky.
 public class CloudLayerProbe : MonoBehaviour
 {
-    [Tooltip("Bulut ayarlarını taşıyan Volume.")]
+    [Tooltip("The Volume carrying the cloud settings.")]
     [SerializeField] Volume cloudVolume;
 
-    [Tooltip("Tavanı itilecek hava sürücüsü.")]
+    [Tooltip("The weather driver the ceiling is pushed to.")]
     [SerializeField] AltitudeWeatherDriver driver;
 
-    [Tooltip("Tavanın okunacağı nokta — oyuncu.")]
+    [Tooltip("The point the ceiling is read at — the player.")]
     [SerializeField] Transform observer;
 
     static readonly int CloudBottomId = Shader.PropertyToID("_CloudBottom");
@@ -24,43 +24,44 @@ public class CloudLayerProbe : MonoBehaviour
     VolumetricClouds clouds;
     Texture2D map;
 
-    /// Katmanın tabanı (metre). Sütuna göre değişmiyor.
+    /// Base of the layer (metres). It does not vary by column.
     public float Bottom => clouds.bottomAltitude.value;
 
-    /// Katmanın olabileceği en yüksek kot (metre). Gösterge bunu aralığın üst ucu olarak
-    /// yazıyor; belirli bir sütunun tepesi için `TopAt` kullanılır.
+    /// The highest elevation the layer can reach (metres). The HUD writes it as the upper end
+    /// of the range; for the top of a specific column use `TopAt`.
     public float MaxTop => clouds.bottomAltitude.value + clouds.altitudeRange.value;
 
     void OnEnable()
     {
         if (cloudVolume == null || driver == null || observer == null)
-            throw new System.InvalidOperationException($"{nameof(CloudLayerProbe)}: bağımlılıklar atanmadı.");
+            throw new System.InvalidOperationException($"{nameof(CloudLayerProbe)}: dependencies are not assigned.");
 
         if (!cloudVolume.profile.TryGet(out clouds))
             throw new System.InvalidOperationException($"{nameof(CloudLayerProbe)}: profilde {nameof(VolumetricClouds)} yok.");
 
         map = clouds.cloudMap.value as Texture2D;
         if (map == null)
-            throw new System.InvalidOperationException($"{nameof(CloudLayerProbe)}: hava haritası atanmadı.");
+            throw new System.InvalidOperationException($"{nameof(CloudLayerProbe)}: the weather map is not assigned.");
     }
 
     void LateUpdate()
     {
         driver.CloudColumnTop = TopAt(observer.position);
 
-        // BAĞ 8: ortak globaller. Şimşek kolu (`LightningBolt.shader`) çakmayı bulut
-        // kabuğuyla kesiştiriyor ve kotları buradan okuyor. Eskiden `AtmosphereController`
-        // yayınlıyordu — silinen bulut modelinin kotlarıydı, gökyüzünde çizilenle ilgisi
-        // yoktu. Kabuk küresel olduğu için sütun tepesi değil katmanın azamisi veriliyor.
+        // LINK 8: shared globals. The lightning bolt (`LightningBolt.shader`) intersects the
+        // flash with the cloud shell and reads the elevations from here. `AtmosphereController`
+        // used to publish them — they were the elevations of the deleted cloud model and had
+        // nothing to do with what was drawn in the sky. Because the shell is spherical the
+        // layer's maximum is given rather than the column top.
         Shader.SetGlobalFloat(CloudBottomId, Bottom);
         Shader.SetGlobalFloat(CloudTopId, MaxTop);
     }
 
-    /// O sütunun bulut tepesi (metre). Hava haritasının B kanalı azami bulut yüksekliğini
-    /// taşıyor (`w_h`, `[H18 s.11]`); shader da yoğunluğu tam bu kotta kesiyor.
+    /// The cloud top of that column (metres). The weather map's B channel carries the maximum
+    /// cloud height (`w_h`, `[H18 p.11]`); the shader also cuts the density at exactly that elevation.
     ///
-    /// Sütunda hiç bulut yoksa sonsuz dönüyor: "tepesi yok" ile "tepesi yerde" aynı şey
-    /// değil. İkincisi yağışı her yerde keserdi.
+    /// With no cloud at all in the column it returns infinity: "no top" and "top on the ground"
+    /// are not the same thing. The second would cut the precipitation everywhere.
     public float TopAt(Vector3 worldPosition)
     {
         Color sample = Sample(worldPosition);
@@ -69,8 +70,8 @@ public class CloudLayerProbe : MonoBehaviour
         return clouds.bottomAltitude.value + clouds.altitudeRange.value * sample.b;
     }
 
-    /// O sütunun kapsaması [0,1]. Gökyüzünün ne kadarının kapandığı değil — o sütunda
-    /// bulut olma oranı.
+    /// The coverage of that column [0,1]. Not how much of the sky is closed — the probability
+    /// of cloud in that column.
     public float CoverageAt(Vector3 worldPosition) => CoverageOf(Sample(worldPosition));
 
     Color Sample(Vector3 worldPosition)
@@ -79,8 +80,8 @@ public class CloudLayerProbe : MonoBehaviour
         return map.GetPixelBilinear(worldPosition.x / size, worldPosition.z / size);
     }
 
-    /// Shader'daki formülün AYNISI: `WM_c = max(w_c0, SAT(g_c − 0.5) × w_c1 × 2)`
-    /// `[H18 s.11]`. İki yerde iki formül olursa gösterge gökyüzüyle çelişir.
+    /// EXACTLY the formula in the shader: `WM_c = max(w_c0, SAT(g_c - 0.5) x w_c1 x 2)`
+    /// `[H18 p.11]`. With two formulas in two places the HUD would contradict the sky.
     float CoverageOf(Color sample) => Mathf.Max(sample.r,
         Mathf.Clamp01(clouds.cloudCoverage.value - 0.5f) * sample.g * 2f);
 

@@ -1,27 +1,27 @@
 using UnityEngine;
 
-/// Görüntünün rengi ve tonu. Dört köşe tanımlanır, ara değerler harmanlanır:
-/// (açık hava / fırtına) × (gündüz / gece).
+/// The color and tone of the image. Four corners are defined and the values in between are
+/// blended: (clear / storm) x (day / night).
 [CreateAssetMenu(fileName = "LookSettings", menuName = "To The Summit/Look Settings")]
 public class LookSettings : ScriptableObject
 {
     [System.Serializable]
     public struct LookProfile
     {
-        [Tooltip("Pozlama (EV). Negatif = karanlık.")]
+        [Tooltip("Exposure (EV). Negative = dark.")]
         [Range(-4f, 2f)] public float exposure;
         [Range(-100f, 100f)] public float contrast;
         [Tooltip("Doygunluk. Negatif = solgun, kasvetli.")]
         [Range(-100f, 100f)] public float saturation;
         public Color colorFilter;
 
-        [Tooltip("Renk sıcaklığı. Negatif = soğuk/mavi.")]
+        [Tooltip("Color temperature. Negative = cool/blue.")]
         [Range(-100f, 100f)] public float temperature;
         [Range(-100f, 100f)] public float tint;
 
-        [Tooltip("Gölgelerin soğuması. Kasvetin ASIL kaldıracı: gölgede kalan her şey " +
-                 "mavileşip ağırlaşırken güneş gören yüzeyler sıcaklığını korur. Global " +
-                 "sıcaklık kaydırması bunu yapamaz — o şafağı da soğutur.")]
+        [Tooltip("Cooling of the shadows. The REAL lever of gloom: everything left in shadow " +
+                 "turns blue and heavy while sunlit surfaces keep their warmth. A global " +
+                 "temperature shift cannot do this — it would cool the dawn as well.")]
         [Range(0f, 1f)] public float shadowChill;
 
         [Range(0f, 3f)] public float bloom;
@@ -47,19 +47,20 @@ public class LookSettings : ScriptableObject
         }
     }
 
-    [Header("Açık hava")]
+    [Header("Clear weather")]
     public LookProfile clearDay = new()
     {
-        // AÇIK GÜNDE POZLAMA KAR İÇİN AÇILIYOR, SAHNE ORTALAMASI İÇİN DEĞİL.
+        // ON A CLEAR DAY THE EXPOSURE OPENS FOR THE SNOW, NOT FOR THE SCENE AVERAGE.
         //
-        // Ölçüldü (10:00, bulut gölgesi kapalı, tam güneşli yamaç): zemin
-        // luması 0.921, sapma 0.0151. Kar ACES'in omzunda eziliyor; yüzey
-        // dokusunun ürettiği fark 255 seviyenin 4'üne sığıyor ve ekranda
-        // TEK PARÇA BEYAZ olarak okunuyor. 0.85 durak kısılınca luma 0.839,
-        // sapma 0.0274 — kabartı geri geliyor, kar hâlâ sahnenin en parlağı.
+        // Measured (10:00, cloud shadow off, fully sunlit slope): ground luma
+        // 0.921, deviation 0.0151. Snow is crushed on ACES's shoulder; the
+        // difference produced by the surface texture fits into 4 of 255 levels
+        // and reads as ONE SOLID WHITE on screen. Pulled 0.85 stops down, the
+        // luma is 0.839 and the deviation 0.0274 — the relief comes back and
+        // the snow is still the brightest thing in the scene.
         //
-        // Fotoğrafta da karlı sahne KARA göre pozlanır; ortalamaya göre
-        // pozlanan kar patlar.
+        // In photography a snowy scene is exposed FOR THE SNOW as well; exposed
+        // for the average, snow blows out.
         exposure = -0.85f, contrast = 6f, saturation = -8f,
         colorFilter = Color.white,
         temperature = -4f, tint = 0f, shadowChill = 0.45f,
@@ -76,7 +77,7 @@ public class LookSettings : ScriptableObject
         grain = 0.14f
     };
 
-    [Header("Fırtına")]
+    [Header("Storm")]
     public LookProfile stormDay = new()
     {
         exposure = -0.35f, contrast = 0f, saturation = -26f,
@@ -95,12 +96,12 @@ public class LookSettings : ScriptableObject
         grain = 0.2f
     };
 
-    [Header("Altın saat")]
-    [Tooltip("Şafak ve batımın KENDİ kademesi. Gece↔gündüz karışımı bu saati soğuk " +
-             "(-11 sıcaklık) ve soluk (-17 doygunluk) basıyordu: palet ne kadar kızıl " +
-             "olursa olsun ekrana pastel geliyordu. Batış ancak sıcak ve doygun bir " +
-             "kademeyle yangın gibi görünür. Yalnız açık havada devreye girer; kapalı " +
-             "havada batış gerçekte de gridir.")]
+    [Header("Golden hour")]
+    [Tooltip("The OWN grade of dawn and sunset. The night/day mix was printing this hour cool " +
+             "(-11 temperature) and pale (-17 saturation): however red the palette was, it " +
+             "arrived on screen as pastel. A sunset only looks like fire with a warm and " +
+             "saturated grade. It only engages in clear weather; in overcast weather a sunset " +
+             "really is grey.")]
     public LookProfile goldenHour = new()
     {
         exposure = -0.8f, contrast = 10f, saturation = 10f,
@@ -110,18 +111,18 @@ public class LookSettings : ScriptableObject
         grain = 0.07f
     };
 
-    /// <param name="storm">0 açık hava, 1 tam fırtına.</param>
-    /// <param name="day">0 gece, 1 gündüz.</param>
-    /// <param name="horizon">1 = güneş tam ufukta: altın saat.</param>
+    /// <param name="storm">0 clear weather, 1 full storm.</param>
+    /// <param name="day">0 night, 1 day.</param>
+    /// <param name="horizon">1 = the sun exactly on the horizon: golden hour.</param>
     public LookProfile Evaluate(float storm, float day, float horizon)
     {
         var clear = LookProfile.Lerp(clearNight, clearDay, day);
         var stormy = LookProfile.Lerp(stormNight, stormDay, day);
         var mixed = LookProfile.Lerp(clear, stormy, storm);
 
-        // Altın saat fırtınada tamamen ölmez: kalın bulutlu batışta da batı ufku
-        // hafif kızarır, tam gri kesim dijital duruyordu. Pay küçük — fırtına yine
-        // baskın; şiddet arttıkça kızıl ezilir ama sıfıra inmez.
+        // The golden hour does not die completely in a storm: even under thick cloud the western
+        // horizon reddens a little, and cutting it to full grey looked digital. The share is
+        // small — the storm still dominates; as the intensity rises the red is crushed but never reaches zero.
         return LookProfile.Lerp(mixed, goldenHour, horizon * Mathf.Lerp(1f, 0.45f, storm));
     }
 }

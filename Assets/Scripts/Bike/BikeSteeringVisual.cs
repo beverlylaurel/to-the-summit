@@ -1,39 +1,39 @@
 using System;
 using UnityEngine;
 
-/// GİDON VE ÇATALI ÇEVİRİR. Kontrolcü bütün bisikleti döndürüyor; bu bileşen ONUN
-/// ÜSTÜNE görsel bir sapma ekliyor — gidon dönüyor, gövde arkasından geliyor.
+/// TURNS THE HANDLEBAR AND FORK. The controller rotates the whole bike; this component adds a
+/// visual deviation ON TOP OF THAT — the handlebar turns and the body follows.
 ///
-/// Neden ayrı: fizik ile görsel ayrı kalmalı. Kontrolcü modelsiz de çalışıyor, model
-/// değişince fizik değişmiyor. Ayrıca çatal takımı ayrı bir nesne olmayan bir modelde
-/// bu bileşen hiç eklenmez ve gerisi aynen çalışır.
+/// Why it is separate: physics and visuals have to stay apart. The controller works with no
+/// model, and changing the model does not change the physics. And on a model where the fork
+/// assembly is not a separate object this component is simply not added and the rest works unchanged.
 ///
-/// AÇI FİZİKTEN TÜREMİYOR, GÖRSEL. Gerçek bir bisiklette hızlıyken gidon neredeyse hiç
-/// dönmez — viraj yatarak alınır ve gidon birkaç derece kıpırdar. Dönüş açısını hıza
-/// bağlamak bunu kendiliğinden veriyor: dururken tam açı, hızlıyken kıl payı.
+/// THE ANGLE IS NOT DERIVED FROM PHYSICS, IT IS VISUAL. On a real bike at speed the handlebar
+/// barely turns — a corner is taken by leaning and the bar moves a few degrees. Tying the turn
+/// angle to the speed gives that for free: full angle at a standstill, a hair at speed.
 public class BikeSteeringVisual : MonoBehaviour
 {
     [SerializeField] BikeController bike;
 
-    [Tooltip("Direksiyon ekseninde dönen parça: çatal, gidon ve kafa birlikte. " +
-             "Modelde ayrı nesne değilse bu bileşen kullanılmaz.")]
+    [Tooltip("The part that turns on the steering axis: fork, handlebar and head together. " +
+             "If it is not a separate object in the model this component is not used.")]
     [SerializeField] Transform steeringAssembly;
 
-    [Tooltip("Dururken gidonun çevrilebildiği en büyük açı (derece). Gerçek bir " +
-             "bisiklette gidon 60-70 dereceye kadar döner ama sürüşte o açıya hiç " +
-             "çıkılmaz.")]
+    [Tooltip("Largest angle the handlebar can turn at a standstill (degrees). On a real " +
+             "bike the bar turns 60-70 degrees, but that angle is never reached while " +
+             "riding.")]
     [Range(5f, 70f)] [SerializeField] float maxAngle = 35f;
 
-    [Tooltip("Bu hızın üstünde gidon neredeyse hiç dönmüyor (m/s). Altı metre saniye " +
-             "yaklaşık 22 km/h: o tempoda viraj yatarak alınır, gidon kıl payı kıpırdar.")]
+    [Tooltip("Above this speed the handlebar barely turns at all (m/s). Six metres per second " +
+             "is about 22 km/h: at that pace a corner is taken by leaning and the bar moves a hair.")]
     [Range(1f, 15f)] [SerializeField] float fullLeanSpeed = 6f;
 
-    [Tooltip("Dönüşün yumuşaması (saniye). Sıfırda gidon zıplıyor.")]
+    [Tooltip("Smoothing of the turn (seconds). At zero the handlebar jumps.")]
     [Range(0.02f, 0.6f)] [SerializeField] float smoothing = 0.12f;
 
-    /// Modelin kendi sıfır duruşu: gidonun düz olduğu andaki yerel dönüşü. Sıfırdan
-    /// kurulsaydı model her açılışta kendi eksenine sıçrardı — üreteçten gelen mesh'in
-    /// sıfır dönüşü düz gidon anlamına gelmiyor.
+    /// The model's own zero pose: its local rotation at the moment the handlebar is straight.
+    /// Built from zero the model would jump to its own axis at every start — the zero rotation
+    /// of a mesh coming from the generator does not mean a straight handlebar.
     Quaternion rest;
     float angle;
 
@@ -47,19 +47,19 @@ public class BikeSteeringVisual : MonoBehaviour
     void OnEnable()
     {
         if (bike == null || steeringAssembly == null)
-            throw new InvalidOperationException($"{nameof(BikeSteeringVisual)}: bağımlılıklar atanmadı.");
+            throw new InvalidOperationException($"{nameof(BikeSteeringVisual)}: dependencies are not assigned.");
 
         rest = steeringAssembly.localRotation;
     }
 
     void LateUpdate()
     {
-        // Yatma açısı zaten direksiyon girdisinin yumuşatılmış hâli; ikinci bir girdi
-        // okumak yerine ondan türetiliyor — iki kaynak olsaydı gidon ile gövde farklı
-        // anlarda dönerdi.
+        // The lean angle is already the smoothed form of the steering input; rather than reading
+        // a second input it is derived from that — with two sources the handlebar and the body
+        // would turn at different moments.
         float steer = bike.LeanAngle / Mathf.Max(1f, MaxLeanOf(bike));
 
-        // Hız arttıkça gidon kısılıyor: viraj yatarak alınmaya başlıyor.
+        // As the speed rises the handlebar is reined in: corners start being taken by leaning.
         float speedFade = 1f - Mathf.Clamp01(bike.Speed / Mathf.Max(0.1f, fullLeanSpeed));
         float target = steer * maxAngle * Mathf.Lerp(0.15f, 1f, speedFade);
 
@@ -69,7 +69,7 @@ public class BikeSteeringVisual : MonoBehaviour
         steeringAssembly.localRotation = rest * Quaternion.Euler(0f, angle, 0f);
     }
 
-    /// Kontrolcünün ayarındaki en büyük yatma açısı. Doğrudan okunamıyor çünkü ayar
-    /// kontrolcünün özel alanı; oran için gereken tek şey bu sayı.
+    /// The largest lean angle in the controller's settings. It cannot be read directly because
+    /// the settings are the controller's private field; this number is all the ratio needs.
     static float MaxLeanOf(BikeController bike) => bike.MaxLean;
 }

@@ -1,69 +1,68 @@
 using UnityEngine;
 
-/// Rüzgârın hız, esinti ve yön ayarları.
+/// The wind's speed, gust and direction settings.
 ///
-/// Bileşenin üstünde `[SerializeField]` olarak durdukları sürece değerin üç kopyası
-/// oluyordu: koddaki varsayılan, sahnedeki serileştirilmiş kopya ve gerçekte çalışan.
-/// Sahne kazanıyor, üstelik Unity sahneyi kendi belleğinden istediği an diske yeniden
-/// yazıyor — koddan yapılan bir düzeltme sessizce geri alınıyordu.
+/// As long as they sat on the component as `[SerializeField]` there were three copies of each
+/// value: the default in code, the serialized copy in the scene, and the one actually running.
+/// The scene wins, and on top of that Unity rewrites the scene to disk from its own memory
+/// whenever it likes — a fix made in code was silently reverted.
 ///
-/// Şiddet burada yok: onu `AltitudeWeatherDriver` sürüyor. Rüzgâr ne kadar eseceğine
-/// kendi karar vermez, yalnızca nasıl eseceğine.
+/// Severity is not here: `AltitudeWeatherDriver` drives it. The wind does not decide how hard it
+/// blows, only how it blows.
 [CreateAssetMenu(menuName = "To The Summit/Wind", fileName = "WindSettings")]
 public class WindSettings : ScriptableObject
 {
-    [Header("Taban rüzgâr")]
-    /// YÜZEY RÜZGÂRI, serbest atmosfer değil. Bulut katmanı kendi tabanını
-    /// `CloudWeatherDriver`'dan alıyor — yüzey sürtünmesi yüzeyi yavaşlatır,
-    /// yukarısı durmaz.
+    [Header("Base wind")]
+    /// SURFACE WIND, not the free atmosphere. The cloud layer takes its own base from
+    /// `CloudWeatherDriver` — surface friction slows the surface, what is above does not stop.
     ///
-    /// 2 m/s'ti ve Beaufort 2 ("hafif esinti") demekti: dağda hiçbir zaman
-    /// durgun hava olmuyordu. Kar terminal hızı 1 m/s olduğu için 2 m/s'lik
-    /// rüzgâr taneyi dikeyden 63° yatırıyor — panel "rüzgâr 0" derken ekranda
-    /// bariz yan yatık kar. 0.6 Beaufort 1 ("hafif hava"); maruziyet çarpanıyla
-    /// birlikte 0.21–0.87 m/s, yani 12–41° arası.
-    [Tooltip("Severity 0 iken YÜZEY hızı (m/s). Sıfır olmamalı.")]
+    /// It was 2 m/s and meant Beaufort 2 ("light breeze"): there was never still air on
+    /// the mountain. Because snow's terminal velocity is 1 m/s, a 2 m/s wind tilts a
+    /// flake 63° off vertical — the panel said "wind 0" while the screen showed
+    /// obviously slanted snow. 0.6 is Beaufort 1 ("light air"); with the exposure
+    /// multiplier it is 0.21-0.87 m/s, i.e. between 12° and 41°.
+    [Tooltip("SURFACE speed at severity 0 (m/s). Must not be zero.")]
     public float calmSpeed = 0.6f;
-    [Tooltip("Severity 1 iken hız (m/s). Tam fırtına.")]
+    [Tooltip("Speed at severity 1 (m/s). Full storm.")]
     public float stormSpeed = 14f;
 
     [Header("Arazi maruziyeti")]
-    [Tooltip("Korunaklı oyukta sürekli hızın kaç katına indiği. Dağda hissedilen en " +
-             "büyük fark budur: sırtta ayakta duramazsın, otuz metre aşağıda rüzgâr " +
+    [Tooltip("The fraction of the sustained speed left in a sheltered hollow. This is the " +
+             "biggest difference felt on a mountain: you cannot stand on the ridge, thirty " +
              "kesilir.")]
     [Range(0.1f, 1f)] public float shelteredFactor = 0.35f;
-    [Tooltip("Açık sırtta sürekli hızın kaç katına çıktığı. Rüzgâr tepeyi aşarken " +
-             "sıkışıp hızlanır.")]
+    [Tooltip("The multiple of the sustained speed reached on an exposed ridge. The wind " +
+             "compresses and speeds up as it crosses the crest.")]
     [Range(1f, 2.5f)] public float exposedFactor = 1.45f;
-    [Tooltip("Taban salınımının hızı. 0.011 ≈ 90 saniyelik periyot.")]
+    [Tooltip("Speed of the base oscillation. 0.011 ≈ a 90 second period.")]
     public float baseFrequency = 0.011f;
-    [Tooltip("Taban hızın kendi etrafında salınma oranı.")]
+    [Tooltip("How much the base speed oscillates around itself.")]
     [Range(0f, 1f)] public float baseVariation = 0.25f;
 
     [Header("Esinti")]
-    [Tooltip("Esintinin taban hıza oranı.")]
+    [Tooltip("The gust's ratio to the base speed.")]
     [Range(0f, 1f)] public float gustAmount = 0.4f;
-    [Tooltip("Esinti sıklığı. 0.08 ≈ 12 saniyelik periyot.")]
+    [Tooltip("Gust frequency. 0.08 ≈ a 12 second period.")]
     public float gustFrequency = 0.08f;
-    [Tooltip("Saniye altı sarsıntının payı: ceketi dalgalandıran kısa çarpmalar. " +
-             "Esintinin üstüne biner.")]
+    [Tooltip("The share of sub-second buffeting: short hits that ripple a jacket. " +
+             "It rides on top of the gust.")]
     [Range(0f, 1f)] public float flickerAmount = 0.12f;
-    [Tooltip("Sarsıntı sıklığı. 0.5 ≈ 2 saniyelik periyot.")]
+    [Tooltip("Buffet frequency. 0.5 ≈ a 2 second period.")]
     public float flickerFrequency = 0.5f;
 
-    [Header("Yön")]
-    [Tooltip("Dağın HÂKİM rüzgâr yönü (derece, +X'ten saat yönünün tersine). Kar " +
-             "deseni bu eksene oturuyor: biçim saatler içinde " +
-             "oluşur, anlık esintiyle dönmezler.")]
+    [Header("Direction")]
+    [Tooltip("The mountain's PREVAILING wind direction (degrees, counter-clockwise from +X). " +
+             "The snow pattern sits on this axis: the shape forms over hours, " +
+             "it does not turn with an instantaneous gust.")]
     [Range(0f, 360f)] public float prevailingDegrees = 205f;
 
-    [Tooltip("Anlık rüzgârın hâkim yönün etrafındaki salınımı (derece). Rüzgâr her " +
-             "yönden gelmez; dağın bir hâkim rüzgârı vardır ve esinti onun etrafında " +
-             "oynar. Serbest 720°'lik süpürme denendi ve geri alındı: birikinti alanı " +
-             "`dot(worldXZ, windAxis)` okuduğu için dağın ortasında (|worldXZ| ≈ 7000 m) " +
-             "0.14 radyanlık bir sapma deseni 980 metre kaydırıyordu — gövde 45 m.")]
+    [Tooltip("The instantaneous wind's swing around the prevailing direction (degrees). The " +
+             "wind does not come from every direction; a mountain has a prevailing wind and the " +
+             "gust plays around it. A free 720° sweep was tried and reverted: because the drift " +
+             "field reads `dot(worldXZ, windAxis)`, in the middle of the mountain (|worldXZ| ≈ 7000 m) " +
+             "a 0.14 radian deviation shifted the pattern by 980 metres — the body is 45 m.")]
     [Range(0f, 90f)] public float directionSpread = 35f;
 
-    [Tooltip("Yön kaymasının hızı.")]
+    [Tooltip("Speed of the direction drift.")]
     public float directionDrift = 0.02f;
 }

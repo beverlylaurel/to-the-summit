@@ -1,44 +1,43 @@
 using UnityEngine;
 
-/// Ortam ışığını GERÇEK gökyüzünden pişirir.
+/// Bakes the ambient light from the REAL sky.
 ///
-/// Paketin kendi probe'u C#'taki analitik `RenderSky`'dan geliyordu ve o yol çoklu
-/// saçılım taşımıyor — alacakaranlık tam olarak çoklu saçılımdan gelir, güneş ufkun
-/// altındayken tek saçılım sıfırdır. Ölçülmüştü: 18:36'da çizilen gökyüzü kızıl,
-/// probe `0.00000`, sahne zifiri karanlık. Analitik yol devre dışı bırakıldı.
+/// The package's own probe came from the analytic `RenderSky` in C# and that path carries no
+/// multiple scattering — twilight comes from multiple scattering exactly, and with the sun below
+/// the horizon single scattering is zero. It was measured: at 18:36 the drawn sky was red, the
+/// probe `0.00000`, the scene pitch black. The analytic path was disabled.
 ///
-/// Skybox materyali PBSky'ın kendisi, yani LUT'un ürettiği alacakaranlığı çiziyor;
-/// `DynamicGI.UpdateEnvironment()` onu küresel harmoniğe çeviriyor.
+/// The skybox material is PBSky itself, so it draws the twilight the LUT produces;
+/// `DynamicGI.UpdateEnvironment()` converts it into spherical harmonics.
 ///
-/// PİŞİRME KISILIYOR. Küresel harmonik ve yansıma küpü yeniden üretiliyor; her karede
-/// çağrılınca kare süresi ikiye katlanıyor. Gökyüzü bir saniyede gözle görülür kadar
-/// değişmiyor.
+/// THE BAKE IS RATE LIMITED. Spherical harmonics and the reflection cube are regenerated; called
+/// every frame it doubles the frame time. The sky does not change visibly within a second.
 public class SkyAmbientBaker : MonoBehaviour
 {
-    [Tooltip("Güneş yönünün kaynağı. Pişirme yalnız gökyüzü kaydığında yenileniyor.")]
+    [Tooltip("Source of the sun direction. The bake is only refreshed when the sky has moved.")]
     [SerializeField] TimeOfDay time;
 
-    [Tooltip("İki pişirme arasındaki en kısa süre (saniye).")]
+    [Tooltip("Shortest interval between two bakes (seconds).")]
     [SerializeField, Range(0.1f, 5f)] float minimumInterval = 0.5f;
 
-    [Tooltip("Güneş yönü bu kadar kayınca yeniden pişiriliyor (derece).")]
+    [Tooltip("The sun direction moving this far triggers a rebake (degrees).")]
     [SerializeField, Range(0.05f, 5f)] float movementDegrees = 0.25f;
 
     Vector3 bakedSunDirection = Vector3.zero;
     float nextBakeTime = -1f;
 
-    /// PİŞİRME BİR KARE GERİDEN OKUYOR. `DynamicGI.UpdateEnvironment()` gökyüzü
-    /// materyalini o anki hâliyle okuyor, ama materyalin parametrelerini render geçişi
-    /// yazıyor — yani `LateUpdate` anında materyalde ÖNCEKİ karenin durumu duruyor.
+    /// THE BAKE READS ONE FRAME BEHIND. `DynamicGI.UpdateEnvironment()` reads the sky material
+    /// in its current state, but the material's parameters are written by the render pass — so at
+    /// `LateUpdate` the material still holds the PREVIOUS frame's state.
     ///
-    /// Sürekli akan zamanda görünmez: her kare yeni pişirme geliyor, bir kare gecikme
-    /// fark edilmiyor. Ama saat SIÇRADIĞINDA tek pişirme yapılıp güneş de durursa
-    /// (F1'de "Saati durdur" işaretliyken) probe eski gökyüzünde DONUYOR.
+    /// With time flowing continuously it is invisible: a new bake arrives every frame and one
+    /// frame of delay goes unnoticed. But when the clock JUMPS and a single bake is done while
+    /// the sun also stops (with "Freeze time" checked in F1) the probe FREEZES on the old sky.
     ///
-    /// Ölçüldü: öğlenden geceye atlandığında saat 00:00'da `ortam tepe` hâlâ
-    /// 0.0793 0.1064 0.1355 — öğlen değeri. `LookController` pozlamayı bu probe'dan
-    /// okuduğu için gece sahnesi GÜNDÜZ pozlamasıyla çiziliyor ve her şey siyah çıkıyor;
-    /// bulutlar en çok bundan etkileniyordu.
+    /// Measured: jumping from noon to night, at 00:00 `ambient zenith` was still
+    /// 0.0793 0.1064 0.1355 — the noon value. Because `LookController` reads the exposure from
+    /// that probe, the night scene was drawn with the daytime exposure and everything came out
+    /// black; the clouds were affected the most.
     int followUpBakes;
 
     public void Bind(TimeOfDay timeRef) => time = timeRef;
@@ -46,7 +45,7 @@ public class SkyAmbientBaker : MonoBehaviour
     void OnEnable()
     {
         if (time == null)
-            throw new System.InvalidOperationException($"{nameof(SkyAmbientBaker)}: bağımlılık atanmadı.");
+            throw new System.InvalidOperationException($"{nameof(SkyAmbientBaker)}: the dependency is not assigned.");
 
         bakedSunDirection = Vector3.zero;
         nextBakeTime = -1f;
@@ -55,7 +54,7 @@ public class SkyAmbientBaker : MonoBehaviour
 
     void LateUpdate()
     {
-        // Açı eşiği: güneş 0.25° kayınca gökyüzü ölçülebilir biçimde değişmiş oluyor.
+        // The angle threshold: with the sun 0.25° away the sky has changed measurably.
         float moved = Vector3.Angle(bakedSunDirection, time.SunDirection);
         bool skyMoved = bakedSunDirection == Vector3.zero || moved >= movementDegrees;
 
@@ -64,15 +63,15 @@ public class SkyAmbientBaker : MonoBehaviour
             bakedSunDirection = time.SunDirection;
             nextBakeTime = Time.time + minimumInterval;
 
-            // Bu pişirme eski materyal durumunu okuyor; takip pişirmesi yenisini alacak.
+            // This bake reads the old material state; the follow-up bake will take the new one.
             followUpBakes = 1;
 
             DynamicGI.UpdateEnvironment();
             return;
         }
 
-        // TAKİP PİŞİRMESİ ARALIĞA TABİ DEĞİL: amacı bir kareyi kapatmak, kısılırsa
-        // gecikme aynen kalır. Kare başına en fazla bir tane, yani maliyeti bir pişirme.
+        // THE FOLLOW-UP BAKE IS NOT RATE LIMITED: its purpose is to close a one-frame gap, and
+        // limited it the delay would simply stay. At most one per frame, so it costs one bake.
         if (followUpBakes > 0)
         {
             followUpBakes--;

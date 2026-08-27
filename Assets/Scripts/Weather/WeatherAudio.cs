@@ -1,8 +1,8 @@
 using System;
 using UnityEngine;
 
-/// Yağmur ve rüzgâr katmanlarını hava durumuna göre harmanlar.
-/// Ayrık "hafif/şiddetli" durumu yoktur; katmanlar eşit-güç geçişiyle karışır.
+/// Blends the rain and wind layers according to the weather.
+/// There is no discrete "light/heavy" state; the layers mix with an equal-power crossfade.
 public class WeatherAudio : MonoBehaviour
 {
     [SerializeField] WeatherState weather;
@@ -16,26 +16,26 @@ public class WeatherAudio : MonoBehaviour
 
     [Header("Seviye")]
     [SerializeField, Range(0f, 1f)] float masterVolume = 1f;
-    [Tooltip("Savrulan yağmur yüzeye daha çok çarpar; rüzgârın yağmur sesine katkısı.")]
+    [Tooltip("Driven rain hits surfaces harder; the wind's contribution to the rain sound.")]
     [SerializeField, Range(0f, 0.5f)] float windRainBoost = 0.2f;
 
-    // Rüzgâr seviyeleri bilerek serileştirilmiyor: Inspector'a girince sahnedeki
-    // bileşen eski değerle donuyor ve koddaki değişiklik etkisiz kalıyor.
-    const float WindVolume = 0.55f;   // rüzgârın yağmura göre seviyesi
+    // The wind levels are deliberately not serialized: once in the Inspector the component in
+    // the scene freezes on the old value and a change in code has no effect.
+    const float WindVolume = 0.55f;   // the wind's level relative to the rain
     const float WindFloor = 0.14f;    // en dingin anda bile duyulan taban
 
     [Header("Zarf")]
-    [Tooltip("Rüzgâr yükselirken yumuşatma süresi. Esinti hızlı gelir.")]
+    [Tooltip("Smoothing time while the wind rises. A gust comes fast.")]
     [SerializeField] float windAttack = 0.4f;
-    [Tooltip("Rüzgâr düşerken yumuşatma süresi. Esinti yavaş çekilir.")]
+    [Tooltip("Smoothing time while the wind falls. A gust withdraws slowly.")]
     [SerializeField] float windRelease = 2.5f;
-    [Tooltip("Yağmur yükseklikle değişir, hızlı atağa gerek yok.")]
+    [Tooltip("Rain changes with altitude, no fast attack needed.")]
     [SerializeField] float rainSmoothing = 2f;
 
-    [Header("Tını")]
-    [Tooltip("Dingin rüzgârın parlaklığı. Düşük = boğuk.")]
+    [Header("Timbre")]
+    [Tooltip("Brightness of calm wind. Low = muffled.")]
     [SerializeField, Range(0f, 1f)] float windCalmBrightness = 0.35f;
-    [Tooltip("Rüzgâr sertleştikçe perdenin oynama miktarı.")]
+    [Tooltip("How much the pitch moves as the wind hardens.")]
     [SerializeField, Range(0f, 0.3f)] float windPitchRange = 0.08f;
 
     AudioBand light;
@@ -57,9 +57,9 @@ public class WeatherAudio : MonoBehaviour
     void OnEnable()
     {
         if (weather == null)
-            throw new InvalidOperationException($"{nameof(WeatherAudio)}: {nameof(weather)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(WeatherAudio)}: {nameof(weather)} is not assigned.");
         if (wind == null)
-            throw new InvalidOperationException($"{nameof(WeatherAudio)}: {nameof(wind)} atanmadı.");
+            throw new InvalidOperationException($"{nameof(WeatherAudio)}: {nameof(wind)} is not assigned.");
     }
 
     void Update()
@@ -68,8 +68,8 @@ public class WeatherAudio : MonoBehaviour
 
         float precipitation = weather.Precipitation;
 
-        // Sürekli şiddet hangi sesin çaldığını, esinti o sesin ne kadar yükseldiğini
-        // belirler. İkisi ayrı okunuyor çünkü kulak ikisini ayrı duyar.
+        // The sustained intensity decides which sound is playing, the gust how far that sound
+        // rises. The two are read separately because the ear hears them separately.
         float sustained = wind.Strength;
         float felt = Mathf.Clamp01(sustained * (1f + wind.Gust));
 
@@ -79,37 +79,37 @@ public class WeatherAudio : MonoBehaviour
 
     void DriveRain(float precipitation, float felt)
     {
-        // YAĞMUR SESİ YAĞMUR ÇİZİLİYORSA ÇALAR.
+        // THE RAIN SOUND PLAYS IF RAIN IS BEING DRAWN.
         //
-        // `SnowRuntimeState.RainWeight01` yağmurun görsel ağırlığı;
-        // `PrecipitationRenderer` damla yoğunluğunu bununla çarpıyor. Ses de
-        // aynı sayıyı okumazsa kar yağarken yağmur sesi duyulur — kar sistemi
-        // devreye girdiğinde tam bu oldu.
+        // `SnowRuntimeState.RainWeight01` is the rain's visual weight;
+        // `PrecipitationRenderer` multiplies the drop density by it. If the audio does
+        // not read the same number, rain is heard while snow falls — which is exactly
+        // what happened when the snow system came online.
         float rain = precipitation * SnowRuntimeState.RainWeight01;
 
-        // GÖRSEL KESME EŞİĞİYLE AYNI. `PrecipitationRenderer` 0.05 altında
-        // damla sayısını sıfıra indiriyor; ses aynı yerde susmazsa oyuncu tek
-        // damla görmeden çiseleme duyar.
+        // THE SAME AS THE VISUAL CUTOFF THRESHOLD. `PrecipitationRenderer` drops the
+        // drop count to zero below 0.05; if the audio does not go quiet at the same
+        // place the player hears drizzle without seeing a single drop.
         rain *= Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.05f, rain));
 
         float master = rain * masterVolume
                        * (1f + felt * windRainBoost);
 
-        // Çiseleme boğuk, sağanak tiz
+        // Drizzle is muffled, a downpour is bright
         float brightness = Mathf.Lerp(0.55f, 1f, rain);
 
         light.Drive(master * Mathf.Sqrt(1f - rain), brightness, 1f);
         heavy.Drive(master * Mathf.Sqrt(rain), brightness, 1f);
     }
 
-    /// Seviye esintiyi izler, band geçişi sürekli şiddeti. Geçiş de esintiye bağlansaydı
-    /// dingin ve fırtına karışımı sekiz saniyede bir yer değiştirir; rüzgârın sertleştiği
-    /// değil, sesin oraya buraya kaydığı duyulurdu.
+    /// The level follows the gust, the band crossfade the sustained intensity. Had the crossfade
+    /// been tied to the gust as well, the calm and storm mixes would swap places every eight
+    /// seconds; what you would hear is not the wind hardening but the sound sliding around.
     void DriveWind(float sustained, float felt)
     {
         float master = Mathf.Lerp(WindFloor, 1f, felt) * masterVolume * WindVolume;
 
-        // Hava hızlandıkça türbülans yüksek frekans üretir
+        // As the air speeds up, turbulence produces high frequencies
         float brightness = Mathf.Lerp(windCalmBrightness, 1f, felt);
         float pitch = 1f + (felt - 0.5f) * 2f * windPitchRange;
 
@@ -117,12 +117,12 @@ public class WeatherAudio : MonoBehaviour
         storm.Drive(master * Mathf.Sqrt(sustained), brightness, pitch);
     }
 
-    /// Play mode'da yeniden derleme bandları düşürebilir; kullanım anında doğrulanır.
+    /// A recompile in Play mode can drop the bands; verified at the point of use.
     void EnsureBands()
     {
         if (light != null) return;
 
-        // Reload sonrası eski band objeleri kalmış olabilir; ikizlenmeyi önle
+        // Old band objects may survive a reload; prevent duplication
         for (int i = transform.childCount - 1; i >= 0; i--)
             Destroy(transform.GetChild(i).gameObject);
 
