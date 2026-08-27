@@ -37,6 +37,14 @@ public class SeaSurface : MonoBehaviour
 
     public SeaSettings Settings => settings;
 
+    /// DENİZ KAMERANIN GÖRÜŞ ALANINDA MI.
+    ///
+    /// `MeshRenderer.isVisible` herhangi bir kameranın (Scene view dahil)
+    /// gördüğünü söylüyor. Mesh yoksa "görünüyor" sayılıyor: yokluğunu
+    /// görünmezlikle karıştırmak simülasyonu kalıcı olarak susturur ve
+    /// belirti "deniz donuk" olur.
+    public bool IsVisible => meshRenderer == null || meshRenderer.isVisible;
+
     public void Bind(SeaSettings source, Shader shader, Transform cam)
     {
         settings = source;
@@ -89,9 +97,14 @@ public class SeaSurface : MonoBehaviour
 
     void EnsureMesh()
     {
+        // MESH KALITE KADEMESINDEN. Ayarda ayrı bir alan tutulsaydı preset
+        // ile mesh ayrışır ve "Low seçtim ama üçgen sayısı düşmedi" durumu
+        // çıkardı (spec §15.3).
+        SeaQuality.Levels seviye = SeaQuality.Of(settings.quality);
+
         if (mesh != null &&
-            Mathf.Approximately(builtQuad, settings.finestQuad) &&
-            builtRings == settings.ringCount)
+            Mathf.Approximately(builtQuad, seviye.FinestQuad) &&
+            builtRings == seviye.RingCount)
         {
             if (filter.sharedMesh == mesh) return;
             filter.sharedMesh = mesh;
@@ -103,13 +116,13 @@ public class SeaSurface : MonoBehaviour
             if (Application.isPlaying) Destroy(mesh); else DestroyImmediate(mesh);
         }
 
-        mesh = SeaMeshBuilder.Build(settings.finestQuad, settings.ringCount);
+        mesh = SeaMeshBuilder.Build(seviye.FinestQuad, seviye.RingCount);
         mesh.hideFlags = HideFlags.DontSave;
 
         filter.sharedMesh = mesh;
 
-        builtQuad = settings.finestQuad;
-        builtRings = settings.ringCount;
+        builtQuad = seviye.FinestQuad;
+        builtRings = seviye.RingCount;
     }
 
     void EnsureMaterial()
@@ -138,7 +151,7 @@ public class SeaSurface : MonoBehaviour
 
         if (cam == null) return;
 
-        float adim = settings.finestQuad;
+        float adim = SeaQuality.Of(settings.quality).FinestQuad;
 
         Vector3 c = cam.position;
         float sx = Mathf.Floor(c.x / adim) * adim;

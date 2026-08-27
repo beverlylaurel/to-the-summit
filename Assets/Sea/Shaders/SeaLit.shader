@@ -39,6 +39,14 @@ Shader "ToTheSummit/SeaLit"
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
             #pragma multi_compile_fog
 
+            // KALITE KEYWORD'U `multi_compile` OLMAK ZORUNDA.
+            //
+            // `Shader.EnableKeyword` ile acilan bir keyword burada tanimli
+            // degilse varyant HIC derlenmiyor ve `#if defined(...)`
+            // sessizce false kaliyor. Kar sisteminde uc detay katmani tam
+            // bu yuzden hic calismamisti.
+            #pragma multi_compile _SEA_QUALITY_LOW _SEA_QUALITY_MEDIUM _SEA_QUALITY_HIGH
+
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
@@ -170,8 +178,13 @@ Shader "ToTheSummit/SeaLit"
                 float thickness = max(sceneEyeDepth - IN.screenPos.w, 0.0);
 
                 // --- REFRAKSIYON ---
+                //
+                // LOW'DA KAPALI, DUZ RENK (spec 15.3). Refraksiyon opak
+                // dokuyu ve derinlik dokusunu okuyor; iki tam ekran
+                // ornekleme.
                 float3 refracted = _SeaUpwellingColor.rgb;
 
+            #if !defined(_SEA_QUALITY_LOW)
                 if (_SeaDbgNoRefraction <= 0.5)
                 {
                     float2 refrOffset = N.xz * _SeaRefractionStrength / max(dist, 1.0);
@@ -185,6 +198,7 @@ Shader "ToTheSummit/SeaLit"
 
                     refracted = SampleSceneColor(refrUV);
                 }
+            #endif
 
                 float3 volume = SeaVolumeColor(thickness);
                 float3 belowSurface = lerp(_SeaUpwellingColor.rgb, refracted * volume, volume);
@@ -238,12 +252,18 @@ Shader "ToTheSummit/SeaLit"
                     float2 foldDir;
                     float whitecap = SeaSampleFoam(IN.positionWS.xz, foldDir);
 
+                    // LOW'DA YON UZATMA KAPALI (spec 15.3): desen dondurulmuyor,
+                    // duz dunya koordinatindan okunuyor.
+                #if defined(_SEA_QUALITY_LOW)
+                    float2 foamUV = IN.positionWS.xz * _SeaFoamTiling;
+                #else
                     float angle = atan2(foldDir.y, foldDir.x);
                     float sn, cs; sincos(angle, sn, cs);
                     float2x2 rot = float2x2(cs, -sn, sn, cs);
 
                     float2 foamUV = mul(rot, IN.positionWS.xz * _SeaFoamTiling);
                     foamUV.x *= 0.35;
+                #endif
 
                     whitecap = saturate(whitecap * (0.55 + 0.75 * SeaFoamNoise(foamUV)));
 

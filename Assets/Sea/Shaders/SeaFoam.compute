@@ -20,7 +20,7 @@ float _SeaDeltaTime;
 [numthreads(8, 8, 1)]
 void KFoam(uint3 id : SV_DispatchThreadID)
 {
-    uint N = (uint)SEA_FFT_SIZE;
+    uint N = _SeaFftSize;
     if (id.x >= N || id.y >= N) return;
 
     float J = _SeaDisplacementRW[id].w;

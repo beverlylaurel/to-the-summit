@@ -74,13 +74,24 @@
 
 // --- FFT ve izgara ---
 
-/// FFT izgara boyutu. [KAYNAK: Tessendorf 2004 4.4 — "For many situations,
-/// values in the range 128 to 512 are sufficient"]
+/// FFT izgarasinin UST SINIRI. Kalite presetleri bunun altinda calisiyor
+/// (`_SeaFftSize`); burasi `numthreads`'in degeri ve dokularin en buyuk
+/// boyutu — degismez.
+///
+/// `numthreads` KEYWORD'E BAGLANMADI. Varyanta bagli `numthreads` her
+/// varyant icin ayri `GetKernelThreadGroupSizes` ve ayri dispatch sayisi
+/// demek; kucuk FFT'de 256 is parcaciginin yarisi bos calisiyor ama
+/// bariyerler tek dalda kaliyor ve sessiz bir tanimsiz davranis riski
+/// dogmuyor.
+/// [KAYNAK: Tessendorf 2004 4.4 — "For many situations, values in the
+/// range 128 to 512 are sufficient"]
 #define SEA_FFT_SIZE             256
 #define SEA_FFT_LOG2             8
 
-/// Kademe sayisi. Tek bir yama hem 200 m'lik olu dalgayi hem 20 cm'lik
-/// cirpintiyi tasiyamaz. [KAYNAK: Tessendorf 2004 4.4; Dupuy & Bruneton 2012]
+/// Kademe UST SINIRI. Preset daha azini calistirabilir; dokular her zaman
+/// bu derinlikte kuruluyor.
+/// Tek bir yama hem 200 m'lik olu dalgayi hem 20 cm'lik cirpintiyi
+/// tasiyamaz. [KAYNAK: Tessendorf 2004 4.4; Dupuy & Bruneton 2012]
 #define SEA_TIER_COUNT           3
 
 #endif

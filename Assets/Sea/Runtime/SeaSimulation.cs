@@ -21,6 +21,9 @@ public class SeaSimulation : MonoBehaviour
     [SerializeField] ComputeShader fftShader;
     [SerializeField] ComputeShader foamShader;
 
+    [Tooltip("Deniz görünmüyorsa hiçbir compute çalışmıyor (spec §15.2).")]
+    [SerializeField] SeaSurface surface;
+
     ISeaEnvironmentSource env;
 
     RenderTexture h0;
@@ -52,9 +55,11 @@ public class SeaSimulation : MonoBehaviour
     public RenderTexture Foam => foamA;
 
     public void Bind(SeaSettings source, SeaEnvironmentBridge bridge,
-                     ComputeShader spectrum, ComputeShader fft, ComputeShader foam)
+                     ComputeShader spectrum, ComputeShader fft, ComputeShader foam,
+                     SeaSurface visibilitySource)
     {
         environment = bridge;
+        surface = visibilitySource;
         Bind(source, (ISeaEnvironmentSource)bridge, spectrum, fft, foam);
     }
 
@@ -124,7 +129,9 @@ public class SeaSimulation : MonoBehaviour
     /// `OnDisable`'da bırakılıyor.
     RenderTexture Kur(string ad, RenderTextureFormat format)
     {
-        var rt = new RenderTexture(SeaConstants.FftSize, SeaConstants.FftSize, 0, format)
+        int n = SeaQuality.Of(settings.quality).FftSize;
+
+        var rt = new RenderTexture(n, n, 0, format)
         {
             name = ad,
             enableRandomWrite = true,
@@ -144,9 +151,13 @@ public class SeaSimulation : MonoBehaviour
         return rt;
     }
 
+    int builtFftSize = -1;
+    SeaProfiler profiler;
+
     void DokulariKur()
     {
         DokulariBirak();
+        builtFftSize = SeaQuality.Of(settings.quality).FftSize;
 
         // Yarım hassasiyet FFT için yeterli; `Float` iki kat bant genişliği
         // ve görsel fark yok (spec §6.8).
@@ -203,14 +214,40 @@ public class SeaSimulation : MonoBehaviour
     {
         if (env == null || settings == null) return;
 
-        if (displacement == null || !displacement.IsCreated())
+        // KALITE DEĞİŞİNCE DOKULAR YENİDEN KURULUYOR. Boyut değiştiği için
+        // eskisi olduğu gibi kullanılamaz.
+        if (displacement == null || !displacement.IsCreated()
+            || builtFftSize != SeaQuality.Of(settings.quality).FftSize)
             DokulariKur();
+
+        // DENİZ GÖRÜNMÜYORSA HİÇBİR ŞEY ÇALIŞMIYOR (spec §15.2).
+        //
+        // Kamera denizden çevrilince compute pass'lerinin tamamı düşüyor.
+        // `surface` bağlanmamışsa kapı açık bırakılıyor — görünürlük
+        // bilinmiyorsa simülasyonu susturmak sessiz bir "deniz donuk"
+        // hatası olurdu.
+        if (surface != null && !surface.IsVisible)
+        {
+            SeaRuntimeState.SimulationActive = false;
+            profiler?.Skipped();
+            return;
+        }
+
+        SeaRuntimeState.SimulationActive = true;
 
         Adim(Application.isPlaying ? Time.time : 0f);
     }
 
     /// Bir simülasyon adımı. Editör testi de bunu çağırıyor.
     public void Adim(float zaman)
+    {
+        profiler ??= new SeaProfiler("Sea.Simulation");
+        profiler.Begin();
+        AdimIcerik(zaman);
+        profiler.End();
+    }
+
+    void AdimIcerik(float zaman)
     {
         Vector3 yon = env.WindDirection;
         float hiz = env.WindSpeed;
@@ -246,12 +283,13 @@ public class SeaSimulation : MonoBehaviour
         spectrumShader.SetFloat(SeaShaderIDs.SeaTime,
                                 Mathf.Repeat(zaman, settings.loopPeriod));
 
-        int grup = SeaConstants.FftSize / 8;
+        SeaQuality.Levels seviye = SeaQuality.Of(settings.quality);
+        int grup = seviye.FftSize / 8;
 
         spectrumShader.SetTexture(kTime, SeaShaderIDs.H0RW, h0);
         spectrumShader.SetTexture(kTime, SeaShaderIDs.SpectrumHtRW, spectrumHt);
         spectrumShader.SetTexture(kTime, SeaShaderIDs.SpectrumSlopeRW, spectrumSlope);
-        spectrumShader.Dispatch(kTime, grup, grup, SeaConstants.TierCount);
+        spectrumShader.Dispatch(kTime, grup, grup, seviye.TierCount);
 
         FftGecisi(kFftH);
         FftGecisi(kFftV);
@@ -260,7 +298,7 @@ public class SeaSimulation : MonoBehaviour
         fftShader.SetTexture(kAssemble, SeaShaderIDs.SpectrumSlopeRW, spectrumSlope);
         fftShader.SetTexture(kAssemble, SeaShaderIDs.DisplacementRW, displacement);
         fftShader.SetTexture(kAssemble, SeaShaderIDs.DerivativesRW, derivatives);
-        fftShader.Dispatch(kAssemble, grup, grup, SeaConstants.TierCount);
+        fftShader.Dispatch(kAssemble, grup, grup, seviye.TierCount);
 
         Kopuk(zaman);
 
@@ -289,18 +327,20 @@ public class SeaSimulation : MonoBehaviour
         foamShader.SetTexture(kFoam, SeaShaderIDs.FoamRW, foamB);
         foamShader.SetTexture(kFoam, SeaShaderIDs.FoamPrevRW, foamA);
 
-        int grup = SeaConstants.FftSize / 8;
-        foamShader.Dispatch(kFoam, grup, grup, SeaConstants.TierCount);
+        SeaQuality.Levels seviye = SeaQuality.Of(settings.quality);
+        int grup = seviye.FftSize / 8;
+        foamShader.Dispatch(kFoam, grup, grup, seviye.TierCount);
 
         (foamA, foamB) = (foamB, foamA);
     }
 
     void BaslangicSpektrumu()
     {
-        int grup = SeaConstants.FftSize / 8;
+        SeaQuality.Levels seviye = SeaQuality.Of(settings.quality);
+        int grup = seviye.FftSize / 8;
 
         spectrumShader.SetTexture(kInitial, SeaShaderIDs.H0RW, h0);
-        spectrumShader.Dispatch(kInitial, grup, grup, SeaConstants.TierCount);
+        spectrumShader.Dispatch(kInitial, grup, grup, seviye.TierCount);
     }
 
     void FftGecisi(int kernel)
@@ -308,8 +348,11 @@ public class SeaSimulation : MonoBehaviour
         fftShader.SetTexture(kernel, SeaShaderIDs.SpectrumHtRW, spectrumHt);
         fftShader.SetTexture(kernel, SeaShaderIDs.SpectrumSlopeRW, spectrumSlope);
 
-        // Grup başına bir satır; iş parçacığı sayısı satır uzunluğu kadar.
-        fftShader.Dispatch(kernel, 1, SeaConstants.FftSize, SeaConstants.TierCount);
+        // Grup başına bir satır. İş parçacığı sayısı her zaman
+        // `SEA_FFT_SIZE`; çalışan FFT daha küçükse fazlalar boşta döner
+        // ama bariyerlere girmeye devam eder (`SeaFFT.compute`).
+        SeaQuality.Levels seviye = SeaQuality.Of(settings.quality);
+        fftShader.Dispatch(kernel, 1, seviye.FftSize, seviye.TierCount);
     }
 
     /// COMPUTE SHADER GLOBALLERİ AYRI YAZILIYOR.
@@ -332,6 +375,10 @@ public class SeaSimulation : MonoBehaviour
         cs.SetFloat(SeaShaderIDs.LoopPeriod, settings.loopPeriod);
 
         cs.SetVector(SeaShaderIDs.TierCutoffK, KademeSinirlari());
+
+        SeaQuality.Levels seviye = SeaQuality.Of(settings.quality);
+        cs.SetInt(SeaShaderIDs.FftSize, seviye.FftSize);
+        cs.SetInt(SeaShaderIDs.FftLog2, seviye.FftLog2);
     }
 
     /// KADEME BANDI SINIRLARI.

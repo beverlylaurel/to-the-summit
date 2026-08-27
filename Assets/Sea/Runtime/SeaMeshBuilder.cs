@@ -29,7 +29,7 @@ public static class SeaMeshBuilder
     ///   halka 0: 0.5 m quad, 128×128 → 32 m yarıçap
     ///   halka 1: 1.0 m quad, halka   → 96 m
     ///   ...her halka bir öncekinin tam 2 katı
-    const int QuadPerSide = 128;
+    public const int QuadPerSide = 128;
 
     public static Mesh Build(float finestQuad, int ringCount)
     {

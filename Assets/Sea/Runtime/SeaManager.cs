@@ -152,8 +152,20 @@ public class SeaManager : MonoBehaviour
 
     void AyarlariYayinla()
     {
+        SeaQuality.Levels seviye = SeaQuality.Of(settings.quality);
+        SeaQuality.Apply(settings.quality);
+
+        // KULLANILMAYAN KADEMENİN AĞIRLIĞI SIFIR.
+        //
+        // Low'da üçüncü kademe hiç hesaplanmıyor; ağırlığı sıfırlanmazsa
+        // yüzey o kademenin BAYAT dokusunu okur ve donmuş bir çırpıntı
+        // katmanı görünür.
+        Vector3 agirlik = settings.tierWeights;
+        if (seviye.TierCount < 3) agirlik.z = 0f;
+        if (seviye.TierCount < 2) agirlik.y = 0f;
+
         Shader.SetGlobalVector(SeaShaderIDs.PatchSizes, settings.patchSizes);
-        Shader.SetGlobalVector(SeaShaderIDs.TierWeights, settings.tierWeights);
+        Shader.SetGlobalVector(SeaShaderIDs.TierWeights, agirlik);
         Shader.SetGlobalVector(SeaShaderIDs.ChoppinessPerTier, settings.choppinessPerTier);
 
         Shader.SetGlobalFloat(SeaShaderIDs.SpectrumDepth, settings.spectrumDepth);

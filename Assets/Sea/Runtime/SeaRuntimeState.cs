@@ -25,4 +25,17 @@ public static class SeaRuntimeState
     /// Deniz sistemi çalışıyor mu. `SeaManager` bir `ISeaEnvironmentSource`
     /// bulamazsa false kalıyor.
     public static bool Active { get; internal set; }
+
+    /// Dalga alanı O KARE hesaplandı mı. Deniz görünmüyorsa bütün compute
+    /// pass'leri düşüyor (spec §15.2) ve bu false oluyor. Profiler'ın
+    /// "görünmezken maliyet" ölçümü buna bakıyor.
+    public static bool SimulationActive { get; internal set; }
+
+    /// Son simülasyon adımının GPU süresi (ms). `SeaProfiler` yazıyor.
+    public static float SimulationGpuMs { get; internal set; }
+
+    /// GPU zamanlaması gerçekten geliyor mu. Profiler kayıt yapmıyorsa
+    /// `SimulationGpuMs` sessizce 0 kalır; bu bayrak olmadan "bedava" ile
+    /// "ölçülemedi" ayrılamaz.
+    public static bool GpuTimingAvailable { get; internal set; }
 }

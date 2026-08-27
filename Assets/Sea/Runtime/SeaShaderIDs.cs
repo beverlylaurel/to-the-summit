@@ -66,6 +66,8 @@ public static class SeaShaderIDs
     public static readonly int FftStep = Shader.PropertyToID("_SeaFftStep");
     public static readonly int FftTier = Shader.PropertyToID("_SeaFftTier");
     public static readonly int DeltaTime = Shader.PropertyToID("_SeaDeltaTime");
+    public static readonly int FftSize = Shader.PropertyToID("_SeaFftSize");
+    public static readonly int FftLog2 = Shader.PropertyToID("_SeaFftLog2");
 
     // --- Sığ su (spec §8) ---
     public static readonly int MaxShoalingGain = Shader.PropertyToID("_SeaMaxShoalingGain");

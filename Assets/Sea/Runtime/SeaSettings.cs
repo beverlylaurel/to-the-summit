@@ -12,6 +12,13 @@ using UnityEngine;
 [CreateAssetMenu(menuName = "To The Summit/Deniz Ayarları", fileName = "SeaSettings")]
 public class SeaSettings : ScriptableObject
 {
+    [Header("Kalite")]
+    /// KALITE KADEMESI FFT ÇÖZÜNÜRLÜĞÜNÜ, KADEME SAYISINI VE MESH'İ SÜRER.
+    /// Sayılar `SeaQuality.Of` tablosunda (spec §15.3); burada yalnız hangi
+    /// kademede olduğumuz duruyor.
+    [Tooltip("Kalite kademesi. Sayılar SeaQuality tablosunda.")]
+    public SeaQualityPreset quality = SeaQualityPreset.Medium;
+
     [Header("Deniz seviyesi")]
     /// DENİZ SEVİYESİ ÖLÇÜLEREK SEÇİLDİ.
     ///
@@ -87,16 +94,6 @@ public class SeaSettings : ScriptableObject
     /// Islak kum bandı bununla nefes alıyor. [KALİBRASYON]
     [Tooltip("Kabarma (run-up) bandının derinlik katkısı (m).")]
     [Range(0f, 2f)] public float runupMaxDepth = 0.45f;
-
-    [Header("Mesh (spec §10.2)")]
-    /// En ince quad. Snap adımı buna eşit; tüm quad boyutları bunun ikinin
-    /// kuvveti katı olduğu için tek snap adımı her halkayı kendi kafesinde
-    /// tutuyor (spec §10.1 hizalama ispatı).
-    [Tooltip("En ince quad boyu (m). Halka 0.")]
-    [Min(0.1f)] public float finestQuad = 0.5f;
-
-    [Tooltip("Halka sayısı. Her halkanın quad boyu bir öncekinin tam 2 katı.")]
-    [Range(3, 8)] public int ringCount = 7;
 
     [Header("Optik (spec §12)")]
     /// Kırmızı en hızlı, mavi en yavaş sönümleniyor — suyun mavi

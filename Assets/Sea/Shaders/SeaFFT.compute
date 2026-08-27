@@ -39,20 +39,35 @@ float4 SeaCMul2(float2 w, float4 v)
 /// tam olarak bu — normalize edilirse dalga yuksekligi N kat kuculur.
 void SeaIFFTSatir(uint tid, uint3 koordBase, bool dikey, uint slice)
 {
-    uint N = (uint)SEA_FFT_SIZE;
+    uint N     = _SeaFftSize;
+    uint log2N = _SeaFftLog2;
 
-    // Bit-ters permutasyon. Zaman ayriklamasi girdiyi bu sirada bekliyor.
-    uint kaynak = reversebits(tid) >> (32u - (uint)SEA_FFT_LOG2);
+    // FAZLA IS PARCACIGI BARIYERLERE GIRMEYE DEVAM EDIYOR.
+    //
+    // `numthreads` her zaman SEA_FFT_SIZE (256) ama calisan FFT 128
+    // olabilir. Fazlalari erken `return` etseydi bariyer AYRIK bir dalda
+    // kalirdi ve `GroupMemoryBarrierWithGroupSync` orada tanimsizdir.
+    // Bunun yerine yalniz BELLEK islemleri kapatiliyor; dongu ve
+    // bariyerler butun grup icin ayni.
+    bool aktif = tid < N;
 
-    uint3 okuma = dikey ? uint3(koordBase.x, kaynak, slice)
-                        : uint3(kaynak, koordBase.y, slice);
+    if (aktif)
+    {
+        // Bit-ters permutasyon. Zaman ayriklamasi girdiyi bu sirada bekliyor.
+        uint kaynak = reversebits(tid) >> (32u - log2N);
 
-    gHt[tid]    = _SeaSpectrumHtRW[okuma];
-    gSlope[tid] = _SeaSpectrumSlopeRW[okuma];
+        uint3 okuma = dikey ? uint3(koordBase.x, kaynak, slice)
+                            : uint3(kaynak, koordBase.y, slice);
+
+        gHt[tid]    = _SeaSpectrumHtRW[okuma];
+        gSlope[tid] = _SeaSpectrumSlopeRW[okuma];
+    }
 
     GroupMemoryBarrierWithGroupSync();
 
-    for (uint s = 1u; s <= (uint)SEA_FFT_LOG2; s++)
+    // `log2N` sabit tamponundan geliyor, yani grup icinde AYNI — dongu
+    // uniform, bariyer guvenli.
+    for (uint s = 1u; s <= log2N; s++)
     {
         uint m  = 1u << s;
         uint mh = m >> 1u;
@@ -60,7 +75,7 @@ void SeaIFFTSatir(uint tid, uint3 koordBase, bool dikey, uint slice)
         // Ciftin ALT elemanini tutan is parcacigi kelebegi yapiyor; ust
         // elemani tutan bekliyor. Ayni iki hucreye tek is parcacigi
         // dokundugu icin adim ici yaris yok.
-        if ((tid & mh) == 0u)
+        if (aktif && (tid & mh) == 0u)
         {
             uint k = tid & (mh - 1u);
             float2 w = SeaExpI(SEA_TWO_PI * (float)k / (float)m);
@@ -78,6 +93,8 @@ void SeaIFFTSatir(uint tid, uint3 koordBase, bool dikey, uint slice)
 
         GroupMemoryBarrierWithGroupSync();
     }
+
+    if (!aktif) return;
 
     uint3 yazma = dikey ? uint3(koordBase.x, tid, slice)
                         : uint3(tid, koordBase.y, slice);
@@ -105,7 +122,7 @@ void KIFFTVertical(uint3 id : SV_DispatchThreadID)
 [numthreads(8, 8, 1)]
 void KAssemble(uint3 id : SV_DispatchThreadID)
 {
-    uint N = (uint)SEA_FFT_SIZE;
+    uint N = _SeaFftSize;
     if (id.x >= N || id.y >= N) return;
 
     uint tier = id.z;

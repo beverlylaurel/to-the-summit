@@ -220,7 +220,7 @@ float SeaSpectrumPower(float2 k, float patchSize, float2 wind, uint tier)
 [numthreads(8, 8, 1)]
 void KInitialSpectrum(uint3 id : SV_DispatchThreadID)
 {
-    uint N = (uint)SEA_FFT_SIZE;
+    uint N = _SeaFftSize;
     if (id.x >= N || id.y >= N) return;
 
     uint tier = id.z;
@@ -265,7 +265,7 @@ void KInitialSpectrum(uint3 id : SV_DispatchThreadID)
 [numthreads(8, 8, 1)]
 void KTimeSpectrum(uint3 id : SV_DispatchThreadID)
 {
-    uint N = (uint)SEA_FFT_SIZE;
+    uint N = _SeaFftSize;
     if (id.x >= N || id.y >= N) return;
 
     uint tier = id.z;

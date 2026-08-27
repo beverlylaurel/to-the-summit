@@ -48,6 +48,11 @@ float3 _SeaChoppinessPerTier;
 
 float _SeaSpectrumDepth;
 float _SeaMaxShoalingGain;
+
+/// CALISAN FFT boyutu ve log2'si. Kalite presetinden geliyor;
+/// `SEA_FFT_SIZE` yalniz ust sinir.
+uint _SeaFftSize;
+uint _SeaFftLog2;
 float _SeaFetch;
 float _SeaSwell;
 float _SeaSmallWaveCutoff;

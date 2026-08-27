@@ -1818,16 +1818,7 @@ public static class MountainSceneBootstrap
         kok.Bind(ayar, kopru, gen.GetComponent<Terrain>());
         EditorUtility.SetDirty(kok);
 
-        var sim = kok.GetComponent<SeaSimulation>();
-        if (sim == null)
-        {
-            sim = kok.gameObject.AddComponent<SeaSimulation>();
-            changed = true;
-        }
-
-        sim.Bind(ayar, kopru, spektrum, fft, kopuk);
-        EditorUtility.SetDirty(sim);
-
+        // YÜZEY SİMÜLASYONDAN ÖNCE: simülasyon görünürlüğü ondan okuyor.
         var yuzey = Object.FindAnyObjectByType<SeaSurface>(FindObjectsInactive.Include);
         if (yuzey == null)
         {
@@ -1836,6 +1827,16 @@ public static class MountainSceneBootstrap
             yuzey = go.AddComponent<SeaSurface>();
             changed = true;
         }
+
+        var sim = kok.GetComponent<SeaSimulation>();
+        if (sim == null)
+        {
+            sim = kok.gameObject.AddComponent<SeaSimulation>();
+            changed = true;
+        }
+
+        sim.Bind(ayar, kopru, spektrum, fft, kopuk, yuzey);
+        EditorUtility.SetDirty(sim);
 
         // MESH KAMERAYI TAKİP EDİYOR, OYUNCUYU DEĞİL: kamera denizden
         // uzaklaşsa bile ufuk doğru kalıyor (spec §10.3).
