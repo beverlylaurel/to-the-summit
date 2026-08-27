@@ -1,26 +1,26 @@
 #ifndef TOTHESUMMIT_STOCHASTIC_TILING_INCLUDED
 #define TOTHESUMMIT_STOCHASTIC_TILING_INCLUDED
 
-// HEITZ-NEYRET STOKASTİK DÖŞEME.
+// HEITZ-NEYRET STOCHASTIC TILING.
 //
-// Sorun: doku metrelerce döşenince desen tekrar eder ve ızgara olarak okunur. Basit
-// harmanlama tekrarı zayıflatır ama VARYANSI da düşürür — iki örneğin ortalaması
-// yarı kontrast demek, doku bulanıklaşır.
+// The problem: tiled over metres a texture repeats and reads as a grid. A plain
+// blend weakens the repetition but also lowers the VARIANCE — the average of two
+// samples means half the contrast, and the texture goes blurry.
 //
-// Yöntem: düzlem altıgen ızgaraya bölünür, her piksel üç köşeye ait olur. Her köşe
-// dokuyu KENDİ rastgele kaymasıyla örnekler; üç örnek baryantrik ağırlıkla harmanlanır.
-// Kayma her hücrede farklı olduğu için tekrar periyodu ortadan kalkar.
+// The method: the plane is split into a hexagonal grid and every pixel belongs to
+// three vertices. Each vertex samples the texture with ITS OWN random offset; the three samples are blended barycentrically.
+// Because the offset differs per cell the repetition period disappears.
 //
-// Kontrast korunuyor çünkü doku ÖN İŞLEMDE Gauss histogramına dönüştürüldü
-// (StochasticTextureBaker). Gauss değişkenlerin ağırlıklı toplamı yine Gauss;
-// ağırlıklar karelerinin toplamına bölünerek varyans birde tutuluyor. Sonuç ters
-// LUT'tan geçirilip özgün histograma dönüyor.
+// Contrast is preserved because the texture was converted to a Gaussian histogram
+// IN A PREPASS (StochasticTextureBaker). A weighted sum of Gaussian variables is
+// still Gaussian; dividing by the root sum of squared weights keeps the variance at
+// one. The result is passed through an inverse LUT back to the original histogram.
 
-/// Altıgen ızgara: UV'yi üç köşeye ve baryantrik ağırlıklara ayırır.
+/// Hexagonal grid: splits a UV into three vertices and barycentric weights.
 void StochasticHexGrid(float2 uv, out float2 vertex1, out float2 vertex2,
                        out float2 vertex3, out float3 weights)
 {
-    // Eşkenar üçgen ızgarasına eğrilmiş koordinat. 1.7320508 = kök 3.
+    // Coordinate skewed onto an equilateral triangle grid. 1.7320508 = sqrt 3.
     const float2x2 gridToSkewed = float2x2(1.0, 0.0, -0.57735027, 1.15470054);
     float2 skewed = mul(gridToSkewed, uv * 3.4641016);
 
@@ -28,7 +28,7 @@ void StochasticHexGrid(float2 uv, out float2 vertex1, out float2 vertex2,
     float3 temp = float3(frac(skewed), 0.0);
     temp.z = 1.0 - temp.x - temp.y;
 
-    // Üçgenin hangi yarısında olduğumuza göre köşeler ve ağırlıklar.
+    // Vertices and weights depending on which half of the triangle we are in.
     if (temp.z > 0.0)
     {
         weights = float3(temp.z, temp.y, temp.x);
@@ -45,23 +45,23 @@ void StochasticHexGrid(float2 uv, out float2 vertex1, out float2 vertex2,
     }
 }
 
-/// Hücre başına rastgele kayma. Aynı hücre her zaman aynı kaymayı alır: desen
-/// kararlı, kamera oynayınca kaynamıyor.
+/// A random offset per cell. The same cell always gets the same offset: the pattern
+/// is stable and does not boil as the camera moves.
 float2 StochasticHash(float2 cell)
 {
     const float2x2 mixer = float2x2(127.1, 311.7, 269.5, 183.3);
     return frac(sin(mul(mixer, cell)) * 43758.5453);
 }
 
-/// Üç örnekli stokastik okuma. `texture`/`samplerState` Gauss dönüşümlü doku,
-/// `lut` ters dönüşüm tablosu.
+/// Three-sample stochastic read. `texture`/`samplerState` is the Gaussian-transformed
+/// texture, `lut` the inverse transform table.
 ///
-/// Türevler ELLE geçiriliyor: her örnek farklı kaymadan okunduğu için donanımın
-/// hesapladığı türev hücre sınırında sıçrıyor ve mip seviyesi bir piksellik
-/// çizgiler hâlinde atlıyordu.
+/// The derivatives are passed IN BY HAND: because each sample is read from a
+/// different offset, the hardware-computed derivative jumps at cell boundaries and
+/// the mip level skipped in one-pixel-wide lines.
 ///
-/// Dokular TEXTURE2D_PARAM ile alınıyor: `TEXTURE2D(x)` parametre listesinde
-/// BİLDİRİM üretir, parametre değil — doku fonksiyona hiç geçmez.
+/// The textures are taken with TEXTURE2D_PARAM: `TEXTURE2D(x)` in a parameter list
+/// produces a DECLARATION, not a parameter — the texture never reaches the function.
 float4 SampleStochastic(TEXTURE2D_PARAM(tex, samplerState),
                         TEXTURE2D_PARAM(lut, lutSampler),
                         float2 uv, float2 ddxUV, float2 ddyUV)
@@ -77,14 +77,14 @@ float4 SampleStochastic(TEXTURE2D_PARAM(tex, samplerState),
     float4 sample3 = SAMPLE_TEXTURE2D_GRAD(tex, samplerState,
                                            uv + StochasticHash(vertex3), ddxUV, ddyUV);
 
-    // VARYANS KORUMA: Gauss örneklerin ağırlıklı toplamının standart sapması
-    // ağırlıkların karekök toplamı kadar küçülür. Ona bölünce dağılım birde kalıyor;
-    // bu adım atlanırsa harman yine bulanıklaşır ve bütün yöntem anlamsızlaşır.
+    // VARIANCE PRESERVATION: the standard deviation of a weighted sum of Gaussian
+    // samples shrinks by the root sum of the weights. Dividing by it keeps the
+    // distribution at one; skip this step and the blend goes blurry again, which defeats the whole method.
     float4 mixed = weights.x * sample1 + weights.y * sample2 + weights.z * sample3;
     mixed = (mixed - 0.5) / length(weights) + 0.5;
 
-    // Ters LUT: Gauss uzayından özgün histograma. Kanal başına ayrı okuma —
-    // dönüşüm de kanal başına yapılmıştı.
+    // Inverse LUT: from Gaussian space back to the original histogram. A separate
+    // read per channel — the transform was done per channel too.
     float4 result;
     result.r = SAMPLE_TEXTURE2D_LOD(lut, lutSampler, float2(saturate(mixed.r), 0.5), 0).r;
     result.g = SAMPLE_TEXTURE2D_LOD(lut, lutSampler, float2(saturate(mixed.g), 0.5), 0).g;
@@ -93,25 +93,25 @@ float4 SampleStochastic(TEXTURE2D_PARAM(tex, samplerState),
     return result;
 }
 
-/// LUT'SUZ STOKASTİK OKUMA — MASKELER İÇİN.
+/// STOCHASTIC READ WITHOUT A LUT — FOR MASKS.
 ///
-/// `SampleStochastic` Gauss dönüşümlü doku ve ters histogram tablosu istiyor.
-/// Maskelerde (kar kenarı gürültüsü gibi) o iki varlık yok ve gerekmiyor:
-/// maske zaten eşikleniyor, histogramın birebir korunması görünmüyor. Kalan
-/// iş üç kaymalı örneğin harmanı ve VARYANS GERİ KAZANIMI — bu adım atlanırsa
-/// harman bulanıklaşır ve yöntem anlamsızlaşır.
+/// `SampleStochastic` wants a Gaussian-transformed texture and an inverse histogram
+/// table. Masks (like the snow edge noise) have neither, and do not need them:
+/// the mask is thresholded anyway and exact histogram preservation is invisible.
+/// What remains is the blend of three offset samples and the VARIANCE RECOVERY —
+/// skip that step and the blend goes blurry and the method is pointless.
 ///
-/// Neden gerekli: düz döşemede aynı desen sabit periyotla tekrar ediyor ve
-/// zemin yukarıdan bakınca DÜZENLİ BİR IZGARA gibi görünüyor (kullanıcı
-/// bildirdi: "izler çok düzenli, prosedürel değil").
+/// Why it is needed: with plain tiling the same pattern repeats at a fixed period
+/// and from above the ground looks like A REGULAR GRID (reported by the user:
+/// "the trails are too regular, they don't look procedural").
 float SampleStochasticMask(TEXTURE2D_PARAM(tex, samplerState), float2 uv)
 {
     float2 vertex1, vertex2, vertex3;
     float3 weights;
     StochasticHexGrid(uv, vertex1, vertex2, vertex3, weights);
 
-    // Türevler ELLE: her örnek farklı kaymadan okunduğu için donanımın türevi
-    // hücre sınırında sıçrıyor ve mip bir piksellik çizgiler hâlinde atlıyor.
+    // Derivatives BY HAND: because each sample is read from a different offset the
+    // hardware derivative jumps at cell boundaries and the mip skips in one-pixel lines.
     float2 dx = ddx(uv);
     float2 dy = ddy(uv);
 

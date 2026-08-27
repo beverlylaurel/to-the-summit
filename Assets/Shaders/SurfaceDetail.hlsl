@@ -3,16 +3,17 @@
 
 #include "StochasticTiling.hlsl"
 
-// ORTAK YÜZEY DETAY OKUMASI. Kar, kaya, çakıl, toprak — hepsi buradan geçiyor.
+// SHARED SURFACE DETAIL SAMPLING. Snow, rock, gravel, soil — all of it here.
 //
-// Her yüzey üç harita taşıyor (normal, pürüzlülük, yükseklik) ve her biri stokastik
-// dönüşümden geçmiş: Gauss histogramı + ters LUT. Bildirimleri ve okumayı yüzey başına
-// elle yazmak on iki satır ediyordu; ikinci yüzeyde yirmi dört, üçüncüde otuz altı.
+// Every surface carries three maps (normal, roughness, height) and each one has
+// been through the stochastic transform: Gaussian histogram + inverse LUT. Writing
+// the declarations and the sampling by hand cost twelve lines per surface; the
+// second surface made it twenty-four, the third thirty-six.
 //
-// Makrolar kullanılıyor çünkü HLSL'de doku demeti bir yapıya konamaz — TEXTURE2D
-// bildirimi tür değil, isim üretir.
+// Macros are used because HLSL cannot put a texture bundle in a struct — a
+// TEXTURE2D declaration is not a type, it produces names.
 
-/// Bir yüzeyin bütün doku bildirimleri. Yüzey adı ön ek olarak geçiyor:
+/// Every texture declaration of one surface. The surface name is the prefix:
 ///   DECLARE_SURFACE_DETAIL(Rock) → _RockNormal, _RockNormalLut, ...
 #define DECLARE_SURFACE_DETAIL(name)      \
     TEXTURE2D(_##name##Normal);           \
@@ -22,16 +23,16 @@
     TEXTURE2D(_##name##Height);           \
     TEXTURE2D(_##name##HeightLut);
 
-/// Yüzeyden okunan mikro detay.
+/// Micro detail read from a surface.
 struct SurfaceDetail
 {
-    float3 normal;      // teğet uzayı
+    float3 normal;      // tangent space
     float roughness;
-    float height;       // 0-1; yükseklik harmanı bunu kullanıyor
+    float height;       // 0-1; the height blend uses this
 };
 
-/// Tek yüzey okuması. `sharedSampler` bütün yüzeyler için ortak — örnekleyici
-/// sayısı donanımda sınırlı ve hepsi aynı ayarı istiyor (Repeat, trilinear, aniso).
+/// A single surface read. `sharedSampler` is shared by every surface — the number
+/// of samplers is limited in hardware and they all want the same settings (Repeat,
 #define SAMPLE_SURFACE_DETAIL(name, sharedSampler, uv, ddxUV, ddyUV, result)          \
 {                                                                                     \
     float4 n = SampleStochastic(TEXTURE2D_ARGS(_##name##Normal, sharedSampler),       \
@@ -43,27 +44,27 @@ struct SurfaceDetail
     float4 h = SampleStochastic(TEXTURE2D_ARGS(_##name##Height, sharedSampler),       \
                                 TEXTURE2D_ARGS(_##name##HeightLut, sharedSampler),    \
                                 uv, ddxUV, ddyUV);                                    \
-    /* Normal haritası "Default" olarak içe aktarılıyor (dönüşüm kanal              */\
-    /* paketlemesini bozardı), o yüzden açma elle: 0-1'den -1..1'e.                 */\
+    /* The normal map is imported as "Default" (a conversion would break the        */\
+    /* channel packing), so the unpacking is manual: 0-1 to -1..1.                  */\
     result.normal = normalize(n.xyz * 2.0 - 1.0);                                     \
     result.roughness = r.r;                                                           \
     result.height = h.r;                                                              \
 }
 
-/// YÜKSEKLİK HARMANI. Doğrusal karışım iki yüzeyi her yerde yarı yarıya
-/// bulanıklaştırır; gerçekte üstteki malzeme önce ÇUKURLARI doldurur, alttaki
-/// tümseklerde açıkta kalır. Eşik `t` ile yükselirken üst malzeme alçak yerlerden
-/// başlayıp tümsekleri örtüyor; geçiş de doğal bir sınır çizgisi kazanıyor.
+/// HEIGHT BLEND. A linear mix blurs the two surfaces half and half everywhere; in
+/// reality the upper material first fills the HOLLOWS and the lower one stays
+/// exposed on the bumps. As the threshold `t` rises the upper material starts from
+/// the low ground and covers the bumps; the transition gains a natural boundary.
 ///
-/// `sharpness` sıfır olsaydı sınır bıçak gibi olurdu, geniş olsaydı doğrusal
-/// karışıma dönerdi.
+/// With `sharpness` at zero the boundary would be knife sharp; wide, it would fall
+/// back to a linear mix.
 float SurfaceHeightBlend(float lowerHeight, float upperHeight, float t, float sharpness)
 {
     float threshold = lerp(-sharpness, 1.0 + sharpness, t);
     return saturate((upperHeight - lowerHeight + threshold) / (2.0 * sharpness));
 }
 
-/// İki yüzeyin yükseklik tabanlı karışımı.
+/// Height-based mix of two surfaces.
 SurfaceDetail BlendSurfaceDetail(SurfaceDetail lower, SurfaceDetail upper,
                                  float t, float sharpness)
 {
@@ -76,9 +77,9 @@ SurfaceDetail BlendSurfaceDetail(SurfaceDetail lower, SurfaceDetail upper,
     return result;
 }
 
-/// EĞİM DÜZELTMELİ UV. Dünya XZ'sinden alınan UV dik yamaçta 1/cos(eğim) kadar
-/// gerilir. Dikey düzlem izdüşümüyle harmanlanarak düzeltiliyor — tam triplanar üç
-/// örnekleme demek, iki yeterli.
+/// SLOPE-CORRECTED UV. A UV taken from world XZ stretches by 1/cos(slope) on a
+/// steep face. It is corrected by blending with a vertical plane projection — full
+/// triplanar means three samples, two are enough.
 float2 SurfacePlanarUV(float3 worldPos, float3 normalWS, float scale)
 {
     float2 flat = worldPos.xz * scale;
@@ -90,8 +91,8 @@ float2 SurfacePlanarUV(float3 worldPos, float3 normalWS, float scale)
     return lerp(flat, side, smoothstep(0.25, 0.75, steep));
 }
 
-/// UV'yi bir eksene döndürür. Yönlü dokular (rüzgâr sastrugisi, katmanlı kaya)
-/// dünyada sabit yönde çizilmiş; sahnedeki gerçek yöne hizalanmaları gerekiyor.
+/// Rotates a UV onto an axis. Directional textures (wind sastrugi, layered rock)
+/// are drawn along a fixed direction in the world; they have to line up with the
 void SurfaceAlignUV(float2 axis, inout float2 uv, inout float2 ddxUV, inout float2 ddyUV)
 {
     float2 perpendicular = float2(-axis.y, axis.x);

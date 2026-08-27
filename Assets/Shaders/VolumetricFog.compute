@@ -1,27 +1,27 @@
-// VOLUMETRİK SİS — Wronski 2014 (SIGGRAPH, AC4) froxel hacmi.
+// VOLUMETRIC FOG — Wronski 2014 (SIGGRAPH, AC4) froxel volume.
 //
-// İki kernel, spec'in geçiş grafiğindeki 2. ve 3. adım:
-//   FogDensityAndLighting — her froxel için yoğunluk (A) ve içeri saçılan ışık (RGB)
-//   FogRayMarch           — ışın boyunca Beer-Lambert birikimi
+// Two kernels, steps 2 and 3 of the spec's pass graph:
+//   FogDensityAndLighting — density (A) and in-scattered light (RGB) per froxel
+//   FogRayMarch           — Beer-Lambert accumulation along the ray
 //
-// 1. adım (ESM) şimdilik yok: URP'nin kendi gölge örneklemesi kullanılıyor. ESM kalite
-// iyileştirmesi (titreme azaltma), sistemin çalışması için şart değil.
+// Step 1 (ESM) is absent for now: URP's own shadow sampling is used. ESM is a quality
+// improvement (less flicker), not a requirement for the system to work.
 //
-// 4. adım (uygulama) `HeightFog.hlsl` içinde: sis zaten her yüzey shader'ında oradan
-// uygulanıyor, ikinci bir yol açmak gerekmiyor.
+// Step 4 (application) lives in `HeightFog.hlsl`: the fog is already applied from there
+// in every surface shader, so a second path is unnecessary.
 
 #pragma kernel FogDensityAndLighting
 #pragma kernel FogRayMarch
 
-// TEK VARYANT, KEYWORD YÖNETİMİ YOK. `multi_compile` denendi ve çalışmadı: bu
-// keyword'ler URP tarafından GLOBAL olarak da açılıyor, compute'a yazılan yerel durumla
-// birleşince aynı kümedeki iki gölge keyword'ü birden açık kalıyor ve o varyant hiç
-// derlenmemiş oluyor — "Can't find kernel variant with keywords: _MAIN_LIGHT_SHADOWS
+// ONE VARIANT, NO KEYWORD MANAGEMENT. `multi_compile` was tried and did not work: these
+// keywords are also enabled GLOBALLY by URP, and combined with the local state written
+// to the compute shader two shadow keywords from the same set stay enabled at once and
+// that variant is never compiled — "Can't find kernel variant with keywords: _MAIN_LIGHT_SHADOWS
 // _MAIN_LIGHT_SHADOWS_CASCADE ...".
 //
-// Proje ayarı sabit olduğu için varyant da sabitleniyor. `PC_RPAsset`: ana ışık gölgesi
-// AÇIK, kademe sayısı 3, yumuşak gölge AÇIK (kalite yüksek). Ayar değişirse burası da
-// değişmeli — sessizce yanlış varyanta düşmesin diye açıkça yazılı.
+// Because the project setting is fixed the variant is fixed too. `PC_RPAsset`: main light
+// shadows ON, 3 cascades, soft shadows ON (high quality). If the setting changes this has
+// to change too — written out explicitly so it does not silently fall to the wrong variant.
 #define _MAIN_LIGHT_SHADOWS_CASCADE 1
 #define _SHADOWS_SOFT_HIGH 1
 #define _LIGHT_COOKIES 1
@@ -29,43 +29,43 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-// Paylaşılan dosyadaki örneklenebilir hacim bildirimi kapatılıyor: burada aynı
+// The sampleable volume declaration in the shared file is turned off: here the same
 // isim RW olarak bildiriliyor.
 #define FOG_VOLUME_COMPUTE
 #include "VolumetricFogShared.hlsl"
 
-RWTexture3D<float4> _FogDensityVolume;      // RGB = yoğunlukla modüle edilmiş in-scattering, A = sönümleme
-RWTexture3D<float4> _FogScatteringVolume;   // RGB = birikmiş in-scattering, A = transmittance
+RWTexture3D<float4> _FogDensityVolume;      // RGB = in-scattering modulated by density, A = extinction
+RWTexture3D<float4> _FogScatteringVolume;   // RGB = accumulated in-scattering, A = transmittance
 
 Texture3D<float4> _FogDensityVolumeRead;
 
-// x = faz anizotropisi g, y = ortam katkısı çarpanı, z = ana ışık çarpanı, w = boş
+// x = phase anisotropy g, y = ambient contribution multiplier, z = main light multiplier, w = unused
 float4 _FogLightParams;
 
-// xy = hacmin x/y çözünürlüğü, zw = 1/çözünürlük
+// xy = x/y resolution of the volume, zw = 1/resolution
 float4 _FogVolumeSize;
 
 float4 _FogCameraPos;
 
-// ORTAM SH'si AÇIKÇA GEÇİYOR. `unity_SHAr` ve kardeşleri `UnityPerDraw` sabit
-// tamponunda; compute dispatch'i o tamponu BAĞLAMIYOR, yani burada okunsalardı sıfır
-// gelirdi ve gölgeli sis simsiyah çıkardı. Değerler `RenderSettings.ambientProbe`'dan
-// Unity'nin kendi paketlemesiyle geliyor.
+// THE AMBIENT SH IS PASSED EXPLICITLY. `unity_SHAr` and its siblings live in the
+// `UnityPerDraw` constant buffer; a compute dispatch DOES NOT BIND that buffer, so read
+// here they would come back zero and shadowed fog would be pitch black. The values
+// come from `RenderSettings.ambientProbe` with Unity's own packing.
 float4 _FogAmbientSH[3];
 
-// Sis renginin sahibi `AtmosphereController`, yani havanın tek durumu. Global skaler ve
-// vektörler compute'a ULAŞIYOR (dokular ulaşmıyor, onlar elle bağlanıyor).
+// The fog color is owned by `AtmosphereController`, the single state of the air. Global
+// scalars and vectors DO REACH compute (textures do not, they are bound by hand).
 float4 _HeightFogColor;
 
-// ANA IŞIK C#'TAN. URP `_MainLightColor` ve `_MainLightPosition`'ı komut tamponuyla
-// yazıyor ve compute dispatch'i o durumu görmüyor — burada okunsalardı sıfır gelir,
-// doğrudan ışık terimi sessizce ölürdü.
-float4 _FogMainLightDirection;   // ışığa doğru birim vektör
+// THE MAIN LIGHT COMES FROM C#. URP writes `_MainLightColor` and `_MainLightPosition`
+// with a command buffer and the compute dispatch does not see that state — read here they
+// would come back zero and the direct light term would die silently.
+float4 _FogMainLightDirection;   // unit vector toward the light
 float4 _FogMainLightColor;
 
-/// Henyey-Greenstein. Spec §3.7'deki formül birebir; `g` sisin kendi değeri —
-/// gökyüzünün `_AerosolAnisotropy`'sinden AYRI, çünkü farklı ortam: sis su damlacığı,
-/// gökyüzününki toz aerosolü.
+/// Henyey-Greenstein. The formula is verbatim from spec §3.7; `g` is the fog's own value —
+/// SEPARATE from the sky's `_AerosolAnisotropy`, because it is a different medium: fog is
+/// water droplets, the sky's is dust aerosol.
 float FogPhaseHG(float cosTheta, float g)
 {
     float g2 = g * g;
@@ -74,14 +74,14 @@ float FogPhaseHG(float cosTheta, float g)
     return (1.0 - g2) / (4.0 * PI * max(denom * sqrt(max(denom, 1e-6)), 1e-6));
 }
 
-/// ORTAM KATKISI SH ÜRÜN İNTEGRALİNDEN. Spec §6.1: HG'nin zonal SH açılımı 2. mertebede
-/// `float4(1, dir.y, dir.z, dir.x) * float4(1, g, g, g)`; ortam SH'siyle çarpımı renk
-/// kanalı başına TEK nokta çarpımı. URP'nin SH sıralaması (x,y,z,1) olduğu için aynı
-/// şey `float4(V * g, 1)` diye yazılıyor.
+/// THE AMBIENT CONTRIBUTION FROM AN SH PRODUCT INTEGRAL. Spec §6.1: the zonal SH expansion
+/// of HG to 2nd order is `float4(1, dir.y, dir.z, dir.x) * float4(1, g, g, g)`; its product
+/// with the ambient SH is a SINGLE dot product per color channel. Because URP's SH ordering
+/// is (x,y,z,1) the same thing is written as `float4(V * g, 1)`.
 ///
-/// KAYNAK ORTAM PROBE'U, yani gökyüzünden pişen tek durum. Buraya atmosferin kendi
-/// in-scattering'ini ayrıca eklemek ÇİFT SAYIM olurdu: homojen atmosferin sahibi
-/// gökyüzü paketinin hava perspektifi (`DECISIONS.md`, karar 2).
+/// THE SOURCE IS THE AMBIENT PROBE, i.e. the single state baked from the sky. Adding the
+/// atmosphere's own in-scattering here as well would be DOUBLE COUNTING: the homogeneous
+/// atmosphere is owned by the sky package's aerial perspective (`DECISIONS.md`, decision 2).
 float3 FogAmbient(float3 viewDir, float g)
 {
     float4 basis = float4(viewDir * g, 1.0);
@@ -90,35 +90,35 @@ float3 FogAmbient(float3 viewDir, float g)
                            dot(_FogAmbientSH[1], basis),
                            dot(_FogAmbientSH[2], basis));
 
-    // Sadece L0 terimi: yönsüz ortalama.
+    // The L0 term only: the directionless average.
     float3 flat = float3(_FogAmbientSH[0].w, _FogAmbientSH[1].w, _FogAmbientSH[2].w);
 
-    // SEVİYE SİS RENGİNDEN, YÖN SH'DEN.
+    // THE LEVEL COMES FROM THE FOG COLOR, THE DIRECTION FROM THE SH.
     //
-    // Probe'un SH'si YÜZEY AYDINLATMASI birimindedir — Unity onu Lambert yüzeyin diffüz
-    // terimi olarak veriyor. Ortamın istediği ise ORTAMIN İÇERİ SAÇTIĞI RADYANS; ikisi
-    // aynı olguyu tarif etse de ölçekleri farklı.
+    // The probe's SH is in units of SURFACE ILLUMINATION — Unity gives it as the diffuse
+    // term of a Lambertian surface. What the medium wants is the RADIANCE THE MEDIUM
+    // SCATTERS IN; the two describe the same phenomenon but at different scales.
     //
-    // ÖLÇÜLDÜ (09:00, yağış 0.80, görüş 3.6 km): probe DC luminansı 0.156, sis rengi
-    // luminansı 0.492 — oran 3.15. Kompozisyon kâğıtta: 3 km'deki sırt eski yolda
-    // `0.962·air`, yeni yolda `0.299·air + 0.663·ortam`. Ortam 3.15 kat sönük olunca
-    // sonuç `0.509·air`, yani 1.9 KAT KOYU çıkıyordu — ara mesafedeki puslu sırtlar
-    // kayboluyordu.
+    // MEASURED (09:00, precipitation 0.80, visibility 3.6 km): probe DC luminance 0.156, fog
+    // color luminance 0.492 — a ratio of 3.15. The composition on paper: a ridge at 3 km was
+    // `0.962·air` on the old path and `0.299·air + 0.663·ambient` on the new one. With the
+    // ambient 3.15 times dimmer the result was `0.509·air`, i.e. 1.9 TIMES DARKER —
+    // hazy ridges at mid distance were disappearing.
     //
-    // Çarpan uydurmak yerine seviye zincirin KENDİ sis renginden alınıyor; SH yalnız
-    // yön şekillendirmesi olarak kalıyor (spec §6.1'in getirisi bu zaten). Böylece
-    // hava değiştiğinde ikisi birlikte değişiyor, ikinci bir kaynak doğmuyor.
+    // Rather than inventing a multiplier the level is taken from the chain's OWN fog color;
+    // the SH is left as directional shaping only (which is what spec §6.1 buys anyway). That
+    // way the two change together when the weather changes and no second source appears.
     float3 direction = shaped / max(flat, 1e-4);
 
     return max(0.0, _HeightFogColor.rgb * direction) * _FogLightParams.y;
 }
 
-/// Froxel'in gördüğü ana ışık: gölge × bulut gölgesi.
+/// The main light a froxel sees: shadow x cloud shadow.
 ///
-/// BULUT GÖLGESİ COOKIE'DEN. `VolumetricCloudsURP` bulut gölgesini ana ışığın cookie
-/// dokusuna yazıyor, gökyüzü paketi de aynı yerden okuyor. Ayrı bir bulut gölge kanalı
-/// açmak ikinci bir yaklaşım demek olurdu — "gökte bulut yokken yerde gölge" durumu tam
-/// olarak öyle doğar.
+/// THE CLOUD SHADOW COMES FROM THE COOKIE. `VolumetricCloudsURP` writes the cloud shadow
+/// into the main light's cookie texture and the sky package reads from the same place.
+/// Opening a separate cloud shadow channel would mean a second approach — "shadow on the
+/// ground with no cloud in the sky" is born exactly that way.
 float FogMainLightAttenuation(float3 worldPos)
 {
     float attenuation = 1.0;
@@ -128,13 +128,13 @@ float FogMainLightAttenuation(float3 worldPos)
     attenuation *= MainLightRealtimeShadow(shadowCoord);
 #endif
 
-    // COOKIE ELLE ÖRNEKLENİYOR. URP'nin `SampleMainLightCookie`'si örtük mip'li
-    // `SAMPLE_TEXTURE2D` kullanıyor; compute shader'da ekran türevi olmadığı için
-    // derleyici "cannot map expression to cs_5_0" veriyor. UV hesabı zaten tek satır:
-    // yönlü ışıkta dünya konumunun ışık uzayına izdüşümü, [-1,1] → [0,1].
-    // `IsMainLightCookieEnabled()` SORULMUYOR: o bayrağı da URP komut tamponuyla yazıyor,
-    // compute'ta sıfır okunur ve cookie hiç örneklenmezdi. Doku C# tarafında bağlanıyor;
-    // bulut gölgesi yoksa zaten beyaz geliyor, yani sonuç kendiliğinden doğru.
+    // THE COOKIE IS SAMPLED BY HAND. URP's `SampleMainLightCookie` uses `SAMPLE_TEXTURE2D`
+    // with an implicit mip; with no screen derivative in a compute shader the compiler
+    // reports "cannot map expression to cs_5_0". The UV computation is one line anyway:
+    // for a directional light, the world position projected into light space, [-1,1] -> [0,1].
+    // `IsMainLightCookieEnabled()` IS NOT ASKED: URP writes that flag with a command buffer
+    // too, in compute it reads zero and the cookie would never be sampled. The texture is
+    // bound on the C# side; with no cloud shadow it comes back white, so the result is right by construction.
     float2 cookieUV = mul(_MainLightWorldToLight, float4(worldPos, 1.0)).xy * 0.5 + 0.5;
     attenuation *= SAMPLE_TEXTURE2D_LOD(_MainLightCookieTexture,
                                         sampler_MainLightCookieTexture, cookieUV, 0).r;
@@ -147,24 +147,18 @@ void FogDensityAndLighting(uint3 id : SV_DispatchThreadID)
 {
     if (any(id.xy >= (uint2)_FogVolumeSize.xy)) return;
 
-    // Hücre MERKEZİ: kenardan örneklemek dilim sınırında yarım hücrelik kayma bırakır.
-    // Derinlikte jitter var — Wronski aliasing'i gürültüye takas etmeyi öneriyor
-    // (spec §6.2) ve TAA deseni zaten dağıtıyor.
+    // The CENTRE of the cell: sampling from the edge leaves a half-cell shift at the slice
+    // boundary. There is jitter in depth — Wronski suggests trading aliasing for noise
+    // (spec §6.2) and TAA already spreads the pattern.
     float2 uv = (id.xy + 0.5) * _FogVolumeSize.zw;
     float slice = (id.z + 0.5 + _FogJitter.x) / _FogVolumeDepth.w;
 
     float viewDepth = FogViewDepthFromSlice(slice);
     float3 worldPos = FogFroxelWorldPos(_FogCameraPos.xyz, uv, viewDepth);
 
-    // YOĞUNLUK PAYLAŞILAN MODELDEN. Analitik kuyruk da aynı fonksiyonları çağırıyor;
-    // hacmin sınırında yapı değişmesin diye tek kaynak.
+    // THE DENSITY COMES FROM THE SHARED MODEL. The analytic tail calls the same functions;
+    // one source so the structure does not change at the volume boundary.
     float height = worldPos.y - _HeightFogBase;
-    // eşikleri var; 160×90 froxel ızgarasında uzaktaki bir hücre o eşiklerden geniş
-    // olduğu için alan hücreler arasında atlıyor ve ekranda dikey, titreyen şeritler
-    // bırakıyordu (rüzgâr arttıkça belirginleşiyor, katman probu açıkken kayboluyor —
-    // prob hacmi örneklemeden dönüyor).
-    //
-    // kapalı biçimde. İki değerlendirici bir olguyu paylaşamaz.
     float density = FogDensityAt(height) * FogBankAt(worldPos.xz);
 
     float3 inScatter = 0.0;
@@ -186,8 +180,8 @@ void FogDensityAndLighting(uint3 id : SV_DispatchThreadID)
     _FogDensityVolume[id] = float4(inScatter, density);
 }
 
-/// Saçılma denkleminin bir adımı. Spec §5.3.3'ten birebir: `rgb` o ana kadar biriken
-/// in-scattering, `a` biriken sönümleme katsayısı.
+/// One step of the scattering equation. Verbatim from spec §5.3.3: `rgb` is the
+/// in-scattering accumulated so far, `a` the accumulated extinction coefficient.
 float4 FogAccumulateScattering(float4 front, float4 back)
 {
     float3 light = front.rgb + saturate(exp(-front.a)) * back.rgb;
@@ -195,19 +189,19 @@ float4 FogAccumulateScattering(float4 front, float4 back)
     return float4(light, front.a + back.a);
 }
 
-/// Nihai yazım. Spec §5.3.3: alpha artık sönümleme değil, out-scattering'in yol açtığı
+/// The final write. Spec §5.3.3: alpha is no longer extinction but the
 /// TRANSMITTANCE.
 void FogWriteOutput(uint3 pos, float4 colorAndDensity)
 {
     _FogScatteringVolume[pos] = float4(colorAndDensity.rgb, exp(-colorAndDensity.a));
 }
 
-/// 2B compute, Z boyunca yürüyor. Spec §5.3.2 birebir; paralel prefix sum denenmiş ve
-/// brute-force'tan %20-30 YAVAŞ çıkmış (spec §5.3.1), o yüzden düz döngü.
+/// A 2D compute marching along Z. Verbatim from spec §5.3.2; a parallel prefix sum was
+/// tried and came out 20-30% SLOWER than brute force (spec §5.3.1), hence a plain loop.
 ///
-/// Sönümleme katsayısı dilimin KALINLIĞIYLA çarpılıyor: yoğunluk 1/m biriminde, dilimler
-/// üstel dağıldığı için kalınlık sabit değil. Çarpılmazsa uzak dilimler yakınlarla aynı
-/// ağırlığı alır ve toplam optik derinlik menzilden bağımsız çıkardı.
+/// The extinction coefficient is multiplied by the slice THICKNESS: density is in 1/m and
+/// because the slices are distributed exponentially the thickness is not constant. Without
+/// it distant slices would carry the same weight as near ones and the total optical depth would be independent of range.
 [numthreads(8, 8, 1)]
 void FogRayMarch(uint3 id : SV_DispatchThreadID)
 {

@@ -54,14 +54,14 @@ half _ImprovedTransmittanceBlend;
 float _PostExposure; // Exposure from the ColorAdjustments override
 half3 _SunColor;
 
-/// ÇAKMA. `LightningFlash` global olarak yazıyor: `_LightningFlash.rgb` o anki parlama,
-/// `_LightningPosition` = (dünya konumu xyz, leke yarıçapı w). Konum çakma başına bir kez
-/// yazılıyor, yani maske kare kare değişmiyor — `[N22 s.180]`'in titreme çaresi bu.
+/// FLASH. `LightningFlash` writes it globally: `_LightningFlash.rgb` is the current flare,
+/// `_LightningPosition` = (world position xyz, blob radius w). The position is written once
+/// per flash, so the mask does not change frame to frame — that is `[N22 p.180]`'s cure for flicker.
 float4 _LightningFlash;
 float4 _LightningPosition;
 
-/// KANAL BOYUNCA NOKTA KAYNAKLAR. Sis (`HeightFog.hlsl`) ile AYNI dizi: iki sistem aynı
-/// çakmayı farklı yerde görmemeli. `LightningFlash` çakma başına bir kez yazıyor.
+/// POINT SOURCES ALONG THE RAY. The SAME array as the fog (`HeightFog.hlsl`): the two systems must not
+/// see the same flash in different places. `LightningFlash` writes it once per flash.
 #define LIGHTNING_MAX_SOURCES 8
 float4 _LightningSources[LIGHTNING_MAX_SOURCES];
 float _LightningSourceCount;

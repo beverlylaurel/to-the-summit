@@ -85,8 +85,8 @@ VolumetricRayResult TraceVolumetricRay(CloudRay cloudRay)
             {
                 // Compute the camera-distance based attenuation
                 float densityAttenuationValue = DensityFadeValue(rayMarchRange.start + currentDistance);
-                // Gurultu mip'leri: ornek ayak izi (ekran pikseli ve isin adimi) kadar
-                // banda sinirlaniyor.
+                // Noise mips: clamped to the band matching the sample footprint
+                // (screen pixel and ray step).
                 float sampleDistance = rayMarchRange.start + currentDistance;
                 float shapeMipOffset = ShapeMipOffset(sampleDistance, stepS);
                 float erosionMipOffset = ErosionMipOffset(sampleDistance, stepS);
@@ -199,7 +199,7 @@ VolumetricRayResult TraceVolumetricRay(CloudRay cloudRay)
 
                 volumetricRay.scattering = directTerm + ambientTerm;
 
-                // Çakma üçüncü ışık kaynağı: rengi güneşin de ortamın da değil, kendisinin.
+                // The flash is a third light source: its color belongs neither to the sun nor to the ambient, but to itself.
                 volumetricRay.scattering += _LightningFlash.rgb * volumetricRay.glow;
             }
         }

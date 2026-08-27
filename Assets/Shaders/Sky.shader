@@ -4,7 +4,7 @@ Shader "ToTheSummit/Sky"
 {
     Properties
     {
-        _SunColor ("Güneş", Color) = (1, 0.95, 0.85, 1)
+        _SunColor ("Sun", Color) = (1, 0.95, 0.85, 1)
         _MoonColor ("Ay", Color) = (0.75, 0.8, 0.95, 1)
     }
 
@@ -21,10 +21,10 @@ Shader "ToTheSummit/Sky"
             #pragma vertex vert
             #pragma fragment frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            // Gradyan, hava rengi ve sis buradan gelir: gökyüzü kendi rengini
-            // hesaplamaz, sisle AYNI AirColor fonksiyonunu çağırır. İki formül
-            // tutulduğu sürece her hava köşesinde yeniden ayrışıyorlardı.
-            // _SunDirection ve _LightningFlash bildirimleri de oradan geliyor.
+            // The gradient, the air color and the fog come from here: the sky does not
+            // compute its own color, it calls the SAME AirColor function as the fog. As
+            // long as two formulas were kept they drifted apart at every weather corner.
+            // The _SunDirection and _LightningFlash declarations come from there too.
             #include "HeightFog.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
@@ -32,12 +32,12 @@ Shader "ToTheSummit/Sky"
                 float4 _MoonColor;
             CBUFFER_END
 
-            // Bulut geçişiyle ortak: AtmosphereController global olarak yazar
+            // Shared with the cloud pass: AtmosphereController writes it globally
             float3 _MoonDirection;
             float _StarStrength;
 
-            /// Bulut sisteminin ortam sondası geçişi 1 yazar, geçiş bitince 0'a döner.
-            /// Sondanın küpüne güneş/ay diski girmesin diye (`VolumetricCloudsURP`).
+            /// The cloud system's ambient probe pass writes 1 and returns to 0 when done.
+            /// So the sun/moon disc does not enter the probe cube (`VolumetricCloudsURP`).
             float _DisableSunDisk;
 
 
@@ -52,8 +52,8 @@ Shader "ToTheSummit/Sky"
                 return OUT;
             }
 
-            /// Yön uzayı üç boyutlu bölünmeli: iki boyuta indirgemek farklı yönleri aynı
-            /// hücreye düşürüyor ve kamera dönünce yıldızlar yeniden dağılıyor.
+            /// Direction space must be divided in three dimensions: reducing it to two drops
+            /// different directions into the same cell and the stars redistribute as the camera turns.
             float Hash3(float3 p)
             {
                 p = frac(p * float3(0.1031, 0.1030, 0.0973));
@@ -68,7 +68,7 @@ Shader "ToTheSummit/Sky"
                 return frac((q.x + q.y) * q.z);
             }
 
-            /// Kadran: keskin disk, dar iç hâle, geniş dış saçılma
+            /// Disc: a sharp core, a narrow inner halo, a broad outer scattering
             float3 Disk(float3 direction, float3 target, float3 color, float size, float glow, float brightness)
             {
                 float d = saturate(dot(direction, target));
@@ -77,13 +77,13 @@ Shader "ToTheSummit/Sky"
 
                 float3 core = color * (disk * 7.0);
 
-                // Kademeli hâle halkaları: her katman bir öncekinden geniş, daha sönük
-                // ve daha doygun. Işık dışa doğru daha uzun bir atmosfer yolundan geçer,
-                // bu yüzden merkez beyaza doyarken dış halkalar sarıya, turuncuya ve
-                // kızıla iner. Tek bir sürekli düşüşle çizmek kadranı düz bir leke
-                // bırakıyordu — kademelenme gerçek bir hâlenin okunmasını sağlıyor.
-                // Üstel düşüş katman üretmiyor: üs küçüldükçe fonksiyon düzleşip gökyüzüne
-                // yayılan genel bir parlaklığa dönüşüyor. Her halkanın kendi sınırı olmalı.
+                // Stepped halo rings: each layer is wider than the previous one, fainter
+                // and more saturated. Light travelling outward passes through a longer path
+                // of atmosphere, so the centre saturates to white while the outer rings fall
+                // to yellow, orange and red. Drawing it with one continuous falloff left the
+                // disc a flat blob — the stepping is what makes a real halo readable.
+                // An exponential falloff produces no layers: as the exponent shrinks the
+                // function flattens into a general glow spread over the sky. Each ring needs its own boundary.
                 float3 tint = color;
                 float3 halo = 0.0;
                 float radius = size * 7.0;
@@ -92,19 +92,19 @@ Shader "ToTheSummit/Sky"
                 [unroll]
                 for (int i = 0; i < 5; i++)
                 {
-                    tint *= color;                  // her katmanda renk derinleşir
+                    tint *= color;                  // the color deepens with each layer
 
-                    // Bant içte geniş, dışta dar. Sabit bir oran iki uçtan birini bozuyor:
-                    // küçük yarıçapta dar bant kenarı keskinleştirip yapay çember bırakıyor,
-                    // büyük yarıçapta geniş bant halkayı doyuramayıp söndürüyor.
+                    // The band is wide inside and narrow outside. A fixed ratio breaks one
+                    // end or the other: at a small radius a narrow band sharpens the edge and
+                    // leaves an artificial circle, at a large radius a wide band cannot saturate the ring and puts it out.
                     float band = radius * lerp(2.4, 0.6, i / 4.0);
 
                     float edge = 1.0 - radius;
                     float ring = smoothstep(edge, edge + band, d);
 
                     halo += tint * (ring * weight);
-                    radius *= 2.6;                  // sonraki halka belirgin şekilde geniş
-                    weight *= 0.5;                  // ve sönük
+                    radius *= 2.6;                  // the next ring is markedly wider
+                    weight *= 0.5;                  // and fainter
                 }
 
                 return (core + halo) * brightness;
@@ -115,47 +115,47 @@ Shader "ToTheSummit/Sky"
                 float3 direction = normalize(IN.direction);
                 float height = direction.y;
 
-                // Gradyan sisle ortak: hava neyse gökyüzü o. Yıldız, kadran ve şimşek
-                // "hava"nın arkasındaki cisimlerdir — üstlerine sis biner, gökyüzü
-                // sislenmeyince çorbanın içinde bile yıldız görünüyordu.
+                // The gradient is shared with the fog: whatever the air is, the sky is. Stars,
+                // discs and lightning are objects BEHIND the "air" — fog sits on top of them,
+                // and while the sky was not fogged the stars showed even inside the soup.
                 float3 sky = AirColor(direction);
                 float3 extras = 0.0;
 
-                // Yıldızlar yön uzayındaki hücrelere oturur; her hücre kendi boyutunu,
-                // parlaklığını ve renk sıcaklığını taşır. Konum yönden türediği için
-                // kamera dönse de yıldızlar yerinde kalır.
-                // Izgara ekranda birkaç pikselden geniş olmalı. Dar ızgarada yıldız yarım
-                // pikselin altında kalıyor; kamera döndükçe piksel ızgarası kayıyor ve
-                // yıldız komşu piksele atlayıp yer değiştiriyormuş gibi görünüyor.
+                // Stars sit in cells of direction space; each cell carries its own size,
+                // brightness and color temperature. Because the position derives from the
+                // direction, the stars stay put even as the camera turns.
+                // The grid has to be wider than a few pixels on screen. On a narrow grid a star
+                // falls below half a pixel; as the camera turns the pixel grid shifts and the
+                // star jumps to a neighbouring pixel, looking as if it moved.
                 float3 grid = direction * 140.0;
                 float3 cell = floor(grid);
                 float3 local = frac(grid) - 0.5;
 
                 float present = step(0.986, Hash3(cell));
 
-                // Boyut dar bir bantta: gerçek yıldız neredeyse noktasaldır, ama ekranda
-                // en az bir iki piksel kaplamazsa kararlı çizilemez
+                // The size sits in a narrow band: a real star is almost a point, but on screen
+                // it cannot be drawn stably unless it covers at least a pixel or two
                 float radius = lerp(0.17, 0.36, Hash3(cell + 5.1));
                 float shape = smoothstep(radius, radius * 0.25, length(local));
 
-                // Parlaklık karesel dağılır: gökyüzünde sönük yıldız çok, parlak az
+                // Brightness follows a square distribution: the sky has many faint stars and few bright ones
                 float magnitude = Hash3(cell + 17.3);
                 float brightness = lerp(0.3, 1.0, magnitude * magnitude);
 
-                // Renk sıcaklığı: sıcak yıldız mavi-beyaz, soğuk olan sarımsı-turuncu.
-                // Sapma küçük tutulur, çoğu yıldız gerçekte de beyaza yakın görünür.
+                // Color temperature: a hot star is blue-white, a cool one yellowish-orange.
+                // The spread is kept small; most stars really do look close to white.
                 float temperature = Hash3(cell + 91.7) * 2.0 - 1.0;
                 float3 tint = float3(1.0 + temperature * 0.16, 1.0, 1.0 - temperature * 0.20);
 
-                // Atmosfer türbülansı yıldızı titretir ama hepsini değil: yalnızca birkaçı
-                // parıldar. Tümü titrerse gökyüzü kaynıyor gibi olur.
+                // Atmospheric turbulence makes stars twinkle, but not all of them: only a few
+                // sparkle. If they all did, the sky would look like it is boiling.
                 float twinkleRoll = Hash3(cell + 41.7);
                 float twinkles = step(0.38, twinkleRoll);
 
-                // Türbülans birkaç ölçekte birden çalışır, tek frekans metronom gibi
-                // vurur. İki hız üst üste binince ritim düzensizleşir ve her yıldız
-                // kendine has bir örüntü kazanır. Yavaş katman alt sınırı belirliyor:
-                // en hızlı yıldız bile birkaç saniyeden kısa sürede tekrarlamıyor.
+                // Turbulence works at several scales at once; a single frequency beats like a
+                // metronome. Two rates on top of each other make the rhythm irregular and give
+                // every star its own pattern. The slow layer sets the lower bound:
+                // even the fastest star does not repeat in less than a few seconds.
                 float slowRate = lerp(0.7, 1.2, Hash3(cell + 63.1));
                 float fastRate = lerp(1.5, 2.2, Hash3(cell + 77.9));
                 float phase = twinkleRoll * 6.2831853;
@@ -163,54 +163,54 @@ Shader "ToTheSummit/Sky"
                 float flicker = sin(_Time.y * slowRate + phase) * 0.6
                               + sin(_Time.y * fastRate + phase * 2.3) * 0.4;
 
-                // Parıldayan yıldız tamamen sönüp geri yanar. Küçük bir salınım sönük bir
-                // yıldızda gözle seçilmiyordu; atmosfer türbülansı gerçekte de yıldızı
-                // görünürlük sınırına kadar kısar.
+                // A sparkling star goes out completely and comes back. A small oscillation was
+                // invisible on a faint star; atmospheric turbulence really does dim a star all
+                // the way down to the visibility limit.
                 float twinkle = lerp(1.0, saturate(flicker * 0.5 + 0.5), twinkles);
 
                 extras += present * shape * brightness * twinkle * tint
                           * _StarStrength * saturate(height);
 
-                // Görünürlük kadranın kendi yüksekliğine bağlı: şafakta sönmesin.
-                // Ufka yakınken çekirdek BEYAZLAŞIR, parlamaz: parlaklık çarpanı hâleyi
-                // de büyütüp diskin çevresindeki duvarı dolduruyordu ve ton eşlemede
-                // ikisi aynı turuncuya yapışıyordu. Gerçekte batan güneş çevresindeki
-                // turuncudan daha beyaz-sarı okunur — ayrışma renkten gelir.
+                // Visibility depends on the disc's own elevation: it must not go out at dawn.
+                // Near the horizon the core TURNS WHITE, it does not brighten: a brightness
+                // multiplier also grew the halo and filled the wall around the disc, and under
+                // tonemapping both stuck to the same orange. A real setting sun reads whiter
+                // and more yellow than the orange around it — the separation comes from color.
                 float lowDisk = 1.0 - saturate(abs(_SunDirection.y) / 0.3);
                 float3 sunDiskColor = lerp(_SunColor.rgb, float3(1.0, 0.92, 0.78), lowDisk * 0.5);
                 float sunVisible = smoothstep(-0.10, 0.04, _SunDirection.y);
                 float moonVisible = smoothstep(-0.10, 0.04, _MoonDirection.y);
 
-                // Kadranlar yıldızlarla aynı sepete konmaz: yıldız sisin ilk
-                // kalınlığında söner ama güneş astronomik parlaklıkta — berrak havada
-                // ufukta da görünür, batımı izleyebilmemizin sebebi bu. Sonsuz gök
-                // yolu yerine sınırlı bir yolla sönür: berrakta loş kızıl disk kalır
-                // (rengi zaten süzülmüş güneş), yağışta ve çorbada kaybolur.
-                // BULUT ORTAM SONDASI ÇİZİLİRKEN KADRANLAR KAPANIR. Bulut sistemi göğü
-                // 16×16'lık bir küpe çizip ortalamasını ortam ışığı olarak kullanıyor;
-                // güneş diski oraya girerse (parlaklık 1400) ortalama diskin rengine
-                // kayıyor ve bulutlar kahverengiye çalıyor. Kaynak bunu şart koşuyor:
+                // Discs are not put in the same basket as stars: a star goes out in the first
+                // thickness of fog, but the sun is at astronomical brightness — in clear air it
+                // is visible on the horizon too, which is why we can watch it set. It fades
+                // along a bounded path rather than the infinite sky path: in clear air a dim
+                // red disc remains (its color already filtered), and in rain and soup it disappears.
+                // THE DISCS ARE TURNED OFF WHILE THE CLOUD AMBIENT PROBE IS DRAWN. The cloud
+                // system draws the sky into a 16x16 cube and uses its average as ambient light;
+                // if the sun disc entered it (brightness 1400) the average would shift toward
+                // the disc's color and the clouds would go brown. The source requires this:
                 // "capture the sky environment without sun disk" (`sky brief.md`).
-                // Global'i bulut sisteminin ortam geçişi kuruyor.
+                // The global is set up by the cloud system's ambient pass.
                 float3 disks = (1.0 - _DisableSunDisk) * (
                     Disk(direction, _SunDirection, sunDiskColor, 0.0016, 1400.0, sunVisible)
                   + Disk(direction, _MoonDirection, _MoonColor.rgb, 0.0011, 3000.0, moonVisible * 0.5));
 
-                // Şimşek boşluklardan görünen gökyüzünü de aydınlatır, ama asıl parlayan
-                // bulut kütlesinin kendisi — o bindirme geçişinde ekleniyor. Burada pay
-                // küçük. Konum ve yarıçap bulutla birebir aynı değerden geliyor: ikisi
-                // ayrı hesaplasaydı gökyüzü bir yerde, bulut başka bir yerde parlardı.
+                // Lightning also lights the sky visible through the gaps, but what really glows
+                // is the cloud mass itself — that is added in the compositing pass. The share
+                // here is small. The position and radius come from exactly the same value as the
+                // cloud: computed separately, the sky would flash in one place and the cloud in another.
                 //
-                // Gökyüzü sonsuzda olduğu için mesafe doğrudan kullanılamıyor; lekenin
-                // **açısal** boyutu hesaplanıyor. Yakın çakma geniş bir alanı kaplar,
-                // uzak olan aynı yarıçapta ama dar bir leke bırakır — perspektif budur.
-                // ÇAKMA PARLAMASI TABLODAN. Burada bir dönem iki sezgisel terim vardı:
-                // açısal bir leke (`0.35 * 1/(1+spread²)`) ve sis payıyla ağırlıklanmış
-                // düz bir katkı. İkisi de mesafeyi ve faz açısını bilmiyordu; Dobashi'nin
-                // eleştirdiği "gerçek fiziksel fenomenden farklı" parlama tam buydu.
+                // Because the sky is at infinity the distance cannot be used directly; the blob's
+                // **angular** size is computed instead. A near strike covers a wide area, a
+                // distant one leaves a narrow blob at the same radius — that is perspective.
+                // THE FLASH GLOW COMES FROM THE TABLE. There were two heuristic terms here for a
+                // while: an angular blob (`0.35 * 1/(1+spread²)`) and a flat contribution weighted
+                // by the fog share. Neither knew the distance or the phase angle; that was exactly
+                // the glow Dobashi criticised as "different from the real physical phenomenon".
                 //
-                // Artık `HeightFog.hlsl → LightningScatter` — sis ve arazi ile AYNI
-                // kaynak. Ayrı hesaplasaydı gökyüzü bir yerde, sis başka yerde parlardı.
+                // Now it is `HeightFog.hlsl -> LightningScatter` — the SAME source as the fog and
+                // the terrain. Computed separately, the sky would flash in one place and the fog in another.
                 float fogAmount = SkyFogAmount(_WorldSpaceCameraPos, direction);
                 sky += extras * (1.0 - fogAmount);
                 sky += LightningScatter(_WorldSpaceCameraPos,

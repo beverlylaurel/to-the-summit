@@ -1,22 +1,22 @@
 // include-rev: 68
 Shader "ToTheSummit/LightningBolt"
 {
-    // Kanal katkısal çizilir: şimşek ışık yayan bir plazma, arkasındaki bulutu ya da
-    // gökyüzünü karartmaz, üstüne ekler. Renk ve sönüm LineRenderer'ın köşe renginden
-    // geliyor — malzemeyi her karede değiştirmek yerine tek malzeme paylaşılıyor.
+    // The channel is drawn additively: lightning is a light-emitting plasma, it does not
+    // darken the cloud or sky behind it, it adds on top. Color and fade come from the
+    // LineRenderer's vertex color — a single material is shared instead of changing it every frame.
     SubShader
     {
-        // Buluttan sonra çizilir, ama bulutu kendisi hesaba katar.
+        // Drawn after the clouds, but it accounts for the clouds itself.
         //
-        // Opak kuyruğa alıp bindirmeye bırakmak denendi ve geri alındı: bindirmedeki
-        // `α`, o pikselin **tüm ışını** boyunca biriken bulut. Kolun arkasında kalan,
-        // on kilometre ötedeki deniz de o sayının içinde — yani kol, kendisinin arkasında
-        // duran bulutla karartılıyor ve fırtınada tamamen kayboluyordu.
+        // Putting it in the opaque queue and leaving it to the compositing was tried and
+        // reverted: the `alpha` there is the cloud accumulated along the pixel's **whole ray**.
+        // The sea ten kilometres away, behind the bolt, is inside that number too — so the
+        // bolt was darkened by cloud standing behind it and vanished entirely in a storm.
         //
-        // Doğrusu yalnızca **önündeki** bulutla sönmek: ışının katmana girdiği uzaklık
-        // kolun uzaklığıyla karşılaştırılıyor. Kol katmanın berisindeyse hiç sönmüyor —
-        // bulut tabanının altında asılı bir kanala bakarken arada bulut yok, ki gerçekte
-        // de öyle.
+        // The correct behaviour is to be attenuated only by the cloud **in front**: the distance
+        // at which the ray enters the layer is compared with the bolt's distance. If the bolt is
+        // nearer than the layer it is not attenuated at all — looking at a channel hanging below
+        // the cloud base there is no cloud in between, which is how it really is.
         Tags
         {
             "RenderType" = "Transparent"
@@ -25,8 +25,8 @@ Shader "ToTheSummit/LightningBolt"
             "IgnoreProjector" = "True"
         }
 
-        // Derinliğe yazmıyor: kanal bir yüzey değil, ışık. Yazsaydı arkasındaki bulut
-        // ışın yürüyüşünde kesilir, kanalın çevresinde bulutsuz bir oyuk açılırdı.
+        // It does not write depth: the channel is light, not a surface. If it did, the cloud
+        // behind it would be cut in the ray march and a cloudless hole would open around the channel.
         Blend One One
         ZWrite Off
         ZTest LEqual
@@ -46,22 +46,22 @@ Shader "ToTheSummit/LightningBolt"
             TEXTURE2D(_CloudTexture);
             SAMPLER(sampler_CloudTexture);
 
-            // Katmanın kotları AtmosphereController tarafından global yazılıyor; burada
-            // yalnızca "önümde bulut var mı" sorusu için okunuyorlar. CloudCommon.hlsl'i
-            // dahil etmek bütün hacim yürütücüsünü, üç boyutlu dokularını ve onlarca
-            // globalini bir çizgi shader'ına taşımak olurdu.
+            // The layer's elevations are written globally by AtmosphereController; here they
+            // are only read for the question "is there cloud in front of me". Including
+            // CloudCommon.hlsl would drag the whole volume marcher, its 3D textures and
+            // dozens of globals into a line shader.
             //
-            // `_CloudBottom` burada BİLDİRİLMİYOR: bulut gölgesi eklendiğinden beri
+            // `_CloudBottom` is NOT DECLARED here: ever since cloud shadows were added
             // HeightFog.hlsl'de duruyor ve bu dosya onu zaten dahil ediyor.
             float _CloudTop;
 
-            // Bulut küresinin yarıçapı, AtmosphereController'ın yazdığı global. Sabit
-            // kopya tutulamaz: kürenin yarıçapı sahne ölçeğini belirliyor ve ayrışırsa
-            // şimşek bulutun içinde başlaması gerekirken önünde ya da arkasında kalır.
+            // Radius of the cloud sphere, a global written by AtmosphereController. A local
+            // copy cannot be kept: the sphere's radius sets the scene scale, and if the two
+            // drift the lightning ends up in front of or behind the cloud instead of inside it.
             float _PlanetRadius;
             #define BoltPlanetRadius _PlanetRadius
 
-            /// Işının verilen yarıçaplı küreye girdiği uzaklık. Girmiyorsa negatif.
+            /// Distance at which the ray enters a sphere of the given radius. Negative if it misses.
             float BoltSphereEntry(float3 origin, float3 direction, float radius)
             {
                 float b = dot(origin, direction);
@@ -102,9 +102,9 @@ Shader "ToTheSummit/LightningBolt"
 
             half4 frag(Varyings IN) : SV_Target
             {
-                // Şerit boyunca enine profil: ortası beyaz bir çekirdek, kenarları hâle.
-                // Tek düze bir şerit kâğıt gibi duruyor; gerçek kanal ince ve çok parlak
-                // bir eksenle onu saran daha soluk bir parıltıdan oluşuyor.
+                // Cross profile along the strip: a white core in the middle, a halo at the edges.
+                // A uniform strip looks like paper; a real channel is a thin, very bright axis
+                // wrapped in a fainter glow.
                 float across = abs(IN.uv.y * 2.0 - 1.0);
 
                 float core = saturate(1.0 - across * 4.0);
@@ -113,24 +113,24 @@ Shader "ToTheSummit/LightningBolt"
 
                 float3 light = IN.color.rgb * (core * 3.0 + halo * 0.6);
 
-                // Üst uç buluttan çıkar, orada başlamaz. Sert bir uçla başlayınca kanal
-                // bulutun önüne asılmış gibi duruyor; kısa bir açılma onu kütlenin
-                // içinden çıkıyor gibi gösteriyor.
+                // The upper end comes out of the cloud, it does not start there. Starting with a
+                // hard end makes the channel look pinned in front of the cloud; a short fade-in
+                // makes it look like it emerges from inside the mass.
                 light *= smoothstep(0.0, 0.18, IN.uv.x);
 
-                // Havanın kendisi kanalı da yutar. Katkısal çizdiğimiz için sis rengine
-                // karışmıyor, sönüyor: iki kilometre uzaktaki kol dipteki kadar parlak
-                // kalırsa mesafesi okunmuyor ve gökyüzüne çizilmiş gibi duruyor.
-                // Sis modeli yüzeylere göre ayarlı: görüş mesafesinde arazi tamamen
-                // kayboluyor. Kanal o yüzeylerden kat kat parlak, dolayısıyla aynı
-                // sönümü uygulamak onu fırtınada — yani çaktığı tek havada — tümden
-                // siliyor. Karekök, parlak bir kaynağın sisin içinde daha uzağa
-                // gitmesini karşılıyor.
+                // The air itself swallows the channel too. Because we draw additively it does not
+                // blend into the fog color, it fades: a bolt two kilometres away that stays as
+                // bright as one at the base reads with no distance and looks painted on the sky.
+                // The fog model is tuned for surfaces: at the visibility range the terrain
+                // disappears completely. The channel is many times brighter than those surfaces,
+                // so applying the same attenuation would erase it entirely in a storm — the only
+                // weather it strikes in. The square root accounts for a bright source reaching
+                // further through fog.
                 light *= sqrt(1.0 - HeightFogAmount(_WorldSpaceCameraPos, IN.positionWS));
 
-                // Önünde duran bulut kadar söner, arkasındaki kadar değil. Işının katmana
-                // girdiği uzaklık kolunkiyle karşılaştırılıyor; kol katmanın berisindeyse
-                // pay sıfır.
+                // It fades by the cloud in front of it, not the cloud behind. The distance at
+                // which the ray enters the layer is compared with the bolt's; if the bolt is
+                // nearer than the layer the share is zero.
                 float3 toBolt = IN.positionWS - _WorldSpaceCameraPos;
                 float boltDistance = length(toBolt);
 

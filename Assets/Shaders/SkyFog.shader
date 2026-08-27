@@ -1,19 +1,19 @@
 // include-rev: 32
 //
-// GÖKYÜZÜNE SİS. Sis katılımcı bir ortam: kameraya ulaşan her ışın onun içinden geçer.
-// Arazide biten ışınlar `MountainSurface` içinde sönümleniyordu, ama SONSUZA giden
-// ışınlar — gökyüzü — hiç sönümlenmiyordu.
+// FOG ON THE SKY. Fog is a participating medium: every ray reaching the camera passes through it.
+// Rays ending on the terrain were attenuated inside `MountainSurface`, but rays going to
+// INFINITY — the sky — were not attenuated at all.
 //
-// Belirti: tam fırtınada (görüş 140 m) arazi tamamen sise dönüşüyor, gökyüzü ham
-// kalıyor. İkisi farklı renkte olduğu için arada keskin bir sınır kalıyor ve göz onu
-// "dağın silueti" diye okuyor. Gerçek beyazlamada gökyüzü de sistir, sınır olmaz.
+// The symptom: in a full storm (140 m visibility) the terrain turned entirely to fog while the sky
+// stayed raw. Being different colors, a hard boundary remained between them and the eye read it
+// as "the silhouette of the mountain". In a real whiteout the sky is fog too and there is no boundary.
 //
-// Eskiden gökyüzünü bizim `Sky.shader`'ımız çiziyordu ve `SkyFogAmount`'u kendi
-// uyguluyordu; gökyüzü PBSky paketine devredilince o adım kayboldu. Pakete çağrı eklemek
-// yama olurdu — delik gökyüzüne özel değil, `ApplyHeightFog` çağırmayan her şeyde var.
+// The sky used to be drawn by our own `Sky.shader`, which applied `SkyFogAmount` itself;
+// when the sky moved to the PBSky package that step was lost. Adding a call into the package
+// would be a patch — the hole is not specific to the sky, it exists for anything that does not call `ApplyHeightFog`.
 //
-// Bu geçiş DERİNLİĞE bakıyor: yalnız hiçbir şeye çarpmamış pikselleri sisliyor, opak
-// yüzeyler kendi shader'larında zaten sislendiği için onlara dokunmuyor.
+// This pass looks at DEPTH: it only fogs pixels that hit nothing, and leaves opaque
+// surfaces alone because they already fogged themselves in their own shaders.
 Shader "Hidden/ToTheSummit/SkyFog"
 {
     SubShader
@@ -26,19 +26,19 @@ Shader "Hidden/ToTheSummit/SkyFog"
             ZWrite Off
             Cull Off
 
-            // GÖKYÜZÜ SEÇİMİ DERİNLİK TESTİNDEN, doku okumasından değil.
-            // `_CameraDepthTexture` bu noktada (skybox'tan hemen sonra) henüz
-            // kopyalanmamış olabiliyor; okunan değer uzak düzlem çıkıyor ve her piksel
-            // atılıyordu — geçiş çalışıyor ama hiçbir şey çizmiyordu (ölçüldü: çizim
-            // sayacı artıyor, ekranda etki yok).
+            // THE SKY IS SELECTED BY THE DEPTH TEST, not by a texture read.
+            // `_CameraDepthTexture` may not be copied yet at this point (right after
+            // the skybox); the value read comes out as the far plane and every pixel
+            // was discarded — the pass ran but drew nothing (measured: the draw
+            // counter went up, no effect on screen).
             //
-            // Üçgen UZAK DÜZLEMDE çiziliyor; `Equal` yalnız derinliğe hiçbir şeyin
-            // yazmadığı pikselleri geçiriyor. Opak yüzeyler kendi shader'larında zaten
-            // sislendi, buradan ikinci kez uygulanmıyor.
+            // The triangle is drawn ON THE FAR PLANE; `Equal` only lets through pixels
+            // nothing has written depth to. Opaque surfaces already fogged in their own
+            // shaders, so it is not applied a second time here.
             ZTest Equal
 
-            // `sonuç = hedef × T + saçılım`. Kaynak alfası geçirgenliği taşıyor:
-            // `One SrcAlpha` tam olarak bu formülü veriyor, ayrı bir kopyalama gerekmiyor.
+            // `result = destination x T + scattering`. The source alpha carries the
+            // transmittance: `One SrcAlpha` gives exactly that formula, no separate copy needed.
             Blend One SrcAlpha
 
             HLSLPROGRAM
@@ -52,9 +52,9 @@ Shader "Hidden/ToTheSummit/SkyFog"
 
             #include "HeightFog.hlsl"
 
-            /// Tam ekran üçgeni UZAK DÜZLEMDE. `Blit.hlsl`'in kendi vertex'i üçgeni yakın
-            /// düzleme koyuyor; `ZTest Equal` ile gökyüzünü seçebilmek için derinlik
-            /// tamponunun temizlenmiş değerinde olmalı.
+            /// Full-screen triangle ON THE FAR PLANE. `Blit.hlsl`'s own vertex puts the
+            /// triangle on the near plane; to select the sky with `ZTest Equal` it has to
+            /// sit at the cleared value of the depth buffer.
             Varyings VertSkyFog(Attributes input)
             {
                 Varyings output = Vert(input);
@@ -69,18 +69,18 @@ Shader "Hidden/ToTheSummit/SkyFog"
 
                 float2 uv = input.texcoord;
 
-                // İKİ KAYNAK BİRDEN UZAK DÜZLEM DEMELİ. `ZTest Equal` derinlik
-                // TAMPONUNU okuyor; paketin hava perspektifi ise derinlik DOKUSUNU.
-                // İkisi siluet pikselinde ayrışabiliyor ve o piksel hem "gök" hem
-                // "geometri" sayılıp çift işleniyordu — normal oyunda koyu, sis
-                // denetiminde beyaz tek piksellik kontur. Gövdede çakışma olmadığı için
-                // iz yalnız kenarda çıkıyordu.
+                // BOTH SOURCES MUST SAY FAR PLANE. `ZTest Equal` reads the depth
+                // BUFFER; the package's aerial perspective reads the depth TEXTURE.
+                // The two can disagree on a silhouette pixel, and that pixel counted as
+                // both "sky" and "geometry" and got processed twice — a one-pixel
+                // outline, dark in normal play and white in the fog diagnostic. With no
+                // overlap in the body, the trace only showed at the edge.
                 //
-                // Geçiş sırası da düzeltildi ama tek başına SIRAYA BAĞIMLI kalırdı.
-                // Bu kapı sıradan bağımsız: paketin geometri saydığı hiçbir piksel
-                // buradan geçemez. Doku henüz hazır değilse uzak düzlem okunur ve kapı
-                // şeffaf olur — davranış `ZTest Equal`'ın tek başınaki hâline döner,
-                // yani hiçbir durumda daha kötü olmaz.
+                // The pass order was fixed as well, but on its own it would stay ORDER
+                // DEPENDENT. This gate is order independent: no pixel the package counts
+                // as geometry can get through. If the texture is not ready the far plane
+                // is read and the gate is transparent — the behaviour falls back to what
+                // `ZTest Equal` alone would do, so it is never worse.
                 float sceneDepth = SampleSceneDepth(uv);
                 if (abs(sceneDepth - UNITY_RAW_FAR_CLIP_VALUE) > 1e-6) discard;
 
@@ -88,12 +88,12 @@ Shader "Hidden/ToTheSummit/SkyFog"
                 float3 far = ComputeWorldSpacePosition(uv, UNITY_RAW_FAR_CLIP_VALUE, UNITY_MATRIX_I_VP);
                 float3 direction = normalize(far - cameraPos);
 
-                // Çakma buradan ÇIKARILDI: sis miktarıyla çarpılıyordu, yani berrak
-                // gökte parlama yok oluyordu. Aşağıda `LightningScatter` ile toplanıyor.
+                // The flash was TAKEN OUT of here: it was multiplied by the fog amount,
+                // so the flare vanished in a clear sky. It is added below with `LightningScatter`.
                 float3 air = AirColor(direction);
 
-                // HACİM ÖNCE. Gökyüzü ışını hacmi baştan sona geçiyor, yani hacmin SON
-                // dilimi: orada geçirgenlik birikmiş, in-scattering de öyle.
+                // THE VOLUME FIRST. A sky ray passes through the volume end to end, i.e.
+                // the LAST slice of the volume: transmittance has accumulated there and so has the in-scattering.
                 float3 volumeScatter = 0.0;
                 float volumeTransmittance = 1.0;
                 float3 tailStart = cameraPos;
@@ -107,15 +107,15 @@ Shader "Hidden/ToTheSummit/SkyFog"
                     volumeScatter = volume.rgb;
                     volumeTransmittance = volume.a;
 
-                    // Kuyruk hacmin bittiği yerden başlıyor; yön ileri eksene izdüşümü 1
-                    // olacak şekilde ölçeklenmiyor çünkü `SkyFogDepth` birim yön istiyor.
+                    // The tail starts where the volume ends; the direction is not scaled
+                    // so its forward-axis projection is 1, because `SkyFogDepth` wants a unit direction.
                     float forward = max(dot(direction, _FogCameraForward.xyz), 1e-4);
                     tailStart = cameraPos + direction * (_FogVolumeDepth.y / forward);
                 }
 
-                // KUYRUK SONSUZ YOL. Arazi yolu sonluydu ve örnekle integre ediliyordu;
-                // gök yolunun sonu yok, her katmanın üstel profili kapalı biçimde
-                // integre ediliyor. `SkyFogAmount` zaten bunun için duruyordu.
+                // THE TAIL IS AN INFINITE PATH. The terrain path was finite and integrated
+                // by sampling; the sky path has no end, so each layer's exponential profile
+                // is integrated in closed form. `SkyFogAmount` was there for exactly this.
                 float tailAmount = SkyFogAmount(tailStart, direction);
 
                 float transmittance = volumeTransmittance * (1.0 - tailAmount);
