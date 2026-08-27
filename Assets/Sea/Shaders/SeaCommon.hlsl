@@ -47,6 +47,7 @@ float3 _SeaTierWeights;
 float3 _SeaChoppinessPerTier;
 
 float _SeaSpectrumDepth;
+float _SeaMaxShoalingGain;
 float _SeaFetch;
 float _SeaSwell;
 float _SeaSmallWaveCutoff;
@@ -58,6 +59,80 @@ float _SeaDbgNoWaves;
 float _SeaDbgNoShallow;
 float _SeaDbgNoFoam;
 float _SeaDbgNoRefraction;
+
+// ------------------------------------------------------- dalga alani
+
+// FFT CIKTISI. `SeaSimulation` her frame yaziyor.
+//
+// ORNEKLEME DUNYA KOORDINATINDAN, `frac()` YOK. Dokular
+// `wrapMode = Repeat` ile kuruluyor ve donanim zaten tekrarliyor;
+// `frac()` eklemek teksel sinirlarinda dikis yaratiyor (spec 10.4).
+TEXTURE2D_ARRAY(_SeaDisplacement);
+SAMPLER(sampler_SeaDisplacement);
+
+TEXTURE2D_ARRAY(_SeaDerivatives);
+SAMPLER(sampler_SeaDerivatives);
+
+TEXTURE2D_ARRAY(_SeaFoam);
+SAMPLER(sampler_SeaFoam);
+
+/// Uc kademenin displacement toplami. w = kademeler arasi EN KUCUK Jacobian.
+///
+/// En kucugu aliniyor cunku katlanma tek bir kademede olsa bile yuzey
+/// katlanmis sayilir; ortalama alinsaydi ince cirpintinin katlanmasi kaba
+/// kademenin duzlugunde erirdi.
+float4 SeaSampleDisplacement(float2 posXZ)
+{
+    float3 disp = 0.0;
+    float  jac  = 1.0;
+
+    [unroll]
+    for (int s = 0; s < SEA_TIER_COUNT; ++s)
+    {
+        float2 uv = posXZ / _SeaPatchSizes[s];
+        float4 d = SAMPLE_TEXTURE2D_ARRAY_LOD(_SeaDisplacement,
+                                              sampler_SeaDisplacement, uv, s, 0);
+        disp += d.xyz * _SeaTierWeights[s];
+        jac   = min(jac, d.w);
+    }
+
+    return float4(disp, jac);
+}
+
+/// Uc kademenin egim toplami. Normal bundan kuruluyor — MERKEZI FARK
+/// KULLANILMIYOR, egim zaten FFT ile uretiliyor ve o daha dogru
+/// (spec 6.7, 10.5).
+float2 SeaSampleSlope(float2 posXZ)
+{
+    float2 egim = 0.0;
+
+    [unroll]
+    for (int s = 0; s < SEA_TIER_COUNT; ++s)
+    {
+        float2 uv = posXZ / _SeaPatchSizes[s];
+        egim += SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives,
+                                       sampler_SeaDerivatives, uv, s).xy
+              * _SeaTierWeights[s];
+    }
+
+    return egim;
+}
+
+/// Tepe kopugu yogunlugu. Kademeler arasi EN BUYUK — kopuk ortulme,
+/// ortalama degil.
+float SeaSampleFoam(float2 posXZ)
+{
+    float f = 0.0;
+
+    [unroll]
+    for (int s = 0; s < SEA_TIER_COUNT; ++s)
+    {
+        float2 uv = posXZ / _SeaPatchSizes[s];
+        f = max(f, SAMPLE_TEXTURE2D_ARRAY(_SeaFoam, sampler_SeaFoam, uv, s).r);
+    }
+
+    return f;
+}
 
 // -------------------------------------------------------- karmasik sayi
 
@@ -169,6 +244,65 @@ float SeaShoalingGain(float depthLocal, float depthRef)
 float SeaBreakerIndex(float slope)
 {
     return lerp(SEA_GAMMA_MILD, SEA_GAMMA_STEEP, saturate(slope / 0.10));
+}
+
+// ---------------------------------------------------- yuzey deformasyonu
+
+struct SeaSurfaceNokta
+{
+    float3 posWS;
+    float  depth;
+    float  jacobian;
+};
+
+/// SIG SU DONUSUMU (spec 8) — vertex asamasi.
+///
+/// ILERI VE DERINLIK GECISI AYNI FONKSIYONU CAGIRIYOR. Ayri yazilsalardi
+/// derinlik tamponu ile renk tamponu farkli bir yuzey gorurdu ve deniz
+/// kendi golgesine takilirdi.
+///
+/// Derinlik SAPTIRILMAMIS xz'den okunuyor: yatay displacement dalganin
+/// kendi hareketi, tabani tasimiyor (spec 10.4).
+SeaSurfaceNokta SeaDeform(float3 posWS)
+{
+    SeaSurfaceNokta o;
+    o.depth = SeaSampleDepth(posWS.xz);
+
+    float4 alan = SeaSampleDisplacement(posWS.xz);
+    float3 disp = _SeaDbgNoWaves > 0.5 ? 0.0 : alan.xyz;
+    o.jacobian  = alan.w;
+
+    if (_SeaDbgNoShallow <= 0.5)
+    {
+        float slope = SeaSampleBottomSlope(posWS.xz);
+
+        // SIGLASMA. Green yasasi cok sig suda sinirsiza gidiyor; tavan
+        // konuyor, gerceginde kirilma devreye giriyor (spec 8.1).
+        float shoal = min(SeaShoalingGain(o.depth, _SeaSpectrumDepth),
+                          _SeaMaxShoalingGain);
+
+        // YATAY DISPLACEMENT SIG SUDA SONUYOR: dalga dikelesir, yatayda
+        // yayilmaz (spec 8.2).
+        float chopScale = saturate(o.depth / SEA_CHOP_FADE_DEPTH);
+
+        // KIYI SONUMU. Derinlik sifira giderken dalga yuksekligi de sifira
+        // gitmeli, yoksa mesh araziyle kesisip titriyor (spec 8.4).
+        float shoreFade = smoothstep(0.0, SEA_SHORE_FADE_DEPTH, o.depth);
+
+        disp.y  *= shoal * shoreFade;
+        disp.xz *= chopScale * shoreFade;
+
+        // KIRILMA YUKSEKLIK SINIRI, EGIME BAGLI (spec 8.3).
+        float gamma = SeaBreakerIndex(slope);
+        float hMax  = gamma * o.depth * 0.5;
+        disp.y = sign(disp.y) * min(abs(disp.y), hMax);
+    }
+
+    posWS.xz += disp.xz;
+    posWS.y  += disp.y;
+
+    o.posWS = posWS;
+    return o;
 }
 
 #endif

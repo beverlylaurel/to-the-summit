@@ -19,6 +19,7 @@ public class SeaSimulation : MonoBehaviour
     [SerializeField] SeaEnvironmentBridge environment;
     [SerializeField] ComputeShader spectrumShader;
     [SerializeField] ComputeShader fftShader;
+    [SerializeField] ComputeShader foamShader;
 
     ISeaEnvironmentSource env;
 
@@ -28,11 +29,17 @@ public class SeaSimulation : MonoBehaviour
     RenderTexture displacement;
     RenderTexture derivatives;
 
+    // KOPUK PING-PONG. Sonum onceki karenin degerini okuyor; tek dokuya
+    // hem okuyup hem yazmak yaris yaratirdi.
+    RenderTexture foamA;
+    RenderTexture foamB;
+
     int kInitial = -1;
     int kTime = -1;
     int kFftH = -1;
     int kFftV = -1;
     int kAssemble = -1;
+    int kFoam = -1;
 
     float lastWindSpeed = float.NaN;
     Vector3 lastWindDir = Vector3.zero;
@@ -42,12 +49,13 @@ public class SeaSimulation : MonoBehaviour
     public RenderTexture Displacement => displacement;
     public RenderTexture Derivatives => derivatives;
     public RenderTexture H0 => h0;
+    public RenderTexture Foam => foamA;
 
     public void Bind(SeaSettings source, SeaEnvironmentBridge bridge,
-                     ComputeShader spectrum, ComputeShader fft)
+                     ComputeShader spectrum, ComputeShader fft, ComputeShader foam)
     {
         environment = bridge;
-        Bind(source, (ISeaEnvironmentSource)bridge, spectrum, fft);
+        Bind(source, (ISeaEnvironmentSource)bridge, spectrum, fft, foam);
     }
 
     /// ARAYÜZ ÜZERİNDEN BAĞLAMA.
@@ -57,12 +65,13 @@ public class SeaSimulation : MonoBehaviour
     /// (`SeaSpectrumTest`) bu yolu kullanıyor — rüzgâr hava sisteminden
     /// gelseydi ölçüm tekrarlanabilir olmazdı.
     public void Bind(SeaSettings source, ISeaEnvironmentSource bridge,
-                     ComputeShader spectrum, ComputeShader fft)
+                     ComputeShader spectrum, ComputeShader fft, ComputeShader foam)
     {
         settings = source;
         env = bridge;
         spectrumShader = spectrum;
         fftShader = fft;
+        foamShader = foam;
     }
 
     void OnEnable()
@@ -85,6 +94,8 @@ public class SeaSimulation : MonoBehaviour
             throw new InvalidOperationException($"{nameof(SeaSimulation)}: {nameof(spectrumShader)} atanmadı.");
         if (fftShader == null)
             throw new InvalidOperationException($"{nameof(SeaSimulation)}: {nameof(fftShader)} atanmadı.");
+        if (foamShader == null)
+            throw new InvalidOperationException($"{nameof(SeaSimulation)}: {nameof(foamShader)} atanmadı.");
 
         // KERNEL VARLIĞI AÇIKÇA SINANIYOR.
         //
@@ -96,6 +107,7 @@ public class SeaSimulation : MonoBehaviour
         kFftH = fftShader.FindKernel("KIFFTHorizontal");
         kFftV = fftShader.FindKernel("KIFFTVertical");
         kAssemble = fftShader.FindKernel("KAssemble");
+        kFoam = foamShader.FindKernel("KFoam");
 
         DokulariKur();
 
@@ -143,6 +155,28 @@ public class SeaSimulation : MonoBehaviour
         spectrumSlope = Kur("Sea_SpectrumSlope", RenderTextureFormat.ARGBHalf);
         displacement = Kur("Sea_Displacement", RenderTextureFormat.ARGBHalf);
         derivatives = Kur("Sea_Derivatives", RenderTextureFormat.ARGBHalf);
+
+        foamA = Kur("Sea_FoamA", RenderTextureFormat.RHalf);
+        foamB = Kur("Sea_FoamB", RenderTextureFormat.RHalf);
+
+        // KOPUK BIRIKIMLI: ilk karenin "onceki" degeri tanimli olmali.
+        // Yeni `RenderTexture`'in icerigi belirsiz; temizlenmezse kopuk
+        // rastgele bir seviyeden sonumlenmeye baslar.
+        Temizle(foamA);
+        Temizle(foamB);
+    }
+
+    static void Temizle(RenderTexture rt)
+    {
+        var eski = RenderTexture.active;
+
+        for (int dilim = 0; dilim < SeaConstants.TierCount; dilim++)
+        {
+            Graphics.SetRenderTarget(rt, 0, CubemapFace.Unknown, dilim);
+            GL.Clear(false, true, Color.clear);
+        }
+
+        RenderTexture.active = eski;
     }
 
     void DokulariBirak()
@@ -152,6 +186,8 @@ public class SeaSimulation : MonoBehaviour
         Birak(ref spectrumSlope);
         Birak(ref displacement);
         Birak(ref derivatives);
+        Birak(ref foamA);
+        Birak(ref foamB);
     }
 
     static void Birak(ref RenderTexture rt)
@@ -226,8 +262,37 @@ public class SeaSimulation : MonoBehaviour
         fftShader.SetTexture(kAssemble, SeaShaderIDs.DerivativesRW, derivatives);
         fftShader.Dispatch(kAssemble, grup, grup, SeaConstants.TierCount);
 
+        Kopuk(zaman);
+
         Shader.SetGlobalTexture(SeaShaderIDs.Displacement, displacement);
         Shader.SetGlobalTexture(SeaShaderIDs.Derivatives, derivatives);
+        Shader.SetGlobalTexture(SeaShaderIDs.Foam, foamA);
+    }
+
+    float sonKopukZamani = float.NaN;
+
+    /// KOPUK SONUMU GERCEK GECEN SUREYE BAGLI.
+    ///
+    /// `Time.deltaTime` kullanilamiyor: editor testi `Adim`'i kendi
+    /// zamaniyla cagiriyor ve orada kare yok. Zaman farki cagiranin
+    /// verdigi degerden cikariliyor.
+    void Kopuk(float zaman)
+    {
+        float dt = float.IsNaN(sonKopukZamani) ? 0f : Mathf.Max(zaman - sonKopukZamani, 0f);
+        sonKopukZamani = zaman;
+
+        // Dongu basa sarinca fark negatif olur; yukaridaki `Max` onu
+        // sifira cekiyor, kopuk o karede yalniz hedefe basiyor.
+        foamShader.SetFloat(SeaShaderIDs.DeltaTime, dt);
+
+        foamShader.SetTexture(kFoam, SeaShaderIDs.DisplacementRW, displacement);
+        foamShader.SetTexture(kFoam, SeaShaderIDs.FoamRW, foamB);
+        foamShader.SetTexture(kFoam, SeaShaderIDs.FoamPrevRW, foamA);
+
+        int grup = SeaConstants.FftSize / 8;
+        foamShader.Dispatch(kFoam, grup, grup, SeaConstants.TierCount);
+
+        (foamA, foamB) = (foamB, foamA);
     }
 
     void BaslangicSpektrumu()

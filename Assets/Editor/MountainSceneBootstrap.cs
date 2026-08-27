@@ -74,6 +74,7 @@ public static class MountainSceneBootstrap
     const string SeaSurfaceShaderPath = "Assets/Sea/Shaders/SeaLit.shader";
     const string SeaSpectrumPath = "Assets/Sea/Shaders/SeaSpectrum.compute";
     const string SeaFftPath = "Assets/Sea/Shaders/SeaFFT.compute";
+    const string SeaFoamPath = "Assets/Sea/Shaders/SeaFoam.compute";
     const string SkyShaderPath = "Assets/Shaders/Sky.shader";
     const string SkyMaterialPath = "Assets/Settings/Sky.mat";
     const string FogComputePath = "Assets/Shaders/VolumetricFog.compute";
@@ -1785,9 +1786,10 @@ public static class MountainSceneBootstrap
 
         var spektrum = AssetDatabase.LoadAssetAtPath<ComputeShader>(SeaSpectrumPath);
         var fft = AssetDatabase.LoadAssetAtPath<ComputeShader>(SeaFftPath);
-        if (spektrum == null || fft == null)
+        var kopuk = AssetDatabase.LoadAssetAtPath<ComputeShader>(SeaFoamPath);
+        if (spektrum == null || fft == null || kopuk == null)
             throw new System.InvalidOperationException(
-                $"Compute bulunamadı: {SeaSpectrumPath} / {SeaFftPath}");
+                $"Compute bulunamadı: {SeaSpectrumPath} / {SeaFftPath} / {SeaFoamPath}");
 
         var kok = Object.FindAnyObjectByType<SeaManager>(FindObjectsInactive.Include);
         if (kok == null)
@@ -1823,7 +1825,7 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
-        sim.Bind(ayar, kopru, spektrum, fft);
+        sim.Bind(ayar, kopru, spektrum, fft, kopuk);
         EditorUtility.SetDirty(sim);
 
         var yuzey = Object.FindAnyObjectByType<SeaSurface>(FindObjectsInactive.Include);

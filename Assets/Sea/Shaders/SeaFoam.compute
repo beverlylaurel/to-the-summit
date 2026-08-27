@@ -1,0 +1,36 @@
+// ROL: Jacobian'dan tepe kopugu uretir ve sonumunu tasir.
+// Cagiran: SeaSimulation.
+
+#pragma kernel KFoam
+
+#include "SeaCommon.hlsl"
+
+RWTexture2DArray<float4> _SeaDisplacementRW;
+RWTexture2DArray<float>  _SeaFoamRW;
+RWTexture2DArray<float>  _SeaFoamPrevRW;
+
+float _SeaDeltaTime;
+
+/// KOPUK ANINDA OLUSUR, YAVAS KAYBOLUR.
+///
+/// Dogrudan atama YAPILMIYOR (spec 18 tuzak tablosu: "kopuk aninda
+/// kayboluyor / sonum yerine dogrudan atama yapilmis"). Yeni deger hedefin
+/// ve sonumlenmis eski degerin BUYUGU: kabaran tepe kopugu aninda basiyor,
+/// tepe gecince iz kaliyor.
+[numthreads(8, 8, 1)]
+void KFoam(uint3 id : SV_DispatchThreadID)
+{
+    uint N = (uint)SEA_FFT_SIZE;
+    if (id.x >= N || id.y >= N) return;
+
+    float J = _SeaDisplacementRW[id].w;
+
+    // Esik J < 0'dan ONCE basliyor ki kopuk yumusak girsin; J = 0 anini
+    // beklemek kopugu bicak gibi aciyor.
+    float hedef = saturate((SEA_FOAM_J_THRESHOLD - J) / SEA_FOAM_J_RANGE);
+
+    float onceki  = _SeaFoamPrevRW[id];
+    float sonraki = max(hedef, onceki - SEA_FOAM_DECAY * _SeaDeltaTime);
+
+    _SeaFoamRW[id] = saturate(sonraki);
+}

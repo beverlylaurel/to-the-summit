@@ -59,7 +59,6 @@ Shader "ToTheSummit/SeaLit"
             float  _SeaSunElevation01;
             float  _SeaPrecipIntensity01;
 
-            float  _SeaMaxShoalingGain;
             float  _SeaRunupMaxDepth;
             float  _SeaShoreFoamPhase;
             float  _SeaShoreFoamDepth;
@@ -86,51 +85,14 @@ Shader "ToTheSummit/SeaLit"
                 float3 posWS = TransformObjectToWorld(IN.positionOS.xyz);
                 posWS.y = _SeaLevelY;
 
-                // KIYI MASKESI VERTEX'TE DEGIL FRAGMENT'TE.
+                // DALGA ALANI VE SIG SU DONUSUMU `SeaCommon`'DA.
                 //
-                // Vertex'te hesaplanip fragment'e interpole edilince kiyi
-                // cizgisi quad sinirlarina takiliyor ve BASAMAKLI cikiyor —
-                // olculdu, 120 m mesafede 2 m'lik quad'lar gorunur basamak
-                // birakti. Fragment'te her piksel kendi derinligini okuyor.
-                //
-                // Vertex asamasinda derinlik yine de gerekiyor: sig su
-                // donusumu (siglasma, kirilma, kiyi sonumu) geometriyi
-                // orada deforme ediyor.
-                float depth = SeaSampleDepth(posWS.xz);
+                // Ileri gecis ile derinlik gecisi AYNI fonksiyonu cagiriyor;
+                // ayri yazilsalardi iki tampon farkli bir yuzey gorurdu.
+                SeaSurfaceNokta nokta = SeaDeform(posWS);
 
-                // --- SIG SU DONUSUMU (spec 8) ---
-                //
-                // Dalga alani henuz yok (Faz 2'de gelecek); su an yalniz
-                // donusum zinciri kurulu ve sifir displacement uzerinde
-                // calisiyor. FFT baglaninca buraya `disp` girecek.
-                float3 disp = 0.0;
-
-                if (_SeaDbgNoShallow <= 0.5)
-                {
-                    float slope     = SeaSampleBottomSlope(posWS.xz);
-                    float shoal     = min(SeaShoalingGain(depth, _SeaSpectrumDepth),
-                                          _SeaMaxShoalingGain);
-                    float chopScale = saturate(depth / SEA_CHOP_FADE_DEPTH);
-
-                    // KIYI SONUMU. Su derinligi sifira giderken dalga
-                    // yuksekligi de sifira gitmeli, yoksa mesh araziyle
-                    // kesisip titriyor (spec 8.4).
-                    float shoreFade = smoothstep(0.0, SEA_SHORE_FADE_DEPTH, depth);
-
-                    disp.y  *= shoal * shoreFade;
-                    disp.xz *= chopScale * shoreFade;
-
-                    // KIRILMA YUKSEKLIK SINIRI (spec 8.3).
-                    float gamma = SeaBreakerIndex(slope);
-                    float hMax  = gamma * depth * 0.5;
-                    disp.y = sign(disp.y) * min(abs(disp.y), hMax);
-                }
-
-                posWS.xz += disp.xz;
-                posWS.y  += disp.y;
-
-                OUT.positionWS = posWS;
-                OUT.positionCS = TransformWorldToHClip(posWS);
+                OUT.positionWS = nokta.posWS;
+                OUT.positionCS = TransformWorldToHClip(nokta.posWS);
                 OUT.screenPos  = ComputeScreenPos(OUT.positionCS);
                 OUT.fogCoord   = ComputeFogFactor(OUT.positionCS.z);
 
@@ -182,12 +144,22 @@ Shader "ToTheSummit/SeaLit"
                 clip(depth);
 
                 float3 V = normalize(_WorldSpaceCameraPos - IN.positionWS);
+                float  dist = length(_WorldSpaceCameraPos - IN.positionWS);
 
-                // --- NORMAL ---
+                // --- NORMAL, FFT EGIM DOKUSUNDAN (spec 10.5) ---
                 //
-                // Dalga alani gelince FFT egim dokusundan okunacak (spec
-                // 10.5, merkezi fark KULLANILMIYOR). Su an duz.
-                float3 N = float3(0, 1, 0);
+                // Merkezi fark KULLANILMIYOR: egim zaten FFT ile uretiliyor
+                // ve o daha dogru (spec 6.7).
+                float2 egim = _SeaDbgNoWaves > 0.5 ? 0.0
+                            : SeaSampleSlope(IN.positionWS.xz);
+
+                float3 N = normalize(float3(-egim.x, 1.0, -egim.y));
+
+                // UZAKTA NORMAL DETAYI SONUYOR. Sonmezse bir tekselden kucuk
+                // dalgalar orneklenip TAA ile kaynayan bir yuzey olusuyor
+                // (spec 10.5).
+                float normalFade = saturate(1.0 - (dist - 120.0) / 400.0);
+                N = normalize(lerp(float3(0, 1, 0), N, normalFade));
 
                 float2 screenUV = IN.screenPos.xy / IN.screenPos.w;
 
@@ -200,7 +172,6 @@ Shader "ToTheSummit/SeaLit"
 
                 if (_SeaDbgNoRefraction <= 0.5)
                 {
-                    float dist = length(_WorldSpaceCameraPos - IN.positionWS);
                     float2 refrOffset = N.xz * _SeaRefractionStrength / max(dist, 1.0);
                     float2 refrUV = screenUV + refrOffset;
 
@@ -229,7 +200,6 @@ Shader "ToTheSummit/SeaLit"
                 float3 L = mainLight.direction;
                 float3 H = normalize(V + L);
 
-                float dist2 = length(_WorldSpaceCameraPos - IN.positionWS);
                 float roughness = lerp(_SeaRoughnessCalm, _SeaRoughnessRough,
                                        saturate(length(_SeaWindWS) / 20.0));
 
@@ -239,7 +209,7 @@ Shader "ToTheSummit/SeaLit"
                 // UZAKTAKI PARILTI YAYINIK. Uzaktaki dalgalar kameranin
                 // cozemedigi olcekte oldugu icin parilti yayiliyor
                 // [KAYNAK: Tessendorf 2004 6 giris].
-                roughness = lerp(roughness, 0.35, saturate((dist2 - 200.0) / 1500.0));
+                roughness = lerp(roughness, 0.35, saturate((dist - 200.0) / 1500.0));
 
                 float spec = pow(saturate(dot(N, H)), max(2.0 / (roughness * roughness), 2.0));
 
@@ -252,21 +222,34 @@ Shader "ToTheSummit/SeaLit"
                 float F = SeaFresnel(N, V);
                 float3 color = lerp(belowSurface, skyRefl, F) + glitter;
 
-                // --- KOPUK (spec 13) ---
-                //
-                // Jacobian kopugu Faz 3'te gelecek. Su an yalniz KIYI
-                // kopugu var: sig suda ve kabarma bandinda.
+                // --- KOPUK (spec 13) — UC KAYNAK ---
                 float foam = 0.0;
 
                 if (_SeaDbgNoFoam <= 0.5)
                 {
+                    // 1. TEPE KOPUGU. Jacobian'dan; sonumu compute'ta
+                    //    tasiniyor (spec 13.2).
+                    float whitecap = SeaSampleFoam(IN.positionWS.xz);
+
+                    // 2. KIRILMA KOPUGU (spec 8.3). Dalga yuksekliginin su
+                    //    derinligine orani kirilma indeksini asiyorsa dalga
+                    //    kiriliyor.
+                    float slope = SeaSampleBottomSlope(IN.positionWS.xz);
+                    float gamma = SeaBreakerIndex(slope);
+                    float H     = 2.0 * abs(IN.positionWS.y - _SeaLevelY);
+                    float oran  = H / max(depth, SEA_MIN_DEPTH);
+                    float breakT = saturate((oran - gamma * 0.7) / (gamma * 0.3));
+
+                    // 3. KIYI KOPUGU (spec 13.3). Kabarma bandi su seviyesini
+                    //    yukselmis gibi gosteriyor (spec 8.5).
                     float runupDepth = _SeaRunupMaxDepth * _SeaShoreFoamPhase;
                     float effDepth = depth + runupDepth;
 
                     float shoreFoam = 1.0 - smoothstep(0.0, _SeaShoreFoamDepth, effDepth);
                     shoreFoam *= 0.4 + 0.6 * _SeaShoreFoamPhase;
 
-                    foam = saturate(shoreFoam);
+                    foam = saturate(max(whitecap,
+                                        max(breakT * SEA_BREAK_FOAM_GAIN, shoreFoam)));
                 }
 
                 // KOPUK FRESNEL'DEN SONRA. Kopuk opak, sacan bir yuzey;
@@ -312,8 +295,13 @@ Shader "ToTheSummit/SeaLit"
                 float3 posWS = TransformObjectToWorld(IN.positionOS.xyz);
                 posWS.y = _SeaLevelY;
 
-                OUT.positionWS = posWS;
-                OUT.positionCS = TransformWorldToHClip(posWS);
+                // ILERI GECISLE AYNI DEFORMASYON. Uygulanmazsa derinlik
+                // tamponu duz bir denizi, renk tamponu dalgali bir denizi
+                // gorur; yuzey kendi derinlik testine takilir.
+                SeaSurfaceNokta nokta = SeaDeform(posWS);
+
+                OUT.positionWS = nokta.posWS;
+                OUT.positionCS = TransformWorldToHClip(nokta.posWS);
 
                 return OUT;
             }

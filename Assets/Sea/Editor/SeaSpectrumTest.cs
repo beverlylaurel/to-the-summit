@@ -54,8 +54,10 @@ public static class SeaSpectrumTest
             "Assets/Sea/Shaders/SeaSpectrum.compute");
         var fft = AssetDatabase.LoadAssetAtPath<ComputeShader>(
             "Assets/Sea/Shaders/SeaFFT.compute");
+        var kopuk = AssetDatabase.LoadAssetAtPath<ComputeShader>(
+            "Assets/Sea/Shaders/SeaFoam.compute");
 
-        if (ayar == null || spek == null || fft == null)
+        if (ayar == null || spek == null || fft == null || kopuk == null)
         {
             Debug.LogError("Deniz testi: ayar veya compute shader bulunamadı.");
             return;
@@ -70,7 +72,7 @@ public static class SeaSpectrumTest
         go.SetActive(false);
 
         var sim = go.AddComponent<SeaSimulation>();
-        sim.Bind(ayar, ortam, spek, fft);
+        sim.Bind(ayar, ortam, spek, fft, kopuk);
 
         go.SetActive(true);
 

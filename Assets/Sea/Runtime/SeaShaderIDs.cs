@@ -46,6 +46,8 @@ public static class SeaShaderIDs
     public static readonly int SpectrumSlopeRW = Shader.PropertyToID("_SeaSpectrumSlopeRW");
     public static readonly int DisplacementRW = Shader.PropertyToID("_SeaDisplacementRW");
     public static readonly int DerivativesRW = Shader.PropertyToID("_SeaDerivativesRW");
+    public static readonly int FoamRW = Shader.PropertyToID("_SeaFoamRW");
+    public static readonly int FoamPrevRW = Shader.PropertyToID("_SeaFoamPrevRW");
 
     /// Kademe bandı üst sınırları (rad/m).
     public static readonly int TierCutoffK = Shader.PropertyToID("_SeaTierCutoffK");
