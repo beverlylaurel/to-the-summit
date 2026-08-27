@@ -328,7 +328,13 @@ Shader "ToTheSummit/SeaLit"
                     foamUV.x *= 0.35;
                 #endif
 
-                    whitecap = saturate(whitecap * (0.55 + 0.75 * SeaFoamNoise(foamUV)));
+                    // BUBBLE STRUCTURE, NOT A FLAT WASH. The noise used to
+                    // scale the coverage between 0.55 and 1.30, i.e. it only
+                    // dimmed it; the foam still read as one solid sheet. It
+                    // now EATS INTO the coverage from below, so the pattern
+                    // has holes and the foam breaks into clumps.
+                    float bubbles = SeaFoamNoise(foamUV);
+                    whitecap = saturate((whitecap - (1.0 - bubbles) * 0.35) * 1.4);
 
                     // 2. BREAKING FOAM (spec 8.3). When the ratio of wave
                     //    height to water depth exceeds the breaker index the
@@ -341,11 +347,17 @@ Shader "ToTheSummit/SeaLit"
 
                     // 3. SHORE FOAM (spec 13.3). The run-up band makes the
                     //    water level look raised (spec 8.5).
-                    float runupDepth = _SeaRunupMaxDepth * _SeaShoreFoamPhase;
-                    float effDepth = depth + runupDepth;
+                    //
+                    // THE SWASH DOES NOT ADVANCE AS ONE STRAIGHT LINE. The
+                    // run-up phase was global, so the whole coastline surged
+                    // and drained together — a band that slides in and out as
+                    // a single piece. A slow field shifts the phase along the
+                    // shore, so one bay is filling while the next is draining.
+                    float alongShore = SeaValueNoise(IN.positionWS.xz * 0.0035);
+                    float phase = frac(_SeaShoreFoamPhase + alongShore * 0.6);
 
-                    float shoreFoam = 1.0 - smoothstep(0.0, _SeaShoreFoamDepth, effDepth);
-                    shoreFoam *= 0.4 + 0.6 * _SeaShoreFoamPhase;
+                    float runupDepth = _SeaRunupMaxDepth * phase;
+                    float effDepth = depth + runupDepth;
 
                     // THE EDGE IS BROKEN UP WITH NOISE. Without it the foam
                     // band becomes a straight line and the shoreline looks
@@ -364,7 +376,29 @@ Shader "ToTheSummit/SeaLit"
                     float breakup =
                           SeaFoamNoise(IN.positionWS.xz * _SeaFoamBreakupTiling) * 0.55
                         + SeaValueNoise(IN.positionWS.xz * (_SeaFoamBreakupTiling * 0.18)) * 0.45;
-                    shoreFoam = saturate((shoreFoam - breakup * 0.45) * 2.5);
+
+                    // THE NOISE MOVES THE WATERLINE, IT DOES NOT DIM THE FOAM.
+                    //
+                    // It used to be subtracted from the finished coverage and
+                    // the result multiplied by 2.5. That multiply crushed the
+                    // whole gradient into two values: the band came out as a
+                    // solid white sheet with a cut edge — paper, not foam.
+                    //
+                    // Displacing the DEPTH the band is measured at gives the
+                    // same irregular outline with the gradient intact: the
+                    // edge dissolves into patches instead of ending on a line.
+                    float bandDepth = effDepth / max(_SeaShoreFoamDepth, 1e-3);
+                    bandDepth += (breakup - 0.5) * 0.9;
+
+                    float shoreFoam = 1.0 - smoothstep(0.15, 1.0, bandDepth);
+
+                    // Fine bubbles inside the band, at the whitecap's scale.
+                    float shoreBubbles = SeaFoamNoise(IN.positionWS.xz * _SeaFoamTiling * 1.7);
+                    shoreFoam *= 0.55 + 0.65 * shoreBubbles;
+
+                    // The swash carries the foam: at the top of the surge the
+                    // band is thickest, as it drains a lacy residue is left.
+                    shoreFoam *= 0.45 + 0.55 * phase;
 
                     foam = max(whitecap, max(breakT * SEA_BREAK_FOAM_GAIN, shoreFoam));
 
@@ -381,8 +415,24 @@ Shader "ToTheSummit/SeaLit"
                 // Lighting: the sun's diffuse share plus the sky. The sky
                 // radiance already sits in `skyRefl`; it is taken at 0.35 as
                 // the hemispherical share [CALIBRATION].
-                float3 foamLight = mainLight.color * saturate(dot(N, L)) + skyRefl * 0.35;
-                color = lerp(color, _SeaFoamColor.rgb * foamLight, foam * 0.9);
+                // FOAM IS ROUGH, NOT MATTE. `_SeaFoamRoughness` was declared and
+                // never read — the foam took no specular at all, so the wet sheen
+                // a breaking crest has was missing and the band read as paper.
+                // A broad GGX lobe at the foam's own roughness puts it back.
+                float fa  = _SeaFoamRoughness * _SeaFoamRoughness;
+                float fa2 = fa * fa;
+                float fd  = (NoH * fa2 - NoH) * NoH + 1.0;
+                float foamSpec = fa2 / (PI * fd * fd + 1e-7) * NoL;
+
+                float3 foamLight = mainLight.color * (NoL + foamSpec * 0.25)
+                                 + skyRefl * 0.35;
+
+                // THIN FOAM IS TRANSLUCENT. A linear blend made every trace of
+                // foam equally opaque, so the faint edges came out as solid
+                // white paper. Squaring the coverage lets thin foam show the
+                // water through it and keeps thick foam opaque.
+                float foamAlpha = foam * foam * (3.0 - 2.0 * foam) * 0.92;
+                color = lerp(color, _SeaFoamColor.rgb * foamLight, foamAlpha);
 
                 // FOG THROUGH URP'S OWN FUNCTION (spec 3.5). No fog
                 // computation of our own IS WRITTEN.

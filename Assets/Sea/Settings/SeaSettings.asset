@@ -27,7 +27,9 @@ MonoBehaviour:
   loopPeriod: 200
   patchSizes: {x: 967, y: 191, z: 37}
   tierWeights: {x: 1, y: 1, z: 1}
-  choppiness: 1.1
+  choppinessCalm: 0.55
+  choppinessStorm: 2.4
+  choppinessWindFull: 15
   choppinessPerTier: {x: 1, y: 0.85, z: 0.45}
   maxShoalingGain: 2.2
   runupMaxDepth: 0.45

@@ -398,7 +398,9 @@ public class SeaSimulation : MonoBehaviour
 
         cs.SetVector(SeaShaderIDs.PatchSizes, settings.patchSizes);
         cs.SetVector(SeaShaderIDs.ChoppinessPerTier, settings.choppinessPerTier);
-        cs.SetFloat(SeaShaderIDs.Choppiness, settings.choppiness);
+        // CHOPPINESS RIDES THE WIND. See the reasoning next to the fields:
+        // held constant, the surface never folded and no whitecap was ever born.
+        cs.SetFloat(SeaShaderIDs.Choppiness, settings.ChoppinessAt(speed));
         cs.SetFloat(SeaShaderIDs.SpectrumDepth, settings.spectrumDepth);
         cs.SetFloat(SeaShaderIDs.Fetch, settings.fetch);
         cs.SetFloat(SeaShaderIDs.Swell, settings.swell);

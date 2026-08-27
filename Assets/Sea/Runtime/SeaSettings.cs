@@ -126,8 +126,30 @@ public class SeaSettings : ScriptableObject
     /// Choppy displacement scale. It sharpens the crests and broadens the
     /// troughs — the nonlinear behaviour that makes the FFT representation
     /// look real. [SOURCE: Tessendorf 2004 equation 44]
-    [Tooltip("Choppy displacement scale.")]
-    [Range(0f, 2f)] public float choppiness = 1.1f;
+    ///
+    /// IT FOLLOWS THE WIND, IT IS NOT A CONSTANT. At a fixed 1.1 the surface
+    /// never folded: measured, in a full storm the smallest Jacobian over the
+    /// whole field was 0.580 while the foam threshold is 0.55 — so a whitecap
+    /// NEVER appeared, at any wind. A calm swell really is smooth and a storm
+    /// sea really is steep enough to break; one number cannot be both.
+    [Tooltip("Choppy displacement in calm air. A swell is round, not sharp.")]
+    [Range(0f, 3f)] public float choppinessCalm = 0.55f;
+
+    [Tooltip("Choppy displacement in a full storm. High enough for the surface " +
+             "to fold — that fold is what makes a whitecap.")]
+    [Range(0f, 3f)] public float choppinessStorm = 2.4f;
+
+    [Tooltip("The wind speed at which the storm value is reached (m/s).")]
+    [Min(1f)] public float choppinessWindFull = 15f;
+
+    /// ONE PLACE COMPUTES IT. The simulation writes the choppiness onto the
+    /// compute shader and `SeaManager` writes the same number as a global for
+    /// the vertex stage. Two separate `Lerp`s would drift the moment one of
+    /// them was edited, and the displacement the foam is computed from would
+    /// stop matching the displacement the mesh is built with.
+    public float ChoppinessAt(float windSpeed) =>
+        Mathf.Lerp(choppinessCalm, choppinessStorm,
+                   Mathf.Clamp01(windSpeed / Mathf.Max(1f, choppinessWindFull)));
 
     /// DIFFERENT PER TIER. Full choppiness at high wave numbers compresses
     /// the chop and leads to knotting (spec §6.7).

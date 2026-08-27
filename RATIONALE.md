@@ -2227,3 +2227,53 @@ sığıyordu, yani üç mod — o kadar az mod tanımı gereği periyodik desend
 üretti ve Unity ikisini tek konsol girdisine katladı — ikinci ölçüm hiç
 olmamış gibi göründü. Rapor artık fetch, patch, swell periyodu ve alpha'yı
 başlığa basıyor. Girdisini adlandırmayan bir rapor bir öncekinden ayırt edilemez.
+
+
+## Köpük hiç doğmuyordu: eşik ölçülen en küçük Jacobian'ın altındaydı
+
+Kullanıcının ifadesi: "kıyıdaki köpük beyazlığı rezalet, kağıt gibi, köpükle
+alakası yok, smooth değil".
+
+**Ölçüldü.** Beyaz başlık köpüğü (`whitecap`) Jacobian'dan doğuyor:
+
+    target = saturate((SEA_FOAM_J_THRESHOLD - J) / SEA_FOAM_J_RANGE)
+
+Eşik 0.55. Tam fırtınada (U₁₀ = 15 m/s) tüm alandaki **en küçük** Jacobian
+0.580 ölçüldü. Yani `target` her yerde tam sıfır: **açık denizde hiçbir rüzgârda
+tek bir beyaz başlık doğmuyordu.** Ekranda görülen tek köpük kıyı bandıydı, o da
+tek başına duruyordu — bu yüzden "köpükle alakası yok".
+
+Sebep sabit `choppiness = 1.1`. Yatay yer değiştirme yüzeyi katlayamayacak kadar
+küçüktü. Sakin bir ölü dalga gerçekten yuvarlaktır ve kırılmaz; fırtına denizi
+gerçekten kırılacak kadar diktir — **tek sayı ikisini birden karşılayamaz.**
+
+Choppiness rüzgâra bağlandı (sakin 0.55 → fırtına 2.4, 15 m/s'de tam).
+Ölçüm: fırtınada min(J) **0.580 → 0.219**, yani eşiğin altına iniyor ve köpük
+doğuyor. Sakin havada üstünde kalıyor, köpük yok.
+
+Choppiness İKİ yerde yazılıyor (compute'a simülasyondan, vertex için global
+olarak `SeaManager`'dan). İki ayrı `Lerp` biri düzenlendiğinde ayrışır ve
+köpüğün hesaplandığı yer değiştirme, mesh'in kurulduğu yer değiştirmeyle
+tutmaz olurdu — `SeaSettings.ChoppinessAt` tek kaynak.
+
+## Kıyı köpüğü kâğıt kenarıydı: gradyan çarpanla eziliyordu
+
+    shoreFoam = saturate((shoreFoam - breakup * 0.45) * 2.5);
+
+O `× 2.5` bandın tüm geçişini iki değere sıkıştırıyordu: içi düz beyaz, kenarı
+kesik. Kâğıt tarifi.
+
+Gürültü artık **kaplamayı karartmıyor, su çizgisini oynatıyor**: bandın ölçüldüğü
+derinliğe ekleniyor. Aynı düzensiz dış hat çıkıyor ama gradyan yerinde kalıyor —
+kenar çizgiyle bitmek yerine yamalara dağılıyor.
+
+Üstüne üç şey daha:
+
+- **Kabarcık dokusu.** Beyaz başlıkta gürültü 0.55–1.30 arası bir çarpandı, yani
+  yalnız soluklaştırıyordu; artık kaplamayı ALTTAN yiyor, desende delik açıyor.
+- **İnce köpük saydam.** Doğrusal harman her köpük izini eşit opak yapıyordu.
+  Kaplamanın smoothstep'i alınıyor: ince köpük altındaki suyu gösteriyor.
+- **Köpüğün speküleri.** `_SeaFoamRoughness` tanımlıydı ve HİÇ OKUNMUYORDU;
+  köpük hiç speküler almıyordu, kırılan tepenin ıslak parlaklığı yoktu.
+- **Kabarma tek çizgi hâlinde ilerlemiyor.** Kıyı boyunca yavaş bir alan
+  fazı kaydırıyor: bir koy dolarken yanındaki boşalıyor.

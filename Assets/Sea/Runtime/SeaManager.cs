@@ -173,7 +173,8 @@ public class SeaManager : MonoBehaviour
         Shader.SetGlobalFloat(SeaShaderIDs.Swell, settings.swell);
         Shader.SetGlobalFloat(SeaShaderIDs.SmallWaveCutoff, settings.smallWaveCutoff);
         Shader.SetGlobalFloat(SeaShaderIDs.LoopPeriod, settings.loopPeriod);
-        Shader.SetGlobalFloat(SeaShaderIDs.Choppiness, settings.choppiness);
+        Shader.SetGlobalFloat(SeaShaderIDs.Choppiness,
+                              settings.ChoppinessAt(env.WindSpeed));
 
         Shader.SetGlobalFloat(SeaShaderIDs.MaxShoalingGain, settings.maxShoalingGain);
         Shader.SetGlobalFloat(SeaShaderIDs.RunupMaxDepth, settings.runupMaxDepth);
