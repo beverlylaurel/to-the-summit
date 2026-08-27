@@ -2162,3 +2162,68 @@ bir renk.
 özelliği, yani pişen küpe girmiyorlar. Kapalı gökyüzü probe'a hâlâ mavi olarak
 ulaşıyor. Kapsama yansımayı gri ve sönük bir kubbeye çekiyor; bulutlar bir
 probe'a girdiği gün bu terim silinir (`DECISIONS.md`).
+
+
+## Deniz tek boy dalgadan ibaretti: spektrumun tek tepesi vardı
+
+Kullanıcının ifadesi: "dalgalar çok düzenli", "dalgalar irili ufaklı olmalı",
+"her şey çok hızlı hareket ediyor".
+
+**Ölçüldü.** Kıyıda `WindField.Severity = 0.2` (hava sürücüsü etek bandını
+sıfıra çiviliyor, `openingIntensity = 0`) ve şiddet→hız eğrisi dördüncü kuvvet:
+
+    FreeAirSpeed = lerp(0.6, 14, 0.2^4) = 0.62 m/s
+
+U₁₀ = 0.62 m/s ve fetch 12 km ile JONSWAP tepesi:
+
+    omega_p = 22 (g²/(U F))^(1/3) = 5.16 rad/s  ->  Tp = 1.22 s,  lambda = 2.3 m
+
+Yani denizin tamamı 2.3 metrelik tek boy bir kırışıklıktı. "Hep aynı" ve "çok
+hızlı" şikâyetlerinin ikisi de tek sebepten: **spektrumun tek tepesi vardı ve o
+tepe çok kısaydı.**
+
+### Düzeltme: çift tepeli spektrum
+
+Gerçek bir açık kıyı rüzgâr sıfırken bile ölü değildir — yüzlerce kilometre
+ötedeki fırtınaların ürettiği ölü dalga (swell) gelir; uzun, yavaş, dar bantlı
+ve yerel rüzgârla ilgisi yok. Spektruma ikinci bir tepe eklendi:
+
+- **Rüzgâr denizi** — yerel U₁₀, yerel fetch (150 km, açık okyanus).
+- **Swell** — periyottan verilen tepe (10 s → 156 m), yüksek gamma (dar bant),
+  sabit yön dağılımı, rüzgâr yönünden 38° kaymış.
+
+Kayma önemli: swell ile rüzgâr denizi çaprazlaşınca fitilli desen kırılıyor.
+
+**Ölçüm, U₁₀ = 8 m/s** (`To The Summit/Sea/Test Wave Field`):
+
+| kademe | bant | önce rms(h) | sonra rms(h) |
+|---|---|---|---|
+| 0 | λ > 48 m | ~0 | 0.680 m |
+| 1 | 9–48 m | 0.689 m | 0.464 m |
+| 2 | λ < 9 m | 0.139 m | 0.096 m |
+
+Rüzgâr tepkisi 1.21× → **3.31×** (rüzgâr 5 kat arttığında). Sakin havada
+Hs ≈ 1.65 m, fırtınada Hs ≈ 5.5 m.
+
+`swellAlpha` kâğıtta değil ölçümle bulundu: enerji alpha ile doğru orantılı,
+rms karekökle. İlk denemede tier 0 rms 1.92 m çıktı (Hs ~7.7 m, sakin hava için
+saçma); hedef 0.25 m rms için alpha × (0.25/1.92)² uygulandı.
+
+### Kademe boyları asal seçildi
+
+512 / 128 / 24'te ilk ikisinin ortak çarpanı 128'di, yani iki döşeme aynı yerde
+faza giriyor ve tekrar gözle görünüyordu. Yeni boylar **967 / 191 / 37** — üçü de
+asal, ikişerli ortak çarpanları yok.
+[KAYNAK: rtryan98, "Ocean Rendering" — *"if a common factor for any two values
+of L exists, then the tiling will be visible"*]
+
+Kademe 0 ayrıca büyüdü: 512 m'de 156 metrelik swell'in döşemeye üç periyodu
+sığıyordu, yani üç mod — o kadar az mod tanımı gereği periyodik desendir.
+967 m'de altı.
+
+## Ölçüm aracı iki koşuyu ayırt edemiyordu
+
+`Test Wave Field` girdilerini yazmıyordu. Farklı ayarlarla iki koşu AYNI metni
+üretti ve Unity ikisini tek konsol girdisine katladı — ikinci ölçüm hiç
+olmamış gibi göründü. Rapor artık fetch, patch, swell periyodu ve alpha'yı
+başlığa basıyor. Girdisini adlandırmayan bir rapor bir öncekinden ayırt edilemez.

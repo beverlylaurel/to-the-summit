@@ -46,7 +46,40 @@ public class SeaSimulation : MonoBehaviour
 
     float lastWindSpeed = float.NaN;
     Vector3 lastWindDir = Vector3.zero;
-    Vector4 lastSpectrumSignature = Vector4.zero;
+    SpectrumInputs lastSpectrumSignature;
+
+    /// EVERY INPUT `h0` DEPENDS ON. It outgrew a `Vector4` when the swell
+    /// partition was added; packing nine numbers into four by hashing them
+    /// would trade a visible bug for a silent one — a collision means the
+    /// spectrum is never rebuilt and the Inspector value does nothing.
+    readonly struct SpectrumInputs : System.IEquatable<SpectrumInputs>
+    {
+        readonly float swell, fetch, depth, cutoff;
+        readonly float swellAlpha, swellOmega, swellGamma, swellSpread, swellDir;
+
+        public SpectrumInputs(SeaSettings s)
+        {
+            swell = s.swell;
+            fetch = s.fetch;
+            depth = s.spectrumDepth;
+            cutoff = s.smallWaveCutoff;
+            swellAlpha = s.swellAlpha;
+            swellOmega = s.swellPeriod;
+            swellGamma = s.swellGamma;
+            swellSpread = s.swellSpread;
+            swellDir = s.swellDirectionOffset;
+        }
+
+        public bool Equals(SpectrumInputs o) =>
+            swell == o.swell && fetch == o.fetch && depth == o.depth
+            && cutoff == o.cutoff && swellAlpha == o.swellAlpha
+            && swellOmega == o.swellOmega && swellGamma == o.swellGamma
+            && swellSpread == o.swellSpread && swellDir == o.swellDir;
+
+        public override bool Equals(object o) => o is SpectrumInputs i && Equals(i);
+
+        public override int GetHashCode() => swell.GetHashCode() ^ fetch.GetHashCode();
+    }
 
     int builtFftSize = -1;
     float lastFoamTime = float.NaN;
@@ -260,14 +293,12 @@ public class SeaSimulation : MonoBehaviour
         // means changing swell from the Inspector does nothing — measured:
         // with swell 0 versus 1 the directional concentration came out
         // exactly the same.
-        Vector4 signature = new Vector4(settings.swell, settings.fetch,
-                                        settings.spectrumDepth,
-                                        settings.smallWaveCutoff);
+        var signature = new SpectrumInputs(settings);
 
         bool dirty = float.IsNaN(lastWindSpeed)
                   || Mathf.Abs(speed - lastWindSpeed) > 0.25f
                   || Vector3.Angle(direction, lastWindDir) > 3f
-                  || signature != lastSpectrumSignature;
+                  || !signature.Equals(lastSpectrumSignature);
 
         WriteSettings(spectrumShader, direction, speed);
         WriteSettings(fftShader, direction, speed);
@@ -371,6 +402,16 @@ public class SeaSimulation : MonoBehaviour
         cs.SetFloat(SeaShaderIDs.SpectrumDepth, settings.spectrumDepth);
         cs.SetFloat(SeaShaderIDs.Fetch, settings.fetch);
         cs.SetFloat(SeaShaderIDs.Swell, settings.swell);
+
+        // THE SWELL'S PEAK COMES FROM A PERIOD, NOT A FETCH. A swell is born in
+        // a storm we do not simulate; its period is what survives the journey.
+        cs.SetFloat(SeaShaderIDs.SwellAlpha, settings.swellAlpha);
+        cs.SetFloat(SeaShaderIDs.SwellPeakOmega,
+                    SeaConstants.TwoPi / Mathf.Max(1f, settings.swellPeriod));
+        cs.SetFloat(SeaShaderIDs.SwellGamma, settings.swellGamma);
+        cs.SetFloat(SeaShaderIDs.SwellSpreadS, settings.swellSpread);
+        cs.SetFloat(SeaShaderIDs.SwellDirOffset,
+                    settings.swellDirectionOffset * Mathf.Deg2Rad);
         cs.SetFloat(SeaShaderIDs.SmallWaveCutoff, settings.smallWaveCutoff);
         cs.SetFloat(SeaShaderIDs.LoopPeriod, settings.loopPeriod);
 

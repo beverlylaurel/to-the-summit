@@ -77,6 +77,17 @@ public static class SeaSpectrumTest
 
         var report = new StringBuilder();
         report.AppendLine("WAVE FIELD MEASUREMENT");
+
+        // THE INPUTS ARE PRINTED WITH THE RESULT. Two runs with different
+        // settings produced the SAME text and Unity collapsed them into one
+        // console entry — the second measurement looked like it had never
+        // happened. A report that does not name its inputs cannot be told
+        // apart from the previous one.
+        report.AppendLine($"fetch {settings.fetch:F0} m   patch {settings.patchSizes}   " +
+                          $"windSpread {settings.swell:F2}");
+        report.AppendLine($"swell: period {settings.swellPeriod:F1} s   " +
+                          $"alpha {settings.swellAlpha:E3}   gamma {settings.swellGamma:F1}   " +
+                          $"spread {settings.swellSpread:F0}   offset {settings.swellDirectionOffset:F0} deg");
         report.AppendLine();
 
         int failures = 0;

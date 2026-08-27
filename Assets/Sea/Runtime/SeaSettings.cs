@@ -40,15 +40,52 @@ public class SeaSettings : ScriptableObject
     [Tooltip("Mean depth the spectrum assumes (m).")]
     [Min(1f)] public float spectrumDepth = 60f;
 
-    /// The distance the wind blows over water. The sea area is ~250 km², so
-    /// its characteristic length is ~15 km; the fetch is of that order.
+    /// FETCH IS THE OPEN OCEAN'S, NOT THE VISIBLE WATER'S. It was 12 km,
+    /// derived from the drawn sea area, and that is a lagoon's number: with
+    /// the shore wind measured at 0.62 m/s it gives a peak wavelength of
+    /// 2.3 m and a period of 1.22 s — the whole sea was one uniform ripple.
+    /// This coast opens onto an ocean; what limits the fetch is the ocean,
+    /// not the piece of it we draw.
     [Tooltip("Fetch — the distance the wind blows over water (m).")]
-    [Min(100f)] public float fetch = 12000f;
+    [Min(100f)] public float fetch = 150000f;
 
-    /// A sea viewed from the shore wants regular wave trains.
+    /// HOW NARROW THE WIND SEA'S CRESTS ARE, not whether there is swell —
+    /// the swell is its own partition below. At 0.72 it narrowed the
+    /// spreading so far that every crest came out parallel: measured, the
+    /// wind-band energy share went from 62.6% to 88.2% between 0 and 1.
+    /// A real wind sea is short-crested and confused.
     /// [SOURCE: Horvath 2015 "swell" parameter]
-    [Tooltip("Swell fraction. 0 = local chop, 1 = distant storm swell.")]
-    [Range(0f, 1f)] public float swell = 0.72f;
+    [Tooltip("How much the wind sea's crests line up. 0 = confused chop, 1 = parallel trains.")]
+    [Range(0f, 1f)] public float swell = 0.18f;
+
+    [Header("Swell — the spectrum's second peak")]
+    /// THE SEA IS NEVER DEAD. A real open coast carries waves born in storms
+    /// hundreds of kilometres away: long, slow, narrow-crested, and unrelated
+    /// to the local wind. Without this partition the sea went flat whenever
+    /// the wind did, and every wave in it was the same size — one peak in the
+    /// spectrum can only make one size of wave.
+    ///
+    /// It is NOT a second weather source: the local wind still drives the
+    /// wind sea and a storm still makes the sea rage. This is the sea's own
+    /// physics, not the sky's.
+    [Tooltip("Swell peak period (s). 10 s = a 156 m wavelength in deep water.")]
+    [Range(4f, 20f)] public float swellPeriod = 10f;
+
+    [Tooltip("Swell energy. 0 switches the partition off. [CALIBRATION]")]
+    [Min(0f)] public float swellAlpha = 0.0075f;
+
+    [Tooltip("Peak sharpness. Higher than the wind sea's 3.3: a swell arrives " +
+             "as a narrow band of periods.")]
+    [Range(1f, 12f)] public float swellGamma = 7f;
+
+    [Tooltip("Directional spreading exponent (cosine-2s). Fixed across " +
+             "frequency — a swell comes from one direction at every period.")]
+    [Range(2f, 60f)] public float swellSpread = 26f;
+
+    [Tooltip("The swell's angle from the wind direction (degrees). A swell " +
+             "born in a distant storm rarely runs with today's wind; crossing " +
+             "them is what breaks the corduroy look.")]
+    [Range(-180f, 180f)] public float swellDirectionOffset = 38f;
 
     /// [SOURCE: Tessendorf 2004 equation 41]
     [Tooltip("Small wave cutoff length (m).")]
@@ -65,12 +102,23 @@ public class SeaSettings : ScriptableObject
     /// 20 cm chop. The `dx` values must be 10–1000 times smaller than `U²/g`
     /// (spec §6.6); for U = 8 m/s, U²/g = 6.52 m.
     ///
-    ///   tier 0: 512 m / 256 = 2.00 m  -> ratio  3.3 (deliberately low, it
-    ///                                    only carries long waves)
-    ///   tier 1: 128 m / 256 = 0.50 m  -> ratio 13.0
-    ///   tier 2:  24 m / 256 = 0.094 m -> ratio 69.4
+    ///   tier 0: 967 m / 256 = 3.78 m  (deliberately coarse, it only carries
+    ///                                   long waves — the swell lives here)
+    ///   tier 1: 191 m / 256 = 0.75 m
+    ///   tier 2:  37 m / 256 = 0.145 m
+    ///
+    /// THE THREE LENGTHS ARE PAIRWISE COPRIME. 512 / 128 / 24 shared a factor
+    /// of 128 between the first two, so their tiles lined up and the repeat
+    /// was visible on the water. All three are primes now, so no two tiles
+    /// come back into phase within the drawn sea.
+    /// [SOURCE: rtryan98, "Ocean Rendering" — "if a common factor for any two
+    ///  values of L exists, then the tiling will be visible"]
+    ///
+    /// Tier 0 also GREW: at 512 m a 156 m swell had barely three periods per
+    /// tile, i.e. three modes — that few modes is a periodic pattern by
+    /// definition. At 967 m it has six.
     [Tooltip("The square each tier covers in the world (m).")]
-    public Vector3 patchSizes = new Vector3(512f, 128f, 24f);
+    public Vector3 patchSizes = new Vector3(967f, 191f, 37f);
 
     [Tooltip("Summation weight of each tier.")]
     public Vector3 tierWeights = new Vector3(1f, 1f, 1f);

@@ -16,11 +16,16 @@ MonoBehaviour:
   seaLevelY: 30
   deepWaterDepth: 200
   spectrumDepth: 60
-  fetch: 12000
-  swell: 0.72
+  fetch: 150000
+  swell: 0.18
+  swellPeriod: 10
+  swellAlpha: 0.00012668107
+  swellGamma: 7
+  swellSpread: 26
+  swellDirectionOffset: 38
   smallWaveCutoff: 0.15
   loopPeriod: 200
-  patchSizes: {x: 512, y: 128, z: 24}
+  patchSizes: {x: 967, y: 191, z: 37}
   tierWeights: {x: 1, y: 1, z: 1}
   choppiness: 1.1
   choppinessPerTier: {x: 1, y: 0.85, z: 0.45}

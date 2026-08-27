@@ -234,11 +234,12 @@ dağ ne kadar büyürse büyüsün kar tanesi büyümüyor.
 | Sayı | Kategori | Not |
 |---|---|---|
 | `seaLevelY` = 30 m | **elle bakılacak** | Arazi yeniden üretilirse kıyı çizgisi tamamen değişir. Bathymetry kendiliğinden tazeleniyor ama şeridin hâlâ 2.7–4.1 km olduğu ÖLÇÜLMELİ. |
-| `fetch` = 12 km | **elle bakılacak** | Deniz alanının çapından türüyor; alan değişince dalga yüksekliği ve tepe periyodu kayar. Kendiliğinden ölçeklenmiyor. |
+| `fetch` = 150 km | **bilerek mutlak** | Açık okyanusun fetch'i, çizilen su parçasının değil. Eskiden deniz alanının çapından türetiliyordu (12 km) ve tepe dalga boyu 2.3 m çıkıyordu. Çizilen alan değişse de bu sayı değişmez. |
+| `swellPeriod` = 10 s | **bilerek mutlak** | Uzaktaki fırtınanın ürettiği ölü dalganın periyodu; derin suda λ = 1.56 T² = 156 m. Dağın ya da deniz alanının boyuyla ilgisi yok. |
+| `patchSizes` (967/191/37 m) | **bilerek mutlak** | Dalga boyu ölçeği. Üçü de asal — ortak çarpanı olan iki döşeme faza girer ve tekrar görünür. Değiştirilecekse yine ikişerli asal seçilmeli. |
 | `deepWaterDepth` = 200 m | **bilerek mutlak** | Arazi dışı varsayımı. Denizin ne kadar açıldığıyla ilgili değil. |
 | `spectrumDepth` = 60 m | **bilerek mutlak** | FFT'nin varsaydığı ortalama derinlik; yerel derinlik mesh üzerinde uygulanıyor. |
 | Mesh halka yarıçapları (~4 km) | **bilerek mutlak** | Oyuncunun gözünden ufka olan mesafe. Dağın boyuyla ilgisi yok. |
-| `patchSizes` (512/128/24 m) | **bilerek mutlak** | Dalga boyu ölçeği; fiziksel deniz özelliği. |
 | Bathymetry çözünürlüğü | **kendiliğinden ölçeklenir** | Arazi heightmap'inden geliyor (şu an 7.3 m/teksel). Arazi boyu değişince teksel boyu da değişir — su çizgisinin basamak boyu da. |
 
 ### Kıyı kumu
