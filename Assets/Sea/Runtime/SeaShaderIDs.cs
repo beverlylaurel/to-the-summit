@@ -89,6 +89,7 @@ public static class SeaShaderIDs
     // --- Wet sand (spec §14) ---
     public static readonly int SeaWetLevelY = Shader.PropertyToID("_SeaWetLevelY");
     public static readonly int SeaWetFadeM = Shader.PropertyToID("_SeaWetFadeM");
+    public static readonly int SeaWetBandM = Shader.PropertyToID("_SeaWetBandM");
     public static readonly int SeaWetDarkening = Shader.PropertyToID("_SeaWetDarkening");
 
     // --- Diagnostics ---

@@ -71,6 +71,7 @@ CBUFFER_END
 // very low elevation and the band is 0 everywhere.
 float _SeaWetLevelY;
 float _SeaWetFadeM;
+float _SeaWetBandM;
 float _SeaWetDarkening;
 
 // STILL-WATER LEVEL, published by `SeaManager`. The sand band hangs from this, not

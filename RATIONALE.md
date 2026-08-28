@@ -2373,3 +2373,39 @@ kabarma kotunu yayınlıyor (`_SeaWetLevelY` fazı taşıyor), kum da onun altı
 `upwellingColor` `(0, 0.2, 0.3)` idi. Kırmızı kanalı TAM SIFIR olan bir su, hangi ışık
 altında olursa olsun havuz turkuazı verir — gerçek deniz suyunun geri saçtığı ışıkta
 az da olsa kırmızı vardır ve seviye çok daha düşüktür. `(0.03, 0.11, 0.14)`.
+
+
+## Kum plastik görünüyordu: ıslaklık bandının tabanı yoktu
+
+Kullanıcının ifadesi: "niye ışık vurduğunda plastik bir görüntü oluşuyor", zeminde kar
+yokken, doğrudan kuma bakarken.
+
+İlk şüpheli yanlıştı — "üstündeki kar" dedim, zeminde kar yoktu.
+
+**Dokular ölçüldü** (`Assets/Textures/Sand`, 256² örneklem):
+
+| Harita | Ortalama |
+|---|---|
+| Albedo | 0.61 / 0.54 / 0.43 — sıcak bej |
+| Pürüzlülük | 0.67 — kum kendi başına mat |
+| AO | 0.92 |
+
+Yani ekrandaki gri ve cila dokudan gelmiyor. Sebep tek satırda:
+
+    float seaWet = 1.0 - smoothstep(_SeaWetLevelY - _SeaWetFadeM, _SeaWetLevelY, worldPos.y);
+
+Bu bir bant değil **yarım uzay**: su çizgisi kotunun altındaki HER nokta 1 dönüyor —
+denize bir metre mi bin metre mi uzakta, hiç bakmıyor. İki sonucu birden:
+
+    albedo   = 0.55 x (0.61, 0.54, 0.43) = (0.34, 0.30, 0.24)   koyu gri
+    puruzluluk = 0.35 x 0.67 = 0.23                              cila
+
+0.23 pürüzlülük ıslak kum değil, verniklenmiş yüzeydir; geniş ve yumuşak parlama
+oradan geliyor.
+
+Islaklık artık gerçek bir bant: kabarma çizgisinden `_SeaWetBandM` (1.6 m) aşağıya
+kadar. Altı zaten su altında ve denizin kendisi çiziyor. Islak kumun parlaklığı da
+0.35 yerine 0.65 çarpanıyla — ıslak kum gerçekte 0.40-0.45 pürüzlülükte durur.
+
+Aynı hata yeni eklenen kıyı dantelinde de vardı (o da tek yanlı bandı okuyordu);
+ikisi artık aynı bandı paylaşıyor.

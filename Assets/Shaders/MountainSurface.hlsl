@@ -481,8 +481,23 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // The level is published by `SeaWetnessDriver`, and while the sea is off it pulls it
     // to a very low elevation, so `seaWet` is 0 everywhere. The sea system writes
     // NOTHING into this material — only two globals are read.
-    float seaWet = 1.0 - smoothstep(_SeaWetLevelY - _SeaWetFadeM,
-                                    _SeaWetLevelY, worldPos.y);
+    // A BAND, NOT A HALF-SPACE.
+    //
+    // This was `1 - smoothstep(level - fade, level, y)`, which returns 1 for EVERY
+    // point below the waterline elevation — a metre from the water or a kilometre
+    // inland, all of it counted as soaking wet. Measured on the sand texture
+    // (mean albedo 0.61/0.54/0.43, mean roughness 0.67): the albedo went to 0.55 of
+    // a warm beige, i.e. dark grey, and the roughness to 0.35 of 0.67 = 0.23, which
+    // is lacquer, not wet sand. The whole beach came out grey and plastic.
+    //
+    // A swash zone is a band: from the run-up line down to about where the water
+    // stands. Below that the ground is under water and the sea draws over it anyway.
+    float seaWetBottom = _SeaWetLevelY - max(_SeaWetBandM, 1e-3);
+
+    float seaWet = (1.0 - smoothstep(_SeaWetLevelY - _SeaWetFadeM,
+                                     _SeaWetLevelY, worldPos.y))
+                 * smoothstep(seaWetBottom - _SeaWetFadeM,
+                              seaWetBottom, worldPos.y);
     albedo = lerp(albedo, albedo * _SeaWetDarkening, seaWet);
 
     // --- The swash lace, on the sand ---
@@ -497,8 +512,9 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // the run-up level (`_SeaWetLevelY` already carries the phase) and the sand
     // draws the residue below it. The noise eats the coverage from underneath,
     // so the lace breaks into patches instead of ending on an edge of its own.
-    float laceBand = 1.0 - smoothstep(_SeaWetLevelY - _SeaWetFadeM * 0.7,
-                                      _SeaWetLevelY, worldPos.y);
+    // The lace rides on the same band, for the same reason: one-sided, it would
+    // have painted foam on every low-lying piece of ground in the world.
+    float laceBand = seaWet;
 
     float laceNoise = MountainFbm(worldPos * 0.75, 3)
                     + MountainFbm(worldPos * 3.1, 2) * 0.5;
@@ -553,7 +569,10 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // WET SAND IS GLOSSIER. Spec §14 cuts the roughness to 0.35 of its value; this code
     // holds smoothness, so it is converted to roughness and back — multiplying smoothness
     // by 0.65 directly would work in the OPPOSITE direction.
-    float seaRough = (1.0 - surface.smoothness) * lerp(1.0, 0.35, seaWet);
+    // WET SAND IS GLOSSIER, NOT LACQUERED. At 0.35 the sand's own 0.67 roughness
+    // fell to 0.23 and the surface read as plastic. Real wet sand sits around
+    // 0.40-0.45 perceptual roughness.
+    float seaRough = (1.0 - surface.smoothness) * lerp(1.0, 0.65, seaWet);
     surface.smoothness = 1.0 - seaRough;
 
     // The exposure map scales the ambient down: a valley floor sees only a small part of the

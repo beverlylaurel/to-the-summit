@@ -27,6 +27,20 @@ public class SeaWetnessDriver : MonoBehaviour
     [Tooltip("Fade thickness of the wet band (m).")]
     [Range(0.05f, 2f)] public float fadeMeters = 0.35f;
 
+    /// HOW TALL THE WET BAND IS (m).
+    ///
+    /// THE BAND USED TO HAVE NO BOTTOM. The terrain read
+    /// `1 - smoothstep(level - fade, level, y)`, which is 1 for EVERY point below
+    /// the waterline elevation — a metre from the water or a kilometre inland, it
+    /// all counted as soaking wet. Measured on the sand: the albedo went to 0.55 of
+    /// a warm beige (grey on screen) and the roughness to 0.35 of 0.67 (0.23, i.e.
+    /// lacquer). The whole beach came out grey and plastic.
+    ///
+    /// A swash zone is a band: from the run-up line down to about where the water
+    /// stands. Below that the ground is under water and the sea draws it anyway.
+    [Tooltip("Height of the wet band below the run-up line (m).")]
+    [Range(0.2f, 6f)] public float bandMeters = 1.6f;
+
     /// How much darker wet sand is than dry sand. [CALIBRATION]
     [Tooltip("Albedo multiplier of the wet surface. 1 = no darkening.")]
     [Range(0.2f, 1f)] public float darkening = 0.55f;
@@ -59,6 +73,7 @@ public class SeaWetnessDriver : MonoBehaviour
         // everywhere.
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetLevelY, -100000f);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetFadeM, 1f);
+        Shader.SetGlobalFloat(SeaShaderIDs.SeaWetBandM, 1f);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetDarkening, 1f);
     }
 
@@ -78,6 +93,7 @@ public class SeaWetnessDriver : MonoBehaviour
 
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetLevelY, settings.seaLevelY + runup);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetFadeM, fadeMeters);
+        Shader.SetGlobalFloat(SeaShaderIDs.SeaWetBandM, bandMeters);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetDarkening, darkening);
     }
 }
