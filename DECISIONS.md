@@ -230,10 +230,12 @@ editörde değil.
 
 ---
 
-### ESM YAZILMIYOR — gölge mesafesi 60 m
+### ESM YAZILMIYOR — gölge mesafesi 150 m
 
 Planın 3. adımıydı. Yazılmadı çünkü kazancı gölge mesafesiyle sınırlı: `PC_RPAsset`'te
-`m_ShadowDistance: 60`, yani arazinin kendi huzmesi zaten yalnız ilk altmış metrede var.
+`m_ShadowDistance: 150`, yani arazinin kendi huzmesi zaten yalnız ilk yüz elli metrede
+var. (Kayıt 60 m diyordu; 2026-08-29'da ölçüldü, asset 150. Karar değişmiyor — ESM'nin
+çözdüğü kenar sızıntısı bu mesafede de görünür kazanç üretmiyor.)
 ESM'nin çözdüğü sorun (gölge haritası kenarlarındaki sızıntı ve aliasing) o mesafede
 görünür bir kazanç üretmiyor; bulut gölgesi de haritadan değil ana ışık cookie'sinden
 geliyor, yani ESM'nin dokunmadığı bir yol.
@@ -245,6 +247,10 @@ olur.
 ---
 ## Bekleyen ölçümler
 
+- **Kar taneciği sisinin kare maliyeti ölçülmedi.** `SnowfallParticle` artık
+  `ApplyHeightFog` çağırıyor: parça başına 8 adımlı çözülmüş integral + bir 3B doku
+  örneği. Tanecikler binlerce ve üst üste biniyor.
+  → [Kar taneciği sis maliyeti ölçülmedi](#kar-taneciği-sis-maliyeti-ölçülmedi)
 - **Derleme süresi darboğazı bulunamadı.** Kullanıcı "compile süresi çok uzadı"
   dedi; ölçülenler: script derlemesi 0.8–1.9 ms, domain reload 3514 ms
   (`FinalizeReload` 2132 ms), shader import MountainSurface 143 / Sky 154 /
@@ -1984,3 +1990,40 @@ değiştirir.
 girdiğinde terim SİLİNİR — telafi teriminin gerekçesi ortadan kalkar.
 
 **Maliyet:** bir `dot` ve bir `lerp`.
+
+
+## Gökyüzü yedeğinin yıldızları ve ayı KESİLDİ (2026-08-29)
+
+**Karar.** `Sky.shader`'ın LUT hazır olmayan yedek dalı sadeleşti: yıldız alanı, ay diski,
+`Hash3`, `Hash`, `_StarStrength`, `_MoonDirection`, `_MoonColor` silindi. `TimeOfDay`'in
+`MoonTint` property'si ve `AtmosphereController`'ın `MoonColorId` yazımı da onlarla gitti —
+tek okuyucuları buydu.
+
+**Gerekçe.** Yedek dal yalnız ilk birkaç karede, LUT üretilmeden görünüyor. O karelerde ay
+diskinin doğru yerde durup durmadığı görülmüyor bile; ama kod okunuyor, taşınıyor,
+"neden burada iki ay var" sorusu her seferinde tekrar soruluyordu. `CLAUDE.md`: çöp kod yok.
+
+**Ne kaybedildi:** LUT'un üretilmesi gecikirse (ilk açılış, shader varyantı derlenirken)
+o karelerde gece gökyüzü düz bir gradyan; yıldız yok, ay yok.
+
+**Tetikleyici — geri dönülecek belirti:** açılışta ya da ilk gece geçişinde göz kırpan
+kadar uzun süren düz siyah/gradyan bir gök görülürse yedek dal geri gelmez; ÖNCE LUT'un
+neden geciktiği ölçülür. Yedeği güzelleştirmek asıl gecikmeyi gizler.
+
+## Kar taneciği sis maliyeti ölçülmedi (2026-08-29)
+
+**Karar.** `SnowfallParticle.shader` ölü `MixFog` yerine `ApplyHeightFog` kullanıyor.
+Maliyet ölçülmeden kabul edildi.
+
+**Gerekçe.** Doğruluk önce geliyor: tanecikler sise girmezse fırtınada 140 m görüşün
+ötesindeki kar hâlâ net görünüyor ve "her yüzey aynı havada durur" kuralı kırılıyor.
+Ölçüm editörde yapılamaz — kar yoğunluğu hava durumuna bağlı ve editör kare süresi
+build'i temsil etmiyor.
+
+**Maliyet — kâğıtta:** parça başına 8 adımlı çözülmüş yükseklik integrali + bir 3B doku
+örneği. Tanecikler saydam ve üst üste biniyor, yani aşırı çizim (overdraw) çarpanı ne ise
+maliyet o kadar katlanıyor.
+
+**Tetikleyici:** bir BUILD'de yoğun kar altında kare süresi hedefin altına düşerse ilk
+şüpheli bu. O zaman ölçülür; ucuzlatma yolu bellidir — taneciklerde tam integral yerine
+tek örnekli analitik kuyruk. Editörde ölçüm yapılmaz.

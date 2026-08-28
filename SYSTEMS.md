@@ -533,6 +533,11 @@ açık olan yer kum koyu olur.
 **Kum için okumaz:** `_SeaWetLevelY`'yi. O kabarmayla nefes alıyor; bant ona bağlansaydı
 kumsalın sınırı her dalgada metrelerce kayardı. Islaklık kumun **üstüne** biniyor —
 sıra: kum → yağış ıslaklığı → deniz ıslaklığı.
+**Alpenglow için okur:** `AtmosphereController.Coverage` — bulut kapsaması. Doğrudan faz
+kapsamayla kısılıyor (tam kapalıda 0.25 katı), sıfırlanmıyor: alpenglow'un iki fazı var,
+doğrudan huzme ve göğün kızılından gelen artçı faz; bulut ilkini öldürür, ikincisini
+yalnız söndürür. Eskiden hiç hava terimi yoktu ve fırtınalı şafakta dağ yüzü kızıl
+yanarken sis paleti aynı durumda bilerek soluyordu — tek göğün iki türevi çelişiyordu.
 **Okumaz:** anlık rüzgâr yönünü — yüzey deseni hâkim yönden kurulur.
 **Artık okumuyor:** kar kuşağı kotlarını. `AltitudeWeatherDriver` ve `TemperatureField`
 bağları 2026-08-22'de söküldü — kar silinince öksüz kalmışlardı.
@@ -655,7 +660,7 @@ Araziye ulaşan güneşi **üç yol** kesiyor ve üçü de aynı kanaldan gidiyo
 | yol | kaynak | menzil |
 |---|---|---|
 | ufuk haritası | `SurfaceMapBaker.BakeHorizon`, 1024², 16 yön | tüm arazi |
-| gölge haritası | URP cascade | 60 m |
+| gölge haritası | URP cascade | 150 m |
 | bulut cookie'si | `VolumetricClouds`, 1024², opaklık 1 | 12 km |
 
 **Bilinçli kural: her harita yalnız kendi sorusunu cevaplar.**
@@ -1222,6 +1227,9 @@ Yağış türü ayrı bir değişkenle değil sıcaklıktan türüyor — ikinci
 - `_SeaWetLevelY`, `_SeaWetFadeM`, `_SeaWetDarkening` — kıyı ıslaklık bandı.
   `MountainSurface.hlsl` bunları okuyor. **Deniz arazi materyaline yazmıyor**,
   bir seviye yayınlıyor.
+- `_SeaWetBandM` — ıslak bandın yüksekliği (m). Bant tek yanlı değil: kabarma
+  çizgisinden bu kadar aşağıya kadar. Tabansız hâlde kıyı kotunun altındaki her yer
+  ıslak sayılıyordu (`RATIONALE.md`).
 - `_SeaLevelY` — durgun su kotu (`SeaManager`). Kum bandı bundan sarkıyor,
   `_SeaWetLevelY`'den değil: o kabarma payını taşıyor ve her dalgada oynuyor,
   kumsal o hızda yer değiştirmez.
@@ -1339,3 +1347,29 @@ gerçekten yaşandı.
 
 İki sistem arasında yeni bir bağ kurulduğunda, bir bağ koptuğunda veya bilinçli bir kural
 eklendiğinde bu dosya aynı adımda güncellenir. Sayı değişiklikleri buraya yazılmaz.
+
+
+## Aynı hava, aynı bulut gölgesi — dört yüzey (2026-08-29)
+
+`ApplyHeightFog` ve bulut gölgesi cookie'si artık ana ışığı okuyan HER yüzeye ulaşıyor.
+Önceden yalnız arazi ikisini birden alıyordu.
+
+| Yüzey | Yerel sis | Bulut gölgesi | Nasıl |
+|---|---|---|---|
+| Arazi (`MountainSurface`) | `ApplyHeightFog` | elle çarpım | kendi ışıklandırmasını yazıyor |
+| Deniz (`SeaLit`) | `ApplyHeightFog` | elle çarpım | kendi optiğini yazıyor |
+| Karlı nesne (`SnowCoverObject`) | `ApplyHeightFog` | elle çarpım | `SnowDirectLight` kullanıyor |
+| Kar taneciği (`SnowfallParticle`) | `ApplyHeightFog` | pragma | — |
+| Bisiklet (`BikeSurface`) | `ApplyHeightFog` | **pragma yeter** | `UniversalFragmentPBR` kullanıyor |
+
+**Ayrım kuralı:** `UniversalFragmentPBR` kullanan shader'da `_LIGHT_COOKIES` pragması
+tek başına yeter — URP cookie'yi kendi örnekler. Işıklandırmayı ELLE yazan shader'da
+(`SnowDirectLight`, denizin optiği, arazinin `lit`'i) `mainLight.color *=
+SampleMainLightCookie(positionWS)` da gerekir.
+
+**Denizde tek çarpım zinciri sürüyor:** parıltı, su rengi (`waterLight`) ve köpük ışığı
+üçü de `mainLight.color` okuyor, o yüzden cookie ve gölge zayıflatması bir kez, ışığın
+kendisine uygulanıyor.
+
+`MixFog` artık `Assets` altında hiç geçmiyor — Unity'nin kendi sisi sahnede kapalı
+(`m_Fog: 0`) ve o çağrı kimlik fonksiyonuydu.

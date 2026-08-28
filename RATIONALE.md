@@ -2409,3 +2409,96 @@ kadar. Altı zaten su altında ve denizin kendisi çiziyor. Islak kumun parlakl�
 
 Aynı hata yeni eklenen kıyı dantelinde de vardı (o da tek yanlı bandı okuyordu);
 ikisi artık aynı bandı paylaşıyor.
+
+
+## Dört yüzey sisi hiç almıyordu ve derleme hatası vermiyordu
+
+`MixFog` Unity'nin kendi sisini uyguluyor. Sahnede `m_Fog: 0` ve çalışma zamanında
+`RenderSettings.fog` yazan tek satır yok — yani o çağrı **kimlik fonksiyonu**, etkisi tam
+sıfır. Hata vermiyor, uyarı vermiyor; bu yüzden dört yüzeyde birden fark edilmeden kaldı:
+
+    SeaLit.shader           MixFog(color, IN.fogCoord)
+    SnowCoverObject.shader  MixFog(color, IN.fogFactor)
+    SnowfallParticle.shader MixFog(color, IN.fogFactor)
+    BikeSurface.shader      (pragma kalıntısı; kendisi zaten ApplyHeightFog kullanıyordu)
+
+Belirti: fırtınada (140 m görüş) dağ 300 metrede kaybolurken deniz ufka kadar keskin,
+bisiklet sise gömülüyken yanındaki karlı kaya net. `HeightFog.hlsl`'in kendi başlığı bunu
+zaten yasaklıyor: *"her yüzey aynı havada durur"*.
+
+Aynı hata bisiklette bir kez yaşanmış ve düzeltilmişti (`BikeSurface.shader` yorumu);
+referans uygulama elimizdeydi.
+
+**Kabul kriteri sayıya bağlandı:** `grep -rn "MixFog" Assets` boş dönmeli. Ölü bir çağrı
+derleyiciden geçtiği için tek koruma budur.
+
+**Deniz için ek kontrol:** `ApplyHeightFog` → `SampleTerrainHeight` UV'yi `saturate` ile
+kırpıyor (`VolumetricFogShared.hlsl`), yani deniz mesh'i arazi sınırının dışına taştığında
+kenar değeri okunuyor — artefakt yok, ayrı bir clamp gerekmedi.
+
+## Bulut gölgesi cookie'si üç yüzeye hiç ulaşmıyordu
+
+Bulut gölgesi ana ışığın cookie dokusuna yazılıyor; yüzeyin onu uygulaması gerekiyor.
+Uygulayan yalnız arazi (elle) ve kar tanecikleriydi. Deniz, karlı nesneler ve bisiklet
+tam güneşle parlıyordu — "gökyüzü kapalı ama nesneler güneşli", `CLAUDE.md`'nin atmosfer
+tutarlılık kuralının tam ihlali.
+
+**İki ayrı reçete var ve karıştırılırsa ya hiç uygulanır ya iki kez:**
+
+- `UniversalFragmentPBR` kullanan shader (bisiklet): `#pragma multi_compile_fragment _
+  _LIGHT_COOKIES` **yeter**, URP kendi örnekler.
+- Işıklandırmayı elle yazan shader (arazi, deniz, karlı nesne): pragma **artı**
+  `mainLight.color *= SampleMainLightCookie(positionWS)`.
+
+Denizde ayrıca `GetMainLight()` argümansız çağrılıyordu — bu overload
+`shadowAttenuation = 1` döndürüyor ve konum almadığı için cookie de örnekleyemiyor. Dağın
+gölgesindeki su hâlâ güneş yolu çiziyordu. `GetMainLight(shadowCoord)` ile ikisi birden
+geldi; parıltı, su rengi ve köpük üçü de `mainLight.color` okuduğu için tek çarpım
+zincirin tamamına yayılıyor.
+
+## Alpenglow fırtınayı görmüyordu
+
+`ApplyAlpenglow` gücü `horizon² × alive × ayar` ile yazıyordu — yağış, kapsama, rüzgâr,
+hiçbiri yok. Fırtınalı şafakta kalın bulut kütlesinin arkasındaki dağ yüzü yine kızıl
+yanıyordu; oysa sis paleti aynı durumda `duskOvercast` ile bilerek soluyor. Tek göğün iki
+türevi birbirini yalanlıyordu.
+
+Kapsama çarpanı eklendi (`lerp(1, 0.25, coverage)`). **Sıfırlanmadı:** alpenglow'un iki
+fazı var — doğrudan huzmenin yüzü sıyırması ve yüzün kızıla boyanmış gökten aldığı artçı
+faz. Bulut ilkini öldürür, ikincisini yalnız söndürür.
+
+Kapsama, göğün, sisin ve bulutların okuduğu AYNI yerden geliyor
+(`AtmosphereController.Coverage`) — ikinci bir eşleme kurulmadı.
+
+## Hüzme invariantı yorumda tutmuyordu
+
+`TimeOfDay` yorumu "`CurrentSunColor × intensity` gerçek hüzmeye eşit kalır" diyordu.
+Matematik:
+
+    CurrentSunColor = Tint(beam · sunColor) · sunFade
+    intensity       = sunIntensity · SunBlend · max(beam) · sunFade
+    çarpım          = beam · sunColor · sunIntensity · SunBlend · sunFade²
+
+`LowSunFade` **iki kez** giriyor. Kare BİLİNÇLİ — hemen üstündeki yorum zaten "kısıcı
+renge de uygulanıyor, yoksa `Tint()` normalize ettiği için bulutlar bir anda pembeleşiyor"
+diyor. Yanlış olan sayı değil, invariant cümlesiydi. Sayıya dokunulmadı; yorum düzeltildi.
+
+## Ay gölge atıyor, tooltip "atmaz" diyordu
+
+`MarkAsSun`'ın gece devri ayı ana ışık yapıyor ve `MountainSceneBootstrap` ona
+`LightShadows.Soft` kuruyor. Tooltip kod değişirken geride kalmış.
+
+## `TimeOfDay` ay varsayılanı sahneden 10.25 kat sapmıştı
+
+Alan varsayılanı `moonIntensity = 0.204f`, kurulum betiği `0.0199f` yazıyor. Sahne
+pratikte kazandığı için hiçbir şey yanlış görünmüyordu; ama bootstrap çalışmadan açılan
+ya da yeni bir sahneye eklenen `TimeOfDay` geceyi on kat parlak yakıyordu. Aynı kural
+`sunIntensity` için zaten yazılıydı, aya uygulanmamıştı. Varsayılanlar eşitlendi —
+davranış değişmiyor.
+
+## Gölge mesafesi: belge 60, yorum 50, gerçek 150
+
+`PC_RPAsset.asset` ve `AtmosphereSettings.asset` ikisi de 150; `ApplyShadowDistance`
+pratikte hep 150'e oturuyor (berrak görüş 25 km × 0.8 > 150). Belge ve yorum artık
+gerçeği söylüyor. Gölge mesafesi dağın boyuna bağlı değil — görüşe bağlı, o yüzden
+`SCALE.md` kaydı gerekmiyor.
