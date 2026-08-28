@@ -41,13 +41,17 @@ Shader "ToTheSummit/SnowfallParticle"
             #pragma target 4.5
             #pragma vertex Vertex
             #pragma fragment Fragment
-            #pragma multi_compile_fog
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
             #pragma multi_compile _ _SHADOWS_SOFT
             #pragma multi_compile _ _LIGHT_COOKIES
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            // THE SAME AIR AS EVERYTHING ELSE. Unity's own fog was called here and with
+            // `m_Fog: 0` in the scene that call was DEAD: a falling flake stayed sharp
+            // inside a storm that had swallowed the mountain behind it.
+            #include "../../Shaders/HeightFog.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
             struct SnowFlake
@@ -85,7 +89,7 @@ Shader "ToTheSummit/SnowfallParticle"
                 float2 uv         : TEXCOORD0;
                 float4 color      : TEXCOORD1;
                 float4 screenPos  : TEXCOORD2;
-                float  fogFactor  : TEXCOORD3;
+                float3 positionWS : TEXCOORD3;
                 float  viewDepth  : TEXCOORD4;
             };
 
@@ -167,7 +171,7 @@ Shader "ToTheSummit/SnowfallParticle"
                 half3 emissive = mainLight.color * _FlakeEmissive * 0.04h;
 
                 OUT.color = float4(_FlakeTint.rgb * lit + emissive, alpha);
-                OUT.fogFactor = ComputeFogFactor(OUT.positionCS.z);
+                OUT.positionWS = positionWS;
 
                 return OUT;
             }
@@ -184,7 +188,12 @@ Shader "ToTheSummit/SnowfallParticle"
                 clip(alpha - 0.002);
 
                 half3 color = IN.color.rgb * tex.rgb;
-                color = MixFog(color, IN.fogFactor);
+                // THE COST IS NOT MEASURED. `ApplyHeightFog` is an eight step UNROLLED
+                // integral plus one 3D sample, paid per pixel on up to 250 000 quads
+                // with overdraw. It was taken because a flake that ignores the air is
+                // a visible contradiction and the frame had headroom (5.2 ms at the
+                // time of writing). The trigger for revisiting is in `DECISIONS.md`.
+                color = ApplyHeightFog(color, _WorldSpaceCameraPos, IN.positionWS);
 
                 return half4(color, alpha);
             }

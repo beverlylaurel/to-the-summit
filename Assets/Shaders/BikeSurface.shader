@@ -68,11 +68,20 @@ Shader "ToTheSummit/BikeSurface"
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
             #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
-            #pragma multi_compile_fog
+
+            // THE CLOUD SHADOW ARRIVES THROUGH THIS KEYWORD. Because this shader goes
+            // through `UniversalFragmentPBR`, URP samples the cookie for us — the
+            // keyword is all that is needed, no hand multiply (unlike the terrain and
+            // the sea, which write their own lighting).
+            //
+            // Unity's own fog pragma was here and was DEAD: with `m_Fog: 0` in the
+            // scene `MixFog` was an identity, and the bike already takes the project's
+            // own air through `ApplyHeightFog` below.
+            #pragma multi_compile_fragment _ _LIGHT_COOKIES
 
             // SCREEN SPACE AMBIENT OCCLUSION. Without the declaration the recesses do not
             // darken: under the mudguard, inside the basket and between the frame tubes
-            // ve bisiklet fazla parlak duruyor.
+            // the bike looked too bright.
             #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"

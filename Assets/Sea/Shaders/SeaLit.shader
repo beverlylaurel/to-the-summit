@@ -39,7 +39,13 @@ Shader "ToTheSummit/SeaLit"
 
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
-            #pragma multi_compile_fog
+
+            // THE CLOUD SHADOW ARRIVES THROUGH THIS KEYWORD. The cloud system writes
+            // its shadow into the main light's cookie and URP applies it wherever the
+            // keyword is on. Without it the sky closed over and the sea kept drawing a
+            // full sun path — the atmosphere rule this project sets for itself
+            // ("the weather and the light cannot contradict") forbids exactly that.
+            #pragma multi_compile_fragment _ _LIGHT_COOKIES
 
             // THE QUALITY KEYWORD MUST BE A `multi_compile`.
             //
@@ -53,6 +59,14 @@ Shader "ToTheSummit/SeaLit"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl"
+
+            // THE SAME AIR AS EVERY OTHER SURFACE. Unity's own fog was called here
+            // (`ComputeFogFactor` / `MixFog`) and with `m_Fog: 0` in the scene that
+            // call was DEAD: in a storm the mountain vanished at 300 m while the sea
+            // stayed sharp to the horizon. Unity's fog is height independent anyway,
+            // which is why the project never uses it. The bike hit the same wall once
+            // (`BikeSurface.shader`) and this is the same fix.
+            #include "../../Shaders/HeightFog.hlsl"
 
             #include "SeaCommon.hlsl"
 
@@ -85,7 +99,6 @@ Shader "ToTheSummit/SeaLit"
                 float4 positionCS : SV_POSITION;
                 float3 positionWS : TEXCOORD0;
                 float4 screenPos  : TEXCOORD1;
-                float  fogCoord   : TEXCOORD2;
             };
 
             Varyings SeaVertex(Attributes IN)
@@ -106,7 +119,6 @@ Shader "ToTheSummit/SeaLit"
                 OUT.positionWS = surf.posWS;
                 OUT.positionCS = TransformWorldToHClip(surf.posWS);
                 OUT.screenPos  = ComputeScreenPos(OUT.positionCS);
-                OUT.fogCoord   = ComputeFogFactor(OUT.positionCS.z);
 
                 return OUT;
             }
@@ -203,7 +215,21 @@ Shader "ToTheSummit/SeaLit"
                 }
             #endif
 
-                Light mainLight = GetMainLight();
+                // THE MAIN LIGHT CARRIES ITS ATTENUATION. `GetMainLight()` with no
+                // argument returns `shadowAttenuation = 1` and cannot sample a cookie:
+                // water standing in a mountain's shadow, or under a cloud, still drew a
+                // full sun path.
+                //
+                // ONE MULTIPLY, THE WHOLE CHAIN FOLLOWS. The glitter, the water's own
+                // colour (`waterLight`) and the foam all read `mainLight.color`, so the
+                // cookie has to be applied here and only here.
+                float4 seaShadowCoord = TransformWorldToShadowCoord(IN.positionWS);
+                Light mainLight = GetMainLight(seaShadowCoord);
+
+            #ifdef _LIGHT_COOKIES
+                mainLight.color *= SampleMainLightCookie(IN.positionWS);
+            #endif
+
                 float3 L = mainLight.direction;
 
                 // --- SURFACE ROUGHNESS ---
@@ -485,9 +511,10 @@ Shader "ToTheSummit/SeaLit"
                 float foamAlpha = foam * foam * (3.0 - 2.0 * foam) * 0.80;
                 color = lerp(color, _SeaFoamColor.rgb * foamLight, foamAlpha);
 
-                // FOG THROUGH URP'S OWN FUNCTION (spec 3.5). No fog
-                // computation of our own IS WRITTEN.
-                color = MixFog(color, IN.fogCoord);
+                // THE SEA STANDS IN THE SAME AIR AS THE TERRAIN. Every layer is fogged
+                // once with ITS OWN distance — the terrain in its own shader, the cloud
+                // in the compositing pass, the sky in `SkyFog`, and the sea here.
+                color = ApplyHeightFog(color, _WorldSpaceCameraPos, IN.positionWS);
 
                 return half4(color, 1.0);
             }

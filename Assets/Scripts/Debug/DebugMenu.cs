@@ -74,6 +74,15 @@ public class DebugMenu : MonoBehaviour
     float lockedWindStrength = 0.5f;
     float lockedWindAngle;
 
+    /// SEA ISOLATION SWITCHES — EVERY SUSPECT AT ONCE.
+    ///
+    /// The globals already existed in `SeaShaderIDs` and the shader already read
+    /// them, but NOBODY DROVE THEM: dead code with no way to reach it. "The sea is
+    /// too white" has four candidate sources and from outside they look identical;
+    /// adding one switch per round costs one Play session each, all four at once
+    /// costs one.
+    bool seaNoWaves, seaNoShallow, seaNoFoam, seaNoRefraction;
+
     /// The cloud settings are driven through `cloudVolume.profile` — the Volume's runtime COPY,
     /// not the asset itself. Writing to `sharedProfile` does not work: the moment another
     /// component in the scene touches `.profile`, the Volume starts blending from the copy and the
@@ -236,6 +245,7 @@ public class DebugMenu : MonoBehaviour
 
         BeginColumn();
         DrawClouds();
+        DrawSea();
         DrawOverlays();
         EndColumn();
 
@@ -735,6 +745,36 @@ public class DebugMenu : MonoBehaviour
             GUILayout.Label($"Direction {lockedWindAngle:F0}°");
             lockedWindAngle = GUILayout.HorizontalSlider(lockedWindAngle, 0f, 360f);
         }
+
+        EndSection();
+    }
+
+    /// SEA DIAGNOSTICS. The shader carries four switches and the panel is the only
+    /// way to reach them. Each one removes ONE term, so what is left on screen names
+    /// the term that produced the symptom.
+    void DrawSea()
+    {
+        BeginSection("Sea");
+
+        GUILayout.Label($"Hs {SeaRuntimeState.SignificantWaveHeight:F2} m   " +
+                        $"Tp {SeaRuntimeState.PeakPeriod:F1} s");
+        GUILayout.Label($"shore foam {SeaRuntimeState.ShoreFoamIntensity01:F2}");
+
+        seaNoWaves      = GUILayout.Toggle(seaNoWaves,      "Switch off the waves");
+        seaNoShallow    = GUILayout.Toggle(seaNoShallow,    "Switch off shallow water");
+        seaNoFoam       = GUILayout.Toggle(seaNoFoam,       "Switch off the foam");
+        seaNoRefraction = GUILayout.Toggle(seaNoRefraction, "Switch off refraction");
+
+        // WRITTEN EVERY FRAME, NOT ON CHANGE. `SeaManager` republishes its own
+        // globals every frame; a value written once here would be overwritten the
+        // next frame and the checkbox would lie.
+        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoWaves,      seaNoWaves ? 1f : 0f);
+        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoShallow,    seaNoShallow ? 1f : 0f);
+        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoFoam,       seaNoFoam ? 1f : 0f);
+        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoRefraction, seaNoRefraction ? 1f : 0f);
+
+        if (GUILayout.Button("Revert settings (sea)"))
+            seaNoWaves = seaNoShallow = seaNoFoam = seaNoRefraction = false;
 
         EndSection();
     }

@@ -58,9 +58,21 @@ Shader "ToTheSummit/SnowCoverObject"
             #pragma multi_compile _ _SHADOWS_SOFT
             #pragma multi_compile _ _ADDITIONAL_LIGHTS
             #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
-            #pragma multi_compile_fog
+
+            // THE CLOUD SHADOW ARRIVES THROUGH THIS KEYWORD, and it has to be applied
+            // BY HAND here: this shader does not go through `UniversalFragmentPBR`, it
+            // writes the snow lighting itself (`SnowDirectLight`), so URP never gets the
+            // chance to sample the cookie for us. Without it a cloud shadow darkened the
+            // ground while the snowy rock standing on it kept its full sun.
+            #pragma multi_compile_fragment _ _LIGHT_COOKIES
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            // THE SAME AIR AS THE TERRAIN. Unity's own fog was called here and with
+            // `m_Fog: 0` in the scene that call was DEAD — the bike took the valley fog
+            // while the snowy rock beside it stayed sharp. Unity's fog is height
+            // independent anyway; the project's own medium lives in `HeightFog`.
+            #include "../../Shaders/HeightFog.hlsl"
             #include "SnowCover.hlsl"
             #include "SnowLighting.hlsl"
 
@@ -101,7 +113,6 @@ Shader "ToTheSummit/SnowCoverObject"
                 float3 normalWS    : TEXCOORD1;
                 float2 uv          : TEXCOORD2;
                 float4 shadowCoord : TEXCOORD3;
-                float  fogFactor   : TEXCOORD4;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -132,7 +143,6 @@ Shader "ToTheSummit/SnowCoverObject"
                 OUT.uv = TRANSFORM_TEX(IN.uv, _BaseMap);
                 OUT.positionCS = TransformWorldToHClip(positionWS);
                 OUT.shadowCoord = TransformWorldToShadowCoord(positionWS);
-                OUT.fogFactor = ComputeFogFactor(OUT.positionCS.z);
 
                 return OUT;
             }
@@ -168,6 +178,10 @@ Shader "ToTheSummit/SnowCoverObject"
                 float3 V = GetWorldSpaceNormalizeViewDir(IN.positionWS);
 
                 Light mainLight = GetMainLight(IN.shadowCoord);
+
+            #ifdef _LIGHT_COOKIES
+                mainLight.color *= SampleMainLightCookie(IN.positionWS);
+            #endif
 
                 half3 color = LightingPhysicallyBased(brdfData, mainLight, N, V);
                 color += SampleSH(N) * albedo;
@@ -215,7 +229,7 @@ Shader "ToTheSummit/SnowCoverObject"
                 LIGHT_LOOP_END
 #endif
 
-                color = MixFog(color, IN.fogFactor);
+                color = ApplyHeightFog(color, _WorldSpaceCameraPos, IN.positionWS);
 
                 return half4(color, 1.0);
             }
