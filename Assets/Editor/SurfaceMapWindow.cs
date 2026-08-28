@@ -1,40 +1,39 @@
 using UnityEditor;
 using UnityEngine;
 
-/// Yüzey haritalarını kanal kanal gösterir. Materyal bu haritalardan besleniyor;
-/// üreteni doğrulamadan tüketeni yazmak, hatayı iki kat zor bulunur hale getiriyor.
+/// Displays surface maps channel by channel. Material consumes these maps;
+/// writing consumer before verifying producer makes bugs twice as hard to locate.
 public class SurfaceMapWindow : EditorWindow
 {
     enum Channel { Accumulation, Concavity, Exposure }
 
     static readonly (Channel channel, string label, string expected)[] Channels =
     {
-        (Channel.Accumulation, "Birikim",
-            "Dere ve oluk ağı görünmeli: yukarıdan aşağı dallanan, birleşerek kalınlaşan " +
-            "çizgiler. Tuz-biber görünüyorsa akış hesabı bozuk. Çakıl buradan sürülüyor."),
-        (Channel.Concavity, "Konkavlık",
-            "Vadi tabanları ve oyuklar açık, sırtlar koyu olmalı. Liken nemi buradan okuyor."),
-        (Channel.Exposure, "Gökyüzü maruziyeti",
-            "Sırtlar ve düzlükler beyaza yakın, vadi dipleri ve yarıklar koyu olmalı. " +
-            "Hem liken hem yüzey gölgelenmesi buradan besleniyor."),
+        (Channel.Accumulation, "Accumulation",
+            "Stream and gully network should be visible: lines branching downward and merging thicker. " +
+            "Salt-and-pepper noise indicates broken flow calculations. Scree/gravel is driven from here."),
+        (Channel.Concavity, "Concavity",
+            "Valley floors and hollows should be light, ridges dark. Lichen moisture reads from here."),
+        (Channel.Exposure, "Sky Exposure",
+            "Ridges and plains should be near white, valley depths and gullies dark. " +
+            "Both lichen and surface ambient occlusion feed from here."),
     };
 
     Texture2D maps;
     Texture2D preview;
     Channel channel = Channel.Accumulation;
 
-    // Toolbar, açıklama kutusu ve kenar boşlukları için görüntünün üstünde kalan yer
+    // Height reserved above preview for toolbar, info box, and margins
     const float ChromeHeight = 110f;
 
     [MenuItem("To The Summit/Terrain/Surface Maps", false, 22)]
     static void Open()
     {
-        var window = GetWindow<SurfaceMapWindow>("Yüzey Haritaları");
+        var window = GetWindow<SurfaceMapWindow>("Surface Maps");
         window.minSize = new Vector2(420f, 560f);
 
-        // Harita 1024²; daha küçük bir alana sıkıştırılınca önizlemenin kendi
-        // aliasing'i beneği taklit ediyor ve neyin gerçek gürültü olduğu anlaşılmıyor.
-        // Pencere ekrana sığan en büyük boyutta açılır, görüntü 1:1'e yakın kalır.
+        // Map is 1024^2; downsampling into a small preview introduces aliasing resembling noise.
+        // Window opens at maximum fitting screen size, keeping preview close to 1:1.
         var screen = Screen.currentResolution;
         float side = Mathf.Min(screen.height - ChromeHeight - 80f, SurfaceMapBaker.MapResolution);
 
@@ -56,16 +55,16 @@ public class SurfaceMapWindow : EditorWindow
     {
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (GUILayout.Button("Haritaları hesapla")) Bake();
+            if (GUILayout.Button("Bake Maps")) Bake();
 
             using (new EditorGUI.DisabledScope(maps == null))
-                if (GUILayout.Button("Yeniden yükle")) Reload();
+                if (GUILayout.Button("Reload")) Reload();
         }
 
         if (maps == null)
         {
             EditorGUILayout.HelpBox(
-                "Yüzey haritası yok. Sahnede terrain varken 'Haritaları hesapla'ya bas.",
+                "No surface maps found. Press 'Bake Maps' with a terrain in the scene.",
                 MessageType.Info);
             return;
         }
@@ -88,13 +87,13 @@ public class SurfaceMapWindow : EditorWindow
         var rect = GUILayoutUtility.GetRect(available, available, GUILayout.ExpandWidth(false));
         rect.x = (position.width - available) * 0.5f;
 
-        // Nokta filtreleme: gerçek pikselleri gösterir. Görüntü 1:1'e yakın olduğu
-        // sürece doğru olan bu; yumuşatma tam da aradığımız gürültüyü gizler.
+        // Point filtering: displays actual texels. As long as display is close to 1:1,
+        // this is correct; bilinear smoothing conceals the noise we are diagnosing.
         EditorGUI.DrawPreviewTexture(rect, preview, null, ScaleMode.ScaleToFit);
 
         EditorGUILayout.LabelField(
-            $"{maps.width}² harita, {available:F0} piksellik alanda " +
-            (available >= maps.width ? "(1:1 veya büyütülmüş)" : $"(%{available / maps.width * 100f:F0} küçültülmüş)"),
+            $"{maps.width}² map in {available:F0} px area " +
+            (available >= maps.width ? "(1:1 or enlarged)" : $"({available / maps.width * 100f:F0}% reduced)"),
             EditorStyles.miniLabel);
     }
 
@@ -103,19 +102,19 @@ public class SurfaceMapWindow : EditorWindow
         var terrain = Object.FindAnyObjectByType<Terrain>();
         if (terrain == null)
         {
-            Debug.LogWarning("Sahnede terrain yok.");
+            Debug.LogWarning("No terrain in scene.");
             return;
         }
 
-        // Birikim ağırlığı hâkim rüzgâr yönüne göre pişiyor; yön ayar asset'inde.
+        // Accumulation weight bakes based on prevailing wind direction from settings asset.
         var wind = AssetDatabase.LoadAssetAtPath<WindSettings>("Assets/Settings/WindSettings.asset");
         if (wind == null)
         {
-            Debug.LogWarning("WindSettings yok; önce sahne kurulumu çalışmalı.");
+            Debug.LogWarning("WindSettings missing; scene setup must run first.");
             return;
         }
 
-        EditorUtility.DisplayProgressBar("Yüzey haritaları", "Akış birikimi hesaplanıyor...", 0.5f);
+        EditorUtility.DisplayProgressBar("Surface Maps", "Calculating flow accumulation...", 0.5f);
         try { maps = SurfaceMapBaker.Bake(terrain, wind.prevailingDegrees); }
         finally { EditorUtility.ClearProgressBar(); }
 
@@ -128,8 +127,8 @@ public class SurfaceMapWindow : EditorWindow
         preview = null;
     }
 
-    /// Seçili kanalı gri tonlamaya açar. Tek kanalı renkli dokudan gözle ayırmak zor;
-    /// aradığımız şey desenin kendisi, rengi değil.
+    /// Expands selected channel into grayscale. Isolating a single channel visually from color texture is difficult;
+    /// we are inspecting the pattern distribution itself, not color.
     void EnsurePreview()
     {
         if (preview != null) return;

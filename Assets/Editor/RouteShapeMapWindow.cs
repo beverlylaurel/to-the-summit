@@ -1,14 +1,14 @@
 using UnityEditor;
 using UnityEngine;
 
-/// TESVİYE HARİTASI. Şekillendirmenin araziye dokunduğu her hücre kırmızı; üstüne
-/// çizilen rota hatları yeşil. İkisi çakışıyorsa tesviye doğru yerde demektir.
+/// CONTOUR MAP. Every cell where grading touches the terrain is red; overlay route lines
+/// are green. If both coincide, grading is at the correct location.
 ///
-/// Neden gerekti: "tesviye yanlış yerde yapılmış" iddiası sayılarla çözülemedi. Rotaya
-/// dik kesitler ovanın kendi tepecikleri yüzünden gürültülü çıkıyor ve bir noktada
-/// yarma, ötekinde dolgu ölçülüyor. Harita soruyu tek bakışta kapatıyor.
+/// Why needed: claims of "grading done at wrong location" could not be resolved by numbers alone.
+/// Cross-sections perpendicular to route are noisy due to foreland mounds, showing cut at one point
+/// and fill at another. The map resolves the question at a glance.
 ///
-/// Ova ve yol dokusu oturunca silinir.
+/// To be deleted once foreland and road texturing are settled.
 public class RouteShapeMapWindow : EditorWindow
 {
     const string MaskPath = "Assets/Terrain/RouteShapeMask.png";
@@ -24,7 +24,7 @@ public class RouteShapeMapWindow : EditorWindow
     Texture2D mask;
 
     [MenuItem("To The Summit/Terrain/Contour Map", false, 27)]
-    static void Open() => GetWindow<RouteShapeMapWindow>("Tesviye Haritası").Show();
+    static void Open() => GetWindow<RouteShapeMapWindow>("Contour Map").Show();
 
     void OnGUI()
     {
@@ -34,19 +34,19 @@ public class RouteShapeMapWindow : EditorWindow
             "Assets/Settings/MountainRoute.asset");
 
         EditorGUILayout.HelpBox(
-            "Kırmızı: tesviyenin araziye dokunduğu yerler.\n" +
-            "Renkli çizgiler: çizilmiş rota.\n\n" +
-            "İkisi çakışıyorsa şekillendirme doğru yerde.",
+            "Red: locations where grading touches the terrain.\n" +
+            "Colored lines: drawn route.\n\n" +
+            "If both coincide, grading is in the correct location.",
             MessageType.None);
 
         if (mask == null)
         {
-            EditorGUILayout.HelpBox("Maske yok. Arazi yeniden üretilince oluşuyor.",
+            EditorGUILayout.HelpBox("Mask missing. Generated when terrain is rebuilt.",
                 MessageType.Warning);
             return;
         }
 
-        // Kare alan: harita kare, oranı bozmak çakışmayı yalancı gösterir.
+        // Square area: map is square, distorting aspect ratio gives false overlap.
         float side = Mathf.Min(position.width - 20f, position.height - 110f);
         var area = new Rect(10f, 100f, side, side);
 
@@ -54,8 +54,8 @@ public class RouteShapeMapWindow : EditorWindow
 
         if (route == null) return;
 
-        // Rota normalize saklandığı için doğrudan haritanın oranına düşüyor.
-        // Y TERS: doku alt satırdan yukarı, ekran üstten aşağı.
+        // Route is stored normalized, matching map aspect ratio directly.
+        // Y INVERTED: texture bottom-row up, screen top-down.
         DrawLine(area, route.road, Color.white);
 
         for (int i = 0; i < route.branches.Count; i++)

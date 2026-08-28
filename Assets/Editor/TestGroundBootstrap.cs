@@ -4,27 +4,25 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-/// TEST SAHNESİ. Mekanikleri dağın üstünde denemek pahalı: her Play'de arazi,
-/// hava, bulut ve kar sistemi ayağa kalkıyor, hata ayıklamak için yürünmesi gereken
-/// mesafe uzun ve sahne dosyası her denemede kirleniyor.
+/// TEST SCENE BOOTSTRAP. Testing mechanics on the mountain is heavy: every Play mode run
+/// initializes terrain, weather, cloud, and snow systems, requiring long travel distances
+/// to debug and dirtying the main scene file.
 ///
-/// Burası düz bir kare alan: ölçek okunabilsin diye ızgara işaretli zemin, oyuncu,
-/// yönlü ışık. Karakter, bitki, tırmanma — hepsi burada denenir, beğenilince ana
-/// oyun sahnesine taşınır.
+/// This scene is a flat square arena: scale-calibrated grid ground, player, directional sun.
+/// Character, vegetation, climbing mechanics are tuned here before deployment to main game scene.
 ///
-/// ATMOSFER YOK. Sis, bulut, kar ve rüzgâr sistemleri dağa bağlı ve buraya
-/// kurulmuyor: mekanik testinde gereksiz, kurulum süresini ve hata yüzeyini
-/// büyütüyor. Görsel doğrulama gerektiğinde ana sahnede yapılır.
+/// NO ATMOSPHERE SYSTEMS. Fog, cloud, snow, and wind are excluded to keep setup fast
+/// and isolate test scope. Visual integration is verified in the main game scene.
 public static class TestGroundBootstrap
 {
     const string ScenePath = "Assets/Scenes/TestGround.unity";
     const string MaterialPath = "Assets/Settings/TestGround.mat";
 
-    /// Alanın kenarı (metre). 200 m: koşarak yirmi saniyede geçilir, ölçek hissi
-    /// için yeterli, kaybolmak için değil.
+    /// Arena side length (meters). 200 m: traversable by sprinting in 20 seconds,
+    /// sufficient for scale perception without getting lost.
     const float Size = 200f;
 
-    /// Izgara aralığı (metre). Boy, hız ve zıplama mesafesi bunlarla ölçülüyor.
+    /// Grid spacing (meters). Height, movement speed, and jump distances calibrated against this grid.
     const float GridSpacing = 5f;
 
     const float PlayerHeight = 1.8f;
@@ -32,8 +30,6 @@ public static class TestGroundBootstrap
 
     const string MainScenePath = "Assets/Scenes/Game.unity";
 
-    /// Sahne değiştirmeden önce kaydetme sorusu: kaydedilmemiş iş varsa Unity
-    /// soruyor, iptal edilirse geçiş yapılmıyor.
     static bool AskToSave() => EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
 
     [MenuItem("To The Summit/Scene/Test Scene _F6", false, 1)]
@@ -45,8 +41,6 @@ public static class TestGroundBootstrap
         else EditorSceneManager.OpenScene(ScenePath);
     }
 
-    /// Oyun sahnesine dönüş. Menüde iki komşu satır: gidiş ve dönüş aynı yerde
-    /// durmazsa "nasıl döneceğim" sorusu her seferinde tekrar sorulur.
     [MenuItem("To The Summit/Scene/Game Scene _F5", false, 0)]
     public static void OpenMain()
     {
@@ -72,18 +66,17 @@ public static class TestGroundBootstrap
 
         Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
         EditorSceneManager.SaveScene(scene, ScenePath);
-        ToolLog.Write($"Test sahnesi kuruldu: {ScenePath} — {Size}x{Size} m, "
-                + $"{GridSpacing} m ızgara.");
+        ToolLog.Write($"Test scene built: {ScenePath} — {Size}x{Size} m, "
+                + $"{GridSpacing} m grid.");
     }
 
-    /// Zemin: tek quad, ızgara dokusu prosedürel. Terrain kurmak gereksiz — burada
-    /// yükseklik yok, çarpışma düz bir kutuyla çözülüyor.
+    /// Ground: single plane primitive with procedural grid texture.
     static void BuildGround()
     {
         var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
         ground.name = "Ground";
 
-        // Unity'nin Plane ilkeli 10 metre; ölçek doğrudan kenar uzunluğunu veriyor.
+        // Unity Plane primitive is 10 meters; scale sets side length directly.
         ground.transform.localScale = new Vector3(Size / 10f, 1f, Size / 10f);
 
         ground.GetComponent<MeshRenderer>().sharedMaterial = LoadOrCreateMaterial();
@@ -100,15 +93,14 @@ public static class TestGroundBootstrap
 
         material.SetTexture("_BaseMap", LoadOrCreateGrid());
 
-        // Doku metre başına bir kez: ızgara karesi gerçek mesafeyi gösteriyor.
+        // Texture tiles once per meter; grid lines reflect true distance.
         material.SetTextureScale("_BaseMap", Vector2.one * (Size / GridSpacing));
         material.SetFloat("_Smoothness", 0.05f);
         EditorUtility.SetDirty(material);
         return material;
     }
 
-    /// Izgara dokusu: kenarları koyu bir kare. Ölçek referansı — oyuncunun boyu,
-    /// adım uzunluğu ve zıplama mesafesi buna bakarak okunuyor.
+    /// Grid texture: square with dark borders for spatial scale reference.
     static Texture2D LoadOrCreateGrid()
     {
         const string Path = "Assets/Settings/TestGrid.png";
@@ -144,8 +136,7 @@ public static class TestGroundBootstrap
         return AssetDatabase.LoadAssetAtPath<Texture2D>(Path);
     }
 
-    /// Yönlü ışık: sabit, öğleden biraz önce. Gün döngüsü yok — mekanik testinde
-    /// ışığın değişmesi karşılaştırmayı bozuyor.
+    /// Directional sun: fixed late morning lighting. No time-of-day cycle during mechanics testing.
     static void BuildLight()
     {
         var light = new GameObject("Sun").AddComponent<Light>();
@@ -161,8 +152,7 @@ public static class TestGroundBootstrap
         RenderSettings.ambientGroundColor = new Color(0.16f, 0.15f, 0.14f);
     }
 
-    /// Oyuncu: ana sahnedekiyle AYNI bileşenler ve ölçüler. Farklı olsaydı burada
-    /// doğrulanan hareket dağda başka türlü davranırdı.
+    /// Player: identical components and dimensions to main game scene.
     static void BuildPlayer()
     {
         var player = new GameObject("Player");
@@ -186,13 +176,9 @@ public static class TestGroundBootstrap
         camera.transform.SetParent(head.transform, false);
         camera.GetComponent<Camera>().farClipPlane = 600f;
 
-        // Bakış OYUNCUDA, kamerada değil — ana sahnedeki bağlanma da böyle. Kamera
-        // pivota bağlı; MouseLook o pivotu döndürüyor.
         player.AddComponent<MouseLook>().Bind(head.transform);
 
-        // Serbest uçuş KAPALI başlar. Açıkken CharacterController'ı devre dışı
-        // bırakıyor (ikisi aynı kontrolcüyü kullanıyor); açık kurulunca yürüyüş
-        // kapalı kontrolcüye Move çağırıyor ve her kare hata basıyordu.
+        // Free fly movement starts disabled.
         var flyer = player.AddComponent<FreeFlyMovement>();
         flyer.Bind(head.transform);
         flyer.enabled = false;

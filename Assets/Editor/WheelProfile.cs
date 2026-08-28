@@ -1,24 +1,21 @@
 using UnityEngine;
 
-/// TEKERLEĞİN DIŞ KENARINI ÖLÇER. Üretilen modelde jant tam çember değil; ne kadar
-/// kaçtığı ancak ölçülerek bilinir ve düzeltme de aynı ölçüden beslenir. Ölçüm ile
-/// düzeltme aynı kaynaktan çıksın diye tek yerde duruyor.
+/// MEASURES OUTER RIM RUNOUT. Generated wheel model is not a perfect circle;
+/// runout amount is determined by measurement, and correction feeds from the same reading.
+/// Measurement and correction share this unified source.
 ///
-/// GÖBEĞE DEĞİL KENARA BAKIYOR: teller ve göbek merkeze yakın duruyor, ortalamaya
-/// karışsalardı "yarıçap" diye anlamsız bir sayı çıkardı. Her açı diliminin EN UZAK
-/// köşesi alınıyor — o da jantın dış kenarı.
+/// EXAMINES OUTER RIM, NOT HUB: spokes and hub sit near center; averaging them would yield
+/// a meaningless radius. The FURTHEST vertex in each angular bin is sampled — corresponding to outer rim.
 ///
-/// MERKEZ KUTUDAN DEĞİL ÇEMBERDEN: sınır kutusunun ortası yalnız en uçlara bakıyor,
-/// çember uydurma (Kåsa) bütün kenarı hesaba katıyor. Dönme merkezi bu.
+/// CENTER FROM CIRCLE FIT, NOT BOUNDING BOX: bounding box center only samples extremes,
+/// while Kåsa circle fitting accounts for the entire perimeter to establish rotation center.
 public class WheelProfile
 {
-    /// Açı çözünürlüğü KÖŞE SAYISINDAN türüyor. Sabit 720 dilim yoğun mesh'te doğruydu
-    /// ama seyreltilmiş tekerlekte jant çevresinde birkaç yüz köşe kalıyor: dilimlerin
-    /// çoğu boş düşüyor, uzun boşluklardan doldurulan profil gürültüye dönüyor ve
-    /// düzeltme o gürültüyü yüzeye basıyordu (sapma 4.6 mm'den 8.1 mm'ye çıktı).
+    /// Angular bin resolution derives from VERTEX COUNT. A constant 720 bins was accurate on dense meshes,
+    /// but decimated wheels retain only a few hundred vertices along the rim: most bins fell empty,
+    /// gap interpolation generated noise, and correction imprinted that noise onto surface.
     ///
-    /// Dilim başına ortalama üç köşe hedefleniyor; jant köşelerinin kabaca onda biri
-    /// çevrede duruyor.
+    /// Target is roughly three vertices per bin; roughly one tenth of rim vertices lie along perimeter.
     static int BinCount(int vertices) => Mathf.Clamp(vertices / 120, 48, 720);
 
     int bins;
@@ -32,11 +29,11 @@ public class WheelProfile
     public float Min { get; private set; }
     public float Max { get; private set; }
 
-    /// Ortalamadan sapmanın karekök ortalaması. Tek bir çıkıntı bunu az yükseltir,
-    /// yaygın ovallik çok.
+    /// Root-mean-square deviation from mean radius. A single protrusion causes low increase,
+    /// generalized ovality causes high increase.
     public float Deviation { get; private set; }
 
-    /// Üç milimetreden fazla taşan açı dilimlerinin oranı. Küçükse çıkıntı, büyükse oval.
+    /// Fraction of angular bins exceeding 3 mm deviation. Small indicates local bump, large indicates ovality.
     public float WideFraction { get; private set; }
 
     public float Width { get; private set; }
@@ -44,9 +41,9 @@ public class WheelProfile
 
     float[] radii;
 
-    /// Verilen eksende ölçer. Hesap DÜNYA UZAYINDA, yani metrede: parça dönüşümlerinde
-    /// yüz kat ölçek var ve mesh'in kendi uzayında ölçülseydi bütün sayılar yüzde bire
-    /// inerdi — iki milimetrelik salgı yirmi mikron görünüp sınırın altında kalıyordu.
+    /// Measures along specified axis in WORLD SPACE (meters): part transforms have
+    /// 100x scale; measuring in mesh space would scale numbers down by 1/100,
+    /// hiding 2 mm runout below threshold.
     public static WheelProfile Measure(Mesh mesh, Transform space, Vector3 axis)
     {
         var profile = new WheelProfile { Axis = axis.normalized };
@@ -102,7 +99,7 @@ public class WheelProfile
     int BinOf(float angle) =>
         Mathf.Clamp((int)((angle + Mathf.PI) / (2f * Mathf.PI) * bins), 0, bins - 1);
 
-    /// Kåsa çember uydurma: kenar noktalarına en küçük kareler anlamında oturan merkez.
+    /// Kåsa circle fitting: least-squares center fitting rim perimeter points.
     Vector2 FitCircle(Vector2[] points, bool[] hit)
     {
         float sx = 0f, sy = 0f, sxx = 0f, syy = 0f, sxy = 0f, sxz = 0f, syz = 0f, sz = 0f;
@@ -166,8 +163,8 @@ public class WheelProfile
         WideFraction = wide / (float)bins;
     }
 
-    /// Boş kalan dilimler komşularından dolduruluyor. Boş dilim sıfır yarıçap demek
-    /// olurdu ve düzeltme o açıda köşeleri merkeze çekerdi.
+    /// Empty bins are interpolated from neighbors. An empty bin would mean zero radius,
+    /// causing correction to pull vertices toward center at that angle.
     void FillGaps(bool[] hit)
     {
         for (int i = 0; i < bins; i++)
@@ -184,10 +181,10 @@ public class WheelProfile
         }
     }
 
-    /// PROFİL YUMUŞATILIYOR. Ölçülen dış kenar köşe köşe zıplıyor; düzeltme ham profile
-    /// göre yapılsaydı o zıplama yüzeye kalıcı olarak yazılırdı. Pencere çevrenin yüzde
-    /// üçü — jantın gerçek şişkinliği kırk derecelik bir yay, yani bu pencereden çok daha
-    /// geniş ve yumuşatmadan sağ çıkıyor.
+    /// PROFILE SMOOTHING. Raw measured rim profile has vertex-to-vertex jitter;
+    /// correcting against raw profile would imprint that jitter into the surface.
+    /// Filter window covers 3% of perimeter — actual rim bulge spans 40 degrees,
+    /// much wider than window and surviving smoothing intact.
     void Smooth()
     {
         int window = Mathf.Max(1, bins / 32);
@@ -203,8 +200,7 @@ public class WheelProfile
         }
     }
 
-    /// Verilen açıdaki ölçülen dış yarıçap. Dilimler arasında doğrusal geçiliyor:
-    /// basamaklı okunsaydı düzeltme jantta yarım derecelik basamaklar bırakırdı.
+    /// Measured outer radius at given angle. Linearly interpolated across bins to avoid stepping artifacts.
     public float RadiusAt(float angle)
     {
         float position = (angle + Mathf.PI) / (2f * Mathf.PI) * bins;

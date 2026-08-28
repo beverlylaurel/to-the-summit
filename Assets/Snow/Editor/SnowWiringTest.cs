@@ -1,5 +1,5 @@
-// ROL: kar sisteminin parçalarının BAĞLI olduğunu denetler — yazıldığını değil.
-// Çağıran: SnowTestRunner.
+// Verifies that components and assets of the snow subsystem are connected properly.
+// Invoked by: SnowTestRunner.
 
 using System.Collections.Generic;
 using System.IO;
@@ -8,52 +8,28 @@ using System.Text;
 using System.Text.RegularExpressions;
 using UnityEngine;
 
-/// YAZILMIŞ OLMAK BAĞLI OLMAK DEĞİL.
-///
-/// Formül denetimi spec'in 68 formülünün 68'ini kodda buldu ve yine de üç ayrı
-/// şey görünmedi: `SnowDetailNormals` doğru yazılmış ama TEK yerden
-/// çağrılıyordu, `SnowSparkle` include'u eksikti ve altı kernel sessizce
-/// derlenmiyordu, dağın kar katmanı hiç yoktu. Üçü de aynı sınıf: parça var,
-/// bağı yok.
-///
-/// Bu bölüm o sınıfı tarıyor. Üç soru soruyor:
-///
-/// 1. Shader'da tanımlı her fonksiyon en az bir yerden çağrılıyor mu?
-/// 2. `SnowShaderIDs`'deki her ad hem YAZILIYOR hem OKUNUYOR mu? Yazılmayan bir
-///    uniform sessizce sıfır okunur — en pahalı hata sınıfı, çünkü hiçbir yerde
-///    hata vermez.
-/// 3. Runtime'daki her bileşen sahne kurulumunda ekleniyor mu?
-///
-/// İstisnalar açıkça listeleniyor ve her birinin gerekçesi yanında. Gerekçesiz
-/// istisna, denetimi süs hâline getirir.
 public static class SnowWiringTest
 {
     const string ShaderDir = "Assets/Snow/Shaders";
     const string RuntimeDir = "Assets/Snow/Runtime";
     const string EditorDir = "Assets/Snow/Editor";
 
-    /// Shader tarafında tanımlı ama BİLEREK çağrılmayanlar.
     static readonly Dictionary<string, string> FunctionExceptions = new()
     {
-        // Shader giriş noktaları: `#pragma fragment` ile bağlanıyorlar, kod
-        // içinden çağrılmıyorlar. Tarayıcı parantezli çağrı arıyor, pragma'yı
-        // görmüyor.
-        { "SnowLitFragment", "#pragma fragment girişi" },
-        { "SnowShadowFragment", "#pragma fragment girişi" },
-        { "SnowDepthNormalsFragment", "#pragma fragment girişi" },
+        { "SnowLitFragment", "#pragma fragment entry" },
+        { "SnowShadowFragment", "#pragma fragment entry" },
+        { "SnowDepthNormalsFragment", "#pragma fragment entry" },
     };
 
-    /// Yazılmayan ama sorun olmayan uniform'lar.
     static readonly Dictionary<string, string> WriteExceptions = new()
     {
-        { "_SnowDetailNormal", "materyalde de duruyor; global yayın SnowManager'da" },
+        { "_SnowDetailNormal", "stored on material; global broadcast in SnowManager" },
     };
 
-    /// Okunmayan (hiçbir shader'da tanımlı olmayan) ama sorun olmayan ID'ler.
     static readonly Dictionary<string, string> ReadExceptions = new()
     {
-        { "_SnowLineY", "karakter shader'ının kendi çizgisi; kullanıcı ekleyecek (spec §16.1)" },
-        { "_SnowAccum", "karakter shader'ının kendi birikmesi; kullanıcı ekleyecek (spec §16.1)" },
+        { "_SnowLineY", "character shader's own line; user will add (spec §16.1)" },
+        { "_SnowAccum", "character shader's own accumulation; user will add (spec §16.1)" },
     };
 
     public static string Run(out bool pass)
@@ -61,7 +37,7 @@ public static class SnowWiringTest
         var r = new StringBuilder();
         pass = true;
 
-        r.AppendLine("# Kar — parçalar bağlı mı");
+        r.AppendLine("# Snow — Wiring Check");
         r.AppendLine(System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         r.AppendLine();
 
@@ -69,7 +45,6 @@ public static class SnowWiringTest
             .Where(p => p.EndsWith(".hlsl") || p.EndsWith(".shader") || p.EndsWith(".compute"))
             .ToArray();
 
-        // Dağın kar katmanı kar ağacının DIŞINDA; taramaya dahil.
         var allShaderText = new Dictionary<string, string>();
 
         foreach (string p in shaderFiles) allShaderText[p] = File.ReadAllText(p);
@@ -84,16 +59,14 @@ public static class SnowWiringTest
         pass &= Prose(r);
 
         r.AppendLine();
-        r.AppendLine("SONUÇ: " + (pass ? "TAMAM" : "BAŞARISIZ"));
+        r.AppendLine("RESULT: " + (pass ? "PASSED" : "FAILED"));
         return r.ToString();
     }
-
-    // ------------------------------------------------------------------ 1
 
     static bool Functions(StringBuilder r, string[] shaderFiles,
                           Dictionary<string, string> allText)
     {
-        r.AppendLine("## Tanımlı ama çağrılmayan shader fonksiyonu");
+        r.AppendLine("## Defined but uncalled shader functions");
 
         var defined = new Dictionary<string, string>();
 
@@ -114,7 +87,6 @@ public static class SnowWiringTest
 
             foreach (var f in allText)
             {
-                // Kendi tanımı sayılmıyor: çağrıyı ayırt etmek için tanım satırı çıkarılıyor.
                 string body = def.Replace(f.Value, "");
                 if (Regex.IsMatch(body, @"\b" + Regex.Escape(kv.Key) + @"\s*\(")) callers++;
             }
@@ -122,8 +94,8 @@ public static class SnowWiringTest
             if (callers == 0) orphans.Add(kv.Key + "  (" + kv.Value + ")");
         }
 
-        r.AppendLine("  Tanımlı fonksiyon        " + defined.Count);
-        r.AppendLine("  [" + M(orphans.Count == 0) + "] Çağrılmayan          " + orphans.Count);
+        r.AppendLine("  Defined functions        " + defined.Count);
+        r.AppendLine("  [" + M(orphans.Count == 0) + "] Uncalled             " + orphans.Count);
 
         foreach (string o in orphans) r.AppendLine("      - " + o);
 
@@ -131,11 +103,9 @@ public static class SnowWiringTest
         return orphans.Count == 0;
     }
 
-    // ------------------------------------------------------------------ 2
-
     static bool Uniforms(StringBuilder r, Dictionary<string, string> allText)
     {
-        r.AppendLine("## Uniform hem yazılıyor hem okunuyor mu");
+        r.AppendLine("## Uniform read/write consistency");
 
         string ids = File.ReadAllText(Path.Combine(RuntimeDir, "SnowShaderIDs.cs"));
 
@@ -162,7 +132,6 @@ public static class SnowWiringTest
                 || Regex.IsMatch(csharp, @"\.Set\w+\(\s*SnowShaderIDs\." + e.Field + @"\b")
                 || Regex.IsMatch(csharp, @"""" + e.Name + @"""");
 
-            // Okunuyor = herhangi bir shader dosyasında adı geçiyor.
             bool read = shaders.Contains(e.Name);
 
             if (!written && !WriteExceptions.ContainsKey(e.Name))
@@ -172,14 +141,14 @@ public static class SnowWiringTest
                 neverRead.Add(e.Name + "  (SnowShaderIDs." + e.Field + ")");
         }
 
-        r.AppendLine("  Tanımlı ID               " + entries.Length);
-        r.AppendLine("  [" + M(neverWritten.Count == 0) + "] Hiç YAZILMAYAN       " + neverWritten.Count +
-                     "   (shader sessizce sıfır okur)");
+        r.AppendLine("  Defined IDs              " + entries.Length);
+        r.AppendLine("  [" + M(neverWritten.Count == 0) + "] Never WRITTEN        " + neverWritten.Count +
+                     "   (shader silently reads zero)");
 
         foreach (string n in neverWritten) r.AppendLine("      - " + n);
 
-        r.AppendLine("  [" + M(neverRead.Count == 0) + "] Hiç OKUNMAYAN        " + neverRead.Count +
-                     "   (ölü ID)");
+        r.AppendLine("  [" + M(neverRead.Count == 0) + "] Never READ           " + neverRead.Count +
+                     "   (dead ID)");
 
         foreach (string n in neverRead) r.AppendLine("      - " + n);
 
@@ -187,11 +156,9 @@ public static class SnowWiringTest
         return neverWritten.Count == 0 && neverRead.Count == 0;
     }
 
-    // ------------------------------------------------------------------ 3
-
     static bool Components(StringBuilder r)
     {
-        r.AppendLine("## Runtime bileşeni sahne kurulumunda ekleniyor mu");
+        r.AppendLine("## Runtime component scene setup check");
 
         string setup = File.ReadAllText(Path.Combine(EditorDir, "SnowDebugWindow.cs"));
 
@@ -201,30 +168,26 @@ public static class SnowWiringTest
                             .Contains("class " + n + " : MonoBehaviour"))
             .ToArray();
 
-        // KULLANICI TARAFI BİLEŞENLER. Bunlar karakterin kemiğine, ateşin
-        // üstüne veya adım olayına bağlanıyor; sahne kurulumu bunları
-        // yerleştiremez çünkü nereye takılacakları bir TASARIM kararı
-        // (spec §1.4, `DECISIONS.md` → Bekleyen kararlar).
         var userSide = new Dictionary<string, string>
         {
-            { "SnowDeformer", "karakterin ayak/bacak kemiklerine" },
-            { "SnowCharacterAccumulator", "karakter mesh'ine" },
-            { "SnowHeatSource", "ateş/ısı veren nesnelere" },
-            { "SnowFootstepAudio", "adım olayına" },
-            { "SnowPuffEmitter", "adım olayına" },
-            { "SnowSprayController", "adım olayına" },
-            { "SnowMovementModifier", "hareket koduna" },
+            { "SnowDeformer", "character foot/leg bones" },
+            { "SnowCharacterAccumulator", "character mesh" },
+            { "SnowHeatSource", "fire/heat objects" },
+            { "SnowFootstepAudio", "footstep events" },
+            { "SnowPuffEmitter", "footstep events" },
+            { "SnowSprayController", "footstep events" },
+            { "SnowMovementModifier", "movement logic" },
         };
 
         var missing = components
             .Where(n => !setup.Contains("<" + n + ">") && !userSide.ContainsKey(n))
             .ToList();
 
-        r.AppendLine("  Kullanıcı tarafı         " + userSide.Count +
-                     "   (sahneye kurulum yerleştiremez, bkz. DECISIONS)");
+        r.AppendLine("  User-side components     " + userSide.Count +
+                     "   (placed per design decisions)");
 
         r.AppendLine("  MonoBehaviour            " + components.Length);
-        r.AppendLine("  [" + M(missing.Count == 0) + "] Kurulumda YOK        " + missing.Count);
+        r.AppendLine("  [" + M(missing.Count == 0) + "] Missing in setup     " + missing.Count);
 
         foreach (string m in missing) r.AppendLine("      - " + m);
 
@@ -232,46 +195,37 @@ public static class SnowWiringTest
         return missing.Count == 0;
     }
 
-    // ------------------------------------------------------------------ 4
-
-    /// SPEC'İN DÜZMETİN KOŞULLARI.
-    ///
-    /// Formül denetimi kod bloklarını tarıyor; spec'in bir kısmı ise DÜZMETİN.
-    /// Sapmaların tamamı orada çıktı — kod bloğu verilen 68 formülün 68'i
-    /// doğruydu. Aşağıdakiler o düzmetinden çıkan, mekanik olarak
-    /// denetlenebilir koşullar. Her satırın yanında spec bölümü var.
     static bool Prose(StringBuilder r)
     {
-        r.AppendLine("## Spec'in düzmetin koşulları");
+        r.AppendLine("## Specification requirements");
 
         var checks = new (string Section, string What, string File, string Needle)[]
         {
-            ("§8.3",  "Kar materyali Queue = Geometry+50",
+            ("§8.3",  "Snow material Queue = Geometry+50",
              "Assets/Snow/Shaders/SnowLit.shader", "Geometry+50"),
 
-            ("§15.2", "Kar yoksa compute pass'leri kapalı",
+            ("§15.2", "Compute passes disabled when dormant",
              "Assets/Snow/Runtime/SnowManager.cs", "if (IsDormant) return;"),
 
-            ("§15.2", "Per-material property'ler tek CBUFFER'da",
+            ("§15.2", "Per-material properties in single CBUFFER",
              "Assets/Snow/Shaders/SnowLitInput.hlsl", "CBUFFER_START(UnityPerMaterial)"),
 
-
-            ("§14.2", "Detay normalleri kar mesh'inde",
+            ("§14.2", "Detail normals on snow mesh",
              "Assets/Snow/Shaders/SnowLitForwardPass.hlsl", "SnowApplyDetailNormals"),
 
-            ("§14.2", "Detay normalleri dağın kar katmanında",
+            ("§14.2", "Detail normals on mountain snow layer",
              "Assets/Shaders/MountainSurface.hlsl", "SnowApplyDetailNormals"),
 
-            ("§3.4",  "Yağmur kar yağarken susuyor",
+            ("§3.4",  "Rain muted during snowfall",
              "Assets/Scripts/Weather/PrecipitationRenderer.cs", "SnowRuntimeState.RainWeight01"),
 
-            ("§13.2", "Mesafeye göre displacement kısma YOK",
+            ("§13.2", "No distance displacement fade",
              "Assets/Snow/Shaders/SnowLit.shader", ""),
 
-            ("§9.2",  "Yakalama shader'ı Cull Off",
+            ("§9.2",  "Depth capture shader Cull Off",
              "Assets/Snow/Shaders/Hidden_SnowCaptureDepth.shader", "Cull Off"),
 
-            ("§16",   "Nesne karı ayrı shader (mevcut shader'lar değişmedi)",
+            ("§16",   "Object snow in separate shader",
              "Assets/Snow/Shaders/SnowCoverObject.shader", "SnowCoverMask"),
         };
 
@@ -283,7 +237,6 @@ public static class SnowWiringTest
 
             if (c.Needle.Length == 0)
             {
-                // Olumsuz koşul: mesafeye göre kısma OLMAMALI.
                 string body = File.Exists(c.File) ? File.ReadAllText(c.File) : "";
                 ok = !body.Contains("distanceFade") && !body.Contains("_DisplacementFade");
             }
@@ -298,7 +251,7 @@ public static class SnowWiringTest
         }
 
         r.AppendLine();
-        r.AppendLine("  Denetlenen               " + checks.Length + "   eksik " + bad);
+        r.AppendLine("  Checked                  " + checks.Length + "   failed " + bad);
         r.AppendLine();
 
         return bad == 0;

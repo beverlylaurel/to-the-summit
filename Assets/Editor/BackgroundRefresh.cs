@@ -3,23 +3,23 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.Compilation;
 
-/// UNITY ARKA PLANDAYKEN DE YENİLER. Unity dosya değişikliğini ancak pencere odağı
-/// aldığında tarıyor; dışarıdan yazılan kod için her seferinde Unity'ye tıklamak ya da
-/// Ctrl+R'a basmak gerekiyordu.
+/// REFRESHES EVEN WHEN UNITY IS IN THE BACKGROUND. Unity only scans for file changes
+/// when the window gains focus; for externally written code, clicking into Unity or
+/// pressing Ctrl+R was required every time.
 ///
-/// Tetikleyici bir dosyanın zaman damgası izleniyor: değiştiği anda içe aktarma ve
-/// derleme isteniyor. Dosya sistemini sürekli taramak yerine tek dosyaya bakmak, büyük
-/// projede taramanın maliyetini ortadan kaldırıyor.
+/// A trigger file's timestamp is monitored: the moment it changes, import and
+/// compilation are requested. Watching a single file instead of continuously scanning the
+/// filesystem eliminates scanning overhead in large projects.
 ///
-/// Play sırasında ve derleme sürerken dokunulmuyor: ortada yeniden yükleme başlatmak
-/// oyunu kesiyor ve yarım kalmış derlemeyi bozuyor.
+/// Untouched during Play mode and active compilation: initiating a reload mid-run
+/// interrupts gameplay and corrupts incomplete compilation.
 [InitializeOnLoad]
 public static class BackgroundRefresh
 {
     const string TriggerPath = "Logs/refresh.trigger";
 
-    /// İki bakış arası. Saniyede bir dosya damgası okumak ölçülemeyecek kadar ucuz;
-    /// her karede okumak gereksiz.
+    /// Interval between checks. Reading a file timestamp once per second is negligibly cheap;
+    /// reading every frame is unnecessary.
     const double Interval = 1.0;
 
     static DateTime stamp;

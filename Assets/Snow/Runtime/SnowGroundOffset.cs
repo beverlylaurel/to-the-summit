@@ -50,7 +50,7 @@ public class SnowGroundOffset : MonoBehaviour
 
         // No surface correction while airborne: the character must not be pulled up while
         // jumping. The correction returns to zero slowly so the landing is soft.
-        float hedef = controller.isGrounded ? YuzeyYuksekligi() : 0f;
+        float hedef = controller.isGrounded ? SurfaceHeight() : 0f;
 
         float k = smoothing > 0f
             ? 1f - Mathf.Exp(-Time.deltaTime / smoothing)
@@ -71,14 +71,14 @@ public class SnowGroundOffset : MonoBehaviour
         uygulanan = yeni;
     }
 
-    float YuzeyYuksekligi()
+    float SurfaceHeight()
     {
-        float derinlik = snowManager.WorldSnowDepth;
-        if (derinlik <= 0f) return 0f;
+        float depth = snowManager.WorldSnowDepth;
+        if (depth <= 0f) return 0f;
 
         Vector3 p = transform.position;
 
-        return SnowSurfaceHeight.RolyefDunya(p, derinlik,
+        return SnowSurfaceHeight.ReliefWorld(p, depth,
                                              snowManager.WindShadowAt(p),
                                              snowManager.SastrugiWindDir);
     }

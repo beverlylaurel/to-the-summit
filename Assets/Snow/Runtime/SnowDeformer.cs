@@ -74,14 +74,14 @@ public class SnowDeformer : MonoBehaviour
     public virtual void GetSegment(int index, out Vector4 a, out Vector4 b)
     {
         // A separate sample at each end: the piece itself narrows and widens along its length.
-        float wA = Dalga(travelled - Vector3.Distance(segmentA, segmentB));
-        float wB = Dalga(travelled);
+        float wA = Wave(travelled - Vector3.Distance(segmentA, segmentB));
+        float wB = Wave(travelled);
 
         float rA = radius * (1f + wA * widthWobble);
-        float derinlik = 1f + wB * depthWobble;
+        float depth = 1f + wB * depthWobble;
 
         a = new Vector4(segmentA.x, segmentA.y, segmentA.z, rA);
-        b = new Vector4(segmentB.x, segmentB.y, segmentB.z, derinlik);
+        b = new Vector4(segmentB.x, segmentB.y, segmentB.z, depth);
     }
 
     /// VALUE NOISE, NOT A SINE, −1..1.
@@ -93,7 +93,7 @@ public class SnowDeformer : MonoBehaviour
     ///
     /// The value noise comes from a hash: it does not repeat, but because it depends on the
     /// distance it is reproducible — the same path gives the same trail and rewinding is not broken.
-    float Dalga(float s)
+    float Wave(float s)
     {
         float u = s / Mathf.Max(0.05f, wobbleLength);
 

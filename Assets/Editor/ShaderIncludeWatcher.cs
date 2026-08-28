@@ -3,19 +3,19 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-/// `.hlsl` değişince onu içeren shader'ları yeniden derletir.
+/// Recompiles shaders containing `.hlsl` files when includes change.
 ///
-/// NEDEN VAR: Unity `.shader` dosyasının hangi `.hlsl`'leri içerdiğini takip ETMİYOR.
-/// Include dosyası değiştiğinde shader bayat kalıyor ve ekranda hiçbir şey değişmiyor —
-/// kod diskte doğru, çalışan sürüm eski. Bu, projenin tekrar tekrar yandığı sessiz
-/// bayatlık sınıfının aynısı (`SYMPTOMS.md`: PNG önbelleği, `.asset` çalışma-zamanı
-/// kopyası, menü düğmesinin yanlış işi yapması).
+/// WHY THIS EXISTS: Unity DOES NOT track which `.hlsl` files are included by a `.shader`.
+/// When an include file changes, the shader remains stale and nothing changes on screen —
+/// code is correct on disk, running version is obsolete. This is the exact same class of
+/// silent staleness that caused issues repeatedly (SYMPTOMS.md: PNG cache, `.asset` runtime
+/// copy, menu item triggering wrong action).
 ///
-/// Belirti hep aynı ve aldatıcı: ölçüm doğru, düzeltme doğru, ekran değişmiyor. Sonra
-/// düzeltme "işe yaramadı" sanılıp geri alınıyor ve gerçek sebep bir tur daha kaçıyor.
+/// The symptom is always identical and misleading: measurement is correct, fix is correct,
+/// screen does not change. Then the fix is presumed "ineffective" and reverted, missing the real cause.
 ///
-/// Kapsam dar tutuluyor: yalnız aynı kök klasördeki shader'lar yeniden içe aktarılıyor.
-/// Tüm projeyi taramak her include kaydında saniyeler yakardı.
+/// Scope is kept narrow: only shaders in the same root folder are reimported.
+/// Scanning the entire project would waste seconds on every include save.
 class ShaderIncludeWatcher : AssetPostprocessor
 {
     static readonly string[] Roots =
@@ -62,7 +62,7 @@ class ShaderIncludeWatcher : AssetPostprocessor
         }
 
         if (count > 0)
-            Debug.Log($"Include değişti: {count} shader yeniden derlendi "
+            Debug.Log($"Include changed: {count} shader(s) recompiled "
                       + $"({string.Join(", ", touchedRoots)}).");
     }
 }

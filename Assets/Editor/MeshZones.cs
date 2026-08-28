@@ -2,22 +2,22 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// TEK MESH'İ BÖLGELERE AYIRIR. Üretilen modelde birbirinden farklı malzemeler aynı
-/// mesh'te geliyor: gidon ile tutamak ve kablolar tek parça, bagaj ile zincir muhafazası
-/// ve pedal tek parça. Malzeme atanamıyor, çünkü bir çizici tek materyal alıyor.
+/// SPLITS A SINGLE MESH INTO ZONES. In generated models, distinct materials arrive in a
+/// single mesh: handlebar, grips, and cables in one piece; luggage rack, chain guard, and
+/// pedals in one piece. Materials cannot be assigned because a renderer takes one material per submesh.
 ///
-/// AYRI MESH YERİNE ALT-MESH. Parça ikiye kesilseydi köşeler kopyalanır ve bellek
-/// katlanırdı; alt-mesh yalnız üçgen listesini bölüyor, köşeler ortak kalıyor. Çizici de
-/// alt-mesh başına ayrı materyal alabiliyor.
+/// SUB-MESHES INSTEAD OF SEPARATE MESHES. Cutting the mesh in two would duplicate vertices
+/// and double memory; sub-meshes only partition the triangle list while vertices remain shared.
+/// The renderer can assign distinct materials per sub-mesh.
 ///
-/// BÖLGE SINIRLARI ORANLA veriliyor, metreyle değil: dosya metreyi santimle karışık
-/// taşıyor (mesh verisi yüzde bir ölçekte, dönüşümde yüz kat ölçek var). Sınırı parçanın
-/// kendi sınır kutusuna oranlayınca birim sorunu ortadan kalkıyor.
+/// ZONE BOUNDARIES SPECIFIED AS RATIOS, not meters: model files mix meters and centimeters
+/// (mesh data at 1/100 scale, transform with 100x scale). Normalizing boundaries against
+/// the part's bounding box eliminates unit ambiguity.
 public static class MeshZones
 {
-    /// Üçgenleri bölge numarasına göre ayırır ve her bölgeyi ayrı alt-mesh yapar.
-    /// Sınıflandırma üçgenin AĞIRLIK MERKEZİNE bakıyor: köşeye bakmak sınırdaki üçgenleri
-    /// iki bölgeye birden sokup her ikisinde de delik bırakıyordu.
+    /// Partitions triangles by zone index and assigns each zone to a separate sub-mesh.
+    /// Classification checks triangle BARYCENTER: checking vertices placed boundary
+    /// triangles into both zones, leaving holes in both.
     public static Mesh Build(Mesh source, Func<Vector3, int> zoneOf, int zones, string name)
     {
         Vector3[] vertices = source.vertices;
@@ -51,13 +51,13 @@ public static class MeshZones
         Vector2[] uv = source.uv;
         if (uv.Length == vertices.Length) mesh.SetUVs(0, uv);
 
-        // KÖŞE RENGİ SIFIRLANIYOR. Üretilen modelde köşe rengi var ve gölgelendirici onu
-        // elle boyanan malzeme maskesi olarak okuyor; taşınsaydı hiç boyanmamış yüzey
-        // kendiliğinden boyalı görünürdü. Boyama bu temiz zeminin üstüne yazılıyor.
+        // VERTEX COLORS CLEARED. Generated models carry vertex colors and shaders read them
+        // as manually painted material masks; if carried over, unpainted surfaces would appear
+        // painted by default. Painting is applied on top of this clean canvas.
         mesh.SetColors(new Color32[vertices.Length]);
 
-        // Yuva numarasının durduğu ikinci UV kanalı da boş açılıyor: bölgeli parçalar
-        // sonradan elle boyanıyor ve kanal yoksa fırça yazacak yer bulamıyor.
+        // Secondary UV channel for slot index is initialized empty: zoned parts are
+        // painted manually later, and without the channel the brush has nowhere to write.
         mesh.SetUVs(1, new Vector2[vertices.Length]);
 
         mesh.subMeshCount = zones;
@@ -67,8 +67,8 @@ public static class MeshZones
         return mesh;
     }
 
-    /// Noktanın parça sınırları içindeki yüksekliği (0 altta, 1 üstte). Mesh verisi
-    /// dosyanın kendi düzeninde geliyor ve o düzende yukarı Z.
+    /// Point elevation within part bounds (0 bottom, 1 top). Mesh data arrives in file coordinates,
+    /// where Z is up.
     public static float Height(Bounds bounds, Vector3 point) =>
         Mathf.InverseLerp(bounds.min.z, bounds.max.z, point.z);
 }

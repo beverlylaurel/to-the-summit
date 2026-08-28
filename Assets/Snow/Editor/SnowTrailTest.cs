@@ -1,30 +1,19 @@
-// ROL: iz oluşumunu ÖLÇER — carve kalıcılığı, sırtın izin ETRAFINDA olması,
-// hareket yönünde asimetri, derinlik ölçeği, patika oluşumu, dolma, rüzgâr eşiği.
-// Çağıran: menü — To The Summit/Snow/Trail Test.
+// Measures trail generation — carve persistence, surrounding rim formation,
+// movement direction asymmetry, depth scaling, packed trail evolution, fill-in, and wind threshold.
+// Invoked by: Menu — To The Summit/Snow/Trail Test.
 
 using System.Text;
 using UnityEditor;
 using UnityEngine;
 
-/// ÜRETİM ÇÖZÜNÜRLÜĞÜNDE KOŞUYOR. 256'da teksel 6.25 cm; 30 cm'lik bir ayak
-/// 4.8 teksel eder ve yakalama blur'u (1.5 teksel) ayağın MERKEZİNE kadar
-/// sızıp arka plandaki -9999'u karıştırır. Ölçüm o zaman kernel'i değil
-/// düzeneğin çözünürlüğünü sınar.
-///
-/// "Sırt izin etrafında mı" göz kararı değil: yarıçapa göre rim profili
-/// çıkarılıyor, tepenin nerede olduğu yazılıyor. Ters yazılmış bir
-/// `blur − carve` tepeyi merkeze taşır ve burada yakalanır.
 public static class SnowTrailTest
 {
     const int Res = 1024;
     const float AreaSize = 16f;
     const float ObserverY = 4900.5f;
 
-    /// Zemin düz ve gözlemcinin 1 m altında; batma kâğıtta hesaplanabilsin.
     const float GroundY = ObserverY - 1f;
 
-    /// Ayak: 30 cm çapında dairesel alt yüzey (bot genişliğinden büyük, ölçüm
-    /// için yeterince çok teksel kaplasın diye).
     const float FootDiameter = 0.30f;
     const float FootRadius = FootDiameter * 0.5f;
 
@@ -38,44 +27,43 @@ public static class SnowTrailTest
     public static string Run(out bool ok)
     {
         var r = new StringBuilder(8192);
-        r.AppendLine("# Kar — iz sınaması");
+        r.AppendLine("# Snow — Trail Test");
         r.AppendLine(System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         r.AppendLine();
 
         ok = Body(r);
 
         r.AppendLine();
-        r.AppendLine(ok ? "SONUÇ: TAMAM — bütün sınamalar geçti."
-                        : "SONUÇ: BAŞARISIZ — yukarıdaki satırlara bakın.");
+        r.AppendLine(ok ? "RESULT: PASSED — all tests completed successfully."
+                        : "RESULT: FAILED — see above for details.");
         return r.ToString();
     }
 
     static bool Body(StringBuilder r)
     {
         var sim = AssetDatabase.LoadAssetAtPath<ComputeShader>(SimPath);
-        if (sim == null) { r.AppendLine("  [-] " + SimPath + " yüklenemedi."); return false; }
+        if (sim == null) { r.AppendLine("  [-] " + SimPath + " could not be loaded."); return false; }
 
         var rig = new Rig(sim, Res, AreaSize, Center, GroundY, ObserverY);
         bool all = true;
 
         try
         {
-            // Taze kar: SWE 0.02, rhoN 0.10 → h = 0.02*1000/(50+0.1*500) = 0.20 m
             float baseH = SnowConstants.RhoWater * 0.02f /
                           Mathf.Lerp(SnowConstants.RhoMin, SnowConstants.RhoMax, 0.10f);
 
-            float footY = GroundY + baseH - 0.12f;   // karın 12 cm içine giriyor
+            float footY = GroundY + baseH - 0.12f;
 
-            r.AppendLine("## Düzenek");
-            r.AppendLine("  [i] Çözünürlük " + Res + ",  teksel " +
-                         (AreaSize / Res * 100f).ToString("0.00") + " cm,  ayak yarıçapı " +
-                         (FootRadius / (AreaSize / Res)).ToString("0.0") + " teksel");
-            r.AppendLine("  [i] Zemin " + GroundY.ToString("0.000") + " m,  SWE 0.020, rhoN 0.10 → " +
-                         "taban derinlik " + (baseH * 100f).ToString("0.0") + " cm");
+            r.AppendLine("## Setup");
+            r.AppendLine("  [i] Resolution " + Res + ",  texel " +
+                         (AreaSize / Res * 100f).ToString("0.00") + " cm,  foot radius " +
+                         (FootRadius / (AreaSize / Res)).ToString("0.0") + " texels");
+            r.AppendLine("  [i] Ground " + GroundY.ToString("0.000") + " m,  SWE 0.020, rhoN 0.10 -> " +
+                         "base depth " + (baseH * 100f).ToString("0.0") + " cm");
             r.AppendLine();
-            r.AppendLine("## Faz 3 kabul kriterleri");
+            r.AppendLine("## Phase 3 Acceptance Criteria");
 
-            // --- 1. carve beliriyor ---
+            // --- 1. Carve forms ---
             rig.ResetSnow(0.02f, 0.10f);
             rig.ClearTrail();
             rig.Stamp(Center, FootDiameter, footY, Vector2.zero);
@@ -84,34 +72,33 @@ public static class SnowTrailTest
             float carve1 = rig.Trail(Center).r;
             bool carved = Mathf.Abs(carve1 - 0.12f) < 0.006f;
             all &= carved;
-            r.AppendLine("  [" + M(carved) + "] carve beliriyor      " + (carve1 * 100f).ToString("0.00") +
-                         " cm  (batma 12.00 cm, taze karda tam batmalı)");
+            r.AppendLine("  [" + M(carved) + "] Carve forms          " + (carve1 * 100f).ToString("0.00") +
+                         " cm  (sink 12.00 cm)");
 
-            // --- 2. carve KALICI ---
+            // --- 2. Carve persists ---
             rig.ClearCapture();
             rig.Deform(1.0f, 0f, 0f);
             float carve2 = rig.Trail(Center).r;
             bool persists = Mathf.Abs(carve2 - carve1) < 1e-4f;
             all &= persists;
-            r.AppendLine("  [" + M(persists) + "] carve KALICI         1 sn sonra " +
-                         (carve2 * 100f).ToString("0.00") + " cm  (kar yağmıyorsa dolmaz)");
+            r.AppendLine("  [" + M(persists) + "] Carve persists       after 1s: " +
+                         (carve2 * 100f).ToString("0.00") + " cm");
 
-            // --- 3. rim izin ETRAFINDA ---
+            // --- 3. Rim forms a ring around trail ---
             rig.Rim();
             RimProfile flat = rig.Profile(Center, 0.40f);
 
             bool ring = flat.Peak > 0.002f && flat.PeakRadius > FootRadius &&
                         flat.AtCenter < flat.Peak * 0.20f;
             all &= ring;
-            r.AppendLine("  [" + M(ring) + "] rim HALKA            merkez " +
-                         (flat.AtCenter * 1000f).ToString("0.00") + " mm,  tepe " +
+            r.AppendLine("  [" + M(ring) + "] Rim ring             center " +
+                         (flat.AtCenter * 1000f).ToString("0.00") + " mm,  peak " +
                          (flat.Peak * 1000f).ToString("0.00") + " mm @ " +
-                         (flat.PeakRadius * 100f).ToString("0.0") + " cm  (ayak yarıçapı " +
-                         (FootRadius * 100f).ToString("0.0") + " cm)" +
-                         (ring ? "" : "  TERS: tepe izin içinde"));
+                         (flat.PeakRadius * 100f).ToString("0.0") + " cm  (foot radius " +
+                         (FootRadius * 100f).ToString("0.0") + " cm)");
 
-            // --- 4. rim derinlikle ölçekleniyor ---
-            rig.ResetSnow(0.01f, 0.10f);                       // SWE yarıya → taban 10 cm
+            // --- 4. Rim scales with depth ---
+            rig.ResetSnow(0.01f, 0.10f);
             rig.ClearTrail();
             rig.Stamp(Center, FootDiameter, GroundY + baseH * 0.5f - 0.06f, Vector2.zero);
             rig.Deform(0.016f, 0f, 0f);
@@ -120,15 +107,11 @@ public static class SnowTrailTest
             float rimHalf = rig.Profile(Center, 0.40f).Peak;
             bool scaled = rimHalf < flat.Peak * 0.75f;
             all &= scaled;
-            r.AppendLine("  [" + M(scaled) + "] rim DERİNLİKLE       SWE yarıya inince tepe " +
-                         (flat.Peak * 1000f).ToString("0.00") + " → " +
-                         (rimHalf * 1000f).ToString("0.00") + " mm" +
-                         (scaled ? "" : "  depthScale uygulanmamış"));
+            r.AppendLine("  [" + M(scaled) + "] Rim scales with depth  half SWE -> peak " +
+                         (flat.Peak * 1000f).ToString("0.00") + " -> " +
+                         (rimHalf * 1000f).ToString("0.00") + " mm");
 
-            // --- 5. rim hareket yönünde ASİMETRİK ---
-            // Ölçü: rim ağırlık merkezinin X kayması. Simetrikse tam 0 çıkar.
-            // Durağan ayakla da ölçülüyor — aracın kendisi sıfır vermeli, yoksa
-            // ölçülen asimetri düzeneğin değil kernel'in olduğu söylenemez.
+            // --- 5. Rim asymmetrical with velocity ---
             rig.ResetSnow(0.02f, 0.10f);
             rig.ClearTrail();
             rig.Stamp(Center, FootDiameter, footY, Vector2.zero);
@@ -148,29 +131,23 @@ public static class SnowTrailTest
             rig.Rim();
             float centroidMinus = rig.Profile(Center, 0.40f).CentroidX;
 
-            // İKİ TARAFLI ÖLÇÜM. Durağan hâl sıfır DEĞİL: Batman'ın 4-tap
-            // Poisson çekirdeği simetrik değil (x toplamı +0.5463 teksel) ve
-            // yakalama blur'una küçük bir +X yanlılığı katıyor. Bu tekniğin
-            // kendisinden geliyor, spec'ten aynen alındı. Ölçülen şey bu
-            // taban değerin ETRAFINDAKİ hıza bağlı kayma.
             float shiftPlus = centroidPlus - centroidStill;
             float shiftMinus = centroidMinus - centroidStill;
 
             bool asym = shiftPlus > 0.002f && shiftMinus < -0.002f;
             all &= asym;
-            r.AppendLine("  [" + M(asym) + "] rim ASİMETRİK        ağırlık merkezi X: durağan " +
+            r.AppendLine("  [" + M(asym) + "] Rim asymmetry        centroid X: stationary " +
                          (centroidStill * 1000f).ToString("0.00") + " mm,  +X 3 m/s " +
                          (centroidPlus * 1000f).ToString("0.00") + " mm (" +
-                         (shiftPlus * 1000f).ToString("+0.00;-0.00") + "),  −X 3 m/s " +
+                         (shiftPlus * 1000f).ToString("+0.00;-0.00") + "),  -X 3 m/s " +
                          (centroidMinus * 1000f).ToString("0.00") + " mm (" +
                          (shiftMinus * 1000f).ToString("+0.00;-0.00") + ")");
 
-            r.AppendLine("  [i] Poisson yanlılığı   durağan kayma " +
+            r.AppendLine("  [i] Poisson bias        stationary shift " +
                          (centroidStill * 1000f).ToString("0.00") +
-                         " mm — 4-tap Poisson çekirdeğinin x toplamı +0.5463 teksel. " +
-                         "Spec §9.4'ten aynen alındı, tekniğin kendisine ait.");
+                         " mm — 4-tap Poisson kernel x sum +0.5463 texels (spec §9.4).");
 
-            // --- 6. patika oluşuyor ---
+            // --- 6. Trail packing evolution ---
             rig.ResetSnow(0.02f, 0.10f);
 
             float firstSink = 0f, lastSink = 0f;
@@ -178,7 +155,7 @@ public static class SnowTrailTest
 
             for (int pass = 0; pass < 40; pass++)
             {
-                rig.ClearTrail();                       // her geçiş taze izle başlasın
+                rig.ClearTrail();
                 rig.Stamp(Center, FootDiameter, footY, Vector2.zero);
                 rig.Deform(0.016f, 0f, 0f);
 
@@ -192,21 +169,17 @@ public static class SnowTrailTest
 
             float rhoN = rig.Snow(Center).g;
 
-            // ÖLÇÜT BATMANIN DÜŞÜŞÜ. Spec §10.1 "5–6 geçişten sonra batma %18'e
-            // düşer" diyor; rhoN'ın tavana dayanmasını istemiyor.
             bool trailForms = lastSink < firstSink * 0.20f && rhoN > SnowConstants.LooseN + 0.05f;
             all &= trailForms;
-            r.AppendLine("  [" + M(trailForms) + "] PATİKA oluşuyor      ilk batma " +
-                         (firstSink * 100f).ToString("0.00") + " cm → 40. geçişte " +
-                         (lastSink * 100f).ToString("0.00") + " cm,  rhoN 0.100 → " +
+            r.AppendLine("  [" + M(trailForms) + "] Trail compaction      initial sink " +
+                         (firstSink * 100f).ToString("0.00") + " cm -> pass 40: " +
+                         (lastSink * 100f).ToString("0.00") + " cm,  rhoN 0.100 -> " +
                          rhoN.ToString("0.000"));
 
-            r.AppendLine("  [i] Sıkışma          batma %18'in altına " + passesTo18 +
-                         ". geçişte indi; spec metni '5–6 geçiş' diyor. Sıkışma AÇILAN " +
-                         "OYMAYA orantılı (SNOW_COMPACT_GAIN), süreye değil: yerinde " +
-                         "bekleyen oyuncunun altında iz derinleşmiyor.");
+            r.AppendLine("  [i] Compaction          sink reached <18% threshold at pass " + passesTo18 +
+                         " (SNOW_COMPACT_GAIN).");
 
-            // --- 7. yağışla doluyor ---
+            // --- 7. Trail fill-in with precipitation ---
             rig.ResetSnow(0.02f, 0.10f);
             rig.ClearTrail();
             rig.Stamp(Center, FootDiameter, footY, Vector2.zero);
@@ -214,27 +187,26 @@ public static class SnowTrailTest
             float beforeFill = rig.Trail(Center).r;
 
             rig.ClearCapture();
-            rig.Deform(60f, 8.33e-7f, 0f);              // i01 = 0.60, spec §17.2 tablosu
+            rig.Deform(60f, 8.33e-7f, 0f);
             float afterFill = rig.Trail(Center).r;
 
-            // Dolma hizi yerel yogunluktan: SWE * (ro_su / ro_kar).
             float rhoTest = SnowConstants.RhoMin
                           + rig.Snow(Center).g * (SnowConstants.RhoMax - SnowConstants.RhoMin);
             float expectedDrop = 8.33e-7f * SnowConstants.FillGain(rhoTest) * 60f;
             bool fills = Mathf.Abs((beforeFill - afterFill) - expectedDrop) < expectedDrop * 0.02f;
             all &= fills;
-            r.AppendLine("  [" + M(fills) + "] YAĞIŞLA doluyor      " +
-                         (beforeFill * 100f).ToString("0.00") + " → " +
-                         (afterFill * 100f).ToString("0.00") + " cm,  60 sn'de " +
+            r.AppendLine("  [" + M(fills) + "] Precipitation fill   " +
+                         (beforeFill * 100f).ToString("0.00") + " -> " +
+                         (afterFill * 100f).ToString("0.00") + " cm,  in 60s: " +
                          ((beforeFill - afterFill) * 100f).ToString("0.00") +
-                         " cm  (beklenen " + (expectedDrop * 100f).ToString("0.00") + " cm)");
+                         " cm  (expected " + (expectedDrop * 100f).ToString("0.00") + " cm)");
 
             bool densityStays = rig.Snow(Center).g > SnowConstants.LooseN + 1e-3f;
             all &= densityStays;
-            r.AppendLine("  [" + M(densityStays) + "] Yoğunluk KALIYOR     dolduktan sonra rhoN " +
-                         rig.Snow(Center).g.ToString("0.000") + "  (taze kar 0.100)");
+            r.AppendLine("  [" + M(densityStays) + "] Density preserved     after fill rhoN " +
+                         rig.Snow(Center).g.ToString("0.000") + "  (fresh snow 0.100)");
 
-            // --- 8. rüzgâr eşiği ---
+            // --- 8. Wind fill threshold ---
             rig.ResetSnow(0.02f, 0.10f);
             rig.ClearTrail();
             rig.Stamp(Center, FootDiameter, footY, Vector2.zero);
@@ -250,10 +222,10 @@ public static class SnowTrailTest
 
             bool windGate = Mathf.Abs(wLow - w0) < 1e-5f && wHigh < wLow;
             all &= windGate;
-            r.AppendLine("  [" + M(windGate) + "] RÜZGÂR eşiği         " +
-                         (w0 * 100f).ToString("0.00") + " cm → 3 m/s'te " +
-                         (wLow * 100f).ToString("0.00") + " cm (değişmedi) → 10 m/s'te " +
-                         (wHigh * 100f).ToString("0.00") + " cm  (eşik 4 m/s)");
+            r.AppendLine("  [" + M(windGate) + "] Wind threshold       " +
+                         (w0 * 100f).ToString("0.00") + " cm -> 3 m/s: " +
+                         (wLow * 100f).ToString("0.00") + " cm (unchanged) -> 10 m/s: " +
+                         (wHigh * 100f).ToString("0.00") + " cm  (threshold 4 m/s)");
         }
         finally
         {
@@ -265,7 +237,6 @@ public static class SnowTrailTest
 
     static string M(bool ok) => ok ? "+" : "-";
 
-    /// Yarıçapa göre rim profilinin özeti.
     struct RimProfile
     {
         public float AtCenter;
@@ -274,11 +245,6 @@ public static class SnowTrailTest
         public float CentroidX;
     }
 
-    // ------------------------------------------------------------------- düzenek
-
-    /// Kernel'leri ÜRETİMDEKİ SIRAYLA koşturan düzenek: yakalama →
-    /// KDeform → KRimBlurH → KRimBlurV → KRim. Ayrı bir sıra
-    /// yazılsaydı sınama üretimi değil kendini doğrulardı.
     sealed class Rig
     {
         readonly ComputeShader sim;
@@ -291,7 +257,6 @@ public static class SnowTrailTest
 
         RenderTexture trail, trailTemp, snow, snowTemp, rimBlur;
 
-        /// İZ PARÇASI TAMPONU — üretimdekiyle aynı düzen.
         ComputeBuffer segments;
         readonly Vector4[] segmentData = new Vector4[2];
         readonly Texture2D ground;
@@ -324,8 +289,6 @@ public static class SnowTrailTest
                 hideFlags = HideFlags.HideAndDontSave,
             };
 
-            // DÜZ ZEMİN: dört teksel, hepsi aynı. Batma hesabı arazi
-            // gürültüsünden bağımsız kalsın.
             ground = new Texture2D(2, 2, TextureFormat.RHalf, false, true)
             {
                 wrapMode = TextureWrapMode.Clamp,
@@ -341,8 +304,6 @@ public static class SnowTrailTest
             Shader.SetGlobalFloat(SnowShaderIDs.SnowAreaSize, areaSize);
             Shader.SetGlobalFloat(SnowShaderIDs.SnowResolution, res);
 
-            // n = 0.5 → groundY = BaseY + 0.5 * Range. Range 2 m: yarım değer
-            // yarım hassasiyette tam temsil edilebiliyor.
             Shader.SetGlobalVector(SnowShaderIDs.GroundOriginXZ,
                 new Vector4(center.x - areaSize, center.y - areaSize, 0f, 0f));
             Shader.SetGlobalVector(SnowShaderIDs.GroundSizeXZ,
@@ -377,14 +338,8 @@ public static class SnowTrailTest
         public void ResetSnow(float swe, float rhoN) => Clear(snow, new Vector4(swe, rhoN, 0f, 0f));
         public void ClearTrail() => Clear(trail, Vector4.zero);
 
-        /// Bu karede iz bırakan bir şey yok.
         public void ClearCapture() => sim.SetInt(SnowShaderIDs.TrailSegmentCount, 0);
 
-        /// TEK BİR KÜRENİN BU KAREKİ İZ PARÇASI.
-        ///
-        /// `surfaceY` artık kullanılmıyor: batma derinliğini kar söylüyor,
-        /// nesnenin yüksekliği değil. İmza korunuyor ki mevcut sınamalar
-        /// olduğu gibi çalışsın.
         public void Stamp(Vector2 worldXZ, float diameter, float surfaceY, Vector2 velocity)
         {
             segmentData[0] = new Vector4(worldXZ.x, 0f, worldXZ.y, diameter * 0.5f);
@@ -448,8 +403,6 @@ public static class SnowTrailTest
         public Color Trail(Vector2 worldXZ) => One(trail, worldXZ);
         public Color Snow(Vector2 worldXZ) => One(snow, worldXZ);
 
-        /// TEK TEKSEL OKUNUYOR. 1024² tam geri okuma 16 MB; kırk geçişlik
-        /// döngüde araç ölçülenden pahalı olurdu.
         Color One(RenderTexture rt, Vector2 worldXZ)
         {
             Vector2 t = WorldToTexel(worldXZ);
@@ -465,9 +418,6 @@ public static class SnowTrailTest
             return readOne.GetPixel(0, 0);
         }
 
-        /// Merkez etrafındaki pencerede rim'in yarıçap profili ve X ağırlık
-        /// merkezi. "Halka mı, hareket yönünde asimetrik mi" sorularının
-        /// sayısal karşılığı.
         public RimProfile Profile(Vector2 worldXZ, float windowRadius)
         {
             float texel = areaSize / res;
@@ -491,7 +441,6 @@ public static class SnowTrailTest
             Color[] px = tex.GetPixels();
             Object.DestroyImmediate(tex);
 
-            // 1 cm'lik yarıçap kutuları
             const float BinSize = 0.01f;
             int bins = Mathf.CeilToInt(windowRadius / BinSize);
             var sum = new float[bins];

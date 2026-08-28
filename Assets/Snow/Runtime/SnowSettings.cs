@@ -1,165 +1,128 @@
-// ROL: kar sisteminin SANATSAL ayarları (spec §0.10). Fiziksel sabitler burada
-// değil, SnowConstants'ta. Bir asset olarak dışarıdan veriliyor.
-// Çağıran: SnowManager ve alt bileşenleri, Inspector'dan enjekte edilerek.
-
 using UnityEngine;
 
-/// Zemin yüksekliğinin nereden geleceği (spec §7). Kullanıcı seçer; sistem
-/// kendisi karar vermez.
+/// Ground elevation source mode (spec §7).
 public enum SnowGroundSource
 {
-    /// Sahnedeki tek Unity Terrain'in heightmap'i bir kez RHalf dokuya pişirilir.
+    /// Baked once to RHalf from the primary scene Unity Terrain heightmap.
     UnityTerrain,
 
-    /// Mesh tabanlı arazi: ayrı bir ortografik kamerayla bir kez bake edilir.
+    /// Mesh-based terrain: baked once via orthographic camera.
     MeshBake,
 }
 
-[CreateAssetMenu(menuName = "To The Summit/Kar/Kar Ayarları", fileName = "SnowSettings")]
+[CreateAssetMenu(menuName = "To The Summit/Snow/Snow Settings", fileName = "SnowSettings")]
 public class SnowSettings : ScriptableObject
 {
-    [Header("Kalite")]
-    [Tooltip("Çözünürlük, halka sayısı, detay katmanı ve VFX kapasitesini birlikte sürer.")]
+    [Header("Quality")]
+    [Tooltip("Drives simulation resolution, cascade rings, detail layers, and VFX capacity.")]
     [SerializeField] SnowQualityPreset quality = SnowQualityPreset.Medium;
 
-    [Header("Zemin")]
-    [Tooltip("Zemin yüksekliğinin kaynağı. Kullanıcı seçer; sistem kendisi karar vermez.")]
+    [Header("Ground")]
+    [Tooltip("Source of base ground elevation.")]
     [SerializeField] SnowGroundSource groundSource = SnowGroundSource.UnityTerrain;
 
-    [Tooltip("MeshBake yolunda bake kamerasının kapsayacağı alan, metre.")]
+    [Tooltip("Area covered by orthographic camera in MeshBake mode, meters.")]
     [SerializeField] float groundBakeArea = 512f;
 
-    [Tooltip("MeshBake yolunda hangi katmanların zemin sayılacağı.")]
+    [Tooltip("Ground layer mask for MeshBake mode.")]
     [SerializeField] LayerMask groundLayerMask = ~0;
 
-    [Header("Yağış")]
-    [Tooltip("Kar yüzeyinin kenarını kıran gürültü dokusu (spec §8.2, §16).")]
+    [Header("Precipitation")]
+    [Tooltip("Breakup noise texture for snow margins (spec §8.2, §16).")]
     [SerializeField] Texture2D breakupNoise;
 
-    [Header("Görünüm")]
-    [Tooltip("Gölgede kalan karın aldığı mavimsi ton (spec §14.3).")]
+    [Header("Appearance")]
+    [Tooltip("Cool ambient shadow tint for snow (spec §14.3).")]
     [SerializeField] Color shadowTint = new(0.66f, 0.76f, 0.95f);
 
-    [Tooltip("İnce karın ışığı geçirme şiddeti.")]
+    [Tooltip("Translucency strength for shallow snow layers.")]
     [SerializeField, Range(0f, 2f)] float translucencyStrength = 0.6f;
 
-    [Header("Parıltı (spec §14.4)")]
-    /// HÜCRE BOYU = PARILTININ EKRANDAKİ BOYU. Bir hücre en fazla bir kristal
-    /// parlatıyor, dolayısıyla nokta hücre kadar büyük görünüyor. 4 mm'de
-    /// noktalar iri kalıyordu (kullanıcı bildirdi: "noktacıklar çok büyük,
-    /// daha minik olmalı"). 1.5 mm gerçek kar kristali ölçeğine yakın.
-    [Tooltip("Parıltı hücresinin dünya boyu, metre.")]
+    [Header("Sparkle (spec §14.4)")]
+    [Tooltip("World size of sparkle crystal cell, meters.")]
     [SerializeField] float sparkleCellSize = 0.0008f;
 
-    [Tooltip("Piksel başına hedeflenen parıltı olasılığı. Mesafeden bağımsız tutuyor.")]
+    [Tooltip("Target sparkle probability per pixel.")]
     [SerializeField] float sparkleDensity = 0.002f;
 
-    [Tooltip("Parıltı konisinin keskinliği.")]
+    [Tooltip("Sparkle specular reflection sharpness.")]
     [SerializeField] float sparkleSharpness = 8f;
 
-    /// YOĞUNLUK VE PARLAKLIK ÖLÇÜLÜ TUTULUYOR. Önce 0.06 / 12 kullanıldı;
-    /// kar yüzeyi sürekli kıvılcım saçıyordu ve kullanıcı "çok abartı, yapay
-    /// duruyor" diye bildirdi. Gerçek karda parıltı seyrektir: kristallerin
-    /// yalnız güneşi tam yansıtan azınlığı göze çarpar.
-    [Tooltip("Parıltının parlaklığı.")]
+    [Tooltip("Sparkle intensity multiplier.")]
     [SerializeField] float sparkleIntensity = 7f;
 
     [Header("Tessellation")]
-    /// KAR YÜZEYİ GEOMETRİ, NORMAL HARİTASI DEĞİL.
-    ///
-    /// Terrain üçgenleri kameraya göre bölünüp kar yüzeyinin yüksekliği kadar
-    /// kaydırılıyor. Normal haritası silüete ve örtüşmeye katkı vermiyor;
-    /// sıyırtma açıda bir yüzeyin görünümünü tamamen o ikisi belirliyor.
-    [Tooltip("En yüksek bölme faktörü. Donanım tavanı 64; Terrain köşe " +
-             "aralığı 7.32 m olduğu için 64'te en ince geometri 11.4 cm.")]
+    [Tooltip("Maximum tessellation factor (hardware max 64).")]
     [SerializeField, Range(1f, 64f)] float tessMax = 64f;
 
-    [Tooltip("Faktörün tam olduğu mesafe (m).")]
+    [Tooltip("Distance where tessellation factor is fully applied, meters.")]
     [SerializeField, Min(1f)] float tessNear = 15f;
 
-    [Tooltip("Faktörün 1'e indiği mesafe (m). Ötesinde bölme yok.")]
+    [Tooltip("Distance where tessellation drops to 1, meters.")]
     [SerializeField, Min(2f)] float tessFar = 60f;
 
-    [Header("Yüzey dokuları")]
-    /// DÖRT KAR YÜZEYİ, DÖRT FİZİKSEL DURUM.
-    ///
-    /// Kar rengi eskiden yalnız yoğunluktan türeyen iki sabit arasında
-    /// lerp'leniyordu; yüzeyin kendi dokusu yoktu ve izin prosedürel kenarı
-    /// çevresindeki boş renge oturmuyordu (kullanıcı bildirdi).
-    ///
-    /// Dokular GLOBAL yayınlanıyor: kar mesh'i ve arazi AYNI dokuyu görmek
-    /// zorunda. Mesh yalnız yerel sapmayı çiziyor, düz alanı arazi çiziyor;
-    /// ikisi farklı doku kullansaydı sınır yine kendini gösterirdi.
-    [Tooltip("Taze düşmüş örtü — düz, özelliksiz.")]
+    [Header("Surface Textures")]
+    [Tooltip("Fresh powder snow surface textures.")]
     [SerializeField] Texture2D surfTazeColor, surfTazeNormal, surfTazeRough;
 
-    [Tooltip("Kuru soğuk toz kar — ince taneli.")]
+    [Tooltip("Dry cold powder snow surface textures.")]
     [SerializeField] Texture2D surfTozColor, surfTozNormal, surfTozRough;
 
-    [Tooltip("Yerleşmiş / sıkışmış kar — topaklı.")]
+    [Tooltip("Settled / compacted snow surface textures.")]
     [SerializeField] Texture2D surfYerlesmisColor, surfYerlesmisNormal, surfYerlesmisRough;
 
-    [Tooltip("Rüzgârın işlediği yüzey — oluklu, sastrugi.")]
-    [SerializeField] Texture2D surfRuzgarColor, surfRuzgarNormal, surfRuzgarRough;
+    [Tooltip("Wind-sculpted sastrugi snow surface textures.")]
+    [SerializeField] Texture2D surfWindColor, surfWindNormal, surfWindRough;
 
-    [Tooltip("Bir döşemenin kapladığı metre.")]
+    [Tooltip("Tiling scale in meters.")]
     [SerializeField] float surfTileMeters = 2.5f;
 
-    [Tooltip("Doku katkısının gücü. 0 = eski düz renk.")]
+    [Tooltip("Surface texture blending strength (0 = uniform color).")]
     [SerializeField, Range(0f, 1f)] float surfStrength = 0.35f;
 
-    [Header("Nesne üstü kar (spec §16)")]
-    [Tooltip("Bu eğimin altındaki yüzeylerde kar tutmaz.")]
+    [Header("Object Snow Coverage (spec §16)")]
+    [Tooltip("Slope threshold below which snow accumulates on objects.")]
     [SerializeField, Range(0f, 1f)] float coverSlopeThreshold = 0.25f;
 
-    [Tooltip("Eğim maskesinin keskinliği.")]
+    [Tooltip("Slope coverage mask sharpness.")]
     [SerializeField] float coverSlopeSharpness = 1.6f;
 
-    [Tooltip("Kenar gürültüsünün dünya ölçeği.")]
+    [Tooltip("World scale of edge breakup noise.")]
     [SerializeField] float coverBreakupScale = 1.8f;
 
-    [Tooltip("Kenar gürültüsünün ağırlığı.")]
+    [Tooltip("Edge breakup noise strength.")]
     [SerializeField, Range(0f, 1f)] float coverBreakupStrength = 0.55f;
 
-    [Tooltip("Kenarın ne kadar keskin bittiği.")]
+    [Tooltip("Coverage boundary edge sharpness.")]
     [SerializeField] float coverEdgeSharpness = 4f;
 
-    [Tooltip("Nesne üstündeki karın kalınlığı, metre.")]
+    [Tooltip("Snow layer thickness on objects, meters.")]
     [SerializeField] float coverThickness = 0.04f;
 
-    [Tooltip("Kenarın yuvarlanma payı.")]
+    [Tooltip("Edge bulge factor.")]
     [SerializeField] float coverEdgeBulge = 0.35f;
 
-    [Header("Kar yağışı (spec §17)")]
-    [Tooltip("Uzaktaki tanenin asgari ekran boyu, piksel. Altında kar kaybolur ve TAA'da titrer.")]
-    // UZAKTAKİ TANE 1.3 PİKSELDE FAZLA KESKİN.
-    //
-    // Taban yol doğru: tane asgari boya büyütülüp `subPixel` ile aynı oranda
-    // söndürülüyor, yani enerji korunuyor. Ama 1.3 piksellik bir leke dokunun
-    // alfa kenarını tek pikselde bitiriyor ve uzaktaki kar KESKİN NOKTA olarak
-    // okunuyor (kullanıcı bildirdi). Gerçekte uzak kar puslanır.
-    //
-    // Ayak izi büyütülüp ışık aynı oranda kısılınca leke yumuşuyor; toplam
-    // parlaklık değişmiyor çünkü `subPixel` boyun karesiyle bölüyor.
+    [Header("Snowfall (spec §17)")]
+    [Tooltip("Minimum screen size of distant snowflakes, pixels.")]
     [SerializeField] float minPixelSize = 2.4f;
 
-    [Tooltip("Tanenin takla frekansı, rad/s.")]
+    [Tooltip("Flake flutter frequency, rad/s.")]
     [SerializeField] float flutterFrequency = 5.5f;
 
-    [Tooltip("Taklanın genliği, metre.")]
+    [Tooltip("Flake flutter amplitude, meters.")]
     [SerializeField] float flutterAmplitude = 0.35f;
 
-    [Tooltip("Gece lambaların altında görünsünler diye küçük bir yayınım.")]
+    [Tooltip("Flake emissive brightness under night lighting.")]
     [SerializeField] float flakeEmissive = 1f;
 
-    [Tooltip("Yer savrulmasının doğum hızı, tane/saniye.")]
+    [Tooltip("Spindrift blowing snow spawn rate, flakes/second.")]
     [SerializeField] float spindriftRate = 6000f;
 
-    [Header("Kar durumu başlangıcı")]
-    [Tooltip("Bölge dışındaki ve yeni açılan şeritteki SWE, metre.")]
+    [Header("Initial State")]
+    [Tooltip("Default SWE outside active region and on newly scrolled margins, meters.")]
     [SerializeField] float defaultSwe = 0f;
 
-    [Tooltip("Bölge dışındaki ve yeni açılan şeritteki normalize yoğunluk.")]
+    [Tooltip("Default normalized density outside active region.")]
     [SerializeField, Range(0f, 1f)] float defaultRhoN = 0.12f;
 
     public SnowQualityPreset Quality => quality;
@@ -192,9 +155,9 @@ public class SnowSettings : ScriptableObject
     public Texture2D SurfYerlesmisColor => surfYerlesmisColor;
     public Texture2D SurfYerlesmisNormal => surfYerlesmisNormal;
     public Texture2D SurfYerlesmisRough => surfYerlesmisRough;
-    public Texture2D SurfRuzgarColor => surfRuzgarColor;
-    public Texture2D SurfRuzgarNormal => surfRuzgarNormal;
-    public Texture2D SurfRuzgarRough => surfRuzgarRough;
+    public Texture2D SurfWindColor => surfWindColor;
+    public Texture2D SurfWindNormal => surfWindNormal;
+    public Texture2D SurfWindRough => surfWindRough;
     public float SurfTileMeters => surfTileMeters;
 
     public float SurfStrength => surfStrength;
@@ -213,10 +176,6 @@ public class SnowSettings : ScriptableObject
     public float FlakeEmissive => flakeEmissive;
     public float SpindriftRate => spindriftRate;
 
-    /// SINAMA GEÇERSİZ KILMASI. `NonSerialized`: asset'e hiç yazılmıyor,
-    /// Play'den çıkınca ve her derlemede kendiliğinden sıfırlanıyor. Geri
-    /// almayı unutmak MÜMKÜN DEĞİL — ayar dosyasına elle sayı yazmanın
-    /// yerine bunun için var.
     [System.NonSerialized] float testSweOverride = -1f;
 
     public bool HasTestSnow => testSweOverride >= 0f;

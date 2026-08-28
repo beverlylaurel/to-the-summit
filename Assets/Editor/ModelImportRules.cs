@@ -1,14 +1,14 @@
 using UnityEditor;
 using UnityEngine;
 
-/// MODEL VE DOKU İÇE AKTARMA AYARLARI. Inspector'dan elle tıklanmaz: model yeniden
-/// indirildiğinde ayarların da yeniden kurulması gerekirdi ve o an unutulur.
+/// MODEL AND TEXTURE IMPORT RULES. Not configured manually in the Inspector:
+/// when a model is re-downloaded, settings would need manual re-setup and get forgotten.
 ///
-/// RIG YALNIZ KARAKTERDE. Humanoid bütün `Assets/Models/` ağacına uygulanıyordu ve
-/// bisikleti insan iskeleti sanıp "Hips bulunamadı" hatası basıyordu; üstelik her içe
-/// aktarmada kurulum betiğinin rig ayarını eziyordu. Kapsam klasöre bağlandı.
+/// RIG ONLY ON CHARACTER. Humanoid was being applied across the entire `Assets/Models/` tree,
+/// treating the bicycle as a human skeleton and throwing "Hips not found" errors, while overwriting
+/// setup script rig configurations on every import. Scope is scoped to subdirectories.
 ///
-/// Yalnızca `Assets/Models/` altındaki dosyalara dokunur.
+/// Only touches files under `Assets/Models/`.
 public class ModelImportRules : AssetPostprocessor
 {
     const string Root = "Assets/Models/";
@@ -17,9 +17,9 @@ public class ModelImportRules : AssetPostprocessor
     bool InScope => assetPath.StartsWith(Root);
     bool IsCharacter => assetPath.StartsWith(Character);
 
-    /// Kural değişince modellerin yeniden içe aktarılmasını Unity buradan anlıyor. Sayı
-    /// artmazsa dosyalar eski ayarla kalıyor ve değişiklik ancak elle "Reimport" ile
-    /// uygulanıyor — yani unutuluyor. Kuralların içeriği her değiştiğinde artırılır.
+    /// Unity detects model reimport requirement when rules change via this version number.
+    /// Without incrementing, files retain stale settings requiring manual "Reimport" which gets forgotten.
+    /// Increment whenever rule logic changes.
     public override uint GetVersion() => 3;
 
     void OnPreprocessModel()
@@ -29,9 +29,9 @@ public class ModelImportRules : AssetPostprocessor
         var importer = (ModelImporter)assetImporter;
         bool character = IsCharacter;
 
-        // HUMANOID yalnız karakterde: Unity'nin insan iskeleti soyutlaması sayesinde
-        // kemik isimleri ne olursa olsun animasyon aynı avatara oturuyor. Bisiklette
-        // iskelet yok — rig kurulmaya çalışılırsa içe aktarma hata basıyor.
+        // HUMANOID only on character: Unity's human skeleton abstraction retargets
+        // animations regardless of bone naming. The bike has no skeleton — setting up
+        // a rig throws import errors.
         importer.animationType = character
             ? ModelImporterAnimationType.Human
             : ModelImporterAnimationType.None;
@@ -41,38 +41,36 @@ public class ModelImportRules : AssetPostprocessor
         importer.importAnimation = character;
         importer.importBlendShapes = character;
 
-        // Materyali FBX'ten ALMIYORUZ. Gömülü materyal Standard shader'a bağlı gelir,
-        // URP'de macenta çizer. Kendi materyalimizi kurulum betiği atıyor.
+        // DO NOT import material from FBX. Embedded materials link to Standard shader,
+        // rendering magenta in URP. Custom materials are assigned by the bootstrap script.
         importer.materialImportMode = ModelImporterMaterialImportMode.None;
 
         importer.importCameras = false;
         importer.importLights = false;
         importer.importVisibility = false;
 
-        // Karakter dışındaki modeller CPU'dan okunuyor: parça ölçümü ve bölge aracı
-        // mesh verisine erişiyor. Karakterde gerek yok, okunabilirlik mesh'in ikinci bir
-        // kopyasını bellekte tutuyor.
+        // Non-character models read from CPU: part measurement and zoning tools
+        // access mesh data. Not needed on character, where readability keeps a duplicate mesh copy in memory.
         importer.isReadable = !character;
 
-        // Teğet yalnız normal haritası olan modelde gerekli. Bisiklet yüzeyi prosedürel
-        // ve üç milyon üçgen — teğet dizisi bedava değil.
+        // Tangents only necessary on models with normal maps. Bike surface is procedural
+        // and three million triangles — tangent arrays are not free.
         importer.importTangents = character
             ? ModelImporterTangents.CalculateMikk
             : ModelImporterTangents.None;
 
-        // Dosyanın kendi ölçeği metre cinsinden geliyor; Unity'nin 0.01 varsayılanı
-        // modeli santimetreye çevirip minyatüre döndürüyordu.
+        // File scale arrives in meters; Unity's 0.01 default converted model to centimeters, shrinking to miniature.
         importer.useFileScale = true;
         importer.globalScale = 1f;
     }
 
-    /// KÖŞE RENGİ SIFIRLANIR. Üretilen modelde köşe rengi var ve bisiklet gölgelendiricisi
-    /// onu ELLE BOYANAN MALZEME MASKESİ olarak okuyor; taşınsaydı hiç boyanmamış yüzey
-    /// kendiliğinden boyalı görünürdü.
+    /// VERTEX COLOR CLEARED. Generated models carry vertex colors and the bike shader
+    /// reads them as MANUALLY PAINTED MATERIAL MASKS; if carried over, unpainted surfaces
+    /// would appear painted by default.
     ///
-    /// Renk akışı SİLİNMİYOR, sıfırlanıyor. Akış hiç yoksa gölgelendirici köşe rengini
-    /// beyaz okuyor — yani bütün maske kanalları açık, bütün bisiklet tek malzemeye
-    /// düşüyor. Sıfır dolu bir akış bu tuzağı kapatıyor.
+    /// Color stream is NOT REMOVED, but zeroed out. If stream is missing, shader reads
+    /// vertex color as white — opening all mask channels and collapsing entire bike to one material.
+    /// A zeroed stream closes this trap.
     void OnPostprocessModel(GameObject model)
     {
         if (!InScope || IsCharacter) return;
@@ -98,9 +96,8 @@ public class ModelImportRules : AssetPostprocessor
             return;
         }
 
-        // Metallic/smoothness VERİ, renk değil: sRGB eğrisinden geçerse okunan
-        // pürüzsüzlük yanlış olur. Smoothness alfa kanalında duruyor, o yüzden alfa
-        // saydamlık olarak yorumlanmamalı.
+        // Metallic/smoothness is DATA, not color: passing through sRGB corrupts smoothness readings.
+        // Smoothness resides in alpha channel, so alpha must not be interpreted as transparency.
         if (assetPath.EndsWith("_MetallicSmoothness.png"))
         {
             importer.sRGBTexture = false;

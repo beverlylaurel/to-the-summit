@@ -1,20 +1,17 @@
 using UnityEngine;
 
-/// Yükseklik alanı üzerinde çalışan İŞLEMLER. Arayüz yok, durum yok — hepsi
-/// `float[]` alıp `float[]` değiştiriyor.
+/// OPERATIONS running on heightfields. Stateless, UI-free — taking `float[]` and mutating `float[]`.
 ///
-/// NEDEN AYRI DOSYA: pencere fırçaları ve önizlemeyi yönetiyor; buradakiler tüm
-/// araziye (ya da bir maskeye) uygulanan toplu işlemler. İkisi karışınca pencere
-/// okunmaz hâle geliyordu.
+/// WHY SEPARATE FILE: Window handles brushes and previews; operations here are batch transforms applied to
+/// the whole terrain (or through a mask). Mixing both made window unreadable.
 ///
-/// KOT BİRİMİ METRE. Bütün eşikler (duruş açısı, çökelme, teras yüksekliği) metre
-/// cinsinden ve hücre boyu `cell` parametresinden geliyor; ızgara çözünürlüğü
-/// değişince sonuç değişmiyor.
+/// ELEVATION UNITS IN METERS. All thresholds (talus angle, deposition, terrace height) in meters
+/// and cell size derived from `cell` parameter; results remain invariant under grid resolution changes.
 public static class TerrainOps
 {
-    // ============================================================ yardımcılar
+    // ============================================================ Helpers
 
-    /// Ayrılabilir kutu bulanıklaştırma. Kayan toplam: maliyet yarıçapla büyümüyor.
+    /// Separable box blur. Running sum: complexity does not grow with radius.
     public static void Blur(float[] h, int n, int radius)
     {
         if (radius < 1) return;
@@ -45,8 +42,8 @@ public static class TerrainOps
         }
     }
 
-    /// Maskeyle harmanlama. Bütün işlemler sonucu buradan geçiriyor: maske yoksa
-    /// tamamı, varsa yalnız maskenin gösterdiği yer değişiyor.
+    /// Blending with mask. All operations route results through here: full terrain if mask is null,
+    /// otherwise masked subset.
     static void Blend(float[] h, float[] result, float[] mask, float amount)
     {
         for (int i = 0; i < h.Length; i++)
@@ -56,13 +53,12 @@ public static class TerrainOps
         }
     }
 
-    // ============================================================ aşınma
+    // ============================================================ Erosion
 
-    /// TERMAL AŞINMA. Gevşek malzeme duruş açısının üstünde durmaz, kayar.
+    /// THERMAL EROSION. Loose material exceeding angle of repose slips downhill.
     ///
-    /// Fiziksel: eğim eşiği aşan fark komşulara paylaştırılıyor. Bulanıklaştırmadan
-    /// farkı sırt hatlarını ve vadi ağını KORUMASI — yalnız taşıyamayacağı kadar dik
-    /// yüzleri indiriyor.
+    /// Distributes gradient excess exceeding threshold to downhill neighbors.
+    /// Unlike blur, it PRESERVES ridges and drainage valleys — only lowering faces steeper than talus angle.
     public static void Thermal(float[] h, int n, float cell, float talusDeg, float rate,
                                int iters, float[] mask = null)
     {
@@ -101,14 +97,12 @@ public static class TerrainOps
         }
     }
 
-    /// HİDROLİK AŞINMA — damlacık modeli.
+    /// HYDRAULIC EROSION — Droplet model.
     ///
-    /// Her damla rastgele bir yere düşüyor, eğim yönünde akıyor, hızlandıkça malzeme
-    /// çözüyor, yavaşlayınca çökeltiyor. Termal aşınmanın veremediği şeyi veriyor:
-    /// **vadi ağı** — dallanan oluklar, birikinti yelpazeleri, sırtların keskinleşmesi.
+    /// Droplets spawn randomly, flow along gradient, dissolve sediment as they accelerate, and deposit as they slow.
+    /// Provides dendritic valley networks, alluvial fans, and ridge sharpening.
     ///
-    /// Termal olan malzemeyi komşuya taşır ve yüzeyi düzler; hidrolik olan malzemeyi
-    /// UZAĞA taşır ve yüzeyi oyar. İkisi ayrı olgu, biri diğerinin yerine geçmiyor.
+    /// Thermal moves material to neighbors smoothing surface; hydraulic transports material far downhill incising valleys.
     public static void Hydraulic(float[] h, int n, float cell, int droplets, int maxSteps,
                                  float inertia, float capacity, float erode, float deposit,
                                  float evaporate, float gravity, int seed,
@@ -116,35 +110,16 @@ public static class TerrainOps
     {
         var rnd = new System.Random(seed);
 
-        // YÜKSEKLİK NORMALİZE EDİLİYOR — SABİTLER ONU VARSAYIYOR.
-        //
-        // Referans uygulama (SebLague/Hydraulic-Erosion, MIT) yükseklik alanını 0-1
-        // aralığında tutuyor ve bütün katsayılar o ölçeğe göre seçilmiş. Bizim alanımız
-        // METRE: aynı sabitlerle `speed² += -dh · gravity` her adımda yüzlerce metrelik
-        // bir farkla besleniyor, hız ve taşıma kapasitesi ~1000 kat şişiyor. Damla dev
-        // miktarda malzeme koparıp bıraktığı yere kule dikiyordu — ekranda sivri uçlar.
-        //
-        // Ölçüldü: metre uzayında tek geçiş 6001 m'lik dağı 8000 m tavanına dayadı.
+        // HEIGHT NORMALIZED TO [0, 1] — CONSTANTS ASSUME NORMALIZED DOMAIN.
+        // Reference implementation (SebLague/Hydraulic-Erosion, MIT) maintains heightfield in [0, 1].
+        // In raw meter domain, speed^2 += -dh * gravity would explode by ~1000x, creating spire artifacts.
         float lo = float.MaxValue, hi = float.MinValue;
         for (int i = 0; i < h.Length; i++) { if (h[i] < lo) lo = h[i]; if (h[i] > hi) hi = h[i]; }
         float span = Mathf.Max(hi - lo, 1f);
         for (int i = 0; i < h.Length; i++) h[i] = (h[i] - lo) / span;
 
-        // EGIM TABANI ARAZIDEN TURUYOR, SABIT DEGIL.
-        //
-        // Referans uygulamada taban 0.01'di ve o uzayda tipik hucre egimleriyle ayni
-        // buyuklukteydi. Bizim alanimizda 30 derecelik yamacta bile hucre basina dusus
-        // 16.9 m / span 6028 m = 0.0028, yani tabanin ucte biri. `Max` her zaman tabani
-        // seciyor ve TASIMA KAPASITESI EGIMDEN BAGIMSIZ SABIT kaliyor.
-        //
-        // Sabit kapasite asinma degil DIFUZYONDUR: damla dik yamacta da duzlukte de ayni
-        // miktari tasir, vadi oymaz, kabartiyi duzler. Olculdu (asama asama bant raporu):
-        // tohum 2250 m bandini 84'e cikardi, asinma 57'ye dusurdu; 300 m bandi 30'dan
-        // 8'e indi. Vadi acmasi gereken adim orta olcegin %70-80'ini siliyordu.
-        //
-        // Taban artik alanin KENDI ortalama egiminin kucuk bir payi: yalnizca duz
-        // zeminde sifira bolmeyi engelliyor, yamacta kapasiteyi egim suruyor. Boylece
-        // dagin boyu ya da izgara sikligi degisince yeniden ayar gerekmiyor.
+        // SLOPE FLOOR DERIVED FROM TERRAIN, NOT FIXED CONSTANT.
+        // Derived from small fraction of terrain mean gradient to avoid constant diffusion on steep slopes.
         double slopeSum = 0.0; int slopeCnt = 0;
         for (int z = 1; z < n - 1; z += 4)
         for (int x = 1; x < n - 1; x += 4)
@@ -172,15 +147,14 @@ public static class TerrainOps
                 float fx = px - ix, fz = pz - iz;
                 int i = iz * n + ix;
 
-                // İki doğrusal yükseklik ve gradyan.
+                // Bilinear height and gradient.
                 float h00 = h[i], h10 = h[i + 1], h01 = h[i + n], h11 = h[i + n + 1];
                 float gx = (h10 - h00) * (1f - fz) + (h11 - h01) * fz;
                 float gz = (h01 - h00) * (1f - fx) + (h11 - h10) * fx;
                 float hOld = h00 * (1 - fx) * (1 - fz) + h10 * fx * (1 - fz)
                            + h01 * (1 - fx) * fz + h11 * fx * fz;
 
-                // ATALET. Damla yönünü bir anda değiştirmiyor; yoksa her adımda en dik
-                // yöne sıçrayıp ızgaraya hizalı zikzak oluklar açıyor.
+                // INERTIA. Smooth direction changes prevent grid-aligned zigzag rills.
                 dx = dx * inertia - gx * (1f - inertia);
                 dz = dz * inertia - gz * (1f - inertia);
                 float len = Mathf.Sqrt(dx * dx + dz * dz);
@@ -191,23 +165,19 @@ public static class TerrainOps
                 int nx = (int)px, nz = (int)pz;
                 if (nx < 1 || nz < 1 || nx >= n - 2 || nz >= n - 2) break;
 
-                // IKI DOGRUSAL, TAM SAYI DEGIL. Referans uygulama iki yuksekligi de
-                // ayni sekilde ornekliyor; burada eski yukseklik iki dogrusal, yenisi
-                // tam sayi konumdan okunuyordu. Fark `dh`'ye hucre ici varyasyon kadar
-                // RASTGELE bilesen katiyor ve damla rastgele karar veriyor: olculdu,
-                // kapali cukur orani %3.13 iken duzeltmeyle %1.36'ya indi.
+                // Bilinear sample for new height to avoid subpixel step bias.
                 float fnx = px - nx, fnz = pz - nz;
                 int jn = nz * n + nx;
                 float hNew = h[jn] * (1 - fnx) * (1 - fnz) + h[jn + 1] * fnx * (1 - fnz)
                            + h[jn + n] * (1 - fnx) * fnz + h[jn + n + 1] * fnx * fnz;
                 float dh = hNew - hOld;
 
-                // Taşıma kapasitesi hıza ve eğime bağlı; yokuş yukarı giderse sıfır.
+                // Sediment capacity depends on speed and slope; zero when moving uphill.
                 float cap = Mathf.Max(-dh, slopeFloor) * speed * water * capacity;
 
                 if (sediment > cap || dh > 0f)
                 {
-                    // Çökelme: çukura girdiyse yalnız çukuru dolduracak kadar.
+                    // Deposition: fills depression if moving uphill.
                     float amt = dh > 0f ? Mathf.Min(dh, sediment) : (sediment - cap) * deposit;
                     sediment -= amt;
                     Deposit(h, n, i, fx, fz, amt, mask);
@@ -238,12 +208,7 @@ public static class TerrainOps
         h[i + n + 1] += amt * fx * fz * m0;
     }
 
-    /// Aşınma bir FIRÇAYA yayılıyor: tek hücreden çekmek iğne deliği açıyor.
-    ///
-    /// YARIÇAP TARAKLANMAYI BELİRLİYOR. Küçük yarıçapta her damla kendi tek hücrelik
-    /// oluğunu kazıyor; pürüzsüz bir yamaçta bütün düşüş hatları paralel olduğu için
-    /// ekranda dikey taranmış çizgiler kalıyor. Geniş fırça komşu damlaların oluklarını
-    /// birleştiriyor ve dallanan vadi ağı çıkıyor.
+    /// Erosion distributed across a brush radius to prevent single-texel pinholes.
     static void Erode(float[] h, int n, int cx, int cz, float amt, int radius, float[] mask)
     {
         if (amt <= 0f) return;
@@ -270,14 +235,10 @@ public static class TerrainOps
         }
     }
 
-    // ============================================================ biçim
+    // ============================================================ Shape Operations
 
-    /// FRAKTAL GÜRÜLTÜ. Her oktav döndürülüyor — hizalı oktavlar ızgara artefaktı
-    /// üretiyor.
-    ///
-    /// NYQUIST SINIRI ZORUNLU: ızgara 2 hücreden kısa dalgayı taşıyamaz, istenirse
-    /// geri katlanıp hücre-hücre zikzağa döner. Bu proje o hatayla bir gün kaybetti;
-    /// sınır burada, çağıran yerde değil.
+    /// FRACTAL NOISE. Rotates each octave to eliminate grid alignment artifacts.
+    /// NYQUIST LIMIT ENFORCED: Wavelengths below 2 cells are discarded to prevent aliasing.
     public static void FractalNoise(float[] h, int n, float cell, float wavelengthM,
                                     int octaves, float amplitudeM, float persistence,
                                     float lacunarity, int seed, float[] mask = null)
@@ -317,8 +278,7 @@ public static class TerrainOps
             h[i] += acc[i] * k * (mask == null ? 1f : mask[i]);
     }
 
-    /// WARP — alanı kendi gürültüsüyle yatayda bükme. Düzgün biçimleri organikleştirir:
-    /// dairesel etek dalgalı kıyıya, düz sırt kıvrımlı sırta döner.
+    /// DOMAIN WARP — Warps heightfield horizontally using noise to organicize geometric contours.
     public static void Warp(float[] h, int n, float cell, float wavelengthM, float strengthM,
                             int seed, float[] mask = null)
     {
@@ -349,12 +309,7 @@ public static class TerrainOps
         }
     }
 
-    /// TERAS / STRATİFİKASYON. Kotu basamaklara oturtuyor — tortul kaya katmanları,
-    /// aşınmış plato kenarları.
-    ///
-    /// `sharpness` basamağın keskinliği: 0'da hiç görünmez, 1'de dik duvar. Sert
-    /// kırpma kullanılmıyor, `smoothstep` ile — dik duvarın türevi kırılınca ekranda
-    /// Mach bandı çıkıyor.
+    /// TERRACING / STRATIFICATION. Quantizes elevations into steps with smoothstep transitions.
     public static void Terrace(float[] h, int n, float stepM, float sharpness,
                                float[] mask = null)
     {
@@ -370,8 +325,7 @@ public static class TerrainOps
         }
     }
 
-    /// KESKİNLEŞTİR / YUMUŞAT. Yüksek geçiren kazanç: 1'in üstü kabartıyı güçlendirir,
-    /// altı söndürür. Yarıçap metre cinsinden ve Nyquist'in üstünde tutuluyor.
+    /// SHARPEN / SMOOTH. High-pass gain filtering across elevation field.
     public static void Sharpen(float[] h, int n, float cell, float radiusM, float gain,
                                float[] mask = null)
     {
@@ -384,8 +338,7 @@ public static class TerrainOps
         }
     }
 
-    /// Kot aralığını yeniden eşler. Dağın boyunu değiştirmenin doğru yolu: bütün
-    /// kabartı oranını koruyor.
+    /// Remaps elevation range preserving relative relief.
     public static void Remap(float[] h, float newMin, float newMax, float[] mask = null)
     {
         float lo = float.MaxValue, hi = float.MinValue;
@@ -400,9 +353,7 @@ public static class TerrainOps
         }
     }
 
-    /// RADYAL KONİ DAMGASI. Boş düzlemde işe başlamak için: merkeze bir kütle koyup
-    /// üstünde çalışmaya devam ediliyor. Kesit `(1-r)²` — ovaya TEĞET iner, açıyla
-    /// çarpmaz; dağ ile ova arasındaki "diz" o çarpmadan doğuyor.
+    /// RADIAL CONE STAMP. Quadratic profile (1-r)^2 tangent to base plain.
     public static void Cone(float[] h, int n, float cell, float cxCell, float czCell,
                             float radiusM, float heightM, float[] mask = null)
     {
@@ -418,19 +369,8 @@ public static class TerrainOps
         }
     }
 
-    /// ETEK GEÇİŞİ. Kütleye dokunmadan, arazinin dış bandındaki kabartıyı ovaya
-    /// indirir. Dağı küçültmez — yalnız eteğin kenara çarpmadan inmesini sağlar.
-    ///
-    /// MESAFE ÇEBİŞEV (kare), YARIÇAP DEĞİL. Arena kare; dairesel bir halka köşeleri
-    /// yüksek bırakır ve oyuncu köşeye yürüyünce duvar bulur. Aynı ders eski maskede
-    /// de ölçülmüştü.
-    ///
-    /// GEÇİŞ SMOOTHSTEP: iki ucunda da türevi sıfır, yani ne dağın eteğinde ne ovanın
-    /// başında diz oluşuyor. Doğrusal bir rampa tam da "dağ absürt bir anda yükseliyor"
-    /// hissini veren kırılmayı bırakıyor.
-    ///
-    /// `keepRelief` dış uçta hayatta kalan kabartı payı: 0 ise ova cam gibi düz olur
-    /// ve yapay durur, 0.1-0.2 arası hafif tepecikli düz bırakıyor.
+    /// APRON TRANSITION. Smoothly attenuates relief along outer perimeter band towards base plain level.
+    /// Uses Chebyshev (square) distance matching square arena bounds.
     public static void Apron(float[] h, int n, float cell, float innerM, float outerM,
                              float plainLevel, float keepRelief)
     {
@@ -443,7 +383,7 @@ public static class TerrainOps
         {
             float dz = Mathf.Abs(z - centre) * cell;
             float dx = Mathf.Abs(x - centre) * cell;
-            float d = Mathf.Max(dx, dz);                 // Çebişev
+            float d = Mathf.Max(dx, dz);                 // Chebyshev
             if (d <= inner) continue;
 
             float t = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(inner, outer, d));
@@ -454,11 +394,7 @@ public static class TerrainOps
         }
     }
 
-    /// OVAYI YUMUŞATIR. Belirli bir kotun altındaki kabartıyı yerel ortalamaya doğru
-    /// çeker — düzleştirmez, ALÇALTIR: tepecikler kalır ama boyları küçülür.
-    ///
-    /// Sabit bir kota oturtmak ovayı masa gibi yapıyor; yerel ortalamaya çekmek
-    /// biçimi koruyup genliği düşürüyor.
+    /// CALMS LOWLAND FORELAND. Pulls elevations below threshold toward local mean, dampening mounds without flattening.
     public static void CalmLowland(float[] h, int n, float cell, float belowM,
                                    float featherM, float keepRelief, float scaleM)
     {
@@ -467,7 +403,6 @@ public static class TerrainOps
 
         for (int i = 0; i < h.Length; i++)
         {
-            // Yalnız alçak yerler: eşiğin üstü hiç etkilenmiyor.
             float w = 1f - Mathf.SmoothStep(0f, 1f,
                           Mathf.InverseLerp(belowM - featherM, belowM + featherM, h[i]));
             if (w <= 0.001f) continue;
@@ -477,28 +412,8 @@ public static class TerrainOps
         }
     }
 
-    /// AKARSU OYMASI — akarsu gucu yasasi dz = -K * A^m * S^n, artı yamac difuzyonu.
-    ///
-    /// NEDEN DAMLA ASINMASI DEGIL: damla yontemi bu olcekte vadi OYMUYOR, DUZLUYOR.
-    /// Asama asama olculdu — tohum 2250 m bandini 84'e cikardi, damla asinmasi 56'ya
-    /// dusurdu; 300 m bandi 30'dan 6'ya indi ve kapali cukur %1.8'den %3.1'e CIKTI
-    /// (izole delik aciyor, kanal degil). Firca yaricapi, kapasite, cokelme orani,
-    /// atalet ve damla sayisi tek tek tarandi; hicbir rejim oymadi. Yontem bu hucre
-    /// boyunda yapisal olarak difuzif.
-    ///
-    /// Bu yontem vadiyi suyun TOPLANDIGI yere acar: once akis yonu (D8), sonra yukaridan
-    /// asagiya tek gecisle drenaj alani, sonra alan ve egimle orantili oyma. Dendritik
-    /// ag kendiliginden cikar; egrilik carpikligi negatiften +3'e gecer (vadi tabani
-    /// icbukey, dar ve derin oldugu icin laplasyen dagilimi pozitife carpilir).
-    ///
-    /// DIFUZYON ZORUNLU ESLIK: yalniz oyma tek hucre genisliginde yariklar birakiyor,
-    /// p90 egim 64 dereceye ciktiyor (gercek alp arazisi 50-58). Yamac difuzyonu
-    /// kanali genisletip omuzu yuvarliyor — gercek arazi evrimi modeli de zaten bu
-    /// ikisinin birlesimidir.
-    ///
-    /// TERMAL ASINMA BU ADIMDAN SONRA CALISTIRILMAZ. Olculdu: 38 derece talusla 40 tur
-    /// carpikligi +2.58'den -0.14'e dusuruyor, yani butun vadi yapisini siliyor, ve
-    /// en dik egimi 88'den ancak 81 dereceye indiriyor. Isini yapmadan yapiyi yikiyor.
+    /// STREAM POWER INCISION — dz = -K * A^m * S^n plus hillslope diffusion.
+    /// Incises valleys along drainage accumulation paths using D8 flow routing.
     public static void FlowIncise(float[] h, int n, float cell, float k, float m,
                                   float slopeExp, int iterations, float diffuse,
                                   float[] mask = null)
@@ -518,8 +433,7 @@ public static class TerrainOps
 
         for (int it = 0; it < iterations; it++)
         {
-            // 1) EN DIK ASAGI KOMSU. Kenar disina bakan yon elenir; alici yoksa hucre
-            //    havza cikisidir ve oyulmaz (aksi halde kenar sonsuza kadar kazilir).
+            // 1) Steepest downhill neighbor (D8).
             for (int z = 0; z < n; z++)
             for (int x = 0; x < n; x++)
             {
@@ -538,8 +452,7 @@ public static class TerrainOps
                 order[i] = i; key[i] = -h[i];
             }
 
-            // 2) DRENAJ ALANI. Yuksekten alcaga tek gecis yeterli: bir hucre islenirken
-            //    ustundeki her sey zaten toplanmis olur.
+            // 2) Drainage area accumulation in topological sort order.
             System.Array.Sort(key, order);
             for (int q = 0; q < total; q++)
             {
@@ -548,7 +461,7 @@ public static class TerrainOps
                 if (r >= 0) area[r] += area[i];
             }
 
-            // 3) OYMA.
+            // 3) Incision.
             for (int i = 0; i < total; i++)
             {
                 if (rec[i] < 0) continue;
@@ -556,7 +469,7 @@ public static class TerrainOps
                 h[i] -= inc * (mask == null ? 1f : mask[i]);
             }
 
-            // 4) YAMAC DIFUZYONU.
+            // 4) Hillslope diffusion.
             if (diffuse > 0f)
             {
                 var smooth = (float[])h.Clone();
@@ -567,23 +480,14 @@ public static class TerrainOps
         }
     }
 
-    // ============================================================ maskeler
+    // ============================================================ Masks
 
-    /// Kot bandı maskesi. Kenarlar yumuşak: sert eşik arazide kontur çizgisi bırakıyor.
+    /// Elevation band mask with feathered boundaries.
     public static float[] MaskByHeight(float[] h, int n, float lo, float hi, float feather)
     {
         var m = new float[n * n];
         for (int i = 0; i < h.Length; i++)
         {
-            // UNITY'NIN SmoothStep'i GLSL'inki DEGIL: `Mathf.SmoothStep(from, to, t)`
-            // from-to arasinda interpolasyon yapar ve t'yi 0-1'e KIRPAR. Esik olarak
-            // kullanilinca 3000 m'lik hucre icin a=350, b=-8249 cikiyor ve Clamp01
-            // sonucu SIFIR — maske her yerde olu kaliyordu. Kot/egim maskeli her islem
-            // sessizce hicbir sey yapmiyordu (olculdu: "Dogallastir" dugmesi bant
-            // tablosunu degistirmedi, yalniz maskesiz termal asama iz birakti).
-            //
-            // Dogru kalip ayni dosyada zaten var (`Apron`, `CalmLowland`): once
-            // InverseLerp ile 0-1'e indir, sonra SmoothStep(0,1,t).
             float a = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(lo - feather, lo + feather, h[i]));
             float b = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(hi - feather, hi + feather, h[i]));
             m[i] = Mathf.Clamp01(Mathf.Min(a, b));
@@ -591,7 +495,7 @@ public static class TerrainOps
         return m;
     }
 
-    /// Eğim maskesi (derece).
+    /// Slope angle mask (degrees).
     public static float[] MaskBySlope(float[] h, int n, float cell, float lo, float hi,
                                       float feather)
     {
@@ -605,7 +509,6 @@ public static class TerrainOps
             float gz = (h[zp * n + x] - h[zm * n + x]) / ((zp - zm) * cell);
             float deg = Mathf.Atan(Mathf.Sqrt(gx * gx + gz * gz)) * Mathf.Rad2Deg;
 
-            // Ayni hata (bkz. `MaskByHeight`): Unity SmoothStep esik fonksiyonu degil.
             float a = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(lo - feather, lo + feather, deg));
             float b = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(hi - feather, hi + feather, deg));
             m[z * n + x] = Mathf.Clamp01(Mathf.Min(a, b));
@@ -613,10 +516,7 @@ public static class TerrainOps
         return m;
     }
 
-    /// Dışbükeylik maskesi: pozitif taraf SIRT, negatif taraf VADİ.
-    ///
-    /// Ölçüt eğim değil `h − bulanık h`. Eğim tabanlı maske bütün yamacı seçiyor;
-    /// dışbükeylik yalnız sırtı ya da yalnız vadiyi seçiyor.
+    /// Curvature mask: positive is ridge, negative is valley.
     public static float[] MaskByCurvature(float[] h, int n, float cell, float radiusM,
                                           bool ridges, float strength)
     {

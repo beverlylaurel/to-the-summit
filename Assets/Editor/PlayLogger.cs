@@ -6,8 +6,8 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-/// Play sırasındaki hata ve uyarıları proje içindeki tek bir dosyaya yazar.
-/// Amaç: konsol içeriğini elle aktarmaya gerek kalmadan sorunu görebilmek.
+/// Writes Play mode errors and warnings into a single file in the project.
+/// Purpose: diagnose issues without requiring manual console log copying.
 [InitializeOnLoad]
 public static class PlayLogger
 {
@@ -61,15 +61,15 @@ public static class PlayLogger
         var builder = new StringBuilder();
 
         builder.AppendLine($"# Play {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-        builder.AppendLine($"Unity {Application.unityVersion}   Sahne: {scene.name}");
+        builder.AppendLine($"Unity {Application.unityVersion}   Scene: {scene.name}");
         builder.AppendLine();
-        builder.AppendLine("## Sahne");
+        builder.AppendLine("## Scene");
 
         foreach (var root in scene.GetRootGameObjects())
             builder.AppendLine($"- {root.name}{Children(root.transform)}");
 
         builder.AppendLine();
-        builder.AppendLine("## Hata ve uyarılar");
+        builder.AppendLine("## Errors and warnings");
         return builder.ToString();
     }
 
@@ -115,11 +115,11 @@ public static class PlayLogger
     {
         var builder = new StringBuilder();
         builder.AppendLine();
-        builder.AppendLine("## Özet");
+        builder.AppendLine("## Summary");
 
         if (order.Count == 0)
         {
-            builder.AppendLine("Hata veya uyarı yok.");
+            builder.AppendLine("No errors or warnings.");
             return builder.ToString();
         }
 
@@ -127,10 +127,10 @@ public static class PlayLogger
         {
             int count = repeats[key];
             if (count > 1)
-                builder.AppendLine($"{count} kez: {key.Replace('|', ' ')}");
+                builder.AppendLine($"{count} times: {key.Replace('|', ' ')}");
         }
 
-        builder.AppendLine($"Toplam {order.Count} farklı kayıt.");
+        builder.AppendLine($"Total {order.Count} distinct records.");
         return builder.ToString();
     }
 

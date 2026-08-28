@@ -28,7 +28,7 @@
 TEXTURE2D(_SnowSurfTazeColor);      TEXTURE2D(_SnowSurfTazeNormal);      TEXTURE2D(_SnowSurfTazeRough);
 TEXTURE2D(_SnowSurfTozColor);       TEXTURE2D(_SnowSurfTozNormal);       TEXTURE2D(_SnowSurfTozRough);
 TEXTURE2D(_SnowSurfYerlesmisColor); TEXTURE2D(_SnowSurfYerlesmisNormal); TEXTURE2D(_SnowSurfYerlesmisRough);
-TEXTURE2D(_SnowSurfRuzgarColor);    TEXTURE2D(_SnowSurfRuzgarNormal);    TEXTURE2D(_SnowSurfRuzgarRough);
+TEXTURE2D(_SnowSurfWindColor);    TEXTURE2D(_SnowSurfWindNormal);    TEXTURE2D(_SnowSurfWindRough);
 /// A SHARED GLOBAL SAMPLER. Declaring a SAMPLER() per texture broke in the DepthNormals
 /// pass: because that pass does not use colour the compiler culls the texture, an unpaired
 /// sampler is left, and it gives a "does not match any texture" error. URP's global sampler
@@ -43,9 +43,9 @@ float _SnowSurfStrength;
 
 struct SnowSurfaceBlend
 {
-    half3 albedoTint;   // 1 civarinda carpan
-    half  roughAdd;     // puruzluluge eklenen sapma
-    half2 normalSlope;  // egim uzayinda detay (n.xy / n.z)
+    half3 albedoTint;   // 1 civarinda multiplier
+    half  roughAdd;     // puruzluluge eklenen deviation
+    half2 normalSlope;  // slope uzayinda detay (n.xy / n.z)
 };
 
 /// Dort dokunun agirligi. Toplam 1'e normalize.
@@ -69,17 +69,17 @@ half4 SnowSurfaceWeights(float rhoN, float wet, float disturb, float3 posWS)
     // Sastrugi and grooves are EROSION forms; spec 18.0 closes erosion in shadow entirely
     // ("curvW is zeroed -> no erosion, deposition only"). In shelter the snow accumulates
     // and stays soft and flat.
-    half ruzgar = (half)(1.0 - saturate(SampleWindShadow(posWS) * 1.2));
+    half wind = (half)(1.0 - saturate(SampleWindShadow(posWS) * 1.2));
 
     // Bozulmus (uzerinden gecilmis) kar dokusunu yitirir, yerlesmise yaklasir.
     packed = max(packed, (half)saturate(disturb));
 
-    half wRuzgar    = ruzgar * (half)0.9;
-    half wToz       = kuru * ((half)1.0 - wRuzgar) * (half)0.9;
-    half wYerlesmis = packed * ((half)1.0 - wRuzgar) * ((half)1.0 - wToz);
-    half wTaze      = (half)1.0 - wRuzgar - wToz - wYerlesmis;
+    half wWind    = wind * (half)0.9;
+    half wToz       = kuru * ((half)1.0 - wWind) * (half)0.9;
+    half wYerlesmis = packed * ((half)1.0 - wWind) * ((half)1.0 - wToz);
+    half wTaze      = (half)1.0 - wWind - wToz - wYerlesmis;
 
-    half4 w = half4(max(wTaze, (half)0.0), wToz, wYerlesmis, wRuzgar);
+    half4 w = half4(max(wTaze, (half)0.0), wToz, wYerlesmis, wWind);
     return w / max(w.x + w.y + w.z + w.w, (half)1e-4);
 }
 
@@ -98,19 +98,19 @@ half4 SnowSurfaceWeights(float rhoN, float wet, float disturb, float3 posWS)
 /// winding grooves and at that slope the surface closed up with dark curls (the user
 /// reported it: "where does this dark pattern come from"). The micro relief of a snow
 /// surface is not that steep.
-#define SNOW_SURF_EGIM_TAVANI 0.35
+#define SNOW_SURF_SLOPE_MAX 0.35
 
-half2 SnowSurfEgimKis(half2 e)
+half2 SnowSurfSlopeClamp(half2 e)
 {
     half boy = length(e);
-    return boy > (half)SNOW_SURF_EGIM_TAVANI
-         ? e * ((half)SNOW_SURF_EGIM_TAVANI / boy)
+    return boy > (half)SNOW_SURF_SLOPE_MAX
+         ? e * ((half)SNOW_SURF_SLOPE_MAX / boy)
          : e;
 }
 
-half2 SnowSurfEgimTavan(half3 n)
+half2 SnowSurfSlopeMax(half3 n)
 {
-    return SnowSurfEgimKis(n.xy / max(n.z, (half)0.2));
+    return SnowSurfSlopeClamp(n.xy / max(n.z, (half)0.2));
 }
 
 /// A STOCHASTIC READ — THE TILE REPEAT IS BROKEN.
@@ -169,12 +169,12 @@ half2 SnowSurfSlope(TEXTURE2D_PARAM(tex, samplerState), float2 uv)
 
     // THE SLOPE WAS READ IN ROTATED SPACE AND IS TURNED BACK TO THE WORLD. Without this
     // every cell's relief faces a random direction and the light falls inconsistently.
-    half2 e1 = (half2)mul(SnowSurfEgimTavan(n1), R1);
-    half2 e2 = (half2)mul(SnowSurfEgimTavan(n2), R2);
-    half2 e3 = (half2)mul(SnowSurfEgimTavan(n3), R3);
+    half2 e1 = (half2)mul(SnowSurfSlopeMax(n1), R1);
+    half2 e2 = (half2)mul(SnowSurfSlopeMax(n2), R2);
+    half2 e3 = (half2)mul(SnowSurfSlopeMax(n3), R3);
 
     half2 harman = (half)w.x * e1 + (half)w.y * e2 + (half)w.z * e3;
-    return SnowSurfEgimKis(harman / (half)max(length(w), 1e-3));
+    return SnowSurfSlopeClamp(harman / (half)max(length(w), 1e-3));
 }
 
 /// TWO SCALES. A texture read at a single scale gives relief OF THE SAME SIZE EVERYWHERE
@@ -184,7 +184,7 @@ half2 SnowSurfSlope(TEXTURE2D_PARAM(tex, samplerState), float2 uv)
 ///
 /// Amplitude: the large scale contributes less, because on a real snow surface the energy
 /// falls with frequency too.
-half2 SnowSurfIkiOlcek(TEXTURE2D_PARAM(tex, samplerState), float2 uv)
+half2 SnowSurfTwoScale(TEXTURE2D_PARAM(tex, samplerState), float2 uv)
 {
     return SnowSurfSlope(TEXTURE2D_ARGS(tex, samplerState), uv) * (half)0.62
          + SnowSurfSlope(TEXTURE2D_ARGS(tex, samplerState), uv * 0.27) * (half)0.28;
@@ -203,21 +203,21 @@ SnowSurfaceBlend SnowSampleSurface(float3 posWS, float rhoN, float wet, float di
     if (_SnowSurfStrength <= 0.001) return o;
 
     // THE RELIEF AND THE COLOUR CLOSE AT DIFFERENT DISTANCES. The reasoning is next to
-    // `SNOW_SURF_KABARTI_FADE_START`: relief falling below a pixel produces aliasing and has
+    // `SNOW_SURF_RELIEF_FADE_START`: relief falling below a pixel produces aliasing and has
     // to be cut, but the mip already averages the colour pattern.
     // Cutting all three together left flat white beyond 28 m.
     float kameraMesafe = distance(posWS, _WorldSpaceCameraPos);
 
-    half renkPayi = (half)(1.0 - smoothstep(SNOW_SURF_RENK_FADE_START,
+    half colorAmount = (half)(1.0 - smoothstep(SNOW_SURF_RENK_FADE_START,
                                             SNOW_SURF_RENK_FADE_END, kameraMesafe));
-    if (renkPayi <= 0.01h) return o;
+    if (colorAmount <= 0.01h) return o;
 
-    half kabartiPayi = (half)(1.0 - smoothstep(SNOW_SURF_KABARTI_FADE_START,
-                                               SNOW_SURF_KABARTI_FADE_END, kameraMesafe));
+    half reliefAmount = (half)(1.0 - smoothstep(SNOW_SURF_RELIEF_FADE_START,
+                                               SNOW_SURF_RELIEF_FADE_END, kameraMesafe));
 
     // If the relief is off, DO NOT READ the normal and roughness textures at all: at
     // distance the texture accesses drop from twelve to four.
-    bool kabartiVar = kabartiPayi > 0.01h;
+    bool kabartiVar = reliefAmount > 0.01h;
 
     half4 w = SnowSurfaceWeights(rhoN, wet, disturb, posWS);
     float2 uv = posWS.xz / max(_SnowSurfTileMeters, 0.01);
@@ -242,57 +242,57 @@ SnowSurfaceBlend SnowSampleSurface(float3 posWS, float rhoN, float wet, float di
     uv += bukum;
 
     half3 renk = 0;
-    half  puru = 0;
-    half2 egim = 0;
+    half  roughVal = 0;
+    half2 slope = 0;
 
     // EACH TEXTURE'S OWN SPATIAL MEAN, MEASURED IN LINEAR SPACE.
     // (Assets/Snow/Textures/Surface, a 256x256 sample.)
     half3 ortToplam = 0;
 
-    const half ESIK = 0.02;
+    const half THRESHOLD = 0.02;
 
-    if (w.x > ESIK)
+    if (w.x > THRESHOLD)
     {
         renk += w.x * SAMPLE_TEXTURE2D(_SnowSurfTazeColor, SNOW_SURF_SAMPLER, uv).rgb;
 
         ortToplam += w.x * half3(0.8434, 0.8965, 0.9446);
         if (kabartiVar)
         {
-            puru += w.x * SAMPLE_TEXTURE2D(_SnowSurfTazeRough, SNOW_SURF_SAMPLER, uv).r;
-            egim += w.x * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfTazeNormal, SNOW_SURF_SAMPLER), uv);
+            roughVal += w.x * SAMPLE_TEXTURE2D(_SnowSurfTazeRough, SNOW_SURF_SAMPLER, uv).r;
+            slope += w.x * SnowSurfTwoScale(TEXTURE2D_ARGS(_SnowSurfTazeNormal, SNOW_SURF_SAMPLER), uv);
         }
     }
-    if (w.y > ESIK)
+    if (w.y > THRESHOLD)
     {
         renk += w.y * SAMPLE_TEXTURE2D(_SnowSurfTozColor, SNOW_SURF_SAMPLER, uv).rgb;
 
         ortToplam += w.y * half3(0.2949, 0.2990, 0.3019);
         if (kabartiVar)
         {
-            puru += w.y * SAMPLE_TEXTURE2D(_SnowSurfTozRough, SNOW_SURF_SAMPLER, uv).r;
-            egim += w.y * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfTozNormal, SNOW_SURF_SAMPLER), uv);
+            roughVal += w.y * SAMPLE_TEXTURE2D(_SnowSurfTozRough, SNOW_SURF_SAMPLER, uv).r;
+            slope += w.y * SnowSurfTwoScale(TEXTURE2D_ARGS(_SnowSurfTozNormal, SNOW_SURF_SAMPLER), uv);
         }
     }
-    if (w.z > ESIK)
+    if (w.z > THRESHOLD)
     {
         renk += w.z * SAMPLE_TEXTURE2D(_SnowSurfYerlesmisColor, SNOW_SURF_SAMPLER, uv).rgb;
 
         ortToplam += w.z * half3(0.7740, 0.8602, 0.9412);
         if (kabartiVar)
         {
-            puru += w.z * SAMPLE_TEXTURE2D(_SnowSurfYerlesmisRough, SNOW_SURF_SAMPLER, uv).r;
-            egim += w.z * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfYerlesmisNormal, SNOW_SURF_SAMPLER), uv);
+            roughVal += w.z * SAMPLE_TEXTURE2D(_SnowSurfYerlesmisRough, SNOW_SURF_SAMPLER, uv).r;
+            slope += w.z * SnowSurfTwoScale(TEXTURE2D_ARGS(_SnowSurfYerlesmisNormal, SNOW_SURF_SAMPLER), uv);
         }
     }
-    if (w.w > ESIK)
+    if (w.w > THRESHOLD)
     {
-        renk += w.w * SAMPLE_TEXTURE2D(_SnowSurfRuzgarColor, SNOW_SURF_SAMPLER, uv).rgb;
+        renk += w.w * SAMPLE_TEXTURE2D(_SnowSurfWindColor, SNOW_SURF_SAMPLER, uv).rgb;
 
         ortToplam += w.w * half3(0.7585, 0.8271, 0.8837);
         if (kabartiVar)
         {
-            puru += w.w * SAMPLE_TEXTURE2D(_SnowSurfRuzgarRough, SNOW_SURF_SAMPLER, uv).r;
-            egim += w.w * SnowSurfIkiOlcek(TEXTURE2D_ARGS(_SnowSurfRuzgarNormal, SNOW_SURF_SAMPLER), uv);
+            roughVal += w.w * SAMPLE_TEXTURE2D(_SnowSurfWindRough, SNOW_SURF_SAMPLER, uv).r;
+            slope += w.w * SnowSurfTwoScale(TEXTURE2D_ARGS(_SnowSurfWindNormal, SNOW_SURF_SAMPLER), uv);
         }
     }
 
@@ -320,7 +320,7 @@ SnowSurfaceBlend SnowSampleSurface(float3 posWS, float rhoN, float wet, float di
     // exceed 20%; a white substance's pattern is in its relief, not its colour. Without a
     // limit, as the strength grew the multiplier diverged channel by channel and turned the
     // surface into a saturated blue/mustard patch (seen while drawing the material at strength 3).
-    half3 carpan = clamp((half)1.0 + (renk / ortalama - (half)1.0) * (half)2.5,
+    half3 multiplier = clamp((half)1.0 + (renk / ortalama - (half)1.0) * (half)2.5,
                          (half3)0.8, (half3)1.2);
 
     // MACRO VARIATION. A real snow field is not equally rough everywhere: what the wind
@@ -328,11 +328,11 @@ SnowSurfaceBlend SnowSampleSurface(float3 posWS, float rhoN, float wet, float di
     // 1.45 with a 40 m scale noise; even with the pattern unchanged it does not read as
     // "the same everywhere" on screen.
     half makro = (half)(0.55 + SnowValueNoise(posWS.xz * 0.025) * 0.9);
-    half taban = (half)_SnowSurfStrength * makro;
+    half baseVal = (half)_SnowSurfStrength * makro;
 
-    o.albedoTint  = lerp(half3(1, 1, 1), carpan, taban * renkPayi);
-    o.roughAdd    = (puru - (half)0.5) * (half)0.25 * taban * kabartiPayi;
-    o.normalSlope = egim * taban * kabartiPayi;
+    o.albedoTint  = lerp(half3(1, 1, 1), multiplier, baseVal * colorAmount);
+    o.roughAdd    = (roughVal - (half)0.5) * (half)0.25 * baseVal * reliefAmount;
+    o.normalSlope = slope * baseVal * reliefAmount;
     return o;
 }
 

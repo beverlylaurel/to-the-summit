@@ -46,9 +46,9 @@ public class SnowCoverageDriver : MonoBehaviour
         float rho = Mathf.Lerp(SnowConstants.RhoMin, SnowConstants.RhoMax,
                                snowManager.WorldRhoN);
 
-        float derinlik = snowManager.WorldSwe * SnowConstants.RhoWater / Mathf.Max(rho, 1f);
+        float depth = snowManager.WorldSwe * SnowConstants.RhoWater / Mathf.Max(rho, 1f);
 
-        return Mathf.Clamp01((derinlik - SnowConstants.MinVisibleHeight)
+        return Mathf.Clamp01((depth - SnowConstants.MinVisibleHeight)
                              / SnowConstants.EdgeFadeRange);
     }
 

@@ -1,35 +1,35 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// ROTA ÖLÇÜMÜ. Çizilen bir hattın uzunluğu, yükselmesi ve eğimi.
+/// ROUTE PROFILING. Length, ascent, and gradient of a drawn route path.
 ///
-/// Neden gerekti: fırça araziye çiziyor ama eğimi göstermiyordu. Yatayda makul görünen
-/// bir hat düşey kesitte duvar olabiliyor ve bu ancak oyunda yürünürken fark ediliyordu.
-/// Ölçüm çizim anında okunmazsa hat körlemesine çizilir.
+/// Why needed: the brush drew on terrain but did not display gradient. A path looking reasonable
+/// horizontally could be a vertical wall in cross-section, only noticed when walking in-game.
+/// Without real-time measurement during drawing, paths are drawn blindly.
 ///
-/// Yükseklik ARAZİDEN okunuyor, saklanmıyor — rota verisi zaten öyle çalışıyor.
+/// Elevation is read from TERRAIN, not stored — route data functions this way by design.
 public static class RouteProfile
 {
     public struct Reading
     {
-        public float length;      // metre, eğim boyunca
-        public float ascent;      // toplam yükselme, metre
-        public float descent;     // toplam alçalma, metre
-        public float maxGrade;    // en dik parçanın eğimi, oran (0.25 = %25)
-        public float steepLength; // eşiği aşan parçaların toplam uzunluğu, metre
+        public float length;      // meters, along slope
+        public float ascent;      // total ascent, meters
+        public float descent;     // total descent, meters
+        public float maxGrade;    // steepest segment gradient, ratio (0.25 = 25%)
+        public float steepLength; // total length of segments exceeding threshold, meters
     }
 
-    /// Yaya için rahat eğim sınırı. %25 ≈ 14 derece: yüklü yürüyüşün üst sınırı.
-    /// Üstü tırmanma değil ama tempoyu bozuyor ve rota süresini şişiriyor.
+    /// Comfortable walking grade limit. 25% ≈ 14 degrees: upper limit for loaded hiking.
+    /// Above this is not climbing, but breaks cadence and inflates route time.
     public const float FootGrade = 0.25f;
 
-    /// BİSİKLET SINIRI. Yaklaşma bisikletle geçiliyor ve bisiklet yürüyüşün çıktığı
-    /// yokuşa çıkamaz: %5-8 rahat, %10-12 yüklü sınır, %15 üstünde inip itersin.
-    /// Yaklaşma hatlarının tesviyesi bu eşiğe göre yapılıyor.
+    /// BICYCLE LIMIT. The approach is ridden by bike, and bikes cannot climb foot gradients:
+    /// 5-8% comfortable, 10-12% loaded limit, above 15% requires dismounting and pushing.
+    /// Approach route grading is calibrated to this threshold.
     public const float BikeGrade = 0.12f;
 
-    /// Araç için sınır. %10 ≈ 5.7 derece: dağ toprak yolunun pratik üst sınırı.
-    /// Otobüs bunun üstünde çıkamaz.
+    /// Vehicle limit. 10% ≈ 5.7 degrees: practical upper limit for mountain dirt roads.
+    /// Buses cannot climb beyond this.
     public const float RoadGrade = 0.10f;
 
     public static Reading Measure(Terrain terrain, List<MountainRoute.Mark> marks,
@@ -53,7 +53,7 @@ public static class RouteProfile
             if (rise > 0f) reading.ascent += rise;
             else reading.descent -= rise;
 
-            // Yataydan sıfıra bölme: üst üste binen iki nokta eğim üretmez.
+            // Divide by zero guard horizontally: two overlapping points produce no grade.
             if (run > 0.5f)
             {
                 float grade = Mathf.Abs(rise) / run;

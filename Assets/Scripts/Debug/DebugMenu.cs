@@ -498,9 +498,9 @@ public class DebugMenu : MonoBehaviour
                 // texture's own value is printed to the screen (red = depth).
                 // If the zigzag is present in this view too the source is in the DATA,
                 // otherwise in the DRAWING. No other observation separates the two hypotheses.
-                bool hamOnce = izHam;
-                izHam = GUILayout.Toggle(izHam, "Raw track (no light, no parallax)");
-                if (izHam != hamOnce) Shader.SetGlobalFloat(SnowDebugDentId, izHam ? 1f : 0f);
+                bool hamOnce = trailRaw;
+                trailRaw = GUILayout.Toggle(trailRaw, "Raw track (no light, no parallax)");
+                if (trailRaw != hamOnce) Shader.SetGlobalFloat(SnowDebugDentId, trailRaw ? 1f : 0f);
 
                 GUILayout.Space(4f);
                 GUILayout.Label("PROB — lekeler ne?");
@@ -552,7 +552,7 @@ public class DebugMenu : MonoBehaviour
                 {
                     mgr.SimTimeScale = 1f;
                     mgr.RefillRegion();
-                    izHam = false;
+                    trailRaw = false;
                     Shader.SetGlobalFloat(SnowDebugDentId, 0f);
 
 
@@ -613,7 +613,7 @@ public class DebugMenu : MonoBehaviour
     }
 
     /// Whether the raw track view is on (`_SnowDebugDent`).
-    bool izHam;
+    bool trailRaw;
 
     static readonly int SnowDebugDentId = Shader.PropertyToID("_SnowDebugDent");
 

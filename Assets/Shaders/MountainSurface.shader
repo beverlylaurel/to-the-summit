@@ -140,7 +140,7 @@ Shader "ToTheSummit/MountainSurface"
                                 OutputPatch<SnowTessControlPoint, 3> patch,
                                 float3 bary : SV_DomainLocation)
             {
-                return VertexFromWS(SnowTessKonum(patch, bary));
+                return VertexFromWS(SnowTessPosition(patch, bary));
             }
 
             /// UniversalFragmentPBR written out — because our own march provides the main
@@ -177,15 +177,15 @@ Shader "ToTheSummit/MountainSurface"
                 // PROB: kar ortusu maskesi.
                 if (_SnowDebugCover > 0.5)
                 {
-                    float cegim = dot(surface.normalWS, _SnowUpDirection);
-                    float cegimM = saturate((cegim - 0.45) / max(1.0 - 0.45, 1e-3));
-                    cegimM = pow(cegimM, _SnowCoverSlopeSharpness);
+                    float slopeFactor = dot(surface.normalWS, _SnowUpDirection);
+                    float slopeFactorM = saturate((slopeFactor - 0.45) / max(1.0 - 0.45, 1e-3));
+                    slopeFactorM = pow(slopeFactorM, _SnowCoverSlopeSharpness);
 
                     float cgok = SampleSkyVisibility(IN.positionWS);
                     float ccuk = saturate(surface.occlusion * 1.35 - 0.35);
 
                     return half4((half)surface.snowMask, (half)ccuk,
-                                 (half)(cegimM * cgok), 1.0h);
+                                 (half)(slopeFactorM * cgok), 1.0h);
                 }
 
                 // TESHIS: yuzey normali ve NdotL.
@@ -320,7 +320,7 @@ Shader "ToTheSummit/MountainSurface"
                     // The mountain's own horizon already measures that (`SampleSkyVisibility`,
                     // which the snow mask uses as well). Tied to the ambient, hollows and
                     // slopes separate.
-                    half gokPayi = (half)SampleSkyVisibility(IN.positionWS);
+                    half skyVisibility = (half)SampleSkyVisibility(IN.positionWS);
 
                     // THE CAVITY'S OWN SHADOW is applied to the direct light. It is not
                     // applied to the ambient: the sky comes from every direction and the
@@ -332,18 +332,18 @@ Shader "ToTheSummit/MountainSurface"
                     half gokLum   = Luminance(SampleSH(half3(0, 1, 0)));
                     half gunesLum = Luminance(mainLight.color)
                                   * saturate(mainLight.direction.y);
-                    half gokPay   = gokLum / max(gokLum + gunesLum, 1e-4h);
+                    half skyShare   = gokLum / max(gokLum + gunesLum, 1e-4h);
 
-                    Light izIsigi = mainLight;
-                    izIsigi.shadowAttenuation *= SnowReliefShadow(mainLight.direction,
+                    Light trailLight = mainLight;
+                    trailLight.shadowAttenuation *= SnowReliefShadow(mainLight.direction,
                                                                   surface.snowDentDepth,
-                                                                  gokPay);
+                                                                  skyShare);
 
-                    half3 karIsik = SnowDirectLight(izIsigi, karN,
+                    half3 karIsik = SnowDirectLight(trailLight, karN,
                                                     inputData.viewDirectionWS, ks)
                                   + SnowAmbient(karN, ks,
                                                 mainLight.shadowAttenuation,
-                                                (half)surface.occlusion * gokPayi,
+                                                (half)surface.occlusion * skyVisibility,
                                                 mainLight.color,
                                                 mainLight.direction);
 
@@ -475,7 +475,7 @@ Shader "ToTheSummit/MountainSurface"
                                 OutputPatch<SnowTessControlPoint, 3> patch,
                                 float3 bary : SV_DomainLocation)
             {
-                return VertexFromWS(SnowTessKonum(patch, bary));
+                return VertexFromWS(SnowTessPosition(patch, bary));
             }
 
             half4 ShadowFragment(Varyings IN) : SV_Target { return 0; }
@@ -524,7 +524,7 @@ Shader "ToTheSummit/MountainSurface"
                                 OutputPatch<SnowTessControlPoint, 3> patch,
                                 float3 bary : SV_DomainLocation)
             {
-                return VertexFromWS(SnowTessKonum(patch, bary));
+                return VertexFromWS(SnowTessPosition(patch, bary));
             }
 
             half4 DepthFragment(Varyings IN) : SV_Target { return 0; }
@@ -586,7 +586,7 @@ Shader "ToTheSummit/MountainSurface"
                                 OutputPatch<SnowTessControlPoint, 3> patch,
                                 float3 bary : SV_DomainLocation)
             {
-                return VertexFromWS(SnowTessKonum(patch, bary));
+                return VertexFromWS(SnowTessPosition(patch, bary));
             }
 
             half4 frag(Varyings IN) : SV_Target

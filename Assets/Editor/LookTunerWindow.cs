@@ -1,7 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 
-/// Hava ve saat kombinasyonlarını canlı önizleyerek renk düzenlemesi ayarlama penceresi.
+/// Window for tuning color grading with live preview across weather and time-of-day combinations.
 public class LookTunerWindow : EditorWindow
 {
     LookController controller;
@@ -13,13 +13,13 @@ public class LookTunerWindow : EditorWindow
     float day = 0.6f;
 
     [MenuItem("To The Summit/Look Settings", false, 100)]
-    static void Open() => GetWindow<LookTunerWindow>("Görünüm").minSize = new Vector2(340f, 420f);
+    static void Open() => GetWindow<LookTunerWindow>("Look").minSize = new Vector2(340f, 420f);
 
     void OnEnable() => Acquire();
 
     void OnDisable()
     {
-        // Pencere kapanınca sahne gerçek hava ve saate dönsün
+        // Revert scene to actual weather and time of day when window closes
         if (controller != null) controller.SetPreview(false, storm, day);
     }
 
@@ -35,32 +35,32 @@ public class LookTunerWindow : EditorWindow
     {
         if (controller == null || serializedLook == null)
         {
-            EditorGUILayout.HelpBox("Sahnede görünüm denetleyicisi yok. Unity'ye odaklanıp derlemeyi bekle.",
+            EditorGUILayout.HelpBox("No look controller in scene. Focus Unity and wait for compilation.",
                 MessageType.Warning);
-            if (GUILayout.Button("Tekrar ara")) Acquire();
+            if (GUILayout.Button("Search Again")) Acquire();
             return;
         }
 
-        EditorGUILayout.LabelField("Önizleme", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Preview", EditorStyles.boldLabel);
 
         EditorGUI.BeginChangeCheck();
-        preview = EditorGUILayout.Toggle("Önizlemeyi kullan", preview);
-        storm = EditorGUILayout.Slider("Fırtına", storm, 0f, 1f);
-        day = EditorGUILayout.Slider("Gündüz", day, 0f, 1f);
+        preview = EditorGUILayout.Toggle("Use Preview", preview);
+        storm = EditorGUILayout.Slider("Storm", storm, 0f, 1f);
+        day = EditorGUILayout.Slider("Day", day, 0f, 1f);
 
         if (EditorGUI.EndChangeCheck())
             controller.SetPreview(preview, storm, day);
 
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (GUILayout.Button("Açık gündüz")) SetPreview(0f, 1f);
-            if (GUILayout.Button("Açık gece")) SetPreview(0f, 0f);
-            if (GUILayout.Button("Fırtına gündüz")) SetPreview(1f, 1f);
-            if (GUILayout.Button("Fırtına gece")) SetPreview(1f, 0f);
+            if (GUILayout.Button("Clear Day")) SetPreview(0f, 1f);
+            if (GUILayout.Button("Clear Night")) SetPreview(0f, 0f);
+            if (GUILayout.Button("Storm Day")) SetPreview(1f, 1f);
+            if (GUILayout.Button("Storm Night")) SetPreview(1f, 0f);
         }
 
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Dört köşe — ara değerler harmanlanır", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Four Corners — intermediate values blended", EditorStyles.boldLabel);
 
         scroll = EditorGUILayout.BeginScrollView(scroll);
         serializedLook.Update();

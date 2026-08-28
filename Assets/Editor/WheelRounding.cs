@@ -1,59 +1,53 @@
 using UnityEditor;
 using UnityEngine;
 
-/// JANTI ÇEMBERE OTURTUR. Üretilen ön tekerlekte kırk derecelik bir yay on iki milimetre
-/// şişmiş: dönerken devirde bir kez yukarı atıyor. Ölçüldü — pivot doğru yerde (1 mm),
-/// yani sebep bağlama değil, mesh'in kendisi.
+/// FITS RIM TO CIRCLE. In generated front wheel, a 40-degree arc had 12 mm bulge,
+/// hopping once per revolution during roll. Pivot was verified correct (1 mm),
+/// establishing mesh geometry as the cause.
 ///
-/// Düzeltme YALNIZ YARIÇAPTA: köşe kendi açısında kalıyor, eksende kaymıyor, kalınlık
-/// değişmiyor. Ölçülen dış profil ortalama yarıçapa oranlanıyor ve köşeler o oranla
-/// dışa/içe çekiliyor. En büyük düzeltme %3.3, ortalama %0.6 — lastik profili bu kadarını
-/// yutuyor.
+/// Correction applied ONLY RADIALLY: vertex angle, axial position, and thickness remain unchanged.
+/// Measured outer profile is normalized against mean radius and vertices are scaled inward/outward.
+/// Maximum correction is 3.3%, average 0.6% — easily absorbed by tire profile.
 ///
-/// GÖBEK VE TELLER DOKUNULMAZ: ağırlık dış kenardan içeri doğru sıfırlanıyor. Bütün
-/// mesh ölçeklenseydi göbek deliği ovalleşir, teller birbirine girerdi.
+/// HUB AND SPOKES UNTOUCHED: correction weight fades to zero toward inner rim.
+/// Scaling entire mesh would deform hub hole oval and distort spokes.
 ///
-/// Sonuç dosyaya yazılıyor ve git'e girmiyor: üretilen varlık repoda durmaz, menüden
-/// yeniden üretilir.
+/// Output written to asset file and excluded from git; generated assets are rebuilt via editor menus.
 public static class WheelRounding
 {
     const string Folder = "Assets/Models/Bike/Generated";
 
-    /// Bu sapmanın altındaki tekerleğe dokunulmuyor (metre). Arka tekerlek 0.9 mm ile
-    /// zaten çember; düzeltmek bir şey kazandırmadan ikinci bir mesh dosyası yaratırdı.
+    /// Wheels below this deviation threshold are untouched (meters). Rear wheel has 0.9 mm deviation
+    /// and is already circular; rounding would create redundant mesh assets without visual benefit.
     const float Threshold = 0.0015f;
 
-    /// Düzeltmenin başladığı yer: dış profilin bu oranından itibaren. Altında kalan
-    /// köşeler (göbek, teller, fren yüzeyi) hiç kıpırdamıyor.
+    /// Inner boundary where correction begins: as fraction of outer profile radius.
+    /// Vertices below (hub, spokes, braking surface) remain completely static.
     const float Inner = 0.7f;
 
-    /// Üretilen mesh'ler (düzeltilmiş jant, bölgeli gidon/bagaj/pedal) bir kez üretilip
-    /// dosyada duruyor. Bölge sınırı ya da düzeltme ayarı değişirse eskisi geçersiz olur.
+    /// Generated meshes (rounded rim, zoned handlebar/rack/pedals) are generated once on disk.
+    /// If zoning boundaries or correction settings change, existing assets must be rebuilt.
     ///
-    /// DİKKAT: elle boyanan malzeme maskesi de bu mesh'lerin içinde. Sıfırlamak boyamayı
-    /// da siler.
+    /// NOTE: Manually painted material masks reside within these meshes; resetting deletes paint masks.
     [MenuItem("To The Summit/Model/Bicycle/Reset Generated Meshes", false, 125)]
     static void Reset()
     {
         if (!AssetDatabase.IsValidFolder(Folder))
         {
-            ToolLog.Write("[Bisiklet] üretilen mesh yok.");
+            ToolLog.Write("[Bicycle] No generated meshes found.");
             return;
         }
 
         AssetDatabase.DeleteAsset(Folder);
-        ToolLog.Write("[Bisiklet] üretilen mesh'ler silindi (boyama dahil); "
-                + "kurulumda yeniden üretilecek.");
+        ToolLog.Write("[Bicycle] Generated meshes deleted (including paint masks); will regenerate during setup.");
     }
 
-    /// Tekerleği düzeltir ve düzeltilmiş mesh'i döndürür. Ölçüm sınırın altındaysa
-    /// kaynak mesh olduğu gibi geri veriliyor.
+    /// Corrects wheel mesh and returns rounded mesh. If runout is below threshold, returns source mesh untouched.
     public static Mesh Round(Mesh source, Transform space, Vector3 axis,
         string assetName, string label)
     {
-        // Dosya adı PARÇADAN geliyor, mesh adından değil: üretilen modelde iki parçanın
-        // mesh adı aynı olabiliyor ve o durumda ikinci tekerlek birincinin dosyasını
-        // okurdu — iki tekerlek tek mesh'e düşerdi.
+        // Asset filename derived from part name, not mesh name: generated models may share mesh names,
+        // which would cause second wheel to overwrite first wheel's asset.
         string path = $"{Folder}/{assetName}_Round.asset";
 
         var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
@@ -63,22 +57,21 @@ public static class WheelRounding
 
         if (profile.Deviation < Threshold)
         {
-            ToolLog.Write($"[Tekerlek] {label} zaten çember "
-                    + $"({profile.Deviation * 1000f:F1} mm sapma) — düzeltilmedi.");
+            ToolLog.Write($"[Wheel] {label} already circular "
+                    + $"({profile.Deviation * 1000f:F1} mm deviation) — skipped.");
             return source;
         }
 
         Mesh rounded = Correct(source, space, profile);
         WheelProfile check = WheelProfile.Measure(rounded, space, axis);
 
-        // DÜZELTME KÖTÜLEŞTİRİYORSA UYGULANMIYOR. Ölçüm gürültülü olduğunda düzeltme
-        // gürültüyü yüzeye basıyor; bir kez oldu ve sapmayı ikiye katladı. Sonucu
-        // ölçmeden kabul etmek, aracın kendisini denetimsiz bırakmak demek.
+        // DO NOT APPLY IF CORRECTION WORSENS DEVIATION. When measurement is noisy, correction
+        // imprints noise onto surface; previously doubled deviation. Verifying prevents unchecked degradation.
         if (check.Deviation >= profile.Deviation)
         {
-            Debug.LogWarning($"[Tekerlek] {label} düzeltmesi uygulanmadı: sapma "
-                + $"{profile.Deviation * 1000f:F1} mm → {check.Deviation * 1000f:F1} mm, "
-                + "yani ölçüm düzeltmeden gürültülü.");
+            Debug.LogWarning($"[Wheel] {label} correction not applied: deviation "
+                + $"{profile.Deviation * 1000f:F1} mm -> {check.Deviation * 1000f:F1} mm, "
+                + "indicating noisy measurement.");
             return source;
         }
 
@@ -88,20 +81,20 @@ public static class WheelRounding
         AssetDatabase.CreateAsset(rounded, path);
         AssetDatabase.SaveAssets();
 
-        ToolLog.Write($"[Tekerlek] {label} çembere oturtuldu.\n"
-            + $"  sapma {profile.Deviation * 1000f:F1} mm → {check.Deviation * 1000f:F1} mm\n"
-            + $"  en geniş − en dar {(profile.Max - profile.Min) * 1000f:F0} mm → "
+        ToolLog.Write($"[Wheel] {label} fitted to circle.\n"
+            + $"  deviation {profile.Deviation * 1000f:F1} mm -> {check.Deviation * 1000f:F1} mm\n"
+            + $"  max - min spread {(profile.Max - profile.Min) * 1000f:F0} mm -> "
             + $"{(check.Max - check.Min) * 1000f:F0} mm\n"
-            + $"  yarıçap {check.Radius:F3} m, genişlik {check.Width * 1000f:F0} mm");
+            + $"  radius {check.Radius:F3} m, width {check.Width * 1000f:F0} mm");
 
         return rounded;
     }
 
     static Mesh Correct(Mesh source, Transform space, WheelProfile profile)
     {
-        // Ölçüm dünya uzayında, köşe verisi mesh uzayında: her köşe ölçüme gidip
-        // düzeltilmiş hâlde geri geliyor. Düzeltmeyi mesh uzayında yapmak, parça
-        // dönüşümündeki yüz kat ölçeği hesaba katmamak demekti.
+        // Measurement in world space, vertices in mesh space: vertices transform to world,
+        // receive correction, and transform back to local space. Correcting in mesh space
+        // would ignore the 100x part transform scaling.
         Matrix4x4 toWorld = space.localToWorldMatrix;
         Matrix4x4 toLocal = space.worldToLocalMatrix;
 
@@ -122,8 +115,7 @@ public static class WheelRounding
             float measured = profile.RadiusAt(Mathf.Atan2(y, x));
             if (measured < 1e-5f) continue;
 
-            // Kenara yaklaştıkça düzeltme açılıyor. Sert bir sınır olsaydı jantın iç
-            // kenarında görünür bir basamak kalırdı.
+            // Smoothly blend correction weight toward outer rim edge.
             float t = Mathf.Clamp01((radius / measured - Inner) / (1f - Inner));
             float weight = t * t * (3f - 2f * t);
 
@@ -141,16 +133,15 @@ public static class WheelRounding
         mesh.SetVertices(vertices);
         mesh.SetTriangles(source.triangles, 0);
 
-        // Normaller KAYNAKTAN: düzeltme yüzeyi yüzde birkaç kaydırıyor, yeniden
-        // hesaplansaydı modelin kendi yumuşatması kaybolur ve jant fasetli görünürdü.
+        // Normals retained from SOURCE: correction shifts surface by a few percent;
+        // recalculating would destroy custom shading smoothing, faceting the rim.
         Vector3[] normals = source.normals;
         if (normals.Length == vertices.Length) mesh.SetNormals(normals);
 
         Vector2[] uv = source.uv;
         if (uv.Length == vertices.Length) mesh.SetUVs(0, uv);
 
-        // Köşe rengi akışı sıfır dolu taşınıyor: akış olmayan mesh'te gölgelendirici
-        // köşe rengini beyaz okuyor ve bütün malzeme maskesi açılıyor.
+        // Zeroed vertex colors initialized to avoid shader defaulting missing stream to white.
         mesh.SetColors(new Color32[vertices.Length]);
         mesh.SetUVs(1, new Vector2[vertices.Length]);
 

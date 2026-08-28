@@ -3,37 +3,22 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-/// KÖŞE RENGİNE MALZEME MASKESİ SÜRER. Üretilen modelde UV yok ve farklı malzemeler aynı
-/// mesh'te geliyor; tutamağın nerede bittiği, kablonun nerede başladığı bir eşik sayısıyla
-/// tarif edilemiyor. Fırça o sınırı gözle koyuyor.
+/// PAINTS MATERIAL MASKS ONTO VERTEX COLORS. Generated models lack UVs and combine different materials
+/// in single meshes; brush defines boundaries interactively.
 ///
-/// MASKE KÖŞEDE DURUYOR, DOKUDA DEĞİL. Model milyonlarca köşe taşıyor: santimetre altı
-/// çözünürlük demek, üstelik UV gerektirmiyor. Gölgelendirici üç kanalı üç malzeme olarak
-/// okuyor (bkz. `BikeSurface`).
+/// MASK LIVES IN VERTICES, NOT TEXTURES. Models carry millions of vertices providing sub-centimeter
+/// resolution without UV unwrapping. Shader maps vertex channels to materials (`BikeSurface`).
 ///
-/// BOYAMA PENCERENİN İÇİNDE VE YALNIZ SEÇİLİ PARÇA ÇİZİLİYOR. Sahnede boyamak, sekiz
-/// kilometre ötedeki karanlık bir noktaya gidip parçayı bulmak ve komşu parçaların
-/// arkasından boyamak demekti.
-///
-/// IŞIN GERÇEK KONUMDAN. Parça sahnedeki yerinde çiziliyor ve ışın oraya atılıyor:
-/// önizleme için ayrı bir dünya kurulsaydı fırçanın değdiği nokta ile mesh'in köşeleri
-/// farklı uzaylarda kalırdı.
+/// Painting performed in custom preview window for selected parts only.
 public class VertexBrush : EditorWindow
 {
-    /// Yuvalar YÜZEYİN IŞIĞA CEVABIYLA anılıyor, malzeme adıyla değil. "Kauçuk" yazınca
-    /// kablo için doğru mu diye düşünmek gerekiyordu; oysa seçilen şey kauçuk olup olmadığı
-    /// değil, parlamayıp parlamadığı. Kablo kılıfı da lastik de aynı yuvaya giriyor çünkü
-    /// ikisi de mat ve metalik değil.
-    static readonly string[] SlotNames = { "Mat", "Yarı mat", "Metalik" };
+    static readonly string[] SlotNames = { "Matte", "Semi-Matte", "Metallic" };
 
-    /// Yuvanın ne için olduğu açılır listenin altında yazıyor. Ad tek başına yeterli
-    /// değil: "mat" seçerken kablonun oraya girip girmediği akla geliyor ve her boyamada
-    /// aynı soru tekrar soruluyordu.
     static readonly string[] SlotHints =
     {
-        "Lastik, kablo kılıfı, plastik, gidon tutamağı. Işığı yaymıyor, parlamıyor.",
-        "Deri, kumaş, boyalı yüzey. Hafif parlıyor ama yansıma vermiyor.",
-        "Çelik, krom, alüminyum, zincir. Çevresini yansıtıyor.",
+        "Rubber, cable housing, plastic, handlebar grips. Diffuse, non-reflective.",
+        "Leather, fabric, painted surfaces. Soft specular without sharp reflections.",
+        "Steel, chrome, aluminum, chain. Reflective.",
     };
 
     [SerializeField] MeshFilter target;
@@ -49,8 +34,6 @@ public class VertexBrush : EditorWindow
     Vector2[] surfaces;
     MeshCollider collider;
 
-    /// Üçgen ızgarası: hücre boyutu fırça yarıçapından, hücre başına üçgen numarası.
-    /// Her darbede bütün üçgenleri taramak yüz binlerce karşılaştırma demek.
     Dictionary<Vector3Int, List<int>> grid;
     Vector3[] centres;
     int[] triangles;
@@ -58,9 +41,6 @@ public class VertexBrush : EditorWindow
 
     PreviewRenderUtility preview;
 
-    /// SERBEST KAMERA. Yörünge kamerası parçanın etrafında dönüyordu ve ince bir kablonun
-    /// arkasına geçmek, doğru açıyı yakalamak zordu. Uçuş sahne penceresindekiyle aynı:
-    /// sağ tuş basılıyken fare bakıyor, WASD yürüyor.
     Vector3 eye;
     float yaw = 30f;
     float pitch = 12f;
@@ -72,12 +52,10 @@ public class VertexBrush : EditorWindow
     bool painting;
 
     [MenuItem("To The Summit/Model/Bicycle/Material Brush", false, 124)]
-    static void Open() => GetWindow<VertexBrush>("Malzeme Fırçası").Show();
+    static void Open() => GetWindow<VertexBrush>("Material Brush").Show();
 
     void OnEnable()
     {
-        // Derleme sonrası hedef alanı seri hâlde duruyor ama mesh, ızgara ve çarpışma
-        // kayboluyor; hazırlık yenilenmezse fırça sessizce ölü kalıyordu.
         if (target != null) EditorApplication.delayCall += Prepare;
     }
 
@@ -89,8 +67,6 @@ public class VertexBrush : EditorWindow
         preview = null;
     }
 
-    // -------------------------------------------------------------------- gui
-
     void OnGUI()
     {
         Toolbar();
@@ -100,9 +76,9 @@ public class VertexBrush : EditorWindow
         if (target == null || mesh == null)
         {
             EditorGUI.HelpBox(view,
-                "Boyanacak parçayı yukarıdaki alana sürükle.\n\n"
-                + "Sol tuş boyar, Shift basılıyken siler.\n"
-                + "Sağ tuş döndürür, orta tuş kaydırır, tekerlek yakınlaştırır.",
+                "Drag part to paint into slot above.\n\n"
+                + "Left click: paint, Shift + click: erase.\n"
+                + "Right click: rotate view, Middle click: pan, Scroll wheel: zoom.",
                 MessageType.Info);
             return;
         }
@@ -116,11 +92,8 @@ public class VertexBrush : EditorWindow
         EditorGUILayout.Space(4f);
 
         MeshFilter picked = (MeshFilter)EditorGUILayout.ObjectField(
-            "Parça", target, typeof(MeshFilter), true);
+            "Part", target, typeof(MeshFilter), true);
 
-        // HAZIRLIK BİR SONRAKİ KAREYE. Seçim değiştiğinde çarpışma ekleniyor ve ilk
-        // boyamada mesh asset'i üretiliyor; ikisi de çizim ortasında yapılınca Unity'nin
-        // yerleşim düzeni kırılıyor ("BeginLayoutGroup must be called first").
         if (picked != target)
         {
             MeshFilter chosen = picked;
@@ -136,34 +109,31 @@ public class VertexBrush : EditorWindow
 
         using (new EditorGUI.DisabledScope(target == null))
         {
-            channel = EditorGUILayout.Popup("Malzeme", channel, SlotNames);
+            channel = EditorGUILayout.Popup("Material", channel, SlotNames);
             EditorGUILayout.LabelField(" ", SlotHints[channel], EditorStyles.miniLabel);
 
             EditorGUILayout.BeginHorizontal();
-            radius = EditorGUILayout.Slider("Yarıçap (m)", radius, 0.003f, 0.2f);
-            erase = GUILayout.Toggle(erase, "Silgi", EditorStyles.miniButton, GUILayout.Width(52f));
+            radius = EditorGUILayout.Slider("Radius (m)", radius, 0.003f, 0.2f);
+            erase = GUILayout.Toggle(erase, "Eraser", EditorStyles.miniButton, GUILayout.Width(52f));
             EditorGUILayout.EndHorizontal();
 
-            strength = EditorGUILayout.Slider("Şiddet", strength, 0.05f, 1f);
+            strength = EditorGUILayout.Slider("Strength", strength, 0.05f, 1f);
         }
 
-            // RENK FIRÇANIN, MALZEMENİN DEĞİL. Materyale yazılsaydı rengi değiştirmek
-            // o yuvayla boyanmış her yeri değiştirirdi; şimdi renk boyandığı anda köşeye
-            // yazılıyor ve orada kalıyor.
-            colour = EditorGUILayout.ColorField("Renk", colour);
+        colour = EditorGUILayout.ColorField("Color", colour);
     }
 
     void Footer()
     {
         EditorGUILayout.BeginHorizontal();
 
-        EditorGUILayout.LabelField($"Köşe {vertices.Length:N0}   Boyalı {Painted():N0}",
+        EditorGUILayout.LabelField($"Vertices {vertices.Length:N0}   Painted {Painted():N0}",
             EditorStyles.miniLabel);
 
-        if (GUILayout.Button("Bu malzemeyi sil", EditorStyles.miniButton, GUILayout.Width(110f)))
+        if (GUILayout.Button("Clear Material", EditorStyles.miniButton, GUILayout.Width(110f)))
             Clear(channel);
 
-        if (GUILayout.Button("Boyamayı sil", EditorStyles.miniButton, GUILayout.Width(110f)))
+        if (GUILayout.Button("Clear All", EditorStyles.miniButton, GUILayout.Width(110f)))
             Clear(-1);
 
         EditorGUILayout.EndHorizontal();
@@ -177,8 +147,6 @@ public class VertexBrush : EditorWindow
 
         return count;
     }
-
-    // ---------------------------------------------------------------- görüntü
 
     void Viewport(Rect view)
     {
@@ -202,16 +170,11 @@ public class VertexBrush : EditorWindow
         preview.camera.clearFlags = CameraClearFlags.SolidColor;
         preview.camera.backgroundColor = new Color(0.16f, 0.17f, 0.19f);
 
-        // İki ışık: karşıdan ana, arkadan dolgu. Tek ışıkta siyah kauçuk ile koyu çelik
-        // birbirinden ayırt edilemiyor. Işıklar kamerayla dönüyor, yoksa parçayı
-        // çevirdiğinde karanlıkta kalıyor.
         preview.lights[0].intensity = 1.4f;
         preview.lights[0].transform.rotation = Quaternion.Euler(35f, yaw + 40f, 0f);
         preview.lights[1].intensity = 0.7f;
         preview.lights[1].transform.rotation = Quaternion.Euler(-20f, yaw + 200f, 0f);
 
-        // YALNIZ SEÇİLİ PARÇA. Alt-mesh'ler kendi materyalleriyle çiziliyor ki boyama
-        // oyundaki hâliyle görünsün.
         Material[] materials = target.GetComponent<Renderer>().sharedMaterials;
 
         for (int i = 0; i < mesh.subMeshCount; i++)
@@ -228,9 +191,6 @@ public class VertexBrush : EditorWindow
         Cursor(view);
     }
 
-    /// WASD ile yürüyor, Q ve E ile alçalıp yükseliyor, Shift hızlandırıyor. Hız
-    /// parçanın kendi boyundan türüyor: sabit metre/saniye verilseydi tekerlekte uygun
-    /// olan hız fren kolunda ışık hızı olurdu.
     void Fly(float span)
     {
         double now = EditorApplication.timeSinceStartup;
@@ -255,8 +215,6 @@ public class VertexBrush : EditorWindow
         Repaint();
     }
 
-    /// Fırça halkası: imlecin altındaki yüzeye çiziliyor. Halka olmadan fırçanın nereye
-    /// değdiği ancak boyadıktan sonra anlaşılıyor.
     void Cursor(Rect view)
     {
         if (Event.current.type != EventType.Repaint) return;
@@ -269,8 +227,6 @@ public class VertexBrush : EditorWindow
 
         Handles.DrawWireDisc(hit.point, hit.normal, radius);
     }
-
-    // ------------------------------------------------------------------ girdi
 
     void Input(Rect view)
     {
@@ -288,8 +244,6 @@ public class VertexBrush : EditorWindow
             return;
         }
 
-        // Sağ tuş bakıyor ve uçuşu açıyor; sol tuş boyamaya ayrıldı, yoksa her fırça
-        // darbesi kamerayı da oynatırdı.
         if (current.type == EventType.MouseDown && current.button == 1)
         {
             flying = true;
@@ -323,7 +277,6 @@ public class VertexBrush : EditorWindow
             return;
         }
 
-        // Tuşlar uçuş sırasında tutuluyor: her karede hangi yönlere gidildiği buradan.
         if (flying && (current.type == EventType.KeyDown || current.type == EventType.KeyUp))
         {
             if (current.type == EventType.KeyDown) held.Add(current.keyCode);
@@ -339,9 +292,7 @@ public class VertexBrush : EditorWindow
         if (current.type == EventType.MouseDown
             && Trace(view, current.mousePosition, out RaycastHit down))
         {
-            // Darbe başına değil, fırça basımı başına kayıt: sürüklerken her karede
-            // kayıt alınsaydı geri alma yığını yüz binlerce köşeyle dolardı.
-            Undo.RegisterCompleteObjectUndo(mesh, "Malzeme fırçası");
+            Undo.RegisterCompleteObjectUndo(mesh, "Material brush");
 
             painting = true;
             Paint(down.point, current.shift);
@@ -361,14 +312,6 @@ public class VertexBrush : EditorWindow
         }
     }
 
-    /// Pencere içindeki noktadan parçaya ışın. Önizleme kamerası parçanın gerçek dünya
-    /// konumunda duruyor, o yüzden ışın doğrudan sahnedeki çarpışmaya atılabiliyor.
-    ///
-    /// IŞIN ELDE KURULUYOR. `ScreenPointToRay` kameranın piksel dikdörtgenini okuyor;
-    /// önizleme kendi hedef dokusuna çizdiği için o dikdörtgen pencereyle tutmuyordu ve
-    /// ışın imlecin durduğu yere değil, yanına gidiyordu — ince kabloda hiç tutmuyor,
-    /// kalın yüzeyde kaymış görünüyordu. Görüntü hangi açı ve orandan çiziliyorsa ışın
-    /// da ondan kuruluyor.
     bool Trace(Rect view, Vector2 mouse, out RaycastHit hit)
     {
         hit = default;
@@ -376,7 +319,6 @@ public class VertexBrush : EditorWindow
 
         Camera camera = preview.camera;
 
-        // Pencere içinde göreli konum: sol üstten sağ alta 0..1.
         float x = Mathf.InverseLerp(view.xMin, view.xMax, mouse.x) * 2f - 1f;
         float y = 1f - Mathf.InverseLerp(view.yMin, view.yMax, mouse.y) * 2f;
 
@@ -388,8 +330,6 @@ public class VertexBrush : EditorWindow
 
         return collider.Raycast(new Ray(camera.transform.position, direction), out hit, 10000f);
     }
-
-    // ------------------------------------------------------------------ hedef
 
     void Prepare()
     {
@@ -405,14 +345,10 @@ public class VertexBrush : EditorWindow
         if (colours == null || colours.Length != vertices.Length)
             colours = new Color32[vertices.Length];
 
-        // Yuva numarası ikinci UV kanalında: köşe rengi renge ve örtme gücüne ayrıldı,
-        // yüzeyin ışığa cevabına yer kalmadı.
         surfaces = mesh.uv2;
         if (surfaces == null || surfaces.Length != vertices.Length)
             surfaces = new Vector2[vertices.Length];
 
-        // Işın için geçici çarpışma; `Release` alıyor. Kalıcı bırakılsaydı iki yüz bin
-        // üçgenlik çarpışma sahnede dururdu.
         collider = target.gameObject.AddComponent<MeshCollider>();
         collider.sharedMesh = mesh;
         collider.hideFlags = HideFlags.HideAndDontSave;
@@ -424,10 +360,6 @@ public class VertexBrush : EditorWindow
         BuildGrid();
     }
 
-    /// BOYANABİLİR KOPYA. Parçaların çoğu mesh'ini doğrudan FBX'ten alıyor; oraya köşe
-    /// rengi yazılamaz, yazılsa da modelin her yeniden içe aktarımında silinir. İlk
-    /// boyamada parçanın kendi kopyası üretiliyor ve kurulum betiği bu kopyayı bulup
-    /// bağlıyor (bkz. `BikeBootstrap.Painted`).
     void EnsureWritable()
     {
         Mesh source = target.sharedMesh;
@@ -449,16 +381,13 @@ public class VertexBrush : EditorWindow
             AssetDatabase.CreateAsset(existing, copyPath);
             AssetDatabase.SaveAssets();
 
-            ToolLog.Write($"[Fırça] {target.name} boyanabilir kopyası: {copyPath}, köşe "
-                + $"{source.vertexCount:N0} → {existing.vertexCount:N0}");
+            ToolLog.Write($"[Brush] {target.name} paintable copy created: {copyPath}, vertices "
+                + $"{source.vertexCount:N0} -> {existing.vertexCount:N0}");
         }
 
         target.sharedMesh = existing;
     }
 
-    /// KÖŞELERİ AYIRIR. Boyama üçgen başına yapılıyor; köşeler paylaşılsaydı bir üçgeni
-    /// boyamak komşusunu da boyar ve sınır yine bulanırdı. Bedeli köşe sayısının artması —
-    /// parça başına birkaç yüz bin köşe, bellekte birkaç megabayt.
     static Mesh Unweld(Mesh source)
     {
         Vector3[] positions = source.vertices;
@@ -515,9 +444,6 @@ public class VertexBrush : EditorWindow
 
     void BuildGrid()
     {
-        // Hücre MESH UZAYINDA. Köşeler o uzayda duruyor ve parça dönüşümünde yüz kat
-        // ölçek var; dünya metresiyle kurulsaydı bütün model birkaç hücreye düşer,
-        // ızgara hiçbir şey kazandırmazdı.
         float scale = Mathf.Max(1e-6f, target.transform.lossyScale.x);
         cell = Mathf.Max(1e-5f, radius / scale);
 
@@ -544,21 +470,10 @@ public class VertexBrush : EditorWindow
         Mathf.FloorToInt(local.y / cell),
         Mathf.FloorToInt(local.z / cell));
 
-    // ----------------------------------------------------------------- boyama
-
-    /// ÜÇGEN BOYANIYOR, KÖŞE DEĞİL. Köşe boyandığında Unity komşu köşeye kadar olan
-    /// yüzeyi iki rengin arasında geçiriyor: ikinci rengi sürdüğünde sınırda hiç
-    /// seçilmemiş bir ara ton beliriyordu. Üçgenin üç köşesi birlikte yazılınca üçgen
-    /// tek renk kalıyor ve sınır keskin oluyor.
-    ///
-    /// Bunun çalışması için kopyanın köşeleri paylaşılmıyor (bkz. `Unweld`); paylaşılsaydı
-    /// bir üçgeni boyamak komşusunu da boyardı.
     void Paint(Vector3 worldPoint, bool eraseNow)
     {
         Vector3 local = target.transform.InverseTransformPoint(worldPoint);
 
-        // Yarıçap dünyada metre, köşeler mesh uzayında: ölçek arada. Parça dönüşümünde
-        // yüz kat ölçek var, çevrilmezse fırça ya bütün parçayı boyar ya hiçbir şeyi.
         float scale = Mathf.Max(1e-6f, target.transform.lossyScale.x);
         float localRadius = radius / scale;
 
@@ -608,9 +523,6 @@ public class VertexBrush : EditorWindow
         Repaint();
     }
 
-    /// Boyamayı siler: seçili yuvayla boyanmış köşeleri ya da hepsini. Örtme gücü
-    /// sıfırlanıyor, renk olduğu gibi kalıyor — görünmeyen renk zarar vermiyor ve
-    /// yeniden boyanınca üstüne yazılıyor.
     void Clear(int slot)
     {
         for (int i = 0; i < colours.Length; i++)
@@ -626,8 +538,6 @@ public class VertexBrush : EditorWindow
         Commit();
     }
 
-    /// Boyama mesh ASSET'İNE yazılıyor. Sahnedeki örneğe yazılsaydı kurulum betiği bir
-    /// daha çalıştığında kaybolurdu.
     void Commit()
     {
         EditorUtility.SetDirty(mesh);

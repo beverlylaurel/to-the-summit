@@ -1,21 +1,21 @@
-// ROL: GPU'da simüle edilen kar tanelerini ve yer savrulmasını çizer.
-// Çağıran: SnowfallRenderer (Graphics.RenderPrimitives).
+// Renders GPU-simulated snowflakes and blowing spindrift particles.
+// Dispatched by: SnowfallRenderer (Graphics.RenderPrimitives).
 
 Shader "ToTheSummit/SnowfallParticle"
 {
     Properties
     {
-        [NoScaleOffset] _FlakeAtlas ("Tane atlası (4×4)", 2D) = "white" {}
-        _FlakeTint ("Renk", Color) = (1, 1, 1, 1)
-        _FlakeEmissive ("Işıma", Float) = 1.0
+        [NoScaleOffset] _FlakeAtlas ("Flake Atlas (4x4)", 2D) = "white" {}
+        _FlakeTint ("Color Tint", Color) = (1, 1, 1, 1)
+        _FlakeEmissive ("Emissive", Float) = 1.0
 
-        _MinPixelSize ("Asgari ekran boyu (piksel)", Float) = 1.3
-        _SoftFade ("Yumuşak parçacık mesafesi (m)", Float) = 0.4
+        _MinPixelSize ("Minimum Pixel Size (px)", Float) = 1.3
+        _SoftFade ("Soft Particle Fade Distance (m)", Float) = 0.4
 
-        _StretchAlongVelocity ("Hız yönünde uzat", Float) = 0
-        _StretchMin ("Asgari uzama", Float) = 1.0
-        _StretchMax ("Azami uzama", Float) = 3.0
-        _AlphaScale ("Alpha çarpanı", Float) = 1.0
+        _StretchAlongVelocity ("Stretch Along Velocity", Float) = 0
+        _StretchMin ("Min Stretch", Float) = 1.0
+        _StretchMax ("Max Stretch", Float) = 3.0
+        _AlphaScale ("Alpha Multiplier", Float) = 1.0
     }
 
     SubShader
@@ -42,8 +42,6 @@ Shader "ToTheSummit/SnowfallParticle"
             #pragma vertex Vertex
             #pragma fragment Fragment
             #pragma multi_compile_fog
-            // Gölge varyantları olmadan `mainLight.shadowAttenuation` her
-            // zaman 1 döner; tane dağın gölgesinde de güneşli kalırdı.
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
             #pragma multi_compile _ _SHADOWS_SOFT
             #pragma multi_compile _ _LIGHT_COOKIES
@@ -78,10 +76,7 @@ Shader "ToTheSummit/SnowfallParticle"
             float  _StretchMax;
             float  _AlphaScale;
 
-            /// Sis yoğunluğu MEVCUT sis sisteminden okunuyor (spec §3.7).
             float _FogDensity01;
-
-            /// Rüzgâr hızı — uzatma bundan geliyor.
             float _WindSpeed;
 
             struct Varyings
@@ -106,8 +101,6 @@ Shader "ToTheSummit/SnowfallParticle"
 
                 SnowFlake f = _Flakes[instanceID];
 
-                // Kapalı yuva: dejenere üçgen. Ayrı bir sayaç ve indirect
-                // argüman tamponu tutmaktan ucuz.
                 if (f.lifetime <= 0.0 || f.alpha <= 0.001)
                 {
                     OUT.positionCS = float4(0, 0, -10, 1);
@@ -119,39 +112,16 @@ Shader "ToTheSummit/SnowfallParticle"
                 float3 toCam = _WorldSpaceCameraPos - f.position;
                 float  dist = length(toCam);
 
-                // ASGARİ EKRAN BOYU ZORUNLU (spec §17.1). Uygulanmazsa
-                // uzaktaki taneler alt piksel kalıyor, kayboluyor ve TAA'da
-                // titriyor.
-                //
-                // ÖLÇEK MEVCUT YAĞIŞ SHADER'INDAKİYLE AYNI İFADE:
-                // `Precipitation.shader` → `PixelsPerRadian()`. `abs` ŞART —
-                // D3D render hedefine çizerken projeksiyonun [1][1] öğesi
-                // NEGATİFE düşüyor. Kendi ifademi yazınca `max(-1.73, 1e-4)`
-                // 1e-4 verdi, ölçek 10000 katına çıktı ve 23 m uzaktaki tane
-                // 680 m'lik bir dörtgen oldu: ekran bembeyaz, 10 FPS
-                // (ölçüldü — `SYMPTOMS.md`).
                 float pixelsPerRadian = abs(UNITY_MATRIX_P._m11) * _ScreenParams.y * 0.5;
                 float minWorld = dist * _MinPixelSize / max(pixelsPerRadian, 1e-4);
-
                 float size = max(f.size, minWorld);
-
-                // ALT PİKSEL TANENİN IŞIĞI PİKSELE ORANLI DÜŞER.
-                //
-                // Asgari ekran boyu tanenin boyunu büyütüyor ama ışığını
-                // artırmıyor: 5 mm'lik tane, 3 cm'lik tane kadar parlak
-                // çiziliyordu ve ekranda ikisi de aynı büyüklükte tek tip
-                // nokta oluyordu ("irili ufaklı değil" — ölçümde tanelerin
-                // %92'si tabana dayanmıştı). Alan oranı kadar soldurmak
-                // alt piksel bir yayıcının doğru integralidir; boy farkı
-                // artık parlaklık farkı olarak taşınıyor.
                 float subPixel = saturate((f.size * f.size) / max(size * size, 1e-12));
 
-                // Kameraya bakan düzlem + ömür boyu dönüş.
                 float3 forward = toCam / max(dist, 1e-4);
                 float3 right = normalize(cross(float3(0, 1, 0), forward));
                 float3 up = cross(forward, right);
 
-                float roll = f.phase + f.age * 1.5708;      // ±90°/s
+                float roll = f.phase + f.age * 1.5708;
                 float2 rc = float2(cos(roll), sin(roll));
 
                 float2 rotated = float2(corner.x * rc.x - corner.y * rc.y,
@@ -159,16 +129,11 @@ Shader "ToTheSummit/SnowfallParticle"
 
                 float3 offset = (right * rotated.x + up * rotated.y) * size;
 
-                // RÜZGÂRDA HIZ YÖNÜNDE UZAMA (spec §17.1).
                 if (_StretchAlongVelocity > 0.5)
                 {
                     float3 velDir = normalize(f.velocity + 1e-5);
                     float3 screenVel = normalize(velDir - forward * dot(velDir, forward) + 1e-5);
                     float3 screenSide = cross(forward, screenVel);
-
-                    // Spec §17.1: tane sisteminde 1→3×, Sistem B'de (yer
-                    // savrulması) 4–8×. Alt sınır ayrı bir parametre; ikisine
-                    // aynı sayıyı vermek savrulmayı tane gibi gösteriyordu.
                     float stretch = lerp(_StretchMin, _StretchMax, saturate(_WindSpeed / 12.0));
 
                     offset = (screenVel * rotated.y * stretch + screenSide * rotated.x) * size;
@@ -180,47 +145,25 @@ Shader "ToTheSummit/SnowfallParticle"
                 OUT.screenPos = ComputeScreenPos(OUT.positionCS);
                 OUT.viewDepth = -TransformWorldToView(positionWS).z;
 
-                // 4×4 atlas, tane başına sabit kare.
                 float2 cell = float2(fmod(f.frame, 4.0), floor(f.frame / 4.0));
                 OUT.uv = (corner + 0.5 + cell) * 0.25;
 
-                // SİS FADE'İ (spec §3.7, §17.1). Uygulanmazsa sisin içinde
-                // asılı beyaz noktalar kalıyor.
                 float fogCut = lerp(120.0, 35.0, saturate(_FogDensity01));
                 float fogFade = 1.0 - saturate(dist / max(fogCut, 1.0));
-
                 float alpha = f.alpha * fogFade * _AlphaScale * subPixel;
 
-                // SPEC §17.1: "Output Particle Lit Quad", Metallic 0,
-                // Smoothness 0.2, `Emissive = _FlakeEmissive * mainLightColor
-                // * 0.04` (gece lambaların altında görünsünler).
-                //
-                // TANE BİR YÜZEY DEĞİL, SAÇICI PARÇACIK.
-                //
-                // Önce `dot(N, L)` kullanılıyordu ve N kameraya bakan quad'ın
-                // normaliydi: tane, güneş KAMERANIN ARKASINDAYKEN en parlak
-                // çıkıyordu. Gerçekte tam tersi — buz kristali ışığı ağırlıkla
-                // İLERİ saçar; kar yağışı güneşe karşı bakınca parlar, güneş
-                // arkadayken soluktur. İşaret fiilen tersti.
-                //
-                // Henyey-Greenstein faz fonksiyonu, g = 0.55 (ileri baskın).
-                // Küçük bir izotropik taban bırakılıyor: kristal tek yönde
-                // değil, her yöne biraz saçar.
                 Light mainLight = GetMainLight(TransformWorldToShadowCoord(positionWS));
 
-                float3 kameraya = normalize(_WorldSpaceCameraPos - positionWS);
-                float cosT = dot(-kameraya, mainLight.direction);
+                float3 toCamera = normalize(_WorldSpaceCameraPos - positionWS);
+                float cosT = dot(-toCamera, mainLight.direction);
 
                 const float g = 0.55;
                 float hg = (1.0 - g * g) / pow(max(1.0 + g * g - 2.0 * g * cosT, 1e-4), 1.5);
-                half faz = (half)(0.18 + 0.42 * hg);
+                half phase = (half)(0.18 + 0.42 * hg);
 
-                // GÖLGE UYGULANIYOR. Uygulanmazsa dağın gölgesindeki tane de
-                // güneşli tane kadar parlak kalıyor ve yağış gölgenin üstünde
-                // yüzen bir tabaka gibi görünüyor.
                 half3 N = (half3)forward;
                 half3 lit = SampleSH(N)
-                          + mainLight.color * mainLight.shadowAttenuation * faz;
+                          + mainLight.color * mainLight.shadowAttenuation * phase;
                 half3 emissive = mainLight.color * _FlakeEmissive * 0.04h;
 
                 OUT.color = float4(_FlakeTint.rgb * lit + emissive, alpha);
@@ -232,16 +175,12 @@ Shader "ToTheSummit/SnowfallParticle"
             half4 Fragment(Varyings IN) : SV_Target
             {
                 half4 tex = SAMPLE_TEXTURE2D(_FlakeAtlas, sampler_FlakeAtlas, IN.uv);
-
                 half alpha = tex.a * IN.color.a;
 
-                // YUMUŞAK PARÇACIK: zemine değen tane keskin bir kenar
-                // bırakmasın.
                 float2 screenUV = IN.screenPos.xy / max(IN.screenPos.w, 1e-4);
                 float sceneDepth = LinearEyeDepth(SampleSceneDepth(screenUV), _ZBufferParams);
 
                 alpha *= saturate((sceneDepth - IN.viewDepth) / max(_SoftFade, 1e-3));
-
                 clip(alpha - 0.002);
 
                 half3 color = IN.color.rgb * tex.rgb;

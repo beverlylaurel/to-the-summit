@@ -1,17 +1,11 @@
-// ROL: uzak kaskadı ve kalıcılığı ÖLÇER — kaskadın birikmesi ve kayması,
-// blok paketleme/açma turu, yarım hassasiyetin taşıdığı çözünürlük.
-// Çağıran: menü — To The Summit/Snow/Persistence Test.
+// Measures far cascades and persistence — cascade accumulation and scrolling,
+// block pack/unpack round-trip, and half-precision fidelity.
+// Invoked by: Menu — To The Summit/Snow/Persistence Test.
 
 using System.Text;
 using UnityEditor;
 using UnityEngine;
 
-/// EN KRİTİK İDDİA: "blok geri geldiğinde iz aynı yerde."
-///
-/// Paketleme ve açma ters yazılırsa iz kayar ya da kaybolur; ikisi de
-/// ekranda "izler bazen duruyor bazen durmuyor" diye görünür ve hangi
-/// tarafın yanlış olduğu anlaşılmaz. Burada tur kapanışı teksel teksel
-/// ölçülüyor.
 public static class SnowPersistenceTest
 {
     const string SimPath = "Assets/Snow/Shaders/SnowSim.compute";
@@ -22,14 +16,13 @@ public static class SnowPersistenceTest
     const int BlockTexels = 128;
     const int StoredSide = 64;
 
-
     [MenuItem("To The Summit/Snow/Persistence Test", false, 59)]
     static void RunMenu() => Debug.Log(Run(out _));
 
     public static string Run(out bool ok)
     {
         var r = new StringBuilder(8192);
-        r.AppendLine("# Kar — kalıcılık ve bölge dışı kar sınaması");
+        r.AppendLine("# Snow — Persistence and Exterior Snow Test");
         r.AppendLine(System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         r.AppendLine();
 
@@ -38,18 +31,14 @@ public static class SnowPersistenceTest
         ok &= WiringTest(r);
 
         r.AppendLine();
-        r.AppendLine(ok ? "SONUÇ: TAMAM — bütün sınamalar geçti."
-                        : "SONUÇ: BAŞARISIZ — yukarıdaki satırlara bakın.");
+        r.AppendLine(ok ? "RESULT: PASSED — all tests completed successfully."
+                        : "RESULT: FAILED — see above for details.");
         return r.ToString();
     }
 
-    // ------------------------------------------------------- yarım hassasiyet
-
-    /// Bloklar yarım hassasiyette saklanıyor (spec `half[]`). O adımın
-    /// sakladığımız büyüklükleri taşıyıp taşımadığı ÖLÇÜLÜYOR.
     static bool HalfTest(StringBuilder r)
     {
-        r.AppendLine("## Saklama hassasiyeti");
+        r.AppendLine("## Storage Precision");
 
         (string name, float value, float tolerance)[] cases =
         {
@@ -70,8 +59,8 @@ public static class SnowPersistenceTest
             bool ok = error < c.tolerance;
             all &= ok;
 
-            r.AppendLine("  [" + M(ok) + "] " + c.name.PadRight(16) + "geri " +
-                         back.ToString("0.000000") + ",  hata " +
+            r.AppendLine("  [" + M(ok) + "] " + c.name.PadRight(16) + "roundtrip " +
+                         back.ToString("0.000000") + ",  error " +
                          (error * 1000f).ToString("0.0000") + " mm");
         }
 
@@ -81,14 +70,14 @@ public static class SnowPersistenceTest
     static bool BlockTest(StringBuilder r)
     {
         r.AppendLine();
-        r.AppendLine("## Blok paketleme turu (spec §21 Faz 10)");
+        r.AppendLine("## Block Packing Roundtrip (spec §21 Phase 10)");
 
         var sim = AssetDatabase.LoadAssetAtPath<ComputeShader>(SimPath);
         var kernels = AssetDatabase.LoadAssetAtPath<ComputeShader>(KernelPath);
 
         if (sim == null || kernels == null)
         {
-            r.AppendLine("  [-] Compute yüklenemedi.");
+            r.AppendLine("  [-] Compute shader could not be loaded.");
             return false;
         }
 
@@ -109,7 +98,6 @@ public static class SnowPersistenceTest
 
         try
         {
-            // Kaynağa konum bağımlı bir desen bas: r = x, g = y.
             int stampGroups = Mathf.CeilToInt(Res / 8f);
 
             kernels.SetInt(SnowShaderIDs.Resolution, Res);
@@ -120,7 +108,6 @@ public static class SnowPersistenceTest
 
             Color[] source = ReadAll(snow);
 
-            // Hedefi sıfırla — açma gerçekten yazıyor mu görülsün.
             sim.SetInt(SnowShaderIDs.Resolution, Res);
             sim.SetVector(SnowShaderIDs.ClearValue, Vector4.zero);
             sim.SetTexture(clear, SnowShaderIDs.Dst, snowOut);
@@ -128,7 +115,6 @@ public static class SnowPersistenceTest
             sim.SetTexture(clear, SnowShaderIDs.Dst, trailOut);
             sim.Dispatch(clear, stampGroups, stampGroups, 1);
 
-            // Paketle.
             sim.SetInt(SnowShaderIDs.BlockTexels, BlockTexels);
             sim.SetInt(SnowShaderIDs.BlockStored, StoredSide);
             sim.SetVector(SnowShaderIDs.BlockOrigin, new Vector4(0f, 0f, 0f, 0f));
@@ -137,7 +123,6 @@ public static class SnowPersistenceTest
             sim.SetBuffer(pack, SnowShaderIDs.BlockBuffer, buffer);
             sim.Dispatch(pack, Mathf.CeilToInt(StoredSide / 8f), Mathf.CeilToInt(StoredSide / 8f), 1);
 
-            // Aç.
             sim.SetTexture(unpack, SnowShaderIDs.Snow, snowOut);
             sim.SetTexture(unpack, SnowShaderIDs.Trail, trailOut);
             sim.SetTexture(unpack, SnowShaderIDs.SnowOut, snowOut);
@@ -155,7 +140,6 @@ public static class SnowPersistenceTest
             for (int y = 0; y < BlockTexels; y++)
             for (int x = 0; x < BlockTexels; x++)
             {
-                // Beklenen: kaynağın 2×2 kutu ortalaması.
                 float sumR = 0f, sumG = 0f;
 
                 int bx = x / step * step;
@@ -183,12 +167,10 @@ public static class SnowPersistenceTest
             bool roundTrip = maxError < 0.01f;
             all &= roundTrip;
 
-            r.AppendLine("  [" + M(roundTrip) + "] Tur kapanıyor           " + written + " / " +
-                         (BlockTexels * BlockTexels) + " teksel yazıldı,  maks hata " +
+            r.AppendLine("  [" + M(roundTrip) + "] Roundtrip closed         " + written + " / " +
+                         (BlockTexels * BlockTexels) + " texels written,  max error " +
                          maxError.ToString("0.00000"));
 
-            // BLOĞUN DIŞI DOKUNULMAMIŞ OLMALI. Açma taşarsa komşu blokların
-            // izleri silinir.
             int leaked = 0;
 
             for (int y = 0; y < Res; y++)
@@ -202,8 +184,8 @@ public static class SnowPersistenceTest
             bool contained = leaked == 0;
             all &= contained;
 
-            r.AppendLine("  [" + M(contained) + "] Blok dışına taşmıyor    " + leaked +
-                         " teksel  (0 olmalı)");
+            r.AppendLine("  [" + M(contained) + "] Contained in block bounds " + leaked +
+                         " texels  (must be 0)");
         }
         finally
         {
@@ -218,34 +200,25 @@ public static class SnowPersistenceTest
         return all;
     }
 
-    // ----------------------------------------------------------------- bağlar
-
     static bool WiringTest(StringBuilder r)
     {
         r.AppendLine();
-        r.AppendLine("## Bağlar");
+        r.AppendLine("## Wiring");
 
         string common = System.IO.File.ReadAllText(CommonPath);
 
-        // SPEC §8.4: "24 m ötesinde kar mesh'i yoktur." Bölgenin dışındaki
-        // kar durumu SABİT BİR SAYI DEĞİL, kar çizgisi eğrisi — sabit olsaydı
-        // dağın tepesi ile eteği aynı kalınlıkta kar taşırdı.
         bool defined = common.Contains("float2 SnowOutsideStateAt");
         bool plain = common.Contains("float2(_FallbackSWE, _FallbackRhoN)");
         bool used = common.Contains("SnowOutsideStateAt(SnowUVToWorld(uv))");
-
-        // Kaskad geri sızmasın: silindiği için gerekçesi de yok.
         bool noCascade = !common.Contains("SnowFarStateAt") && !common.Contains("_SnowFarTex");
 
-        r.AppendLine("  [" + M(defined) + "] Bölge dışı tanımlı      `SnowOutsideStateAt`");
-        r.AppendLine("  [" + M(plain) + "] İrtifa terimi yok       kar yağarsa tutar, kota bakmaz");
-        r.AppendLine("  [" + M(used) + "] `SnowStateAt` okuyor    bölge dışında devreye giriyor");
-        r.AppendLine("  [" + M(noCascade) + "] Kaskad kalıntısı yok    (spec §8.4)");
+        r.AppendLine("  [" + M(defined) + "] Exterior defined        `SnowOutsideStateAt`");
+        r.AppendLine("  [" + M(plain) + "] No altitude term        accumulation handles snowfall");
+        r.AppendLine("  [" + M(used) + "] `SnowStateAt` reads      active outside region");
+        r.AppendLine("  [" + M(noCascade) + "] No cascade leftovers    (spec §8.4)");
 
         return defined && plain && used && noCascade;
     }
-
-    // ----------------------------------------------------------------- yardım
 
     static string M(bool ok) => ok ? "+" : "-";
 
@@ -270,22 +243,6 @@ public static class SnowPersistenceTest
         rt.Release();
         Object.DestroyImmediate(rt);
         rt = null;
-    }
-
-    static Color Read(RenderTexture rt)
-    {
-        RenderTexture prev = RenderTexture.active;
-        RenderTexture.active = rt;
-
-        var tex = new Texture2D(1, 1, TextureFormat.RGBAFloat, false, true);
-        tex.ReadPixels(new Rect(rt.width / 2, rt.height / 2, 1, 1), 0, 0);
-        tex.Apply(false);
-
-        RenderTexture.active = prev;
-
-        Color c = tex.GetPixel(0, 0);
-        Object.DestroyImmediate(tex);
-        return c;
     }
 
     static Color[] ReadAll(RenderTexture rt)

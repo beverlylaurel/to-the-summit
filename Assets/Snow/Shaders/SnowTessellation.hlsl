@@ -82,7 +82,7 @@ SnowTessControlPoint SnowHull(InputPatch<SnowTessControlPoint, 3> patch,
 
 /// KAR YUZEYININ YUKSEKLIGI — GORSEL VE FIZIK AYNI FONKSIYONU OKUYOR.
 ///
-/// `SnowYuzeyRolyef` piksel ayak izi istiyor cunku analitik gurultu
+/// `SnowSurfaceRelief` piksel ayak izi istiyor cunku analitik gurultu
 /// mip'lenmiyor. KOSE ASAMASINDA PIKSEL AYAK IZI YOK: `fwidth` yalniz
 /// fragment'te tanimli. Yerine KOSE ARALIGI veriliyor — bolme faktoru ne
 /// kadar yuksekse kose o kadar sik, yani ornekleme frekansi o kadar yuksek.
@@ -102,14 +102,14 @@ float SnowTessYerDegistirme(float3 posWS)
     float faktor = max(lerp(1.0, _SnowTessMax, t), 1.0);
 
     // Terrain kose araligi / bolme faktoru = yeni kose araligi.
-    float koseAraligi = SNOW_TERRAIN_VERTEX_SPACING / faktor;
+    float vertexSpacing = SNOW_TERRAIN_VERTEX_SPACING / faktor;
 
     // Maruziyet `SampleWindShadow`'un TERSI: o fonksiyon korunakliligi
     // olcuyor (spec 18.0: "> 0 -> golgede"). Siperde drift, acikta sastrugi.
-    float maruziyet = 1.0 - saturate(SampleWindShadow(posWS) * 1.2);
+    float exposure = 1.0 - saturate(SampleWindShadow(posWS) * 1.2);
 
-    float h = SnowYuzeyRolyef(posWS.xz, koseAraligi, SnowWorldCoverHeight(),
-                              true, maruziyet);
+    float h = SnowSurfaceRelief(posWS.xz, vertexSpacing, SnowWorldCoverHeight(),
+                              true, exposure);
 
     // IZ DE GEOMETRIYE GIRIYOR.
     //
@@ -132,7 +132,7 @@ float SnowTessYerDegistirme(float3 posWS)
 /// YER DEGISTIRME DUNYA +Y YONUNDE, YUZEY NORMALI BOYUNCA DEGIL. Kar yatay
 /// birikiyor; egimli arazide normal boyunca kaydirmak kari yamaca dik
 /// yapistirir.
-float3 SnowTessKonum(OutputPatch<SnowTessControlPoint, 3> patch, float3 bary)
+float3 SnowTessPosition(OutputPatch<SnowTessControlPoint, 3> patch, float3 bary)
 {
     float3 posWS = patch[0].positionWS * bary.x
                  + patch[1].positionWS * bary.y

@@ -2,29 +2,26 @@ using System;
 using System.IO;
 using System.Text;
 
-/// ARAÇ ÇIKTISI DOSYAYA GİDER, KONSOLA DEĞİL. Editördeki bütün araçlar — sahne kurulumu,
-/// arazi üretimi, doku pişirme, ölçüm, fırça — sonuçlarını uzun tablolar hâlinde basıyor.
-/// Konsola gitseydi gerçek hata ve uyarılar o tabloların arasında kaybolurdu.
+/// TOOL OUTPUT DIRECTED TO FILE, NOT CONSOLE. All editor tools — scene bootstrap,
+/// terrain generation, texture baking, measurement, brushes — produce verbose tables.
+/// Outputting to console would bury real errors and warnings among those tables.
 ///
-/// Yeni araç yazarken kural: bilgi `ToolLog.Write`, sorun `Debug.LogWarning` ya da
-/// `Debug.LogError`. Konsolda görünen her satır bakılması gereken bir şey olmalı.
+/// Rule when writing new tools: informative output via `ToolLog.Write`, issues via
+/// `Debug.LogWarning` or `Debug.LogError`. Every console line must require attention.
 ///
-/// DOSYA PAYLAŞIMLI AÇILIYOR. Log okunurken (editör, terminal, başka bir araç) dosya
-/// kilitli oluyor; ilk sürüm döndürme için `File.Delete` çağırıyordu ve kilitli dosyada
-/// `IOException` fırlatıp kurulumu yarıda kesti. Silmek yerine kesiliyor ve okuyucuya
-/// izin veriliyor.
+/// FILE OPENED IN SHARED MODE. While logs are read (editor, terminal, external tool),
+/// file is locked; earlier versions called `File.Delete` for truncation, throwing `IOException`
+/// and interrupting setup. Truncation is used instead of deletion, granting reader permissions.
 public static class ToolLog
 {
-    /// ADI UNITY'NİNKİYLE ÇAKIŞAMAZ. Yol `Logs/editor.log` idi; Unity kendi logunu aynı
-    /// klasöre `Logs/Editor.log` diye yazıyor ve Windows dosya adlarında büyük-küçük harf
-    /// ayrımı YOK — ikisi tek dosyaydı. Sonuçları: araç çıktısı Unity'nin logunun içine
-    /// karışıyordu, aşağıdaki 512 KB kesme Unity'nin logunu kırpıyordu ve Unity kendi
-    /// eski konumundan yazmaya devam ettiği için araya sıfır bayt dolgusu giriyordu
-    /// (bir kez 23 MB'lık NUL dosyası buradan çıktı, sebebi o zaman anlaşılmamıştı).
+    /// CANNOT CONFLICT WITH UNITY LOG NAME. Path was `Logs/editor.log`; Unity writes its own
+    /// log to `Logs/Editor.log` in the same directory, and Windows filesystem is CASE-INSENSITIVE —
+    /// colliding into a single file. Tool output mixed into Unity log, 512 KB truncation
+    /// cropped Unity log, and Unity continued writing at its previous file offset inserting zero-byte padding.
     const string LogPath = "Logs/tools.log";
 
-    /// Dosya bu boyutu aşınca baştan yazılıyor. Sınırsız büyüseydi okunamaz olurdu;
-    /// yarım megabayt son birkaç yüz kaydı tutuyor.
+    /// File truncated when exceeding this size. Unbounded growth impairs readability;
+    /// half a megabyte retains recent hundreds of entries.
     const long MaxBytes = 512 * 1024;
 
     public static void Write(string message)
@@ -33,11 +30,9 @@ public static class ToolLog
 
         string line = $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}{Environment.NewLine}";
 
-        // AKIŞ ELLE AÇILIYOR, iki sebeple. Birincisi paylaşım: `File.AppendAllText`
-        // dosyayı okumaya kapalı açıyor ve log okunurken yazma "sharing violation" ile
-        // düşüp kurulumu kesiyordu. İkincisi kesme: bir çağrıda `Create`, diğerinde
-        // `Append` kullanılınca Windows aradaki boşluğu sıfır baytla dolduruyor ve dosya
-        // yirmi üç megabayta şişti — burada uzunluk sıfırlanıp sona konumlanılıyor.
+        // Stream opened manually for sharing and truncation control:
+        // `File.AppendAllText` opens without read sharing, failing with sharing violation during active reading.
+        // Truncating resets stream length and seeks to end.
         using var stream = new FileStream(LogPath, FileMode.OpenOrCreate, FileAccess.Write,
             FileShare.ReadWrite | FileShare.Delete);
 

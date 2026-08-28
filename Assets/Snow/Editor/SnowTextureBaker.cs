@@ -1,14 +1,10 @@
-// ROL: kar sisteminin ihtiyaç duyduğu prosedürel dokuları üretir ve asset
-// olarak yazar. Bir kez koşar; doku varsa dokunmaz.
-// Çağıran: SnowDebugWindow (sahne kurulumu).
+// Generates procedural textures required by the snow subsystem and writes them as assets.
+// Invoked by: SnowDebugWindow (scene setup).
 
 using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-/// DOKU ÜRETİLİYOR, İNDİRİLMİYOR. Spec §8.2 `_SnowBreakup` diye bir gürültü
-/// istiyor ama dosya listesinde yok. Prosedürel üretmek hem tohumu kayda
-/// geçiriyor hem de repoya ikili bir varlık eklemeden tekrarlanabilir kılıyor.
 public static class SnowTextureBaker
 {
     public const string BreakupPath = "Assets/Snow/Textures/T_Snow_Breakup.png";
@@ -16,7 +12,6 @@ public static class SnowTextureBaker
 
     const int BreakupResolution = 256;
 
-    /// Tohum sabit: aynı doku her makinede aynı çıksın.
     const int Seed = 20260822;
 
     public static Texture2D EnsureBreakup()
@@ -47,10 +42,6 @@ public static class SnowTextureBaker
 
         var importer = (TextureImporter)AssetImporter.GetAtPath(BreakupPath);
 
-        // `SingleChannel` DEĞİL. O tip değeri varsayılan olarak ALPHA'ya
-        // koyuyor; shader `.r` okuyor ve sıfır buluyor. Belirtisi "gürültü
-        // hiç etki etmiyor" — kar kenarı düz çizgi, sastrugi dümdüz
-        // (ölçüldü). `Default` ile gri tonlama üç kanala da yazılıyor.
         importer.textureType = TextureImporterType.Default;
         importer.sRGBTexture = false;
         importer.wrapMode = TextureWrapMode.Repeat;
@@ -61,10 +52,6 @@ public static class SnowTextureBaker
         return AssetDatabase.LoadAssetAtPath<Texture2D>(BreakupPath);
     }
 
-    /// TEK DETAY NORMALİ, DÖRT ÖLÇEKTE. Spec §14.2 dört katman istiyor
-    /// (makro 8 m, mezo 0.6 m, mikro 0.05 m, ezilmiş 0.25 m) ama dört ayrı
-    /// doku istemiyor — aynı döşenebilir normal farklı tile'larla örneklenince
-    /// katmanlar birbirine benzemiyor.
     public static Texture2D EnsureDetailNormal()
     {
         var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(DetailNormalPath);
@@ -83,7 +70,6 @@ public static class SnowTextureBaker
         var tex = new Texture2D(Res, Res, TextureFormat.RGBA32, false, true);
         var px = new Color32[Res * Res];
 
-        // Yükseklikten normal: merkezi fark, döşenebilirlik için sarmalı.
         for (int y = 0; y < Res; y++)
         for (int x = 0; x < Res; x++)
         {
@@ -119,12 +105,8 @@ public static class SnowTextureBaker
         return AssetDatabase.LoadAssetAtPath<Texture2D>(DetailNormalPath);
     }
 
-    // ---------------------------------------------------------------- sastrugi
-
     public const string SastrugiNoisePath = "Assets/Snow/Textures/T_Sastrugi_Noise.png";
 
-    /// SASTRUGİ GÜRÜLTÜSÜ (spec §18.4). UV'si rüzgâr yönünde sıkıştırılarak
-    /// örnekleniyor; dokunun kendisi izotropik olmalı, yönü UV veriyor.
     public static Texture2D EnsureSastrugiNoise()
     {
         var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(SastrugiNoisePath);
@@ -140,8 +122,6 @@ public static class SnowTextureBaker
         for (int y = 0; y < Res; y++)
         for (int x = 0; x < Res; x++)
         {
-            // Dalga + gürültü. Saf gürültü sırt yerine benek verir; saf dalga
-            // ise tekrar eden bir tarak deseni.
             float u = (x + 0.5f) / Res;
             float v = (y + 0.5f) / Res;
 
@@ -173,17 +153,8 @@ public static class SnowTextureBaker
         return AssetDatabase.LoadAssetAtPath<Texture2D>(SastrugiNoisePath);
     }
 
-    // ------------------------------------------------------------ tane atlası
-
     public const string FlakeAtlasPath = "Assets/Snow/Textures/T_Flake_Atlas.png";
 
-    /// 4×4 TANE ATLASI (spec §17.1). On altı AYRI kristal — hepsi aynı
-    /// olsaydı yağış tekrar eden bir desen olurdu ve "irili ufaklı değil"
-    /// belirtisi buradan doğardı.
-    ///
-    /// Altı katlı simetri gerçek kar kristalinin kendi simetrisi; kollar ve
-    /// yan dallar hücreden hücreye değişiyor. Son iki hücre yuvarlak
-    /// (graupel) — sulu karda o biçim baskın.
     public static Texture2D EnsureFlakeAtlas()
     {
         var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(FlakeAtlasPath);
@@ -206,7 +177,6 @@ public static class SnowTextureBaker
 
             var rng = new System.Random(Seed + index * 7919);
 
-            // Kolun uzunluğu ve kalınlığı, yan dalların yeri — hücre başına.
             float armLength = graupel ? 0.30f : Mathf.Lerp(0.62f, 0.92f, (float)rng.NextDouble());
             float armWidth = Mathf.Lerp(0.055f, 0.110f, (float)rng.NextDouble());
             float coreRadius = graupel ? Mathf.Lerp(0.34f, 0.46f, (float)rng.NextDouble())
@@ -234,13 +204,10 @@ public static class SnowTextureBaker
                 float dist = Mathf.Sqrt(u * u + v * v);
                 float alpha = 0f;
 
-                // Çekirdek
                 alpha = Mathf.Max(alpha, 1f - Step01(coreRadius * 0.6f, coreRadius, dist));
 
                 if (!graupel)
                 {
-                    // ALTI KATLI SİMETRİ: açı 60°'ye katlanıyor, tek kol
-                    // çiziliyor, altısı birden çıkıyor.
                     float angle = Mathf.Atan2(v, u);
                     float folded = Mathf.Repeat(angle, Mathf.PI / 3f) - Mathf.PI / 6f;
 
@@ -264,13 +231,11 @@ public static class SnowTextureBaker
                 }
                 else
                 {
-                    // Graupel: pütürlü yuvarlak.
                     float bump = Mathf.Sin(Mathf.Atan2(v, u) * 7f) * 0.035f;
                     alpha = Mathf.Max(alpha, 1f - Step01(coreRadius + bump,
                                                           coreRadius + bump + 0.08f, dist));
                 }
 
-                // Kenarda tam sıfıra in: atlas hücreleri birbirine sızmasın.
                 alpha *= 1f - Step01(0.88f, 1.0f, dist);
 
                 byte a = (byte)Mathf.Clamp(Mathf.RoundToInt(alpha * 255f), 0, 255);
@@ -299,10 +264,6 @@ public static class SnowTextureBaker
         return AssetDatabase.LoadAssetAtPath<Texture2D>(FlakeAtlasPath);
     }
 
-    /// GERÇEK EŞİK FONKSİYONU. `Mathf.SmoothStep(a, b, t)` GLSL'in
-    /// `smoothstep`'i DEĞİL — a ile b ARASINDA interpolasyon yapıyor, eşik
-    /// uygulamıyor. Karıştırıldığında atlas kristal değil düz soluk bir leke
-    /// çıkıyor (ölçüldü: on altı hücrenin kaplaması %2.0–%2.8, hepsi aynı).
     static float Step01(float edge0, float edge1, float x)
     {
         float t = Mathf.Clamp01((x - edge0) / Mathf.Max(edge1 - edge0, 1e-6f));
@@ -316,8 +277,6 @@ public static class SnowTextureBaker
         return Vector2.Distance(p, a + ab * t);
     }
 
-    /// Yüzeyin dikliği. Küçültülürse normaller yatıklaşıp detay kaybolur,
-    /// büyütülürse yüzey plastik görünür.
     const float NormalStrength = 0.06f;
 
     static void EnsureFolder()
@@ -327,9 +286,6 @@ public static class SnowTextureBaker
             AssetDatabase.CreateFolder("Assets/Snow", "Textures");
     }
 
-    /// DÖŞENEBİLİR gürültü. Kafes noktaları frekansa göre sarılıyor; sarılmazsa
-    /// kar kenarında dokunun dikişi düz bir çizgi olarak görünür — tam da
-    /// kırmaya çalıştığımız şey.
     static float TilingFbm(float u, float v)
     {
         float sum = 0f;
@@ -357,7 +313,6 @@ public static class SnowTextureBaker
         float fx = x - x0;
         float fy = y - y0;
 
-        // Smoothstep: doğrusal harmanlama kafes çizgilerini görünür bırakıyor.
         fx = fx * fx * (3f - 2f * fx);
         fy = fy * fy * (3f - 2f * fy);
 
@@ -371,7 +326,6 @@ public static class SnowTextureBaker
 
     static float Lattice(int x, int y, int frequency, int octave)
     {
-        // Sarma: frekansın katında aynı değere dönüyor → doku döşenebiliyor.
         x = ((x % frequency) + frequency) % frequency;
         y = ((y % frequency) + frequency) % frequency;
 

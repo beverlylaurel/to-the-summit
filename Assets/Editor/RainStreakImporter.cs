@@ -5,23 +5,20 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-/// GARG-NAYAR İZ VERİTABANINI UNITY'YE ALIR — `rain-spec.md` §10.2 Aşama 1.
+/// IMPORTS GARG-NAYAR STREAK DATABASE INTO UNITY — `rain-spec.md` §10.2 Phase 1.
 ///
-/// Kaynak 15 000 adet 16-bit tek kanal PNG ve proje dışında duruyor (Kirmse arazi
-/// verisiyle aynı kural: ham veri repoya girmez). `Tools/rain/pack_streaks.py` onları
-/// normalize edip float16 bloklara paketliyor; bu araç blokları `Texture2DArray`'e
-/// çeviriyor.
+/// Source consists of 15,000 16-bit single-channel PNGs stored outside the project
+/// (same rule as DEM data: raw data does not enter repository). `Tools/rain/pack_streaks.py`
+/// normalizes and packs them into float16 blobs; this tool converts blobs into `Texture2DArray`.
 ///
-/// NEDEN UNITY PNG'LERİ DOĞRUDAN OKUMUYOR: `ImageConversion` 16-bit gri PNG'yi 8-bit'e
-/// indiriyor. Spec §5.4.4'ün uyardığı şey tam da bu — her dokunun kendi max çarpanı var
-/// ve çarpanlar 0.002 ile 0.65 arasında değişiyor; hassasiyet kaybı sönük izleri
-/// tamamen siliyor ve "tüm izler eşit parlak" sonucunu veriyor.
+/// WHY UNITY CANNOT READ PNGs DIRECTLY: `ImageConversion` downsamples 16-bit grayscale PNGs to 8-bit.
+/// Spec §5.4.4 warns of this exact problem — each texture has its own max multiplier varying
+/// between 0.002 and 0.65; precision loss completely erases faint streaks, rendering "all streaks equally bright".
 public static class RainStreakImporter
 {
-    /// Paketlenmiş bloklar PROJE AĞACINDA AMA `Assets/` DIŞINDA. İçeride olsalardı
-    /// Unity onları `TextAsset` olarak import ederdi — editöre ve build'e 67 MB, oysa
-    /// yalnız içe aktarma anında okunuyorlar. Ham PNG'ler repoya hiç girmiyor (Kirmse
-    /// arazi verisiyle aynı kural).
+    /// Packed blobs reside IN THE PROJECT TREE BUT OUTSIDE `Assets/`. If inside,
+    /// Unity would import them as `TextAsset` — adding 67 MB to editor and build, whereas
+    /// they are only read during import. Raw PNGs never enter repository.
     const string SourceFolder = "Tools/rain/packed";
     const string AssetPath = "Assets/Rain/RainStreakDatabase.asset";
 
@@ -31,13 +28,13 @@ public static class RainStreakImporter
         var indexFiles = Directory.GetFiles(SourceFolder, "*.index.txt");
         if (indexFiles.Length == 0)
             throw new FileNotFoundException(
-                $"{SourceFolder} içinde .index.txt yok. Önce Tools/rain/pack_streaks.py çalıştırılmalı.");
+                $"No .index.txt found in {SourceFolder}. Run Tools/rain/pack_streaks.py first.");
 
         var db = ScriptableObject.CreateInstance<RainStreakDatabase>();
         var sizes = new SortedSet<int>();
         var dcams = new SortedSet<int>();
 
-        // Önce eksenleri ve seviyeleri topla: hangi boyut, hangi kamera açısı var.
+        // Gather axes and levels first: determine available resolutions and camera angles.
         var parsed = new Dictionary<string, Index>();
         foreach (var file in indexFiles)
         {
@@ -68,8 +65,7 @@ public static class RainStreakImporter
                 angle.Ambient[s] = Build($"env_size{size}_dcam{dcam:00}", parsed);
             }
 
-            // Varlık tablosu yalnız (dcam, v, h, osc)'ye bağlı — çözünürlükten
-            // bağımsız, bir kez alınıyor.
+            // Occupancy table depends only on (dcam, v, h, osc) — resolution-independent, sampled once.
             angle.Present = parsed[$"point_size{db.Sizes[0]}_dcam{dcam:00}"].Present;
             angles.Add(angle);
         }
@@ -94,12 +90,12 @@ public static class RainStreakImporter
         Selection.activeObject = db;
     }
 
-    /// Blok → `Texture2DArray`. Blok float16 ve dilim dilim sıralı; `SetPixelData`
-    /// baytları olduğu gibi alıyor, dönüşüm yok.
+    /// Blob → `Texture2DArray`. Blob is float16 ordered slice by slice; `SetPixelData`
+    /// ingests raw bytes directly without conversion.
     static Texture2DArray Build(string name, Dictionary<string, Index> parsed)
     {
         if (!parsed.TryGetValue(name, out var index))
-            throw new KeyNotFoundException($"{name}.index.txt yok");
+            throw new KeyNotFoundException($"Missing {name}.index.txt");
 
         string blob = Path.Combine(SourceFolder, name + ".bytes");
         byte[] data = File.ReadAllBytes(blob);
@@ -108,15 +104,15 @@ public static class RainStreakImporter
         long expected = (long)sliceBytes * index.Slices;
         if (data.LongLength != expected)
             throw new IOException(
-                $"{name}.bytes {data.LongLength} bayt, {expected} bekleniyordu " +
-                $"({index.Width}×{index.Height}×{index.Slices}, R16F)");
+                $"{name}.bytes has {data.LongLength} bytes, expected {expected} " +
+                $"({index.Width}x{index.Height}x{index.Slices}, R16F)");
 
         var array = new Texture2DArray(index.Width, index.Height, index.Slices,
                                        TextureFormat.RHalf, false, true)
         {
             name = name,
-            // İz DİKEY tekrar etmiyor: uçları kırpılmış bir doku. Yatayda da
-            // tekrar yok — kenarın ötesi hava.
+            // Streak does not repeat vertically: texture has clipped endpoints.
+            // No horizontal repeat either — beyond edge is empty air.
             wrapMode = TextureWrapMode.Clamp,
             filterMode = FilterMode.Bilinear,
         };
@@ -146,16 +142,16 @@ public static class RainStreakImporter
 
         var head = db.Angles[0];
         Debug.Log(
-            $"İz veritabanı kuruldu: {db.Angles.Length} kamera açısı × "
-            + $"{db.Sizes.Length} çözünürlük ({string.Join(", ", db.Sizes)} px)\n"
-            + $"  eksen: v {db.Vertical.Length} × h {db.Horizontal.Length} × osc 10\n"
-            + $"  dcam0 en yüksek seviye: {head.Point.Last().width}×{head.Point.Last().height}"
-            + $" × {head.Point.Last().depth} dilim\n"
-            + $"  eksik kombinasyon: {missing} (uç dikey açılarda iz dejenere, spec §5.4.5)\n"
-            + $"  bellek: {bytes / 1048576f:F1} MB");
+            $"Streak database built: {db.Angles.Length} camera angle(s) x "
+            + $"{db.Sizes.Length} resolution(s) ({string.Join(", ", db.Sizes)} px)\n"
+            + $"  axes: v {db.Vertical.Length} x h {db.Horizontal.Length} x osc 10\n"
+            + $"  dcam0 top level: {head.Point.Last().width}x{head.Point.Last().height}"
+            + $" x {head.Point.Last().depth} slices\n"
+            + $"  missing combinations: {missing} (streak degenerates at extreme vertical angles, spec §5.4.5)\n"
+            + $"  memory: {bytes / 1048576f:F1} MB");
     }
 
-    /// `.index.txt` — paketleyicinin yazdığı boyut ve eksen kaydı.
+    /// `.index.txt` — dimensions and axis metadata recorded by packer.
     class Index
     {
         public int Width, Height, Slices, Dcam;
@@ -167,9 +163,9 @@ public static class RainStreakImporter
             var index = new Index();
             string name = Path.GetFileName(path);
 
-            // dcam kimliği dosya adında: <tür>_size<N>_dcam<NN>.index.txt
+            // dcam ID in filename: <type>_size<N>_dcam<NN>.index.txt
             int mark = name.IndexOf("_dcam", System.StringComparison.Ordinal);
-            if (mark < 0) throw new IOException($"{name}: dosya adında _dcam yok");
+            if (mark < 0) throw new IOException($"{name}: missing _dcam in filename");
             index.Dcam = int.Parse(name.Substring(mark + 5, 2), CultureInfo.InvariantCulture);
 
             foreach (string line in File.ReadAllLines(path))
@@ -182,7 +178,7 @@ public static class RainStreakImporter
                     case "slices": index.Slices = int.Parse(parts[1]); break;
                     case "format":
                         if (parts[1] != "R16F")
-                            throw new IOException($"{name}: format {parts[1]}, R16F bekleniyor");
+                            throw new IOException($"{name}: format {parts[1]}, expected R16F");
                         break;
                     case "axis":
                         var values = parts.Skip(2).Select(int.Parse).ToArray();

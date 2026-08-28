@@ -1,6 +1,6 @@
-// ROL: kar sisteminin teşhis penceresi — durum dokularının kanallarını gösterir,
-// bölge/snap sayılarını yazar. Bir de sahneyi kuran düğme.
-// Çağıran: menü — To The Summit/Snow/Snow Diagnostics.
+// Diagnostic and inspection window for the snow subsystem — displays render texture channels,
+// region/snap parameters, and scene setup controls.
+// Invoked by: Menu — To The Summit/Snow/Snow Diagnostics.
 
 using System.IO;
 using UnityEditor;
@@ -12,30 +12,29 @@ public class SnowDebugWindow : EditorWindow
 {
     static readonly string[] ChannelNames =
     {
-        "R — swe (kar su eşdeğeri, m)",
-        "G — rhoN (normalize yoğunluk)",
-        "B — wet (ıslaklık)",
-        "A — disturb (tazelik)",
-        "h — türetilmiş taban derinlik (m)",
+        "R — swe (snow water equivalent, m)",
+        "G — rhoN (normalized density)",
+        "B — wet (wetness)",
+        "A — disturb (freshness)",
+        "h — derived base depth (m)",
     };
 
-    /// Her kanalın görüntüleme tavanı. rhoN/wet/disturb zaten 0..1.
     static readonly float[] ChannelRanges = { 0.60f, 1f, 1f, 1f, 1.20f };
 
     enum PreviewSource
     {
-        Durum,
-        Iz,
-        GokyuzuGorunurlugu,
-        RuzgarGolgesi,
+        State,
+        Trail,
+        SkyVisibility,
+        WindShadow,
     }
 
     static readonly string[] SourceNames =
     {
-        "Durum (RT_Snow)",
-        "İz (RT_Trail)",
-        "Gökyüzü görünürlüğü (RT_SkyVis)",
-        "Rüzgâr gölgesi (RT_WindShadow)",
+        "State (RT_Snow)",
+        "Trail (RT_Trail)",
+        "Sky Visibility (RT_SkyVis)",
+        "Wind Shadow (RT_WindShadow)",
     };
 
     PreviewSource source;
@@ -48,7 +47,7 @@ public class SnowDebugWindow : EditorWindow
     RenderTexture preview;
 
     [MenuItem("To The Summit/Snow/Snow Diagnostics", false, 50)]
-    static void Open() => GetWindow<SnowDebugWindow>("Kar Teşhisi").minSize = new Vector2(420f, 560f);
+    static void Open() => GetWindow<SnowDebugWindow>("Snow Diagnostics").minSize = new Vector2(420f, 560f);
 
     void OnDisable()
     {
@@ -59,9 +58,6 @@ public class SnowDebugWindow : EditorWindow
         preview = null;
     }
 
-    /// BLIT BURADA, OnGUI'DE DEĞİL. Play modunda OnGUI içinde `Graphics.Blit`
-    /// çağırmak aktif render hedefini editör GUI geçişinin altından çekiyor ve
-    /// pencerenin tamamı siyah kalıyor — hiçbir istisna basmadan.
     void OnInspectorUpdate()
     {
         UpdatePreview();
@@ -79,7 +75,7 @@ public class SnowDebugWindow : EditorWindow
 
         EnsurePreview(shown.width);
 
-        bool raw = source == PreviewSource.GokyuzuGorunurlugu || source == PreviewSource.RuzgarGolgesi;
+        bool raw = source == PreviewSource.SkyVisibility || source == PreviewSource.WindShadow;
         float worldSize = raw ? SnowConstants.SkyAreaSize : manager.Settings.QualityData.AreaSize;
         Vector2 worldCenter = manager.AreaCenter;
 
@@ -95,13 +91,6 @@ public class SnowDebugWindow : EditorWindow
         Graphics.Blit(shown, preview, debugMaterial, 0);
     }
 
-    /// İZOLASYON ANAHTARLARI. Belirtiden sorumluyu bulmanın tek yolu
-    /// şüphelileri TEK TEK kapatmak; tahmin turu yakıyor.
-    ///
-    /// Şüphelilerin TAMAMI burada, tek seferde. Biri eksik olsaydı "hepsini
-    /// kapattım hâlâ oluyor" cevabı hiçbir şey söylemezdi.
-    ///
-    /// Bu bölüm kar sistemi kabul edilince silinecek.
     void DrawIsolation()
     {
         SnowManager manager = SnowManager.Active;
@@ -110,16 +99,15 @@ public class SnowDebugWindow : EditorWindow
         GameObject host = manager.gameObject;
 
         EditorGUILayout.Space(8f);
-        EditorGUILayout.LabelField("İzolasyon", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Isolation", EditorStyles.boldLabel);
 
-        Toggle<SnowfallRenderer>(host, "Kar yağışı (taneler)");
-        Toggle<SnowCoverageDriver>(host, "Nesne üstü kar");
-        Toggle<SnowBurstParticles>(host, "Ayak tozu / püskürtme");
-        Toggle<SnowPersistence>(host, "İz kalıcılığı");
+        Toggle<SnowfallRenderer>(host, "Snowfall (flakes)");
+        Toggle<SnowCoverageDriver>(host, "Object snow cover");
+        Toggle<SnowBurstParticles>(host, "Foot puff / spray");
+        Toggle<SnowPersistence>(host, "Trail persistence");
 
         EditorGUILayout.HelpBox(
-            "Her satır bir şüpheli. Kapatıp belirtinin kaybolduğu satır sorumludur. " +
-            "Play'den çıkınca hepsi geri açılır — sahneye yazılmıyor.",
+            "Toggle individual subsystems to isolate issues. Changes revert on exiting Play Mode.",
             MessageType.None);
     }
 
@@ -136,12 +124,6 @@ public class SnowDebugWindow : EditorWindow
         }
     }
 
-    /// SINAMA KARI. Ayar dosyasına DOKUNMUYOR: değer `NonSerialized` bir
-    /// alanda duruyor, Play'den çıkınca ve her derlemede sıfırlanıyor.
-    /// Geri almayı unutmak mümkün değil.
-    ///
-    /// Bu bölüm kar sistemi kabul edilince silinecek
-    /// (`DECISIONS.md` → Silinecek geçiciler).
     void DrawTestSnow()
     {
         SnowManager manager = SnowManager.Active;
@@ -150,19 +132,19 @@ public class SnowDebugWindow : EditorWindow
         SnowSettings settings = manager.Settings;
 
         EditorGUILayout.Space(8f);
-        EditorGUILayout.LabelField("Sınama karı", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Test Snow", EditorStyles.boldLabel);
 
-        testSwe = EditorGUILayout.Slider("Başlangıç SWE (m)", testSwe, 0f, 0.10f);
+        testSwe = EditorGUILayout.Slider("Initial SWE (m)", testSwe, 0f, 0.10f);
 
         float rho = Mathf.Lerp(SnowConstants.RhoMin, SnowConstants.RhoMax, settings.DefaultRhoN);
         float depth = testSwe * SnowConstants.RhoWater / Mathf.Max(rho, 1f);
 
-        EditorGUILayout.LabelField("Karşılığı",
-            (depth * 100f).ToString("0.0") + " cm derinlik  (yoğunluk " + rho.ToString("0") + " kg/m³)");
+        EditorGUILayout.LabelField("Equivalent",
+            (depth * 100f).ToString("0.0") + " cm depth  (density " + rho.ToString("0") + " kg/m³)");
 
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (GUILayout.Button("Dünyayı karla doldur", GUILayout.Height(24f)))
+            if (GUILayout.Button("Fill World With Snow", GUILayout.Height(24f)))
             {
                 settings.SetTestSnow(testSwe);
                 manager.RefillRegion();
@@ -170,7 +152,7 @@ public class SnowDebugWindow : EditorWindow
 
             using (new EditorGUI.DisabledScope(!settings.HasTestSnow))
             {
-                if (GUILayout.Button("Ayarları geri al", GUILayout.Height(24f)))
+                if (GUILayout.Button("Reset Settings", GUILayout.Height(24f)))
                 {
                     settings.ClearTestSnow();
                     manager.RefillRegion();
@@ -180,18 +162,17 @@ public class SnowDebugWindow : EditorWindow
 
         EditorGUILayout.HelpBox(
             settings.HasTestSnow
-                ? "Sınama karı AÇIK. Ayar dosyasına yazılmadı; Play'den çıkınca " +
-                  "veya derleme olunca kendiliğinden sıfırlanır."
-                : "Ayar dosyasındaki değer kullanılıyor (defaultSwe = " +
+                ? "Test snow is ACTIVE. Not saved to asset; resets on Play Mode exit or script recompilation."
+                : "Using default values from asset (defaultSwe = " +
                   settings.DefaultSwe.ToString("0.000") + ").",
             settings.HasTestSnow ? MessageType.Warning : MessageType.None);
     }
 
     RenderTexture SourceTexture(SnowManager m) => source switch
     {
-        PreviewSource.Iz => m.TrailTexture,
-        PreviewSource.GokyuzuGorunurlugu => m.SkyVisTexture,
-        PreviewSource.RuzgarGolgesi => m.WindShadowTexture,
+        PreviewSource.Trail => m.TrailTexture,
+        PreviewSource.SkyVisibility => m.SkyVisTexture,
+        PreviewSource.WindShadow => m.WindShadowTexture,
         _ => m.SnowTexture,
     };
 
@@ -225,20 +206,20 @@ public class SnowDebugWindow : EditorWindow
     {
         scroll = EditorGUILayout.BeginScrollView(scroll);
 
-        EditorGUILayout.LabelField("Kurulum", EditorStyles.boldLabel);
-        if (GUILayout.Button("Sahneyi kur", GUILayout.Height(28f))) SetupScene();
+        EditorGUILayout.LabelField("Setup", EditorStyles.boldLabel);
+        if (GUILayout.Button("Set Up Scene", GUILayout.Height(28f))) SetupScene();
 
         DrawIsolation();
         DrawTestSnow();
 
         EditorGUILayout.Space(8f);
-        EditorGUILayout.LabelField("Durum", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Status", EditorStyles.boldLabel);
 
         SnowManager manager = SnowManager.Active;
 
         if (manager == null || !manager.IsReady)
         {
-            EditorGUILayout.HelpBox("SnowManager etkin değil. Play'e basın veya sahneyi kurun.",
+            EditorGUILayout.HelpBox("SnowManager inactive. Enter Play Mode or run scene setup.",
                                     MessageType.Info);
             EditorGUILayout.EndScrollView();
             return;
@@ -246,30 +227,30 @@ public class SnowDebugWindow : EditorWindow
 
         SnowQualityData q = manager.Settings.QualityData;
 
-        EditorGUILayout.LabelField("Kalite", manager.Settings.Quality.ToString());
-        EditorGUILayout.LabelField("Çözünürlük", q.Resolution.ToString());
-        EditorGUILayout.LabelField("Teksel", (manager.TexelSize * 100f).ToString("0.###") + " cm");
-        EditorGUILayout.LabelField("Bölge merkezi",
+        EditorGUILayout.LabelField("Quality", manager.Settings.Quality.ToString());
+        EditorGUILayout.LabelField("Resolution", q.Resolution.ToString());
+        EditorGUILayout.LabelField("Texel Size", (manager.TexelSize * 100f).ToString("0.###") + " cm");
+        EditorGUILayout.LabelField("Area Center",
             manager.AreaCenter.x.ToString("0.000") + " , " + manager.AreaCenter.y.ToString("0.000"));
-        EditorGUILayout.LabelField("Son kaydırma",
-            manager.LastScrollTexels.x + " , " + manager.LastScrollTexels.y + " teksel");
-        EditorGUILayout.LabelField("İz parçaları",
-            (manager.CaptureActive ? "aktif" : "boşta") +
-            "   deformer " + SnowDeformerRegistry.Count);
+        EditorGUILayout.LabelField("Last Scroll",
+            manager.LastScrollTexels.x + " , " + manager.LastScrollTexels.y + " texels");
+        EditorGUILayout.LabelField("Trail Segments",
+            (manager.CaptureActive ? "active" : "idle") +
+            "   deformers " + SnowDeformerRegistry.Count);
 
         var profiler = Object.FindAnyObjectByType<SnowProfiler>();
 
         if (profiler != null)
         {
             EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField("Geçiş süreleri (spec §15.1)", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Pass Times (spec §15.1)", EditorStyles.boldLabel);
 
             for (int i = 0; i < SnowProfiler.MarkerNames.Length; i++)
                 EditorGUILayout.LabelField(SnowProfiler.MarkerNames[i],
                     profiler.MillisecondsFor(i).ToString("0.000") + " ms");
 
-            EditorGUILayout.LabelField("TOPLAM",
-                profiler.TotalMilliseconds.ToString("0.000") + " ms   (hedef < 1.500)");
+            EditorGUILayout.LabelField("TOTAL",
+                profiler.TotalMilliseconds.ToString("0.000") + " ms   (target < 1.500)");
         }
 
         ISnowEnvironmentSource env = manager.Environment;
@@ -277,18 +258,18 @@ public class SnowDebugWindow : EditorWindow
         if (env != null)
         {
             EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField("Çevre (okunan)", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField("Rüzgâr", env.WindSpeed.ToString("0.0") + " m/s  " +
-                                                 env.WindDirection.ToString("0.00"));
-            EditorGUILayout.LabelField("Sıcaklık", env.TemperatureC.ToString("0.0") + " °C");
-            EditorGUILayout.LabelField("Güneş yüksekliği", env.SunElevation01.ToString("0.00"));
-            EditorGUILayout.LabelField("Yağış", env.PrecipKind + "  " +
-                                                env.PrecipIntensity01.ToString("0.00"));
-            EditorGUILayout.LabelField("Sis", env.FogDensity01.ToString("0.00"));
+            EditorGUILayout.LabelField("Environment Source", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Wind", env.WindSpeed.ToString("0.0") + " m/s  " +
+                                                env.WindDirection.ToString("0.00"));
+            EditorGUILayout.LabelField("Temperature", env.TemperatureC.ToString("0.0") + " °C");
+            EditorGUILayout.LabelField("Sun Elevation", env.SunElevation01.ToString("0.00"));
+            EditorGUILayout.LabelField("Precipitation", env.PrecipKind + "  " +
+                                                       env.PrecipIntensity01.ToString("0.00"));
+            EditorGUILayout.LabelField("Fog", env.FogDensity01.ToString("0.00"));
         }
 
         EditorGUILayout.Space(6f);
-        EditorGUILayout.LabelField("Yayınlanan durum", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Broadcast State", EditorStyles.boldLabel);
         EditorGUILayout.LabelField("IsSnowing", SnowRuntimeState.IsSnowing.ToString());
         EditorGUILayout.LabelField("SnowfallIntensity01", SnowRuntimeState.SnowfallIntensity01.ToString("0.00"));
         EditorGUILayout.LabelField("GroundCoverage01", SnowRuntimeState.GroundCoverage01.ToString("0.00"));
@@ -296,22 +277,19 @@ public class SnowDebugWindow : EditorWindow
         EditorGUILayout.LabelField("Stormness01", SnowRuntimeState.Stormness01.ToString("0.00"));
 
         EditorGUILayout.Space(8f);
-        EditorGUILayout.LabelField("Görüntü", EditorStyles.boldLabel);
-        source = (PreviewSource)EditorGUILayout.Popup("Doku", (int)source, SourceNames);
+        EditorGUILayout.LabelField("Preview", EditorStyles.boldLabel);
+        source = (PreviewSource)EditorGUILayout.Popup("Texture", (int)source, SourceNames);
 
-        bool raw = source == PreviewSource.GokyuzuGorunurlugu || source == PreviewSource.RuzgarGolgesi;
+        bool raw = source == PreviewSource.SkyVisibility || source == PreviewSource.WindShadow;
         using (new EditorGUI.DisabledScope(raw))
         {
-            channel = EditorGUILayout.Popup("Kanal", channel, ChannelNames);
+            channel = EditorGUILayout.Popup("Channel", channel, ChannelNames);
         }
 
-        gridSize = EditorGUILayout.Slider("Izgara (m)", gridSize, 0.25f, 8f);
-        // IZGARA BİR TEST DEĞİL, ÖLÇEK ÇUBUĞU. Faz 1'de dokular boş — içinde
-        // ızgarayla kıyaslanacak hiçbir şey yok. Kaydırma doğruluğu göz kararıyla
-        // değil `To The Summit/Snow/Scroll Test` ile ölçülüyor.
+        gridSize = EditorGUILayout.Slider("Grid (m)", gridSize, 0.25f, 8f);
         EditorGUILayout.HelpBox(
-            "Yeşil ızgara DÜNYAYA çakılı, ölçek çubuğudur. Kaydırma doğruluğu " +
-            "menüdeki \"Kaydırma Sınaması\" ile ölçülür — gözle değil.",
+            "Green grid represents world-space reference markers. Scroll accuracy is verified via " +
+            "Menu -> To The Summit/Snow/Scroll Test.",
             MessageType.None);
 
         if (preview != null)
@@ -323,8 +301,6 @@ public class SnowDebugWindow : EditorWindow
         EditorGUILayout.EndScrollView();
     }
 
-    // ------------------------------------------------------------------ kurulum
-
     const string SettingsPath = "Assets/Snow/Settings/SnowSettings.asset";
     const string ComputePath = "Assets/Snow/Shaders/SnowSim.compute";
     const string SkyShaderPath = "Assets/Snow/Shaders/Hidden_SnowSkyDepth.shader";
@@ -334,34 +310,16 @@ public class SnowDebugWindow : EditorWindow
     const string DriftMaterialPath = "Assets/Snow/Settings/M_SnowDrift.mat";
     const string PuffMaterialPath = "Assets/Snow/Settings/M_SnowPuff.mat";
 
-    /// SAHNE ELLE DÜZENLENMİYOR. Proje kuralı: bileşen ekleme, referans bağlama ve
-    /// layer açma kodda yapılıyor; kullanıcı yalnız düğmeye basıyor.
-    /// KURULUM TEK YERDE, İKİ TETİKLEYİCİ.
-    ///
-    /// `SnowAutoWire` bunu eksik referans gördüğünde kendiliğinden çağırıyor;
-    /// düğme de yerinde duruyor. Ayrı bir sınıfa çıkarmak denendi ve on üç
-    /// sabit, altı yardımcı metot peşinden sürüklendi — kazancı yoktu.
-    /// Kurulumu menüden koşturur. Pencereyi açıp düğmeye basmak yerine tek
-    /// komut; otomatik kurulum yeni bir bileşeni henüz tanımıyorken gerekiyor.
     [MenuItem("To The Summit/Snow/Set Up Scene", false, 51)]
     static void SetupSceneMenu() => SetupScene();
 
     public static void SetupScene()
     {
-        // PLAY MODUNDA KURULUM YAPILMAZ.
-        //
-        // Play'de eklenen bileşenler ve bağlar Play çıkınca SİLİNİYOR; sahne
-        // dosyasına hiç yazılmıyor. Bir kez oldu: VFX katmanları Play'de
-        // kuruldu, "bağlandı" görüldü, Play kapanınca sahnede `VisualEffect`
-        // referansı sıfırdı ve kar yağmadı (`SYMPTOMS.md`).
-        //
-        // `MarkSceneDirty` zaten Play'de fırlatıyor ama kurulumun SONUNDA —
-        // o noktaya kadar yarım iş yapılmış oluyor. Kapı en başta.
         if (EditorApplication.isPlaying)
         {
-            Debug.LogError("Kar sistemi kurulumu Play modunda çalıştırılamaz. " +
-                           "Play'de kurulan bileşenler Play çıkınca silinir. " +
-                           "Önce Play'i durdurun.");
+            Debug.LogError("Snow subsystem setup cannot be run in Play Mode. " +
+                           "Modifications made in Play Mode revert on exit. " +
+                           "Exit Play Mode before running setup.");
             return;
         }
 
@@ -398,19 +356,14 @@ public class SnowDebugWindow : EditorWindow
         var sampler = go.GetComponent<SnowSampler>();
         if (sampler == null) sampler = go.AddComponent<SnowSampler>();
 
-
         var persistence = go.GetComponent<SnowPersistence>();
         if (persistence == null) persistence = go.AddComponent<SnowPersistence>();
 
-        // VFX KATMANLARI: bileşen sahnede duruyor ama VFX referansları BOŞ.
-        // Boşken hiçbir şey yapmıyorlar — mevcut compute yolu çalışmaya devam
-        // ediyor. İkisi birden bağlanırsa kar iki katına çıkar (`DECISIONS.md`).
         var fallLayers = go.GetComponent<SnowfallLayers>();
         if (fallLayers == null) fallLayers = go.AddComponent<SnowfallLayers>();
 
         var driftVfx = go.GetComponent<SnowDriftVfxController>();
         if (driftVfx == null) driftVfx = go.AddComponent<SnowDriftVfxController>();
-
 
         if (go.GetComponent<SnowProfiler>() == null)
             go.AddComponent<SnowProfiler>();
@@ -433,7 +386,6 @@ public class SnowDebugWindow : EditorWindow
             player != null ? player.transform : null;
         bridgeSerialized.ApplyModifiedProperties();
 
-        // F1 menüsündeki Kar bölümü de buradan bağlanıyor; elle atama yok.
         var debugMenu = Object.FindAnyObjectByType<DebugMenu>();
         if (debugMenu != null)
         {
@@ -445,20 +397,12 @@ public class SnowDebugWindow : EditorWindow
             menuSerialized.ApplyModifiedProperties();
         }
 
-        // ÖRTÜ AYARLARI. Bağlanmazsa global'ler 0 kalıyor, maske sıfır çıkıyor
-        // ve dağda hiç kar görünmüyor — "kod koşmuyor" ile aynı belirti.
         var coverageSerialized = new SerializedObject(coverage);
         coverageSerialized.FindProperty("settings").objectReferenceValue = settings;
         coverageSerialized.ApplyModifiedProperties();
 
         EditorUtility.SetDirty(coverage);
 
-        // VFX NESNELERİ. Grafikler `SnowVfxBuilder` ile üretiliyor; burada
-        // sahneye yerleşip denetleyicilere bağlanıyorlar.
-        //
-        // Grafik yoksa referans boş kalıyor ve denetleyici hiçbir şey yapmıyor
-        // — eski compute yolu çalışmaya devam ediyor. Yarım bağlamaktansa hiç
-        // bağlamamak doğru.
         var snowfallVfx = EnsureVfx(go, "VFX_Snowfall");
         var puffVfx = EnsureVfx(go, "VFX_SnowPuff");
         var sprayVfx = EnsureVfx(go, "VFX_SnowSpray");
@@ -473,7 +417,6 @@ public class SnowDebugWindow : EditorWindow
             Camera.main != null ? Camera.main.transform
                                 : (player != null ? player.transform : null);
 
-        // Zemin kotu OYUNCUNUN AYAGINDAN, kameradan degil.
         fallLayersSerialized.FindProperty("groundReference").objectReferenceValue =
             player != null ? player.transform : null;
         fallLayersSerialized.ApplyModifiedProperties();
@@ -485,15 +428,13 @@ public class SnowDebugWindow : EditorWindow
         driftVfxSerialized.FindProperty("curtain").objectReferenceValue = curtainVfx;
         driftVfxSerialized.ApplyModifiedProperties();
 
-        var izGovdesi = EnsureTrailDeformer(player);
-        EnsurePlayerSide(player, izGovdesi, sampler, burst, bridge);
+        var trailBody = EnsureTrailDeformer(player);
+        EnsurePlayerSide(player, trailBody, sampler, burst, bridge);
 
         var driftVfxSerializedFollow = new SerializedObject(driftVfx);
-        // AYAK KOTU, KAMERA DEGIL: saltasyon yere yapisik.
         driftVfxSerializedFollow.FindProperty("followTarget").objectReferenceValue =
             player != null ? player.transform : null;
         driftVfxSerializedFollow.ApplyModifiedProperties();
-
 
         EditorUtility.SetDirty(fallLayers);
         EditorUtility.SetDirty(driftVfx);
@@ -519,7 +460,6 @@ public class SnowDebugWindow : EditorWindow
         managerSerialized.FindProperty("skyShader").objectReferenceValue =
             AssetDatabase.LoadAssetAtPath<Shader>(SkyShaderPath);
         managerSerialized.ApplyModifiedProperties();
-
 
         Material flakeMat = LoadOrCreateParticleMaterial(FlakeMaterialPath, stretch: false, alpha: 1f);
         Material driftMat = LoadOrCreateParticleMaterial(DriftMaterialPath, stretch: true, alpha: 0.12f);
@@ -562,10 +502,8 @@ public class SnowDebugWindow : EditorWindow
         managerSerialized.ApplyModifiedProperties();
 
         EditorUtility.SetDirty(persistence);
-
         EditorUtility.SetDirty(burst);
         EditorUtility.SetDirty(sampler);
-
         EditorUtility.SetDirty(snowfall);
         EditorUtility.SetDirty(manager);
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(go.scene);
@@ -574,28 +512,20 @@ public class SnowDebugWindow : EditorWindow
 
         AssetDatabase.SaveAssets();
 
-        Debug.Log($"Kar sistemi kuruldu. Renderer özelliği eklenen renderer sayısı: {added}.\n" +
+        Debug.Log($"Snow subsystem set up. Render features added to {added} renderers.\n" +
                   SnowProjectCheck.Run());
     }
 
-    /// Kar yüzeyi materyali. Halkaların HEPSİ aynı materyali paylaşıyor —
-    /// ayrı ayrı olsaydı SRP Batcher dört halkayı dört çizime bölerdi.
-    /// VFX nesnesi: yoksa yaratılıyor, asset'i bağlanıyor.
-    ///
-    /// Asset yoksa `null` dönüyor ve çağıran tarafta referans boş kalıyor —
-    /// denetleyici o zaman hiçbir şey yapmıyor ve eski yol çalışmaya devam
-    /// ediyor. Sessizce boş bir `VisualEffect` bırakmak, ekranda "kar
-    /// yağmıyor" olarak görünür ve sebebi aranır.
-    static UnityEngine.VFX.VisualEffect EnsureVfx(GameObject host, string ad)
+    static UnityEngine.VFX.VisualEffect EnsureVfx(GameObject host, string name)
     {
         var asset = AssetDatabase.LoadAssetAtPath<UnityEngine.VFX.VisualEffectAsset>(
-            "Assets/Snow/VFX/" + ad + ".vfx");
+            "Assets/Snow/VFX/" + name + ".vfx");
 
         if (asset == null) return null;
 
-        Transform t = host.transform.Find(ad);
+        Transform t = host.transform.Find(name);
 
-        GameObject go = t != null ? t.gameObject : new GameObject(ad);
+        GameObject go = t != null ? t.gameObject : new GameObject(name);
         if (t == null) go.transform.SetParent(host.transform, false);
 
         var vfx = go.GetComponent<UnityEngine.VFX.VisualEffect>();
@@ -607,26 +537,6 @@ public class SnowDebugWindow : EditorWindow
         return vfx;
     }
 
-    /// AYAK PROXY'SI — IZ BIRAKAN GORUNMEZ NOKTA (spec 1.4, 9).
-    ///
-    /// Iz birakacak bir sey olmazsa kar hic bozulmuyor — olculdu, sahnede
-    /// sifir deformer vardi ve yurumek hicbir iz birakmiyordu.
-    ///
-    /// IKI AYAK, ADIM FAZI YOK. Gercek ayak izi adim fazina baglanmayi
-    /// gerektiriyor (hangi ayak yerde); su an iki proxy de surekli yerde,
-    /// yani yuruyus iki paralel oluk aciyor. Tek olugtan gercekci, gercek
-    /// ayak izinden basit — DECISIONS.md.
-    ///
-    /// GORUNMEZLIK KATMANDAN, GOLGE KAPALI.
-    ///
-    /// Eskiden `ShadowsOnly` kullaniliyordu: kutu ana kameradan gizleniyordu ama
-    /// GOLGE DUSURMEYE DEVAM EDIYORDU — o kipin zaten amaci bu. Karakter
-    /// olmadigi icin ayaklarin altinda iki kara leke goruluyordu (kullanici
-    /// bildirdi, asagi bakinca).
-    ///
-    /// Proxy'nin isi kari OYMAK; golge karakterin isi. Gövdenin artık mesh'i
-    /// yok, dolayısıyla ne çiziliyor ne gölge düşürüyor; katman yalnız
-    /// kimliklendirme için duruyor.
     static Transform EnsureTrailDeformer(FirstPersonController player)
     {
         if (player == null) return null;
@@ -634,64 +544,39 @@ public class SnowDebugWindow : EditorWindow
         int layer = LayerMask.NameToLayer(SnowProjectCheck.DeformerLayer);
         if (layer < 0) return null;
 
-        // Ayak tabani: CharacterController varsa gercek taban, yoksa transform.
         float footY = 0f;
         var cc = player.GetComponent<CharacterController>();
         if (cc != null) footY = cc.center.y - cc.height * 0.5f;
 
-        // ESKI IKI AYAK PROXY'SI SILINIYOR (asagidaki gerekce).
-        foreach (var eskiAd in new[] { "SnowFoot_L", "SnowFoot_R" })
+        foreach (var oldName in new[] { "SnowFoot_L", "SnowFoot_R" })
         {
-            Transform eskiT = player.transform.Find(eskiAd);
-            if (eskiT != null) Object.DestroyImmediate(eskiT.gameObject);
+            Transform oldT = player.transform.Find(oldName);
+            if (oldT != null) Object.DestroyImmediate(oldT.gameObject);
         }
 
         return EnsureTrailBody(player.transform, new Vector3(0f, footY, 0f), layer);
     }
 
-    /// TEK GOVDE, IKI AYAK DEGIL.
-    ///
-    /// Once iki kup proxy vardi (11x6x28 cm, +-11 cm yanlarda). Uc ayri
-    /// belirti uretiyordu, ucu de kullanici tarafindan bildirildi:
-    ///   - "2 ayaktan besleniyor" -> iki paralel oluk
-    ///   - "keskin dikdortgen izler" -> kup alt yuzeyi duz ve koseli
-    ///   - "capraz giderken ayak izi yan cikiyor" -> kupler oyuncuyla donuyor
-    ///
-    /// Kure ucunu birden kapatiyor ve donel simetrik oldugu icin gidis yonu
-    /// izi hic etkilemiyor.
-    ///
-    /// ARTIK MESH YOK. Gövde çizilmiyordu bile — yalnız aşağıdan bakan
-    /// yakalamaya rasterize ediliyordu. Yakalama zinciri kaldırıldı; `KDeform`
-    /// kürenin şeklini kapalı formülle biliyor. Geriye bir transform ve
-    /// `SnowDeformer` kalıyor: NEREDE ve NE KADAR GENİŞ.
-    ///
-    /// YÜKSEKLİK DE YOK. Ne kadar batılacağını kar söylüyor. Gövdeyi kar
-    /// yüzeyine oturtan bileşen (`SnowTrailBodyAlign`) silindi: oturma
-    /// yüksekliğini karın durumundan okuyordu ve karın durumu gövdenin
-    /// bastığı yerden geliyordu — gecikmeli geri besleme, yani osilatör
-    /// (`SYMPTOMS.md`).
     static Transform EnsureTrailBody(Transform parent, Vector3 localPos, int layer)
     {
-        const string Ad = "SnowTrailBody";
+        const string Name = "SnowTrailBody";
 
-        Transform t = parent.Find(Ad);
+        Transform t = parent.Find(Name);
         GameObject go;
 
         if (t != null)
         {
             go = t.gameObject;
 
-            // ESKİ MESH ARTIĞI TEMİZLENİYOR. Sahnede duran gövde primitive
-            // olarak kurulmuştu; çizim yolu kalkınca renderer da gereksiz.
-            var eskiR = go.GetComponent<MeshRenderer>();
-            if (eskiR != null) Object.DestroyImmediate(eskiR);
+            var oldR = go.GetComponent<MeshRenderer>();
+            if (oldR != null) Object.DestroyImmediate(oldR);
 
-            var eskiF = go.GetComponent<MeshFilter>();
-            if (eskiF != null) Object.DestroyImmediate(eskiF);
+            var oldF = go.GetComponent<MeshFilter>();
+            if (oldF != null) Object.DestroyImmediate(oldF);
         }
         else
         {
-            go = new GameObject(Ad);
+            go = new GameObject(Name);
             go.transform.SetParent(parent, false);
         }
 
@@ -706,15 +591,6 @@ public class SnowDebugWindow : EditorWindow
         var def = go.GetComponent<SnowDeformer>();
         if (def == null) def = go.AddComponent<SnowDeformer>();
 
-        // İZ GÖVDESİ BOTTAN GENİŞ.
-        //
-        // 16 cm bir bot genişliği; ama taze karda ayak batınca kenar ÇÖKER ve
-        // açılan çukur bottan belirgin geniş olur. 15 cm yarıçap iki ayağın
-        // toplam izini karşılıyor (11 cm ayak + 22 cm ara).
-        //
-        // AYRI AYRI AYAK İZLERİ DENENDİ VE GERİ ALINDI: adım olayı 39 cm'de
-        // bir düştüğü için iz birden beliriyordu (gerekçe `SnowDeformer`).
-        // Düzensizlik artık yola bağlı SÜREKLİ bir dalgadan geliyor.
         var defSo = new SerializedObject(def);
         defSo.FindProperty("radius").floatValue = 0.15f;
         defSo.ApplyModifiedProperties();
@@ -723,37 +599,23 @@ public class SnowDebugWindow : EditorWindow
         return go.transform;
     }
 
-    /// OYUNCU TARAFI — spec §18.6, §19.1–19.3, §16.2.
-    ///
-    /// Bileşenlerin hepsi yazılıydı ama hiçbiri sahnede yoktu: tek referansları
-    /// bir yorum satırıydı. Burada oyuncuya takılıp `SnowSampler`'a ve adım
-    /// ritmine bağlanıyorlar.
-    ///
-    /// KAR SİSTEMİ OYUNCUYU BİLMİYOR. Bağ tek yönlü: bu bileşenler kar
-    /// örneğini OKUYOR, kar sistemine hiçbir şey yazmıyorlar.
     static void EnsurePlayerSide(FirstPersonController player,
-                                 Transform izGovdesi,
+                                 Transform trailBody,
                                  SnowSampler sampler, SnowBurstParticles burst,
                                  SnowEnvironmentBridge bridge)
     {
         if (player == null) return;
 
         GameObject go = player.gameObject;
-        Transform anchor = izGovdesi != null ? izGovdesi : player.transform;
+        Transform anchor = trailBody != null ? trailBody : player.transform;
 
-        // --- Adım ritmi: ayak fazı + adım olayı
         var rhythm = go.GetComponent<SnowStepRhythm>();
         if (rhythm == null) rhythm = go.AddComponent<SnowStepRhythm>();
 
         var rs = new SerializedObject(rhythm);
         rs.FindProperty("body").objectReferenceValue = go.GetComponent<CharacterController>();
-        // RITIM GOVDEYI SURMUYOR, YALNIZ FAZ URETIYOR. Once iz govdesi buraya
-        // ayak proxy'si olarak bagliydi; ritim onu yarim sinusle kaldirip
-        // indiriyordu ve oluk testere disine donuyordu (olculdu). Govdenin
-        // yuksekligi artik ize hic girmiyor; ritim yalniz adim olayi ve faz.
         rs.ApplyModifiedProperties();
 
-        // --- Ayak sesi (spec §19.1). Klipler SONRA verilecek.
         var audio = go.GetComponent<SnowFootstepAudio>();
         if (audio == null) audio = go.AddComponent<SnowFootstepAudio>();
 
@@ -772,7 +634,6 @@ public class SnowDebugWindow : EditorWindow
         aus.FindProperty("rhythm").objectReferenceValue = rhythm;
         aus.ApplyModifiedProperties();
 
-        // --- Ayak toz bulutu (spec §19.3)
         var puff = go.GetComponent<SnowPuffEmitter>();
         if (puff == null) puff = go.AddComponent<SnowPuffEmitter>();
 
@@ -783,8 +644,6 @@ public class SnowDebugWindow : EditorWindow
         ps.FindProperty("rhythm").objectReferenceValue = rhythm;
         ps.ApplyModifiedProperties();
 
-        // --- Koşarken püskürtme (spec §18.6). Adım olayına değil HIZA bağlı;
-        // sürekli bir akış, tekil bir olay değil.
         var spray = go.GetComponent<SnowSprayController>();
         if (spray == null) spray = go.AddComponent<SnowSprayController>();
 
@@ -795,8 +654,6 @@ public class SnowDebugWindow : EditorWindow
         sps.FindProperty("velocitySource").objectReferenceValue = player.transform;
         sps.ApplyModifiedProperties();
 
-        // --- Karda yavaşlama (spec §19.2). SpeedMultiplier yayınlıyor;
-        // hareket koduna BAĞLANMADI — o ayrı onay (`DECISIONS.md`).
         var move = go.GetComponent<SnowMovementModifier>();
         if (move == null) move = go.AddComponent<SnowMovementModifier>();
 
@@ -805,11 +662,6 @@ public class SnowDebugWindow : EditorWindow
         ms.FindProperty("footAnchor").objectReferenceValue = anchor;
         ms.ApplyModifiedProperties();
 
-        // --- Karakter üstü kar (spec §16.2).
-        //
-        // `targets` BİLEREK BOŞ: sahnede henüz karakter mesh'i yok. Mantık
-        // kurulu ve çalışıyor; mesh geldiğinde tek yapılacak bu diziye
-        // renderer'ları koymak.
         var accum = go.GetComponent<SnowCharacterAccumulator>();
         if (accum == null) accum = go.AddComponent<SnowCharacterAccumulator>();
 
@@ -821,8 +673,6 @@ public class SnowDebugWindow : EditorWindow
         EditorUtility.SetDirty(go);
     }
 
-    /// Tane ve savrulma materyalleri. İkisi aynı shader'ı paylaşıyor;
-    /// farkları uzatma ve alpha çarpanı (spec §17.1).
     static Material LoadOrCreateParticleMaterial(string path, bool stretch, float alpha)
     {
         Texture2D atlas = SnowTextureBaker.EnsureFlakeAtlas();
@@ -846,15 +696,6 @@ public class SnowDebugWindow : EditorWindow
         return material;
     }
 
-    /// ANA IŞIK GÜNDÖNGÜSÜNDEN SORULUYOR, TARAMAYLA BULUNMUYOR.
-    ///
-    /// Eski hâli "ilk aktif directional light"ı alıyordu. Sahnede İKİ tane var
-    /// (güneş ve ay) ve tarama sırası AYI önce buldu: kar sistemi tam gündüzde
-    /// `intensity = 0` olan ay ışığına bağlanmıştı. Tane emissive'i sıfır
-    /// çıkıyordu ve kar aydınlatmasının tamamı yanlış kaynaktan geliyordu.
-    ///
-    /// `TimeOfDay` hangisinin güneş olduğunu zaten biliyor; tahmin etmeye
-    /// gerek yok.
     static Light FindSun()
     {
         var clock = Object.FindAnyObjectByType<TimeOfDay>();
@@ -867,8 +708,6 @@ public class SnowDebugWindow : EditorWindow
             if (sun != null) return sun;
         }
 
-        // Gündöngü yoksa tek directional ışığa düşülüyor; iki tane varsa
-        // hangisi olduğu belirsiz kalacağı için EN PARLAK olan seçiliyor.
         Light best = null;
 
         foreach (Light l in Object.FindObjectsByType<Light>(FindObjectsInactive.Exclude))
@@ -893,7 +732,6 @@ public class SnowDebugWindow : EditorWindow
         return asset;
     }
 
-    /// İlk boş KULLANICI yuvasına açıyor. Dolu bir yuvayı boşaltmıyor (spec §1.3).
     static void EnsureLayer(string name)
     {
         if (LayerMask.NameToLayer(name) >= 0) return;
@@ -914,13 +752,9 @@ public class SnowDebugWindow : EditorWindow
         }
 
         throw new System.InvalidOperationException(
-            $"Boş layer yuvası kalmamış; '{name}' açılamadı. Kar sistemi kendi başına " +
-            "bir layer boşaltmaz (spec §1.3).");
+            $"No free layer slots available; could not configure '{name}' (spec §1.3).");
     }
 
-    /// PAKET DOSYASINA YAZMA. `t:UniversalRendererData` araması paket içindeki
-    /// renderer'ları da buluyor; oraya yazmak paketi kirletiyor ve güncellemede
-    /// kayboluyor. Yalnız `Assets/` altındakiler.
     static int AddFeatureToRenderers()
     {
         int added = 0;

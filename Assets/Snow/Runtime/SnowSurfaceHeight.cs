@@ -1,5 +1,5 @@
 // ROLE: gives the snow surface's height on the CPU. The exact twin of
-// `SnowYuzeyRolyef` inside `SnowRelief.hlsl`.
+// `SnowSurfaceRelief` inside `SnowRelief.hlsl`.
 // CALLED BY: GroundSnap (seats the character on the surface).
 
 using UnityEngine;
@@ -84,41 +84,41 @@ public static class SnowSurfaceHeight
         return Mathf.Lerp(Mathf.Lerp(a, b, fx), Mathf.Lerp(c, d, fx), fy);
     }
 
-    /// The twin of `SnowRelief.hlsl` → `SnowOktavAgirligiKipli`.
+    /// The twin of `SnowRelief.hlsl` → `SnowOctaveWeightModal`.
     ///
     /// On the CPU `pikselBoyu` is zero: the sampling frequency is infinite and there is no
     /// Nyquist cut. The geometry threshold is still applied — the physics surface has to be
     /// the same as the GEOMETRIC surface, not the fine octaves in the normal map.
-    static float OktavAgirligi(float dalgaBoyu, float pikselBoyu, bool yalnizGeometri)
+    static float OctaveWeight(float wavelength, float pikselBoyu, bool yalnizGeometri)
     {
-        if (yalnizGeometri && dalgaBoyu < SnowConstants.TessMinDalga) return 0f;
+        if (yalnizGeometri && wavelength < SnowConstants.TessMinWavelength) return 0f;
 
-        return Mathf.Clamp01(dalgaBoyu / Mathf.Max(pikselBoyu * 2.0f, 1e-5f) - 1.0f);
+        return Mathf.Clamp01(wavelength / Mathf.Max(pikselBoyu * 2.0f, 1e-5f) - 1.0f);
     }
 
-    /// The twin of `SnowRelief.hlsl` → `SnowYuzeyRolyef`.
+    /// The twin of `SnowRelief.hlsl` → `SnowSurfaceRelief`.
     ///
     /// The order has to be the same as in HLSL: ceiling → fBm four octaves → ripple
     /// → sastrugi → drift. In floating point the order of summation changes the result.
-    public static float Rolyef(Vector2 worldXZ, float karDerinligi,
-                               Vector2 sastrugiWindDir, float maruziyet,
+    public static float Relief(Vector2 worldXZ, float snowDepth,
+                               Vector2 sastrugiWindDir, float exposure,
                                float pikselBoyu = 0f, bool yalnizGeometri = true)
     {
-        float tavan = karDerinligi * SnowConstants.BedformDepthFrac;
+        float ceiling = snowDepth * SnowConstants.BedformDepthFrac;
 
-        float sastrugiPay = maruziyet;
-        float driftPay    = 1f - maruziyet;
+        float sastrugiAmount = exposure;
+        float driftAmount    = 1f - exposure;
 
         // --- the fBm base: four octaves, self-affine ---
         float h   = 0f;
-        float amp = Mathf.Min(SnowConstants.FbmAmp, tavan);
+        float amp = Mathf.Min(SnowConstants.FbmAmp, ceiling);
         float frq = SnowConstants.FbmScale;
 
         for (int i = 0; i < 4; i++)
         {
             h += (ValueNoise(worldXZ.x * frq + i * 17.3f,
                              worldXZ.y * frq + i * 17.3f) * 2f - 1f) * amp
-               * OktavAgirligi(1f / frq, pikselBoyu, yalnizGeometri);
+               * OctaveWeight(1f / frq, pikselBoyu, yalnizGeometri);
 
             amp *= SnowConstants.FbmGain;
             frq *= 2f;
@@ -137,22 +137,22 @@ public static class SnowSurfaceHeight
         // --- RIPPLE: ridges perpendicular to the wind ---
         h += (ValueNoise(boyunca / SnowConstants.RippleLength,
                          enine / (SnowConstants.RippleLength * 6f)) * 2f - 1f)
-           * Mathf.Min(SnowConstants.RippleAmp, tavan)
-           * OktavAgirligi(SnowConstants.RippleLength, pikselBoyu, yalnizGeometri);
+           * Mathf.Min(SnowConstants.RippleAmp, ceiling)
+           * OctaveWeight(SnowConstants.RippleLength, pikselBoyu, yalnizGeometri);
 
         // --- SASTRUGI: parallel to the wind, sharp ---
         float ns = ValueNoise(boyunca / SnowConstants.SastrugiWidth,
                               enine / SnowConstants.SastrugiLength);
         ns = ns * ns * (3f - 2f * ns);
 
-        h += (ns - 0.5f) * Mathf.Min(SnowConstants.SastrugiHeight, tavan) * sastrugiPay
-           * OktavAgirligi(SnowConstants.SastrugiLength, pikselBoyu, yalnizGeometri);
+        h += (ns - 0.5f) * Mathf.Min(SnowConstants.SastrugiHeight, ceiling) * sastrugiAmount
+           * OctaveWeight(SnowConstants.SastrugiLength, pikselBoyu, yalnizGeometri);
 
         // --- DRIFT: deposition mounds, soft ---
         h += (ValueNoise(boyunca / SnowConstants.DriftWidth,
                          enine / SnowConstants.DriftLength) - 0.5f)
-           * Mathf.Min(SnowConstants.DriftHeight, tavan) * driftPay
-           * OktavAgirligi(SnowConstants.DriftLength, pikselBoyu, yalnizGeometri);
+           * Mathf.Min(SnowConstants.DriftHeight, ceiling) * driftAmount
+           * OctaveWeight(SnowConstants.DriftLength, pikselBoyu, yalnizGeometri);
 
         return h;
     }
@@ -162,16 +162,16 @@ public static class SnowSurfaceHeight
     /// The snow depth and the wind shadow come FROM OUTSIDE: this class has to stay pure
     /// (the co-op rule) and must not depend on `SnowManager` — systems do not call each
     /// other directly (`CLAUDE.md`).
-    public static float RolyefDunya(Vector3 posWS, float karDerinligi,
-                                    float ruzgarGolgesi, Vector2 sastrugiWindDir)
+    public static float ReliefWorld(Vector3 posWS, float snowDepth,
+                                    float windShadow, Vector2 sastrugiWindDir)
     {
-        if (karDerinligi <= 0f) return 0f;
+        if (snowDepth <= 0f) return 0f;
 
         // The exposure is the inverse of `SampleWindShadow`: that function measures
         // shelteredness. The coefficient has to be the same as in `SnowTessellation.hlsl`.
-        float maruziyet = 1f - Mathf.Clamp01(ruzgarGolgesi * 1.2f);
+        float exposure = 1f - Mathf.Clamp01(windShadow * 1.2f);
 
-        return Rolyef(new Vector2(posWS.x, posWS.z), karDerinligi,
-                      sastrugiWindDir, maruziyet);
+        return Relief(new Vector2(posWS.x, posWS.z), snowDepth,
+                      sastrugiWindDir, exposure);
     }
 }

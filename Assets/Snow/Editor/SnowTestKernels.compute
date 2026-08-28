@@ -87,26 +87,26 @@ void KTestRnm(uint3 id : SV_DispatchThreadID)
     // dunya normali olarak: (x, z, y) takasinin tersi
     float3 tiltedWS = normalize(float3(tilted.x, tilted.z, tilted.y));
 
-    float2 tabanEgim = float2(tiltedWS.x, tiltedWS.z) / max(tiltedWS.y, 1e-3);
-    float2 detayEgim = float2(0.0, 0.0);
+    float2 baseSlope = float2(tiltedWS.x, tiltedWS.z) / max(tiltedWS.y, 1e-3);
+    float2 detailSlope = float2(0.0, 0.0);
 
     float3 result;
 
     if (id.x == 0)
     {
         // sifir detay -> taban aynen
-        float2 t = tabanEgim + detayEgim;
+        float2 t = baseSlope + detailSlope;
         result = normalize(float3(t.x, 1.0, t.y)) - tiltedWS;
     }
     else if (id.x == 1)
     {
         // duz taban -> detayin egimi aynen
-        float2 t = float2(0.0, 0.0) + tabanEgim;
+        float2 t = float2(0.0, 0.0) + baseSlope;
         result = normalize(float3(t.x, 1.0, t.y)) - tiltedWS;
     }
     else
     {
-        float2 t = tabanEgim + tabanEgim;
+        float2 t = baseSlope + baseSlope;
         result = float3(length(normalize(float3(t.x, 1.0, t.y))), 0, 0);
     }
 

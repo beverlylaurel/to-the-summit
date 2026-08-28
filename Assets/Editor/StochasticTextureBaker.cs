@@ -4,28 +4,28 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-/// HEITZ-NEYRET stokastik döşeme ön işlemesi.
+/// HEITZ-NEYRET stochastic tiling preprocessing.
 ///
-/// Sorun: dağ 17.5 km, doku metrelerce döşeniyor — birkaç metrelik desen on binden
-/// fazla tekrar eder ve ızgara olarak okunur. Basit harmanlama tekrarı zayıflatır ama
-/// kontrastı da düşürür: iki örnek ortalanınca varyans yarıya iner, doku bulanıklaşır.
+/// Problem: mountain is 17.5 km, texture tiles over meters — a several-meter pattern repeats
+/// over 10,000 times reading as a grid. Simple blending weakens repetition but degrades contrast:
+/// averaging two samples halves variance, blurring the texture.
 ///
-/// Yöntem: dokuyu HİSTOGRAM DÖNÜŞÜMÜNDEN geçir. Her kanal, değerleri Gauss dağılımına
-/// eşleyen bir sıralama dönüşümüyle yeniden yazılır. Gauss değişkenlerin ağırlıklı
-/// toplamı yine Gauss olduğu için üç örnek harmanlanınca dağılım BOZULMAZ; sonra ters
-/// LUT ile özgün histograma geri çevrilir. Ortalama alma yerine dağılım koruma.
+/// Method: HISTOGRAM TRANSFORMATION on texture. Each channel is rewritten using a rank transform
+/// mapping values to a Gaussian distribution. Because weighted sums of Gaussian variables remain Gaussian,
+/// blending three samples PRESERVES distribution; an inverse LUT subsequently restores the original histogram.
+/// Preserving distribution instead of averaging.
 ///
-/// Hangi dokuların pişeceği ELLE YAZILMIYOR: diskteki bütün `SurfaceMaterialSet`
-/// asset'leri taranıyor. Yeni yüzey eklemek bu dosyaya dokunmayı gerektirmiyor.
+/// Baked textures are NOT HARDCODED: all `SurfaceMaterialSet` assets on disk are scanned.
+/// Adding a new surface does not require modifying this file.
 public static class StochasticTextureBaker
 {
     const int LutSize = 256;
 
-    /// Üretim değişince artırılır; işaret dosyası eskiyse hepsi yeniden pişer.
+    /// Incremented when generation logic changes; outdated markers trigger rebake.
     public const int Revision = 3;
     static string MarkerPath => TextureIngest.Folder + "/stochastic-rev.txt";
 
-    /// Harita adı → normal harita mı (üç kanal) yoksa tek kanal mı.
+    /// Map name -> normal map (3 channels) or single channel.
     static readonly (string map, bool threeChannel)[] Maps =
     {
         ("Normal", true),
@@ -40,7 +40,7 @@ public static class StochasticTextureBaker
         EnsureAll();
     }
 
-    /// Eksik ya da eski çıktıları pişirir. Bir şey pişmişse true döner.
+    /// Bakes missing or outdated outputs. Returns true if any texture was baked.
     public static bool EnsureAll()
     {
         var sets = TextureIngest.AllSets();
@@ -82,14 +82,14 @@ public static class StochasticTextureBaker
         foreach (var set in sets) TextureIngest.Resolve(set);
         AssetDatabase.SaveAssets();
 
-        ToolLog.Write($"Stokastik döşeme pişti: {baked.Count} doku.");
+        ToolLog.Write($"Stochastic tiling baked: {baked.Count} texture(s).");
         return true;
     }
 
     static void Bake(string path, string outputName, bool threeChannel)
     {
-        // Okuma için geçici olarak sıkıştırmasız ve okunabilir yapılıyor: sıkıştırılmış
-        // doku GetPixels'te bloklara yuvarlanır ve histogram bozulur.
+        // Temporarily make uncompressed and readable for processing:
+        // compressed textures quantize into blocks in GetPixels, corrupting the histogram.
         var importer = (TextureImporter)AssetImporter.GetAtPath(path);
         bool wasReadable = importer.isReadable;
         var wasType = importer.textureType;
@@ -108,8 +108,8 @@ public static class StochasticTextureBaker
         var transformed = new Color[pixels.Length];
         var lut = new Color[LutSize];
 
-        // Kanal başına bağımsız dönüşüm: kanallar arası ilişki bozulur ama Heitz'in
-        // makalesi de böyle yapıyor — görsel fark yok, matematik çok daha basit.
+        // Independent per-channel transformation: cross-channel correlation is decoupled,
+        // following Heitz's paper — visual difference is negligible, math is much simpler.
         int channels = threeChannel ? 3 : 1;
 
         for (int c = 0; c < channels; c++)
@@ -117,13 +117,13 @@ public static class StochasticTextureBaker
             var values = new float[pixels.Length];
             for (int i = 0; i < pixels.Length; i++) values[i] = Channel(pixels[i], c);
 
-            // Sıralama: her pikselin histogramdaki yeri (birikimli olasılık).
+            // Sorting: cumulative probability rank for each pixel in histogram.
             var order = new int[values.Length];
             for (int i = 0; i < order.Length; i++) order[i] = i;
             Array.Sort(order, (a, b) => values[a].CompareTo(values[b]));
 
-            // İleri dönüşüm: birikimli olasılık → Gauss. 0.5 ortalamalı, 1/6 standart
-            // sapmalı bir Gauss'a oturtuluyor ki 0-1 aralığına sığsın.
+            // Forward transform: cumulative probability -> Gaussian.
+            // Fitted to Gaussian with 0.5 mean and 1/6 standard deviation to fit [0, 1].
             var gauss = new float[values.Length];
             for (int rank = 0; rank < order.Length; rank++)
             {
@@ -134,8 +134,8 @@ public static class StochasticTextureBaker
             for (int i = 0; i < pixels.Length; i++)
                 SetChannel(ref transformed[i], c, gauss[i]);
 
-            // TERS LUT: Gauss değerinden özgün değere. Shader harmanladığı Gauss
-            // örneğini buradan geri çeviriyor.
+            // INVERSE LUT: Gaussian value back to original value.
+            // Shader evaluates blended Gaussian samples against this LUT.
             for (int i = 0; i < LutSize; i++)
             {
                 float g = (i + 0.5f) / LutSize;
@@ -174,8 +174,8 @@ public static class StochasticTextureBaker
         }
     }
 
-    /// Standart normal dağılımın ters birikimli fonksiyonu (Acklam yaklaşımı).
-    /// Kapalı biçimde çözümü yok; bu yaklaşım 1e-9 hassasiyetinde.
+    /// Inverse cumulative distribution function for standard normal distribution (Acklam approximation).
+    /// No closed-form solution; approximation precision is 1e-9.
     static float InverseGauss(double p)
     {
         const double a1 = -39.69683028665376, a2 = 220.9460984245205;
@@ -213,7 +213,7 @@ public static class StochasticTextureBaker
                      / (((((b1 * r + b2) * r + b3) * r + b4) * r + b5) * r + 1));
     }
 
-    /// Standart normal birikimli dağılım — hata fonksiyonunun yaklaşımı.
+    /// Standard normal cumulative distribution function — error function approximation.
     static float GaussCdf(double x)
     {
         double t = 1.0 / (1.0 + 0.2316419 * Math.Abs(x));
@@ -237,18 +237,18 @@ public static class StochasticTextureBaker
         var importer = (TextureImporter)AssetImporter.GetAtPath(path);
         if (importer == null) return;
 
-        // Dönüştürülmüş doku ve LUT ikisi de VERİ: normal harita olarak işaretlenirse
-        // Unity kanalları yeniden paketler ve dönüşüm bozulur.
+        // Transformed texture and LUT are both DATA: if marked as normal map,
+        // Unity repacks channels and corrupts the transform.
         importer.textureType = TextureImporterType.Default;
         importer.sRGBTexture = false;
         importer.mipmapEnabled = !isLut;
         importer.filterMode = FilterMode.Bilinear;
         importer.anisoLevel = isLut ? 0 : 8;
 
-        // LUT kenardan kenara okunuyor: sarma tersini getirir.
+        // LUT is sampled edge-to-edge: wrapping would bleed opposite edge.
         importer.wrapMode = isLut ? TextureWrapMode.Clamp : TextureWrapMode.Repeat;
 
-        // Sıkıştırma histogramı bozar — dönüşümün tamamı değer hassasiyetine dayalı.
+        // Compression corrupts histogram — transformation relies on numerical precision.
         importer.textureCompression = TextureImporterCompression.Uncompressed;
         importer.maxTextureSize = isLut ? 256 : 1024;
         importer.SaveAndReimport();

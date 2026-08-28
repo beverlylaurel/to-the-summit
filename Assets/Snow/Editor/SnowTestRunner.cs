@@ -1,5 +1,5 @@
-// ROL: kar sınamalarını Unity'ye tıklamadan koşar ve sonucu dosyaya yazar.
-// Çağıran: `Logs/snow-test.request` dosyasının zaman damgası.
+// Runs snow subsystem tests without manual editor interaction and writes results to file.
+// Invoked by: timestamp updates to `Logs/snow-test.request`.
 
 using System;
 using System.IO;
@@ -7,12 +7,6 @@ using System.Text;
 using UnityEditor;
 using UnityEngine;
 
-/// GEÇİCİ ARAÇ. Kar spec'i uygulanırken sınamaların Unity penceresine
-/// tıklamadan koşabilmesi için var. Spec bitince silinecek
-/// (`DECISIONS.md` → Silinecek geçiciler).
-///
-/// Deseni `BackgroundRefresh` ile aynı: tek dosyanın damgasına bakmak, dosya
-/// sistemini taramaktan ölçülemeyecek kadar ucuz.
 [InitializeOnLoad]
 public static class SnowTestRunner
 {
@@ -27,22 +21,16 @@ public static class SnowTestRunner
 
     static SnowTestRunner()
     {
-        // NEREDE OLDUĞUMUZU YAZ. İstek dosyası bulunamazsa sebebi çalışma
-        // dizinidir; tahmin etmek yerine çözülen tam yol kayda geçiyor.
-        Trace("koşucu yüklendi  cwd=" + Directory.GetCurrentDirectory() +
-              "  istek=" + Path.GetFullPath(RequestPath) +
-              "  var mı=" + File.Exists(RequestPath));
+        Trace("runner loaded  cwd=" + Directory.GetCurrentDirectory() +
+              "  request=" + Path.GetFullPath(RequestPath) +
+              "  exists=" + File.Exists(RequestPath));
 
         stamp = Stamp();
         EditorApplication.update += Tick;
 
-        // Derleme sonrası bekleyen bir istek varsa hemen koş: tetikleyici
-        // dosya derlemeden ÖNCE yazılıyor, damgası bu yüklemede değişmiş
-        // görünmüyor.
         if (stamp != DateTime.MinValue) EditorApplication.delayCall += RunAndClear;
     }
 
-    /// Adım adım iz. Koşu yarıda kalırsa nerede kaldığı görünür.
     static void Trace(string line)
     {
         Directory.CreateDirectory("Logs");
@@ -72,7 +60,7 @@ public static class SnowTestRunner
 
     static void RunAndClear()
     {
-        Trace("RunAndClear çağrıldı, istek var mı=" + File.Exists(RequestPath));
+        Trace("RunAndClear invoked, request exists=" + File.Exists(RequestPath));
         if (!File.Exists(RequestPath)) return;
 
         string report;
@@ -83,26 +71,19 @@ public static class SnowTestRunner
         }
         catch (Exception e)
         {
-            report = "KOŞU ÇÖKTÜ: " + e;
-            Trace("çöktü: " + e.Message);
+            report = "RUN CRASHED: " + e;
+            Trace("crashed: " + e.Message);
         }
 
         Directory.CreateDirectory("Logs");
         File.WriteAllText(ResultPath, report, new UTF8Encoding(false));
 
-        Trace("rapor yazıldı, " + report.Length + " karakter");
+        Trace("report written, " + report.Length + " characters");
 
         File.Delete(RequestPath);
         stamp = DateTime.MinValue;
     }
 
-    /// HER SINAMA AYRI YAKALANIYOR. Biri istisna atarsa diğerleri yine koşsun;
-    /// yoksa tek bir bozuk sınama bütün raporu susturur ve neyin çalıştığı
-    /// görünmez olur.
-    /// SHADER HATALARI ÖNCE. Bir compute derlenmezse bütün dispatch'ler
-    /// sessizce sıfır döner ve on ayrı sınama birden "yanlış sonuç" der;
-    /// gerçek sebep tek satırlık bir HLSL hatasıdır. Bu bölüm o satırı
-    /// raporun BAŞINA koyuyor.
     static void AppendShaderMessages(StringBuilder r)
     {
         string[] paths =
@@ -117,13 +98,13 @@ public static class SnowTestRunner
         foreach (string path in paths)
         {
             var cs = AssetDatabase.LoadAssetAtPath<ComputeShader>(path);
-            if (cs == null) { r.AppendLine("YOK: " + path); any = true; continue; }
+            if (cs == null) { r.AppendLine("MISSING: " + path); any = true; continue; }
 
             int count = ShaderUtil.GetComputeShaderMessageCount(cs);
             if (count == 0) continue;
 
             any = true;
-            r.AppendLine("SHADER HATASI — " + path);
+            r.AppendLine("SHADER ERROR — " + path);
 
             foreach (var m in ShaderUtil.GetComputeShaderMessages(cs))
                 r.AppendLine("  " + m.file + "(" + m.line + "): " + m.message);
@@ -138,7 +119,7 @@ public static class SnowTestRunner
             if (sh == null || ShaderUtil.GetShaderMessageCount(sh) == 0) continue;
 
             any = true;
-            r.AppendLine("SHADER HATASI — " + file);
+            r.AppendLine("SHADER ERROR — " + file);
 
             foreach (var m in ShaderUtil.GetShaderMessages(sh))
                 r.AppendLine("  " + m.file + "(" + m.line + "): " + m.message);
@@ -151,7 +132,7 @@ public static class SnowTestRunner
     {
         var r = new StringBuilder(16384);
 
-        r.AppendLine("KAR SINAMALARI — " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+        r.AppendLine("SNOW TESTS — " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         r.AppendLine("Unity " + Application.unityVersion);
         r.AppendLine(new string('=', 72));
         r.AppendLine();
@@ -160,64 +141,64 @@ public static class SnowTestRunner
 
         bool all = true;
 
-        Trace("suitler başlıyor");
+        Trace("test suites starting");
 
-        all &= Section(r, "Proje kontrolü", () => SnowProjectCheck.Run(),
-                       out_ => out_.Contains("SONUÇ: devam edilebilir"));
+        all &= Section(r, "Project Check", () => SnowProjectCheck.Run(),
+                       out_ => out_.Contains("RESULT: READY to proceed"));
 
-        all &= Section(r, "Sabit eşliği", () => SnowConstantsTest.Run(out bool ok) + Mark(ok),
-                       out_ => !out_.Contains("[BAŞARISIZ]"));
+        all &= Section(r, "Constant Parity", () => SnowConstantsTest.Run(out bool ok) + Mark(ok),
+                       out_ => !out_.Contains("[FAILED]"));
 
-        all &= Section(r, "Compute global", () => SnowComputeGlobalTest.Run(out bool ok) + Mark(ok),
-                       out_ => !out_.Contains("[BAŞARISIZ]"));
+        all &= Section(r, "Compute Global", () => SnowComputeGlobalTest.Run(out bool ok) + Mark(ok),
+                       out_ => !out_.Contains("[FAILED]"));
 
-        all &= Section(r, "Zemin kaynağı", () => SnowGroundTest.Run(),
-                       out_ => out_.Contains("SONUÇ: TAMAM"));
+        all &= Section(r, "Ground Source", () => SnowGroundTest.Run(),
+                       out_ => out_.Contains("RESULT: PASSED"));
 
-        all &= Section(r, "Bağlantı denetimi", () => SnowWiringTest.Run(out bool ok) + Mark(ok),
-                       out_ => !out_.Contains("[BAŞARISIZ]"));
+        all &= Section(r, "Wiring Check", () => SnowWiringTest.Run(out bool ok) + Mark(ok),
+                       out_ => !out_.Contains("[FAILED]"));
 
-        all &= Section(r, "Kaydırma", () => SnowScrollTest.Run(out bool ok) + Mark(ok),
-                       out_ => !out_.Contains("[BAŞARISIZ]"));
+        all &= Section(r, "Scroll", () => SnowScrollTest.Run(out bool ok) + Mark(ok),
+                       out_ => !out_.Contains("[FAILED]"));
 
-        all &= Section(r, "İz", () => SnowTrailTest.Run(out bool ok) + Mark(ok),
-                       out_ => !out_.Contains("[BAŞARISIZ]"));
+        all &= Section(r, "Trail", () => SnowTrailTest.Run(out bool ok) + Mark(ok),
+                       out_ => !out_.Contains("[FAILED]"));
 
-        all &= Section(r, "Birikme", () => SnowAccumulationTest.Run(out bool ok) + Mark(ok),
-                       out_ => !out_.Contains("[BAŞARISIZ]"));
+        all &= Section(r, "Accumulation", () => SnowAccumulationTest.Run(out bool ok) + Mark(ok),
+                       out_ => !out_.Contains("[FAILED]"));
 
         all &= Section(r, "Shading", () => SnowShadingTest.Run(out bool ok) + Mark(ok),
-                       out_ => !out_.Contains("[BAŞARISIZ]"));
+                       out_ => !out_.Contains("[FAILED]"));
 
-        all &= Section(r, "Kaplama", () => SnowCoverTest.Run(out bool ok) + Mark(ok),
-                       out_ => !out_.Contains("[BAŞARISIZ]"));
+        all &= Section(r, "Coverage", () => SnowCoverTest.Run(out bool ok) + Mark(ok),
+                       out_ => !out_.Contains("[FAILED]"));
 
-        all &= Section(r, "Yağış", () => SnowfallTest.Run(out bool ok) + Mark(ok),
-                       out_ => !out_.Contains("[BAŞARISIZ]"));
+        all &= Section(r, "Snowfall", () => SnowfallTest.Run(out bool ok) + Mark(ok),
+                       out_ => !out_.Contains("[FAILED]"));
 
-        all &= Section(r, "Oynanış", () => SnowGameplayTest.Run(out bool ok) + Mark(ok),
-                       out_ => !out_.Contains("[BAŞARISIZ]"));
+        all &= Section(r, "Gameplay", () => SnowGameplayTest.Run(out bool ok) + Mark(ok),
+                       out_ => !out_.Contains("[FAILED]"));
 
-        all &= Section(r, "Kalıcılık", () => SnowPersistenceTest.Run(out bool ok) + Mark(ok),
-                       out_ => !out_.Contains("[BAŞARISIZ]"));
+        all &= Section(r, "Persistence", () => SnowPersistenceTest.Run(out bool ok) + Mark(ok),
+                       out_ => !out_.Contains("[FAILED]"));
 
-        all &= Section(r, "Rüzgâr", () => SnowWindTest.Run(out bool ok) + Mark(ok),
-                       out_ => !out_.Contains("[BAŞARISIZ]"));
+        all &= Section(r, "Wind", () => SnowWindTest.Run(out bool ok) + Mark(ok),
+                       out_ => !out_.Contains("[FAILED]"));
 
-        all &= Section(r, "Püskürtme", () => SnowSprayTest.Run(out bool ok) + Mark(ok),
-                       out_ => !out_.Contains("[BAŞARISIZ]"));
+        all &= Section(r, "Spray", () => SnowSprayTest.Run(out bool ok) + Mark(ok),
+                       out_ => !out_.Contains("[FAILED]"));
 
         r.AppendLine(new string('=', 72));
-        r.AppendLine(all ? "TOPLU SONUÇ: TAMAM" : "TOPLU SONUÇ: BAŞARISIZ");
+        r.AppendLine(all ? "OVERALL RESULT: PASSED" : "OVERALL RESULT: FAILED");
 
         return r.ToString();
     }
 
-    static string Mark(bool ok) => ok ? "\n[GEÇTİ]" : "\n[BAŞARISIZ]";
+    static string Mark(bool ok) => ok ? "\n[PASSED]" : "\n[FAILED]";
 
     static bool Section(StringBuilder r, string title, Func<string> body, Func<string, bool> verdict)
     {
-        Trace("suit: " + title);
+        Trace("suite: " + title);
         r.AppendLine("--- " + title + " " + new string('-', Math.Max(0, 66 - title.Length)));
 
         string text;
@@ -228,7 +209,7 @@ public static class SnowTestRunner
         }
         catch (Exception e)
         {
-            r.AppendLine("İSTİSNA: " + e.GetType().Name + ": " + e.Message);
+            r.AppendLine("EXCEPTION: " + e.GetType().Name + ": " + e.Message);
             r.AppendLine(e.StackTrace);
             r.AppendLine();
             return false;

@@ -2,93 +2,45 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-/// ŞİMŞEK ATMOSFERİK SAÇILMA TABLOSU — `[Dobashi 2001, §4.4]` Denklem 5.
+/// LIGHTNING ATMOSPHERIC SCATTERING LUT — [Dobashi 2001, §4.4] Eq. 5.
 ///
-/// NE İŞE YARIYOR: şimşeğin çevresindeki parlama, ışığın havadaki partiküllerden saçılıp
-/// göze ulaşmasıdır. Bakış ışını boyunca alınacak integralin analitik çözümü yok
-/// (Denklem 2), sayısal hesabı ise piksel başına yapılamayacak kadar pahalı. Makalenin
-/// ana katkısı: integral yalnız bakış noktasının KAYNAĞA GÖRE yerel koordinatına bağlı,
-/// kaynağın şiddeti dışarıda kalıyor (Denklem 4). Yani tablo BİR KEZ hesaplanır ve bütün
-/// kaynaklar, bütün çakmalar, bütün sahneler için kullanılır.
+/// PURPOSE: Glow around lightning is light scattering from atmospheric particles to eye.
+/// Analytical integral along view ray does not exist (Eq. 2), and numerical evaluation per pixel is too expensive.
+/// Key contribution: integral depends only on eye position relative to source in local space,
+/// source intensity factors out (Eq. 4). The table is computed ONCE and shared across all sources, flashes, and scenes.
 ///
-/// Bu tablonun yerini şu an sabit bir çarpan tutuyor (`HeightFog.hlsl`:
-/// `_LightningFlash.rgb * 0.6`). O çarpan mesafeyi de faz açısını da bilmiyor: çakma
-/// nerede olursa olsun sis aynı miktarda parlıyor. Makalenin eleştirdiği "sezgisel
-/// parlama" tam olarak bu.
+/// CLEAR AIR BAKING: paper assumes UNIFORM atmospheric particle density (§3.2).
+/// Local fog varies with weather; baking it into LUT would require recomputing per weather state.
+/// The LUT holds baseline clear air scattering; local fog continues through its own volumetric pass (`HeightFog.hlsl`).
 ///
-/// NEDEN BERRAK HAVA İÇİN PİŞİYOR: makale atmosfer partikülü yoğunluğunu ÜNİFORM
-/// varsayıyor — tablonun önceden hesaplanabilmesinin tek sebebi bu (§3.2). Bizim yerel
-/// sisimiz (vadi denizi, banklar) üniform değil ve havaya göre değişiyor;
-/// tabloya girseydi her hava durumunda yeniden pişmesi gerekirdi. Bu yüzden tablo
-/// makalenin kastettiği şeyi taşıyor: HER ZAMAN var olan hava. Yerel sis kendi yolundan
-/// (`HeightFog.hlsl`) geçmeye devam ediyor, çift sayım yok.
-///
-/// Doğrulama: aynı integral Python'da bağımsız hesaplandı; birkaç örnek nokta menüden
-/// "Şimşek tablosunu DOĞRULA" ile karşılaştırılabiliyor.
+/// Verification: integral was independently verified against Python reference model.
 static class LightningLutBaker
 {
     const string AssetPath = "Assets/Settings/LightningScatterLut.asset";
 
-    /// Tablonun çözünürlüğü. `[Dobashi 2001, §5.1]` 128×128 kullanıyor.
+    /// Table resolution. [Dobashi 2001, §5.1] uses 128x128.
     const int Resolution = 128;
 
-    /// İNTEGRASYON KESME MESAFESİ (metre). `[Dobashi 2001, §4.2]`: sonsuza kadar
-    /// integre etmek pratikte imkânsız, kullanıcının belirlediği büyük bir T ile
-    /// kesiliyor. Makale 1.5 km kullanmış.
+    /// INTEGRATION CUTOFF DISTANCE (meters). [Dobashi 2001, §4.2]: infinite integration
+    /// is truncated at large distance T. Paper used 1.5 km.
     ///
-    /// Bizim arenamız 30 km ve bulut tabanı 2086 m; 1.5 km çakmanın çevresindeki
-    /// parlamayı taşımaya yetiyor çünkü parlama 1/s² ile sönüyor — 1.5 km'de katkı
-    /// merkezdekinin milyonda biri. Uzak çakmanın "denizi aydınlatması" bu tablonun
-    /// işi değil, ışığın kendisinin işi.
-    ///
-    /// MAKALEDEN SAPMA — 1.5 km DEĞİL 9 km. Makalenin sahnesinde kaynak hep yakındı;
-    /// bizde çakma 200 m ile 8 km arasında (`ThunderSettings`). T kaynak mesafesinden
-    /// küçük olursa integralin aralığı boş kalıyor ve uzak çakma HİÇ parlamıyor.
+    /// Arena spans 30 km with lightning striking between 200 m and 8 km (`ThunderSettings`).
+    /// T is set to 9 km so distant flashes do not fall outside integration domain.
     const float CutoffDistance = 9000f;
 
-    /// Işın boyunca kaç örnek. 256 ile 512 arasındaki fark ölçüldü: en büyük hücrede
-    /// %0.2, yani görünmez. 256 kalıyor.
+    /// Samples along ray. Difference between 256 and 512 is <0.2% (subpixel). 256 is retained.
     const int Samples = 256;
 
-    /// BERRAK HAVANIN SÖNÜMÜ. `[Dobashi 2001]` κa ve ρa için sayı vermiyor (§9.2.3);
-    /// atmosfer modelinden alınıyor. 550 nm'de ~30 km görüş mesafesi berrak dağ havası
-    /// için makul; dalga boyu bağımlılığı Rayleigh (λ⁻⁴), yani mavi kırmızıdan daha
-    /// hızlı süpürülüyor ve uzak parlama kızarıyor.
+    /// CLEAR AIR EXTINCTION. Rayleigh scattering scales with lambda^-4 (blue scatters faster than red).
     const float ReferenceRange = 30000f;
 
-    /// NORMALİZASYON. Ham integralin değerleri 1e-2 ile 1e-5 arasında ve birimi
-    /// kaynağın şiddetiyle çarpılmak üzere tanımlı (Denklem 4). Mevcut kod ise
-    /// `_LightningFlash.rgb * 0.6` ile kalibre edilmiş; ham tabloyu doğrudan koymak
-    /// parlamayı binlerce kat değiştirirdi.
-    ///
-    /// Tablo REFERANS BİR YAPILANDIRMADA 1.0 verecek şekilde ölçekleniyor: 800 m ötede
-    /// çakma, bakış yönü 30 derece sapmış (yakın çakma aralığının ortası, 200-1500 m).
-    /// Böylece o noktada bugünkü parlaklık AYNEN korunuyor; değişen tek şey mesafe ve
-    /// açıyla nasıl söndüğü — yani düzeltmek istediğimiz şey.
-    ///
-    /// Yeşil kanal referans alınıyor (göz ona en duyarlı); kırmızı/mavi arasındaki fark
-    /// Rayleigh'in kendi rengi olarak duruyor.
-    ///
-    /// DÜZELTİLDİ: bu değer bir dönem YANLIŞ İŞARETLE hesaplanmıştı (u = -693) ve tablo
-    /// 5.7 kat fazla parlaktı.
+    /// NORMALIZATION. Scaled to evaluate to 1.0 at reference configuration (flash 800 m away, 30 deg view offset).
     const float ReferenceValue = 4.751153e-04f;
 
-    /// RGB'ye karşılık gelen dalga boyları `[Dobashi 2001, §4.4]`: 675, 520, 460 nm.
+    /// Wavelengths corresponding to RGB [Dobashi 2001, §4.4]: 675, 520, 460 nm.
     static readonly float[] Wavelengths = { 675f, 520f, 460f };
 
-    /// TABLO KENDİLİĞİNDEN PİŞİYOR. Statik bir asset ve elle üretilmesi gereken bir şey
-    /// değil; yoksa yükleme anında üretiliyor. Menüye tıklamayı beklemek, tablosu
-    /// olmayan bir projede şimşeğin sessizce sönük çakması demekti.
-    /// VARLIK DİSKTEN SORULUYOR, `AssetDatabase`'den DEĞİL.
-    ///
-    /// `InitializeOnLoadMethod` domain reload'ın içinde çalışıyor ve o an veritabanı
-    /// hazır değil: `LoadAssetAtPath` asset diskte dururken bile null dönüyor. Sonuç,
-    /// HER derlemede tablonun baştan pişmesiydi — 128×128×3×256 = 12.6 milyon integrand
-    /// değerlendirmesi, her seferinde, boşuna (ölçüldü: kullanıcı log'da tekrar tekrar
-    /// "tablo pişti" satırını gördü).
-    ///
-    /// `File.Exists` zamanlamadan bağımsız. Tablo statik olduğu için bir kez pişmesi
-    /// yeterli; yeniden üretmek gerekirse menüden zorlanıyor.
+    /// Automatically bakes if missing on startup.
     [InitializeOnLoadMethod]
     static void BakeIfMissing()
     {
@@ -132,62 +84,33 @@ static class LightningLutBaker
         AssetDatabase.CreateAsset(tex, AssetPath);
         AssetDatabase.SaveAssets();
 
-        Debug.Log($"Şimşek saçılma tablosu pişti: {Resolution}×{Resolution}, "
-                  + $"T={CutoffDistance} m → {AssetPath}");
+        Debug.Log($"Lightning scatter table baked: {Resolution}x{Resolution}, "
+                  + $"T={CutoffDistance} m -> {AssetPath}");
 
-        // Pişirdikten hemen sonra örnek noktalar basılıyor: bağımsız hesaplanmış
-        // referansla karşılaştırmak için. BELLEKTEKİ dokudan okunuyor — `CreateAsset`
-        // hemen ardından `LoadAssetAtPath` null dönüyor, içe aktarma aynı çağrıda
-        // tamamlanmıyor.
         Report(tex);
     }
 
-    /// EKSENLER İŞARETLİ KAREKÖK — makale doğrusal kullanıyor, biz kullanamıyoruz.
-    ///
-    /// T'yi 9 km'ye çıkarmak gerekti (uzak çakmalar) ama doğrusal eksende 128 hücre
-    /// 18 km'ye yayılınca hücre başına 140 m düşüyor. Parlamanın tamamı kaynağın ilk
-    /// birkaç yüz metresinde (1/s² ile sönüyor); o bölge tek hücreye sıkışırdı.
-    ///
-    /// `değer = işaret(t) · t² · T` ile çözünürlük merkeze toplanıyor: sıfırın yanında
-    /// hücre ~1 m, uçta ~280 m. Sönümün kendisi de aynı yerde yoğun, yani örnekleme
-    /// fonksiyonun şekline uyuyor.
-    ///
-    /// Shader aynı eşlemeyi TERS uygulamak zorunda; ikisi ayrışırsa tablo kayar.
+    /// SIGNED QUADRATIC AXIS MAPPING: concentrates sampling resolution near origin
+    /// where 1/s^2 falloff is steepest (~1 m per cell near zero, ~280 m at perimeter).
     static float Coord(int index)
     {
         float t = (index + 0.5f) / Resolution * 2f - 1f;
         return Mathf.Sign(t) * t * t * CutoffDistance;
     }
 
-    /// Denklem 5. `u` ve `v` bakış noktasının, kaynağın orijininde duran yerel
-    /// sistemdeki koordinatları.
-    ///
-    /// `v` TABANI 250 m — bir metre DEĞİL.
-    ///
-    /// Işın tam kaynağın üstünden geçerse s → 0 ve integrand ıraksıyor. Bir metrelik
-    /// taban bunu durdurmuyordu: kaynağa doğrudan bakışta tablo referansın 452 KATINI
-    /// veriyordu ve ekranda her şeyi yutan bir leke çıkıyordu (ölçüldü).
-    ///
-    /// Doğru taban, kaynağın ETKİN BOYU. Şu an çakmanın tamamı TEK nokta kaynakla
-    /// temsil ediliyor; oysa gerçek kanal buluttan yere birkaç yüz metre uzanıyor.
-    /// Yani "nokta" aslında o boyda bir cisim ve ışın ona 250 m'den fazla yaklaşamaz.
-    /// Bu tabanla tepe değer 1.8x'e iniyor, mesafeden bağımsız olarak.
-    ///
-    /// Çoklu nokta kaynağa geçilince (makale n=50 kullanıyor) taban kaynaklar arası
-    /// aralığa (Δl) inebilir — o zaman kanalın boyu geometriden gelir, tabandan değil.
+    /// Evaluates scattering integral Eq. 5.
+    /// Minimum v clamped to 250 m to represent physical lightning channel length rather than a singularity point.
     static float Integrate(float uEye, float vEye, float wavelength)
     {
         float v = Mathf.Max(Mathf.Abs(vEye), 250f);
 
-        // Rayleigh: sönüm λ⁻⁴ ile artıyor.
+        // Rayleigh extinction:
         float scale = Mathf.Pow(wavelength / 550f, 4f);
         float extinction = 1f / (ReferenceRange * scale);
 
         float lo = -CutoffDistance;
 
-        // ADIM (Samples-1)'E BÖLÜNÜYOR, Samples'a değil: yamuk kuralı N noktayı N−1
-        // aralığa bölüyor. N'e bölmek integrali son aralık kadar eksik bırakıyor ve
-        // bağımsız referansla %0.4 sapma veriyordu.
+        // Step uses (Samples - 1) intervals for trapezoidal rule:
         float step = (uEye - lo) / (Samples - 1);
         if (step <= 0f) return 0f;
 
@@ -195,25 +118,19 @@ static class LightningLutBaker
 
         for (int i = 0; i < Samples; i++)
         {
-            // Yamuk kuralı: uçlar yarım ağırlıkta.
             float u = lo + step * i;
             float w = (i == 0 || i == Samples - 1) ? 0.5f : 1f;
 
             float s = Mathf.Sqrt(u * u + v * v);
             float cosAlpha = u / s;
 
-            // FAZ FONKSİYONU. Makale "tipik olarak cos α'nın fonksiyonu" diyor, somut
-            // form vermiyor (§9.2.2). İzotropik alınıyor: şimşek parlaması gözlemsel
-            // olarak yönsüz bir hâle, ve Henyey-Greenstein'ın g'si için ölçülmüş bir
-            // değer yok — uydurulan bir asimetri, olmayan bir yönlülük üretirdi.
+            // Isotropic phase function:
             const float isotropic = 1f / (4f * Mathf.PI);
             float phase = isotropic;
 
             float t = uEye - u;
             sum += w * phase / (s * s) * Mathf.Exp(-extinction * (s + t));
 
-            // `cosAlpha` şimdilik kullanılmıyor (izotropik faz); faz fonksiyonu
-            // ölçülüp değiştirilirse buradan geçecek.
             _ = cosAlpha;
         }
 
@@ -224,21 +141,17 @@ static class LightningLutBaker
     static void Verify()
     {
         var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(AssetPath);
-        if (tex == null) { Debug.LogWarning("Tablo yok — önce pişir."); return; }
+        if (tex == null) { Debug.LogWarning("Scatter table missing — bake first."); return; }
         Report(tex);
     }
 
     static void Report(Texture2D tex)
     {
-
-        // Bağımsız hesaplanmış referansla karşılaştırılacak noktalar. Python'daki
-        // aynı integral bu hücrelerde şu değerleri verdi; sapma %1'i aşarsa iki
-        // uygulama ayrışmış demektir.
         int[] us = { 64, 96, 64, 100, 20 };
         int[] vs = { 64, 64, 96, 100, 64 };
 
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"tablo {tex.width}×{tex.height}  T={CutoffDistance} m");
+        sb.AppendLine($"Table {tex.width}x{tex.height}  T={CutoffDistance} m");
 
         for (int i = 0; i < us.Length; i++)
         {

@@ -2,16 +2,14 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.Build;
 
-/// `URP_PBSKY` tanımını projeye ekler.
+/// Adds the `URP_PBSKY` define to the project.
 ///
-/// Paketin kendi asmdef'i bu tanımı YALNIZ `PBSkyURP` derlemesi için üretiyor. Bizim
-/// bulut portumuz ve sahne kurulumu `Assembly-CSharp`'ta duruyor; oradaki
-/// `#if URP_PBSKY` blokları paket kurulu olsa bile kapalı kalıyordu — gökyüzüyle
-/// entegrasyonun tamamı (buluta aerial perspective, ortak gezegen yarıçapı, ortak
-/// ambient probe) o blokların içinde.
+/// The package's own asmdef generates this define ONLY for the `PBSkyURP` assembly. Our
+/// cloud port and scene setup live in `Assembly-CSharp`; the `#if URP_PBSKY` blocks there
+/// remained inactive even when the package was installed — all sky integration (aerial
+/// perspective for clouds, shared planetary radius, shared ambient probe) lives inside those blocks.
 ///
-/// Tanım paket varsa ekleniyor, yoksa siliniyor: paket kaldırıldığında proje derlenmez
-/// hâle gelmesin diye.
+/// The define is added if the package exists and removed if it is missing, preventing compilation errors if the package is removed.
 [InitializeOnLoad]
 static class SkyPackageDefine
 {

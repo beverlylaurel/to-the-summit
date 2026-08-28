@@ -4,33 +4,23 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-/// Dağı sıfırdan yapma atölyesi: boş düzlemden başlar, fırça ve toplu işlemlerle
-/// şekillenir, arazinin yükseklik haritası olarak yazılır.
+/// Mountain building workbench: starts from flat plain, shapes via brushes and batch operations,
+/// exports to terrain heightmap.
 ///
-/// NEDEN VAR: dağ önce Python'da istatistikle üretiliyordu ve şekli ancak süzgeçle
-/// dolaylı ayarlanabiliyordu — "şuraya bir sırt koy" denemiyordu, her tur dakikalar
-/// sürüyordu ve istenen görüntüye ulaşılamadı.
-///
-/// İKİ IZGARA. Çalışma 1025²'de (29.3 m/hücre), görüntü 513²'de. Fırça yalnız kendi
-/// yarıçapındaki hücrelere dokunuyor; pahalı olan örgüyü GPU'ya yüklemek, o yüzden
-/// çizim sırasında saniyede ~10 kez yenileniyor. Kaydederken 4097²'ye büyütülüyor.
+/// TWO GRIDS: Editing grid at 1025^2 (29.3 m/cell), preview grid at 513^2.
+/// Export upsamples to 4097^2.
 public class MountainBuilderWindow : EditorWindow
 {
     const int Grid = 1025;
     const int View = 513;
     const int Export = 4097;
     const float ArenaM = 30000f;
-    const float MaxM = 8000f;   // arazinin dikey tavanı (`TerrainData.size.y`)
+    const float MaxM = 8000f;   // Terrain vertical ceiling (`TerrainData.size.y`)
 
-    // ÇALIŞMA DOSYASI. Pencerenin ızgarası serileştirilmiyor ve her derleme onu siliyordu;
-    // saatlerce yontulan dağ tek bir kod değişikliğiyle gidiyordu. Ham float32 yazılıyor:
-    // PNG'ye çevirmek 16 bit'e yuvarlar ve geri okurken kot kayardı.
     const string SculptDir = "Assets/Terrain/Sculpts";
-    const string AutoName = "_son";
-    const string RescueName = "_kurtarma";   // üzerine yazmadan önceki son hâl
+    const string AutoName = "_latest";
+    const string RescueName = "_rescue";
 
-    // Değişiklik oldu mu ve en son ne zaman kaydedildi. Editör çökerse ya da zorla
-    // kapatılırsa `OnDisable` çalışmıyor; periyodik kayıt o boşluğu kapatıyor.
     bool dirtySinceSave;
     double lastAutoSave;
 
@@ -41,99 +31,82 @@ public class MountainBuilderWindow : EditorWindow
     enum MaskKind { None, Height, Slope, Ridges, Valleys }
 
     static readonly string[] TabNames =
-    { "Fırça", "İşlemler", "Maske", "Rota", "Ölçüm", "Kaydet" };
+    { "Brush", "Operations", "Mask", "Route", "Measure", "Save" };
 
     static readonly string[] BrushNames =
-    { "Yükselt", "Alçalt", "Yumuşat", "Düzleştir", "Sırt", "Vadi", "Aşındır", "Keskinleştir", "Gürültü" };
+    { "Raise", "Lower", "Smooth", "Flatten", "Ridge", "Valley", "Erode", "Sharpen", "Noise" };
 
-    /// Her fırçanın NEREYE çizileceği. "Ne yapar" yetmiyordu: vadinin yamaca mı ovaya mı
-    /// çizileceği, sırtın nereden başlayacağı bilinmeden araç kullanılamıyor.
     static readonly string[] BrushHelp =
     {
-        // Yükselt
-        "NEREYE: dağın gövdesi. Merkeze büyük yarıçapla (2-4 km) bas, kütleyi kur.\n"
-        + "Küçük yarıçapla omuz, basamak ve yan tepe eklersin.\n"
-        + "İPUCU: tek seferde çok bastırma; üst üste hafif geçişler daha doğal duruyor.",
+        // Raise
+        "TARGET: Mountain mass. Click center with large radius (2-4 km) to build main mass.\n"
+        + "Use smaller radius for shoulders, steps, and sub-peaks.\n"
+        + "TIP: Avoid heavy single stamps; layered light passes look more natural.",
 
-        // Alçalt
-        "NEREYE: kütlenin içine oyulacak çanaklar — buzul sirki (zirvenin altındaki kaşık\n"
-        + "biçimli çukur), boyun (iki zirve arası çökük), ovada göl yatağı.\n"
-        + "Vadi için bunu DEĞİL, Vadi fırçasını kullan: vadi çizgiseldir, çanak değil.",
+        // Lower
+        "TARGET: Hollows within terrain mass — cirques (glacial bowls below peaks),\n"
+        + "cols / saddles between peaks, lowland lake beds.\n"
+        + "For valleys use the Valley brush: valleys are linear channels, not radial bowls.",
 
-        // Yumuşat
-        "NEREYE: fırça izlerinin kaldığı yer, testere görünümü, tek hücrelik sivri uçlar.\n"
-        + "Aşınmadan sonra kalan sertlikleri alır.\n"
-        + "DİKKAT: geniş yarıçapla uzun sürtmek dağı hamurlaştırır, detay gider.",
+        // Smooth
+        "TARGET: Brush seam artifacts, jagged stepping, single-cell spikes.\n"
+        + "Softens harsh edges remaining after erosion passes.\n"
+        + "CAUTION: Overusing wide-radius smoothing flattens fine mountain relief.",
 
-        // Düzleştir
-        "NEREYE: kamp yerleri, sırt üstündeki omuzlar, iki zirve arasındaki kol (col),\n"
-        + "ovadaki teraslar. Gerçek dağda düzlükler SIRT ÜSTÜNDE ve BOYUNDA olur —\n"
-        + "dik yamacın ortasında düzlük doğal durmaz.\n"
-        + "Önce düzlüğü istediğin kota tıkla (o kot hedef olur), sonra etrafa yay.",
+        // Flatten
+        "TARGET: Campsite benches, ridge shoulders, cols / saddles between peaks,\n"
+        + "valley terraces. In real mountains, flats form on RIDGES and COLS —\n"
+        + "flat benches mid-cliff look unnatural.\n"
+        + "Click at desired target elevation first, then brush outward.",
 
-        // Sırt
-        "NEREYE: zirveden AŞAĞI DOĞRU, parmak gibi dışa açılan hatlar. Gerçek dağda sırt\n"
-        + "zirveden başlar, alçalarak etek boyunca uzar; üç-beş tane olur.\n"
-        + "Sırtlar vadileri BİRBİRİNDEN AYIRIR: iki vadinin arasında mutlaka bir sırt var.\n"
-        + "NASIL: En/boy 3-5 yap, Açı'yı çizeceğin yöne çevir, zirveden dışa sürükle.\n"
-        + "Rotalar sırttan gider (25-30°), duvardan değil — tırmanış hattını burada kurarsın.",
+        // Ridge
+        "TARGET: Downward radial spines radiating from peak. In real mountains,\n"
+        + "ridges descend from summit down to valley floors (3-5 major ridges).\n"
+        + "Ridges DIVIDE VALLEYS: every two valleys are separated by a ridge.\n"
+        + "USAGE: Aspect 3-5, align Angle to direction, drag outward from summit.\n"
+        + "Routes follow ridges (25-30 deg) rather than sheer walls.",
 
-        // Vadi
-        "NEREYE: İKİ SIRTIN ARASINA, yukarıdan aşağı. Vadi asla zirveden geçmez ve asla\n"
-        + "yokuş yukarı gitmez — su nereye akarsa vadi oradadır.\n"
-        + "Yukarıda dar ve dik başlar, aşağı indikçe genişler ve yatıklaşır.\n"
-        + "Ovaya vardığında sığ bir oluğa döner; ovada derin vadi olmaz.\n"
-        + "NASIL: En/boy 3-5, zirvenin biraz altından başla, eteğe kadar sürükle.",
+        // Valley
+        "TARGET: BETWEEN TWO RIDGES, from top to bottom. Valleys never cross peaks\n"
+        + "and never run uphill — valleys follow natural drainage pathways.\n"
+        + "Narrow and steep near tops, widening and flattening downhill.\n"
+        + "USAGE: Aspect 3-5, start below summit, drag to base plain.",
 
-        // Aşındır
-        "NEREYE: fazla dik kalan yüzler ve keskin kenarlar. Duruş açısını (38°) aşan\n"
-        + "yerleri indirir, sırt hattını korur.\n"
-        + "Kütleyi kurduktan sonra genel bir geçiş yap; İşlemler sekmesindeki termal\n"
-        + "aşınma aynı işi tüm araziye uygular.",
+        // Erode
+        "TARGET: Overly steep faces and razor edges. Lowers faces exceeding angle\n"
+        + "of repose (38 deg) while preserving ridge axes.",
 
-        // Keskinleştir
-        "NEREYE: aşınma ya da yumuşatma sonrası silikleşen sırt hatları.\n"
-        + "Mevcut kabartıyı güçlendirir — olmayan bir sırtı YARATMAZ, önce Sırt fırçasıyla\n"
-        + "çiz, sonra burayla belirginleştir.",
+        // Sharpen
+        "TARGET: Ridge axes softened after erosion or smoothing.\n"
+        + "Amplifies existing relief — draw ridge spine first, then sharpen.",
 
-        // Gürültü
-        "NEREYE: fazla düz kalan yamaçlar ve ova. Ovada 'tepecikli düz' görüntüyü bu verir.\n"
-        + "Küçük güçle geniş alana sürt; büyük güç arazi ölçeğinde çöp üretir.\n"
-        + "Zirve çevresinde az kullan — orada kaya yapısı gürültüden değil sırtlardan gelir.",
+        // Noise
+        "TARGET: Overly smooth slopes and foreland plains. Provides rolling mounds.\n"
+        + "Use low strength across broad areas; avoid heavy application near summit.",
     };
 
-
-    // --- veri
+    // --- Data
     float[] h;
     Mesh mesh;
     Material mat;
 
-    // ÖRGÜ ÖNBELLEĞİ. Köşe dizileri ve ÜÇGEN İNDEKSLERİ bir kez kuruluyor: topoloji
-    // hiç değişmiyor, yalnız köşe kotu ve rengi değişiyor. Eskiden her yenilemede
-    // `Mesh.Clear` + üçgenlerin yeniden ataması yapılıyordu — 525 bin indeks, saniyede
-    // on kez. Fırça takılmasının kaynağı buydu.
     Vector3[] vVerts;
     Color[] vCols;
     bool topoBuilt;
 
-    // Fırçanın değdiği bölge (görüntü ızgarası koordinatı). Yalnız burası yeniden
-    // hesaplanıyor; tüm alanı taramak 263 bin köşe demek.
     int pdx0 = int.MaxValue, pdz0 = int.MaxValue, pdx1 = int.MinValue, pdz1 = int.MinValue;
 
-    // DEĞİŞİM İZİ. Yumuşak vuruşlarda kot birkaç metre oynuyor ve 30 km'lik bir arenada
-    // gözle seçilmiyor — fırçanın işe yarayıp yaramadığı anlaşılmıyordu. Değişen köşeler
-    // parlıyor ve bir saniyede sönüyor; iz kotun kendisine değil DEĞİŞİMİNE bakıyor.
     float[] heat;
     int hx0 = int.MaxValue, hz0 = int.MaxValue, hx1 = int.MinValue, hz1 = int.MinValue;
     double lastHeatTick;
     PreviewRenderUtility prev;
 
-    // --- fırça
+    // --- Brush
     BrushKind brush = BrushKind.Raise;
     float radiusM = 900f, strength = 0.5f, hardness = 0.35f, aspect = 1f, angleDeg = 0f;
     float flattenTarget = float.NaN;
 
-    // --- maske
+    // --- Mask
     MaskKind maskKind = MaskKind.None;
     float maskLo = 500f, maskHi = 4000f, maskFeather = 200f;
     float maskSlopeLo = 0f, maskSlopeHi = 30f, maskSlopeFeather = 5f;
@@ -141,78 +114,37 @@ public class MountainBuilderWindow : EditorWindow
     bool maskPreview;
     float[] maskCache;
 
-    // --- işlem ayarları
-    // TERMAL VARSAYILANLARI ÖLÇÜMLE SEÇİLDİ. 20 tur / 0.14 hız 1025²'lik ızgarada
-    // yakınsamıyor: komşu eğimi duruş açısının çok üstünde kalıyor ve sivri duruyor.
-    // 60 tur / 0.5 hız ile komşu eğimi tam duruş açısına oturuyor (sentetik sivri
-    // üstünde ölçüldü: 500 m'lik tek hücre -> 36.0 derece koni).
+    // --- Operation Settings
     float opTalus = 36f, opRate = 0.5f; int opIters = 60;
-    // VARSAYILANLAR SebLague/Hydraulic-Erosion (MIT) REFERANSINDAN. Kendi seçtiğim
-    // sayılarla damla yönünü çok ağır değiştiriyor ve ızgaraya hizalı oluklar açıyordu;
-    // referansın ataleti (0.05) çok daha düşük.
     int hydDroplets = 120000, hydSteps = 30;
-    // ATALET REFERANSTAN YÜKSEK. Referans (0.05) FRAKTAL GÜRÜLTÜ üstünde çalışıyor:
-    // orada düşüş hatları zaten dağınık. Bizimki elle yontulmuş pürüzsüz bir kütle ve
-    // bütün düşüş hatları ışınsal — düşük atalet damlayı her adımda en dik yöne
-    // kilitliyor, yan yana paralel oluklar açılıyor ve ekranda dikey taranmış çizgiler
-    // kalıyor. Atalet damlaya savrulma payı veriyor, oluklar birleşip dallanıyor.
     float hydInertia = 0.35f, hydCapacity = 4f, hydErode = 0.3f, hydDeposit = 0.3f,
           hydEvap = 0.01f, hydGravity = 4f;
     int hydBrush = 5;
     float noiseWl = 1200f, noiseAmp = 120f, noisePers = 0.5f, noiseLac = 2f; int noiseOct = 6;
     float warpWl = 3000f, warpAmp = 400f;
 
-    // DOĞALLAŞTIR — ölçümden türetilmiş değerler. `_son.bytes` üzerinde yapılan bant
-    // analizi: dağ 4 km üstünde doğru, altında giderek boşalıyordu (2.2 km'de 2 kat,
-    // 575 m'de 5.3 kat, 150 m'de 13 kat eksik kabartı). Spektral eğim β 4.6 çıktı;
-    // gerçek arazi 2.0-2.5. Eğrilik çarpıklığı -0.23 (gerçek akarsu arazisi -0.5..-2),
-    // yani vadiler oyulmamıştı. Sebep araçta görünüyordu: 120 bin damla = hücre başına
-    // 0.11 damla (kanal ağı için 1-5 gerekir) ve 30 adım = damlanın menzili 880 m.
+    // Naturalize settings
     float natSeedWl = 2000f, natSeedAmp = 1200f, natSeedPers = 0.75f;
     int natSeedOct = 7;
-    // AKARSU OYMASI: K 0.15, 6 tur, difuzyon 0.20. Olcut EGIM DAGILIMI oldu; bant
-    // hedefi tek basina yaniltti (beta=2.2'yi 9 km'den 150 m'ye uzatmak kagitta bile
-    // 53 derece ortanca egim veriyor, gercek alp arazisi 30-38). Bu ucluyle olculen
-    // sonuc: ortanca 34.7, p90 60.6, >60 derece %10.7, egrilik carpikligi +3.24.
     float natFlowK = 0.15f, natFlowDiffuse = 0.20f;
     int natFlowIters = 6;
-
-    // BUZUL IMZASI: 3800 m ustunde mevcut egriligi abartir — icbukey canak derinlesir,
-    // disbukey sirt incelir. Uydurma canak yerlestirmiyor, arazinin kendi bicimini
-    // keskinlestiriyor. 6000 m'lik dagin ust yarisini akarsu degil buz sekillendirir.
     float natGlacierFrom = 3800f, natGlacierGain = 0.5f, natGlacierRadius = 700f;
-
-    /// ETKI: butun asamalari birlikte olcekler. Tek doz dayatmak yanlisti — sayilar
-    /// hedefe gelse de sonucu begenmek kullanicinin karari.
     float natStrength = 0.4f;
     float terraceStep = 120f, terraceSharp = 0.6f;
     float sharpRadius = 200f, sharpGain = 1.6f;
     float remapMin = 0f, remapMax = 5709f;
     float coneRadius = 9000f, coneHeight = 4500f;
-    // ÖLÇÜMLE AYARLANDI. İlk değerlerle etek geçişi kenarı düzeltti (kenar kotu
-    // 1202 -> 133 m) ama ova bandı 11.5 derecede kaldı — bisikletle geçilecek yer için
-    // dik. Geçiş daha içeriden başlıyor ve ovada kalan kabartı payı düşürüldü.
     float apronInner = 7500f, apronOuter = 14500f, apronKeep = 0.12f;
     float calmBelow = 900f, calmFeather = 350f, calmKeep = 0.18f, calmScale = 700f;
-    // OVA SIFIRDAN BAŞLIYOR. 186 m eski ÜRETİLEN arazinin ölçülmüş kotuydu, tasarım
-    // kararı değil. Tek bağı sıcaklık: donma seviyesi mutlak kottan türüyor, 186 m fark
-    // 1.2 °C demek — ihmal edilir.
     float plainM = 0f;
 
-    // İNCE DETAY — KAYDETME ANINDA, 4097²'DE. Yontma ızgarası 29.3 m; aradaki büyütme
-    // ondan ince hiçbir şey üretemiyor ve dağ yakından çıplak görünüyor. Arazinin kendi
-    // ızgarası 7.32 m, yani 14.65 m'ye kadar dalga taşıyabiliyor — o bant burada
-    // dolduruluyor.
     bool fineDetail = true;
     float fineWavelength = 420f, fineAmplitude = 26f;
     int fineOctaves = 5;
     float fineSteepBias = 0.7f;
     int opSeed = 12345;
 
-    // --- kamera / durum
-    // SERBEST UÇUŞ KAMERASI. Önce sabit bir eksen etrafında yörüngeye oturuyordu:
-    // mesafe sabitti, dağın dibine girilemiyordu. Artık konum bağımsız — WASD uçurur,
-    // sağ tık bakış yönünü çevirir.
+    // --- Camera / State
     float yaw = 35f, pitch = 30f, vScale = 1f, viewShare = 0.5f;
     Vector3 flyPos = new Vector3(0f, 12f, -26f);   // km
     float flySpeed = 1.2f;                          // km/s
@@ -223,25 +155,11 @@ public class MountainBuilderWindow : EditorWindow
     double lastMeshBuild;
     Vector3 cursor; bool cursorValid;
 
-    // KAMERA DURUMU ELDE TUTULUYOR. `PreviewRenderUtility`'nin kamerası ancak
-    // `BeginPreview` içinde doğru piksel dikdörtgenine kavuşuyor; fare hareketinde
-    // `ScreenPointToRay` ve `WorldToScreenPoint` eski/boş değerle çalışıyor ve fırça
-    // halkası hiç görünmüyordu. Işın da izdüşüm de artık aynı matristen türüyor.
     Vector3 camPos; Quaternion camRot; float camFov = 32f; Rect viewRect;
 
     Vector2 scroll;
-    string sculptName = "dag";
+    string sculptName = "mountain";
 
-    // ROTALAR. Noktalar KİLOMETRE cinsinden yatay konum (x, z) tutuyor; kot saklanmıyor,
-    // her çizimde araziden okunuyor. Dağ yeniden yontulduğunda hat yeni zemine
-    // kendiliğinden oturuyor — mutlak kot saklansaydı havada asılı kalırdı.
-    // ADI `RoutePath`, `Path` DEĞİL: `System.IO.Path`'i gölgeliyor ve dosya adı
-    // işlemleri derlenmiyordu.
-    // `[Serializable]` ŞART. Unity `EditorWindow`'un private alanlarını derleme
-    // sonrasına taşıyor ama yalnız serileştirilebilir türleri: `float[] h` sağ
-    // çıkıyordu, özel sınıf dizisi olan rotalar çıkmıyordu. Açılışta `h` dolu
-    // görüldüğü için dosya da okunmuyor, rotalar boş kalıyor, sonraki kapanışta o
-    // boşluk dosyanın üstüne yazılıyordu.
     [System.Serializable]
     class RoutePath
     {
@@ -252,18 +170,15 @@ public class MountainBuilderWindow : EditorWindow
 
     [SerializeField] RoutePath[] paths =
     {
-        new RoutePath { name = "Otobüs yolu", color = new Color(1.00f, 0.60f, 0.10f) },
-        new RoutePath { name = "Tırmanış rotası", color = new Color(0.95f, 0.25f, 0.25f) },
+        new RoutePath { name = "Bus road", color = new Color(1.00f, 0.60f, 0.10f) },
+        new RoutePath { name = "Climbing route", color = new Color(0.95f, 0.25f, 0.25f) },
     };
 
-    int activePath;   // 0 = otobüs yolu, 1 = tırmanış rotası
-    float routeSpacingM = 25f;    // iki nokta arası mesafe
-    float routeRadiusM = 3.2f;    // yolun yarı genişliği (MountainRoute.Mark.radius)
+    int activePath;
+    float routeSpacingM = 25f;
+    float routeRadiusM = 3.2f;
     bool drawingRoute;
 
-    // ROTA GERİ ALMA AYRI YIĞIN. Yükseklik yığını dikdörtgen kopyası tutuyor; rota
-    // noktası oraya sığmıyor. Vuruş başına kaç nokta eklendiği saklanıyor: bir sürükleme
-    // onlarca nokta bırakıyor ve tek tek geri almak işkence olurdu.
     struct RouteEdit { public int path; public List<Vector2> pts; }
     readonly List<RouteEdit> routeUndo = new List<RouteEdit>();
     readonly List<RouteEdit> routeRedo = new List<RouteEdit>();
@@ -271,15 +186,11 @@ public class MountainBuilderWindow : EditorWindow
     [SerializeField] Vector2 spawn = new Vector2(float.NaN, float.NaN);
     bool placingSpawn;
 
-    // FARE İMLECİ HALKANIN ÜSTÜNDE GİZLENİYOR. İki imleç birden (ok + halka) nereye
-    // vuracağını belirsizleştiriyor. Unity'nin `MouseCursor` listesinde "yok" değeri
-    // olmadığı için saydam 1×1 bir imleç kullanılıyor.
     Texture2D blankCursor;
     bool cursorHidden;
     string info = "", report = "", stats = "";
     readonly HashSet<string> openHelp = new HashSet<string>();
 
-    // --- geri alma
     struct Edit { public int x0, z0, w, d; public float[] before, after; }
     readonly List<Edit> undoStack = new List<Edit>();
     readonly List<Edit> redoStack = new List<Edit>();
@@ -290,20 +201,16 @@ public class MountainBuilderWindow : EditorWindow
     [MenuItem("To The Summit/Terrain/Mountain Builder", false, 12)]
     static void Open()
     {
-        var w = GetWindow<MountainBuilderWindow>("Dağ Yapımı");
+        var w = GetWindow<MountainBuilderWindow>("Mountain Builder");
         w.minSize = new Vector2(620f, 760f);
         w.Show();
     }
 
     void OnEnable()
     {
-        // Fırça halkasının fare hareketinde güncellenmesi için şart.
         wantsMouseMove = true;
         EditorApplication.update += Fly;
         if (h == null && !LoadSculpt(AutoName)) NewFlat();
-
-        // Yükseklik derlemeden sağ çıkmış ama rotalar boşsa, dosyadaki hatları geri
-        // oku. `h != null` diye dosyayı hiç açmamak rotaları yok ediyordu.
         else if (h != null && RoutesEmpty()) LoadRoutesOnly(AutoName);
     }
 
@@ -312,8 +219,6 @@ public class MountainBuilderWindow : EditorWindow
         EditorApplication.update -= Fly;
         keysDown.Clear();
 
-        // Derleme ve pencere kapanışı aynı yoldan geçiyor: çalışma burada diske iniyor,
-        // açılışta geri okunuyor.
         if (h != null) SaveSculpt(AutoName);
         ShowSystemCursor();
         if (blankCursor != null) { DestroyImmediate(blankCursor); blankCursor = null; }
@@ -352,41 +257,37 @@ public class MountainBuilderWindow : EditorWindow
         {
             bool routeMode = tab == Tab.Route;
             using (new EditorGUI.DisabledScope((routeMode ? routeUndo.Count : undoStack.Count) == 0))
-                if (GUILayout.Button("↶ Geri", EditorStyles.toolbarButton, GUILayout.Width(56f)))
+                if (GUILayout.Button("↶ Undo", EditorStyles.toolbarButton, GUILayout.Width(56f)))
                 { if (routeMode) RouteUndo(); else Undo(); }
             using (new EditorGUI.DisabledScope((routeMode ? routeRedo.Count : redoStack.Count) == 0))
-                if (GUILayout.Button("↷ İleri", EditorStyles.toolbarButton, GUILayout.Width(56f)))
+                if (GUILayout.Button("↷ Redo", EditorStyles.toolbarButton, GUILayout.Width(56f)))
                 { if (routeMode) RouteRedo(); else Redo(); }
 
             GUILayout.Space(10f);
-            // SIFIRLAMA HER ZAMAN ERİŞİLEBİLİR. Izgara pencerenin alanında yaşıyor ve
-            // derleme onu sıfırlamıyor; varsayılan değişince eski düzlem bellekte kalıyor.
-            if (GUILayout.Button("Boş düzlem", EditorStyles.toolbarButton, GUILayout.Width(80f)))
+            if (GUILayout.Button("Flat Plain", EditorStyles.toolbarButton, GUILayout.Width(80f)))
                 NewFlat();
             plainM = EditorGUILayout.FloatField(plainM, EditorStyles.toolbarTextField,
                                                 GUILayout.Width(44f));
             GUILayout.Label("m", EditorStyles.miniLabel, GUILayout.Width(12f));
 
             GUILayout.Space(10f);
-            GUILayout.Label("dikey abartma", EditorStyles.miniLabel, GUILayout.Width(76f));
+            GUILayout.Label("vertical scale", EditorStyles.miniLabel, GUILayout.Width(76f));
             vScale = GUILayout.HorizontalSlider(vScale, 1f, 4f, GUILayout.Width(70f));
-            GUILayout.Label("görünüm payı", EditorStyles.miniLabel, GUILayout.Width(74f));
+            GUILayout.Label("view split", EditorStyles.miniLabel, GUILayout.Width(74f));
             viewShare = GUILayout.HorizontalSlider(viewShare, 0.25f, 0.75f, GUILayout.Width(70f));
 
             GUILayout.Space(10f);
-            GUILayout.Label($"hız {flySpeed:F1} km/s", EditorStyles.miniLabel, GUILayout.Width(78f));
-            if (GUILayout.Button("kamerayı sıfırla", EditorStyles.toolbarButton, GUILayout.Width(96f)))
+            GUILayout.Label($"speed {flySpeed:F1} km/s", EditorStyles.miniLabel, GUILayout.Width(78f));
+            if (GUILayout.Button("reset camera", EditorStyles.toolbarButton, GUILayout.Width(96f)))
             { flyPos = new Vector3(0f, 12f, -26f); yaw = 35f; pitch = 30f; flySpeed = 1.2f; Repaint(); }
 
             GUILayout.FlexibleSpace();
-            GUILayout.Label("WASD uç · Q/E alçal-yüksel · Shift hızlı · sağ tık bak · "
-                            + "tekerlek hız · sol tık boya",
+            GUILayout.Label("WASD fly · Q/E up/down · Shift fast · Right click look · "
+                            + "Scroll speed · Left click paint",
                             EditorStyles.miniLabel);
         }
     }
 
-    /// Bölüm başlığı + ⓘ. Açıklama katlanır: her zaman açık olsaydı panel okunmaz
-    /// olurdu, hiç olmasaydı hangi vidanın ne yaptığı bilinmezdi.
     void Section(string title, string help)
     {
         using (new EditorGUILayout.HorizontalScope())
@@ -394,7 +295,7 @@ public class MountainBuilderWindow : EditorWindow
             EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
             GUILayout.FlexibleSpace();
             bool on = openHelp.Contains(title);
-            if (GUILayout.Button(on ? "ⓘ kapat" : "ⓘ nedir?", EditorStyles.miniButton,
+            if (GUILayout.Button(on ? "ⓘ hide" : "ⓘ info", EditorStyles.miniButton,
                                  GUILayout.Width(74f)))
             {
                 if (on) openHelp.Remove(title); else openHelp.Add(title);
@@ -409,31 +310,26 @@ public class MountainBuilderWindow : EditorWindow
     static int IntSlider(string label, string tip, int v, int lo, int hi)
         => EditorGUILayout.IntSlider(new GUIContent(label, tip), v, lo, hi);
 
-    // ------------------------------------------------------------- fırça
+    // ------------------------------------------------------------- Brush
 
     void DrawBrushTab()
     {
-        Section("Dağ anatomisi — nereye ne çizilir",
-            "Bir dağ rastgele tümsek değil; parçaları belli bir düzende durur.\n\n"
-            + "ZİRVE  — tek nokta. Sırtların birleştiği yer.\n"
-            + "SIRT   — zirveden aşağı, parmak gibi dışa açılan hatlar. Üç-beş tane.\n"
-            + "         Tırmanış rotası buradan gider (25-30°).\n"
-            + "VADİ   — İKİ SIRTIN ARASI. Yukarıda dar ve dik, aşağı indikçe genişler.\n"
-            + "         Asla yokuş yukarı gitmez, asla sırtı kesmez.\n"
-            + "BOYUN  — iki zirve arasındaki çökük. Düzleştir fırçasıyla yapılır.\n"
-            + "ETEK   — kütlenin ovaya indiği kuşak. Eğim burada hızla düşer.\n"
-            + "OVA    — hafif tepecikli düz. Oyun burada başlıyor.\n\n"
-            + "SIRA: önce kütle (Yükselt), sonra sırtlar, sonra aralarına vadiler, "
-            + "sonra aşınma, en son yüzey dokusu.\n\n"
-            + "KURAL: her vadinin iki yanında birer sırt olmalı. Sırt-vadi-sırt-vadi "
-            + "diye dolanır; bu düzen bozulursa dağ yapay görünür.");
+        Section("Mountain anatomy — placement guide",
+            "A mountain follows structural geological rules:\n\n"
+            + "SUMMIT — Single peak point where ridge spines converge.\n"
+            + "RIDGE  — Radial descending spines radiating outward (3-5 spines).\n"
+            + "         Climbing routes follow ridges (25-30 deg).\n"
+            + "VALLEY — DRAINAGE BETWEEN TWO RIDGES. Narrow/steep at top, wide at base.\n"
+            + "COL    — Saddle dip between peaks. Formed with Flatten brush.\n"
+            + "APRON  — Foot transition into plain. Gradient attenuates rapidly.\n"
+            + "PLAIN  — Rolling lowland foreland.\n\n"
+            + "ORDER: Mass first (Raise) -> Ridges -> Valleys -> Erosion -> Surface detail.\n\n"
+            + "RULE: Every valley sits between two ridges (ridge-valley-ridge-valley alternating).");
 
-        Section("Fırça",
-            "Sol tıkla araziye boyarsın. Halka nereye vuracağını gösterir; halkanın "
-            + "şekli fırçanın şeklidir.\n\n"
-            + "Yarıçap büyük olduğunda kütle, küçük olduğunda ayrıntı çalışırsın. "
-            + "Sırt ve Vadi fırçaları uzatılmış (En/boy 3-5) kullanılır: Açı'yı "
-            + "çizeceğin yöne çevir, sonra sürükle.");
+        Section("Brush",
+            "Left click paints on terrain. Wire ring indicates brush footprint and orientation.\n\n"
+            + "Large radius for mountain mass, small radius for detail features.\n"
+            + "Ridge and Valley brushes use stretched aspect ratio (3-5): set Angle along drawing direction.");
 
         int b = GUILayout.SelectionGrid((int)brush, BrushNames, 3, GUILayout.Height(60f));
         if (b != (int)brush) { brush = (BrushKind)b; Repaint(); }
@@ -442,246 +338,177 @@ public class MountainBuilderWindow : EditorWindow
         EditorGUILayout.Space(4f);
         using (new EditorGUILayout.HorizontalScope())
         {
-            radiusM = Slider("Yarıçap (m)", "Fırçanın etki mesafesi.", radiusM, 60f, 8000f);
+            radiusM = Slider("Radius (m)", "Brush influence radius.", radiusM, 60f, 8000f);
             if (GUILayout.Button("−", EditorStyles.miniButtonLeft, GUILayout.Width(22f)))
                 radiusM = Mathf.Max(60f, radiusM * 0.8f);
             if (GUILayout.Button("+", EditorStyles.miniButtonRight, GUILayout.Width(22f)))
                 radiusM = Mathf.Min(8000f, radiusM * 1.25f);
         }
 
-        strength = Slider("Güç", "Bir vuruşta taşınan miktar.", strength, 0.02f, 1f);
-        hardness = Slider("Sertlik",
-            "0 = kenarı tamamen yumuşak tümsek. 1 = keskin kenarlı disk; arazide "
-            + "basamak bırakır.", hardness, 0f, 1f);
-        aspect = Slider("En/boy",
-            "1 = daire. Büyütünce fırça bir eksende uzar — sırt ve vadi çekmenin yolu.",
-            aspect, 1f, 8f);
+        strength = Slider("Strength", "Amount modified per stroke.", strength, 0.02f, 1f);
+        hardness = Slider("Hardness", "0 = soft radial falloff, 1 = hard disk edge.", hardness, 0f, 1f);
+        aspect = Slider("Aspect", "1 = circular. Values > 1 stretch brush along angle axis.", aspect, 1f, 8f);
         using (new EditorGUI.DisabledScope(aspect <= 1.01f))
-            angleDeg = Slider("Açı (derece)", "Uzatmanın yönü.", angleDeg, 0f, 180f);
+            angleDeg = Slider("Angle (deg)", "Orientation angle of brush elongation.", angleDeg, 0f, 180f);
 
-        EditorGUILayout.LabelField($"etki alanı  {radiusM:F0} × {radiusM / aspect:F0} m  ·  "
-                                   + $"hücre {CellM:F1} m", EditorStyles.miniLabel);
+        EditorGUILayout.LabelField($"Footprint: {radiusM:F0} x {radiusM / aspect:F0} m  ·  "
+                                   + $"Cell: {CellM:F1} m", EditorStyles.miniLabel);
     }
 
-    // ------------------------------------------------------------- işlemler
+    // ------------------------------------------------------------- Operations
 
     void DrawOpsTab()
     {
         EditorGUILayout.HelpBox(
-            "Buradaki işlemler TÜM araziye uygulanır — ya da Maske sekmesinde bir maske "
-            + "seçtiysen yalnız onun gösterdiği yere.", MessageType.None);
+            "Operations apply to the ENTIRE terrain (or masked area if mask is active).", MessageType.None);
 
         opSeed = EditorGUILayout.IntField(
-            new GUIContent("Tohum", "Gürültü ve aşınmanın rastgeleliği. Aynı tohum aynı "
-            + "sonucu verir; beğenmediğini değiştirip tekrar dene."), opSeed);
+            new GUIContent("Seed", "Random seed for procedural generation and erosion."), opSeed);
 
         EditorGUILayout.Space(8f);
-        Section("★ Doğallaştır — tek tıkla",
-            "Dağın ÖLÇÜLEN eksiğini kapatır: kütle biçimi doğru ama vadi yok, "
-            + "orta ölçek boş. Başlangıçta eğim ortancası 23°, 60° üstü pay %0, eğrilik "
-            + "çarpıklığı -0,14 (yani hiç vadi oyulmamış).\n\n"
-            + "ÜÇ AŞAMA:\n"
-            + "1. TOHUM — 60-2000 m arası kırışıklık. Amacı kendisi değil; aşınmanın "
-            + "ısıracağı yapıyı vermek.\n"
-            + "2. AKARSU OYMASI — vadiyi suyun TOPLANDIĞI yere açar (drenaj alanı + "
-            + "eğim), yanında yamaç düzülmesi. Dendritik ağ kendiliğinden çıkar.\n"
-            + "3. BUZUL İMZASI — 3800 m üstünde çanakları derinleştirir, sırtları inceltir. "
-            + "6000 m’lik dağın üst yarısını akarsu değil buz şekillendirir.\n\n"
-            + "DAMLA AŞINMASI KULLANILMIYOR: ölçüldü, bu hücre boyunda vadi OYMUYOR, "
-            + "DÜZLÜYOR (2250 m bandını 84’ten 56’ya düşürdü, kapalı çukuru artırdı). "
-            + "Fırça, kapasite, çökelme, atalet tek tek taranda; hiçbir rejim oymadı.\n"
-            + "TERMAL DE YOK: 38° talusla bütün vadi yapısını siliyor (çarpıklık +2,6 → "
-            + "-0,1) ve en dik eğimi ancak 88°’den 81°’ye indiriyor.\n\n"
-            + "Ova korunur (450 m altına dokunulmaz). Geri alınabilir (Ctrl+Z).");
+        Section("★ Naturalize — One-click",
+            "Closes the measured gap between sculpted mass and realistic alpine morphology.\n\n"
+            + "THREE PHASES:\n"
+            + "1. SEED — 60-2000 m mid-scale structural wrinkles.\n"
+            + "2. STREAM INCISION — Carves dendritic drainage networks proportional to catchment area.\n"
+            + "3. GLACIAL CARVING — Sharpens cirque hollows and arête ridges above 3800 m.\n\n"
+            + "Preserves base plain (elevations below 450 m untouched). Fully undoable (Ctrl+Z).");
 
-
-        natStrength = Slider("Etki",
-            "0 = hiç dokunma, 1 = tam doz. Sayılar tam dozda hedefe geliyor ama "
-            + "beğenmek senin kararın: azıyla başla, beğenmezsen Ctrl+Z, artırıp tekrar dene.",
-            natStrength, 0f, 1f);
+        natStrength = Slider("Strength", "0 = untouched, 1 = full dosage.", natStrength, 0f, 1f);
 
         using (new EditorGUI.DisabledScope(h == null))
-        if (GUILayout.Button("★ Doğallaştır", GUILayout.Height(34f)))
+        if (GUILayout.Button("★ Naturalize", GUILayout.Height(34f)))
             Naturalize();
 
-        // ASAMA RAPORU DUGMENIN ALTINDA: sifir yazan asama olu demektir.
         if (!string.IsNullOrEmpty(natDiag))
             EditorGUILayout.TextArea(natDiag, EditorStyles.label);
 
         EditorGUILayout.Space(6f);
-        Section("Termal aşınma",
-            "Gevşek malzeme duruş açısının üstünde durmaz, kayar. Dik yüzleri indirir "
-            + "ama SIRT HATLARINI ve vadi ağını korur — bulanıklaştırmadan farkı bu.\n\n"
-            + "Duruş açısı gerçek kayada 30-40 derece. Düşürmek dağı yürünür yapar.");
-        opTalus = Slider("Duruş açısı (derece)", "Bu açının üstündeki yüzler akar.", opTalus, 25f, 55f);
-        opRate = Slider("Hız", "Tur başına taşınan pay.", opRate, 0.02f, 0.5f);
-        opIters = IntSlider("Tur", "Arttıkça yamaçlar duruş açısına yaklaşır.", opIters, 1, 120);
-        if (GUILayout.Button("Termal aşınmayı uygula", GUILayout.Height(24f)))
+        Section("Thermal erosion",
+            "Loose material exceeding talus slope angle slips downhill. Lowers cliffs while PRESERVING RIDGES.");
+        opTalus = Slider("Talus angle (deg)", "Slopes steeper than this angle erode.", opTalus, 25f, 55f);
+        opRate = Slider("Rate", "Material transport fraction per iteration.", opRate, 0.02f, 0.5f);
+        opIters = IntSlider("Iterations", "Number of simulation passes.", opIters, 1, 120);
+        if (GUILayout.Button("Apply Thermal Erosion", GUILayout.Height(24f)))
             RunOp(g => TerrainOps.Thermal(g, Grid, CellM, opTalus, opRate, opIters, Mask()));
 
         EditorGUILayout.Space(8f);
-        Section("Hidrolik aşınma",
-            "Yağmur damlaları eğim yönünde akar, hızlandıkça malzeme çözer, yavaşlayınca "
-            + "çökeltir. Termal aşınmanın veremediği şeyi verir: VADİ AĞI — dallanan "
-            + "oluklar, birikinti yelpazeleri, keskinleşen sırtlar.\n\n"
-            + "Termal malzemeyi komşuya taşır ve düzler; hidrolik uzağa taşır ve oyar. "
-            + "İkisi ayrı olgu.");
-        hydDroplets = IntSlider("Damla sayısı", "Çok olursa daha çok oluk, daha uzun sürer.",
-                                hydDroplets, 5000, 400000);
-        hydSteps = IntSlider("Damla ömrü", "Bir damlanın atacağı adım.", hydSteps, 8, 128);
-        hydInertia = Slider("Atalet",
-            "Düşük değer damlayı her adımda en dik yöne kilitler ve pürüzsüz yamaçta "
-            + "paralel oluklar (dikey taranmış çizgiler) bırakır. Yükseltmek savrulma "
-            + "payı verir, oluklar birleşip dallanır.", hydInertia, 0f, 0.95f);
-        hydBrush = IntSlider("Aşınma fırçası (hücre)",
-            "Bir damlanın kazıdığı alanın yarıçapı. Küçük değer tek hücrelik oluk, "
-            + "yani taraklanma; geniş değer komşu olukları birleştirir.", hydBrush, 1, 10);
-        hydCapacity = Slider("Taşıma kapasitesi", "Damlanın taşıyabileceği malzeme.",
-                             hydCapacity, 0.5f, 16f);
-        hydErode = Slider("Çözme", "Malzemeyi koparma hızı.", hydErode, 0.02f, 1f);
-        hydDeposit = Slider("Çökeltme", "Malzemeyi bırakma hızı.", hydDeposit, 0.02f, 1f);
-        hydEvap = Slider("Buharlaşma", "Damlanın ömrünü kısaltır.", hydEvap, 0.001f, 0.1f);
-        hydGravity = Slider("Yerçekimi", "Hızlanma katsayısı.", hydGravity, 0.5f, 12f);
-        if (GUILayout.Button("Hidrolik aşınmayı uygula", GUILayout.Height(24f)))
+        Section("Hydraulic erosion",
+            "Droplet simulation carving valleys, rills, and alluvial fans.");
+        hydDroplets = IntSlider("Droplets", "Droplet count.", hydDroplets, 5000, 400000);
+        hydSteps = IntSlider("Droplet lifetime", "Max steps per droplet.", hydSteps, 8, 128);
+        hydInertia = Slider("Inertia", "Directional inertia avoiding grid artifacts.", hydInertia, 0f, 0.95f);
+        hydBrush = IntSlider("Brush radius (cells)", "Erosion brush radius.", hydBrush, 1, 10);
+        hydCapacity = Slider("Capacity", "Sediment carrying capacity.", hydCapacity, 0.5f, 16f);
+        hydErode = Slider("Erosion rate", "Sediment pickup rate.", hydErode, 0.02f, 1f);
+        hydDeposit = Slider("Deposition rate", "Sediment settling rate.", hydDeposit, 0.02f, 1f);
+        hydEvap = Slider("Evaporation", "Evaporation rate per step.", hydEvap, 0.001f, 0.1f);
+        hydGravity = Slider("Gravity", "Acceleration coefficient.", hydGravity, 0.5f, 12f);
+        if (GUILayout.Button("Apply Hydraulic Erosion", GUILayout.Height(24f)))
             RunOp(g => TerrainOps.Hydraulic(g, Grid, CellM, hydDroplets, hydSteps, hydInertia,
                                             hydCapacity, hydErode, hydDeposit, hydEvap,
                                             hydGravity, opSeed, hydBrush, Mask()));
 
         EditorGUILayout.Space(8f);
-        Section("Fraktal gürültü",
-            "Çok ölçekli doku. Her oktav bir öncekinin yarısı dalga boyunda ve döndürülmüş "
-            + "olarak biner — hizalı oktavlar ızgara deseni üretir.\n\n"
-            + "Dalga boyu 2 hücrenin (58 m) altına inen oktavlar OTOMATİK kesilir: ızgara "
-            + "onları taşıyamaz, istenirse zikzağa döner. Bu proje o hatayla bir gün yaktı.");
-        noiseWl = Slider("Dalga boyu (m)", "En kaba oktavın boyu.", noiseWl, 120f, 8000f);
-        noiseOct = IntSlider("Oktav", "Kaç kademe ince detay.", noiseOct, 1, 10);
-        noiseAmp = Slider("Genlik (m)", "Toplam kabartı yüksekliği.", noiseAmp, 2f, 800f);
-        noisePers = Slider("Sönüm", "Her oktavın genlik payı.", noisePers, 0.2f, 0.8f);
-        noiseLac = Slider("Sıklık artışı", "Her oktavda dalga boyu bölücüsü.", noiseLac, 1.6f, 3f);
-        if (GUILayout.Button("Gürültü ekle", GUILayout.Height(24f)))
+        Section("Fractal noise", "Multiscale rotated octave noise.");
+        noiseWl = Slider("Wavelength (m)", "Base octave wavelength.", noiseWl, 120f, 8000f);
+        noiseOct = IntSlider("Octaves", "Octave count.", noiseOct, 1, 10);
+        noiseAmp = Slider("Amplitude (m)", "Total amplitude.", noiseAmp, 2f, 800f);
+        noisePers = Slider("Persistence", "Amplitude decay per octave.", noisePers, 0.2f, 0.8f);
+        noiseLac = Slider("Lacunarity", "Frequency multiplier per octave.", noiseLac, 1.6f, 3f);
+        if (GUILayout.Button("Add Noise", GUILayout.Height(24f)))
             RunOp(g => TerrainOps.FractalNoise(g, Grid, CellM, noiseWl, noiseOct, noiseAmp,
                                                noisePers, noiseLac, opSeed, Mask()));
 
         EditorGUILayout.Space(8f);
-        Section("Bükme (warp)",
-            "Araziyi yatayda kendi gürültüsüyle büker. Düzgün biçimleri organikleştirir: "
-            + "dairesel etek dalgalı kıyıya, düz sırt kıvrımlı sırta döner.");
-        warpWl = Slider("Bükme ölçeği (m)", "Kıvrımların boyu.", warpWl, 300f, 12000f);
-        warpAmp = Slider("Bükme miktarı (m)", "Ne kadar kayacağı.", warpAmp, 10f, 2000f);
-        if (GUILayout.Button("Bük", GUILayout.Height(24f)))
+        Section("Domain warp", "Horizontally distorts terrain via noise.");
+        warpWl = Slider("Warp wavelength (m)", "Warp scale.", warpWl, 300f, 12000f);
+        warpAmp = Slider("Warp amplitude (m)", "Warp strength.", warpAmp, 10f, 2000f);
+        if (GUILayout.Button("Warp", GUILayout.Height(24f)))
             RunOp(g => TerrainOps.Warp(g, Grid, CellM, warpWl, warpAmp, opSeed, Mask()));
 
         EditorGUILayout.Space(8f);
-        Section("Teras / katmanlaşma",
-            "Kotu basamaklara oturtur — tortul kaya katmanları, aşınmış plato kenarları. "
-            + "Keskinlik 1'e yaklaştıkça basamak dikleşir.");
-        terraceStep = Slider("Basamak yüksekliği (m)", "İki teras arası kot farkı.",
-                             terraceStep, 10f, 600f);
-        terraceSharp = Slider("Keskinlik", "0 = görünmez, 1 = dik duvar.", terraceSharp, 0f, 1f);
-        if (GUILayout.Button("Teras uygula", GUILayout.Height(24f)))
+        Section("Terrace / Stratification", "Quantizes elevations into stepped terraces.");
+        terraceStep = Slider("Step height (m)", "Elevation step interval.", terraceStep, 10f, 600f);
+        terraceSharp = Slider("Sharpness", "0 = soft ramp, 1 = cliff edge.", terraceSharp, 0f, 1f);
+        if (GUILayout.Button("Apply Terraces", GUILayout.Height(24f)))
             RunOp(g => TerrainOps.Terrace(g, Grid, terraceStep, terraceSharp, Mask()));
 
         EditorGUILayout.Space(8f);
-        Section("Keskinleştir / yumuşat",
-            "Belirli bir ölçekteki kabartıyı güçlendirir (kazanç > 1) ya da söndürür "
-            + "(< 1). Aşınmadan sonra yumuşamış detayı geri getirmek için.");
-        sharpRadius = Slider("Ölçek (m)", "Hangi boydaki kabartı etkilenecek.", sharpRadius, 60f, 2000f);
-        sharpGain = Slider("Kazanç", "1 = değişiklik yok.", sharpGain, 0.2f, 3f);
-        if (GUILayout.Button("Uygula", GUILayout.Height(24f)))
+        Section("Sharpen / Smooth", "High-pass spatial gain filtering.");
+        sharpRadius = Slider("Radius (m)", "Filter radius.", sharpRadius, 60f, 2000f);
+        sharpGain = Slider("Gain", "1 = identity, > 1 sharpens, < 1 smooths.", sharpGain, 0.2f, 3f);
+        if (GUILayout.Button("Apply Filter", GUILayout.Height(24f)))
             RunOp(g => TerrainOps.Sharpen(g, Grid, CellM, sharpRadius, sharpGain, Mask()));
 
         EditorGUILayout.Space(8f);
-        Section("Etek geçişi",
-            "Dağa DOKUNMAZ. Arazinin dış bandındaki kabartıyı ovaya indirir; eteğin "
-            + "arena kenarına çarpmadan, dizsiz inmesini sağlar.\n\n"
-            + "Mesafe KARE olarak ölçülür (Çebişev), yarıçap olarak değil: arena kare ve "
-            + "dairesel bir halka köşeleri yüksek bırakır.\n\n"
-            + "Kalan kabartı 0 olursa ova cam gibi düz ve yapay olur; 0.1-0.2 hafif "
-            + "tepecikli düz bırakır.");
-        apronInner = Slider("Başlangıç (m)", "Bu mesafeye kadar hiç dokunulmaz — dağın "
-            + "kütlesi burada bitmeli.", apronInner, 3000f, 14000f);
-        apronOuter = Slider("Bitiş (m)", "Burada ova kotuna tam iner. Arena yarısı 15000 m.",
-            apronOuter, 5000f, 15000f);
-        apronKeep = Slider("Kalan kabartı", "Dış uçta hayatta kalan kabartı payı.",
-            apronKeep, 0f, 0.5f);
-        if (GUILayout.Button("Etek geçişini uygula", GUILayout.Height(24f)))
+        Section("Apron transition",
+            "Smoothly attenuates outer perimeter band toward base plain using Chebyshev bounds.");
+        apronInner = Slider("Inner radius (m)", "Inner boundary where mountain mass ends.", apronInner, 3000f, 14000f);
+        apronOuter = Slider("Outer radius (m)", "Outer boundary where plain level is reached.", apronOuter, 5000f, 15000f);
+        apronKeep = Slider("Relief retention", "Fraction of relief retained at outer boundary.", apronKeep, 0f, 0.5f);
+        if (GUILayout.Button("Apply Apron Transition", GUILayout.Height(24f)))
             RunOp(g => TerrainOps.Apron(g, Grid, CellM, apronInner, apronOuter, plainM, apronKeep));
 
         EditorGUILayout.Space(8f);
-        Section("Ovayı yumuşat",
-            "Belirli bir kotun ALTINDAKİ kabartıyı küçültür. Düzleştirmez — tepecikler "
-            + "kalır, boyları düşer. Sabit bir kota oturtmak ovayı masa gibi yapıyor.");
-        calmBelow = Slider("Kot eşiği (m)", "Bunun altı yumuşar, üstü hiç etkilenmez.",
-            calmBelow, 50f, 3000f);
-        calmFeather = Slider("Geçiş (m)", "Eşiğin yumuşama bandı.", calmFeather, 20f, 1000f);
-        calmKeep = Slider("Kalan kabartı", "0 = düz, 1 = dokunma.", calmKeep, 0f, 1f);
-        calmScale = Slider("Tepecik ölçeği (m)", "Bu boydan büyük şekiller korunur.",
-            calmScale, 100f, 2000f);
-        if (GUILayout.Button("Ovayı yumuşat", GUILayout.Height(24f)))
-            RunOp(g => TerrainOps.CalmLowland(g, Grid, CellM, calmBelow, calmFeather,
-                                              calmKeep, calmScale));
+        Section("Calm lowland", "Dampens relief below target elevation toward local mean.");
+        calmBelow = Slider("Elevation ceiling (m)", "Elevations below this threshold are calmed.", calmBelow, 50f, 3000f);
+        calmFeather = Slider("Feather (m)", "Transition feather band.", calmFeather, 20f, 1000f);
+        calmKeep = Slider("Relief retention", "0 = flat, 1 = untouched.", calmKeep, 0f, 1f);
+        calmScale = Slider("Scale (m)", "Features larger than this scale are preserved.", calmScale, 100f, 2000f);
+        if (GUILayout.Button("Calm Lowland", GUILayout.Height(24f)))
+            RunOp(g => TerrainOps.CalmLowland(g, Grid, CellM, calmBelow, calmFeather, calmKeep, calmScale));
 
         EditorGUILayout.Space(8f);
-        Section("Kot aralığı",
-            "Bütün araziyi verilen alt-üst kota yeniden eşler. Dağın boyunu değiştirmenin "
-            + "doğru yolu: kabartı ORANLARINI korur, biçimi bozmaz.");
-        remapMin = Slider("En alçak (m)", "Ovanın kotu.", remapMin, 0f, 2000f);
-        remapMax = Slider("En yüksek (m)", "Zirvenin kotu.", remapMax, 500f, MaxM);
-        if (GUILayout.Button("Kotu yeniden eşle", GUILayout.Height(24f)))
+        Section("Elevation remap", "Remaps full terrain elevations between min and max bounds.");
+        remapMin = Slider("Min (m)", "Plain level.", remapMin, 0f, 2000f);
+        remapMax = Slider("Max (m)", "Peak level.", remapMax, 500f, MaxM);
+        if (GUILayout.Button("Remap Elevation Range", GUILayout.Height(24f)))
             RunOp(g => TerrainOps.Remap(g, remapMin, remapMax, Mask()));
 
         EditorGUILayout.Space(8f);
-        Section("Başlangıç kütlesi",
-            "Boş düzlemde işe başlamak için merkeze bir kütle koyar. Kesit ovaya TEĞET "
-            + "iner (açıyla çarpmaz), yani dağ ile ova arasında diz oluşmaz — "
-            + "'dağ absürt bir anda yükseliyor' hissi o dizden gelir.");
-        coneRadius = Slider("Taban yarıçapı (m)", "Kütlenin ovaya indiği mesafe.",
-                            coneRadius, 1000f, 15000f);
-        coneHeight = Slider("Yükseklik (m)", "Merkeze eklenecek kot.", coneHeight, 100f, MaxM);
-        if (GUILayout.Button("Kütle ekle", GUILayout.Height(24f)))
+        Section("Initial cone stamp", "Stamps quadratic cone tangent to base plain.");
+        coneRadius = Slider("Radius (m)", "Cone base radius.", coneRadius, 1000f, 15000f);
+        coneHeight = Slider("Height (m)", "Peak height.", coneHeight, 100f, MaxM);
+        if (GUILayout.Button("Stamp Cone", GUILayout.Height(24f)))
             RunOp(g => TerrainOps.Cone(g, Grid, CellM, (Grid - 1) * 0.5f, (Grid - 1) * 0.5f,
                                        coneRadius, coneHeight, Mask()));
     }
 
-    // ------------------------------------------------------------- maske
+    // ------------------------------------------------------------- Mask
 
     void DrawMaskTab()
     {
-        Section("Maske",
-            "İşlemlerin NEREYE uygulanacağını sınırlar. Örnek: yalnız 3000 m üstüne aşınma "
-            + "oluğu oymak, yalnız dik yüzleri aşındırmak, yalnız sırtları "
-            + "keskinleştirmek.\n\n"
-            + "Önizlemeyi açarsan maske sarıyla boyanır.");
+        Section("Mask",
+            "Restricts where operations apply (e.g., above 3000 m, steep cliffs only, ridges only).\n"
+            + "Enable preview to highlight mask in yellow.");
 
         var k = (MaskKind)EditorGUILayout.EnumPopup(
-            new GUIContent("Tür", "Maskenin neye göre kurulacağı."), maskKind);
+            new GUIContent("Type", "Mask generator mode."), maskKind);
         if (k != maskKind) { maskKind = k; maskCache = null; meshDirty = true; }
 
         EditorGUI.BeginChangeCheck();
         switch (maskKind)
         {
             case MaskKind.Height:
-                maskLo = Slider("Alt kot (m)", "Bunun altı maskelenmez.", maskLo, 0f, MaxM);
-                maskHi = Slider("Üst kot (m)", "Bunun üstü maskelenmez.", maskHi, 0f, MaxM);
-                maskFeather = Slider("Geçiş (m)", "Kenar yumuşaklığı; sert eşik kontur çizgisi bırakır.",
-                                     maskFeather, 1f, 800f);
+                maskLo = Slider("Min elevation (m)", "", maskLo, 0f, MaxM);
+                maskHi = Slider("Max elevation (m)", "", maskHi, 0f, MaxM);
+                maskFeather = Slider("Feather (m)", "", maskFeather, 1f, 800f);
                 break;
             case MaskKind.Slope:
-                maskSlopeLo = Slider("Alt eğim (derece)", "", maskSlopeLo, 0f, 90f);
-                maskSlopeHi = Slider("Üst eğim (derece)", "", maskSlopeHi, 0f, 90f);
-                maskSlopeFeather = Slider("Geçiş (derece)", "", maskSlopeFeather, 0.5f, 20f);
+                maskSlopeLo = Slider("Min slope (deg)", "", maskSlopeLo, 0f, 90f);
+                maskSlopeHi = Slider("Max slope (deg)", "", maskSlopeHi, 0f, 90f);
+                maskSlopeFeather = Slider("Feather (deg)", "", maskSlopeFeather, 0.5f, 20f);
                 break;
             case MaskKind.Ridges:
             case MaskKind.Valleys:
-                maskCurveRadius = Slider("Ölçek (m)",
-                    "Hangi boydaki sırt/vadi seçilecek.", maskCurveRadius, 60f, 3000f);
-                maskCurveStrength = Slider("Eşik (m)",
-                    "Bu kadar dışbükeylikte maske tam açılır.", maskCurveStrength, 2f, 300f);
+                maskCurveRadius = Slider("Scale (m)", "Curvature filter radius.", maskCurveRadius, 60f, 3000f);
+                maskCurveStrength = Slider("Threshold (m)", "Curvature amplitude threshold.", maskCurveStrength, 2f, 300f);
                 break;
         }
         if (EditorGUI.EndChangeCheck()) { maskCache = null; if (maskPreview) meshDirty = true; }
 
-        bool p = EditorGUILayout.ToggleLeft("Maskeyi önizle (sarı)", maskPreview);
+        bool p = EditorGUILayout.ToggleLeft("Preview mask (yellow)", maskPreview);
         if (p != maskPreview) { maskPreview = p; meshDirty = true; }
     }
 
@@ -707,25 +534,23 @@ public class MountainBuilderWindow : EditorWindow
         return maskCache;
     }
 
-    // ------------------------------------------------------------- ölçüm
+    // ------------------------------------------------------------- Route
 
     void DrawRouteTab()
     {
-        Section("Rota",
-            "Sol tık araziye nokta koyar, seçili hatta eklenir. Sağ tık kamerayı çevirir "
-            + "(nokta koymaz).\n\n"
-            + "Noktalar yalnız YATAY konum tutuyor; kot her çizimde araziden okunuyor, "
-            + "yani dağı yeniden yontarsan hat yeni zemine kendiliğinden oturur.");
+        Section("Route",
+            "Left click marks points on selected route. Right click rotates camera.\n"
+            + "Points store horizontal positions; elevations are sampled dynamically from terrain.");
 
         using (new EditorGUILayout.HorizontalScope())
         {
-            GUILayout.Label("Doğuş (spawn)", GUILayout.Width(110f));
-            GUILayout.Label(float.IsNaN(spawn.x) ? "konmadı"
+            GUILayout.Label("Spawn point", GUILayout.Width(110f));
+            GUILayout.Label(float.IsNaN(spawn.x) ? "Unset"
                             : $"({spawn.x * 1000f:F0}, {spawn.y * 1000f:F0}) m  ·  "
-                              + $"kot {HeightAtKm(spawn.x, spawn.y):F0} m");
+                              + $"Elev {HeightAtKm(spawn.x, spawn.y):F0} m");
             GUILayout.FlexibleSpace();
             bool was = placingSpawn;
-            placingSpawn = GUILayout.Toggle(placingSpawn, was ? "tıkla…" : "yerleştir",
+            placingSpawn = GUILayout.Toggle(placingSpawn, was ? "Click map..." : "Set Spawn",
                                             EditorStyles.miniButton, GUILayout.Width(80f));
         }
 
@@ -735,7 +560,6 @@ public class MountainBuilderWindow : EditorWindow
             var pth = paths[i];
             using (new EditorGUILayout.HorizontalScope())
             {
-                // Renk kutusu: listedeki hat ile 3B'deki çizgi aynı renkte.
                 var sw = GUILayoutUtility.GetRect(14f, 14f, GUILayout.Width(14f));
                 EditorGUI.DrawRect(sw, pth.color);
 
@@ -746,11 +570,11 @@ public class MountainBuilderWindow : EditorWindow
 
                 using (new EditorGUI.DisabledScope(pth.pts.Count == 0))
                 {
-                    if (GUILayout.Button("yumuşat", EditorStyles.miniButton, GUILayout.Width(64f)))
+                    if (GUILayout.Button("Smooth", EditorStyles.miniButton, GUILayout.Width(64f)))
                     { SmoothPath(pth); Repaint(); }
-                    if (GUILayout.Button("son nokta", EditorStyles.miniButton, GUILayout.Width(72f)))
+                    if (GUILayout.Button("Pop Point", EditorStyles.miniButton, GUILayout.Width(72f)))
                     { pth.pts.RemoveAt(pth.pts.Count - 1); Repaint(); }
-                    if (GUILayout.Button("temizle", EditorStyles.miniButton, GUILayout.Width(60f)))
+                    if (GUILayout.Button("Clear", EditorStyles.miniButton, GUILayout.Width(60f)))
                     { pth.pts.Clear(); Repaint(); }
                 }
             }
@@ -758,11 +582,9 @@ public class MountainBuilderWindow : EditorWindow
 
         EditorGUILayout.Space(6f);
         routeSpacingM = EditorGUILayout.Slider(
-            new GUIContent("Nokta aralığı (m)", "Hattın örnekleme sıklığı. Küçük değer "
-            + "daha akıcı çizgi, daha çok nokta."), routeSpacingM, 5f, 200f);
+            new GUIContent("Point spacing (m)", "Sampling distance between route points."), routeSpacingM, 5f, 200f);
         routeRadiusM = EditorGUILayout.Slider(
-            new GUIContent("Yol yarı genişliği (m)", "Kaydedilirken her noktaya yazılır. "
-            + "3.2 yazıyorsa yol 6.4 metre."), routeRadiusM, 0.5f, 20f);
+            new GUIContent("Half-width (m)", "Corridor half-width written to MountainRoute.Mark.radius."), routeRadiusM, 0.5f, 20f);
 
         EditorGUILayout.Space(6f);
         var a = paths[activePath];
@@ -777,15 +599,12 @@ public class MountainBuilderWindow : EditorWindow
                 if (d > 0f) gain += d; else loss -= d;
             }
             EditorGUILayout.HelpBox(
-                $"{a.name}:  yatay {len:F2} km  ·  çıkış {gain:F0} m  ·  iniş {loss:F0} m  ·  "
-                + $"ortalama eğim {Mathf.Atan(gain / Mathf.Max(len * 1000f, 1f)) * Mathf.Rad2Deg:F1}°",
+                $"{a.name}:  Length {len:F2} km  ·  Ascent {gain:F0} m  ·  Descent {loss:F0} m  ·  "
+                + $"Mean Grade {Mathf.Atan(gain / Mathf.Max(len * 1000f, 1f)) * Mathf.Rad2Deg:F1}°",
                 MessageType.None);
         }
     }
 
-    /// Hattı yumuşatır: elle çizilen çizgide fare titremesi kalıyor ve hat testere
-    /// gibi okunuyor. Uç noktalar sabit kalıyor — hattın nerede başlayıp bittiği
-    /// kullanıcının kararı.
     static void SmoothPath(RoutePath pth)
     {
         if (pth.pts.Count < 3) return;
@@ -795,61 +614,35 @@ public class MountainBuilderWindow : EditorWindow
             pth.pts[i] = (src[i - 1] + src[i] * 2f + src[i + 1]) * 0.25f;
     }
 
+    // ------------------------------------------------------------- Measure
+
     void DrawMeasureTab()
     {
-        Section("Ölçüm",
-            "Göz kararı yerine sayı. Rota şartı: sırtlar 25-30 derece, duvarlar 50-60, "
-            + "ve yürünür pay yeterli olmalı.\n\n"
-            + "Ölçüm çalışma ızgarasında (29.3 m) yapılıyor; gerçek arazi 7.32 m olduğu "
-            + "için ince ölçekte biraz daha dik çıkacak.");
+        Section("Measure",
+            "Quantifies slopes across altitude bands to verify ridge/wall distributions.");
 
-        if (GUILayout.Button("Ölç", GUILayout.Height(26f))) Measure();
+        if (GUILayout.Button("Measure Terrain", GUILayout.Height(26f))) Measure();
         if (!string.IsNullOrEmpty(report)) EditorGUILayout.TextArea(report, EditorStyles.label);
 
         EditorGUILayout.Space(10f);
-        Section("Doğallık — gerçek arazi ölçütleri",
-            "Ölçüt EGIM DAĞILIMI: doğrudan ölçülür ve gerçek dağ verileriyle "
-            + "karşılaştırılabilir.\n\n"
-            + "Bir dönem burada 'spektral eğim 2,2' hedefi vardı ve YANLIŞTI: o eğriyi "
-            + "9 km’den 150 m’ye uzatmak kâğıtta 53 derece ortanca eğim veriyor, gerçek "
-            + "alp arazisi 30-38. Gerçek arazi spektrumu küçük ölçekte düzleşir.\n\n"
-            + "EĞRİLİK ÇARPIKLIĞI vadinin izidir ve POZİTİF olmalıdır: vadi tabanı "
-            + "içbükeydir (laplasyen +), dar ve derindir; yamaçlar geniş ve hafif dışbükeydir. "
-            + "Yapay V vadisiyle sınandı: +5,79 verdi, sırt -5,79. Dokunulmamış dağ -0,14 "
-            + "(vadi yok), oyulmuş hali +3,2.\n\n"
-            + "Kabartı tablosu mutlak hedef taşımaz; düğmeden ÖNCE ve SONRA bakıp neyin "
-            + "ne kadar değiştiğini görmek içindir.");
+        Section("Naturalness — Real terrain metrics",
+            "Quantifies slope distributions and drainage curvature skewness.");
 
-
-        if (GUILayout.Button("Doğallığı ölç", GUILayout.Height(26f))) MeasureNaturalness();
+        if (GUILayout.Button("Measure Naturalness", GUILayout.Height(26f))) MeasureNaturalness();
         if (!string.IsNullOrEmpty(natReport))
             EditorGUILayout.TextArea(natReport, EditorStyles.label);
     }
 
     string natReport, natDiag;
 
-    /// Dağın hangi ÖLÇEKTE eksik olduğunu sayıya indirir.
-    ///
-    /// Yöntem: alanı iki farklı yarıçapla bulanıklaştırıp farkını almak o dalga boyu
-    /// bandını ayırır (band-pass). Her bandın RMS'i o ölçekteki kabartıdır.
-    ///
-    /// Ölçüm YALNIZ DAĞDA (kot > 300 m): ova düz olduğu için ortalamayı aşağı çekip
-    /// eksiği olduğundan küçük gösteriyordu.
     void MeasureNaturalness()
     {
-        if (h == null) { natReport = "ızgara yok"; return; }
+        if (h == null) { natReport = "No grid loaded."; return; }
 
-        // OLCUT EGIM DAGILIMI, spektral yasa DEGIL.
-        //
-        // Once "beta = 2.2, kabarti ~ lambda^0.6" hedefi kondu ve YANLIS cikti: o egriyi
-        // 9 km'den 150 m'ye uzatmak kagitta 53 derece ortanca egim veriyor, oysa gercek
-        // alp arazisi 30-38. Gercek arazi spektrumu kucuk olcekte duzlesir, iki dekat
-        // boyunca tek guc yasasi degildir. Egim dagilimi dogrudan olculebilir ve
-        // gercek arazi degerleriyle karsilastirilabilir; ondan sasmiyoruz.
         float[] mids = { 9000f, 4500f, 2250f, 1125f, 575f, 300f, 150f };
         var sb = new System.Text.StringBuilder();
 
-        sb.AppendLine("kabartı (RMS m) — önce/sonra karşılaştırmak için");
+        sb.AppendLine("Relief (RMS m) — Before / after comparison:");
         for (int b = 0; b < mids.Length; b++)
             sb.AppendLine($"  {mids[b],6:F0} m   {BandRms(mids[b]),6:F1}");
 
@@ -872,24 +665,20 @@ public class MountainBuilderWindow : EditorWindow
         float pct60 = slopes.Count > 0 ? 100f * over60 / slopes.Count : 0f;
 
         sb.AppendLine();
-        sb.AppendLine($"eğim ortanca   {med,5:F1}°     (gerçek alp 30-38)");
-        sb.AppendLine($"eğim p90       {p90,5:F1}°     (gerçek alp 50-58)");
-        sb.AppendLine($"60° üstü pay   %{pct60,4:F1}      (gerçek alp %5-12)");
-        sb.AppendLine($"eğrilik çarpıklığı {CurvatureSkew(),5:F2}  (POZİTİF = vadi oyulmuş)");
-        sb.AppendLine($"kapalı çukur      %{PitFraction() * 100f,5:F2}  (düşük olmalı)");
+        sb.AppendLine($"Slope median    {med,5:F1}°     (alpine target 30-38)");
+        sb.AppendLine($"Slope p90       {p90,5:F1}°     (alpine target 50-58)");
+        sb.AppendLine($">60° fraction   %{pct60,4:F1}      (alpine target 5-12%)");
+        sb.AppendLine($"Curvature skew  {CurvatureSkew(),5:F2}  (Positive indicates incised valleys)");
+        sb.AppendLine($"Pit fraction    %{PitFraction() * 100f,5:F2}  (should be low)");
         natReport = sb.ToString();
     }
 
-    /// Kutu bulanıklığı Gauss değil; eşdeğer yarıçap σ·√3. Bant kenarları bu yüzden
-    /// yumuşak, ama ölçüm ÖNCE-SONRA karşılaştırması olduğu için sapma iki tarafta aynı.
     int BlurRadiusFor(float wavelengthM)
     {
         float sigmaCells = wavelengthM / (2f * Mathf.PI * CellM);
         return Mathf.Max(1, Mathf.RoundToInt(sigmaCells * 1.732f));
     }
 
-    /// Laplasyenin çarpıklığı. Akarsu aşınmış arazide vadiler dar ve keskin, sırtlar
-    /// geniş ve yayvan — dağılım negatife kayar. Yapay/pürüzsüz arazide simetriktir.
     float CurvatureSkew()
     {
         int n = Grid;
@@ -917,8 +706,6 @@ public class MountainBuilderWindow : EditorWindow
         return m2 <= 1e-9 ? 0f : (float)(m3 / System.Math.Pow(m2, 1.5));
     }
 
-    /// Sekiz komşusunun hepsinden alçak olan hücrelerin payı. Su böyle bir hücreden
-    /// çıkamaz; gerçek arazide bu yüzden neredeyse yoktur.
     float PitFraction()
     {
         int n = Grid, pits = 0, cnt = 0;
@@ -943,7 +730,7 @@ public class MountainBuilderWindow : EditorWindow
     void Measure()
     {
         var bands = new (float lo, float hi, string name)[]
-            { (0, 3, "kütle 0-3 km"), (3, 6, "yamaç 3-6 km"), (6, 9, "etek 6-9 km"), (9, 15, "ova 9-15 km") };
+            { (0, 3, "Mass 0-3 km"), (3, 6, "Slope 3-6 km"), (6, 9, "Apron 6-9 km"), (9, 15, "Plain 9-15 km") };
         var lists = new List<float>[bands.Length];
         for (int i = 0; i < bands.Length; i++) lists[i] = new List<float>();
 
@@ -972,9 +759,9 @@ public class MountainBuilderWindow : EditorWindow
         }
 
         var sb = new System.Text.StringBuilder();
-        sb.AppendFormat("zirve {0:F0} m · taban {1:F0} m · kabartı {2:F0} m\n", top, low, top - low);
-        sb.AppendFormat("dağ genişliği {0:F1} km · kenar kotu {1:F0} m\n\n", wide * 2f, edge);
-        sb.AppendLine("bant           ortanca eğim   yürünür (<30°)");
+        sb.AppendFormat("Summit {0:F0} m · Base {1:F0} m · Relief {2:F0} m\n", top, low, top - low);
+        sb.AppendFormat("Span {0:F1} km · Edge {1:F0} m\n\n", wide * 2f, edge);
+        sb.AppendLine("Band           Median Slope   Walkable (<30°)");
         for (int b = 0; b < bands.Length; b++)
         {
             if (lists[b].Count == 0) continue;
@@ -988,65 +775,48 @@ public class MountainBuilderWindow : EditorWindow
         Repaint();
     }
 
-    // ------------------------------------------------------------- kaydet
+    // ------------------------------------------------------------- Save
 
     void DrawSaveTab()
     {
-        Section("Zemin",
-            "Boş düzlem her şeyi siler ve tek kotta bir ova bırakır. Araziden oku, "
-            + "sahnedeki mevcut dağı yükleyip üstünde çalışmanı sağlar.");
-        plainM = Slider("Ova kotu (m)", "Oyunun başlayacağı kot.", plainM, 0f, 2000f);
+        Section("Terrain Base", "Manages base plain elevation and terrain loading.");
+        plainM = Slider("Base plain (m)", "Starting plain elevation.", plainM, 0f, 2000f);
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (GUILayout.Button("Boş düzlem", GUILayout.Height(24f))) NewFlat();
-            if (GUILayout.Button("Araziden oku", GUILayout.Height(24f))) LoadFromTerrain();
+            if (GUILayout.Button("New Flat Plain", GUILayout.Height(24f))) NewFlat();
+            if (GUILayout.Button("Load From Scene Terrain", GUILayout.Height(24f))) LoadFromTerrain();
         }
 
         EditorGUILayout.Space(10f);
-        Section("İnce detay (kaydetme anında)",
-            "Yontma ızgarası 29.3 m; arazi 7.32 m. Aradaki bant yontarken var olamıyor "
-            + "ve dağ yakından çıplak görünüyor. Bu geçiş onu arazinin kendi "
-            + "çözünürlüğünde dolduruyor — Nyquist sınırına (14.6 m) kadar.\n\n"
-            + "Dik yamaçta çok, düz ovada az uygulanır. Sonda bir termal geçiş "
-            + "eklenen dokunun hiçbir yerde duruş açısını aşmamasını garantiliyor.");
+        Section("Fine Detail (Export Time)",
+            "Upsamples from 29.3 m grid to 7.32 m terrain resolution, injecting high-frequency rock textures.");
 
-        fineDetail = EditorGUILayout.ToggleLeft("İnce detay eklensin", fineDetail);
+        fineDetail = EditorGUILayout.ToggleLeft("Add Fine Detail on Export", fineDetail);
         using (new EditorGUI.DisabledScope(!fineDetail))
         {
             fineWavelength = EditorGUILayout.Slider(
-                new GUIContent("Doku ölçeği (m)", "En kaba oktavın dalga boyu."),
-                fineWavelength, 80f, 1200f);
+                new GUIContent("Wavelength (m)", "Base octave wavelength."), fineWavelength, 80f, 1200f);
             fineOctaves = EditorGUILayout.IntSlider(
-                new GUIContent("Oktav", "Kaç kademe. Nyquist altı otomatik kesilir."),
-                fineOctaves, 1, 8);
+                new GUIContent("Octaves", "Octave count."), fineOctaves, 1, 8);
             fineAmplitude = EditorGUILayout.Slider(
-                new GUIContent("Genlik (m)", "Toplam kabartı. Büyütmek kaya yüzeyini "
-                + "gürültülü yapar."), fineAmplitude, 2f, 120f);
+                new GUIContent("Amplitude (m)", "Relief amplitude."), fineAmplitude, 2f, 120f);
             fineSteepBias = EditorGUILayout.Slider(
-                new GUIContent("Dik yamaç eğilimi", "1 = yalnız dik yerler doku alır, "
-                + "0 = her yer eşit."), fineSteepBias, 0f, 1f);
+                new GUIContent("Steep Slope Bias", "1 = cliffs only, 0 = uniform."), fineSteepBias, 0f, 1f);
         }
 
         EditorGUILayout.Space(10f);
-        Section("Sahneyi sıfırla",
-            "Sahnedeki araziyi dümdüz yapar ve dikey tavanı bu pencereyle eşitler. "
-            + "Yontulan çalışma etkilenmez — o ayrı dosyada duruyor. "
-            + "Kaydet-uygula sonrası iki yapı üst üste görünüyorsa önce bunu çalıştır.");
-        if (GUILayout.Button("Sahnedeki araziyi düzleştir", GUILayout.Height(24f)))
+        Section("Scene Reset", "Flattens scene terrain to base plain.");
+        if (GUILayout.Button("Flatten Scene Terrain", GUILayout.Height(24f)))
             FlattenScene();
 
         EditorGUILayout.Space(10f);
-        Section("Çalışma dosyaları",
-            "Yontulan ızgara ham olarak diske yazılır (1025², float32, kayıpsız). Pencere "
-            + "her kapanışta ve her KAYDET'te kendini otomatik kaydeder, açılışta geri "
-            + "yükler — derleme artık çalışmayı silmiyor.\n\n"
-            + "Ada kaydedersen birden çok dağ saklayabilirsin.");
+        Section("Sculpt Assets", "Save and load binary float32 sculpt files.");
 
         using (new EditorGUILayout.HorizontalScope())
         {
-            sculptName = SanitizeName(EditorGUILayout.TextField("Ad", sculptName));
-            if (GUILayout.Button("Kaydet", GUILayout.Width(70f)))
-            { SaveSculpt(sculptName, force: true); info = $"çalışma kaydedildi: {sculptName}"; }
+            sculptName = SanitizeName(EditorGUILayout.TextField("Name", sculptName));
+            if (GUILayout.Button("Save", GUILayout.Width(70f)))
+            { SaveSculpt(sculptName, force: true); info = $"Sculpt saved: {sculptName}"; }
         }
 
         if (Directory.Exists(SculptDir))
@@ -1056,35 +826,23 @@ public class MountainBuilderWindow : EditorWindow
                 string n = Path.GetFileNameWithoutExtension(f);
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    GUILayout.Label(n == AutoName ? $"{n}  (otomatik)" : n);
-                    if (GUILayout.Button("Yükle", GUILayout.Width(60f))) LoadSculpt(n);
+                    GUILayout.Label(n == AutoName ? $"{n}  (auto)" : n);
+                    if (GUILayout.Button("Load", GUILayout.Width(60f))) LoadSculpt(n);
                     using (new EditorGUI.DisabledScope(n == AutoName))
-                        if (GUILayout.Button("Sil", GUILayout.Width(50f)))
+                        if (GUILayout.Button("Delete", GUILayout.Width(50f)))
                         { AssetDatabase.DeleteAsset(f.Replace("\\", "/")); }
                 }
             }
         }
 
         EditorGUILayout.Space(10f);
-        Section("Kaydet",
-            "Çalışma ızgarası 4097²'ye büyütülür, araziye yazılır, yükseklik haritası "
-            + "PNG olarak kaydedilir ve yüzey haritaları (normal, ufuk, birikinti) bayat "
-            + "ilan edilir — kurulum onları yeniden pişirir.");
-        if (GUILayout.Button("KAYDET VE UYGULA", GUILayout.Height(36f))) SaveAndApply();
+        Section("Save & Apply", "Exports to terrain data, bakes surface maps, updates routes.");
+        if (GUILayout.Button("SAVE AND APPLY TO SCENE", GUILayout.Height(36f))) SaveAndApply();
         if (!string.IsNullOrEmpty(info)) EditorGUILayout.HelpBox(info, MessageType.None);
     }
 
-    // ================================================================ işlem koşucusu
+    // ================================================================ Operation Runner
 
-    /// Her toplu işlem geri alınabilir ve süresi ölçülüyor: hangi vidanın pahalı
-    /// olduğunu bilmeden ayarlanmıyor.
-    /// DÖRT AŞAMA TEK DÜĞMEDE. Sıra jeomorfolojik: yükselti/gürültü → akarsu → buzul →
-    /// kütle hareketi. Sıra değişirse sonuç yanlış olur; örneğin buzul çanağı akarsu
-    /// vadisinin üstüne oyulur, tersi değil.
-    ///
-    /// Değerlerin hepsi `_son.bytes` üzerinde yapılan bant ölçümünden geliyor, göz
-    /// kararı değil. Ölçüm sekmesindeki "Doğallık" bölümü aynı sayıları üretiyor —
-    /// düğmeden önce ve sonra bakılıp kapanan açık görülebilir.
     void Naturalize()
     {
         if (h == null) return;
@@ -1094,52 +852,39 @@ public class MountainBuilderWindow : EditorWindow
 
         try
         {
-            // Ova korunuyor: bütün aşamalar taban kotunun üstündeki kütleye uygulanır.
-            // Ovaya gürültü ekmek kullanıcının bilerek düzleştirdiği alanı bozar.
-            // TABAN 450 m, GECIS 350: ova TAM korunmali. 100 m tabanla ovaya gurultunun
-            // dortte biri siziyordu (olculdu: kot<50 m hucrelerde maske ortalamasi 0.254).
-            // Bu esikle ayni olcum 0.000 veriyor; etek 100-800 m arasinda yumusak giriyor.
             float[] land = TerrainOps.MaskByHeight(h, Grid, plainM + 450f, MaxM, 350f);
 
-            // ASAMA ASAMA OLCUM. Iki tur "dugmeye bastim, sayilar degismedi" yasandi;
-            // ucuncude tahmin degil olcum yaziliyor. Her asamadan sonra o asamanin
-            // araziye ne KADAR dokundugu (RMS metre) rapora giriyor. Sifir yazan asama
-            // olu demektir ve hangisi oldugu tek tikta gorunur.
             var before = (float[])h.Clone();
             var diag = new System.Text.StringBuilder();
             double maskMean = 0.0; int maskCnt = 0;
             for (int i = 0; i < land.Length; i++) { if (h[i] > 300f) { maskMean += land[i]; maskCnt++; } }
-            diag.AppendLine($"maske ortalamasi (dagda)  {(maskCnt > 0 ? maskMean / maskCnt : 0):F3}   (1.000 olmali)");
-            diag.AppendLine($"etki                      {natStrength:F2}");
-            diag.AppendLine($"akarsu K / tur / difuzyon {natFlowK} / {natFlowIters} / {natFlowDiffuse}");
+            diag.AppendLine($"Mask mean (mountain)      {(maskCnt > 0 ? maskMean / maskCnt : 0):F3}   (target: 1.000)");
+            diag.AppendLine($"Strength                   {natStrength:F2}");
+            diag.AppendLine($"Stream K / iters / diffuse {natFlowK} / {natFlowIters} / {natFlowDiffuse}");
 
-            EditorUtility.DisplayProgressBar("Doğallaştır", "1/3 — orta bant tohumu", 0.05f);
+            EditorUtility.DisplayProgressBar("Naturalize", "1/3 — Mid-band seed", 0.05f);
             TerrainOps.FractalNoise(h, Grid, CellM, natSeedWl, natSeedOct,
                                     natSeedAmp * natStrength,
                                     natSeedPers, 2f, opSeed, land);
-            diag.AppendLine($"1 tohum ekledi            {DeltaRms(before):F1} m");
+            diag.AppendLine($"1 Seed added               {DeltaRms(before):F1} m");
             diag.AppendLine($"   -> {Bands()}");
 
-            // AKARSU OYMASI TUR TUR: her turda ilerleme, pencere donuk kalmasin.
             for (int c = 0; c < natFlowIters; c++)
             {
-                EditorUtility.DisplayProgressBar("Doğallaştır",
-                    $"2/3 — akarsu oyması ({c + 1}/{natFlowIters})",
+                EditorUtility.DisplayProgressBar("Naturalize",
+                    $"2/3 — Stream incision ({c + 1}/{natFlowIters})",
                     0.10f + 0.70f * c / natFlowIters);
                 TerrainOps.FlowIncise(h, Grid, CellM, natFlowK * natStrength, 0.5f, 1f, 1,
                                       natFlowDiffuse, land);
             }
-            diag.AppendLine($"2 akarsu oymasi           {DeltaRms(before):F1} m (kumulatif)");
+            diag.AppendLine($"2 Stream incision          {DeltaRms(before):F1} m (cumulative)");
             diag.AppendLine($"   -> {Bands()}");
 
-            // BUZUL: mevcut eğriliği abartmak. Çanak zaten içbükeyse derinleşir, sırt
-            // zaten dışbükeyse incelir — sirk ve arête ikisi tek işlemden çıkar.
-            // Uydurma bir çanak yerleştirilmiyor; arazinin kendi biçimi keskinleşiyor.
-            EditorUtility.DisplayProgressBar("Doğallaştır", "3/3 — buzul imzası", 0.85f);
+            EditorUtility.DisplayProgressBar("Naturalize", "3/3 — Glacial features", 0.85f);
             float[] high = TerrainOps.MaskByHeight(h, Grid, natGlacierFrom, MaxM, 400f);
             TerrainOps.Sharpen(h, Grid, CellM, natGlacierRadius,
                                natGlacierGain * natStrength, high);
-            diag.AppendLine($"3 buzul sonrasi           {DeltaRms(before):F1} m (kumulatif)");
+            diag.AppendLine($"3 Glacial sharpening       {DeltaRms(before):F1} m (cumulative)");
             diag.AppendLine($"   -> {Bands()}");
 
             natDiag = diag.ToString();
@@ -1153,11 +898,10 @@ public class MountainBuilderWindow : EditorWindow
         PushEdit(0, 0, Grid - 1, Grid - 1, snap);
         maskCache = null;
         meshDirty = true;
-        info = $"doğallaştırma bitti — {sw.ElapsedMilliseconds / 1000f:F1} sn";
+        info = $"Naturalization completed — {sw.ElapsedMilliseconds / 1000f:F1} s";
         Repaint();
     }
 
-    /// Tek dalga boyu bandinin RMS'i — asama asama nerede enerji kaldigini gorur.
     float BandRms(float wavelengthM)
     {
         var a = (float[])h.Clone();
@@ -1178,7 +922,6 @@ public class MountainBuilderWindow : EditorWindow
     string Bands() => $"2250m {BandRms(2250f):F0} · 1125m {BandRms(1125f):F0} · "
                     + $"575m {BandRms(575f):F0} · 300m {BandRms(300f):F0}";
 
-    /// Iki alan arasindaki farkin RMS'i — bir asamanin araziye ne kadar dokundugu.
     float DeltaRms(float[] before)
     {
         double sum = 0.0; int cnt = 0;
@@ -1200,11 +943,11 @@ public class MountainBuilderWindow : EditorWindow
         PushEdit(0, 0, Grid - 1, Grid - 1, snap);
         maskCache = null;
         meshDirty = true;
-        info = $"işlem {sw.ElapsedMilliseconds} ms";
+        info = $"Operation completed in {sw.ElapsedMilliseconds} ms";
         Repaint();
     }
 
-    // ================================================================ geri alma
+    // ================================================================ Undo / Redo
 
     static readonly KeyCode[] FlyKeys =
     { KeyCode.W, KeyCode.A, KeyCode.S, KeyCode.D, KeyCode.Q, KeyCode.E,
@@ -1216,15 +959,12 @@ public class MountainBuilderWindow : EditorWindow
 
         if (e.type == EventType.KeyDown && (e.control || e.command))
         {
-            // Hangi yığın: rota sekmesindeyken rota, diğerlerinde yükseklik.
             if (e.keyCode == KeyCode.Z)
             { if (tab == Tab.Route) RouteUndo(); else Undo(); e.Use(); return; }
             if (e.keyCode == KeyCode.Y)
             { if (tab == Tab.Route) RouteRedo(); else Redo(); e.Use(); return; }
         }
 
-        // UÇUŞ TUŞLARI YUTULUYOR. Yutulmazsa Unity onları kendi kısayolları sayıyor
-        // (Space sahne penceresini oynatıyor, A hepsini seçiyor).
         if (e.type == EventType.KeyDown && System.Array.IndexOf(FlyKeys, e.keyCode) >= 0)
         {
             if (keysDown.Add(e.keyCode)) lastFlyTick = EditorApplication.timeSinceStartup;
@@ -1310,7 +1050,7 @@ public class MountainBuilderWindow : EditorWindow
         undoStack.Add(ed);
     }
 
-    // ================================================================ görünüm
+    // ================================================================ Viewport
 
     void DrawViewport()
     {
@@ -1334,8 +1074,6 @@ public class MountainBuilderWindow : EditorWindow
         cam.transform.position = camPos;
         cam.transform.rotation = camRot;
 
-        // YAKIN KIRPMA 5 METRE. Birim kilometre olduğu için 1f yazmak 1 KM demekti ve
-        // yüzeye yaklaşınca arazi kesiliyordu — "dibine giremiyorum" bundandı.
         cam.nearClipPlane = 0.005f;
         cam.farClipPlane = 300f;
         cam.fieldOfView = camFov;
@@ -1348,14 +1086,10 @@ public class MountainBuilderWindow : EditorWindow
         DrawRoutes(r);
         DrawBrushRing(r);
 
-        // Halka çizildiyse sistem imleci gizli, değilse geri geliyor. Pencereden
-        // çıkıldığında da geri geliyor (`OnDisable`), yoksa imleç kaybolmuş kalırdı.
         if (cursorValid && tab == Tab.Brush) HideSystemCursor(r);
         else ShowSystemCursor();
     }
 
-    /// Dünya noktasını pencere koordinatına düşürür. Kameranın kendi matrisleri
-    /// kullanılmıyor — bkz. `camPos` yorumu.
     bool Project(Vector3 world, Rect r, out Vector2 g)
     {
         g = Vector2.zero;
@@ -1383,8 +1117,6 @@ public class MountainBuilderWindow : EditorWindow
         return new Ray(camPos, dir.normalized);
     }
 
-    /// Rota hatlarını ve doğuş noktasını 3B görünümde çizer. Kot her karede araziden
-    /// okunuyor, o yüzden hat yüzeye yapışık kalıyor.
     void DrawRoutes(Rect r)
     {
         Handles.BeginGUI();
@@ -1419,7 +1151,6 @@ public class MountainBuilderWindow : EditorWindow
                                 spawn.y);
             if (Project(w, r, out Vector2 g))
             {
-                // Doğuş beyaz artı: hiçbir rota rengiyle karışmıyor.
                 Handles.color = Color.black;
                 Handles.DrawAAPolyLine(5f, new Vector3(g.x - 9f, g.y, 0f), new Vector3(g.x + 9f, g.y, 0f));
                 Handles.DrawAAPolyLine(5f, new Vector3(g.x, g.y - 9f, 0f), new Vector3(g.x, g.y + 9f, 0f));
@@ -1438,8 +1169,6 @@ public class MountainBuilderWindow : EditorWindow
         if (!cursorValid) return;
         if (tab != Tab.Brush && tab != Tab.Route) return;
 
-        // Rota çizerken halka fırça yarıçapını değil YOLUN GENİŞLİĞİNİ gösteriyor;
-        // ikisi farklı büyüklükler ve fırça yarıçapını göstermek yanıltırdı.
         float ringR = tab == Tab.Route ? Mathf.Max(routeRadiusM * 6f, 40f) : radiusM;
         float ringAspect = tab == Tab.Route ? 1f : aspect;
 
@@ -1462,15 +1191,12 @@ public class MountainBuilderWindow : EditorWindow
 
         if (pts.Count > 2)
         {
-            // İKİ KAT ÇİZGİ: koyu alt katman her zeminde görünür kılıyor, açık zeminde
-            // tek sarı çizgi kayboluyordu.
             Handles.color = new Color(0f, 0f, 0f, 0.55f);
             Handles.DrawAAPolyLine(4f, pts.ToArray());
             Handles.color = new Color(1f, 0.85f, 0.15f, 1f);
             Handles.DrawAAPolyLine(2f, pts.ToArray());
         }
 
-        // Merkez artı: fırçanın tam nereye vurduğu.
         if (Project(cursor, r, out Vector2 c0))
         {
             Handles.color = new Color(1f, 0.85f, 0.15f, 1f);
@@ -1482,9 +1208,6 @@ public class MountainBuilderWindow : EditorWindow
         Handles.EndGUI();
     }
 
-    /// WASD uçuşu. Tuşlar `OnGUI`'de toplanıyor ama hareket burada işleniyor: IMGUI
-    /// yalnız olay geldiğinde çalışıyor, tuş basılı tutulduğunda tekrar hızına bağlı
-    /// kesik kesik ilerliyordu.
     void Fly()
     {
         AutoSaveTick();
@@ -1513,16 +1236,12 @@ public class MountainBuilderWindow : EditorWindow
         if (keysDown.Contains(KeyCode.LeftShift)) sp *= 5f;
         if (keysDown.Contains(KeyCode.LeftAlt)) sp *= 0.15f;
 
-        // HIZ YERE OLAN YÜKSEKLİĞE GÖRE ÖLÇEKLENİYOR. Sabit hız 30 km'lik arenada
-        // ikisini birden bozuyordu: yukarıdan bakarken sürünüyor, yüzeye inince
-        // fırlıyordu. Yerden 2 km yukarıda tam hız, dibinde altıda bir.
         float ground = HeightAtKm(flyPos.x, flyPos.z) / 1000f * vScale;
         float above = Mathf.Max(0f, flyPos.y - ground);
         sp *= Mathf.Lerp(0.16f, 1f, Mathf.Clamp01(above / 2f));
 
         flyPos += move.normalized * sp * dt;
 
-        // Arena 30 km; kamera biraz dışına çıkabiliyor ama kaybolmuyor.
         flyPos.x = Mathf.Clamp(flyPos.x, -40f, 40f);
         flyPos.z = Mathf.Clamp(flyPos.z, -40f, 40f);
         flyPos.y = Mathf.Clamp(flyPos.y, -1f, 60f);
@@ -1530,9 +1249,6 @@ public class MountainBuilderWindow : EditorWindow
         Repaint();
     }
 
-    /// R3 — ÇÖKMEYE KARŞI. `OnDisable` editör çökerse ya da süreç öldürülürse
-    /// çalışmıyor; o durumda son kayıttan sonraki her şey giderdi. İki dakikada bir,
-    /// yalnız değişiklik varsa yazılıyor.
     void AutoSaveTick()
     {
         if (!dirtySinceSave || h == null) return;
@@ -1574,13 +1290,7 @@ public class MountainBuilderWindow : EditorWindow
     {
         Event e = Event.current;
 
-        // LAYOUT OLAYINDA DOKUNMA. IMGUI her karede önce Layout sonra Repaint gönderiyor
-        // ve Layout sırasında `GUILayoutUtility.GetRect` gerçek dikdörtgeni değil sahte
-        // bir (0,0,1,1) döndürüyor. Buradaki "fare dışarıda" testi onu görüp `cursorValid`
-        // bayrağını her karede siliyordu; Repaint geldiğinde imleç hep geçersizdi ve fırça
-        // halkası hiç çizilmiyordu. Işın baştan beri çalışıyordu — 338 isabet, 0 çizim.
         if (e.type == EventType.Layout || e.type == EventType.Used) return;
-
         if (!r.Contains(e.mousePosition)) { cursorValid = false; ShowSystemCursor(); return; }
 
         if (e.type == EventType.MouseDrag && e.button == 1)
@@ -1588,8 +1298,6 @@ public class MountainBuilderWindow : EditorWindow
         if (e.type == EventType.ContextClick) { e.Use(); return; }
         if (e.type == EventType.ScrollWheel)
         {
-            // Tekerlek artık yakınlaştırmıyor, UÇUŞ HIZINI değiştiriyor: mesafeyi WASD
-            // belirliyor ve ikisi aynı anda olunca kontrol kayboluyordu.
             flySpeed = Mathf.Clamp(flySpeed * (1f - e.delta.y * 0.12f), 0.05f, 20f);
             e.Use(); Repaint(); return;
         }
@@ -1602,9 +1310,6 @@ public class MountainBuilderWindow : EditorWindow
             Repaint();
         }
 
-        // ROTA SEKMESİNDE SOL TIK BOYAMAZ, HAT ÇİZER. Basılı tutup sürüklemek fırça
-        // gibi sürekli nokta ekliyor; tek tek tıklamak uzun bir yolda onlarca tık demekti.
-        // Noktalar `routeSpacingM`'den sık konmuyor, yoksa hat binlerce noktaya çıkıyor.
         if (tab == Tab.Route)
         {
             if (e.type == EventType.MouseDown && e.button == 0 && cursorValid)
@@ -1624,10 +1329,6 @@ public class MountainBuilderWindow : EditorWindow
             }
             else if (e.type == EventType.MouseDrag && e.button == 0 && drawingRoute && cursorValid)
             {
-                // ARA DOLDURULUYOR. Fare olayları hızlı çekişte seyrek geliyor ve
-                // noktalar arasında boşluk kalıyordu — hat fırça değil kırık çizgi
-                // görünüyordu. Son noktadan imlece kadar `routeSpacingM` aralıklarla
-                // ara noktalar konuyor, yani hız ne olursa olsun aynı sıklık.
                 var list = paths[activePath].pts;
                 var q = new Vector2(cursor.x, cursor.z);
 
@@ -1637,7 +1338,7 @@ public class MountainBuilderWindow : EditorWindow
                     var last = list[list.Count - 1];
                     float distM = Vector2.Distance(last, q) * 1000f;
                     int steps = Mathf.FloorToInt(distM / Mathf.Max(routeSpacingM, 1f));
-                    steps = Mathf.Min(steps, 400);   // tek karede kilitlenmeye karşı
+                    steps = Mathf.Min(steps, 400);
                     for (int i = 1; i <= steps; i++)
                         list.Add(Vector2.Lerp(last, q, i / (float)steps));
                 }
@@ -1732,7 +1433,7 @@ public class MountainBuilderWindow : EditorWindow
         return Mathf.Lerp(a, b, tz);
     }
 
-    // ================================================================ fırça uygulama
+    // ================================================================ Brush Application
 
     void Paint(Vector3 worldKm)
     {
@@ -1749,8 +1450,6 @@ public class MountainBuilderWindow : EditorWindow
         if (x1 > sx1) sx1 = x1;
         if (z1 > sz1) sz1 = z1;
 
-        // Komşu okuyan fırçalar kopyadan okuyor: yerinde yazılırsa fırçanın gittiği
-        // yön sonucu değiştirir (soldan sağa başka, sağdan sola başka).
         int sw = x1 - x0 + 1, sd = z1 - z0 + 1;
         float[] src = null;
         if (brush == BrushKind.Smooth || brush == BrushKind.Erode || brush == BrushKind.Sharpen)
@@ -1804,7 +1503,6 @@ public class MountainBuilderWindow : EditorWindow
                 case BrushKind.Ridge:
                 case BrushKind.Valley:
                 {
-                    // Uzun eksene DİK mesafeye göre keskin kesit: sırt/oluk hattı.
                     float perp = Mathf.Abs(uz) / radiusM;
                     float crest = Mathf.Max(0f, 1f - perp * 3f);
                     float v = amp * w * crest * crest;
@@ -1850,7 +1548,6 @@ public class MountainBuilderWindow : EditorWindow
 
                 case BrushKind.Noise:
                 {
-                    // Dalga boyu 4 hücre = 117 m, Nyquist'in (2 hücre) üstünde.
                     float n1 = Mathf.PerlinNoise(x * 0.25f, z * 0.25f) - 0.5f;
                     float n2 = Mathf.PerlinNoise(x * 0.55f + 31.7f, z * 0.55f + 11.3f) - 0.5f;
                     h[i] += (n1 + n2 * 0.5f) * amp * w;
@@ -1861,8 +1558,6 @@ public class MountainBuilderWindow : EditorWindow
             h[i] = Mathf.Clamp(h[i], 0f, MaxM);
         }
 
-        // Görüntü ızgarasındaki karşılığı; bir hücre payı bırakılıyor çünkü normal
-        // hesabı komşuyu okuyor.
         float toView = (View - 1) / (float)(Grid - 1);
         pdx0 = Mathf.Min(pdx0, Mathf.FloorToInt(x0 * toView) - 1);
         pdz0 = Mathf.Min(pdz0, Mathf.FloorToInt(z0 * toView) - 1);
@@ -1876,7 +1571,7 @@ public class MountainBuilderWindow : EditorWindow
         }
     }
 
-    // ================================================================ veri
+    // ================================================================ Data Persistence
 
     void NewFlat()
     {
@@ -1890,7 +1585,7 @@ public class MountainBuilderWindow : EditorWindow
     void LoadFromTerrain()
     {
         var gen = Object.FindAnyObjectByType<MountainGenerator>();
-        if (gen == null) { info = "sahnede arazi yok"; return; }
+        if (gen == null) { info = "No terrain in scene."; return; }
         var data = gen.GetComponent<Terrain>().terrainData;
         int res = data.heightmapResolution;
         var src = data.GetHeights(0, 0, res, res);
@@ -1906,7 +1601,6 @@ public class MountainBuilderWindow : EditorWindow
         maskCache = null; meshDirty = true; Repaint();
     }
 
-    /// Izgara tek kotta mı? Kaydetme koruması bunu soruyor.
     bool IsFlat()
     {
         if (h == null || h.Length == 0) return true;
@@ -1916,7 +1610,6 @@ public class MountainBuilderWindow : EditorWindow
         return true;
     }
 
-    /// Var olan dosyayı yedekler. En son üç yedek tutuluyor.
     static void Backup(string path)
     {
         if (!File.Exists(path)) return;
@@ -1927,29 +1620,23 @@ public class MountainBuilderWindow : EditorWindow
 
         for (int i = 3; i > 1; i--)
         {
-            string older = $"{dir}/{name}.yedek{i}{ext}";
-            string newer = $"{dir}/{name}.yedek{i - 1}{ext}";
+            string older = $"{dir}/{name}.backup{i}{ext}";
+            string newer = $"{dir}/{name}.backup{i - 1}{ext}";
             if (File.Exists(older)) File.Delete(older);
             if (File.Exists(newer)) File.Move(newer, older);
         }
-        File.Copy(path, $"{dir}/{name}.yedek1{ext}", true);
+        File.Copy(path, $"{dir}/{name}.backup1{ext}", true);
     }
 
-    /// Dosya adını güvenli hâle getirir.
-    ///
-    /// Windows'ta `: * ? " &lt; &gt; |` dosya adında yasak. Kullanıcı saat yazdı ("16:50"),
-    /// yol geçersiz oldu ve `FileStream` OnGUI'nin ORTASINDA istisna fırlattı — açık bir
-    /// yatay bloğun içinde. Düzen dengesi bozuldu, ardından her çizim "Invalid GUILayout
-    /// state" verdi ve pencere kullanılamaz hâle geldi.
     static string SanitizeName(string name)
     {
-        if (string.IsNullOrWhiteSpace(name)) return "dag";
+        if (string.IsNullOrWhiteSpace(name)) return "mountain";
         var bad = System.IO.Path.GetInvalidFileNameChars();
         var sb = new System.Text.StringBuilder(name.Length);
         foreach (char c in name.Trim())
             sb.Append(System.Array.IndexOf(bad, c) >= 0 ? '_' : c);
         string clean = sb.ToString().Trim(' ', '.');
-        return clean.Length == 0 ? "dag" : clean;
+        return clean.Length == 0 ? "mountain" : clean;
     }
 
     static string SculptPath(string name) => $"{SculptDir}/{SanitizeName(name)}.bytes";
@@ -1961,7 +1648,6 @@ public class MountainBuilderWindow : EditorWindow
         return true;
     }
 
-    /// Dosyadan YALNIZ rota bloğunu okur; yükseklik alanına dokunmaz.
     void LoadRoutesOnly(string name)
     {
         string path = SculptPath(name);
@@ -1973,11 +1659,11 @@ public class MountainBuilderWindow : EditorWindow
             using (var br = new BinaryReader(fs))
             {
                 int first = br.ReadInt32();
-                if (first >= 0) return;              // eski biçim, rota taşımıyor
+                if (first >= 0) return;
                 int res = br.ReadInt32();
                 if (res != Grid) return;
 
-                br.ReadSingle();                      // ova kotu
+                br.ReadSingle();
                 fs.Seek((long)Grid * Grid * 4, SeekOrigin.Current);
 
                 spawn = new Vector2(br.ReadSingle(), br.ReadSingle());
@@ -1994,12 +1680,11 @@ public class MountainBuilderWindow : EditorWindow
                     }
                 }
             }
-            info = "rotalar dosyadan geri okundu";
+            info = "Routes loaded from sculpt file.";
         }
         catch (System.Exception e)
         {
-            // Hata yutulmuyor: rota sessizce kaybolmasın.
-            Debug.LogWarning($"Rota bloğu okunamadı ({name}): {e.Message}");
+            Debug.LogWarning($"Could not read route block ({name}): {e.Message}");
         }
     }
 
@@ -2008,55 +1693,41 @@ public class MountainBuilderWindow : EditorWindow
         if (h == null) return;
         Directory.CreateDirectory(SculptDir);
 
-        // DÜZ IZGARA DOLU DOSYAYI EZMEZ — AMA YALNIZ OTOMATİK KAYITTA. Koruma bir kez
-        // fazla geniş kondu ve kasıtlı düzleştirmeyi de engelledi: kullanıcı düzleştirip
-        // kaydediyor, kapanışta yazma reddediliyor, açılışta eski dağ geri geliyordu.
-        //
-        // `force` = kullanıcı açıkça bastı (KAYDET, ada kaydet). Korumanın işi yalnız
-        // KAZA ile boş ızgaranın üstüne yazılmasını önlemek.
         string path = SculptPath(name);
-        // Rota çizilmişse dosya artık yalnız yükseklik taşımıyor; düz ızgara diye
-        // atlamak çizilen hattı da götürürdü.
         bool hasRoutes = !RoutesEmpty();
 
-        // BOŞ ROTA DOLU DOSYANIN ROTASINI SİLMEZ. Bellekteki hatlar boşsa ama dosyada
-        // varsa, önce dosyadakiler geri okunuyor — kaydetme onları taşımalı, silmemeli.
         if (!hasRoutes && File.Exists(path)) LoadRoutesOnly(name);
 
         if (!force && !hasRoutes && IsFlat() && File.Exists(path)
             && new FileInfo(path).Length > 1024)
         {
-            info = $"çalışma DÜZ, {name} üzerine yazılmadı (otomatik kayıt)";
+            info = $"Grid is FLAT, {name} not overwritten (autosave).";
             return;
         }
         Backup(path);
 
-        // DOSYA HATASI OnGUI'Yİ KESMEZ. Kesince açık düzen blokları kapanmıyor ve
-        // pencere "Invalid GUILayout state" ile kilitleniyor.
         try
         {
-        using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write))
-        using (var bw = new BinaryWriter(fs))
-        {
-            // SÜRÜM DAMGASI NEGATİF. Eski dosyalar ilk alan olarak ızgara boyunu (pozitif)
-            // yazıyordu; negatif değer yeni biçimi ayırt ediyor ve eskiler hâlâ okunuyor.
-            bw.Write(-2);
-            bw.Write(Grid);
-            bw.Write(plainM);
-            for (int i = 0; i < h.Length; i++) bw.Write(h[i]);
-
-            bw.Write(spawn.x); bw.Write(spawn.y);
-            bw.Write(paths.Length);
-            foreach (var pth in paths)
+            using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write))
+            using (var bw = new BinaryWriter(fs))
             {
-                bw.Write(pth.pts.Count);
-                foreach (var q in pth.pts) { bw.Write(q.x); bw.Write(q.y); }
+                bw.Write(-2);
+                bw.Write(Grid);
+                bw.Write(plainM);
+                for (int i = 0; i < h.Length; i++) bw.Write(h[i]);
+
+                bw.Write(spawn.x); bw.Write(spawn.y);
+                bw.Write(paths.Length);
+                foreach (var pth in paths)
+                {
+                    bw.Write(pth.pts.Count);
+                    foreach (var q in pth.pts) { bw.Write(q.x); bw.Write(q.y); }
+                }
             }
-        }
         }
         catch (System.Exception e)
         {
-            info = $"kaydedilemedi ({name}): {e.Message}";
+            info = $"Failed to save ({name}): {e.Message}";
             Debug.LogWarning(info);
             return;
         }
@@ -2069,8 +1740,6 @@ public class MountainBuilderWindow : EditorWindow
         string path = SculptPath(name);
         if (!File.Exists(path)) return false;
 
-        // R1 — ÜZERİNE YAZMADAN ÖNCE KURTARMA KOPYASI. "Yükle" düğmesine yanlış basmak
-        // o ana kadarki çalışmayı yok ediyordu ve geri alma yığını da temizleniyordu.
         if (h != null && !IsFlat()) SaveSculpt(RescueName, force: true);
 
         using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read))
@@ -2080,15 +1749,12 @@ public class MountainBuilderWindow : EditorWindow
             int version = first < 0 ? -first : 1;
             int res = first < 0 ? br.ReadInt32() : first;
 
-            // ÇÖZÜNÜRLÜK UYUŞMAZLIĞI SESSİZ GEÇMEZ. Izgara boyu değişirse eski dosya
-            // yanlış okunur ve dağ çöp çıkar; açıkça reddediliyor.
             if (res != Grid)
             {
-                info = $"çalışma dosyası {res}², pencere {Grid}² — okunmadı";
+                info = $"Sculpt file is {res}^2, window is {Grid}^2 — cannot load.";
                 return false;
             }
-            // R4 — HER ŞEY GEÇİCİYE OKUNUYOR, EN SONDA ATANIYOR. Dosya yarıda kesikse
-            // eskiden `h` yeni veriyle, rotalar yarım kalıyordu; artık ya hepsi ya hiçbiri.
+
             float newPlain = br.ReadSingle();
             var g = new float[Grid * Grid];
             for (int i = 0; i < g.Length; i++) g[i] = br.ReadSingle();
@@ -2126,17 +1792,15 @@ public class MountainBuilderWindow : EditorWindow
         routeUndo.Clear(); routeRedo.Clear();
         maskCache = null; meshDirty = true;
         dirtySinceSave = false;
-        info = $"çalışma yüklendi: {name}";
+        info = $"Sculpt loaded: {name}";
         Repaint();
         return true;
     }
 
-    /// Sahnedeki araziyi tek kota indirir ve dikey tavanı pencereyle eşitler.
-    /// Yontulan çalışmaya dokunmaz.
     void FlattenScene()
     {
         var gen = Object.FindAnyObjectByType<MountainGenerator>();
-        if (gen == null) { info = "sahnede arazi yok"; return; }
+        if (gen == null) { info = "No terrain in scene."; return; }
         var terrain = gen.GetComponent<Terrain>();
         var data = terrain.terrainData;
 
@@ -2147,21 +1811,13 @@ public class MountainBuilderWindow : EditorWindow
         EditorUtility.SetDirty(data);
         AssetDatabase.SaveAssets();
 
-        info = $"sahne düzleştirildi · tavan {MaxM:F0} m";
-        ToolLog.Write($"Arazi düzleştirildi, dikey tavan {MaxM:F0} m.");
+        info = $"Scene flattened · Ceiling {MaxM:F0} m";
+        ToolLog.Write($"Terrain flattened, vertical ceiling {MaxM:F0} m.");
         Repaint();
     }
 
     const string RouteAssetPath = "Assets/Settings/MountainRoute.asset";
 
-    /// Doğuşu ve hatları `MountainRoute` asset'ine yazar.
-    ///
-    /// NEDEN ASSET: sahne kurulumu (`MountainSceneBootstrap.SpawnPose`) oyuncuyu oradan
-    /// konumlandırıyor. Pencerede tutulan bir konum Play'e geçmezdi.
-    ///
-    /// BAKIŞ YÖNÜ HESAPLANIYOR, sorulmuyor: doğuştan arazinin en yüksek noktasına doğru.
-    /// Oyun dağa tırmanmak üzerine; oyuncunun ilk karede sırtı dağa dönük olması hiçbir
-    /// durumda istenmiyor.
     void SaveRoutes(Terrain terrain)
     {
         var route = AssetDatabase.LoadAssetAtPath<MountainRoute>(RouteAssetPath);
@@ -2190,7 +1846,6 @@ public class MountainBuilderWindow : EditorWindow
             route.spawn = ToNorm(spawn);
             route.spawnSet = true;
 
-            // En yüksek noktayı bul ve ona bak.
             int bi = 0; float best = float.MinValue;
             for (int i = 0; i < h.Length; i++) if (h[i] > best) { best = h[i]; bi = i; }
             float sx = ((bi % Grid) * CellM - ArenaM * 0.5f) / 1000f;
@@ -2201,19 +1856,9 @@ public class MountainBuilderWindow : EditorWindow
         EditorUtility.SetDirty(route);
     }
 
-    /// Kilometre cinsinden merkez-eksenli konumu araziye göre normalize (0-1) eder.
     static Vector2 ToNorm(Vector2 km)
         => new Vector2(km.x * 1000f / ArenaM + 0.5f, km.y * 1000f / ArenaM + 0.5f);
 
-    /// Arazinin KENDİ çözünürlüğünde ince doku. Yontma ızgarasında var olamayan bant
-    /// (14.65 - 60 m) burada doldurulyor.
-    ///
-    /// İKİ MASKE: dik yerde çok, düzde az (gerçek dağda çıplak kayada doku çoktur,
-    /// çimenli etekte azdır) ve ova neredeyse hiç almaz — oyuncunun yürüyeceği yer.
-    ///
-    /// SONDA TERMAL GEÇİŞ: eklenen doku hiçbir yerde duruş açısını aşmasın diye. Tek
-    /// hücrelik sivri bırakmamak kural; sekiz tur yerel eğimi oturtmaya yetiyor,
-    /// büyük ölçekli biçime dokunmuyor.
     void AddFineDetail(float[,] norm)
     {
         int n = Export;
@@ -2223,7 +1868,6 @@ public class MountainBuilderWindow : EditorWindow
         for (int x = 0; x < n; x++)
             g[z * n + x] = norm[z, x] * MaxM;
 
-        // Eğim ve kot maskesi tek geçişte.
         var mask = new float[n * n];
         float lowRef = plainM + 60f;
         for (int z = 0; z < n; z++)
@@ -2254,17 +1898,14 @@ public class MountainBuilderWindow : EditorWindow
     void SaveAndApply()
     {
         var gen = Object.FindAnyObjectByType<MountainGenerator>();
-        if (gen == null) { info = "sahnede arazi yok"; return; }
+        if (gen == null) { info = "No terrain in scene."; return; }
 
-        // Aynı koruma yükseklik haritası için: düz bir ızgarayı yazmak dağı siler ve
-        // `Araziyi Yeniden Üret` o düz haritayı araziye uygular.
         if (IsFlat() && !EditorUtility.DisplayDialog(
-                "Düz arazi kaydedilecek",
-                "Çalışma ızgarası tek kotta. Kaydedersen sahnedeki arazi düzleşir."
-                + "\n\nDevam edilsin mi?",
-                "Evet, düz kaydet", "Vazgeç"))
+                "Saving Flat Terrain",
+                "Working grid is completely flat. Saving will flatten the scene terrain.\n\nContinue?",
+                "Yes, Save Flat", "Cancel"))
         {
-            info = "kaydetme iptal edildi";
+            info = "Save cancelled.";
             return;
         }
 
@@ -2299,22 +1940,18 @@ public class MountainBuilderWindow : EditorWindow
         SaveRoutes(terrain);
         SaveSculpt(AutoName, force: true);
         dirtySinceSave = false;
-        // KURULUM AYNI ADIMDA KOŞUYOR. Haritaları bayat ilan edip bırakmak yetmiyordu:
-        // tazeleyen bir şey olmadığı için doğru gölgelendirme ancak Play'e girilip
-        // çıkılınca görülüyordu.
-        EditorUtility.DisplayProgressBar("Dağ Yapımı", "Yüzey haritaları pişiriliyor...", 0.8f);
+
+        EditorUtility.DisplayProgressBar("Mountain Builder", "Baking surface maps...", 0.8f);
         try { MountainSceneBootstrap.Rebuild(); }
         finally { EditorUtility.ClearProgressBar(); }
 
-        info = "kaydedildi · arazi, yüzey haritaları ve doğuş güncellendi";
-        ToolLog.Write("Dağ yapımı araziye yazıldı ve kurulum koşturuldu.");
+        info = "Saved: Terrain, surface maps, and spawn updated.";
+        ToolLog.Write("Mountain builder applied to terrain; bootstrap rebuild executed.");
         Repaint();
     }
 
-    // ================================================================ örgü
+    // ================================================================ Mesh
 
-    /// Yalnız fırçanın değdiği dikdörtgeni yeniden hesaplar. Tüm alanı taramak 263 bin
-    /// köşe demek ve fırça takılıyordu.
     void UpdatePaintedRegion()
     {
         if (pdx1 < pdx0 || vVerts == null || mesh == null) return;
@@ -2336,8 +1973,6 @@ public class MountainBuilderWindow : EditorWindow
             float val = h[gi];
             int vi = z * View + x;
 
-            // Önceki kotla farkı ize yazılıyor. Ölçek fırçanın kendi gücüne göre:
-            // güçlü vuruşta da hafif vuruşta da iz görünür kalıyor.
             float delta = Mathf.Abs(val - vVerts[vi].y * 1000f);
             float scale = Mathf.Max(2f, strength * 40f);
             heat[vi] = Mathf.Clamp01(Mathf.Max(heat[vi], delta / scale));
@@ -2363,8 +1998,6 @@ public class MountainBuilderWindow : EditorWindow
         mesh.RecalculateBounds();
     }
 
-    /// İzin sönümü. Yalnız izin bulunduğu dikdörtgen yeniden renklendiriliyor; tüm
-    /// alanı taramak 263 bin köşe demek ve fırça takılırdı.
     void DecayHeat()
     {
         if (heat == null || hx1 < hx0 || vCols == null || mesh == null) return;
@@ -2374,7 +2007,6 @@ public class MountainBuilderWindow : EditorWindow
         lastHeatTick = now;
         if (dt <= 0f) return;
 
-        // Yarılanma ~0.35 s: vuruş bitince iz hemen kaybolmuyor ama ekranda da kalmıyor.
         float k = Mathf.Exp(-dt / 0.35f);
         float cellKm = ArenaM / 1000f / (View - 1);
         float sc = (Grid - 1) / (float)(View - 1);
@@ -2418,17 +2050,14 @@ public class MountainBuilderWindow : EditorWindow
             GUILayout.FlexibleSpace();
             if (!string.IsNullOrEmpty(info)) GUILayout.Label(info, EditorStyles.miniLabel);
             if (cursorValid)
-                GUILayout.Label($"fırça  ({cursor.x * 1000f:F0}, {cursor.z * 1000f:F0}) m  ·  "
-                                + $"kot {HeightAtKm(cursor.x, cursor.z):F0} m",
+                GUILayout.Label($"Brush: ({cursor.x * 1000f:F0}, {cursor.z * 1000f:F0}) m  ·  "
+                                + $"Elev: {HeightAtKm(cursor.x, cursor.z):F0} m",
                                 EditorStyles.miniLabel);
         }
     }
 
     static readonly Vector3 SunDir = new Vector3(0.45f, 0.62f, -0.64f).normalized;
 
-    /// Bir köşenin rengi: kot bandı × Lambert, üstüne maske ve değişim izi.
-    /// Üç yerden birden çağrılıyor (tam kurulum, boyanan bölge, iz sönümü) — üç ayrı
-    /// kopya olsaydı biri güncellenip öteki unutulurdu.
     Color VertexColor(int gi, float val, float lam, float[] m, float glow)
     {
         float band = Mathf.Clamp01((val - plainM) / 5000f);
@@ -2452,7 +2081,7 @@ public class MountainBuilderWindow : EditorWindow
 
         if (mesh == null)
         {
-            mesh = new Mesh { name = "DagYapimi", indexFormat = IndexFormat.UInt32 };
+            mesh = new Mesh { name = "MountainBuilder", indexFormat = IndexFormat.UInt32 };
             mesh.hideFlags = HideFlags.HideAndDontSave;
             mesh.MarkDynamic();
         }
@@ -2487,8 +2116,6 @@ public class MountainBuilderWindow : EditorWindow
             cols[z * View + x] = VertexColor(gi, val, lam, m, 0f);
         }
 
-        // ÜÇGENLER BİR KEZ. Topoloji sabit; her yenilemede yeniden atamak 525 bin
-        // indeksi boşuna GPU'ya yollamak demek.
         mesh.SetVertices(verts);
         mesh.SetColors(cols);
         if (!topoBuilt)
@@ -2509,8 +2136,6 @@ public class MountainBuilderWindow : EditorWindow
 
         if (mat == null)
         {
-            // Sahne aydınlatmasından bağımsız: gölgeleme köşe renginde pişiyor. Işıktan
-            // etkilenen bir teşhis görünümü yalan söyler.
             mat = new Material(Shader.Find("Hidden/Internal-Colored"))
             { hideFlags = HideFlags.HideAndDontSave };
             mat.SetInt("_SrcBlend", (int)BlendMode.One);
@@ -2519,9 +2144,7 @@ public class MountainBuilderWindow : EditorWindow
             mat.SetInt("_Cull", (int)CullMode.Back);
         }
 
-        // İSTATİSTİK AYRI ALANDA. `info` işlem mesajlarıyla eziliyordu ve zirve kotu
-        // ekranda kalmıyordu.
-        stats = $"zirve {top:F0} m · taban {low:F0} m · kabartı {top - low:F0} m · "
-              + $"tavan {MaxM:F0} m · arena {sizeKm:F0} km · hücre {CellM:F1} m";
+        stats = $"Summit {top:F0} m · Base {low:F0} m · Relief {top - low:F0} m · "
+              + $"Ceiling {MaxM:F0} m · Arena {sizeKm:F0} km · Cell {CellM:F1} m";
     }
 }

@@ -1,120 +1,55 @@
-// ROL: kar yağışının iki katmanını (yakın parçacık, uzak doku) tek şiddetten
-// sürer (spec §17, §17.3).
-// Çağıran: sahne (SnowManager'ın yanında).
-
 using UnityEngine;
 using UnityEngine.VFX;
 
-/// İKİ KATMAN, TEK KAYNAK
-/// `[KAYNAK: Langer ve ark., EGSR 2004]`.
-///
-/// Makalenin gözlemi: düşen kar aynı anda hem ayrı ayrı hareket eden
-/// parçacıklardır hem de dinamik bir dokudur. Doku özelliklerini yalnız
-/// parçacıkla yakalamak, render hızını ciddi biçimde düşürecek kadar çok
-/// parçacık gerektiriyor. Çözüm seyrek parçacık + aralarını dolduran doku.
-///
-/// HER İKİSİ DE AYNI `i01`'DEN. Spec §17.3 bunu ayrıca uyarıyor: ayrı
-/// kaynaklardan gelirse "yoğun kar yağıyor ama zemin birikmiyor" hatası
-/// çıkıyor. Şiddet `SnowRuntimeState.SnowfallIntensity01`; bu bileşen onu
-/// yalnız OKUYOR, kendi şiddetini üretmiyor.
+/// Drives dual-layer snowfall (near VFX particles and distant precipitation) from shared intensity (spec §17, §17.3).
 [DisallowMultipleComponent]
 public class SnowfallLayers : MonoBehaviour
 {
-    [Header("Yakın katman — VFX parçacıkları (spec §17.1)")]
-    [Tooltip("VFX_Snowfall örneği. Boş bırakılırsa katman sürülmez; " +
-             "mevcut compute yolu çalışmaya devam eder.")]
+    [Header("Near Layer — VFX Particles (spec §17.1)")]
+    [Tooltip("VFX_Snowfall instance.")]
     [SerializeField] VisualEffect nearLayer;
 
-    [Tooltip("Grafikteki spawn oranı özelliğinin adı.")]
+    [Tooltip("VFX graph spawn rate property name.")]
     [SerializeField] string rateProperty = "SpawnRate";
 
-    [Tooltip("Grafikteki türbülans şiddeti özelliğinin adı.")]
+    [Tooltip("VFX graph turbulence intensity property name.")]
     [SerializeField] string turbulenceProperty = "TurbulenceIntensity";
 
-    [Tooltip("Grafikteki rüzgâr kuvveti özelliğinin adı.")]
+    [Tooltip("VFX graph wind force property name.")]
     [SerializeField] string windProperty = "WindForce";
 
-    [Tooltip("Grafikteki tane emissive rengi özelliğinin adı.")]
+    [Tooltip("VFX graph flake emissive color property name.")]
     [SerializeField] string emissiveProperty = "FlakeEmissive";
 
-    [Tooltip("Grafikteki zemin kotu özelliğinin adı.")]
+    [Tooltip("VFX graph ground Y plane property name.")]
     [SerializeField] string groundProperty = "GroundY";
 
-    // UZAK YAĞIŞ KATMANI YOK. Spec §17.2 kameraya kilitli üç doku perdesi
-    // istiyor; yazıldı, denendi ve KALDIRILDI — ekranda "kâğıt gibi incecik,
-    // derinliği yok" bir levha olarak görünüyordu (kullanıcı iki kez bildirdi,
-    // elemeyle bu sistem olduğu doğrulandı).
-    //
-    // Spec'in gerekçesi "bu katman olmadan parçacık sayısını 3–4 katına
-    // çıkarmak gerekir"; kapasite zaten 40000'den 120000'e çıkarıldı, yani
-    // gerekçe karşılandı. Sapma `DECISIONS.md`'de.
-
-    [Header("Çevre")]
-    [Tooltip("Rüzgâr hızını okuyan köprü. Türbülans şiddeti ondan türüyor.")]
+    [Header("Environment")]
+    [Tooltip("Environment bridge providing wind speed and direction.")]
     [SerializeField] SnowEnvironmentBridge environment;
 
-    [Tooltip("Spawn kutusunun izlediği hedef — kamera.")]
+    [Tooltip("Follow target for spawn box — main camera.")]
     [SerializeField] Transform followTarget;
 
-    [Tooltip("Zemin kotunun okunduğu hedef — oyuncunun AYAĞI. Kamera değil: " +
-             "kamera göz hizasında ve tane oraya inmeden ölür.")]
+    [Tooltip("Ground reference transform — player foot level.")]
     [SerializeField] Transform groundReference;
 
-    [Header("Devir")]
-    [Tooltip("Compute tabanlı eski yağış. Yakın katman bağlıyken KAPATILIYOR; " +
-             "iki yağış sistemi birden koşarsa kar iki katına çıkar.")]
+    [Header("Fallback")]
+    [Tooltip("Compute-based legacy snowfall renderer (disabled when VFX near layer is active).")]
     [SerializeField] SnowfallRenderer computeFallback;
 
-    /// Teşhis: yakın katmanın o anki oranı.
+    /// Diagnostics: Current near layer spawn rate.
     public float NearRate { get; private set; }
 
-    /// Teşhis: grafiğe giden tane emissive'i.
+    /// Diagnostics: Flake emissive color sent to graph.
     public Color NearEmissive { get; private set; }
 
-    /// SÜRÜKLEME KATSAYISI GRAFİKTEKİYLE AYNI OLMAK ZORUNDA.
-    ///
-    /// Rüzgâr grafiğe KUVVET olarak gidiyor; denge hızı `F / drag`. Buradaki
-    /// sayı `SnowVfxBuilder`'daki `dragCoefficient` ile aynı olmazsa tane
-    /// rüzgârdan hızlı ya da yavaş sürüklenir.
     const float FlakeDrag = 9.81f;
-
-    /// Spec §17.1'in formülü: `_FlakeEmissive * mainLightColor * 0.04`.
-    ///
-    /// SPEC'İN 0.04'Ü BU SAHNEDE 25 KAT DÜŞÜK KALIYOR. Ana ışık HDR ve
-    /// şiddeti 2.7; `0.9 * 2.7 * 0.04 = 0.097` çıkıyor ve tane ekranda
-    /// gökyüzünden ayırt edilemiyor.
-    ///
-    /// Ölçüldü — gökyüzü bölgesinde tane pikselleri, üç emissive değeri:
-    ///     0.097 -> en parlak 161, gökyüzü medyanı 107   (görünmüyor)
-    ///     2.5   -> en parlak 227, doygun piksel 0        (doğru)
-    ///     20    -> en parlak 255, doygun piksel 113      (yanmış)
-    ///
-    /// Spec `_FlakeEmissive`'in DEĞERİNİ vermiyor, yalnız formülü veriyor;
-    /// kalibrasyon bize ait.
-    ///
-    /// İKİNCİ KALİBRASYON — DOKU DEĞİŞTİ. Tane dokusu `DefaultDot`'tan (tam
-    /// daire) 4×4 kar tanesi atlasına geçince aynı ekran alanında daha az
-    /// piksel doluyor: dallı tane, boşluklu. Ölçüldü, gökyüzü bölgesinde en
-    /// parlak piksel 222 -> 193. Ölçek 1.0'dan 1.6'ya çıkarıldı, tepe 225'e
-    /// döndü ve hiçbir piksel doymadı.
     const float EmissiveScale = 1.6f;
-
-    /// Tanenin kendi rengi; ana ışık bunu çarpıyor. Kar tanesi nötr beyaza
-    /// yakın, hafif mavi kaçık — saçılma kısa dalga boyunu biraz daha çok
-    /// dağıtıyor.
     static readonly Color FlakeTint = new Color(0.86f, 0.92f, 1f);
 
-    /// Teşhis: katman gerçekten sürülüyor mu.
     public bool NearDriven => nearLayer != null;
 
-    /// TEK YAĞIŞ SİSTEMİ KOŞAR.
-    ///
-    /// Yakın katman bağlıysa compute yolu kapanıyor. İkisi birden koşarsa kar
-    /// iki katına çıkar ve hangisinin ne çizdiği ayrılamaz — bir belirti
-    /// görüldüğünde hangi sisteme bakılacağı belirsiz olur.
-    ///
-    /// Compute yolu VFX doğrulanana kadar duruyor; doğrulanınca silinecek
-    /// (`DECISIONS.md` → Silinecek geçiciler).
     void OnEnable()
     {
         if (computeFallback != null)
@@ -123,8 +58,6 @@ public class SnowfallLayers : MonoBehaviour
 
     void OnDisable()
     {
-        // Bileşen kapanınca eski yol geri açılıyor: kar sisteminin tamamen
-        // susması, yarısının susmasından iyidir.
         if (computeFallback != null) computeFallback.enabled = true;
     }
 
@@ -136,11 +69,6 @@ public class SnowfallLayers : MonoBehaviour
 
         if (nearLayer == null) return;
 
-        // SPAWN KUTUSU KAMERAYI İZLİYOR (spec §17.1): merkez
-        // `cameraPos + up * 11 + windDir * 3`, 1 m ızgarasına SNAP'Lİ.
-        //
-        // Snap yoksa kamera hareketinde spawn deseni yürüyor — taneler
-        // kameranın peşinden sürüklenen bir küme gibi görünüyor.
         if (followTarget != null)
         {
             Vector3 wind = environment != null ? environment.WindDirection : Vector3.zero;
@@ -150,52 +78,19 @@ public class SnowfallLayers : MonoBehaviour
                 Mathf.Floor(c.x), Mathf.Floor(c.y), Mathf.Floor(c.z));
         }
 
-        // ORAN GRAFİKTE DEĞİL BURADA. Grafikteki sabit oran yalnız
-        // varsayılan; şiddet oyunun hava sisteminden geliyor (spec §17.3).
         if (nearLayer.HasFloat(rateProperty))
             nearLayer.SetFloat(rateProperty, NearRate);
 
-        // TÜRBÜLANS TAMAMEN RÜZGÂRA BAĞLI — spec'in `+ 0.15` tabanı DÜŞTÜ.
-        //
-        // Spec §17.1 `Intensity = 0.35 * _WindSpeed + 0.15` veriyor ve sayıları
-        // `[KALİBRASYON]` diye işaretliyor. Taban terim ölçümde yanlış çıktı:
-        // türbülans bloğu uzayda TUTARLI bir alan (dalga boyu ~8 m) ve zamanla
-        // değişmiyor. Rüzgâr sıfırken 0.15 / drag 0.9 = 0.167 m/s'lik ortak bir
-        // sürüklenme kalıyor; 5 saniyelik ömürde 83 cm ve çevredeki bütün taneler
-        // aynı yöne. Duran oyuncu tek lobun içinde kaldığı için bu hafif bir
-        // rüzgâr gibi okunuyordu (kullanıcı bildirdi: yürürken düzeliyor,
-        // dururken rüzgâr varmış gibi).
-        //
-        // TUTARLI HAVA AKIMI ZATEN RÜZGÂRIN TANIMI. Rüzgâr 0'ken net sürüklenme
-        // de 0 olmalı. Tanenin rüzgârsız havada çırpınması ayrı bir terim —
-        // spec'in "Salınım"ı, grafikte `SnowFlakeFlutter`.
         if (environment != null && nearLayer.HasFloat(turbulenceProperty))
             nearLayer.SetFloat(turbulenceProperty, 0.35f * environment.WindSpeed);
 
-        // RÜZGÂR KUVVET OLARAK GİDİYOR (spec §17.1). Denge hızı `F / drag`
-        // olduğu için hedef hız burada sürüklemeyle çarpılıyor.
         if (environment != null && nearLayer.HasVector3(windProperty))
             nearLayer.SetVector3(windProperty,
                                  environment.WindDirection * environment.WindSpeed * FlakeDrag);
 
-        // ZEMİN KOTU (spec §17.1: tane zeminin 2 cm altına inince ölüyor).
-        //
-        // KAMERA DEĞİL AYAK. İlk sürüm `followTarget`i (kamerayı) kullandı ve
-        // KARIN TAMAMINI SİLDİ: kamera göz hizasında (zeminden 1.65 m yukarıda),
-        // kesme düzlemi de oraya çıkınca her tane daha havadayken ölüyordu —
-        // ölçüldü, `aliveParticleCount = 0`.
-        //
-        // VFX'in zemin yükseklik dokusuna erişimi yok; oyuncunun ayak kotu
-        // yeterince iyi bir yaklaşım, çünkü spawn kutusu yalnız 24 m.
-        // KOT DÜNYA GÖNDERİLİYOR. Sistem dünya uzayında (`SnowVfxBuilder.SetWorldSpace`),
-        // yani grafikteki `position` da dünya koordinatı. Sistem yerel iken
-        // burada kutu konumu çıkarılıyordu; uzay değişince o düzeltme
-        // gerekçesini yitirdi.
         if (groundReference != null && nearLayer.HasFloat(groundProperty))
             nearLayer.SetFloat(groundProperty, groundReference.position.y);
 
-        // TANE GECE PARLAMASIN. Emissive ana ışık renginden türüyor; sabit
-        // bırakılırsa kar karanlıkta da aynı parlaklıkta duruyor.
         if (nearLayer.HasVector4(emissiveProperty))
         {
             Color light = environment != null && environment.Sun != null

@@ -1,16 +1,10 @@
-// ROL: rüzgâr gölgesini, taşınımı, sastrugiyi ve ısı kaynaklarını ÖLÇER.
-// Çağıran: menü — To The Summit/Snow/Wind Test.
+// Measures wind shadow, transport, sastrugi, and heat sources.
+// Invoked by: Menu — To The Summit/Snow/Wind Test.
 
 using System.Text;
 using UnityEditor;
 using UnityEngine;
 
-/// EN KRİTİK İDDİA: KÜTLE KORUNUYOR.
-///
-/// Spec §21 Faz 12 bunu açıkça istiyor: "`Σ swe` `KWindTransport` sırasında
-/// değişmemeli. Haç döşemesi doğru uygulandıysa bu test geçer; atomik veya
-/// naif scatter kullanıldıysa geçmez." Kar çoğalırsa dağ beyazlar, kaybolursa
-/// erir — ikisi de saatler sonra fark edilir.
 public static class SnowWindTest
 {
     const string SimPath = "Assets/Snow/Shaders/SnowSim.compute";
@@ -31,7 +25,7 @@ public static class SnowWindTest
     public static string Run(out bool ok)
     {
         var r = new StringBuilder(8192);
-        r.AppendLine("# Kar — rüzgâr, sastrugi ve ısı sınaması");
+        r.AppendLine("# Snow — Wind, Sastrugi, and Heat Test");
         r.AppendLine(System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         r.AppendLine();
 
@@ -41,20 +35,18 @@ public static class SnowWindTest
         ok &= HeatTest(r);
 
         r.AppendLine();
-        r.AppendLine(ok ? "SONUÇ: TAMAM — bütün sınamalar geçti."
-                        : "SONUÇ: BAŞARISIZ — yukarıdaki satırlara bakın.");
+        r.AppendLine(ok ? "RESULT: PASSED — all tests completed successfully."
+                        : "RESULT: FAILED — see above for details.");
         return r.ToString();
     }
 
-    // ------------------------------------------------------- rüzgâr gölgesi
-
     static bool ShadowTest(StringBuilder r)
     {
-        r.AppendLine("## Rüzgâr gölgesi (spec §18.0)");
-        r.AppendLine("  [i] [KAYNAK: Cordonnier ve ark., EG 2018, §4.2]");
+        r.AppendLine("## Wind Shadow (spec §18.0)");
+        r.AppendLine("  [i] [Reference: Cordonnier et al., EG 2018, §4.2]");
 
         var sim = AssetDatabase.LoadAssetAtPath<ComputeShader>(SimPath);
-        if (sim == null) { r.AppendLine("  [-] " + SimPath + " yüklenemedi."); return false; }
+        if (sim == null) { r.AppendLine("  [-] " + SimPath + " could not be loaded."); return false; }
 
         int kernel = sim.FindKernel("KWindShadow");
         int groups = Mathf.CeilToInt(SkyRes / 8f);
@@ -67,7 +59,6 @@ public static class SnowWindTest
 
         try
         {
-            // Ortada, kuzey-güney uzanan 8 m yüksek bir duvar.
             WriteWall(sky, wallColumn: SkyRes / 2, wallHeight: GroundY + 8f);
 
             Shader.SetGlobalVector(SnowShaderIDs.SkyCenterXZ, Vector4.zero);
@@ -84,11 +75,10 @@ public static class SnowWindTest
             bool leeward = lee > 0.05f && windward < lee * 0.25f;
             all &= leeward;
 
-            r.AppendLine("  [" + M(leeward) + "] +X rüzgârı        duvarın arkası " +
-                         lee.ToString("0.000") + " m,  önü " + windward.ToString("0.000") +
-                         " m  (kapak rüzgâr ALTINDA olmalı)");
+            r.AppendLine("  [" + M(leeward) + "] +X wind             behind wall " +
+                         lee.ToString("0.000") + " m,  in front " + windward.ToString("0.000") +
+                         " m  (shadow forms leeward)");
 
-            // Yön çevrilince kapak öbür tarafa geçmeli.
             float leeBack = Solve(sim, kernel, groups, shadow, sky, ground,
                                   wind: new Vector3(-10f, 0f, 0f), sampleColumn: SkyRes / 2 - 8);
 
@@ -99,19 +89,18 @@ public static class SnowWindTest
             bool flipped = leeBack > 0.05f && windwardBack < leeBack * 0.25f;
             all &= flipped;
 
-            r.AppendLine("  [" + M(flipped) + "] −X rüzgârı        duvarın arkası " +
-                         leeBack.ToString("0.000") + " m,  önü " + windwardBack.ToString("0.000") +
-                         " m  (kapak taraf değiştirdi)");
+            r.AppendLine("  [" + M(flipped) + "] -X wind             behind wall " +
+                         leeBack.ToString("0.000") + " m,  in front " + windwardBack.ToString("0.000") +
+                         " m  (shadow flips sides)");
 
-            // Rüzgâr yoksa gölge de yok.
             float calm = Solve(sim, kernel, groups, shadow, sky, ground,
                                wind: Vector3.zero, sampleColumn: SkyRes / 2 + 8);
 
             bool noWind = calm < 0.01f;
             all &= noWind;
 
-            r.AppendLine("  [" + M(noWind) + "] Rüzgârsız         " + calm.ToString("0.000") +
-                         " m  (kapak yok)");
+            r.AppendLine("  [" + M(noWind) + "] Calm wind            " + calm.ToString("0.000") +
+                         " m  (no shadow)");
         }
         finally
         {
@@ -123,8 +112,6 @@ public static class SnowWindTest
         return all;
     }
 
-    /// Yirmi dört Gauss-Seidel iterasyonu, her biri iki parite. Üretimde
-    /// kareye yayılıyor; burada tek seferde koşuyor.
     static float Solve(ComputeShader sim, int kernel, int groups,
                        RenderTexture shadow, RenderTexture sky, Texture2D ground,
                        Vector3 wind, int sampleColumn, bool reset = true)
@@ -145,23 +132,19 @@ public static class SnowWindTest
             sim.Dispatch(kernel, groups, groups, 1);
         }
 
-        // Gölge = Wz − A. Duvarın dışında A zemin yüksekliği.
         Color c = ReadPixel(shadow, sampleColumn, SkyRes / 2);
         return Mathf.Max(0f, c.r - GroundY);
     }
 
-    // ----------------------------------------------------------- kütle testi
-
     static bool MassTest(StringBuilder r)
     {
         r.AppendLine();
-        r.AppendLine("## Kütle korunumu (spec §21 Faz 12)");
-        r.AppendLine("  [i] Haç döşemesi doğruysa geçer; atomik veya naif scatter kullanıldıysa geçmez.");
+        r.AppendLine("## Mass Conservation (spec §21 Phase 12)");
 
         var sim = AssetDatabase.LoadAssetAtPath<ComputeShader>(SimPath);
         var kernels = AssetDatabase.LoadAssetAtPath<ComputeShader>(KernelPath);
 
-        if (sim == null || kernels == null) { r.AppendLine("  [-] Compute yüklenemedi."); return false; }
+        if (sim == null || kernels == null) { r.AppendLine("  [-] Compute shaders could not be loaded."); return false; }
 
         int transport = sim.FindKernel("KWindTransport");
         int stamp = kernels.FindKernel("KStamp");
@@ -184,12 +167,8 @@ public static class SnowWindTest
             Shader.SetGlobalFloat(SnowShaderIDs.SkyAreaSize, SkyArea);
             Shader.SetGlobalFloat(SnowShaderIDs.SkyResolution, SkyRes);
 
-            // Gölge yok: her yerde erozyon mümkün.
             ClearRg(shadow);
 
-            // ENGEBELİ KAR. Düz bir yüzeyde eğrilik sıfır ve hiç taşınım
-            // olmaz; ölçüm o zaman "kütle korundu" der ama hiçbir şey
-            // olmadığı için der.
             WriteBumpySnow(snow, kernels, stamp, groups);
             ClearArgb(trail);
 
@@ -220,20 +199,17 @@ public static class SnowWindTest
             bool conserved = drift < 0.01f;
             all &= conserved;
 
-            r.AppendLine("  [" + M(conserved) + "] Σ swe             " + before.ToString("0.000") +
-                         " → " + after.ToString("0.000") + "  sapma %" +
-                         (drift * 100f).ToString("0.000") + "  (tolerans %1)");
+            r.AppendLine("  [" + M(conserved) + "] Sum SWE              " + before.ToString("0.000") +
+                         " -> " + after.ToString("0.000") + "  drift " +
+                         (drift * 100f).ToString("0.000") + "%  (tolerance 1%)");
 
-            // TAŞINIM GERÇEKTEN OLDU MU. Kütle korunmuş olabilir çünkü
-            // hiçbir şey olmamıştır; dağılımın değiştiği ayrıca ölçülüyor.
             float variance = SweVariance(snow);
             bool moved = variance > 0f;
             all &= moved;
 
-            r.AppendLine("  [" + M(moved) + "] Dağılım değişti   varyans " +
-                         variance.ToString("0.0000000") + "  (sıfırsa hiç taşınım olmamış)");
+            r.AppendLine("  [" + M(moved) + "] Distribution changed variance " +
+                         variance.ToString("0.0000000"));
 
-            // EŞİK: 4 m/s'de hiç taşınım olmamalı.
             WriteBumpySnow(snow, kernels, stamp, groups);
             float calmBefore = SumSwe(snow);
 
@@ -252,9 +228,9 @@ public static class SnowWindTest
             bool gated = Mathf.Abs(calmAfter - calmBefore) < calmBefore * 1e-5f;
             all &= gated;
 
-            r.AppendLine("  [" + M(gated) + "] 4 m/s eşiği       Σ swe " +
-                         calmBefore.ToString("0.000") + " → " + calmAfter.ToString("0.000") +
-                         "  (eşik gevşek karda 5 m/s)");
+            r.AppendLine("  [" + M(gated) + "] 4 m/s threshold     Sum SWE " +
+                         calmBefore.ToString("0.000") + " -> " + calmAfter.ToString("0.000") +
+                         "  (loose snow threshold 5 m/s)");
         }
         finally
         {
@@ -267,15 +243,13 @@ public static class SnowWindTest
         return all;
     }
 
-    // -------------------------------------------------------------- sastrugi
-
     static bool SastrugiTest(StringBuilder r)
     {
         r.AppendLine();
         r.AppendLine("## Sastrugi (spec §18.4)");
 
         var kernels = AssetDatabase.LoadAssetAtPath<ComputeShader>(KernelPath);
-        if (kernels == null) { r.AppendLine("  [-] Test kernel'i yüklenemedi."); return false; }
+        if (kernels == null) { r.AppendLine("  [-] Test kernel could not be loaded."); return false; }
 
         int kernel = kernels.FindKernel("KTestSastrugi");
         const int Samples = 256;
@@ -287,9 +261,6 @@ public static class SnowWindTest
 
         try
         {
-            // ÖNCE DOKUNUN KENDİSİ. Gürültü sabitse aşağıdaki bütün ölçümler
-            // sıfır çıkar ve sebebi kernel sanılır (bir kez oldu: `.r` sıfır
-            // okunuyordu çünkü içe aktarıcı değeri alpha'ya koymuştu).
             string noisePath = AssetDatabase.GetAssetPath(noise);
             var noiseImporter = (TextureImporter)AssetImporter.GetAtPath(noisePath);
 
@@ -312,12 +283,9 @@ public static class SnowWindTest
             bool noiseOk = noiseMax - noiseMin > 0.2f;
             all &= noiseOk;
 
-            r.AppendLine("  [" + M(noiseOk) + "] Gürültü dokusu       .r aralığı " +
-                         noiseMin.ToString("0.000") + " – " + noiseMax.ToString("0.000") +
-                         "  (sabitse desen de sabit olur)");
+            r.AppendLine("  [" + M(noiseOk) + "] Noise texture        .r range " +
+                         noiseMin.ToString("0.000") + " – " + noiseMax.ToString("0.000"));
 
-            // Rüzgâr +X. Sırtlar rüzgâra DİK uzanıyor: dalga boyu rüzgâr
-            // yönünde KISA (0.35 m), sırtlar rüzgâra dik yönde UZUN (1.20 m).
             Shader.SetGlobalVector(SnowShaderIDs.SastrugiWindDir, new Vector4(1f, 0f, 0f, 0f));
 
             float alongVariation = Variation(kernels, kernel, rt, Samples,
@@ -326,25 +294,22 @@ public static class SnowWindTest
             float acrossVariation = Variation(kernels, kernel, rt, Samples,
                                               axis: new Vector2(0f, 1f), noise);
 
-            // Rüzgâr yönünde daha hızlı değişmeli: dalga boyu orada kısa.
             bool oriented = alongVariation > acrossVariation * 1.5f;
             all &= oriented;
 
-            r.AppendLine("  [" + M(oriented) + "] Sırtlar rüzgâra DİK  rüzgâr yönünde değişim " +
-                         (alongVariation * 1000f).ToString("0.00") + " mm/örnek,  dik yönde " +
+            r.AppendLine("  [" + M(oriented) + "] Ridges PERPENDICULAR wind variation " +
+                         (alongVariation * 1000f).ToString("0.00") + " mm/sample,  across " +
                          (acrossVariation * 1000f).ToString("0.00") +
-                         " mm/örnek  (oran " +
+                         " mm/sample  (ratio " +
                          (alongVariation / Mathf.Max(acrossVariation, 1e-9f)).ToString("0.00") + ")");
 
-            // Genlik sıfırsa hiç yer değiştirme yok.
             float zero = Variation(kernels, kernel, rt, Samples,
                                    axis: new Vector2(1f, 0f), noise, amplitude: 0f);
 
             bool gated = zero < 1e-6f;
             all &= gated;
 
-            r.AppendLine("  [" + M(gated) + "] Genlik 0             " + zero.ToString("0.0000000") +
-                         "  (sırt yoksa yüzey düz)");
+            r.AppendLine("  [" + M(gated) + "] Amplitude 0          " + zero.ToString("0.0000000"));
         }
         finally
         {
@@ -374,16 +339,14 @@ public static class SnowWindTest
         return sum / (samples - 1);
     }
 
-    // ------------------------------------------------------------ ısı kaynağı
-
     static bool HeatTest(StringBuilder r)
     {
         r.AppendLine();
-        r.AppendLine("## Isı kaynağı (spec §18.2)");
-        r.AppendLine("  [i] [KAYNAK: Grosbellet ve ark., CGF 2016 — alanlar TOPLANIR]");
+        r.AppendLine("## Heat Sources (spec §18.2)");
+        r.AppendLine("  [i] [Reference: Grosbellet et al., CGF 2016]");
 
         var kernels = AssetDatabase.LoadAssetAtPath<ComputeShader>(KernelPath);
-        if (kernels == null) { r.AppendLine("  [-] Test kernel'i yüklenemedi."); return false; }
+        if (kernels == null) { r.AppendLine("  [-] Test kernel could not be loaded."); return false; }
 
         int kernel = kernels.FindKernel("KTestHeat");
         const int Samples = 128;
@@ -397,7 +360,6 @@ public static class SnowWindTest
 
         try
         {
-            // Tek kaynak: merkezde, yarıçap 2 m, şiddet 0.5 m.
             posRadius[0] = new Vector4(0f, 0f, 0f, 2f);
             heatParams[0] = new Vector4(0.5f, 0f, 0f, 0f);
 
@@ -407,7 +369,6 @@ public static class SnowWindTest
 
             float[] single = Profile(kernels, kernel, rt, Samples, step: 0.05f);
 
-            // Merkezde tam şiddet, yarıçapta TAM SIFIR.
             bool center = Mathf.Abs(single[0] - 0.5f) < 1e-3f;
 
             int atRadius = Mathf.RoundToInt(2f / 0.05f);
@@ -415,14 +376,13 @@ public static class SnowWindTest
 
             all &= center && compact;
 
-            r.AppendLine("  [" + M(center) + "] Merkez               " + single[0].ToString("0.0000") +
-                         "  (şiddet 0.5)");
-            r.AppendLine("  [" + M(compact) + "] Yarıçapta TAM sıfır  2.0 m → " +
-                         single[atRadius].ToString("0.0000000") + ",  2.2 m → " +
+            r.AppendLine("  [" + M(center) + "] Center                 " + single[0].ToString("0.0000") +
+                         "  (intensity 0.5)");
+            r.AppendLine("  [" + M(compact) + "] EXACT zero at radius   2.0 m -> " +
+                         single[atRadius].ToString("0.0000000") + ",  2.2 m -> " +
                          single[atRadius + 4].ToString("0.0000000") +
-                         "  (Wyvill kompakt destekli; lineer/Gauss kuyruk bırakırdı)");
+                         "  (Wyvill compact support)");
 
-            // İKİ KAYNAK ÜST ÜSTE → TOPLANIYOR.
             posRadius[1] = new Vector4(0f, 0f, 0f, 2f);
             heatParams[1] = new Vector4(0.5f, 0f, 0f, 0f);
 
@@ -435,19 +395,17 @@ public static class SnowWindTest
             bool sums = Mathf.Abs(pair[0] - 1f) < 1e-3f;
             all &= sums;
 
-            r.AppendLine("  [" + M(sums) + "] İki kaynak TOPLANIYOR " + single[0].ToString("0.000") +
-                         " + " + single[0].ToString("0.000") + " = " + pair[0].ToString("0.000") +
-                         "  (çarpılsaydı 0.250 olurdu)");
+            r.AppendLine("  [" + M(sums) + "] Two sources ADDITIVE   " + single[0].ToString("0.000") +
+                         " + " + single[0].ToString("0.000") + " = " + pair[0].ToString("0.000"));
 
-            // Kaynak yoksa alan sıfır.
             Shader.SetGlobalInt(SnowShaderIDs.HeatCount, 0);
             float[] none = Profile(kernels, kernel, rt, Samples, step: 0.05f);
 
             bool empty = none[0] < 1e-9f;
             all &= empty;
 
-            r.AppendLine("  [" + M(empty) + "] Kaynak yok            " + none[0].ToString("0.0000000") +
-                         "  (`_HeatCount = 0` iken maliyet de yok)");
+            r.AppendLine("  [" + M(empty) + "] No sources             " + none[0].ToString("0.0000000") +
+                         "  (`_HeatCount = 0` zero cost)");
         }
         finally
         {
@@ -472,8 +430,6 @@ public static class SnowWindTest
 
         return profile;
     }
-
-    // ----------------------------------------------------------------- yardım
 
     static string M(bool ok) => ok ? "+" : "-";
 
@@ -544,7 +500,6 @@ public static class SnowWindTest
         for (int y = 0; y < Res; y++)
         for (int x = 0; x < Res; x++)
         {
-            // Dalgalı bir yüzey: hem dışbükey hem içbükey bölgeler olsun.
             float bump = Mathf.Sin(x * 0.15f) * Mathf.Cos(y * 0.11f);
             px[y * Res + x] = new Color(0.05f + bump * 0.02f, 0.10f, 0f, 0f);
         }

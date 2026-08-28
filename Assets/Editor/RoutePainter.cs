@@ -3,56 +3,33 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-/// ROTA FIRÇASI. Otobüs yolu, doğuş noktası, tırmanış hatları, kamplar ve marketler Scene View'da
-/// araziye çizilerek işaretleniyor.
-///
-/// Neden araç: bunlar sayıyla verilemez. "Doğuş noktası (4210, 186, 9330)" diye bir
-/// koordinat yazmak, dağa bakıp "şu sırtın arkasından çıkalım" demenin yerini tutmuyor.
-/// Karar araziye bakarak veriliyor, o yüzden işaret de araziye konuyor.
-///
-/// FIRÇA YARIÇAPI VERİ. Ayrı bir "koridor genişliği" sayısı tutulmuyor: hattı kalın
-/// çizersen yol geniş, ince çizersen patika olur; kampı büyük çizersen düzleştirilecek
-/// alan büyük olur.
+/// ROUTE BRUSH. Interactively paints bus road, spawn point, approach branches, camps, and shelters in Scene View.
 public class RoutePainter : EditorWindow
 {
     const string RoutePath = "Assets/Settings/MountainRoute.asset";
 
-    /// Sürüklerken iki nokta arası mesafe, FIRÇA BOYUNA bağlı. Sabit 25 metreydi ve
-    /// ince fırçayla eğri çizilemiyordu: yakınlaşıp yol çizerken noktalar arası mesafe
-    /// yolun kendisinden yedi kat büyük kalıyor, hat zikzak çıkıyordu.
-    ///
-    /// Oran 0.6: nokta aralığı yolun genişliğinden dar, yani dönüş yolun kendi
-    /// kalınlığından küçük adımlarla örnekleniyor ve eğri okunuyor. Kalın fırçada
-    /// aralık kendiliğinden büyüyor, gereksiz nokta birikmiyor.
     float Spacing => Mathf.Max(2f, radius * 0.6f);
 
     enum Layer { Spawn, Road, Branch, Camp, Shop }
-
-    /// BÖLGE. Başlangıç çevresi (otobüs, doğuş, yaklaşma) ile dağın kendisi ayrı
-    /// tutuluyor: ikisi farklı zamanlarda, farklı sorularla çiziliyor ve tek bir düz
-    /// katman listesinde karışıyorlardı.
     enum Region { Start, Mountain }
 
     static readonly Layer[] StartLayers =
         { Layer.Spawn, Layer.Road, Layer.Branch, Layer.Camp, Layer.Shop };
 
     static readonly string[] StartLayerNames =
-        { "Doğuş", "Yol", "Hat", "Kamp", "Market" };
+        { "Spawn", "Road", "Branch", "Camp", "Shop" };
 
     static readonly Color[] BranchColors =
     {
-        new(1f, 0.55f, 0.1f),      // turuncu
-        new(0.95f, 0.25f, 0.75f),  // macenta
-        new(0.2f, 0.85f, 0.9f),    // camgöbeği
-        new(0.95f, 0.3f, 0.25f),   // kırmızı
-        new(0.7f, 0.9f, 0.25f),    // fıstık yeşili
-        new(0.75f, 0.6f, 1f),      // lila
+        new(1f, 0.55f, 0.1f),      // orange
+        new(0.95f, 0.25f, 0.75f),  // magenta
+        new(0.2f, 0.85f, 0.9f),    // cyan
+        new(0.95f, 0.3f, 0.25f),   // red
+        new(0.7f, 0.9f, 0.25f),    // lime
+        new(0.75f, 0.6f, 1f),      // lilac
     };
 
-    /// HATLAR SABİT. "Hat ekle" butonu vardı ve kaldırıldı: hat sayısı bir tasarım
-    /// kararı, çizim sırasında verilecek bir şey değil. Değişmesi gerekiyorsa burası
-    /// değişir ve eksik olan kendiliğinden açılır.
-    static readonly string[] BranchNames = { "Hat 1", "Hat 2", "Hat 3", "Ana hat" };
+    static readonly string[] BranchNames = { "Branch 1", "Branch 2", "Branch 3", "Main Branch" };
 
     static readonly Color SpawnColor = new(0.25f, 1f, 0.35f);
     static readonly Color RoadColor = new(0.9f, 0.88f, 0.82f);
@@ -72,7 +49,7 @@ public class RoutePainter : EditorWindow
     bool hasLastPaint;
 
     [MenuItem("To The Summit/Route Brush", false, 40)]
-    static void Open() => GetWindow<RoutePainter>("Rota Fırçası").Show();
+    static void Open() => GetWindow<RoutePainter>("Route Brush").Show();
 
     void OnEnable()
     {
@@ -99,9 +76,6 @@ public class RoutePainter : EditorWindow
         return asset;
     }
 
-    /// Sabit listedeki her hattın var olduğunu garanti eder. Eksik olan eklenir, var
-    /// olan ELLENMEZ — içindeki çizim kaybolmamalı. Fazlası da silinmez: elle silinmiş
-    /// bir hattı geri getirmek, çizilmiş bir hattı yok etmekten ucuz.
     static void EnsureBranches(MountainRoute asset)
     {
         bool added = false;
@@ -120,20 +94,18 @@ public class RoutePainter : EditorWindow
         AssetDatabase.SaveAssetIfDirty(asset);
     }
 
-    // ------------------------------------------------------------------ pencere
-
     void OnGUI()
     {
         if (route == null) route = LoadOrCreate();
 
         EditorGUILayout.HelpBox(
-            "Sol tık: işaretle. Sürükleyerek hat çiz.\n" +
-            "Shift + tık: sil.\n" +
-            "Ctrl + tekerlek: fırça yarıçapı.\n\n" +
-            "Doğuş: bir tık yer, ikinci tık BAKIŞ YÖNÜ.",
+            "Left click: Mark point. Drag to paint continuous path.\n" +
+            "Shift + click: Erase marks.\n" +
+            "Ctrl + scroll wheel: Adjust brush radius.\n\n" +
+            "Spawn: First click sets position, second click sets LOOK DIRECTION.",
             MessageType.None);
 
-        bool next = GUILayout.Toggle(painting, "Fırça açık", "Button", GUILayout.Height(28f));
+        bool next = GUILayout.Toggle(painting, "Brush Active", "Button", GUILayout.Height(28f));
         if (next != painting)
         {
             painting = next;
@@ -142,15 +114,13 @@ public class RoutePainter : EditorWindow
 
         EditorGUILayout.Space();
         region = (Region)GUILayout.SelectionGrid((int)region,
-            new[] { "BAŞLANGIÇ", "DAĞ" }, 2, GUILayout.Height(24f));
+            new[] { "START", "MOUNTAIN" }, 2, GUILayout.Height(24f));
 
         if (region == Region.Mountain)
         {
             EditorGUILayout.Space();
             EditorGUILayout.HelpBox(
-                "Dağ rotası henüz tanımlanmadı. " +
-                "Tırmanış hatları, geçitler ve tehlike bölgeleri buraya gelecek — " +
-                "başlangıç çevresiyle karışmasın diye ayrı duruyor.",
+                "Mountain route is reserved for upper mountain climbing lines and danger zones.",
                 MessageType.Info);
             return;
         }
@@ -173,27 +143,17 @@ public class RoutePainter : EditorWindow
         }
 
         EditorGUILayout.Space();
-        radius = EditorGUILayout.Slider("Yarıçap (m)", radius, 5f, 300f);
+        radius = EditorGUILayout.Slider("Radius (m)", radius, 5f, 300f);
 
         EditorGUILayout.Space();
         DrawStatus();
 
         EditorGUILayout.Space();
-        if (GUILayout.Button("Yarıçapları gerçekçi dağıt")) SpreadRadii();
-        if (GUILayout.Button("Seçili katmanı temizle")) ClearLayer();
-
-        // Zorunlu değil: çizim kendiliğinden kaydediliyor. Bu buton ham veriyi
-        // açıyor — hat adını değiştirmek, tek bir noktayı elle düzeltmek için.
-        if (GUILayout.Button("Ham veriyi Inspector'da aç")) Selection.activeObject = route;
+        if (GUILayout.Button("Spread Radii Realistically")) SpreadRadii();
+        if (GUILayout.Button("Clear Selected Layer")) ClearLayer();
+        if (GUILayout.Button("Inspect Raw Data Asset")) Selection.activeObject = route;
     }
 
-    /// Seçili katmanın durumu. Yatayda makul görünen bir hat düşeyde duvar olabiliyor;
-    /// eğim çizim anında okunmazsa hat körlemesine çiziliyor.
-    ///
-    /// YALNIZ KARAR VERDİREN SAYILAR: hattın kaç noktadan
-    /// oluştuğu, yarıçapların ham dağılımı gibi iç veriler panelden çıkarıldı — okuyanı
-    /// yormaktan başka işe yaramıyorlardı. Kalanların hepsinin bir karşılığı var:
-    /// yürünebilir mi, ne kadar sürer, otobüs çıkabilir mi.
     void DrawStatus()
     {
         var terrain = Object.FindAnyObjectByType<Terrain>();
@@ -202,8 +162,8 @@ public class RoutePainter : EditorWindow
         if (layer == Layer.Spawn)
         {
             EditorGUILayout.LabelField(route.spawnSet
-                ? $"Başlangıç işaretli — bakış {route.spawnYaw:F0}°"
-                : "Başlangıç işaretlenmedi");
+                ? $"Spawn marked — Look yaw {route.spawnYaw:F0}°"
+                : "Spawn not marked");
             return;
         }
 
@@ -211,22 +171,22 @@ public class RoutePainter : EditorWindow
 
         if (layer == Layer.Camp || layer == Layer.Shop)
         {
-            string what = layer == Layer.Camp ? "kamp" : "market";
+            string what = layer == Layer.Camp ? "camp" : "shop";
             if (marks.Count == 0)
             {
-                EditorGUILayout.LabelField($"Henüz {what} yok");
+                EditorGUILayout.LabelField($"No {what}s marked yet");
                 return;
             }
 
             float span = 0f;
             foreach (MountainRoute.Mark mark in marks) span += mark.radius * 2f;
-            EditorGUILayout.LabelField($"{marks.Count} {what}", $"ortalama {span / marks.Count:F0} m çapında");
+            EditorGUILayout.LabelField($"{marks.Count} {what}(s)", $"Average {span / marks.Count:F0} m diameter");
             return;
         }
 
         if (marks.Count < 2)
         {
-            EditorGUILayout.LabelField("Bu hat henüz çizilmedi");
+            EditorGUILayout.LabelField("Path not drawn yet");
             return;
         }
 
@@ -237,29 +197,25 @@ public class RoutePainter : EditorWindow
         foreach (MountainRoute.Mark mark in marks) width += mark.radius * 2f;
         width /= marks.Count;
 
-        EditorGUILayout.LabelField("Genişlik", $"{width:F1} m");
-        EditorGUILayout.LabelField("Uzunluk", $"{reading.length / 1000f:F2} km");
-        EditorGUILayout.LabelField("Tırmanış", $"{reading.ascent:F0} m");
+        EditorGUILayout.LabelField("Width", $"{width:F1} m");
+        EditorGUILayout.LabelField("Length", $"{reading.length / 1000f:F2} km");
+        EditorGUILayout.LabelField("Ascent", $"{reading.ascent:F0} m");
 
-        // Yürüme süresi: düz mesafe artı yükselme cezası (600 m/saat tırmanma).
-        // Koşu hedefi 90-120 dakika; bu hattın ondan ne kadar yiyeceği burada okunuyor.
         float minutes = reading.length / 2.2f / 60f + reading.ascent / 600f;
-        EditorGUILayout.LabelField("Yürüme süresi", $"~{minutes:F0} dakika");
+        EditorGUILayout.LabelField("Est. Walk Time", $"~{minutes:F0} minutes");
 
-        // Eğim SAYIYLA DEĞİL HÜKÜMLE: "%38" karar verdirmiyor, "otobüs çıkamaz"
-        // verdiriyor. Nerede olduğu sahnede kırmızı çiziliyor.
         bool road = layer == Layer.Road;
         bool tooSteep = reading.maxGrade > threshold;
 
         string verdict = road
-            ? (tooSteep ? "Fazla dik — otobüs çıkamaz" : "Otobüs çıkabilir")
-            : (tooSteep ? "Dik yerler var — bisikletten inilir" : "Baştan sona bisikletle");
+            ? (tooSteep ? "Too steep — Inaccessible by bus" : "Accessible by bus")
+            : (tooSteep ? "Steep sections present — Requires pushing bike" : "Rideable throughout");
 
         EditorGUILayout.HelpBox(verdict, tooSteep ? MessageType.Warning : MessageType.Info);
 
         if (tooSteep)
-            EditorGUILayout.LabelField("En dik yokuş",
-                $"%{reading.maxGrade * 100f:F0}   ({reading.steepLength:F0} m boyunca)");
+            EditorGUILayout.LabelField("Steepest gradient",
+                $"{reading.maxGrade * 100f:F0}% ({reading.steepLength:F0} m span)");
     }
 
     List<MountainRoute.Mark> SelectedMarks() => layer switch
@@ -271,56 +227,26 @@ public class RoutePainter : EditorWindow
         _ => null
     };
 
-    /// Yol otobüs için, hatlar bisiklet için. Yaklaşma bisikletle geçiliyor; yürüyüş
-    /// eşiği (%25) bisikletin inip ittiği yokuşu "uygun" gösteriyordu.
     float SteepThreshold() =>
         layer == Layer.Road ? RouteProfile.RoadGrade : RouteProfile.BikeGrade;
 
-    /// TÜM katmanların yarıçaplarını gerçekçi ölçülere oturtur.
-    ///
-    /// Neden gerekli: fırça tek bir yarıçapla çiziyor ve bütün hat aynı kalınlıkta
-    /// çıkıyor. Gerçekte yol ne sabit genişliktedir ne de patika ile aynı: otobüsün
-    /// geçtiği toprak yol 7 metre, keçi yolu 2 metre.
-    ///
-    /// DEĞİŞİM HAT BOYUNCA YUMUŞAK, nokta başına rastgele değil. Nokta başına gürültü
-    /// koridoru testere dişine çeviriyor; genişlik onlarca metrede değişir, adım başına
-    /// değil. Bu yüzden dalga boyu sekiz nokta (~200 m).
-    ///
-    /// Tohum NOKTA İNDEKSİNDEN: aynı hatta tekrar basınca aynı sonuç çıkıyor, her
-    /// tıklamada koridor yeniden zıplamıyor.
     void SpreadRadii()
     {
-        Undo.RecordObject(route, "Yarıçapları dağıt");
+        Undo.RecordObject(route, "Spread Radii");
 
-        // Bütün katmanlar değişiyor; tek katman geçersiz kılmak yetmez.
         groundCache.Clear();
 
-        // Yarıçap, genişliğin yarısı. Toprak dağ yolu ~7 m geniş, ana patika ~3.5 m,
-        // yan patika ~2 m. Kamp bir çadır grubu ve ateş yeri; market tek yapı.
         Spread(route.road, 3.5f, 0.9f);
 
-        // HER HAT KENDİ GENİŞLİĞİNDE. Üçüne aynı taban verilince üç patika birbirinin
-        // kopyası oluyordu; gerçekte biri çok kullanılıp genişlemiş, biri neredeyse
-        // kaybolmuş olur. Taban hattın indeksinden türüyor: aynı hat her çalıştırmada
-        // aynı genişlikte kalıyor, yeni hat eklenince eskiler kaymıyor.
         for (int i = 0; i < route.branches.Count; i++)
         {
-            if (route.branches[i].name.Contains("Ana"))
+            if (route.branches[i].name.Contains("Main"))
             {
                 Spread(route.branches[i].marks, 1.8f, 0.5f);
                 continue;
             }
 
-            // Taban aralığa YAYILARAK veriliyor, saf karmayla değil. Karma denendi ve
-            // üç hattı 1.14-1.30 arasına düşürdü: sayılar farklı ama gözle aynı.
-            // Rastgelelik kümelenir; ayrı görünmesi gereken şeyler ayrı aralıklara
-            // KONUR, sonra içlerinde oynatılır.
-            //
-            // Bölme sabit (6, palet boyu): hat sayısına bölünseydi yeni hat eklenince
-            // eskilerin genişliği kayardı. 1.4 - 3.6 m: kaybolmaya yüz tutmuş izden
-            // çok yürünmüş yola kadar.
             float slot = ((i % 6) + Hash(i * 977 + 31) * 0.7f) / 5.7f;
-            // Alt sınır 0.9: bisikletin geçebileceği en dar tread 1.8 metre.
             float own = Mathf.Lerp(0.9f, 1.9f, slot);
             Spread(route.branches[i].marks, own, own * 0.22f);
         }
@@ -337,8 +263,6 @@ public class RoutePainter : EditorWindow
 
         for (int i = 0; i < marks.Count; i++)
         {
-            // İki ölçek: yumuşak dalga hattın genelini, ince kırıntı tek tek noktaları
-            // oynatıyor. İkincisi olmazsa genişlik matematiksel bir sinüs gibi okunuyor.
             float wave = Mathf.PerlinNoise(i / (float)Wavelength, 0.5f) * 2f - 1f;
             float grain = (Hash(i) - 0.5f) * 0.35f;
 
@@ -348,7 +272,6 @@ public class RoutePainter : EditorWindow
         }
     }
 
-    /// Tam sayı karması: aynı indeks her çalışmada aynı sayıyı veriyor.
     static float Hash(int value)
     {
         uint h = (uint)value * 2654435761u;
@@ -360,7 +283,7 @@ public class RoutePainter : EditorWindow
 
     void ClearLayer()
     {
-        Undo.RecordObject(route, "Rota katmanını temizle");
+        Undo.RecordObject(route, "Clear Route Layer");
 
         switch (layer)
         {
@@ -374,22 +297,14 @@ public class RoutePainter : EditorWindow
         Flush();
     }
 
-    /// İşaret eklendi: asset kirli, ekran tazelensin. DİSKE YAZILMIYOR — bir hat
-    /// çizerken saniyede birkaç nokta düşüyor ve her nokta için dosya yazmak editörü
-    /// kilitliyor. Yazma darbe bitince (`Flush`).
     void Save()
     {
-        // Yalnız DÜZENLENEN katmanın önbelleği atılıyor. Hepsini birden atmak, bir
-        // hatta nokta eklerken öteki hatların kotlarını da yeniden okutuyordu.
         List<MountainRoute.Mark> edited = SelectedMarks();
         if (edited != null) groundCache.Remove(edited);
 
         Redraw();
     }
 
-    /// Önbelleği KORUYAN kayıt. Sürükleyerek çizerken her nokta için bütün hattın
-    /// kotları yeniden okunuyordu: bin noktalık bir hatta bu, tek bir darbede yarım
-    /// milyon arazi sorgusu demek. Eklenen nokta önbelleğin sonuna yazılıyor.
     void SaveAppended(List<MountainRoute.Mark> target, Vector3 world)
     {
         if (groundCache.TryGetValue(target, out Vector3[] cached))
@@ -414,22 +329,14 @@ public class RoutePainter : EditorWindow
         Repaint();
     }
 
-    /// Diske yaz. Kirli işaretlemek tek başına yetmiyor: Unity kirli asset'leri kendi
-    /// zamanlamasıyla yazıyor ve arada çökme olursa çizim gidiyor. Fırça darbesi
-    /// bittiğinde yazmak hem güvenli hem ucuz.
     void Flush()
     {
         Save();
         AssetDatabase.SaveAssetIfDirty(route);
     }
 
-    // -------------------------------------------------------------- scene view
-
     void OnSceneGUI(SceneView view)
     {
-        // Referans BURADA da tazeleniyor. Script yeniden derlendiğinde pencere alanı
-        // sıfırlanıyor ve `OnGUI` çalışana kadar boş kalıyordu: sahnede çizim yokmuş
-        // gibi görünüyor, oysa veri asset'te duruyor. Pencereye tıklamak gerekiyordu.
         if (route == null) route = LoadOrCreate();
 
         var terrain = Object.FindAnyObjectByType<Terrain>();
@@ -438,8 +345,6 @@ public class RoutePainter : EditorWindow
         DrawExisting(terrain);
         if (!painting || region != Region.Start) return;
 
-        // Fırça açıkken seçim kilitleniyor: aksi hâlde her tık sahnedeki nesneyi
-        // seçiyor ve çizim yarıda kalıyor.
         HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
 
         if (!Probe(terrain, out Vector3 point)) return;
@@ -451,9 +356,6 @@ public class RoutePainter : EditorWindow
         HandleClicks(terrain, point);
     }
 
-    /// İmleç altındaki arazi noktası. Işın ÇARPIŞMADAN okunuyor: yükseklik haritası
-    /// ile çarpışma yüzeyi köşegende birkaç santim ayrışıyor ve işaret gözle konurken
-    /// gözün gördüğü yüzey çarpışma yüzeyi.
     static bool Probe(Terrain terrain, out Vector3 point)
     {
         Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
@@ -469,9 +371,6 @@ public class RoutePainter : EditorWindow
         return false;
     }
 
-    /// Yarıçap CTRL + TEKERLEK ile. Köşeli parantez denendi ve geri alındı: Türkçe
-    /// klavyede o tuşlar AltGr istiyor. Tekerlek her boyama aracında aynı jest ve
-    /// klavye düzeninden bağımsız.
     void HandleShortcuts()
     {
         Event e = Event.current;
@@ -507,7 +406,6 @@ public class RoutePainter : EditorWindow
             return;
         }
 
-        // Doğuş SÜRÜKLENMİYOR: tek nokta, ikinci tık yön veriyor.
         if (layer == Layer.Spawn)
         {
             if (down) { PaintSpawn(terrain, point); Flush(); }
@@ -515,14 +413,12 @@ public class RoutePainter : EditorWindow
             return;
         }
 
-        // Sürüklerken aralık kontrolü. Nokta katmanlarında (kamp, market) sürükleme
-        // yok: her tık bir işaret.
         bool line = layer == Layer.Road || layer == Layer.Branch;
         if (drag && !line) return;
 
         if (hasLastPaint && Vector3.Distance(point, lastPaint) < Spacing) return;
 
-        Undo.RecordObject(route, "Rota işaretle");
+        Undo.RecordObject(route, "Paint Route Mark");
         var mark = new MountainRoute.Mark
         {
             position = MountainRoute.ToNormalized(point, terrain),
@@ -539,11 +435,9 @@ public class RoutePainter : EditorWindow
         e.Use();
     }
 
-    /// Doğuş: işaretli değilse konum, işaretliyse BAKIŞ YÖNÜ. İki ayrı moda gerek yok —
-    /// yer belliyken bir daha tıklamanın tek anlamlı karşılığı yön.
     void PaintSpawn(Terrain terrain, Vector3 point)
     {
-        Undo.RecordObject(route, "Doğuş işaretle");
+        Undo.RecordObject(route, "Mark Spawn");
 
         if (!route.spawnSet)
         {
@@ -562,11 +456,9 @@ public class RoutePainter : EditorWindow
         Save();
     }
 
-    /// Fırça çapındaki işaretleri siler. En yakını değil hepsi: üst üste binmiş
-    /// noktaları teker teker avlamak çizmekten uzun sürüyordu.
     void Erase(Terrain terrain, Vector3 point)
     {
-        Undo.RecordObject(route, "Rota işaretini sil");
+        Undo.RecordObject(route, "Erase Route Mark");
 
         if (layer == Layer.Spawn)
         {
@@ -592,8 +484,6 @@ public class RoutePainter : EditorWindow
 
         Save();
     }
-
-    // ------------------------------------------------------------------ çizim
 
     void DrawCursor(Vector3 point)
     {
@@ -625,8 +515,6 @@ public class RoutePainter : EditorWindow
                 EventType.Repaint);
         }
 
-        // Market KÜRE, kamp KÜP: renk körlüğünden bağımsız ayırt edilsinler ve uzaktan
-        // silueti okunsun.
         Handles.color = ShopColor;
         foreach (MountainRoute.Mark shop in route.shops)
         {
@@ -643,7 +531,6 @@ public class RoutePainter : EditorWindow
         Handles.DrawWireDisc(spawn, Vector3.up, 12f);
         Handles.DrawWireDisc(spawn, Vector3.up, 4f);
 
-        // Bakış yönü: ok gözle okunacak kadar uzun, hattı gölgelemeyecek kadar kısa.
         float yaw = route.spawnYaw * Mathf.Deg2Rad;
         var forward = new Vector3(Mathf.Cos(yaw), 0f, Mathf.Sin(yaw));
         Handles.ArrowHandleCap(0, spawn + Vector3.up * 3f,
@@ -653,9 +540,6 @@ public class RoutePainter : EditorWindow
     void DrawBranch(Terrain terrain, MountainRoute.Branch branch, Color color) =>
         DrawLine(terrain, branch.marks, color, RouteProfile.BikeGrade);
 
-    /// Hat çizimi. Eşiği aşan parçalar KIRMIZI: sayı pencerede "%38" diyor ama nerede
-    /// olduğunu söylemiyor. Renk yeri gösteriyor, ikisi birlikte hattı düzeltilebilir
-    /// kılıyor.
     void DrawLine(Terrain terrain, List<MountainRoute.Mark> marks, Color color,
         float steepThreshold)
     {
@@ -663,14 +547,9 @@ public class RoutePainter : EditorWindow
 
         Vector3[] ground = GroundCached(terrain, marks);
 
-        // ÇİZGİ YUMUŞATILIYOR. Noktalar 25 metre aralıklı ve düz parçalarla
-        // birleştirilince hat kırık bir zikzak oluyor; oysa çizilen şey bir patika,
-        // köşeleri yok. Veri polyline kalıyor, yumuşatma yalnız gösterimde.
         Handles.color = color;
         Handles.DrawAAPolyLine(4f, Smooth(ground));
 
-        // Dik parçalar HAM noktalar arasında ölçülüyor: yumuşatma eğimi hafifçe
-        // değiştirir ve uyarı gerçek veriden gelmeli.
         Handles.color = Color.red;
         for (int i = 1; i < ground.Length; i++)
         {
@@ -685,12 +564,6 @@ public class RoutePainter : EditorWindow
         DrawCorridor(marks, ground, color);
     }
 
-    /// KORİDORUN GERÇEK GENİŞLİĞİ. Merkez çizgisi sabit piksel kalınlığında çiziliyor
-    /// ve yarıçapla ilgisi yok; nokta başına halka ise 17.5 km'lik arazide piksel altına
-    /// düşüyor. İkisi birlikte "hepsi aynı kalınlıkta" gösteriyordu, oysa veri farklı.
-    ///
-    /// Bant iki kenar çizgisi olarak: dolgu yüzey uzaktan araziyi boyuyor ve altındaki
-    /// eğim okunmaz oluyor.
     static void DrawCorridor(List<MountainRoute.Mark> marks, Vector3[] ground, Color color)
     {
         if (ground.Length < 2) return;
@@ -700,8 +573,6 @@ public class RoutePainter : EditorWindow
 
         for (int i = 0; i < ground.Length; i++)
         {
-            // Yön komşulardan: uçlarda tek komşu, ortada ikisinin ortalaması. Tek
-            // komşuyla kenar her noktada kırılıyor ve bant testere dişi oluyordu.
             Vector3 before = ground[Mathf.Max(i - 1, 0)];
             Vector3 after = ground[Mathf.Min(i + 1, ground.Length - 1)];
 
@@ -719,8 +590,6 @@ public class RoutePainter : EditorWindow
         Handles.DrawAAPolyLine(2f, Smooth(right));
     }
 
-    /// Catmull-Rom: eğri noktaların HEPSİNDEN geçiyor. Ortalama tabanlı yumuşatma
-    /// çizgiyi noktalardan uzaklaştırır ve hat çizdiğin yerden kayar.
     static Vector3[] Smooth(Vector3[] points)
     {
         const int Steps = 4;
@@ -751,10 +620,6 @@ public class RoutePainter : EditorWindow
         return output;
     }
 
-    /// ZEMİN KOTLARI ÖNBELLEKTE. Her yeniden çizimde nokta başına altı `SampleHeight`
-    /// çağrılıyordu (merkez, eğim, iki koridor kenarı) ve altı yüz noktalık bir rotada
-    /// bu kare başına üç binden fazla arazi sorgusu demek: fırça gözle görülür şekilde
-    /// geride kalıyordu. Kotlar yalnız veri değiştiğinde yeniden okunuyor.
     Vector3[] GroundCached(Terrain terrain, List<MountainRoute.Mark> marks)
     {
         if (groundCache.TryGetValue(marks, out Vector3[] cached)
@@ -768,8 +633,6 @@ public class RoutePainter : EditorWindow
         return ground;
     }
 
-    /// Normalize konumun zemin üstündeki dünya karşılığı. Yükseklik SAKLANMIYOR,
-    /// her çizimde araziden okunuyor — arazi değişince işaretler kendiliğinden oturuyor.
     static Vector3 Ground(Terrain terrain, Vector2 normalized)
     {
         Vector3 world = MountainRoute.ToWorld(normalized, terrain);

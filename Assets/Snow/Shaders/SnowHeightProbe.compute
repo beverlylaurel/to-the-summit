@@ -1,4 +1,4 @@
-// ROL: verilen dunya konumlarinda `SnowYuzeyRolyef`'i calistirip sonucu
+// ROL: verilen dunya konumlarinda `SnowSurfaceRelief`'i calistirip sonucu
 // tampona yazar. Yalniz eslik testi kullaniyor.
 #pragma kernel KHeightProbe
 
@@ -21,9 +21,9 @@ void KHeightProbe(uint3 id : SV_DispatchThreadID)
     if ((int)id.x >= _ProbeCount) return;
 
     // `pikselBoyu` sifir: CPU tarafinda ornekleme frekansi sonsuz ve LOD
-    // kesimi yok. Iki taraf ayni kosulda olmali, yoksa sapma LOD'dan gelir
+    // kesimi yok. Iki taraf ayni kosulda olmali, yoksa deviation LOD'dan gelir
     // ve formul hatasi sanilir.
-    _ProbeResult[id.x] = SnowYuzeyRolyef(_ProbePositions[id.x], 0.0,
+    _ProbeResult[id.x] = SnowSurfaceRelief(_ProbePositions[id.x], 0.0,
                                          _ProbeDepths[id.x], true,
                                          _ProbeExposure[id.x]);
 }

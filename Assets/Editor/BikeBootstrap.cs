@@ -3,17 +3,11 @@ using System.Text;
 using UnityEditor;
 using UnityEngine;
 
-/// BİSİKLETİ SAHNEYE KURAR. Model, materyal, ayar asset'i ve bileşenler koddan
-/// bağlanıyor — sahne elle düzenlenmiyor (bkz. `CLAUDE.md`).
+/// BOOTSTRAPS BICYCLE IN SCENE. Model, materials, settings asset, and components wired
+/// from code — scene is not edited manually (see CLAUDE.md).
 ///
-/// İçe aktarma ayarı burada DEĞİL: rig, ölçek ve okunabilirlik `ModelImportRules`'ta,
-/// yani modelin her yenilenmesinde kendiliğinden uygulanıyor.
-///
-/// DOKU DOSYASI YOK. Modelde UV yok (FBX'te tek UV katmanı bile bulunmuyor); yüzey
-/// `ToTheSummit/BikeSurface` ile nesne uzayında prosedürel boyanıyor.
-///
-/// PARÇA TABLOSU BASILIYOR. Modelde 26 parça var ve adlarından hangisinin ne olduğu
-/// anlaşılmıyor (`model_part7`); boyut ve konum yazılınca eşleştirilebiliyor.
+/// Import settings handled in `ModelImportRules` (rig, scale, readability).
+/// No texture files needed; surface uses procedural object-space shader `ToTheSummit/BikeSurface`.
 public static class BikeBootstrap
 {
     const string Folder = "Assets/Models/Bike";
@@ -22,49 +16,20 @@ public static class BikeBootstrap
     const string RoutePath = "Assets/Settings/MountainRoute.asset";
     const string ShaderName = "ToTheSummit/BikeSurface";
 
-    /// Bisikletin gerçek boyu (metre). Model 120 cm yükseklikle geliyor.
     const float ExpectedHeight = 1.20f;
 
-    // Parça tablosundan okunan eşleşmeler. Tekerlek çapı 0.73 m ve ikisi bisikletin iki
-    // ucunda; gidon tam genişlikte ve en yukarıda — hepsi ölçüden ayırt edilebiliyor.
     const string FrontWheelPart = "model_part25";
     const string RearWheelPart = "model_part14";
     const string HandlebarPart = "model_part8";
     const string SaddlePart = "model_part18";
 
-    // BÖLGELİ PARÇALAR. Üretilen modelde farklı malzemeler aynı mesh'te: gidon ile
-    // tutamak ve kablolar tek parça, bagaj ile zincir muhafazası ve pedal tek parça.
-    // Sınırlar üçgen dağılımından ölçüldü (bkz. `MeshZones`).
     const string RackPart = "model_part10";
     const string PedalPart = "model_part11";
 
-    /// Pedal gövdesinin başladığı yer: bisikletin orta düzleminden metre. Ölçüm: pedal
-    /// gövdesi ile krank kolu ayrı kümeler, arada boşluk var. Kural iki pedal için de
-    /// aynı — sağ pedal ayrı parça, sol pedal bagaj mesh'inin içinde.
     const float PedalFrom = 0.14f;
-
-    /// Bagaj mesh'inde aktarma organları sınırı: parçanın kendi yüksekliğinin bu
-    /// oranının altı. Ölçüm: alt bölgede 290 bin üçgen (muhafaza, krank, sol pedal),
-    /// üstte 46 bin (bagaj tablası).
     const float DriveBelow = 0.49f;
-
-    /// Direksiyonla dönen parçaların başladığı yer: modelin arka ucundan itibaren metre.
-    /// Ön takımın tamamı (çatal, gidon, fren kolları, kablolar) bu eşiğin önünde duruyor.
     const float SteeringFrom = 1.20f;
 
-    /// YÜZEY TAKIMI. Kadro boyası, krom, kauçuk, deri ve yağlı çelik.
-    ///
-    /// PARLAKLIK BİLEREK DÜŞÜK. Fabrika çıkışı krom kapalı havada bütün gökyüzünü aynalıyor
-    /// ve bisiklet plastik gibi parlıyordu; kullanılmış bir bisikletin kromu çukurlu ve
-    /// mat. Aynı sebeple kadro boyası da cilalı değil, yıllanmış.
-    ///
-    /// Hepsi aynı gölgelendirici, farklı ayar —
-    /// malzemeyi ayıran şey renk değil, ışığa verdiği cevap: krom metalik ve fırça izli,
-    /// deri yarı mat ve renkçe oynak.
-    ///
-    /// Lastiğin kendisi burada değil: tekerlek mesh'inin içinde ve ayrı materyal
-    /// atanamıyor, gölgelendirici onu yarıçaptan ayırıyor (bkz. `WheelMaterial`).
-    /// Kauçuk yine de var — gidon tutamağı ve pedal lastiği ayrı parça.
     static readonly (string Name, Color Colour, float Metallic, float Smoothness,
                      float Variation, float Grain, float Brushed,
                      float Dust, float Fade, float Grime)[] Surfaces =
@@ -76,46 +41,34 @@ public static class BikeBootstrap
         ("Steel",   new Color(0.13f, 0.13f, 0.14f), 0.85f, 0.32f, 0.05f, 0.14f, 0.4f, 0.20f, 0.03f, 0.55f),
     };
 
-    /// PARÇA → YÜZEY. Eşleşme parça tablosundaki ölçüden çıkarıldı: konumu, boyu ve
-    /// simetrik eşi olup olmadığı. Listede olmayan parça boyalı sayılıyor.
-    ///
-    /// Bu tablo GÖZLE DOĞRULANIR. Ölçü bir parçanın nerede durduğunu söylüyor, ne
-    /// olduğunu söylemiyor; yanlış eşleşme görülünce burası düzeltilir.
     static readonly Dictionary<string, string> PartSurface = new Dictionary<string, string>
     {
-        { "model_part0",  "Chrome"  },  // ön üstte kütle: far ve kablo demeti
-        { "model_part1",  "Chrome"  },  // ön küçük parça
-        { "model_part2",  "Chrome"  },  // fren kolu (sağ)
-        { "model_part3",  "Chrome"  },  // fren kolu (sol)
-        { "model_part4",  "Rubber"  },  // gidon tutamağı (sağ)
-        { "model_part5",  "Rubber"  },  // gidon tutamağı (sol)
-        { "model_part6",  "Chrome"  },  // ön fren pabucu (sağ)
-        { "model_part7",  "Chrome"  },  // ön fren pabucu (sol)
-        { "model_part8",  "Chrome"  },  // gidon
-        { "model_part9",  "Paint"   },  // kadro üstü ince levha
-        { "model_part10", "Paint"   },  // arka bagaj ve destekleri
-        { "model_part11", "Chrome"  },  // krank ve pedal
-        { "model_part12", "Steel"   },  // zincir — yağlı çelik, krom değil
-        { "model_part13", "Chrome"  },  // arka çamurluk
-        { "model_part15", "Chrome"  },  // çamurluk çubuğu
-        { "model_part16", "Chrome"  },  // arka göbek yanı
-        { "model_part17", "Chrome"  },  // arka uçtaki çubuk
-        { "model_part18", "Leather" },  // sele
-        { "model_part19", "Chrome"  },  // arka üstteki küçük parça
-        { "model_part20", "Chrome"  },  // gidon boğazı
-        { "model_part21", "Chrome"  },  // ön çatal kolu
-        { "model_part22", "Chrome"  },  // ön çatal gövdesi
-        { "model_part23", "Chrome"  },  // ön çamurluk
-        { "model_part24", "Paint"   },  // kadro
+        { "model_part0",  "Chrome"  },  // headlight and cable cluster
+        { "model_part1",  "Chrome"  },  // front small hardware
+        { "model_part2",  "Chrome"  },  // brake lever (right)
+        { "model_part3",  "Chrome"  },  // brake lever (left)
+        { "model_part4",  "Rubber"  },  // handlebar grip (right)
+        { "model_part5",  "Rubber"  },  // handlebar grip (left)
+        { "model_part6",  "Chrome"  },  // front brake shoe (right)
+        { "model_part7",  "Chrome"  },  // front brake shoe (left)
+        { "model_part8",  "Chrome"  },  // handlebar
+        { "model_part9",  "Paint"   },  // frame top plate
+        { "model_part10", "Paint"   },  // rear rack and stays
+        { "model_part11", "Chrome"  },  // crank and pedal
+        { "model_part12", "Steel"   },  // chain
+        { "model_part13", "Chrome"  },  // rear fender
+        { "model_part15", "Chrome"  },  // fender stay
+        { "model_part16", "Chrome"  },  // rear hub flange
+        { "model_part17", "Chrome"  },  // rear stay rod
+        { "model_part18", "Leather" },  // saddle
+        { "model_part19", "Chrome"  },  // rear upper hardware
+        { "model_part20", "Chrome"  },  // stem
+        { "model_part21", "Chrome"  },  // front fork blade
+        { "model_part22", "Chrome"  },  // front fork crown
+        { "model_part23", "Chrome"  },  // front fender
+        { "model_part24", "Paint"   },  // frame
     };
 
-    /// YÜZEY DEĞERLERİ KENDİLİĞİNDEN EŞİTLENİYOR. Tablodaki bir sayı değiştiğinde
-    /// materyale ancak menü çalışınca geçiyordu; her renk denemesi için "Sahneye Kur"a
-    /// basmak gerekiyordu. Derleme sonrası tablo ile materyal karşılaştırılıyor, yalnız
-    /// FARKLI olan yazılıyor — her açılışta asset kirletmek yeniden içe aktarma demek.
-    ///
-    /// Yapısal kurulum (hiyerarşi, rig, binme, zemine oturtma) burada değil: o menüde
-    /// kalıyor çünkü sahneyi değiştiriyor ve her derlemede yapılması istenmez.
     [InitializeOnLoadMethod]
     static void SyncMaterials()
     {
@@ -170,8 +123,6 @@ public static class BikeBootstrap
         Selection.activeGameObject = Place(materials, settings);
     }
 
-    // --------------------------------------------------------------- materyal
-
     static Dictionary<string, Material> BuildMaterials()
     {
         var materials = new Dictionary<string, Material>();
@@ -179,7 +130,7 @@ public static class BikeBootstrap
         Shader shader = Shader.Find(ShaderName);
         if (shader == null)
         {
-            Debug.LogError($"[Bisiklet] gölgelendirici bulunamadı: {ShaderName}");
+            Debug.LogError($"[Bicycle] Shader not found: {ShaderName}");
             return materials;
         }
 
@@ -221,26 +172,17 @@ public static class BikeBootstrap
         return material;
     }
 
-    /// TEKERLEK MATERYALİ. Lastik, jant ve göbek tek mesh'te geldiği için ayrı materyal
-    /// atanamıyor; ayrım gölgelendiricide yarıçaptan yapılıyor ve göbek ile dış yarıçap
-    /// buradan veriliyor. İki tekerleğin ölçüsü farklı, o yüzden iki ayrı materyal.
     static Material WheelMaterial(string name, Transform space,
         Vector3 axisWorld, WheelProfile profile)
     {
         Shader shader = Shader.Find(ShaderName);
         Material material = LoadOrCreate(shader, name);
 
-        // Göbek gölgelendiricinin okuduğu uzayda veriliyor: nesne uzayı, ölçekle
-        // çarpılmış. Parça dönüşümünde yüz kat ölçek var; ham yerel konum verilseydi
-        // göbek yarıçapın yüzde birinde kalır, bütün tekerlek lastik sayılırdı.
         Vector3 centre = space.InverseTransformPoint(profile.Centre) * space.lossyScale.x;
 
         material.SetFloat("_WheelMode", 1f);
         material.SetVector("_WheelCentre", centre);
         material.SetFloat("_WheelRadius", profile.Radius);
-
-        // Eksen de nesne uzayında veriliyor: mesh verisi FBX'in Z-yukarı düzeninde,
-        // Unity'nin Y-yukarı dönüşü parçanın transform'unda duruyor.
         material.SetVector("_WheelAxis",
             space.InverseTransformDirection(axisWorld).normalized);
         material.SetColor("_TireColor", new Color(0.07f, 0.07f, 0.08f));
@@ -268,12 +210,8 @@ public static class BikeBootstrap
         return settings;
     }
 
-    // ----------------------------------------------------------------- sahneye
-
     static GameObject Place(Dictionary<string, Material> materials, BikeSettings settings)
     {
-        // Seçim ÖNCE bırakılıyor: Inspector yok edilen nesneyi çizmeye devam edip
-        // her açılışta bir yığın `MissingReferenceException` basıyordu.
         Selection.activeGameObject = null;
 
         var existing = Object.FindAnyObjectByType<BikeController>();
@@ -282,21 +220,16 @@ public static class BikeBootstrap
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
         if (prefab == null)
         {
-            Debug.LogError("[Bisiklet] model içe aktarılamadı.");
+            Debug.LogError("[Bicycle] Model could not be imported.");
             return null;
         }
 
         var root = new GameObject("Bicycle");
         GameObject model = (GameObject)PrefabUtility.InstantiatePrefab(prefab, root.transform);
 
-        // Prefab bağı ÇÖZÜLÜYOR: prefab örneğinin çocukları yeniden ebeveynlenemiyor ve
-        // dönen parçaları ayırmak tam olarak bunu gerektiriyor. Mesh'ler yine FBX'ten
-        // paylaşılıyor — kopya çıkmıyor, yalnız hiyerarşi serbest kalıyor.
         PrefabUtility.UnpackPrefabInstance(model, PrefabUnpackMode.Completely,
             InteractionMode.AutomatedAction);
 
-        // Kök başlangıçta orijinde ve model dönüşsüz: bütün ölçüler böylece doğrudan
-        // modelin kendi eksenlerinde okunuyor, dönüşüm çevirmeye gerek kalmıyor.
         model.transform.localPosition = Vector3.zero;
         model.transform.localRotation = Quaternion.identity;
 
@@ -307,12 +240,8 @@ public static class BikeBootstrap
 
         Rig(model, out Transform steering, out Transform frontWheel, out Transform rearWheel);
 
-        // Modelin uzunluk ekseni +X'te geliyor, oysa kontrolcü `transform.forward` (+Z)
-        // yönünde sürüyor. Çeyrek tur çevirip modeli kökün önüne bakacak hâle getiriyoruz.
         model.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
 
-        // Tekerlekler yere değsin ve bisiklet kökün üstünde ortalansın: model kendi
-        // orijinini nerede taşırsa taşısın, kök hep yer temasında duruyor.
         Bounds bounds = Measure(model);
         model.transform.localPosition -= new Vector3(bounds.center.x, bounds.min.y, bounds.center.z);
         bounds = Measure(model);
@@ -326,17 +255,12 @@ public static class BikeBootstrap
         bike.Bind(settings);
         root.AddComponent<BikePlayerInput>();
 
-        // Tekerlek ekseni modelin genişlik ekseni (+Z). Direksiyon altındaki ön tekerlek
-        // de aynı eksende dönüyor: eğik direksiyon pivotu ile tekerlek arasına dönüşü
-        // sıfırlayan bir yuva konuyor (bkz. `Rig`).
         root.AddComponent<BikeWheels>().Bind(bike, settings, frontWheel, rearWheel, Vector3.forward);
         root.AddComponent<BikeSteeringVisual>().Bind(bike, steering);
 
         var input = root.GetComponent<BikePlayerInput>();
         Ride(bike, input, model);
 
-        // GÖLGE AÇIK. Bisiklet gölge düşürmüyordu; arazi sistemi gölgeyi
-        // okuyor, gölgesiz duran nesne havada asılı gibi görünüyor.
         foreach (Renderer renderer in model.GetComponentsInChildren<Renderer>())
         {
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
@@ -345,10 +269,6 @@ public static class BikeBootstrap
 
         root.transform.position = SpawnPoint();
 
-        // YERE OTURUYOR MU, ÖLÇÜLÜYOR. Model kökün üstünde alt sınırı sıfıra çekilerek
-        // duruyor ama doğuş noktası ışınla bulunuyor ve arada beş santimlik pay vardı;
-        // alçak güneşte o pay gölgeyi bisikletten koparıyor, nesne havada duruyormuş gibi
-        // görünüyor. Ölçüm yazılıyor ki "havada mı" sorusu gözle değil sayıyla cevaplansın.
         Bounds placed = Measure(model);
         var down = new Ray(placed.center + Vector3.up * 2f, Vector3.down);
 
@@ -357,25 +277,20 @@ public static class BikeBootstrap
             float gap = placed.min.y - ground.point.y;
             root.transform.position -= Vector3.up * gap;
 
-            ToolLog.Write($"[Bisiklet] zeminle arası {gap * 1000f:F0} mm ölçüldü, "
-                        + "kapatıldı; tekerlek yere değiyor.");
+            ToolLog.Write($"[Bicycle] Ground gap measured at {gap * 1000f:F0} mm, "
+                        + "closed; wheels resting on ground.");
         }
 
-        Undo.RegisterCreatedObjectUndo(root, "Bisikleti kur");
+        Undo.RegisterCreatedObjectUndo(root, "Set up bicycle");
         return root;
     }
 
-    /// OYUNCUYU BİSİKLETE BAĞLAR. Binme bileşeni oyuncunun üstünde duruyor: bisiklet
-    /// oyuncuyu bilmiyor, oyuncu da bisikleti bilmiyor — ikisini tanıştıran tek yer bu.
-    ///
-    /// Selenin yeri sele parçasından ÖLÇÜLÜYOR. Elle girilseydi model değişince sürücü
-    /// havada ya da kadronun içinde otururdu.
     static void Ride(BikeController bike, BikePlayerInput input, GameObject model)
     {
         var walker = Object.FindAnyObjectByType<FirstPersonController>();
         if (walker == null)
         {
-            Debug.LogWarning("[Bisiklet] sahnede oyuncu yok; binme bağlanmadı.");
+            Debug.LogWarning("[Bicycle] No player in scene; riding not bound.");
             return;
         }
 
@@ -385,7 +300,7 @@ public static class BikeBootstrap
 
         if (look == null || body == null || camera == null)
         {
-            Debug.LogWarning("[Bisiklet] oyuncuda bakış, çarpışma ya da kamera yok.");
+            Debug.LogWarning("[Bicycle] Player missing look, collider, or camera.");
             return;
         }
 
@@ -400,8 +315,6 @@ public static class BikeBootstrap
         EditorUtility.SetDirty(rider);
     }
 
-    /// Tabloya göre materyal atar. Tabloda olmayan parça boyalı sayılıyor: eksik bir
-    /// eşleşme atanmamış materyal bırakmasın.
     static void Paint(GameObject model, Dictionary<string, Material> materials)
     {
         foreach (Renderer renderer in model.GetComponentsInChildren<Renderer>())
@@ -413,9 +326,6 @@ public static class BikeBootstrap
         }
     }
 
-    /// ELLE BOYANMIŞ KOPYALARI bağlar. Fırça, FBX'ten gelen mesh'e köşe rengi
-    /// yazamadığı için parçanın kendi kopyasını üretiyor; kurulum o kopyayı bulmazsa
-    /// boyama her "Sahneye Kur" ile düşerdi.
     static void Painted(GameObject model)
     {
         foreach (MeshFilter filter in model.GetComponentsInChildren<MeshFilter>())
@@ -427,20 +337,8 @@ public static class BikeBootstrap
         }
     }
 
-    /// BÖLGELİ PARÇALARA ayrı materyal bağlar. Gidon mesh'i bar, tutamak ve kablo
-    /// olarak; bagaj mesh'i tabla ve aktarma organları olarak alt-mesh'lere ayrılıyor.
-    ///
-    /// Sonuç mesh'i dosyaya yazılıyor ve git'e girmiyor: üretilen varlık depoda durmaz.
     static void Zone(GameObject model, Dictionary<string, Material> materials)
     {
-        // GİDON BÖLÜNMÜYOR. Tutamak ve kablo sınırı eşikle konuyordu ve tutamak bara
-        // taşıyordu; sınır eşik sayısıyla tarif edilemiyor. Gidonun tamamı krom, kauçuk
-        // olması gereken yerler ELLE boyanıyor (bkz. `VertexBrush`). Alt-mesh olarak
-        // bırakılsaydı fırça o siyahı geri alamazdı — maske malzeme ekliyor, silmiyor.
-
-        // PEDAL SINIRI DÜNYA UZAYINDA. İki pedal ayna simetrik ve ayrı mesh'lerde;
-        // her mesh'in kendi ekseni farklı yöne bakıyor. Orta düzleme uzaklık ikisi için
-        // de aynı kuralı veriyor: dışarıda kalan kütle pedal gövdesi, içeride kalan kol.
         float middle = Measure(model).center.z;
 
         var rack = FindPart(model, RackPart).GetComponent<MeshFilter>();
@@ -458,9 +356,9 @@ public static class BikeBootstrap
 
         rack.GetComponent<Renderer>().sharedMaterials = new[]
         {
-            materials["Paint"],    // bagaj tablası ve destekleri
-            materials["Chrome"],   // zincir muhafazası ve krank kolu
-            materials["Rubber"],   // sol pedal gövdesi
+            materials["Paint"],
+            materials["Chrome"],
+            materials["Rubber"],
         };
 
         var pedal = FindPart(model, PedalPart).GetComponent<MeshFilter>();
@@ -473,14 +371,11 @@ public static class BikeBootstrap
 
         pedal.GetComponent<Renderer>().sharedMaterials = new[]
         {
-            materials["Chrome"],   // krank kolu ve mil
-            materials["Rubber"],   // pedal gövdesi
+            materials["Chrome"],
+            materials["Rubber"],
         };
     }
 
-    /// Bölgeli mesh'i dosyadan okur, yoksa üretir. VAR OLANIN ÜSTÜNE YAZILMIYOR: maske
-    /// elle boyanıyor ve köşe renginde bu mesh'in içinde duruyor; her kurulumda yeniden
-    /// üretilseydi boyama silinirdi. Bölge sınırı değiştirilecekse menüden sıfırlanıyor.
     static Mesh Zoned(string name, System.Func<Mesh> build)
     {
         const string folder = Folder + "/Generated";
@@ -499,12 +394,6 @@ public static class BikeBootstrap
         return mesh;
     }
 
-    /// DÖNEN PARÇALARI AYIRIR. Model tek dosyada 26 parça olarak geliyor ama hepsi
-    /// kımıldamaz bir hiyerarşide; tekerleğin kendi göbeğinde dönmesi ve ön takımın
-    /// direksiyon ekseninde çevrilmesi için araya pivot nesneleri giriyor.
-    ///
-    /// Parçaların kendi dönüşüm orijini modelin orijininde duruyor: doğrudan
-    /// döndürülselerdi tekerlek kendi ekseninde değil bisikletin ortasında dönerdi.
     static void Rig(GameObject model, out Transform steering,
         out Transform frontWheel, out Transform rearWheel)
     {
@@ -512,17 +401,13 @@ public static class BikeBootstrap
         Transform rearPart = FindPart(model, RearWheelPart);
         Transform barPart = FindPart(model, HandlebarPart);
 
-        // Jant düzeltmesi göbek ölçümünden ÖNCE: düzeltme dış kenarı oynatıyor, pivot da
-        // o kenardan uydurulan çemberin merkezine oturuyor.
-        SetupWheel(frontPart, model.transform.forward, "Ön", "WheelFront");
-        SetupWheel(rearPart, model.transform.forward, "Arka", "WheelRear");
+        SetupWheel(frontPart, model.transform.forward, "Front", "WheelFront");
+        SetupWheel(rearPart, model.transform.forward, "Rear", "WheelRear");
 
         Vector3 frontHub = frontPart.GetComponent<Renderer>().bounds.center;
         Vector3 rearHub = rearPart.GetComponent<Renderer>().bounds.center;
         Vector3 bar = barPart.GetComponent<Renderer>().bounds.center;
 
-        // Direksiyon ekseni ÖLÇÜLÜYOR, yazılmıyor: ön göbekten gidon merkezine giden
-        // doğru. Sabit bir açı yazılsaydı model değişince sessizce yalan olurdu.
         Vector3 axis = (bar - frontHub).normalized;
 
         steering = new GameObject("Steering").transform;
@@ -540,10 +425,6 @@ public static class BikeBootstrap
             renderer.transform.SetParent(steering, true);
         }
 
-        // Ön tekerlek direksiyonla birlikte çevriliyor ama kendi dönüşü modelin
-        // ekseninde: eğik pivotun altına dönüşü sıfırlayan bir yuva giriyor, böylece iki
-        // tekerlek de aynı yerel eksende (+Z) dönüyor ve `BikeWheels` tek eksenle
-        // yetiniyor.
         var mount = new GameObject("FrontWheelMount").transform;
         mount.SetParent(steering, false);
         mount.position = frontHub;
@@ -559,9 +440,6 @@ public static class BikeBootstrap
         rearPart.SetParent(rearWheel, true);
     }
 
-    /// Tekerleği çembere oturtup kendi materyalini bağlar. Ölçüm dünya uzayında yapılıyor:
-    /// parça dönüşümlerinde yüz kat ölçek var ve mesh'in kendi uzayında milimetreler
-    /// mikrona iniyor.
     static void SetupWheel(Transform part, Vector3 axis, string label, string materialName)
     {
         var filter = part.GetComponent<MeshFilter>();
@@ -579,20 +457,18 @@ public static class BikeBootstrap
         foreach (Transform child in model.GetComponentsInChildren<Transform>())
             if (child.name == name) return child;
 
-        throw new System.InvalidOperationException($"[Bisiklet] parça yok: {name}");
+        throw new System.InvalidOperationException($"[Bicycle] Part not found: {name}");
     }
 
-    /// Parçaları boyut, konum ve atanan yüzeyle listeler. Hangi parçanın ne olduğu ancak
-    /// böyle anlaşılıyor: tekerlek yüksek ve dar, sele küçük ve yukarıda, gidon önde.
     static void Report(GameObject model)
     {
         var renderers = model.GetComponentsInChildren<MeshRenderer>();
         var report = new StringBuilder();
 
         Bounds whole = Measure(model);
-        report.Append($"[Bisiklet] {renderers.Length} parça, toplam boyut "
+        report.Append($"[Bicycle] {renderers.Length} parts, total bounds "
                     + $"{whole.size.x:F2} x {whole.size.y:F2} x {whole.size.z:F2} m "
-                    + $"(beklenen yükseklik {ExpectedHeight:F2} m)");
+                    + $"(expected height {ExpectedHeight:F2} m)");
 
         int total = 0;
 
@@ -611,12 +487,12 @@ public static class BikeBootstrap
                 : PartSurface.TryGetValue(renderers[i].name, out string named) ? named
                 : "Paint";
 
-            report.Append($"\n  {renderers[i].name,-14} {surface,-8} {triangles,7} üçgen   "
-                        + $"boyut {b.size.x:F2} x {b.size.y:F2} x {b.size.z:F2}   "
-                        + $"merkez ön{local.x:F2} yük{local.y:F2} yan{local.z:F2}");
+            report.Append($"\n  {renderers[i].name,-14} {surface,-8} {triangles,7} tri   "
+                        + $"size {b.size.x:F2} x {b.size.y:F2} x {b.size.z:F2}   "
+                        + $"center fwd{local.x:F2} up{local.y:F2} side{local.z:F2}");
         }
 
-        report.Append($"\n  TOPLAM {total} üçgen");
+        report.Append($"\n  TOTAL {total} triangles");
         ToolLog.Write(report.ToString());
     }
 
@@ -630,8 +506,6 @@ public static class BikeBootstrap
         return bounds;
     }
 
-    /// Doğuş noktasının yanı. Bisiklet oyuncunun içinde doğmasın diye iki metre yana
-    /// alınıyor; kot arazinin çarpışma yüzeyinden okunuyor.
     static Vector3 SpawnPoint()
     {
         var terrain = Object.FindAnyObjectByType<Terrain>();

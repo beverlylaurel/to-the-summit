@@ -3,25 +3,21 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-/// DIŞ DOKU ALIMI. ambientCG / Poly Haven / benzeri bir klasörü projeye alır:
-/// haritaları bulur, hedef çözünürlüğe indirir, import ayarlarını kurar ve ışık
-/// pişmişliğini ÖLÇER.
+/// EXTERNAL TEXTURE INGESTION. Imports asset folders (ambientCG / Poly Haven / etc.) into project:
+/// locates maps, downsamples to target resolution, configures import settings, and MEASURES baked lighting.
 ///
-/// Elle yapılmıyor çünkü her doku için aynı beş adım tekrarlanıyordu ve biri
-/// atlandığında sebebi görselden anlaşılmıyor: normal harita "renk" olarak
-/// okunursa kabartma yönü tersine döner, pürüzlülük sRGB'den geçerse parlaklık
-/// yanlış olur.
+/// Automated to prevent human errors across repetitive import steps:
+/// normal maps marked as "color" invert relief, roughness passing through sRGB corrupts glossiness.
 ///
-/// RENK HARİTASI ALINMIYOR. Bu projede yüzey rengi prosedürel ve sistemlere bağlı
-/// (kar: tazelik/derinlik/ıslaklık; kaya: oksit/liken/kot). Dokudan yalnız kabartma,
-/// pürüzlülük ve yükseklik geliyor. Renk almak zincirin tamamını koparırdı.
+/// COLOR MAPS EXCLUDED. Surface coloration in this project is procedural and system-driven
+/// (snow: freshness/depth/wetness; rock: oxidation/lichen/altitude). Textures only provide relief,
+/// roughness, and height. Importing color maps would decouple the environmental shading pipeline.
 public static class TextureIngest
 {
     public const string Folder = "Assets/Terrain";
     const int TargetSize = 1024;
 
-    /// Kaynak klasörde aranan son ekler. ambientCG ve Poly Haven adlandırmaları
-    /// farklı; ikisi de yakalanıyor.
+    /// Suffix patterns matched in source folders across common naming conventions.
     static readonly (string map, string[] suffixes)[] Wanted =
     {
         ("Normal", new[] { "_NormalGL.png", "_nor_gl.png", "_Normal.png", "_normal.png" }),
@@ -29,14 +25,13 @@ public static class TextureIngest
         ("Height", new[] { "_Displacement.png", "_disp.png", "_height.png", "_Height.png" })
     };
 
-    /// Işık pişmişliği eşiği. Üstündeyse doku albedo olarak kullanılamaz; bu projede
-    /// zaten albedo almıyoruz ama normal haritası da şüpheli hale gelir.
+    /// Baked light correlation warning threshold.
     const float BakedLightWarning = 0.3f;
 
     [MenuItem("To The Summit/Textures/Fetch Texture...", false, 60)]
     static void IngestMenu()
     {
-        string source = EditorUtility.OpenFolderPanel("Doku klasörü", "", "");
+        string source = EditorUtility.OpenFolderPanel("Texture Folder", "", "");
         if (string.IsNullOrEmpty(source)) return;
 
         string prefix = Path.GetFileName(source.TrimEnd('/', '\\'));
@@ -46,12 +41,11 @@ public static class TextureIngest
         if (set != null) Selection.activeObject = set;
     }
 
-    /// Klasörü projeye alır ve bir `SurfaceMaterialSet` üretir. Stokastik dönüşüm
-    /// ayrı adım (`StochasticTextureBaker`); burası yalnız ham haritaları hazırlıyor.
+    /// Ingests folder and creates `SurfaceMaterialSet`. Stochastic transform is handled in `StochasticTextureBaker`.
     public static SurfaceMaterialSet Ingest(string sourceFolder, string prefix)
     {
         if (!Directory.Exists(sourceFolder))
-            throw new DirectoryNotFoundException($"Doku klasörü yok: {sourceFolder}");
+            throw new DirectoryNotFoundException($"Texture folder missing: {sourceFolder}");
 
         Directory.CreateDirectory(Folder);
         var files = Directory.GetFiles(sourceFolder, "*.png");
@@ -64,7 +58,7 @@ public static class TextureIngest
 
             if (match == null)
             {
-                Debug.LogWarning($"{prefix}: {map} haritası bulunamadı.");
+                Debug.LogWarning($"{prefix}: {map} map not found.");
                 continue;
             }
 
@@ -84,16 +78,14 @@ public static class TextureIngest
         EditorUtility.SetDirty(set);
         AssetDatabase.SaveAssets();
 
-        // Dönüşüm ve bağlama: pişirici bütün setleri tarıyor.
         StochasticTextureBaker.EnsureAll();
         Resolve(set);
 
-        ToolLog.Write($"{prefix}: {found} harita alındı. Işık korelasyonu "
-                + $"{set.bakedLightCorrelation:F3}, yönlülük {set.anisotropy:F2}.");
+        ToolLog.Write($"{prefix}: {found} map(s) ingested. Baked light correlation "
+                + $"{set.bakedLightCorrelation:F3}, anisotropy {set.anisotropy:F2}.");
         return set;
     }
 
-    /// Diskteki setleri tarar; pişirici hangi dokuları dönüştüreceğini buradan bulur.
     public static SurfaceMaterialSet[] AllSets() =>
         AssetDatabase.FindAssets($"t:{nameof(SurfaceMaterialSet)}")
             .Select(AssetDatabase.GUIDToAssetPath)
@@ -101,7 +93,6 @@ public static class TextureIngest
             .Where(s => s != null)
             .ToArray();
 
-    /// Pişmiş çıktıları sete bağlar. Pişirici dosyaları yazdıktan sonra çağrılıyor.
     public static void Resolve(SurfaceMaterialSet set)
     {
         Texture2D Load(string suffix) =>
@@ -128,9 +119,9 @@ public static class TextureIngest
         return set;
     }
 
-    /// IŞIK PİŞMİŞLİĞİ ÖLÇÜMÜ. Fotoğraftan taranmış dokularda yönlü güneş renge
-    /// gömülü olur: tümsekler sistematik aydınlık, çukurlar koyu. Renk parlaklığı ile
-    /// normalin eğimi arasındaki korelasyon bunu sayıyla veriyor — göz kararı değil.
+    /// MEASURES BAKED LIGHTING. In photogrammetry textures, directional sunlight is often baked into albedo:
+    /// mounds systematically bright, crevices dark. Correlation between color luminance and normal slope
+    /// quantifies baked lighting objectively.
     static void Measure(string sourceFolder, string[] files, SurfaceMaterialSet set)
     {
         string colorPath = files.FirstOrDefault(
@@ -177,20 +168,16 @@ public static class TextureIngest
 
         if (set.bakedLightCorrelation > BakedLightWarning)
             Debug.LogWarning(
-                $"{set.assetPrefix}: IŞIK PİŞMİŞ (korelasyon "
-              + $"{set.bakedLightCorrelation:F2}). Bu dokuda yönlü güneş var; sahnenin "
-              + "kendi güneşiyle çakışır. Başka doku seç ya da yalnız yükseklikten "
-              + "normal üret.");
+                $"{set.assetPrefix}: BAKED LIGHT DETECTED (correlation "
+              + $"{set.bakedLightCorrelation:F2}). Texture contains baked directional lighting conflicting "
+              + "with scene sun. Choose another texture or derive normals purely from height.");
     }
 
-    /// Proje dışı dosyayı okur. `LoadImage` import ayarlarından bağımsız çalışıyor —
-    /// dosya henüz projede olmayabilir.
     static Color[] ReadRaw(string path)
     {
         var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false, true);
         if (!texture.LoadImage(File.ReadAllBytes(path))) return null;
 
-        // Ölçüm için tam çözünürlük gereksiz; küçültme hem hızlı hem gürültüyü siler.
         var scaled = Downscale(texture, 256);
         var pixels = scaled.GetPixels();
 
@@ -203,7 +190,7 @@ public static class TextureIngest
     {
         var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false, true);
         if (!texture.LoadImage(File.ReadAllBytes(source)))
-            throw new IOException($"Okunamadı: {source}");
+            throw new IOException($"Could not read: {source}");
 
         var scaled = Downscale(texture, TargetSize);
         File.WriteAllBytes(destination, scaled.EncodeToPNG());
@@ -213,8 +200,6 @@ public static class TextureIngest
         _ = isNormal;
     }
 
-    /// Bilinear küçültme. `Texture2D.Resize` içeriği atıyor; blit ile yeniden
-    /// örneklenip geri okunuyor.
     static Texture2D Downscale(Texture2D source, int size)
     {
         var target = RenderTexture.GetTemporary(size, size, 0, RenderTextureFormat.ARGB32,

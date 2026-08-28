@@ -153,7 +153,7 @@ struct MountainSurface
     half  smoothness;
     half  occlusion;
 
-    /// Local height of the snow surface (m). `SnowYuzeyEgim` returns it together with the
+    /// Local height of the snow surface (m). `SnowSurfaceSlope` returns it together with the
     /// gradient; ambient occlusion reads it. A separate call would have meant six more
     /// noise samples per pixel.
     half  snowSurfaceHeight;
@@ -620,9 +620,9 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // The geometry already gives everything parallax gave — and it breaks the
         // silhouette too, so neighbouring bumps really do occlude each other. The ray
         // march's 12-32 steps went with it.
-        float3 izPos = worldPos;
-        float2 izUV = SnowWorldToUV(izPos);
-        float izDerinlik = SnowDentSmooth(izUV);
+        float3 trailPos = worldPos;
+        float2 trailUV = SnowWorldToUV(trailPos);
+        float trailDepth = SnowDentSmooth(trailUV);
 
         // THE INSIDE OF A TRAIL IS CRUSHED SNOW — THE DENSITY IS READ LOCALLY.
         //
@@ -635,15 +635,15 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // transitions smoothly into the world's. The gain is that the INSIDE of a footprint
         // really looks compacted — pressed snow densifies, its albedo drops and its
         // roughness rises.
-        float4 karDurum = SnowStateAt(izUV);
-        float bolgeIci  = SnowInsideMask(izUV);
+        float4 snowState = SnowStateAt(trailUV);
+        float bolgeIci  = SnowInsideMask(trailUV);
 
-        float yerelRho = lerp(_FallbackRhoN, karDurum.g, bolgeIci);
-        float yerelIslak = lerp(_SurfaceWetness, max(_SurfaceWetness, karDurum.b), bolgeIci);
-        float yerelBozulma = karDurum.a * bolgeIci;
+        float localRho = lerp(_FallbackRhoN, snowState.g, bolgeIci);
+        float localWet = lerp(_SurfaceWetness, max(_SurfaceWetness, snowState.b), bolgeIci);
+        float localDisturb = snowState.a * bolgeIci;
 
         // Spec §14.1: albedo and roughness come from FRESHNESS, and freshness from density.
-        float freshness = 1.0 - saturate((SnowDensity(yerelRho) - 100.0) / 350.0);
+        float freshness = 1.0 - saturate((SnowDensity(localRho) - 100.0) / 350.0);
 
         half3 snowAlbedo = lerp(half3(0.70, 0.73, 0.79), half3(0.90, 0.92, 0.95), freshness);
         // Dry snow is rough; the reasoning is in `SnowConstants.hlsl` -> `SNOW_ROUGH_PACKED`.
@@ -670,15 +670,15 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         //
         // The snow mesh uses the same blend. The two must see the same texture: the mesh
         // only draws the local deviation, the terrain draws the flat area.
-        SnowSurfaceBlend karYuzey = SnowSampleSurface(izPos, yerelRho, yerelIslak, yerelBozulma);
-        surface.snowBlend   = karYuzey;
-        surface.snowRhoN    = (half)yerelRho;
-        surface.snowWet     = (half)yerelIslak;
-        surface.snowDisturb = (half)yerelBozulma;
-        surface.snowDentDepth = (half)izDerinlik;
+        SnowSurfaceBlend snowSurface = SnowSampleSurface(trailPos, localRho, localWet, localDisturb);
+        surface.snowBlend   = snowSurface;
+        surface.snowRhoN    = (half)localRho;
+        surface.snowWet     = (half)localWet;
+        surface.snowDisturb = (half)localDisturb;
+        surface.snowDentDepth = (half)trailDepth;
 
-        snowAlbedo = saturate(snowAlbedo * karYuzey.albedoTint);
-        snowRough  = saturate(snowRough + karYuzey.roughAdd);
+        snowAlbedo = saturate(snowAlbedo * snowSurface.albedoTint);
+        snowRough  = saturate(snowRough + snowSurface.roughAdd);
 
         surface.albedo     = lerp(surface.albedo, snowAlbedo, snowMask);
         surface.smoothness = lerp(surface.smoothness, 1.0 - snowRough, snowMask);
@@ -705,7 +705,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // Add the texture normal too: the real information of the snow texture is here.
         {
             float2 e = float2(detailed.x, detailed.z) / max(detailed.y, 1e-3)
-                     + (float2)karYuzey.normalSlope;
+                     + (float2)snowSurface.normalSlope;
             detailed = normalize(float3(e.x, 1.0, e.y));
         }
 
@@ -722,11 +722,11 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // the hollow. Measured: inside the blend a 22 cm trail was barely discernible on
         // screen.
         {
-            half2 izEgim = SnowDentSlope(izUV);
+            half2 trailSlope = SnowDentSlope(trailUV);
             float3 n = surface.normalWS;
-            float2 e = float2(n.x, n.z) / max(n.y, 1e-3) - (float2)izEgim;
+            float2 e = float2(n.x, n.z) / max(n.y, 1e-3) - (float2)trailSlope;
             surface.normalWS = normalize(lerp(n, normalize(float3(e.x, 1.0, e.y)),
-                                              saturate(izDerinlik * 20.0)));
+                                              saturate(trailDepth * 20.0)));
         }
 
         // THE SNOW SURFACE'S OWN RELIEF — INDEPENDENT OF THE TRAIL.
@@ -741,17 +741,17 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // cavity slope either. But the surface's own relief exists EVERYWHERE there is snow,
         // so its weight is `snowMask`.
         {
-            float yuzeyYuksekligi;
+            float surfaceHeight;
             // Thickness of the snow layer: the bedforms cannot be deeper than this.
-            float karKalinligi = SnowBaseHeight(karDurum.r, yerelRho);
+            float snowThickness = SnowBaseHeight(snowState.r, localRho);
 
-            half2 yuzeyEgim = SnowYuzeyEgim(izPos.xz, izPos.y, karKalinligi, yuzeyYuksekligi)
-                            + SnowMikroEgim(izPos.xz, izDerinlik);
+            half2 surfaceSlope = SnowSurfaceSlope(trailPos.xz, trailPos.y, snowThickness, surfaceHeight)
+                            + SnowMicroSlope(trailPos.xz, trailDepth);
 
-            surface.snowSurfaceHeight = (half)yuzeyYuksekligi;
+            surface.snowSurfaceHeight = (half)surfaceHeight;
 
             float3 n = surface.normalWS;
-            float2 e = float2(n.x, n.z) / max(n.y, 1e-3) - (float2)yuzeyEgim;
+            float2 e = float2(n.x, n.z) / max(n.y, 1e-3) - (float2)surfaceSlope;
 
             surface.normalWS = normalize(lerp(n, normalize(float3(e.x, 1.0, e.y)),
                                               snowMask));
@@ -784,10 +784,10 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // `SNOW_BURY_REF_DEPTH` = 0.30 m: at that thickness the burial reaches the full
         // share (0.55), below it proportionally.
         {
-            float kalinlik = SnowBaseHeight(karDurum.r, yerelRho);
-            half gomme = (half)(0.55 * saturate(kalinlik / SNOW_BURY_REF_DEPTH));
+            float thickness = SnowBaseHeight(snowState.r, localRho);
+            half buryFactor = (half)(0.55 * saturate(thickness / SNOW_BURY_REF_DEPTH));
 
-            surface.occlusion = lerp(surface.occlusion, 1.0, snowMask * gomme);
+            surface.occlusion = lerp(surface.occlusion, 1.0, snowMask * buryFactor);
         }
 
         // THE CAVITY'S VIEW FACTOR IS COMPENSATED BY MULTIPLE SCATTERING.
@@ -820,7 +820,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
             // as a product; each is reasonable on its own while their product dropped the
             // trail to a third of flat snow (the user reported: "why is the inside of the
             // snow dark").
-            half V = (half)saturate(1.0 - 0.35 * izDerinlik / SNOW_RELIEF_MAX_DEPTH);
+            half V = (half)saturate(1.0 - 0.35 * trailDepth / SNOW_RELIEF_MAX_DEPTH);
 
             surface.occlusion *= V / max((half)1.0 - a * ((half)1.0 - V), (half)0.05);
         }
@@ -853,17 +853,17 @@ MountainSurface BuildMountainSurface(float3 worldPos)
             // reported: "I can't get my head round this shading", and found the culprit
             // himself: "that's the snow surface's own shadow").
             //
-            // The right denominator is the relief's own ceiling — `SnowYuzeyRolyef` already
+            // The right denominator is the relief's own ceiling — `SnowSurfaceRelief` already
             // clips the height there. In 50 cm of snow that is 30 cm; the same 10 cm hollow
             // gives 0.33 and the mid tones come back.
-            float rolyefTavan = SnowBaseHeight(karDurum.r, yerelRho)
+            float reliefMax = SnowBaseHeight(snowState.r, localRho)
                               * SNOW_BEDFORM_DEPTH_FRAC;
 
-            half cukur = (half)saturate(-surface.snowSurfaceHeight
-                                        / max(rolyefTavan, 1e-4));
+            half depression = (half)saturate(-surface.snowSurfaceHeight
+                                        / max(reliefMax, 1e-4));
 
             surface.occlusion *= lerp((half)1.0, (half)1.0 - SNOW_SURFACE_AO,
-                                      cukur * (half)snowMask);
+                                      depression * (half)snowMask);
         }
 
         // THE INSIDE OF A HOLLOW SHIFTS TOWARD BLUE — SNOW IS TRANSLUCENT.
@@ -877,11 +877,11 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // It is NOT a compensation term: the block above returns the INTENSITY of the lost
         // sky light, this one returns its COLOR. They are two different quantities.
         {
-            half derinlik01 = (half)saturate(izDerinlik / SNOW_RELIEF_MAX_DEPTH);
+            half depth01 = (half)saturate(trailDepth / SNOW_RELIEF_MAX_DEPTH);
 
             surface.albedo = lerp(surface.albedo,
                                   surface.albedo * (half3)SNOW_SSS_TINT,
-                                  derinlik01 * (half)snowMask);
+                                  depth01 * (half)snowMask);
         }
 
 

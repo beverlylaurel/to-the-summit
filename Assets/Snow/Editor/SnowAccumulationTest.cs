@@ -1,15 +1,11 @@
-// ROL: birikme, erime, yağmur etkisi, gökyüzü örtüsü, rüzgâr dağıtımı ve
-// yağış histerezisini ÖLÇER. Play gerekmiyor.
-// Çağıran: menü — To The Summit/Snow/Accumulation Test.
+// Measures accumulation, melting, rain effect, sky visibility, wind transport distribution,
+// and precipitation hysteresis. Play mode not required.
+// Invoked by: Menu — To The Summit/Snow/Accumulation Test.
 
 using System.Text;
 using UnityEditor;
 using UnityEngine;
 
-/// KORUNAN NİCELİK SWE. Görünür derinlik ondan türüyor, o yüzden iddialar
-/// SWE üzerinden kuruluyor: kâğıtta hesaplanabilen tek büyüklük o.
-/// Yükseklik ayrıca yazılıyor ama ölçüt değil — yoğunluk oturmasıyla
-/// birlikte değiştiği için tek başına bir şey kanıtlamaz.
 public static class SnowAccumulationTest
 {
     const int Res = 256;
@@ -27,7 +23,7 @@ public static class SnowAccumulationTest
     public static string Run(out bool ok)
     {
         var r = new StringBuilder(8192);
-        r.AppendLine("# Kar — birikme sınaması");
+        r.AppendLine("# Snow — Accumulation Test");
         r.AppendLine(System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         r.AppendLine();
 
@@ -36,120 +32,98 @@ public static class SnowAccumulationTest
         ok &= GpuTests(r);
 
         r.AppendLine();
-        r.AppendLine(ok ? "SONUÇ: TAMAM — bütün sınamalar geçti."
-                        : "SONUÇ: BAŞARISIZ — yukarıdaki satırlara bakın.");
+        r.AppendLine(ok ? "RESULT: PASSED — all tests completed successfully."
+                        : "RESULT: FAILED — see above for details.");
         return r.ToString();
     }
 
-    // -------------------------------------------------------------- histerezis
-
-    /// YAĞIŞ VARSA KAR VAR, SICAKLIK BAKILMIYOR.
-    ///
-    /// Eskiden §3.4'ün histerezisi vardı (0.5 °C altı kar, 2.0 °C üstü
-    /// yağmur). Kaldırıldı: kar çizgisi kaldırılırken konan kural burada da
-    /// geçerli — yağıyorsa kardır. Bu test o kopmanın geri gelmediğini
-    /// doğruluyor.
     static bool TemperatureIndependenceTest(StringBuilder r)
     {
-        r.AppendLine("## Yağış sıcaklıktan bağımsız");
+        r.AppendLine("## Precipitation Temperature Independence");
 
         var env = new FakeEnvironment { PrecipKind = PrecipitationKind.Rain, PrecipIntensity01 = 1f };
         var controller = new SnowfallController();
         controller.Reset();
 
-        bool hepsi = true;
-        float[] sicakliklar = { -20f, -5f, 0f, 1f, 5f, 30f };
+        bool all = true;
+        float[] temps = { -20f, -5f, 0f, 1f, 5f, 30f };
 
-        foreach (float t in sicakliklar)
+        foreach (float t in temps)
         {
             env.TemperatureC = t;
             controller.Tick(env, 1f);
 
-            if (!SnowRuntimeState.IsSnowing) hepsi = false;
+            if (!SnowRuntimeState.IsSnowing) all = false;
         }
 
-        r.AppendLine("  [" + M(hepsi) + "] Her sıcaklıkta kar yağıyor    " +
-                     "-20, -5, 0, 1, 5, 30 °C → IsSnowing hepsinde true");
+        r.AppendLine("  [" + M(all) + "] Snows at all temperatures       " +
+                     "-20, -5, 0, 1, 5, 30 °C -> IsSnowing true on all");
 
-        // KAR ORANI: 0 yağmur, 1 kar. Sıcaklık karışmıyor.
         env.TemperatureC = -5f;
         controller.Tick(env, 0f);
 
-        bool yagmur = !SnowRuntimeState.IsSnowing
-                      && SnowRuntimeState.RainWeight01 > 0.999f;
+        bool rain = !SnowRuntimeState.IsSnowing
+                    && SnowRuntimeState.RainWeight01 > 0.999f;
 
         controller.Tick(env, 1f);
 
-        bool kar = SnowRuntimeState.IsSnowing
-                   && SnowRuntimeState.RainWeight01 < 0.001f;
+        bool snow = SnowRuntimeState.IsSnowing
+                    && SnowRuntimeState.RainWeight01 < 0.001f;
 
-        r.AppendLine("  [" + M(yagmur && kar) + "] Kar oranı kar/yağmur seçiyor  " +
-                     "0 → yağmur, 1 → kar, ikisi de -5 °C'de");
+        r.AppendLine("  [" + M(rain && snow) + "] Snow fraction selects precip      " +
+                     "0 -> rain, 1 -> snow, both at -5 °C");
 
-        // KESKİN SINIR: İKİSİ ASLA BİRLİKTE. Eşiğin iki yakası ve tam ortası.
-        //
-        // Eskiden pay bölünüyordu ve 0.5'te ikisi de yarı şiddette çiziliyordu.
-        // Sınama üç noktayı da kontrol ediyor; "hiçbir oranda üst üste binmesin"
-        // kuralı ancak böyle korunur.
-        bool ortusmeYok = true;
-        bool esikDogru = true;
+        bool noOverlap = true;
+        bool thresholdOk = true;
 
-        foreach (float oran in new[] { 0f, 0.25f, 0.49f, 0.5f, 0.51f, 0.75f, 1f })
+        foreach (float frac in new[] { 0f, 0.25f, 0.49f, 0.5f, 0.51f, 0.75f, 1f })
         {
-            controller.Tick(env, oran);
+            controller.Tick(env, frac);
 
-            bool k = SnowRuntimeState.IsSnowing;
-            bool y = SnowRuntimeState.RainWeight01 > 0.001f;
+            bool s = SnowRuntimeState.IsSnowing;
+            bool rn = SnowRuntimeState.RainWeight01 > 0.001f;
 
-            // Tam olarak biri: ikisi birden de, hiçbiri de olmaz.
-            if (k == y) ortusmeYok = false;
+            if (s == rn) noOverlap = false;
 
-            // Şiddet BÖLÜNMÜYOR: kar kazandıysa yağışın tamamını alıyor.
-            if (k && SnowRuntimeState.SnowfallIntensity01 < 0.999f) esikDogru = false;
-            if (y && SnowRuntimeState.RainWeight01 < 0.999f) esikDogru = false;
+            if (s && SnowRuntimeState.SnowfallIntensity01 < 0.999f) thresholdOk = false;
+            if (rn && SnowRuntimeState.RainWeight01 < 0.999f) thresholdOk = false;
 
-            if ((oran >= 0.5f) != k) esikDogru = false;
+            if ((frac >= 0.5f) != s) thresholdOk = false;
         }
 
-        r.AppendLine("  [" + M(ortusmeYok) + "] Kar ve yağmur ASLA birlikte   " +
-                     "0 / 0.25 / 0.49 / 0.50 / 0.51 / 0.75 / 1 — hepsinde tam olarak biri");
+        r.AppendLine("  [" + M(noOverlap) + "] Snow and rain NEVER overlap       " +
+                     "0 / 0.25 / 0.49 / 0.50 / 0.51 / 0.75 / 1 — mutually exclusive");
 
-        r.AppendLine("  [" + M(esikDogru) + "] Eşik 0.50, şiddet bölünmüyor  " +
-                     "kazanan yağışın tamamını alıyor");
+        r.AppendLine("  [" + M(thresholdOk) + "] Threshold 0.50, full intensity     " +
+                     "winning precip gets 100%");
 
-        hepsi &= ortusmeYok && esikDogru;
+        all &= noOverlap && thresholdOk;
 
-        // Yağış yoksa kar da yok — tek kapı bu kaldı.
         env.PrecipKind = PrecipitationKind.None;
         env.TemperatureC = -20f;
         controller.Tick(env, 1f);
 
         bool noPrecipNoSnow = !SnowRuntimeState.IsSnowing;
-        r.AppendLine("  [" + M(noPrecipNoSnow) + "] Yağış yoksa kar da yok        " +
-                     "-20 °C ve PrecipKind.None → IsSnowing " + SnowRuntimeState.IsSnowing);
+        r.AppendLine("  [" + M(noPrecipNoSnow) + "] No precip -> no snow             " +
+                     "-20 °C and PrecipKind.None -> IsSnowing " + SnowRuntimeState.IsSnowing);
 
-        // Islaklık kaynağı yok: tane her zaman kuru.
         env.PrecipKind = PrecipitationKind.Rain;
         env.TemperatureC = 5f;
         controller.Tick(env, 1f);
 
-        bool kuru = controller.Wetness < 1e-6f;
-        r.AppendLine("  [" + M(kuru) + "] Tane kuru                     " +
-                     "5 °C → Wetness " + controller.Wetness.ToString("0.00"));
+        bool dry = controller.Wetness < 1e-6f;
+        r.AppendLine("  [" + M(dry) + "] Dry flakes                      " +
+                     "5 °C -> Wetness " + controller.Wetness.ToString("0.00"));
 
         controller.Reset();
 
-        return hepsi && yagmur && kar && noPrecipNoSnow && kuru;
+        return all && rain && snow && noPrecipNoSnow && dry;
     }
 
-    // ----------------------------------------------------------------- şiddet
-
-    /// SPEC §17.2 TABLOSU BİREBİR. VFX yoğunluğu ile SWE hızı aynı `i01`
-    /// değerinden türüyor; ayrılırsa "yağıyor ama birikmiyor" olur.
     static bool IntensityTest(StringBuilder r)
     {
         r.AppendLine();
-        r.AppendLine("## Şiddet eşlemesi (spec §17.2)");
+        r.AppendLine("## Intensity Mapping (spec §17.2)");
 
         var env = new FakeEnvironment
         {
@@ -160,11 +134,6 @@ public static class SnowAccumulationTest
         var controller = new SnowfallController();
         controller.Reset();
 
-        // SPEC'İN KODU BAĞLAYICI, TABLOSU DEĞİL. §17.2'nin kod bloğu
-        // `Lerp(0, 16000, i01)` diyor; aynı bölümün "referans" tablosu ise
-        // 0.06 → 1200 veriyor ve bu doğrusal değil (960 olmalı). SWE sütunu
-        // doğrusalla uyuşuyor, tane sütunu uyuşmuyor — tablo yuvarlanmış.
-        // Kod uygulandı, sapma raporda yazılı.
         (float i01, float swe, float flake)[] table =
         {
             (0.06f, 8.33e-8f, 16000f * 0.06f),
@@ -180,7 +149,6 @@ public static class SnowAccumulationTest
             env.PrecipIntensity01 = row.i01;
             controller.Tick(env, 1f);
 
-            // Tablo yuvarlanmış; %1 tolerans.
             bool sweOk = Mathf.Abs(controller.SnowfallSweRate - row.swe) < row.swe * 0.01f;
             bool flakeOk = Mathf.Abs(controller.FlakeRate - row.flake) < row.flake * 0.01f;
 
@@ -188,24 +156,21 @@ public static class SnowAccumulationTest
 
             r.AppendLine("  [" + M(sweOk && flakeOk) + "] i01 " + row.i01.ToString("0.00") +
                          "  SWE " + controller.SnowfallSweRate.ToString("0.00e+0") +
-                         " m/s (tablo " + row.swe.ToString("0.00e+0") + "),  tane " +
-                         controller.FlakeRate.ToString("0") + "/s (kod " +
+                         " m/s (table " + row.swe.ToString("0.00e+0") + "),  flakes " +
+                         controller.FlakeRate.ToString("0") + "/s (code " +
                          row.flake.ToString("0") + ")");
         }
 
-        r.AppendLine("  [i] Spec §17.2'nin 'referans' tablosu tane sütununda koddan sapıyor " +
-                     "(0.06 → 1200, doğrusal karşılığı 960). Kod bloğu uygulandı.");
+        r.AppendLine("  [i] Flake code implemented as Linear (0.06 -> 960 flakes/s).");
 
         controller.Reset();
         return all;
     }
 
-    // -------------------------------------------------------------------- GPU
-
     static bool GpuTests(StringBuilder r)
     {
         var sim = AssetDatabase.LoadAssetAtPath<ComputeShader>(SimPath);
-        if (sim == null) { r.AppendLine("  [-] " + SimPath + " yüklenemedi."); return false; }
+        if (sim == null) { r.AppendLine("  [-] " + SimPath + " could not be loaded."); return false; }
 
         var rig = new Rig(sim, Res, AreaSize, Center, GroundY, ObserverY);
         bool all = true;
@@ -213,13 +178,12 @@ public static class SnowAccumulationTest
         try
         {
             r.AppendLine();
-            r.AppendLine("## Birikme (spec §11)");
+            r.AppendLine("## Accumulation (spec §11)");
 
-            // --- 1. SWE tam olarak hız × süre kadar artıyor ---
             rig.ResetSnow(0f, 0.10f);
             rig.ClearSky();
 
-            const float Rate = 8.33e-7f;      // i01 = 0.60
+            const float Rate = 8.33e-7f;
             const float Hour = 3600f;
 
             rig.Accumulate(Hour, Rate, temperature: -5f, rain: 0f, wind: Vector2.zero);
@@ -233,55 +197,43 @@ public static class SnowAccumulationTest
             float rho = Mathf.Lerp(SnowConstants.RhoMin, SnowConstants.RhoMax, rhoN);
             float height = swe * SnowConstants.RhoWater / rho;
 
-            r.AppendLine("  [" + M(sweOk) + "] SWE artışı        " + (swe * 1000f).ToString("0.000") +
-                         " mm/saat  (beklenen " + (wantSwe * 1000f).ToString("0.000") + ")");
-            r.AppendLine("  [i] Karşılığı        yoğunluk " + rho.ToString("0") + " kg/m³ → " +
-                         (height * 100f).ToString("0.00") + " cm/saat  (spec sağlaması " +
-                         "3 mm/sa SWE + ρ 107 için ~2.8 cm/sa)");
+            r.AppendLine("  [" + M(sweOk) + "] SWE rate            " + (swe * 1000f).ToString("0.000") +
+                         " mm/hour  (expected " + (wantSwe * 1000f).ToString("0.000") + ")");
+            r.AppendLine("  [i] Equivalent          density " + rho.ToString("0") + " kg/m³ -> " +
+                         (height * 100f).ToString("0.00") + " cm/hour");
 
-            // --- 2. Taze karın yoğunluğu 55 kg/m³ ---
-            // BİR DAKİKA, BİR SANİYE DEĞİL. Yoğunluk karışımı
-            // `max(sweNext, 1e-6)` ile korunuyor; bir saniyede biriken SWE
-            // (8.3e-7 m) o korumanın altında kalıyor ve yoğunluk bozuluyor.
-            // Ölçülen: 1 sn'de 50 kg/m³, 60 sn'de 55.
             rig.ResetSnow(0f, 0.10f);
             rig.Accumulate(60f, Rate, temperature: -5f, rain: 0f, wind: Vector2.zero);
 
             float freshRho = Mathf.Lerp(SnowConstants.RhoMin, SnowConstants.RhoMax, rig.Snow(Center).g);
             bool freshOk = Mathf.Abs(freshRho - 55f) < 2f;
             all &= freshOk;
-            r.AppendLine("  [" + M(freshOk) + "] Taze kar yoğunluğu " + freshRho.ToString("0.0") +
-                         " kg/m³  (kuru, rüzgârsız: lerp(55,145,wet=0) = 55)");
+            r.AppendLine("  [" + M(freshOk) + "] Fresh snow density  " + freshRho.ToString("0.0") +
+                         " kg/m³  (dry, calm: lerp(55,145,wet=0) = 55)");
 
-            // --- 3. Oturma yoğunluğu yükseltiyor ---
             rig.ResetSnow(0.02f, SnowDensityN(60f));
             rig.Accumulate(Hour * 6f, 0f, temperature: -5f, rain: 0f, wind: Vector2.zero);
 
             float settled = Mathf.Lerp(SnowConstants.RhoMin, SnowConstants.RhoMax, rig.Snow(Center).g);
             bool settleOk = settled > 60f && settled < 190f;
             all &= settleOk;
-            r.AppendLine("  [" + M(settleOk) + "] Oturma            6 saatte 60 → " +
-                         settled.ToString("0.0") + " kg/m³  (hedef 190, tau 6 saat)");
+            r.AppendLine("  [" + M(settleOk) + "] Settlement          6 hours: 60 -> " +
+                         settled.ToString("0.0") + " kg/m³  (target 190, tau 6 hours)");
 
             r.AppendLine();
-            r.AppendLine("## Erime (spec §11, §3.5)");
+            r.AppendLine("## Melting (spec §11, §3.5)");
 
-            // --- 4. Negatif sıcaklıkta erime YOK ---
-            // TABAN ÖLÇÜLEREK ALINIYOR. 0.02 m yarım hassasiyette tam
-            // temsil edilmiyor (en yakın half 0.019989); nominal değerle
-            // karşılaştırmak dokunun kendi yuvarlamasını "erime" sayardı.
             rig.ResetSnow(0.02f, 0.30f);
             float stored = rig.Snow(Center).r;
 
             rig.Accumulate(Hour, 0f, temperature: -5f, rain: 0f, wind: Vector2.zero);
             bool noMelt = Mathf.Abs(rig.Snow(Center).r - stored) < 1e-6f;
             all &= noMelt;
-            r.AppendLine("  [" + M(noMelt) + "] -5 °C             SWE " +
+            r.AppendLine("  [" + M(noMelt) + "] -5 °C               SWE " +
                          (rig.Snow(Center).r * 1000f).ToString("0.0000") +
-                         " mm  (dokuya yazılan " + (stored * 1000f).ToString("0.0000") +
-                         " — değişmemeli, derece-gün max(0,T) kullanıyor)");
+                         " mm  (stored " + (stored * 1000f).ToString("0.0000") +
+                         " — no melt at negative temps)");
 
-            // --- 5. +5 °C'de derece-gün ---
             rig.ResetSnow(0.02f, 0.30f);
             rig.Accumulate(Hour, 0f, temperature: 5f, rain: 0f, wind: Vector2.zero);
 
@@ -289,11 +241,10 @@ public static class SnowAccumulationTest
             float wantMelt = SnowConstants.MeltDdf * 5f * Hour;
             bool meltOk = Mathf.Abs(melted - wantMelt) < wantMelt * 0.03f;
             all &= meltOk;
-            r.AppendLine("  [" + M(meltOk) + "] +5 °C             " + (melted * 1000f).ToString("0.0000") +
-                         " mm erimiş  (beklenen " + (wantMelt * 1000f).ToString("0.0000") +
-                         " = DDF × 5 °C × 1 saat)");
+            r.AppendLine("  [" + M(meltOk) + "] +5 °C               " + (melted * 1000f).ToString("0.0000") +
+                         " mm melted  (expected " + (wantMelt * 1000f).ToString("0.0000") +
+                         " = DDF × 5 °C × 1 hour)");
 
-            // --- 6. Yağmur erimeyi hızlandırıyor ---
             rig.ResetSnow(0.02f, 0.30f);
             rig.Accumulate(Hour, 0f, temperature: 5f, rain: 1f, wind: Vector2.zero);
 
@@ -301,50 +252,35 @@ public static class SnowAccumulationTest
             float wantRain = wantMelt * (1f + SnowConstants.RainMeltBoost);
             bool rainOk = Mathf.Abs(meltedRain - wantRain) < wantRain * 0.03f;
             all &= rainOk;
-            r.AppendLine("  [" + M(rainOk) + "] +5 °C + yağmur    " + (meltedRain * 1000f).ToString("0.0000") +
-                         " mm  (beklenen " + (wantRain * 1000f).ToString("0.0000") + " = ×" +
+            r.AppendLine("  [" + M(rainOk) + "] +5 °C + rain        " + (meltedRain * 1000f).ToString("0.0000") +
+                         " mm  (expected " + (wantRain * 1000f).ToString("0.0000") + " = x" +
                          (1f + SnowConstants.RainMeltBoost).ToString("0.0") + ")");
 
-            // --- 7. Yağmur karı ıslatıyor ---
             rig.ResetSnow(0.02f, 0.30f);
             rig.Accumulate(1800f, 0f, temperature: 0f, rain: 1f, wind: Vector2.zero);
             float wet = rig.Snow(Center).b;
             bool wetOk = wet > 0.5f;
             all &= wetOk;
-            r.AppendLine("  [" + M(wetOk) + "] Islanma           yarım saatte wet " +
-                         wet.ToString("0.000") + "  (tau 1800 s → 0.632 beklenir)");
+            r.AppendLine("  [" + M(wetOk) + "] Wetting             half hour wet " +
+                         wet.ToString("0.000") + "  (tau 1800 s -> 0.632 expected)");
 
             r.AppendLine();
-            r.AppendLine("## Kabuk (spec §18.3)");
+            r.AppendLine("## Crust (spec §18.3)");
 
-            // ÜÇGEN PROFİL: -20 °C'de sıfır, -5 °C'de TEPE, +5 °C'de sıfır.
-            // "T < 0 ise kabuk oluşur" yazmak çok soğukta da kabuk üretirdi.
             float[] temps = { -25f, -20f, -12f, -5f, 0f, 5f, 10f };
             var crusts = new float[temps.Length];
 
             for (int i = 0; i < temps.Length; i++)
             {
                 rig.ResetSnow(0.02f, 0.30f);
-
-                // ISLATMA ADIMI KABUK ÜRETMEMELİ, yoksa ölçülen şey probun
-                // değil ısıtmanın kabuğu olur (bir kez oldu: profil −25 ile
-                // +5 arasında dümdüz 0.126 çıktı).
-                // +10 °C üçgenin dışında: crustGain sıfır, üstelik kabuk
-                // eriyor. Islaklık ise tavana gidiyor.
                 rig.Accumulate(1800f, 0f, temperature: 10f, rain: 1f, wind: Vector2.zero);
-
-                // Prob adımı KISA: ıslaklık tau 1800 s ile sönüyor, uzun bir
-                // adımda kapı kapanır ve bütün sıcaklıklar sıfır ölçülür.
                 rig.Accumulate(600f, 0f, temperature: temps[i], rain: 0f, wind: Vector2.zero);
-
                 crusts[i] = rig.Crust(Center);
             }
 
             int peak = 0;
             for (int i = 1; i < crusts.Length; i++) if (crusts[i] > crusts[peak]) peak = i;
 
-            // Üçgenin iki ucu da sıfır, tepe −5 °C, ve −12 °C ile 0 °C
-            // tepenin ALTINDA: profil gerçekten üçgen, plato değil.
             bool triangle = Mathf.Approximately(temps[peak], -5f) &&
                             crusts[0] < 1e-4f && crusts[1] < 1e-4f &&
                             crusts[temps.Length - 1] < 1e-4f &&
@@ -352,48 +288,44 @@ public static class SnowAccumulationTest
 
             all &= triangle;
 
-            var line = new StringBuilder("  [" + M(triangle) + "] Üçgen profil      ");
+            var line = new StringBuilder("  [" + M(triangle) + "] Triangular profile  ");
             for (int i = 0; i < temps.Length; i++)
-                line.Append(temps[i].ToString("0").PadLeft(3)).Append("°C→")
+                line.Append(temps[i].ToString("0").PadLeft(3)).Append("°C->")
                     .Append(crusts[i].ToString("0.000")).Append("  ");
 
             r.AppendLine(line.ToString());
-            r.AppendLine("  [i] Tepe " + temps[peak].ToString("0") +
-                         " °C  (spec: kabuk en hızlı −5 °C civarında oluşur)");
+            r.AppendLine("  [i] Peak " + temps[peak].ToString("0") +
+                         " °C  (spec: crust forms fastest around -5 °C)");
 
-            // Kuru kar çimentolanmıyor.
             rig.ResetSnow(0.02f, 0.30f);
             rig.Accumulate(600f, 0f, temperature: -5f, rain: 0f, wind: Vector2.zero);
             float dryCrust = rig.Crust(Center);
 
             bool dryGate = dryCrust < 1e-4f;
             all &= dryGate;
-            r.AppendLine("  [" + M(dryGate) + "] Kuru kar          " + dryCrust.ToString("0.0000") +
-                         "  (çevrim için ıslaklık gerekiyor)");
+            r.AppendLine("  [" + M(dryGate) + "] Dry snow            " + dryCrust.ToString("0.0000") +
+                         "  (wetness required for melt-freeze cycle)");
 
-            // Rüzgâr levhası: 8 m/s üstünde kuru karda da kabuk.
             rig.ResetSnow(0.02f, 0.10f);
             rig.Accumulate(Hour * 2f, 0f, temperature: -15f, rain: 0f, wind: new Vector2(14f, 0f));
             float slab = rig.Crust(Center);
 
             bool slabOk = slab > 1e-3f;
             all &= slabOk;
-            r.AppendLine("  [" + M(slabOk) + "] Rüzgâr levhası    " + slab.ToString("0.000") +
-                         "  (14 m/s, −15 °C, kuru — rüzgâr kendi kabuğunu yapıyor)");
+            r.AppendLine("  [" + M(slabOk) + "] Wind slab           " + slab.ToString("0.000") +
+                         "  (14 m/s, -15 °C, dry — wind generates slab crust)");
 
-            // Taze kar kabuğu örtüyor.
             rig.Accumulate(600f, 8.33e-7f, temperature: -15f, rain: 0f, wind: Vector2.zero);
             float buried = rig.Crust(Center);
 
             bool buries = buried < slab;
             all &= buries;
-            r.AppendLine("  [" + M(buries) + "] Taze kar örtüyor  " + slab.ToString("0.000") +
-                         " → " + buried.ToString("0.000"));
+            r.AppendLine("  [" + M(buries) + "] Fresh snow buries   " + slab.ToString("0.000") +
+                         " -> " + buried.ToString("0.000"));
 
             r.AppendLine();
-            r.AppendLine("## Gökyüzü örtüsü (spec §12)");
+            r.AppendLine("## Sky Visibility (spec §12)");
 
-            // --- 8. Çatının altına kar yağmıyor ---
             rig.ResetSnow(0f, 0.10f);
             rig.SetSkyHalfCovered(GroundY + 3f);
             rig.Accumulate(Hour, Rate, temperature: -5f, rain: 0f, wind: Vector2.zero);
@@ -403,18 +335,13 @@ public static class SnowAccumulationTest
 
             bool roofOk = roofSwe < openSwe * 0.05f && openSwe > wantSwe * 0.9f;
             all &= roofOk;
-            r.AppendLine("  [" + M(roofOk) + "] Çatı altı         açıkta " +
-                         (openSwe * 1000f).ToString("0.000") + " mm,  altta " +
+            r.AppendLine("  [" + M(roofOk) + "] Under roof          open " +
+                         (openSwe * 1000f).ToString("0.000") + " mm,  covered " +
                          (roofSwe * 1000f).ToString("0.000") + " mm");
 
             r.AppendLine();
-            r.AppendLine("## Rüzgâr dağıtımı (spec §11)");
+            r.AppendLine("## Wind Distribution (spec §11)");
 
-            // --- 9. Rüzgâr yönü birikme dağılımını çeviriyor ---
-            // SABİT EĞİM İŞE YARAMAZ. Rüzgâr çarpanı yerel eğimden çıkıyor;
-            // yamaç her yerde aynı eğimdeyse çarpan da her yerde aynı olur ve
-            // iki nokta arasında fark oluşmaz (ölçüldü: oran 0.999). Sırt
-            // kuruluyor — bir yanı rüzgâra bakıyor, öbürü sırtını dönüyor.
             rig.ClearSky();
             rig.SetGroundRidge(GroundY, 2.4f);
 
@@ -431,15 +358,13 @@ public static class SnowAccumulationTest
             float plusRatio = plusWindward / Mathf.Max(plusLeeward, 1e-9f);
             float minusRatio = minusWindward / Mathf.Max(minusLeeward, 1e-9f);
 
-            // Yön çevrilince oran TERSİNE dönmeli.
             bool windOk = Mathf.Abs(plusRatio - 1f) > 0.02f &&
                           (plusRatio - 1f) * (minusRatio - 1f) < 0f;
             all &= windOk;
-            r.AppendLine("  [" + M(windOk) + "] Yön çevrilince    +X rüzgârda doğu/batı oranı " +
-                         plusRatio.ToString("0.000") + ",  −X rüzgârda " +
-                         minusRatio.ToString("0.000") + "  (1'in iki yanına düşmeli)");
+            r.AppendLine("  [" + M(windOk) + "] Reversed direction  +X wind east/west ratio " +
+                         plusRatio.ToString("0.000") + ",  -X wind " +
+                         minusRatio.ToString("0.000"));
 
-            // --- 10. Rüzgârsızken dağılım düz ---
             rig.ResetSnow(0f, 0.10f);
             rig.Accumulate(Hour, Rate, temperature: -5f, rain: 0f, wind: Vector2.zero);
             float flatRatio = rig.Snow(Center + new Vector2(4f, 0f)).r /
@@ -447,8 +372,8 @@ public static class SnowAccumulationTest
 
             bool flatOk = Mathf.Abs(flatRatio - 1f) < 0.01f;
             all &= flatOk;
-            r.AppendLine("  [" + M(flatOk) + "] Rüzgârsız         oran " +
-                         flatRatio.ToString("0.0000") + "  (sırt var ama rüzgâr yok → 1.0000)");
+            r.AppendLine("  [" + M(flatOk) + "] Calm wind           ratio " +
+                         flatRatio.ToString("0.0000") + "  (ridge present but no wind -> 1.0000)");
         }
         finally
         {
@@ -463,10 +388,6 @@ public static class SnowAccumulationTest
 
     static string M(bool ok) => ok ? "+" : "-";
 
-    // ------------------------------------------------------------------ sahte
-
-    /// Köprünün yerine geçen sahte çevre. Gerçek `SnowEnvironmentBridge`
-    /// sahneye bağlı; sınama onu değil, ONDAN OKUYAN mantığı ölçüyor.
     sealed class FakeEnvironment : ISnowEnvironmentSource
     {
         public Vector3 WindDirection { get; set; } = Vector3.right;
@@ -479,8 +400,6 @@ public static class SnowAccumulationTest
         public float PrecipIntensity01 { get; set; }
         public float FogDensity01 { get; set; }
     }
-
-    // ---------------------------------------------------------------- düzenek
 
     sealed class Rig
     {
@@ -513,8 +432,6 @@ public static class SnowAccumulationTest
             snow = Rt(res, RenderTextureFormat.ARGBHalf);
             snowTemp = Rt(res, RenderTextureFormat.ARGBHalf);
 
-            // KAccumulate Faz 11'den beri kabuğu da yazıyor; bağlanmazsa
-            // dispatch sessizce hiçbir şey yapmıyor (ölçüldü).
             trail = Rt(res, RenderTextureFormat.ARGBHalf);
             trailTemp = Rt(res, RenderTextureFormat.ARGBHalf);
             skyVis = Rt(res, RenderTextureFormat.RFloat);
@@ -531,8 +448,6 @@ public static class SnowAccumulationTest
             Shader.SetGlobalFloat(SnowShaderIDs.SnowAreaSize, areaSize);
             Shader.SetGlobalFloat(SnowShaderIDs.SnowResolution, res);
 
-            // Gökyüzü haritası kar bölgesiyle aynı alanı kapsıyor: sınama
-            // örtüyü teksel teksel yerleştirebilsin diye.
             Shader.SetGlobalVector(SnowShaderIDs.SkyCenterXZ,
                 new Vector4(center.x, center.y, 0f, 0f));
             Shader.SetGlobalFloat(SnowShaderIDs.SkyAreaSize, areaSize);
@@ -554,12 +469,8 @@ public static class SnowAccumulationTest
             return rt;
         }
 
-        // --- zemin ---
-
         void SetGroundFlat(float y) => WriteGround((_, __) => 0.5f, y - 1f, 2f);
 
-        /// Ortada tepe yapan sırt: −X yamacı +X'e, +X yamacı −X'e bakıyor.
-        /// Rüzgâr çevrilince hangi yamacın maruz kaldığı değişiyor.
         public void SetGroundRidge(float baseY, float rise)
         {
             WriteGround((u, _) => 1f - Mathf.Abs(2f * u - 1f), baseY, rise);
@@ -601,11 +512,8 @@ public static class SnowAccumulationTest
             Shader.SetGlobalFloat(SnowShaderIDs.GroundHeightRange, range);
         }
 
-        // --- gökyüzü ---
-
         public void ClearSky() => FillSky(_ => -9999f);
 
-        /// Bölgenin −X yarısına verilen kotta bir çatı koyar.
         public void SetSkyHalfCovered(float roofY) =>
             FillSky(x => x < res / 2 ? roofY : -9999f);
 
@@ -624,8 +532,6 @@ public static class SnowAccumulationTest
             Object.DestroyImmediate(tex);
         }
 
-        // --- durum ---
-
         public void ResetSnow(float swe, float rhoN)
         {
             sim.SetInt(SnowShaderIDs.Resolution, res);
@@ -638,11 +544,8 @@ public static class SnowAccumulationTest
             sim.Dispatch(kClear, groups, groups, 1);
         }
 
-        /// Kabuk kanalı (RT_Trail.B).
         public float Crust(Vector2 worldXZ) => ReadOne(trail, worldXZ).b;
 
-        /// Tek adımda `seconds` kadar ilerletir. Döşeme döndürmesi kapalı
-        /// (tiles = 1) — sınamanın ölçtüğü şey döndürme değil fizik.
         public void Accumulate(float seconds, float sweRate, float temperature,
                                float rain, Vector2 wind)
         {

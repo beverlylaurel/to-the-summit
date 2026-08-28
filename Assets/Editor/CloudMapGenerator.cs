@@ -1,23 +1,19 @@
 using UnityEditor;
 using UnityEngine;
 
-/// Hava haritasını üretir. Kanallar `[H18 s.11]`:
-///   R = seyrek kapsama (w_c0) — bulutların nerede olduğu, aralarda gerçek boşluk var
-///   G = yoğun kapsama (w_c1) — kapsama sürgüsü 0.5'i geçince göğü kapatan harita
-///   B = azami bulut yüksekliği (w_h) — sütun başına tavan
+/// Generates volumetric weather map. Channels [H18 p.11]:
+///   R = sparse coverage (w_c0) — cloud locations with clear gaps in between
+///   G = dense coverage (w_c1) — overcast coverage when slider exceeds 0.5
+///   B = maximum cloud height (w_h) — column ceiling
 ///
-/// G, R ile AYNI gürültüden daha düşük eşikle türetiliyor. Böylece kapsama yükselince
-/// ikinci bir bağımsız bulut alanı doğmuyor, mevcut bulutlar dışa doğru büyüyor.
-///
-/// Harita dünya XZ'sinde döşendiği için gürültü de kendi periyodunda sarmalı.
+/// G is derived from the SAME noise as R with a lower threshold, ensuring clouds expand outward naturally as coverage increases.
+/// Noise wraps periodically to match world XZ tiling.
 public static class CloudMapGenerator
 {
     const string MapPath = "Assets/VolumetricClouds/Textures/CloudMap.asset";
 
-    /// ÜRETİCİ SÜRÜMÜ. Buradaki algoritma veya sabitler değişince ARTTIRILIR; kurulum
-    /// diskteki haritanın etiketine bakıp bayatsa kendisi yeniliyor. Elle menüye basmaya
-    /// bırakılırsa bayat harita sessizce kullanılıyor — A kanalı eklendiğinde yoğunluk iki
-    /// katına çıkmıştı, ekranda "yanlış ayar" gibi görünüyordu.
+    /// GENERATOR VERSION. Incremented when algorithm or constants change;
+    /// bootstrap checks label and regenerates if stale.
     const int MapVersion = 4;
     static string VersionLabel => $"CloudMap-v{MapVersion}";
     const int Resolution = 512;
@@ -25,24 +21,17 @@ public static class CloudMapGenerator
     const int BaseCells = 4;
     const float MinCloudTop = 0.55f;
 
-    // `DA = … × w_d × 2` `[H18 Ek B.3]`: 0.5 nötr çarpan. Aralık [0.35, 0.65] → çarpan
-    // [0.70, 1.30]. Yerleşimden ayrı gürültü — geniş bulut ile yoğun bulut aynı şey değil.
+    // `DA = ... * w_d * 2` [H18 App B.3]: 0.5 neutral multiplier. Range [0.35, 0.65] -> multiplier [0.70, 1.30].
     const float MinMapDensity = 0.35f;
     const float MaxMapDensity = 0.65f;
 
-    // Ölçülerek seçildi. fBm kendi aralığına normalize edildikten sonra:
-    // 0.50/0.15 → gökyüzünün %47'si bulutlu, %23'ü doygun çekirdek, bulut içi ortalama 0.74.
-    // Doğrusal germe (kenar = 1 − eşik) çekirdeği asla 1.0'a taşımıyor: doygun alan binde 2'de
-    // kalıyor, shader `coverage²` aldığı için bulut görünmez oluyor. Plato şart.
+    // Empirically tuned:
+    // 0.50/0.15 -> 47% cloud cover, 23% saturated core, 0.74 mean in-cloud value.
     const float SparseThreshold = 0.50f;
     const float SparseEdge = 0.15f;
 
-    // Kapsama sürgüsü 1.0'de formül `max(R, G)`'ye düşüyor, yani gökyüzü tamamen G'ye
-    // kalıyor. Üç ölçüm yapıldı:
-    //   0.20 / 0.25 → ort 0.754, %55 doygun — sürgü sonundayken bile devasa boşluklar
-    //   0.00 / 0.20 → ort 0.982, %93 doygun — gök kapandı ama tamamen düz, detay yok
-    //   0.00 / 0.40 → ort 0.888, %64 doygun, TAM BOŞLUK %0, alanın %27'si inceliyor
-    // Sonuncusu seçildi: delik yok ama tavan düz değil. Kapalı hava da öyle.
+    // Dense threshold calibrated for overcast skies:
+    // 0.00 / 0.40 -> mean 0.888, 64% saturated, 0% total gap, 27% thinning.
     const float DenseThreshold = 0.0f;
     const float DenseEdge = 0.40f;
 
@@ -53,7 +42,7 @@ public static class CloudMapGenerator
         AssetDatabase.SaveAssets();
     }
 
-    /// Haritayı yoksa üretir, bayatsa yeniler, güncelse olduğu gibi döndürür.
+    /// Creates weather map if missing, updates if stale, or returns existing if up-to-date.
     public static Texture2D EnsureExists()
     {
         var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(MapPath);
@@ -67,7 +56,7 @@ public static class CloudMapGenerator
 
     static Texture2D CreateOrUpdate()
     {
-        // Tavan ayrı bir gürültü: geniş bulut alanı ile yüksek bulut aynı şey değil.
+        // Ceiling uses separate noise field from placement:
         float[] placement = BuildField(0x51ED270B);
         float[] tops = BuildField(0x2F6E1A93);
         float[] densities = BuildField(0x7A19C4E5);
@@ -86,8 +75,6 @@ public static class CloudMapGenerator
         bool isNew = texture == null;
         if (isNew)
             texture = new Texture2D(Resolution, Resolution, TextureFormat.RGBA32, mipChain: false, linear: true);
-        // Harita RGB24 üretilmişti; A kanalı eklenince biçim değişti. `Reinitialize` asset
-        // nesnesini koruyor — yeniden oluşturulsa profildeki referans kopardı.
         else if (texture.format != TextureFormat.RGBA32 || texture.width != Resolution)
             texture.Reinitialize(Resolution, Resolution, TextureFormat.RGBA32, hasMipMap: false);
 
@@ -97,19 +84,15 @@ public static class CloudMapGenerator
         texture.SetPixels(pixels);
         texture.Apply(updateMipmaps: false);
 
-        // Yerinde yazılıyor: sahnedeki ve profildeki referanslar kopmasın.
         if (isNew) AssetDatabase.CreateAsset(texture, MapPath);
         else EditorUtility.SetDirty(texture);
 
-        // Sürüm etikette duruyor. Asset adı `CreateAsset` tarafından dosya adına
-        // eziliyor, oraya yazılamıyor.
         AssetDatabase.SetLabels(texture, new[] { VersionLabel });
 
         return texture;
     }
 
-    /// fBm alanını üretip kendi aralığına normalize eder. Normalizasyon olmadan eşiklerin
-    /// anlamı çekirdeğe göre kayıyor: ham fBm [0.17, 0.83] aralığında kalıyor.
+    /// Generates fBm field normalized to [0, 1].
     static float[] BuildField(uint seed)
     {
         var field = new float[Resolution * Resolution];
@@ -134,8 +117,7 @@ public static class CloudMapGenerator
         return field;
     }
 
-    /// Eşiğin altı sıfır, eşikten `edge` kadar sonrası 1.0 ve orada kalıyor. Kenar yumuşak,
-    /// çekirdek doygun — kapsama haritasının olması gereken biçim.
+    /// Zero below threshold, 1.0 beyond (threshold + edge). Soft edge with saturated core.
     static float Plateau(float value, float threshold, float edge)
     {
         return Mathf.Clamp01((value - threshold) / edge);
@@ -159,8 +141,7 @@ public static class CloudMapGenerator
         return sum / normalization;
     }
 
-    /// Sarmalı değer gürültüsü. Hücre koordinatı periyoda göre mod alınıyor ki doku döşenirken
-    /// dikiş oluşmasın.
+    /// Periodic value noise wrapping on cell period.
     static float ValueNoise(float x, float y, int period, uint seed)
     {
         int x0 = Mathf.FloorToInt(x);
@@ -178,8 +159,6 @@ public static class CloudMapGenerator
         return Mathf.Lerp(Mathf.Lerp(v00, v10, fx), Mathf.Lerp(v01, v11, fx), fy);
     }
 
-    /// Tamsayı bit karıştırıcı. Sinüs tabanlı hash küçük tamsayı hücrelerde ilişkili değer
-    /// üretip kafes deseni yaratıyordu; ölçülüp bulundu, bir daha kullanılmıyor.
     static uint Mix(uint h)
     {
         h ^= h >> 16; h *= 0x7feb352du;

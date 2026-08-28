@@ -1,8 +1,8 @@
 using UnityEditor;
 using UnityEngine;
 
-/// Assets/Audio altındaki seslerin import ayarlarını sabitler.
-/// Ambiyanslar diskten akar (bellekte açılmaz), gök gürültüleri anında çalabilsin diye bellekte durur.
+/// Enforces import settings for audio assets under Assets/Audio.
+/// Ambiances stream from disk (not decompressed into memory), while thunder clips stay in memory for instant playback.
 public class AudioImportSettings : AssetPostprocessor
 {
     const string AudioRoot = "Assets/Audio/";

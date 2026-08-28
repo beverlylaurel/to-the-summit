@@ -7,52 +7,26 @@ using System.IO;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-/// Sahnenin tek kaynağı. Unity her derleme sonrası çalışır, sahneyi buradaki
-/// ayarlara getirir. Ayarlar değişmediyse hiçbir şey yapmaz.
+/// Single source of truth for the scene. Runs after every domain reload, bringing the scene
+/// to these configured settings. Does nothing if settings have not changed.
 [InitializeOnLoad]
 public static class MountainSceneBootstrap
 {
-    // --- Oyuncu ---
+    // --- Player ---
     const float PlayerHeight = 1.8f;
     const float EyeHeight = 1.65f;
-    const float FarClipFactor = 3f;   // kamera menzili = harita kenarı × bu
+    const float FarClipFactor = 3f;   // Camera far clip = map dimension * factor
 
-    /// Arazi LOD'unun siluette izin verdiği hata (piksel). Unity varsayılanı 5 ve o
-    /// değer yalnızca sahnede yaşıyordu. Gölgeyi düşüren mesh de bu LOD'dan çiziliyor:
-    /// kaba siluetin ışık yönünden izdüşümü, gölge kenarına üçgen dişler olarak
-    /// vuruyordu — yaklaşınca beliriyordu çünkü gölge mesafesi 150 metre.
-    /// LOD ne zaman seyreltmeye başlasın (ekran pikseli). 1'e indirmenin bedeli
-    /// ölçüldü: FPS 170 -> 60. Seyreltmenin NE KADAR kabalaşacağını bu değil
-    /// `TerrainMaxLod` sınırlıyor.
+    /// Maximum error allowed for terrain LOD silhouette (pixels).
     const float TerrainPixelError = 2f;
 
-    /// EN KABA LOD KADEMESI. Testere belirtisinin sebebi buydu ve analitik olarak
-    /// olculdu: her kademe ornekleri atliyor, ara nokta dogrusal kuruluyor ve aradaki
-    /// fark siluete basamak olarak cikiyor.
-    ///
-    ///   LOD 1  adim 14.6 m   ortanca hata  2.15 m   %95   8.7 m
-    ///   LOD 2  adim 29.3 m   ortanca hata  6.44 m   %95  25.9 m
-    ///   LOD 3  adim 58.6 m   ortanca hata 15.0 m    %95  60.1 m
-    ///   LOD 4  adim 117 m    ortanca hata 31.9 m    %95  126 m
-    ///
-    /// Bu, belirtinin her yanini aciklıyor: farkli yamalar farkli kademede oldugu icin
-    /// testerelerin boyu metrelerce degisiyor; en kaba kademede yama iki ucgene inince
-    /// duz yuzlu piramit cikiyor; ve yukseklik haritasini bulaniklastirmak ise yaramiyor
-    /// cunku hata veride degil, veriden ATLANAN orneklerde.
-    ///
-    /// 1'de en kaba adim 14.6 m, yani ortanca hata 2.15 m. Sifir tam detay demek ve
-    /// 30 km'de odenemez.
+    /// COARSEST LOD LEVEL. Limits coarseness to maintain silhouette accuracy.
     const int TerrainMaxLod = 1;
 
-    /// Basemap fiilen kapalı: Unity bu mesafenin ötesindeki araziyi malzemeyle değil,
-    /// malzemenin bir kez pişirilmiş 1024'lük fotoğrafıyla çizer. O fotoğraf canlı
-    /// değerlere kör (sürgüler uzakta "çalışmıyor" görünüyordu) ve 17 metrelik
-    /// texellerinde keskin maske sınırları bilinear büyütmeyle baklava kenarlarına
-    /// dönüyor. Uzak arazi de gerçek malzemeyle çizilir.
+    /// Basemap effectively disabled: forces terrain rendering with full material rather than baked 1024 basemap.
     const float TerrainBasemapDistance = 25000f;
 
-    /// Kurulumun çalıştığı tek sahne: oyunun kendisi. Test sahnesi (`TestGround`)
-    /// ayrı ve buraya dokunulmuyor — mekanikler orada denenir, oyun burada kurulur.
+    /// Main game scene path where bootstrapping runs.
     const string MainScenePath = "Assets/Scenes/Game.unity";
 
     const string TerrainDataPath = "Assets/Terrain/MountainTerrainData.asset";
@@ -87,7 +61,7 @@ public static class MountainSceneBootstrap
     const string SkyWeatherPath = "Assets/Settings/SkyWeatherSettings.asset";
     const string MoonLightName = "Moon Light";
 
-    /// `EnsureCloudVolume`'un bulut bileşenini yazdığı Volume. F1 paneli buradan bağlanıyor.
+    /// Volume where `EnsureCloudVolume` writes volumetric cloud component.
     static UnityEngine.Rendering.Volume cloudVolume;
 
     static MountainSceneBootstrap()
@@ -96,30 +70,12 @@ public static class MountainSceneBootstrap
         EditorApplication.playModeStateChanged += OnPlayModeChanged;
     }
 
-    /// Derleme Play mode'dayken olursa Run kendini iptal eder ve bir daha tetiklenmez.
-    /// Edit moduna dönüşte tekrar çalışsın diye buradan da çağrılır.
     static void OnPlayModeChanged(PlayModeStateChange change)
     {
         if (change == PlayModeStateChange.EnteredEditMode)
             EditorApplication.delayCall += Run;
     }
 
-    /// TAM ZİNCİR. Eskiden yalnız `gen.Generate()` çağırıyordu ve bu, arazinin
-    /// içeriğini `MountainGenerator`'ın KENDİ prosedürel çıktısıyla dolduruyordu —
-    /// eski radyal koni, terasları ve çok oktavlı gürültüsüyle. Yükseklik haritası
-    /// uygulanmıyor, tesviye yapılmıyor, yüzey haritaları pişirilmiyordu.
-    ///
-    /// BU BİR GÜN YAKTI. Kullanıcı testere belirtisini kovalarken bu düğmeye onlarca
-    /// kez bastı; her basış benim ürettiğim yükseklik haritasını eski jeneratörün
-    /// çıktısıyla EZDİ. `Logs/tools.log`: yükseklik haritası araziye en son 13:44:53'te
-    /// uygulanmış, aradaki dokuz saatte altı kez yeniden pişirildi ve hiçbiri ulaşmadı.
-    /// Testere de zaten eski jeneratörün terasıydı.
-    ///
-    /// İmza da sıfırlanıyor: `GetAssetDependencyHash` PNG dışarıdan yazıldığında
-    /// güncellenmeyebiliyor ve kurulum "değişmemiş" deyip üretimi atlıyor.
-    /// Kurulumu dışarıdan koşturur. `Dağ Yapımı` penceresi kaydettikten sonra çağırıyor:
-    /// pencere yüzey haritalarını bayat ilan ediyor ama tazeleyen bir şey yoktu ve
-    /// kullanıcı doğru gölgelendirmeyi ancak Play'e girip çıkınca görüyordu.
     public static void Rebuild() => RegenerateTerrain();
 
     [MenuItem("To The Summit/Terrain/Regenerate Terrain", false, 20)]
@@ -128,7 +84,7 @@ public static class MountainSceneBootstrap
         var gen = Object.FindAnyObjectByType<MountainGenerator>();
         if (gen == null)
             throw new System.InvalidOperationException(
-                "Sahnede MountainGenerator yok; önce kurulum çalışmalı.");
+                "No MountainGenerator in scene; bootstrap must run first.");
 
         gen.lastBuildSignature = string.Empty;
         SurfaceMapBaker.Invalidate();
@@ -137,7 +93,6 @@ public static class MountainSceneBootstrap
         Run();
     }
 
-    /// Run sırasında yüklenen ayarlar; yardımcı metotlar ölçüyü buradan okur
     static MountainSettings current;
 
     static void Run()
@@ -147,15 +102,10 @@ public static class MountainSceneBootstrap
         var scene = SceneManager.GetActiveScene();
         if (!scene.IsValid() || !scene.isLoaded) return;
 
-        // YALNIZ ANA SAHNE. Kurulum aktif sahneye çalışıyor; test sahnesi açıkken
-        // oraya dağ, hava ve kar sistemi kurup düz alanı boğardı.
         if (scene.path != MainScenePath) return;
 
         bool changed = false;
 
-        // SÜRE ÖLÇÜMÜ. Kurulum her derlemeden sonra çalışıyor ve beklenen sürenin ne
-        // kadarı Unity'nin derlemesi, ne kadarı bizim işimiz belli değildi. Aşama
-        // aşama ölçülüyor; toplam eşiğin altındaysa hiç basılmıyor ki konsol kirlenmesin.
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var timings = new System.Text.StringBuilder();
         long mark = 0;
@@ -168,19 +118,16 @@ public static class MountainSceneBootstrap
         }
 
         if (RemoveMissingScripts(scene)) changed = true;
-        Phase("ölü script taraması");
+        Phase("missing scripts scan");
 
         EnsureSkyFeature();
         EnsureCloudFeature();
         EnsureFogFeature();
-        Phase("gökyüzü, bulut ve sis geçişleri");
+        Phase("sky, cloud, fog features");
 
-        // SIRA ÖNEMLİ: `EnsureCloudVolume` sahnedeki Volume'u bulup `cloudVolume` statiğine
-        // yazıyor, gökyüzü de onun profiline yazıyor. Ayrı arama yapılsaydı sahnedeki
-        // birden fazla Volume arasından başkası seçilebilirdi.
         EnsureCloudVolume();
         EnsureSkyVolume();
-        Phase("gökyüzü ve bulut hacimleri");
+        Phase("sky and cloud volumes");
 
         var settings = current = LoadOrCreateSettings();
 
@@ -193,18 +140,8 @@ public static class MountainSceneBootstrap
 
         gen.Bind(settings);
 
-        Phase("dağ bileşeni");
+        Phase("mountain component");
 
-        // ARAZİNİN KAYNAĞI `Dağ YapımI` PENCERESİ. Dağ elle yapılıyor ve pencere
-        // yükseklik alanını doğrudan `TerrainData`'ya yazıyor. Kurulum araziyi ÜRETMİYOR,
-        // yalnız ona bağlı olan her şeyi (yüzey haritaları, doğuş, bileşenler) tazeliyor.
-        //
-        // Düzenlenebilir asıl: `Assets/Terrain/Sculpts/*.bytes` (1025², float32).
-        // Üretilmiş sonuç: `MountainTerrainData.asset`.
-        //
-        // `regenerated` yalnız AYAR imzasına bakıyor; yüzey haritalarının tazeliğini
-        // `SurfaceMapBaker.MapsCurrent` ayrı karar veriyor ve pencere kaydederken
-        // `Invalidate()` çağırdığı için harita orada bayat ilan ediliyor.
         string signature = settings.BuildSignature();
         bool regenerated = gen.lastBuildSignature != signature;
 
@@ -240,8 +177,6 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
-        // TEST NESNELERİ ANA SAHNEDE DURMUYOR. Karakter, bitki örtüsü ve mekanik
-        // denemeleri `TestGround` sahnesinde; ana sahne dağın kendisi.
         if (RemoveStaleTestObjects()) changed = true;
 
         var snap = player.GetComponent<GroundSnap>();
@@ -254,28 +189,22 @@ public static class MountainSceneBootstrap
         snap.Bind(gen.GetComponent<Terrain>());
         EditorUtility.SetDirty(snap);
 
-        // KARAKTER KAR YÜZEYİNDE DURUYOR.
-        //
-        // `GroundSnap` yalnız başlangıçta ve düşünce çalışıyor; kar yüzeyi
-        // tessellation ile yükseldiği için karakterin HER KARE o yüzeyde
-        // tutulması gerekiyor. Ayrı bileşen: `GroundSnap`'in işi kurtarma,
-        // bunun işi yüzey takibi.
-        var karOfset = player.GetComponent<SnowGroundOffset>();
-        if (karOfset == null)
+        var snowOffset = player.GetComponent<SnowGroundOffset>();
+        if (snowOffset == null)
         {
-            karOfset = player.gameObject.AddComponent<SnowGroundOffset>();
+            snowOffset = player.gameObject.AddComponent<SnowGroundOffset>();
             changed = true;
         }
 
-        var karYonetici = Object.FindAnyObjectByType<SnowManager>(FindObjectsInactive.Include);
-        var karOfsetSo = new SerializedObject(karOfset);
-        var alan = karOfsetSo.FindProperty("snowManager");
+        var snowManager = Object.FindAnyObjectByType<SnowManager>(FindObjectsInactive.Include);
+        var snowOffsetSo = new SerializedObject(snowOffset);
+        var snowManagerProp = snowOffsetSo.FindProperty("snowManager");
 
-        if (alan.objectReferenceValue != karYonetici)
+        if (snowManagerProp.objectReferenceValue != snowManager)
         {
-            alan.objectReferenceValue = karYonetici;
-            karOfsetSo.ApplyModifiedPropertiesWithoutUndo();
-            EditorUtility.SetDirty(karOfset);
+            snowManagerProp.objectReferenceValue = snowManager;
+            snowOffsetSo.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(snowOffset);
             changed = true;
         }
 
@@ -288,10 +217,6 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
-        // TAA: bulut yürüyüşü ekranın 1/9'unda yapılıyor ve blok deseni tül gibi
-        // okunuyor. Kaydın (DECISIONS.md → "Yürüyüş çözünürlüğü 1/9'da kaldı")
-        // tetikleyicisi tam olarak buydu: deseni eritecek zamansal katman gelirse
-        // açılacaktı. URP'nin kendi TAA'sı hazır geliyor, ayrı bir şey yazmaya gerek yok.
         var cameraData = camera.GetUniversalAdditionalCameraData();
         if (cameraData.antialiasing != AntialiasingMode.TemporalAntiAliasing)
         {
@@ -301,13 +226,6 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
-        // DITHERING AÇIK. Gökyüzü tüm görüş alanında 1 duraktan az değişiyor (ölçüldü,
-        // durak konturu tek sınır veriyor). Bu kadar düz bir gradyanda 8 bit çıkışın
-        // basamakları lekeli bantlara dönüyor; belirti "gökyüzünde devasa koyu bölge"
-        // diye okunuyordu ve haftalarca gökyüzü hesabında arandı — orada değildi.
-        //
-        // URP varsayılanı KAPALI. Açıkken son geçişte mavi gürültü ekleniyor, basamak
-        // sınırı eriyor. TAA ile birlikte çalışır, deseni ayrıca zamanda da dağıtır.
         if (!cameraData.dithering)
         {
             cameraData.dithering = true;
@@ -324,14 +242,6 @@ public static class MountainSceneBootstrap
             terrainComponent.heightmapPixelError = TerrainPixelError;
             terrainComponent.heightmapMaximumLOD = TerrainMaxLod;
             terrainComponent.basemapDistance = TerrainBasemapDistance;
-
-            // ARAZİ GÖLGE HARİTASINA YAZMIYOR. Kendi gölgesini yükseklik alanından
-            // yürüyerek hesaplıyor (bkz. `TerrainSunShadow`) ve o hesap kilometrelerce
-            // uzağı taşıyor; harita altmış metrede bitiyor. İkisi birden açıkken arazi
-            // kendi kendini gölgeliyordu ve ovada çizgi çizgi gölge akneleri çıkıyordu.
-            //
-            // Haritada yalnız HAREKETLİ nesneler kalıyor: bisiklet, oyuncu, ileride
-            // çadır ve ekipman. Onların gölgesi araziye böyle düşüyor.
             terrainComponent.shadowCastingMode = ShadowCastingMode.Off;
 
             EditorUtility.SetDirty(terrainComponent);
@@ -346,9 +256,6 @@ public static class MountainSceneBootstrap
 
         var weatherState = Object.FindAnyObjectByType<WeatherState>();
 
-        // Ayarlar sürücüden önce yüklenir: bulut tavanı orada tanımlı ve yağışın nerede
-        // kesileceğini o belirliyor. İki yerde ayrı tanımlanırsa "bulutların üstündeyim
-        // ama tepemden yağış geliyor" durumu geri gelir.
         var atmosphereSettings = LoadOrCreateAtmosphereSettings();
 
         var atmosphere = Object.FindAnyObjectByType<AtmosphereController>();
@@ -358,15 +265,10 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
-        // Rüzgâr her çalışmada yeniden bağlanır: ayar asset'i sonradan eklendiğinde
-        // sahnedeki bileşende alan boş kalıyor ve hata ancak Play'e basınca çıkıyordu.
         var windField = Object.FindAnyObjectByType<WindField>();
         windField.Bind(LoadOrCreate<WindSettings>(WindPath));
         EditorUtility.SetDirty(windField);
 
-        // Kuşak sınırları dağın zemini ve zirvesinden türer; dağ değişince kayar
-        // Sıcaklık dördüncü kaynak: donma seviyesi ondan türüyor, sürücü kendi
-        // modelini kurmuyor.
         var thermometer = weatherState.GetComponent<TemperatureField>();
         if (thermometer == null)
         {
@@ -376,27 +278,12 @@ public static class MountainSceneBootstrap
 
         thermometer.Bind(weatherState, windField, Object.FindAnyObjectByType<TimeOfDay>());
 
-        // DENİZ SEVİYESİ SICAKLIĞI KIŞLIK.
-        //
-        // Varsayılan +7.8 °C idi ve dağın eteğinde (206 m) hava +4.8 °C
-        // çıkıyordu. Kar yağıyor ama derece-gün erimesi yağışın %98'ini
-        // yiyordu: ölçüldü, birikme hızı 3.6e-9 m/s; sıcaklık -4 °C'ye
-        // çekilince 1.10e-7 m/s, otuz kat.
-        //
-        // Kar çizgisi ve yağış-sıcaklık bağı kaldırıldığı için oyun "her kotta
-        // kar tutar" diyor; sıcaklık modeli de buna uymalı. Kâğıtta 206 m:
-        //   -2 - 6.5*0.206 + 1.63*gunduz - 3.25*yagis
-        //   yağışlı gündüz -4.96 °C, yağışsız gündüz -1.71 °C — ikisi de donma altı.
-        // Zirvede (6028 m) -42.8 °C; kışın Everest zirvesi mertebesinde.
         var thermoSerialized = new SerializedObject(thermometer);
         thermoSerialized.FindProperty("seaLevelCelsius").floatValue = -2f;
         thermoSerialized.ApplyModifiedProperties();
 
         EditorUtility.SetDirty(thermometer);
 
-        // KUŞAKLAR ÖLÇÜLEN ARAZİDEN. Taban eskiden `baseHeight × terrainHeight` ile
-        // ayardan geliyordu (186 m) ve elle yapılan dağın gerçek ovası 0 m olunca hava
-        // kuşakları kayıyordu. `gen.Measure()` ikisini de araziden okuyor.
         gen.Measure();
 
         var driver = Object.FindAnyObjectByType<AltitudeWeatherDriver>();
@@ -406,8 +293,6 @@ public static class MountainSceneBootstrap
             gen.groundAltitude, gen.peakAltitude);
         EditorUtility.SetDirty(driver);
 
-        // Arazi maruziyeti: rüzgâr sırtta hızlanır, oyukta kesilir. Rüzgâr araziyi
-        // bilmez, arazi rüzgârı bilir — bu yüzden ayrı bir bileşen ölçüp itiyor.
         var shelter = windField.GetComponent<TerrainWindShelter>();
         if (shelter == null)
         {
@@ -418,28 +303,19 @@ public static class MountainSceneBootstrap
         shelter.Bind(player.transform, SurfaceComponent(gen, ref changed), windField);
         EditorUtility.SetDirty(shelter);
 
-        // Bulut katmanının tek kaynağı. Yağış ve şimşek kotlarını buradan okuyor,
-        // ikisinden de ÖNCE kurulmak zorunda.
         EnsureCloudLayerProbe(player, ref changed);
 
-        // Yağış her çalışmada yeniden bağlanır: bulut kaynağı burada kuruluyor ve
-        // yağışın nereden düştüğünü o belirliyor.
         var precipitationRenderer = Object.FindAnyObjectByType<PrecipitationRenderer>();
         var precipitationShader = AssetDatabase.LoadAssetAtPath<Shader>(PrecipitationShaderPath);
         if (precipitationShader == null)
-            throw new System.InvalidOperationException($"Shader bulunamadı: {PrecipitationShaderPath}");
+            throw new System.InvalidOperationException($"Shader not found: {PrecipitationShaderPath}");
 
-        // GARG-NAYAR İZ VERİTABANI. Yoksa yağmur izleri veritabanından çizilemez;
-        // pişirmek dış veri gerektirdiği için burada üretilmiyor, eksikse uyarılıyor.
         var streakDatabase = AssetDatabase.LoadAssetAtPath<RainStreakDatabase>(RainStreakDatabasePath);
         if (streakDatabase == null)
             Debug.LogWarning(
-                $"İz veritabanı yok: {RainStreakDatabasePath}. Menü: " +
+                $"No streak database: {RainStreakDatabasePath}. Menu: " +
                 "To The Summit/Rain/Set Up Streak Database");
 
-        // HER KOŞUDA VARLIĞI GARANTİ EDİLİYOR, yalnız sahne yaratılırken değil.
-        // Sahne zaten varsa yaratma bloğu hiç çalışmıyor ve arama null dönüyordu.
-        // Belirti: yağmur izleri hiç görünmüyor, hata da yok.
         var streakSet = precipitationRenderer.GetComponent<RainStreakWorkingSet>();
         if (streakSet == null)
             streakSet = precipitationRenderer.gameObject.AddComponent<RainStreakWorkingSet>();
@@ -450,9 +326,6 @@ public static class MountainSceneBootstrap
             streakSet, Object.FindAnyObjectByType<TimeOfDay>());
         EditorUtility.SetDirty(precipitationRenderer);
 
-        // Eski kurulumdan kalan çizim bileşenleri: yağış artık doğrudan çiziliyor
-        // (iki alt parça, kapalı olan hiç gönderilmiyor). Kalırlarsa mesh'in tamamını
-        // ikinci kez çizerler.
         var staleRenderer = precipitationRenderer.GetComponent<MeshRenderer>();
         if (staleRenderer != null)
         {
@@ -476,7 +349,6 @@ public static class MountainSceneBootstrap
         EnsureStorm(weatherState, player.transform, atmosphere,
             gen.GetComponent<Terrain>(), ref changed);
 
-        // Eski, eksik bileşenli Debug objesi varsa baştan kurulur
         var staleHud = Object.FindAnyObjectByType<PerformanceHud>();
         if (staleHud != null && staleHud.GetComponent<PerformanceSampler>() == null)
         {
@@ -490,8 +362,6 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
-        // Bakış hareketten ayrı: serbest uçuşa geçince yürüyüş kapanıyor,
-        // bakış oradaysa fare de ölüyordu
         var look = player.GetComponent<MouseLook>();
         if (look == null)
         {
@@ -510,8 +380,6 @@ public static class MountainSceneBootstrap
         flyer.Bind(camera.transform.parent);
         EditorUtility.SetDirty(flyer);
 
-        // Kapalı başlamalı: açıkken CharacterController'ı devre dışı bırakıyor,
-        // oyuncu çarpışmasız kalıp zeminden düşüyor
         if (flyer.enabled)
         {
             flyer.enabled = false;
@@ -528,55 +396,12 @@ public static class MountainSceneBootstrap
         EnsureSkyDrivers(ref changed);
 
     #if URP_PBSKY
-        // GÜNEŞ ŞİDDETİ GÖKYÜZÜ PAKETİNİN KALİBRASYONUNDAN. Paket 100000 lux yer
-        // aydınlığına göre kurulu ve gökyüzü parlaklığını ana ışıktan türetiyor; 1.5'te
-        // gök sahneye göre sönük kalıyordu. Sayı paketin kendi önerisi, bizim seçimimiz
-        // değil — gök ile sahnenin göreli parlaklığı buradan geliyor.
         var timeOfDay = Object.FindAnyObjectByType<TimeOfDay>();
         timeOfDay.SunIntensity = 3.030782f;
-
-        // AY GÖKYÜZÜNÜ AYDINLATAN TEK KAYNAK. Paket geceleyin ayı güneş yerine koyup
-        // atmosferi ondan hesaplıyor; ortam probe'u da o gökyüzünden pişiyor. Değer göz
-        // kararı bulundu, gerçek ay parlaklığının karşılığı değil.
-        // 0.204 → 0.0199. AY ON DÖRT DURAK FAZLA PARLAKTI ve gecenin gündüz gibi
-        // okunmasının kökü buydu; üstüne yapılan pozlama/kontrast düzeltmeleri yamaydı.
-        //
-        // Gerçek oran: dolunay aydınlanması ≈ 0,25 lüks, güneş ≈ 133.000 lüks — arada
-        // 19 durak var. Eski değerde güneş 3,0308'e karşı etkin ay 0,204 × renk ışıması
-        // 0,384 = 0,078, yani 39:1 = 5,3 durak. Gece öğlenin beş durak altındaydı.
-        //
-        // Yeni değerde etkin 0,00765 → 396:1 = 8,6 durak. Fiziğin hâlâ 10,4 durak
-        // üstünde ve bu BİLEREK: tam fiziksel gece için pozlamanın 19 durak açması
-        // gerekirdi, `exposureCap` 2,5'te duruyor.
-        //
-        // SAYIYI BULUT BELİRLEDİ. Önce 0.0058'e çekilmişti (−4 durak hedefi, formülden);
-        // arazi doğru göründü ama ay ışığındaki bulut eşiğin altında kalıp simsiyah
-        // çıkıyordu. Sürgüyle ölçüldü: bulut karla birlikte ve orantılı parlıyor, yani
-        // saçılım integrali sağlam, mesele eşikti. 0.0199 ikisinin de eşiğin üstünde
-        // olduğu en düşük değer.
-        //
-        // TAVAN KIL PAYI BAĞLI. Pozlama uyumu `0.35 × 7,25 = 2,54` istiyor, `exposureCap`
-        // 2,5'te kırpıyor. Yani buradan yapılan değişiklik ŞU AN ekrana birebir iniyor,
-        // ama ay biraz daha yükseltilirse kırpma kalkar ve kısıntının %65'i geri gelir.
         timeOfDay.MoonIntensity = 0.0199f;
-
-        // Ay albedosu. Doğan ay atmosferden geçerken sarıya kayıyordu; taban soğutuldu.
-        // Hesap `TimeOfDay.moonColor` yorumunda.
-        //
-        // DOYGUNLUK DÜŞÜRÜLDÜ. Pozlama uyum payı yükselince gece bir durak açıldı ve o
-        // soğuk taban olduğundan fazla göze çarptı. Ay ışığı fizikte güneş ışığının gri
-        // regolitten yansıması, yani nötre yakın; gecenin mavi görünmesi gözün karanlıkta
-        // maviye kaymasından (Purkinje) geliyor ve bu kadar doygun değil.
-        //
-        // TON DEĞİŞTİ, PARLAKLIK DEĞİŞMEDİ. Doygunluğu düşürmek tek başına ışıma gücünü
-        // de yükseltiyor — `(0.72,0.80,1.00)` denendi, sahne bir tık daha aydınlandı.
-        // Ton lineer uzayda eski rengin ışımasına (Y = 0.3844) ölçeklendi; `MoonIntensity`
-        // bu yüzden 0.204'te kalıyor ve `SurfaceLightLevel` üzerinden pozlama uyumu da
-        // kaymıyor.
         timeOfDay.MoonColor = new Color(0.586f, 0.653f, 0.818f, 1f);
     #endif
 
-        // Debug menüsünde olduğu gibi her çalışmada yeniden bağlanır
         atmosphere.Bind(
             atmosphereSettings,
             weatherState,
@@ -595,17 +420,11 @@ public static class MountainSceneBootstrap
         }
         else if (lookController.Look == null)
         {
-            // Önceki çalışmada bağlanamadan eklenmiş olabilir
             lookController.Bind(LoadOrCreateLookSettings(), weatherState,
                 Object.FindAnyObjectByType<TimeOfDay>());
             changed = true;
         }
 
-        // POZLAMA UYUM PAYI SAHNEYE YAZILIYOR. Alan serileştirilmiş: koddaki varsayılanı
-        // değiştirmek sahnedeki eski örneği etkilemiyor, ölçülen düzeltme kaybolurdu.
-        // Gerekçe ve ölçüm `LookController.adaptShare` başında.
-        // YENİDEN ARANIYOR: yukarıdaki dal bileşeni bu karede yaratmış olabilir, o
-        // durumda eldeki başvuru hâlâ boş.
         lookController = Object.FindAnyObjectByType<LookController>();
         if (lookController != null)
         {
@@ -619,18 +438,18 @@ public static class MountainSceneBootstrap
             }
         }
 
-        Phase("sistemler");
+        Phase("systems");
 
         EnsureTerrainSurface(gen, regenerated, ref changed);
-        Phase("yüzey haritaları");
+        Phase("surface maps");
 
         EnsureSea(gen, camera, weatherState, windField, atmosphere, thermometer, ref changed);
-        Phase("deniz");
+        Phase("sea");
 
         EnsureRouteOverlay(gen, ref changed);
         EnsureClimbHud(player, gen, ref changed);
         EnsureDebugMenu(player, ref changed);
-        Phase("rota, göstergeler");
+        Phase("route, HUD");
 
         if (changed)
         {
@@ -639,23 +458,20 @@ public static class MountainSceneBootstrap
                 EditorSceneManager.SaveScene(scene);
         }
 
-        Phase("sahne kaydı");
+        Phase("scene save");
 
-        // Eşik 200 ms: altındaki kurulumlar zaten fark edilmiyor.
         if (clock.ElapsedMilliseconds >= 200)
-            ToolLog.Write($"[Kurulum] toplam {clock.ElapsedMilliseconds} ms{timings}");
+            ToolLog.Write($"[Bootstrap] total {clock.ElapsedMilliseconds} ms{timings}");
     }
 
     static readonly string[] BandNames =
     {
-        "0-25%   etek",
-        "25-50%  alt yamaç",
-        "50-75%  üst yamaç",
-        "75-100% zirve"
+        "0-25%   foot",
+        "25-50%  lower slope",
+        "50-75%  upper slope",
+        "75-100% summit"
     };
 
-    /// Kuşak başına hedef dağılım: yürünebilir, zorlu, tırmanma, duvar.
-    /// Aşağıda yürüyüş baskın, yukarı çıktıkça tırmanma ve geçilemez duvar artar.
     static readonly float[,] BandTargets =
     {
         { 75f, 20f,  5f,  0f },
@@ -664,25 +480,23 @@ public static class MountainSceneBootstrap
         { 15f, 30f, 45f, 10f }
     };
 
-    /// Üretilen dağın ölçüm sonucunu ve kullanılan parametreleri dosyaya yazar.
-    /// Console'a bakmaya gerek kalmasın diye.
     static void WriteMountainReport(MountainGenerator gen)
     {
         var report = new System.Text.StringBuilder();
 
-        report.AppendLine($"# Dağ {System.DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        report.AppendLine($"# Mountain {System.DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         report.AppendLine();
         var s = gen.Settings;
-        report.AppendLine($"{s.terrainSize} m taban, {s.terrainHeight} m zirve, " +
-                          $"{s.heightmapResolution} çözünürlük " +
-                          $"({s.terrainSize / (s.heightmapResolution - 1f):F2} m/örnek)");
-        report.AppendLine($"Ortalama eğim {gen.meanSlopeDegrees:F1}°   " +
-                          $"gerçek zirve {gen.peakAltitude:F0} m " +
-                          $"(tavanın %{gen.peakAltitude / s.terrainHeight * 100f:F0}'i)");
-        report.AppendLine($"Zemin {s.baseHeight * s.terrainHeight:F0} m");
+        report.AppendLine($"{s.terrainSize} m base, {s.terrainHeight} m peak, " +
+                          $"{s.heightmapResolution} resolution " +
+                          $"({s.terrainSize / (s.heightmapResolution - 1f):F2} m/sample)");
+        report.AppendLine($"Mean slope {gen.meanSlopeDegrees:F1}°   " +
+                          $"peak altitude {gen.peakAltitude:F0} m " +
+                          $"({gen.peakAltitude / s.terrainHeight * 100f:F0}% of ceiling)");
+        report.AppendLine($"Base {s.baseHeight * s.terrainHeight:F0} m");
         report.AppendLine();
-        report.AppendLine("## Yükseklik kuşağı başına eğim dağılımı (sadece dağ)");
-        report.AppendLine("Kuşak                 Yürü   Zorlu  Tırman  Duvar   Ort");
+        report.AppendLine("## Slope distribution per altitude band (mountain only)");
+        report.AppendLine("Band                 Walk   Stren  Climb  Wall   Mean");
         report.AppendLine("                     0-30°  30-45°  45-70°   70°+");
 
         for (int i = 0; i < MountainGenerator.AltitudeBandCount; i++)
@@ -692,55 +506,49 @@ public static class MountainSceneBootstrap
                 $"{BandNames[i],-20} {band.walkable,5:F1}  {band.strenuous,6:F1}  " +
                 $"{band.climbable,6:F1}  {band.wall,5:F1}  {band.meanDegrees,5:F1}°");
             report.AppendLine(
-                $"{"hedef",-20} {BandTargets[i, 0],5:F0}  {BandTargets[i, 1],6:F0}  " +
+                $"{"target",-20} {BandTargets[i, 0],5:F0}  {BandTargets[i, 1],6:F0}  " +
                 $"{BandTargets[i, 2],6:F0}  {BandTargets[i, 3],5:F0}");
         }
 
         report.AppendLine();
-        report.AppendLine("## Parametreler");
+        report.AppendLine("## Parameters");
         report.AppendLine($"seed {s.seed}   mountainRadius {s.mountainRadius}   baseHeight {s.baseHeight}");
         report.AppendLine($"radialDistortion {s.radialDistortion}   radialFrequency {s.radialFrequency}");
-        report.AppendLine($"ikincil zirve {s.secondaryPeaks}   yayılım {s.peakSpread}   " +
-                          $"yükseklik {s.peakHeightRange}   yarıçap {s.peakRadiusRange}");
-        report.AppendLine($"oktav {gen.EffectiveOctaves} (çözünürlükten)   " +
+        report.AppendLine($"secondary peaks {s.secondaryPeaks}   spread {s.peakSpread}   " +
+                          $"height {s.peakHeightRange}   radius {s.peakRadiusRange}");
+        report.AppendLine($"octaves {gen.EffectiveOctaves} (from resolution)   " +
                           $"baseFrequency {s.baseFrequency}   " +
                           $"lacunarity {s.lacunarity}   gain {s.gain}");
         report.AppendLine($"ridgeInfluence {s.ridgeInfluence}   ridgeFootDamping {s.ridgeFootDamping}   " +
                           $"ridgeSharpness {s.ridgeSharpness}");
         report.AppendLine($"warp {s.warpStrength} @ {s.warpFrequency}   " +
-                          $"detay {s.warpDetailStrength} @ {s.warpDetailFrequency}");
-        report.AppendLine($"teras kaba {s.coarseTerraceStrength}/{s.coarseTerraceBands}   " +
-                          $"ince {s.fineTerraceStrength}/{s.fineTerraceBands}");
+                          $"detail {s.warpDetailStrength} @ {s.warpDetailFrequency}");
+        report.AppendLine($"terrace coarse {s.coarseTerraceStrength}/{s.coarseTerraceBands}   " +
+                          $"fine {s.fineTerraceStrength}/{s.fineTerraceBands}");
         report.AppendLine($"terraceSharpness {s.terraceSharpness}   " +
-                          $"kot kayması {s.terraceOffsetAmount} @ {s.terraceOffsetFrequency}   " +
-                          $"güç değişimi {s.terraceVariation} @ {s.terraceVariationFrequency}");
-        report.AppendLine($"erozyon {s.erosionIterations} iterasyon   talus {s.talusAngle}°   " +
-                          $"oran {s.erosionRate}");
-        report.AppendLine($"zirve platosu {s.summitPlateauStart} düzlük {s.summitFlatness}");
+                          $"offset {s.terraceOffsetAmount} @ {s.terraceOffsetFrequency}   " +
+                          $"variation {s.terraceVariation} @ {s.terraceVariationFrequency}");
+        report.AppendLine($"erosion {s.erosionIterations} iterations   talus {s.talusAngle}°   " +
+                          $"rate {s.erosionRate}");
+        report.AppendLine($"summit plateau {s.summitPlateauStart} flatness {s.summitFlatness}");
 
         Directory.CreateDirectory("Logs");
         File.WriteAllText("Logs/mountain.log", report.ToString(), System.Text.Encoding.UTF8);
     }
 
-    /// Gökyüzü materyali. Bulut parametreleri her karede AtmosphereController tarafından yazılır.
     static Material LoadOrCreateSkyMaterial()
     {
         var material = AssetDatabase.LoadAssetAtPath<Material>(SkyMaterialPath);
-        if (material != null)
-        {
-            // (bulut dokusu ataması silindi)
-            return material;
-        }
+        if (material != null) return material;
 
         var shader = AssetDatabase.LoadAssetAtPath<Shader>(SkyShaderPath);
         if (shader == null)
-            throw new System.InvalidOperationException($"Shader bulunamadı: {SkyShaderPath}");
+            throw new System.InvalidOperationException($"Shader not found: {SkyShaderPath}");
 
         material = new Material(shader) { name = "Sky" };
         AssetDatabase.CreateAsset(material, SkyMaterialPath);
         AssetDatabase.SaveAssets();
 
-        // (bulut dokusu ataması silindi)
         return material;
     }
 
@@ -748,15 +556,12 @@ public static class MountainSceneBootstrap
     {
         var renderer = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.ScriptableRendererData>(RendererPath);
         if (renderer == null)
-            throw new System.InvalidOperationException($"Renderer bulunamadı: {RendererPath}");
+            throw new System.InvalidOperationException($"Renderer not found: {RendererPath}");
 
         var compute = AssetDatabase.LoadAssetAtPath<ComputeShader>(FogComputePath);
         if (compute == null)
-            throw new System.InvalidOperationException($"Sis compute shader'ı bulunamadı: {FogComputePath}");
+            throw new System.InvalidOperationException($"Fog compute shader not found: {FogComputePath}");
 
-        // VAR OLAN ÖRNEK DE GÜNCELLENİYOR, yalnız yokken kurulmuyor. Feature'a sonradan
-        // alan eklendiğinde erken dönen bir kurulum o alanı boş bırakıyor ve geçiş
-        // sessizce çalışmıyor — sis buradan bir kez kaybedildi.
         VolumetricFogFeature feature = null;
         foreach (var existing in renderer.rendererFeatures)
             if (existing is VolumetricFogFeature found) { feature = found; break; }
@@ -765,11 +570,9 @@ public static class MountainSceneBootstrap
         if (isNew)
         {
             feature = ScriptableObject.CreateInstance<VolumetricFogFeature>();
-            feature.name = "Volumetrik Sis";
+            feature.name = "Volumetric Fog";
         }
 
-        // Bağlar eklemeden ÖNCE yazılıyor: `Create()` örnek listeye girer girmez Unity
-        // tarafından çağrılıyor ve bağlar boşsa geçiş hiç kuyruğa girmiyor.
         var serialized = new SerializedObject(feature);
         serialized.FindProperty("compute").objectReferenceValue = compute;
         serialized.FindProperty("settings").objectReferenceValue =
@@ -777,7 +580,7 @@ public static class MountainSceneBootstrap
 
         var skyFogShader = AssetDatabase.LoadAssetAtPath<Shader>(SkyFogShaderPath);
         if (skyFogShader == null)
-            throw new System.InvalidOperationException($"Gökyüzü sisi shader'ı bulunamadı: {SkyFogShaderPath}");
+            throw new System.InvalidOperationException($"Sky fog shader not found: {SkyFogShaderPath}");
 
         serialized.FindProperty("skyFogShader").objectReferenceValue = skyFogShader;
         serialized.ApplyModifiedPropertiesWithoutUndo();
@@ -793,19 +596,12 @@ public static class MountainSceneBootstrap
         AssetDatabase.ImportAsset(RendererPath);
     }
 
-    /// GÖKYÜZÜ RENDER GEÇİŞİ. `PhysicallyBasedSkyURP` (jiaozi158, MIT — HDRP'nin PBSky'ının
-    /// URP portu). Rayleigh, Mie ve ozon soğurmasını LUT'lardan hesaplıyor; aynı LUT'lar
-    /// hava perspektifini ve ambient probe'u da besliyor.
-    ///
-    /// Bulut portu bu paketle çalışmak üzere yazılmış: `URP_PBSKY` tanımlıyken bulutlar
-    /// gezegen merkezini ve yarıçapını buradan alıyor, ambient probe'u paylaşıyor ve
-    /// hava perspektifinden geçiyor. Tanımı `SkyPackageDefine` kuruyor.
     static void EnsureSkyFeature()
     {
     #if URP_PBSKY
         var renderer = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.ScriptableRendererData>(RendererPath);
         if (renderer == null)
-            throw new System.InvalidOperationException($"Renderer bulunamadı: {RendererPath}");
+            throw new System.InvalidOperationException($"Renderer not found: {RendererPath}");
 
         foreach (var existing in renderer.rendererFeatures)
             if (existing is PhysicallyBasedSkyURP) return;
@@ -814,31 +610,21 @@ public static class MountainSceneBootstrap
         var lutShader = Shader.Find("Hidden/Sky/PhysicallyBasedSkyPrecomputation");
         if (skyShader == null || lutShader == null)
             throw new System.InvalidOperationException(
-                "Gökyüzü shader'ları bulunamadı. Paket kurulu mu: " +
+                "Sky shaders not found. Check package: " +
                 "Packages/com.jiaozi158.unity-physically-based-sky-urp");
 
         var feature = ScriptableObject.CreateInstance<PhysicallyBasedSkyURP>();
         feature.name = "Physically Based Sky";
 
-        // Feature shader'ları `Create()` içinde `Shader.Find` ile KARŞILAŞTIRIYOR; eşleşmezse
-        // hata basıp hiçbir geçiş eklemiyor. Bu yüzden örnek üretildikten hemen sonra,
-        // `Create()` elle çağrılmadan önce bağlanıyorlar.
         var serialized = new SerializedObject(feature);
         serialized.FindProperty("m_Shader").objectReferenceValue = skyShader;
         serialized.FindProperty("m_LutShader").objectReferenceValue = lutShader;
         serialized.FindProperty("m_FallbackSkyMaterial").objectReferenceValue =
             AssetDatabase.LoadAssetAtPath<Material>(SkyMaterialPath);
-        // Gök yansıması bulutları da içersin: paket yansıma küpünü pişirirken bu materyali
-        // kullanıyor. Boş bırakılırsa yansımada gök var, bulut yok.
         serialized.FindProperty("m_VolumetricCloudsMaterial").objectReferenceValue =
             AssetDatabase.LoadAssetAtPath<Material>(CloudMaterialPath);
         serialized.ApplyModifiedPropertiesWithoutUndo();
 
-        // `Create()` ELLE ÇAĞRILMIYOR — bulut feature'ında çağrılıyor ama burada olmaz.
-        // Gökyüzü feature'ının `Create()`'i ilk satırında `VolumeManager.instance.stack`
-        // okuyor; bootstrap `delayCall`'dan çalışırken hacim yığını henüz kurulmamış
-        // oluyor ve `NullReferenceException` atıyor. Shader'lar zaten eklemeden ÖNCE
-        // bağlandığı için Unity kendi `Create()`'ini çağırdığında doğrulama geçiyor.
         renderer.rendererFeatures.Add(feature);
         AssetDatabase.AddObjectToAsset(feature, renderer);
         EditorUtility.SetDirty(renderer);
@@ -847,11 +633,6 @@ public static class MountainSceneBootstrap
     #endif
     }
 
-    /// GÜNEŞ SOĞURMASI BULUTUN KENDİ KONUMUNDA. Kapalıyken bulut shader'ı
-    /// `sun.color * PI` yazıyor, yani HAM güneşi — soğurma hiç uygulanmıyor ve bulutlar
-    /// 18:00'de bile bembeyaz kalıyordu. Açıkken `_PHYSICALLY_BASED_SUN` devreye giriyor
-    /// ve gökyüzü paketinin `EvaluateSunColorAttenuation`'ı bulutun bulunduğu KOTTA
-    /// uygulanıyor; kameradaki değerden daha doğru, çünkü bulut 2-5 km yukarıda.
     static void SetCloudSunAttenuation(VolumetricCloudsURP feature)
     {
     #if URP_PBSKY
@@ -862,44 +643,21 @@ public static class MountainSceneBootstrap
         property.boolValue = true;
         serialized.ApplyModifiedPropertiesWithoutUndo();
 
-        // `Create()` ÇAĞRILMIYOR: `_PHYSICALLY_BASED_SUN` anahtarı her karede
-        // `UpdateMaterialProperties` içinde bu bool'a bakılarak ayarlanıyor, kurulum
-        // gerektirmiyor. Elle çağırmak `Create()`'in içindeki hacim okumasında patlıyor.
         EditorUtility.SetDirty(feature);
         AssetDatabase.SaveAssets();
         AssetDatabase.ImportAsset(RendererPath);
     #endif
     }
 
-    /// GÖKYÜZÜ HACMİ. Üç override bulut hacminin profiline yazılıyor; bulut portu gezegen
-    /// yarıçapını ve ambient kipini oradan okuyor.
-    ///
-    /// YALNIZ ASSET'E yazılıyor. `Volume.profile` asset'in çalışma-zamanı kopyası ve
-    /// kopyaya `Add<T>()` ile bileşen üretmek DENENDİ: üretilen bileşenler hiçbir asset'e
-    /// ait olmuyor, Play'e girerken yok ediliyor ve profilin bileşen listesi bozuluyor
-    /// (`VolumeComponent.parameters` null). Kopya zaten her domain reload'da asset'ten
-    /// yeniden üretiliyor, yani asset doğruysa kopya da doğru oluyor.
     static void EnsureSkyVolume()
     {
     #if URP_PBSKY
         if (cloudVolume == null)
             throw new System.InvalidOperationException(
-                "Gökyüzü hacmi bulut hacminden sonra kurulmalı: `cloudVolume` yazılmamış.");
+                "Sky volume must be setup after cloud volume: `cloudVolume` is null.");
 
         ApplySkyOverrides(cloudVolume.sharedProfile);
 
-        // ORTAM KİPİ SKYBOX OLMAK ZORUNDA. Sahnede `Flat` kalmıştı: `AtmosphereController`
-        // eskiden hem kipi hem rengi yazıyordu, yazan kod kaldırıldı ama sahnedeki kip
-        // kaldı ve paketin dinamik probe'u hiç devreye girmedi. ÖLÇÜLDÜ — probe öğle ve
-        // gece birebir aynıydı (`0.223 0.293 0.420`) ve tepe ile taban da aynıydı, yani
-        // gökyüzünden pişmiş değil düz bir renkti. Bulutlar günün her saatinde o donmuş
-        // rengi yiyordu.
-        // YANSIMA ŞİDDETİ 1, YANİ KISILMIYOR. Eskiden `AtmosphereController` bunu gök
-        // seviyesinden türetiyordu ve ölçülmüş bir gerekti: pişen harita gece kararmıyor,
-        // bisikletin kromu karanlıkta parlıyordu. O gerekçe ORTADAN KALKTI — paket
-        // yansıma küpünü gerçek gökyüzünden pişiriyor, gece küpün kendisi karanlık.
-        // Telafi terimi geri eklenmiyor; kısıcı yalnız haritanın yalan söylediği yerde
-        // gerekliydi.
         bool ambientChanged = RenderSettings.ambientMode != UnityEngine.Rendering.AmbientMode.Skybox
                            || !Mathf.Approximately(RenderSettings.reflectionIntensity, 1f);
 
@@ -911,7 +669,7 @@ public static class MountainSceneBootstrap
     #endif
     }
 
-#if URP_PBSKY
+    #if URP_PBSKY
     static void ApplySkyOverrides(UnityEngine.Rendering.VolumeProfile profile)
     {
         if (!profile.TryGet(out VisualEnvironment visualEnvironment))
@@ -935,60 +693,19 @@ public static class MountainSceneBootstrap
             AssetDatabase.AddObjectToAsset(fog, profile);
         }
 
-        // Fiziksel gökyüzü seçiliyor; 0 "gökyüzü yok" demek ve paket hiçbir şey çizmiyor.
         SetSky(visualEnvironment.skyType, (int)VisualEnvironment.SkyType.PhysicallyBased);
-
-        // DÜNYA UZAYI. Kamera uzayında gök ve bulutlar kamerayla birlikte taşınıyor;
-        // 5709 m'lik dağda katmanın üstüne çıkmak imkânsız hâle geliyordu. Bulut tarafında
-        // `localClouds` anahtarı da bu değeri izliyor — ikisi tek yerden geliyor.
         SetSky(visualEnvironment.renderingSpace, VisualEnvironment.RenderingSpace.World);
-
-        // Ortam ışığı gökyüzünden pişiyor. `AtmosphereController` artık `ambientLight`
-        // yazmıyor: iki yazar aynı kareyi çekiştirince sonuç yazma sırasına kalıyordu.
         SetSky(visualEnvironment.skyAmbientMode, VisualEnvironment.SkyAmbientMode.Dynamic);
-
         SetSky(pbrSky.type, PhysicallyBasedSky.PhysicallyBasedSkyModel.EarthAdvanced);
-
-        // HAVA PERSPEKTİFİ. Brief'in şartı: uzak dağ, silüet ve BULUT aynı atmosferik
-        // perdeden geçmeli. Bulut geçişi bunu okuyup 7 numaralı birleştirme pass'ine
-        // geçiyor.
         SetSky(pbrSky.atmosphericScattering, true);
-
-        // YILDIZLAR PROSEDÜREL. Küp harita silindi: 512'lik yüzde bir teksel 0.176°,
-        // ekranda bir piksel 0.047° — her yıldız zorunlu olarak dört piksel genişliğinde
-        // ve bilineer süzmeyle yumuşak bir lekeydi. Bir piksele inmek 2048'lik yüz, yani
-        // RGBAHalf'ta 201 MB isterdi. Ayrıca durağan doku TİTREYEMEZ.
-        // Üretim ve sayılar `Assets/Shaders/StarField.hlsl` başında.
-        //
-        // ÇARPAN 0.08 → 0.55. Eski sayı gökyüzü BEŞ DURAK DAHA PARLAKKEN kurulmuştu ve
-        // ölçütü "en parlak yıldız gökten 12 kat parlak" idi. Ay fiziksel orana çekilince
-        // gök koyulaştı ama yıldızların MUTLAK seviyesi yerinde kaldı; oran 400 kata
-        // çıktı, buna karşın ekranda yıldızlar kayboldu. Oran yanlış ölçüttü: görünürlüğü
-        // gökle kıyas değil, yıldızın ekrandaki kendi seviyesi belirliyor.
-        //
-        // Yeni ölçüt fiziksel: 6. KADİR ÇIPLAK GÖZÜN SINIRINDA OLMALI. Gece pozlaması
-        // ×2 (profil −1.5 EV + uyum tavanı 2.5 EV) alınarak kâğıtta:
-        //
-        //   kadir 0–1  bağıl 1.00  → 0.55 × 2 = 1.10   → doygun nokta
-        //   kadir 2    bağıl 0.158 → 0.174             → sRGB ~0.42, belirgin
-        //   kadir 4    bağıl 0.025 → 0.0276            → sRGB ~0.19, sönük ama var
-        //   kadir 6    bağıl 0.004 → 0.0044            → sRGB ~0.08, tam sınırda
-        //
-        // GÜNDÜZ SOLMASI ARTIK AÇIKÇA YAZILI. Eskiden `(1 − skyOpacity)`in halledeceği
-        // varsayılmıştı; ölçüldü, yanlış — zenitte gündüz opaklık ~0.2 ve sabah 8'de
-        // gökyüzü yıldızlıydı. Solma güneş yüksekliğinden, kadire göre ayrı ayrı.
         SetSky(pbrSky.spaceEmissionMultiplier, 0.55f);
-
-        // PAKETİN SİSİ ŞİMDİLİK KAPALI. Kendi yükseklik sisimiz sis bankları, inversiyon
-        // ve vadi sis denizi taşıyor; pakette bunların karşılığı yok. İkisi birlikte
-        // açılırsa sis iki kez uygulanıyor. Geçiş `DECISIONS.md`'de kayıtlı.
         SetSky(fog.enabled, false);
 
         EditorUtility.SetDirty(profile);
         AssetDatabase.SaveAssets();
         AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath(profile));
     }
-#endif
+    #endif
 
     static void SetSky<T>(VolumeParameter<T> parameter, T value)
     {
@@ -996,18 +713,15 @@ public static class MountainSceneBootstrap
         parameter.overrideState = true;
     }
 
-    /// BULUT RENDER GEÇİŞİ. `VolumetricCloudsURP` (jiaozi158, MIT — HDRP'nin URP portu)
-    /// URP renderer'ına alt nesne olarak ekleniyor. Feature'ın kendi materyali var; shader
-    /// gizli olduğu için materyal asset olarak üretilip bağlanıyor.
     static void EnsureCloudFeature()
     {
         var renderer = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.ScriptableRendererData>(RendererPath);
         if (renderer == null)
-            throw new System.InvalidOperationException($"Renderer bulunamadı: {RendererPath}");
+            throw new System.InvalidOperationException($"Renderer not found: {RendererPath}");
 
         var shader = Shader.Find("Hidden/Sky/VolumetricClouds");
         if (shader == null)
-            throw new System.InvalidOperationException("Bulut shader'ı bulunamadı: Hidden/Sky/VolumetricClouds");
+            throw new System.InvalidOperationException("Cloud shader not found: Hidden/Sky/VolumetricClouds");
 
         var material = AssetDatabase.LoadAssetAtPath<Material>(CloudMaterialPath);
         if (material == null)
@@ -1032,10 +746,6 @@ public static class MountainSceneBootstrap
         serialized.ApplyModifiedPropertiesWithoutUndo();
 
         SetCloudSunAttenuation(feature);
-
-        // `Create()` ÖRNEK ÜRETİLİRKEN Unity tarafından bir kez çağrılıyor ve materyal o
-        // an henüz atanmamış oluyor; feature "Material is empty" deyip erken dönüyor.
-        // Materyal bağlandıktan sonra elle tekrar çağrılıyor ki geçişler kurulsun.
         feature.Create();
 
         renderer.rendererFeatures.Add(feature);
@@ -1045,8 +755,6 @@ public static class MountainSceneBootstrap
         AssetDatabase.ImportAsset(RendererPath);
     }
 
-    /// BAĞ 2 ve 3: bulut katmanının oyun tarafındaki tek kaynağı. Yağış kesimi ve tırmanma
-    /// göstergesi kotları buradan alıyor; bulutları çizen render özelliğine soramazlar.
     static void EnsureCloudLayerProbe(FirstPersonController player, ref bool changed)
     {
         var probe = Object.FindAnyObjectByType<CloudLayerProbe>();
@@ -1062,7 +770,6 @@ public static class MountainSceneBootstrap
 
         EditorUtility.SetDirty(probe);
 
-        // GİRDİ BAĞLARI: dünya durumunu bulut ayarlarına çeviren tek yön.
         var driver = Object.FindAnyObjectByType<CloudWeatherDriver>();
         if (driver == null)
         {
@@ -1078,19 +785,13 @@ public static class MountainSceneBootstrap
         EditorUtility.SetDirty(driver);
     }
 
-    /// GÖKYÜZÜ SÜRÜCÜLERİ. Bulut sondasıyla aynı nesnede duruyorlar — ikisi de aynı
-    /// Volume'u sürüyor — ama kurulumları AYRI, çünkü `TimeOfDay`'e bağımlılar ve o
-    /// sahne kurulumunda daha sonra üretiliyor. Bulut sondasının içinde kurulduklarında
-    /// sıfırdan kurulan bir sahnede saat henüz yokken bağlanıyorlardı.
     static void EnsureSkyDrivers(ref bool changed)
     {
         var probe = Object.FindAnyObjectByType<CloudLayerProbe>();
         if (probe == null)
             throw new System.InvalidOperationException(
-                "Gökyüzü sürücüleri bulut sondasından sonra kurulmalı: sonda yok.");
+                "Sky drivers must be setup after cloud probe.");
 
-        // Atmosferin hava bağı bulut sondasıyla aynı nesnede: ikisi de aynı Volume'u
-        // sürüyor ve aynı hava durumundan besleniyor.
         var skyDriver = Object.FindAnyObjectByType<SkyWeatherDriver>();
         if (skyDriver == null)
         {
@@ -1104,8 +805,6 @@ public static class MountainSceneBootstrap
             LoadOrCreate<SkyWeatherSettings>(SkyWeatherPath));
         EditorUtility.SetDirty(skyDriver);
 
-        // ORTAM IŞIĞI GERÇEK GÖKYÜZÜNDEN PİŞİYOR. Paketin analitik probe'u çoklu saçılım
-        // taşımıyordu ve alacakaranlıkta sıfır veriyordu; devre dışı bırakıldı.
         var ambientBaker = Object.FindAnyObjectByType<SkyAmbientBaker>();
         if (ambientBaker == null)
         {
@@ -1117,8 +816,6 @@ public static class MountainSceneBootstrap
         EditorUtility.SetDirty(ambientBaker);
     }
 
-    /// Gürültü dokuları materyalde duruyor, hiçbir kod atamıyor — repo hazır materyalle geliyordu.
-    /// Eşleşme shader'daki örneklemeden: `_Worley128RGBA` düşük frekans şekil, `_ErosionNoise` detay.
     static void BindCloudTextures(Material material)
     {
         material.SetTexture("_Worley128RGBA", LoadCloudTexture("WorleyNoise128RGBA"));
@@ -1132,22 +829,17 @@ public static class MountainSceneBootstrap
         var path = $"Assets/VolumetricClouds/Textures/{fileName}.png";
         var texture = AssetDatabase.LoadAssetAtPath<Texture>(path);
         if (texture == null)
-            throw new System.InvalidOperationException($"Bulut dokusu bulunamadı: {path}");
+            throw new System.InvalidOperationException($"Cloud texture not found: {path}");
         return texture;
     }
 
-    /// BULUT VOLUME BİLEŞENİ. Ayarlar `VolumetricClouds` (VolumeComponent) üzerinden geliyor ve
-    /// varsayılanı KAPALI; sahnedeki profile ekleyip açıyoruz.
-    ///
-    /// v1 KURALI: buraya bizim hiçbir ayarımız yazılmıyor (bkz. `CLOUDS_REBUILD.md`).
-    /// Repo'nun varsayılanları neyse o çalışıyor.
     static void EnsureCloudVolume()
     {
         var volume = Object.FindAnyObjectByType<UnityEngine.Rendering.Volume>();
         if (volume == null)
-            throw new System.InvalidOperationException("Sahnede Volume yok, bulut hacmi eklenemedi.");
+            throw new System.InvalidOperationException("No Volume in scene, cloud volume cannot be added.");
         if (volume.sharedProfile == null)
-            throw new System.InvalidOperationException($"{volume.name} Volume'unda profil yok.");
+            throw new System.InvalidOperationException($"{volume.name} Volume has no profile.");
 
         var profile = volume.sharedProfile;
         if (!profile.TryGet(out VolumetricClouds clouds))
@@ -1157,32 +849,16 @@ public static class MountainSceneBootstrap
             AssetDatabase.AddObjectToAsset(clouds, profile);
         }
 
-        // F1 paneli de bunu okuyor: sahnede birden fazla Volume var, ayrı ayrı aranırsa
-        // panel bulutu taşımayan profile bağlanabilir.
         cloudVolume = volume;
 
         clouds.state.value = true;
-
-        // KATMAN MUTLAK KOTTA. Yerel olmayan kipte ışın başlangıcı `float3(0,0,0)`, yani
-        // kamera deniz seviyesindeymiş gibi davranılıyor ve bulutlar oyuncuyla birlikte
-        // yükseliyor — 5709 m'lik dağda katmanın üstüne hiç çıkılamıyordu. Ayrıca hava
-        // haritası kamera XZ'siyle kaydırılıyor; `CloudLayerProbe` mutlak XZ okuduğu için
-        // gökyüzüyle gösterge ayrışıyordu. Yerel kip ikisini de düzeltiyor.
         clouds.localClouds.value = true;
         clouds.localClouds.overrideState = true;
-
-        // BAĞ 1: yer bulut gölgesi. Bulut sistemi gölgeyi ana ışığın cookie dokusuna
-        // yazıyor, arazi shader'ı `_LIGHT_COOKIES` ile okuyor.
         clouds.shadows.value = true;
         clouds.shadows.overrideState = true;
-        // Harita ayar değil, bağlantı: olmadan kapsama alanı yok.
         clouds.cloudMap.value = CloudMapGenerator.EnsureExists();
         clouds.cloudMap.overrideState = true;
 
-        // AYARLANMIŞ DEĞERLER. F1'de göz kararı bulunup onaylandı; burada duruyorlar ki
-        // sahne yeniden kurulduğunda geri gelsinler. Kapsama, yoğunluk, rüzgâr hızı ve
-        // yönü Play'de `CloudWeatherDriver` tarafından havadan yazılıyor — buradaki
-        // değerler sürücü kapalıyken (F1 → "Havadan ayır") geçerli olan başlangıç.
         SetCloud(clouds.cloudCoverage, 0.65f);
         SetCloud(clouds.densityMultiplier, 0.39f);
         SetCloud(clouds.globalSpeed, 20f);
@@ -1197,8 +873,6 @@ public static class MountainSceneBootstrap
         SetCloud(clouds.bottomAltitude, 2086f);
         SetCloud(clouds.altitudeRange, 3298f);
         SetCloud(clouds.altitudeDistortion, 0.25f);
-        // HARITA PERIYODU 48 KM. Doseme kirici bu periyoda gore tasarlandi; harita
-        // 40 km'de kalinca ikisi hizalanmiyor ve kirici kendi kafesini birakiyor.
         SetCloud(clouds.cloudMapSize, 48000f);
         SetCloud(clouds.earthCurvature, 0.00f);
 
@@ -1216,28 +890,14 @@ public static class MountainSceneBootstrap
         SetCloud(clouds.sunLightDimmer, 1.00f);
         SetCloud(clouds.shadowOpacity, 1.00f);
         SetCloud(clouds.shadowOpacityFallback, 0.00f);
-        // BULUT GOLGESI KESKINLIGI. Golge ayri bir cookie dokusundan geliyor (URP'nin 60 m
-        // kaskad golgesiyle ilgisi yok). Keskinlik = texel boyu = bolge / cozunurluk.
-        //   - shadowDistance: cookie kamera-merkezli ve oyuncuyu takip ediyor; 30 km arenayi
-        //     statik kaplamasi gerekmiyor. 12 km yaricap uzaktaki golgeleri de yakalar.
-        //   - Ultra1024: 12 km icin texel ~27 m (arazi yontma hucresiyle ayni). Iki 3x3
-        //     bulanik gecisi bu ince texelde dar penumbra birakir: BELIRGIN ama dogal
-        //     yumusak, ezik degil. 256'da texel ~70 m'ydi ve gecisler onu lapaya ceviriyordu.
-        // Ikisi de arena YATAY olcegine bagli, dagin boyuna DEGIL (SCALE.md).
         SetCloud(clouds.shadowResolution, VolumetricClouds.CloudShadowResolution.Ultra1024);
         SetCloud(clouds.shadowDistance, 12000f);
 
-        // ADIM SAYISI. Menzil = adim boyu x adim sayisi, adim boyu altitudeRange/6'dan.
-        // 80'de menzil 44 km; ufka bakista isin katmanda uzun kalip yuruyus erken bitiyordu.
         SetCloud(clouds.numPrimarySteps, 128);
         SetCloud(clouds.numLightSteps, 8);
         SetCloud(clouds.temporalAccumulationFactor, 0.95f);
         SetCloud(clouds.perceptualBlending, 1.00f);
         SetCloud(clouds.fadeInStart, 0f);
-        // YAKIN SONUM 300 M. 5000'de saturate(d/fadeInDistance) kuresel bir irtifa
-        // carpanina donusuyor (yerde ~2 km, 20 km'de ~15 km) ve bulut yukseldikce gece
-        // simsiyah okunuyordu. Gercek isi kameranin burnunda yogun bulut olusmasini
-        // engellemek; o is birkac yuz metrede biter.
         SetCloud(clouds.fadeInDistance, 300f);
 
         EditorUtility.SetDirty(profile);
@@ -1245,8 +905,6 @@ public static class MountainSceneBootstrap
         AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath(profile));
     }
 
-    /// `overrideState` açılmadan harmanlama parametreyi atlıyor: değer profile yazılır ama
-    /// yığına hiç geçmez.
     static void SetCloud(FloatParameter parameter, float value)
     {
         parameter.value = value;
@@ -1271,12 +929,9 @@ public static class MountainSceneBootstrap
         parameter.overrideState = true;
     }
 
-    // (AssignCloudNoise SİLİNDİ — bulut dokuları yeniden yazılıyor.)
-
     static readonly int BaseNoiseId = Shader.PropertyToID("_BaseNoise");
     static readonly int DetailNoiseId = Shader.PropertyToID("_DetailNoise");
 
-    /// Ayarlar asset'i tek kaynak: hem bootstrap hem tuner penceresi buna bakar
     static MountainSettings LoadOrCreateSettings()
     {
         var settings = AssetDatabase.LoadAssetAtPath<MountainSettings>(SettingsPath);
@@ -1346,27 +1001,19 @@ public static class MountainSceneBootstrap
         return player.AddComponent<FirstPersonController>();
     }
 
-    /// Hava: durum, rüzgâr, yüksekliğe bağlı sürücü ve yağış çizimi
     static void CreateWeather()
     {
         var go = new GameObject("Weather");
 
         go.AddComponent<WeatherState>();
         go.AddComponent<WindField>();
-
-        // Bağlama Run'da yapılır: kuşak sınırları ve bulut tavanı orada hesaplanıyor,
-        // burada ikinci bir kopyasını tutmak ikisinin ayrışmasına açık kapı bırakır.
         go.AddComponent<AltitudeWeatherDriver>();
 
         var precipitation = new GameObject("Precipitation");
         precipitation.transform.SetParent(go.transform, false);
         precipitation.AddComponent<PrecipitationRenderer>();
-
-        // `RainStreakWorkingSet` BURADA EKLENMİYOR: bağlama bloğunda her koşuda
-        // garanti ediliyor. İki yerde eklemek, sahne varken birinin atlanması demek.
     }
 
-    /// Ses: katman harmanı ve gök gürültüsü. WeatherState/WindField ile aynı ağaçta durur.
     static void CreateWeatherAudio()
     {
         var state = Object.FindAnyObjectByType<WeatherState>();
@@ -1384,20 +1031,14 @@ public static class MountainSceneBootstrap
         var thunder = new GameObject("Thunder");
         thunder.transform.SetParent(state.transform, false);
         thunder.AddComponent<ThunderPlayer>();
-
-        // Bağlama burada değil, EnsureStorm'da: orası her çalışmada girdiği için hem yeni
-        // hem eski sahneleri kapsıyor. İki yerde bağlamak ikinci bir doğru yaratırdı.
     }
 
-    /// Gök gürültüsü ve şimşek. Her çalışmada yeniden bağlanır — bir ayar asset'i ya da
-    /// bağımlılık sonradan eklendiğinde sahnedeki bileşende o alan boş kalıyor ve hata
-    /// ancak Play'e basınca çıkıyordu.
     static void EnsureStorm(WeatherState state, Transform observer,
         AtmosphereController atmosphere, Terrain terrain, ref bool changed)
     {
         var thunder = Object.FindAnyObjectByType<ThunderPlayer>();
         if (thunder == null)
-            throw new System.InvalidOperationException("Sahnede ThunderPlayer yok.");
+            throw new System.InvalidOperationException("No ThunderPlayer in scene.");
 
         thunder.Bind(
             state,
@@ -1417,20 +1058,16 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
-        // SAÇILMA TABLOSU. `LightningLutBaker` yoksa pişiriyor; burada yalnız
-        // bağlanıyor. Bulunamazsa parlama sessizce kaybolurdu, o yüzden yüksek sesle.
         var scatterLut = AssetDatabase.LoadAssetAtPath<Texture2D>(
             "Assets/Settings/LightningScatterLut.asset");
         if (scatterLut == null)
             throw new System.InvalidOperationException(
-                "Şimşek saçılma tablosu yok: Assets/Settings/LightningScatterLut.asset");
+                "No lightning scatter LUT: Assets/Settings/LightningScatterLut.asset");
 
         flash.Bind(thunder, atmosphere, observer, tuning,
             Object.FindAnyObjectByType<CloudLayerProbe>(), scatterLut, 9000f, terrain);
         EditorUtility.SetDirty(flash);
 
-        // Kol ışıkla aynı nesnede durabilir: ikisi de aynı çakmayı çiziyor ve kol
-        // konumu ışıktan okuyor. Ayrı nesne, ayrı yerde duruyormuş izlenimi verirdi.
         var bolt = flash.GetComponent<LightningBolt>();
         if (bolt == null)
         {
@@ -1449,7 +1086,7 @@ public static class MountainSceneBootstrap
 
         var shader = AssetDatabase.LoadAssetAtPath<Shader>(BoltShaderPath);
         if (shader == null)
-            throw new System.InvalidOperationException($"Shader bulunamadı: {BoltShaderPath}");
+            throw new System.InvalidOperationException($"Shader not found: {BoltShaderPath}");
 
         material = new Material(shader) { name = "LightningBolt" };
         AssetDatabase.CreateAsset(material, BoltMaterialPath);
@@ -1462,12 +1099,11 @@ public static class MountainSceneBootstrap
     {
         var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
         if (clip == null)
-            throw new System.InvalidOperationException($"Ses bulunamadı: {path}");
+            throw new System.InvalidOperationException($"Audio clip not found: {path}");
 
         return clip;
     }
 
-    /// Klasördeki verilen önekle başlayan tüm klipleri ada göre sıralı döndürür
     static AudioClip[] LoadClips(string folder, string prefix)
     {
         var guids = AssetDatabase.FindAssets("t:AudioClip", new[] { folder });
@@ -1481,7 +1117,7 @@ public static class MountainSceneBootstrap
         }
 
         if (paths.Count == 0)
-            throw new System.InvalidOperationException($"Ses bulunamadı: {folder}/{prefix}*");
+            throw new System.InvalidOperationException($"Audio clips not found: {folder}/{prefix}*");
 
         paths.Sort(System.StringComparer.Ordinal);
 
@@ -1492,19 +1128,12 @@ public static class MountainSceneBootstrap
         return clips;
     }
 
-    /// Gün döngüsü. Sahnedeki yönlü ışığı sürer, havayı tanımaz.
     static void CreateTimeOfDay()
     {
         var go = new GameObject("Time Of Day");
         go.AddComponent<TimeOfDay>();
     }
 
-    /// GÜNEŞ VE AY AYRI IŞIK. Tek ışığa iki cisim sığmıyordu: ay güneşin tam karşısında,
-    /// yön bir tanedir ve devir anında disk 180° atlıyordu.
-    ///
-    /// AY GÖLGE DÜŞÜRMÜYOR ve bu bilinçli: gökyüzü paketinin `GetMainLight`'ı gölgesiz
-    /// cismi ana ışık saymayıp `RenderSettings.sun`'a düşüyor. Böylece gökyüzü her zaman
-    /// güneşten sürülüyor, ana ışık gece bile değişmiyor.
     static void EnsureLightData(Light light, ref bool changed)
     {
         if (light.GetComponent<UniversalAdditionalLightData>() != null) return;
@@ -1533,24 +1162,8 @@ public static class MountainSceneBootstrap
         }
 
         moon.type = LightType.Directional;
-
-        // AY GÖLGE DÜŞÜRÜYOR ve bu gerekli: paketin `GetMainLight`'ı gölgesiz cismi ana
-        // ışık saymayıp `RenderSettings.sun`'a düşüyor. Gökyüzü saçılımı tek cisimden
-        // geldiği için ay ana ışık olamazsa gece göğü hiç aydınlanmıyor.
-        //
-        // URP yalnız ana ışığın gölgesini çiziyor, yani iki gölge kaynağı oluşmuyor.
         moon.shadows = LightShadows.Soft;
 
-        // GÜNEŞ BİLEŞENDEN AYIRT EDİLİYOR, ADDAN DEĞİL. Sahnede ÜÇ yönlü ışık var:
-        // güneş, ay ve şimşek. Eskiden yalnız ay adı eleniyordu ve `FindObjectsByType`
-        // sırası garantili olmadığı için ŞİMŞEK ışığı güneş sanılıp `TimeOfDay`'e
-        // bağlanabiliyordu. O olduğunda gerçek güneş hiç sürülmüyor, son şiddetinde
-        // (3.03) ve son açısında gökte asılı kalıyor — gece yarısında ayın yanında
-        // ikinci bir parlak cisim olarak görünüyordu. Ölçüldü: cisim0 yönü güneşi
-        // +31°'de gösteriyordu, saat 00:00'da.
-        //
-        // Şimşek `[RequireComponent(typeof(Light))]` ile kendi ışığını taşıyor, yani
-        // bileşeninden kesin ayırt ediliyor.
         Light sun = null;
         foreach (var light in Object.FindObjectsByType<Light>())
         {
@@ -1560,21 +1173,15 @@ public static class MountainSceneBootstrap
 
             if (sun != null)
                 throw new System.InvalidOperationException(
-                    $"Sahnede birden fazla güneş adayı yönlü ışık var: {sun.name} ve {light.name}. " +
-                    "Hangisinin güneş olduğu belirsiz.");
+                    $"Multiple directional light candidates in scene: {sun.name} and {light.name}.");
 
             sun = light;
         }
 
         if (sun == null)
             throw new System.InvalidOperationException(
-                "Güneş bulunamadı: ay ve şimşek dışında yönlü ışık yok.");
+                "Sun light not found in scene.");
 
-        // URP EK VERİSİ İKİ IŞIKTA DA OLMALI. Unity bu bileşeni yalnız ışık MENÜDEN
-        // eklendiğinde otomatik koyuyor; koddan eklenen ışıkta olmuyor. Bulut gölge
-        // geçişi ana ışığın cookie ayarlarını buradan okuyor ve yoksa
-        // `NullReferenceException` atıyor. Ana ışık gece aya, gündüz güneşe döndüğü için
-        // ikisinde de bulunmak zorunda.
         EnsureLightData(sun, ref changed);
         EnsureLightData(moon, ref changed);
 
@@ -1583,12 +1190,11 @@ public static class MountainSceneBootstrap
         EditorUtility.SetDirty(moon);
     }
 
-    /// Renk düzenlemesi. Mevcut Global Volume objesine bağlanır.
     static void CreateLookController(WeatherState weatherState)
     {
         var volume = Object.FindAnyObjectByType<UnityEngine.Rendering.Volume>();
         if (volume == null)
-            throw new System.InvalidOperationException("Sahnede Volume bulunamadı.");
+            throw new System.InvalidOperationException("No Volume found in scene.");
 
         volume.gameObject.AddComponent<LookController>().Bind(
             LoadOrCreateLookSettings(),
@@ -1610,10 +1216,6 @@ public static class MountainSceneBootstrap
         return settings;
     }
 
-    /// Esc paneli. Sistemleri tanıyan tek yer burası; sistemlerin kendisi paneli bilmez.
-    ///
-    /// Her çalışmada yeniden bağlanır: panele yeni bir bağımlılık eklendiğinde sahnedeki
-    /// bileşende o alan boş kalıyor ve panel çizilirken patlıyordu.
     static void EnsureDebugMenu(FirstPersonController player, ref bool changed)
     {
         var menu = Object.FindAnyObjectByType<DebugMenu>();
@@ -1642,12 +1244,8 @@ public static class MountainSceneBootstrap
             Object.FindAnyObjectByType<CloudWeatherDriver>());
 
         EditorUtility.SetDirty(menu);
-
     }
 
-    /// Script'i silinmiş bileşenler sahnede boş kabuk olarak kalır: Unity uyarı basar,
-    /// sahne dosyası ölü blok taşır. WeatherFog kaldırılıp yerini AtmosphereController
-    /// alınca tam bunu yaşadık.
     static bool RemoveMissingScripts(Scene scene)
     {
         int removed = 0;
@@ -1657,12 +1255,11 @@ public static class MountainSceneBootstrap
             removed += GameObjectUtility.RemoveMonoBehavioursWithMissingScript(transform.gameObject);
 
         if (removed > 0)
-            ToolLog.Write($"Sahneden {removed} adet kayıp script kaldırıldı.");
+            ToolLog.Write($"Removed {removed} missing scripts from scene.");
 
         return removed > 0;
     }
 
-    /// Geçici geliştirme araçları: ölçüm, eşik denetimi, gösterge, kare hızı limiti
     static void CreateDebugTools()
     {
         var go = new GameObject("Debug");
@@ -1678,12 +1275,6 @@ public static class MountainSceneBootstrap
         go.AddComponent<FrameRateCap>();
     }
 
-    /// Dağ yüzeyi materyali. Yüzey haritaları dağın biçiminden çıkarılır; dağ
-    /// değiştiğinde onlar da değişmeli — yalnızca "harita yok" koşuluna bağlıyken
-    /// yeniden üretilen dağın üstünde eski dağın çakıl ve maruziyet haritası kalıyordu.
-    /// Rotanın içeriğinden türeyen imza. Nokta konumları ve yarıçapları değişince
-    /// arazinin yeniden şekillenmesi gerekiyor; dosyanın değiştiği tarihe bakmak
-    /// yetmiyor, fırça her darbede dosyayı yazıyor ama şekli hep değiştirmiyor.
     static string RouteSignature(MountainRoute route)
     {
         if (route == null) return "-";
@@ -1696,8 +1287,6 @@ public static class MountainSceneBootstrap
 
         hash.Append('|').Append(route.camps.Count);
 
-        // Sayılar aynı kalıp konumlar değişebiliyor: birkaç örnek noktanın kendisi de
-        // imzaya giriyor. Hepsini almak binlerce noktada dizgiyi şişiriyor.
         Sample(hash, route.road);
         foreach (MountainRoute.Branch branch in route.branches) Sample(hash, branch.marks);
         Sample(hash, route.camps);
@@ -1716,10 +1305,6 @@ public static class MountainSceneBootstrap
                 .Append(',').Append(marks[i].radius.ToString("F1"));
     }
 
-    /// Yüzey bileşenini bulur, yoksa ekler. Rüzgâr sığınağı da aynı bileşene bağlanıyor
-    /// ve kurulum sırasında ondan ÖNCE geliyor: referans o anda yoksa sığınak sessizce
-    /// boş kalır ve arazi rüzgârı hiç etkilemez. Veriyi `EnsureTerrainSurface` bağlıyor,
-    /// burası yalnız bileşenin var olduğunu garanti ediyor.
     static TerrainSurface SurfaceComponent(MountainGenerator gen, ref bool changed)
     {
         var terrain = gen.GetComponent<Terrain>();
@@ -1734,14 +1319,12 @@ public static class MountainSceneBootstrap
     {
         var terrain = gen.GetComponent<Terrain>();
 
-        // Rüzgâr ağırlığı hâkim rüzgâr yönüne göre pişiyor; açı asset'in ADINDA
-        // taşınıyor ki yön değişince harita bayat sayılsın ve yeniden pişsin.
         float prevailing = LoadOrCreate<WindSettings>(WindPath).prevailingDegrees;
 
         var maps = SurfaceMapBaker.Load();
         if (regenerated || !SurfaceMapBaker.MapsCurrent(prevailing))
         {
-            EditorUtility.DisplayProgressBar("Yüzey", "Haritalar çıkarılıyor...", 0.5f);
+            EditorUtility.DisplayProgressBar("Surface", "Extracting surface maps...", 0.5f);
             try { maps = SurfaceMapBaker.Bake(terrain, prevailing); }
             finally { EditorUtility.ClearProgressBar(); }
 
@@ -1764,108 +1347,83 @@ public static class MountainSceneBootstrap
         EditorUtility.SetDirty(surface);
     }
 
-    /// DENİZ SAHNEYE KODDAN KURULUYOR.
-    ///
-    /// İlk kurulum tek seferlik bir editör komutuyla yapılmıştı; sahne bir
-    /// daha kurulunca kaybolurdu. `CLAUDE.md`: elle sahne düzenleme yok.
-    ///
-    /// Sıra: köprü → yönetici → simülasyon → yüzey. Yönetici bathymetry'yi
-    /// köprüsüz kuramıyor, yüzey de deniz seviyesini yöneticinin ayarından
-    /// okuyor.
     static void EnsureSea(MountainGenerator gen, Camera camera,
                           WeatherState weatherState, WindField windField,
                           AtmosphereController atmosphere,
                           TemperatureField thermometer, ref bool changed)
     {
-        var ayar = AssetDatabase.LoadAssetAtPath<SeaSettings>(SeaSettingsPath);
-        if (ayar == null)
-            throw new System.InvalidOperationException($"Ayar bulunamadı: {SeaSettingsPath}");
+        var seaSettings = AssetDatabase.LoadAssetAtPath<SeaSettings>(SeaSettingsPath);
+        if (seaSettings == null)
+            throw new System.InvalidOperationException($"Settings not found: {SeaSettingsPath}");
 
-        var yuzeyShader = AssetDatabase.LoadAssetAtPath<Shader>(SeaSurfaceShaderPath);
-        if (yuzeyShader == null)
-            throw new System.InvalidOperationException($"Shader bulunamadı: {SeaSurfaceShaderPath}");
+        var surfaceShader = AssetDatabase.LoadAssetAtPath<Shader>(SeaSurfaceShaderPath);
+        if (surfaceShader == null)
+            throw new System.InvalidOperationException($"Shader not found: {SeaSurfaceShaderPath}");
 
-        var spektrum = AssetDatabase.LoadAssetAtPath<ComputeShader>(SeaSpectrumPath);
+        var spectrum = AssetDatabase.LoadAssetAtPath<ComputeShader>(SeaSpectrumPath);
         var fft = AssetDatabase.LoadAssetAtPath<ComputeShader>(SeaFftPath);
-        var kopuk = AssetDatabase.LoadAssetAtPath<ComputeShader>(SeaFoamPath);
-        if (spektrum == null || fft == null || kopuk == null)
+        var foam = AssetDatabase.LoadAssetAtPath<ComputeShader>(SeaFoamPath);
+        if (spectrum == null || fft == null || foam == null)
             throw new System.InvalidOperationException(
-                $"Compute bulunamadı: {SeaSpectrumPath} / {SeaFftPath} / {SeaFoamPath}");
+                $"Compute shaders not found: {SeaSpectrumPath} / {SeaFftPath} / {SeaFoamPath}");
 
-        var kok = Object.FindAnyObjectByType<SeaManager>(FindObjectsInactive.Include);
-        if (kok == null)
+        var root = Object.FindAnyObjectByType<SeaManager>(FindObjectsInactive.Include);
+        if (root == null)
         {
-            kok = new GameObject("Sea").AddComponent<SeaManager>();
+            root = new GameObject("Sea").AddComponent<SeaManager>();
             changed = true;
         }
 
-        var kopru = kok.GetComponent<SeaEnvironmentBridge>();
-        if (kopru == null)
+        var bridge = root.GetComponent<SeaEnvironmentBridge>();
+        if (bridge == null)
         {
-            kopru = kok.gameObject.AddComponent<SeaEnvironmentBridge>();
+            bridge = root.gameObject.AddComponent<SeaEnvironmentBridge>();
             changed = true;
         }
 
-        var zaman = Object.FindAnyObjectByType<TimeOfDay>();
+        var time = Object.FindAnyObjectByType<TimeOfDay>();
+        var timeSo = new SerializedObject(time);
+        var sun = timeSo.FindProperty("sun").objectReferenceValue as Light;
 
-        // GÜNEŞ `TimeOfDay`'İN KENDİ IŞIĞI. Sahnedeki ilk directional light
-        // alınsaydı ŞİMŞEK ışığı seçilirdi — ilk kurulumda tam bu oldu.
-        var zamanSo = new SerializedObject(zaman);
-        var gunes = zamanSo.FindProperty("sun").objectReferenceValue as Light;
+        bridge.Bind(windField, weatherState, time, atmosphere, thermometer, sun);
+        EditorUtility.SetDirty(bridge);
 
-        kopru.Bind(windField, weatherState, zaman, atmosphere, thermometer, gunes);
-        EditorUtility.SetDirty(kopru);
+        root.Bind(seaSettings, bridge, gen.GetComponent<Terrain>());
+        EditorUtility.SetDirty(root);
 
-        kok.Bind(ayar, kopru, gen.GetComponent<Terrain>());
-        EditorUtility.SetDirty(kok);
-
-        // YÜZEY SİMÜLASYONDAN ÖNCE: simülasyon görünürlüğü ondan okuyor.
-        var yuzey = Object.FindAnyObjectByType<SeaSurface>(FindObjectsInactive.Include);
-        if (yuzey == null)
+        var surface = Object.FindAnyObjectByType<SeaSurface>(FindObjectsInactive.Include);
+        if (surface == null)
         {
             var go = new GameObject("Sea Surface",
                                     typeof(MeshFilter), typeof(MeshRenderer));
-            yuzey = go.AddComponent<SeaSurface>();
+            surface = go.AddComponent<SeaSurface>();
             changed = true;
         }
 
-        var sim = kok.GetComponent<SeaSimulation>();
+        var sim = root.GetComponent<SeaSimulation>();
         if (sim == null)
         {
-            sim = kok.gameObject.AddComponent<SeaSimulation>();
+            sim = root.gameObject.AddComponent<SeaSimulation>();
             changed = true;
         }
 
-        sim.Bind(ayar, kopru, spektrum, fft, kopuk, yuzey);
+        sim.Bind(seaSettings, bridge, spectrum, fft, foam, surface);
         EditorUtility.SetDirty(sim);
 
-        // MESH KAMERAYI TAKİP EDİYOR, OYUNCUYU DEĞİL: kamera denizden
-        // uzaklaşsa bile ufuk doğru kalıyor (spec §10.3).
-        yuzey.Bind(ayar, yuzeyShader, camera.transform);
-        EditorUtility.SetDirty(yuzey);
+        surface.Bind(seaSettings, surfaceShader, camera.transform);
+        EditorUtility.SetDirty(surface);
 
-        // ISLAK KUM SÜRÜCÜSÜ. Deniz araziye dokunmuyor; iki global yayınlıyor
-        // ve arazi materyali onları okuyor (spec §14).
-        var islak = kok.GetComponent<SeaWetnessDriver>();
-        if (islak == null)
+        var wetness = root.GetComponent<SeaWetnessDriver>();
+        if (wetness == null)
         {
-            islak = kok.gameObject.AddComponent<SeaWetnessDriver>();
+            wetness = root.gameObject.AddComponent<SeaWetnessDriver>();
             changed = true;
         }
 
-        islak.Bind(ayar);
-        EditorUtility.SetDirty(islak);
+        wetness.Bind(seaSettings);
+        EditorUtility.SetDirty(wetness);
 
-        // BAĞLAR TAMAMLANINCA `OnEnable` TEKRAR ÇALIŞTIRILIYOR.
-        //
-        // `AddComponent` `OnEnable`'ı Bind'dan ÖNCE çağırıyor; bileşen ortam
-        // kaynağını bulamayıp kendini devre dışı bırakıyor. Ölçüldü:
-        // `SeaSimulation.enabled` false kaldı, kernel indeksleri -1'de kaldı
-        // ve ilk `Update` "Invalid kernelIndex (-1)" attı.
-        //
-        // `enabled` zaten false olanlar ATLANMIYOR — atlanacak olan tam da
-        // düzeltilmesi gereken durum.
-        foreach (var b in new Behaviour[] { kok, sim, yuzey, islak })
+        foreach (var b in new Behaviour[] { root, sim, surface, wetness })
         {
             b.enabled = false;
             b.enabled = true;
@@ -1891,8 +1449,6 @@ public static class MountainSceneBootstrap
     static AtmosphereSettings LoadOrCreateAtmosphereSettings() =>
         LoadOrCreate<AtmosphereSettings>(AtmospherePath);
 
-    /// Ayar asset'i yoksa koddaki varsayılanlarla oluşturur. Varsa dokunmaz: asset artık
-    /// tek doğru, kod yalnızca ilk hâli veriyor.
     static T LoadOrCreate<T>(string path) where T : ScriptableObject
     {
         var settings = AssetDatabase.LoadAssetAtPath<T>(path);
@@ -1907,10 +1463,6 @@ public static class MountainSceneBootstrap
         return settings;
     }
 
-    /// THE SAND MAPS ARE BOUND FROM CODE TOO. Dragged in by hand, the settings asset can
-    /// silently come up empty between one scene setup and the next; the shader reads a missing
-    /// texture as black and the shore goes dark. Missing maps are not swallowed — they throw
-    /// here, because a shore without sand should be a decision, not an accident.
     static TerrainMaterialSettings BindSandTextures(TerrainMaterialSettings settings)
     {
         Texture2D Load(string name) =>
@@ -1923,7 +1475,7 @@ public static class MountainSceneBootstrap
 
         if (albedo == null || normal == null || rough == null || ao == null)
             throw new System.InvalidOperationException(
-                $"Kum dokuları bulunamadı: {SandTexturePath}");
+                $"Sand textures not found: {SandTexturePath}");
 
         if (settings.sandAlbedo == albedo && settings.sandNormal == normal
             && settings.sandRoughness == rough && settings.sandAO == ao)
@@ -1934,8 +1486,6 @@ public static class MountainSceneBootstrap
         settings.sandRoughness = rough;
         settings.sandAO = ao;
 
-        // Without bumping the revision, `TerrainSurface.ApplySettings` skips and the maps
-        // never reach the material.
         settings.revision++;
         EditorUtility.SetDirty(settings);
 
@@ -1956,8 +1506,6 @@ public static class MountainSceneBootstrap
         return settings;
     }
 
-    /// Tırmanış göstergesi yalnızca okur; her çalışmada yeniden bağlanır ki
-    /// dağ veya hava sistemi yenilendiğinde eski referansla kalmasın.
     static void EnsureClimbHud(FirstPersonController player, MountainGenerator gen, ref bool changed)
     {
         var climbHud = Object.FindAnyObjectByType<ClimbHud>();
@@ -1982,9 +1530,6 @@ public static class MountainSceneBootstrap
         EditorUtility.SetDirty(climbHud);
     }
 
-    /// Dağ eteğinin biraz dışı: düz arazide, ayaklar yüzeye değecek şekilde
-    /// Ana sahnede kalmış test nesnelerini siler. Test karakteri ve bitki örtüsü
-    /// buradan kaldırıldı; sahnede duran eski kopyalar kendiliğinden gitmiyor.
     static bool RemoveStaleTestObjects()
     {
         bool changed = false;
@@ -2001,9 +1546,6 @@ public static class MountainSceneBootstrap
         return changed;
     }
 
-    /// Doğuş yeri ve bakış yönü. İŞARETLİYSE rota asset'inden (bkz. `RoutePainter`);
-    /// değilse hesaplanmış nokta. Elle işaretlenmiş bir doğuş, hesabın bilemeyeceği
-    /// şeyi biliyor: dağın hangi yüzünden bakıldığını.
     static void SpawnPose(out Vector3 position, out Quaternion rotation)
     {
         var route = AssetDatabase.LoadAssetAtPath<MountainRoute>(RoutePath);
@@ -2023,13 +1565,6 @@ public static class MountainSceneBootstrap
         rotation = Quaternion.identity;
     }
 
-    /// Verilen XZ'nin ÇARPIŞMA yüzeyindeki kotu. `SampleHeight` yükseklik haritasını
-    /// okuyor, collider'ın gerçekte nerede olduğunu değil; ikisi köşegende ayrışıyor ve
-    /// oyuncu zemine gömülüyor.
-    ///
-    /// Işın sahneye değil arazinin KENDİ collider'ına atılıyor: sahne geneline atılınca
-    /// oyuncunun kendi kapsülüne çarpıyor ve her kurulum çalışması onu bir kapsül boyu
-    /// yukarı taşıyordu.
     static Vector3 GroundAt(Vector3 position)
     {
         var terrain = Object.FindAnyObjectByType<Terrain>();
@@ -2050,9 +1585,6 @@ public static class MountainSceneBootstrap
         var terrain = Object.FindAnyObjectByType<Terrain>();
         if (terrain == null) return new Vector3(current.terrainSize * 0.45f, 5f, 0f);
 
-        // Dağ eteğinin biraz dışı, ama harita kenarını asla aşmadan.
-        // mountainRadius 0.45'i geçtiğinde 1.12 çarpanı doğuş noktasını haritanın
-        // dışına atıyor ve altında zemin kalmıyordu.
         const float SafeEdge = 0.47f;
 
         float radius = current.mountainRadius;
@@ -2060,13 +1592,6 @@ public static class MountainSceneBootstrap
 
         var pos = new Vector3(distance, 0f, 0f);
 
-        // Çarpışma yüzeyini ışınla bul: SampleHeight yükseklik haritasını okur,
-        // collider'ın gerçekte nerede olduğunu değil. İkisi ayrışırsa oyuncu zemine gömülür.
-        //
-        // Işın sahneye değil, arazinin kendi collider'ına atılıyor. Sahne geneline atmak
-        // oyuncunun kapsülüne çarpıyordu — oyuncu tam doğuş noktasında durduğu için her
-        // kurulum çalışması onu kendi tepesine, bir kapsül boyu yukarı taşıyordu ve sahne
-        // her derlemede oyuncu biraz daha yükselmiş olarak kaydediliyordu.
         float top = terrain.transform.position.y + terrain.terrainData.size.y + 100f;
         var ray = new Ray(new Vector3(pos.x, top, pos.z), Vector3.down);
 

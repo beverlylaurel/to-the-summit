@@ -1,15 +1,11 @@
-// ROL: kar yağışını ÖLÇER — tane simülasyonu, doğum kutusu, zemin ve örtü
-// kesme, rüzgâr sürüklenmesi, yoğunluk eşlemesi, savrulma eşiği, atlas.
-// Çağıran: menü — To The Summit/Snow/Precipitation Test.
+// Measures snowfall simulation — flake physics, spawn bounds, ground/roof clipping,
+// wind drift, intensity mapping, drift threshold, and atlas validity.
+// Invoked by: Menu — To The Summit/Snow/Precipitation Test.
 
 using System.Text;
 using UnityEditor;
 using UnityEngine;
 
-/// SPEC §22'NİN DÖRT BELİRTİSİ BURADA SAYIYA BAĞLANIYOR:
-/// "uzak taneler kayboluyor", "çatı altına kar yağıyor", "sisin içinde beyaz
-/// noktalar", "yağıyor ama birikmiyor". İlk üçü shader'da, dördüncüsü
-/// yoğunluk eşlemesinde.
 public static class SnowfallTest
 {
     const string ComputePath = "Assets/Snow/Shaders/SnowfallSim.compute";
@@ -21,9 +17,6 @@ public static class SnowfallTest
     static readonly Vector3 SpawnCenter = new(0f, 111f, 0f);
     static readonly Vector3 SpawnExtent = new(20f, 13f, 20f);
 
-    /// ZEMİN KUTUNUN ALTINDA. Kutunun içinden geçseydi alt şeritteki taneler
-    /// her karede ölüp kutunun ortasına geri doğar ve ortalama konum YUKARI
-    /// kayardı — "düşmüyor" diye yanlış ölçülürdü (bir kez oldu).
     const float GroundY = 50f;
 
     [MenuItem("To The Summit/Snow/Precipitation Test", false, 57)]
@@ -32,7 +25,7 @@ public static class SnowfallTest
     public static string Run(out bool ok)
     {
         var r = new StringBuilder(8192);
-        r.AppendLine("# Kar — yağış sınaması");
+        r.AppendLine("# Snow — Precipitation Test");
         r.AppendLine(System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         r.AppendLine();
 
@@ -42,32 +35,23 @@ public static class SnowfallTest
         ok &= ShaderTest(r);
 
         r.AppendLine();
-        r.AppendLine(ok ? "SONUÇ: TAMAM — bütün sınamalar geçti."
-                        : "SONUÇ: BAŞARISIZ — yukarıdaki satırlara bakın.");
+        r.AppendLine(ok ? "RESULT: PASSED — all tests completed successfully."
+                        : "RESULT: FAILED — see above for details.");
         return r.ToString();
     }
 
-    // ------------------------------------------------------------------ sayım
-
     static bool CountTest(StringBuilder r)
     {
-        r.AppendLine("## Yoğunluk ve eşikler (spec §17.1, §17.2)");
+        r.AppendLine("## Density and Thresholds (spec §17.1, §17.2)");
 
         bool all = true;
 
-        // Şiddet 0 → hiç tane. "Karsız sahnede maliyet sıfır" (spec §15.2).
         int none = SnowfallRenderer.FlakeCountFor(0f, 1f);
         bool zero = none == 0;
         all &= zero;
-        r.AppendLine("  [" + M(zero) + "] Şiddet 0          " + none +
-                     " tane  (kar yoksa hiç iş yok)");
+        r.AppendLine("  [" + M(zero) + "] Intensity 0          " + none +
+                     " flakes  (dormant when clear)");
 
-        // ASGARİ EKRAN BOYU İFADESİ İŞARET GÜVENLİ Mİ.
-        //
-        // HLSL burada koşturulamıyor; denetlenen şey kaynağın kendisi.
-        // `UNITY_MATRIX_P._m11` D3D render hedefinde NEGATİF geliyor ve
-        // `abs` olmadan ölçek 10000 katına çıkıyor (ölçüldü). Aynı hatanın
-        // ikinci kez yazılmasını bu satır engelliyor.
         string particleSrc = System.IO.File.ReadAllText(
             "Assets/Snow/Shaders/SnowfallParticle.shader");
 
@@ -75,37 +59,27 @@ public static class SnowfallTest
             particleSrc, @"(?<!abs\()\s*UNITY_MATRIX_P\._m11");
 
         all &= signSafe;
-        r.AppendLine("  [" + M(signSafe) + "] _m11 işaret güvenli  " +
-                     (signSafe ? "abs ile sarılı" : "ABS YOK — ölçek negatifte patlar"));
+        r.AppendLine("  [" + M(signSafe) + "] _m11 sign-safe       " +
+                     (signSafe ? "wrapped with abs" : "NO ABS — scale breaks on negative matrix"));
 
-        // Şiddet arttıkça tane sayısı artıyor ve kapasitede doyuyor —
-        // spec §17.1 + §17.2'nin birlikte verdiği davranış.
         int low = SnowfallRenderer.FlakeCountFor(0.06f, 1f);
         int mid = SnowfallRenderer.FlakeCountFor(0.24f, 1f);
         int high = SnowfallRenderer.FlakeCountFor(1f, 1f);
 
-        // SPEC KENDİ İÇİNDE ÇELİŞİYOR: §17.2'nin FORMÜLÜ
-        // `Lerp(0, 16000, i01)` (i01 = 0.06 → 960 tane/s), altındaki
-        // "referans" tablosu 1200 diyor. SWE sütunu doğrusal, tane sütunu
-        // değil. Kod bloğu normatif, tablo referans — formül uygulandı.
         bool lowMatchesSpec = Mathf.Abs(low - 0.06f * 16000f * 6.5f) < 2f;
-        // Tavan artık spec'in kendi formülünü kırpmıyor: tam şiddette
-        // 16000 × 6.5 = 104000 tane, kapasite 160000.
         bool notClipped = high == Mathf.RoundToInt(16000f * 6.5f);
         bool monotone = low > 0 && low < mid && mid < high && lowMatchesSpec && notClipped;
 
         all &= monotone;
-        r.AppendLine("  [" + M(monotone) + "] Şiddet → tane     0.06 → " + low +
-                     ",  0.24 → " + mid + ",  1.00 → " + high + "  (kırpılmıyor)");
+        r.AppendLine("  [" + M(monotone) + "] Intensity -> flakes   0.06 -> " + low +
+                     ",  0.24 -> " + mid + ",  1.00 -> " + high);
 
-        // Kalite preseti kapasiteyi ölçekliyor (spec §15.3).
         int lowQuality = SnowfallRenderer.FlakeCountFor(0.24f, 0.35f);
         bool scaled = lowQuality < mid;
         all &= scaled;
-        r.AppendLine("  [" + M(scaled) + "] Kalite ölçeği     Medium " + mid +
-                     " → Low " + lowQuality + "  (VfxCapacityScale 0.35)");
+        r.AppendLine("  [" + M(scaled) + "] Quality scale        Medium " + mid +
+                     " -> Low " + lowQuality + "  (VfxCapacityScale 0.35)");
 
-        // SAVRULMA EŞİĞİ: rüzgâr 7 m/s altında yok, sıkışmış karda yok.
         int calm = SnowfallRenderer.DriftCountFor(5f, 0.8f, 1f, 1f);
         int justBelow = SnowfallRenderer.DriftCountFor(7f, 0.8f, 1f, 1f);
         int windy = SnowfallRenderer.DriftCountFor(12f, 0.8f, 1f, 1f);
@@ -113,11 +87,10 @@ public static class SnowfallTest
 
         bool gate = calm == 0 && justBelow == 0 && windy > 0 && packed == 0;
         all &= gate;
-        r.AppendLine("  [" + M(gate) + "] Savrulma eşiği    5 m/s → " + calm +
-                     ",  7 m/s → " + justBelow + ",  12 m/s → " + windy +
-                     ",  12 m/s ama sıkışmış → " + packed);
+        r.AppendLine("  [" + M(gate) + "] Drift threshold      5 m/s -> " + calm +
+                     ",  7 m/s -> " + justBelow + ",  12 m/s -> " + windy +
+                     ",  12 m/s packed -> " + packed);
 
-        // DOĞUM KUTUSU 1 m IZGARASINA SNAP'Lİ.
         Vector3 a = SnowfallRenderer.SnapSpawnCenter(new Vector3(3.2f, 50f, -7.9f), Vector3.right);
         Vector3 b = SnowfallRenderer.SnapSpawnCenter(new Vector3(3.4f, 50.2f, -7.7f), Vector3.right);
 
@@ -126,21 +99,19 @@ public static class SnowfallTest
                        Mathf.Approximately(a.z, Mathf.Round(a.z));
 
         all &= snapped;
-        r.AppendLine("  [" + M(snapped) + "] Doğum kutusu snap 20 cm'lik iki konum aynı merkeze düşüyor: " +
+        r.AppendLine("  [" + M(snapped) + "] Spawn box snap        snapped to integer center: " +
                      a.ToString("0.0"));
 
         return all;
     }
 
-    // ------------------------------------------------------------ simülasyon
-
     static bool SimulationTest(StringBuilder r)
     {
         r.AppendLine();
-        r.AppendLine("## Tane simülasyonu (spec §17.1)");
+        r.AppendLine("## Flake Simulation (spec §17.1)");
 
         var cs = AssetDatabase.LoadAssetAtPath<ComputeShader>(ComputePath);
-        if (cs == null) { r.AppendLine("  [-] " + ComputePath + " yüklenemedi."); return false; }
+        if (cs == null) { r.AppendLine("  [-] " + ComputePath + " could not be loaded."); return false; }
 
         var rig = new Rig(cs, Capacity);
         bool all = true;
@@ -151,7 +122,6 @@ public static class SnowfallTest
             rig.SetSky(occluderY: -9999f);
             rig.SetWind(new Vector3(4f, 0f, 0f), 4f);
 
-            // İlk kare: bütün taneler doğuyor, hacim anında doluyor.
             rig.Step(0.016f);
             Flake[] first = rig.Read();
 
@@ -161,10 +131,8 @@ public static class SnowfallTest
 
             bool fills = inside == Capacity;
             all &= fills;
-            r.AppendLine("  [" + M(fills) + "] Hacim anında dolu " + inside + " / " + Capacity +
-                         "  (spec: kutunun tamamına spawn)");
+            r.AppendLine("  [" + M(fills) + "] Volume instantly full " + inside + " / " + Capacity);
 
-            // Boyut dağılımı: 0.6–1.7 kat.
             float minSize = float.MaxValue, maxSize = 0f;
             for (int i = 0; i < Capacity; i++)
             {
@@ -174,11 +142,10 @@ public static class SnowfallTest
 
             bool sized = maxSize / Mathf.Max(minSize, 1e-6f) > 2.0f;
             all &= sized;
-            r.AppendLine("  [" + M(sized) + "] İrili ufaklı      " + (minSize * 1000f).ToString("0.0") +
-                         " – " + (maxSize * 1000f).ToString("0.0") + " mm  (oran " +
-                         (maxSize / minSize).ToString("0.00") + ", spec 0.6–1.7 kat = 2.83)");
+            r.AppendLine("  [" + M(sized) + "] Size distribution     " + (minSize * 1000f).ToString("0.0") +
+                         " – " + (maxSize * 1000f).ToString("0.0") + " mm  (ratio " +
+                         (maxSize / minSize).ToString("0.00") + ")");
 
-            // Atlas kareleri dağılmış mı: 16 hücrenin hepsi kullanılıyor mu.
             var used = new bool[16];
             for (int i = 0; i < Capacity; i++)
             {
@@ -191,10 +158,9 @@ public static class SnowfallTest
 
             bool frames = usedCount >= 14;
             all &= frames;
-            r.AppendLine("  [" + M(frames) + "] Atlas dağılımı    " + usedCount +
-                         " / 16 hücre kullanılıyor");
+            r.AppendLine("  [" + M(frames) + "] Atlas distribution    " + usedCount +
+                         " / 16 cells utilized");
 
-            // Taneler DÜŞÜYOR ve rüzgârla sürükleniyor.
             Vector3 before = MeanPosition(first);
 
             for (int i = 0; i < 20; i++) rig.Step(0.05f);
@@ -207,12 +173,11 @@ public static class SnowfallTest
             bool drifts = delta.x > 0.5f;
 
             all &= falls && drifts;
-            r.AppendLine("  [" + M(falls) + "] Düşüyor           1 sn'de Δy = " +
+            r.AppendLine("  [" + M(falls) + "] Falls                 in 1s Delta_y = " +
                          delta.y.ToString("0.00") + " m");
-            r.AppendLine("  [" + M(drifts) + "] Rüzgârla sürükleniyor  Δx = " +
-                         delta.x.ToString("0.00") + " m  (rüzgâr +X 4 m/s)");
+            r.AppendLine("  [" + M(drifts) + "] Drifts with wind     Delta_x = " +
+                         delta.x.ToString("0.00") + " m  (+X 4 m/s wind)");
 
-            // Rüzgâr tersine → sürüklenme tersine.
             rig.Reset();
             rig.SetWind(new Vector3(-4f, 0f, 0f), 4f);
             rig.Step(0.016f);
@@ -223,13 +188,12 @@ public static class SnowfallTest
 
             bool reversed = dxBack < -0.5f;
             all &= reversed;
-            r.AppendLine("  [" + M(reversed) + "] Yön çevrilince    Δx = " +
-                         dxBack.ToString("0.00") + " m  (rüzgâr −X)");
+            r.AppendLine("  [" + M(reversed) + "] Reversed direction   Delta_x = " +
+                         dxBack.ToString("0.00") + " m  (-X wind)");
 
-            // ZEMİN KESME: zemini yükselt, taneler yeniden doğsun.
             rig.Reset();
             rig.SetWind(Vector3.zero, 0f);
-            rig.SetGround(SpawnCenter.y + SpawnExtent.y + 5f);   // her şeyin üstünde
+            rig.SetGround(SpawnCenter.y + SpawnExtent.y + 5f);
             rig.Step(0.05f);
             rig.Step(0.05f);
 
@@ -239,10 +203,9 @@ public static class SnowfallTest
 
             bool groundKill = aged == 0;
             all &= groundKill;
-            r.AppendLine("  [" + M(groundKill) + "] Zemin kesme       zemin taneden yüksekken " +
-                         aged + " tane yaşamaya devam ediyor  (0 olmalı)");
+            r.AppendLine("  [" + M(groundKill) + "] Ground clipping       ground above flakes leaves " +
+                         aged + " alive (must be 0)");
 
-            // ÖRTÜ KESME: çatı taneden 3 m yukarıda → hepsi ölmeli.
             rig.Reset();
             rig.SetGround(GroundY);
             rig.SetSky(occluderY: SpawnCenter.y + SpawnExtent.y + 3f);
@@ -255,10 +218,9 @@ public static class SnowfallTest
 
             bool roofKill = survivors == 0;
             all &= roofKill;
-            r.AppendLine("  [" + M(roofKill) + "] Örtü kesme        çatı altında " + survivors +
-                         " tane yaşamaya devam ediyor  (0 olmalı)");
+            r.AppendLine("  [" + M(roofKill) + "] Sky occlusion clip   under roof leaves " + survivors +
+                         " alive (must be 0)");
 
-            // ALPHA RAMPASI: yeni doğan tane görünmez, orta yaşta görünür.
             rig.Reset();
             rig.SetSky(occluderY: -9999f);
             rig.Step(0.016f);
@@ -269,11 +231,10 @@ public static class SnowfallTest
 
             bool ramps = youngAlpha < 0.15f && matureAlpha > 0.6f;
             all &= ramps;
-            r.AppendLine("  [" + M(ramps) + "] Alpha rampası     doğumda " +
-                         youngAlpha.ToString("0.000") + " → 2 sn sonra " +
+            r.AppendLine("  [" + M(ramps) + "] Alpha ramp            spawn " +
+                         youngAlpha.ToString("0.000") + " -> 2s later " +
                          matureAlpha.ToString("0.000"));
 
-            // KAPALI YUVA HİÇ İŞ YAPMIYOR.
             rig.Reset();
             rig.SetAlive(Capacity / 2);
             rig.Step(0.05f);
@@ -284,8 +245,8 @@ public static class SnowfallTest
 
             bool tailDead = liveTail == 0;
             all &= tailDead;
-            r.AppendLine("  [" + M(tailDead) + "] Kapalı yuvalar    " + liveTail +
-                         " tanesi hâlâ canlı  (0 olmalı)");
+            r.AppendLine("  [" + M(tailDead) + "] Disabled slots       " + liveTail +
+                         " alive (must be 0)");
         }
         finally
         {
@@ -295,18 +256,16 @@ public static class SnowfallTest
         return all;
     }
 
-    // ------------------------------------------------------------------ atlas
-
     static bool AtlasTest(StringBuilder r)
     {
         r.AppendLine();
-        r.AppendLine("## Tane atlası (spec §17.1)");
+        r.AppendLine("## Flake Atlas (spec §17.1)");
 
         Texture2D atlas = SnowTextureBaker.EnsureFlakeAtlas();
 
         if (atlas == null)
         {
-            r.AppendLine("  [-] Atlas üretilemedi.");
+            r.AppendLine("  [-] Atlas could not be generated.");
             return false;
         }
 
@@ -344,14 +303,9 @@ public static class SnowfallTest
 
         bool filled = min > 0.01f;
         all &= filled;
-        r.AppendLine("  [" + M(filled) + "] Her hücre dolu    kaplama %" + (min * 100f).ToString("0.0") +
-                     " – %" + (max * 100f).ToString("0.0"));
+        r.AppendLine("  [" + M(filled) + "] Every cell filled     coverage " + (min * 100f).ToString("0.0") +
+                     "% – " + (max * 100f).ToString("0.0") + "%");
 
-        // ON ALTI HÜCRE BİRBİRİNDEN FARKLI. Aynı olsalardı yağış tek tip
-        // görünürdü — kullanıcının eski sistemde bildirdiği belirti.
-        //
-        // ÖLÇÜT KAPLAMA DEĞİL, BİÇİM. İki farklı kristal aynı kaplamaya sahip
-        // olabilir; ayrımı piksel piksel yapmak gerekiyor.
         var signature = new float[16][];
 
         for (int c = 0; c < 16; c++) signature[c] = CellSignature(px, atlas.width, cell, c);
@@ -375,11 +329,10 @@ public static class SnowfallTest
 
         bool varied = distinct == 16;
         all &= varied;
-        r.AppendLine("  [" + M(varied) + "] Hücreler farklı   " + distinct +
-                     " / 16 ayrı biçim  (en yakın iki hücrenin farkı " +
-                     closest.ToString("0.000") + ", eşik 0.050)");
+        r.AppendLine("  [" + M(varied) + "] Distinct cells        " + distinct +
+                     " / 16 unique patterns  (closest pair delta " +
+                     closest.ToString("0.000") + ", threshold 0.050)");
 
-        // Hücre kenarları saydam: komşu hücre sızmıyor.
         float edge = 0f;
         for (int cy = 0; cy < 4; cy++)
         for (int cx = 0; cx < 4; cx++)
@@ -388,13 +341,11 @@ public static class SnowfallTest
 
         bool clean = edge < 0.02f;
         all &= clean;
-        r.AppendLine("  [" + M(clean) + "] Hücre kenarı temiz  en yüksek kenar alpha " +
+        r.AppendLine("  [" + M(clean) + "] Cell edges clean     max edge alpha " +
                      edge.ToString("0.000"));
 
         return all;
     }
-
-    // ------------------------------------------------------------------ shader
 
     static bool ShaderTest(StringBuilder r)
     {
@@ -403,22 +354,22 @@ public static class SnowfallTest
 
         var shader = AssetDatabase.LoadAssetAtPath<Shader>(ShaderPath);
 
-        if (shader == null) { r.AppendLine("  [-] " + ShaderPath + " yüklenemedi."); return false; }
+        if (shader == null) { r.AppendLine("  [-] " + ShaderPath + " could not be loaded."); return false; }
 
         bool hasError = ShaderUtil.ShaderHasError(shader);
 
-        r.AppendLine("  [" + M(!hasError) + "] Derleme           " +
-                     (hasError ? "HATA VAR" : "hatasız"));
+        r.AppendLine("  [" + M(!hasError) + "] Compilation           " +
+                     (hasError ? "ERRORS FOUND" : "clean"));
 
         foreach (ShaderMessage m in ShaderUtil.GetShaderMessages(shader))
             r.AppendLine("      [" + m.severity + "] " + m.file + "(" + m.line + "): " + m.message);
 
         (string needle, string symptom)[] checks =
         {
-            ("_MinPixelSize", "Uzak taneler kayboluyor"),
-            ("_FogDensity01", "Sisin içinde beyaz noktalar"),
-            ("SampleSceneDepth", "Yumuşak parçacık yok"),
-            ("_StretchAlongVelocity", "Rüzgârda uzatma yok"),
+            ("_MinPixelSize", "Distant flakes disappear"),
+            ("_FogDensity01", "White points in fog"),
+            ("SampleSceneDepth", "Missing soft particle blending"),
+            ("_StretchAlongVelocity", "Missing wind stretch"),
         };
 
         string source = System.IO.File.ReadAllText(ShaderPath);
@@ -429,19 +380,12 @@ public static class SnowfallTest
             bool found = source.Contains(c.needle);
             all &= found;
             r.AppendLine("  [" + M(found) + "] " + c.needle.PadRight(24) +
-                         (found ? "" : "EKSİK → " + c.symptom));
+                         (found ? "" : "MISSING -> " + c.symptom));
         }
-
-        r.AppendLine("  [i] VFX GRAPH YERİNE COMPUTE. `.vfx` bir düğüm grafiği ve " +
-                     "metinden yazılamıyor; spec §17.1'in saydığı davranışların " +
-                     "hepsi GPU tane havuzuyla uygulandı. Gerekçe `DECISIONS.md`.");
 
         return all;
     }
 
-    // ----------------------------------------------------------------- yardım
-
-    /// Hücrenin 8×8'e indirgenmiş alpha imzası.
     static float[] CellSignature(Color[] px, int width, int cell, int index)
     {
         int cx = index % 4;
@@ -507,8 +451,6 @@ public static class SnowfallTest
         public float Frame;
         public float Alpha;
     }
-
-    // ---------------------------------------------------------------- düzenek
 
     sealed class Rig
     {

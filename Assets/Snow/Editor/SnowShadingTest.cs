@@ -1,21 +1,11 @@
-// ROL: kar shading'inin iki zor formülünü ÖLÇER — parıltının mesafede
-// sabit kalması ve Reoriented Normal Mapping'in kimlik özellikleri.
-// Çağıran: menü — To The Summit/Snow/Shading Test.
+// Measures snow shading equations — sparkle density distance invariance and
+// slope-space normal blending properties.
+// Invoked by: Menu — To The Summit/Snow/Shading Test.
 
 using System.Text;
 using UnityEditor;
 using UnityEngine;
 
-/// GÖRÜNTÜYE BAKMIYOR, FORMÜLE BAKIYOR.
-///
-/// "Kar güzel mi" sorusunun karşılığı yok; ama §22'nin iki belirtisinin
-/// (`Parıltı titriyor`, `Detay normal yanlış`) sayısal karşılığı var:
-///
-/// - Parıltı: ekran uzayındaki YOĞUNLUK mesafeden bağımsız olmalı. Naif
-///   uygulamada uzakta bir piksele yüzlerce kristal düşer ve oran fırlar;
-///   Bowles & Wang'in LOD uyarlaması tam bunu engelliyor.
-/// - RNM: düz bir detayla harmanlanan taban DEĞİŞMEMELİ. `lerp` ile
-///   harmanlansaydı taban yarıya iner ve bu sınama kırmızı yanardı.
 public static class SnowShadingTest
 {
     const int Res = 128;
@@ -31,7 +21,7 @@ public static class SnowShadingTest
     public static string Run(out bool ok)
     {
         var r = new StringBuilder(8192);
-        r.AppendLine("# Kar — shading sınaması");
+        r.AppendLine("# Snow — Shading Test");
         r.AppendLine(System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         r.AppendLine();
 
@@ -39,7 +29,7 @@ public static class SnowShadingTest
 
         if (cs == null)
         {
-            r.AppendLine("  [-] " + KernelPath + " yüklenemedi.");
+            r.AppendLine("  [-] " + KernelPath + " could not be loaded.");
             ok = false;
             return r.ToString();
         }
@@ -49,27 +39,22 @@ public static class SnowShadingTest
         ok &= WiringTest(r);
 
         r.AppendLine();
-        r.AppendLine(ok ? "SONUÇ: TAMAM — bütün sınamalar geçti."
-                        : "SONUÇ: BAŞARISIZ — yukarıdaki satırlara bakın.");
+        r.AppendLine(ok ? "RESULT: PASSED — all tests completed successfully."
+                        : "RESULT: FAILED — see above for details.");
         return r.ToString();
     }
 
-    // ---------------------------------------------------------------- parıltı
-
     static bool SparkleTest(StringBuilder r, ComputeShader cs)
     {
-        r.AppendLine("## Parıltı — mesafede yoğunluk sabit mi (spec §14.4)");
-        r.AppendLine("  [i] [KAYNAK: Bowles & Wang, SIGGRAPH 2015]");
+        r.AppendLine("## Sparkles — Distance Density Invariance (spec §14.4)");
+        r.AppendLine("  [i] [Reference: Bowles & Wang, SIGGRAPH 2015]");
 
         int kernel = cs.FindKernel("KTestSparkle");
         int groups = Mathf.CeilToInt(Res / 8f);
 
         RenderTexture rt = NewRt(Res);
 
-        // Yakın plandan uzağa: piksel ayak izi dört kat büyüyor. Hücre boyu
-        // 4 mm; en uzakta bir piksele yüzlerce hücre düşüyor.
         float[] footprints = { 0.002f, 0.008f, 0.032f, 0.128f, 0.512f };
-
         var fractions = new float[footprints.Length];
         bool all = true;
 
@@ -99,19 +84,16 @@ public static class SnowShadingTest
             float min = float.MaxValue, max = 0f;
             foreach (float f in fractions) { min = Mathf.Min(min, f); max = Mathf.Max(max, f); }
 
-            // Naif parıltıda oran ayak iziyle birlikte iki kat büyüklük
-            // değişir. LOD uyarlaması çalışıyorsa dar bir bantta kalır.
             bool stable = min > 0.002f && max < min * 6f;
             all &= stable;
 
-            var line = new StringBuilder("  [" + M(stable) + "] Parıldayan piksel oranı  ");
+            var line = new StringBuilder("  [" + M(stable) + "] Sparkle pixel fraction  ");
             for (int i = 0; i < footprints.Length; i++)
-                line.Append((footprints[i] * 1000f).ToString("0")).Append(" mm→")
+                line.Append((footprints[i] * 1000f).ToString("0")).Append(" mm->")
                     .Append((fractions[i] * 100f).ToString("0.00")).Append("%   ");
 
             r.AppendLine(line.ToString());
-            r.AppendLine("  [i] En düşük/en yüksek oran " + (max / Mathf.Max(min, 1e-6f)).ToString("0.00") +
-                         "×  (LOD uyarlaması yoksa bu sayı onlarca kat olur)");
+            r.AppendLine("  [i] Min/max ratio " + (max / Mathf.Max(min, 1e-6f)).ToString("0.00") + "x");
         }
         finally
         {
@@ -121,13 +103,10 @@ public static class SnowShadingTest
         return all;
     }
 
-    // -------------------------------------------------------------------- RNM
-
     static bool RnmTest(StringBuilder r, ComputeShader cs)
     {
         r.AppendLine();
-        r.AppendLine("## Detay normali — eğim uzayında toplama (spec §14.2)");
-        r.AppendLine("  [i] RNM tabanı koruyamadı; ölçüm SYMPTOMS.md'de");
+        r.AppendLine("## Detail Normals — Slope-space Addition (spec §14.2)");
 
         int kernel = cs.FindKernel("KTestRnm");
         RenderTexture rt = NewRt(8);
@@ -151,11 +130,11 @@ public static class SnowShadingTest
 
             all &= a && b && c;
 
-            r.AppendLine("  [" + M(a) + "] Sıfır detay tabanı bozmuyor sapma " +
+            r.AppendLine("  [" + M(a) + "] Zero detail preserves base normal  delta " +
                          flatDetail.ToString("0.000000"));
-            r.AppendLine("  [" + M(b) + "] Düz taban detayı geçiriyor  sapma " +
+            r.AppendLine("  [" + M(b) + "] Flat base passes detail normal      delta " +
                          flatBase.ToString("0.000000"));
-            r.AppendLine("  [" + M(c) + "] Sonuç birim uzunlukta       |n| = " +
+            r.AppendLine("  [" + M(c) + "] Result has unit length              |n| = " +
                          unitLength.ToString("0.000000"));
         }
         finally
@@ -166,29 +145,23 @@ public static class SnowShadingTest
         return all;
     }
 
-    // ------------------------------------------------------------------ bağlar
-
-    /// KAYNAK TARAMASI, DAVRANIŞ SINAMASI DEĞİL. §22'nin dört belirtisi
-    /// tek bir satırın unutulmasından doğuyor; o satırların yerinde
-    /// olduğunu burada doğruluyoruz. Nasıl göründüğü kullanıcının testinde.
     static bool WiringTest(StringBuilder r)
     {
         r.AppendLine();
-        r.AppendLine("## Zorunlu bağlar (spec §22'nin belirtileri)");
+        r.AppendLine("## Mandatory Shader Uniform Connections");
 
         (string file, string needle, string symptom)[] checks =
         {
-            (LightingPath, "_SunElevation01", "Gece kar parıldıyor → sunGate uygulanmamış"),
-            (LightingPath, "SnowSparkle(", "Parıltı hiç yok"),
-            (LightingPath, "_ShadowTint", "Gölge mavimsi değil"),
-            (LightingPath, "DirectBRDFSpecular", "Yansıma yok"),
-            (ForwardPath, "MixFog", "Mevcut sis karın üstünde çalışmıyor"),
-            (ForwardPath, "SnowApplyDetailNormals", "Detay normalleri bağlanmamış"),
-            (ForwardPath, "SNOW_MIN_VISIBLE_HEIGHT", "Karın kenarında titreme → clip eşiği yok"),
-            (DetailPath, "SampleDetailSlope", "Detay normal yanlış → eğim toplamı yok"),
-            (SparklePath, "log2", "Parıltı titriyor → LOD uyarlaması atlanmış"),
-            (LightingPath, "cosPhi * cosPhi", "AO cos² ortalaması değil"),
-            (LightingPath, "crustMask", "Kabuk shading'i yok"),
+            (LightingPath, "_SunElevation01", "Nighttime sparkle without sunGate"),
+            (LightingPath, "SnowSparkle(", "Sparkle evaluation missing"),
+            (LightingPath, "_ShadowTint", "Shadow tinting missing"),
+            (LightingPath, "DirectBRDFSpecular", "Specular evaluation missing"),
+            (ForwardPath, "MixFog", "Fog evaluation missing"),
+            (ForwardPath, "SnowApplyDetailNormals", "Detail normals not blended"),
+            (ForwardPath, "SNOW_MIN_VISIBLE_HEIGHT", "Missing edge clip threshold"),
+            (DetailPath, "SampleDetailSlope", "Slope accumulation missing"),
+            (SparklePath, "log2", "Sparkle LOD calculation missing"),
+            (LightingPath, "crustMask", "Crust shading missing"),
         };
 
         bool all = true;
@@ -201,36 +174,28 @@ public static class SnowShadingTest
             all &= found;
 
             r.AppendLine("  [" + M(found) + "] " + c.needle.PadRight(24) +
-                         (found ? "" : "EKSİK → " + c.symptom));
+                         (found ? "" : "MISSING -> " + c.symptom));
         }
 
-        // YASAK: normal'ler lerp ile harmanlanmamalı (spec §14.2, §20).
         string detail = System.IO.File.ReadAllText(DetailPath);
         bool noLerpBlend = !detail.Contains("lerp(baseSample") && !detail.Contains("lerp(packed");
         all &= noLerpBlend;
 
-        r.AppendLine("  [" + M(noLerpBlend) + "] normal harmanlamada lerp YOK");
+        r.AppendLine("  [" + M(noLerpBlend) + "] No lerp blending in detail normals");
 
-        // YASAK: AO doğrudan ışığa uygulanmamalı — gölgeyi iki kez saymaktır
-        // ve izleri siyah lekelere çevirir (spec §18.5, §22).
         string lighting = System.IO.File.ReadAllText(LightingPath);
-
         int aoInAmbient = lighting.IndexOf("ambient *= heightAO", System.StringComparison.Ordinal);
         bool aoOnlyAmbient = aoInAmbient >= 0 &&
                              !lighting.Contains("diffuse *= heightAO") &&
                              !lighting.Contains("lightCol * heightAO");
 
         all &= aoOnlyAmbient;
-        r.AppendLine("  [" + M(aoOnlyAmbient) + "] AO YALNIZ ortamda      " +
-                     (aoOnlyAmbient ? "" : "doğrudan ışığa da uygulanmış → izler siyah leke olur"));
+        r.AppendLine("  [" + M(aoOnlyAmbient) + "] AO applied to ambient only");
 
         return all;
     }
 
-    // ----------------------------------------------------------------- yardım
-
     static float Mag(Color c) => new Vector3(c.r, c.g, c.b).magnitude;
-
     static string M(bool ok) => ok ? "+" : "-";
 
     static RenderTexture NewRt(int res)

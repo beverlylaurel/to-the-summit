@@ -71,7 +71,7 @@ public class SnowFootprintDeformer : SnowDeformer
 
     struct Ayak
     {
-        public Vector3 konum;
+        public Vector3 pos;
         public Vector2 ileri;
         public bool    basili;
     }
@@ -83,26 +83,26 @@ public class SnowFootprintDeformer : SnowDeformer
     public override void GetSegment(int index, out Vector4 a, out Vector4 b)
     {
         // The base class supplies the path's fluctuation (width and depth).
-        base.GetSegment(index, out Vector4 tabanA, out Vector4 tabanB);
+        base.GetSegment(index, out Vector4 baseA, out Vector4 baseB);
 
         Ayak ayak = index < Bolumler.Length ? sol : sag;
         Vector4 bol = Bolumler[index % Bolumler.Length];
 
-        float yaricap = bootWidth * 0.5f * bol.z * (tabanA.w / Mathf.Max(Radius, 1e-4f));
-        float yari    = Mathf.Max(0f, bootLength * bol.y * 0.5f - yaricap);
+        float radius = bootWidth * 0.5f * bol.z * (baseA.w / Mathf.Max(Radius, 1e-4f));
+        float halfLen    = Mathf.Max(0f, bootLength * bol.y * 0.5f - radius);
 
         var ileri3 = new Vector3(ayak.ileri.x, 0f, ayak.ileri.y);
-        Vector3 orta = ayak.konum + ileri3 * (bootLength * bol.x);
+        Vector3 mid = ayak.pos + ileri3 * (bootLength * bol.x);
 
-        Vector3 pa = orta - ileri3 * yari;
-        Vector3 pb = orta + ileri3 * yari;
+        Vector3 pa = mid - ileri3 * halfLen;
+        Vector3 pb = mid + ileri3 * halfLen;
 
         // A foot in the air leaves no mark: the sinking multiplier is zero and `KDeform`
         // writes nothing there.
-        float basinc = ayak.basili ? tabanB.w * bol.w : 0f;
+        float pressure = ayak.basili ? baseB.w * bol.w : 0f;
 
-        a = new Vector4(pa.x, pa.y, pa.z, yaricap);
-        b = new Vector4(pb.x, pb.y, pb.z, basinc);
+        a = new Vector4(pa.x, pa.y, pa.z, radius);
+        b = new Vector4(pb.x, pb.y, pb.z, pressure);
     }
 
     protected override void OnEnable()
@@ -185,7 +185,7 @@ public class SnowFootprintDeformer : SnowDeformer
         float rad = (solMu ? -toeOut : toeOut) * Mathf.Deg2Rad;
         float c = Mathf.Cos(rad), s = Mathf.Sin(rad);
 
-        ayak.konum = transform.position + sag3 * (solMu ? -0.5f : 0.5f) * stanceWidth;
+        ayak.pos = transform.position + sag3 * (solMu ? -0.5f : 0.5f) * stanceWidth;
         ayak.ileri = new Vector2(ileri3.x * c + ileri3.z * s,
                                  -ileri3.x * s + ileri3.z * c).normalized;
     }

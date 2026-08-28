@@ -1,6 +1,5 @@
-// ROL: bölge kaydırmasının ve snap ızgarasının doğruluğunu ÖLÇER. Göz kararı
-// yok — her sınamanın tek doğru cevabı var, sayı olarak basılıyor.
-// Çağıran: menü — To The Summit/Snow/Scroll Test.
+// Measures active region scrolling and texel grid snapping precision.
+// Invoked by: Menu — To The Summit/Snow/Scroll Test.
 
 using System.Collections.Generic;
 using System.Text;
@@ -8,12 +7,6 @@ using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 
-/// ARAÇ ÖNCE KENDİNİ DOĞRULUYOR (CLAUDE.md — "aracın kendisi önce doğrulanır").
-///
-/// Geri okuma yolunda y ekseni çevrilebiliyor: `RWTexture2D[id.xy]`'nin y'si ile
-/// `Texture2D.GetPixels()`'in y'si aynı yöne bakmak zorunda değil. Bu sınama
-/// çevrimi VARSAYMIYOR, damgadan ÖLÇÜYOR ve beklenen değerleri ona göre kuruyor.
-/// Varsayılsaydı bir işaret hatası ya sahte başarısızlık ya da gizlenmiş bug olurdu.
 public static class SnowScrollTest
 {
     const int Res = 1024;
@@ -29,7 +22,7 @@ public static class SnowScrollTest
     public static string Run(out bool ok)
     {
         var r = new StringBuilder(4096);
-        r.AppendLine("# Kar — kaydırma ve snap sınaması");
+        r.AppendLine("# Snow — Scroll and Snap Test");
         r.AppendLine(System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         r.AppendLine();
 
@@ -39,22 +32,20 @@ public static class SnowScrollTest
         ok &= ReleaseTest(r);
 
         r.AppendLine();
-        r.AppendLine(ok ? "SONUÇ: TAMAM — bütün sınamalar geçti."
-                        : "SONUÇ: BAŞARISIZ — yukarıdaki satırlara bakın.");
+        r.AppendLine(ok ? "RESULT: PASSED — all tests completed successfully."
+                        : "RESULT: FAILED — see above for details.");
         return r.ToString();
     }
 
-    // ---------------------------------------------------------------- kaydırma
-
     static bool ScrollTests(StringBuilder r)
     {
-        r.AppendLine("## KScroll — içerik dünyaya çakılı kalıyor mu");
+        r.AppendLine("## KScroll — World Anchoring Fidelity");
 
         var sim = AssetDatabase.LoadAssetAtPath<ComputeShader>(SimPath);
-        if (sim == null) { r.AppendLine("  [-] " + SimPath + " yüklenemedi."); return false; }
+        if (sim == null) { r.AppendLine("  [-] " + SimPath + " could not be loaded."); return false; }
 
         var stampCs = AssetDatabase.LoadAssetAtPath<ComputeShader>(StampPath);
-        if (stampCs == null) { r.AppendLine("  [-] " + StampPath + " yüklenemedi."); return false; }
+        if (stampCs == null) { r.AppendLine("  [-] " + StampPath + " could not be loaded."); return false; }
 
         int stampKernel = stampCs.FindKernel("KStamp");
         int scrollKernel = sim.FindKernel("KScroll");
@@ -67,7 +58,6 @@ public static class SnowScrollTest
 
         try
         {
-            // --- ARAÇ DOĞRULAMASI: damga geri okundu mu, y çevrildi mi ---
             stampCs.SetInt("_Resolution", Res);
             stampCs.SetTexture(stampKernel, "_Dst", src);
             stampCs.Dispatch(stampKernel, groups, groups, 1);
@@ -76,18 +66,17 @@ public static class SnowScrollTest
 
             if (!DetectOrientation(stamp, r, out bool flipped)) return false;
 
-            r.AppendLine("  [+] Okuma yolu           damga birebir geri geldi, y ekseni " +
-                         (flipped ? "ÇEVRİK (hesaba katıldı)" : "aynı yönde"));
+            r.AppendLine("  [+] Readback path        orientation verified, Y-axis " +
+                         (flipped ? "FLIPPED (accounted for)" : "aligned"));
 
-            // --- KAYDIRMA VAKALARI ---
             Vector2Int[] cases =
             {
-                new(0, 0),          // birim: içerik hiç kaymamalı
+                new(0, 0),
                 new(7, 3),
                 new(-5, 11),
-                new(4, -4),         // Medium'da bir SnapStep = 4 teksel
-                new(Res, 0),        // tamamen dışarı: her teksel yeni şerit
-                new(-1200, 1200),   // iki eksende de dışarı
+                new(4, -4),
+                new(Res, 0),
+                new(-1200, 1200),
             };
 
             foreach (Vector2Int d in cases)
@@ -108,7 +97,6 @@ public static class SnowScrollTest
                 for (int ay = 0; ay < Res; ay++)
                 for (int ax = 0; ax < Res; ax++)
                 {
-                    // Dizi indeksinden GPU id'sine: çevrim ölçüldü, varsayılmadı.
                     int gy = flipped ? Res - 1 - ay : ay;
                     int sx = ax + d.x;
                     int sy = gy + d.y;
@@ -130,9 +118,9 @@ public static class SnowScrollTest
 
                 r.AppendLine("  [" + (pass ? "+" : "-") + "] delta " +
                     ("(" + d.x + ", " + d.y + ")").PadRight(16) +
-                    " uyuşmayan " + bad + " / " + (Res * Res) +
-                    "   yeni şerit " + edgeCount +
-                    (pass ? "" : "   MAKS HATA " + maxErr.ToString("F3")));
+                    " mismatched " + bad + " / " + (Res * Res) +
+                    "   new strip " + edgeCount +
+                    (pass ? "" : "   MAX ERROR " + maxErr.ToString("F3")));
             }
         }
         finally
@@ -144,8 +132,6 @@ public static class SnowScrollTest
         return all;
     }
 
-    /// Damgadan y yönünü ölçüyor. x hiç çevrilmez; çevrilmişse araç bozuktur ve
-    /// sınama durur — bozuk araçla kernel suçlamak bir tur yakar.
     static bool DetectOrientation(Color[] stamp, StringBuilder r, out bool flipped)
     {
         flipped = false;
@@ -155,9 +141,8 @@ public static class SnowScrollTest
 
         if (!guess && Mathf.Abs(g00) > 0.5f)
         {
-            r.AppendLine("  [-] Okuma yolu           damga bozuk: (0,0)'da G = " +
-                         g00.ToString("F3") + ", 0 ya da " + (Res - 1) + " olmalıydı. " +
-                         "ARAÇ GÜVENİLMEZ, kaydırma sınanmadı.");
+            r.AppendLine("  [-] Readback path corrupted: (0,0) G = " +
+                         g00.ToString("F3") + ", expected 0 or " + (Res - 1));
             return false;
         }
 
@@ -170,10 +155,9 @@ public static class SnowScrollTest
 
             if (Mathf.Abs(c.r - ex) > 0f || Mathf.Abs(c.g - ey) > 0f)
             {
-                r.AppendLine("  [-] Okuma yolu           damga (" + ax + "," + ay + ")'de " +
-                             "beklenen (" + ex + "," + ey + "), gelen (" +
-                             c.r.ToString("F3") + "," + c.g.ToString("F3") + "). " +
-                             "ARAÇ GÜVENİLMEZ, kaydırma sınanmadı.");
+                r.AppendLine("  [-] Readback mismatch at (" + ax + "," + ay + "): " +
+                             "expected (" + ex + "," + ey + "), got (" +
+                             c.r.ToString("F3") + "," + c.g.ToString("F3") + ")");
                 return false;
             }
         }
@@ -182,12 +166,10 @@ public static class SnowScrollTest
         return true;
     }
 
-    // -------------------------------------------------------------------- snap
-
     static bool SnapTests(StringBuilder r)
     {
         r.AppendLine();
-        r.AppendLine("## SnapToTexelGrid — kesirli snap var mı");
+        r.AppendLine("## SnapToTexelGrid — Texel Grid Snapping");
 
         bool all = true;
 
@@ -198,24 +180,16 @@ public static class SnowScrollTest
             float ratio = q.SnapStep / texel;
             float err = Mathf.Abs(ratio - q.ScrollTexels);
 
-            // Bir SnapStep tam sayı teksele denk gelmezse merkez teksel altı
-            // titrer; belirtisi izlerin kayması olur (spec §6.4).
-            //
-            // FLOAT ORANI TAM SAYI HESABIYLA KARŞILAŞTIRILIYOR. Spec'in ilk
-            // hâli float'ı üç haneye yuvarlayıp "tam" demişti; gerçek oran
-            // 4.0078'di ve hata orada saklandı.
             bool pass = err < 1e-4f;
             all &= pass;
 
             r.AppendLine("  [" + (pass ? "+" : "-") + "] " + p.ToString().PadRight(8) +
-                " teksel " + (texel * 100f).ToString("F4") + " cm   " +
-                "SnapStep / teksel = " + ratio.ToString("F6") +
-                "   tam sayı hesabı " + q.ScrollTexels +
-                (pass ? "  (uyuyor)" : "  AYRIŞMA — snap bozuk"));
+                " texel " + (texel * 100f).ToString("F4") + " cm   " +
+                "SnapStep / texel = " + ratio.ToString("F6") +
+                "   integer calc " + q.ScrollTexels +
+                (pass ? "  (matched)" : "  MISMATCH — snap broken"));
         }
 
-        // Gerçek dünya süpürmesi: sahnedeki koordinat mertebesinde (~-7500 m)
-        // büyük sayı hassasiyeti snap'i bozuyor mu.
         SnowQualityData med = SnowQuality.Get(SnowQualityPreset.Medium);
         float t = med.AreaSize / med.Resolution;
 
@@ -241,22 +215,17 @@ public static class SnowScrollTest
         bool sweepPass = maxDev < t * 0.5f && backwards == 0;
         all &= sweepPass;
 
-        r.AppendLine("  [" + (sweepPass ? "+" : "-") + "] Süpürme  x = -7494 → -7474, " +
-            steps + " adım   maks sapma " + (maxDev * 1000f).ToString("F4") + " mm " +
-            "(sınır " + (t * 500f).ToString("F3") + " mm)   geri sıçrama " + backwards);
+        r.AppendLine("  [" + (sweepPass ? "+" : "-") + "] Sweep x = -7494 -> -7474, " +
+            steps + " steps   max deviation " + (maxDev * 1000f).ToString("F4") + " mm " +
+            "(limit " + (t * 500f).ToString("F3") + " mm)   backwards steps " + backwards);
 
         return all;
     }
 
-    // ---------------------------------------------------------------- sızıntı
-
-    /// Her RenderTexture alanı OnDisable'da bırakılıyor mu. Yeni bir doku eklenip
-    /// bırakma unutulursa Play'den çıkışta sızıntı olur; belirtisi editörün
-    /// birkaç Play turundan sonra şişmesi, sebebi ise günler sonra aranır.
     static bool ReleaseTest(StringBuilder r)
     {
         r.AppendLine();
-        r.AppendLine("## SnowManager — her doku bırakılıyor mu");
+        r.AppendLine("## SnowManager — Resource Release Check");
 
         string src = System.IO.File.ReadAllText(ManagerPath);
 
@@ -278,13 +247,11 @@ public static class SnowScrollTest
             if (!released.Contains(n)) { all = false; missing.Append(' ').Append(n); }
 
         r.AppendLine("  [" + (all ? "+" : "-") + "] " + declared.Count +
-            " RenderTexture alanı, " + released.Count + " bırakma" +
-            (all ? "" : "   BIRAKILMAYAN:" + missing));
+            " RenderTexture fields, " + released.Count + " released" +
+            (all ? "" : "   LEAKED:" + missing));
 
         return all;
     }
-
-    // ------------------------------------------------------------------ yardım
 
     static RenderTexture NewRT(int res)
     {
@@ -309,8 +276,6 @@ public static class SnowScrollTest
         rt = null;
     }
 
-    /// RGBAFloat + linear: yarım kayan noktadaki tam sayılar (≤ 2048) birebir
-    /// geliyor, gama dönüşümü araya girmiyor.
     static Color[] Read(RenderTexture rt)
     {
         RenderTexture prev = RenderTexture.active;

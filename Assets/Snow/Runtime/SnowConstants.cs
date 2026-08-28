@@ -1,261 +1,220 @@
 using UnityEngine;
-// ROL: kar sisteminin FİZİKSEL sabitleri. Sanatsal ayarlar burada değil,
-// SnowSettings ScriptableObject'inde (spec §0.10).
-// Çağıran: bütün kar bileşenleri; SnowConstantsTest bu değerlerin
-// SnowConstants.hlsl ile birebir aynı olduğunu doğrular.
 
-/// SABİTLER İKİ YERDE YAŞIYOR ve birebir aynı olmak zorunda: burası CPU tarafı,
-/// `Shaders/SnowConstants.hlsl` GPU tarafı. Tek yerde tutmanın yolu yok — HLSL
-/// C# okuyamıyor, C# de `#define` göremiyor. Ayrışma sessizdir: simülasyon
-/// GPU'da bir eşikle, CPU'daki karar başka bir eşikle çalışır ve belirti
-/// "bazen oluyor bazen olmuyor" olur.
-///
-/// `SnowConstantsTest` her ikisini de metin olarak okuyup karşılaştırıyor.
-/// Yeni bir sabit eklenince İKİSİNE de eklenecek, yoksa test kırmızı yanar.
+/// PHYSICAL constants for the snow system (spec §0.10). Artistic settings live in SnowSettings.
+/// CPU mirror of `Shaders/SnowConstants.hlsl`. Verified for parity by `SnowConstantsTest`.
 public static class SnowConstants
 {
-    // --- Yoğunluk (spec §6.3) ---
+    // --- Density (spec §6.3) ---
 
-    /// Taze toz kar, kg/m³.
+    /// Fresh powder snow, kg/m³.
     public const float RhoMin = 50f;
 
-    /// Çiğnenmiş, buzlu kar, kg/m³.
+    /// Packed, icy snow, kg/m³.
     public const float RhoMax = 550f;
 
-    /// Suyun yoğunluğu, kg/m³. SWE → derinlik dönüşümünün çarpanı.
+    /// Water density, kg/m³. SWE -> depth conversion multiplier.
     public const float RhoWater = 1000f;
 
-    // --- Bölge takibi (spec §6.4) ---
+    // --- Active region tracking (spec §6.4) ---
 
-    /// Bölge merkezi kaç quad'lık adımlarla yer değiştiriyor.
-    ///
-    /// SNAP ADIMI SABİT DEĞİL, TÜRETİLMİŞ: `SnowQualityData.SnapStep` =
-    /// `QuadSize × SnapQuads`. Sabit yazılırsa preset değiştiğinde quad boyu
-    /// kayar ama adım kalır, oran bozulur ve izler teksel altı titrer (§22).
-    ///
-    /// 2 katsayısı doğruluk için gerekli değil; `1 × quadSize` de geçerli.
-    /// RT kaydırma sıklığını yarıya indirdiği için 2 seçilmiş.
+    /// Snap step in quad units for active region center.
     public const float SnapQuads = 2f;
 
-    /// `SnapQuads`'ın tam sayı hâli. `ScrollTexels` float'a hiç uğramadan
-    /// hesaplansın diye ayrı duruyor.
+    /// Integer version of `SnapQuads` for direct texel scroll math.
     public const int SnapQuadsInt = 2;
 
-    /// Kenar sönümünün başladığı normalize kenar uzaklığı (spec §8.3).
-    /// 24 m alanın dış 2 metresi: 1 − 2×2/24 = 0.833.
+    /// Normalized distance from center where edge fade begins (spec §8.3).
     public const float EdgeFadeStart = 0.833f;
 
-    // --- Kar / arazi çakışması (spec §8.1) ---
+    // --- Snow / terrain intersection (spec §8.1) ---
 
-    /// Bu derinliğin altındaki kar hiç çizilmiyor, metre. Z-fighting'i tamamen
-    /// kaldırıyor ve karın araziye kaybolarak karışmasını sağlıyor.
+    /// Snow below this depth is clipped to eliminate z-fighting, meters.
     public const float MinVisibleHeight = 0.004f;
 
-    /// Kenar geçiş bandı, metre. `SnowConstants.hlsl`'in
-    /// `SNOW_EDGE_FADE_RANGE`'i ve `SnowLit.shader`'ın `_SnowEdgeFadeRange`'i
-    /// ile AYNI olmak zorunda: üçü de "kar ne zaman görünür olur" sorusunu
-    /// cevaplıyor. Ayrışırlarsa arazi, mesh ve nesneler farklı anlarda
-    /// beyazlar.
+    /// Edge fade transition range, meters.
     public const float EdgeFadeRange = 0.006f;
 
-    // --- İz oluşumu (spec §10.1) ---
+    // --- Deformation & compaction (spec §10.1) ---
 
-    /// Gevşek karın normalize yoğunluğu.
+    /// Normalized density of loose snow.
     public const float LooseN = 0.10f;
 
-    /// Sıkışmış (patika) karın normalize yoğunluğu.
+    /// Normalized density of packed snow.
     public const float PackedN = 0.55f;
 
-    /// Tam sıkışmış karda batmanın kaç katına indiği. Taze karda 1.0, patikada bu.
+    /// Sink scale on fully packed snow.
     public const float PackedSinkScale = 0.18f;
 
-    // --- Kenar yığılması (spec §10.2) ---
+    // --- Rim displacement (spec §10.2) ---
 
-    /// Sırt hesabında hız yönünde kaydırma, saniye.
+    /// Offset along velocity direction for rim calculation, seconds.
     public const float RimVelocityBias = 0.04f;
 
-    /// Sırt yüksekliğinin ölçekleneceği referans kar derinliği, metre.
+    /// Reference snow depth for rim height scaling, meters.
     public const float RimRefDepth = 0.25f;
 
-    /// Sırt blur'unun yarıçapı, teksel. Büyütülürse sırt izden uzaklaşıp yüzer.
+    /// Rim blur radius, texels.
     public const float RimBlurTexels = 7f;
 
-    // --- İzlerin dolması (spec §10.3) ---
+    // --- Trail infill (spec §10.3) ---
 
-    /// SU EŞDEĞERİNDEN KAR DERİNLİĞİNE. Sabit bir katsayı yok: `ρ_su / ρ_kar`,
-    /// yani yerel yoğunluğa bağlı (taze karda ≈ 18). Bir dönem 900 yazılıydı
-    /// ve ~50 kat hızlı dolduruyordu; iz saniyeler içinde daralıyordu.
+    /// SWE to snow depth conversion gain: `rho_water / rho_snow`.
     public static float FillGain(float rhoKar) => SnowConstants.RhoWater / Mathf.Max(rhoKar, 1f);
 
-    /// 4 m/s üstündeki her m/s'nin doldurma hızına eklediği, m/s.
+    /// Additional infill rate per m/s of wind above 4 m/s, m/s.
     public const float WindFill = 0.0012f;
 
-    /// Duruş açısı gevşemesinin kare başına geçiş sayısı. Koni geçiş başına
-    /// bir teksel yayılıyor. Duruş yüksekliği 6 cm'den 1.5 cm'ye indirilince
-    /// omuz 0.5 tekselden 3 tekselden geniş bir yamaca döndü; 3 geçiş omzun
-    /// tam eninde kalıyordu ve yürürken kenar arkada kalıyordu. Sonuç
-    /// idempotent — sayı görünümü değil yalnız yakınsama hızını değiştiriyor.
+    /// Angle of repose relaxation iterations per frame.
     public const int ReposeIterations = 10;
 
-    // --- Birikme, oturma, erime (spec §11) ---
+    // --- Accumulation, settling, melting (spec §11) ---
 
-    /// Oturmanın zaman sabiti, saniye (6 saat).
+    /// Snow settling time constant, seconds (6 hours).
     public const float SettleTau = 21600f;
 
-    /// Tazelik kanalının sönüm zaman sabiti, saniye.
+    /// Disturbance decay time constant, seconds.
     public const float DisturbTau = 900f;
 
-    /// Derece-gün erime katsayısı, m/(°C·s). 4 mm/(°C·gün) — standart kar DDF'i.
+    /// Degree-day melt factor, m/(°C·s) (4 mm/(°C·day)).
     public const float MeltDdf = 4.63e-8f;
 
-    /// Rüzgâr yönlü yeniden dağıtımın şiddeti.
+    /// Wind-directed redistribution bias.
     public const float DriftBias = 0.45f;
 
-    /// Yağmur karın üstüne yağarken erimenin kaç katına çıktığı.
+    /// Melt acceleration factor during rain-on-snow events.
     public const float RainMeltBoost = 2.5f;
 
-    /// SWE'nin tavanı, metre.
+    /// Maximum SWE ceiling, meters.
     public const float SweMax = 0.60f;
 
-    // --- Yağış (spec §3.4, §17.2) ---
+    // --- Precipitation (spec §3.4, §17.2) ---
 
-    /// Tam şiddette yağışın SWE hızı, m/s (5 mm/saat).
+    /// Peak precipitation SWE rate, m/s (5 mm/hr).
     public const float MaxSweRate = 1.39e-6f;
 
-    /// Tam şiddette saniyedeki tane doğum hızı.
+    /// Peak snowfall flake spawn rate, flakes/second.
     public const float MaxFlakeRate = 16000f;
 
-    // --- Gökyüzü görünürlüğü (spec §12.1) ---
+    // --- Sky visibility (spec §12.1) ---
 
-    /// Gökyüzü haritasının kapsadığı alan, metre.
+    /// Sky visibility coverage area, meters.
     public const float SkyAreaSize = 96f;
 
-    /// Harita bu kadar kayınca yenileniyor, metre. Her frame değil.
+    /// Movement threshold before refreshing sky map, meters.
     public const float SkyMoveThreshold = 4f;
 
-    // --- Rüzgâr taşınımı (spec §18.0, §18.1) ---
+    // --- Wind transport (spec §18.0, §18.1) ---
 
-    /// Rüzgâr-etki yüzeyinin düşey ivmesi, m/s². Cordonnier ve ark., EG 2018.
+    /// Vertical acceleration of wind-influence surface, m/s².
     public const float WindShadowC = 0.7f;
 
-    /// Aşınma hızı, m/(s·s). Makaledeki 0.1 m/(s·gün)'ün saniyeye çevrilmişi.
+    /// Surface erosion rate, m/(s·s).
     public const float ErosionRate = 1.16e-6f;
 
-    /// Gevşek kar için savrulma eşiği, 10 m'deki rüzgâr hızı (m/s). PBSM varsayılanı.
+    /// Threshold wind speed at 10 m for loose snow drift, m/s.
     public const float DriftU10Loose = 5f;
 
-    /// Sıkışmış kar için savrulma eşiği, m/s. Li & Pomeroy 1997 üst sınırı.
+    /// Threshold wind speed at 10 m for packed snow drift, m/s.
     public const float DriftU10Packed = 11f;
 
-    // --- Isı kaynakları (spec §18.2) ---
+    // --- Heat sources (spec §18.2) ---
 
-    /// Aynı anda hesaba katılan en fazla ısı kaynağı. Uniform dizi boyutu.
+    /// Maximum simultaneous heat sources.
     public const int MaxHeatSources = 16;
 
-    /// Isı alanının SWE'yi eritme hızı, m SWE / (m θ · s).
+    /// Heat field melt rate, m SWE / (m theta · s).
     public const float HeatMeltRate = 0.0009f;
 
-    /// Isı alanının ıslaklığı artırma hızı, 1 / (m θ · s).
+    /// Heat field wetness rate, 1 / (m theta · s).
     public const float HeatWetRate = 0.25f;
 
-    // --- Kabuk (spec §18.3) ---
+    // --- Crust (spec §18.3) ---
 
-    /// Karın çok dengesizleştiği sıcaklık, °C.
+    /// Temperature above which snow destabilizes, °C.
     public const float TWarm = 5f;
 
-    /// Erime-donma çimentolanmasının en hızlı olduğu sıcaklık, °C.
+    /// Optimal melt-freeze crust formation temperature, °C.
     public const float TCool = -5f;
 
-    /// Karın yalnız kendi ağırlığıyla sıkıştığı sıcaklık, °C.
+    /// Temperature threshold for dry settling under self-weight, °C.
     public const float TFreeze = -20f;
 
-    /// Kabuğun büyüme hızı, 1/s.
+    /// Crust growth rate, 1/s.
     public const float CrustGain = 1.4e-4f;
 
-    /// Rüzgâr levhasının kabuğa katkısı, 1/s.
+    /// Wind slab contribution to crust growth, 1/s.
     public const float CrustWindGain = 6.0e-5f;
 
-    /// Sıcakta kabuğun erime zaman sabiti, saniye.
+    /// Crust thermal degradation time constant, seconds.
     public const float CrustMeltTau = 1200f;
 
-    /// Taze karın kabuğu örtme katsayısı.
+    /// Fresh snow burial coefficient for crust.
     public const float CrustBury = 220f;
 
-    /// Bu değerin üstündeki kabuk sağlam sayılıyor.
+    /// Crust threshold value for load-bearing surface.
     public const float CrustSolid = 0.55f;
 
-    /// Bu batmanın üstünde kabuk kırılıyor, metre.
+    /// Sink penetration depth triggering crust fracture, meters.
     public const float CrustBreakPen = 0.05f;
 
-    /// Sağlam kabuğun üstünde batmanın kaç katına indiği.
+    /// Sink scale on solid unbroken crust.
     public const float CrustSinkScale = 0.04f;
 
     // --- Sastrugi (spec §18.4) ---
 
-    /// Rüzgâr yönünün yumuşatma zaman sabiti, saniye. Ham yön gust'larla titrer.
+    /// Wind direction smoothing time constant, seconds.
     public const float SastrugiWindTau = 120f;
 
-    // --- İz içi AO (spec §18.5) ---
+    // --- Suspension curtains (spec §18.7) ---
 
-    // --- Süspansiyon perdeleri (spec §18.7) ---
-
-    /// Süspansiyon katmanının ölçek yüksekliği, metre.
+    /// Suspension layer scale height, meters.
     public const float SuspScaleH = 1.1f;
 
-    /// Perde alfasının tabanı.
+    /// Base opacity for suspension curtains.
     public const float SuspAlphaBase = 0.16f;
 
-    /// Süspansiyonun üst sınırı, metre. PBSM.
+    /// Maximum suspension layer ceiling, meters.
     public const float SuspMaxHeight = 5f;
 
-    // --- Püskürtme (spec §18.6) ---
+    // --- Spray (spec §18.6) ---
 
-    /// Yerinden edilen metreküp başına parçacık sayısı.
+    /// Particle count spawned per displaced cubic meter of snow.
     public const float SprayParticlesPerM3 = 40000f;
 
-    // --- Hesaplama (spec §20) ---
+    // --- Compute (spec §20) ---
 
-    /// Compute thread group boyutu. Her zaman 8×8×1.
+    /// Compute shader thread group dimension (8x8x1).
     public const int GroupSize = 8;
 
-    /// Mesh'in düşey sınır payı, metre (spec §8.2).
-    ///
-    /// Yer değiştirme köşe shader'ında olduğu için CPU sınırları bilmiyor.
-    /// Dar bırakılırsa kar, kamera açısına göre eleniyor (§22).
+    /// Vertical bounds margin for snow mesh, meters (spec §8.2).
     public const float MeshBoundsHeight = 600f;
 
-    // --- Kar yüzeyi geometrisi ---
-    //
-    // BU BLOK HLSL'İN İKİZİ. `SnowSurfaceHeight` bu sabitleri okuyup
-    // `SnowYuzeyRolyef`'in aynısını CPU'da hesaplıyor; fizik ve görsel aynı
-    // yüzeyi görmek zorunda. Eşliği `SnowConstantsTest` sınıyor — bir sayı
-    // tek tarafta değişirse test kırmızı verir.
+    // --- Snow surface micro-relief geometry ---
 
-    /// Terrain köşe aralığı, metre. Arazi 30000 m / heightmap 4097.
+    /// Terrain vertex spacing, meters (30000 m / 4097).
     public const float TerrainVertexSpacing = 7.32f;
 
-    /// Geometriye giren en kısa dalga boyu, metre.
-    public const float TessMinDalga = 0.50f;
+    /// Minimum geometric wavelength allowed into tessellation, meters.
+    public const float TessMinWavelength = 0.50f;
 
-    /// Yer şeklinin kar tabakasının kaçta kaçına kadar inebileceği.
+    /// Fraction of snow depth subject to bedform relief modulation.
     public const float BedformDepthFrac = 0.60f;
 
-    /// fBm tabanı: genlik (m), ilk oktavın frekansı, oktavlar arası oran.
+    /// fBm micro-relief parameters: amplitude (m), base frequency, octave gain.
     public const float FbmAmp = 0.015f;
     public const float FbmScale = 0.80f;
     public const float FbmGain = 0.574f;
 
-    /// Ripple: yarı genlik (m) ve dalga boyu (m), rüzgâra dik sırtlar.
+    /// Ripples: half-amplitude (m) and wavelength (m) transverse to wind.
     public const float RippleAmp = 0.006f;
     public const float RippleLength = 0.17f;
 
-    /// Sastrugi: tepe-dip yükseklik (m), rüzgâra dik aralık, rüzgâr yönünde
-    /// uzama. LENGTH rüzgâra DİK eksende, WIDTH rüzgâr yönünde.
+    /// Sastrugi: peak-to-trough height (m), transverse spacing, longitudinal span.
     public const float SastrugiHeight = 0.20f;
     public const float SastrugiLength = 0.90f;
     public const float SastrugiWidth = 2.20f;
 
-    /// Drift: birikme tepecikleri. Aynı eksen kuralı sastrugi'deki gibi.
+    /// Drifts: relief height (m), transverse spacing, longitudinal span.
     public const float DriftHeight = 0.15f;
     public const float DriftLength = 0.90f;
     public const float DriftWidth = 1.60f;
