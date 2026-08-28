@@ -94,22 +94,20 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ## Bekleyen kararlar
 
-- **İngilizceye çeviri YARIM — 60 dosya, 5705 satır kaldı** (2026-08-27'de duraklatıldı).
-  `Assets/Scripts`, `Assets/Shaders`, `Assets/VolumetricClouds`, `Assets/Sea` bitti ve
-  sıfır Türkçe satır taşıyor. Kalan: `Assets/Editor` 2282 satır (en büyükleri
-  `MountainBuilderWindow` 540, `MountainSceneBootstrap` 428), `Assets/Snow` 3423 satır
-  (`SnowSim.compute` 377, `SnowManager` 370, `SnowVfxBuilder` 293,
-  `SnowConstants.hlsl` 289, `SnowRelief.hlsl` 235).
+- **Türkçe TANIMLAYICILAR duruyor — yorumlar bitti** (yorum tarafı 2026-08-28'de
+  kapandı: `Assets` altında sıfır Türkçe diakritik satırı). Kalan 15 tanımlayıcı:
 
-  **Ayrı ve SON adım: Türkçe tanımlayıcılar.** `SNOW_SURF_EGIM_TAVANI`,
-  `SnowYuzeyRolyef`, `SnowOktavAgirligiKipli`, `izDerinlik` gibi adlar duruyor.
-  Dosya dosya değil TEK kelime-sınırlı yeniden adlandırma turuyla yapılacak: çevrilmiş
-  yorumlar hâlâ eski adlarla atıfta bulunuyor, ikisi aynı anda düzelmezse belge koda
-  yalan söyler.
+  `SnowTessYerDegistirme`, `Yerlestir`, `karIsik`, `uzunlukKare`, `wYerlesmis`,
+  `rhoKar`, `rhoYerel`, `kuyrukGurultu`, `[Header("Dalgalanma")]`, ve
+  `surfYerlesmisColor/Normal/Rough` + bunların `SurfYerlesmis*` property'leri ve
+  `_SnowSurfYerlesmis*` shader adları.
 
-  Araç zinciri hazır (oturum scratchpad'i): blok çıkarıcı, yamacı, kod satırı koruması,
-  kesik-yorum taraması. Çeviri sırasında ÖLÜ yorum bulunursa çevrilmez, silinir —
-  bu turda savrulan kar sökülünce kalan yedi öksüz blok böyle temizlendi.
+  **Üçü SERİLEŞTİRİLMİŞ ALAN.** `surfYerlesmisColor/Normal/Rough` değerleri
+  `SnowSettings.asset`'te YAML anahtarı olarak duruyor; düz yeniden adlandırma üç doku
+  referansını sessizce düşürür. Ya `[FormerlySerializedAs]` eklenecek ya da asset'in
+  YAML anahtarları aynı adımda değiştirilecek. `_SnowSurfYerlesmis*` shader adları da
+  `SnowManager` ile birlikte değişmeli — biri değişip öteki kalırsa doku bağlanmaz ve
+  hata çıkmaz, yüzey sessizce yanlış çizilir.
 
 - **Kar sisteminin kullanıcı tarafı beş iş** — kod tarafı bitti, bunlar
   sahne/prefab kararı ve spec §1.4 gereği ayrı ayrı onaya tabi:
