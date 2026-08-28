@@ -32,14 +32,14 @@ MonoBehaviour:
   choppinessWindFull: 15
   choppinessPerTier: {x: 1, y: 0.85, z: 0.45}
   maxShoalingGain: 2.2
-  runupMaxDepth: 0.45
+  runupMaxDepth: 1.1
   extinctionRgb: {x: 0.3, y: 0.08, z: 0.05}
-  upwellingColor: {r: 0, g: 0.2, b: 0.3, a: 1}
+  upwellingColor: {r: 0.03, g: 0.11, b: 0.14, a: 1}
   refractionStrength: 0.35
   roughnessCalm: 0.02
   roughnessRough: 0.14
-  shoreFoamDepth: 1.2
-  foamColor: {r: 0.92, g: 0.94, b: 0.95, a: 1}
+  shoreFoamDepth: 0.6
+  foamColor: {r: 0.78, g: 0.8, b: 0.82, a: 1}
   foamRoughness: 0.85
   foamTiling: 0.8
   foamBreakupTiling: 0.35

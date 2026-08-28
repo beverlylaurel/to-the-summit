@@ -485,6 +485,30 @@ MountainSurface BuildMountainSurface(float3 worldPos)
                                     _SeaWetLevelY, worldPos.y);
     albedo = lerp(albedo, albedo * _SeaWetDarkening, seaWet);
 
+    // --- The swash lace, on the sand ---
+    //
+    // THE WATERLINE ENDED ON A DRAWN LINE. The sea mesh is clipped at depth 0,
+    // so the foam stops at a geometric edge and meets dry sand there: white on
+    // one side, dark on the other, with nothing in between. A real swash does
+    // not end at the still waterline — it runs up the beach and leaves a lace
+    // that thins as it drains.
+    //
+    // The terrain draws that part. It is not a second source: the sea publishes
+    // the run-up level (`_SeaWetLevelY` already carries the phase) and the sand
+    // draws the residue below it. The noise eats the coverage from underneath,
+    // so the lace breaks into patches instead of ending on an edge of its own.
+    float laceBand = 1.0 - smoothstep(_SeaWetLevelY - _SeaWetFadeM * 0.7,
+                                      _SeaWetLevelY, worldPos.y);
+
+    float laceNoise = MountainFbm(worldPos * 0.75, 3)
+                    + MountainFbm(worldPos * 3.1, 2) * 0.5;
+
+    float lace = saturate((laceBand - (1.25 - laceNoise) * 0.7) * 2.2);
+
+    // Foam is a scattering surface: it takes the light but shows none of the
+    // sand under it. The colour is the sea's foam colour, kept off-white.
+    albedo = lerp(albedo, float3(0.78, 0.80, 0.82), lace * 0.6);
+
     // --- Bump noise: the raw material of the procedural normal; without it the surface
     //     looks like plastic. Its value goes to the snow's micro placement and its gradient
     //     to the shading — two consumers, one sample ---

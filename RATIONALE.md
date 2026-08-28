@@ -2315,3 +2315,61 @@ yüzden suyun o noktadan çekildiği faz bir `acos` ile çıkıyor.
 
 Bedeli bir `acos` ve bir `exp`. Kazanç: kamera-göreli bir RT, yeniden izdüşüm
 ve kare kare sönüm dispatch'i yok.
+
+
+## Köpük kâğıt gibiydi: HDR ışıkla çarpılıp beyaza kırpılıyordu
+
+Kullanıcının ifadesi: "deniz köpüğü çok yoğun, aşırı yoğun, çok fazla beyazlık var
+ve köpük gibi değil", "köpükte tuhaf desenler var".
+
+Köpüğün ışığı şöyleydi:
+
+    foamLight = gunesRengi * (NoL + spec*0.25) + skyRefl * 0.35
+    renk      = foamColor * foamLight
+
+`skyRefl` ortam probe'undan geliyor ve HDR: parlak gökte üç kanalda da 1'in belirgin
+üstünde. 0.93'lük bir köpük rengiyle çarpılınca sonuç her kanalda taşıyor, ton eşleme
+saf beyaza kırpıyor. **Köpüğün içindeki her kabarcık, her kenar, her gradyan orada
+düzleşiyor.** "Kâğıt gibi" tam olarak bu; ve köpüğü artırmak yalnızca daha çok beyaz
+üretiyordu, çünkü zaten doymuştu.
+
+Köpük artık herhangi bir difüz yüzey gibi ışıklanıyor — gökyüzü ışınım olarak
+(`SampleSH`), toplam albedodan ÖNCE 1'e kırpılıyor. Renk de 0.93'ten 0.78'e indi:
+deniz köpüğü kâğıt beyazı değildir.
+
+Kaplama tarafında üç düzeltme:
+- Kabarcık gürültüsü kaplamayı yiyordu ama arkasından gelen `× 1.4` yediğini geri
+  koyuyordu — desen yine kapanıp levhaya dönüyordu. Çarpan kalktı, delikler açık kaldı.
+- Kırılma kazancı 1.60 → 0.85.
+- Kıyı bandı 1.2 m derinlikti; 2.14°'lik bu kıyıda o **32 metrelik** bir beyaz şerit
+  demek. 0.6 m'ye indi.
+- Köpük hiçbir zaman tam opak değil (0.92 → 0.80): gerçek köpüğün altından su görünür.
+
+## Köpükteki tuhaf desenler: kıvrım yönü düz suda gürültüydü
+
+Köpük deseni `foldDir`'e göre döndürülüp geriliyordu (`atan2(foldDir)`). `foldDir`
+türev dokusunun zw kanalı; **neredeyse düz bir denizde o değer sayısal gürültü.**
+Sonuç piksel başına FARKLI bir dönme, yani dalgalarla hiç ilgisi olmayan sürtme
+lekeleri.
+
+Kıvrımın büyüklüğü ölçülüyor artık: zayıfsa eksen rüzgâr yönüne düşüyor — gerçek
+köpük şeritlerinin dizildiği yön zaten odur.
+
+## Kıyı çizgisi çizilmiş bir çizgide bitiyordu
+
+Deniz mesh'i `depth <= 0`'da kesiliyor. Köpük o geometrik kenarda tam parlaklıkta
+bitiyor ve karşısında kuru kum başlıyor: bir yanda beyaz, öbür yanda koyu, arada
+hiçbir şey yok.
+
+Gerçek kabarma durgun su çizgisinde bitmez — kumsala çıkar ve çekilirken incelen bir
+dantel bırakır. O kısmı **arazi** çiziyor artık. İkinci kaynak değil: deniz zaten
+kabarma kotunu yayınlıyor (`_SeaWetLevelY` fazı taşıyor), kum da onun altına kalıntıyı
+çiziyor. Gürültü kaplamayı alttan yiyor, böylece dantel kendi kenarında bitmiyor.
+
+`runupMaxDepth` 0.45 → 1.1 m: ıslak şerit de kumsalda yukarı çıkıyor.
+
+## Denizin rengi: kırmızısı sıfır olan bir turkuaz
+
+`upwellingColor` `(0, 0.2, 0.3)` idi. Kırmızı kanalı TAM SIFIR olan bir su, hangi ışık
+altında olursa olsun havuz turkuazı verir — gerçek deniz suyunun geri saçtığı ışıkta
+az da olsa kırmızı vardır ve seviye çok daha düşüktür. `(0.03, 0.11, 0.14)`.

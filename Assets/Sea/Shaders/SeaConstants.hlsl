@@ -59,7 +59,7 @@
 #define SEA_GAMMA_STEEP          1.10
 
 /// Foam gain produced by breaking. [CALIBRATION]
-#define SEA_BREAK_FOAM_GAIN      1.60
+#define SEA_BREAK_FOAM_GAIN      0.85
 
 // --- Foam (Jacobian) ---
 

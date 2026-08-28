@@ -55,7 +55,7 @@ public static class SeaConstants
     public const float GammaSteep = 1.10f;
 
     /// Foam gain produced by breaking. [CALIBRATION]
-    public const float BreakFoamGain = 1.60f;
+    public const float BreakFoamGain = 0.85f;
 
     // --- Foam (Jacobian) ---
 

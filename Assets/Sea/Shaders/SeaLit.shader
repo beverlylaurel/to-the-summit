@@ -320,9 +320,20 @@ Shader "ToTheSummit/SeaLit"
                 #if defined(_SEA_QUALITY_LOW)
                     float2 foamUV = IN.positionWS.xz * _SeaFoamTiling;
                 #else
-                    float angle = atan2(foldDir.y, foldDir.x);
-                    float sn, cs; sincos(angle, sn, cs);
-                    float2x2 rot = float2x2(cs, -sn, sn, cs);
+                    // THE FOLD DIRECTION IS ONLY TRUSTED WHERE THERE IS A FOLD.
+                    //
+                    // `foldDir` is the derivative texture's zw; on a nearly flat sea
+                    // it is numerical noise, so `atan2` gave a DIFFERENT rotation per
+                    // pixel and the stretched pattern smeared into streaks that had
+                    // nothing to do with the waves. In calm water the fold falls back
+                    // to the wind axis, which is the direction real streaks line up on.
+                    float foldLen = length(foldDir);
+                    float2 axis = foldLen > 1e-3 ? foldDir / foldLen
+                                                 : normalize(_SeaWindWS.xy + float2(1e-4, 0.0));
+                    axis = normalize(lerp(normalize(_SeaWindWS.xy + float2(1e-4, 0.0)),
+                                          axis, saturate(foldLen * 40.0)));
+
+                    float2x2 rot = float2x2(axis.x, -axis.y, axis.y, axis.x);
 
                     float2 foamUV = mul(rot, IN.positionWS.xz * _SeaFoamTiling);
                     foamUV.x *= 0.35;
@@ -333,8 +344,10 @@ Shader "ToTheSummit/SeaLit"
                     // dimmed it; the foam still read as one solid sheet. It
                     // now EATS INTO the coverage from below, so the pattern
                     // has holes and the foam breaks into clumps.
+                    // The `* 1.4` that used to be here put back everything the bubbles
+                    // ate and the foam closed into a sheet again. The holes stay open now.
                     float bubbles = SeaFoamBubbles(foamUV);
-                    whitecap = saturate((whitecap - (1.0 - bubbles) * 0.35) * 1.4);
+                    whitecap = saturate(whitecap - (1.0 - bubbles) * 0.55);
 
                     // 2. BREAKING FOAM (spec 8.3). When the ratio of wave
                     //    height to water depth exceeds the breaker index the
@@ -448,14 +461,28 @@ Shader "ToTheSummit/SeaLit"
                 float fd  = (NoH * fa2 - NoH) * NoH + 1.0;
                 float foamSpec = fa2 / (PI * fd * fd + 1e-7) * NoL;
 
-                float3 foamLight = mainLight.color * (NoL + foamSpec * 0.25)
-                                 + skyRefl * 0.35;
+                // FOAM IS LIT LIKE A DIFFUSE SURFACE AND IT CANNOT EXCEED WHITE.
+                //
+                // It used to be `foamColor * (sunColor * NoL + skyRefl * 0.35)`, and
+                // `skyRefl` is the environment probe — an HDR quantity that goes well
+                // above 1 on a bright sky. Multiplied by a 0.93 foam colour the result
+                // came out over 1 in every channel: the foam clipped to pure white and
+                // every bubble, every edge and every gradient inside it was crushed
+                // flat. That is the "paper" look, and it is why more foam only ever
+                // looked like more white.
+                //
+                // The sky now enters as irradiance (`SampleSH`), the way it does for
+                // any other diffuse surface, and the sum is clamped before the albedo.
+                float3 foamIrradiance = mainLight.color * NoL * mainLight.shadowAttenuation
+                                      + SampleSH(N);
+
+                float3 foamLight = min(foamIrradiance + foamSpec * 0.12, 1.0);
 
                 // THIN FOAM IS TRANSLUCENT. A linear blend made every trace of
                 // foam equally opaque, so the faint edges came out as solid
                 // white paper. Squaring the coverage lets thin foam show the
                 // water through it and keeps thick foam opaque.
-                float foamAlpha = foam * foam * (3.0 - 2.0 * foam) * 0.92;
+                float foamAlpha = foam * foam * (3.0 - 2.0 * foam) * 0.80;
                 color = lerp(color, _SeaFoamColor.rgb * foamLight, foamAlpha);
 
                 // FOG THROUGH URP'S OWN FUNCTION (spec 3.5). No fog
