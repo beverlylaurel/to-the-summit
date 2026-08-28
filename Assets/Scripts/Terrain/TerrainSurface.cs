@@ -12,6 +12,10 @@ public class TerrainSurface : MonoBehaviour
     [SerializeField] WindField wind;
     [SerializeField] TimeOfDay time;
 
+    /// THE ALPENGLOW HAS TO SEE THE WEATHER. Read for the coverage only; the terrain
+    /// writes nothing back. The reasoning is next to `ApplyAlpenglow`.
+    [SerializeField] AtmosphereController atmosphere;
+
     [SerializeField] Texture2D surfaceMaps;
     [Tooltip("How much the terrain speeds the wind up or slows it down. It is baked against "
              + "the prevailing wind direction; the wind shelter reads it.")]
@@ -144,7 +148,8 @@ public class TerrainSurface : MonoBehaviour
     }
 
     public void Bind(TerrainMaterialSettings source, WeatherState weatherState, WindField windField,
-        TimeOfDay timeOfDay, Texture2D maps, Texture2D windMap,
+        TimeOfDay timeOfDay, AtmosphereController atmosphereController,
+        Texture2D maps, Texture2D windMap,
         Texture2D normals, Texture2DArray horizonMap, Texture2D heightMap,
         Shader shader)
     {
@@ -152,6 +157,7 @@ public class TerrainSurface : MonoBehaviour
         weather = weatherState;
         wind = windField;
         time = timeOfDay;
+        atmosphere = atmosphereController;
         surfaceMaps = maps;
         windWeight = windMap;
         groundNormals = normals;
@@ -256,9 +262,27 @@ public class TerrainSurface : MonoBehaviour
         // left to light. The old −0.18 limit carried power through the night for nothing.
         float alive = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-0.05f, 0.05f, time.SunHeight));
 
+        // THE CLOUD COVER CUTS THE DIRECT PHASE.
+        //
+        // The strength used to be `horizon x alive x setting` with no weather term at all:
+        // at dawn IN A STORM the mountain face still burned red behind a thick cloud mass,
+        // while the fog palette in exactly the same state was deliberately going pale
+        // (`AtmosphereController`, `duskOvercast`). Two derivations of one sky contradicting
+        // each other — the thing `CLAUDE.md` forbids.
+        //
+        // IT IS NOT ZEROED. An alpenglow has two phases: the direct beam grazing the face,
+        // and the afterglow the face takes from a sky painted red. Cloud cover kills the
+        // first and only dims the second, so the floor stays well above zero.
+        //
+        // The coverage comes from the SAME place the sky, the fog and the clouds read
+        // (`AtmosphereController.Coverage`) — no second mapping.
+        float overcast = atmosphere != null ? Mathf.Clamp01(atmosphere.Coverage) : 0f;
+        float weatherGate = Mathf.Lerp(1f, 0.25f, overcast);
+
         material.SetColor(DawnColorId, time.CurrentSunColor);
         material.SetVector(DawnDirId, time.SunDirection);
-        material.SetFloat(DawnStrengthId, horizon * alive * settings.alpenglowStrength);
+        material.SetFloat(DawnStrengthId,
+            horizon * alive * weatherGate * settings.alpenglowStrength);
         material.SetFloat(AlpenglowFacingId, settings.alpenglowFacing);
     }
 

@@ -1337,6 +1337,7 @@ public static class MountainSceneBootstrap
             Object.FindAnyObjectByType<WeatherState>(),
             Object.FindAnyObjectByType<WindField>(),
             Object.FindAnyObjectByType<TimeOfDay>(),
+            Object.FindAnyObjectByType<AtmosphereController>(),
             maps,
             SurfaceMapBaker.LoadDrift(),
             SurfaceMapBaker.LoadNormals(),

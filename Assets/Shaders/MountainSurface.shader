@@ -35,7 +35,7 @@ Shader "ToTheSummit/MountainSurface"
 
             // THE TERRAIN'S SHADOW COMES FROM TWO SOURCES. The mountain's own ridges are
             // found by marching the height field (see TerrainSunShadow) — the shadow map
-            // does not carry that distance, it ends at fifty metres. But MOVING OBJECTS are
+            // does not carry that distance, it ends at 150 metres. But MOVING OBJECTS are
             // in the map: the bike, the player, later rocks and tents. As long as the map
             // was not read, none of them cast a shadow on the ground.
             // SNOW QUALITY TIER. `SnowManager.ApplyQualityKeyword` enabled the global
@@ -99,7 +99,6 @@ Shader "ToTheSummit/MountainSurface"
             {
                 float4 positionCS  : SV_POSITION;
                 float3 positionWS  : TEXCOORD0;
-                float  fogFactor   : TEXCOORD2;
             };
 
             Varyings VertexFromWS(float3 positionWS)
@@ -122,7 +121,6 @@ Shader "ToTheSummit/MountainSurface"
 
                 OUT.positionWS = positionWS;
                 OUT.positionCS = TransformWorldToHClip(positionWS);
-                OUT.fogFactor = ComputeFogFactor(OUT.positionCS.z);
 
                 return OUT;
             }
@@ -215,7 +213,8 @@ Shader "ToTheSummit/MountainSurface"
                 float3 shadingNormal = surface.normalWS;
                 inputData.normalWS = shadingNormal;
                 inputData.viewDirectionWS = GetWorldSpaceNormalizeViewDir(IN.positionWS);
-                inputData.fogCoord = IN.fogFactor;
+                // No `fogCoord`: only `MixFog` reads it and the scene has Unity's own fog
+                // switched off (`m_Fog: 0`). The terrain applies `ApplyHeightFog` itself.
                 inputData.bakedGI = SampleSH(shadingNormal);
                 inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(IN.positionCS);
                 inputData.shadowMask = half4(1, 1, 1, 1);

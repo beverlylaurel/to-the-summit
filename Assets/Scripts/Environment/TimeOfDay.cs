@@ -33,17 +33,30 @@ public class TimeOfDay : MonoBehaviour
     // Full compensation (0.29 0.42 1.00) removes the orange but pulls the overhead moon
     // toward violet. Halfway was chosen: the blue of the rising moon goes from 0.43 to 0.56
     // while the overhead moon does not cool too much.
-    [SerializeField] Color moonColor = new(0.52f, 0.64f, 1.00f);
+    //
+    // THE DEFAULT MATCHES THE SCENE. `MountainSceneBootstrap` writes this value too;
+    // the field default used to be (0.52, 0.64, 1.00) and the two silently diverged.
+    // The rule was already written down for `sunIntensity` and simply had not been
+    // applied to the moon.
+    [SerializeField] Color moonColor = new(0.586f, 0.653f, 0.818f);
     // 3.030782 is the sky package's calibration: 100000 lux of ground illuminance. The scene
     // setup writes it too, and the default was updated here so the two do not diverge.
     [SerializeField] float sunIntensity = 3.030782f;
     // While the ambient probe was frozen the night filled with a fake blue and the moon
     // looked unnecessary. Once the probe became honest the night fell to its real value and
     // the moon was left as the only source lighting the sky. The value was found by eye.
-    [SerializeField] float moonIntensity = 0.204f;
+    //
+    // THE DEFAULT MATCHES THE SCENE. It used to be 0.204 here while the setup script wrote
+    // 0.0199 — a factor of 10.25. The scene wins in practice, so nothing looked wrong; but
+    // a `TimeOfDay` dropped into a fresh scene, or one opened before the bootstrap ran, lit
+    // the night ten times too brightly. Same rule as `sunIntensity` above.
+    [SerializeField] float moonIntensity = 0.0199f;
 
-    [Tooltip("The moon's own directional light. It CASTS NO SHADOW: the sky package does not " +
-             "count a shadowless object as the main light and falls back to the sun, so the sky is always driven by the sun.")]
+    [Tooltip("The moon's own directional light. IT DOES CAST A SHADOW: at night the moon " +
+             "becomes the main light (`MarkAsSun`'s night handover) and the scene setup gives " +
+             "it soft shadows, so moonlight throws the mountain's shadow the way daylight does. " +
+             "The sky itself is still always driven by the sun — the package draws the moon " +
+             "separately, as a second celestial body.")]
     [SerializeField] Light moon;
 
     /// The sun's peak intensity. Because the sky package derives its own brightness from the
@@ -150,7 +163,6 @@ public class TimeOfDay : MonoBehaviour
     /// The sun's current color. Orange at dawn, close to white at the zenith.
     public Color CurrentSunColor { get; private set; } = Color.white;
 
-    public Color MoonTint => moonColor;
 
     /// The moon is opposite the sun. Only this component uses it: nothing is left to be read
     /// from outside, the moon's own light and celestial body data are driven from here.
@@ -338,8 +350,15 @@ public class TimeOfDay : MonoBehaviour
             // contrast blow-up came from.
             //
             // The BRIGHTEST CHANNEL is taken, not the luminance: `Tint()` normalizes the color
-            // by the same channel. That way `CurrentSunColor x intensity` stays equal to the
-            // real beam — color and intensity follow the same curve.
+            // by the same channel, so the color and the intensity follow the same curve.
+            //
+            // THE PRODUCT IS NOT THE RAW BEAM. `LowSunFade` is applied TWICE on purpose —
+            // once to the color (above) and once here to the intensity — so
+            // `CurrentSunColor x intensity` comes to `beam x sunFade^2`. The comment used to
+            // claim the two multiplied back to the real beam; they do not, and the squaring
+            // is deliberate: a low sun is dimmed once as a color decision and once as a light
+            // decision. The cloud side squares the same fade for the same reason
+            // (`AtmosphereController`, `cloudWarm *= cloudWarm`).
             float extinction = Mathf.Max(beam.x, Mathf.Max(beam.y, beam.z)) * sunFade;
             sun.intensity = sunIntensity * SunBlend(SunDirection.y) * extinction;
         }

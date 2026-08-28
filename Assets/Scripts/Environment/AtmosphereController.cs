@@ -55,7 +55,6 @@ public class AtmosphereController : MonoBehaviour
     static readonly int HeightFogSunColorId = Shader.PropertyToID("_HeightFogSunColor");
     static readonly int SunDirectionId = Shader.PropertyToID("_SunDirection");
     static readonly int SunColorId = Shader.PropertyToID("_SunColor");
-    static readonly int MoonColorId = Shader.PropertyToID("_MoonColor");
 
     static readonly int PlanetRadiusId = Shader.PropertyToID("_PlanetRadius");
 
@@ -446,10 +445,14 @@ public class AtmosphereController : MonoBehaviour
         // The sky gradient no longer goes to the material: the sky reads the same AirColor function
         // as the fog, and that function feeds from the _HeightFog* globals.
 
-        // The disc's colour is the same as the light's; as the cloud thickens the sun is veiled
+        // The disc's colour is the same as the light's; as the cloud thickens the sun is veiled.
+        //
+        // ONLY THE SUN NOW. The moon's veil colour was written here too, into a property the
+        // fallback sky no longer has: the fallback's moon disc and star field were cut because
+        // nothing ever fed `_MoonDirection` or `_StarStrength` (`DECISIONS.md`). Writing a
+        // colour to a property that does not exist is silent, which is exactly why it survived.
         float veil = 1f - coverage * 0.75f;
         skyMaterial.SetColor(SunColorId, time.CurrentSunColor * veil);
-        skyMaterial.SetColor(MoonColorId, time.MoonTint * veil);
 
         // (THE CLOUD TEXTURE PUBLICATIONS WERE DELETED — the noise and the weather map are being rewritten.)
         //
