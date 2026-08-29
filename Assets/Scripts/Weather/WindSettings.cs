@@ -21,8 +21,24 @@ public class WindSettings : ScriptableObject
     /// flake 63° off vertical — the panel said "wind 0" while the screen showed
     /// obviously slanted snow. 0.6 is Beaufort 1 ("light air"); with the exposure
     /// multiplier it is 0.21-0.87 m/s, i.e. between 12° and 41°.
-    [Tooltip("SURFACE speed at severity 0 (m/s). Must not be zero.")]
-    public float calmSpeed = 0.6f;
+    /// SPEED AT SEVERITY 0 (m/s). NOT DEAD CALM.
+    ///
+    /// This was 0.6 m/s — Beaufort 0, glass. With the quartic severity curve the base
+    /// of the mountain sits at severity 0.2, which is `0.2^4 = 0.0016` of the way to
+    /// the storm: the coast got 0.62 m/s at ALL times. Measured consequence on the
+    /// sea: the wind sea's Hs was 0.19 m and everything visible came from the fixed
+    /// swell, so waves only ever broke at the shore and the open water was a sheet.
+    ///
+    /// An open coast is not glass. Beaufort 2, a light breeze, is 1.6-3.3 m/s and is
+    /// the ordinary state; dead calm is an event, not the default. 3.0 m/s puts the
+    /// base at Hs 1.17 m with a wind sea of 0.92 m — waves everywhere, not only where
+    /// the bottom makes them break.
+    ///
+    /// THE STORM END IS UNTOUCHED, and so is the reason the curve exists: at severity
+    /// 0.57 the speed goes 2.0 -> 4.2 m/s, still far under the 8.5 m/s that once drove
+    /// the rain sideways.
+
+    public float calmSpeed = 3.0f;
     [Tooltip("Speed at severity 1 (m/s). Full storm.")]
     public float stormSpeed = 14f;
 

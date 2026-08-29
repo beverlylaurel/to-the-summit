@@ -1480,3 +1480,22 @@ tanım gereği Gauss — yöntemin pahalı yarısı düşüyor.
 
 **Şimdilik yalnız tier 2.** Tier 1 (191 m, 21 tekrar) ve tier 0 (967 m, 4 tekrar)
 dokunulmadı; maliyet o tierlar için ölçülmeden açılmayacak.
+
+
+## Rüzgâr: taban bir esinti, Strength tabanın üstünü ölçüyor (2026-08-29)
+
+**`calmSpeed` = 3,0 m/s.** Şiddet 0'da hız sıfıra gitmiyor: açık bir kıyı cam değildir,
+Bofor 2 olağan hâldir. Deniz bunu `FreeAirSpeed` üzerinden okuyor (arazi maruziyeti
+uygulanmadan — açık su dağın arkasında değil).
+
+**`Strength` artık bir hız oranı değil, tabanın üstündeki fazlalık:**
+
+    Strength = (sustained - calmSpeed * maruziyet) / (stormSpeed - calmSpeed)
+
+**Bunu okuyanlar** — kar sürüklenmesi, sisin kapanması, rüzgâr sesi, bulut hızı, girdap
+genliği — hepsi "olağanın ötesinde ne kadar rüzgâr var" diye soruyor; hafif esinti hiçbiri
+için rüzgâr değil.
+
+**Bilinçli kural:** fırtına ucu korunmuştur (korunaklı 0,350, açık 1,000). Ölü sakinlikte
+her maruziyette 0. `s^4` eğrisine dokunulmadı — gerekçesi (`RATIONALE.md`, yağmur eğimi)
+hâlâ geçerli.

@@ -3941,3 +3941,43 @@ kusurdu (`SeaFoamBubbles`, ayrı kayıt).
 
 **Ders:** bir dokunun tekrar edip etmediği zaman ekseninde değil, **uzayda ve gerçek alan
 üzerinde** ölçülür. Spektrum dar değildi; döşeme tekrar ediyordu.
+
+
+## "Dalgalar niye sadece kıyıda?" — deniz suçsuz, rüzgâr yok
+
+Denize verilen rüzgâr **deniz seviyesinde her zaman 0,62 m/s**. Zincir:
+
+    windAtBase = 0.20                      hava sürücüsünün taban şiddeti
+    ShapeSeverity(s) = s^4                 0.20^4 = 0.0016
+    speed = lerp(calmSpeed, stormSpeed, .) = lerp(0.6, 14, 0.0016) = 0.62 m/s
+
+O hızda rüzgâr denizi Hs 0,19 m. Görünen her şey sabit ölü dalgadan geliyordu: Hs 0,74 m,
+dalga boyu 156 m, eğimi %0,5 — uzaktan camdan farksız. Kırılabildiği tek yer kıyı, çünkü
+kırılma sığ su ister. Belirti buydu.
+
+`s^4` eğrisi **dağ için** konmuş ve gerekçesi geçerli: doğrusal eşlemede oyun sürekli
+8 m/s'de kalıyor, 1 mm'lik yağmur damlası yataydan 25° geliyordu. Ama aynı eğri, tabanı
+0,6 m/s olan bir denizi imkânsız kılıyor.
+
+**Düzeltme tabanda:** `calmSpeed` 0,6 → 3,0 m/s. Bofor 2, hafif esinti — açık bir kıyının
+olağan hâli. Cam gibi deniz (Bofor 0) bir olaydır, varsayılan değil.
+
+| şiddet | eski hız | yeni hız | eski Hs | yeni Hs |
+|---|---|---|---|---|
+| 0,20 (taban) | 0,62 m/s | 3,02 m/s | 0,74 m | **1,17 m** |
+| 0,57 | 2,02 m/s | 4,16 m/s | — | 1,42 m |
+| 1,00 | 14 m/s | 14 m/s | — | 3,66 m |
+
+Fırtına ucu değişmedi; yağmur eğimini bozan 8,5 m/s hâlâ çok uzakta.
+
+**Yan etki ölçüldü ve kapatıldı.** `Strength = sustained / stormSpeed` tabanı da rüzgâr
+sayıyordu: taban yükselince açık bir sırt **ölü sakinlikte 0,311** okuyordu — kar
+sürüklemeyi başlatan 0,22 eşiğinin üstünde. Dağ, rüzgârsız bir günde kar savuracaktı.
+
+`Strength` artık tabanın ÜSTÜNDEKİ rüzgârı ölçüyor:
+
+    Strength = (sustained - calmSpeed * maruziyet) / (stormSpeed - calmSpeed)
+
+Hafif esinti kar sürüklemez, sisi kapatmaz, duyulmaz — o sistemlerin sorduğu "olağanın
+ötesinde ne kadar rüzgâr var". Fırtına ucundaki sayılar aynen geri geldi (korunaklı 0,350,
+açık 1,000); ölü sakinlikte her maruziyette sıfır.

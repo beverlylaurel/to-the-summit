@@ -141,9 +141,13 @@ public class WindField : MonoBehaviour
         // place the wind breathes too, it just blows small.
         //
         // Disabled while locked: whatever the test slider gives is what it should be, the terrain must not interfere.
+        float exposure = 1f;
         if (!overrideActive)
-            sustained *= Mathf.Lerp(settings.shelteredFactor, settings.exposedFactor,
-                                    Mathf.Clamp01(Exposure));
+        {
+            exposure = Mathf.Lerp(settings.shelteredFactor, settings.exposedFactor,
+                                  Mathf.Clamp01(Exposure));
+            sustained *= exposure;
+        }
 
         // The slow layer: the air's general state, on the scale of minutes
         float slow = Mathf.PerlinNoise(t * settings.baseFrequency, 0f) * 2f - 1f;
@@ -190,6 +194,23 @@ public class WindField : MonoBehaviour
 
         Velocity = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * speed;
 
-        Strength = Mathf.Clamp01(sustained / settings.stormSpeed);
+        // STRENGTH MEASURES THE WIND ABOVE THE CALM FLOOR, NOT THE SPEED ITSELF.
+        //
+        // It used to be `sustained / stormSpeed`. That counted the floor as wind, and
+        // once the floor was raised to a light breeze (3 m/s, so the coast is not
+        // glass) an exposed ridge read 0.311 in DEAD CALM — past the 0.22 threshold
+        // that starts drifting snow. The mountain would have been blowing snow on a
+        // still day.
+        //
+        // A light breeze does not drift snow, does not close the fog and is not heard.
+        // What those systems ask is "how much wind is there BEYOND the ordinary", and
+        // the floor is the ordinary. The exposure scales the floor too, so a sheltered
+        // hollow and an exposed ridge both read zero when nothing is blowing — and at
+        // the storm end the numbers come back to what they were (sheltered 0.35,
+        // exposed 1.0).
+        float floorSpeed = settings.calmSpeed * exposure;
+
+        Strength = Mathf.Clamp01((sustained - floorSpeed)
+                                 / Mathf.Max(settings.stormSpeed - settings.calmSpeed, 1e-3f));
     }
 }
