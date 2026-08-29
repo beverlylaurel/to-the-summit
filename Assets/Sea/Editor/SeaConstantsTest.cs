@@ -49,6 +49,7 @@ public static class SeaConstantsTest
         ("OffshoreRamp", "SEA_OFFSHORE_RAMP"),
         ("MinDepth", "SEA_MIN_DEPTH"),
         ("ShoreFadeDepth", "SEA_SHORE_FADE_DEPTH"),
+        ("ShoreEdgeNoise", "SEA_SHORE_EDGE_NOISE"),
         ("ChopFadeDepth", "SEA_CHOP_FADE_DEPTH"),
         ("GammaMild", "SEA_GAMMA_MILD"),
         ("GammaSteep", "SEA_GAMMA_STEEP"),

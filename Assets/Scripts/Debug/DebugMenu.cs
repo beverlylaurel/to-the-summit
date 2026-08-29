@@ -74,21 +74,6 @@ public class DebugMenu : MonoBehaviour
     float lockedWindStrength = 0.5f;
     float lockedWindAngle;
 
-    /// SEA ISOLATION SWITCHES — EVERY SUSPECT AT ONCE.
-    ///
-    /// The globals already existed in `SeaShaderIDs` and the shader already read
-    /// them, but NOBODY DROVE THEM: dead code with no way to reach it. "The sea is
-    /// too white" has four candidate sources and from outside they look identical;
-    /// adding one switch per round costs one Play session each, all four at once
-    /// costs one.
-    bool seaNoWaves, seaNoShallow, seaNoFoam, seaNoRefraction;
-
-    /// Removes the sea surface entirely: whatever is left on screen is not the sea.
-    bool seaNoSurface;
-
-    /// The terms that survive with the waves switched off. Every one of them is a
-    /// suspect for the straight-edged patch, so they all go in at once.
-    bool seaNoFog, seaNoShadow, seaNoSkyRefl;
 
     /// The cloud settings are driven through `cloudVolume.profile` — the Volume's runtime COPY,
     /// not the asset itself. Writing to `sharedProfile` does not work: the moment another
@@ -241,7 +226,6 @@ public class DebugMenu : MonoBehaviour
         GUILayout.BeginHorizontal();
 
         BeginColumn();
-        DrawSeaDiagnostics();
         DrawMovement();
         DrawTimeOfDay();
         EndColumn();
@@ -635,41 +619,6 @@ public class DebugMenu : MonoBehaviour
         EndSection();
     }
 
-    /// THE THREE SWITCHES THAT WOULD NOT TAKE A CLICK.
-    ///
-    /// They sat at the bottom of the tallest column and were drawn correctly but took
-    /// their clicks somewhere else. Removing `FlexibleSpace` from the column did not
-    /// fix it, so the position itself is now the variable: they are drawn FIRST, in the
-    /// SHORT column, where the controls above them demonstrably work.
-    ///
-    /// The probe line below reports the two things that can make a drawn control
-    /// unclickable — `GUI.enabled`, and the rect the layout actually gave it. If a
-    /// click still does nothing, that line says which of the two it is.
-    void DrawSeaDiagnostics()
-    {
-        BeginSection("Deniz teşhis");
-
-        seaNoFog     = GUILayout.Toggle(seaNoFog,     "Yerel sisi kapat");
-        seaNoShadow  = GUILayout.Toggle(seaNoShadow,  "Gölgeyi kapat");
-        seaNoSkyRefl = GUILayout.Toggle(seaNoSkyRefl, "Gök yansımasını kapat");
-
-        Rect last = GUILayoutUtility.GetLastRect();
-        GUILayout.Label($"etkin {GUI.enabled}   kutu y {last.y:F0} h {last.height:F0}   " +
-                        $"fare {Event.current.mousePosition.x:F0},{Event.current.mousePosition.y:F0}");
-        GUILayout.Label($"durum {(seaNoFog ? 1 : 0)}{(seaNoShadow ? 1 : 0)}{(seaNoSkyRefl ? 1 : 0)}");
-
-        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoFog, seaNoFog ? 1f : 0f);
-        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoShadow, seaNoShadow ? 1f : 0f);
-        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoSkyReflection, seaNoSkyRefl ? 1f : 0f);
-
-        if (GUILayout.Button("Ayarları geri al (deniz teşhis)"))
-            seaNoFog = seaNoShadow = seaNoSkyRefl = false;
-
-        EndSection();
-    }
-
-    /// SEA DIAGNOSTICS. Each switch removes ONE term, so what is left on screen names
-    /// the term that produced the symptom.
     void DrawSea()
     {
         BeginSection("Deniz");
@@ -677,24 +626,6 @@ public class DebugMenu : MonoBehaviour
         GUILayout.Label($"Hs {SeaRuntimeState.SignificantWaveHeight:F2} m   " +
                         $"Tp {SeaRuntimeState.PeakPeriod:F1} s");
         GUILayout.Label($"kıyı köpüğü {SeaRuntimeState.ShoreFoamIntensity01:F2}");
-
-        seaNoSurface    = GUILayout.Toggle(seaNoSurface,    "Deniz yüzeyini kapat");
-        seaNoWaves      = GUILayout.Toggle(seaNoWaves,      "Dalgaları kapat");
-        seaNoShallow    = GUILayout.Toggle(seaNoShallow,    "Sığ su dönüşümünü kapat");
-        seaNoFoam       = GUILayout.Toggle(seaNoFoam,       "Köpüğü kapat");
-        seaNoRefraction = GUILayout.Toggle(seaNoRefraction, "Kırılmayı kapat");
-
-        // WRITTEN EVERY FRAME, NOT ON CHANGE. `SeaManager` republishes its own
-        // globals every frame; a value written once here would be overwritten the
-        // next frame and the checkbox would lie.
-        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoSurface,    seaNoSurface ? 1f : 0f);
-        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoWaves,      seaNoWaves ? 1f : 0f);
-        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoShallow,    seaNoShallow ? 1f : 0f);
-        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoFoam,       seaNoFoam ? 1f : 0f);
-        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoRefraction, seaNoRefraction ? 1f : 0f);
-
-        if (GUILayout.Button("Ayarları geri al (deniz)"))
-            seaNoSurface = seaNoWaves = seaNoShallow = seaNoFoam = seaNoRefraction = false;
 
         EndSection();
     }

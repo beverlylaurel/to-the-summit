@@ -3761,3 +3761,33 @@ Aynı tarif denize taşındı.
 görünümü içinde bu boşluğun üst sınırı yok; yerleşim geçişi ile çizim geçişi kontrollerin
 yerinde anlaşamıyor. En uzun sütunun alt kontrolleri bir yerde çiziliyor, tıklamayı başka
 yerde alıyordu. `FlexibleSpace` silindi — işi zaten dikey grubun kendisi yapıyor.
+
+
+## "Denizin bittiği sınır sert. Köpüğün sınırı yumuşak, denizinki değil."
+
+Kullanıcı ayrımı kendi koydu: aynı karede kıyı köpüğünün zeminle sınırı dağınık ve
+yumuşak, denizin kendi sınırı kesme gibi. İki kenar da aynı yerde, aralarındaki tek fark
+onları üreten ifade.
+
+**İki sebep var, ikisi de sınırın kendisinde:**
+
+1. **Kesme, düz bir eğri üzerinden yapılıyordu.** `clip(depth)` yalnız derinlik alanına
+   bakıyor, o alan da 7,32 m'lik yükseklik haritasının düzgün interpolasyonu — yani
+   çizilmiş bir eğri. Köpük ise `SeaFoamNoise` ile kırılıyor; farkı yaratan buydu.
+   Kesme artık AYNI gürültüyle kaydırılıyor.
+
+2. **Fresnel son piksele kadar 1 kalıyordu.** Sıyırma açısında yüzey tamamen ayna, yani
+   su çizgisinin bir yanında tam gökyüzü yansıması, öbür yanında kum vardı. Bu sıçrama
+   tek piksele düşüyordu ve "kesik kenar" görüntüsünü veren şey oydu.
+
+   Milimetrelik bir su filmi ayna değildir — arayüzü kuracak ortam yok.
+   `SEA_SHORE_FADE_DEPTH` (0,60 m) boyunca yansıma ve parıltı sönüyor; geriye sudan
+   görünen zemin kalıyor, ki çizginin öbür yanındaki piksel zaten onu gösteriyor. İki
+   yaka aynı renkte buluşuyor.
+
+**Köpük bilerek sönmüyor:** su çizgisindeki dantel tam da köpüğün ait olduğu yer.
+
+**Dalga boyu denetimi:** kenar gürültüsünün genliği 0,06 m derinlik; ölçülen %5 kıyı
+eğiminde su çizgisini 1,2 m oynatıyor. Onu üreten gürültünün kendi özellik boyu
+(`_SeaFoamBreakupTiling` = 0,35) 2,9 m — genlik özellik boyunun altında, yani büküm
+lapaya dönmüyor.

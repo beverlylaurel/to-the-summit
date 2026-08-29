@@ -165,11 +165,22 @@ Shader "ToTheSummit/SeaLit"
                 // ANYTHING OVER LAND IS DISCARDED — every pixel reads its own
                 // depth, so the shoreline does not snap to quad boundaries.
                 float depth = SeaSampleDepth(IN.positionWS.xz);
-                clip(depth);
 
-                // DIAGNOSTIC: removes the whole surface, so anything left on screen is
-                // NOT the sea.
-                clip(_SeaDbgNoSurface > 0.5 ? -1.0 : 1.0);
+                // THE WATERLINE IS NOT A DRAWN CURVE.
+                //
+                // `clip(depth)` cuts on the depth field alone, and that field is a
+                // smooth interpolation of a 7.32 m heightmap: the cut came out as a
+                // clean geometric line, while the foam right next to it — which carries
+                // the same noise the swash does — reads soft. The edge is displaced by
+                // the SAME noise, so the waterline breaks into tongues and hollows
+                // instead of ending on a curve.
+                //
+                // The amplitude is bounded by the noise's own feature size: at
+                // `_SeaFoamBreakupTiling` the features are about 2.9 m across, and
+                // `SEA_SHORE_EDGE_NOISE` on the measured 5% shore slope moves the line
+                // by 1.2 m. A bend larger than the feature that makes it would smear.
+                float edgeNoise = SeaFoamNoise(IN.positionWS.xz * _SeaFoamBreakupTiling) - 0.5;
+                clip(depth + edgeNoise * SEA_SHORE_EDGE_NOISE);
 
                 float3 V = normalize(_WorldSpaceCameraPos - IN.positionWS);
                 float  dist = length(_WorldSpaceCameraPos - IN.positionWS);
@@ -178,8 +189,7 @@ Shader "ToTheSummit/SeaLit"
                 //
                 // NO central difference: the slope already comes from the FFT
                 // and that is more accurate (spec 6.7).
-                float2 slopeSum = _SeaDbgNoWaves > 0.5 ? 0.0
-                                : SeaSampleSlope(IN.positionWS.xz);
+                float2 slopeSum = SeaSampleSlope(IN.positionWS.xz);
 
                 float3 N = normalize(float3(-slopeSum.x, 1.0, -slopeSum.y));
 
@@ -203,7 +213,6 @@ Shader "ToTheSummit/SeaLit"
                 float3 refracted = _SeaUpwellingColor.rgb;
 
             #if !defined(_SEA_QUALITY_LOW)
-                if (_SeaDbgNoRefraction <= 0.5)
                 {
                     float2 refrOffset = N.xz * _SeaRefractionStrength / max(dist, 1.0);
                     float2 refrUV = screenUV + refrOffset;
@@ -231,13 +240,8 @@ Shader "ToTheSummit/SeaLit"
                 Light mainLight = GetMainLight(seaShadowCoord);
 
             #ifdef _LIGHT_COOKIES
-                if (_SeaDbgNoShadow <= 0.5)
-                    mainLight.color *= SampleMainLightCookie(IN.positionWS);
+                mainLight.color *= SampleMainLightCookie(IN.positionWS);
             #endif
-
-                // DIAGNOSTIC: removes the shadow map AND the cloud cookie together — both
-                // reach the surface through the same multiply.
-                if (_SeaDbgNoShadow > 0.5) mainLight.shadowAttenuation = 1.0;
 
                 float3 L = mainLight.direction;
 
@@ -292,10 +296,6 @@ Shader "ToTheSummit/SeaLit"
                                                              perceptualRoughness,
                                                              1.0, screenUV);
 
-                // DIAGNOSTIC: a flat grey instead of the probe. The probe read is the only
-                // term here that depends on the SCREEN as well as the world position.
-                if (_SeaDbgNoSkyReflection > 0.5) skyRefl = 0.2;
-
                 // THE PROBE CARRIES THE SKY BUT NOT THE CLOUDS. The volumetric
                 // clouds are a render feature drawn after the skybox, so they never
                 // enter the baked cube and an overcast sky still arrives here as
@@ -336,13 +336,29 @@ Shader "ToTheSummit/SeaLit"
                 // THE SUN LOBE IS ALSO WEIGHTED BY FRESNEL. It used to be added
                 // raw, so looking straight down — where the surface reflects almost
                 // nothing — the sun still burned on it.
-                float F = SeaFresnel(N, V);
+                // THE FILM STOPS BEING A MIRROR BEFORE IT STOPS EXISTING.
+                //
+                // Fresnel goes to 1 at grazing angles, so up to the very last pixel the
+                // surface returned a full sky reflection — and then the clip removed it.
+                // The step from "sky" to "sand" landed on one pixel and that is what read
+                // as a cut edge.
+                //
+                // A millimetre of water over sand has no mirror in it: there is not
+                // enough medium to build the interface. Over `SEA_SHORE_FADE_DEPTH` the
+                // reflection and the glitter fade out and what is left is the ground
+                // seen through the water — which is what the pixel on the other side of
+                // the line already shows. The two sides meet at the same colour.
+                //
+                // The FOAM is deliberately not faded: the swash lace at the waterline is
+                // exactly where foam belongs.
+                float shoreFilm = smoothstep(0.0, SEA_SHORE_FADE_DEPTH, depth);
+
+                float F = SeaFresnel(N, V) * shoreFilm;
                 float3 color = lerp(belowSurface, skyRefl, F) + glitter * F;
 
                 // --- FOAM (spec 13) — THREE SOURCES ---
                 float foam = 0.0;
 
-                if (_SeaDbgNoFoam <= 0.5)
                 {
                     // 1. WHITECAP FOAM, STRETCHED ALONG THE FOLD DIRECTION.
                     //
@@ -558,8 +574,7 @@ Shader "ToTheSummit/SeaLit"
                 // THE SEA STANDS IN THE SAME AIR AS THE TERRAIN. Every layer is fogged
                 // once with ITS OWN distance — the terrain in its own shader, the cloud
                 // in the compositing pass, the sky in `SkyFog`, and the sea here.
-                if (_SeaDbgNoFog <= 0.5)
-                    color = ApplyHeightFog(color, _WorldSpaceCameraPos, IN.positionWS);
+                color = ApplyHeightFog(color, _WorldSpaceCameraPos, IN.positionWS);
 
                 return half4(color, 1.0);
             }

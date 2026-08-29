@@ -55,6 +55,9 @@ public static class SeaConstants
     /// Wave damping at the shoreline (m). [CALIBRATION]
     public const float ShoreFadeDepth = 0.60f;
 
+    /// Waterline displacement by the foam noise (m of depth). [CALIBRATION]
+    public const float ShoreEdgeNoise = 0.06f;
+
     /// Depth at which horizontal displacement dies out in shallow water (m).
     /// [CALIBRATION]
     public const float ChopFadeDepth = 8.00f;

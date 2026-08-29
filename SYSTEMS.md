@@ -1418,3 +1418,16 @@ başlayıp `SEA_OFFSHORE_RAMP` (4000 m) boyunca `_SeaDeepWaterDepth`'e iniyor.
 **Bilinçli kural:** rampanın uzunluğu ölçülen kenar derinliğinden (25,4 m) ve seçilen
 %4,4 kıta yamacı eğiminden çıkıyor; sayı `SeaConstants` ve `SeaConstants.hlsl`'de,
 eşitliği `Sea/Test Constant Parity` denetliyor.
+
+
+## Deniz: su çizgisi (2026-08-29)
+
+İki terim birlikte kuruyor, ikisi de aynı derinlik alanından:
+
+- **Kesme** — `clip(depth + gürültü * SEA_SHORE_EDGE_NOISE)`. Gürültü köpüğünkiyle
+  AYNI (`SeaFoamNoise`, `_SeaFoamBreakupTiling`); ikinci bir kaynak yok.
+- **Film** — `smoothstep(0, SEA_SHORE_FADE_DEPTH, depth)` Fresnel'i ve parıltıyı kısıyor.
+  Köpüğü kısmıyor.
+
+**Teşhis anahtarları silindi.** `_SeaDbgNo*` globalleri, shader dalları ve panel bölümü
+gitti; deniz bölümünde yalnız Hs / Tp / kıyı köpüğü okuması kaldı.

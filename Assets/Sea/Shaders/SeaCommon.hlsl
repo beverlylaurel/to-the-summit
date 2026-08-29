@@ -66,14 +66,6 @@ float _SeaLoopPeriod;
 float _SeaChoppiness;
 
 // --- Diagnostics ---
-float _SeaDbgNoWaves;
-float _SeaDbgNoShallow;
-float _SeaDbgNoFoam;
-float _SeaDbgNoRefraction;
-float _SeaDbgNoSurface;
-float _SeaDbgNoFog;
-float _SeaDbgNoShadow;
-float _SeaDbgNoSkyReflection;
 
 // ------------------------------------------------------------- wave field
 
@@ -426,10 +418,9 @@ SeaSurfacePoint SeaDeform(float3 posWS)
     o.depth = SeaSampleDepth(posWS.xz);
 
     float4 field = SeaSampleDisplacement(posWS.xz);
-    float3 disp  = _SeaDbgNoWaves > 0.5 ? 0.0 : field.xyz;
+    float3 disp  = field.xyz;
     o.jacobian   = field.w;
 
-    if (_SeaDbgNoShallow <= 0.5)
     {
         float slope = SeaSampleBottomSlope(posWS.xz);
 
