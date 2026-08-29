@@ -2791,3 +2791,34 @@ hava değil. WMO'nun "istisnai berraklık" eşiği 50 km, temiz kıyı/dağ hava
 
 Ölçülmüş sonuçlar `SYMPTOMS.md` → "Uzak bulutlar sise gömülüyor".
 
+
+## Palet yeşil-griye çevrildi (2026-08-30)
+
+Ton kararı `DESIGN.md`'de: koyu palet, ağır, depresif. Bu kaydın konusu **hangi yön** olduğu.
+
+**Doygunluk tek başına kasvet üretmiyor — ölçüldü.** İlk süpürme yalnız doygunluğu gezdirdi
+(−14 / −40 / −60 / −80) ve kullanıcının cevabı şu oldu: *"renklerle oynanmamış ki, sadece
+siyah/beyaza doğru kaymış."* Doğru teşhis. Doygunluk düşürmek rengi **yok eder**, kasvet ise
+bir **yön** ister: grinin bir tarafa yaslanması lazım.
+
+**İkinci süpürme doygunluğu sabitledi (−40) ve yalnız rengin yönünü gezdirdi.** Üç yön
+denendi, hepsi kaynaklı:
+
+| yön | kaynak | sonuç |
+|---|---|---|
+| yeşil-gri | Death Stranding'in paleti — gri, yeşil çalan | **seçildi** |
+| soğuk siyan | The Revenant'ın kışı, mat mavi-gri | elendi |
+| hastalıklı sarı | çürüme, bleach-bypass bölgesi | elendi |
+
+Yeşil-gri kazandı çünkü herkes maviye gider; mavi **soğuk** okunur, yeşil-gri **hasta**.
+Kartpostal hissini kıran şey buydu — gökyüzü maviden kirli petrole düştü.
+
+**Kontrasta dokunulmadı, bilinçli.** Referansın yaptığı da bu: doygunluk iner, kontrast
+kalır. Kontrastı düşürmek "soluk" verir, "ağır" vermez.
+
+**Altın saat ayrı tutuldu.** Doygunluğu 10 → 0 indi ama sıcaklığı 14 → 18 çıktı ve tek sıcak
+filtreyi o taşıyor. Revenant'ın kuralı: soğuk bir dünyada **tek** sıcak kaynak, baştan sona
+soğuk olandan daha ağır durur.
+
+Ölçülen değerler `LookSettings.asset`'te; buradaki kayıt yönün **neden** o yön olduğu.
+

@@ -15,10 +15,10 @@ MonoBehaviour:
   clearDay:
     exposure: -1
     contrast: 12
-    saturation: -14
-    colorFilter: {r: 0.94, g: 0.95, b: 1, a: 1}
-    temperature: -14
-    tint: 2
+    saturation: -40
+    colorFilter: {r: 0.86, g: 0.95, b: 0.86, a: 1}
+    temperature: -6
+    tint: 14
     shadowChill: 0.45
     bloom: 0.5
     bloomThreshold: 1.91
@@ -26,10 +26,10 @@ MonoBehaviour:
   clearNight:
     exposure: -1.5
     contrast: -22
-    saturation: -22
-    colorFilter: {r: 0.765, g: 0.803, b: 0.898, a: 1}
-    temperature: -20
-    tint: 6
+    saturation: -50
+    colorFilter: {r: 0.78, g: 0.88, b: 0.82, a: 1}
+    temperature: -12
+    tint: 12
     shadowChill: 0.7
     bloom: 0.15
     bloomThreshold: 2.18
@@ -37,10 +37,10 @@ MonoBehaviour:
   stormDay:
     exposure: -0.8
     contrast: 4
-    saturation: -34
-    colorFilter: {r: 0.86, g: 0.89, b: 0.95, a: 1}
-    temperature: -26
-    tint: 0
+    saturation: -58
+    colorFilter: {r: 0.82, g: 0.9, b: 0.83, a: 1}
+    temperature: -8
+    tint: 13
     shadowChill: 0.85
     bloom: 0.8
     bloomThreshold: 1.55
@@ -48,10 +48,10 @@ MonoBehaviour:
   stormNight:
     exposure: -2.1
     contrast: -4
-    saturation: -42
-    colorFilter: {r: 0.66, g: 0.72, b: 0.9, a: 1}
-    temperature: -40
-    tint: 4
+    saturation: -66
+    colorFilter: {r: 0.74, g: 0.83, b: 0.78, a: 1}
+    temperature: -18
+    tint: 10
     shadowChill: 1
     bloom: 0.55
     bloomThreshold: 1.73
@@ -59,10 +59,10 @@ MonoBehaviour:
   goldenHour:
     exposure: -0.8
     contrast: 10
-    saturation: 10
-    colorFilter: {r: 1, g: 0.97, b: 0.9, a: 1}
-    temperature: 14
-    tint: 4
+    saturation: 0
+    colorFilter: {r: 1, g: 0.92, b: 0.72, a: 1}
+    temperature: 18
+    tint: 6
     shadowChill: 0.25
     bloom: 0.35
     bloomThreshold: 2

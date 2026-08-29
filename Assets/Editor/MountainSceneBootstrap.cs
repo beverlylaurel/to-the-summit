@@ -894,8 +894,20 @@ public static class MountainSceneBootstrap
         SetCloud(clouds.shadowResolution, VolumetricClouds.CloudShadowResolution.Ultra1024);
         SetCloud(clouds.shadowDistance, 12000f);
 
-        SetCloud(clouds.numPrimarySteps, 128);
-        SetCloud(clouds.numLightSteps, 8);
+        // MEASURED, NOT PICKED. The clouds were 6.0 ms of an 11.4 ms frame — turning them off
+        // took it to 5.4 and the main thread stopped waiting on the GPU. Breaking that bill down
+        // one switch at a time: shadows, erosion and micro erosion are noise; the march is the
+        // whole cost. 128/8 -> 96/6 measured 10.5 ms -> 7.6 ms with no visible difference on the
+        // same frame, and 64/4 (6.3 ms) lost the thin clouds' detail.
+        //
+        // Both numbers sit inside what the paper's own table ships `[N22 p.183]`: light samples
+        // 6 on PS4 and 10 on PS5, view samples 60-90 and 96-180.
+        //
+        // THIS IS THE SOURCE. The value was set on the asset three times and came back each
+        // time — the bootstrap writes it from here on every run, which is exactly the trap
+        // SYMPTOMS.md records under "kod diskte doğru, ekranda eski".
+        SetCloud(clouds.numPrimarySteps, 96);
+        SetCloud(clouds.numLightSteps, 6);
         SetCloud(clouds.temporalAccumulationFactor, 0.95f);
         SetCloud(clouds.perceptualBlending, 1.00f);
         SetCloud(clouds.fadeInStart, 0f);
