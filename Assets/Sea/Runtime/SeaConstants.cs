@@ -58,11 +58,11 @@ public static class SeaConstants
     /// Wave damping at the shoreline (m). [CALIBRATION]
     public const float ShoreFadeDepth = 0.60f;
 
-    /// Depth where the shore wave starts handing over to the FFT field (m).
-    public const float ShoreWaveDeepIn = 10f;
+    /// Breaking index below which the shore wave owns nothing. [CALIBRATION]
+    public const float SurfZoneLo = 0.60f;
 
-    /// Depth where the shore wave is gone (m).
-    public const float ShoreWaveDeepOut = 20f;
+    /// Breaking index at which it owns the whole surface. [CALIBRATION]
+    public const float SurfZoneHi = 1.20f;
 
     /// Waterline displacement by the foam noise (m of depth). [CALIBRATION]
     public const float ShoreEdgeNoise = 0.06f;

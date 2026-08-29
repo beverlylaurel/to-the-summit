@@ -421,16 +421,27 @@ float SeaSampleShoreTravel(float2 posXZ)
                                 saturate(uv), 0).r;
 }
 
-/// HOW MUCH OF THE SURFACE THE SHORE WAVE OWNS, BY DEPTH.
+/// HOW MUCH OF THE SURFACE THE SHORE WAVE OWNS — THE SURF ZONE, NOT A DEPTH.
 ///
-/// Two ends, both measured on the baked field. Deep end: the crest only follows
-/// the depth contour between 1 m and 16 m (median 5-10 degrees, collapsing
-/// outside), so it hands over across 10-20 m. Shallow end: the same
-/// `SEA_SHORE_FADE_DEPTH` the FFT uses, because a wave cannot stand in water
-/// thinner than itself and the mesh would cut through the beach.
+/// A fixed depth band was wrong and it showed: handing the field over everywhere
+/// shallower than 10 m replaced 170 metres of open sea with two sinusoids, and the
+/// big waves went with it.
+///
+/// The right question is not "how deep" but "is the wave depth-limited here". That
+/// is the breaking index: `B = H / (gamma h)`. Where `B` is at or past 1 the wave
+/// is breaking and its shape is the bottom's business, not the spectrum's; well
+/// below 1 the sea is still the spectrum's and the FFT keeps it.
+///
+/// This also carries the weather for free. At 0.5 m/s the zone ends around 2 m of
+/// depth (35 m offshore); at 20 m/s it reaches past 13 m — a storm has a wide surf
+/// zone, a calm has a narrow one.
 float SeaShoreWaveWeight(float depth)
 {
-    return (1.0 - smoothstep(SEA_SHORE_WAVE_DEEP_IN, SEA_SHORE_WAVE_DEEP_OUT, depth))
+    float shoal = min(SeaShoalingGain(depth, _SeaSpectrumDepth), _SeaMaxShoalingGain);
+    float breaking = (_SeaSignificantHeight * shoal)
+                   / max(SEA_GAMMA_MILD * depth, 1e-3);
+
+    return smoothstep(SEA_SURF_ZONE_LO, SEA_SURF_ZONE_HI, breaking)
          * smoothstep(0.0, SEA_SHORE_FADE_DEPTH, depth);
 }
 

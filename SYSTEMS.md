@@ -1478,8 +1478,14 @@ eğimi aynı katsayıyla kısılıp kıyı dalgasının kendi eğimi ekleniyor.
 ve **kırılma sınırı** `gamma h / 2`. İkincisi sörf kuşağında hâkim — orada dalga boyu deniz
 durumunun değil suyun derinliğinin işidir.
 
-**Bant `SEA_SHORE_WAVE_DEEP_IN/OUT` (10–20 m) ile kapanıyor**, çünkü ölçüldü: tepe ile
-derinlik konturu arasındaki açının medyanı 1–16 m arasında 5–10°, dışında dağılıyor.
+**Devir bandı derinlikle değil KIRILMA İNDİSİYLE tanımlı** (`SEA_SURF_ZONE_LO/HI`,
+`B = H / gamma h`). Sabit derinlik bandı denenmiş ve elenmişti: 170 metrelik açık denizi
+iki sinüse çeviriyordu. İndis havayı taşıyor — sörf kuşağı 0,5 m/s'de 53 m, 20 m/s'de
+245 m.
+
+**Cephe derin sudan başlıyor, kıyıya yürüyor.** Su çizgisinden başlatmak bütün kıyıyı aynı
+faza kilitliyordu. Kara, dokunduğu suyun değerini alıyor — su çizgisinde süreklilik var,
+karada faz birikmiyor.
 
 
 ## Deniz: swash kıyı dalgasının koşusu (2026-08-29)

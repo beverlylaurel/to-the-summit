@@ -20,6 +20,10 @@ using UnityEngine;
 /// the weather; the texture would need rebaking every time the wind changed.
 /// `tau` depends only on the bathymetry.
 ///
+/// THE FRONT RUNS SHOREWARD, FROM THE DEEP. Seeding it at the waterline instead
+/// would put every shore point at `tau = 0` and the whole coast would surge in
+/// step — the very thing this field exists to break.
+///
 /// THE EIKONAL IS SOLVED, NOT DIJKSTRA. `|grad tau| = 1/c` on a grid, by fast
 /// marching. Dijkstra on an 8-neighbour grid makes paths follow the grid
 /// directions and the crests come out octagonal; the upwind quadratic update
@@ -82,10 +86,13 @@ public static class SeaShorePhase
             }
         }
 
-        // THE FRONT STARTS AT THE WATERLINE. Every water texel with a land
-        // neighbour is a source at tau = 0. Marching outward from there gives the
-        // time a wave took to ARRIVE, which is what the phase needs, and it makes
-        // the shoreline the reference for every bay at once.
+        // THE FRONT STARTS IN DEEP WATER AND RUNS SHOREWARD.
+        //
+        // It used to start AT THE WATERLINE. That put every shore point at tau = 0
+        // by construction, so the whole coast was in phase — exactly the thing the
+        // field was built to break. The wave arrives FROM the deep, and how long it
+        // takes to get somewhere is what separates a bay from the headland beside
+        // it: the bay's path is shallower, therefore slower, therefore later.
         var heap = new MinHeap(1 << 16);
 
         for (int y = 0; y < res; y++)
@@ -97,13 +104,7 @@ public static class SeaShorePhase
                 if (d <= 0f) continue;
 
                 bool onEdge = x == 0 || y == 0 || x == res - 1 || y == res - 1;
-                bool touchesLand = onEdge
-                    || seaLevelY - (baseY + hm[y, x - 1] * height) <= 0f
-                    || seaLevelY - (baseY + hm[y, x + 1] * height) <= 0f
-                    || seaLevelY - (baseY + hm[y - 1, x] * height) <= 0f
-                    || seaLevelY - (baseY + hm[y + 1, x] * height) <= 0f;
-
-                if (!touchesLand) continue;
+                if (!onEdge && d < maxDepth) continue;
 
                 tau[row + x] = 0f;
                 state[row + x] = Band;
@@ -145,16 +146,57 @@ public static class SeaShorePhase
             }
         }
 
-        // Anything the front never reached (land, enclosed pools) gets the deepest
-        // value in the field, so a sample there is not a hole.
-        float deepest = 0f;
-        for (int i = 0; i < tau.Length; i++)
-            if (tau[i] < far && tau[i] > deepest) deepest = tau[i];
-
-        for (int i = 0; i < tau.Length; i++)
-            if (tau[i] >= far) tau[i] = deepest;
+        // LAND CARRIES THE ARRIVAL TIME OF THE WATER IT TOUCHES.
+        //
+        // Filling land with a constant looked harmless and was not: the shader turns
+        // tau into a phase with `frac(tau / Tp)`, and a jump from a few seconds to a
+        // fixed 264 s across one texel is 26 cycles of that function. Bilinear
+        // filtering spread them over the shoreline and the beach came out in zebra
+        // stripes (`SYMPTOMS.md`).
+        //
+        // The swash on a beach belongs to the wave that just arrived at the water in
+        // front of it, so land takes the NEAREST water value: continuous across the
+        // waterline, and no phase accumulates inland where no wave travels.
+        ExtendOntoLand(tau, state, res, far);
 
         return tau;
+    }
+
+    /// Nearest-value extension: a second front, zero cost, that only copies.
+    static void ExtendOntoLand(float[] tau, byte[] state, int res, float far)
+    {
+        var queue = new int[res * res];
+        int head = 0, tail = 0;
+
+        for (int i = 0; i < tau.Length; i++)
+            if (tau[i] < far) queue[tail++] = i;
+
+        int[] nx = { 1, -1, 0, 0 };
+        int[] ny = { 0, 0, 1, -1 };
+
+        while (head < tail)
+        {
+            int idx = queue[head++];
+            int cx = idx % res;
+            int cy = idx / res;
+
+            for (int k = 0; k < 4; k++)
+            {
+                int x = cx + nx[k], y = cy + ny[k];
+                if (x < 0 || y < 0 || x >= res || y >= res) continue;
+
+                int n = y * res + x;
+                if (tau[n] < far) continue;
+
+                tau[n] = tau[idx];
+                queue[tail++] = n;
+            }
+        }
+
+        // Nothing can stay unreached: the queue starts from every water texel and
+        // the grid is connected. If it did, a hole would read as zero and pulse.
+        for (int i = 0; i < tau.Length; i++)
+            if (tau[i] >= far) tau[i] = 0f;
     }
 
     static Texture2D ToTexture(float[] tau, int res)
