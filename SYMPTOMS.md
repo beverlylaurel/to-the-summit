@@ -4149,3 +4149,42 @@ Bu, aynı satırdaki İKİNCİ kontur hatası. Birincisi siyahtı ve sebebi uydu
 (kenara uzak düzleme yakın bir derinlik yazılıyordu, sis doyuyordu); kaydı shader'ın kendi
 yorumunda duruyor.
 
+
+## Uzak bulutlar sise gömülüyor — ve bunu bir ikinci hata gizliyormuş
+
+Konturu düzeltince (yukarıdaki kayıt) uzak bulutların görünürlüğü düştü. Belirti yeni değil;
+**yeni olan, görünür olması.**
+
+**İlk şüpheli yanlış olurdu:** "kontur düzeltmesi fazla sönümlüyor". Sönümleme doğru —
+shader'ın kendi belgesi (`HeightFog.hlsl`, `FogPath`) tam da onu tarif ediyor: *"the scattering
+share has to be scaled by how much the cloud covers"*, yani **dolgu** kapsamla ölçeklenir,
+**sönümleme** tam uygulanır. `edgeFog` bu sözleşmeden sapmaydı ve ince bulutu hiç söndürmediği
+için asıl sorunu örtüyordu.
+
+**Gerçek sebep:** `clearVisibility = 25000`. Ayarın **kendi tooltip'i** belirtiyi önceden
+yazmış:
+
+> *"At two thousand metres on the mountain the real clear-air visibility is 100-200 km...
+> Keeping it low does not only wash out the distance: it also inflates the optical depth of
+> the ray climbing 2.6 km from the ground to the cloud and **erases the sea of cloud**."*
+
+Uyarı yazılmış, değer düzeltilmemiş. Dört belgede de 25 km için yazılmış bir gerekçe yok.
+
+**Ölçüm.** Bulut irtifasında hava zaten temiz (3000 m'de eşdeğer görüş 423 km); optik
+derinliği şişiren şey, ışının ilk ~19 km'sini sınır tabakasının içinde geçirmesi.
+
+| yatay | irtifa | 25 km ayarı | 60 km ayarı |
+|---|---|---|---|
+| 10 km | 2500 m | 0,716 | **0,813** |
+| 20 km | 2500 m | 0,519 | **0,666** |
+| 30 km | 2500 m | 0,376 | **0,545** |
+| 50 km | 2500 m | 0,196 | **0,364** |
+| 80 km | 2500 m | 0,074 | **0,199** |
+
+Yer seviyesi görüşü 24,3 km → 52,3 km. WMO'nun "istisnai berraklık" sınıfı 50 km'nin üstü;
+temiz kıyı/dağ havası açık günde 50-80 km. Tooltip'in 100-200 km'si **irtifa** için ve o zaten
+serbest katmandan geliyor — 25 km olan, yer seviyesi değeriydi.
+
+**Neden 100 değil de 60:** tooltip'in verdiği aralık dağ tepesi için; kamera 283 m'de, kıyıda.
+Yer seviyesinde 100 km istisnai bir gün demek, varsayılan hava değil.
+

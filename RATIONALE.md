@@ -2772,3 +2772,22 @@ yapıldığında gökyüzü daha doğruymuş.
 
 **Diskin sönümlü kalması bir istisna değil, aynı kuralın öbür yüzü.** LUT atmosferi hesaplar,
 disk atmosferin arkasındadır. Birine giren, ötekine geçen ışın verilir.
+
+
+## Açık hava görüşü 25 km → 60 km (2026-08-29)
+
+Değerin **hiçbir gerekçesi yoktu** — dört belgede de kaydı yok. Ayarın kendi tooltip'i ise
+gerçek aralığı (100-200 km, irtifada) ve düşük tutmanın belirtisini ("bulut denizini siler")
+yazmış durumdaydı.
+
+**Neden bugüne kadar görünmedi:** bulut shader'ındaki `edgeFog` ince bulutu hiç söndürmüyordu.
+İki hata birbirini örtüyordu; kontur düzeltilince alttaki çıktı.
+
+**60, tooltip'in 100-200'ü değil, çünkü ikisi farklı yükseklikten konuşuyor.** Tooltip'in
+aralığı 2000 m için ve orada zaten sağlanıyor: sınır tabakası tersinme kapağıyla kesiliyor,
+geriye serbest katman kalıyor ve 3000 m'de eşdeğer görüş 423 km. `clearVisibility` ise **yer
+seviyesi** değeri. Kamera 283 m'de, kıyıda; orada 100 km istisnai bir gün olur, varsayılan
+hava değil. WMO'nun "istisnai berraklık" eşiği 50 km, temiz kıyı/dağ havası açık günde 50-80 km.
+
+Ölçülmüş sonuçlar `SYMPTOMS.md` → "Uzak bulutlar sise gömülüyor".
+
