@@ -494,53 +494,71 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // stands.
     float seaWetBottom = _SeaWetLevelY - max(_SeaWetBandM, 1e-3);
 
-    float swash = (1.0 - smoothstep(_SeaWetLevelY - _SeaWetFadeM,
-                                    _SeaWetLevelY, worldPos.y))
-                * smoothstep(seaWetBottom - _SeaWetFadeM,
-                             seaWetBottom, worldPos.y);
-
-    // BELOW THE WATERLINE THE GROUND IS WET, FULL STOP.
+    // ABOVE THE WATER'S REACH THIS WHOLE BLOCK PRODUCES ZERO, SO IT IS NOT RUN.
     //
-    // The band's bottom was written on the assumption that "the sea draws over it
-    // anyway". It does not: the sea shows what is UNDER it. `refracted` samples the
-    // scene colour and the water is clear over the first metres — measured
-    // transmittance at 25 m out (path 2.8 m, extinction 0.30/0.08/0.05 per m) is
-    // 0.43 / 0.80 / 0.87. So the sea bed arrived at the eye almost undimmed, drawn
-    // with DRY sand (albedo 0.61/0.54/0.43): the shallows read as a bright cream
-    // sheet out to where the water finally gets deep.
+    // `swash` is `1 - smoothstep(level - fade, level, y)`, which is 0 for every point at or
+    // above `_SeaWetLevelY`; `submerged` is the same shape at `_SeaLevelY`. The run-up level
+    // is the still level plus a non-negative surge, so a single comparison covers both — the
+    // `max` is there because that ordering is an invariant of another system, not of this file.
     //
-    // The band's bottom still exists — it is what stops ground far ABOVE the water
-    // from counting as wet, which is the symptom it was added for.
-    float submerged = 1.0 - smoothstep(_SeaLevelY - _SeaWetFadeM,
-                                       _SeaLevelY, worldPos.y);
-
-    float seaWet = max(swash, submerged);
-    albedo = lerp(albedo, albedo * _SeaWetDarkening, seaWet);
-
-    // --- The swash lace, on the sand ---
+    // What the gate skips is not the smoothsteps, it is `laceNoise`: two fbm calls, three plus
+    // two octaves, five `MountainNoise` evaluations, FORTY hashes. Paid on every terrain pixel
+    // of a 6 km mountain for a band a few metres tall.
     //
-    // THE WATERLINE ENDED ON A DRAWN LINE. The sea mesh is clipped at depth 0,
-    // so the foam stops at a geometric edge and meets dry sand there: white on
-    // one side, dark on the other, with nothing in between. A real swash does
-    // not end at the still waterline — it runs up the beach and leaves a lace
-    // that thins as it drains.
-    //
-    // The terrain draws that part. It is not a second source: the sea publishes
-    // the run-up level (`_SeaWetLevelY` already carries the phase) and the sand
-    // draws the residue below it. The noise eats the coverage from underneath,
-    // so the lace breaks into patches instead of ending on an edge of its own.
-    // The lace rides on the SWASH band only. On the submerged part there is no
-    // swash — the sea draws its own foam there.
-    float laceBand = swash;
+    // Bit-identical: every term below is multiplied into `albedo` through a weight that is
+    // exactly 0 up there, and `seaRough` further down reads `swash`, which is initialised to 0.
+    float swash = 0.0;
 
-    float laceNoise = MountainFbm(worldPos * 0.75, 3)
-                    + MountainFbm(worldPos * 3.1, 2) * 0.5;
+    if (worldPos.y < max(_SeaWetLevelY, _SeaLevelY))
+    {
+        swash = (1.0 - smoothstep(_SeaWetLevelY - _SeaWetFadeM,
+                                        _SeaWetLevelY, worldPos.y))
+                    * smoothstep(seaWetBottom - _SeaWetFadeM,
+                                 seaWetBottom, worldPos.y);
 
-    float lace = saturate((laceBand - (1.25 - laceNoise) * 0.7) * 2.2);
+        // BELOW THE WATERLINE THE GROUND IS WET, FULL STOP.
+        //
+        // The band's bottom was written on the assumption that "the sea draws over it
+        // anyway". It does not: the sea shows what is UNDER it. `refracted` samples the
+        // scene colour and the water is clear over the first metres — measured
+        // transmittance at 25 m out (path 2.8 m, extinction 0.30/0.08/0.05 per m) is
+        // 0.43 / 0.80 / 0.87. So the sea bed arrived at the eye almost undimmed, drawn
+        // with DRY sand (albedo 0.61/0.54/0.43): the shallows read as a bright cream
+        // sheet out to where the water finally gets deep.
+        //
+        // The band's bottom still exists — it is what stops ground far ABOVE the water
+        // from counting as wet, which is the symptom it was added for.
+        float submerged = 1.0 - smoothstep(_SeaLevelY - _SeaWetFadeM,
+                                           _SeaLevelY, worldPos.y);
 
-    // Foam is a scattering surface: it takes the light but shows none of the
-    // sand under it. The colour is the sea's foam colour, kept off-white.
-    albedo = lerp(albedo, float3(0.78, 0.80, 0.82), lace * 0.6);
+        float seaWet = max(swash, submerged);
+        albedo = lerp(albedo, albedo * _SeaWetDarkening, seaWet);
+
+        // --- The swash lace, on the sand ---
+        //
+        // THE WATERLINE ENDED ON A DRAWN LINE. The sea mesh is clipped at depth 0,
+        // so the foam stops at a geometric edge and meets dry sand there: white on
+        // one side, dark on the other, with nothing in between. A real swash does
+        // not end at the still waterline — it runs up the beach and leaves a lace
+        // that thins as it drains.
+        //
+        // The terrain draws that part. It is not a second source: the sea publishes
+        // the run-up level (`_SeaWetLevelY` already carries the phase) and the sand
+        // draws the residue below it. The noise eats the coverage from underneath,
+        // so the lace breaks into patches instead of ending on an edge of its own.
+        // The lace rides on the SWASH band only. On the submerged part there is no
+        // swash — the sea draws its own foam there.
+        float laceBand = swash;
+
+        float laceNoise = MountainFbm(worldPos * 0.75, 3)
+                        + MountainFbm(worldPos * 3.1, 2) * 0.5;
+
+        float lace = saturate((laceBand - (1.25 - laceNoise) * 0.7) * 2.2);
+
+        // Foam is a scattering surface: it takes the light but shows none of the
+        // sand under it. The colour is the sea's foam colour, kept off-white.
+        albedo = lerp(albedo, float3(0.78, 0.80, 0.82), lace * 0.6);
+    }
 
     // --- Bump noise: the raw material of the procedural normal; without it the surface
     //     looks like plastic. Its value goes to the snow's micro placement and its gradient

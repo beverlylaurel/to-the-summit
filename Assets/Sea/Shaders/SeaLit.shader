@@ -424,8 +424,16 @@ Shader "ToTheSummit/SeaLit"
                     // has holes and the foam breaks into clumps.
                     // The `* 1.4` that used to be here put back everything the bubbles
                     // ate and the foam closed into a sheet again. The holes stay open now.
-                    float bubbles = SeaFoamBubbles(foamUV);
-                    whitecap = saturate(whitecap - (1.0 - bubbles) * 0.55);
+                    // OPEN WATER PAYS NOTHING. `saturate(0 - x)` is 0 for every
+                    // non-negative x, so with no whitecap here the bubbles cannot
+                    // change the result — and they are two cellular lookups plus a
+                    // domain warp, i.e. four more on top. Bit-identical: the branch
+                    // only skips a line whose output is already known to be 0.
+                    if (whitecap > 0.0)
+                    {
+                        float bubbles = SeaFoamBubbles(foamUV);
+                        whitecap = saturate(whitecap - (1.0 - bubbles) * 0.55);
+                    }
 
                     // 2. BREAKING FOAM (spec 8.3). When the ratio of wave
                     //    height to water depth exceeds the breaker index the
@@ -587,8 +595,11 @@ Shader "ToTheSummit/SeaLit"
 
                     float shoreFoam = band * max(fresh, residue * 0.55);
 
-                    // Bubbles inside the band, at the whitecap's scale.
-                    shoreFoam *= 0.55 + 0.65 * SeaFoamBubbles(IN.positionWS.xz * _SeaFoamTiling * 1.7);
+                    // Bubbles inside the band, at the whitecap's scale. Outside the
+                    // band `shoreFoam` is already 0 and the multiply cannot revive it,
+                    // so the second cellular pair is skipped there. Bit-identical.
+                    if (shoreFoam > 0.0)
+                        shoreFoam *= 0.55 + 0.65 * SeaFoamBubbles(IN.positionWS.xz * _SeaFoamTiling * 1.7);
 
                     foam = max(whitecap, max(breakT * SEA_BREAK_FOAM_GAIN, shoreFoam));
 
