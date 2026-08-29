@@ -1569,3 +1569,30 @@ Fresnel. **Yeni bir renk ayarı yok.**
 İleri saçılma lobu (`SEA_SSS_POWER` = 4) Petzold'un ölçtüğü faz fonksiyonundan: su ileri
 yönde yana göre iki-üç kat büyüklük daha çok saçıyor. Bu yüzden parlama yalnız güneşe
 doğru bakarken görünüyor (75°'de sıfıra iniyor).
+
+
+## Deniz: köpük ölçülmüş bir yasaya bağlandı (2026-08-29)
+
+**Beyaz başlık kaplaması artık Monahan & O'Muircheartaigh 1980'i izliyor:**
+`W = 3.84e-6 * U10^3.41`.
+
+Eşik seçilmedi, **çözüldü**. Her rüzgâr için "hangi eşik Monahan'ı verir" sorusu ayrı ayrı
+çözüldü ve cevaplar neredeyse aynı çıktı: 0,837 / 0,835 / 0,842 / 0,866 / 1,023. Yani
+Jacobian'ın istatistiği doğru rüzgâr bağımlılığını zaten taşıyordu; yanlış olan tek şey
+çizginin nereye çekildiğiydi. `SEA_FOAM_J_THRESHOLD` 0,55 → **0,85**.
+
+| U10 | önce | sonra | Monahan |
+|---|---|---|---|
+| 6 | %0,00 | %0,23 | %0,17 |
+| 8 | %0,00 | %0,58 | %0,46 |
+| 12 | %0,06 | %1,98 | %1,84 |
+| 15 | %0,23 | %3,54 | %3,93 |
+| 20 | %0,37 | %4,26 | %10,49 |
+
+Fırtına ucunda bilerek muhafazakâr: 20 m/s'de ideal eşik 1,02, biz 0,85'te kaldık.
+
+**Köpük sönümü üssel oldu.** Gerçek beyaz başlığın iki evresi var: etkin tepe 1–3 saniye
+parlak, ardından kabarcık kalıntısı onlarca saniye sürüklenerek soluyor. Doğrusal sönüm
+ikisini birden veremez — 0,28/s'de köpük 3,6 saniyede tamamen yok oluyordu ve deniz hiç
+kullanılmış görünmüyordu. `exp` tek sayıyla ikisini de veriyor: 0,15/s'de **parlak 2,4 s,
+görünür 20 s**.

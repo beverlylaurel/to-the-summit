@@ -126,12 +126,37 @@
 /// Jacobian threshold and transition range. J < 0 means the surface has
 /// folded; the threshold starts before that so foam enters smoothly.
 /// [SOURCE: Tessendorf 2004 4.6 — folding test] [CALIBRATION: threshold value]
-#define SEA_FOAM_J_THRESHOLD     0.55
-#define SEA_FOAM_J_RANGE         0.55
+/// WHERE FOAM STARTS, ON THE JACOBIAN. Solved from a measured law, not chosen.
+///
+/// Monahan & O'Muircheartaigh 1980 give the whitecap coverage of a real sea as
+/// `W = 3.84e-6 * U10^3.41`. Ours was 10 to 30 times short of it:
+///
+///     U10    bizim     Monahan
+///       8    0.00%      0.46%
+///      12    0.06%      1.84%
+///      15    0.23%      3.93%
+///      20    0.37%     10.49%
+///
+/// Solving for the threshold that reproduces `W` at each wind gives 0.837, 0.835,
+/// 0.842, 0.866, 1.023 — very nearly the SAME number. That is the finding: the
+/// Jacobian's statistics already carry the right wind dependence, and the only
+/// thing wrong was where the line was drawn. 0.85 covers 6 to 20 m/s; the storm end
+/// stays slightly conservative on purpose.
+#define SEA_FOAM_J_THRESHOLD     0.85
+#define SEA_FOAM_J_RANGE         0.85
 
 /// Foam decay rate (1/s). Foam appears INSTANTLY and fades SLOWLY; with a
 /// direct assignment foam would disappear instantly. [CALIBRATION]
-#define SEA_FOAM_DECAY           0.28
+/// FOAM FADES EXPONENTIALLY, NOT LINEARLY (1/s).
+///
+/// A real whitecap has two stages: the active crest is bright for one to three
+/// seconds, then a residue of bubbles drifts and fades for tens of seconds. A
+/// linear decay cannot be both — at 0.28/s foam went from full to nothing in 3.6 s
+/// and the sea never looked used.
+///
+/// An exponential does both with one number. At 0.15/s the foam stays bright
+/// (over 0.7) for 2.4 s and stays visible (over 0.05) for 20 s.
+#define SEA_FOAM_DECAY           0.15
 
 // --- FFT and grid ---
 

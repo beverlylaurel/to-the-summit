@@ -76,11 +76,11 @@ public static class SeaConstants
     // --- Foam (Jacobian) ---
 
     /// Jacobian threshold and transition range. [SOURCE: Tessendorf 2004 §4.6]
-    public const float FoamJThreshold = 0.55f;
-    public const float FoamJRange = 0.55f;
+    public const float FoamJThreshold = 0.85f;
+    public const float FoamJRange = 0.85f;
 
     /// Foam decay rate (1/s). [CALIBRATION]
-    public const float FoamDecay = 0.28f;
+    public const float FoamDecay = 0.15f;
 
     // --- FFT and grid ---
 

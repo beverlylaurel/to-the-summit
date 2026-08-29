@@ -29,8 +29,11 @@ void KFoam(uint3 id : SV_DispatchThreadID)
     // the exact J = 0 moment opens foam like a knife edge.
     float target = saturate((SEA_FOAM_J_THRESHOLD - J) / SEA_FOAM_J_RANGE);
 
+    // EXPONENTIAL, NOT LINEAR. A linear fade has one lifetime; a real whitecap has
+    // two — bright for a second or two, then a residue that drifts and fades for
+    // tens of seconds. `exp` gives both from one rate.
     float previous = _SeaFoamPrevRW[id];
-    float next     = max(target, previous - SEA_FOAM_DECAY * _SeaDeltaTime);
+    float next     = max(target, previous * exp(-SEA_FOAM_DECAY * _SeaDeltaTime));
 
     _SeaFoamRW[id] = saturate(next);
 }
