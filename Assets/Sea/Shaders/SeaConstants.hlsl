@@ -48,6 +48,15 @@
 /// holding that would need 28.6 km, far past anything the mesh draws (4064 m).
 #define SEA_OFFSHORE_RAMP        4000.0
 
+/// Which tier gets the hexagonal tiling. Tier 2 first: its patch is 37 m and it
+/// repeats 110 times inside the visible sea, so it is the one the eye catches.
+#define SEA_HEX_TIER             2
+
+/// Hexagons per patch, along one axis. At the 37 m patch of tier 2 this is a
+/// hexagon about 11 m across — larger than the features it carries (1-5 m), small
+/// enough that the repeat is gone.
+#define SEA_HEX_TILES            3.464
+
 #define SEA_MIN_DEPTH            0.05
 
 /// Wave damping at the shoreline (m). Below this depth the wave height goes

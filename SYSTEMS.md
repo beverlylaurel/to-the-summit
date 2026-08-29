@@ -1451,3 +1451,32 @@ gitti; deniz bölümünde yalnız Hs / Tp / kıyı köpüğü okuması kaldı.
 
 **Bilinçli kural:** `shoreSlope` ARAZİNİN özelliği, denizin değil. Dağ yeniden
 üretilirse yeniden ölçülmeli (`SCALE.md`).
+
+
+## Deniz: tier 2 altıgen karoyla döşeniyor (2026-08-29)
+
+FFT parçası her `L` metrede tam tekrar ediyor. Tier 2'nin `L`'si 37 m ve görünür denize
+110 kez sığıyor — göze çarpan tekrar bu.
+
+`SeaHexWeights` düzlemi altıgenlere bölüyor; her altıgen AYNI dokuyu kendi rastgele
+kaymasıyla okuyor, bir noktayı örten üç altıgen harmanlanıyor.
+
+**Harman varyans koruyor:** `(a w0 + b w1 + c w2) / sqrt(w0²+w1²+w2²)`. Düz ağırlıklı
+toplam, ağırlıkların eşitlendiği yerde varyansı düşürür ve deniz altıgen ortalarında
+düzleşir.
+
+**Gauss dönüşümü GEREKMİYOR.** Heitz–Neyret girdiyi "Gaussianize" edip sonra geri çeviriyor,
+çünkü fotoğraflanmış doku Gauss değil. Tessendorf alanı rastgele fazların toplamı, yani
+tanım gereği Gauss — yöntemin pahalı yarısı düşüyor.
+
+**Harmanlanmayan iki şey:**
+- **Jacobian** — sıfır ortalamalı Gauss değil, 1 civarında oturuyor ve kıvrım
+  ORTALAMA değil MİNİMUM. Üçünün en kıvrımlısı alınıyor.
+- **Köpük** — kaplama; ortalaması alınırsa altıgen sınırlarında petek deseni çıkar.
+  Tierlar arasında zaten uygulanan kural: en büyüğü kazanır.
+
+**Ölçüm:** tam bir parça (37 m) kaymadaki özilinti **1,000 → −0,001**. Varyans oranı
+**0,992**. Ağırlıklar toplamı her yerde 1,0000, en küçük bileşen 0.
+
+**Şimdilik yalnız tier 2.** Tier 1 (191 m, 21 tekrar) ve tier 0 (967 m, 4 tekrar)
+dokunulmadı; maliyet o tierlar için ölçülmeden açılmayacak.

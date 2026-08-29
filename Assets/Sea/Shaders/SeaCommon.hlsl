@@ -83,6 +83,79 @@ SAMPLER(sampler_SeaDerivatives);
 TEXTURE2D_ARRAY(_SeaFoam);
 SAMPLER(sampler_SeaFoam);
 
+/// Folded for the same reason as `SeaHash21`, and by the same rule.
+float2 SeaHash22(float2 p)
+{
+    p = fmod(abs(p), SEA_HASH_PERIOD);
+
+    float3 q = frac(float3(p.x, p.y, p.x + 19.19) * float3(0.1031, 0.1030, 0.0973));
+    q += dot(q, q.yzx + 33.33);
+    return frac(float2((q.x + q.y) * q.z, (q.x + q.z) * q.y));
+}
+
+/// HEXAGONAL TILING — BREAKING THE FFT OWN REPEAT.
+///
+/// An FFT patch repeats exactly every `L` metres. Measured on the tiers in use:
+/// tier 2 has L = 37 m and fits into the visible sea 110 times, tier 1 has 191 m
+/// and fits 21 times. Coprime patch sizes stop the three lining up with each
+/// other, but each one still repeats on its own.
+///
+/// The cure is by-example synthesis: cover the plane with hexagons, give each
+/// hexagon a random offset into the SAME texture, and blend the three that cover a
+/// point. Three samples, no extra memory, and cheaper than adding a fourth FFT
+/// tier. [SOURCE: Heitz & Neyret 2018; Ubisoft La Forge, ocean tiling and blending]
+///
+/// THE GAUSSIAN STEP IS NOT NEEDED HERE. Heitz and Neyret "Gaussianise" the input
+/// and undo it after blending, because a photographed texture is not Gaussian. A
+/// Tessendorf field IS: it is a sum of components with random phases. So plain
+/// mean-and-variance preservation is exact for us, and the histogram transform —
+/// the expensive half of the method — drops out.
+void SeaHexWeights(float2 uv, out float2 o0, out float2 o1, out float2 o2, out float3 w)
+{
+    // Skew the square lattice into the hexagonal one.
+    const float2x2 toSkewed = float2x2(1.0, 0.0, -0.57735027, 1.15470054);
+
+    float2 skewed = mul(toSkewed, uv * SEA_HEX_TILES);
+    float2 baseCell = floor(skewed);
+    float3 bary = float3(frac(skewed), 0.0);
+    bary.z = 1.0 - bary.x - bary.y;
+
+    float2 v0, v1, v2;
+    if (bary.z > 0.0)
+    {
+        w  = float3(bary.z, bary.y, bary.x);
+        v0 = baseCell;
+        v1 = baseCell + float2(0.0, 1.0);
+        v2 = baseCell + float2(1.0, 0.0);
+    }
+    else
+    {
+        w  = float3(-bary.z, 1.0 - bary.y, 1.0 - bary.x);
+        v0 = baseCell + float2(1.0, 1.0);
+        v1 = baseCell + float2(1.0, 0.0);
+        v2 = baseCell + float2(0.0, 1.0);
+    }
+
+    // Each hexagon reads the patch from its own random place. The texture wraps,
+    // so any offset is legal.
+    o0 = SeaHash22(v0);
+    o1 = SeaHash22(v1);
+    o2 = SeaHash22(v2);
+}
+
+/// Variance-preserving blend of three samples of a ZERO-MEAN Gaussian field.
+/// A plain weighted sum would shrink the variance wherever the weights are even,
+/// and the sea would go flat in the middle of every hexagon.
+float3 SeaHexBlend3(float3 a, float3 b, float3 c, float3 w)
+{
+    return (a * w.x + b * w.y + c * w.z) * rsqrt(dot(w, w));
+}
+
+float2 SeaHexBlend2(float2 a, float2 b, float2 c, float3 w)
+{
+    return (a * w.x + b * w.y + c * w.z) * rsqrt(dot(w, w));
+}
+
 /// Sum of the three tiers' displacement. w = the SMALLEST Jacobian across
 /// the tiers.
 ///
@@ -98,10 +171,30 @@ float4 SeaSampleDisplacement(float2 posXZ)
     for (int s = 0; s < SEA_TIER_COUNT; ++s)
     {
         float2 uv = posXZ / _SeaPatchSizes[s];
-        float4 d = SAMPLE_TEXTURE2D_ARRAY_LOD(_SeaDisplacement,
-                                              sampler_SeaDisplacement, uv, s, 0);
-        disp += d.xyz * _SeaTierWeights[s];
-        jac   = min(jac, d.w);
+
+        if (s == SEA_HEX_TIER)
+        {
+            float2 o0, o1, o2; float3 w;
+            SeaHexWeights(uv, o0, o1, o2, w);
+
+            float4 d0 = SAMPLE_TEXTURE2D_ARRAY_LOD(_SeaDisplacement, sampler_SeaDisplacement, uv + o0, s, 0);
+            float4 d1 = SAMPLE_TEXTURE2D_ARRAY_LOD(_SeaDisplacement, sampler_SeaDisplacement, uv + o1, s, 0);
+            float4 d2 = SAMPLE_TEXTURE2D_ARRAY_LOD(_SeaDisplacement, sampler_SeaDisplacement, uv + o2, s, 0);
+
+            disp += SeaHexBlend3(d0.xyz, d1.xyz, d2.xyz, w) * _SeaTierWeights[s];
+
+            // THE JACOBIAN IS NOT BLENDED. It is not a zero-mean Gaussian — it sits
+            // around 1 and folding is the MINIMUM, not the average. Taking the most
+            // folded of the three keeps foam where a fold actually is.
+            jac = min(jac, min(d0.w, min(d1.w, d2.w)));
+        }
+        else
+        {
+            float4 d = SAMPLE_TEXTURE2D_ARRAY_LOD(_SeaDisplacement,
+                                                  sampler_SeaDisplacement, uv, s, 0);
+            disp += d.xyz * _SeaTierWeights[s];
+            jac   = min(jac, d.w);
+        }
     }
 
     return float4(disp, jac);
@@ -118,9 +211,26 @@ float2 SeaSampleSlope(float2 posXZ)
     for (int s = 0; s < SEA_TIER_COUNT; ++s)
     {
         float2 uv = posXZ / _SeaPatchSizes[s];
-        slope += SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives,
-                                        sampler_SeaDerivatives, uv, s).xy
-               * _SeaTierWeights[s];
+
+        if (s == SEA_HEX_TIER)
+        {
+            float2 o0, o1, o2; float3 w;
+            SeaHexWeights(uv, o0, o1, o2, w);
+
+            // THE SAME WEIGHTS AS THE DISPLACEMENT. Blended differently, the normal
+            // would stop describing the surface the geometry actually has.
+            float2 s0 = SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives, sampler_SeaDerivatives, uv + o0, s).xy;
+            float2 s1 = SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives, sampler_SeaDerivatives, uv + o1, s).xy;
+            float2 s2 = SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives, sampler_SeaDerivatives, uv + o2, s).xy;
+
+            slope += SeaHexBlend2(s0, s1, s2, w) * _SeaTierWeights[s];
+        }
+        else
+        {
+            slope += SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives,
+                                            sampler_SeaDerivatives, uv, s).xy
+                   * _SeaTierWeights[s];
+        }
     }
 
     return slope;
@@ -141,13 +251,37 @@ float SeaSampleFoam(float2 posXZ, out float2 foldDirection)
     for (int s = 0; s < SEA_TIER_COUNT; ++s)
     {
         float2 uv = posXZ / _SeaPatchSizes[s];
-        float k = SAMPLE_TEXTURE2D_ARRAY(_SeaFoam, sampler_SeaFoam, uv, s).r;
+        float2 pick = uv;
+        float k;
+
+        if (s == SEA_HEX_TIER)
+        {
+            float2 o0, o1, o2; float3 w;
+            SeaHexWeights(uv, o0, o1, o2, w);
+
+            // FOAM IS COVERAGE, SO THE LARGEST WINS — the same rule already used
+            // across tiers. Blending it would average foam away where the hexagons
+            // meet and draw a honeycomb.
+            float k0 = SAMPLE_TEXTURE2D_ARRAY(_SeaFoam, sampler_SeaFoam, uv + o0, s).r;
+            float k1 = SAMPLE_TEXTURE2D_ARRAY(_SeaFoam, sampler_SeaFoam, uv + o1, s).r;
+            float k2 = SAMPLE_TEXTURE2D_ARRAY(_SeaFoam, sampler_SeaFoam, uv + o2, s).r;
+
+            float2 best = o0;
+            k = k0;
+            if (k1 > k) { k = k1; best = o1; }
+            if (k2 > k) { k = k2; best = o2; }
+            pick = uv + best;
+        }
+        else
+        {
+            k = SAMPLE_TEXTURE2D_ARRAY(_SeaFoam, sampler_SeaFoam, uv, s).r;
+        }
 
         if (k > f)
         {
             f = k;
             foldDirection = SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives,
-                                                   sampler_SeaDerivatives, uv, s).zw;
+                                                   sampler_SeaDerivatives, pick, s).zw;
         }
     }
 
@@ -215,15 +349,6 @@ float SeaFoamNoise(float2 p)
 }
 
 /// Two 2D random offsets for a cell.
-/// Folded for the same reason as `SeaHash21`, and by the same rule.
-float2 SeaHash22(float2 p)
-{
-    p = fmod(abs(p), SEA_HASH_PERIOD);
-
-    float3 q = frac(float3(p.x, p.y, p.x + 19.19) * float3(0.1031, 0.1030, 0.0973));
-    q += dot(q, q.yzx + 33.33);
-    return frac(float2((q.x + q.y) * q.z, (q.x + q.z) * q.y));
-}
 
 /// WORLEY (CELLULAR) F1 — the distance to the nearest scattered point.
 ///
