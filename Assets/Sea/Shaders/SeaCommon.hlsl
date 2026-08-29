@@ -54,6 +54,10 @@ float _SeaMaxShoalingGain;
 /// knows its own elevation. Published by `SeaManager`.
 float _SeaSignificantHeight;
 
+/// `(beat angular frequency, beat depth, 0, 0)` — the two spectral peaks' interference.
+/// This is what a "set" is: the arriving waves grow and shrink over the beat period.
+float4 _SeaWaveGroups;
+
 /// The RUNNING FFT size and its log2. Comes from the quality preset;
 /// `SEA_FFT_SIZE` is only the upper bound.
 uint _SeaFftSize;

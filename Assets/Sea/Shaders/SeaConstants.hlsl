@@ -10,6 +10,7 @@
 /// Gravity. [SOURCE: Tessendorf 2004 4.2]
 #define SEA_G                    9.81
 
+#define SEA_SQRT2                1.41421356
 #define SEA_TWO_PI               6.28318530718
 
 /// Index of refraction of water. [SOURCE: Tessendorf 2004 6.1.2, 6.3 sample shader]

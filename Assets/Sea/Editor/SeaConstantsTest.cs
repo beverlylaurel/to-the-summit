@@ -36,6 +36,7 @@ public static class SeaConstantsTest
     {
         ("G", "SEA_G"),
         ("TwoPi", "SEA_TWO_PI"),
+        ("Sqrt2", "SEA_SQRT2"),
         ("WaterIor", "SEA_WATER_IOR"),
         ("BulkReflectivity", "SEA_BULK_REFLECTIVITY"),
 

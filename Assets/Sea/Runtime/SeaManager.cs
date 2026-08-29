@@ -28,6 +28,9 @@ public class SeaManager : MonoBehaviour
 
     float bakedSeaLevel = float.NaN;
 
+    /// `(beat angular frequency, beat depth, 0, 0)`.
+    Vector4 waveGroups;
+
     public SeaSettings Settings => settings;
 
     public void Bind(SeaSettings source, SeaEnvironmentBridge bridge, Terrain target)
@@ -254,6 +257,8 @@ public class SeaManager : MonoBehaviour
             SeaSpectrumMoments.Result m = SeaSpectrumMoments.Integrate(u, settings);
             SeaRuntimeState.SignificantWaveHeight = m.SignificantHeight;
             SeaRuntimeState.PeakPeriod = m.PeakPeriod;
+            waveGroups = new Vector4(SeaConstants.TwoPi / Mathf.Max(m.BeatPeriod, 0.1f),
+                                     m.BeatDepth, 0f, 0f);
             momentInputs = inputs;
             momentsValid = true;
         }
@@ -265,6 +270,12 @@ public class SeaManager : MonoBehaviour
         // pixel only knows its own elevation, which is not the same thing.
         Shader.SetGlobalFloat(SeaShaderIDs.SignificantHeight,
                               SeaRuntimeState.SignificantWaveHeight);
+
+        // THE SETS. Where the surf zone's outer edge stands depends on how big the
+        // waves arriving right now are, and that changes from wave to wave because the
+        // spectrum has two peaks. Without it the edge sits on one depth contour and
+        // draws the shoreline's own curve.
+        Shader.SetGlobalVector(SeaShaderIDs.WaveGroups, waveGroups);
 
         // HOW HIGH THE SWASH REACHES — STOCKDON, NOT A FIXED NUMBER.
         //

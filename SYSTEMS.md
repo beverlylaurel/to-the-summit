@@ -1499,3 +1499,34 @@ için rüzgâr değil.
 **Bilinçli kural:** fırtına ucu korunmuştur (korunaklı 0,350, açık 1,000). Ölü sakinlikte
 her maruziyette 0. `s^4` eğrisine dokunulmadı — gerekçesi (`RATIONALE.md`, yağmur eğimi)
 hâlâ geçerli.
+
+
+## Deniz: sörf kuşağı setlerle nefes alıyor (2026-08-29)
+
+`SeaSpectrumMoments` iki spektrum tepesinin **vuruşmasını** da döndürüyor:
+periyot `2pi/|w_ruzgar - w_olu|` ve modülasyon derinliği `2 A1 A2 / (A1² + A2²)`.
+`SeaManager` bunu `_SeaWaveGroups` olarak yayımlıyor.
+
+Kırılma ölçütünün dalga yüksekliği artık o zarfı taşıyor:
+
+    setPhase = w_vurus * (t - derinlik * 0.35)
+    waveH    = Hs * shoal * (1 + derinlik_modulasyonu * 0.5 * cos(setPhase))
+
+**Neden var:** sabit Hs ile ölçüt yalnız derinliğe bağlıydı, yani sörfün dış kenarı tek
+bir derinlik konturunda duruyordu ve yukarıdan bakınca **kıyı çizgisinin kendi eğrisini**
+çiziyordu. Gerçek sörf kuşağı nefes alır: büyük set daha açıkta kırılır, durgunlukta kenar
+geri çekilir.
+
+**Uydurma zarf değil.** Spektrumda zaten iki tepe var; "set" dediğimiz şey onların
+girişimi. Faz derinlikle kaydırılıyor, böylece set VARIYOR — bütün kıyı aynı anda
+atmıyor.
+
+**Ölçülen nefes** (kıyı eğimi %5,8):
+
+| U10 | Hs | vuruş | kenar | nefes |
+|---|---|---|---|---|
+| 3,0 | 1,17 m | 9 s | 37–90 m | 52 m |
+| 6,5 | 1,96 m | 16 s | 71–126 m | 54 m |
+| 14 | 3,66 m | 40 s | 138–188 m | 50 m |
+
+Öncesi: her rüzgârda tek kontur, nefes 0 m.

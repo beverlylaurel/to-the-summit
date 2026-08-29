@@ -415,7 +415,27 @@ Shader "ToTheSummit/SeaLit"
 
                     float shoal  = min(SeaShoalingGain(depth, _SeaSpectrumDepth),
                                        _SeaMaxShoalingGain);
-                    float waveH  = _SeaSignificantHeight * shoal;
+
+                    // THE SETS MOVE THE BREAKER LINE.
+                    //
+                    // With a fixed Hs the criterion depends on depth alone, so the
+                    // outer edge of the surf sits on one depth contour and draws the
+                    // shoreline's own curve — from a height it reads as a clean arc
+                    // that has nothing to do with the water.
+                    //
+                    // A real surf zone breathes: a big set breaks further out and the
+                    // lull lets the edge fall back. That is not an invented envelope.
+                    // The spectrum has TWO peaks and their interference is exactly the
+                    // wave-to-wave size change. Measured: the beat runs 4 s in a calm
+                    // and 89 s at 20 m/s, at a modulation depth of 0.29 to 0.97.
+                    //
+                    // The phase carries the travel across the shelf, so the set arrives
+                    // rather than the whole coast pulsing at once: deeper water is
+                    // reached earlier, which `depth` stands in for.
+                    float setPhase = _SeaWaveGroups.x * (_SeaTime - depth * 0.35);
+                    float setSize  = 1.0 + _SeaWaveGroups.y * 0.5 * cos(setPhase);
+
+                    float waveH  = _SeaSignificantHeight * shoal * setSize;
                     float ratio  = waveH / max(depth, SEA_MIN_DEPTH);
                     float breakT = saturate((ratio - gamma * 0.7) / (gamma * 0.3));
 

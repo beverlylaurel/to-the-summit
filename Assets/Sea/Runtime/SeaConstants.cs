@@ -18,6 +18,9 @@ public static class SeaConstants
 
     public const float TwoPi = 6.28318530718f;
 
+    /// Amplitude of a single sinusoid with unit rms.
+    public const float Sqrt2 = 1.41421356f;
+
     /// Index of refraction of water. [SOURCE: Tessendorf 2004 §6.1.2]
     public const float WaterIor = 1.34f;
 

@@ -36,10 +36,23 @@ public static class SeaSpectrumMoments
         /// whichever partition actually carries the energy.
         public readonly float PeakPeriod;
 
-        public Result(float significantHeight, float peakPeriod)
+        /// BEAT OF THE TWO PEAKS: `2pi / |w_wind - w_swell|` (s), and how deep the
+        /// modulation goes, `2 A1 A2 / (A1^2 + A2^2)`, 0..1.
+        ///
+        /// This is the wave-to-wave size change on a real shore — the reason the surf
+        /// zone breathes instead of standing on one depth contour. It is not an
+        /// invented envelope: both partitions are already in the spectrum, and their
+        /// interference is what a "set" is.
+        public readonly float BeatPeriod;
+        public readonly float BeatDepth;
+
+        public Result(float significantHeight, float peakPeriod,
+                      float beatPeriod, float beatDepth)
         {
             SignificantHeight = significantHeight;
             PeakPeriod = peakPeriod;
+            BeatPeriod = beatPeriod;
+            BeatDepth = beatDepth;
         }
     }
 
@@ -69,7 +82,7 @@ public static class SeaSpectrumMoments
         float swellAlpha = settings.swellAlpha;
         float swellGamma = settings.swellGamma;
 
-        double m0 = 0.0;
+        double m0 = 0.0, m0Wind = 0.0, m0Swell = 0.0;
         float peakDensity = -1f;
         float peakOmega = omegaPSwell;
 
@@ -91,6 +104,8 @@ public static class SeaSpectrumMoments
 
             float total = (wind + swell) * attenuation;
             m0 += total * OmegaStep;
+            m0Wind += wind * attenuation * OmegaStep;
+            m0Swell += swell * attenuation * OmegaStep;
 
             if (total > peakDensity)
             {
@@ -99,8 +114,18 @@ public static class SeaSpectrumMoments
             }
         }
 
+        // Amplitudes of the two partitions, and their beat.
+        float aWind = Mathf.Sqrt((float)m0Wind) * SeaConstants.Sqrt2;
+        float aSwell = Mathf.Sqrt((float)m0Swell) * SeaConstants.Sqrt2;
+
+        float dOmega = Mathf.Abs(omegaPWind - omegaPSwell);
+        float beatPeriod = dOmega > 1e-4f ? SeaConstants.TwoPi / dOmega : 1e4f;
+        float beatDepth = 2f * aWind * aSwell
+                        / Mathf.Max(aWind * aWind + aSwell * aSwell, 1e-8f);
+
         return new Result(4f * Mathf.Sqrt((float)m0),
-                          SeaConstants.TwoPi / Mathf.Max(peakOmega, 1e-4f));
+                          SeaConstants.TwoPi / Mathf.Max(peakOmega, 1e-4f),
+                          beatPeriod, beatDepth);
     }
 
     /// JONSWAP peak frequency (rad/s). Mirrors `SeaPeakOmega`.
