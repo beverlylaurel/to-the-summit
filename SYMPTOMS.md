@@ -4104,3 +4104,48 @@ büyüğü alınarak devir teslim dikişsiz yapıldı.
 oluyor. Yani alacakaranlık doğru enerjiyi yanlış yönden taşıyor — 18:00'de zenit 0,0205,
 18:30'da 0,0398, arada iki katlık bir çukur. 690 katın yanında görünmez ama duruyor.
 `DECISIONS.md` → "Gökyüzü LUT'u yönü ana ışıktan alıyor".
+
+
+## Ufuktaki uzak bulutların kenarında parlak kontur (yakın bulutlarda yok)
+
+**İlk şüpheli yanlış olurdu:** "yükseltme (upscale) kenarı taşırıyor". Taşırıyor, ama tek
+başına kontur üretmiyor — kanıtı, F1'den bulut sisi kapatılınca taşma devam ediyor, kontur
+gidiyor.
+
+**Gerçek sebep:** sönümleme ile dolgu **aynı ağırlığı** paylaşıyordu.
+
+```hlsl
+half edgeFog = lerp(1.0, fogTransmittance, cloudCover);
+cloudsColor.xyz = cloudsColor.xyz * edgeFog + fogScattering * cloudCover;
+```
+
+İnce kenarda `cloudCover ≈ 0` olduğu için `edgeFog ≈ 1` çıkıyor: bulutun kendi rengi **hiç
+sönmüyor**. Hemen yanındaki gövde pikselinde `cloudCover ≈ 1`, ve 37 km'de geçirgenlik
+neredeyse sıfır olduğu için gövde kendi rengini tamamen kaybedip hava ışığına dönüyor.
+Aradaki fark, her uzak bulutun çevresine parlak bir çizgi olarak oturuyor.
+
+**Neden yalnız uzakta:** yakında `fogTransmittance ≈ 1`, `lerp(1, ~1, cover)` de ≈ 1. İki
+biçim aynı sonucu veriyor, fark görünmüyor.
+
+**Yükseltme işi ağırlaştırıyor ama sebebi değil:** renk çift doğrusal yükseltiliyor, derinlik
+nokta örnekleniyor. Silüetin dışına taşan parlak renk tam da sönümlenmeyen piksellere düşüyor.
+
+**Ayırt eden ölçüm:** F1 → "Bulut sisi" aç/kapa, aynı saatte iki kare. Kapalıyken kontur yok.
+
+**Düzeltme:** ikisi ayrı soru, ayrı ağırlık.
+
+```hlsl
+cloudsColor.xyz = cloudsColor.xyz * fogTransmittance + fogScattering * cloudCover;
+```
+
+Sönümleme **tam** — `cloudsColor.xyz` yalnız bulutun kendi ışığını taşıyor ve o ışık, bulut ne
+kadar ince olursa olsun kameraya kadar bütün mesafeyi kat ediyor. Arkadaki yüzey ayrı geçişte
+birleştiriliyor (`Blend One SrcAlpha`) ve sisini kendi yolunda alıyor.
+
+Dolgu `cloudCover`'da **kalıyor**, ters sebeple: hava ışığı yalnız bulutun gerçekten kapattığı
+pay kadar eklenmeli, yoksa pikselin geri kalanı sisi iki kez yer.
+
+Bu, aynı satırdaki İKİNCİ kontur hatası. Birincisi siyahtı ve sebebi uydurma mesafeydi
+(kenara uzak düzleme yakın bir derinlik yazılıyordu, sis doyuyordu); kaydı shader'ın kendi
+yorumunda duruyor.
+
