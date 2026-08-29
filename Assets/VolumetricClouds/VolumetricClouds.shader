@@ -264,6 +264,11 @@ Shader "Hidden/Sky/VolumetricClouds"
                     float fogTransmittance;
                     FogPath(camPos, posInput.positionWS, fogScattering, fogTransmittance);
 
+                    // Off, the cloud takes no fog at all: nothing is added and the transmittance
+                    // returns to 1, so the two lines below hand `cloudsColor` back untouched.
+                    fogScattering *= _CloudFogEnabled;
+                    fogTransmittance = lerp(1.0, fogTransmittance, _CloudFogEnabled);
+
                     // The cloud's own light fades along the distance; the fog fill is added in
                     // proportion to how much the cloud COVERS the scene behind it (`1 - w`) —
                     // where it is transparent the surface behind already took the fog along its own path and does not take it twice.
@@ -731,6 +736,11 @@ Shader "Hidden/Sky/VolumetricClouds"
                     float3 fogScattering;
                     float fogTransmittance;
                     FogPath(camPos, posInput.positionWS, fogScattering, fogTransmittance);
+
+                    // Off, the cloud takes no fog at all: nothing is added and the transmittance
+                    // returns to 1, so the two lines below hand `cloudsColor` back untouched.
+                    fogScattering *= _CloudFogEnabled;
+                    fogTransmittance = lerp(1.0, fogTransmittance, _CloudFogEnabled);
 
                     // The cloud's own light fades along the distance; the fog fill is added in
                     // proportion to how much the cloud COVERS the scene behind it (`1 - w`) —

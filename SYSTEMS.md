@@ -14,7 +14,7 @@ Nubis/HZD makalesine göre düzeltildi. Portun makaleyle farkları ve ölçümle
 | `AltitudeWeatherDriver.CloudMass` **veya** `AtmosphereController.Coverage` — hangisi büyükse | örtünün optik kalınlığı | `densityMultiplier` |
 | `WindField.FreeAirSpeed` + `PrevailingDirection` | serbest hava rüzgârı, **arazi maruziyeti uygulanmadan** | `globalSpeed` (km/h), `globalOrientation` |
 | `TimeOfDay` | **dolaylı** — yönlü ışığın yönü/rengi/şiddeti | `GetMainLight()` |
-| `HeightFog.hlsl → FogPath` | kamera ile bulut arasındaki sis | birleştirme geçişi |
+| `HeightFog.hlsl → FogPath` | kamera ile bulut arasındaki sis | birleştirme geçişi; F1'den ayrı kapatılabilir (`_CloudFogEnabled`) |
 
 Çeviriyi `CloudWeatherDriver` yapıyor; tek yön, bulut geri yazmıyor.
 
@@ -1619,7 +1619,7 @@ zincirinin ufuktaki deliğine (aşağıda) bağışık olması.
 renklilik kaybının ne kadarının harcandığını söylüyor. İkisi ayrışırsa iki alana bölünür;
 tetikleyici `DECISIONS.md`'de.
 
-**Play'de doğrulandı** (F1 → Göz uyumu). Kâğıtta hesaplanan ile ekranda okunan:
+**Play'de doğrulandı.** Kâğıtta hesaplanan ile ekranda okunan:
 
 | saat | ışık | kademe | eski | kâğıt | PLAY | çubuk |
 |---|---|---|---|---|---|---|
@@ -1664,3 +1664,19 @@ kanca ayın ışığını eziyor ve gece sıfırlanıyor (ölçüldü: 0,00039 �
 
 **Kalan sınır:** LUT'un YÖNÜ hâlâ URP'nin ana ışığından geliyor. Sayılar ve gerekçe
 `SYMPTOMS.md` → "Gökyüzü probu gün doğumunda ve batımında çöküyor".
+
+
+## F1: bulut sisi ayrı anahtar (2026-08-29)
+
+`AtmosphereController.CloudFogEnabled` → `_CloudFogEnabled` → `VolumetricClouds.shader`'daki
+iki `FogPath` çağrısı. Kapalıyken saçılım sıfırlanıyor, geçirgenlik 1'e dönüyor; bulut, bulut
+geçişinin ürettiği hâliyle kalıyor.
+
+**Neden mevcut "Yükseklik sisi" yetmiyor.** O anahtar `FogEnabled` üzerinden üç katmanın
+yoğunluğunu birden sıfırlıyor — arazi, deniz ve gökyüzü de sisini kaybediyor. Buluttaki
+pusun sisten mi bulutun kendi tonundan mı geldiği o anahtarla sorulamıyor.
+
+**F1'den silinenler (işi bitti):** "Rüzgârla taşınmayı kapat", "Rüzgâr gölgesini kapat" —
+kar sisteminin izolasyon anahtarlarıydı, `SnowManager`'daki ölü dallarıyla birlikte gitti.
+"Göz uyumu" bölümü de silindi; pozlama zinciri ölçüldü, düzeltildi ve Play'de doğrulandı.
+

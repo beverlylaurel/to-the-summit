@@ -32,6 +32,7 @@ public class AtmosphereController : MonoBehaviour
 
     static readonly int HeightFogColorId = Shader.PropertyToID("_HeightFogColor");
     static readonly int HeightFogDensityId = Shader.PropertyToID("_HeightFogDensity");
+    static readonly int CloudFogEnabledId = Shader.PropertyToID("_CloudFogEnabled");
     static readonly int HeightFogFalloffId = Shader.PropertyToID("_HeightFogFalloff");
     static readonly int HeightFogBaseId = Shader.PropertyToID("_HeightFogBase");
     static readonly int FogSeaDensityId = Shader.PropertyToID("_FogSeaDensity");
@@ -93,6 +94,11 @@ public class AtmosphereController : MonoBehaviour
     /// aerial perspective is a separate mechanism and is not affected — tying the two to one switch
     /// produces false evidence like "I turned the fog off and the problem is still there".
     public bool FogEnabled { get; set; } = true;
+
+    /// Whether the cloud takes the fog on the path between it and the camera. Separate from
+    /// `FogEnabled`, which takes the whole fog down at once and so cannot tell the haze ON the
+    /// cloud apart from the cloud's own tone.
+    public bool CloudFogEnabled { get; set; } = true;
 
     /// For testing, fixes the cloud coverage independently of the weather.
     public bool CoverageLocked { get; set; }
@@ -799,6 +805,7 @@ public class AtmosphereController : MonoBehaviour
         skyShade = Color.Lerp(physicalAway, color, overcast);
 
 
+        Shader.SetGlobalFloat(CloudFogEnabledId, CloudFogEnabled ? 1f : 0f);
         Shader.SetGlobalFloat(HeightFogDensityId, density);
         Shader.SetGlobalFloat(HeightFogFalloffId, falloff);
         Shader.SetGlobalFloat(HeightFogBaseId, settings.fogBaseAltitude);

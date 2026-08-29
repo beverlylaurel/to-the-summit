@@ -1235,7 +1235,6 @@ public static class MountainSceneBootstrap
             Object.FindAnyObjectByType<LightningFlash>(),
             Object.FindAnyObjectByType<TimeOfDay>(),
             Object.FindAnyObjectByType<AtmosphereController>(),
-            Object.FindAnyObjectByType<LookController>(),
             Object.FindAnyObjectByType<PrecipitationRenderer>(),
             Object.FindAnyObjectByType<PerformanceHud>(),
             Object.FindAnyObjectByType<ClimbHud>(),

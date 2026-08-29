@@ -166,6 +166,12 @@ float _SunHeight;
 // therefore no "shadow on the ground with no cloud in the sky".
 float _CloudBottom;        // base of the layer (metres)
 
+/// TEST SWITCH (F1): 1 the cloud takes the fog between it and the camera, 0 it takes none.
+/// Only the CLOUD side is switched; the terrain, the sea and the sky keep their own fog. The
+/// height fog's own switch zeroes the densities on the CPU and takes everything down together,
+/// which cannot answer "is that haze on the cloud coming from the fog or from the cloud".
+float _CloudFogEnabled;
+
 /// Height fog: the density integral along the path the ray travels.
 ///
 /// Constant density fog cannot do this — it applies the same amount looking down from the

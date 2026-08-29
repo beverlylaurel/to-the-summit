@@ -97,8 +97,6 @@ public class SnowManager : MonoBehaviour
     float lastSimulatedTime = -1f;
     float simDeltaTime;
 
-    [System.NonSerialized] public bool WindTransportOff;
-    [System.NonSerialized] public bool WindShadowOff;
 
     public float MeanSwe { get; private set; } = -1f;
     public float MeanRhoN { get; private set; } = -1f;
@@ -458,12 +456,12 @@ public class SnowManager : MonoBehaviour
         cmd.BeginSample(SnowProfiler.MarkerNames[3]);
         DispatchAccumulate(cmd, groups);
 
-        if (!WindShadowOff) DispatchWindShadow(cmd);
+        DispatchWindShadow(cmd);
 
         float driftActive = SnowDriftVfxController.DriftActiveFor(
             env.WindSpeed, SnowRuntimeState.LooseSnowFraction);
 
-        if (!WindTransportOff && driftActive > 0f)
+        if (driftActive > 0f)
             DispatchWindTransport(cmd, groups);
 
         if (persistence != null) persistence.Dispatch(cmd);

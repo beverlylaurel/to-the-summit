@@ -18,7 +18,6 @@ public class DebugMenu : MonoBehaviour
     [SerializeField] LightningFlash lightning;
     [SerializeField] TimeOfDay time;
     [SerializeField] AtmosphereController atmosphere;
-    [SerializeField] LookController look;
     [SerializeField] PrecipitationRenderer precipitation;
     [SerializeField] TemperatureField temperature;
     [SerializeField] SnowfallRenderer snowfall;
@@ -66,8 +65,6 @@ public class DebugMenu : MonoBehaviour
     float lockedSnowFraction = 1f;
 
     /// Diagnostic: wind transport and its shadow can be switched off separately.
-    bool windTransportOff;
-    bool windShadowOff;
 
    float lockedPrecipitation = 0.6f;
 
@@ -103,8 +100,7 @@ public class DebugMenu : MonoBehaviour
     public void Bind(FirstPersonController walkerRef, FreeFlyMovement flyerRef,
         WeatherState weatherRef, AltitudeWeatherDriver driverRef, WindField windRef,
         ThunderPlayer thunderRef, LightningFlash lightningRef, TimeOfDay timeRef,
-        AtmosphereController atmosphereRef, LookController lookRef,
-        PrecipitationRenderer precipitationRef,
+        AtmosphereController atmosphereRef, PrecipitationRenderer precipitationRef,
         PerformanceHud hudRef, ClimbHud climbHudRef,
         CursorLock cursorLockRef,
         RouteOverlay routeOverlayRef, Volume cloudVolumeRef, CloudWeatherDriver cloudDriverRef)
@@ -121,7 +117,6 @@ public class DebugMenu : MonoBehaviour
         lightning = lightningRef;
         time = timeRef;
         atmosphere = atmosphereRef;
-        look = lookRef;
         precipitation = precipitationRef;
         hud = hudRef;
         climbHud = climbHudRef;
@@ -132,7 +127,7 @@ public class DebugMenu : MonoBehaviour
     {
         if (walker == null || flyer == null || weather == null || weatherDriver == null
             || wind == null || thunder == null || lightning == null || time == null
-            || atmosphere == null || look == null
+            || atmosphere == null
             || precipitation == null || hud == null || climbHud == null
             || cursorLock == null || routeOverlay == null
             || cloudVolume == null || cloudDriver == null)
@@ -231,7 +226,6 @@ public class DebugMenu : MonoBehaviour
         BeginColumn();
         DrawMovement();
         DrawTimeOfDay();
-        DrawExposure();
         EndColumn();
 
         BeginColumn();
@@ -419,38 +413,6 @@ public class DebugMenu : MonoBehaviour
         EndSection();
     }
 
-    /// THE EXPOSURE CHAIN, READ-ONLY. No setting to put back: nothing here writes anything.
-    ///
-    /// It exists because the chain is four multiplications deep and every question about it
-    /// looks identical from outside the code. "The night is flat", "the sunset goes black",
-    /// "the blizzard is as bright as a clear noon" are three different faults and all three
-    /// present as "the exposure is wrong". These lines separate them at a glance:
-    ///
-    ///   - which SOURCE is driving — the sun term or the sky probe. The two are combined with
-    ///     `max()`, so whichever is larger silently owns the exposure and the other one is
-    ///     discarded. Marked with an arrow so it can be read while walking.
-    ///   - whether the CEILING is engaging, and by how much. The raw share and the saturated
-    ///     result are printed side by side; when they are equal the ceiling is doing nothing.
-    ///   - how far into ROD VISION the grade thinks it is.
-    void DrawExposure()
-    {
-        BeginSection("Göz uyumu");
-
-        float sun = look.SunTermNormalized;
-        float sky = look.SkyTermNormalized;
-        bool skyWins = sky > sun;
-
-        GUILayout.Label($"güneş {sun:F4} {(skyWins ? " " : "←")}   gök {sky:F4} {(skyWins ? "←" : " ")}");
-
-        float stops = -Mathf.Log(Mathf.Max(0.0005f, look.LightLevel), 2f);
-        GUILayout.Label($"ışık {look.LightLevel:F4}   öğlenin {stops:F2} kademe altı");
-
-        GUILayout.Label($"açılma {look.AdaptationEV:F2} EV   (tavansız {0.35f * Mathf.Max(0f, stops):F2})");
-        GUILayout.Label($"çubuk görüşü {look.ScotopicWeight:F2}");
-
-        EndSection();
-    }
-
     void DrawWeather()
     {
         BeginSection("Hava durumu");
@@ -540,22 +502,6 @@ public class DebugMenu : MonoBehaviour
                 GUILayout.Space(6f);
             }
 
-            if (mgr != null)
-            {
-                bool nextWt = GUILayout.Toggle(windTransportOff, "Rüzgârla taşınmayı kapat (teşhis)");
-                if (nextWt != windTransportOff)
-                {
-                    windTransportOff = nextWt;
-                    mgr.WindTransportOff = windTransportOff;
-                }
-
-                bool nextWs = GUILayout.Toggle(windShadowOff, "Rüzgâr gölgesini kapat (teşhis)");
-                if (nextWs != windShadowOff)
-                {
-                    windShadowOff = nextWs;
-                    mgr.WindShadowOff = windShadowOff;
-                }
-            }
         }
 
         GUILayout.Space(6f);
@@ -677,6 +623,11 @@ public class DebugMenu : MonoBehaviour
         GUILayout.Label($"Görüş {atmosphere.Visibility:F0} m");
 
         atmosphere.FogEnabled = GUILayout.Toggle(atmosphere.FogEnabled, "Yükseklik sisi");
+
+        // ONLY THE CLOUD SIDE. `FogEnabled` above zeroes every layer's density and takes the
+        // terrain, the sea and the sky down with it, so it cannot answer the one question worth
+        // asking here: is the haze ON the cloud the fog, or the cloud's own tone.
+        atmosphere.CloudFogEnabled = GUILayout.Toggle(atmosphere.CloudFogEnabled, "Bulut sisi");
         precipitation.enabled = GUILayout.Toggle(precipitation.enabled, "Yağmur ve kar");
 
         hud.enabled = GUILayout.Toggle(hud.enabled, "Performans göstergesi");
