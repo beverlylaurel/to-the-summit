@@ -192,26 +192,72 @@ public class SeaManager : MonoBehaviour
         Shader.SetGlobalFloat(SeaShaderIDs.FoamBreakupTiling, settings.foamBreakupTiling);
     }
 
-    /// THE PEAK PERIOD FOLLOWS FROM THE SPECTRUM.
+    /// EVERY INPUT OF THE INTEGRATION, NOT JUST THE WIND. Cached on the wind
+    /// alone, editing the swell in the Inspector would leave Hs and Tp on the
+    /// old spectrum with no error anywhere.
+    readonly struct MomentInputs
+    {
+        readonly float wind, fetch, depth, swellPeriod, swellAlpha, swellGamma;
+
+        public MomentInputs(float wind, SeaSettings s)
+        {
+            this.wind = wind;
+            fetch = s.fetch;
+            depth = s.spectrumDepth;
+            swellPeriod = s.swellPeriod;
+            swellAlpha = s.swellAlpha;
+            swellGamma = s.swellGamma;
+        }
+
+        /// The wind moves continuously, so it gets a dead band; the rest are
+        /// Inspector fields and any change at all counts.
+        ///
+        /// 0.1 m/s of dead band is worth 1 cm of Hs at 8 m/s (measured slope
+        /// 0.11 m per m/s). Without it a gusting wind would re-integrate 1600
+        /// steps every frame for a number that does not move.
+        public bool Matches(in MomentInputs other)
+        {
+            return Mathf.Abs(wind - other.wind) < 0.1f
+                && fetch == other.fetch
+                && depth == other.depth
+                && swellPeriod == other.swellPeriod
+                && swellAlpha == other.swellAlpha
+                && swellGamma == other.swellGamma;
+        }
+    }
+
+    MomentInputs momentInputs;
+
+    /// A default `MomentInputs` is all zeros, which could in principle match a
+    /// real one. The flag says "nothing has been integrated yet" without relying
+    /// on a sentinel value.
+    bool momentsValid;
+
+    /// THE SEA STATE COMES FROM THE SPECTRUM THAT IS RUNNING.
     ///
-    /// JONSWAP peak frequency `wp = 22 (g² / (U10 F))^(1/3)` and `Tp = 2pi/wp`.
-    /// [SOURCE: Horvath 2015 / JONSWAP]
+    /// Hs and Tp used to be read off the fetch-limited JONSWAP relations. Those
+    /// describe the WIND SEA only, and the spectrum has a second partition: a
+    /// swell with its own peak period and a fixed energy. In a dead calm the wind
+    /// sea is nothing and the swell is everything, so both numbers were wrong
+    /// exactly where it showed — the shore was surging with a 2.6 second period
+    /// while the swell running under it is ten seconds long (`RATIONALE.md`).
     ///
-    /// Significant wave height Hs, from fetch-limited growth:
-    /// `Hs ~ 0.0016 (g F / U10²)^(1/2) U10² / g`.
-    /// [SOURCE: JONSWAP fetch-limited growth relation]
+    /// `SeaSpectrumMoments` integrates both partitions. It is not free (about
+    /// 1600 steps), so it runs only when the wind actually changes.
     void UpdateState()
     {
         float u = Mathf.Max(env.WindSpeed, 0.1f);
-        float g = SeaConstants.G;
-        float f = settings.fetch;
 
-        float omegaP = 22f * Mathf.Pow(g * g / (u * f), 1f / 3f);
-        SeaRuntimeState.PeakPeriod = SeaConstants.TwoPi / Mathf.Max(omegaP, 1e-4f);
+        var inputs = new MomentInputs(u, settings);
 
-        float dimensionlessFetch = g * f / (u * u);
-        SeaRuntimeState.SignificantWaveHeight =
-            0.0016f * Mathf.Sqrt(dimensionlessFetch) * u * u / g;
+        if (!momentsValid || !momentInputs.Matches(inputs))
+        {
+            SeaSpectrumMoments.Result m = SeaSpectrumMoments.Integrate(u, settings);
+            SeaRuntimeState.SignificantWaveHeight = m.SignificantHeight;
+            SeaRuntimeState.PeakPeriod = m.PeakPeriod;
+            momentInputs = inputs;
+            momentsValid = true;
+        }
 
         Shader.SetGlobalFloat(SeaShaderIDs.PeakPeriod, SeaRuntimeState.PeakPeriod);
 

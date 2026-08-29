@@ -2548,3 +2548,46 @@ Bandın tabanı silinmedi, kapsamı düzeltildi: tabanın işi sudan YUKARIDAKİ
 sayılmasını durdurmaktı (eklendiği belirti oydu) ve o işi yapmaya devam ediyor. Su
 altındaki zemin ayrı bir terimle ıslak. Danteli ve ıslak parlamayı yalnız swash sürüyor:
 su altında ne dantel var ne de yüzeydeki su filmi.
+
+
+## Hs ve Tp neden formülden değil spektrumdan okunuyor
+
+Fetch sınırlı JONSWAP bağıntıları — `Tp = 2pi/omega_p`, `Hs = 0.0016 sqrt(gF/U^2) U^2/g` —
+**rüzgâr denizini** tarif eder. Çalışan spektrumda ikinci bir parça var: kendi tepe
+periyodu (10 s), kendi yönü ve **rüzgârdan bağımsız sabit enerjisi** olan ölü dalga. Sakin
+havada denizi ayakta tutan tek şey o; iki sayı da onu görmüyordu.
+
+Belirti buradan çıktı: kıyıdaki koşu-yukarı fazının periyodu Tp'dir, ve 0,5 m/s'de Tp
+2,63 saniyeydi. Kumsalda beyazlık iki saniyede bir gelip gidiyordu. Altındaki gerçek
+dalga ise on saniyelik.
+
+**Formül düzeltilmedi, kaynak değiştirildi.** `SeaSpectrumMoments` iki parçanın 1B
+spektrumunu 0,05–8 rad/s bandında 0,005 adımla integre ediyor:
+
+- `Hs = 4 sqrt(m0)`, m0 = iki parçanın toplam varyansı
+- `Tp` = TOPLAM spektrumun tepesi, yani enerjiyi hangi parça taşıyorsa onun periyodu
+
+Formüller compute shader'ınkilerin aynısı — biri değişirse öteki de değişmeli, ikisi aynı
+spektrumu tarif ediyor.
+
+**Maliyet ölçüldü:** integrasyon 0,187 ms (editörde, ilk hâli 0,295 ms'ti; `alpha`, derinlik
+ölçeği ve `omega^5` döngüden çıkarıldı). Rüzgâr 0,1 m/s'den az değiştiyse yeniden
+hesaplanmıyor — o kadar rüzgâr 8 m/s'de 1 cm Hs eder.
+
+## Kırılma köpüğünün ekranı kaplaması iki kapıyla kapandı
+
+Hs düzelince kırılma kuşağı sakin havada 3 m'den 45 m'ye çıktı — çünkü gerçek Hs 0,10
+değil 0,74 m. Kuşağın GENİŞLİĞİ doğru, ama kuşağın tamamı beyaz değil: `crest` çarpanı
+köpüğü tepelere oturtuyor.
+
+Yüzey kotu dağılımı üzerinden ortalama alfa (sigma = Hs/4):
+
+| mesafe | derinlik | U=0,5 | U=3 | U=8 | U=20 |
+|---|---|---|---|---|---|
+| 3–29 m | 0,36–1,68 m | 0,10 | 0,10 | 0,10 | 0,10 |
+| 45 m | 2,35 m | 0,03 | 0,10 | 0,10 | 0,10 |
+| 88 m | 4,13 m | 0 | 0 | 0,12 | 0,12 |
+| 200 m | 5,34 m | 0 | 0 | 0,11 | 0,13 |
+
+Düzeltmeden önce aynı kuşakta alfa 0,75'ti. Ortalama beyazlık 7,5 kat düştü ve kuşağın
+sınırı artık havayla birlikte hareket ediyor.

@@ -3663,3 +3663,39 @@ deniz altındakini **gösteriyor**. Ölçüm: 25 m açıkta ışın suda 2,8 m y
 
 **Düzeltme:** deniz kotunun altı tanım gereği ıslak. Bandın tabanı duruyor — onun işi
 sudan YUKARIDAKİ zeminin ıslak sayılmasını durdurmak, ki eklendiği belirti oydu.
+
+
+## "Alttan bir beyazlık gelip gidiyor, 2 saniyede bir"
+
+**Sebep — sayı doğrudan hesaplanabildi, şüpheli aramaya gerek kalmadı.** Kıyıdaki
+koşu-yukarı fazının periyodu doğrudan Tp:
+
+    phase = t * (2pi / Tp)   ->   sin periyodu = Tp
+
+Ve Tp fetch sınırlı JONSWAP bağıntısından geliyordu, yani YALNIZ rüzgâr denizinden.
+0,5 m/s'de:
+
+    omega_p = 22 * (g^2 / (U10 * F))^(1/3) = 2,39 rad/s   ->   Tp = 2,63 s
+
+Kullanıcının "2 saniyede bir" dediği sayı buydu.
+
+**Asıl mesele Tp değil, Tp'nin nereden geldiğiydi.** Spektrumun İKİ parçası var
+(`SeaSpectrum.compute`): rüzgâr denizi ve ölü dalga. Ölü dalganın kendi tepe periyodu
+10 saniye ve enerjisi rüzgârdan bağımsız — sakin havada denizde duran tek şey o. Hs ve Tp
+ise yalnız birinci parçadan okunuyordu.
+
+**Ölçüm — iki parça ayrı ayrı integre edildi:**
+
+| U10 | eski Tp | gerçek Tp | eski Hs | gerçek Hs |
+|---|---|---|---|---|
+| 0,5 | 2,63 s | **9,97 s** | 0,10 m | **0,74 m** |
+| 3 | 4,78 s | 9,97 s | 0,59 m | 1,17 m |
+| 8 | 6,62 s | 6,63 s | 1,58 m | 2,31 m |
+| 20 | 8,99 s | 8,98 s | 3,96 m | 4,91 m |
+
+Rüzgâr sertleştikçe iki sayı birbirine yaklaşıyor — çünkü orada rüzgâr denizi ölü
+dalgayı zaten örtüyor. Hata sakin havada, tam kullanıcının baktığı yerde.
+
+**Düzeltme:** `SeaSpectrumMoments` iki parçayı da sayısal integre ediyor;
+Hs = 4·sqrt(m0), Tp = toplam spektrumun tepesi. Aynı kapı Hs'i de düzeltiyor, yani
+kırılma köpüğü de doğru sayıyı okuyor.

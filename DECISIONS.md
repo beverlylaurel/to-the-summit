@@ -251,9 +251,6 @@ olur.
 ---
 ## Bekleyen ölçümler
 
-- **Hs ölü dalgayı saymıyor.** Kırılma köpüğü Hs'i okuyor; Hs yalnız rüzgâr denizinin
-  fetch formülünden geliyor, sabit `swell` payı içinde yok.
-  → [Hs ölü dalgayı saymıyor](#hs-ölü-dalgayı-saymıyor)
 - **Kar taneciği sisinin kare maliyeti ölçülmedi.** `SnowfallParticle` artık
   `ApplyHeightFog` çağırıyor: parça başına 8 adımlı çözülmüş integral + bir 3B doku
   örneği. Tanecikler binlerce ve üst üste biniyor.
@@ -2036,20 +2033,3 @@ maliyet o kadar katlanıyor.
 tek örnekli analitik kuyruk. Editörde ölçüm yapılmaz.
 
 
-## Hs ölü dalgayı saymıyor (2026-08-29)
-
-**Karar.** Kırılma köpüğü `SeaRuntimeState.SignificantWaveHeight`'ı okuyor. O değer
-fetch sınırlı rüzgâr denizinin bağıntısından geliyor:
-`Hs = 0.0016 sqrt(g F / U10^2) U10^2 / g`. Spektrumun İKİNCİ parçası — sabit alfalı,
-10 saniyelik ölü dalga — bu sayının içinde yok.
-
-**Sonuç.** Ölü sakinlikte (0,5 m/s) Hs 0,10 m diyor, gerçek yüzeyde ölü dalga duruyor.
-Yani kırılma köpüğü sakin havada olması gerekenden DAR bir kuşakta kalıyor.
-
-**Neden şimdi düzeltilmedi.** Ölü dalganın kendi Hs'i spektrumun varyansından çıkar
-(`swellAlpha`, tepe frekansı, gamma). İki değeri karesel toplamak doğru yol ama sayı
-ölçülmeden yazılmaz — `SeaSpectrumTest` toplam rms(h) veriyor, iki parçayı ayırmıyor.
-
-**Tetikleyici:** ölü sakin havada kıyıda hiç köpük görülmüyorsa, ya da testin ayrıştırma
-çıktısı eklenirse bu kayıt açılır. Ölçüm yolu belli: `SeaSpectrumTest`'e rüzgâr payı
-kapatılmış bir koşu eklenir, rms(h) x 4 = ölü dalganın Hs'i.

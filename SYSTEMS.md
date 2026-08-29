@@ -1386,9 +1386,14 @@ kendisi, ikinci bir hesap değil. `SeaLit` kırılma köpüğünü bundan kuruyo
 **Okumaz:** pikselin kendi kotunu — o dalganın boyu değil, dalganın o andaki yeri.
 Kotun tek işi köpüğü tepeye oturtmak (`crest` çarpanı).
 
-**Bilinçli kural:** Hs **rüzgâr denizinin** formülünden geliyor; sabit ölü dalga
-(`swell`) payı içinde yok. Ölü sakinlikte gerçek yüzey Hs'in söylediğinden yüksek —
-kayıt `DECISIONS.md`'de.
+**Hs ve Tp `SeaSpectrumMoments`'tan geliyor** — iki spektrum parçasının (rüzgâr denizi +
+ölü dalga) sayısal integrali. Fetch bağıntısı artık kullanılmıyor: o yalnız rüzgâr
+denizini tarif ediyordu ve sakin havada hem Hs'i hem Tp'yi yanlış veriyordu
+(`SYMPTOMS.md`).
+
+**Tp'yi kıyı da okuyor:** koşu-yukarı fazının periyodu Tp. Yani `SeaWetnessDriver`'ın
+ıslak bandı, kıyı köpüğünün ilerleyip çekilmesi ve dantel — üçü de aynı periyottan
+türüyor. Tek kaynak.
 
 ## Arazi: su altı tanım gereği ıslak (2026-08-29)
 
