@@ -12,7 +12,7 @@ maddesinden ikisi çürüdü, ikisi yanlış etiketliydi.
 - **[TEST ŞARTLI]** — beklenen fark sıfır ya da algı altı, piksel garantisi yok. A/B karesi
   olmadan uygulanmaz.
 
-**Denetimin kendi dersi:** ilk sürümde `[KESİN]` etiketiyle gelen maddelerden **dördü**
+**Denetimin kendi dersi:** ilk sürümde `[KESİN]` etiketiyle gelen maddelerden **altısı**
 yanlış çıktı:
 
 - **S1** aritmetik hatası — "terim daima 0" değil, kumsalda çalışıyor
@@ -22,6 +22,8 @@ yanlış çıktı:
   silinseydi gökyüzü bozulurdu
 - **A2** shader'ın instanced terrain yolunu desteklediğini varsaymış — desteklemiyor, açılınca
   arazi tamamen kayboldu (Play'de görüldü, geri alındı)
+- **A1** doku akışının Terrain'i izlediğini varsaymış — izlemiyor, kum dokuları mip 2'ye
+  kilitlendi ve kıyı düzleşti (ölçüldü: `requestedMipmapLevel = -1`)
 
 Bir altıncısının (**C1**) öncülü doğruydu ama kazanç tahmini 8-30 kat şişikti.
 
@@ -96,7 +98,7 @@ GPU marker). Eksik: `ProfilerCaptures/` boş, diske frame-log yok, kar dışı s
 
 | # | Bulgu | Kanıt |
 |---|---|---|
-| **A1** | **Mipmap Streaming kapalı** — `streamingMipmapsActive: 0`, **iki tier'da da**. 4× 4K normal harita, 138 MB RainStreakDatabase, terrain yan dosyaları. Açılınca aynı mip'ler seçilir, yalnız kullanılmayan üst mip'ler bellekten iner → piksel farkı yok, 8 GB kartta VRAM basıncı düşer | `QualitySettings.asset:39,93` |
+| ~~A1~~ | **REDDEDİLDİ — KUM DOKUSUNU SİLİYOR.** Açıldı (27 içe aktarıcı + iki tier) ve kıyıdaki kum düzleşti. Ölçüldü: `T_Sand_*` **mip 2'ye kilitlenmiş** (4096 yerine 1024), `requestedMipmapLevel = -1` — kimse daha yükseğini istemiyor. Unity'nin akış sistemi **Terrain'i izlemiyor**, mip seviyesini hesaplayamıyor, `maxLevelReduction` kadar düşürüp bırakıyor. Raporun "aynı mip'ler seçilir" varsayımı yalnız izlenen renderer'lar için doğru. Bu projenin büyük dokularının hepsi terrain materyalinde | ölçüldü, geri alındı |
 | ~~A2~~ | **REDDEDİLDİ — ARAZİYİ TAMAMEN SİLİYOR.** Açıldı ve Play'de zemin çizilmedi: Tri 988k → 561k, Draw 166 → 58, FPS 130 → 153. Kazanç değil, arazinin yokluğu. Sebep: `MountainSurface` instanced terrain yolunu desteklemiyor. Raporun "aynı LOD algoritması ve geometri" varsayımı shader'ın desteklediğini kabul ediyor; etmiyor | ölçüldü, geri alındı |
 | ~~A3~~ | **REDDEDİLDİ.** `ModelImportRules.cs:54` her içe aktarmada `isReadable = !character` diye zorluyor, gerekçesi yazılı: *"part measurement and zoning tools access mesh data"*. `BikeBootstrap` gerçekten okuyor (`MeshZones.Build(rack.sharedMesh, …)`). Runtime okuma yok — ama **editör aracı okuyor**, ve rapor yalnız runtime'a bakmış. Kapatmak bisiklet kurulumunu bozar; denendi, postprocessor bayrağı anında geri açtı | `ModelImportRules.cs:40-54` |
 
@@ -205,7 +207,7 @@ aramak boşa tur.
 
 1. **S2, S4, S1'** — shader kapıları. CPU kalemlerinin aksine ölçek burada: maliyet
    ekranın çoğunda piksel başına ödeniyor. Her biri ayrı commit, piksel diff'i 0 olmalı.
-2. **A1** — doku akışı. Bedava, ve VRAM tarafında gerçek. (A2 ve A3 reddedildi.)
+2. ~~**A1/A2/A3**~~ — **ayar tarafının üçü de reddedildi** (aşağıdaki 1c tablosu).
 3. **Profiler capture'ı** — 988k üçgen, 166 draw, yarı çözünürlüklü bulut marşı, froxel
    sisi. Zamanın nerede olduğu buradan görülür; kalan sıralama ondan sonra yazılır.
 4. **[TEST ŞARTLI]** — T1'den başlayarak tek tek, screenshot-diff protokolüyle.
