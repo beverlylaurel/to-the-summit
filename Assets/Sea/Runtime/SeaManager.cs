@@ -215,6 +215,12 @@ public class SeaManager : MonoBehaviour
 
         Shader.SetGlobalFloat(SeaShaderIDs.PeakPeriod, SeaRuntimeState.PeakPeriod);
 
+        // THE SURFACE SHADER NEEDS Hs, NOT THE HUD ONLY. The breaking
+        // criterion (spec 8.3) compares the WAVE'S height with the depth; a
+        // pixel only knows its own elevation, which is not the same thing.
+        Shader.SetGlobalFloat(SeaShaderIDs.SignificantHeight,
+                              SeaRuntimeState.SignificantWaveHeight);
+
         // Run-up phase: a breaking wave advances up the shore and withdraws
         // (spec §8.5). Its period follows the spectrum's peak period.
         float t = Application.isPlaying ? Time.time : 0f;

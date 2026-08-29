@@ -1373,3 +1373,30 @@ kendisine uygulanıyor.
 
 `MixFog` artık `Assets` altında hiç geçmiyor — Unity'nin kendi sisi sahnede kapalı
 (`m_Fog: 0`) ve o çağrı kimlik fonksiyonuydu.
+
+
+## Deniz: kırılma ölçütü Hs okuyor (2026-08-29)
+
+`SeaManager` artık `_SeaSignificantHeight` yayımlıyor — `SeaRuntimeState`'teki Hs'in ta
+kendisi, ikinci bir hesap değil. `SeaLit` kırılma köpüğünü bundan kuruyor:
+
+    waveH = Hs * min(SeaShoalingGain(depth, _SeaSpectrumDepth), _SeaMaxShoalingGain)
+
+**Okur:** rüzgâr hızını (Hs zaten ondan türüyor), yerel derinliği, taban eğimini.
+**Okumaz:** pikselin kendi kotunu — o dalganın boyu değil, dalganın o andaki yeri.
+Kotun tek işi köpüğü tepeye oturtmak (`crest` çarpanı).
+
+**Bilinçli kural:** Hs **rüzgâr denizinin** formülünden geliyor; sabit ölü dalga
+(`swell`) payı içinde yok. Ölü sakinlikte gerçek yüzey Hs'in söylediğinden yüksek —
+kayıt `DECISIONS.md`'de.
+
+## Arazi: su altı tanım gereği ıslak (2026-08-29)
+
+`seaWet` iki parçanın büyüğü:
+
+- **swash** — `_SeaWetLevelY` (kabarma çizgisi) ile onun `_SeaWetBandM` altı arası.
+  Kıyı dantelini (`lace`) ve ıslak parlamayı (`seaRough`) YALNIZ bu sürüyor.
+- **submerged** — `_SeaLevelY`'nin altındaki her şey.
+
+Albedo kararması ikisinin birleşimini okuyor. Gerekçe `RATIONALE.md`, belirti
+`SYMPTOMS.md`.

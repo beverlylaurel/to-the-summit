@@ -3619,3 +3619,47 @@ kapalıyken **sessizce 0** dönüyor. Sıfır ile "ölçülemedi" ayrılamıyord
 **Yapılan:** `SeaRuntimeState.GpuTimingAvailable` bayrağı. Bayrak false iken o sayıya
 bakılmıyor.
 
+
+
+## "Kıyı full köpük. Saçma sapan." — rüzgâr 0,5 m/s'ken
+
+**İlk şüpheli — yanlış:** kıyı köpüğü bandı (`shoreFoam`). Ölçüldü ve elendi: bandın
+alfası 8 m'den sonra 0,000. Bandın tamamı zaten dar — deniz alanının yalnız %2,2'si
+1,7 m'den sığ, ve ölçülen kıyı profilinde su çizgisinden 2 m derinliğe ortanca **44 m**
+var. Kıyı köpüğü ekranı dolduramaz.
+
+**Gerçek sebep — kırılma köpüğü (`breakT`) dalganın boyu yerine PİKSELİN KOTUNU
+okuyordu.** Formül `waveH = 2 * |y - _SeaLevelY|` yazıyordu. İki sonuç, ikisi de ölçüldü:
+
+| |y − deniz kotu| | köpük alfasının bittiği mesafe |
+|---|---|
+| 0,05 m | — (yok) |
+| 0,20 m | 6 m |
+| 0,40 m | 20 m |
+
+Göz 1,7 m'de: 20 m mesafe ufkun 4,9° altında, ekrandaki suyun **%87'si** o mesafeden
+yakında. Yani sığlıkta her piksel "kırılıyor" sayılıyor ve kıyı tek parça beyaz sayfa
+oluyordu. İkinci sonuç: çukur da tepe kadar uzak olduğu için ölçüt **hava durumundan
+bağımsızdı** — ölü sakinlikte fırtınayla aynı kırılma.
+
+**Ayırt eden ölçüm:** aynı kıyı kesitinde üç köpük teriminin alfası ayrı ayrı hesaplandı.
+`shoreFoam` 8 m'de sıfırlanıyor, `whitecap` Jacobian eşiğinin (0,55) altına inmiyor,
+`breakT` 20 m'ye kadar 0,75 veriyordu. Tek başına ekranı dolduran terim buydu.
+
+**Düzeltme:** `waveH` artık yerel derinliğe göre sığlaştırılmış **Hs** (belirgin dalga
+yüksekliği). Hs havayı taşıyor: 0,5 m/s'de 0,10 m, 20 m/s'de 3,96 m. Aynı kesitte köpüğün
+bittiği mesafe 0,5 m/s'de 3 m, 3 m/s'de 29 m, 8 m/s'de 88 m, 20 m/s'de 120 m'nin ötesi.
+
+## Sığ suyun altındaki kum kuru çiziliyordu
+
+Aynı ekran görüntüsünün ikinci yarısı. Köpük bittiği yerde bile su kremsi-yeşil bir
+tabaka olarak duruyordu.
+
+**Sebep:** `seaWet` bandının bir tabanı var (`_SeaWetBandM`, 1,6 m) ve o tabanın altındaki
+arazi ISLAK SAYILMIYOR. Bandın yorumu "altı zaten suyun altında, denizi çiziyor" diyordu;
+deniz altındakini **gösteriyor**. Ölçüm: 25 m açıkta ışın suda 2,8 m yol alıyor, sönüm
+(0,30 / 0,08 / 0,05 per m) ile geçirgenlik 0,43 / 0,80 / 0,87. Kuru kum albedosu
+(0,61 / 0,54 / 0,43) neredeyse hiç sönmeden göze geliyordu.
+
+**Düzeltme:** deniz kotunun altı tanım gereği ıslak. Bandın tabanı duruyor — onun işi
+sudan YUKARIDAKİ zeminin ıslak sayılmasını durdurmak, ki eklendiği belirti oydu.

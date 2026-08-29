@@ -2569,8 +2569,6 @@ MonoBehaviour:
   sunLight: {fileID: 410087040}
   manualWindDirection: {x: 1, y: 0, z: 0}
   manualWindSpeed: 12
-  manualSkyColor: {r: 0.69, g: 0.84, b: 1, a: 1}
-  manualHorizonColor: {r: 0.8, g: 0.86, b: 0.92, a: 1}
   manualCloudCover: 0.3
   manualFogDensity: 0.2
   snowThresholdC: 0
@@ -2623,6 +2621,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SeaWetnessDriver
   settings: {fileID: 11400000, guid: 15a1fd9f44116d64eb40d66e30db7a25, type: 2}
   fadeMeters: 0.35
+  bandMeters: 1.6
   darkening: 0.55
 --- !u!1 &1268737626
 GameObject:
@@ -3039,6 +3038,7 @@ MonoBehaviour:
   weather: {fileID: 1805896806}
   wind: {fileID: 1805896805}
   time: {fileID: 508855605}
+  atmosphere: {fileID: 1805896809}
   surfaceMaps: {fileID: 2800000, guid: 07fea8576ef26e44999b9f55ed1a5459, type: 2}
   windWeight: {fileID: 2800000, guid: ce4583cf81e3d4e49a5f183fea0185f9, type: 2}
   groundNormals: {fileID: 2800000, guid: 01e2bdda4928e6c4f8c6f50d50eed21f, type: 2}

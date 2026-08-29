@@ -378,11 +378,42 @@ Shader "ToTheSummit/SeaLit"
                     // 2. BREAKING FOAM (spec 8.3). When the ratio of wave
                     //    height to water depth exceeds the breaker index the
                     //    wave breaks.
+                    //
+                    // THE WAVE'S HEIGHT IS NOT THE PIXEL'S ELEVATION. This read
+                    // `2 * |y - seaLevel|`, i.e. it took the surface's instantaneous
+                    // displacement AT THIS POINT for the height of the wave. Two
+                    // things follow and both were measured on the shore transect
+                    // (waterline -> 1.68 m depth in 29 m):
+                    //
+                    //   - EVERY point that is not exactly at the still level counts
+                    //     as a wave. With |y - seaLevel| = 0.2 m the criterion is met
+                    //     out to 6 m, with 0.4 m out to 20 m, and the foam alpha
+                    //     there is 0.75. From eye height 1.7 m the first twenty
+                    //     metres of water fill about 87% of the screen: the shore
+                    //     came out as one white sheet.
+                    //   - It DOES NOT depend on the sea state. A dead calm
+                    //     (measured: wind 0.5 m/s) breaks exactly as hard as a storm,
+                    //     because a trough is as far from the still level as a crest.
+                    //
+                    // Hs shoaled to the local depth is the height the criterion is
+                    // written for, and it carries the weather: Hs is 0.10 m at 0.5 m/s
+                    // and 3.96 m at 20 m/s, so the breaker line moves out with the sea.
                     float slope = SeaSampleBottomSlope(IN.positionWS.xz);
                     float gamma = SeaBreakerIndex(slope);
-                    float waveH = 2.0 * abs(IN.positionWS.y - _SeaLevelY);
-                    float ratio = waveH / max(depth, SEA_MIN_DEPTH);
+
+                    float shoal  = min(SeaShoalingGain(depth, _SeaSpectrumDepth),
+                                       _SeaMaxShoalingGain);
+                    float waveH  = _SeaSignificantHeight * shoal;
+                    float ratio  = waveH / max(depth, SEA_MIN_DEPTH);
                     float breakT = saturate((ratio - gamma * 0.7) / (gamma * 0.3));
+
+                    // THE FOAM RIDES THE CREST. Without this the band is a function
+                    // of depth alone: a clean strip parallel to the shore that never
+                    // moves. Breaking happens at the crest and the trough behind it
+                    // is clear water.
+                    float crest = saturate((IN.positionWS.y - _SeaLevelY)
+                                           / max(0.25 * waveH, 0.02));
+                    breakT *= crest;
 
                     // 3. SHORE FOAM (spec 13.3). The run-up band makes the
                     //    water level look raised (spec 8.5).

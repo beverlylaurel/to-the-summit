@@ -2502,3 +2502,49 @@ davranış değişmiyor.
 pratikte hep 150'e oturuyor (berrak görüş 25 km × 0.8 > 150). Belge ve yorum artık
 gerçeği söylüyor. Gölge mesafesi dağın boyuna bağlı değil — görüşe bağlı, o yüzden
 `SCALE.md` kaydı gerekmiyor.
+
+
+## Kırılma ölçütü neden pikselin kotunu okuyamaz
+
+Kırılma ölçütü `H / h > gamma` — H **dalganın yüksekliği**, h derinlik. Kodda H yerine
+`2 * |y - deniz kotu|` vardı: pikselin o andaki dikey yer değiştirmesi.
+
+Bu ikame iki şeyi bozuyor:
+
+1. **Çukur da tepe kadar uzaktır.** Durgun kottan sapan her nokta "dalga" sayılıyor, yani
+   sığ suda yüzeyin tamamı ölçütü geçiyor. Ölçüldü: |y − kot| = 0,40 m iken köpük 20 m'ye
+   kadar 0,75 alfa. Göz 1,7 m'deyken ekrandaki suyun %87'si o mesafeden yakın.
+2. **Hava durumu düşüyor.** Sakin denizde de fırtınada da sapmanın MUTLAK değeri alındığı
+   için ölçüt neredeyse aynı yerde tetikleniyor. Oysa sörf kuşağının genişliği doğrudan
+   deniz durumunun ölçüsüdür.
+
+Hs zaten hesaplanıyordu (`SeaRuntimeState.SignificantWaveHeight`) ama yalnız HUD'a
+gidiyordu. Global olarak yayımlandı; kırılma onu yerel derinliğe göre sığlaştırıp
+kullanıyor. Yeni bir büyüklük uydurulmadı — var olan büyüklük doğru yere bağlandı.
+
+Sonuç aynı kıyı kesitinde ölçüldü — köpüğün bittiği mesafe:
+
+| rüzgâr | Hs | köpük sınırı |
+|---|---|---|
+| 0,5 m/s | 0,10 m | 3 m |
+| 3 m/s | 0,59 m | 29 m |
+| 8 m/s | 1,58 m | 88 m |
+| 20 m/s | 3,96 m | > 120 m |
+
+**Tepe çarpanı neden var.** Hs derinliğin fonksiyonu, yani tek başına kıyıya paralel,
+hiç kımıldamayan temiz bir şerit üretir. Kırılma tepede olur, arkasındaki çukur berrak
+sudur. `crest` çarpanı bandı dalganın üstüne oturtuyor — telafi değil, ölçütün eksik
+kalan yarısı.
+
+## "Altı zaten suyun altında" bir gerekçe değildi
+
+`seaWet` bandının tabanının yorumu şunu diyordu: *"Altı suyun altında ve deniz onu zaten
+çiziyor."* Deniz onu çizmiyor — **gösteriyor**. `refracted` sahne rengini örnekliyor ve
+sönüm ilk metrelerde çok zayıf: 25 m açıkta ışın suda 2,8 m yol alıyor, geçirgenlik
+0,43 / 0,80 / 0,87. Kuru kum albedosu (0,61 / 0,54 / 0,43) neredeyse olduğu gibi göze
+geliyordu.
+
+Bandın tabanı silinmedi, kapsamı düzeltildi: tabanın işi sudan YUKARIDAKİ zeminin ıslak
+sayılmasını durdurmaktı (eklendiği belirti oydu) ve o işi yapmaya devam ediyor. Su
+altındaki zemin ayrı bir terimle ıslak. Danteli ve ıslak parlamayı yalnız swash sürüyor:
+su altında ne dantel var ne de yüzeydeki su filmi.

@@ -68,6 +68,7 @@ public static class SeaShaderIDs
 
     // --- Shallow water (spec §8) ---
     public static readonly int MaxShoalingGain = Shader.PropertyToID("_SeaMaxShoalingGain");
+    public static readonly int SignificantHeight = Shader.PropertyToID("_SeaSignificantHeight");
     public static readonly int RunupMaxDepth = Shader.PropertyToID("_SeaRunupMaxDepth");
     public static readonly int PeakPeriod = Shader.PropertyToID("_SeaPeakPeriod");
     public static readonly int ShoreFoamPhase = Shader.PropertyToID("_SeaShoreFoamPhase");

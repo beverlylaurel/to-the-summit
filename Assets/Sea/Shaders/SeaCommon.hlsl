@@ -49,6 +49,11 @@ float3 _SeaChoppinessPerTier;
 float _SeaSpectrumDepth;
 float _SeaMaxShoalingGain;
 
+/// Significant wave height Hs (m) of the CURRENT sea state. The breaking
+/// criterion needs the wave's height, and a pixel does not know it: it only
+/// knows its own elevation. Published by `SeaManager`.
+float _SeaSignificantHeight;
+
 /// The RUNNING FFT size and its log2. Comes from the quality preset;
 /// `SEA_FFT_SIZE` is only the upper bound.
 uint _SeaFftSize;
