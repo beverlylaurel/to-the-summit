@@ -4003,7 +4003,7 @@ uca kimse bakmamıştı. Düzeltme: sert kırpma yerine `tanh` doyumu — tavan�
 aynı, üstünde eğrilip tavanı hiç geçmiyor, sıralama hiç kaybolmuyor.
 
 
-## Gökyüzü probu gün doğumunda ve batımında TAM SIFIR
+## Gökyüzü probu gün doğumunda ve batımında çöküyor — KAPANDI
 
 **Belirti:** altın saatte sahnenin ortam ışığı çöküyor; pozlama bir anda tavana yapışıyor.
 
@@ -4050,7 +4050,57 @@ Düzeltme yazılmış ama üstüne yazılıyor.
 Yani gün batımında pozlama "günün en karanlık anı"nı görüyor: 10,97 kademe, açılma **3,33 EV**
 — gecenin en karanlık saatinden (2,95) daha fazla. Sıralama ters.
 
-**Kapatılmadı** — sebep gökyüzü paketinde, düzeltmesi sahnenin aydınlatmasını değiştirir.
-`DECISIONS.md` → "Ufuktaki gökyüzü deliği". Göz uyumunun çubuk görüşü terimi sivil
-alacakaranlık kapısı taşıdığı için delikten etkilenmiyor (18:00'de çubuk 0,00, altın saat
-solmuyor); pozlamanın kendisi etkileniyor.
+**GERÇEK SEBEP: atmosferik sönüm üç kez uygulanıyordu.**
+
+`TimeOfDay` yönlü ışığa kendi atmosfer modelini uyguluyor — `BeamTransmittance` bir kez renge,
+bir kez şiddete (`LowSunFade` de öyle; kodun kendi yorumu "iki kez, bilerek" diyor). Bu SAHNE
+için doğru: batı güneşinde bir yamacın ALDIĞI ışık gerçekten kızarıp söner.
+
+Ama paket gökyüzü LUT'unu `mainLight.color × mainLight.intensity` ile aydınlatıyor
+(`PhysicallyBasedSkyURP.cs`, `celestialBodyData.color`) — yani **sahne için sönümlenmiş
+ışıkla** — ve LUT kendi atmosferini zaten hesaplıyor. Sönüm üç kez.
+
+**Ayırt eden ölçüm** — ışığın şiddeti ile zenit birebir aynı anda ölüyor:
+
+| güneş yüksekliği | sönüm (beam×fade) | ışık.intensity | zenit |
+|---|---|---|---|
+| +0,115 | 0,619 | 1,876 | 0,0361 |
+| +0,058 | 0,239 | 0,725 | 0,0101 |
+| +0,023 | 0,008 | 0,024 | 0,000227 |
+| 0,000 | **0,000** | **0,000** | 0,0000295 |
+
+**Düzeltme:** LUT atmosfer üstü güneşi alıyor, sahne ışığı sönümlü kalıyor. Paketde
+`PhysicallyBasedSkyURP.SkySunRadiance` kancası; `TimeOfDay` oraya `sunColor × sunIntensity ×
+SunBlend × π` yazıyor. Güneş **diski** hâlâ sahne ışığından geliyor — diske bakarken atmosferi
+gerçekten arasından görüyorsun, batan güneş kırmızı kalmalı.
+
+**Sonuç, ölçüldü:**
+
+| saat | h | önce | sonra |
+|---|---|---|---|
+| 12:00 | +0,883 | 0,0972 | 0,1319 |
+| 17:30 | +0,115 | 0,0361 | 0,0726 |
+| 17:45 | +0,058 | 0,0101 | 0,0521 |
+| **18:00** | 0,000 | **0,0000295** | **0,0205** |
+| 18:30 | −0,115 | 0,000205 | 0,0398 |
+| 19:00 | −0,229 | 0,000274 | 0,0119 |
+| 20:00 | −0,442 | 0,000332 | **0,000332** |
+| 00:00 | −0,883 | 0,000394 | **0,000394** |
+
+Gün batımı 690 kat düzeldi, gece **birebir korundu**. Pozlama 18:00'de 3,33 EV'den
+**0,99 EV**'ye indi — 17:30'un 0,70'iyle aynı mertebe, sıralama düzeldi.
+
+**Yan etki, bilinçli:** öğlen gökyüzü %36 parlak (0,0972 → 0,1319). Kaybolan şey çift sönümdü.
+Doğrulayıcı işaret: `ReferenceSkyLuminance = 0,148` ölçümle konmuş "öğlen gökyüzü" sabiti;
+öğlen değeri hatayla 0,097 (%34 altında), düzeltmeden sonra 0,132 (%11 altında). Sabit
+kalibre edildiğinde gökyüzü daha doğruymuş — çift sönüm sonradan sızmış.
+
+**Bir ara düzeltme geceyi öldürdü, ölçümle yakalandı.** Kancaya yalnız güneş yazılınca
+−18°'den sonra kapı kapanıyor ve override hâlâ yürürlükte olduğu için paketin LUT'u
+aydınlattığı **ay ışığını eziyordu**: gece zeniti 0,00039'dan TAM SIFIR'a düştü. İkisinin
+büyüğü alınarak devir teslim dikişsiz yapıldı.
+
+**Kalan, kapatılmadı:** LUT **yönünü** hâlâ URP'nin ana ışığından alıyor, ufkun altında o ay
+oluyor. Yani alacakaranlık doğru enerjiyi yanlış yönden taşıyor — 18:00'de zenit 0,0205,
+18:30'da 0,0398, arada iki katlık bir çukur. 690 katın yanında görünmez ama duruyor.
+`DECISIONS.md` → "Gökyüzü LUT'u yönü ana ışıktan alıyor".

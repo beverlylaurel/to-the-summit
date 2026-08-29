@@ -2743,3 +2743,32 @@ saate bağlı, ışığa değil. Aynı kusur doygunlukta vardı ve bu turda kapa
 elle ayarlanmış bir eğri olduğu için aynı işlem ona körlemesine uygulanmadı.
 
 **C grubu** — incelemenin kendi tavsiyesi: yerel ton eşleme pahalı, bleaching konfor riski.
+
+
+## Gökyüzünün güneşi neden sahnenin güneşinden ayrıldı (2026-08-29)
+
+Tek `Light` iki role birden hizmet ediyordu ve rollerin istediği büyüklük farklı: sahne
+atmosferden **geçmiş** ışını ister, gökyüzü LUT'u atmosfere **giren** ışını. Aynı değeri
+ikisine de vermek sönümü üç kez uygulamak demekti ve ufukta gökyüzünü tamamen öldürüyordu.
+
+**Bu proje bu hatayı bir kez daha yaşamış.** `LookController`'ın yorumu: "Once the double sun
+attenuation was removed and twilight came down to its real level." O tur sahnenin pozlaması
+için kapatılmış; gökyüzünün aynı ışıktan beslendiğini kimse kontrol etmemiş.
+
+**`SunBlend` neden kaldı.** Sönüm değil, astronomik alacakaranlığı −18°'de bitiren kapı.
+Kaldırılsaydı LUT gece boyunca gezegenin içinden geçen bir güneşle aydınlanırdı. Ufukta
+değeri 0,98 — yani gün batımını hiç kısmıyor, ki mesele oydu.
+
+**Neden `max`, neden anahtar değil.** İlk sürüm kancaya yalnız güneşi yazdı ve geceyi
+öldürdü: kapı kapandıktan sonra override sıfır yazıyor, paket de ayı okuyamıyordu.
+`if (kapı > 0) güneş else null` de olurdu ama kapının iki yakasında 0,0119 → ~0 → 0,00039
+diye bir çukur bırakırdı. Büyüğünü almak dikişi tamamen kaldırıyor ve iki kaynaktan hiçbiri
+öbürünün altında kapatılmıyor.
+
+**Öğlenin %36 parlaması bir bedel değil, düzeltmenin kendisi.** Kaybolan şey çift sönümdü.
+Sabit `ReferenceSkyLuminance = 0,148` bunu doğruluyor: ölçümle konmuş "öğlen gökyüzü" değeri,
+hatayla 0,097 okunuyordu (%34 altında), düzeltmeyle 0,132 (%11 altında). Kalibrasyon
+yapıldığında gökyüzü daha doğruymuş.
+
+**Diskin sönümlü kalması bir istisna değil, aynı kuralın öbür yüzü.** LUT atmosferi hesaplar,
+disk atmosferin arkasındadır. Birine giren, ötekine geçen ışın verilir.

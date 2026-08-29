@@ -247,10 +247,9 @@ olur.
 ---
 ## Bekleyen ölçümler
 
-- **Ufuktaki gökyüzü deliği Play'de doğrulanmadı.** Edit modda ölçüldü (probe skybox
-  malzemesinden pişirilerek); Play paketin `AmbientProbePass`'ini kullanıyor, o yol
-  ölçülmedi. F1 → "Göz uyumu" satırı 18:00'de `gök` terimini gösteriyor.
-  → [Ufuktaki gökyüzü deliği](#ufuktaki-gökyüzü-deliği--ertelendi-2026-08-29)
+- **Gökyüzü %36 parlaklaştı, Play'de bakılmadı.** Çift sönüm kalkınca öğlen zeniti
+  0,0972 → 0,1319. Sahnenin gündüz aydınlatması bu kadar arttı; ekranda fazla mı, ölçülmedi.
+  → [Gökyüzü LUT'u yönü ana ışıktan alıyor](#gökyüzü-lutu-yönü-ana-ışıktan-alıyor--ertelendi-2026-08-29)
 - **`SkyAmbientBaker` gereksiz mi ölçülmedi.** Paket probe'u zaten yazıyor olabilir; öyleyse
   bileşenin her karedeki SH pişirmesi boşa gidiyor.
   → [`SkyAmbientBaker` ile paketin `AmbientProbePass`'i aynı probe'a yazıyor](#skyambientbaker-ile-paketin-ambientprobepassi-aynı-probea-yazıyor--ölçülecek-2026-08-29)
@@ -2095,9 +2094,33 @@ aydınlatmasını değiştirmek demek — pozlama işi değil.
 girmesi. Yarım gün.
 
 
-## Ufuktaki gökyüzü deliği — ERTELENDİ (2026-08-29)
+## Gökyüzü LUT'u yönü ana ışıktan alıyor — ERTELENDİ (2026-08-29)
 
-**Karar:** gün doğumu ve batımında ambient probe'un tam sıfıra düşmesi bu tur kapatılmadı.
+**Karar:** gökyüzü LUT'unun ışık YÖNÜ, URP'nin seçtiği ana ışıktan geliyor; ufkun altında o
+ay oluyor. Alacakaranlık doğru enerjiyi yanlış yönden taşıyor. Bu tur kapatılmadı.
+
+**Ölçüm:** radyans ayrıldıktan sonra zenit 18:00'de 0,0205, 18:30'da 0,0398 — ufukta iki
+katlık bir çukur kalıyor. Öncesindeki 690 katlık çöküşün yanında görünmez.
+
+**Neden şimdi değil:** yön override'ı diski de taşır (`celestialBodyData.forward` hem LUT'a
+hem diske gidiyor) ve gece diskin ay olması gerekiyor. Doğru çözüm paketin tek-ışık
+varsayımını açmak; radyans ayrımının üstüne aynı turda ikinci bir paket değişikliği
+yığılmıyor.
+
+**Tetikleyici:** gün batımında ufkun yanlış tarafı aydınlık görünüyorsa, ya da altın saatte
+gökyüzü kısa bir an sönüyorsa.
+
+**Maliyet:** paketin `celestialBodyData` kurulumunu LUT ve disk için ayırmak. Yarım gün.
+
+
+## Ufuktaki gökyüzü deliği — KAPANDI (2026-08-29)
+
+**Kapandı.** Sebep tahmin ettiğim gibi paketin tek-ışıklı LUT'u değil, `TimeOfDay`'in ışığa
+uyguladığı atmosferik sönümün LUT'a da gitmesiydi. Ölçümler ve düzeltme `SYMPTOMS.md` →
+"Gökyüzü probu gün doğumunda ve batımında çöküyor". Aşağıdaki eski kayıt, yanlış çıkan ilk
+teşhisin kaydı olarak duruyor.
+
+**Eski karar:** gün doğumu ve batımında ambient probe'un tam sıfıra düşmesi bu tur kapatılmadı.
 
 **Ölçüm ve tekrarı:** `SYMPTOMS.md` → "Gökyüzü probu gün doğumunda ve batımında TAM SIFIR".
 Güneş yüksekliği +0,01 ile −0,07 arasında zenit tam sıfır; ufkun iki yakasında simetrik

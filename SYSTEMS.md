@@ -1641,3 +1641,26 @@ pozlamayı alıyor.
 
 Kayıt bilinçli bir kural değil, **açık bir boşluk**. Kararı ve neden bugün kapatılmadığı
 `DECISIONS.md` → "Göz uyumu havaya kör".
+
+
+## Gökyüzü atmosfer üstü güneşi alıyor, sahne sönümlüsünü (2026-08-29)
+
+**Yeni bağ.** `TimeOfDay` → `PhysicallyBasedSkyURP.SkySunRadiance`.
+
+Aynı güneşin iki tüketicisi var ve ikisi farklı büyüklük istiyor:
+
+- **sahnenin yönlü ışığı** — atmosferden GEÇMİŞ ışın. `BeamTransmittance × LowSunFade`
+  uygulanır. Batı güneşinde yamaç kızarıp söner.
+- **gökyüzü LUT'u** — atmosfere GİREN ışın. Sönüm uygulanmaz; LUT kendi atmosferini
+  hesaplıyor, sönümlenmiş ışık verilirse üç kez uygulanmış olur.
+
+**Bilinçli kural — güneş diski sahne ışığından gelir.** Kanca yalnız
+`celestialBodyData.color`'ı (LUT'un ışığı) değiştiriyor; `surfaceColor` ve `flareColor` (disk
+ve parlama) sönümlü değerde kalıyor. Diske bakarken atmosferi gerçekten arasından görüyorsun.
+
+**Bilinçli kural — devir teslim, anahtarlama değil.** Kanca güneşin ve ayın atmosfer üstü
+radyanslarından **büyüğünü** yazıyor. Yalnız güneş yazılırsa astronomik alacakaranlık bitince
+kanca ayın ışığını eziyor ve gece sıfırlanıyor (ölçüldü: 0,00039 → 0).
+
+**Kalan sınır:** LUT'un YÖNÜ hâlâ URP'nin ana ışığından geliyor. Sayılar ve gerekçe
+`SYMPTOMS.md` → "Gökyüzü probu gün doğumunda ve batımında çöküyor".

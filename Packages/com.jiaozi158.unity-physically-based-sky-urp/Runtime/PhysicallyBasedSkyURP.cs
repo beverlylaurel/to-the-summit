@@ -56,6 +56,22 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
     /// (ayrı bir yönlü ışık olarak) araziyi sürüyor.
     public static Light MoonLight { get; set; }
 
+    /// ATMOSFER USTU GUNES — gokyuzunu aydinlatan radyans.
+    ///
+    /// Paket LUT'unu `mainLight.color x mainLight.intensity` ile aydinlatiyor. Bu projede o
+    /// isik sahneye gore ayarlaniyor: `TimeOfDay` ona atmosferik sonumu (`BeamTransmittance x
+    /// LowSunFade`) uyguluyor, cunku bati gunesinde bir yamacin ALDIGI isik gercekten kizarip
+    /// soner. LUT ise kendi atmosferini zaten hesapliyor. Sonuc: sonum uc kez uygulaniyordu.
+    ///
+    /// OLCULDU. Gunes yuksekligi +0,058'den 0'a inerken isigin siddeti 0,725'ten TAM SIFIR'a
+    /// dusuyor ve zenit parlakligi onu birebir izliyor: 0,0101 -> 0,0000295. Gun batiminda
+    /// gokyuzu, ayisigindaki gece yarisindan 13 KAT KARANLIK oluyordu.
+    ///
+    /// Kurulunca LUT'un isigi buradan gelir; gunes DISKI (`surfaceColor` / `flareColor`) yine
+    /// sahne isigindan gelir, cunku diske bakarken atmosferi gercekten arasindan goruyorsun ve
+    /// batan gunes kirmizi kalmali.
+    public static Color? SkySunRadiance { get; set; }
+
     /// AY DİSKİNİN PARLAKLIĞI, IŞIĞINDAN AYRI. İkisi ayrı fiziksel büyüklük: biri yüzey
     /// radyansı, diğeri yerdeki aydınlık. Tek sayıdan türetilince disk absürt parlak
     /// çıkıyordu — güneş diski ~3000, ay diski ~198, yani oran 15. Gerçekte oran
@@ -882,7 +898,9 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 surfaceColor *= rcpSolidAngle;
                 flareColor *= rcpSolidAngle;
 
-                celestialBodyData.color = float3(color.r, color.g, color.b);
+                // LUT atmosfer ustu gunesi alir, disk sahne isigini. Bkz. `SkySunRadiance`.
+                Color lutColor = SkySunRadiance ?? color;
+                celestialBodyData.color = float3(lutColor.r, lutColor.g, lutColor.b);
 
                 const float lightingUnitsMultiplier = 50.0f;
                 color *= rcp(lightingUnitsMultiplier); // avoid potential precision issues

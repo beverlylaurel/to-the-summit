@@ -361,6 +361,40 @@ public class TimeOfDay : MonoBehaviour
             // (`AtmosphereController`, `cloudWarm *= cloudWarm`).
             float extinction = Mathf.Max(beam.x, Mathf.Max(beam.y, beam.z)) * sunFade;
             sun.intensity = sunIntensity * SunBlend(SunDirection.y) * extinction;
+
+            // THE SKY IS NOT LIT BY THE LIGHT THE GROUND GETS.
+            //
+            // Everything above this line dims and reddens the sun BECAUSE THAT IS WHAT A SLOPE
+            // RECEIVES at sunset. The sky package computes its own atmosphere, so handing it the
+            // same value applies the absorption twice more — the light already carries it in the
+            // colour and again in the intensity.
+            //
+            // MEASURED: as the sun goes from +0.058 to 0 the light's intensity falls 0.725 ->
+            // EXACTLY ZERO and the sky's zenith follows it down, 0.0101 -> 0.0000295. Sunset was
+            // coming out THIRTEEN TIMES DARKER than a moonlit midnight, which is backwards by
+            // about four orders of magnitude.
+            //
+            // `SunBlend` STAYS. It is not absorption, it is the gate that ends astronomical
+            // twilight at -18 degrees; without it the LUT would be lit by a sun pointing through
+            // the planet all night. At the horizon it is still 0.98, so the sky gets its sun.
+            //
+            // THE MOON HAS TO SURVIVE THE HAND-OVER. Written as the sun's radiance alone this
+            // zeroed the night sky: past -18 degrees the gate closes, and the override was still
+            // in force, so it replaced the moonlight the package had been lighting the LUT with.
+            // Measured: the night zenith went from 0.00039 to EXACTLY ZERO. Taking the larger of
+            // the two hands the sky over without a seam — the sun wins until twilight ends, the
+            // moon from then on, and neither is ever switched off under the other.
+            //
+            // WHAT THIS DOES NOT FIX: the LUT still takes its DIRECTION from whichever light URP
+            // calls the main one, and past the horizon that is the moon. So twilight carries the
+            // right amount of energy from the wrong direction. Pre-existing, and the package's
+            // own note says why (one light per LUT). DECISIONS.md.
+            float skySun = sunIntensity * SunBlend(SunDirection.y);
+            float skyMoon = moonIntensity * MoonBlend(MoonDirection.y);
+
+            PhysicallyBasedSkyURP.SkySunRadiance = skySun >= skyMoon
+                ? sunColor.linear * (skySun * Mathf.PI)
+                : moonColor.linear * (skyMoon * Mathf.PI);
         }
 
         if (moon != null)
