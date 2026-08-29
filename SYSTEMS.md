@@ -1039,6 +1039,16 @@ yüzden GLOBAL — arazi ayrı bir materyal ve per-materyal kalsalardı sıfır 
 `_SnowBreakup` dokusunun tanımı da tek yerde (`SnowCommon.hlsl`); mesh, arazi ve
 nesne maskesi üçü de onu okuyor.
 
+**Arazi kar maskesi İZİ DE OKUR (2026-08-30).** `SnowCoverMaskWithNoise` dört soru
+soruyor — eğim, gök, çukur, gürültü — ve hiçbiri iz değil. `MountainSurface.hlsl`
+maskeyi ayrıca **oyma sonrası kalan sütunla** çarpıyor: `SnowBaseHeight(swe,
+_FallbackRhoN) - SnowDentAt(uv)`, eşik `SNOW_MIN_VISIBLE_HEIGHT`. Bot karı sıyırıp
+bitirdiğinde maske düşer ve zemin görünür — ince karda iz zaten böyle okunur.
+Sütun **dünyanın yoğunluğuyla** ölçülür, yerel yoğunlukla değil: `KDeform` oymayı
+o çerçevede kırpıyor, yerel yoğunluk kullanılırsa iz içinde sıkışan kar sütunu
+kısaltır ve oyma sütunu geçer (ölçüldü: 20 cm izde maske sıfırlanıp zemin açıldı).
+Nesne maskesi bu terimi almaz — nesnede iz yok.
+
 **Parıltının ayarı TEK yerde.** Parıltı per-materyal kalsaydı farklı sayılarla
 parıldarlardı. `_SparkleCellSize/Density/Sharpness/Intensity` global,
 sahibi `SnowSettings`, yayını `SnowManager`. Arazi tarafında `snowMask` ile

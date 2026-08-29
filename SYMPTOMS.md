@@ -4252,3 +4252,56 @@ serbest katmandan geliyor — 25 km olan, yer seviyesi değeriydi.
 **Neden 100 değil de 60:** tooltip'in verdiği aralık dağ tepesi için; kamera 283 m'de, kıyıda.
 Yer seviyesinde 100 km istisnai bir gün demek, varsayılan hava değil.
 
+
+---
+
+## Kar izi 1 cm ve 5 cm'de hiç görünmüyor
+
+**Kullanıcının ağzından:** *"kar adım izi 1cm ve 5cm'de gözükmüyor. kar izi 1cm ve 5cm'de
+20cm ve 50cm'deki gibi birebir aynı gözükmeli."*
+
+**İlk şüpheli (yanlış):** oyma derinliği kar kalınlığıyla sınırlı, o yüzden iz sığ kalıyor.
+Doğru ama **yetersiz** — oyma zaten oradaydı ve tek başına belirtiyi açıklamıyordu.
+
+**Ölçüm.** Dört kar derinliğinde aynı dört metre yürünüp iz üstünden 2 cm ızgarayla örneklendi:
+
+| kar | oyma maks | rim maks | ekranda |
+|---|---|---|---|
+| 1 cm | 5,1 mm | 0,11 mm | **hiç yok** |
+| 5 cm | 25,6 mm | 2,8 mm | yok denecek kadar az |
+| 20 cm | 108 mm | 40 mm (tavanda) | net |
+
+Oyma 20 cm'den 1 cm'e **19 kat** düşüyor — bu doğru, bot bastığı kardan derine inemez. Ama
+rim **360 kat** düşüyordu.
+
+**Gerçek sebep — üst üste binmiş üç telafi terimi.** Üçü de aynı şeyi yapıyordu: zaten kar
+kalınlığıyla ölçeklenmiş bir büyüklüğü bir kez daha mutlak kalınlıkla çarpmak.
+
+1. `SnowSim.compute` `KRim`: `rimTarget = min(raised, blurCarve) * SNOW_RIM_STRENGTH *
+   saturate(baseH / 0.25)`. `raised` zaten oymayla orantılı; ikinci çarpan 1 cm'de 0,040.
+2. `SnowSim.compute` `KDeform`: `maxCarve = baseH * (1 - kalanPay)`. Paketleme sınırı derin
+   kar için doğru; ince tabakada kar **yandan kaçar**, sıkışmaz. Ayrıca `baseH` yerel
+   yoğunlukla ölçülüyordu — iz sıkıştıkça sütun kısalıyor, oyma kısalmıyor, tavan kendi
+   kendine düşüyordu.
+3. `MountainSurface.hlsl`: çukur eğimi normale `saturate(trailDepth * 20.0)` ağırlığıyla
+   giriyordu. Eğim zaten derinliğin türevi; bu ağırlık 1 cm'de 0,14. Kapı **varlık** kapısı
+   olmalı, büyüklük kapısı değil.
+
+**Dördüncü ve asıl eksik: kar maskesinde iz terimi yoktu.** `SnowCoverMaskWithNoise` dört soru
+soruyor — eğim, gök, çukur, gürültü — hiçbiri iz değil. Bot karı sıyırıp bitirse bile maske tam
+kalıyordu, yani ince karda iz ancak beyaz-üstüne-beyaz olabiliyordu. Oysa 1 cm karda iz tam da
+**zemini açtığı için** okunur; karşıtlık malzeme değişimidir, derinlik ipucu değil.
+
+**Ayırt eden ölçüm — aracın kendisi iki kez yalan söyledi:**
+
+- Yüzey shader'ına konan kırmızı prob hiç görünmedi. Sebep: kar pikselinde `surface.albedo`
+  kullanılmıyor, `MountainSurface.shader` `SnowBuildSurfaceFrom` ile ayrı bir kar yüzeyi
+  kuruyor. Prob ölü bir yola yazıyordu. Dosyanın canlı olduğu, içine kasıtlı sözdizimi hatası
+  konup `ShaderUtil.ShaderHasError` **True** dönmesiyle kanıtlandı.
+- İlk turlar saat **12:00**'de ölçüldü. Güneş tepedeyken çukur duvarı gölge vermez; iz en az
+  okunduğu anda ölçülüyordu. 09:36'ya alınınca aynı iz görünür oldu.
+
+**Sonuç.** 1 cm çözüldü: iz zemini açıyor, ekranda net. 5 cm iyileşti (oyma 25,6 → 31,8 mm,
+rim 2,8 → 14,4 mm) ama hâlâ zayıf; orada zemin açılmıyor (1,7 cm kar kalıyor, doğru) ve tek
+ipucu kabartma. 20 ve 50 cm hiç değişmedi — `SNOW_MAX_SINK` orada zaten bağlayıcı.
+Kalan zayıflığın sebebi ve tetikleyicisi `DECISIONS.md`'de.

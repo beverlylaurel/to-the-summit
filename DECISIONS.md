@@ -94,6 +94,10 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ## Bekleyen kararlar
 
+- **5 cm karda ayak izi zayıf** — sıkışma zinciri gerçek sayılara çekilmedi
+  (`SNOW_PACKED_N`, `SNOW_COMPACT_GAIN`). Tetikleyici ve maliyet aşağıda,
+  "5 cm karda ayak izi zayıf kalıyor" başlığında.
+
 - **Türkçe TANIMLAYICILAR duruyor — yorumlar bitti** (yorum tarafı 2026-08-28'de
   kapandı: `Assets` altında sıfır Türkçe diakritik satırı). Kalan 15 tanımlayıcı:
 
@@ -2214,3 +2218,31 @@ aynıysa alanı sonradan silen biri var.
 
 **Tetikleyici:** konsolu TEMİZLEYİP Play'e basınca aynı hata geri gelirse.
 
+
+## 5 cm karda ayak izi zayıf kalıyor — malzeme karşıtlığı yok
+
+**Karar.** 1 cm çözüldü, 20 ve 50 cm zaten doğruydu. 5 cm iyileştirildi ama olması gereken
+netliğe ulaşmadı; daha ileri gidilmedi.
+
+**Gerekçe.** 5 cm bir boşlukta duruyor: zemini açacak kadar ince değil (3,2 cm oyulduktan
+sonra 1,7 cm kar kalıyor, `SNOW_MIN_VISIBLE_HEIGHT`'ın çok üstünde), kabartmayla okunacak
+kadar da derin değil. Elde kalan tek ipucu eğim, o da 20 cm'dekinin üçte biri.
+
+Bunu daha ileri zorlamanın tek yolu, kabartmayı fiziksel karşılığından koparıp yapay
+karşıtlık üretmekti — yani telafi terimi. Bu belirtinin sebebi zaten **üç telafi terimiydi**
+(`SYMPTOMS.md` → "Kar izi 1 cm ve 5 cm'de hiç görünmüyor"); dördüncüsünü eklemek aynı hatayı
+tekrarlamak olurdu.
+
+**Ölçülmüş asıl eksik.** İz içindeki kar yeterince sıkışmıyor. Ölçüm: iz merkezinde
+yoğunluk `rhoN = 0,216`, bozulmamış kar `0,183`. Aradaki fark albedo ve pürüzlülüğe
+neredeyse hiç yansımıyor (freshness 0,834 ↔ 0,881). Gerçekte bot altındaki kar
+350–500 kg/m³'e çıkar, yani `rhoN ≈ 0,6–0,9` — bizim tavanımız `SNOW_PACKED_N = 0,55` ve
+üstüne `SNOW_COMPACT_GAIN = 0,60` sönümü var. Sıkışan kar görünür şekilde daha koyu ve daha
+düz olmalı; şu an değil.
+
+**Tetikleyici — geri dönülecek belirti:** orta derinlikte (3–8 cm) iz hâlâ okunmuyorsa
+çözüm kabartmayı büyütmek DEĞİL, sıkışma zincirini gerçek sayılara çekmektir:
+`SNOW_PACKED_N` ve `SNOW_COMPACT_GAIN`.
+
+**Maliyet.** `SNOW_PACKED_N` dört yerde daha okunuyor (batma ölçeği, pürüzlülük, sürüklenme
+eşiği, yeniden dolum), dolayısıyla tek sayı değişikliği değil — hepsi birlikte ölçülmeli.

@@ -722,6 +722,41 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         float localWet = lerp(_SurfaceWetness, max(_SurfaceWetness, snowState.b), bolgeIci);
         float localDisturb = snowState.a * bolgeIci;
 
+        // WHERE THE BOOT TOOK THE SNOW AWAY, THERE IS NO SNOW.
+        //
+        // `SnowCoverMaskWithNoise` asks four questions — slope, sky, cavity, noise — and not
+        // one of them is the trail. The mask therefore stayed at full strength inside a
+        // footprint even when the sole had scraped the layer down to nothing, so a print in
+        // thin snow could only ever be white-on-white: a hollow lit slightly differently,
+        // never bare ground.
+        //
+        // That is the wrong end of the physics. On 1 cm of snow a boot print is unmistakable
+        // precisely BECAUSE it exposes what is underneath — the contrast is a material
+        // change, not a depth cue. Depth is what makes a print in 20 cm of snow read, and
+        // that mechanism (relief, normals, its own shadow) is already wired.
+        //
+        // The remaining column is what the coverage kernel already fades on
+        // (`SnowSim.compute` KCoverage): below SNOW_MIN_VISIBLE_HEIGHT there is nothing left
+        // to draw. The same threshold is applied here to the COLUMN AFTER CARVING.
+        //
+        // THE COLUMN IS MEASURED AT THE WORLD'S DENSITY, NOT THE LOCAL ONE. `KDeform` clamps
+        // the carve against `refThickness = SnowBaseHeight(snow.r, _FallbackRhoN)`, so that is
+        // the frame the carve is expressed in. Using the LOCAL density here mixes two
+        // quantities: inside a print the snow is compacted, its column height shrinks, and the
+        // carve — which does not shrink with it — overtook the column. MEASURED with the local
+        // density: a 20 cm print reported a negative remainder and opened to bare ground, which
+        // is exactly the artefact this term exists to avoid.
+        //
+        // MEASURED, walking the same four metres, against the world's column:
+        //   1 cm layer  -> column 9.9 mm, carve 7.0 mm -> 2.9 mm left, under the 4 mm floor
+        //   20 cm layer -> column 200 mm, carve 108 mm -> 92 mm left, far above it
+        // so the thin print opens to the ground and the deep print is untouched.
+        float carved = SnowDentAt(trailUV);
+        float remainingColumn = max(0.0, SnowBaseHeight(snowState.r, _FallbackRhoN) - carved);
+
+        snowMask *= lerp(1.0, saturate((remainingColumn - SNOW_MIN_VISIBLE_HEIGHT)
+                                       / SNOW_EDGE_FADE_RANGE), bolgeIci);
+
         // Spec §14.1: albedo and roughness come from FRESHNESS, and freshness from density.
         float freshness = 1.0 - saturate((SnowDensity(localRho) - 100.0) / 350.0);
 
@@ -801,11 +836,28 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // the hollow. Measured: inside the blend a 22 cm trail was barely discernible on
         // screen.
         {
+            // THE GATE ASKS "IS THERE A TRAIL", NOT "HOW DEEP IS IT".
+            //
+            // `trailSlope` ALREADY carries the depth: it is the derivative of the dent, so a
+            // shallow hollow produces a gentle slope on its own. Weighting it a second time by
+            // the absolute depth charged shallow prints twice.
+            //
+            // `trailDepth * 20` reaches 1 only at 5 cm. MEASURED, walking the same four metres:
+            //   20 cm layer -> dent 107 mm -> weight 1.00
+            //   1 cm layer  -> dent 7 mm   -> weight 0.14
+            // so the 1 cm print's normal was applied at a seventh strength on top of a slope
+            // that was already fifteen times gentler, and the print rendered as untouched snow.
+            //
+            // 2 mm is the presence threshold: below it the dent is texture noise rather than a
+            // footprint. Everything above it gets its own slope, at full strength, whatever the
+            // depth. Deep snow is unaffected — it saturated long before either threshold.
+            const float TrailPresenceMeters = 0.002;
+
             half2 trailSlope = SnowDentSlope(trailUV);
             float3 n = surface.normalWS;
             float2 e = float2(n.x, n.z) / max(n.y, 1e-3) - (float2)trailSlope;
             surface.normalWS = normalize(lerp(n, normalize(float3(e.x, 1.0, e.y)),
-                                              saturate(trailDepth * 20.0)));
+                                              saturate(trailDepth / TrailPresenceMeters)));
         }
 
         // THE SNOW SURFACE'S OWN RELIEF — INDEPENDENT OF THE TRAIL.

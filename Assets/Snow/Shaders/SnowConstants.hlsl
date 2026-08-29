@@ -50,6 +50,7 @@
 #define SNOW_SETTLE_TAIL_SCALE       5.0
 #define SNOW_HOLE_FLARE              0.08
 #define SNOW_MAX_SINK                0.15
+#define SNOW_LATERAL_ESCAPE          0.110
 #define SNOW_PACKED_SINK_SCALE       0.18
 #define SNOW_COMPACT_GAIN            0.60
 
@@ -60,7 +61,6 @@
 #define SNOW_RIM_MAX                 0.04
 #define SNOW_RIM_CLUMP_SCALE         7.0
 #define SNOW_RIM_CLUMP_FLOOR         0.35
-#define SNOW_RIM_REF_DEPTH           0.25
 #define SNOW_RIM_BLUR_TEXELS         7.0
 #define SNOW_DENT_SLOPE_TEXELS       2.0
 

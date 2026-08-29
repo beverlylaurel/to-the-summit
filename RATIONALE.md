@@ -2822,3 +2822,31 @@ soğuk olandan daha ağır durur.
 
 Ölçülen değerler `LookSettings.asset`'te; buradaki kayıt yönün **neden** o yön olduğu.
 
+
+## Ayak izi: kalınlıkla ölçeklenmiş büyüklük İKİNCİ kez kalınlıkla çarpılmaz
+
+**Kural.** Bir büyüklük zaten kar kalınlığından türüyorsa, üstüne mutlak kalınlık çarpanı
+konmaz. Konursa etki kare olarak düşer ve ince karda ortadan kalkar.
+
+**Neden.** Kar izinin üç ayrı yerinde aynı hata vardı ve üçü çarpılıyordu:
+
+| yer | terim | 1 cm karda | 20 cm karda |
+|---|---|---|---|
+| `KRim` | `saturate(baseH / 0.25)` | 0,040 | 0,745 |
+| `KDeform` | tavan yerel yoğunluklu `baseH` | sıkıştıkça düşer | bağlayıcı değil |
+| `MountainSurface.hlsl` | `saturate(trailDepth * 20)` | 0,14 | 1,00 |
+
+Oyma zaten 19 kat düşerken rim 360 kat düştü. Üçü de "ince karda iz zayıf olmalı" sezgisiyle
+yazılmıştı — ama bu sezgi **zaten** oymanın içinde kodlanmıştı; terimler onu tekrarladı.
+
+**Ayırt eden ölçüm.** Aynı dört metre, dört kar derinliğinde, 2 cm ızgarayla örneklendi.
+Oymanın kar kalınlığıyla orantılı düşmesi doğru çıktı; rim'in ondan bağımsız çökmesi
+yanlış çıktı. Sayı olmasa üçü de makul görünüyordu.
+
+**Doğru soru "ne kadar derin" değil, "var mı".** Eğim zaten derinliğin türevidir; sığ çukur
+kendiliğinden yumuşak eğim verir. Normale giren kapı bu yüzden **varlık** kapısı oldu
+(2 mm eşiği: altı doku gürültüsü, üstü ayak izi), büyüklük kapısı değil.
+
+**İnce karda iz derinlikle değil MALZEMEYLE okunur.** 1 cm karda bot zemini açar; karşıtlık
+kar↔zemin albedosudur. Bu yüzden çözüm kabartmayı büyütmek değil, kar maskesine oyma
+terimini bağlamak oldu — sistemin dört sorusundan biri eksikti, beşincisi eklendi.

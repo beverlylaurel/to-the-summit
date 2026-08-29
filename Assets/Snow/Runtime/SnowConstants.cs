@@ -50,8 +50,11 @@ public static class SnowConstants
     /// Offset along velocity direction for rim calculation, seconds.
     public const float RimVelocityBias = 0.04f;
 
-    /// Reference snow depth for rim height scaling, meters.
-    public const float RimRefDepth = 0.25f;
+    /// Layer thickness below which snow escapes sideways instead of compacting, meters.
+    /// The boot sole's width: once the layer is as thick as the sole is wide, snow under
+    /// the middle has as far to travel sideways as it is deep, so escaping is no easier
+    /// than compressing and the packing limit takes over on its own.
+    public const float LateralEscape = 0.110f;
 
     /// Rim blur radius, texels.
     public const float RimBlurTexels = 7f;

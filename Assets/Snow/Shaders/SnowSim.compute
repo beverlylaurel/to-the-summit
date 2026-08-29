@@ -147,7 +147,6 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         snow.g = lerp(snow.g, _FallbackRhoN, ratio);
     }
 
-    float baseH = SnowBaseHeight(snow.r, snow.g);
     float2 worldXZ = SnowTexelToWorld(id.xy);
 
     float radius, sinkMultiplier, axisDistance;
@@ -155,8 +154,38 @@ void KDeform(uint3 id : SV_DispatchThreadID)
 
     if (radius > 0.0 && distance <= (radius + SNOW_MAX_SINK * SNOW_HOLE_FLARE) * (1.0 + SNOW_SETTLE_TAIL_LEN * 2.5))
     {
-        float kalanPay    = SnowDensity(SNOW_LOOSE_N) / max(SnowDensity(SNOW_PACKED_N), 1.0);
-        float maxCarve = baseH * (1.0 - kalanPay);
+        // A THIN LAYER IS PUSHED ASIDE, NOT COMPRESSED IN PLACE.
+        //
+        // `kalanPay` is the packing limit: a column of loose snow cannot be squeezed past
+        // packed density, so 30.8% of it always survives underfoot. That is right for DEEP
+        // snow, where the sole compresses a column that is tall next to the boot.
+        //
+        // It is wrong for a thin layer. When the snow is far shallower than the sole is wide,
+        // there is nowhere to compress TO — the snow escapes sideways and becomes the rim, and
+        // the sole reaches the ground. This is why a boot print on 1 cm of snow reads as BARE
+        // GROUND with a white edge, not as a shallow white dish. The crossover is the sole's
+        // WIDTH (`bootWidth` 0.11 m in SnowFootprintDeformer): once the layer is as thick as
+        // the sole is wide, snow under the middle has as far to travel sideways as it is deep,
+        // so escaping stops being easier than compressing and the packing limit takes over.
+        //
+        // THE CEILING IS MEASURED ON THE WORLD'S COLUMN, NOT THE COMPACTED ONE. A local-density
+        // column shrinks as the print compacts while the carve, measured from the untouched
+        // surface, does not — so the deeper the sole pressed, the lower its own ceiling fell
+        // and it stalled. `refThickness` is the same quantity the compaction block below uses,
+        // so the two now agree instead of each having its own idea of how tall the snow is.
+        //
+        // MEASURED, walking the same four metres:
+        //   before        1 cm layer -> carve 5.1 mm of a 9.9 mm column, print invisible
+        //   lateral only  1 cm layer -> carve 7.0 mm, only the sole's centre reached ground
+        //   both          1 cm layer -> carve 9.3 mm, the whole sole opens to the terrain
+        //   20 cm layer   unchanged throughout: SNOW_MAX_SINK binds long before this ceiling
+        float refThickness = SnowBaseHeight(snow.r, _FallbackRhoN);
+
+        float lateral = saturate(refThickness / SNOW_LATERAL_ESCAPE);
+
+        float kalanPay = SnowDensity(SNOW_LOOSE_N) / max(SnowDensity(SNOW_PACKED_N), 1.0)
+                       * lateral;
+        float maxCarve = refThickness * (1.0 - kalanPay);
 
         float crust  = trail.b;
         float packed = saturate((snow.g - SNOW_LOOSE_N) / max(SNOW_PACKED_N - SNOW_LOOSE_N, 1e-3));
@@ -198,8 +227,7 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         trail.a = 0.0;
     }
 
-    float refThickness = SnowBaseHeight(snow.r, _FallbackRhoN);
-    float compressible  = max(min(refThickness, SNOW_MAX_SINK), 1e-3);
+    float compressible  = max(min(SnowBaseHeight(snow.r, _FallbackRhoN), SNOW_MAX_SINK), 1e-3);
 
     float hedefN = _FallbackRhoN
                  + (SNOW_PACKED_N - _FallbackRhoN)
@@ -266,11 +294,23 @@ void KRim(uint3 id : SV_DispatchThreadID)
 
     float raised = max(0.0, blurCarve - carve);
 
-    float4 snow  = _Snow[id.xy];
-    float  baseH = SnowBaseHeight(snow.r, snow.g);
-    float  depthScale = saturate(baseH / SNOW_RIM_REF_DEPTH);
-
-    float rimTarget = min(raised, blurCarve) * SNOW_RIM_STRENGTH * depthScale;
+    // THE RIM IS THE SNOW THAT CAME OUT OF THE HOLE, NOT A FUNCTION OF THE LAYER'S THICKNESS.
+    //
+    // `raised` is already the displaced amount: the blurred carve minus the carve, so it is
+    // proportional to how much was dug. Scaling it a SECOND time by the absolute layer depth
+    // (`saturate(baseH / 0.25)`) charged shallow snow twice for the same shallowness.
+    //
+    // MEASURED, walking the same four metres at four depths:
+    //   1 cm layer  -> carve 5.1 mm, depthScale 0.040 -> rim 0.11 mm   (nothing on screen)
+    //   5 cm layer  -> carve 25.6 mm, depthScale 0.20 -> rim 2.8 mm
+    //   20 cm layer -> carve 109 mm, depthScale 0.75  -> rim clamped at SNOW_RIM_MAX
+    // The carve alone already falls 19x from 20 cm to 1 cm, which is correct — a boot cannot
+    // dig deeper than the snow it stands in. The rim fell a further 19x on top of that, so the
+    // print lost 360x of its relief and the 1 cm case rendered as untouched snow.
+    //
+    // Deep snow does not move: the target was already above SNOW_RIM_MAX there and still is,
+    // so the clamp keeps the 20 cm and 50 cm prints bit-for-bit what they were.
+    float rimTarget = min(raised, blurCarve) * SNOW_RIM_STRENGTH;
 
     float2 topakXZ = SnowTexelToWorld(id.xy);
     float  topak   = SnowWarpedBlockNoise(topakXZ * SNOW_RIM_CLUMP_SCALE);
