@@ -687,6 +687,25 @@ MountainSurface BuildMountainSurface(float3 worldPos)
                                             0.45, _SnowCoverSlopeSharpness,
                                             _SnowCoverBreakupStrength, _SnowCoverEdgeSharpness);
 
+    // SNOW DOES NOT LIE ON THE SEA BED.
+    //
+    // `SnowCoverMaskWithNoise` asks four questions — slope, sky, cavity, noise — and the sea
+    // is not among them, so the snow line ran straight down the beach and carried on under
+    // the water: standing in the shallows and looking down, the bottom was white.
+    //
+    // Sea water does not let it. Salt puts the freezing point at -1.9 C and the sea's heat
+    // capacity holds the surface layer there whatever the air is doing, so a flake that
+    // reaches the water melts; the sea bed never accumulates. The same is true of the swash
+    // zone, which every run-up wets with that water.
+    //
+    // The boundary is NOT a second invented line: it is `_SeaWetLevelY`, the run-up level the
+    // sea already publishes and the wet-sand band already hangs from, and it fades over
+    // `_SeaWetFadeM`, the same fade. Snow stops exactly where the sand stops being wet.
+    // `max` with the still level because the run-up is dragged far below the world when the
+    // sea is switched off, and the still level is the honest floor in that case.
+    float seaReach = max(_SeaWetLevelY, _SeaLevelY);
+    snowMask *= smoothstep(seaReach, seaReach + max(_SeaWetFadeM, 1e-3), worldPos.y);
+
     if (snowMask > 0.001)
     {
         // THE TRAIL IS REAL GEOMETRY — NOT PARALLAX.

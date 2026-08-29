@@ -1049,6 +1049,14 @@ o çerçevede kırpıyor, yerel yoğunluk kullanılırsa iz içinde sıkışan k
 kısaltır ve oyma sütunu geçer (ölçüldü: 20 cm izde maske sıfırlanıp zemin açıldı).
 Nesne maskesi bu terimi almaz — nesnede iz yok.
 
+**Arazi kar maskesi DENİZİ DE OKUR (2026-08-30).** Aynı maske deniz kotunu da sormuyordu;
+kar çizgisi sahilden aşağı devam edip su altında sürüyordu (`SYMPTOMS.md` → "Deniz dibinde
+kar birikiyor"). `MountainSurface.hlsl` maskeyi `smoothstep(seaReach, seaReach +
+_SeaWetFadeM, worldPos.y)` ile çarpıyor; `seaReach = max(_SeaWetLevelY, _SeaLevelY)`.
+Sınır **ıslak kum bandının astığı çizginin ta kendisi** — ikinci bir eşik yok, kar tam
+olarak kumun ıslak olmayı bıraktığı yerde başlıyor. Yağan tanecikler dokunulmadı: denize
+kar yağar, sadece birikmez. Kar → deniz yönünde tek bağ budur; deniz karı hiç okumaz.
+
 **Parıltının ayarı TEK yerde.** Parıltı per-materyal kalsaydı farklı sayılarla
 parıldarlardı. `_SparkleCellSize/Density/Sharpness/Intensity` global,
 sahibi `SnowSettings`, yayını `SnowManager`. Arazi tarafında `snowMask` ile

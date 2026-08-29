@@ -4305,3 +4305,41 @@ kalıyordu, yani ince karda iz ancak beyaz-üstüne-beyaz olabiliyordu. Oysa 1 c
 rim 2,8 → 14,4 mm) ama hâlâ zayıf; orada zemin açılmıyor (1,7 cm kar kalıyor, doğru) ve tek
 ipucu kabartma. 20 ve 50 cm hiç değişmedi — `SNOW_MAX_SINK` orada zaten bağlayıcı.
 Kalan zayıflığın sebebi ve tetikleyicisi `DECISIONS.md`'de.
+
+---
+
+## Deniz dibinde kar birikiyor
+
+**Kullanıcının ağzından:** *"denizin içine kar yağıyor. kıyıda sığ suda zemine baktığımda
+suyun içinde yerde kar görünüyor?"*
+
+**İlk şüpheli (yanlış çıkmadı, ama eksikti):** kar biriktirme kernel'i suyu bilmiyor.
+Doğru — ama asıl mesele biriktirme değil, **çizim**: arazi kar maskesi dünya konumunu
+okuyor ve deniz kotunu hiç sormuyordu.
+
+**Ölçüm.** `Assets/Snow/` ağacının tamamında deniz seviyesine dair **tek satır yok**:
+
+```
+grep -rn "SeaLevel\|_SeaLevelY\|waterLevel" Assets/Snow/   →  sıfır eşleşme
+```
+
+`SnowCoverMaskWithNoise` dört soru soruyor — eğim, gök görünürlüğü, çukur (AO), gürültü.
+Hiçbiri su değil. Kar çizgisi sahilden aşağı devam edip su altında sürüyordu.
+
+**Ayırt eden ölçüm.** Aynı sahilde (`-11542, 30.1, -1370`, 40 m'de 2.4 m yükselen gerçek bir
+kıyı), kar kaplaması 1'e zorlanıp aynı kadraj iki kez çekildi:
+
+| kapı | deniz dibi | kum bandı |
+|---|---|---|
+| kapalı | **bembeyaz** | yok |
+| açık | koyu | var |
+
+**Gerçek sebep ve düzeltme.** Deniz suyu kara izin vermez: tuz donma noktasını −1,9 °C'ye
+indirir ve denizin ısı sığası yüzey katmanını orada tutar; suya ulaşan tane erir, dip
+biriktirmez. Aynısı her tırmanışta o suyla ıslanan swash bölgesi için de geçerli.
+
+Maske artık `_SeaWetLevelY` — denizin zaten yayınladığı tırmanma kotu, ıslak kum bandının da
+astığı çizgi — üstünde `_SeaWetFadeM` ile açılıyor. **İkinci bir sınır uydurulmadı**: kar tam
+olarak kumun ıslak olmayı bıraktığı yerde başlıyor.
+
+**Yağan tanecikler değiştirilmedi.** Denize kar yağar, sadece birikmez.
