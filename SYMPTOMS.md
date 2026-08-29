@@ -3981,3 +3981,66 @@ sürüklemeyi başlatan 0,22 eşiğinin üstünde. Dağ, rüzgârsız bir günde
 Hafif esinti kar sürüklemez, sisi kapatmaz, duyulmaz — o sistemlerin sorduğu "olağanın
 ötesinde ne kadar rüzgâr var". Fırtına ucundaki sayılar aynen geri geldi (korunaklı 0,350,
 açık 1,000); ölü sakinlikte her maruziyette sıfır.
+
+
+## Gece hep aynı parlaklıkta — ay doğuyor, batıyor, hiçbir şey değişmiyor
+
+**İlk şüpheli yanlıştı:** "gökyüzü zaten gece boyu aynı parlaklıkta". Değilmiş. Ölçüldü:
+ışık seviyesi gece boyunca 0,0058 (gece yarısı, ay tepede) ile 0,0014 (18:30, ay henüz
+doğmamış) arasında geziyor — **3,5 kademelik** gerçek bir değişim, üstelik doğru yönde.
+
+**Gerçek sebep:** `LookController`'daki `Mathf.Clamp(..., 0f, exposureCap)`. Ham hedef gece
+yarısı 2,60 EV, 03:00'te 2,78, 05:00'te 3,16, 05:30'da 3,30 — **hepsi 2,5'in üstünde**, yani
+her gece saati tam olarak 2,50'ye kırpılıyordu. Veri oradaydı, kırpma yiyordu.
+
+**Ayırt eden ölçüm:** günün 18 saatinde ham hedef ile kırpılmış hedefi yan yana yazdırmak.
+Kırpılmamış sütun geziniyor, kırpılmış sütun on bir satır boyunca `2,50 2,50 2,50` diye
+iniyor. Tek bakışta ayrılıyor.
+
+Bu, alt sınırda bir kez daha yaşanmış bir hata: `lightLevel` 0,02'ye kırpılırken
+alacakaranlık tek seviyeye düzleşmişti. Aynı kırpma **aralığın öbür ucunda** duruyordu ve o
+uca kimse bakmamıştı. Düzeltme: sert kırpma yerine `tanh` doyumu — tavanın altında birebir
+aynı, üstünde eğrilip tavanı hiç geçmiyor, sıralama hiç kaybolmuyor.
+
+
+## Gökyüzü probu gün doğumunda ve batımında TAM SIFIR
+
+**Belirti:** altın saatte sahnenin ortam ışığı çöküyor; pozlama bir anda tavana yapışıyor.
+
+**İlk şüpheli yanlıştı:** ölçüm artefaktı. Edit modda `SkyAmbientBaker`'da `[ExecuteAlways]`
+yok, `LateUpdate` hiç dönmüyor, probe donuyor — ilk süpürmede zenit gün boyu 0,2129'da
+çakılıydı ve **araç yalan söylüyordu**. Kareler arasında dönen bir süpürme (her saatte 12
+kare, zorlanmış repaint + `DynamicGI.UpdateEnvironment`) kurulunca sayılar canlandı.
+
+**Gerçek sebep — ve ölçüm:** delik gerçek. Saatler ters sırada tekrar tarandı, aynı sayılar
+5 haneye kadar geldi:
+
+| güneş yüksekliği | zenit |
+|---|---|
+| +0,0923 | 0,0306 |
+| +0,0462 | 0,0045 |
+| +0,0231 | 0,000228 |
+| +0,0116 | 0,0000101 |
+| 0,0000 | **0,000000** |
+| −0,0462 | **0,000000** |
+| −0,0693 | 0,000161 |
+
+Ufkun iki yakasında simetrik yükseklikte **163 kat** fark var ve arada tam sıfır bir bant.
+Gerçek alacakaranlık ufka göre neredeyse simetriktir. Sebep paketin kendi notunda yazılı:
+sky-view LUT **tek ışıktan** pişiyor, ay gökyüzünü aydınlatmıyor. Güneş ufka inince gündüz
+dalı ölüyor, gece dalı henüz doğmuyor, ikisi ortada buluşamıyor.
+
+`SurfaceLightLevel`'in aynı anda sıfırlanması **doğru**: ufka paralel ışın düz zemine sıfır
+ışınım düşürür. Yanlış olan, gökyüzünün de sıfır olması.
+
+**ÖLÇÜMÜN SINIRI — Play'de doğrulanmadı.** Yukarıdaki sayılar edit modda, elle
+`DynamicGI.UpdateEnvironment()` çağırarak, yani probe'u **skybox malzemesinden** pişirerek
+alındı. Play bu yolu kullanmıyor: sahnede `skyAmbientMode = Dynamic` ve paket her karede
+kendi `AmbientProbePass`'ini kuyruğa alıp probe'u **kendi LUT'undan** yazıyor. İki ayrı yol;
+ölçülen bir tanesi. Deliğin Play'de de olup olmadığı F1 → "Göz uyumu" satırından
+okunacak: 18:00'de `gök` terimi sıfıra düşüyorsa delik gerçek.
+
+**Kapatılmadı** — sebep gökyüzü paketinde, düzeltmesi sahnenin aydınlatmasını değiştirir.
+`DECISIONS.md` → "Ufuktaki gökyüzü deliği". Göz uyumunun çubuk görüşü terimi bu delikten
+etkilenmesin diye sivil alacakaranlık kapısı taşıyor; pozlamanın kendisi taşımıyor ve
+delikte 2,50 yerine 3,45 EV'ye açılıyor — Play'de bakılacak ilk sayı bu.

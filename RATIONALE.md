@@ -2668,3 +2668,72 @@ devam etmeli ve ince uç düşmemeli.
 
 Kaba oktavların çarpanları `_SeaFoamBreakupTiling`'e bağlı (0,0292 ve 0,0117), yani ayar
 değişirse dört ölçek birlikte kayıyor; ikinci bir kaynak yok.
+
+
+## Göz uyumu: tavan neden `tanh`, banda neden cd/m² denmedi (2026-08-29)
+
+**Tavan doyum, kırpma değil.** Ölçüm `SYMPTOMS.md`'de: sert kırpma geceyi tek pozlamaya
+düzleştiriyordu. `tanh` seçildi çünkü tavanın **altında birebir doğrusal** — öğlen 0,098 →
+0,098, 08:00 0,3045 → 0,3043, altın saat 0,700 → 0,697 — yani gündüz ve altın saat
+kımıldamıyor, yalnız gece geri geliyor: gece yarısı 2,50 → 2,47, 05:30 2,50 → 3,05.
+
+**Tavan fizik, pay tasarım.** Rodopsin rejenerasyonu gerçek gözde 6-7 kademelik kazanç
+verir; **doyan** şey bu. Oyunun bu kazancın ne kadarını harcadığı `adaptShare`, ve o bir
+sıkıştırma kararı. Eskiden ikisi tek kırpılmış sayının içinde birbirine dolanmıştı; ayrı
+ayrı düşünülemediği için kırpma yıllarca görülmedi.
+
+**Çubuk görüşü bandı oyunun aralığına konuldu, cd/m²'ye değil — ve bu bilinçli.** Gerçek gün
+öğleden aysız geceye ~18 kademe iner; bu oyunda 9,4 (ölçüldü: öğlen 0,28 kademe altta, en
+karanlık saat 9,45). Bandı gerçek parlaklığa çakarsak mezopik bölge ~15 kademe altta kalır
+ve terim **hiç çalışmaz**, çünkü oyunun gecesi kendi öğlenine göre gerçeğinden yaklaşık bin
+kat parlak. Sıkıştırma zaten var; band da sıkıştırılmış aralığa oturuyor. Çıkan ağırlıklar
+tutarlı: gece yarısı ay tepedeyken 0,66 — dolunaylı kar gerçekten mezopiktir — alacakaranlık
+sonrası ay doğmadan 1,0.
+
+**Purkinje'nin RENK yarısı yazılmadı.** Kayma bir *parlaklık ağırlığı* değişimidir: V(λ)
+yerine V′(λ) (tepe 507 nm). sRGB birincillerinde oran V′/V ≈ (0,019 · 0,48 · 10,3); luminans
+korunacak şekilde normalize edilince (0,017 · 0,443 · 9,41). Bunu `colorFilter` gibi bir
+**çarpan** olarak uygulamak mavi kanalı 9,4 ile çarpar — gece neon mavisi olur. Doğru işlem
+"V′ ağırlıklı griye doygunluk düşürmek"tir ve `ColorAdjustments.saturation` sabit fotopik
+luma kullandığı için bunu ifade edemez; ayrı bir geçiş ister.
+
+Yazılan yarı doğru olanı: **çubuklar renksizdir.** Renklilik kaybı uygulandı, renk kayması
+uygulanmadı. Gece profillerinde zaten elle ayarlanmış bir mavi eğilim var (`colorFilter`
+0,92/0,95/1,00, sıcaklık −14) ve onun üstüne ikinci bir kaynak konmadı.
+
+**Doygunluk payı `adaptShare`'den geliyor, yeni bir sayı uydurulmadı.** Profilden **kalan**
+renkliliğin (`100 + profile.saturation`) payı alınıyor: açık gecede −20 → −48, fırtınalı
+gecede −36 → −58. Aynı sıkıştırma, iki eksen.
+
+
+## İnceleme maddelerinden yapılmayanlar ve sebepleri (2026-08-29)
+
+**A1 "adaptShare'i yöne göre böl" — yapılmadı, çünkü inceleme kendi içinde çelişiyor.**
+§4 tablosu "gerçek ~0,5 ışığa, ~0,25 karanlığa" diyor, §A1 metni tam tersini: "ışığa 0,25,
+karanlığa 0,45". Fizyoloji §A1'i doğruluyor (karanlığa açılma payı büyük). Ama asıl mesele
+şu: iki paylı bir kurulum `adaptTarget > adapt` testine bağlı olduğu için **histerezis
+bandı** yaratır, ve gece bandın genişliği ~1 EV çıkar — küçük bir aydınlanmada pozlama bir
+kademe birden düşer. Ölçüm zaten gerçek sebebin pay değil **tavan** olduğunu gösterdi;
+tavan doyuma çevrilince maddenin gerekçesi ortadan kalktı.
+
+**A2 "bakış yönü karışımı" — yapılmadı.** İncelemenin kendi §6'sı ekran-ortalama uyumu
+"güneşe bakınca fırlama" diye reddediyor; bakış yönü probu aynı sorunun yumuşatılmışı.
+Ayrıca `LookController`'a kamera bağımlılığı sokar ve incelemenin kendisi 2-3 s ek yumuşatma
+şart koşuyor. Getiri, taşıdığı salınım riskini karşılamıyor.
+
+**A3 "alt sınırı 0,0005 → 0,00006" — konusuz.** Ölçüldü: gerçek çevrimde ışık seviyesi
+0,0014'ün altına **hiç inmiyor**. Alt sınır zaten devreye girmiyor; indirmek hiçbir şey
+değiştirmez.
+
+**B2 "karanlıkta glare artsın" — yapılmadı.** Yönü doğru (göz bebeği 2→8 mm, alan 16 kat,
+kaynak çevresindeki hale büyür). Ama `bloom.intensity` bir stil parametresi, veiling
+luminance değil; 16 çarpanının orada fiziksel bir karşılığı yok ve incelemenin önerdiği
+"ucuz sürüm" savunulabilir bir katsayı taşımıyor. Proje kuralı: karşılığı yazılamayan
+katsayı bağlanmaz.
+
+**B3 "Weber kontrastı" — zaten var, elle.** Gece profilleri kontrastı düşürüyor (açık gündüz
+6 → açık gece 3, fırtınalı gece −3). Eksik olan mekanizma değil, **neye bağlı olduğu**:
+saate bağlı, ışığa değil. Aynı kusur doygunlukta vardı ve bu turda kapatıldı; kontrast
+elle ayarlanmış bir eğri olduğu için aynı işlem ona körlemesine uygulanmadı.
+
+**C grubu** — incelemenin kendi tavsiyesi: yerel ton eşleme pahalı, bleaching konfor riski.

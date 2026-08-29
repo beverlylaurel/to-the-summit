@@ -10,14 +10,33 @@ using UnityEngine.Rendering.Universal;
 public class LookController : MonoBehaviour
 {
     /// EXPOSURE ADAPTATION. The eye opens up in the dark but does not close the whole
-    /// difference; `adaptShare` is the share it closes, `exposureCap` the most stops it can open.
+    /// difference; `adaptShare` is the share it closes, `rodCeilingEV` is where that opening
+    /// SATURATES.
     ///
-    /// The cap was 0.6, and that number was tuned while the sky was not PHYSICALLY darkening.
-    /// Once the double sun attenuation was removed and twilight came down to its real level,
-    /// 0.6 EV opened nothing: the sky data was there but the screen looked pitch black.
+    /// IT IS A SATURATION, NOT A CLIP, and that difference is the whole reason the number
+    /// changed. It used to be `Mathf.Clamp(..., 0f, 2.5f)`.
+    ///
+    /// MEASURED over a full day: the raw target is 2.60 EV at midnight, 2.78 at 03:00, 3.16 at
+    /// 05:00 and 3.30 at 05:30. Every one of them is above 2.5 — so EVERY NIGHT HOUR came out
+    /// at exactly 2.50. Three and a half stops of real sky change, the moon rising, the moon
+    /// setting, the dark hour before dawn, all rendered at one single exposure. This is the same
+    /// trap the LOWER bound already had (a clamp at 0.02 flattened twilight into one level); it
+    /// was sitting at the other end of the range and nobody had looked at that end.
+    ///
+    /// `tanh` closes it and touches nothing else. Below the ceiling it IS the linear share, so
+    /// noon, dawn and the golden hour come out as before to three decimals; above it the curve
+    /// bends over, never crosses the ceiling, and the ordering survives however dark it gets.
+    ///
+    /// THE CEILING IS PHYSICS, THE SHARE IS DESIGN. Rhodopsin regeneration is worth 6-7 stops of
+    /// gain in a real eye, and that gain is what saturates. How much of it this game spends is
+    /// `adaptShare`, a deliberate compression. Tangled into one clipped number the two could not
+    /// be reasoned about separately, which is why the clipping went unnoticed.
+    ///
+    /// WHAT IT COSTS, measured: midnight 2.50 -> 2.47, 03:00 2.50 -> 2.55, 05:30 2.50 -> 3.05,
+    /// noon 0.098 -> 0.098. The night gets its ordering back and the day does not move.
     [Header("Pozlama uyumu")]
-    [Tooltip("The most stops that can be opened in darkness (EV).")]
-    [SerializeField, Range(0f, 6f)] float exposureCap = 2.5f;
+    [Tooltip("Where opening to darkness saturates (EV) — rhodopsin's own ceiling.")]
+    [SerializeField, Range(0f, 10f)] float rodCeilingEV = 6.5f;
 
     /// IT STAYS AT 0.35. It was raised to 0.60 for a while: the night sky sat at the bottom of
     /// the tone curve, and while the data varied by less than one stop across the whole field of
@@ -37,6 +56,38 @@ public class LookController : MonoBehaviour
 
     /// The current exposure adaptation. It reaches the target by smoothing.
     float adapt;
+
+    /// Below noon, in stops, where rod vision starts and where it has fully taken over.
+    ///
+    /// THE BAND IS PLACED ON THIS GAME'S RANGE, NOT ON cd/m2, and that is deliberate rather
+    /// than lazy. A real day spans about 18 stops from noon to a moonless night; this one spans
+    /// 9.4 (measured: 0.28 stops below noon at midday, 9.45 at the darkest hour). Anchored to
+    /// real luminance the mesopic band would sit around 15 stops down and the term would never
+    /// fire at all, because the game's night is roughly a thousand times brighter than a real
+    /// one relative to its own noon.
+    ///
+    /// Measured weights that come out of this placement: 0.66 at midnight with the moon up —
+    /// which is right, a full moon on snow really is mesopic — and 1.0 in the hour after dusk
+    /// before the moon rises, the genuinely darkest part of the cycle.
+    const float ScotopicOnsetStops = 5f;
+    const float ScotopicFullStops = 9f;
+
+    /// Sine of -6 degrees: the end of civil twilight, and the earliest the rods can take over.
+    const float CivilTwilightSine = -0.1045f;
+
+    /// The floor under the light level. Measured, it never engages in the real cycle — the
+    /// darkest hour reads 0.0014 — but the level is a ratio and nothing guarantees a future
+    /// sky cannot reach zero, and `log2(0)` is negative infinity.
+    const float LightLevelFloor = 0.0005f;
+
+    /// WHAT THE ADAPTATION IS DOING RIGHT NOW. Read by the F1 panel; the chain is four
+    /// multiplications deep and every question about it ("is the sky or the sun driving this",
+    /// "is the ceiling engaging", "why is the night flat") needs the intermediate values.
+    public float LightLevel { get; private set; } = 1f;
+    public float SunTermNormalized { get; private set; } = 1f;
+    public float SkyTermNormalized { get; private set; }
+    public float AdaptationEV => adapt;
+    public float ScotopicWeight { get; private set; }
 
     [SerializeField] LookSettings look;
     [SerializeField] WeatherState weather;
@@ -173,10 +224,17 @@ public class LookController : MonoBehaviour
         // multiplied by its own elevation. The intensity alone was misleading: with the sun below
         // the horizon its intensity is still large but none of it reaches the ground (`N·L` is
         // negative). Without the multiplier the adaptation stayed at 0.81 EV at 18:30 and the scene looked pitch black.
+        SunTermNormalized = time != null ? time.SurfaceLightLevel / ReferenceSunIntensity : 1f;
+        SkyTermNormalized = AmbientZenithLuminance() / ReferenceSkyLuminance;
+
         float lightLevel = time != null
-            ? Mathf.Max(time.SurfaceLightLevel / ReferenceSunIntensity,
-                        AmbientZenithLuminance() / ReferenceSkyLuminance)
+            ? Mathf.Max(SunTermNormalized, SkyTermNormalized)
             : 1f;
+
+        LightLevel = lightLevel;
+
+        // How far below noon the scene is, in stops. Everything below reads this.
+        float stops = Mathf.Max(0f, -Mathf.Log(Mathf.Max(LightLevelFloor, lightLevel), 2f));
 
         // THE ADAPTATION IS PARTIAL. Closing the whole difference (full normalization) turned
         // dawn into noon — Unreal's documentation describes the same trap: with the lower bound
@@ -187,8 +245,12 @@ public class LookController : MonoBehaviour
         // THE LOWER BOUND WENT 0.02 → 0.0005. `lightLevel` used to be clamped at 0.02, so the
         // adaptation could see at most 5.6 stops; real night is far below that and the clamp
         // flattened twilight into a single level.
-        float adaptTarget = Mathf.Clamp(adaptShare * -Mathf.Log(Mathf.Max(0.0005f, lightLevel), 2f),
-                                        0f, exposureCap);
+        //
+        // AND THE UPPER BOUND WAS DOING THE SAME THING AT THE OTHER END. See `rodCeilingEV`:
+        // the hard clamp is gone and the opening saturates INTO the ceiling instead of hitting
+        // it flat.
+        float adaptTarget = rodCeilingEV
+                          * (float)System.Math.Tanh(adaptShare * stops / Mathf.Max(0.01f, rodCeilingEV));
 
         // THE EYE DOES NOT ADAPT INSTANTLY, AND NOT AT THE SAME RATE IN BOTH DIRECTIONS.
         //
@@ -205,9 +267,24 @@ public class LookController : MonoBehaviour
         adapt = Mathf.Lerp(adapt, adaptTarget,
                            1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(0.01f, tau)));
 
+        ScotopicWeight = ScotopicWeightOf(stops);
+
         Set(colorAdjustments.postExposure, profile.exposure + adapt);
         Set(colorAdjustments.contrast, profile.contrast);
-        Set(colorAdjustments.saturation, profile.saturation);
+
+        // ROD VISION HAS NO COLOUR AT ALL. The night profiles already drain some of it (-20
+        // clear, -36 storm) and that hand-tuning stays; what it could not do is respond to the
+        // LIGHT. Keyed to `DayFactor` it is a clock ramp — it fires on time rather than on
+        // darkness, and it cannot tell a moonlit night from the black hour before moonrise.
+        //
+        // THE SHARE IS `adaptShare`, ON PURPOSE. The same number that says how much of the
+        // eye's exposure gain this game spends now says how much of its chroma loss it spends,
+        // and it is taken out of the chroma that is LEFT after the profile rather than piled on
+        // top of it. One compression, two axes. If the two ever need to move apart they split
+        // into two fields; the trigger for that is written in DECISIONS.md.
+        Set(colorAdjustments.saturation,
+            Mathf.Max(-100f, profile.saturation
+                             - adaptShare * (100f + profile.saturation) * ScotopicWeight));
         Set(colorAdjustments.colorFilter, profile.colorFilter);
 
         Set(whiteBalance.temperature, profile.temperature);
@@ -235,6 +312,34 @@ public class LookController : MonoBehaviour
         Set(bloom.threshold, profile.bloomThreshold);
 
         Set(filmGrain.intensity, profile.grain);
+    }
+
+    /// HOW FAR INTO ROD-ONLY VISION THE SCENE IS, 0..1. Two conditions the eye genuinely
+    /// requires, multiplied together.
+    ///
+    /// THE LIGHT HAS TO BE LOW — `ScotopicOnsetStops`..`ScotopicFullStops` below noon.
+    ///
+    /// AND THE SUN HAS TO BE DOWN. Rods only take over after civil twilight, sun below -6
+    /// degrees. This is not a guard bolted on to protect the sunset, it is the definition:
+    /// civil twilight is photopic, you can still read a newspaper in it, and a grade that
+    /// drained the colour out of a sunset would be wrong even if the light level agreed.
+    ///
+    /// It also happens to make the term immune to the hole the light chain has at the horizon
+    /// (SYMPTOMS.md, "gokyuzu probu gun dogumunda ve batiminda tam sifir"): the sky probe reads
+    /// EXACTLY zero from sun height +0.01 down to -0.07, some forty minutes of clock, which the
+    /// level ramp on its own would read as the darkest moment of the whole day — in the middle
+    /// of the golden hour.
+    float ScotopicWeightOf(float stops)
+    {
+        float level = Mathf.SmoothStep(0f, 1f,
+            Mathf.InverseLerp(ScotopicOnsetStops, ScotopicFullStops, stops));
+
+        if (time == null) return level;
+
+        float sunDown = Mathf.SmoothStep(0f, 1f,
+            Mathf.InverseLerp(0f, CivilTwilightSine, time.SunHeight));
+
+        return level * sunDown;
     }
 
     static void Set(FloatParameter parameter, float value)

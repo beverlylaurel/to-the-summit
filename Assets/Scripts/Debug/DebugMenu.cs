@@ -18,6 +18,7 @@ public class DebugMenu : MonoBehaviour
     [SerializeField] LightningFlash lightning;
     [SerializeField] TimeOfDay time;
     [SerializeField] AtmosphereController atmosphere;
+    [SerializeField] LookController look;
     [SerializeField] PrecipitationRenderer precipitation;
     [SerializeField] TemperatureField temperature;
     [SerializeField] SnowfallRenderer snowfall;
@@ -102,7 +103,8 @@ public class DebugMenu : MonoBehaviour
     public void Bind(FirstPersonController walkerRef, FreeFlyMovement flyerRef,
         WeatherState weatherRef, AltitudeWeatherDriver driverRef, WindField windRef,
         ThunderPlayer thunderRef, LightningFlash lightningRef, TimeOfDay timeRef,
-        AtmosphereController atmosphereRef, PrecipitationRenderer precipitationRef,
+        AtmosphereController atmosphereRef, LookController lookRef,
+        PrecipitationRenderer precipitationRef,
         PerformanceHud hudRef, ClimbHud climbHudRef,
         CursorLock cursorLockRef,
         RouteOverlay routeOverlayRef, Volume cloudVolumeRef, CloudWeatherDriver cloudDriverRef)
@@ -119,6 +121,7 @@ public class DebugMenu : MonoBehaviour
         lightning = lightningRef;
         time = timeRef;
         atmosphere = atmosphereRef;
+        look = lookRef;
         precipitation = precipitationRef;
         hud = hudRef;
         climbHud = climbHudRef;
@@ -129,7 +132,7 @@ public class DebugMenu : MonoBehaviour
     {
         if (walker == null || flyer == null || weather == null || weatherDriver == null
             || wind == null || thunder == null || lightning == null || time == null
-            || atmosphere == null
+            || atmosphere == null || look == null
             || precipitation == null || hud == null || climbHud == null
             || cursorLock == null || routeOverlay == null
             || cloudVolume == null || cloudDriver == null)
@@ -228,6 +231,7 @@ public class DebugMenu : MonoBehaviour
         BeginColumn();
         DrawMovement();
         DrawTimeOfDay();
+        DrawExposure();
         EndColumn();
 
         BeginColumn();
@@ -411,6 +415,38 @@ public class DebugMenu : MonoBehaviour
         Time.timeScale = timeScale;
 
         if (GUILayout.Button("Hızı normale al")) timeScale = 1f;
+
+        EndSection();
+    }
+
+    /// THE EXPOSURE CHAIN, READ-ONLY. No setting to put back: nothing here writes anything.
+    ///
+    /// It exists because the chain is four multiplications deep and every question about it
+    /// looks identical from outside the code. "The night is flat", "the sunset goes black",
+    /// "the blizzard is as bright as a clear noon" are three different faults and all three
+    /// present as "the exposure is wrong". These lines separate them at a glance:
+    ///
+    ///   - which SOURCE is driving — the sun term or the sky probe. The two are combined with
+    ///     `max()`, so whichever is larger silently owns the exposure and the other one is
+    ///     discarded. Marked with an arrow so it can be read while walking.
+    ///   - whether the CEILING is engaging, and by how much. The raw share and the saturated
+    ///     result are printed side by side; when they are equal the ceiling is doing nothing.
+    ///   - how far into ROD VISION the grade thinks it is.
+    void DrawExposure()
+    {
+        BeginSection("Göz uyumu");
+
+        float sun = look.SunTermNormalized;
+        float sky = look.SkyTermNormalized;
+        bool skyWins = sky > sun;
+
+        GUILayout.Label($"güneş {sun:F4} {(skyWins ? " " : "←")}   gök {sky:F4} {(skyWins ? "←" : " ")}");
+
+        float stops = -Mathf.Log(Mathf.Max(0.0005f, look.LightLevel), 2f);
+        GUILayout.Label($"ışık {look.LightLevel:F4}   öğlenin {stops:F2} kademe altı");
+
+        GUILayout.Label($"açılma {look.AdaptationEV:F2} EV   (tavansız {0.35f * Mathf.Max(0f, stops):F2})");
+        GUILayout.Label($"çubuk görüşü {look.ScotopicWeight:F2}");
 
         EndSection();
     }

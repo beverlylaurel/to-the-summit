@@ -247,6 +247,13 @@ olur.
 ---
 ## Bekleyen ölçümler
 
+- **Ufuktaki gökyüzü deliği Play'de doğrulanmadı.** Edit modda ölçüldü (probe skybox
+  malzemesinden pişirilerek); Play paketin `AmbientProbePass`'ini kullanıyor, o yol
+  ölçülmedi. F1 → "Göz uyumu" satırı 18:00'de `gök` terimini gösteriyor.
+  → [Ufuktaki gökyüzü deliği](#ufuktaki-gökyüzü-deliği--ertelendi-2026-08-29)
+- **`SkyAmbientBaker` gereksiz mi ölçülmedi.** Paket probe'u zaten yazıyor olabilir; öyleyse
+  bileşenin her karedeki SH pişirmesi boşa gidiyor.
+  → [`SkyAmbientBaker` ile paketin `AmbientProbePass`'i aynı probe'a yazıyor](#skyambientbaker-ile-paketin-ambientprobepassi-aynı-probea-yazıyor--ölçülecek-2026-08-29)
 - **Kar taneciği sisinin kare maliyeti ölçülmedi.** `SnowfallParticle` artık
   `ApplyHeightFog` çağırıyor: parça başına 8 adımlı çözülmüş integral + bir 3B doku
   örneği. Tanecikler binlerce ve üst üste biniyor.
@@ -2064,3 +2071,86 @@ katman olmalı.
 **Maliyet:** dört commit, bir CPU pişirme adımı (`SeaShorePhase`, hızlı yürüyüş eikonal
 çözücü) ve iki shader yolu silindi. Ölçüm araçları oturumda kaldı; yeniden gerekirse
 `SYMPTOMS.md` yerine bu kayıt okunacak.
+
+
+## Göz uyumu havaya kör — ERTELENDİ (2026-08-29)
+
+**Karar:** `LookController` gündüz boyunca hava durumunu görmüyor; bu tur kapatılmadı.
+
+**Ölçüm:** `max(güneş, gök)` öğlen güneş terimini seçiyor (0,825 / 0,686). Güneş terimi
+`sun.intensity × max(0, −forward.y)`, `sun.intensity` = `sunIntensity × SunBlend ×
+atmosferik sönüm` — bulut yok. Tam tipide öğlen ile açık havada öğlen **aynı** pozlamayı
+alıyor.
+
+**Neden şimdi değil:** iki ayrı düzeltme gerekiyor ve ikisi de bu maddenin dışına taşıyor.
+(1) `max()` yanlış birleştirici — retinaya düşen aydınlanma toplamdır, `max` değil; ama
+toplama geçmek `ReferenceSunIntensity` ve `ReferenceSkyLuminance`'in ikisini birden yeniden
+kalibre etmeyi gerektirir ve o iki sayı ölçümle konmuştu. (2) Asıl eksik, doğrudan ışının
+buluttan hiç sönmemesi; onu düzeltmek `sun.intensity`'ye dokunmak, yani sahnenin
+aydınlatmasını değiştirmek demek — pozlama işi değil.
+
+**Tetikleyici:** "tipide gündüz fazla parlak / tipi ile açık hava aynı görünüyor".
+
+**Maliyet:** iki referans sabitinin yeniden ölçülmesi + bulut sönümünün ışık zincirine
+girmesi. Yarım gün.
+
+
+## Ufuktaki gökyüzü deliği — ERTELENDİ (2026-08-29)
+
+**Karar:** gün doğumu ve batımında ambient probe'un tam sıfıra düşmesi bu tur kapatılmadı.
+
+**Ölçüm ve tekrarı:** `SYMPTOMS.md` → "Gökyüzü probu gün doğumunda ve batımında TAM SIFIR".
+Güneş yüksekliği +0,01 ile −0,07 arasında zenit tam sıfır; ufkun iki yakasında simetrik
+yükseklikte 163 kat fark.
+
+**Sebep:** `PhysicallyBasedSkyURP`'nin sky-view LUT'u tek ışıktan pişiyor (paketin kendi
+notu). Güneş ufka inince gündüz dalı ölüyor, ay gökyüzünü aydınlatmadığı için gece dalı
+doğmuyor.
+
+**Neden şimdi değil:** düzeltme paketin LUT'una ikinci bir gök cismi sokmak ya da ufuk
+bandında iki dalı harmanlamak demek. Probe **her şeyin** ortam ışığını sürüyor — arazi,
+kar, deniz, bulut — yani bu bir pozlama düzeltmesi değil, aydınlatma değişikliği. Üstüne
+aynı turda ikinci bir doğrulanmamış değişiklik yığılmıyor.
+
+**Şimdilik ne yapıldı:** göz uyumunun çubuk görüşü terimi sivil alacakaranlık kapısı
+taşıyor, böylece delik altın saati griye çeviremiyor. Pozlamanın kendisi delikte tavana
+doğru açılıyor ama `tanh` doyumu ve 2,5 s zaman sabiti yüzünden savrulma görülmüyor —
+**Play'de doğrulanacak.**
+
+**Tetikleyici:** "gün batımında sahne bir an kararıyor/patlıyor", ya da altın saatte ortam
+ışığının gözle görülür şekilde ölmesi.
+
+**Maliyet:** paketin LUT geçişine dokunmak. Bir gün, ve gökyüzünün tamamının yeniden
+gözden geçirilmesi.
+
+
+## `SkyAmbientBaker` ile paketin `AmbientProbePass`'i aynı probe'a yazıyor — ÖLÇÜLECEK (2026-08-29)
+
+**Bulgu:** sahnede `VisualEnvironment.skyAmbientMode = Dynamic`, yani paket her karede
+`AmbientProbePass`'i kuyruğa alıp probe'u kendisi yazıyor. `SkyAmbientBaker` de
+`LateUpdate`'te `DynamicGI.UpdateEnvironment()` çağırıyor. Render `LateUpdate`'ten sonra
+koştuğu için **paket sonuncu yazan** görünüyor.
+
+Doğruysa `SkyAmbientBaker`'ın SH pişirmesi her karede boşa gidiyor — kendi yorumunun
+deyişiyle "her karede çağrılırsa kare süresini ikiye katlar" olan iş. Yansıma küpü tarafı
+ayrı: `DynamicGI.UpdateEnvironment()` onu da yeniliyor ve `AmbientProbePass` yenilemiyor
+olabilir, o yüzden bileşen körlemesine silinmiyor.
+
+**Ölçüm:** Play'de `SkyAmbientBaker` kapalı/açık kare süresi ve probe değeri; kapalıyken
+probe hâlâ saati izliyorsa bileşen gereksiz.
+
+**Tetikleyici:** performans turu, ya da ufuktaki gökyüzü deliğine dönüldüğünde.
+
+
+## `adaptShare` iki eksende birden kullanılıyor (2026-08-29)
+
+**Karar:** pozlama kazancının payı ile çubuk görüşünün renklilik kaybı payı **aynı sayı**.
+
+**Gerekçe:** ikisi de "bu oyun fizyolojik etkinin ne kadarını harcıyor" sorusunun cevabı;
+tek kavram, tek sayı. İkinci bir alan açmak, karşılığı olmayan ikinci bir zevk sayısı
+demekti.
+
+**Tetikleyici:** gecede pozlama doğru ama renk fazla/az soluk — yani biri iyi, öteki değil.
+O gün `scotopicChromaShare` diye ikinci bir alana bölünür.
+
+**Maliyet:** tek alan, tek satır.

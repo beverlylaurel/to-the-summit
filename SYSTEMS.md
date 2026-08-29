@@ -1596,3 +1596,36 @@ parlak, ardından kabarcık kalıntısı onlarca saniye sürüklenerek soluyor. 
 ikisini birden veremez — 0,28/s'de köpük 3,6 saniyede tamamen yok oluyordu ve deniz hiç
 kullanılmış görünmüyordu. `exp` tek sayıyla ikisini de veriyor: 0,15/s'de **parlak 2,4 s,
 görünür 20 s**.
+
+
+## Göz uyumu: tavan artık kesmiyor, doyuyor (2026-08-29)
+
+`LookController` iki büyüklük okuyor — `TimeOfDay.SurfaceLightLevel` (iki gök cisminin düz
+zemine düşen katkısı) ve ambient probe'un zenit parlaklığı — ikisinin **büyüğünü** alıp
+öğlene göre kaç kademe altta olduğunu buluyor. Bu sayıdan üç şey türüyor:
+
+- **pozlama açılması** — `rodCeilingEV · tanh(adaptShare · kademe / rodCeilingEV)`
+- **çubuk görüşü ağırlığı** — ışık rampası × sivil alacakaranlık kapısı
+- **doygunluk düşüşü** — profilden **kalan** renkliliğin `adaptShare` kadarı
+
+Yeni bağ yok; okunan şey aynı iki kaynak. Değişen, o sayının nasıl eğrildiği.
+
+**Bilinçli kural — çubuk görüşü güneş batmadan açılmaz.** Ağırlık ışık seviyesiyle çarpım
+hâlinde bir *sivil alacakaranlık kapısı* taşıyor: güneş −6°'nin altına inmeden çubuklar
+devralmaz. Bu bir koruma değil tanım; sivil alacakaranlık fotopik. Yan faydası, ışık
+zincirinin ufuktaki deliğine (aşağıda) bağışık olması.
+
+**Bilinçli kural — tek sıkıştırma, iki eksen.** `adaptShare` hem pozlama kazancının hem
+renklilik kaybının ne kadarının harcandığını söylüyor. İkisi ayrışırsa iki alana bölünür;
+tetikleyici `DECISIONS.md`'de.
+
+
+## Göz uyumu havayı GÖRMÜYOR (2026-08-29)
+
+`max(güneş, gök)` gündüz boyunca **güneş** terimini seçiyor (öğlen 0,825 / 0,686) ve güneş
+terimi `sun.intensity × max(0, −forward.y)`; `sun.intensity` ise `sunIntensity × SunBlend ×
+atmosferik sönüm` — **içinde bulut yok**. Tam tipide öğlen ile açık havada öğlen aynı
+pozlamayı alıyor.
+
+Kayıt bilinçli bir kural değil, **açık bir boşluk**. Kararı ve neden bugün kapatılmadığı
+`DECISIONS.md` → "Göz uyumu havaya kör".
