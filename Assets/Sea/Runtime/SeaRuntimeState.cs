@@ -20,8 +20,13 @@ public static class SeaRuntimeState
     /// Fraction of open water covered by whitecap foam.
     public static float WhitecapCoverage01 { get; internal set; }
 
-    /// Current strength of the shore foam. Derived from the run-up phase.
+    /// Current strength of the shore foam: the surge, 0 at the lowest point of
+    /// the swash and 1 at the top of the run-up.
     public static float ShoreFoamIntensity01 { get; internal set; }
+
+    /// How high the swash reaches above still water at its top (m). Stockdon's
+    /// R2% for the current Hs, Tp and shore slope.
+    public static float RunupHeight { get; internal set; }
 
     /// Whether the sea system is running. Stays false if `SeaManager`
     /// cannot find an `ISeaEnvironmentSource`.

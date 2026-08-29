@@ -438,7 +438,15 @@ Shader "ToTheSummit/SeaLit"
                     float alongShore = SeaValueNoise(IN.positionWS.xz * 0.0035);
                     float phase = frac(_SeaShoreFoamPhase + alongShore * 0.6);
 
-                    float runupDepth = _SeaRunupMaxDepth * phase;
+                    // THE SURGE IS BUILT ONCE AND USED FOR BOTH.
+                    //
+                    // The run-up height used to be `max * phase` — a sawtooth that
+                    // climbed steadily and then snapped back, while the foam beside it
+                    // followed the cosine. Two shapes for one wave. The water level and
+                    // the foam now ride the SAME surge.
+                    float surge = 0.5 - 0.5 * cos(SEA_TWO_PI * phase);
+
+                    float runupDepth = _SeaRunupMaxDepth * surge;
                     float effDepth = depth + runupDepth;
 
                     // THE EDGE IS BROKEN UP WITH NOISE. Without it the foam
@@ -490,7 +498,6 @@ Shader "ToTheSummit/SeaLit"
                     // covered window is symmetric about the peak, so the phase
                     // at which the water leaves a point follows from an acos.
                     float reach = saturate(depth / max(_SeaShoreFoamDepth, 1e-3));
-                    float surge = 0.5 - 0.5 * cos(SEA_TWO_PI * phase);
 
                     // Fresh foam: where the bore stands right now.
                     float fresh = 1.0 - smoothstep(surge - 0.30, surge + 0.10, reach);

@@ -177,7 +177,6 @@ public class SeaManager : MonoBehaviour
                               settings.ChoppinessAt(env.WindSpeed));
 
         Shader.SetGlobalFloat(SeaShaderIDs.MaxShoalingGain, settings.maxShoalingGain);
-        Shader.SetGlobalFloat(SeaShaderIDs.RunupMaxDepth, settings.runupMaxDepth);
 
         Shader.SetGlobalVector(SeaShaderIDs.ExtinctionRGB, settings.extinctionRgb);
         Shader.SetGlobalColor(SeaShaderIDs.UpwellingColor, settings.upwellingColor);
@@ -267,13 +266,46 @@ public class SeaManager : MonoBehaviour
         Shader.SetGlobalFloat(SeaShaderIDs.SignificantHeight,
                               SeaRuntimeState.SignificantWaveHeight);
 
-        // Run-up phase: a breaking wave advances up the shore and withdraws
-        // (spec §8.5). Its period follows the spectrum's peak period.
-        float t = Application.isPlaying ? Time.time : 0f;
-        float phase = t * (SeaConstants.TwoPi / Mathf.Max(SeaRuntimeState.PeakPeriod, 0.1f));
-        float runup = Mathf.Sin(phase) * 0.5f + 0.5f;
+        // HOW HIGH THE SWASH REACHES — STOCKDON, NOT A FIXED NUMBER.
+        //
+        // `runupMaxDepth` was 1.1 m whatever the sea was doing; on the measured 5.8%
+        // shore that is 19 m of beach, and the water ran that far up in a dead calm.
+        // R2% is the standard run-up parametrisation and it takes the sea state:
+        //
+        //     R2% = 1.1 ( 0.35 b sqrt(Hs L0) + sqrt(Hs L0 (0.563 b^2 + 0.004)) / 2 )
+        //
+        // with `b` the beach slope and `L0 = g Tp^2 / 2pi` the deep-water wavelength.
+        // Measured against the same shore: 0.69 m (12 m) in a calm, 1.60 m (28 m) at
+        // 20 m/s. [SOURCE: Stockdon et al. 2006]
+        float l0 = SeaConstants.G * SeaRuntimeState.PeakPeriod * SeaRuntimeState.PeakPeriod
+                 / SeaConstants.TwoPi;
+        float b = settings.shoreSlope;
+        float hsl0 = SeaRuntimeState.SignificantWaveHeight * l0;
 
-        SeaRuntimeState.ShoreFoamIntensity01 = runup;
-        Shader.SetGlobalFloat(SeaShaderIDs.ShoreFoamPhase, runup);
+        SeaRuntimeState.RunupHeight =
+            1.1f * (0.35f * b * Mathf.Sqrt(hsl0)
+                  + Mathf.Sqrt(hsl0 * (0.563f * b * b + 0.004f)) * 0.5f);
+
+        Shader.SetGlobalFloat(SeaShaderIDs.RunupMaxDepth, SeaRuntimeState.RunupHeight);
+
+        // THE PHASE IS A PHASE, NOT AN AMOUNT.
+        //
+        // This published `sin(...) * 0.5 + 0.5` — the surge AMOUNT — under the name
+        // `_SeaShoreFoamPhase`, and the shader fed it straight into
+        // `0.5 - 0.5 cos(2pi * phase)`. Running an amount through a cosine folds the
+        // cycle in half: as the value swept 0.5 -> 1 -> 0.5 -> 0 -> 0.5 over one Tp,
+        // the surge went 1 -> 0 -> 1 -> 0 -> 1. The swash ran at Tp/2 and lurched at
+        // the turns. That is the "it still goes in and out too fast".
+        //
+        // A linear 0..1 sawtooth goes out now, and the surge is built from it in ONE
+        // place — the same expression the shader uses, so the wet band and the foam
+        // cannot drift apart.
+        float t = Application.isPlaying ? Time.time : 0f;
+        float phase = Mathf.Repeat(t / Mathf.Max(SeaRuntimeState.PeakPeriod, 0.1f), 1f);
+
+        SeaRuntimeState.ShoreFoamIntensity01 =
+            0.5f - 0.5f * Mathf.Cos(SeaConstants.TwoPi * phase);
+
+        Shader.SetGlobalFloat(SeaShaderIDs.ShoreFoamPhase, phase);
     }
 }

@@ -3809,3 +3809,45 @@ Bu, "su yoksa suyun rengi de yok" cümlesinin kendisi.
 eğiminde su çizgisini 1,2 m oynatıyor. Onu üreten gürültünün kendi özellik boyu
 (`_SeaFoamBreakupTiling` = 0,35) 2,9 m — genlik özellik boyunun altında, yani büküm
 lapaya dönmüyor.
+
+
+## "Aşağıdan gelen beyazlık hâlâ çok hızlı gidip geliyor, ayrıca çok ileri gidiyor"
+
+Tp 2,63 s'den 9,97 s'ye çıkmıştı ama kullanıcı hâlâ hızlı diyordu. İki ayrı hata vardı,
+ikisi de kodu okuyunca görülüyor.
+
+**1. Miktar, faz olarak yayımlanıyordu — döngü ikiye katlanıyordu.**
+
+`SeaManager` şunu yazıyordu:
+
+    ShoreFoamPhase = sin(2pi t / Tp) * 0.5 + 0.5      // bu bir MIKTAR
+
+Shader ise onu faz sanıp içine koyuyordu:
+
+    surge = 0.5 - 0.5 * cos(2pi * phase)
+
+Girdi bir Tp boyunca 0,5 → 1 → 0,5 → 0 → 0,5 süpürüyor; çıktı 1 → 0 → 1 → 0 → 1 oluyor.
+Yani **swash Tp/2'de, 5 saniyede bir** gidip geliyordu ve dönüşlerde sıçrıyordu.
+
+Artık doğrusal bir 0..1 testere dişi yayımlanıyor, surge tek yerde kuruluyor ve ıslak bant
+ile köpük aynı ifadeyi okuyor.
+
+**2. Çıkış yüksekliği sabitti — hava ne yaparsa yapsın 1,1 m.**
+
+Ölçülen %5,8 kıyı eğiminde bu 19 metrelik kumsal demek, ve ölü sakinlikte de o kadar
+gidiyordu. Stockdon R2% deniz durumunu okuyor:
+
+    R2% = 1.1 ( 0.35 b sqrt(Hs L0) + sqrt(Hs L0 (0.563 b^2 + 0.004)) / 2 )
+
+| U10 | Hs | Tp | R2% | yatay çıkış | dönüş periyodu |
+|---|---|---|---|---|---|
+| 0,5 | 0,74 m | 10,0 s | 0,69 m | 12 m | 10,0 s |
+| 3 | 1,17 m | 10,0 s | 0,87 m | 15 m | 10,0 s |
+| 8 | 2,31 m | 6,6 s | 0,81 m | 14 m | 6,6 s |
+| 20 | 4,91 m | 9,0 s | 1,60 m | 28 m | 9,0 s |
+
+Öncesi: dönüş 5,0 s, yatay 19 m — sabit.
+
+**Üçüncü tutarsızlık, aynı adımda:** shader su seviyesini `max * phase` ile yükseltiyordu,
+yani düzgün tırmanıp geri kopan bir testere; yanındaki köpük ise kosinüsü izliyordu. Bir
+dalga için iki şekil. İkisi de artık `surge`'ü okuyor.

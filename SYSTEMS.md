@@ -1433,3 +1433,21 @@ eşitliği `Sea/Test Constant Parity` denetliyor.
 
 **Teşhis anahtarları silindi.** `_SeaDbgNo*` globalleri, shader dalları ve panel bölümü
 gitti; deniz bölümünde yalnız Hs / Tp / kıyı köpüğü okuması kaldı.
+
+
+## Deniz: swash tek fazdan türüyor (2026-08-29)
+
+`SeaManager` iki şey yayımlıyor:
+
+- **`_SeaShoreFoamPhase`** — doğrusal 0..1 testere dişi, periyodu Tp.
+- **`_SeaRunupMaxDepth`** — Stockdon R2%, `Hs`, `Tp` ve `settings.shoreSlope`'tan.
+
+`surge = 0.5 - 0.5 cos(2pi * phase)` **tek ifade**: shader'da köpük ve su seviyesi,
+`SeaWetnessDriver`'da ıslak bandın tepesi — üçü de onu okuyor.
+`SeaRuntimeState.ShoreFoamIntensity01` aynı ifadenin CPU'daki karşılığı.
+
+**Okur:** Hs ve Tp (spektrumdan), kıyı eğimi (ayar).
+**Okumaz:** sabit bir çıkış yüksekliği — öyle bir sayı artık yok.
+
+**Bilinçli kural:** `shoreSlope` ARAZİNİN özelliği, denizin değil. Dağ yeniden
+üretilirse yeniden ölçülmeli (`SCALE.md`).

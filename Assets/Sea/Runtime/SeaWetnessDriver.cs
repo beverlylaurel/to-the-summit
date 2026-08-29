@@ -87,9 +87,9 @@ public class SeaWetnessDriver : MonoBehaviour
             return;
         }
 
-        // The run-up phase is 0..1; the top of the band sits that far above
-        // sea level (spec §8.5).
-        float runup = settings.runupMaxDepth * SeaRuntimeState.ShoreFoamIntensity01;
+        // The band's top rides the swash: how high it reaches (`RunupHeight`, from
+        // Stockdon) times where it is in its cycle right now.
+        float runup = SeaRuntimeState.RunupHeight * SeaRuntimeState.ShoreFoamIntensity01;
 
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetLevelY, settings.seaLevelY + runup);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetFadeM, fadeMeters);

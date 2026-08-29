@@ -162,10 +162,14 @@ public class SeaSettings : ScriptableObject
     [Tooltip("Upper bound of the shoaling gain.")]
     [Range(1f, 5f)] public float maxShoalingGain = 2.2f;
 
-    /// The largest amount by which the run-up band raises the water level (m).
-    /// The wet sand band breathes with it. [CALIBRATION]
-    [Tooltip("Depth contribution of the run-up band (m).")]
-    [Range(0f, 2f)] public float runupMaxDepth = 0.45f;
+    /// MEAN SLOPE OF THE BEACH FACE, USED BY THE RUN-UP.
+    ///
+    /// Stockdon's R2% needs the slope of the face the water climbs, and that is a
+    /// property of the TERRAIN, not of the sea. The default is measured on the
+    /// generated shore: waterline to 1.68 m of depth in 29 m. Regenerate the mountain
+    /// at a different size and this wants re-measuring (`SCALE.md`).
+    [Tooltip("Mean slope of the beach face (rise over run).")]
+    [Range(0.005f, 0.4f)] public float shoreSlope = 0.058f;
 
     [Header("Optics (spec §12)")]
     /// Red decays fastest, blue slowest — the reason water looks blue.
