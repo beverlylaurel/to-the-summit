@@ -3892,3 +3892,29 @@ eklemek (~98 m, ~245 m):
 | bant ortalaması | 5,9 m | 6,6 m |
 
 Bant artık burunlarda kapanıp koylarda açılıyor; "her diş aynı" görüntüsünü kıran bu.
+
+
+## Köpük şeritleri eşit aralıklı
+
+**İlk şüpheli — dalga alanı — ölçümle elendi.** Yüzeyin özilintisi: ölü dalga 3 dalgada,
+rüzgâr denizi 2 dalgada adım kaybediyor (gerçek denizde 2–4). Tepe uzunluğu dalga boyunun
+**3,1 katı**, gerçek ölü dalgada 3–8. Alan fazla düzenli değil.
+
+**Gerçek sebep: kabarcık alanının ızgarası, GERİLDİĞİ için görünüyor.** Çağıran taraf
+kabarcıkları kıvrım yönü boyunca uzatmak için bir ekseni 0,35 ile eziyor. Ezilen bir Worley
+ızgarası sıralarını hizalar; sakin havada kıvrım yönü rüzgâr eksenine düştüğü için, rüzgâr
+bir dünya ekseni boyunca estiğinde sıralar da onunla hizalanıyor.
+
+**Ölçüm — geriliş ekseni boyunca özilinti tepesi:**
+
+| kıvrım açısı | mevcut | +alan büküm | +büküm, ince oktav döndürülmüş |
+|---|---|---|---|
+| 0° | **0,346** | 0,124 | 0,145 |
+| 23° | 0,168 | 0,183 | 0,176 |
+| 45° | 0,208 | 0,157 | 0,150 |
+| 67° | 0,178 | 0,223 | 0,194 |
+| 90° | 0,282 | 0,189 | 0,141 |
+| **en kötü** | **0,346** | 0,223 | **0,194** |
+
+0,3 üstü görünür tekrar. Kazanan üçüncü sütun: koordinat aramadan önce büküldü (büküm de
+hücresel, yeni bir gürültü türü girmedi) ve ince oktav kendi ızgara yönünü aldı.

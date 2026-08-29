@@ -387,10 +387,36 @@ float SeaCellular(float2 p)
 /// a wash.
 float SeaFoamBubbles(float2 p)
 {
-    float coarse = 1.0 - SeaCellular(p);
-    float fine   = 1.0 - SeaCellular(p * 2.9 + 17.3);
+    // THE LATTICE SHOWS WHEN THE FIELD IS STRETCHED.
+    //
+    // The caller squashes one axis by 0.35 to stretch the bubbles along the fold
+    // direction. A Worley lattice squashed like that lines its rows up, and in calm
+    // water the fold falls back to the wind axis — so when the wind runs along a
+    // world axis the rows run with it. Measured along the stretch axis, the field
+    // repeated with a strength of 0.346 every 14.8 m: evenly spaced foam streaks.
+    //
+    // Warping the coordinate before the lookup bends the lattice out of alignment.
+    // The warp is itself cellular, so no new kind of noise enters.
+    //
+    // MEASURED, worst case over fold angles 0/23/45/67/90 degrees:
+    //     current                       0.346
+    //     + domain warp                 0.223
+    //     + warp, fine octave turned    0.194
+    //
+    // 0.194 is under the 0.3 that reads as a repeat, and the second octave carrying
+    // its own lattice orientation costs nothing.
+    float2 warp = float2(SeaCellular(p * 0.21 + float2(5.7, 2.3)),
+                         SeaCellular(p * 0.19 + float2(-3.1, 8.9)));
+
+    float2 q = p + (warp - 0.5) * 1.6;
+
+    const float2x2 turn = float2x2(0.42666, -0.90441, 0.90441, 0.42666);
+
+    float coarse = 1.0 - SeaCellular(q);
+    float fine   = 1.0 - SeaCellular(mul(turn, q) * 2.9 + 17.3);
 
     float bubbles = coarse * 0.65 + fine * 0.35;
+
     return saturate(bubbles * bubbles * 1.35);
 }
 
