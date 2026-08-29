@@ -405,32 +405,96 @@ arazi yolu ondan öğrendi.
 
 ---
 
-## Bulut kenarında siyah kontur (arazi arkadayken görünür, gök arkadayken görünmez)
+## BULUT KENARI KONTURU — İKİ AYRI HATA, BİRBİRİNE KARIŞTIRILMASIN
+
+Aynı yerde, aynı satırda, birbirine hiç benzemeyen iki hata var. Bir kez ikisi aynı sanılıp
+birinin çözümü ötekinin üstüne yazıldı ve **kapanmış bir hata geri geldi**. Ayrı tutuluyorlar.
+
+Ayırt eden soru tek: **kontur hangi renkte ve nerede?**
+
+| | Kontur nasıl görünüyor | Nerede |
+|---|---|---|
+| **(A)** halka eleniyor | arkasında ne varsa onun rengi — sissiz kalıyor | bulutta **ve dağda**, birebir aynı |
+| **(B)** mesafe uyduruluyor | **siyah** | yalnız bulut çevresinde |
+
+---
+
+## (A) Bulutta VE dağda birebir aynı kontur — kenar halkası eleniyor
+
+**Belirti:** her siluetin kenarında ince bir çizgi. Kullanıcının ifadesiyle: *"birebir aynı
+kontur bulutlarda da var, dağda da var."* Gün batımında en okunaklı.
+
+**İlk şüpheliler yanlıştı, dördü de ölçümle elendi:** yarı çözünürlük, büyütme filtresi,
+zamansal birikim, adım gürültüsü. Büyütme filtresi ayrıca ayrı bir turda düzeltildi
+(uzamsal ağırlığı ölüydü, derinliğe hiç bakmıyordu) ve **ekranda hiçbir şey değişmedi** —
+sebep orada değildi.
+
+**"Tam çözünürlükte kayboluyor" bir teşhis DEĞİLDİR.** `resolutionScale = 1` aynı anda beş
+şeyi birden değiştiriyor. Bir kez bu gözlem sebep sanıldı ve kare hızının yarısı buna
+ödendi (130 → 60 FPS). Hata gizlenmişti, çözülmemişti.
+
+**Gerçek sebep:** bulut kenarı pikselinde derinlik gerçek değil. O piksel **eleniyordu**
+(`hasCloud` false → sis uygulanmıyor). Elenince her siluetin çevresinde bir piksellik
+**sissiz halka** kalıyor, hemen içeride sis uygulanıyor — sert açma-kapama. Halkanın
+arkasında ne varsa (bulut, dağ, gök) sissiz göründüğü için kontur kazanıyor. Konturun
+bulutta ve dağda **aynı** olmasının sebebi bu: kontur bulutun değil, **halkanın**.
+
+**Ayırt eden ölçüm:** bulut yokken kontur da yok.
+
+**Çözüm:** eleme yok. Kenar pikseli uzak düzlemin bir tık berisinde **sonlu bir proxy**
+alıyor ve sisleniyor. Elenen tek şey GERÇEK uzak düzlem: orada ters-Z'de dünya konumu
+sonsuza gidiyor, NaN çıkıyor ve `Blend One SrcAlpha` üzerinden arkadaki her şeyi siliyor.
+
+**Bu proxy tek başına güvenli değil — (B)'yi doğurur. Clamp'siz kullanılmaz.**
+
+---
+
+## (B) Bulut çevresinde SİYAH kontur — uydurulan mesafe sisi doyuruyor
+
+**Belirti:** yalnız bulutların çevresinde siyah bir çizgi. Arazi arkadayken okunuyor, gök
+arkadayken görünmüyor (hava rengi ≈ gök).
 
 **İlk şüpheli:** bulut ışın yürüyüşü, sonra zamansal birikim, sonra mesafe sınırı.
 *(Üçü de yanlış — kontur bunlar değişmeden duruyordu.)*
 
-**Ayırt eden ölçüm:** F1 "Bulut sisini KAPAT" anahtarı (`_CloudFogOff`). Kapatınca kontur
-gidiyor, yükseklik sisi arazide/gökte açık kalsa bile — yani sebep birleştirme geçişinin sis
-bloğu. *(Anahtar teşhis bitince kaldırıldı; sebep kesin bulundu, ölçüm aracı yerinde bırakılmadı.)*
+**Ayırt eden ölçüm:** F1 "Bulut sisini kapat". Kapatınca kontur gidiyor, yükseklik sisi
+arazide ve gökte açık kalsa bile — yani sebep birleştirme geçişinin sis bloğu.
 
-**Sebep:** bulut yarı çözünürlükte çiziliyor, renk **bilinear** büyütülüyor ama derinlik
-**nokta** örnekleniyor. Uyuşmadıkları bleed halkasında `edgeOfClouds` tetikleniyor ve
-derinliğe uzak düzlemin bir tık berisi (`CLOUDS_RAW_FAR_CLIP_VALUE`) **uyduruluyordu**.
-Sis o sahte mesafeyle (~70 km) hesaplanınca doyuyor → halka hava rengine boyanıyor.
-Arazi arkadayken (koyu) fark okunuyor, gök arkadayken (hava rengi≈gök) görünmüyor.
-Derinlik çıkışı kapatılınca **her** bulut pikseli uydurma alıyor → ince kontur yerine
-kocaman siyah lekeler. Aynı hata iki ölçekte.
+**Gerçek sebep:** (A)'nın sonlu proxy'sinden dünya konumu geri kurulunca mesafe astronomik
+çıkıyor (~70 km ve ötesi). NaN değil, ama float hassasiyeti bitiyor; sisin integrali doyuma
+gidip halkayı hava rengine boyuyor.
 
-**Çözüm:** kombine geçişi derinlik **yazmıyor** (`Blend One SrcAlpha`), yani uydurmanın
-hiçbir işlevi yoktu. Kaldırıldı: halka pikseli uzak düzlem derinliğini korur → `hasCloud`
-false → sissiz geçer (opaklık≈0, görünmez). Gövde gerçek `meanDistance` türevli derinlikle
-sislenir. Eski "mesafeyi sınırla" telafisi (clamp) de silindi — gerekçesi kalktı.
+**Çözüm — ve burası kritik:** proxy'yi kaldırmak DEĞİL, **mesafeyi sınırlamak**. Sınır
+uydurma değil: sahnede hiçbir şey **uzak düzlemden** öteye gidemez (`_ProjectionParams.z`),
+ve paket kendi hava perspektifini de aynı şekilde sınırlıyor. Yalnız **yol** sınırlanıyor;
+optik derinliğe tavan konulmuyor, yani beyazlama ve fırtına ucu etkilenmiyor.
 
-**Not:** "pikseli elemek 1px sissiz halka bırakır, o da kontur" korkusu ölçümle çürüdü
-(sis-tamamen-kapalı = temiz). Eleme değil, uydurmayı kesmek doğru olanmış.
+**Derinlik çıkışı kapalıyken** her bulut pikseli proxy alır ve ekran kocaman siyah lekelerle
+dolar (ölçüldü). O yolda mesafe bilinmiyor: sis uygulanmaz.
 
 ---
+
+## Neden bu ikisi birbirine karıştı — ve tekrarlanmaması için
+
+(B) çözülürken (A) ile aynı hata sanıldı. (B)'yi kapatmanın kolay yolu proxy'yi kaldırıp
+pikseli elemekti — ama eleme tam olarak (A)'nın sebebidir ve o **zaten ölçülüp yazılmıştı**.
+Commit'in kendi notu: *"Eski 'mesafeyi sınırla' telafisi (clamp) de silindi — gerekçesi
+kalktı."* Gerekçe kalkmamıştı: clamp, proxy'yi güvenli kılan şeydi. İkisi birbirinin
+alternatifi değil, **birbirinin tamamlayıcısı**.
+
+Kaydı geri getiren şey `git log -S"kontur"` oldu; kullanıcı "bunu daha önce çözmüştük"
+dediği için bakıldı.
+
+**Kural:** aynı satırdaki iki belirti aynı sebep değildir. Bir düzeltme başka bir
+düzeltmenin terimini siliyorsa, silinen terimin gerekçesi **ayrıca** çürütülmelidir —
+"gerekçesi kalktı" demek yetmez.
+
+**Not:** bu satırdaki ÜÇÜNCÜ hata ayrı bir kayıtta: "Uzak bulutlardaki parlak kontur"
+(sönümleme ile dolgu aynı ağırlığı paylaşıyordu). Üçü de aynı iki satırda yaşıyor, üçü de
+farklı.
+
+---
+
 
 ## Katılımcı ortam (sis, bulut) fazla koyu ya da fazla parlak
 

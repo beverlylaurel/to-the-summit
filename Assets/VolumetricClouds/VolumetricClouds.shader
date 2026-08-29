@@ -233,15 +233,24 @@ Shader "Hidden/Sky/VolumetricClouds"
 
             #ifdef _OUTPUT_CLOUDS_DEPTH
                 float depth = SAMPLE_TEXTURE2D_X_LOD(_VolumetricCloudsDepthTexture, s_point_clamp_sampler, screenUV, 0).r;
-                // NO INVENTED DISTANCE FOR THE EDGE RING. A tick short of the far plane
-                // (`CLOUDS_RAW_FAR_CLIP_VALUE`) used to be written here. That fake distance
-                // (~70 km) saturated the fog and left a BLACK OUTLINE around the clouds;
-                // measured, F1 "Turn cloud fog OFF" removed the outline. Because the bilinear
-                // color left a bleed ring that did not match the far plane depth,
-                // `edgeOfClouds` was triggered there. With the invention gone the ring pixel
-                // keeps the far plane depth, `hasCloud` is false and the transparent bleed
-                // color passes unfogged. The combine pass DOES NOT WRITE depth
-                // (`Blend One SrcAlpha`) — the invention had no other function either.
+                // THE EDGE RING IS NOT CULLED. It takes a FINITE proxy just short of the far
+                // plane, and the fog path below is CLAMPED so that proxy cannot saturate it.
+                //
+                // THIS WAS SOLVED ONCE AND THEN OVERWRITTEN. Two different outlines were taken
+                // for one:
+                //
+                //   1. Culling the ring leaves a one pixel UNFOGGED band around every cloud,
+                //      and whatever is behind that band gains an outline — the cloud, and the
+                //      mountain too, identically. Measured then: no cloud, no outline.
+                //   2. Giving the ring an UNCLAMPED fake distance (~70 km) saturates the fog
+                //      and paints a black outline instead.
+                //
+                // The later fix cured (2) by choosing (1), and deleted the clamp saying "its
+                // reason is gone". Its reason was not gone: the clamp is exactly what makes
+                // the finite proxy safe. Both halves are needed, and the older record said so
+                // — SYMPTOMS.md, "Bulutların çevresinde halka / bulut kenarında kontur".
+                bool edgeOfClouds = depth == UNITY_RAW_FAR_CLIP_VALUE && cloudsColor.a < 1.0;
+                depth = edgeOfClouds ? CLOUDS_RAW_FAR_CLIP_VALUE : depth;
             #else
                 // Derinlik cikisi kapaliyken bulut mesafesi bilinmiyor. Uydurmak (eski
                 // hal) ekrani KOCAMAN siyah lekelerle dolduruyordu (olculdu). Mesafe
@@ -251,18 +260,34 @@ Shader "Hidden/Sky/VolumetricClouds"
 
                 PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenResolution.zw, depth, UNITY_MATRIX_I_VP, UNITY_MATRIX_V);
 
-                // The cloud distance is built from the real depth (above). Because the edge
-                // ring keeps the far plane depth, `hasCloud` is false and it passes unfogged;
-                // in the body it is fogged by the real distance.
+                // ONLY THE TRUE FAR PLANE IS CULLED. There the world position reconstruction
+                // runs to infinity in reversed Z and produces a NaN, which `Blend One SrcAlpha`
+                // then smears over everything behind it. The edge proxy is finite and is fine.
                 bool hasCloud = depth != UNITY_RAW_FAR_CLIP_VALUE;
 
                 if (hasCloud)
                 {
                     float3 camPos = GetCameraPositionWS();
 
+                    // A NUMERICAL BOUND ON THE DISTANCE, NOT ON THE OPTICAL DEPTH.
+                    //
+                    // At the ring pixel the depth is the finite proxy above, and rebuilding a
+                    // world position from it puts the point astronomically far away — not a
+                    // NaN, but past what float carries, so the fog integral comes back as
+                    // noise. The bound is not invented: nothing in the scene can be beyond the
+                    // FAR PLANE, and the sky package limits its own aerial perspective the same
+                    // way. Only the PATH is clamped — the optical depth keeps no ceiling, so
+                    // whiteout and the storm end are untouched.
+                    float3 toCloud = posInput.positionWS - camPos;
+                    float cloudDistance = length(toCloud);
+
+                    float3 fogTarget = camPos + toCloud
+                                     * (min(cloudDistance, _ProjectionParams.z)
+                                        / max(cloudDistance, 1e-4));
+
                     float3 fogScattering;
                     float fogTransmittance;
-                    FogPath(camPos, posInput.positionWS, fogScattering, fogTransmittance);
+                    FogPath(camPos, fogTarget, fogScattering, fogTransmittance);
 
                     // Off, the cloud takes no fog at all: nothing is added and the transmittance
                     // returns to 1, so the two lines below hand `cloudsColor` back untouched.
@@ -708,15 +733,24 @@ Shader "Hidden/Sky/VolumetricClouds"
                 // We don't force enabling clouds depth, but it's required to achieve physically accurate results
             #ifdef _OUTPUT_CLOUDS_DEPTH
                 float depth = SAMPLE_TEXTURE2D_X_LOD(_VolumetricCloudsDepthTexture, s_point_clamp_sampler, screenUV, 0).r;
-                // NO INVENTED DISTANCE FOR THE EDGE RING. A tick short of the far plane
-                // (`CLOUDS_RAW_FAR_CLIP_VALUE`) used to be written here. That fake distance
-                // (~70 km) saturated the fog and left a BLACK OUTLINE around the clouds;
-                // measured, F1 "Turn cloud fog OFF" removed the outline. Because the bilinear
-                // color left a bleed ring that did not match the far plane depth,
-                // `edgeOfClouds` was triggered there. With the invention gone the ring pixel
-                // keeps the far plane depth, `hasCloud` is false and the transparent bleed
-                // color passes unfogged. The combine pass DOES NOT WRITE depth
-                // (`Blend One SrcAlpha`) — the invention had no other function either.
+                // THE EDGE RING IS NOT CULLED. It takes a FINITE proxy just short of the far
+                // plane, and the fog path below is CLAMPED so that proxy cannot saturate it.
+                //
+                // THIS WAS SOLVED ONCE AND THEN OVERWRITTEN. Two different outlines were taken
+                // for one:
+                //
+                //   1. Culling the ring leaves a one pixel UNFOGGED band around every cloud,
+                //      and whatever is behind that band gains an outline — the cloud, and the
+                //      mountain too, identically. Measured then: no cloud, no outline.
+                //   2. Giving the ring an UNCLAMPED fake distance (~70 km) saturates the fog
+                //      and paints a black outline instead.
+                //
+                // The later fix cured (2) by choosing (1), and deleted the clamp saying "its
+                // reason is gone". Its reason was not gone: the clamp is exactly what makes
+                // the finite proxy safe. Both halves are needed, and the older record said so
+                // — SYMPTOMS.md, "Bulutların çevresinde halka / bulut kenarında kontur".
+                bool edgeOfClouds = depth == UNITY_RAW_FAR_CLIP_VALUE && cloudsColor.a < 1.0;
+                depth = edgeOfClouds ? CLOUDS_RAW_FAR_CLIP_VALUE : depth;
             #else
                 // Derinlik cikisi kapaliyken bulut mesafesi bilinmiyor. Uydurmak (eski
                 // hal) ekrani KOCAMAN siyah lekelerle dolduruyordu (olculdu). Mesafe
@@ -739,9 +773,9 @@ Shader "Hidden/Sky/VolumetricClouds"
                 }
             #endif
 
-                // The cloud distance is built from the real depth (above). Because the edge
-                // ring keeps the far plane depth, `hasCloud` is false and it passes unfogged;
-                // in the body it is fogged by the real distance. There is no double counting
+                // ONLY THE TRUE FAR PLANE IS CULLED. There the world position reconstruction
+                // runs to infinity in reversed Z and produces a NaN, which `Blend One SrcAlpha`
+                // then smears over everything behind it. The edge proxy is finite and is fine. There is no double counting
                 // with the aerial perspective above: that is the homogeneous atmosphere, this
                 // is local fog (valley / bank / drifting snow), and the boundary is deliberate (decision 2).
                 bool hasCloud = depth != UNITY_RAW_FAR_CLIP_VALUE;
@@ -750,9 +784,25 @@ Shader "Hidden/Sky/VolumetricClouds"
                 {
                     float3 camPos = GetCameraPositionWS();
 
+                    // A NUMERICAL BOUND ON THE DISTANCE, NOT ON THE OPTICAL DEPTH.
+                    //
+                    // At the ring pixel the depth is the finite proxy above, and rebuilding a
+                    // world position from it puts the point astronomically far away — not a
+                    // NaN, but past what float carries, so the fog integral comes back as
+                    // noise. The bound is not invented: nothing in the scene can be beyond the
+                    // FAR PLANE, and the sky package limits its own aerial perspective the same
+                    // way. Only the PATH is clamped — the optical depth keeps no ceiling, so
+                    // whiteout and the storm end are untouched.
+                    float3 toCloud = posInput.positionWS - camPos;
+                    float cloudDistance = length(toCloud);
+
+                    float3 fogTarget = camPos + toCloud
+                                     * (min(cloudDistance, _ProjectionParams.z)
+                                        / max(cloudDistance, 1e-4));
+
                     float3 fogScattering;
                     float fogTransmittance;
-                    FogPath(camPos, posInput.positionWS, fogScattering, fogTransmittance);
+                    FogPath(camPos, fogTarget, fogScattering, fogTransmittance);
 
                     // Off, the cloud takes no fog at all: nothing is added and the transmittance
                     // returns to 1, so the two lines below hand `cloudsColor` back untouched.
