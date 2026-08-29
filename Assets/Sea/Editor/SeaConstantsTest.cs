@@ -36,7 +36,6 @@ public static class SeaConstantsTest
     {
         ("G", "SEA_G"),
         ("TwoPi", "SEA_TWO_PI"),
-        ("Sqrt2", "SEA_SQRT2"),
         ("WaterIor", "SEA_WATER_IOR"),
         ("BulkReflectivity", "SEA_BULK_REFLECTIVITY"),
 
@@ -50,8 +49,6 @@ public static class SeaConstantsTest
         ("OffshoreRamp", "SEA_OFFSHORE_RAMP"),
         ("MinDepth", "SEA_MIN_DEPTH"),
         ("ShoreFadeDepth", "SEA_SHORE_FADE_DEPTH"),
-        ("SurfZoneLo", "SEA_SURF_ZONE_LO"),
-        ("SurfZoneHi", "SEA_SURF_ZONE_HI"),
         ("ShoreEdgeNoise", "SEA_SHORE_EDGE_NOISE"),
         ("ChopFadeDepth", "SEA_CHOP_FADE_DEPTH"),
         ("GammaMild", "SEA_GAMMA_MILD"),

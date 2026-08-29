@@ -82,17 +82,10 @@ public class SeaSettings : ScriptableObject
              "frequency — a swell comes from one direction at every period.")]
     [Range(2f, 60f)] public float swellSpread = 26f;
 
-    /// WHERE THE SWELL COMES FROM, ABSOLUTELY.
-    ///
-    /// It used to be an OFFSET from the wind, so a distant storm's swell swung round
-    /// whenever the local breeze did. A swell outlives the weather that made it and
-    /// keeps its heading; that is what makes it a swell — and crossing the wind sea
-    /// at an angle is what breaks the corduroy look.
-    ///
-    /// It also has to be fixed for the shore wave: the travel-time field is baked for
-    /// this direction, and a direction that moved would mean rebaking every gust.
-    [Tooltip("Direction the swell travels, degrees.")]
-    [Range(0f, 360f)] public float swellDirectionDeg = 38f;
+    [Tooltip("The swell's angle from the wind direction (degrees). A swell " +
+             "born in a distant storm rarely runs with today's wind; crossing " +
+             "them is what breaks the corduroy look.")]
+    [Range(-180f, 180f)] public float swellDirectionOffset = 38f;
 
     /// [SOURCE: Tessendorf 2004 equation 41]
     [Tooltip("Small wave cutoff length (m).")]

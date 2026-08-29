@@ -87,7 +87,7 @@ public static class SeaSpectrumTest
                           $"windSpread {settings.swell:F2}");
         report.AppendLine($"swell: period {settings.swellPeriod:F1} s   " +
                           $"alpha {settings.swellAlpha:E3}   gamma {settings.swellGamma:F1}   " +
-                          $"spread {settings.swellSpread:F0}   heading {settings.swellDirectionDeg:F0} deg");
+                          $"spread {settings.swellSpread:F0}   offset {settings.swellDirectionOffset:F0} deg");
         report.AppendLine();
 
         int failures = 0;

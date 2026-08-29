@@ -41,17 +41,6 @@ float2 _SeaBathySizeXZ;
 float  _SeaBathyResolution;
 float  _SeaDeepWaterDepth;
 
-// --- Shore wave: wave travel time from the waterline, in seconds ---
-//
-// Baked by `SeaShorePhase`. Its level sets ARE the crests, so refraction comes
-// from the sea bed instead of being applied to a field.
-TEXTURE2D(_SeaShoreTravelTex);
-SAMPLER(sampler_SeaShoreTravelTex);
-
-/// `(dir.x, dir.y, 1/c_deep, bias)`. The texture holds only the DELAY the sea bed
-/// adds; the straight deep-water plane is added back here, at full precision.
-float4 _SeaShorePlane;
-
 // --- Tier parameters (spec 6.6) ---
 float3 _SeaPatchSizes;
 float3 _SeaTierWeights;
@@ -64,14 +53,6 @@ float _SeaMaxShoalingGain;
 /// criterion needs the wave's height, and a pixel does not know it: it only
 /// knows its own elevation. Published by `SeaManager`.
 float _SeaSignificantHeight;
-
-/// Peak period of the current sea state (s). The swash cycles with it.
-float _SeaPeakPeriod;
-
-/// The shore wave's two trains: `(rms_wind, omega_wind, rms_swell, omega_swell)`.
-/// In shallow water the celerity does not depend on frequency, so both ride the
-/// same travel time and their beat is the wave-to-wave size change on the shore.
-float4 _SeaShoreTrains;
 
 /// The RUNNING FFT size and its log2. Comes from the quality preset;
 /// `SEA_FFT_SIZE` is only the upper bound.
@@ -414,153 +395,6 @@ float SeaBreakerIndex(float slope)
     return lerp(SEA_GAMMA_MILD, SEA_GAMMA_STEEP, saturate(slope / 0.10));
 }
 
-/// TRAVEL TIME OF A SHALLOW-WATER WAVE, FROM THE WATERLINE (s).
-///
-/// Outside the terrain the field is meaningless, but so is the shore wave —
-/// `SeaShoreWaveWeight` is already zero at that depth.
-float SeaSampleShoreTravel(float2 posXZ)
-{
-    float2 uv = (posXZ - _SeaBathyOriginXZ) / _SeaBathySizeXZ;
-    float residual = SAMPLE_TEXTURE2D_LOD(_SeaShoreTravelTex, sampler_SeaShoreTravelTex,
-                                          saturate(uv), 0).r;
-
-    return residual + dot(posXZ, _SeaShorePlane.xy) * _SeaShorePlane.z + _SeaShorePlane.w;
-}
-
-/// HOW MUCH OF THE SURFACE THE SHORE WAVE OWNS — THE SURF ZONE, NOT A DEPTH.
-///
-/// A fixed depth band was wrong and it showed: handing the field over everywhere
-/// shallower than 10 m replaced 170 metres of open sea with two sinusoids, and the
-/// big waves went with it.
-///
-/// The right question is not "how deep" but "is the wave depth-limited here". That
-/// is the breaking index: `B = H / (gamma h)`. Where `B` is at or past 1 the wave
-/// is breaking and its shape is the bottom's business, not the spectrum's; well
-/// below 1 the sea is still the spectrum's and the FFT keeps it.
-///
-/// This also carries the weather for free. At 0.5 m/s the zone ends around 2 m of
-/// depth (35 m offshore); at 20 m/s it reaches past 13 m — a storm has a wide surf
-/// zone, a calm has a narrow one.
-float SeaShoreWaveWeight(float depth)
-{
-    float shoal = min(SeaShoalingGain(depth, _SeaSpectrumDepth), _SeaMaxShoalingGain);
-    float breaking = (_SeaSignificantHeight * shoal)
-                   / max(SEA_GAMMA_MILD * depth, 1e-3);
-
-    return smoothstep(SEA_SURF_ZONE_LO, SEA_SURF_ZONE_HI, breaking)
-         * smoothstep(0.0, SEA_SHORE_FADE_DEPTH, depth);
-}
-
-/// THE SHORE WAVE — ONE TRAIN, ALIGNED TO THE SEA BED.
-///
-/// `phi = omega * (tau - t)`. Points sharing a travel time share a phase, so a
-/// crest is a contour of `tau`: it bends into bays and wraps round headlands
-/// because the DEPTH does. Nothing here rotates a wave vector.
-///
-/// IT REPLACES ENERGY, IT DOES NOT ADD IT. The weight is the SHARE of the
-/// surface's variance the pair carries; the FFT gives up exactly that share
-/// (`SeaShoreWaveFftScale`). Measured without the handover, the shallow rms went
-/// from 1.27 m to 2.20 m at 8 m/s — three quarters more sea than the state has.
-///
-/// TWO TRAINS, NOT ONE. A single frequency has no beat, and the wave-to-wave size
-/// change is exactly the two spectral peaks interfering. They cost one texture
-/// read together because shallow water is non-dispersive.
-///
-/// Amplitudes are the partitions' own — `A = sqrt(2) * rms` per train — shoaled by
-/// Green's law with the FFT's own ceiling, and then capped by BREAKING: the pair
-/// cannot be taller than `gamma * h` in water of depth `h`. Without the cap the
-/// surf zone would be clipped flat by the limiter further down instead of simply
-/// being the right size.
-float2 SeaShoreWaveAmplitudes(float depth, float slope, float weight)
-{
-    float shoal     = min(SeaShoalingGain(depth, _SeaSpectrumDepth), _SeaMaxShoalingGain);
-    float shoreFade = smoothstep(0.0, SEA_SHORE_FADE_DEPTH, depth);
-
-    float2 rms = float2(_SeaShoreTrains.x, _SeaShoreTrains.z) * (shoal * shoreFade);
-    float2 amp = SEA_SQRT2 * weight * rms;
-
-    float cap = SeaBreakerIndex(slope) * depth * 0.5;
-    float sum = amp.x + amp.y;
-    if (sum > cap) amp *= cap / max(sum, 1e-5);
-
-    return amp;
-}
-
-float SeaShoreWaveHeight(float2 posXZ, float depth, float slope)
-{
-    float weight = SeaShoreWaveWeight(depth);
-    if (weight <= 0.001) return 0.0;
-
-    float2 amp = SeaShoreWaveAmplitudes(depth, slope, weight);
-    float  t   = SeaSampleShoreTravel(posXZ) - _SeaTime;
-
-    return amp.x * cos(_SeaShoreTrains.y * t)
-         + amp.y * cos(_SeaShoreTrains.w * t);
-}
-
-/// What is left for the FFT's vertical displacement once the shore wave has taken
-/// its share. Variances add, so the amplitudes go as `sqrt(1 - w^2)`.
-float SeaShoreWaveFftScale(float depth)
-{
-    float w = SeaShoreWaveWeight(depth);
-    return sqrt(saturate(1.0 - w * w));
-}
-
-/// SLOPE OF THE SHORE WAVE.
-///
-/// The surface it makes has to be SHADED as well as displaced: in the surf zone
-/// the FFT's vertical is handed over almost entirely, so a normal read from the
-/// FFT slope texture alone would light a moving wave as flat water.
-///
-/// `grad(A cos(omega (tau - t))) = -A omega sin(...) grad(tau)`, with `grad(A)`
-/// dropped — the amplitude follows the depth and changes over tens of metres,
-/// the phase over a crest spacing.
-/// WHERE THE SWASH IS IN ITS CYCLE, AT THIS POINT.
-///
-/// The swash is the RUN-UP of the shore wave, so it reads the same travel field:
-/// `phase = (tau - t) / Tp`. A point the wave reaches later surges later, which
-/// means a bay fills while the headland beside it is already draining.
-///
-/// What this replaces: a single global phase plus a 286 m noise offset. The whole
-/// coast moved as one, and the only thing breaking it up was a noise with no
-/// relation to the shore's shape.
-float SeaShoreSwashPhase(float2 posXZ)
-{
-    return frac((SeaSampleShoreTravel(posXZ) - _SeaTime) / max(_SeaPeakPeriod, 0.1));
-}
-
-/// The surge itself, 0 at the lowest point of the cycle and 1 at the top of the
-/// run-up. Built from the phase in ONE place: the sea's foam, the sea's water
-/// level and the terrain's wet band all read this shape.
-float SeaShoreSurgeAt(float phase)
-{
-    return 0.5 - 0.5 * cos(SEA_TWO_PI * phase);
-}
-
-float2 SeaShoreWaveSlope(float2 posXZ, float depth, float slopeBed)
-{
-    float weight = SeaShoreWaveWeight(depth);
-    if (weight <= 0.001) return 0.0;
-
-    float2 amp = SeaShoreWaveAmplitudes(depth, slopeBed, weight);
-
-    float e = _SeaBathySizeXZ.x / _SeaBathyResolution;
-
-    float tau  = SeaSampleShoreTravel(posXZ);
-    float dTdx = SeaSampleShoreTravel(posXZ + float2(e, 0))
-               - SeaSampleShoreTravel(posXZ - float2(e, 0));
-    float dTdz = SeaSampleShoreTravel(posXZ + float2(0, e))
-               - SeaSampleShoreTravel(posXZ - float2(0, e));
-
-    float2 gradTau = float2(dTdx, dTdz) / (2.0 * e);
-    float  t = tau - _SeaTime;
-
-    float dHdTau = -amp.x * _SeaShoreTrains.y * sin(_SeaShoreTrains.y * t)
-                 -  amp.y * _SeaShoreTrains.w * sin(_SeaShoreTrains.w * t);
-
-    return dHdTau * gradTau;
-}
-
 // -------------------------------------------------------- surface deform
 
 struct SeaSurfacePoint
@@ -604,14 +438,8 @@ SeaSurfacePoint SeaDeform(float3 posWS)
         // (spec 8.4).
         float shoreFade = smoothstep(0.0, SEA_SHORE_FADE_DEPTH, o.depth);
 
-        disp.y  *= shoal * shoreFade * SeaShoreWaveFftScale(o.depth);
+        disp.y  *= shoal * shoreFade;
         disp.xz *= chopScale * shoreFade;
-
-        // THE SHORE WAVE IS ADDED HERE, NOT ON TOP OF EVERYTHING.
-        //
-        // Inside the shallow block it goes through the same breaking limit as the
-        // FFT field below, so it cannot stand taller than the water it is in.
-        disp.y += SeaShoreWaveHeight(posWS.xz, o.depth, slope);
 
         // BREAKING HEIGHT LIMIT, SLOPE DEPENDENT (spec 8.3).
         float gamma = SeaBreakerIndex(slope);

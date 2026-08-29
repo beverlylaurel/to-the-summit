@@ -19,7 +19,6 @@ public static class SeaShaderIDs
     // --- Sea level and bathymetry (spec §9) ---
     public static readonly int SeaLevelY = Shader.PropertyToID("_SeaLevelY");
     public static readonly int BathyTex = Shader.PropertyToID("_SeaBathyTex");
-    public static readonly int ShoreTravelTex = Shader.PropertyToID("_SeaShoreTravelTex");
     public static readonly int BathyOriginXZ = Shader.PropertyToID("_SeaBathyOriginXZ");
     public static readonly int BathySizeXZ = Shader.PropertyToID("_SeaBathySizeXZ");
     public static readonly int BathyResolution = Shader.PropertyToID("_SeaBathyResolution");
@@ -57,8 +56,7 @@ public static class SeaShaderIDs
     public static readonly int SwellPeakOmega = Shader.PropertyToID("_SeaSwellPeakOmega");
     public static readonly int SwellGamma = Shader.PropertyToID("_SeaSwellGamma");
     public static readonly int SwellSpreadS = Shader.PropertyToID("_SeaSwellSpreadS");
-    public static readonly int SwellDirection = Shader.PropertyToID("_SeaSwellDirection");
-    public static readonly int ShorePlane = Shader.PropertyToID("_SeaShorePlane");
+    public static readonly int SwellDirOffset = Shader.PropertyToID("_SeaSwellDirOffset");
     public static readonly int SmallWaveCutoff = Shader.PropertyToID("_SeaSmallWaveCutoff");
     public static readonly int LoopPeriod = Shader.PropertyToID("_SeaLoopPeriod");
     public static readonly int Choppiness = Shader.PropertyToID("_SeaChoppiness");
@@ -71,9 +69,9 @@ public static class SeaShaderIDs
     // --- Shallow water (spec §8) ---
     public static readonly int MaxShoalingGain = Shader.PropertyToID("_SeaMaxShoalingGain");
     public static readonly int SignificantHeight = Shader.PropertyToID("_SeaSignificantHeight");
-    public static readonly int ShoreTrains = Shader.PropertyToID("_SeaShoreTrains");
     public static readonly int RunupMaxDepth = Shader.PropertyToID("_SeaRunupMaxDepth");
     public static readonly int PeakPeriod = Shader.PropertyToID("_SeaPeakPeriod");
+    public static readonly int ShoreFoamPhase = Shader.PropertyToID("_SeaShoreFoamPhase");
 
     // --- Optics (spec §12) ---
     public static readonly int ExtinctionRGB = Shader.PropertyToID("_SeaExtinctionRGB");
@@ -90,7 +88,7 @@ public static class SeaShaderIDs
     public static readonly int FoamBreakupTiling = Shader.PropertyToID("_SeaFoamBreakupTiling");
 
     // --- Wet sand (spec §14) ---
-    public static readonly int SeaRunupHeight = Shader.PropertyToID("_SeaRunupHeight");
+    public static readonly int SeaWetLevelY = Shader.PropertyToID("_SeaWetLevelY");
     public static readonly int SeaWetFadeM = Shader.PropertyToID("_SeaWetFadeM");
     public static readonly int SeaWetBandM = Shader.PropertyToID("_SeaWetBandM");
     public static readonly int SeaWetDarkening = Shader.PropertyToID("_SeaWetDarkening");

@@ -25,8 +25,6 @@ public class SeaManager : MonoBehaviour
 
     ISeaEnvironmentSource env;
     Texture2D bathymetry;
-    Texture2D shoreTravel;
-    Vector4 shorePlane;
 
     float bakedSeaLevel = float.NaN;
 
@@ -86,13 +84,6 @@ public class SeaManager : MonoBehaviour
 
         if (Application.isPlaying) Destroy(bathymetry); else DestroyImmediate(bathymetry);
         bathymetry = null;
-
-        if (shoreTravel != null)
-        {
-            if (Application.isPlaying) Destroy(shoreTravel); else DestroyImmediate(shoreTravel);
-            shoreTravel = null;
-        }
-
         bakedSeaLevel = float.NaN;
     }
 
@@ -102,15 +93,6 @@ public class SeaManager : MonoBehaviour
         ReleaseBathymetry();
 
         bathymetry = SeaBathymetry.Bake(terrain, settings.seaLevelY);
-
-        // BAKED TOGETHER, BECAUSE THEY DESCRIBE THE SAME SEA BED. The travel field
-        // is the depth field integrated; letting them go out of step would put the
-        // crests on a shoreline that no longer exists.
-        float swellRad = settings.swellDirectionDeg * Mathf.Deg2Rad;
-        shoreTravel = SeaShorePhase.Bake(terrain, settings.seaLevelY, settings.spectrumDepth,
-                                         new Vector2(Mathf.Cos(swellRad), Mathf.Sin(swellRad)),
-                                         out shorePlane);
-
         bakedSeaLevel = settings.seaLevelY;
     }
 
@@ -155,14 +137,12 @@ public class SeaManager : MonoBehaviour
 
     void PublishBathymetry()
     {
-        if (bathymetry == null || shoreTravel == null) return;
+        if (bathymetry == null) return;
 
         Vector3 o = terrain.transform.position;
         Vector3 s = terrain.terrainData.size;
 
         Shader.SetGlobalTexture(SeaShaderIDs.BathyTex, bathymetry);
-        Shader.SetGlobalTexture(SeaShaderIDs.ShoreTravelTex, shoreTravel);
-        Shader.SetGlobalVector(SeaShaderIDs.ShorePlane, shorePlane);
         Shader.SetGlobalVector(SeaShaderIDs.BathyOriginXZ, new Vector4(o.x, o.z, 0f, 0f));
         Shader.SetGlobalVector(SeaShaderIDs.BathySizeXZ, new Vector4(s.x, s.z, 0f, 0f));
         Shader.SetGlobalFloat(SeaShaderIDs.BathyResolution, bathymetry.width);
@@ -247,9 +227,6 @@ public class SeaManager : MonoBehaviour
 
     MomentInputs momentInputs;
 
-    /// (rms, omega) of the wind sea and of the swell — the shore wave's two trains.
-    Vector4 shoreTrains;
-
     /// A default `MomentInputs` is all zeros, which could in principle match a
     /// real one. The flag says "nothing has been integrated yet" without relying
     /// on a sentinel value.
@@ -277,7 +254,6 @@ public class SeaManager : MonoBehaviour
             SeaSpectrumMoments.Result m = SeaSpectrumMoments.Integrate(u, settings);
             SeaRuntimeState.SignificantWaveHeight = m.SignificantHeight;
             SeaRuntimeState.PeakPeriod = m.PeakPeriod;
-            shoreTrains = new Vector4(m.WindRms, m.WindOmega, m.SwellRms, m.SwellOmega);
             momentInputs = inputs;
             momentsValid = true;
         }
@@ -289,14 +265,6 @@ public class SeaManager : MonoBehaviour
         // pixel only knows its own elevation, which is not the same thing.
         Shader.SetGlobalFloat(SeaShaderIDs.SignificantHeight,
                               SeaRuntimeState.SignificantWaveHeight);
-
-        // THE SHORE WAVE IS TWO TRAINS, NOT ONE. In shallow water `c = sqrt(g h)`
-        // does not depend on frequency, so both partitions share the SAME travel
-        // time and the shader needs one texture read for the pair. Their beat is
-        // the wave-to-wave size change on the shore.
-        Shader.SetGlobalVector(SeaShaderIDs.ShoreTrains,
-                               new Vector4(shoreTrains.x, shoreTrains.y,
-                                           shoreTrains.z, shoreTrains.w));
 
         // HOW HIGH THE SWASH REACHES — STOCKDON, NOT A FIXED NUMBER.
         //
@@ -320,18 +288,24 @@ public class SeaManager : MonoBehaviour
 
         Shader.SetGlobalFloat(SeaShaderIDs.RunupMaxDepth, SeaRuntimeState.RunupHeight);
 
-        // THE SWASH PHASE IS NOT A GLOBAL ANY MORE.
+        // THE PHASE IS A PHASE, NOT AN AMOUNT.
         //
-        // It used to be one number for the whole coast; both the sea's foam and the
-        // terrain's wet band now read it per position from the travel field
-        // (`SeaShoreSwashPhase`), so a bay fills while the headland drains.
+        // This published `sin(...) * 0.5 + 0.5` — the surge AMOUNT — under the name
+        // `_SeaShoreFoamPhase`, and the shader fed it straight into
+        // `0.5 - 0.5 cos(2pi * phase)`. Running an amount through a cosine folds the
+        // cycle in half: as the value swept 0.5 -> 1 -> 0.5 -> 0 -> 0.5 over one Tp,
+        // the surge went 1 -> 0 -> 1 -> 0 -> 1. The swash ran at Tp/2 and lurched at
+        // the turns. That is the "it still goes in and out too fast".
         //
-        // What is left here is the number the panel and the audio read: where the
-        // swash is at the WATERLINE, which is where the travel time is zero.
+        // A linear 0..1 sawtooth goes out now, and the surge is built from it in ONE
+        // place — the same expression the shader uses, so the wet band and the foam
+        // cannot drift apart.
         float t = Application.isPlaying ? Time.time : 0f;
-        float phase = Mathf.Repeat(-t / Mathf.Max(SeaRuntimeState.PeakPeriod, 0.1f), 1f);
+        float phase = Mathf.Repeat(t / Mathf.Max(SeaRuntimeState.PeakPeriod, 0.1f), 1f);
 
         SeaRuntimeState.ShoreFoamIntensity01 =
             0.5f - 0.5f * Mathf.Cos(SeaConstants.TwoPi * phase);
+
+        Shader.SetGlobalFloat(SeaShaderIDs.ShoreFoamPhase, phase);
     }
 }

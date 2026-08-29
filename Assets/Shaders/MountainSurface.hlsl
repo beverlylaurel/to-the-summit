@@ -414,7 +414,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // gentle one with the patch open becomes a bay of sand.
     //
     // The band hangs from `_SeaLevelY` — the STILL-water level — not from
-    // the run-up line: that one moves with every wave.
+    // `_SeaWetLevelY`: that one carries the run-up and moves with every wave.
     float sandTop    = _SeaLevelY + _SandBandAbove;
     float sandBottom = _SeaLevelY - _SandBandBelow;
     float sandBand = (1.0 - smoothstep(sandTop - _SandFade, sandTop, worldPos.y))
@@ -492,26 +492,10 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     //
     // A swash zone is a band: from the run-up line down to about where the water
     // stands.
-    // THE RUN-UP LINE IS LOCAL, NOT GLOBAL.
-    //
-    // It used to be one number for the whole coast: every beach in the world rose
-    // and fell together. The level is now built HERE from the sea's own travel
-    // field — the same field its crests and its foam read — so a bay fills while
-    // the headland beside it drains, and the two systems cannot disagree.
-    float2 seaUV = (worldPos.xz - _SeaBathyOriginXZ) / _SeaBathySizeXZ;
-    float  seaTau = SAMPLE_TEXTURE2D(_SeaShoreTravelTex, sampler_SeaShoreTravelTex,
-                                     saturate(seaUV)).r
-                  + dot(worldPos.xz, _SeaShorePlane.xy) * _SeaShorePlane.z
-                  + _SeaShorePlane.w;
+    float seaWetBottom = _SeaWetLevelY - max(_SeaWetBandM, 1e-3);
 
-    float seaPhase = frac((seaTau - _SeaTime) / max(_SeaPeakPeriod, 0.1));
-    float seaSurge = 0.5 - 0.5 * cos(SEA_TWO_PI_TERRAIN * seaPhase);
-
-    float seaWetLevel  = _SeaLevelY + _SeaRunupHeight * seaSurge;
-    float seaWetBottom = seaWetLevel - max(_SeaWetBandM, 1e-3);
-
-    float swash = (1.0 - smoothstep(seaWetLevel - _SeaWetFadeM,
-                                    seaWetLevel, worldPos.y))
+    float swash = (1.0 - smoothstep(_SeaWetLevelY - _SeaWetFadeM,
+                                    _SeaWetLevelY, worldPos.y))
                 * smoothstep(seaWetBottom - _SeaWetFadeM,
                              seaWetBottom, worldPos.y);
 
@@ -542,7 +526,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // that thins as it drains.
     //
     // The terrain draws that part. It is not a second source: the sea publishes
-    // the run-up level (`seaWetLevel` above carries the phase) and the sand
+    // the run-up level (`_SeaWetLevelY` already carries the phase) and the sand
     // draws the residue below it. The noise eats the coverage from underneath,
     // so the lace breaks into patches instead of ending on an edge of its own.
     // The lace rides on the SWASH band only. On the submerged part there is no

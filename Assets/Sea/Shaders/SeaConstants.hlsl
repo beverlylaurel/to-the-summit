@@ -11,7 +11,6 @@
 #define SEA_G                    9.81
 
 #define SEA_TWO_PI               6.28318530718
-#define SEA_SQRT2                1.41421356
 
 /// Index of refraction of water. [SOURCE: Tessendorf 2004 6.1.2, 6.3 sample shader]
 #define SEA_WATER_IOR            1.34
@@ -55,12 +54,6 @@
 /// to zero; otherwise the mesh intersects the terrain and flickers.
 /// [CALIBRATION]
 #define SEA_SHORE_FADE_DEPTH     0.60
-
-/// Breaking index (`H / gamma h`) over which the shore wave takes the surface.
-/// Below the low bound the sea is still the spectrum's; at the high bound the wave
-/// is depth-limited and its shape belongs to the bottom.
-#define SEA_SURF_ZONE_LO         0.60
-#define SEA_SURF_ZONE_HI         1.20
 
 /// How far the waterline is displaced by the foam's own noise (m of depth).
 /// On the measured 5% shore slope this moves the line about 1.2 m, which stays

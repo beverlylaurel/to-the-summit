@@ -69,31 +69,13 @@ CBUFFER_END
 //
 // Published by `SeaWetnessDriver`. While the sea is off the level is pulled to a
 // very low elevation and the band is 0 everywhere.
-/// HOW HIGH THE SWASH REACHES ABOVE STILL WATER (m), and where it is in its
-/// cycle AT THIS POINT — the terrain reads the sea's own travel field so the wet
-/// band and the sea's foam cannot drift apart.
-#define SEA_TWO_PI_TERRAIN 6.28318530718
-
-float _SeaRunupHeight;
-float _SeaPeakPeriod;
-float _SeaTime;
-
-TEXTURE2D(_SeaShoreTravelTex);
-SAMPLER(sampler_SeaShoreTravelTex);
-
-/// `(dir.x, dir.y, 1/c_deep, bias)` — see `SeaCommon.hlsl`. The texture holds the
-/// delay only; the plane is added back at full precision.
-float4 _SeaShorePlane;
-
-float2 _SeaBathyOriginXZ;
-float2 _SeaBathySizeXZ;
-
+float _SeaWetLevelY;
 float _SeaWetFadeM;
 float _SeaWetBandM;
 float _SeaWetDarkening;
 
 // STILL-WATER LEVEL, published by `SeaManager`. The sand band hangs from this, not
-// from the run-up line: that one rises and falls with every
+// from `_SeaWetLevelY`: that one carries the run-up and rises and falls with every
 // wave, and a beach does not move at that rate.
 float _SeaLevelY;
 

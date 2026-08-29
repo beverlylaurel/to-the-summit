@@ -82,6 +82,7 @@ Shader "ToTheSummit/SeaLit"
             float  _SeaPrecipIntensity01;
 
             float  _SeaRunupMaxDepth;
+            float  _SeaShoreFoamPhase;
             float  _SeaShoreFoamDepth;
             float4 _SeaFoamColor;
             float  _SeaFoamRoughness;
@@ -188,15 +189,7 @@ Shader "ToTheSummit/SeaLit"
                 //
                 // NO central difference: the slope already comes from the FFT
                 // and that is more accurate (spec 6.7).
-                // THE NORMAL FOLLOWS THE SAME HANDOVER AS THE GEOMETRY. The FFT's
-                // slope is scaled by whatever share it still owns, and the shore
-                // wave's own slope takes the rest — otherwise the surf zone moves
-                // but is lit as flat water.
-                float bedSlope = SeaSampleBottomSlope(IN.positionWS.xz);
-
-                float2 slopeSum = SeaSampleSlope(IN.positionWS.xz)
-                                * SeaShoreWaveFftScale(depth)
-                                + SeaShoreWaveSlope(IN.positionWS.xz, depth, bedSlope);
+                float2 slopeSum = SeaSampleSlope(IN.positionWS.xz);
 
                 float3 N = normalize(float3(-slopeSum.x, 1.0, -slopeSum.y));
 
@@ -417,7 +410,8 @@ Shader "ToTheSummit/SeaLit"
                     // Hs shoaled to the local depth is the height the criterion is
                     // written for, and it carries the weather: Hs is 0.10 m at 0.5 m/s
                     // and 3.96 m at 20 m/s, so the breaker line moves out with the sea.
-                    float gamma = SeaBreakerIndex(bedSlope);
+                    float slope = SeaSampleBottomSlope(IN.positionWS.xz);
+                    float gamma = SeaBreakerIndex(slope);
 
                     float shoal  = min(SeaShoalingGain(depth, _SeaSpectrumDepth),
                                        _SeaMaxShoalingGain);
@@ -436,16 +430,21 @@ Shader "ToTheSummit/SeaLit"
                     // 3. SHORE FOAM (spec 13.3). The run-up band makes the
                     //    water level look raised (spec 8.5).
                     //
-                    // THE SWASH IS THE SHORE WAVE'S OWN RUN-UP.
+                    // THE SWASH DOES NOT ADVANCE AS ONE STRAIGHT LINE. The
+                    // run-up phase was global, so the whole coastline surged
+                    // and drained together — a band that slides in and out as
+                    // a single piece. A slow field shifts the phase along the
+                    // shore, so one bay is filling while the next is draining.
+                    float alongShore = SeaValueNoise(IN.positionWS.xz * 0.0035);
+                    float phase = frac(_SeaShoreFoamPhase + alongShore * 0.6);
+
+                    // THE SURGE IS BUILT ONCE AND USED FOR BOTH.
                     //
-                    // It used to be a single global phase plus a 286 m noise offset:
-                    // the whole coast surged together and the only thing breaking that
-                    // up was a noise unrelated to the shore's shape. The surge now
-                    // comes from the SAME travel field the crests do, so a bay fills
-                    // while the headland beside it drains — and it is the same field
-                    // the terrain's wet band reads.
-                    float phase = SeaShoreSwashPhase(IN.positionWS.xz);
-                    float surge = SeaShoreSurgeAt(phase);
+                    // The run-up height used to be `max * phase` — a sawtooth that
+                    // climbed steadily and then snapped back, while the foam beside it
+                    // followed the cosine. Two shapes for one wave. The water level and
+                    // the foam now ride the SAME surge.
+                    float surge = 0.5 - 0.5 * cos(SEA_TWO_PI * phase);
 
                     float runupDepth = _SeaRunupMaxDepth * surge;
                     float effDepth = depth + runupDepth;

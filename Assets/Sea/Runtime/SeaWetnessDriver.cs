@@ -69,8 +69,9 @@ public class SeaWetnessDriver : MonoBehaviour
 
     static void Disable()
     {
-        // No run-up at all: the band collapses to nothing wherever it is read.
-        Shader.SetGlobalFloat(SeaShaderIDs.SeaRunupHeight, 0f);
+        // An elevation below the terrain: `smoothstep` then returns 0
+        // everywhere.
+        Shader.SetGlobalFloat(SeaShaderIDs.SeaWetLevelY, -100000f);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetFadeM, 1f);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetBandM, 1f);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetDarkening, 1f);
@@ -86,12 +87,11 @@ public class SeaWetnessDriver : MonoBehaviour
             return;
         }
 
-        // THE AMOUNT IS PUBLISHED, NOT THE LEVEL.
-        //
-        // A level is one number for the whole coast, and the whole coast then rises
-        // and falls together. The terrain builds its own level from this height and
-        // the sea's travel field, so the band surges where the wave actually is.
-        Shader.SetGlobalFloat(SeaShaderIDs.SeaRunupHeight, SeaRuntimeState.RunupHeight);
+        // The band's top rides the swash: how high it reaches (`RunupHeight`, from
+        // Stockdon) times where it is in its cycle right now.
+        float runup = SeaRuntimeState.RunupHeight * SeaRuntimeState.ShoreFoamIntensity01;
+
+        Shader.SetGlobalFloat(SeaShaderIDs.SeaWetLevelY, settings.seaLevelY + runup);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetFadeM, fadeMeters);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetBandM, bandMeters);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetDarkening, darkening);

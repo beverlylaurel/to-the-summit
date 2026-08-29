@@ -241,7 +241,6 @@ dağ ne kadar büyürse büyüsün kar tanesi büyümüyor.
 | `shoreSlope` = 0.058 | **elle bakılacak** | ARAZİNİN özelliği. Stockdon R2%'yi sürüyor, yani swash'ın ne kadar yukarı çıktığını. Ölçüm: su çizgisinden 1.68 m derinliğe 29 m. Arazi yeniden üretilirse yeniden ölçülmeli — aynı kesitten. |
 | `spectrumDepth` = 60 m | **bilerek mutlak** | FFT'nin varsaydığı ortalama derinlik; yerel derinlik mesh üzerinde uygulanıyor. |
 | Mesh halka yarıçapları (~4 km) | **bilerek mutlak** | Oyuncunun gözünden ufka olan mesafe. Dağın boyuyla ilgisi yok. |
-| Kıyı dalgası seyahat alanı (`SeaShorePhase`) | **kendiliğinden ölçeklenir** | Batimetriyle birlikte pişiyor, aynı çözünürlük. Ama teksel 7,32 m ve en sığ tepe aralığı 16 m — arazi büyürse teksel büyür ve en sığ tepeler çözülemez hâle gelir. Arazi boyu artarsa tepe aralığı/teksel oranı yeniden ölçülmeli. |
 | Bathymetry çözünürlüğü | **kendiliğinden ölçeklenir** | Arazi heightmap'inden geliyor (şu an 7.3 m/teksel). Arazi boyu değişince teksel boyu da değişir — su çizgisinin basamak boyu da. |
 
 ### Kıyı kumu
