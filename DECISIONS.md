@@ -79,12 +79,10 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ## Silinecek geçiciler
 
-- **F1 → Deniz → düz kenar avı** (`_SeaDbgNoSurface`, `_SeaDbgNoFog`, `_SeaDbgNoShadow`,
-  `_SeaDbgNoSkyReflection`). Kumsaldaki düz kenarlı
-  yamanın deniz yüzeyinden geldiğini kanıtladı; sebep bulunup kapandığında anahtar ve
-  globaller birlikte silinir. Elenenler: kıyı ıslaklığı, dantel, arazi karı (anahtarları
-  ve `_TerrainDbg*` globalleri silindi) ve dalgalar (kapatıldı, kenar durdu — yani sebep
-  mesh'in dikey yer değiştirmesi değil).
+- **F1 → Deniz → teşhis anahtarları** (`_SeaDbgNoSurface`, `_SeaDbgNoFog`,
+  `_SeaDbgNoShadow`, `_SeaDbgNoSkyReflection`). Düz kenarın sebebi bulundu
+  (`SYMPTOMS.md`); bu dört anahtar bir sonraki deniz turunda hâlâ gerekmezse
+  globalleriyle birlikte silinir.
 
 - **Ova ve patika ölçüm araçları** (`ForelandProbe`, F1'deki kurulum süresi logu) — ova
   ve yol dokusu oturunca silinir

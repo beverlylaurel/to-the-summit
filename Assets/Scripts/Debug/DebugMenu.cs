@@ -88,7 +88,7 @@ public class DebugMenu : MonoBehaviour
 
     /// The terms that survive with the waves switched off. Every one of them is a
     /// suspect for the straight-edged patch, so they all go in at once.
-    bool seaNoFog, seaNoShadow, seaNoSkyReflection;
+    bool seaNoFog, seaNoShadow, seaNoSkyRefl;
 
     /// The cloud settings are driven through `cloudVolume.profile` — the Volume's runtime COPY,
     /// not the asset itself. Writing to `sharedProfile` does not work: the moment another
@@ -278,11 +278,15 @@ public class DebugMenu : MonoBehaviour
     }
 
     void BeginColumn() => GUILayout.BeginVertical(GUILayout.Width(ColumnWidth));
-    void EndColumn()
-    {
-        GUILayout.FlexibleSpace();
-        GUILayout.EndVertical();
-    }
+
+    /// NO `FlexibleSpace` HERE.
+    ///
+    /// It used to push the column's content to the top. Inside a scroll view the
+    /// space it asks for has no upper bound, so the layout pass and the repaint pass
+    /// disagreed on where the controls are: the last toggles of the tallest column
+    /// were drawn in one place and took their clicks in another. The user reported it
+    /// as "the last three toggles do not click".
+    void EndColumn() => GUILayout.EndVertical();
 
     /// Opens a titled box; close it with EndSection
     void BeginSection(string label)
@@ -647,8 +651,8 @@ public class DebugMenu : MonoBehaviour
         seaNoFoam       = GUILayout.Toggle(seaNoFoam,       "Köpüğü kapat");
         seaNoRefraction = GUILayout.Toggle(seaNoRefraction, "Kırılmayı kapat");
         seaNoFog        = GUILayout.Toggle(seaNoFog,        "Yerel sisi kapat");
-        seaNoShadow     = GUILayout.Toggle(seaNoShadow,     "Gölge + bulut gölgesini kapat");
-        seaNoSkyReflection = GUILayout.Toggle(seaNoSkyReflection, "Gökyüzü yansımasını kapat");
+        seaNoShadow     = GUILayout.Toggle(seaNoShadow,     "Gölgeyi kapat");
+        seaNoSkyRefl    = GUILayout.Toggle(seaNoSkyRefl,    "Gök yansımasını kapat");
 
         // WRITTEN EVERY FRAME, NOT ON CHANGE. `SeaManager` republishes its own
         // globals every frame; a value written once here would be overwritten the
@@ -660,11 +664,11 @@ public class DebugMenu : MonoBehaviour
         Shader.SetGlobalFloat(SeaShaderIDs.DbgNoRefraction, seaNoRefraction ? 1f : 0f);
         Shader.SetGlobalFloat(SeaShaderIDs.DbgNoFog,        seaNoFog ? 1f : 0f);
         Shader.SetGlobalFloat(SeaShaderIDs.DbgNoShadow,     seaNoShadow ? 1f : 0f);
-        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoSkyReflection, seaNoSkyReflection ? 1f : 0f);
+        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoSkyReflection, seaNoSkyRefl ? 1f : 0f);
 
         if (GUILayout.Button("Ayarları geri al (deniz)"))
             seaNoSurface = seaNoWaves = seaNoShallow = seaNoFoam = seaNoRefraction = false;
-            seaNoFog = seaNoShadow = seaNoSkyReflection = false;
+            seaNoFog = seaNoShadow = seaNoSkyRefl = false;
 
         EndSection();
     }

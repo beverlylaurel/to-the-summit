@@ -37,6 +37,17 @@
 // --- Shallow water and breaking ---
 
 /// Floor depth that prevents division by zero (m). [CALIBRATION]
+/// Period the noise coordinate is folded into before hashing. Big enough that the
+/// repeat is never in view (512 cells is 640 m at the foam's tiling), small enough
+/// that a float still carries the fraction.
+#define SEA_HASH_PERIOD          512.0
+
+/// Distance over which the sea bed reaches deep water outside the terrain (m).
+/// Measured: the edge is 25.4 m deep, deep water is 200 m, so this length is a
+/// 4.4% gradient — a continental slope. The terrain's own bed falls at 0.61% and
+/// holding that would need 28.6 km, far past anything the mesh draws (4064 m).
+#define SEA_OFFSHORE_RAMP        4000.0
+
 #define SEA_MIN_DEPTH            0.05
 
 /// Wave damping at the shoreline (m). Below this depth the wave height goes

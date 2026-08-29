@@ -44,6 +44,9 @@ public static class SeaConstantsTest
         ("JonswapSigmaHi", "SEA_JONSWAP_SIGMA_HI"),
         ("MichellSteepness", "SEA_MICHELL_STEEPNESS"),
 
+        ("HashPeriod", "SEA_HASH_PERIOD"),
+
+        ("OffshoreRamp", "SEA_OFFSHORE_RAMP"),
         ("MinDepth", "SEA_MIN_DEPTH"),
         ("ShoreFadeDepth", "SEA_SHORE_FADE_DEPTH"),
         ("ChopFadeDepth", "SEA_CHOP_FADE_DEPTH"),

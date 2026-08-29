@@ -2611,3 +2611,40 @@ Aynı temizlikte iki ölü şey daha çıktı:
   için anahtar da gitti.
 - **İki "TEMPORARY" yorumu** — ışık-gölge sınırındaki çizgi probu ve dünya koordinatı
   cetveli. Kodları yıllar önce silinmiş, yorumları kalmıştı.
+
+
+## Arazi kutusunun dışı neden sabit derinlik olamaz
+
+`SeaSampleDepth` kutu dışında tek satırla `_SeaDeepWaterDepth` döndürüyordu ve yorumu
+"arazinin ötesi açık deniz" diyordu. Doğru olan cümle bu değil: **derinlik sürekli bir
+alandır**, ve o satır onu kare bir sınırda 25 metreden 200 metreye zıplatıyordu.
+
+Derinlik üç şeyi birden sürüyor — soğurma (`SeaVolumeColor`), sığlaşma kazancı
+(`SeaShoalingGain`) ve kırılma ölçütü. Üçü birden aynı çizgide zıplayınca sonuç renkte
+görünen keskin bir kenar oluyor.
+
+Çözüm ölçüden çıktı, tercihten değil:
+
+- Kenardaki gerçek derinlik: dört kenarda da %100 su, ortalama **25,4 m**.
+- Kenar öncesi son 500 metrede yatağın eğimi: **%0,61**. O eğimi sürdürmek 200 m'ye
+  inmek için 28,6 km ister — mesh'in ulaştığı 4064 m'nin çok ötesi.
+- Seçilen rampa **4000 m**, yani %4,4: gerçek bir kıta yamacı eğimi ve mesh'in görünür
+  menzilinin tamamını kaplıyor.
+
+`saturate(uv)` en yakın kenar tekselini okuduğu için değer sınırda **süreklidir**; rampa
+onun üstüne biner. Dallanma da gitti.
+
+## Gürültü hash'i dünya ölçeğinde ölçülerek seçildi
+
+Denizin `SeaHash21`/`SeaHash22`'si koordinatı katlamadan büyük çarpanlarla hash'liyordu.
+Kıyı kilometrelerce uzakta; `frac()`'in girdisi milyonlara çıkınca float'ın mantisi
+bitiyor ve hash birkaç değere düşüyor. 64×64 hücrede ölçüldü: başlangıç 15000'de
+**4096 hücrede 20 farklı değer**. Köpükteki dama deseni buydu.
+
+Yeni hash uydurulmadı: `MountainSurface.hlsl`'deki `MountainHash` aynı sorunu aynı
+ölçekte çözmüş — önce `fmod(abs(p), 512)`, sonra 0,1031 gibi KÜÇÜK çarpanlar. Aynı yapı
+iki boyuta taşındı ve ölçüm tekrarlandı: her başlangıçta ~2400 farklı değer, dünya
+konumundan bağımsız.
+
+Periyot 512: köpüğün döşemesinde 640 metrelik bir tekrar demek, kabarcık deseni için
+görüş menzilinin çok ötesi.

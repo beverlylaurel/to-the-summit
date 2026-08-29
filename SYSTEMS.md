@@ -1405,3 +1405,16 @@ türüyor. Tek kaynak.
 
 Albedo kararması ikisinin birleşimini okuyor. Gerekçe `RATIONALE.md`, belirti
 `SYMPTOMS.md`.
+
+
+## Deniz: batimetri arazinin dışında da sürüyor (2026-08-29)
+
+`SeaSampleDepth` arazi kutusunun dışında artık sabit dönmüyor: en yakın kenar tekselinden
+başlayıp `SEA_OFFSHORE_RAMP` (4000 m) boyunca `_SeaDeepWaterDepth`'e iniyor.
+
+**Bunu okuyanlar** — üçü de aynı derinlik alanından besleniyor, ayrı bir kaynak yok:
+`SeaVolumeColor` (soğurma), `SeaShoalingGain` (sığlaşma), kırılma ölçütü (`breakT`).
+
+**Bilinçli kural:** rampanın uzunluğu ölçülen kenar derinliğinden (25,4 m) ve seçilen
+%4,4 kıta yamacı eğiminden çıkıyor; sayı `SeaConstants` ve `SeaConstants.hlsl`'de,
+eşitliği `Sea/Test Constant Parity` denetliyor.

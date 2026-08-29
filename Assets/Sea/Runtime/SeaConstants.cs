@@ -37,6 +37,16 @@ public static class SeaConstants
     /// Deep-water steepness limit. [SOURCE: Michell 1893]
     public const float MichellSteepness = 0.142f;
 
+    /// Period the procedural noise folds its coordinate into before hashing.
+    /// The shore sits kilometres from the origin and a float stops carrying the
+    /// fraction there; measured, the hash fell to 39 distinct values in 4096 cells
+    /// and the foam came out as a lattice (`RATIONALE.md`).
+    public const float HashPeriod = 512f;
+
+    /// Distance over which the sea bed reaches deep water outside the terrain (m).
+    /// A 4.4% gradient from the measured 25.4 m edge depth. [CALIBRATION]
+    public const float OffshoreRamp = 4000f;
+
     // --- Shallow water and breaking ---
 
     /// Floor depth that prevents division by zero (m). [CALIBRATION]

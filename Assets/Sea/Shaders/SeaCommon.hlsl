@@ -171,11 +171,33 @@ float SeaSampleFoam(float2 posXZ, out float2 foldDirection)
 /// outline, and a CELLULAR field (`SeaFoamBubbles`) for the bubble structure.
 /// The reasoning is in `DECISIONS.md` — value noise cannot describe foam at
 /// any octave count, and the cellular field needs no texture at all.
+/// THE COORDINATE IS FOLDED BEFORE IT IS HASHED.
+///
+/// The shore sits at x = 12000, z = -13000. `frac(p * 123.34)` on a number that
+/// large is `frac()` of about 1.5 million, and a float carries 24 bits of
+/// mantissa: what comes back is a handful of quantized values, not noise.
+///
+/// MEASURED, over a 64x64 block of cells (4096 possible values):
+///
+///     cell origin        distinct values
+///     0                  1040
+///     1000                157
+///     9600                 39
+///     15000                20
+///
+/// Twenty values across four thousand cells is a LATTICE, and that is the grid
+/// that showed on the foam. Folding into a 512-unit period first, then using
+/// small multipliers, holds 2400 at every origin.
+///
+/// This is `MountainHash`'s own recipe (`MountainSurface.hlsl`) — the terrain hit
+/// the same wall at the same scale and solved it there.
 float SeaHash21(float2 p)
 {
-    p = frac(p * float2(123.34, 456.21));
-    p += dot(p, p + 45.32);
-    return frac(p.x * p.y);
+    p = fmod(abs(p), SEA_HASH_PERIOD);
+
+    float3 q = frac(float3(p.x, p.y, p.x + 19.19) * float3(0.1031, 0.1030, 0.0973));
+    q += dot(q, q.yzx + 33.33);
+    return frac((q.x + q.y) * q.z);
 }
 
 float SeaValueNoise(float2 p)
@@ -201,11 +223,14 @@ float SeaFoamNoise(float2 p)
 }
 
 /// Two 2D random offsets for a cell.
+/// Folded for the same reason as `SeaHash21`, and by the same rule.
 float2 SeaHash22(float2 p)
 {
-    float3 q = frac(p.xyx * float3(127.1, 311.7, 74.7));
-    q += dot(q, q.yzx + 34.23);
-    return frac(float2(q.x * q.y, q.y * q.z));
+    p = fmod(abs(p), SEA_HASH_PERIOD);
+
+    float3 q = frac(float3(p.x, p.y, p.x + 19.19) * float3(0.1031, 0.1030, 0.0973));
+    q += dot(q, q.yzx + 33.33);
+    return frac(float2((q.x + q.y) * q.z, (q.x + q.z) * q.y));
 }
 
 /// WORLEY (CELLULAR) F1 — the distance to the nearest scattered point.
@@ -316,15 +341,29 @@ float SeaQuantizeOmega(float omega)
 /// The terrain heightmap is NOT SAMPLED DIRECTLY in a shader — the scaling
 /// constants change between Unity versions. It is baked once on the CPU
 /// (spec 9).
+/// THE SEA BED DOES NOT FALL OFF A CLIFF AT THE TERRAIN'S EDGE.
+///
+/// This used to return `_SeaDeepWaterDepth` the moment the sample left the
+/// terrain box. Measured on the four edges: the real depth there is 12.9-30.0 m
+/// (mean 25.4 m), and one texel further out the shader read 200 m. An eight-fold
+/// step in the quantity that drives absorption, shoaling and breaking — along a
+/// PERFECTLY STRAIGHT line, because the terrain box is a square. Two of those
+/// lines meet at a corner. That was the straight-edged patch on the water.
+///
+/// The bed now keeps descending outward. `saturate(uv)` reads the nearest edge
+/// texel, so the value is continuous ACROSS the boundary, and from there it
+/// reaches deep water over `SEA_OFFSHORE_RAMP`.
 float SeaSampleDepth(float2 posXZ)
 {
     float2 uv = (posXZ - _SeaBathyOriginXZ) / _SeaBathySizeXZ;
 
-    // Outside the terrain = open sea. The sea mesh is larger than the terrain
-    // and reaches the horizon; beyond it the depth is constant.
-    if (any(uv < 0.0) || any(uv > 1.0)) return _SeaDeepWaterDepth;
+    float bed = SAMPLE_TEXTURE2D_LOD(_SeaBathyTex, sampler_SeaBathyTex, saturate(uv), 0).r;
 
-    return SAMPLE_TEXTURE2D_LOD(_SeaBathyTex, sampler_SeaBathyTex, uv, 0).r;
+    // How far outside the terrain box the sample is, in metres.
+    float2 outsideUV = max(max(-uv, uv - 1.0), 0.0);
+    float  outside   = length(outsideUV * _SeaBathySizeXZ);
+
+    return lerp(bed, _SeaDeepWaterDepth, saturate(outside / SEA_OFFSHORE_RAMP));
 }
 
 /// Bottom slope (tan theta). The breaker index follows from it (spec 8.3).

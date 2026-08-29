@@ -3699,3 +3699,65 @@ dalgayı zaten örtüyor. Hata sakin havada, tam kullanıcının baktığı yerd
 **Düzeltme:** `SeaSpectrumMoments` iki parçayı da sayısal integre ediyor;
 Hs = 4·sqrt(m0), Tp = toplam spektrumun tepesi. Aynı kapı Hs'i de düzeltiyor, yani
 kırılma köpüğü de doğru sayıyı okuyor.
+
+
+## "Denizin sınırlarında smooth geçiş yok, keskin çizgilerle ayrılıyor"
+
+**Elenen şüpheliler — hepsi F1 izolasyon anahtarıyla, kullanıcı tarafından:**
+
+| Şüpheli | Nasıl elendi |
+|---|---|
+| Kıyı ıslaklığı, dantel, arazi karı | Üçü de kapatıldı, kenar durdu |
+| Dalgalar (mesh'in dikey yer değiştirmesi) | Kapatıldı, kenar durdu |
+| **Deniz yüzeyi** | Kapatılınca kenar GİTTİ |
+
+**Su çizgisi olamayacağı ölçüldü.** Batimetriden derinlik=0 konturu izlendi: 1646 metrelik
+bir parçada uçları birleştiren doğrudan **393 m** sapıyor, yani kendi boyunun %24'ü kadar
+kıvrılıyor. Kıyı düz değil.
+
+**Gerçek sebep:** `SeaSampleDepth` arazi kutusunun dışına çıkar çıkmaz
+`_SeaDeepWaterDepth` (200 m) döndürüyordu. Arazi kenarındaki gerçek derinlik ölçüldü:
+
+| kenar | su oranı | derinlik |
+|---|---|---|
+| batı | %100 | 21,9 – 29,8 m |
+| doğu | %100 | 12,9 – 30,0 m |
+| güney | %100 | 26,1 – 29,5 m |
+| kuzey | %100 | 23,9 – 28,8 m |
+
+Ortalama 25,4 m. Bir teksel ötesi 200 m. **Sekiz katlık basamak** — ve arazi kutusu kare
+olduğu için basamağın izi kusursuz düz bir çizgi, iki çizgi de bir köşede birleşiyor.
+Derinlik soğurmayı, sığlaşmayı ve kırılmayı sürdüğü için basamak renkte doğrudan
+görünüyor.
+
+**Düzeltme:** `saturate(uv)` en yakın kenar tekselini okuyor (sınırda değer sürekli),
+oradan 4000 m'de derin suya iniyor — %4,4 eğim, bir kıta yamacı.
+
+## Denizde ızgara/dama deseni — köpükte
+
+**Kullanıcının keşfi:** desen köpükten geliyor.
+
+**Sebep — hash dünya ölçeğinde çöküyor.** `SeaHash21` ve `SeaHash22` koordinatı
+katlamadan `frac(p * 127.1)` yapıyordu. Kıyı x = 12000'de; `frac()`'in girdisi 1,5 milyon
+ve float 24 bit mantis taşıyor.
+
+**Ölçüm — 64×64 hücrelik blokta kaç FARKLI değer çıkıyor (4096 mümkün):**
+
+| hücre başlangıcı | mevcut hash | katlanmış hash |
+|---|---|---|
+| 0 | 1040 | 2378 |
+| 1000 | 157 | 2449 |
+| 9600 | 39 | 2265 |
+| 12000 | 39 | 2402 |
+| 15000 | **20** | 2377 |
+
+Dört bin hücrede yirmi değer bir kafestir. `MountainHash` aynı duvara aynı ölçekte
+çarpmış ve orada çözülmüştü: önce 512'lik periyoda katla, sonra KÜÇÜK çarpanlarla hash'le.
+Aynı tarif denize taşındı.
+
+## F1'de son üç onay kutusuna tıklanmıyor
+
+**Sebep:** `EndColumn()` sütunun sonuna `GUILayout.FlexibleSpace()` koyuyordu. Kaydırma
+görünümü içinde bu boşluğun üst sınırı yok; yerleşim geçişi ile çizim geçişi kontrollerin
+yerinde anlaşamıyor. En uzun sütunun alt kontrolleri bir yerde çiziliyor, tıklamayı başka
+yerde alıyordu. `FlexibleSpace` silindi — işi zaten dikey grubun kendisi yapıyor.
