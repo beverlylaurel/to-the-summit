@@ -2177,3 +2177,30 @@ demekti.
 O gün `scotopicChromaShare` diye ikinci bir alana bölünür.
 
 **Maliyet:** tek alan, tek satır.
+
+## `WindField` NRE'si tekrarlamadı — ÖLÇÜLDÜ, KAPANDI (2026-08-29)
+
+**Belirti:** konsolda yüzlerce `NullReferenceException — WindField.Update() at WindField.cs:137`,
+yani `settings` null.
+
+**İlk şüphelim yanlıştı** (iki kez): bağlanmamış referans, sonra ikinci bir örnek. Statik
+kontrol ikisini de çürüttü — sahnede tek `WindField`, GUID doğru, asset yükleniyor
+(`calmSpeed=3`), referans aynı nesne.
+
+**Ayırt eden ölçüm:** `OnEnable` ve ilk null'lı `Update` için örnek kimliği + sahne adı
+yazdıran geçici bir prob. Play'de gelen tek satır:
+
+```
+[WindField] OnEnable  nesne='Weather'  id=568105584918885734  sahne='Game'  kare=0  settings=WindSettings
+```
+
+`settings NULL` satırı **hiç gelmedi**. Yani o koşuda hata oluşmadı; konsoldaki yığın eski
+oturumlardan kalmaydı. `DisableDomainReload, DisableSceneReload` açık ve konsol Play'de
+temizlenmiyorsa yığın öylece duruyor — bayat hatayı canlı sanmanın yolu bu.
+
+**Prob söküldü.** Tekrarlarsa tarif yukarıda: `OnEnable` ve `Update` içine kimlik + sahne
+adı yazdır, `OnEnable` satırı hiç yoksa hayalet örnek, kimlikler farklıysa ikinci örnek,
+aynıysa alanı sonradan silen biri var.
+
+**Tetikleyici:** konsolu TEMİZLEYİP Play'e basınca aynı hata geri gelirse.
+
