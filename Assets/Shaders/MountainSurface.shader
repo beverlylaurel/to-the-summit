@@ -67,26 +67,6 @@ Shader "ToTheSummit/MountainSurface"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            /// DIAGNOSTIC SWITCH — INVERTED LOGIC, DELIBERATELY.
-            ///
-            /// It used to be `_TerrainShadowReceive` (1 = on) and only
-            /// `DebugMenu.Update()` wrote it. With the panel absent from the
-            /// scene or disabled the global was never written, Unity globals
-            /// start at ZERO and the terrain was drawn without shadows — the
-            /// whole of gameplay unshadowed in a build.
-            ///
-            /// With inverted logic the default falls on the right side: if
-            /// nobody writes it, it stays 0, and 0 means "do not disable".
-            float _TerrainShadowOff;
-            /// TEMPORARY. Prints thin color stripes around the light-shadow boundary.
-            /// The question is "is there a zigzag" and it is answered by SHAPE rather than
-            /// brightness: with a smooth normal field the stripes are thin and flowing, and
-            /// if it has settled on the texture grid they are rectangular blocks. Block or stripe — separable at a glance.
-            /// TEMPORARY RULER. Prints grid lines in world coordinates: 10 m cyan,
-            /// 100 m red, 1000 m yellow. To find out HOW MANY METRES the sawtooth was by
-            /// counting rather than guessing — five rounds of layers were guessed and all of
-            /// them were wrong, because the one missing number was the tooth size.
-
             #include "MountainSurface.hlsl"
             #include "../Snow/Shaders/SnowTessellation.hlsl"
 
@@ -148,64 +128,7 @@ Shader "ToTheSummit/MountainSurface"
             /// probe sampling — there is no reflection probe in the scene and the surface is matte.
             half4 Fragment(Varyings IN) : SV_Target
             {
-                // DIAGNOSTIC: the trail depth straight to the screen. It returns BEFORE
-                // lighting, because the snow lighting rebuilds `lit` entirely and the
-                // diagnostic color written into the albedo is lost there.
-                if (_SnowDebugDent > 0.5)
-                {
-                    float ham = SnowDentAt(SnowWorldToUV(IN.positionWS)) / SNOW_RELIEF_MAX_DEPTH;
-                    float ici  = SnowInsideMask(SnowWorldToUV(IN.positionWS));
-                    return half4(saturate(ham), saturate(ici) * 0.35h, 0.0h, 1.0h);
-                }
                 MountainSurface surface = BuildMountainSurface(IN.positionWS);
-
-                // PROB: yerdeki lekeler ne?
-                if (_SnowDebugProbe > 0.5)
-                {
-                    float4 psc = TransformWorldToShadowCoord(IN.positionWS);
-                    Light pL = GetMainLight(psc);
-                    float pd = dot(surface.normalWS, pL.direction);
-
-                    return half4((half)saturate(-pd * 3.0),
-                                 (half)(1.0 - pL.shadowAttenuation),
-                                 (half)(1.0 - surface.occlusion),
-                                 1.0h);
-                }
-
-                // PROB: kar ortusu maskesi.
-                if (_SnowDebugCover > 0.5)
-                {
-                    float slopeFactor = dot(surface.normalWS, _SnowUpDirection);
-                    float slopeFactorM = saturate((slopeFactor - 0.45) / max(1.0 - 0.45, 1e-3));
-                    slopeFactorM = pow(slopeFactorM, _SnowCoverSlopeSharpness);
-
-                    float cgok = SampleSkyVisibility(IN.positionWS);
-                    float ccuk = saturate(surface.occlusion * 1.35 - 0.35);
-
-                    return half4((half)surface.snowMask, (half)ccuk,
-                                 (half)(slopeFactorM * cgok), 1.0h);
-                }
-
-                // TESHIS: yuzey normali ve NdotL.
-                //
-                // Wrap diffuse kapatilinca lekeler AYDINLIK kaldi; diffuse
-                // sonunce aydinlik kalan yerde diffuse disi bir terim var
-                // demektir. Bu gorunum lekelerin normalden gelip gelmedigini
-                // ayirir:
-                //   kirmizi = saturate(dot(N, gunes))  -- duz NdotL
-                //   yesil   = wrap NdotL
-                //   mavi    = normalin dikligi (N.y)
-                // Lekeler kirmizida gorunuyorsa kaynak normal; yalniz
-                // maviye vurmuyorsa kaynak arazi egimi degil kar rolyefi.
-                if (_SnowDebugNormal > 0.5)
-                {
-                    Light dL = GetMainLight();
-                    float d  = dot(surface.normalWS, dL.direction);
-                    float w  = saturate((d + 0.55) / 1.55);
-
-                    return half4((half)saturate(d), (half)w,
-                                 (half)saturate(surface.normalWS.y), 1.0h);
-                }
 
                 // The Forward+ light loop macros read this variable by name
                 InputData inputData = (InputData)0;
@@ -245,11 +168,8 @@ Shader "ToTheSummit/MountainSurface"
                 // terrain's: two separate phenomena — one is being behind a ridge, the other
                 // is having an object above you. They go through the same channel because
                 // both cut the direct sun.
-                // DIAGNOSTIC SWITCH: with `_TerrainShadowOff` at one the shadow map is never
-                // read. The terrain covers most of the screen and this read happens per pixel — its share of the frame time can only be known by turning it off and measuring.
-                if (_TerrainShadowOff < 0.5)
-                    mainLight.shadowAttenuation *=
-                        MainLightRealtimeShadow(TransformWorldToShadowCoord(IN.positionWS));
+                mainLight.shadowAttenuation *=
+                    MainLightRealtimeShadow(TransformWorldToShadowCoord(IN.positionWS));
 
                 // THE CLOUD SHADOW comes from the cloud system's own cookie texture; the very
                 // density field that draws the sky. It cuts the direct sun and does not touch

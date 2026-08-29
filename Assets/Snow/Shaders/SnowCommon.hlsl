@@ -269,8 +269,6 @@ float3 _SnowTessCameraPos;
 float  _SnowTessMax;
 float  _SnowTessNear;
 float  _SnowTessFar;
-float  _SnowDbgNoTess;
-float  _SnowDbgNoDrift;
 
 /// Sastrugi surface offset.
 float SnowSastrugiOffset(float2 posXZ, float amplitude)
@@ -321,26 +319,5 @@ float4 SnowTrailAt(float2 uv)
     return SAMPLE_TEXTURE2D_LOD(_SnowTrailTex, sampler_LinearClamp, saturate(uv), 0)
            * SnowInsideMask(uv);
 }
-
-// --- Diagnostic debug uniforms ---
-
-float _SnowDebugDent;
-float _SnowDebugNormal;
-float _SnowDebugProbe;
-float _SnowDebugCover;
-
-float _SnowDbgNoFbm;
-float _SnowDbgNoRipple;
-float _SnowDbgNoSastrugi;
-float _SnowDbgNoMicro;
-float _SnowDbgNoLod;
-float _SnowDbgNoSpec;
-float _SnowDbgNoSparkle;
-float _SnowDbgNoWrap;
-float _SnowDbgNoAO;
-float _SnowDbgNoBounce;
-float _SnowDbgNoTexNormal;
-float _SnowDbgNoCavityShadow;
-float _SnowDbgFlatNormal;
 
 #endif

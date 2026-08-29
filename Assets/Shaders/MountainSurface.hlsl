@@ -515,9 +515,6 @@ MountainSurface BuildMountainSurface(float3 worldPos)
                                        _SeaLevelY, worldPos.y);
 
     float seaWet = max(swash, submerged);
-
-    if (_TerrainDbgNoSeaWet > 0.5) { seaWet = 0.0; swash = 0.0; }
-
     albedo = lerp(albedo, albedo * _SeaWetDarkening, seaWet);
 
     // --- The swash lace, on the sand ---
@@ -534,7 +531,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // so the lace breaks into patches instead of ending on an edge of its own.
     // The lace rides on the SWASH band only. On the submerged part there is no
     // swash — the sea draws its own foam there.
-    float laceBand = _TerrainDbgNoLace > 0.5 ? 0.0 : swash;
+    float laceBand = swash;
 
     float laceNoise = MountainFbm(worldPos * 0.75, 3)
                     + MountainFbm(worldPos * 3.1, 2) * 0.5;
@@ -672,8 +669,6 @@ MountainSurface BuildMountainSurface(float3 worldPos)
                                             0.45, _SnowCoverSlopeSharpness,
                                             _SnowCoverBreakupStrength, _SnowCoverEdgeSharpness);
 
-    if (_TerrainDbgNoSnow > 0.5) snowMask = 0.0;
-
     if (snowMask > 0.001)
     {
         // THE TRAIL IS REAL GEOMETRY — NOT PARALLAX.
@@ -776,7 +771,6 @@ MountainSurface BuildMountainSurface(float3 worldPos)
             detailed = normalize(float3(e.x, 1.0, e.y));
         }
 
-        if (_SnowDbgNoTexNormal > 0.5) detailed = snowNormal;
 
         snowNormal = normalize(lerp(snowNormal, detailed, snowSlope));
 
@@ -824,12 +818,6 @@ MountainSurface BuildMountainSurface(float3 worldPos)
                                               snowMask));
 
         }
-
-        // DIAGNOSTIC: the normal is flattened LAST so that every layer is crushed —
-        // the trail slope, the surface relief and the TERRAIN's own normal.
-        if (_SnowDbgFlatNormal > 0.5)
-            surface.normalWS = normalize(lerp(surface.normalWS, _SnowUpDirection, snowMask));
-
 
         // The micro-cavity is buried under the snow — but NOT COMPLETELY.
         //

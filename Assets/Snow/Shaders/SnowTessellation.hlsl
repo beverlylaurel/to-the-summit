@@ -49,13 +49,6 @@ SnowTessFactors SnowPatchConstant(InputPatch<SnowTessControlPoint, 3> patch)
 {
     SnowTessFactors f;
 
-    if (_SnowDbgNoTess > 0.5)
-    {
-        f.edge[0] = f.edge[1] = f.edge[2] = 1.0;
-        f.inside  = 1.0;
-        return f;
-    }
-
     // HLSL kurali: `edge[i]` i'inci KOSENIN KARSISINDAKI kenar.
     f.edge[0] = SnowTessKenarFaktoru(patch[1].positionWS, patch[2].positionWS);
     f.edge[1] = SnowTessKenarFaktoru(patch[2].positionWS, patch[0].positionWS);
@@ -95,8 +88,6 @@ SnowTessControlPoint SnowHull(InputPatch<SnowTessControlPoint, 3> patch,
 /// tabakasinin KALINLIGINI vermek, cunku yer sekli ondan derin olamaz.
 float SnowTessYerDegistirme(float3 posWS)
 {
-    if (_SnowDbgNoTess > 0.5) return 0.0;
-
     float d = distance(posWS, _SnowTessCameraPos);
     float t = saturate((_SnowTessFar - d) / max(_SnowTessFar - _SnowTessNear, 1e-3));
     float faktor = max(lerp(1.0, _SnowTessMax, t), 1.0);

@@ -83,14 +83,8 @@ public class DebugMenu : MonoBehaviour
     /// costs one.
     bool seaNoWaves, seaNoShallow, seaNoFoam, seaNoRefraction;
 
-    // --- Shoreline: which layer draws the straight-edged patch on the beach ---
-    bool seaNoSurface, shoreNoSeaWet, shoreNoLace, shoreNoSnow;
-
-    static readonly int TerrainNoSeaWetId = Shader.PropertyToID("_TerrainDbgNoSeaWet");
-    static readonly int TerrainNoLaceId   = Shader.PropertyToID("_TerrainDbgNoLace");
-    static readonly int TerrainNoSnowId   = Shader.PropertyToID("_TerrainDbgNoSnow");
-    static readonly int SnowAreaCenterId  = Shader.PropertyToID("_SnowAreaCenter");
-    static readonly int SnowAreaSizeId    = Shader.PropertyToID("_SnowAreaSize");
+    /// Removes the sea surface entirely: whatever is left on screen is not the sea.
+    bool seaNoSurface;
 
     /// The cloud settings are driven through `cloudVolume.profile` — the Volume's runtime COPY,
     /// not the asset itself. Writing to `sharedProfile` does not work: the moment another
@@ -255,7 +249,6 @@ public class DebugMenu : MonoBehaviour
         BeginColumn();
         DrawClouds();
         DrawSea();
-        DrawShoreline();
         DrawOverlays();
         EndColumn();
 
@@ -475,9 +468,6 @@ public class DebugMenu : MonoBehaviour
             lockedSnowFraction = GUILayout.HorizontalSlider(lockedSnowFraction, 0f, 1f);
             GUILayout.Label(SnowStateStatus());
 
-            // RING BOUNDARY DIAGNOSTIC. The rings are ±8, ±16, ±32, ±64 m. If the
-            // defect is at a ring's edge, lowering the ring count moves the defect
-            // inward together with that boundary.
             SnowManager mgr = snowManager;
 
             // ------------------------------------------- SNOW TEST ENVIRONMENT
@@ -512,72 +502,10 @@ public class DebugMenu : MonoBehaviour
                                 $"SWE {mgr.MeanSwe * 1000f:F2} mm   " +
                                 $"derinlik {SnowDepthMm(mgr):F1} mm");
 
-                // RAW TRACK VIEW — A SINGLE-ANSWER TEST.
-                //
-                // Lighting, parallax and the relief ray are OFF; only the track
-                // texture's own value is printed to the screen (red = depth).
-                // If the zigzag is present in this view too the source is in the DATA,
-                // otherwise in the DRAWING. No other observation separates the two hypotheses.
-                bool hamOnce = trailRaw;
-                trailRaw = GUILayout.Toggle(trailRaw, "Raw track (no light, no parallax)");
-                if (trailRaw != hamOnce) Shader.SetGlobalFloat(SnowDebugDentId, trailRaw ? 1f : 0f);
-
-                GUILayout.Space(4f);
-                GUILayout.Label("PROB — lekeler ne?");
-
-                Prob(ref probLeke, ProbId,
-                     "  G=slope facing away from the sun  B=shadow  M=AO");
-                Prob(ref probKapak, KapakId,
-                     "  Snow cover: G=mask B=AO M=slope×sky");
-                Prob(ref probNormal, NormalId,
-                     "  Normal: K=NdotL Y=wrap M=N.y");
-
-                GUILayout.Space(4f);
-                GUILayout.Label("Surface relief — switch off:");
-
-                Prob(ref kFbm,      FbmId,      "  fBm base");
-                Prob(ref kRipple,   RippleId,   "  ripple");
-                Prob(ref kSastrugi, SastrugiId, "  sastrugi");
-                Prob(ref kMicro,    MicroId,    "  mikro tane");
-                Prob(ref kLod,      LodId,      "  octave LOD threshold");
-                Prob(ref kTexN,     TexNId,     "  kar dokusu normali");
-                Prob(ref kDuz,      DuzId,      "  NORMALI TAMAMEN DUZLESTIR");
-                Prob(ref kTess,     TessId,     "  tessellation (geometri)");
-                Prob(ref kDrift,    DriftId,    "  drift (birikme tepecikleri)");
-
-                GUILayout.Space(4f);
-                GUILayout.Label("Lighting — switch off:");
-
-                Prob(ref kSpec,    SpecId,    "  specular");
-                Prob(ref kSparkle, SparkleId, "  sparkle");
-                Prob(ref kWrap,    WrapId,    "  wrapped diffuse");
-                Prob(ref kAO,      AOId,      "  ambient occlusion");
-                Prob(ref kBounce,  BounceId,  "  kar-kar transferi");
-                Prob(ref kCavity,  CavityId,  "  the cavity's own shadow");
-
-                if (GUILayout.Button("Switch off the probes"))
-                {
-                    probLeke = probKapak = probNormal = false;
-                    kFbm = kRipple = kSastrugi = kMicro = kLod = kTexN = kDuz = kTess = kDrift = false;
-                    kSpec = kSparkle = kWrap = kAO = kBounce = kCavity = false;
-
-                    foreach (int id in ProbIdleri) Shader.SetGlobalFloat(id, 0f);
-                }
-
-                GUILayout.Space(4f);
-
-
-
                 if (GUILayout.Button("Revert settings (test)"))
                 {
                     mgr.SimTimeScale = 1f;
                     mgr.RefillRegion();
-                    trailRaw = false;
-                    Shader.SetGlobalFloat(SnowDebugDentId, 0f);
-
-
-
-
                 }
 
                 GUILayout.Space(6f);
@@ -631,67 +559,6 @@ public class DebugMenu : MonoBehaviour
 
         EndSection();
     }
-
-    /// Whether the raw track view is on (`_SnowDebugDent`).
-    bool trailRaw;
-
-    static readonly int SnowDebugDentId = Shader.PropertyToID("_SnowDebugDent");
-
-    /// PROBES — for diagnosing the patches on the ground. Each one switches off a
-    /// single term or prints a quantity directly as colour.
-    bool probLeke, probKapak, probNormal;
-    bool kFbm, kRipple, kSastrugi, kMicro, kLod, kTexN, kDuz, kTess, kDrift;
-    bool kSpec, kSparkle, kWrap, kAO, kBounce, kCavity;
-
-    static readonly int ProbId     = Shader.PropertyToID("_SnowDebugProbe");
-    static readonly int KapakId    = Shader.PropertyToID("_SnowDebugCover");
-    static readonly int NormalId   = Shader.PropertyToID("_SnowDebugNormal");
-    static readonly int FbmId      = Shader.PropertyToID("_SnowDbgNoFbm");
-    static readonly int RippleId   = Shader.PropertyToID("_SnowDbgNoRipple");
-    static readonly int SastrugiId = Shader.PropertyToID("_SnowDbgNoSastrugi");
-    static readonly int MicroId    = Shader.PropertyToID("_SnowDbgNoMicro");
-    static readonly int LodId      = Shader.PropertyToID("_SnowDbgNoLod");
-    static readonly int TexNId     = Shader.PropertyToID("_SnowDbgNoTexNormal");
-    static readonly int DuzId      = Shader.PropertyToID("_SnowDbgFlatNormal");
-    static readonly int TessId     = Shader.PropertyToID("_SnowDbgNoTess");
-    static readonly int DriftId    = Shader.PropertyToID("_SnowDbgNoDrift");
-    static readonly int SpecId     = Shader.PropertyToID("_SnowDbgNoSpec");
-    static readonly int SparkleId  = Shader.PropertyToID("_SnowDbgNoSparkle");
-    static readonly int WrapId     = Shader.PropertyToID("_SnowDbgNoWrap");
-    static readonly int AOId       = Shader.PropertyToID("_SnowDbgNoAO");
-    static readonly int BounceId   = Shader.PropertyToID("_SnowDbgNoBounce");
-    static readonly int CavityId   = Shader.PropertyToID("_SnowDbgNoCavityShadow");
-
-    static readonly int[] ProbIdleri =
-    {
-        ProbId, KapakId, NormalId,
-        FbmId, RippleId, SastrugiId, MicroId, LodId, TexNId, DuzId, TessId, DriftId,
-        SpecId, SparkleId, WrapId, AOId, BounceId, CavityId,
-    };
-
-    /// Draws one probe and writes it to the shader if it changed.
-    static void Prob(ref bool durum, int id, string etiket)
-    {
-        bool once = durum;
-        durum = GUILayout.Toggle(durum, etiket);
-
-        if (durum != once) Shader.SetGlobalFloat(id, durum ? 1f : 0f);
-    }
-
-
-
-
-    /// THE SWITCHES THAT SEPARATE THE SOURCE OF THE STEP AT A TRACK'S EDGE.
-    ///
-    /// The step was hunted in the wrong place for three rounds — the smoothing
-    /// kernel's undersampling, the blocky component of the edge noise, the
-    /// derivative discontinuity of bilinear filtering. All three were real defects,
-    /// all three were fixed, and the step stopped. EVERY suspect has to be switchable
-    /// at once so the culprit is found in a single round.
-
-
-
-
 
     string SnowStatus()
     {
@@ -770,6 +637,7 @@ public class DebugMenu : MonoBehaviour
                         $"Tp {SeaRuntimeState.PeakPeriod:F1} s");
         GUILayout.Label($"shore foam {SeaRuntimeState.ShoreFoamIntensity01:F2}");
 
+        seaNoSurface    = GUILayout.Toggle(seaNoSurface,    "Switch off the sea surface");
         seaNoWaves      = GUILayout.Toggle(seaNoWaves,      "Switch off the waves");
         seaNoShallow    = GUILayout.Toggle(seaNoShallow,    "Switch off shallow water");
         seaNoFoam       = GUILayout.Toggle(seaNoFoam,       "Switch off the foam");
@@ -778,47 +646,14 @@ public class DebugMenu : MonoBehaviour
         // WRITTEN EVERY FRAME, NOT ON CHANGE. `SeaManager` republishes its own
         // globals every frame; a value written once here would be overwritten the
         // next frame and the checkbox would lie.
+        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoSurface,    seaNoSurface ? 1f : 0f);
         Shader.SetGlobalFloat(SeaShaderIDs.DbgNoWaves,      seaNoWaves ? 1f : 0f);
         Shader.SetGlobalFloat(SeaShaderIDs.DbgNoShallow,    seaNoShallow ? 1f : 0f);
         Shader.SetGlobalFloat(SeaShaderIDs.DbgNoFoam,       seaNoFoam ? 1f : 0f);
         Shader.SetGlobalFloat(SeaShaderIDs.DbgNoRefraction, seaNoRefraction ? 1f : 0f);
 
         if (GUILayout.Button("Revert settings (sea)"))
-            seaNoWaves = seaNoShallow = seaNoFoam = seaNoRefraction = false;
-
-        EndSection();
-    }
-
-    /// WHO DRAWS THE STRAIGHT-EDGED PATCH ON THE BEACH.
-    ///
-    /// Four layers can paint the same ground and each one has a boundary of its own:
-    /// the sea (clipped at depth zero), the shore wetness, the swash lace and the
-    /// terrain's snow. A straight edge belongs to whichever of them carries a SQUARE
-    /// region — and the only way to say which is to remove them one at a time.
-    void DrawShoreline()
-    {
-        BeginSection("Shoreline");
-
-        // The snow region IS a square and it follows the player. Printed so its edge
-        // can be compared with where the patch's edge actually sits.
-        Vector4 c = Shader.GetGlobalVector(SnowAreaCenterId);
-        float areaSize = Shader.GetGlobalFloat(SnowAreaSizeId);
-        GUILayout.Label($"snow region {areaSize:F0} m square, centre {c.x:F0}, {c.y:F0}");
-        GUILayout.Label($"sea level {SeaRuntimeState.Active} | Hs {SeaRuntimeState.SignificantWaveHeight:F2} m");
-
-        seaNoSurface  = GUILayout.Toggle(seaNoSurface,  "Switch off the sea surface");
-        shoreNoSeaWet = GUILayout.Toggle(shoreNoSeaWet, "Switch off the shore wetness");
-        shoreNoLace   = GUILayout.Toggle(shoreNoLace,   "Switch off the swash lace");
-        shoreNoSnow   = GUILayout.Toggle(shoreNoSnow,   "Switch off the terrain snow");
-
-        // Written every frame, for the same reason as the sea switches.
-        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoSurface, seaNoSurface ? 1f : 0f);
-        Shader.SetGlobalFloat(TerrainNoSeaWetId,        shoreNoSeaWet ? 1f : 0f);
-        Shader.SetGlobalFloat(TerrainNoLaceId,          shoreNoLace ? 1f : 0f);
-        Shader.SetGlobalFloat(TerrainNoSnowId,          shoreNoSnow ? 1f : 0f);
-
-        if (GUILayout.Button("Revert settings (shoreline)"))
-            seaNoSurface = shoreNoSeaWet = shoreNoLace = shoreNoSnow = false;
+            seaNoSurface = seaNoWaves = seaNoShallow = seaNoFoam = seaNoRefraction = false;
 
         EndSection();
     }

@@ -79,9 +79,10 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ## Silinecek geçiciler
 
-- **F1 → Kıyı bölümü** (`DebugMenu.DrawShoreline`, `_SeaDbgNoSurface`,
-  `_TerrainDbgNoSeaWet`, `_TerrainDbgNoLace`, `_TerrainDbgNoSnow`). Kumsaldaki düz
-  kenarlı yamanın sahibi bulunduğunda bölüm ve dört global birlikte silinir.
+- **F1 → Deniz → "Deniz yüzeyini kapat"** (`_SeaDbgNoSurface`). Kumsaldaki düz kenarlı
+  yamanın deniz yüzeyinden geldiğini kanıtladı; sebep bulunup kapandığında anahtar ve
+  global birlikte silinir. Diğer üç şüpheli (kıyı ıslaklığı, dantel, arazi karı) elendi,
+  anahtarları ve `_TerrainDbg*` globalleri silindi.
 
 - **Ova ve patika ölçüm araçları** (`ForelandProbe`, F1'deki kurulum süresi logu) — ova
   ve yol dokusu oturunca silinir

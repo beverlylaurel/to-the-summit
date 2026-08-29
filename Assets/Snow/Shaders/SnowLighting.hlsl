@@ -82,7 +82,6 @@ half3 SnowDirectLight(Light L, float3 N, float3 V, SnowSurface s)
     const half W = 0.15;
 
     half wrapNdotL = saturate((dot(N, L.direction) + W) / ((1.0 + W) * (1.0 + W)));
-    if (_SnowDbgNoWrap > 0.5) wrapNdotL = saturate(dot(N, L.direction));
     half3 diffuse = s.albedo * wrapNdotL;
 
     half back  = saturate(dot(V, -L.direction));
@@ -93,7 +92,6 @@ half3 SnowDirectLight(Light L, float3 N, float3 V, SnowSurface s)
     half3 spec = s.brdfData.specular
                * DirectBRDFSpecular(s.brdfData, N, L.direction, V) * NdotL;
 
-    if (_SnowDbgNoSpec > 0.5) spec = (half3)0.0;
 
     half sunGate = saturate(_SunElevation01 * 20.0);
     half sparkle = 0;
@@ -112,7 +110,6 @@ half3 SnowDirectLight(Light L, float3 N, float3 V, SnowSurface s)
 
     half3 lightCol = L.color * (L.distanceAttenuation * L.shadowAttenuation);
 
-    if (_SnowDbgNoSparkle > 0.5) sparkle = 0;
 
     return (diffuse + spec + sparkle * _SparkleIntensity) * lightCol;
 }
@@ -132,10 +129,8 @@ half3 SnowAmbient(float3 N, SnowSurface s, half mainShadow, half heightAO,
 
     ambient *= lerp((half)1.0, multiScatter, (half)_SnowMultiScatter);
 
-    if (_SnowDbgNoAO <= 0.5) ambient *= heightAO;
-
-    if (_SnowDbgNoBounce <= 0.5)
-        ambient += sunColor * saturate(sunDirection.y) * s.albedo * SNOW_LATERAL_BOUNCE;
+    ambient *= heightAO;
+    ambient += sunColor * saturate(sunDirection.y) * s.albedo * SNOW_LATERAL_BOUNCE;
 
     return ambient;
 }

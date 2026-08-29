@@ -49,8 +49,6 @@ float SnowDentSmooth(float2 uv)
 
 half SnowReliefShadow(float3 lightDirWS, float dent, float skyAmount)
 {
-    if (_SnowDbgNoCavityShadow > 0.5) return (half)1.0;
-
     float horizonTan = dent / max(_SnowCavityRadius, 1e-3);
     float gunesTan = lightDirWS.y / max(length(lightDirWS.xz), 1e-4);
     float engel = saturate(1.0 - gunesTan / max(horizonTan, 1e-4));
@@ -87,7 +85,6 @@ float SnowPikselBoyu(float2 worldXZ)
 
 float SnowOctaveWeight(float wavelength, float pikselBoyu)
 {
-    if (_SnowDbgNoLod > 0.5) return 1.0;
     return saturate(wavelength / max(pikselBoyu * 2.0, 1e-5) - 1.0);
 }
 
@@ -125,12 +122,9 @@ float SnowSurfaceRelief(float2 worldXZ, float pikselBoyu, float snowDepth,
 
     float2 dik = float2(-w.y, w.x);
 
-    if (_SnowDbgNoFbm > 0.5) h = 0.0;
-
     float2 pr = float2(dot(worldXZ, w)   / SNOW_RIPPLE_LENGTH,
                        dot(worldXZ, dik) / (SNOW_RIPPLE_LENGTH * 6.0));
 
-    if (_SnowDbgNoRipple <= 0.5)
     h += (SnowValueNoise(pr) * 2.0 - 1.0) * min(SNOW_RIPPLE_AMP, ceiling)
        * SnowOctaveWeightModal(SNOW_RIPPLE_LENGTH, pikselBoyu, yalnizGeometri);
 
@@ -140,14 +134,12 @@ float SnowSurfaceRelief(float2 worldXZ, float pikselBoyu, float snowDepth,
     float ns = SnowValueNoise(ps);
     ns = ns * ns * (3.0 - 2.0 * ns);
 
-    if (_SnowDbgNoSastrugi <= 0.5)
     h += (ns - 0.5) * min(SNOW_SASTRUGI_HEIGHT, ceiling) * sastrugiAmount
        * SnowOctaveWeightModal(SNOW_SASTRUGI_LENGTH, pikselBoyu, yalnizGeometri);
 
     float2 pd = float2(dot(worldXZ, w)   / SNOW_DRIFT_WIDTH,
                        dot(worldXZ, dik) / SNOW_DRIFT_LENGTH);
 
-    if (_SnowDbgNoDrift <= 0.5)
     h += (SnowValueNoise(pd) - 0.5) * min(SNOW_DRIFT_HEIGHT, ceiling) * driftAmount
        * SnowOctaveWeightModal(SNOW_DRIFT_LENGTH, pikselBoyu, yalnizGeometri);
 
@@ -187,8 +179,6 @@ float SnowMicroRelief(float2 worldXZ, float dent, float pikselBoyu)
 
 half2 SnowMicroSlope(float2 worldXZ, float dent)
 {
-    if (_SnowDbgNoMicro > 0.5) return (half2)0.0;
-
     const float e = 0.01;
     float pikselBoyu = SnowPikselBoyu(worldXZ);
 

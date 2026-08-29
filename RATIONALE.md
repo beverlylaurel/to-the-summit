@@ -2591,3 +2591,23 @@ Yüzey kotu dağılımı üzerinden ortalama alfa (sigma = Hs/4):
 
 Düzeltmeden önce aynı kuşakta alfa 0,75'ti. Ortalama beyazlık 7,5 kat düştü ve kuşağın
 sınırı artık havayla birlikte hareket ediyor.
+
+
+## F1'den silinen teşhis anahtarları (2026-08-29)
+
+Panelde on dokuz kar probu duruyordu: `_SnowDebugDent`, `_SnowDebugProbe`,
+`_SnowDebugCover`, `_SnowDebugNormal` ve on beş `_SnowDbgNo*`. Hepsi kapanmış
+belirtiler içindi — yerdeki lekeler, izin kenarındaki basamak, oyuncuyu takip eden kare
+(`SYMPTOMS.md`, üçü de ölçümle kapandı).
+
+Anahtar silinince shader dalı ölür: global bir daha yazılmaz, `if` hep yanlış kalır. Bu
+yüzden panel ve shader tarafı **aynı adımda** gitti — 39 kullanım yeri, altı dosya. Kalan
+yol her zaman normal yoldu; hiçbir davranış değişmedi.
+
+Aynı temizlikte iki ölü şey daha çıktı:
+
+- **`_TerrainShadowOff`** — arazinin gölge okumasını kapatan anahtar. Onu yazan panel
+  satırı çoktan silinmişti, yani global hep 0'dı ve dal hiç çalışmıyordu. Ölçüm bittiği
+  için anahtar da gitti.
+- **İki "TEMPORARY" yorumu** — ışık-gölge sınırındaki çizgi probu ve dünya koordinatı
+  cetveli. Kodları yıllar önce silinmiş, yorumları kalmıştı.
