@@ -2072,7 +2072,17 @@ katman olmalı.
 `SYMPTOMS.md` yerine bu kayıt okunacak.
 
 
-## Göz uyumu havaya kör — ERTELENDİ (2026-08-29)
+## Göz uyumu havaya kör — KAPANDI (2026-08-29)
+
+**Kapandı.** Tetikleyici tersinden geldi: "tipide gündüz fazla parlak" değil, **fazla
+karanlık**. %95 kapsamada öğlen alacakaranlık gibi çıkıyordu.
+
+**Düzeltme:** güneş terimi `× (1 − AtmosphereController.Coverage)`. Ertelenirken sayılan iki
+engelden ikisi de aşıldı: `max()` birleştiricisine dokunulmadı (yani iki referans sabiti
+yeniden kalibre edilmedi) ve `sun.intensity`'ye dokunulmadı (yani sahnenin aydınlatması
+değişmedi). Sönen tek şey pozlamanın OKUDUĞU ışın.
+
+**Eski kayıt:**
 
 **Karar:** `LookController` gündüz boyunca hava durumunu görmüyor; bu tur kapatılmadı.
 

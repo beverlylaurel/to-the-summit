@@ -421,7 +421,8 @@ public static class MountainSceneBootstrap
         else if (lookController.Look == null)
         {
             lookController.Bind(LoadOrCreateLookSettings(), weatherState,
-                Object.FindAnyObjectByType<TimeOfDay>());
+                Object.FindAnyObjectByType<TimeOfDay>(),
+                Object.FindAnyObjectByType<AtmosphereController>());
             changed = true;
         }
 
@@ -1199,7 +1200,8 @@ public static class MountainSceneBootstrap
         volume.gameObject.AddComponent<LookController>().Bind(
             LoadOrCreateLookSettings(),
             weatherState,
-            Object.FindAnyObjectByType<TimeOfDay>());
+            Object.FindAnyObjectByType<TimeOfDay>(),
+            Object.FindAnyObjectByType<AtmosphereController>());
     }
 
     static LookSettings LoadOrCreateLookSettings()

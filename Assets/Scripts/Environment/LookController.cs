@@ -99,6 +99,9 @@ public class LookController : MonoBehaviour
     [SerializeField] WeatherState weather;
     [SerializeField] TimeOfDay time;
 
+    [Tooltip("Bulut kapsamasının kaynağı; pozlamanın havayı görmesi için.")]
+    [SerializeField] AtmosphereController atmosphere;
+
     [Header("Preview (editor only)")]
     [Tooltip("While on, the values below are used instead of the weather and clock systems.")]
     [SerializeField] bool preview;
@@ -115,11 +118,13 @@ public class LookController : MonoBehaviour
 
     public LookSettings Look => look;
 
-    public void Bind(LookSettings settings, WeatherState weatherState, TimeOfDay timeOfDay)
+    public void Bind(LookSettings settings, WeatherState weatherState, TimeOfDay timeOfDay,
+                     AtmosphereController atmosphereController)
     {
         look = settings;
         weather = weatherState;
         time = timeOfDay;
+        atmosphere = atmosphereController;
 
         Initialize();
     }
@@ -230,7 +235,26 @@ public class LookController : MonoBehaviour
         // multiplied by its own elevation. The intensity alone was misleading: with the sun below
         // the horizon its intensity is still large but none of it reaches the ground (`N·L` is
         // negative). Without the multiplier the adaptation stayed at 0.81 EV at 18:30 and the scene looked pitch black.
-        SunTermNormalized = time != null ? time.SurfaceLightLevel / ReferenceSunIntensity : 1f;
+        // THE BEAM DOES NOT REACH THE GROUND THROUGH A CLOUD.
+        //
+        // `SurfaceLightLevel` is the two bodies' contribution to flat ground and it knows nothing
+        // about the weather: `sun.intensity` is `sunIntensity x SunBlend x atmospheric extinction`
+        // with no cloud term anywhere. Because the two sources are combined with `max()` and the
+        // sun wins all day (measured at noon: 0.825 against the sky's 0.686), THE EXPOSURE COULD
+        // NOT SEE THE WEATHER AT ALL — a full blizzard at midday adapted exactly like a clear one.
+        //
+        // The symptom on screen: noon under 95% cover came out looking like dusk. Overcast is
+        // GREY, not dark; the scene darkens, the eye opens, and the two nearly cancel. Without
+        // the second half only the darkening happened.
+        //
+        // Only the BEAM is attenuated. The sky term is measured from the ambient probe, which is
+        // baked from the drawn sky and therefore already carries the cloud — attenuating it here
+        // would count the cloud twice.
+        float cloudBlock = atmosphere != null ? Mathf.Clamp01(atmosphere.Coverage) : 0f;
+
+        SunTermNormalized = time != null
+            ? time.SurfaceLightLevel / ReferenceSunIntensity * (1f - cloudBlock)
+            : 1f;
         SkyTermNormalized = AmbientZenithLuminance() / ReferenceSkyLuminance;
 
         float lightLevel = time != null

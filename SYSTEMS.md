@@ -1632,7 +1632,20 @@ Gece artık üç ayrı sayı; eskiden üçü de 2,50'ydi. 18:00 satırı düzelm
 gökyüzü deliğinin** göstergesi — çubuk terimi kapısı sayesinde renge bulaşmıyor.
 
 
-## Göz uyumu havayı GÖRMÜYOR (2026-08-29)
+## Göz uyumu havayı görüyor — KAPANDI (2026-08-29)
+
+**Yeni bağ.** `AtmosphereController.Coverage` → `LookController`.
+
+Güneş terimi artık `× (1 − kapsama)`. Yalnız **ışın** sönüyor; gök terimi ambient probe'dan
+geliyor ve bulutu zaten taşıyor, ona da uygulamak çift sayım olurdu.
+
+**Belirti:** %95 kapsamada öğlen alacakaranlık gibi çıkıyordu. Kapalı hava **gri**dir,
+karanlık değil: sahne kararır, göz açılır, ikisi birbirini büyük ölçüde götürür. İkinci
+yarısı olmayınca yalnız kararma kalıyordu.
+
+**Ölçülmüş sebep (aşağıdaki eski kayıt):**
+
+## Göz uyumu havayı GÖRMÜYORDU (2026-08-29, kapandı)
 
 `max(güneş, gök)` gündüz boyunca **güneş** terimini seçiyor (öğlen 0,825 / 0,686) ve güneş
 terimi `sun.intensity × max(0, −forward.y)`; `sun.intensity` ise `sunIntensity × SunBlend ×

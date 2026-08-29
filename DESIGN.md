@@ -28,8 +28,20 @@ Soru "başarabilecek miyim" değil, **"neden hâlâ gidiyorum"**.
   hedefi olur; dağın kayıtsızlığı tam da olay üretmemesinde. "Az kalsın" anı bu oyunun
   registerinde değil — burada ölüm bir sahne değil, birikmiş bir sonuç.
 - Sıçratma (jump scare), takip eden şey, tehditkâr ses tasarımı yok.
-- Estetize edilmiş acı yok. Depresyon dramatik değil — **sıradan, düz**. Karanlık palet,
-  ağır müzik, şiirsel monolog ne kadar azsa o kadar gerçek.
+- Estetize edilmiş acı yok. Depresyon dramatik değil — **sıradan, düz**. Şiirsel monolog,
+  ağır müzik, "bak ne kadar hüzünlü" diyen anlatım ne kadar azsa o kadar gerçek.
+
+  **PALET BU YASAĞIN DIŞINDA (2026-08-29 kararı).** Burada eskiden "karanlık palet" de
+  sayılıydı; kaldırıldı. Kullanıcı koyu paleti, ağır tonu, depresif atmosferi **açıkça
+  istedi** ve karar onun.
+
+  Ayrım şurada duruyor ve korunuyor: palet **anlatmaz**. Karanlık, oyuncuya "üzül" demek
+  ya da dağı tehditkâr göstermek için kullanılmaz — dağın hâlâ kötü niyeti yok. Işık
+  soğuk ve ağır olabilir çünkü orası **öyle bir yer**, seni umursamadığı için ısıtmıyor.
+  Sömürülen ruh, dünyanın sana karşı olmasından değil, seni fark etmemesinden.
+
+  Somut sınır: palet karanlıkken de dağ oyuncunun tonuna tepki VERMEZ, olay üretmez,
+  sıçratmaz. Karanlık bir durum, bir tehdit değil.
 
 **Anlatma, kur.** Bir karakter anlamsızlığı açıkladığı an register ölür. Felsefe yapıdan
 çıkar: tekrar, kayıtsızlık, sönük doruk, kesilen iç ses.
