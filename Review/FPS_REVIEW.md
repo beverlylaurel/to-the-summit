@@ -117,11 +117,11 @@ GPU marker). Eksik: `ProfilerCaptures/` boş, diske frame-log yok, kar dışı s
 
 | # | Fırsat | Beklenen | Risk / test şartı |
 |---|---|---|---|
-| **T1** | **HDR 64 → 32 bit** (`m_HDRColorBufferPrecision: 1→0`, R11G11B10f). Doğrulandı: PC profilinde 1 | bant genişliği ~%35-40 | Bant riski; sahne gradyan yoğun (sis + PBSky + bulut). Pin'li saat/havada gökyüzü, deniz ufku, sis gradyanı diff'i |
+| **T1** | **UYGULANDI.** HDR 64 → 32 bit (R11G11B10f) | **Play'de bant görülmedi** (gökyüzü, deniz ufku, sis gradyanı, gece). **FPS DEĞİŞMEDİ** — raporun "en büyük tekil GPU kazancı" iddiası çürüdü. Renk tamponu yarıya indi; kazanç kare hızı değil, pay. Kalıyor | ölçüldü |
 | **T2** | DepthNormals pass'te tessellation kaldırmak — o pass zaten `_GroundNormals`'ten düz normal yazıyor | vertex yükü ~64× | Depth-priming farkı teorik; A/B karesi |
 | **T3** | ShadowCaster/DepthOnly tess faktörü (ör. maks/4) — yer değiştirme ≤ 30 cm, 150 m shadowmap'te texel 7 cm | orta | Gölge silueti teknik olarak değişir |
 | **T5** | Far clip **90000** → 60000 (doğrulandı: `Game.unity:772`); bulut katmanı 48 km | depth hassasiyeti de düzelir | Bulut/sky shader'ları far plane'e duyarlı; ufuk karesi A/B |
-| **T6** | Berrak hava gölge tavanı 150 → ~110 m — kod yorumu "25 m gölge farkı gözle ayırt edilmez" diyor | DrawShadows alanı ~%46 | Önce Profiler'da DrawShadows payı doğrulanmalı |
+| **T6** | **UYGULANDI.** Berrak hava gölge tavanı 150 → 110 m | Gölgelenen alan **%46** azaldı, kesilme görülmedi. **FPS DEĞİŞMEDİ**. Kalıyor | ölçüldü |
 | **T7** | Kar iki-ölçek stokastik okuma skip'i + `fineLap` 4 → 2 örnek | orta | Desen örneği değişir; yakında görünürse iptal |
 | **T8** | Precipitation `AirColor` vertex başına (parçacık başına 4 kez) | yağmurda vertex ALU ~%20 | Mimari değişiklik; yağış zaten hızlı, öncelik düşük |
 | **T9** | Volume framework "Every Frame" → "Via Scripting" | düşük | Tetik gecikirse hava geçişinde fark |
@@ -215,3 +215,27 @@ aramak boşa tur.
 **Protokol (her madde için aynı):** F1'den zaman durdur + havayı elle ayarla + kapsamayı
 kilitle → önce/sonra aynı kadraj → piksel diff → fark 0. Fark çıkarsa madde geri alınır ve
 `SYMPTOMS.md`'ye yazılır.
+
+
+---
+
+## 6. Ölçümün söylediği: darboğaz bulunamadı
+
+İki bağımsız yük yarıya indirildi ve **kare hızı iki seferinde de kıpırdamadı**:
+
+| ne azaltıldı | ne kadar | FPS |
+|---|---|---|
+| piksel bant genişliği (T1) | renk tamponu yarıya | değişmedi |
+| gölgelenen alan (T6) | %46 | değişmedi |
+
+Buna CPU tarafındaki ölçüm de ekleniyor: en büyük CPU kalemi (C1, tüm atmosfer işi)
+**0,066 ms** — 7,5 ms'lik karenin %0,9'u.
+
+Yani kare **ne piksel bant genişliğine, ne gölge alanına, ne de bu CPU işlerine** bağlı.
+Üç yönde de aranıp bulunamadı. Kalan adaylar ölçülmeden sıralanamaz: bulut ışın yürüyüşü
+(yarı çözünürlük, 128 adım), froxel sis hacmi, arazi tessellation'ı, ana iş parçacığı.
+
+**Bir sonraki adım tahmin değil, capture.** Profiler'da Rendering + GPU modülleri açık bir
+oturum alınmadan bu rapordan başka madde uygulanmaz — çünkü rapordaki her tahmin şimdiye
+kadar ya çürüdü ya da bir mertebe şişik çıktı.
+

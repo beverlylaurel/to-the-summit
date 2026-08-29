@@ -63,6 +63,6 @@ MonoBehaviour:
   deckVisibility: 60
   deckClearAmount: 0.35
   ambientStrength: 0.85
-  maxShadowDistance: 150
+  maxShadowDistance: 110
   shadowVisibilityRatio: 0.8
   transitionSeconds: 3
