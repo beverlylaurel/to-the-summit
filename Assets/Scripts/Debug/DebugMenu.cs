@@ -86,6 +86,10 @@ public class DebugMenu : MonoBehaviour
     /// Removes the sea surface entirely: whatever is left on screen is not the sea.
     bool seaNoSurface;
 
+    /// The terms that survive with the waves switched off. Every one of them is a
+    /// suspect for the straight-edged patch, so they all go in at once.
+    bool seaNoFog, seaNoShadow, seaNoSkyReflection;
+
     /// The cloud settings are driven through `cloudVolume.profile` — the Volume's runtime COPY,
     /// not the asset itself. Writing to `sharedProfile` does not work: the moment another
     /// component in the scene touches `.profile`, the Volume starts blending from the copy and the
@@ -642,6 +646,9 @@ public class DebugMenu : MonoBehaviour
         seaNoShallow    = GUILayout.Toggle(seaNoShallow,    "Sığ su dönüşümünü kapat");
         seaNoFoam       = GUILayout.Toggle(seaNoFoam,       "Köpüğü kapat");
         seaNoRefraction = GUILayout.Toggle(seaNoRefraction, "Kırılmayı kapat");
+        seaNoFog        = GUILayout.Toggle(seaNoFog,        "Yerel sisi kapat");
+        seaNoShadow     = GUILayout.Toggle(seaNoShadow,     "Gölge + bulut gölgesini kapat");
+        seaNoSkyReflection = GUILayout.Toggle(seaNoSkyReflection, "Gökyüzü yansımasını kapat");
 
         // WRITTEN EVERY FRAME, NOT ON CHANGE. `SeaManager` republishes its own
         // globals every frame; a value written once here would be overwritten the
@@ -651,9 +658,13 @@ public class DebugMenu : MonoBehaviour
         Shader.SetGlobalFloat(SeaShaderIDs.DbgNoShallow,    seaNoShallow ? 1f : 0f);
         Shader.SetGlobalFloat(SeaShaderIDs.DbgNoFoam,       seaNoFoam ? 1f : 0f);
         Shader.SetGlobalFloat(SeaShaderIDs.DbgNoRefraction, seaNoRefraction ? 1f : 0f);
+        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoFog,        seaNoFog ? 1f : 0f);
+        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoShadow,     seaNoShadow ? 1f : 0f);
+        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoSkyReflection, seaNoSkyReflection ? 1f : 0f);
 
         if (GUILayout.Button("Ayarları geri al (deniz)"))
             seaNoSurface = seaNoWaves = seaNoShallow = seaNoFoam = seaNoRefraction = false;
+            seaNoFog = seaNoShadow = seaNoSkyReflection = false;
 
         EndSection();
     }

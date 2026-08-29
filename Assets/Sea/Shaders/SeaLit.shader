@@ -231,8 +231,13 @@ Shader "ToTheSummit/SeaLit"
                 Light mainLight = GetMainLight(seaShadowCoord);
 
             #ifdef _LIGHT_COOKIES
-                mainLight.color *= SampleMainLightCookie(IN.positionWS);
+                if (_SeaDbgNoShadow <= 0.5)
+                    mainLight.color *= SampleMainLightCookie(IN.positionWS);
             #endif
+
+                // DIAGNOSTIC: removes the shadow map AND the cloud cookie together — both
+                // reach the surface through the same multiply.
+                if (_SeaDbgNoShadow > 0.5) mainLight.shadowAttenuation = 1.0;
 
                 float3 L = mainLight.direction;
 
@@ -286,6 +291,10 @@ Shader "ToTheSummit/SeaLit"
                 float3 skyRefl = GlossyEnvironmentReflection(R, IN.positionWS,
                                                              perceptualRoughness,
                                                              1.0, screenUV);
+
+                // DIAGNOSTIC: a flat grey instead of the probe. The probe read is the only
+                // term here that depends on the SCREEN as well as the world position.
+                if (_SeaDbgNoSkyReflection > 0.5) skyRefl = 0.2;
 
                 // THE PROBE CARRIES THE SKY BUT NOT THE CLOUDS. The volumetric
                 // clouds are a render feature drawn after the skybox, so they never
@@ -549,7 +558,8 @@ Shader "ToTheSummit/SeaLit"
                 // THE SEA STANDS IN THE SAME AIR AS THE TERRAIN. Every layer is fogged
                 // once with ITS OWN distance — the terrain in its own shader, the cloud
                 // in the compositing pass, the sky in `SkyFog`, and the sea here.
-                color = ApplyHeightFog(color, _WorldSpaceCameraPos, IN.positionWS);
+                if (_SeaDbgNoFog <= 0.5)
+                    color = ApplyHeightFog(color, _WorldSpaceCameraPos, IN.positionWS);
 
                 return half4(color, 1.0);
             }

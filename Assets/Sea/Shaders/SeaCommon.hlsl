@@ -71,6 +71,9 @@ float _SeaDbgNoShallow;
 float _SeaDbgNoFoam;
 float _SeaDbgNoRefraction;
 float _SeaDbgNoSurface;
+float _SeaDbgNoFog;
+float _SeaDbgNoShadow;
+float _SeaDbgNoSkyReflection;
 
 // ------------------------------------------------------------- wave field
 

@@ -98,5 +98,8 @@ public static class SeaShaderIDs
     public static readonly int DbgNoShallow = Shader.PropertyToID("_SeaDbgNoShallow");
     public static readonly int DbgNoFoam = Shader.PropertyToID("_SeaDbgNoFoam");
     public static readonly int DbgNoSurface = Shader.PropertyToID("_SeaDbgNoSurface");
+    public static readonly int DbgNoFog = Shader.PropertyToID("_SeaDbgNoFog");
+    public static readonly int DbgNoShadow = Shader.PropertyToID("_SeaDbgNoShadow");
+    public static readonly int DbgNoSkyReflection = Shader.PropertyToID("_SeaDbgNoSkyReflection");
     public static readonly int DbgNoRefraction = Shader.PropertyToID("_SeaDbgNoRefraction");
 }
