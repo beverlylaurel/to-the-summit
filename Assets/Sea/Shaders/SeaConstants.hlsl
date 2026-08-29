@@ -11,6 +11,7 @@
 #define SEA_G                    9.81
 
 #define SEA_TWO_PI               6.28318530718
+#define SEA_SQRT2                1.41421356
 
 /// Index of refraction of water. [SOURCE: Tessendorf 2004 6.1.2, 6.3 sample shader]
 #define SEA_WATER_IOR            1.34
@@ -54,6 +55,14 @@
 /// to zero; otherwise the mesh intersects the terrain and flickers.
 /// [CALIBRATION]
 #define SEA_SHORE_FADE_DEPTH     0.60
+
+/// Depth band over which the shore wave hands over to the FFT field (m).
+/// MEASURED on the baked travel field: the angle between the crest and the depth
+/// contour has a median of 5-10 degrees between 1 m and 16 m of depth (73-89% of
+/// samples under 30 degrees), and collapses outside it. The shore wave is only
+/// trustworthy inside that band, so it fades out across 10-20 m.
+#define SEA_SHORE_WAVE_DEEP_IN   10.0
+#define SEA_SHORE_WAVE_DEEP_OUT  20.0
 
 /// How far the waterline is displaced by the foam's own noise (m of depth).
 /// On the measured 5% shore slope this moves the line about 1.2 m, which stays

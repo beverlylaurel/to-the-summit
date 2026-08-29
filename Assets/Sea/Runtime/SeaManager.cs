@@ -25,6 +25,7 @@ public class SeaManager : MonoBehaviour
 
     ISeaEnvironmentSource env;
     Texture2D bathymetry;
+    Texture2D shoreTravel;
 
     float bakedSeaLevel = float.NaN;
 
@@ -84,6 +85,13 @@ public class SeaManager : MonoBehaviour
 
         if (Application.isPlaying) Destroy(bathymetry); else DestroyImmediate(bathymetry);
         bathymetry = null;
+
+        if (shoreTravel != null)
+        {
+            if (Application.isPlaying) Destroy(shoreTravel); else DestroyImmediate(shoreTravel);
+            shoreTravel = null;
+        }
+
         bakedSeaLevel = float.NaN;
     }
 
@@ -93,6 +101,12 @@ public class SeaManager : MonoBehaviour
         ReleaseBathymetry();
 
         bathymetry = SeaBathymetry.Bake(terrain, settings.seaLevelY);
+
+        // BAKED TOGETHER, BECAUSE THEY DESCRIBE THE SAME SEA BED. The travel field
+        // is the depth field integrated; letting them go out of step would put the
+        // crests on a shoreline that no longer exists.
+        shoreTravel = SeaShorePhase.Bake(terrain, settings.seaLevelY, settings.spectrumDepth);
+
         bakedSeaLevel = settings.seaLevelY;
     }
 
@@ -137,12 +151,13 @@ public class SeaManager : MonoBehaviour
 
     void PublishBathymetry()
     {
-        if (bathymetry == null) return;
+        if (bathymetry == null || shoreTravel == null) return;
 
         Vector3 o = terrain.transform.position;
         Vector3 s = terrain.terrainData.size;
 
         Shader.SetGlobalTexture(SeaShaderIDs.BathyTex, bathymetry);
+        Shader.SetGlobalTexture(SeaShaderIDs.ShoreTravelTex, shoreTravel);
         Shader.SetGlobalVector(SeaShaderIDs.BathyOriginXZ, new Vector4(o.x, o.z, 0f, 0f));
         Shader.SetGlobalVector(SeaShaderIDs.BathySizeXZ, new Vector4(s.x, s.z, 0f, 0f));
         Shader.SetGlobalFloat(SeaShaderIDs.BathyResolution, bathymetry.width);
@@ -265,6 +280,11 @@ public class SeaManager : MonoBehaviour
         // pixel only knows its own elevation, which is not the same thing.
         Shader.SetGlobalFloat(SeaShaderIDs.SignificantHeight,
                               SeaRuntimeState.SignificantWaveHeight);
+
+        // The shore wave turns the baked travel time into a phase with this.
+        Shader.SetGlobalFloat(SeaShaderIDs.PeakOmega,
+                              SeaConstants.TwoPi
+                              / Mathf.Max(SeaRuntimeState.PeakPeriod, 0.1f));
 
         // HOW HIGH THE SWASH REACHES — STOCKDON, NOT A FIXED NUMBER.
         //

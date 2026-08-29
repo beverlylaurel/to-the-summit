@@ -189,7 +189,15 @@ Shader "ToTheSummit/SeaLit"
                 //
                 // NO central difference: the slope already comes from the FFT
                 // and that is more accurate (spec 6.7).
-                float2 slopeSum = SeaSampleSlope(IN.positionWS.xz);
+                // THE NORMAL FOLLOWS THE SAME HANDOVER AS THE GEOMETRY. The FFT's
+                // slope is scaled by whatever share it still owns, and the shore
+                // wave's own slope takes the rest — otherwise the surf zone moves
+                // but is lit as flat water.
+                float bedSlope = SeaSampleBottomSlope(IN.positionWS.xz);
+
+                float2 slopeSum = SeaSampleSlope(IN.positionWS.xz)
+                                * SeaShoreWaveFftScale(depth)
+                                + SeaShoreWaveSlope(IN.positionWS.xz, depth, bedSlope);
 
                 float3 N = normalize(float3(-slopeSum.x, 1.0, -slopeSum.y));
 
@@ -410,8 +418,7 @@ Shader "ToTheSummit/SeaLit"
                     // Hs shoaled to the local depth is the height the criterion is
                     // written for, and it carries the weather: Hs is 0.10 m at 0.5 m/s
                     // and 3.96 m at 20 m/s, so the breaker line moves out with the sea.
-                    float slope = SeaSampleBottomSlope(IN.positionWS.xz);
-                    float gamma = SeaBreakerIndex(slope);
+                    float gamma = SeaBreakerIndex(bedSlope);
 
                     float shoal  = min(SeaShoalingGain(depth, _SeaSpectrumDepth),
                                        _SeaMaxShoalingGain);

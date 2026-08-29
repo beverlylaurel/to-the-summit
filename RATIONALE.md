@@ -2668,3 +2668,55 @@ devam etmeli ve ince uç düşmemeli.
 
 Kaba oktavların çarpanları `_SeaFoamBreakupTiling`'e bağlı (0,0292 ve 0,0117), yani ayar
 değişirse dört ölçek birlikte kayıyor; ikinci bir kaynak yok.
+
+
+## Kırılma neden alanı döndürerek yapılmadı
+
+FFT alanını uzamsal değişen bir açıyla döndürmek, döndürme gradyanı büyüdüğü yerde alanı
+gerer; kıyı tam da o bölge. Bunun yerine sığ suda **kendi başına kıyıya paralel olan** bir
+tren eklendi ve kırılma ondan düştü.
+
+Dayanak: sığ su dalgası `c = sqrt(g h)` hızıyla gider, fazı `omega * tau`, `tau` seyahat
+süresi. Aynı `tau` = aynı faz = **aynı tepe**. `tau` deniz yatağının fonksiyonu olduğundan
+tepeler konturları izler. Fermat: `tau` alanı en kısa SÜRE yolunu çözer, ki dalga ışını
+zaten odur.
+
+**Dijkstra değil, eikonal.** 8 komşulu ızgarada Dijkstra yolları ızgara yönlerine
+yapıştırır ve tepeler sekizgen çıkar; yukarı-akış ikinci derece güncellemesinde bu hata
+yok. [KAYNAK: Sethian 1996]
+
+**Ölçüm — alan kendi denklemini sağlıyor:** `|grad tau| * c` ortalaması 131 199 örnekte
+**1,018**.
+
+**Ölçüm — tepeler konturları izliyor:**
+
+| derinlik bandı | medyan açı | 30° altı |
+|---|---|---|
+| 0,3–1 m | 169° | %16 |
+| 1–2 m | 6,6° | %72 |
+| 2–4 m | 5,0° | %89 |
+| 4–8 m | 6,1° | %87 |
+| 8–16 m | 10,2° | %73 |
+| 16–30 m | 163° | %16 |
+
+İki uçtaki bozulma beklenen: 0,3 m altında cephenin kaynağı zaten su çizgisi (gradyan
+dejenere), 16 m üstünde en yakın kıyı hangisi olduğu belirsizleşiyor (medyal eksen). Kıyı
+dalgası ikisinde de sönük — `SEA_SHORE_WAVE_DEEP_IN/OUT` bandı doğrudan bu tablodan
+seçildi.
+
+**Araç iki kez düzeltildi.** İlk ölçüm ±1 tekselle yapıldı ve 80° verdi; arazi mikro
+rölyefi gradyan yönünü rastgeleleştiriyordu. Taban genişletilince (±4 teksel, 29 m) ve
+ölçüm derinlik bandına ayrılınca gerçek tablo çıktı.
+
+## Kıyı dalgası neden FFT'nin ÜSTÜNE eklenmedi
+
+İlk hâli ekliyordu. Ölçüm: 8 m/s'de sığ sudaki rms 1,27 m'den **2,20 m**'ye çıkıyordu —
+denizin sahip olduğundan dörtte üç fazla enerji. Profil tek tepeliydi, yani "çift tepe var
+mı" ölçütü bunu yakalamıyordu; yakalayan, toplamı FFT'nin kendi zarfıyla karşılaştırmak
+oldu.
+
+Şimdi ağırlık bir PAY: FFT `sqrt(1 - w^2)` ile kısılıyor, varyanslar toplanıyor, toplam
+FFT'nin tek başına verdiğine eşit kalıyor. Sapma yalnız kırılma sınırının kestiği yerde,
+ve orada negatif olması doğru — 0,6 m suda dalga yüksekliği deniz durumunun değil
+`gamma h`'nin işi. Eskiden orada 2,7 m rms iddia ediliyor ve yalnız kırpma kurtarıyordu;
+kırpılmış dalga da düz tepeli görünüyordu.

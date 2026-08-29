@@ -1451,3 +1451,32 @@ gitti; deniz bölümünde yalnız Hs / Tp / kıyı köpüğü okuması kaldı.
 
 **Bilinçli kural:** `shoreSlope` ARAZİNİN özelliği, denizin değil. Dağ yeniden
 üretilirse yeniden ölçülmeli (`SCALE.md`).
+
+
+## Deniz: kıyı dalgası — kırılma arazi'den geliyor (2026-08-29)
+
+`SeaShorePhase` bir alan pişiriyor: **su çizgisinden itibaren sığ su dalgasının seyahat
+süresi** (`tau`, saniye). Eikonal `|grad tau| = 1/c`, `c = sqrt(g h)`, hızlı yürüyüşle
+(fast marching) çözülüyor.
+
+**Tepe, `tau`'nun eş-seviye eğrisidir.** Faz `omega * (tau - t)` olduğu için aynı seyahat
+süresini paylaşan noktalar aynı fazı paylaşır. `tau` yalnız deniz yatağından geldiğinden
+tepeler koya bükülür, buruna sarılır — **hiçbir yerde bir dalga vektörü döndürülmüyor.**
+
+**Zaman pişiyor, faz değil.** Faz `omega`'ya bağlı, `omega` havayla değişiyor; süre yalnız
+batimetriye bağlı, yani rüzgâr her değiştiğinde yeniden pişirme yok.
+
+**Okur:** batimetri (aynı arazi), `Hs` ve `Tp` (`SeaSpectrumMoments`), taban eğimi
+(kırılma sınırı için).
+**Okumaz:** rüzgâr yönünü, ölü dalga yönünü — kıyıda yön artık yatağın işi.
+
+**Enerji devrediliyor, eklenmiyor.** Ağırlık `w` bu trenin taşıdığı varyans PAYI; FFT'nin
+dikey yer değiştirmesi `sqrt(1 - w^2)` ile kısılıyor. Normal de aynı devri izliyor: FFT
+eğimi aynı katsayıyla kısılıp kıyı dalgasının kendi eğimi ekleniyor.
+
+**Genlik iki sınırdan küçüğü:** deniz durumunun kendi genliği (`sqrt(2) w Hs/4` × sığlaşma)
+ve **kırılma sınırı** `gamma h / 2`. İkincisi sörf kuşağında hâkim — orada dalga boyu deniz
+durumunun değil suyun derinliğinin işidir.
+
+**Bant `SEA_SHORE_WAVE_DEEP_IN/OUT` (10–20 m) ile kapanıyor**, çünkü ölçüldü: tepe ile
+derinlik konturu arasındaki açının medyanı 1–16 m arasında 5–10°, dışında dağılıyor.

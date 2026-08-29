@@ -18,6 +18,9 @@ public static class SeaConstants
 
     public const float TwoPi = 6.28318530718f;
 
+    /// Amplitude of a single sinusoid with unit rms.
+    public const float Sqrt2 = 1.41421356f;
+
     /// Index of refraction of water. [SOURCE: Tessendorf 2004 §6.1.2]
     public const float WaterIor = 1.34f;
 
@@ -54,6 +57,12 @@ public static class SeaConstants
 
     /// Wave damping at the shoreline (m). [CALIBRATION]
     public const float ShoreFadeDepth = 0.60f;
+
+    /// Depth where the shore wave starts handing over to the FFT field (m).
+    public const float ShoreWaveDeepIn = 10f;
+
+    /// Depth where the shore wave is gone (m).
+    public const float ShoreWaveDeepOut = 20f;
 
     /// Waterline displacement by the foam noise (m of depth). [CALIBRATION]
     public const float ShoreEdgeNoise = 0.06f;
