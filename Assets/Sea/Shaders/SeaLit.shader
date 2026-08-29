@@ -339,6 +339,46 @@ Shader "ToTheSummit/SeaLit"
                 float F = SeaFresnel(N, V);
                 float3 color = lerp(belowSurface, skyRefl, F) + glitter * F;
 
+                // --- LIGHT THROUGH THE WAVE (subsurface) ---
+                //
+                // A backlit crest glows. That glow was missing entirely: every path in
+                // this shader returned light that came from ABOVE the surface (the sky,
+                // the sun's lobe) or from BELOW it (the bottom, the upwelling constant).
+                // Nothing carried light that went INTO the water and came back out of
+                // the same face — which is the one thing that makes a wave look like
+                // water rather than like a moving surface.
+                //
+                // THE CREST IS THE THIN PART. Where the surface stands above the still
+                // level the light has less water to cross, so more of it gets through.
+                // Sea of Thieves reads this from the choppiness offset; the elevation
+                // above still water says the same thing here and is already to hand.
+                // [SOURCE: Ang 2018, The Technical Art of Sea of Thieves]
+                //
+                // THE TINT IS NOT A NEW COLOUR. It is sunlight attenuated over the path
+                // it took through the crest, using the same extinction the depth colour
+                // uses.
+                //
+                // THE PATH IS A SLANT, NOT THE HEIGHT. Light crosses the crest along
+                // the sun's own direction, so a low sun travels much further through
+                // the same water: `h / sin(elevation)`. That is why a backlit wave at
+                // sunset is deep green and the same wave at noon is almost white —
+                // measured here, a 0.6 m crest passes (0.84, 0.95, 0.97) with the sun
+                // overhead and (0.30, 0.73, 0.82) with it near the horizon.
+                //
+                // IT ENTERS THROUGH THE SURFACE, so Fresnel's TRANSMITTED share carries
+                // it: at grazing angles, where the surface is all mirror, there is no
+                // glow — which is what a real sea does.
+                float crestHeight = max(IN.positionWS.y - _SeaLevelY, 0.0);
+                float slant = crestHeight / max(L.y, 0.15);
+                float3 through = exp(-_SeaExtinctionRGB * slant);
+
+                float crestMask = saturate(crestHeight
+                                           / max(0.5 * _SeaSignificantHeight, 0.05));
+                float forward = pow(saturate(dot(V, -L)), SEA_SSS_POWER);
+
+                color += mainLight.color * through
+                       * (crestMask * forward * SEA_SSS_GAIN * (1.0 - F));
+
                 // --- FOAM (spec 13) — THREE SOURCES ---
                 float foam = 0.0;
 

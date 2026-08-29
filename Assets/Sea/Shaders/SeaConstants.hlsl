@@ -76,6 +76,22 @@
 /// smaller than the waves it carries would cut them up.
 #define SEA_HEX_TILES            2.0
 
+/// SUBSURFACE GLOW — the forward-scattering lobe's sharpness.
+///
+/// Water scatters strongly FORWARD (Petzold's measured phase function is two to
+/// three orders of magnitude higher near zero degrees than sideways), so the light
+/// that entered the back of a crest leaves it in nearly the same direction. You see
+/// it when you look towards the sun through a wave, and not otherwise.
+#define SEA_SSS_POWER            4.0
+
+/// How much of the light entering a crest comes back out towards the eye.
+/// [CALIBRATION] The physical chain is backscatter coefficient x path x phase
+/// function; for coastal water that is a couple of percent times a forward lobe of
+/// a few hundred, which lands in this range. The tint is NOT a separate colour: it
+/// is the sunlight attenuated over the path through the crest, so it comes from the
+/// same `_SeaExtinctionRGB` the depth colour uses.
+#define SEA_SSS_GAIN             0.35
+
 #define SEA_MIN_DEPTH            0.05
 
 /// Wave damping at the shoreline (m). Below this depth the wave height goes

@@ -1530,3 +1530,42 @@ atmıyor.
 | 14 | 3,66 m | 40 s | 138–188 m | 50 m |
 
 Öncesi: her rüzgârda tek kontur, nefes 0 m.
+
+
+## Deniz: dalganın içinden geçen ışık (2026-08-29)
+
+Shader'da bu yol **yoktu**. Her terim ya yüzeyin ÜSTÜNDEN gelen ışığı döndürüyordu
+(gökyüzü yansıması, güneş lobu) ya da ALTINDAN geleni (taban, upwelling sabiti). Suya
+girip aynı yüzden geri çıkan ışığı taşıyan hiçbir şey yoktu — oysa bir dalgayı su gibi
+gösteren tek şey odur.
+
+    tepeYuk  = max(y - _SeaLevelY, 0)
+    yol      = tepeYuk / max(L.y, 0.15)
+    gecen    = exp(-_SeaExtinctionRGB * yol)
+    ileri    = pow(saturate(dot(V, -L)), SEA_SSS_POWER)
+    renk    += mainLight.color * gecen * (maske * ileri * SEA_SSS_GAIN * (1 - F))
+
+**Okuduğu kaynaklar:** yüzey kotu (tepe = ince yer), güneş yönü ve yüksekliği, aynı
+`_SeaExtinctionRGB`, aynı `mainLight.color` (gölge ve bulut cookie'si dahil), aynı
+Fresnel. **Yeni bir renk ayarı yok.**
+
+**Üç bilinçli kural:**
+
+- **Tepe ince yerdir.** Sea of Thieves bunu choppiness kaymasından okuyor; burada durgun
+  kotun üstündeki yükseklik aynı şeyi söylüyor ve zaten elde. [KAYNAK: Ang 2018]
+- **Yol bir eğik, yükseklik değil.** Işık güneşin yönü boyunca geçiyor, alçak güneş aynı
+  sudan çok daha uzun yol alıyor. Ölçüldü, 0,6 m'lik tepede geçen ışık:
+
+  | güneş yüksekliği | yol | R / G / B | renk |
+  |---|---|---|---|
+  | 90° | 0,60 m | 0,84 / 0,95 / 0,97 | beyaza yakın |
+  | 30° | 1,20 m | 0,70 / 0,91 / 0,94 | turkuaz |
+  | 8° | 4,00 m | 0,30 / 0,73 / 0,82 | yeşil |
+
+  Sabit yolla her yükseklikte beyaza yakın çıkıyordu.
+- **Yüzeyden GİRİYOR**, o yüzden Fresnel'in GEÇİRDİĞİ payla taşınıyor: sıyırma açısında
+  yüzey tamamen ayna, parlama yok — gerçek denizin yaptığı da bu.
+
+İleri saçılma lobu (`SEA_SSS_POWER` = 4) Petzold'un ölçtüğü faz fonksiyonundan: su ileri
+yönde yana göre iki-üç kat büyüklük daha çok saçıyor. Bu yüzden parlama yalnız güneşe
+doğru bakarken görünüyor (75°'de sıfıra iniyor).
