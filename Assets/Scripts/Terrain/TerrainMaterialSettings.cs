@@ -73,7 +73,7 @@ public class TerrainMaterialSettings : ScriptableObject
     /// SAND — PART OF THE SHORE, NOT ALL OF IT.
     ///
     /// The band is tied to `_SeaLevelY`, the still-water level `SeaManager` publishes: a beach
-    /// belongs to the sea's level, not to the run-up. The wet band (`_SeaWetLevelY`) breathes
+    /// belongs to the sea's level, not to the run-up. The wet band breathes
     /// with every wave and a beach does not move that fast.
     ///
     /// Three conditions have to hold at once, and that is what makes only PART of the coast

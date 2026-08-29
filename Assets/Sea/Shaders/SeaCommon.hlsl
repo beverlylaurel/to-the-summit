@@ -61,9 +61,13 @@ float _SeaMaxShoalingGain;
 /// knows its own elevation. Published by `SeaManager`.
 float _SeaSignificantHeight;
 
-/// Peak angular frequency of the current sea state (rad/s). The shore wave turns
-/// the baked travel time into a phase with it.
-float _SeaPeakOmega;
+/// Peak period of the current sea state (s). The swash cycles with it.
+float _SeaPeakPeriod;
+
+/// The shore wave's two trains: `(rms_wind, omega_wind, rms_swell, omega_swell)`.
+/// In shallow water the celerity does not depend on frequency, so both ride the
+/// same travel time and their beat is the wave-to-wave size change on the shore.
+float4 _SeaShoreTrains;
 
 /// The RUNNING FFT size and its log2. Comes from the quality preset;
 /// `SEA_FFT_SIZE` is only the upper bound.
@@ -437,29 +441,44 @@ float SeaShoreWaveWeight(float depth)
 /// because the DEPTH does. Nothing here rotates a wave vector.
 ///
 /// IT REPLACES ENERGY, IT DOES NOT ADD IT. The weight is the SHARE of the
-/// surface's variance this train carries; the FFT gives up exactly that share
+/// surface's variance the pair carries; the FFT gives up exactly that share
 /// (`SeaShoreWaveFftScale`). Measured without the handover, the shallow rms went
 /// from 1.27 m to 2.20 m at 8 m/s — three quarters more sea than the state has.
 ///
-/// The amplitude is the sea state's own — `rms = Hs/4`, `A = sqrt(2) * rms` for a
-/// single train — shoaled by Green's law with the FFT's own ceiling, and then
-/// capped by BREAKING: a wave cannot be taller than `gamma * h` in water of depth
-/// `h`, and without the cap the surf zone would be clipped flat by the limiter
-/// further down instead of simply being the right size.
+/// TWO TRAINS, NOT ONE. A single frequency has no beat, and the wave-to-wave size
+/// change is exactly the two spectral peaks interfering. They cost one texture
+/// read together because shallow water is non-dispersive.
+///
+/// Amplitudes are the partitions' own — `A = sqrt(2) * rms` per train — shoaled by
+/// Green's law with the FFT's own ceiling, and then capped by BREAKING: the pair
+/// cannot be taller than `gamma * h` in water of depth `h`. Without the cap the
+/// surf zone would be clipped flat by the limiter further down instead of simply
+/// being the right size.
+float2 SeaShoreWaveAmplitudes(float depth, float slope, float weight)
+{
+    float shoal     = min(SeaShoalingGain(depth, _SeaSpectrumDepth), _SeaMaxShoalingGain);
+    float shoreFade = smoothstep(0.0, SEA_SHORE_FADE_DEPTH, depth);
+
+    float2 rms = float2(_SeaShoreTrains.x, _SeaShoreTrains.z) * (shoal * shoreFade);
+    float2 amp = SEA_SQRT2 * weight * rms;
+
+    float cap = SeaBreakerIndex(slope) * depth * 0.5;
+    float sum = amp.x + amp.y;
+    if (sum > cap) amp *= cap / max(sum, 1e-5);
+
+    return amp;
+}
+
 float SeaShoreWaveHeight(float2 posXZ, float depth, float slope)
 {
     float weight = SeaShoreWaveWeight(depth);
     if (weight <= 0.001) return 0.0;
 
-    float shoal     = min(SeaShoalingGain(depth, _SeaSpectrumDepth), _SeaMaxShoalingGain);
-    float shoreFade = smoothstep(0.0, SEA_SHORE_FADE_DEPTH, depth);
+    float2 amp = SeaShoreWaveAmplitudes(depth, slope, weight);
+    float  t   = SeaSampleShoreTravel(posXZ) - _SeaTime;
 
-    float rms       = 0.25 * _SeaSignificantHeight * shoal * shoreFade;
-    float amplitude = min(SEA_SQRT2 * weight * rms,
-                          SeaBreakerIndex(slope) * depth * 0.5);
-
-    float tau = SeaSampleShoreTravel(posXZ);
-    return amplitude * cos(_SeaPeakOmega * (tau - _SeaTime));
+    return amp.x * cos(_SeaShoreTrains.y * t)
+         + amp.y * cos(_SeaShoreTrains.w * t);
 }
 
 /// What is left for the FFT's vertical displacement once the shore wave has taken
@@ -479,29 +498,50 @@ float SeaShoreWaveFftScale(float depth)
 /// `grad(A cos(omega (tau - t))) = -A omega sin(...) grad(tau)`, with `grad(A)`
 /// dropped — the amplitude follows the depth and changes over tens of metres,
 /// the phase over a crest spacing.
+/// WHERE THE SWASH IS IN ITS CYCLE, AT THIS POINT.
+///
+/// The swash is the RUN-UP of the shore wave, so it reads the same travel field:
+/// `phase = (tau - t) / Tp`. A point the wave reaches later surges later, which
+/// means a bay fills while the headland beside it is already draining.
+///
+/// What this replaces: a single global phase plus a 286 m noise offset. The whole
+/// coast moved as one, and the only thing breaking it up was a noise with no
+/// relation to the shore's shape.
+float SeaShoreSwashPhase(float2 posXZ)
+{
+    return frac((SeaSampleShoreTravel(posXZ) - _SeaTime) / max(_SeaPeakPeriod, 0.1));
+}
+
+/// The surge itself, 0 at the lowest point of the cycle and 1 at the top of the
+/// run-up. Built from the phase in ONE place: the sea's foam, the sea's water
+/// level and the terrain's wet band all read this shape.
+float SeaShoreSurgeAt(float phase)
+{
+    return 0.5 - 0.5 * cos(SEA_TWO_PI * phase);
+}
+
 float2 SeaShoreWaveSlope(float2 posXZ, float depth, float slopeBed)
 {
     float weight = SeaShoreWaveWeight(depth);
     if (weight <= 0.001) return 0.0;
 
-    float shoal     = min(SeaShoalingGain(depth, _SeaSpectrumDepth), _SeaMaxShoalingGain);
-    float shoreFade = smoothstep(0.0, SEA_SHORE_FADE_DEPTH, depth);
-
-    float rms       = 0.25 * _SeaSignificantHeight * shoal * shoreFade;
-    float amplitude = min(SEA_SQRT2 * weight * rms,
-                          SeaBreakerIndex(slopeBed) * depth * 0.5);
+    float2 amp = SeaShoreWaveAmplitudes(depth, slopeBed, weight);
 
     float e = _SeaBathySizeXZ.x / _SeaBathyResolution;
 
-    float tau = SeaSampleShoreTravel(posXZ);
+    float tau  = SeaSampleShoreTravel(posXZ);
     float dTdx = SeaSampleShoreTravel(posXZ + float2(e, 0))
                - SeaSampleShoreTravel(posXZ - float2(e, 0));
     float dTdz = SeaSampleShoreTravel(posXZ + float2(0, e))
                - SeaSampleShoreTravel(posXZ - float2(0, e));
 
     float2 gradTau = float2(dTdx, dTdz) / (2.0 * e);
+    float  t = tau - _SeaTime;
 
-    return -amplitude * _SeaPeakOmega * sin(_SeaPeakOmega * (tau - _SeaTime)) * gradTau;
+    float dHdTau = -amp.x * _SeaShoreTrains.y * sin(_SeaShoreTrains.y * t)
+                 -  amp.y * _SeaShoreTrains.w * sin(_SeaShoreTrains.w * t);
+
+    return dHdTau * gradTau;
 }
 
 // -------------------------------------------------------- surface deform

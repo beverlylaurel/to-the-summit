@@ -1480,3 +1480,33 @@ durumunun değil suyun derinliğinin işidir.
 
 **Bant `SEA_SHORE_WAVE_DEEP_IN/OUT` (10–20 m) ile kapanıyor**, çünkü ölçüldü: tepe ile
 derinlik konturu arasındaki açının medyanı 1–16 m arasında 5–10°, dışında dağılıyor.
+
+
+## Deniz: swash kıyı dalgasının koşusu (2026-08-29)
+
+Kıyıdaki hareketin tamamı **tek alandan** türüyor: `SeaShorePhase`'in pişirdiği seyahat
+süresi.
+
+    faz  = frac((tau - t) / Tp)          SeaShoreSwashPhase
+    surge = 0.5 - 0.5 cos(2pi * faz)     SeaShoreSurgeAt
+
+Bunu okuyanlar:
+
+| Okuyan | Ne için |
+|---|---|
+| `SeaLit` kıyı köpüğü | tazelik ve kalıntı, bandın kotu |
+| `MountainSurface` ıslak bant | bandın tepesi = `_SeaLevelY + _SeaRunupHeight * surge` |
+| `MountainSurface` dantel | aynı banda biniyor |
+
+**Küresel faz kalktı.** `_SeaShoreFoamPhase` ve 286 metrelik `alongShore` gürültüsü
+silindi: kıyı boyunca değişimi artık kıyının kendi şekli veriyor, alakasız bir gürültü
+değil. `SeaWetnessDriver` seviye değil **miktar** yayımlıyor (`_SeaRunupHeight`); seviyeyi
+arazi kendi konumunda kuruyor.
+
+**Kıyı dalgası iki tren.** `_SeaShoreTrains = (rms_rüzgâr, ω_rüzgâr, rms_ölü, ω_ölü)`.
+Sığ su dağılımsız olduğu için ikisi aynı `tau`'yu paylaşıyor — tek doku okuması, iki
+kosinüs. Vuruşmaları dalgadan dalgaya boy değişimi; tek frekanslı bir tren onu kaybederdi.
+
+**Bilinçli kural:** genlikler iki parçanın kendi rms'inden geliyor, `4*sqrt(rmsW²+rmsS²)`
+toplam Hs'e eşit (ölçüldü, dört rüzgâr hızında tam eşleşme). Üçüncü bir "ne kadar büyük"
+ayarı yok.

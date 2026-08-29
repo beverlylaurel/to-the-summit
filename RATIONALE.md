@@ -2720,3 +2720,41 @@ FFT'nin tek başına verdiğine eşit kalıyor. Sapma yalnız kırılma sınır�
 ve orada negatif olması doğru — 0,6 m suda dalga yüksekliği deniz durumunun değil
 `gamma h`'nin işi. Eskiden orada 2,7 m rms iddia ediliyor ve yalnız kırpma kurtarıyordu;
 kırpılmış dalga da düz tepeli görünüyordu.
+
+
+## Grup terimi uydurulmadı — düşen ikinci tren geri kondu
+
+Plan "setler" için bir grup periyodu öngörüyordu ve önce ölçüldü. İki spektrum tepesinin
+vuruşması:
+
+| U10 | Hs_rüzgâr | Hs_ölü | Tp_rüzgâr | vuruş periyodu | modülasyon derinliği |
+|---|---|---|---|---|---|
+| 0,5 | 0,19 m | 0,71 m | 2,6 s | 4 s | 0,49 |
+| 3 | 0,92 m | 0,71 m | 4,8 s | 9 s | 0,97 |
+| 8 | 2,20 m | 0,71 m | 6,6 s | 20 s | 0,59 |
+| 20 | 4,86 m | 0,71 m | 9,0 s | 89 s | 0,29 |
+
+Gerçek sörf setleri 1–3 dakika; buradaki vuruş çoğunlukla çok daha kısa. Yani bu
+"gruplaşma" değil, düpedüz **girişim** — ve girişim FFT alanında ZATEN var, çünkü iki
+parça aynı spektrumda yaşıyor.
+
+Kaybeden tek şey kıyı dalgasıydı: spektrumu tek frekansa indirdiği için vuruşması yoktu.
+Bu yüzden ayrı bir zarf terimi YAZILMADI; kıyı dalgası **iki trene** çıkarıldı. Sığ suda
+`c = sqrt(g h)` frekanstan bağımsız olduğundan ikisi aynı seyahat süresini paylaşıyor:
+maliyet tek doku okuması, iki kosinüs. Vuruş kendiliğinden doğuyor, uydurulmuş sabit yok.
+
+Doğrulama: `4*sqrt(rms_rüzgâr² + rms_ölü²)` dört rüzgâr hızında da toplam Hs'e binde bir
+hassasiyetle eşit.
+
+## Kıyı boyunca değişim neden gürültüden alınmadı
+
+Swash fazı küresel bir sayı artı 286 metrelik bir değer gürültüsüydü. Gürültünün kıyının
+şekliyle hiçbir ilgisi yok: bir koy ile yanındaki burun, aralarındaki mesafe o gürültünün
+ölçeğinden küçükse aynı anda kabarıyordu.
+
+Faz artık seyahat süresinden geliyor. Dalganın geç ulaştığı yer geç kabarıyor — koyun içi
+ile burun ucu arasındaki fark, aradaki gerçek seyahat süresi farkı kadar. Aynı alan
+tepelerin yönünü de veriyor, yani ikisi tanım gereği tutarlı.
+
+Yan etki: arazinin ıslak bandı da aynı alanı okuyor. Eskiden deniz köpüğü yerel, ıslak
+bant küreseldi; ikisi çelişebilirdi ve çelişme sessizdi.
