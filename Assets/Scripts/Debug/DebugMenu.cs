@@ -241,6 +241,7 @@ public class DebugMenu : MonoBehaviour
         GUILayout.BeginHorizontal();
 
         BeginColumn();
+        DrawSeaDiagnostics();
         DrawMovement();
         DrawTimeOfDay();
         EndColumn();
@@ -634,8 +635,40 @@ public class DebugMenu : MonoBehaviour
         EndSection();
     }
 
-    /// SEA DIAGNOSTICS. The shader carries four switches and the panel is the only
-    /// way to reach them. Each one removes ONE term, so what is left on screen names
+    /// THE THREE SWITCHES THAT WOULD NOT TAKE A CLICK.
+    ///
+    /// They sat at the bottom of the tallest column and were drawn correctly but took
+    /// their clicks somewhere else. Removing `FlexibleSpace` from the column did not
+    /// fix it, so the position itself is now the variable: they are drawn FIRST, in the
+    /// SHORT column, where the controls above them demonstrably work.
+    ///
+    /// The probe line below reports the two things that can make a drawn control
+    /// unclickable — `GUI.enabled`, and the rect the layout actually gave it. If a
+    /// click still does nothing, that line says which of the two it is.
+    void DrawSeaDiagnostics()
+    {
+        BeginSection("Deniz teşhis");
+
+        seaNoFog     = GUILayout.Toggle(seaNoFog,     "Yerel sisi kapat");
+        seaNoShadow  = GUILayout.Toggle(seaNoShadow,  "Gölgeyi kapat");
+        seaNoSkyRefl = GUILayout.Toggle(seaNoSkyRefl, "Gök yansımasını kapat");
+
+        Rect last = GUILayoutUtility.GetLastRect();
+        GUILayout.Label($"etkin {GUI.enabled}   kutu y {last.y:F0} h {last.height:F0}   " +
+                        $"fare {Event.current.mousePosition.x:F0},{Event.current.mousePosition.y:F0}");
+        GUILayout.Label($"durum {(seaNoFog ? 1 : 0)}{(seaNoShadow ? 1 : 0)}{(seaNoSkyRefl ? 1 : 0)}");
+
+        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoFog, seaNoFog ? 1f : 0f);
+        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoShadow, seaNoShadow ? 1f : 0f);
+        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoSkyReflection, seaNoSkyRefl ? 1f : 0f);
+
+        if (GUILayout.Button("Ayarları geri al (deniz teşhis)"))
+            seaNoFog = seaNoShadow = seaNoSkyRefl = false;
+
+        EndSection();
+    }
+
+    /// SEA DIAGNOSTICS. Each switch removes ONE term, so what is left on screen names
     /// the term that produced the symptom.
     void DrawSea()
     {
@@ -650,9 +683,6 @@ public class DebugMenu : MonoBehaviour
         seaNoShallow    = GUILayout.Toggle(seaNoShallow,    "Sığ su dönüşümünü kapat");
         seaNoFoam       = GUILayout.Toggle(seaNoFoam,       "Köpüğü kapat");
         seaNoRefraction = GUILayout.Toggle(seaNoRefraction, "Kırılmayı kapat");
-        seaNoFog        = GUILayout.Toggle(seaNoFog,        "Yerel sisi kapat");
-        seaNoShadow     = GUILayout.Toggle(seaNoShadow,     "Gölgeyi kapat");
-        seaNoSkyRefl    = GUILayout.Toggle(seaNoSkyRefl,    "Gök yansımasını kapat");
 
         // WRITTEN EVERY FRAME, NOT ON CHANGE. `SeaManager` republishes its own
         // globals every frame; a value written once here would be overwritten the
@@ -662,13 +692,9 @@ public class DebugMenu : MonoBehaviour
         Shader.SetGlobalFloat(SeaShaderIDs.DbgNoShallow,    seaNoShallow ? 1f : 0f);
         Shader.SetGlobalFloat(SeaShaderIDs.DbgNoFoam,       seaNoFoam ? 1f : 0f);
         Shader.SetGlobalFloat(SeaShaderIDs.DbgNoRefraction, seaNoRefraction ? 1f : 0f);
-        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoFog,        seaNoFog ? 1f : 0f);
-        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoShadow,     seaNoShadow ? 1f : 0f);
-        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoSkyReflection, seaNoSkyRefl ? 1f : 0f);
 
         if (GUILayout.Button("Ayarları geri al (deniz)"))
             seaNoSurface = seaNoWaves = seaNoShallow = seaNoFoam = seaNoRefraction = false;
-            seaNoFog = seaNoShadow = seaNoSkyRefl = false;
 
         EndSection();
     }
