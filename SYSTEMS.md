@@ -1426,8 +1426,10 @@ eşitliği `Sea/Test Constant Parity` denetliyor.
 
 - **Kesme** — `clip(depth + gürültü * SEA_SHORE_EDGE_NOISE)`. Gürültü köpüğünkiyle
   AYNI (`SeaFoamNoise`, `_SeaFoamBreakupTiling`); ikinci bir kaynak yok.
-- **Film** — `smoothstep(0, SEA_SHORE_FADE_DEPTH, depth)` Fresnel'i ve parıltıyı kısıyor.
-  Köpüğü kısmıyor.
+- **Devir** — `lerp(refracted, color, smoothstep(0, SEA_SHORE_FADE_DEPTH, depth))`,
+  en sonda ve TEK terim. Yansıma, parıltı, su rengi ve köpük hepsi birlikte sönüyor;
+  ölçülen kıyı eğiminde bandın kumdaki genişliği 10 m. Su çizgisini oradan arazinin
+  danteli (`laceBand`) devralıyor — iki sistem aynı `_SeaWetLevelY`'den besleniyor.
 
 **Teşhis anahtarları silindi.** `_SeaDbgNo*` globalleri, shader dalları ve panel bölümü
 gitti; deniz bölümünde yalnız Hs / Tp / kıyı köpüğü okuması kaldı.

@@ -336,24 +336,7 @@ Shader "ToTheSummit/SeaLit"
                 // THE SUN LOBE IS ALSO WEIGHTED BY FRESNEL. It used to be added
                 // raw, so looking straight down — where the surface reflects almost
                 // nothing — the sun still burned on it.
-                // THE FILM STOPS BEING A MIRROR BEFORE IT STOPS EXISTING.
-                //
-                // Fresnel goes to 1 at grazing angles, so up to the very last pixel the
-                // surface returned a full sky reflection — and then the clip removed it.
-                // The step from "sky" to "sand" landed on one pixel and that is what read
-                // as a cut edge.
-                //
-                // A millimetre of water over sand has no mirror in it: there is not
-                // enough medium to build the interface. Over `SEA_SHORE_FADE_DEPTH` the
-                // reflection and the glitter fade out and what is left is the ground
-                // seen through the water — which is what the pixel on the other side of
-                // the line already shows. The two sides meet at the same colour.
-                //
-                // The FOAM is deliberately not faded: the swash lace at the waterline is
-                // exactly where foam belongs.
-                float shoreFilm = smoothstep(0.0, SEA_SHORE_FADE_DEPTH, depth);
-
-                float F = SeaFresnel(N, V) * shoreFilm;
+                float F = SeaFresnel(N, V);
                 float3 color = lerp(belowSurface, skyRefl, F) + glitter * F;
 
                 // --- FOAM (spec 13) — THREE SOURCES ---
@@ -570,6 +553,29 @@ Shader "ToTheSummit/SeaLit"
                 // water through it and keeps thick foam opaque.
                 float foamAlpha = foam * foam * (3.0 - 2.0 * foam) * 0.80;
                 color = lerp(color, _SeaFoamColor.rgb * foamLight, foamAlpha);
+
+                // THE WATER FADES OUT INSTEAD OF BEING CUT OFF.
+                //
+                // Displacing the clip line with noise gave the waterline an irregular
+                // SHAPE but it is still a binary cut, and the strongest thing standing on
+                // it is the foam: white on one side of the line, sand on the other, with
+                // nothing in between. Fading the reflection alone did not touch that.
+                //
+                // ONE TERM, AT THE END, FOR EVERY LAYER. `refracted` is the scene colour
+                // behind this pixel — literally what the ground would look like with no
+                // sea drawn over it, and at the shore the offset guard cancels the
+                // refraction offset so it is EXACTLY that pixel. Blending towards it as
+                // the depth goes to zero makes the two sides of the line meet at the same
+                // value, so the cut has nothing left to show. Reflection, glitter, water
+                // colour and foam all go through it together.
+                //
+                // The surface is drawn opaque on purpose (alpha blending ghosts under TAA
+                // and brings sorting problems, spec 12.6). This is not alpha: it is the
+                // physical statement that with no water there is no water colour.
+                //
+                // The terrain carries the waterline onward from here — the swash lace it
+                // draws on the sand starts where this ends.
+                color = lerp(refracted, color, smoothstep(0.0, SEA_SHORE_FADE_DEPTH, depth));
 
                 // THE SEA STANDS IN THE SAME AIR AS THE TERRAIN. Every layer is fogged
                 // once with ITS OWN distance — the terrain in its own shader, the cloud

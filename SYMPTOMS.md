@@ -3785,7 +3785,25 @@ onları üreten ifade.
    görünen zemin kalıyor, ki çizginin öbür yanındaki piksel zaten onu gösteriyor. İki
    yaka aynı renkte buluşuyor.
 
-**Köpük bilerek sönmüyor:** su çizgisindeki dantel tam da köpüğün ait olduğu yer.
+**Bir tur eksik kaldı — yansımayı söndürmek yetmedi.** Kenar gürültüsü su çizgisine
+düzensiz bir ŞEKİL verdi ama kesme hâlâ ikili, ve çizgide duran en güçlü şey KÖPÜKTÜ:
+bir yanda beyaz, öbür yanda kum, arada hiçbir şey. Yansımayı kısmak ona dokunmuyordu.
+
+**Kapatan terim, en sonda, tek:**
+
+    color = lerp(refracted, color, smoothstep(0, SEA_SHORE_FADE_DEPTH, depth));
+
+`refracted` bu pikselin arkasındaki sahne rengi — üstüne deniz çizilmeseydi zeminin
+görüneceği renk. Kıyıda kaydırma koruması kırılma sapmasını iptal ettiği için TAM O
+piksel. Derinlik sıfıra giderken ona doğru harmanlanınca çizginin iki yakası aynı değerde
+buluşuyor, kesmenin gösterecek bir şeyi kalmıyor. Yansıma, parıltı, su rengi ve köpük
+hepsi birlikte geçiyor.
+
+Alfa değil: yüzey bilerek opak çiziliyor (TAA'da hayalet ve sıralama sorunu, spec 12.6).
+Bu, "su yoksa suyun rengi de yok" cümlesinin kendisi.
+
+Ölçülen %5,8 kıyı eğiminde devir bandı kumda **10 m**: 0,9 m'de %2, 5,2 m'de %50,
+10,4 m'de %100. Su çizgisini oradan arazinin danteli devralıyor.
 
 **Dalga boyu denetimi:** kenar gürültüsünün genliği 0,06 m derinlik; ölçülen %5 kıyı
 eğiminde su çizgisini 1,2 m oynatıyor. Onu üreten gürültünün kendi özellik boyu
