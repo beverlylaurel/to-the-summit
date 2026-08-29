@@ -24,6 +24,17 @@ using UnityEngine;
 /// would put every shore point at `tau = 0` and the whole coast would surge in
 /// step — the very thing this field exists to break.
 ///
+/// AND IT COMES FROM ONE DIRECTION. Seeding every deep texel at `tau = 0` launches
+/// a wave that arrives from all sides at once; measured, the front's heading was
+/// spread over seven of twelve compass bins. What that draws is concentric rings
+/// around every shallow patch — the "onion rings" on the shore. The seeds now
+/// carry the arrival time of a PLANE wave from the swell's direction.
+///
+/// THE RESIDUAL IS STORED, NOT THE TIME. Across 30 km the plane term alone reaches
+/// 1235 s, and half precision resolves about 1 s there — two thirds of a radian of
+/// phase. What is baked is the DELAY relative to that plane (0 in deep water,
+/// ~150 s at the shore), and the shader adds the plane back at full precision.
+///
 /// THE EIKONAL IS SOLVED, NOT DIJKSTRA. `|grad tau| = 1/c` on a grid, by fast
 /// marching. Dijkstra on an 8-neighbour grid makes paths follow the grid
 /// directions and the crests come out octagonal; the upwind quadratic update
@@ -42,19 +53,26 @@ public static class SeaShorePhase
     /// `RHalf` again: the field runs 0..~100 s and half precision resolves 0.05 s
     /// there, which is 0.03 rad of phase at a ten second swell — far below what
     /// a crest shows.
-    public static Texture2D Bake(Terrain terrain, float seaLevelY, float maxDepth)
+    public static Texture2D Bake(Terrain terrain, float seaLevelY, float maxDepth,
+                                Vector2 direction, out Vector4 plane)
     {
-        float[] tau = Field(terrain, seaLevelY, maxDepth, out int res);
+        float[] tau = Field(terrain, seaLevelY, maxDepth, direction, out int res, out plane);
         return ToTexture(tau, res);
     }
 
     /// The solved field itself, in seconds. Separate from the texture so a
     /// measurement can read it: `Apply(..., makeNoLongerReadable: true)` throws the
     /// CPU copy away, and keeping one alive for a 4097 texture is 33 MB for nothing.
-    public static float[] Field(Terrain terrain, float seaLevelY, float maxDepth, out int resolution)
+    /// `plane` comes back as `(dir.x, dir.y, 1/c_deep, bias)`; the shader rebuilds the
+    /// full travel time as `residual + dot(posXZ, dir) * plane.z + plane.w`.
+    public static float[] Field(Terrain terrain, float seaLevelY, float maxDepth,
+                                Vector2 direction, out int resolution, out Vector4 plane)
     {
         if (terrain == null)
             throw new ArgumentNullException(nameof(terrain));
+
+        Vector2 dir = direction.sqrMagnitude > 1e-6f ? direction.normalized : Vector2.right;
+        float invDeepC = 1f / Mathf.Sqrt(SeaConstants.G * maxDepth);
 
         TerrainData td = terrain.terrainData;
         int res = td.heightmapResolution;
@@ -95,6 +113,24 @@ public static class SeaShorePhase
         // it: the bay's path is shallower, therefore slower, therefore later.
         var heap = new MinHeap(1 << 16);
 
+        Vector3 origin = terrain.transform.position;
+
+        // The plane wave's own arrival time at a seed, referenced so the earliest is
+        // zero. `dir` points the way the wave travels, so a larger projection is
+        // reached later.
+        float minProj = float.MaxValue;
+        for (int y = 0; y < res; y++)
+        for (int x = 0; x < res; x++)
+        {
+            float d = seaLevelY - (baseY + hm[y, x] * height);
+            if (d <= 0f) continue;
+            bool onEdge = x == 0 || y == 0 || x == res - 1 || y == res - 1;
+            if (!onEdge && d < maxDepth) continue;
+
+            float proj = (origin.x + x * texel) * dir.x + (origin.z + y * texel) * dir.y;
+            if (proj < minProj) minProj = proj;
+        }
+
         for (int y = 0; y < res; y++)
         {
             int row = y * res;
@@ -106,9 +142,12 @@ public static class SeaShorePhase
                 bool onEdge = x == 0 || y == 0 || x == res - 1 || y == res - 1;
                 if (!onEdge && d < maxDepth) continue;
 
-                tau[row + x] = 0f;
+                float proj = (origin.x + x * texel) * dir.x + (origin.z + y * texel) * dir.y;
+                float t0 = (proj - minProj) * invDeepC;
+
+                tau[row + x] = t0;
                 state[row + x] = Band;
-                heap.Push(row + x, 0f);
+                heap.Push(row + x, t0);
             }
         }
 
@@ -158,6 +197,20 @@ public static class SeaShorePhase
         // front of it, so land takes the NEAREST water value: continuous across the
         // waterline, and no phase accumulates inland where no wave travels.
         ExtendOntoLand(tau, state, res, far);
+
+        // Subtract the plane the seeds were launched with. What remains is the DELAY
+        // the sea bed adds, which is small and survives half precision.
+        plane = new Vector4(dir.x, dir.y, invDeepC, -minProj * invDeepC);
+
+        for (int y = 0; y < res; y++)
+        {
+            int row = y * res;
+            for (int x = 0; x < res; x++)
+            {
+                float proj = (origin.x + x * texel) * dir.x + (origin.z + y * texel) * dir.y;
+                tau[row + x] = Mathf.Max(tau[row + x] - (proj - minProj) * invDeepC, 0f);
+            }
+        }
 
         return tau;
     }
@@ -314,6 +367,7 @@ public static class SeaShorePhase
     /// `tau = 2 sqrt(x / (g beta))` is exact, so the solver can be checked against
     /// it. Any bay in the real bathymetry only bends the field; it does not change
     /// what a straight transect must read.
+    /// The residual only — the plane term is the shader's job.
     public static string Verify(float[] tau, int res, Terrain terrain, float seaLevelY)
     {
         TerrainData td = terrain.terrainData;

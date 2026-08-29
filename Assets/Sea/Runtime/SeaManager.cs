@@ -26,6 +26,7 @@ public class SeaManager : MonoBehaviour
     ISeaEnvironmentSource env;
     Texture2D bathymetry;
     Texture2D shoreTravel;
+    Vector4 shorePlane;
 
     float bakedSeaLevel = float.NaN;
 
@@ -105,7 +106,10 @@ public class SeaManager : MonoBehaviour
         // BAKED TOGETHER, BECAUSE THEY DESCRIBE THE SAME SEA BED. The travel field
         // is the depth field integrated; letting them go out of step would put the
         // crests on a shoreline that no longer exists.
-        shoreTravel = SeaShorePhase.Bake(terrain, settings.seaLevelY, settings.spectrumDepth);
+        float swellRad = settings.swellDirectionDeg * Mathf.Deg2Rad;
+        shoreTravel = SeaShorePhase.Bake(terrain, settings.seaLevelY, settings.spectrumDepth,
+                                         new Vector2(Mathf.Cos(swellRad), Mathf.Sin(swellRad)),
+                                         out shorePlane);
 
         bakedSeaLevel = settings.seaLevelY;
     }
@@ -158,6 +162,7 @@ public class SeaManager : MonoBehaviour
 
         Shader.SetGlobalTexture(SeaShaderIDs.BathyTex, bathymetry);
         Shader.SetGlobalTexture(SeaShaderIDs.ShoreTravelTex, shoreTravel);
+        Shader.SetGlobalVector(SeaShaderIDs.ShorePlane, shorePlane);
         Shader.SetGlobalVector(SeaShaderIDs.BathyOriginXZ, new Vector4(o.x, o.z, 0f, 0f));
         Shader.SetGlobalVector(SeaShaderIDs.BathySizeXZ, new Vector4(s.x, s.z, 0f, 0f));
         Shader.SetGlobalFloat(SeaShaderIDs.BathyResolution, bathymetry.width);

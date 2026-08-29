@@ -500,7 +500,9 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // the headland beside it drains, and the two systems cannot disagree.
     float2 seaUV = (worldPos.xz - _SeaBathyOriginXZ) / _SeaBathySizeXZ;
     float  seaTau = SAMPLE_TEXTURE2D(_SeaShoreTravelTex, sampler_SeaShoreTravelTex,
-                                     saturate(seaUV)).r;
+                                     saturate(seaUV)).r
+                  + dot(worldPos.xz, _SeaShorePlane.xy) * _SeaShorePlane.z
+                  + _SeaShorePlane.w;
 
     float seaPhase = frac((seaTau - _SeaTime) / max(_SeaPeakPeriod, 0.1));
     float seaSurge = 0.5 - 0.5 * cos(SEA_TWO_PI_TERRAIN * seaPhase);

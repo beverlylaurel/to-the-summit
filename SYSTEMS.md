@@ -1516,3 +1516,30 @@ kosinüs. Vuruşmaları dalgadan dalgaya boy değişimi; tek frekanslı bir tren
 **Bilinçli kural:** genlikler iki parçanın kendi rms'inden geliyor, `4*sqrt(rmsW²+rmsS²)`
 toplam Hs'e eşit (ölçüldü, dört rüzgâr hızında tam eşleşme). Üçüncü bir "ne kadar büyük"
 ayarı yok.
+
+
+## Deniz: ölü dalganın yönü mutlak (2026-08-29)
+
+`swellDirectionOffset` (rüzgârdan sapma) → `swellDirectionDeg` (mutlak yön).
+
+**Neden:** ölü dalga uzaktaki bir fırtınanın ürünü; yerel meltem dönünce onunla dönmez.
+Ayrıca kıyı dalgasının seyahat alanı bu yön için pişiyor — yön oynasaydı her esintide
+yeniden pişirmek gerekirdi.
+
+**Okur:** hiçbir şey. Bu bir ayar, türev değil.
+**Okuyanlar:** `SeaSpectrum.compute` (ölü dalga parçasının yönü) ve `SeaShorePhase`
+(cephenin geldiği yön).
+
+Rüzgâr denizi hâlâ rüzgârla dönüyor; ikisinin çaprazlaşması korunuyor.
+
+## Deniz: seyahat dokusu GECİKME saklıyor (2026-08-29)
+
+`_SeaShoreTravelTex` mutlak süreyi değil, derin sudan gelen düz bir düzlem dalgasına göre
+**gecikmeyi** taşıyor. Düzlem `_SeaShorePlane = (dir.x, dir.y, 1/c_derin, bias)` ile
+shader'da geri ekleniyor.
+
+**Gerekçe:** 30 km'de düzlem terimi 1235 s'ye çıkıyor, RHalf orada 1 s çözüyor — 0,63 rad
+faz hatası. Gecikme 0–570 s aralığında kalıyor.
+
+**Bilinçli kural:** deniz ve arazi AYNI iki satırı kullanıyor; biri değişirse öteki de
+değişmeli, yoksa kıyı köpüğü ile ıslak bant sessizce ayrılır.

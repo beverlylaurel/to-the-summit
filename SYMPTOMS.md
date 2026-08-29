@@ -3944,3 +3944,33 @@ o mesafede yok oluyordu.
 
 Sabit 170 m yerine sörf kuşağı artık havayla açılıp kapanıyor — fırtınada geniş, sakinde
 dar. Ötesi FFT'nin.
+
+
+## Kıyıdaki dalgalar "soğan halkası" gibi
+
+**Sebep: cephe her yönden geliyordu.** Seyahat alanının tohumları TÜM derin su
+teksellerine `tau = 0` yazıyordu; bu, aynı anda her yandan gelen bir dalga demek. Sığ bir
+noktanın etrafında cephe kapanıyor ve iç içe halkalar çiziyor.
+
+**Ölçüm — cephenin gittiği yön, 30°'lik 12 bölmede:**
+
+| | önce | sonra |
+|---|---|---|
+| %3'ün üstündeki bölme | 7 | 6, ama %65'i ölü dalga yönünün ±45°'sinde |
+| en yüklü bölme | %18,2 | %32,4 (0–30°, ölü dalga 38°) |
+| kapalı cephe (yerel maksimum) | %0,01 | 0 / 186 124 |
+
+**Düzeltme:** tohumlar artık ölü dalganın yönünden gelen bir DÜZLEM dalgasının varış
+zamanını taşıyor. Kalan yayılma refraksiyonun kendisi — cephe sığlaşırken dönüyor, ki
+istenen bu.
+
+**İki yan karar aynı adımda:**
+
+- **Ölü dalganın yönü mutlak oldu.** Eskiden rüzgârdan sapma idi, yani uzaktaki fırtınanın
+  ölü dalgası yerel meltemle birlikte dönüyordu. Ölü dalga onu doğuran havayı geride
+  bırakır; zaten ölü dalga olması bu. Alan da o yön için pişiyor, yani her esintide
+  yeniden pişirme yok.
+- **Dokuda süre değil GECİKME saklanıyor.** 30 km boyunca düzlem terimi 1235 saniyeye
+  çıkıyor ve yarım hassasiyet orada ancak 1 saniye çözüyor — 0,63 radyan faz hatası.
+  Saklanan, düzlemin üstüne deniz yatağının eklediği gecikme (0–570 s); düzlemi shader tam
+  hassasiyette geri ekliyor.

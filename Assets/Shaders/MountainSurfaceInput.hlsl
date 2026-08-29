@@ -81,6 +81,10 @@ float _SeaTime;
 TEXTURE2D(_SeaShoreTravelTex);
 SAMPLER(sampler_SeaShoreTravelTex);
 
+/// `(dir.x, dir.y, 1/c_deep, bias)` — see `SeaCommon.hlsl`. The texture holds the
+/// delay only; the plane is added back at full precision.
+float4 _SeaShorePlane;
+
 float2 _SeaBathyOriginXZ;
 float2 _SeaBathySizeXZ;
 

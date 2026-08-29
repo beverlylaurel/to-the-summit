@@ -67,7 +67,7 @@ public class SeaSimulation : MonoBehaviour
             swellOmega = s.swellPeriod;
             swellGamma = s.swellGamma;
             swellSpread = s.swellSpread;
-            swellDir = s.swellDirectionOffset;
+            swellDir = s.swellDirectionDeg;
         }
 
         public bool Equals(SpectrumInputs o) =>
@@ -412,8 +412,8 @@ public class SeaSimulation : MonoBehaviour
                     SeaConstants.TwoPi / Mathf.Max(1f, settings.swellPeriod));
         cs.SetFloat(SeaShaderIDs.SwellGamma, settings.swellGamma);
         cs.SetFloat(SeaShaderIDs.SwellSpreadS, settings.swellSpread);
-        cs.SetFloat(SeaShaderIDs.SwellDirOffset,
-                    settings.swellDirectionOffset * Mathf.Deg2Rad);
+        cs.SetFloat(SeaShaderIDs.SwellDirection,
+                    settings.swellDirectionDeg * Mathf.Deg2Rad);
         cs.SetFloat(SeaShaderIDs.SmallWaveCutoff, settings.smallWaveCutoff);
         cs.SetFloat(SeaShaderIDs.LoopPeriod, settings.loopPeriod);
 

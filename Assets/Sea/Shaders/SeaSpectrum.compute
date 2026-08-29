@@ -34,7 +34,7 @@ float _SeaSwellAlpha;       // energy scale; the storm producing it is not simul
 float _SeaSwellPeakOmega;   // 2*pi / peak period (rad/s)
 float _SeaSwellGamma;       // peak sharpness; higher than the wind sea's
 float _SeaSwellSpreadS;     // cosine-2s exponent, fixed across frequency
-float _SeaSwellDirOffset;   // radians from the wind direction
+float _SeaSwellDirection;   // radians from the wind direction
 
 // ------------------------------------------------------------------ random
 
@@ -259,7 +259,9 @@ float SeaSpectrumPower(float2 k, float patchSize, float2 wind, uint tier)
     // alive in calm weather; and because its peak is many times longer than
     // the wind sea's, the two together give waves of DIFFERENT SIZES rather
     // than one uniform field.
-    float thetaSwell = thetaWind + _SeaSwellDirOffset;
+    // ABSOLUTE, NOT AN OFFSET FROM THE WIND. A swell outlives the weather that
+    // made it; it does not swing round with the local breeze.
+    float thetaSwell = _SeaSwellDirection;
 
     float sSwell = _SeaSwellAlpha
                  * SeaSwellSpectrum(omega, _SeaSwellPeakOmega, _SeaSwellGamma)

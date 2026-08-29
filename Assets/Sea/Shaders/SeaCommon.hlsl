@@ -48,6 +48,10 @@ float  _SeaDeepWaterDepth;
 TEXTURE2D(_SeaShoreTravelTex);
 SAMPLER(sampler_SeaShoreTravelTex);
 
+/// `(dir.x, dir.y, 1/c_deep, bias)`. The texture holds only the DELAY the sea bed
+/// adds; the straight deep-water plane is added back here, at full precision.
+float4 _SeaShorePlane;
+
 // --- Tier parameters (spec 6.6) ---
 float3 _SeaPatchSizes;
 float3 _SeaTierWeights;
@@ -417,8 +421,10 @@ float SeaBreakerIndex(float slope)
 float SeaSampleShoreTravel(float2 posXZ)
 {
     float2 uv = (posXZ - _SeaBathyOriginXZ) / _SeaBathySizeXZ;
-    return SAMPLE_TEXTURE2D_LOD(_SeaShoreTravelTex, sampler_SeaShoreTravelTex,
-                                saturate(uv), 0).r;
+    float residual = SAMPLE_TEXTURE2D_LOD(_SeaShoreTravelTex, sampler_SeaShoreTravelTex,
+                                          saturate(uv), 0).r;
+
+    return residual + dot(posXZ, _SeaShorePlane.xy) * _SeaShorePlane.z + _SeaShorePlane.w;
 }
 
 /// HOW MUCH OF THE SURFACE THE SHORE WAVE OWNS — THE SURF ZONE, NOT A DEPTH.

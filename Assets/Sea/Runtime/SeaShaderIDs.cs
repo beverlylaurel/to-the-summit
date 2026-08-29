@@ -57,7 +57,8 @@ public static class SeaShaderIDs
     public static readonly int SwellPeakOmega = Shader.PropertyToID("_SeaSwellPeakOmega");
     public static readonly int SwellGamma = Shader.PropertyToID("_SeaSwellGamma");
     public static readonly int SwellSpreadS = Shader.PropertyToID("_SeaSwellSpreadS");
-    public static readonly int SwellDirOffset = Shader.PropertyToID("_SeaSwellDirOffset");
+    public static readonly int SwellDirection = Shader.PropertyToID("_SeaSwellDirection");
+    public static readonly int ShorePlane = Shader.PropertyToID("_SeaShorePlane");
     public static readonly int SmallWaveCutoff = Shader.PropertyToID("_SeaSmallWaveCutoff");
     public static readonly int LoopPeriod = Shader.PropertyToID("_SeaLoopPeriod");
     public static readonly int Choppiness = Shader.PropertyToID("_SeaChoppiness");

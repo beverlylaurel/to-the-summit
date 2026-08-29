@@ -22,7 +22,7 @@ MonoBehaviour:
   swellAlpha: 0.00012668107
   swellGamma: 7
   swellSpread: 26
-  swellDirectionOffset: 38
+  swellDirectionDeg: 38
   smallWaveCutoff: 0.15
   loopPeriod: 200
   patchSizes: {x: 967, y: 191, z: 37}
