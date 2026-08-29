@@ -3918,3 +3918,26 @@ bir dünya ekseni boyunca estiğinde sıralar da onunla hizalanıyor.
 
 0,3 üstü görünür tekrar. Kazanan üçüncü sütun: koordinat aramadan önce büküldü (büküm de
 hücresel, yeni bir gürültü türü girmedi) ve ince oktav kendi ızgara yönünü aldı.
+
+
+## "Köpükler dalgaların köpüğüyse, dalgalar düzenli demektir"
+
+**Kullanıcı haklıydı ve ben yanlış yeri ölçmüştüm.** Spektrumun ZAMAN özilintisini
+ölçmüştüm (ölü dalga 3 dalgada adım kaybediyor) ve "alan düzenli değil" demiştim. Oysa
+soru uzaydaydı.
+
+Dalga alanı GPU'dan geri okundu ve tepeleri KESEN yönde 1200 metrelik bir çizgi boyunca
+özilinti ölçüldü:
+
+| U10 | yön | korelasyon boyu | yerel tepe |
+|---|---|---|---|
+| 0,5 | +X (tepeleri kesen) | 31,5 m | 0,154 @ 177 m |
+| 8 | +X | 14,0 m | **0,489 @ 190 m** |
+| 8 | +Z (tepe boyunca) | 32,5 m | 0,077 @ 81 m |
+
+**190 m, tier 1'in parça boyu (191 m).** Dalgalar gerçekten 191 metrede bir tekrar
+ediyordu; köpük onu işaretliyordu. Köpük maskesi suçlu değildi — o ayrı ve daha küçük bir
+kusurdu (`SeaFoamBubbles`, ayrı kayıt).
+
+**Ders:** bir dokunun tekrar edip etmediği zaman ekseninde değil, **uzayda ve gerçek alan
+üzerinde** ölçülür. Spektrum dar değildi; döşeme tekrar ediyordu.

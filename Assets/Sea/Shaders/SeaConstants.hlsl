@@ -48,14 +48,32 @@
 /// holding that would need 28.6 km, far past anything the mesh draws (4064 m).
 #define SEA_OFFSHORE_RAMP        4000.0
 
-/// Which tier gets the hexagonal tiling. Tier 2 first: its patch is 37 m and it
-/// repeats 110 times inside the visible sea, so it is the one the eye catches.
-#define SEA_HEX_TIER             2
+/// The first tier that gets the hexagonal tiling; every tier from here up is
+/// tiled. Measured repeats inside the visible sea (4064 m):
+///
+///     tier 2   L =  37 m   110 repeats   tiled
+///     tier 1   L = 191 m    21 repeats   tiled
+///     tier 0   L = 967 m     4 repeats   NOT tiled
+///
+/// Tier 0 stays whole for two reasons, and the second is the important one: four
+/// repeats across the whole visible sea is at the edge of noticing, and tier 0
+/// carries the long swell whose crests run for hundreds of metres. Cutting those
+/// into 280 m hexagons is exactly how the big waves were lost once before.
+#define SEA_HEX_TIER_MIN         1
 
-/// Hexagons per patch, along one axis. At the 37 m patch of tier 2 this is a
-/// hexagon about 11 m across — larger than the features it carries (1-5 m), small
-/// enough that the repeat is gone.
-#define SEA_HEX_TILES            3.464
+/// Hexagons per patch, along one axis. Chosen by measurement on the REAL field
+/// (read back from the GPU, 1200 m of line across the crests at 8 m/s):
+///
+///     tiles   tier1 cell   peak repeat
+///     none         -       0.489 @ 190 m     <- tier 1's own patch
+///     2.00        96 m     0.322 @  61 m
+///     3.46        55 m     0.343 @  64 m
+///     5.50        35 m     0.419 @  61 m
+///     8.00        24 m     0.372 @  61 m
+///
+/// 2.0 wins, and the big cells are also the safest for the wave shape: a hexagon
+/// smaller than the waves it carries would cut them up.
+#define SEA_HEX_TILES            2.0
 
 #define SEA_MIN_DEPTH            0.05
 

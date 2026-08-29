@@ -172,7 +172,7 @@ float4 SeaSampleDisplacement(float2 posXZ)
     {
         float2 uv = posXZ / _SeaPatchSizes[s];
 
-        if (s == SEA_HEX_TIER)
+        if (s >= SEA_HEX_TIER_MIN)
         {
             float2 o0, o1, o2; float3 w;
             SeaHexWeights(uv, o0, o1, o2, w);
@@ -212,7 +212,7 @@ float2 SeaSampleSlope(float2 posXZ)
     {
         float2 uv = posXZ / _SeaPatchSizes[s];
 
-        if (s == SEA_HEX_TIER)
+        if (s >= SEA_HEX_TIER_MIN)
         {
             float2 o0, o1, o2; float3 w;
             SeaHexWeights(uv, o0, o1, o2, w);
@@ -254,7 +254,7 @@ float SeaSampleFoam(float2 posXZ, out float2 foldDirection)
         float2 pick = uv;
         float k;
 
-        if (s == SEA_HEX_TIER)
+        if (s >= SEA_HEX_TIER_MIN)
         {
             float2 o0, o1, o2; float3 w;
             SeaHexWeights(uv, o0, o1, o2, w);
