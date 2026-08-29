@@ -12,10 +12,18 @@ maddesinden ikisi çürüdü, ikisi yanlış etiketliydi.
 - **[TEST ŞARTLI]** — beklenen fark sıfır ya da algı altı, piksel garantisi yok. A/B karesi
   olmadan uygulanmaz.
 
-**Denetimin kendi dersi:** ilk sürümde `[KESİN]` etiketiyle gelen maddelerden **üçü**
-yanlış çıktı — biri aritmetik hatasından (S1), biri hiç çalışmayan bir fonksiyondan (S3),
-biri de yalnız runtime'a bakıp editör aracını atladığından (A3). Bir dördüncüsünün (C1)
-öncülü doğruydu ama kazanç tahmini 8-30 kat şişikti. Etiket, doğrulamanın yerine geçmez.
+**Denetimin kendi dersi:** ilk sürümde `[KESİN]` etiketiyle gelen maddelerden **dördü**
+yanlış çıktı:
+
+- **S1** aritmetik hatası — "terim daima 0" değil, kumsalda çalışıyor
+- **S3** hiç çağrılmayan bir fonksiyon — kazanç sıfır
+- **A3** yalnız runtime'a bakmış, editör aracının okumasını atlamış
+- **S7** yalnız `Assets/` altında aramış — dosya `Packages/` altından iki kez include ediliyor,
+  silinseydi gökyüzü bozulurdu
+
+Bir beşincisinin (**C1**) öncülü doğruydu ama kazanç tahmini 8-30 kat şişikti.
+
+Üçünün ortak deseni aynı: **arama kapsamı dar tutulmuş.** Etiket, doğrulamanın yerine geçmez.
 
 ---
 
@@ -77,7 +85,7 @@ GPU marker). Eksik: `ProfilerCaptures/` boş, diske frame-log yok, kar dışı s
 | **S4** | **Deniz köpük kabarcık gürültüsü `whitecap = 0` iken hesaplanıyor.** `saturate(0 - x) ≡ 0`, bubbles'tan bağımsız. Kıyı köpüğündeki ikinci çağrı da `band = 0` iken gereksiz | `SeaLit.shader:427-428, 591` | 36–72 hash/px açık deniz |
 | **S1'** | **Swash dantel gürültüsü kapısı** — `laceBand = swash`, `swash = 0` ⇒ `lace = 0`. Kapı `if (swash > 0)` **bit-identical**. **Gerekçe düzeltildi:** ilk sürüm "lace daima 0" diyordu, yanlış (aşağıya bak) | `MountainSurface.hlsl:534-543` | ~40 hash/px, dağın büyük kısmı |
 | **S6** | **Heightmap ray tracing bayrağı açık, URP raster yolunda kullanılmıyor** — `m_EnableHeightmapRayTracing: 1` pasif maliyet | `Game.unity:3006` | küçük, kesin |
-| **S7** | **`StarField.hlsl` hiçbir shader'a include edilmiyor** — ölü dosya. Temizlik maddesi, FPS değil | `Assets/Shaders/StarField.hlsl` | — |
+| ~~S7~~ | **REDDEDİLDİ — dosya CANLI.** `PhysicallyBasedSky.shader` onu **iki kez** include ediyor (satır 23 ve 246) ve `EvaluateStarField` çağırıyor; `SkyWeatherDriver` de `_StarFieldParams`'ı sürüyor. Rapor yalnız `Assets/` altında aramış, referans `Packages/` altında. Silinseydi gökyüzü bozulurdu | `PhysicallyBasedSky.shader:23,205,246,421` | — |
 | **S8** | `LightningScatter` erken çıkışı doğru; düzeltme gerekmez | `HeightFog.hlsl:76-79` | — |
 
 ### 1c. Ayarlar
