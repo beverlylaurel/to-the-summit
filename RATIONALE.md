@@ -2648,3 +2648,23 @@ konumundan bağımsız.
 
 Periyot 512: köpüğün döşemesinde 640 metrelik bir tekrar demek, kabarcık deseni için
 görüş menzilinin çok ötesi.
+
+
+## Tek ölçekli bir kenar, periyodu olmasa da desen okunur
+
+Kıyı köpüğünün kenarı iki gürültüden kuruluyordu: ~3 m ince doku ve ~16 m kaba kırılma.
+Özilinti ölçüldü, gerçek bir periyot YOK (korelasyon boyunun ötesindeki en büyük yerel
+tepe 0,11–0,23). Ama kullanıcı haklıydı ve neden haklı olduğunu ikinci ölçüm söyledi:
+kenarın salınımı 32 metreden sonra büyümüyor.
+
+Bu, "desen" için periyot gerekmediğini gösteriyor: **tek ölçek yeter.** Bütün dişler aynı
+boyda olunca göz düzen görür. Gerçek bir su çizgisinde koy, dil ve parmak aynı anda
+vardır — ölçek serbesttir.
+
+Düzeltme "daha çok oktav" değil, **doğru yere oktav**: düz bir fBm denendi, enerjiyi
+yayarak ince dokuyu öldürdü (1 m penceresinde 0,29 → 0,05 m). Mevcut ince oktavlar
+korunup üstlerine iki kaba oktav eklendi. Ölçüt tekti — salınım kaba uca doğru büyümeye
+devam etmeli ve ince uç düşmemeli.
+
+Kaba oktavların çarpanları `_SeaFoamBreakupTiling`'e bağlı (0,0292 ve 0,0117), yani ayar
+değişirse dört ölçek birlikte kayıyor; ikinci bir kaynak yok.

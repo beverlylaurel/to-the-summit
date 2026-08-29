@@ -454,18 +454,35 @@ Shader "ToTheSummit/SeaLit"
                     // drawn on (spec 18 pitfall table).
                     // [SOURCE: Crest, SIGGRAPH 2017]
                     //
-                    // TWO SCALES. The fine noise (~3 m) is the foam's own
-                    // texture; the COARSE noise (~16 m) breaks up the
-                    // straightness of the waterline.
+                    // FOUR SCALES, BECAUSE ONE SCALE READS AS A PATTERN.
                     //
-                    // The coarse scale came FROM A MEASUREMENT: the steps in
-                    // the waterline are the terrain heightmap's own
-                    // resolution (4097 texels / 30 km = 7.3 m) and they DO NOT
-                    // CHANGE when the sea mesh is refined. Noise finer than
-                    // that scale hides nothing there.
+                    // This was ~3 m of fine texture plus ~16 m of coarse, and the
+                    // coarse one carried the edge. Measured on a 1 km stretch of
+                    // shore: the edge's wander stops growing past a 32 m window
+                    // (1.08 -> 1.16 -> 1.17 m). Nothing bigger than that exists, so
+                    // every tooth came out the same size and the eye reads a repeat
+                    // even though the autocorrelation shows no true period.
+                    //
+                    // A real waterline has bays, tongues and fingers at once. Two
+                    // coarse octaves (~98 m and ~245 m) are ADDED on top rather than
+                    // replacing the fine ones — measured, a plain 5-octave fBm spread
+                    // the energy and lost the fine detail (0.29 -> 0.05 m at 1 m).
+                    //
+                    // After: the wander keeps growing to 1.24 m at 128 m, and the band
+                    // width goes from 2.5-9.5 m to 0-11.8 m — it closes to nothing on
+                    // the points and opens in the bays. The mean is 5.9 -> 6.6 m.
+                    //
+                    // The 16 m scale is still the smallest that matters for the OUTLINE:
+                    // the waterline's own steps are the terrain heightmap's resolution
+                    // (4097 texels / 30 km = 7.3 m), and noise finer than that hides
+                    // nothing there.
+                    float2 breakupXZ = IN.positionWS.xz * _SeaFoamBreakupTiling;
+
                     float breakup =
-                          SeaFoamNoise(IN.positionWS.xz * _SeaFoamBreakupTiling) * 0.55
-                        + SeaValueNoise(IN.positionWS.xz * (_SeaFoamBreakupTiling * 0.18)) * 0.45;
+                          SeaFoamNoise(breakupXZ) * 0.55
+                        + SeaValueNoise(breakupXZ * 0.18) * 0.45
+                        + (SeaValueNoise(breakupXZ * 0.0292) - 0.5) * 0.6
+                        + (SeaValueNoise(breakupXZ * 0.0117 + float2(51.3, 17.7)) - 0.5) * 0.5;
 
                     // THE NOISE MOVES THE WATERLINE, IT DOES NOT DIM THE FOAM.
                     //

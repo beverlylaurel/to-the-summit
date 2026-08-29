@@ -3851,3 +3851,44 @@ gidiyordu. Stockdon R2% deniz durumunu okuyor:
 **Üçüncü tutarsızlık, aynı adımda:** shader su seviyesini `max * phase` ile yükseltiyordu,
 yani düzgün tırmanıp geri kopan bir testere; yanındaki köpük ise kosinüsü izliyordu. Bir
 dalga için iki şekil. İkisi de artık `surge`'ü okuyor.
+
+
+## "Köpükler niye düzenli desenlere ve aralıklara sahip?"
+
+**İki yanlış hipotez, ikisi de ölçümle elendi — kod yazılmadan:**
+
+| Hipotez | Nasıl elendi |
+|---|---|
+| Değer gürültüsünün ızgarası eksene hizalı | Oktavları döndürmek özilinti tepesini 0,36'dan yalnız 0,32'ye indirdi |
+| Kenarın gerçek bir periyodu var | Korelasyon boyunun ötesindeki en büyük yerel tepe 0,11–0,23. Periyot yok |
+
+**Araç bir kez yalan söyledi ve düzeltildi.** İlk özilinti taraması "her kıyı yönünde 2,0 m"
+dedi — o taranan en kısa gecikmeydi, yani tepe değil kısa menzil korelasyonuydu. İkinci
+sürüm önce korelasyon boyunu buluyor, tepeyi ancak onun ötesinde arıyor.
+
+**Gerçek sebep: kenarın TEK ölçeği vardı.** 1 km'lik kıyı boyunca bandın kenarı izlendi ve
+farklı pencerelerle düzleştirildikten sonra kalan salınım ölçüldü:
+
+| pencere | kalan salınım |
+|---|---|
+| 1 m | 0,29 m |
+| 8 m | 0,71 m |
+| 32 m | 1,08 m |
+| 64 m | 1,16 m |
+| 128 m | **1,17 m** |
+
+32 metreden sonra büyümüyor: o ölçekten büyük hiçbir yapı yok. Her diş aynı boyda çıkıyor
+ve göz bunu tekrar olarak okuyor — matematiksel bir periyot olmasa bile.
+
+**Düzeltme ölçüyle seçildi.** Düz bir 5 oktavlı fBm denendi ve ELENDİ: enerjiyi yayıp ince
+dokuyu öldürdü (1 m'de 0,29 → 0,05). Kazanan, ince oktavların ÜSTÜNE iki kaba oktav
+eklemek (~98 m, ~245 m):
+
+| ölçüt | önce | sonra |
+|---|---|---|
+| 1 m penceresinde salınım | 0,29 m | 0,28 m |
+| 128 m penceresinde | 1,17 m (düz) | 1,24 m (hâlâ artıyor) |
+| bant genişliği | 2,5 – 9,5 m | 0 – 11,8 m |
+| bant ortalaması | 5,9 m | 6,6 m |
+
+Bant artık burunlarda kapanıp koylarda açılıyor; "her diş aynı" görüntüsünü kıran bu.
