@@ -106,11 +106,25 @@ public class WindField : MonoBehaviour
 
     public void Bind(WindSettings tuning) => settings = tuning;
 
+    /// A MISSING BINDING STOPS THE COMPONENT, IT DOES NOT DROWN THE CONSOLE.
+    ///
+    /// This used to throw and leave the component ENABLED. Unity logs the exception and carries
+    /// on, so `Update` kept running and threw a bare `NullReferenceException` on `settings`
+    /// every frame — sixty a second, no object name, no reason. The one line that said what was
+    /// actually wrong sat somewhere above thousands of them, and the console reads as if the
+    /// error survives a Clear because a fresh flood arrives the moment the game runs again.
+    ///
+    /// The error is not swallowed: it is louder now, because it names the object and it is the
+    /// only line. Disabling is what makes it readable — a component that cannot compute its
+    /// wind has nothing to contribute by ticking.
     void OnEnable()
     {
-        if (settings == null)
-            throw new System.InvalidOperationException(
-                $"{nameof(WindField)}: {nameof(settings)} is not assigned.");
+        if (settings != null) return;
+
+        Debug.LogError($"{nameof(WindField)} ('{name}'): {nameof(settings)} atanmamış — "
+                       + "bileşen durduruldu. Sahne bootstrap'i bağlamalı "
+                       + "(MountainSceneBootstrap.EnsureWeather).", this);
+        enabled = false;
     }
 
     /// For testing, fixes the base severity and the direction; the fluctuation (base oscillation +
