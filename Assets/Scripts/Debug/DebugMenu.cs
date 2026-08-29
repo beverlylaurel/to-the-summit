@@ -231,7 +231,7 @@ public class DebugMenu : MonoBehaviour
 
         GUILayout.BeginArea(area);
 
-        GUILayout.Label("Test panel — F1 to exit", title);
+        GUILayout.Label("Test paneli — çıkmak için F1", title);
 
         scroll = GUILayout.BeginScrollView(scroll);
         GUILayout.BeginHorizontal();
@@ -303,7 +303,7 @@ public class DebugMenu : MonoBehaviour
     {
         BeginSection("Bulut");
 
-        bool detach = GUILayout.Toggle(detachFromWeather, "Detach from weather (manual)");
+        bool detach = GUILayout.Toggle(detachFromWeather, "Havadan ayır (elle)");
         if (detach != detachFromWeather)
         {
             detachFromWeather = detach;
@@ -332,7 +332,7 @@ public class DebugMenu : MonoBehaviour
     {
         BeginSection("Hareket");
 
-        GUILayout.Label($"Speed multiplier {speedMultiplier:F0}×");
+        GUILayout.Label($"Hız çarpanı {speedMultiplier:F0}×");
 
         // The slider is quadratic: precise at small values, reaching 100× at the end
         float normalized = Mathf.Sqrt((speedMultiplier - 1f) / 99f);
@@ -342,7 +342,7 @@ public class DebugMenu : MonoBehaviour
         walker.SpeedMultiplier = speedMultiplier;
         flyer.SpeedMultiplier = speedMultiplier;
 
-        bool nextFreeFly = GUILayout.Toggle(freeFly, "Free flight (Q/E)");
+        bool nextFreeFly = GUILayout.Toggle(freeFly, "Serbest uçuş (Q/E)");
         if (nextFreeFly != freeFly)
         {
             freeFly = nextFreeFly;
@@ -379,7 +379,7 @@ public class DebugMenu : MonoBehaviour
 
     void DrawTimeOfDay()
     {
-        BeginSection("Time of day");
+        BeginSection("Günün saati");
 
         GUILayout.Label($"Saat {time.Clock}");
 
@@ -404,20 +404,20 @@ public class DebugMenu : MonoBehaviour
 
         using (new GUILayout.HorizontalScope())
         {
-            if (GUILayout.Button("Dawn")) time.SetNormalized(0.25f);
-            if (GUILayout.Button("Noon")) time.SetNormalized(0.5f);
-            if (GUILayout.Button("Sunset")) time.SetNormalized(0.75f);
+            if (GUILayout.Button("Şafak")) time.SetNormalized(0.25f);
+            if (GUILayout.Button("Öğle")) time.SetNormalized(0.5f);
+            if (GUILayout.Button("Gün batımı")) time.SetNormalized(0.75f);
             if (GUILayout.Button("Gece")) time.SetNormalized(0f);
         }
 
         time.Paused = GUILayout.Toggle(time.Paused, "Saati durdur");
 
         GUILayout.Space(6f);
-        GUILayout.Label($"Game speed {timeScale:F2}×");
+        GUILayout.Label($"Oyun hızı {timeScale:F2}×");
         timeScale = GUILayout.HorizontalSlider(timeScale, 0f, 4f);
         Time.timeScale = timeScale;
 
-        if (GUILayout.Button("Reset speed to normal")) timeScale = 1f;
+        if (GUILayout.Button("Hızı normale al")) timeScale = 1f;
 
         EndSection();
     }
@@ -426,13 +426,13 @@ public class DebugMenu : MonoBehaviour
     {
         BeginSection("Hava durumu");
 
-        GUILayout.Label($"Precipitation {weather.Precipitation:F2}");
+        GUILayout.Label($"Yağış {weather.Precipitation:F2}");
 
         // The driver is NOT DISABLED, its target is supplied from outside. Disabled,
         // `StormIntensity` and `ClearWindow` froze but the atmosphere kept reading them: while the
         // slider drove precipitation, visibility and colour, the cloud coverage stayed at the
         // value held at the moment of the lock and the two diverged.
-        bool nextLock = GUILayout.Toggle(weatherLocked, "Set the weather manually");
+        bool nextLock = GUILayout.Toggle(weatherLocked, "Havayı elle ayarla");
         if (nextLock != weatherLocked)
         {
             weatherLocked = nextLock;
@@ -455,7 +455,7 @@ public class DebugMenu : MonoBehaviour
             //
             // Now if there is precipitation there is snow; a second slider has nothing
             // left to say.
-            GUILayout.Label($"Precipitation intensity {lockedPrecipitation:F2}");
+            GUILayout.Label($"Yağış şiddeti {lockedPrecipitation:F2}");
             lockedPrecipitation = GUILayout.HorizontalSlider(lockedPrecipitation, 0f, 1f);
 
             // SNOW FRACTION, NOT SNOW INTENSITY. The intensity comes from the slider
@@ -463,8 +463,8 @@ public class DebugMenu : MonoBehaviour
             // Two separate questions: "how much is falling" and "what is falling".
             // A SWITCH, NOT A SLIDER. The threshold is 0.5; there is no "mixed" state,
             // either snow falls or rain does (`SnowfallController`).
-            GUILayout.Label($"Precipitation type: {(lockedSnowFraction >= 0.5f ? "SNOW" : "RAIN")}" +
-                            $"   (slider {lockedSnowFraction:F2}, threshold 0.50)   " + SnowStatus());
+            GUILayout.Label($"Yağış türü: {(lockedSnowFraction >= 0.5f ? "KAR" : "YAĞMUR")}" +
+                            $"   (kaydırıcı {lockedSnowFraction:F2}, eşik 0,50)   " + SnowStatus());
             lockedSnowFraction = GUILayout.HorizontalSlider(lockedSnowFraction, 0f, 1f);
             GUILayout.Label(SnowStateStatus());
 
@@ -484,8 +484,8 @@ public class DebugMenu : MonoBehaviour
                 GUILayout.Space(6f);
                 GUILayout.Label("— KAR SINAMASI —");
 
-                GUILayout.Label($"Simulation speed ×{mgr.SimTimeScale:F0}   " +
-                                (mgr.SimTimeScale > 1.5f ? "ACCELERATED" : "real time"));
+                GUILayout.Label($"Simülasyon hızı ×{mgr.SimTimeScale:F0}   " +
+                                (mgr.SimTimeScale > 1.5f ? "HIZLANDIRILMIŞ" : "gerçek zaman"));
 
                 mgr.SimTimeScale = Mathf.Round(
                     GUILayout.HorizontalSlider(mgr.SimTimeScale, 1f, 500f));
@@ -498,11 +498,11 @@ public class DebugMenu : MonoBehaviour
                 if (GUILayout.Button("50 cm"))      mgr.FillSnowDepth(0.50f);
                 GUILayout.EndHorizontal();
 
-                GUILayout.Label($"Measured: coverage {SnowRuntimeState.GroundCoverage01:F3}   " +
+                GUILayout.Label($"Ölçülen: örtü {SnowRuntimeState.GroundCoverage01:F3}   " +
                                 $"SWE {mgr.MeanSwe * 1000f:F2} mm   " +
                                 $"derinlik {SnowDepthMm(mgr):F1} mm");
 
-                if (GUILayout.Button("Revert settings (test)"))
+                if (GUILayout.Button("Ayarları geri al (sınama)"))
                 {
                     mgr.SimTimeScale = 1f;
                     mgr.RefillRegion();
@@ -513,14 +513,14 @@ public class DebugMenu : MonoBehaviour
 
             if (mgr != null)
             {
-                bool nextWt = GUILayout.Toggle(windTransportOff, "Switch off wind transport (diagnostic)");
+                bool nextWt = GUILayout.Toggle(windTransportOff, "Rüzgârla taşınmayı kapat (teşhis)");
                 if (nextWt != windTransportOff)
                 {
                     windTransportOff = nextWt;
                     mgr.WindTransportOff = windTransportOff;
                 }
 
-                bool nextWs = GUILayout.Toggle(windShadowOff, "Switch off the wind shadow (diagnostic)");
+                bool nextWs = GUILayout.Toggle(windShadowOff, "Rüzgâr gölgesini kapat (teşhis)");
                 if (nextWs != windShadowOff)
                 {
                     windShadowOff = nextWs;
@@ -535,27 +535,27 @@ public class DebugMenu : MonoBehaviour
         using (new Disabled(weatherLocked))
         {
             weatherDriver.Instant = GUILayout.Toggle(weatherDriver.Instant,
-                "Weather follows the altitude instantly");
+                "Hava irtifayı anında izlesin");
 
-            GUILayout.Label($"Clear window {weatherDriver.ClearWindow:F2}  " +
-                            $"residue {weatherDriver.WindowResidue:F2}");
-            GUILayout.Label($"Severity {weatherDriver.StormIntensity:F2}  " +
-                            $"cloud mass {weatherDriver.CloudMass:F2}  " +
-                            $"ceiling share {weatherDriver.CeilingAt(walker.transform.position.y):F2}");
+            GUILayout.Label($"Açık pencere {weatherDriver.ClearWindow:F2}  " +
+                            $"kalıntı {weatherDriver.WindowResidue:F2}");
+            GUILayout.Label($"Şiddet {weatherDriver.StormIntensity:F2}  " +
+                            $"bulut kütlesi {weatherDriver.CloudMass:F2}  " +
+                            $"tavan payı {weatherDriver.CeilingAt(walker.transform.position.y):F2}");
             weatherDriver.ForceWindow = GUILayout.Toggle(weatherDriver.ForceWindow,
-                "Force the weather open");
+                "Havayı zorla aç");
         }
 
-        if (GUILayout.Button("Fire lightning")) thunder.TriggerNow();
+        if (GUILayout.Button("Şimşek çaktır")) thunder.TriggerNow();
 
         // A strike not being seen can be two different things: the event never arrived, or it
         // arrived and was not drawn. From outside the two look the same, so the measurement is here.
         GUILayout.Label(lightning.LastDistance < 0f
-            ? "Last strike: none"
-            : $"Last strike: {lightning.LastDistance:F0} m   " +
-              $"light {lightning.Intensity:F2}   glow {lightning.Glow:F2}");
+            ? "Son çakma: yok"
+            : $"Son çakma: {lightning.LastDistance:F0} m   " +
+              $"ışık {lightning.Intensity:F2}   parıltı {lightning.Glow:F2}");
 
-        lightning.Held = GUILayout.Toggle(lightning.Held, "Hold the strike lit");
+        lightning.Held = GUILayout.Toggle(lightning.Held, "Çakmayı yanık tut");
 
         EndSection();
     }
@@ -565,8 +565,8 @@ public class DebugMenu : MonoBehaviour
         if (!SnowRuntimeState.IsSnowing) return "kar yok";
 
         return snowfall != null
-            ? $"falling, {snowfall.AliveFlakes} flakes"
-            : "falling";
+            ? $"yağıyor, {snowfall.AliveFlakes} tanecik"
+            : "yağıyor";
     }
 
     /// THE STEP AT THE WRAP POINT.
@@ -592,22 +592,22 @@ public class DebugMenu : MonoBehaviour
 
         // `GroundCoverage01` is the readback of the state texture: near 1 if there is
         // snow, 0 if the texture is empty.
-        return $"snowing {(SnowRuntimeState.IsSnowing ? "YES" : "no")}   " +
-               $"intensity {SnowRuntimeState.SnowfallIntensity01:F2}   " +
+        return $"kar yağıyor {(SnowRuntimeState.IsSnowing ? "EVET" : "hayır")}   " +
+               $"şiddet {SnowRuntimeState.SnowfallIntensity01:F2}   " +
                $"yeni kar ρ {rho:F0}   " +
                $"DOKUDA {SnowRuntimeState.GroundCoverage01:F2}   " +
-               $"loose {SnowRuntimeState.LooseSnowFraction:F2}";
+               $"gevşek {SnowRuntimeState.LooseSnowFraction:F2}";
     }
 
     void DrawWind()
     {
-        BeginSection("Wind");
+        BeginSection("Rüzgâr");
 
-        GUILayout.Label($"Severity {wind.Strength:F2}   Speed {wind.Velocity.magnitude:F1} m/s");
+        GUILayout.Label($"Şiddet {wind.Strength:F2}   Hız {wind.Velocity.magnitude:F1} m/s");
 
         // The lock fixes the base severity and the direction; the fluctuation keeps working on top
         // — the component is not disabled. A 0.5 on the slider is a 0.5 that breathes around itself.
-        bool nextLock = GUILayout.Toggle(windLocked, "Set the wind manually");
+        bool nextLock = GUILayout.Toggle(windLocked, "Rüzgârı elle ayarla");
         if (nextLock != windLocked)
         {
             windLocked = nextLock;
@@ -616,10 +616,10 @@ public class DebugMenu : MonoBehaviour
 
         using (new Disabled(!windLocked))
         {
-            GUILayout.Label($"Severity {lockedWindStrength:F2}");
+            GUILayout.Label($"Şiddet {lockedWindStrength:F2}");
             lockedWindStrength = GUILayout.HorizontalSlider(lockedWindStrength, 0f, 1f);
 
-            GUILayout.Label($"Direction {lockedWindAngle:F0}°");
+            GUILayout.Label($"Yön {lockedWindAngle:F0}°");
             lockedWindAngle = GUILayout.HorizontalSlider(lockedWindAngle, 0f, 360f);
         }
 
@@ -631,17 +631,17 @@ public class DebugMenu : MonoBehaviour
     /// the term that produced the symptom.
     void DrawSea()
     {
-        BeginSection("Sea");
+        BeginSection("Deniz");
 
         GUILayout.Label($"Hs {SeaRuntimeState.SignificantWaveHeight:F2} m   " +
                         $"Tp {SeaRuntimeState.PeakPeriod:F1} s");
-        GUILayout.Label($"shore foam {SeaRuntimeState.ShoreFoamIntensity01:F2}");
+        GUILayout.Label($"kıyı köpüğü {SeaRuntimeState.ShoreFoamIntensity01:F2}");
 
-        seaNoSurface    = GUILayout.Toggle(seaNoSurface,    "Switch off the sea surface");
-        seaNoWaves      = GUILayout.Toggle(seaNoWaves,      "Switch off the waves");
-        seaNoShallow    = GUILayout.Toggle(seaNoShallow,    "Switch off shallow water");
-        seaNoFoam       = GUILayout.Toggle(seaNoFoam,       "Switch off the foam");
-        seaNoRefraction = GUILayout.Toggle(seaNoRefraction, "Switch off refraction");
+        seaNoSurface    = GUILayout.Toggle(seaNoSurface,    "Deniz yüzeyini kapat");
+        seaNoWaves      = GUILayout.Toggle(seaNoWaves,      "Dalgaları kapat");
+        seaNoShallow    = GUILayout.Toggle(seaNoShallow,    "Sığ su dönüşümünü kapat");
+        seaNoFoam       = GUILayout.Toggle(seaNoFoam,       "Köpüğü kapat");
+        seaNoRefraction = GUILayout.Toggle(seaNoRefraction, "Kırılmayı kapat");
 
         // WRITTEN EVERY FRAME, NOT ON CHANGE. `SeaManager` republishes its own
         // globals every frame; a value written once here would be overwritten the
@@ -652,7 +652,7 @@ public class DebugMenu : MonoBehaviour
         Shader.SetGlobalFloat(SeaShaderIDs.DbgNoFoam,       seaNoFoam ? 1f : 0f);
         Shader.SetGlobalFloat(SeaShaderIDs.DbgNoRefraction, seaNoRefraction ? 1f : 0f);
 
-        if (GUILayout.Button("Revert settings (sea)"))
+        if (GUILayout.Button("Ayarları geri al (deniz)"))
             seaNoSurface = seaNoWaves = seaNoShallow = seaNoFoam = seaNoRefraction = false;
 
         EndSection();
@@ -664,19 +664,19 @@ public class DebugMenu : MonoBehaviour
 
     void DrawOverlays()
     {
-        BeginSection("What to draw");
+        BeginSection("Ne çizilsin");
 
-        GUILayout.Label($"Visibility {atmosphere.Visibility:F0} m");
+        GUILayout.Label($"Görüş {atmosphere.Visibility:F0} m");
 
-        atmosphere.FogEnabled = GUILayout.Toggle(atmosphere.FogEnabled, "Height fog");
-        precipitation.enabled = GUILayout.Toggle(precipitation.enabled, "Rain and snow");
+        atmosphere.FogEnabled = GUILayout.Toggle(atmosphere.FogEnabled, "Yükseklik sisi");
+        precipitation.enabled = GUILayout.Toggle(precipitation.enabled, "Yağmur ve kar");
 
-        hud.enabled = GUILayout.Toggle(hud.enabled, "Performance readout");
-        climbHud.enabled = GUILayout.Toggle(climbHud.enabled, "Climb readout");
+        hud.enabled = GUILayout.Toggle(hud.enabled, "Performans göstergesi");
+        climbHud.enabled = GUILayout.Toggle(climbHud.enabled, "Tırmanış göstergesi");
 
         // The OBJECT, not the component: the layer sits on a disabled object.
         GameObject lines = routeOverlay.gameObject;
-        bool showLines = GUILayout.Toggle(lines.activeSelf, "Route lines");
+        bool showLines = GUILayout.Toggle(lines.activeSelf, "Rota çizgileri");
         if (showLines != lines.activeSelf) lines.SetActive(showLines);
 
         EndSection();

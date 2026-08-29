@@ -63,19 +63,19 @@ public class PerformanceWatchdog : MonoBehaviour
         if (s.AverageFps < criticalFps)
             Raise("fps", $"FPS kritik: {s.AverageFps:F0}", AlertSeverity.Critical, now);
         else if (s.AverageFps < warningFps)
-            Raise("fps", $"FPS low: {s.AverageFps:F0}", AlertSeverity.Warning, now);
+            Raise("fps", $"FPS düşük: {s.AverageFps:F0}", AlertSeverity.Warning, now);
 
         if (s.AverageFps > 0f && s.OnePercentLowFps < s.AverageFps * stutterRatio)
-            Raise("stutter", $"Stutter: 1% low {s.OnePercentLowFps:F0} / avg {s.AverageFps:F0}", AlertSeverity.Warning, now);
+            Raise("stutter", $"Takılma: %1 dip {s.OnePercentLowFps:F0} / ort {s.AverageFps:F0}", AlertSeverity.Warning, now);
 
         if (s.ManagedGrowthMbPerSec > gcGrowthMbPerSec)
-            Raise("gc", $"GC pressure: {s.ManagedGrowthMbPerSec:F1} MB/s", AlertSeverity.Warning, now);
+            Raise("gc", $"GC baskısı: {s.ManagedGrowthMbPerSec:F1} MB/s", AlertSeverity.Warning, now);
 
         if (s.DrawCalls > drawCallLimit)
-            Raise("draw", $"Draw calls high: {s.DrawCalls}", AlertSeverity.Warning, now);
+            Raise("draw", $"Draw call yüksek: {s.DrawCalls}", AlertSeverity.Warning, now);
 
         if (s.Triangles > triangleLimit)
-            Raise("tri", $"Triangles high: {s.Triangles / 1000}k", AlertSeverity.Warning, now);
+            Raise("tri", $"Üçgen sayısı yüksek: {s.Triangles / 1000}k", AlertSeverity.Warning, now);
 
         if (s.TotalMemoryMb > memoryLimitMb)
             Raise("mem", $"Bellek kritik: {s.TotalMemoryMb} MB", AlertSeverity.Critical, now);

@@ -18,6 +18,11 @@ geçmez.
 
 Belgeler (`*.md`) ve commit mesajları Türkçe kalır; onlar kullanıcı için.
 
+**Ekranda kullanıcıya görünen metin de Türkçe.** F1 test paneli, tırmanış göstergesi,
+performans uyarıları — bölüm başlığı, etiket, buton, onay kutusu, durum satırı. Ayrım
+"kaynak mı, arayüz mü" değil: **kim okuyor?** Kod okuyan Claude, panel okuyan kullanıcı.
+Tanımlayıcı ve yorum bu satırların içinde de İngilizce kalır; yalnız görünen dize Türkçe.
+
 ## Kod mimarisi
 
 React component mantığı geçerlidir: her parça kendi içinde kapalı, dışarıdan gelen parametreyle çalışır, başka parçalara bağımlı değildir.

@@ -81,40 +81,40 @@ public class ClimbHud : MonoBehaviour
         // All elevations are relative to the ground. With the altitude relative and the band
         // boundaries written as absolute, the two could not be compared: "I am at 2114 m, the
         // storm is at 4709 m" were two numbers measured from two different zero points.
-        builder.AppendFormat("CLIMB\n");
-        builder.AppendFormat("  Your altitude          {0:F0} m\n", altitude);
-        builder.AppendFormat("  Summit                 {0:F0} m   ({1:F0}% complete)\n",
+        builder.AppendFormat("TIRMANIŞ\n");
+        builder.AppendFormat("  Bulunduğun irtifa      {0:F0} m\n", altitude);
+        builder.AppendFormat("  Zirve                  {0:F0} m   (%{1:F0} tamamlandı)\n",
             summit - ground, Mathf.Clamp01(altitude / (summit - ground)) * 100f);
-        builder.AppendFormat("  Altitude weather sees  {0:F0} m\n\n",
+        builder.AppendFormat("  Havanın gördüğü irtifa {0:F0} m\n\n",
             weatherDriver.ProgressAltitude - ground);
 
         // TEMPERATURE. Measured and felt are printed separately: the wind does not change the
         // thermometer, it changes the person. The freezing level derives from the same source —
         // three lines, three faces of one model.
         builder.AppendFormat("SICAKLIK\n");
-        builder.AppendFormat("  Measured               {0:F1} °C\n",
+        builder.AppendFormat("  Ölçülen                {0:F1} °C\n",
             temperature.At(observer.position.y));
-        builder.AppendFormat("  Felt                   {0:F1} °C   (wind chill)\n",
+        builder.AppendFormat("  Hissedilen             {0:F1} °C   (rüzgâr soğutması)\n",
             temperature.FeltAt(observer.position.y));
         builder.AppendFormat("  Donma seviyesi         {0:F0} m\n\n",
             temperature.FreezingLevel - ground);
 
-        builder.AppendFormat("WEATHER BANDS\n");
-        builder.AppendFormat("  Permanent storm        {0:F0} m\n\n",
+        builder.AppendFormat("HAVA KUŞAKLARI\n");
+        builder.AppendFormat("  Sürekli fırtına        {0:F0} m\n\n",
             weatherDriver.BlizzardAltitude - ground);
 
-        builder.AppendFormat("PRECIPITATION\n");
-        builder.AppendFormat("  Severity               {0:F2}\n", weather.Precipitation);
-        builder.AppendFormat("  Clear window           {0:F2}   (1 = the weather cleared)\n\n",
+        builder.AppendFormat("YAĞIŞ\n");
+        builder.AppendFormat("  Şiddet                 {0:F2}\n", weather.Precipitation);
+        builder.AppendFormat("  Açık pencere           {0:F2}   (1 = hava açtı)\n\n",
             weatherDriver.ClearWindow);
 
-        builder.AppendFormat("WIND\n");
-        builder.AppendFormat("  Sustained severity     {0:F2}\n", wind.Strength);
-        builder.AppendFormat("  Instantaneous gust     {0:+0.00;-0.00}\n", wind.Gust);
-        builder.AppendFormat("  Speed                  {0:F1} m/s\n\n", wind.Velocity.magnitude);
+        builder.AppendFormat("RÜZGÂR\n");
+        builder.AppendFormat("  Sürekli şiddet         {0:F2}\n", wind.Strength);
+        builder.AppendFormat("  Anlık hamle            {0:+0.00;-0.00}\n", wind.Gust);
+        builder.AppendFormat("  Hız                    {0:F1} m/s\n\n", wind.Velocity.magnitude);
 
-        builder.AppendFormat("VISIBILITY\n");
-        builder.AppendFormat("  Visibility             {0:F0} m\n", atmosphere.Visibility);
+        builder.AppendFormat("GÖRÜŞ\n");
+        builder.AppendFormat("  Görüş mesafesi         {0:F0} m\n", atmosphere.Visibility);
         // "Coverage", not "cover": this is how much of the LAYER is cloud — not how much of the
         // sky is closed. It can read 95% at the summit while the sky is clear, because the player
         // has climbed above the layer. That is why where they stand is printed too.
@@ -138,25 +138,25 @@ public class ClimbHud : MonoBehaviour
         //
         // The shadow comes not from the cloud above you but from the cloud IN THE SUN'S
         // DIRECTION. The local coverage never answers that question.
-        builder.AppendFormat("  Cloud — above you      {0:F0}%\n",
+        builder.AppendFormat("  Bulut — tepende        %{0:F0}\n",
             cloudLayer.CoverageAt(observer.position) * 100f);
-        builder.AppendFormat("  Cloud — in the sky     {0:F0}%   (the shadow comes from this)\n",
+        builder.AppendFormat("  Bulut — gökyüzünde     %{0:F0}   (gölge bundan geliyor)\n",
             atmosphere.Coverage * 100f);
 
         if (float.IsPositiveInfinity(top))
-            builder.AppendFormat("  Cloud layer            no cloud in this column\n\n");
+            builder.AppendFormat("  Bulut katmanı          bu sütunda bulut yok\n\n");
         else
         {
-            string place = observer.position.y > top ? "you are above it"
-                         : observer.position.y < bottom ? "you are below it"
-                         : "you are inside it";
-            builder.AppendFormat("  Cloud layer            {0:F0} – {1:F0} m   ({2})\n\n",
+            string place = observer.position.y > top ? "üstündesin"
+                         : observer.position.y < bottom ? "altındasın"
+                         : "içindesin";
+            builder.AppendFormat("  Bulut katmanı          {0:F0} – {1:F0} m   ({2})\n\n",
                 bottom - ground, top - ground, place);
         }
 
         builder.AppendFormat("ZAMAN\n");
         builder.AppendFormat("  Saat                   {0}\n", time.Clock);
-        builder.AppendFormat("  Day factor             {0:F2}   (0 night, 1 full day)", time.DayFactor);
+        builder.AppendFormat("  Gündüz katsayısı       {0:F2}   (0 gece, 1 tam gündüz)", time.DayFactor);
 
         readout = builder.ToString();
     }
