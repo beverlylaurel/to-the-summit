@@ -75,9 +75,15 @@ public class LookController : MonoBehaviour
     /// Sine of -6 degrees: the end of civil twilight, and the earliest the rods can take over.
     const float CivilTwilightSine = -0.1045f;
 
-    /// The floor under the light level. Measured, it never engages in the real cycle — the
-    /// darkest hour reads 0.0014 — but the level is a ratio and nothing guarantees a future
-    /// sky cannot reach zero, and `log2(0)` is negative infinity.
+    /// The floor under the light level. IT ENGAGES, AND WHERE IT ENGAGES IS A BUG.
+    ///
+    /// Measured in Play: the level is 0.0058 at midnight and 0.0018 before dawn, all well
+    /// above the floor — and then 0.0002 AT SUNSET, below it. The floor is doing its job
+    /// (`log2(0)` is negative infinity) but the reason it is reached is that the sky probe
+    /// collapses at the horizon, not that the scene is dark. At 17:30 the sky term reads 0.25;
+    /// half an hour later it reads 0.0002 while the drawn sky is blazing orange.
+    ///
+    /// SYMPTOMS.md, "Gokyuzu probu gun dogumunda ve batiminda cokuyor".
     const float LightLevelFloor = 0.0005f;
 
     /// WHAT THE ADAPTATION IS DOING RIGHT NOW. Read by the F1 panel; the chain is four

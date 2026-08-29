@@ -2721,9 +2721,15 @@ tavan doyuma çevrilince maddenin gerekçesi ortadan kalktı.
 Ayrıca `LookController`'a kamera bağımlılığı sokar ve incelemenin kendisi 2-3 s ek yumuşatma
 şart koşuyor. Getiri, taşıdığı salınım riskini karşılamıyor.
 
-**A3 "alt sınırı 0,0005 → 0,00006" — konusuz.** Ölçüldü: gerçek çevrimde ışık seviyesi
-0,0014'ün altına **hiç inmiyor**. Alt sınır zaten devreye girmiyor; indirmek hiçbir şey
-değiştirmez.
+**A3 "alt sınırı 0,0005 → 0,00006" — yapılmadı, ama "konusuz" demek YANLIŞTI.**
+Edit mod ölçümüne bakıp "seviye 0,0014'ün altına hiç inmiyor, sınır devreye girmiyor"
+demiştim. Play bunu çürüttü: gün batımında seviye **0,0002**, sınırın altında. Sınır
+çalışıyor.
+
+Ama indirmenin çaresi yine de bu değil. Sınıra gece değil, **gökyüzü probunun ufuktaki
+çöküşü** dayanıyor (`SYMPTOMS.md`). Sınırı indirmek bozuk girdinin daha derinini görmek
+demek: gün batımı bugün 3,33 EV'ye açılıyor, sınır düşürülürse daha da açılır. Önce girdi
+düzelecek.
 
 **B2 "karanlıkta glare artsın" — yapılmadı.** Yönü doğru (göz bebeği 2→8 mm, alan 16 kat,
 kaynak çevresindeki hale büyür). Ama `bloom.intensity` bir stil parametresi, veiling

@@ -4033,14 +4033,24 @@ dalı ölüyor, gece dalı henüz doğmuyor, ikisi ortada buluşamıyor.
 `SurfaceLightLevel`'in aynı anda sıfırlanması **doğru**: ufka paralel ışın düz zemine sıfır
 ışınım düşürür. Yanlış olan, gökyüzünün de sıfır olması.
 
-**ÖLÇÜMÜN SINIRI — Play'de doğrulanmadı.** Yukarıdaki sayılar edit modda, elle
-`DynamicGI.UpdateEnvironment()` çağırarak, yani probe'u **skybox malzemesinden** pişirerek
-alındı. Play bu yolu kullanmıyor: sahnede `skyAmbientMode = Dynamic` ve paket her karede
-kendi `AmbientProbePass`'ini kuyruğa alıp probe'u **kendi LUT'undan** yazıyor. İki ayrı yol;
-ölçülen bir tanesi. Deliğin Play'de de olup olmadığı F1 → "Göz uyumu" satırından
-okunacak: 18:00'de `gök` terimi sıfıra düşüyorsa delik gerçek.
+**PLAY'DE DOĞRULANDI, ama tam sıfır değil.** Edit modda (probe skybox malzemesinden
+pişirilerek) zenit tam `0,000000` okunuyordu. Play paketin `AmbientProbePass`'ini kullanıyor
+ve orada 18:00'de `gök = 0,0002`. Delik gerçek, çöküşün büyüklüğü ise şu: **17:30'da gök
+terimi 0,25, 18:00'de 0,0002 — 1250 kat.** Aynı anda ekranda turuncu bir gün batımı çizili.
+Yani probe, ÇİZİLEN gökyüzünü okumuyor.
+
+Bu, `SkyAmbientBaker`'ın kendi yorumunda tarif ettiği belirtinin ta kendisi: "18:36'da çizilen
+gökyüzü kırmızıydı, probe 0,00000, sahne kapkaranlıktı." O yorum sorunu paketin analitik
+`RenderSky` yoluna bağlayıp "analitik yol kapatıldı" diyor. **Kapanmamış.** Sahnede
+`skyAmbientMode = Dynamic` olduğu için paketin `AmbientProbePass`'i her kare kuyruğa giriyor
+ve render `LateUpdate`'ten sonra koştuğu için `SkyAmbientBaker`'ın pişirdiğini **eziyor**.
+Düzeltme yazılmış ama üstüne yazılıyor.
+
+**Yan etki — alt sınır devreye giriyor.** Işık seviyesi 0,0002, `LightLevelFloor` 0,0005.
+Yani gün batımında pozlama "günün en karanlık anı"nı görüyor: 10,97 kademe, açılma **3,33 EV**
+— gecenin en karanlık saatinden (2,95) daha fazla. Sıralama ters.
 
 **Kapatılmadı** — sebep gökyüzü paketinde, düzeltmesi sahnenin aydınlatmasını değiştirir.
-`DECISIONS.md` → "Ufuktaki gökyüzü deliği". Göz uyumunun çubuk görüşü terimi bu delikten
-etkilenmesin diye sivil alacakaranlık kapısı taşıyor; pozlamanın kendisi taşımıyor ve
-delikte 2,50 yerine 3,45 EV'ye açılıyor — Play'de bakılacak ilk sayı bu.
+`DECISIONS.md` → "Ufuktaki gökyüzü deliği". Göz uyumunun çubuk görüşü terimi sivil
+alacakaranlık kapısı taşıdığı için delikten etkilenmiyor (18:00'de çubuk 0,00, altın saat
+solmuyor); pozlamanın kendisi etkileniyor.

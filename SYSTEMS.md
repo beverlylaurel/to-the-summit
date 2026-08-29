@@ -1619,6 +1619,18 @@ zincirinin ufuktaki deliğine (aşağıda) bağışık olması.
 renklilik kaybının ne kadarının harcandığını söylüyor. İkisi ayrışırsa iki alana bölünür;
 tetikleyici `DECISIONS.md`'de.
 
+**Play'de doğrulandı** (F1 → Göz uyumu). Kâğıtta hesaplanan ile ekranda okunan:
+
+| saat | ışık | kademe | eski | kâğıt | PLAY | çubuk |
+|---|---|---|---|---|---|---|
+| 00:00 | 0,0058 | 7,43 | 2,50 | 2,47 | **2,48** | 0,66 |
+| 03:00 | 0,0041 | 7,94 | 2,50 | 2,62 | **2,60** | 0,83 |
+| 05:00 | 0,0018 | 9,08 | 2,50 | 2,94 | **2,95** | 1,00 |
+| 18:00 | 0,0002 | 10,97 | 2,50 | 3,45 | **3,33** | 0,00 |
+
+Gece artık üç ayrı sayı; eskiden üçü de 2,50'ydi. 18:00 satırı düzelme değil, **ufuktaki
+gökyüzü deliğinin** göstergesi — çubuk terimi kapısı sayesinde renge bulaşmıyor.
+
 
 ## Göz uyumu havayı GÖRMÜYOR (2026-08-29)
 
