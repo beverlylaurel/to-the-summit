@@ -2029,3 +2029,38 @@ maliyet o kadar katlanıyor.
 tek örnekli analitik kuyruk. Editörde ölçüm yapılmaz.
 
 
+
+
+## Kıyı için EŞEVRELİ dalga treni kurulmayacak — denendi, geri alındı (2026-08-29)
+
+**Karar.** Kıyıda refraction, pişirilmiş bir varış-süresi alanı ve ondan türeyen tek
+frekanslı bir dalga treniyle YAPILMAYACAK. Denendi (`5b5201e`..`19a742a`), dört tur belirti
+kovalandı, `f466de1` ile geri alındı.
+
+**Fizik doğruydu, sonuç yanlıştı.** Alan kendi eikonalini sağlıyordu (|grad tau|·c
+ortalaması 1,018), tepeler derinlik konturlarına oturuyordu (2–8 m'de medyan açı 5–6°).
+Sorun doğrulukta değil: **kilometrelerce boyunca kusursuz eşevreli bir tren**, gerçek deniz
+yüzeyi stokastik olduğu için hep yapay okunuyor. Belirtiler tek sebebin yüzleri:
+
+| Belirti | Yüzeyde görünen |
+|---|---|
+| İki tren moiré yaptı | sıkışık tarak |
+| Cephe her yönden geldi | soğan halkası |
+| Karada "en yakın su" dolgusu parça parça sabit | altıgen kenarlı basamaklar |
+| Bandın kotu uzayda sıçradı | alt katman dalgadan bağımsız hareket |
+
+**İkinci hata:** aynı alan ARAZİYE de sürüldü. Karada `tau` 4-komşulu taşma dolgusuyla
+dolduruluyor, yani parça parça sabit; sınırlarında sıçrıyor.
+
+**Üretimdeki sistemler bunu yapmıyor.** Crest, Oceanology ve UE5 su eklentisi FFT'ye
+dokunmuyor; kıyıyı **derinlikle maskelenmiş yerel bir etki** olarak ekliyor — kıyı normali
+boyunca kayan doku, derinlik farkıyla sürülen köpük. Yerel olduğu için eşevrelilik
+artefaktı doğmuyor.
+
+**Tetikleyici — bu karar ne zaman açılır:** yalnız yerel yol denenmiş ve refraction hissi
+hâlâ eksikse. O zaman bile tren küresel değil, kıyıya yerel ve stokastik faz taşıyan bir
+katman olmalı.
+
+**Maliyet:** dört commit, bir CPU pişirme adımı (`SeaShorePhase`, hızlı yürüyüş eikonal
+çözücü) ve iki shader yolu silindi. Ölçüm araçları oturumda kaldı; yeniden gerekirse
+`SYMPTOMS.md` yerine bu kayıt okunacak.
