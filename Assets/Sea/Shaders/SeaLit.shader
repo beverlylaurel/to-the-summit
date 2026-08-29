@@ -167,6 +167,10 @@ Shader "ToTheSummit/SeaLit"
                 float depth = SeaSampleDepth(IN.positionWS.xz);
                 clip(depth);
 
+                // DIAGNOSTIC: removes the whole surface, so anything left on screen is
+                // NOT the sea.
+                clip(_SeaDbgNoSurface > 0.5 ? -1.0 : 1.0);
+
                 float3 V = normalize(_WorldSpaceCameraPos - IN.positionWS);
                 float  dist = length(_WorldSpaceCameraPos - IN.positionWS);
 

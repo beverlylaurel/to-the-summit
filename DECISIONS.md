@@ -79,6 +79,10 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ## Silinecek geçiciler
 
+- **F1 → Kıyı bölümü** (`DebugMenu.DrawShoreline`, `_SeaDbgNoSurface`,
+  `_TerrainDbgNoSeaWet`, `_TerrainDbgNoLace`, `_TerrainDbgNoSnow`). Kumsaldaki düz
+  kenarlı yamanın sahibi bulunduğunda bölüm ve dört global birlikte silinir.
+
 - **Ova ve patika ölçüm araçları** (`ForelandProbe`, F1'deki kurulum süresi logu) — ova
   ve yol dokusu oturunca silinir
 - **Bisiklet maskesi yeniden seyreltmede silinecek** — malzeme maskesi köşe renginde duruyor;

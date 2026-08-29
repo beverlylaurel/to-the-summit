@@ -79,6 +79,13 @@ float _SeaWetDarkening;
 // wave, and a beach does not move at that rate.
 float _SeaLevelY;
 
+// DIAGNOSTIC SWITCHES. Written every frame by `DebugMenu` (F1). One suspect each:
+// nothing here changes what the surface IS, it only removes one contribution so the
+// symptom can be attributed.
+float _TerrainDbgNoSeaWet;
+float _TerrainDbgNoLace;
+float _TerrainDbgNoSnow;
+
 // Sand maps of the shore. Outside the CBUFFER because textures always are; the
 // scalars that go with them are inside `UnityPerMaterial`.
 TEXTURE2D(_SandAlbedo);      SAMPLER(sampler_SandAlbedo);

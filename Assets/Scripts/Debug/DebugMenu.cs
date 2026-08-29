@@ -83,6 +83,15 @@ public class DebugMenu : MonoBehaviour
     /// costs one.
     bool seaNoWaves, seaNoShallow, seaNoFoam, seaNoRefraction;
 
+    // --- Shoreline: which layer draws the straight-edged patch on the beach ---
+    bool seaNoSurface, shoreNoSeaWet, shoreNoLace, shoreNoSnow;
+
+    static readonly int TerrainNoSeaWetId = Shader.PropertyToID("_TerrainDbgNoSeaWet");
+    static readonly int TerrainNoLaceId   = Shader.PropertyToID("_TerrainDbgNoLace");
+    static readonly int TerrainNoSnowId   = Shader.PropertyToID("_TerrainDbgNoSnow");
+    static readonly int SnowAreaCenterId  = Shader.PropertyToID("_SnowAreaCenter");
+    static readonly int SnowAreaSizeId    = Shader.PropertyToID("_SnowAreaSize");
+
     /// The cloud settings are driven through `cloudVolume.profile` — the Volume's runtime COPY,
     /// not the asset itself. Writing to `sharedProfile` does not work: the moment another
     /// component in the scene touches `.profile`, the Volume starts blending from the copy and the
@@ -246,6 +255,7 @@ public class DebugMenu : MonoBehaviour
         BeginColumn();
         DrawClouds();
         DrawSea();
+        DrawShoreline();
         DrawOverlays();
         EndColumn();
 
@@ -775,6 +785,40 @@ public class DebugMenu : MonoBehaviour
 
         if (GUILayout.Button("Revert settings (sea)"))
             seaNoWaves = seaNoShallow = seaNoFoam = seaNoRefraction = false;
+
+        EndSection();
+    }
+
+    /// WHO DRAWS THE STRAIGHT-EDGED PATCH ON THE BEACH.
+    ///
+    /// Four layers can paint the same ground and each one has a boundary of its own:
+    /// the sea (clipped at depth zero), the shore wetness, the swash lace and the
+    /// terrain's snow. A straight edge belongs to whichever of them carries a SQUARE
+    /// region — and the only way to say which is to remove them one at a time.
+    void DrawShoreline()
+    {
+        BeginSection("Shoreline");
+
+        // The snow region IS a square and it follows the player. Printed so its edge
+        // can be compared with where the patch's edge actually sits.
+        Vector4 c = Shader.GetGlobalVector(SnowAreaCenterId);
+        float areaSize = Shader.GetGlobalFloat(SnowAreaSizeId);
+        GUILayout.Label($"snow region {areaSize:F0} m square, centre {c.x:F0}, {c.y:F0}");
+        GUILayout.Label($"sea level {SeaRuntimeState.Active} | Hs {SeaRuntimeState.SignificantWaveHeight:F2} m");
+
+        seaNoSurface  = GUILayout.Toggle(seaNoSurface,  "Switch off the sea surface");
+        shoreNoSeaWet = GUILayout.Toggle(shoreNoSeaWet, "Switch off the shore wetness");
+        shoreNoLace   = GUILayout.Toggle(shoreNoLace,   "Switch off the swash lace");
+        shoreNoSnow   = GUILayout.Toggle(shoreNoSnow,   "Switch off the terrain snow");
+
+        // Written every frame, for the same reason as the sea switches.
+        Shader.SetGlobalFloat(SeaShaderIDs.DbgNoSurface, seaNoSurface ? 1f : 0f);
+        Shader.SetGlobalFloat(TerrainNoSeaWetId,        shoreNoSeaWet ? 1f : 0f);
+        Shader.SetGlobalFloat(TerrainNoLaceId,          shoreNoLace ? 1f : 0f);
+        Shader.SetGlobalFloat(TerrainNoSnowId,          shoreNoSnow ? 1f : 0f);
+
+        if (GUILayout.Button("Revert settings (shoreline)"))
+            seaNoSurface = shoreNoSeaWet = shoreNoLace = shoreNoSnow = false;
 
         EndSection();
     }
