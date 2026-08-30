@@ -4372,3 +4372,22 @@ saçılımı — yüzeyin altındaki hacim için zaten hesapladığı büyüklü
 neredeyse saf suydu (Jerlov Tip I, tropik berrak); mavi hiç sönmediği için sığ su parlak
 turkuaz çıkıyordu. Jerlov kıyı 3C: (0,346, 0,082, **0,154**). Yukarı saçılım rengi de aynı
 tablodan, %1,9 geri saçılım payıyla: (0,030, 0,140, 0,111) — yeşil baskın, mavi ikinci.
+
+---
+
+## Uzaktan köpük yapıştırılmış leke gibi duruyor
+
+**Ölçüm.** Köpüğün tek bir kabarcık oktavı vardı, `_SeaFoamTiling = 0.8` → özellikler
+**1,25 m**. Yakında doğru; 100 m ve ötesinde iki üç piksel, yani düz bir yıkamaya
+ortalanıyor ve beyaz başlık suyun üstüne yapıştırılmış soluk bir leke olarak okunuyor.
+
+**Gerçek köpük iki ölçekte kurulur:** birkaç metrelik kaba **dantel** (kümeler ve
+kanallar) ve onun içindeki kabarcıklar. Mesafede hayatta kalan kaba olanıdır ve eksik
+olan oydu.
+
+**Düzeltme.** İkinci oktav `foamUV * 0.20` ile eklendi (~6,25 m). Aşındırma bütçesi
+**bölündü, eklenmedi**: 0,55 zaten Jacobian eşiğinin çözüldüğü Monahan kaplamasına göre
+ayarlıydı, daha fazlası beyaz başlık alanını o yasanın altına iterdi. Yeni dağılım
+0,30 ince + 0,25 kaba.
+
+**Maliyet:** bir hücresel arama, yalnız `whitecap > 0` dalında. FPS değişmedi (142).

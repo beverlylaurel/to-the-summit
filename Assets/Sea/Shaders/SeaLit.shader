@@ -449,8 +449,29 @@ Shader "ToTheSummit/SeaLit"
                     // only skips a line whose output is already known to be 0.
                     if (whitecap > 0.0)
                     {
+                        // TWO SCALES, BECAUSE ONE OF THEM IS ALWAYS THE WRONG SIZE.
+                        //
+                        // A single bubble octave at `_SeaFoamTiling` gives features about
+                        // 1.25 m across. Close up that is right; at 100 m and beyond it is
+                        // two or three pixels, so it averages to a flat wash and a whitecap
+                        // reads as a pale blob pasted on the water — which is exactly what
+                        // the wide shots showed.
+                        //
+                        // Real foam is built at two scales: a coarse LACE of clumps and
+                        // channels a few metres across, and the bubbles inside it.
+                        // [SOURCE: shipped ocean foam is authored as a coarse 4-8 m clump
+                        // layer plus a 0.25-1 m bubble layer.] The coarse one is the one that
+                        // survives the distance, and it was the missing octave.
+                        //
+                        // The erosion budget is SPLIT, not added to: 0.55 was already tuned
+                        // against the Monahan coverage the Jacobian threshold was solved for,
+                        // and taking more would push the whitecap area below that law.
                         float bubbles = SeaFoamBubbles(foamUV);
-                        whitecap = saturate(whitecap - (1.0 - bubbles) * 0.55);
+                        float lace = SeaFoamBubbles(foamUV * 0.20 + 31.7);
+
+                        whitecap = saturate(whitecap
+                                            - (1.0 - bubbles) * 0.30
+                                            - (1.0 - lace) * 0.25);
                     }
 
                     // 2. BREAKING FOAM (spec 8.3). When the ratio of wave
