@@ -305,6 +305,24 @@ Shader "ToTheSummit/SeaLit"
                 float3 overcast = dot(skyRefl, float3(0.299, 0.587, 0.114)) * 0.85;
                 skyRefl = lerp(skyRefl, overcast, _SeaCloudCover01 * 0.85);
 
+                // A REFLECTED RAY THAT POINTS DOWN NEVER REACHES THE SKY.
+                //
+                // `GlossyEnvironmentReflection` answers for every direction, including the
+                // ones below the horizon, and returns whatever the environment holds down
+                // there. On a wave face tilted towards the viewer the reflected ray dips
+                // under the horizon and the sea came back carrying DARK BROWN BLOTCHES —
+                // hard-edged patches that slid over the water and read as dirt on glass.
+                //
+                // MEASURED: painting `skyRefl` magenta put the magenta exactly on those
+                // blotches, in the same shapes and the same places. It was the reflection,
+                // not the refraction (disabling that left them) and not the sea bed.
+                //
+                // Physically the ray hits WATER, so what comes back is the water's own
+                // upwelling — the same quantity the surface already computes for the volume
+                // below it. The band is narrow (0 to 0.06 in R.y, about 3.5 degrees) because
+                // a real horizon is sharp; wider than that and the whole sea flattens.
+                skyRefl = lerp(upwelling, skyRefl, smoothstep(0.0, 0.06, R.y));
+
                 // --- SUN GLITTER (spec 12.5) ---
                 //
                 // GGX, NOT A BLINN LOBE. `pow(dot(N,H), 2/r^2)` is a shape with no

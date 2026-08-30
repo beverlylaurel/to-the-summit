@@ -4343,3 +4343,32 @@ astığı çizgi — üstünde `_SeaWetFadeM` ile açılıyor. **İkinci bir sı
 olarak kumun ıslak olmayı bıraktığı yerde başlıyor.
 
 **Yağan tanecikler değiştirilmedi.** Denize kar yağar, sadece birikmez.
+
+---
+
+## Denizde kayan kahverengi lekeler
+
+**Kullanıcının ağzından:** *"şu anda plastik bir görüntü var ve dalgalar çok yapay ve tuhaf."*
+
+**İlk şüpheli (yanlış):** kırılma (refraction) su üstü piksellerini çekiyor. Kapatıldı —
+lekeler durdu.
+
+**İkinci şüpheli (yanlış):** deniz dibindeki kumun sığ sudan geçmesi. Renk zinciri
+değiştirildi, lekeler yine durdu.
+
+**Ayırt eden ölçüm.** `skyRefl` sabit magenta yapıldı. Magenta **tam lekelerin yerinde**,
+aynı şekillerde çıktı. Kaynak yansımaymış.
+
+**Gerçek sebep.** `GlossyEnvironmentReflection` her yön için cevap verir — ufkun altındakiler
+dâhil. Viewer'a doğru eğilmiş bir dalga yüzeyinde yansıyan ışın ufkun altına dalıyor ve
+ortamın orada ne varsa onu geri getiriyordu: sert kenarlı kahverengi lekeler, suyun üstünde
+kayan kir gibi.
+
+Fizik basit: o ışın **suya** çarpar, göğe değil. Dönmesi gereken şey suyun kendi yukarı
+saçılımı — yüzeyin altındaki hacim için zaten hesapladığı büyüklük. Bant dar tutuldu
+(R.y 0 → 0.06, ~3,5°); gerçek ufuk keskindir, geniş tutulunca bütün deniz düzleşiyor.
+
+**Aynı adımda düzeltilen ikinci sapma — su rengi.** `extinctionRgb` (0,30, 0,08, **0,05**)
+neredeyse saf suydu (Jerlov Tip I, tropik berrak); mavi hiç sönmediği için sığ su parlak
+turkuaz çıkıyordu. Jerlov kıyı 3C: (0,346, 0,082, **0,154**). Yukarı saçılım rengi de aynı
+tablodan, %1,9 geri saçılım payıyla: (0,030, 0,140, 0,111) — yeşil baskın, mavi ikinci.

@@ -33,8 +33,8 @@ MonoBehaviour:
   choppinessPerTier: {x: 1, y: 0.85, z: 0.45}
   maxShoalingGain: 2.2
   shoreSlope: 0.058
-  extinctionRgb: {x: 0.3, y: 0.08, z: 0.05}
-  upwellingColor: {r: 0.03, g: 0.11, b: 0.14, a: 1}
+  extinctionRgb: {x: 0.346, y: 0.082, z: 0.154}
+  upwellingColor: {r: 0.03, g: 0.14, b: 0.111, a: 1}
   refractionStrength: 0.35
   roughnessCalm: 0.02
   roughnessRough: 0.14
