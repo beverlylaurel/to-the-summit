@@ -1,6 +1,25 @@
 # To The Summit — Çalışma Kuralları
 
-Karlı, fırtınalı bir dağa tırmanma oyunu. Unity 6000.5.6f1, URP, birinci şahıs.
+Karlı, fırtınalı bir dağ dünyası. Unity 6000.5.6f1, URP, birinci şahıs.
+
+**Oyun dağa tırmanma oyunu DEĞİL.** Ana dağ kalır, asla kaldırılmaz; tırmanışa dayalı iş
+yapılmaz. Türün ne olduğu henüz söylenmedi (`DESIGN.md` → askıdaki bölümler).
+
+## Komutlar
+
+Unity açıkken **Unity MCP** kullanılır: konsol okuma, `RunCommand` ile editör kodu
+çalıştırma, Play'e girip çıkma. Araç yoksa oturum eskidir, kullanıcıya söylenir.
+
+| iş | nasıl |
+|---|---|
+| Derleme tetikle | `date > Logs/refresh.trigger` — Unity odaksız derler |
+| Sahne | `Assets/Scenes/Game.unity` (F5), test için `TestGround.unity` (F6) |
+| Sahneyi yeniden kur | `To The Summit/Scene/Rebuild Test Scene` |
+| Arazi yüzey haritaları | `To The Summit/Terrain/Surface Maps` |
+| Çökme sonrası başlat | `Unity.exe -projectPath "D:\ME\game	o the summit"` |
+
+**`To The Summit/Terrain/Regenerate Terrain` yükseklik haritasını SIFIRDAN üretir** ve elle
+yontulmuş dağı siler. Yüzey haritalarını tazelemek için değil.
 
 ## Rol dağılımı
 
@@ -73,9 +92,6 @@ devam ediyor — son eklenenler: kapsama → optik kalınlık, sis → bulut bir
 - **`CLOUDS_REBUILD.md`** teknik kayıt: portun makaleyle sekiz farkı, hangisi nasıl
   kapandı, ölçülmüş sayılar, kurtarılmış gürültü hash'i. Yeni bir sapma yapılacaksa
   önce oraya bakılır — aynı hata iki kez ölçülmesin.
-- **`NUBIS_NOTES.md`** makale okumaları: 12 soru, her cevabın yanında kaynak sayfa.
-  Bulut tarafında bir sayı veya formül gerektiğinde önce oraya bakılır, tahmin
-  yürütülmez. Buradaki dersler ÖLÇÜMDEN, oradaki cevaplar MAKALEDEN gelir.
 
 **Repo'nun üstüne kendi terimimiz eklenmez.** Görüntü yanlışsa önce onun parametrelerine
 ve ürettiği dokulara bakılır, tek seferde tek sayı değişir. Ekleme ihtiyacı doğuyorsa
@@ -120,6 +136,25 @@ Yeni sistem = yeni klasör. Dosyalar `Assets/Scripts` kökünde birikmez.
 tek ağaçta duruyor (`Runtime/`, `Shaders/`, `Editor/`, `Settings/`). Spec §1.5 böyle
 istiyor ve gerekçesi geçerli: kar iki kez silindi, ikisinde de parçaları dört ayrı
 klasörden toplamak gerekti. Üçüncüsünde tek klasör silinecek. Gerekçe `DECISIONS.md`.
+
+## Arazi
+
+Dağ **elle yontuldu**, üretilmedi: `Assets/Editor/MountainBuilderWindow.cs`.
+`MountainGenerator` ilk formu kurdu, bugünkü şekil ondan gelmiyor.
+
+- Asıl veri `Assets/Terrain/MountainTerrainData.asset` (4097², 30 km kare, tavan 8000 m) —
+  **git'te izlenmiyor.** Üzerine yazmadan önce yedek alınır.
+- Yükseklik değişirse şunlar bayatlar ve **aynı adımda** yeniden pişirilir
+  (`SurfaceMapBaker.Invalidate()` + `Bake()`): `MountainNormals`, `MountainHorizon`,
+  `MountainHeight`, `MountainSurfaceMaps`, `MountainWindWeight`.
+
+## Play modu
+
+`enterPlayModeOptions = DisableDomainReload, DisableSceneReload`. Play'de açıklanamayan
+davranışta ilk şüpheli budur.
+
+Play modda yapılan sahne düzenlemesi uçar; kalıcı düzeltme edit modda yapılır ve sahne
+dosyasından doğrulanır.
 
 ## Tasarım otoritesi
 
