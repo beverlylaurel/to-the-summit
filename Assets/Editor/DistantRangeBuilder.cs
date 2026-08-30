@@ -24,9 +24,17 @@ public static class DistantRangeBuilder
     const string ShaderName = "ToTheSummit/DistantRange";
     const string ObjectName = "Distant Range";
 
-    /// The playable terrain's half size. The ring starts just outside it.
+    /// The playable terrain's half size.
     const float PlayableHalf = 15000f;
-    const float InnerMargin = 120f;
+
+    /// THE RING STARTS UNDER THE TERRAIN, NOT BESIDE IT.
+    ///
+    /// A ring beginning 120 m OUTSIDE the playable square left a slot between the two, and
+    /// from the ground that slot read as a straight dark line running across the middle of
+    /// the view — the one thing a backdrop must not do. Starting 600 m INSIDE means the first
+    /// two rings are covered by the terrain itself, so the skirt is hidden rather than
+    /// butted up against an edge.
+    const float InnerMargin = -600f;
 
     /// HOW FAR THE RING GOES. The geometric horizon from the summit (6 km) is 276 km, and at
     /// 2 km the atmosphere controller opens visibility to 300 km — so a ring that stopped at
@@ -366,9 +374,10 @@ public static class DistantRangeBuilder
                 // is under the horizon from any altitude the player can reach.
                 float h = ground - radius * radius / (2f * EarthRadius);
 
-                // The innermost ring is dropped below the playable terrain's foot so the seam
-                // is hidden under it rather than meeting it edge to edge.
-                if (ri == 0) h = Mathf.Min(h, SeaLevel) - 400f;
+                // The two innermost rings sit under the playable terrain and are pulled well
+                // below its foot: nothing of them should ever be visible, and any tilt of the
+                // camera that would catch them catches the terrain first.
+                if (ri <= 1) h = Mathf.Min(h, SeaLevel) - 500f;
 
                 vertices.Add(new Vector3(world.x, h, world.y));
                 colors.Add(SurfaceColor(ground));
@@ -406,12 +415,18 @@ public static class DistantRangeBuilder
         var upland = new Color(0.19f, 0.20f, 0.185f);
         var snow = new Color(0.72f, 0.74f, 0.78f);
 
-        float alpine = Mathf.InverseLerp(300f, 900f, height);
+        float alpine = Mathf.InverseLerp(200f, 600f, height);
         Color ground = Color.Lerp(rock, upland, alpine);
 
-        // The snow line is a BAND, not a step: on a real range it wanders a few hundred metres
+        // THE SNOW LINE IS LOW, BECAUSE THIS WORLD IS COLD. The scene reads -0,6 C at the
+        // beach and -13 C at 2 km; a Himalayan 5 km snow line would be wrong here, and a
+        // 1250 m one left the ranges bare — MEASURED, the summits land around 60% of a
+        // massif's nominal peak once the ridge field is averaged in, so a 2 km massif tops
+        // out near 1,2 km and never reached the old band at all.
+        //
+        // It is a BAND, not a step: on a real range the line wanders a few hundred metres
         // with aspect and wind.
-        float snowLine = Mathf.InverseLerp(1250f, 1750f, height);
+        float snowLine = Mathf.InverseLerp(650f, 1150f, height);
         Color c = Color.Lerp(ground, snow, snowLine * snowLine);
 
         return c;
