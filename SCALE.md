@@ -258,3 +258,15 @@ dağ ne kadar büyürse büyüsün kar tanesi büyümüyor.
 Cevabı ölçmek için batı kenarında Z boyunca kesit alıp `30 − zemin > 0` bandının
 genişliğine bakılır.
 
+
+## Uzak arazi kuşağı (2026-08-30)
+
+| ne | kategori | ne olur |
+|---|---|---|
+| `DistantRangeBuilder.PlayableHalf` 15000 m | **elle bakılacak** | Oynanabilir arazinin yarı boyu. `terrainSize` değişirse bu da değişmeli, yoksa kuşak ya araziyi keser ya arada boşluk kalır. |
+| `OuterRadius` 140000 m | **bilerek mutlak** | Yerin eğrilik düşüşü 140 km'de 1538 m; oyuncunun çıkabileceği her irtifada ufkun altında kalır. Dağın boyuyla değil **Dünya'nın yarıçapıyla** ilgili. |
+| `EarthRadius` 6371000 m | **bilerek mutlak** | Fiziksel sabit. |
+| `FarClipFactor` 5.5 | **kendiliğinden ölçeklenir** ama tavanı kuşak belirler | `terrainSize * 5.5` = 165 km, kuşağın 140 km'sini geçiyor. `terrainSize` küçülürse uzak düzlem kuşağın içine düşer ve ufka sert bir yay çizer — o zaman çarpan büyütülmeli. |
+| `AngularSegments` 2048 | **elle bakılacak** | 20 km'de 61 m köşe aralığı, 1080p/60° için ~5 piksel. Görüş açısı veya çözünürlük değişirse yeniden hesaplanmalı. |
+| Masif yarıçapı 4,2–9,5 km, tepe 900–2900 m | **bilerek mutlak** | Gerçek sıradağ istatistiği; ana dağın boyuna bağlı değil. |
+| Kar çizgisi 1250–1750 m | **elle bakılacak** | Oyun dünyasının kar çizgisiyle aynı olmalı; ana dağınki `SnowCoverageDriver`'dan geliyor, kuşağınki köşe rengine pişirilmiş. İkisi ayrışırsa ufuktaki sıra farklı mevsimde görünür. |
