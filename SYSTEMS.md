@@ -1219,33 +1219,6 @@ dünya noktasında kalıyor. Üç presette de bir SnapStep tam sayı teksele den
 (8 / 16 / 24) — kesirli olsaydı izler teksel altı titrerdi. Ölçüm:
 `To The Summit/Snow/Scroll Test`.
 
-### Uzak arazi kuşağı (`DistantRangeBuilder`, `DistantRange.shader`)
-
-Oynanabilir 30 km'lik karenin dışını, 15,1 km'den 140 km'ye kadar saran **tek statik mesh**.
-Editörde bir kez pişiyor (`Dağ Yapımı/Uzak Sırayı Üret`, ~1 sn), çalışma zamanında yalnız
-mesh ve malzemesi var: tek çizim, doku yok, çarpıştırıcı yok, gölge yok.
-
-**Ne okur:**
-- `HeightFog.hlsl` → `ApplyHeightFog` — **araziyle aynı hava**. İki ayrı sis yolu tam
-  kuşağın araziyle buluştuğu yerde dikiş olarak görünürdü.
-- `GetMainLight()` — yalnız yön ve renk. **Gölge koordinatı okumaz**: kademeler ~2 km'de
-  bitiyor, kuşak 15 km'de başlıyor; oradaki bir gölge örneklemesi son kademenin ötesine
-  düşer.
-- `SampleSH(N)` — ortam ışığı.
-
-**Ne okumaz:** kar sistemi, hava durumu, rüzgâr, deniz. Kar çizgisi köşe rengine
-**pişirilmiş** (1250–1750 m bandı), yani mevsim değiştirmez. Bilinçli: oyuncu oraya asla
-gidemez ve 20 km'den okunan tek şey siluet ile kar çizgisinin yatay bandıdır.
-
-**Bilinçli kurallar:**
-- Kuşak oynanabilir araziye **dokunmaz**. İç sınır dairesel değil, oynanabilir **kareyi**
-  takip eder (karenin köşeleri 21,2 km'ye ulaşıyor, 15,1 km'lik daire onları keserdi).
-- En içteki halka arazinin eteğinin 400 m altına indirilir — dikiş arazinin altında kalır.
-- Zemin `d²/(2R)` ile aşağı çekilir (R = 6 371 km). Uzak kenar kendiliğinden ufkun altına
-  iner; bu olmadan 140 km'deki kenar tam boyunda havada biterdi.
-- **Renk eğrilikten ÖNCEKİ yükseklikten** hesaplanır. Eğri yükseklikle hesaplanınca uzak
-  sıralar çıplak kaya çıkıyordu: eğrilik kar çizgisi sınanmadan önce 1,5 km'yi almıştı.
-
 ### Deniz (`Assets/Sea/`)
 
 **Deniz OKUR, YAZMAZ.** Sistem içinde `RenderSettings`, `VolumeProfile` veya

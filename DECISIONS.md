@@ -94,6 +94,9 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ## Bekleyen kararlar
 
+- **Gezegen boşluğu hâlâ açık** — kuşak denendi ve kaldırıldı, arazi büyütülecek.
+  Ölçümler ve maliyet kıyası aşağıda, "Uzak arazi kuşağı DENENDİ VE KALDIRILDI".
+
 - **5 cm karda ayak izi zayıf** — sıkışma zinciri gerçek sayılara çekilmedi
   (`SNOW_PACKED_N`, `SNOW_COMPACT_GAIN`). Tetikleyici ve maliyet aşağıda,
   "5 cm karda ayak izi zayıf kalıyor" başlığında.
@@ -2246,3 +2249,36 @@ düz olmalı; şu an değil.
 
 **Maliyet.** `SNOW_PACKED_N` dört yerde daha okunuyor (batma ölçeği, pürüzlülük, sürüklenme
 eşiği, yeniden dolum), dolayısıyla tek sayı değişikliği değil — hepsi birlikte ölçülmeli.
+
+## Uzak arazi kuşağı DENENDİ VE KALDIRILDI — arazi büyütülecek (2026-08-30)
+
+**Karar.** Oynanabilir karenin dışına prosedürel bir sıradağ kuşağı (15 → 140 km, tek statik
+mesh) yapıldı, kullanıcı "tuhaf duruyor" dedi, tamamen geri alındı. Boşluk **araziyi
+büyüterek** kapatılacak.
+
+**Geri alınanlar:** `DistantRangeBuilder.cs`, `DistantRange.shader`, `M_DistantRange.mat`,
+`DistantRange.asset`, sahnedeki `Distant Range` nesnesi, ve `FarClipFactor` 5.5 → 3
+(uzak düzlem 165 km → 90 km). `SCALE.md`, `SYSTEMS.md`, `RATIONALE.md` kayıtları silindi.
+
+**Gerekçesini yitiren kayıt silinir; ama ölçüm silinmez.** Kuşak yanlış çözümdü, ölçüm
+değil. Arazi büyütülürken ikisi de geçerli olacak:
+
+- **6 km'de geometrik ufuk `3,57·√h` = 276 km.** Oyunun görüşü 60 km'ye ayarlıydı, yani
+  gerçeğin 4,6 katı kısası.
+- **2 km irtifada atmosfer denetleyicisi görüşü zaten 300 km'ye açıyor.** Yani arazi orada
+  bitince onu örtecek hava kalınlığı yok; sis boşluğu gizlemiyor.
+- Yani boşluk hissi **iki** eksik: arazi 15 km'de bitiyor VE o bitişi örtecek hava yok.
+  Araziyi büyütmek birincisini çözer; ikincisi hâlâ ayrı bir soru.
+- Yerin eğrilik düşüşü `d²/(2R)`: 60 km'de 283 m, 140 km'de 1538 m. Arazi 60 km'nin ötesine
+  taşarsa eğrilik olmadan uzak kenar tam boyunda havada durur.
+
+**Ölçülmüş maliyet, ileride kıyas olsun diye:** kuşak 121 masif / 323 584 üçgen / tek çizim
+idi ve 175 → 172 FPS'e mal oluyordu. Araziyi büyütmenin maliyeti bununla kıyaslanmalı;
+30 km karede yükseklik haritası 4097 ve teksel 7,32 m, büyütünce ya çözünürlük düşer ya
+bellek artar (`SCALE.md`).
+
+**Tetikleyici — geri dönülecek belirti:** araziyi büyütmek belleği ya da oynanış
+yüzeyinin çözünürlüğünü kabul edilemez şekilde bozarsa, kuşak fikri yeniden açılır — ama
+o zaman siluetin neden "tuhaf" durduğu önce ölçülür. Kullanıcının tek cümlesi vardı,
+sebebi ayrıştırılmadı: masif şekli mi, ölçek mi, renk/kar çizgisi mi, arazinin bittiği
+yerdeki dikiş mi.

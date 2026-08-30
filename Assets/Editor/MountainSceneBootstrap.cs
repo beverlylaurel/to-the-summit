@@ -15,16 +15,7 @@ public static class MountainSceneBootstrap
     // --- Player ---
     const float PlayerHeight = 1.8f;
     const float EyeHeight = 1.65f;
-    /// Camera far clip = map dimension * factor.
-    ///
-    /// 3 (90 km) was enough while the world ended at the playable square. `DistantRangeBuilder`
-    /// now puts backdrop terrain out to 140 km, and a far plane inside that cuts the ring
-    /// through the middle and leaves a hard arc across the horizon. 5.5 is 165 km, which
-    /// clears the ring with room to spare.
-    ///
-    /// Precision is not the cost: URP uses a reversed-Z float buffer, whose resolution is set
-    /// by the NEAR plane (0.3 m), not the far one.
-    const float FarClipFactor = 5.5f;
+    const float FarClipFactor = 3f;   // Camera far clip = map dimension * factor
 
     /// Maximum error allowed for terrain LOD silhouette (pixels).
     const float TerrainPixelError = 2f;
