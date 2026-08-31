@@ -19,19 +19,19 @@ Shader "ToTheSummit/SeaLit"
         Tags
         {
             "RenderType" = "Opaque"
-            // THE SEA IS OPAQUE AND BELONGS IN THE OPAQUE QUEUE.
+            // THE SEA STAYS IN THE TRANSPARENT QUEUE -- IT READS THE SCENE.
             //
-            // It was `Transparent-1` (2999), past the 2500 line, so its `DepthOnly` pass
-            // never ran and the sea never reached `_CameraDepthTexture`. The clouds march
-            // against that texture: not seeing the sea, they drew straight through it, and
-            // then the sea -- drawn after the cloud composite -- painted them out. Measured:
-            // sea drawn -> deck cut, sea hidden -> deck whole.
+            // `Geometry+450` was tried so the sea would reach `_CameraDepthTexture` and the
+            // clouds could occlude against it. It works for the clouds and breaks the water:
+            // the depth and colour copies happen AFTER the opaque queue, so from inside it the
+            // sea reads a texture that is not there yet. Measured with a thickness probe at
+            // the waterline -- transparent queue: green near the shore, blue offshore, a real
+            // depth gradient; opaque queue: one flat value across the whole band. The water
+            // column, the refraction and the shallow-water colour all hang off that read.
             //
-            // In the opaque queue the sea writes depth before the clouds march, the clouds
-            // occlude against it, and the package's own combine composites over it. Still
-            // after the terrain (2000), and `SkyFog` skips it because it discards every
-            // pixel whose depth is not the far plane.
-            "Queue" = "Geometry+450"
+            // The cloud order is solved on the CLOUD side instead: its composite runs after
+            // the transparent queue.
+            "Queue" = "Transparent-1"
             "RenderPipeline" = "UniversalPipeline"
         }
 

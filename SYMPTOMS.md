@@ -27,34 +27,38 @@ mesafeyle ilgili değildi, ölçüm de o yönde yapılmamıştı.
 Deniz açıkken kesik, deniz gizliyken bulut tam. Yani ışın kesilmiyor, **deniz bulutun
 üstüne çiziliyor**.
 
-**Gerçek sebep:** deniz `Transparent-1` kuyruğundaydı — sayı olarak **2999**, opak sınırı
-olan 2500'ün ötesinde. Bu yüzden denizin `DepthOnly` geçişi hiç koşmuyor, deniz
-`_CameraDepthTexture`'a hiç girmiyordu. Bulut ışını o dokuya karşı yürüyor: denizi
-görmediği için içinden geçip çiziyor, sonra da bulut birleştirmesinden (
-`BeforeRenderingTransparents`) **sonra** çizilen deniz bulutu boyayıp siliyordu.
+**Gerçek sebep:** bulut birleştirmesi `BeforeRenderingTransparents`'ta koşuyor, deniz ise
+saydam kuyrukta (`Transparent-1`) — yani bulutlardan **sonra**. Deniz opak (`Blend Off`,
+`ZWrite On`), bulut sahne derinliğine bir şey yazmıyor, dolayısıyla deniz test edecek bir şey
+bulamadan birleştirilmiş bulutun üstüne biniyor.
 
-Deniz zaten opak: `RenderType Opaque`, `ZWrite On`, `Blend Off`, `_CameraOpaqueTexture`
-okumuyor. Saydam kuyrukta durmasının işlevsel bir gerekçesi yoktu.
+**Çözüm:** bulut geçişi `AfterRenderingTransparents`'a alındı
+(`VolumetricCloudsURP.cs`). Deniz artık bulutlardan önce çiziliyor, bulut onun üstüne
+biniyor. Tek satır, tek yön.
 
-**Çözüm:** `SeaLit.shader` → `"Queue" = "Geometry+450"` (2450). Deniz bulut yürümeden
-önce derinlik yazıyor, bulut ona karşı örtülüyor, birleştirme paketin **kendi** geçişiyle
-denizin üstüne biniyor. Deniz 131 km'de, yeşil kare yok, örtü kesilmiyor.
+Işın yürüyüşü hâlâ opak-sonrası derinliği okuyor, yani denizi bilmiyor. Bu bir bedel
+değil: bulut katmanı 2–5 km'de duruyor, suya varan ışın ya katmana hiç girmiyor (kamera
+katmanın altında, su ufkun altında) ya da önce katmanı geçiyor (kamera katmanın üstünde) —
+iki durumda da bulutun suyun üstüne çizilmesi zaten doğru olan.
 
-Araziden (2000) sonra çizilmeye devam ediyor. `SkyFog` denizi boyamıyor: derinliği uzak
-düzlem olmayan her pikseli `discard` ediyor, deniz artık derinlik yazdığı için elenmiş
-oluyor — sisini kendi shader'ında uyguluyor, eskisi gibi.
+**ÜÇ YANLIŞ ÇÖZÜM DENENDİ VE ÖLÇÜMLE ELENDİ:**
 
-**Maliyet ölçüldü:** deniz derinlik ön-geçişine de girdiği için üçgen sayısı 802k → 1139k
-(deniz mesh'i 337k), 17 km'de kare süresi 8,4 → 9,6 ms.
-
-**İki yanlış çözüm denendi ve geri alındı:**
-
-1. `PC_Renderer.asset` → `depthTexture: 1`. Bulut derinliği sahne derinliğine yazılınca
+1. **`PC_Renderer.asset` → `depthTexture: 1`.** Bulut derinliği sahne derinliğine yazılınca
    deniz ile bulut aynı değeri paylaşıp z-çakışmasına giriyor: 22 km'de gökyüzüne dağılmış
    yeşil benekler.
-2. Denizin shader'ında `_VolumetricCloudsDepthTexture`'a karşı `clip`. Bulut derinliği
-   çeyrek çözünürlükte ve klip ikili olduğu için bulut siluetleri denizin üstünde
-   **basamak basamak** çıkıyor. Ölçüldü, kaldırıldı.
+2. **Denizin shader'ında `_VolumetricCloudsDepthTexture`'a karşı `clip`.** Bulut derinliği
+   çeyrek çözünürlükte, klip ikili: bulut siluetleri denizin üstünde basamak basamak çıktı.
+3. **Denizi opak kuyruğa almak (`Geometry+450`).** Bulut tarafını gerçekten düzeltiyor ve
+   **suyu bozuyor**: derinlik ve renk kopyaları opak kuyruktan SONRA alınıyor, opak kuyruğun
+   içinden deniz henüz var olmayan bir dokuyu okuyor. Su çizgisinde kalınlık probuyla
+   ölçüldü — saydam kuyrukta kıyıya yakın yeşil, açıkta mavi (gerçek derinlik geçişi); opak
+   kuyrukta bant boyunca tek düz değer. Su sütunu, kırılma ve sığ su rengi hep o okumaya
+   bağlı. Ayrıca deniz derinlik ön-geçişine de giriyordu: üçgen 802k → 1139k, 17 km'de
+   8,2 → 9,6 ms.
+
+**Dersi:** belirtinin göründüğü katmanı düzeltmek, o katmanın **başka** bir şeye bağlı
+olduğunu görmeden yapılırsa bir hatayı ötekiyle değişiyor. Denizin sırası bulut için
+yanlıştı ama su için doğruydu; taşınması gereken buluttu.
 
 **Not:** `depthTexture: 1` bir kez de kontur için denenmiş ve "kontur düzeldi" sanılmıştı;
 o doğrulama %90 kapsamada yapıldığı için yanlıştı. Konturun sebebi ayrı (NaN, aşağıda).

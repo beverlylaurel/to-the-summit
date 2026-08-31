@@ -257,7 +257,21 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
         if (volumetricCloudsPass == null)
         {
             volumetricCloudsPass = new(material, resolutionScale);
-            volumetricCloudsPass.renderPassEvent = RenderPassEvent.BeforeRenderingTransparents; // Use camera previous matrix to do reprojection
+
+            // AFTER THE TRANSPARENT QUEUE, NOT BEFORE IT.
+            //
+            // The package ships `BeforeRenderingTransparents`. The sea sits in that queue
+            // and is opaque, so it drew straight over the composited cloud deck: from above,
+            // the deck ended in a hard-edged sheet wherever the water reached. The sea cannot
+            // move to the opaque queue -- it reads the depth and colour copies that only exist
+            // after that queue (measured, `SYMPTOMS.md`).
+            //
+            // The ray march still reads the after-opaques depth, so it does not know about the
+            // sea. That costs nothing here: the cloud layer sits at 2-5 km, so a ray that ends
+            // on the water either never enters the layer (camera below it, water below the
+            // horizon) or crosses the layer first (camera above it) -- in both cases painting
+            // the cloud over the water is what should happen.
+            volumetricCloudsPass.renderPassEvent = RenderPassEvent.AfterRenderingTransparents;
         }
         else
         {

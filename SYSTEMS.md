@@ -1740,14 +1740,12 @@ yüksekliğini oradan okuyor, eğrilseydi uzaktaki her tepe çukur okunurdu.
 derinlik sürekli ama türevi sıçrıyordu; dip eğimi kırılma ölçütünü besliyor ve kutunun
 kenarı denizin üstünde parlak bir kare olarak görünüyordu (`SYMPTOMS.md`).
 
-**Deniz opak kuyrukta (`Geometry+450`), saydam kuyrukta değil.** Deniz `_CameraDepthTexture`'a
-girmek zorunda: hacimsel bulut ışını o dokuya karşı yürüyor ve denizi görmezse içinden geçip
-çiziyor, sonra deniz bulutun üstüne biniyor. `Transparent-1` = 2999, opak sınırı 2500'ün
-ötesinde, orada denizin `DepthOnly` geçişi hiç koşmuyordu.
+**Deniz saydam kuyrukta (`Transparent-1`) kalır.** Opak olmasına rağmen: derinlik ve renk
+kopyaları (`_CameraDepthTexture`, `_CameraOpaqueTexture`) opak kuyruktan sonra alınıyor ve
+denizin su sütunu, kırılması, sığ su rengi o iki okumaya bağlı. Opak kuyruğa taşındığında
+kalınlık okuması düzleşiyor (ölçüldü, `SYMPTOMS.md`).
 
-**Deniz bulutu okumaz, bulut denizi okur.** Yön tek: deniz kendi derinliğini yazar, bulut
-ona karşı örtülür, birleştirme paketin kendi geçişiyle denizin üstüne biner. Denizin
-shader'ında bulut dokusu yok.
-
-**`SkyFog` denizi boyamaz.** Derinliği uzak düzlem olmayan her pikseli `discard` ediyor;
-deniz derinlik yazdığı için eleniyor ve sisini kendi shader'ında uyguluyor.
+**Bulut denizden SONRA birleştirilir.** `VolumetricCloudsURP` geçişi
+`AfterRenderingTransparents`'ta; paketin kendi varsayılanı `BeforeRenderingTransparents` ve
+orada deniz birleştirilmiş bulutun üstüne biniyordu. Sıra tek yönlü: deniz çizer, bulut
+üstüne biner. Denizin shader'ında bulut dokusu yok, bulutun ışın yürüyüşünde deniz yok.
