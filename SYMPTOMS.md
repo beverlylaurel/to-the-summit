@@ -647,6 +647,28 @@ uydurma değil: sahnede hiçbir şey **uzak düzlemden** öteye gidemez (`_Proje
 ve paket kendi hava perspektifini de aynı şekilde sınırlıyor. Yalnız **yol** sınırlanıyor;
 optik derinliğe tavan konulmuyor, yani beyazlama ve fırtına ucu etkilenmiyor.
 
+**GERİ DÖNDÜ (2026-08-31) — sınır DOĞRU AMA YETERSİZDİ.** Uzak düzleme sınırlamak sayısal
+taşmayı kesiyor, sisi kesmiyor: bulut 10 km'deyken halkaya **90 km** veriliyordu. O yol
+boyunca integral yine doyuyor ve halka yine siyah çıkıyor — sınırsız yalan yerine sınırlı
+bir yalan.
+
+**Çözüm:** halka, uzak düzlemi değil **komşusunun mesafesini** alıyor. Halka tanım gereği
+tek piksel geniş, yani gerçek bir mesafe hemen yanında duruyor; sekiz komşudan uzak
+değerden en çok sapan seçiliyor (en yakın yüzey). Hiçbiri geçerli değilse piksel eleniyor —
+o zaman (A) oluşur, ki ikisinin ehveni odur.
+
+**ÖLÇÜM ARACI İKİ KEZ YALAN SÖYLEDİ, İKİSİ DE DOĞRULANMAMIŞTI:**
+
+1. "Bulut sisini kapat" testi `AtmosphereController` kapalıyken yapıldı — `_CloudFogEnabled`
+   yazan bileşen oydu, değer hiç değişmedi, iki kare aynı çıktı. "Sis değil" sonucuna
+   varıldı. **Sisti.** Global geri okunsaydı bir turda görülürdü.
+2. Ardından `EvaluateAtmosphericScattering` suçlandı ve düzeltme oraya yazıldı. Ölçüldü:
+   `_EnableAtmosphericScattering` **zaten 0**, o blok hiç çalışmıyor. Düzeltme ölü koda
+   gitti.
+
+**Kural:** anahtarı çevirdikten sonra **anahtarın kendisini geri oku**. Kapattığın şeyi
+yazan bileşeni kapatırsan anahtar çalışmaz ve ölçüm sessizce yalan söyler.
+
 **Derinlik çıkışı kapalıyken** her bulut pikseli proxy alır ve ekran kocaman siyah lekelerle
 dolar (ölçüldü). O yolda mesafe bilinmiyor: sis uygulanmaz.
 

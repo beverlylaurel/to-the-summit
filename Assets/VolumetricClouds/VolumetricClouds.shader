@@ -209,6 +209,7 @@ Shader "Hidden/Sky/VolumetricClouds"
             SAMPLER(s_point_clamp_sampler);
             float4 _ScreenResolution;
             TEXTURE2D_X_FLOAT(_VolumetricCloudsDepthTexture);
+            float4 _VolumetricCloudsDepthTexture_TexelSize;
 
             #pragma multi_compile_local_fragment _ _LOW_RESOLUTION_CLOUDS
             #pragma multi_compile_local_fragment _ _OUTPUT_CLOUDS_DEPTH
@@ -250,7 +251,37 @@ Shader "Hidden/Sky/VolumetricClouds"
                 // the finite proxy safe. Both halves are needed, and the older record said so
                 // — SYMPTOMS.md, "Bulutların çevresinde halka / bulut kenarında kontur".
                 bool edgeOfClouds = depth == UNITY_RAW_FAR_CLIP_VALUE && cloudsColor.a < 1.0;
-                depth = edgeOfClouds ? CLOUDS_RAW_FAR_CLIP_VALUE : depth;
+
+                if (edgeOfClouds)
+                {
+                    // THE RING BORROWS ITS NEIGHBOUR'S DISTANCE.
+                    //
+                    // Giving it the far plane is what the bound below already does, and it is
+                    // still wrong by an order of magnitude: the cloud beside it is ~10 km away
+                    // and the ring was being fogged as if it were 90 km away. Over that path
+                    // the integral saturates and the ring goes black -- the same outline as
+                    // before, just produced by a bounded lie instead of an unbounded one.
+                    //
+                    // The ring is one pixel wide by construction, so a real distance is always
+                    // sitting next to it. Whichever neighbour is FURTHEST from the far value is
+                    // the closest surface, and that is the one taken. Written without assuming
+                    // which way the depth runs, so reversed Z needs no special case.
+                    float2 tx = _VolumetricCloudsDepthTexture_TexelSize.xy;
+                    float best = 0.0;
+                    float borrowed = depth;
+
+                    #define CLOUDS_BORROW(ox, oy) {                         float d = SAMPLE_TEXTURE2D_X_LOD(_VolumetricCloudsDepthTexture,                             s_point_clamp_sampler, screenUV + float2(ox, oy) * tx, 0).r;                         float s = abs(d - UNITY_RAW_FAR_CLIP_VALUE);                         if (s > best) { best = s; borrowed = d; } }
+
+                    CLOUDS_BORROW(-1.0,  0.0) CLOUDS_BORROW( 1.0,  0.0)
+                    CLOUDS_BORROW( 0.0, -1.0) CLOUDS_BORROW( 0.0,  1.0)
+                    CLOUDS_BORROW(-1.0, -1.0) CLOUDS_BORROW( 1.0, -1.0)
+                    CLOUDS_BORROW(-1.0,  1.0) CLOUDS_BORROW( 1.0,  1.0)
+                    #undef CLOUDS_BORROW
+
+                    // Nothing valid around it: leave the pixel culled rather than invent a
+                    // distance. That is the unfogged ring, which is the lesser of the two.
+                    depth = best > 0.0 ? borrowed : CLOUDS_RAW_FAR_CLIP_VALUE;
+                }
             #else
                 // Derinlik cikisi kapaliyken bulut mesafesi bilinmiyor. Uydurmak (eski
                 // hal) ekrani KOCAMAN siyah lekelerle dolduruyordu (olculdu). Mesafe
@@ -259,6 +290,28 @@ Shader "Hidden/Sky/VolumetricClouds"
             #endif
 
                 PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenResolution.zw, depth, UNITY_MATRIX_I_VP, UNITY_MATRIX_V);
+
+                // THE PROXY'S DISTANCE IS BOUNDED ONCE, HERE, FOR EVERY CONSUMER.
+                //
+                // The edge ring carries a fake depth, and rebuilding a world position from it
+                // puts the point ~70 km out. Anything that integrates along that path saturates
+                // and paints the ring. The bound used to sit on the LOCAL FOG alone, so the
+                // ring came back through the other consumer -- the sky package's aerial
+                // perspective, which reads the same `positionWS` a few lines below. Switching
+                // the cloud fog off then changed nothing, and the measurement said "not the
+                // fog" when it was exactly the fog, down a second path.
+                //
+                // Nothing in the scene can be past the FAR PLANE, so that is the bound. Only
+                // the PATH is bounded; no optical depth gets a ceiling.
+                {
+                    float3 boundCam = GetCameraPositionWS();
+                    float3 boundRay = posInput.positionWS - boundCam;
+                    float  boundLen = length(boundRay);
+
+                    posInput.positionWS = boundCam + boundRay
+                                        * (min(boundLen, _ProjectionParams.z) / max(boundLen, 1e-4));
+                    posInput.linearDepth = min(posInput.linearDepth, _ProjectionParams.z);
+                }
 
                 // ONLY THE TRUE FAR PLANE IS CULLED. There the world position reconstruction
                 // runs to infinity in reversed Z and produces a NaN, which `Blend One SrcAlpha`
@@ -278,12 +331,10 @@ Shader "Hidden/Sky/VolumetricClouds"
                     // FAR PLANE, and the sky package limits its own aerial perspective the same
                     // way. Only the PATH is clamped — the optical depth keeps no ceiling, so
                     // whiteout and the storm end are untouched.
-                    float3 toCloud = posInput.positionWS - camPos;
-                    float cloudDistance = length(toCloud);
-
-                    float3 fogTarget = camPos + toCloud
-                                     * (min(cloudDistance, _ProjectionParams.z)
-                                        / max(cloudDistance, 1e-4));
+                    // `posInput.positionWS` is already bounded above -- for every consumer,
+                    // not just this one. A second bound here would be the same clamp written
+                    // twice, and the one that was written twice is the one that got forgotten.
+                    float3 fogTarget = posInput.positionWS;
 
                     float3 fogScattering;
                     float fogTransmittance;
@@ -684,6 +735,7 @@ Shader "Hidden/Sky/VolumetricClouds"
         #endif
 
             TEXTURE2D_X_FLOAT(_VolumetricCloudsDepthTexture);
+            float4 _VolumetricCloudsDepthTexture_TexelSize;
 
             #pragma multi_compile_local_fragment _ _LOW_RESOLUTION_CLOUDS
             #pragma multi_compile_local_fragment _ _OUTPUT_CLOUDS_DEPTH
@@ -750,7 +802,37 @@ Shader "Hidden/Sky/VolumetricClouds"
                 // the finite proxy safe. Both halves are needed, and the older record said so
                 // — SYMPTOMS.md, "Bulutların çevresinde halka / bulut kenarında kontur".
                 bool edgeOfClouds = depth == UNITY_RAW_FAR_CLIP_VALUE && cloudsColor.a < 1.0;
-                depth = edgeOfClouds ? CLOUDS_RAW_FAR_CLIP_VALUE : depth;
+
+                if (edgeOfClouds)
+                {
+                    // THE RING BORROWS ITS NEIGHBOUR'S DISTANCE.
+                    //
+                    // Giving it the far plane is what the bound below already does, and it is
+                    // still wrong by an order of magnitude: the cloud beside it is ~10 km away
+                    // and the ring was being fogged as if it were 90 km away. Over that path
+                    // the integral saturates and the ring goes black -- the same outline as
+                    // before, just produced by a bounded lie instead of an unbounded one.
+                    //
+                    // The ring is one pixel wide by construction, so a real distance is always
+                    // sitting next to it. Whichever neighbour is FURTHEST from the far value is
+                    // the closest surface, and that is the one taken. Written without assuming
+                    // which way the depth runs, so reversed Z needs no special case.
+                    float2 tx = _VolumetricCloudsDepthTexture_TexelSize.xy;
+                    float best = 0.0;
+                    float borrowed = depth;
+
+                    #define CLOUDS_BORROW(ox, oy) {                         float d = SAMPLE_TEXTURE2D_X_LOD(_VolumetricCloudsDepthTexture,                             s_point_clamp_sampler, screenUV + float2(ox, oy) * tx, 0).r;                         float s = abs(d - UNITY_RAW_FAR_CLIP_VALUE);                         if (s > best) { best = s; borrowed = d; } }
+
+                    CLOUDS_BORROW(-1.0,  0.0) CLOUDS_BORROW( 1.0,  0.0)
+                    CLOUDS_BORROW( 0.0, -1.0) CLOUDS_BORROW( 0.0,  1.0)
+                    CLOUDS_BORROW(-1.0, -1.0) CLOUDS_BORROW( 1.0, -1.0)
+                    CLOUDS_BORROW(-1.0,  1.0) CLOUDS_BORROW( 1.0,  1.0)
+                    #undef CLOUDS_BORROW
+
+                    // Nothing valid around it: leave the pixel culled rather than invent a
+                    // distance. That is the unfogged ring, which is the lesser of the two.
+                    depth = best > 0.0 ? borrowed : CLOUDS_RAW_FAR_CLIP_VALUE;
+                }
             #else
                 // Derinlik cikisi kapaliyken bulut mesafesi bilinmiyor. Uydurmak (eski
                 // hal) ekrani KOCAMAN siyah lekelerle dolduruyordu (olculdu). Mesafe
@@ -759,6 +841,28 @@ Shader "Hidden/Sky/VolumetricClouds"
             #endif
 
                 PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenResolution.zw, depth, UNITY_MATRIX_I_VP, UNITY_MATRIX_V);
+
+                // THE PROXY'S DISTANCE IS BOUNDED ONCE, HERE, FOR EVERY CONSUMER.
+                //
+                // The edge ring carries a fake depth, and rebuilding a world position from it
+                // puts the point ~70 km out. Anything that integrates along that path saturates
+                // and paints the ring. The bound used to sit on the LOCAL FOG alone, so the
+                // ring came back through the other consumer -- the sky package's aerial
+                // perspective, which reads the same `positionWS` a few lines below. Switching
+                // the cloud fog off then changed nothing, and the measurement said "not the
+                // fog" when it was exactly the fog, down a second path.
+                //
+                // Nothing in the scene can be past the FAR PLANE, so that is the bound. Only
+                // the PATH is bounded; no optical depth gets a ceiling.
+                {
+                    float3 boundCam = GetCameraPositionWS();
+                    float3 boundRay = posInput.positionWS - boundCam;
+                    float  boundLen = length(boundRay);
+
+                    posInput.positionWS = boundCam + boundRay
+                                        * (min(boundLen, _ProjectionParams.z) / max(boundLen, 1e-4));
+                    posInput.linearDepth = min(posInput.linearDepth, _ProjectionParams.z);
+                }
 
             #ifdef PHYSICALLY_BASED_SKY
                 if (_EnableAtmosphericScattering)
@@ -793,12 +897,10 @@ Shader "Hidden/Sky/VolumetricClouds"
                     // FAR PLANE, and the sky package limits its own aerial perspective the same
                     // way. Only the PATH is clamped — the optical depth keeps no ceiling, so
                     // whiteout and the storm end are untouched.
-                    float3 toCloud = posInput.positionWS - camPos;
-                    float cloudDistance = length(toCloud);
-
-                    float3 fogTarget = camPos + toCloud
-                                     * (min(cloudDistance, _ProjectionParams.z)
-                                        / max(cloudDistance, 1e-4));
+                    // `posInput.positionWS` is already bounded above -- for every consumer,
+                    // not just this one. A second bound here would be the same clamp written
+                    // twice, and the one that was written twice is the one that got forgotten.
+                    float3 fogTarget = posInput.positionWS;
 
                     float3 fogScattering;
                     float fogTransmittance;
