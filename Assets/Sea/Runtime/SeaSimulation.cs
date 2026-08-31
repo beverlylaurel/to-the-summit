@@ -164,14 +164,7 @@ public class SeaSimulation : MonoBehaviour
 
     /// `GetTemporary` IS NOT USED (spec §15.2). Textures are created once and
     /// released in `OnDisable`.
-    /// `mips` is for the DERIVATIVE texture alone. The surface samples slopes at
-    /// grazing angles where one pixel covers tens of metres of water; without a mip
-    /// chain the hardware picks a single texel out of that span and TAA turns the
-    /// result into noise. Averaging is what makes distant water flat, and it has to
-    /// be the hardware doing it per pixel -- a blanket distance fade cannot, because
-    /// it also kills the waves that ARE resolved (measured: the surface went mirror
-    /// at 520 m, where a 2 m wave still spans 7.1 pixels).
-    RenderTexture Create(string label, RenderTextureFormat format, bool mips = false)
+    RenderTexture Create(string label, RenderTextureFormat format)
     {
         int n = SeaQuality.Of(settings.quality).FftSize;
 
@@ -179,17 +172,13 @@ public class SeaSimulation : MonoBehaviour
         {
             name = label,
             enableRandomWrite = true,
-            filterMode = mips ? FilterMode.Trilinear : FilterMode.Bilinear,
+            filterMode = FilterMode.Bilinear,
 
             // MANDATORY: the mesh surface samples from world coordinates and
             // the texture must repeat past the patch boundary (spec §10.4).
             wrapMode = TextureWrapMode.Repeat,
 
-            useMipMap = mips,
-
-            // The compute kernel writes mip 0; the chain is built by hand after the
-            // dispatch, so Unity must not try to build it on render-target set.
-            autoGenerateMips = false,
+            useMipMap = false,
             dimension = TextureDimension.Tex2DArray,
             volumeDepth = SeaConstants.TierCount,
             hideFlags = HideFlags.DontSave,
@@ -210,7 +199,7 @@ public class SeaSimulation : MonoBehaviour
         spectrumHt = Create("Sea_SpectrumHt", RenderTextureFormat.ARGBHalf);
         spectrumSlope = Create("Sea_SpectrumSlope", RenderTextureFormat.ARGBHalf);
         displacement = Create("Sea_Displacement", RenderTextureFormat.ARGBHalf);
-        derivatives = Create("Sea_Derivatives", RenderTextureFormat.ARGBHalf, mips: true);
+        derivatives = Create("Sea_Derivatives", RenderTextureFormat.ARGBHalf);
 
         foamA = Create("Sea_FoamA", RenderTextureFormat.RHalf);
         foamB = Create("Sea_FoamB", RenderTextureFormat.RHalf);
@@ -343,9 +332,6 @@ public class SeaSimulation : MonoBehaviour
         fftShader.SetTexture(kAssemble, SeaShaderIDs.DisplacementRW, displacement);
         fftShader.SetTexture(kAssemble, SeaShaderIDs.DerivativesRW, derivatives);
         fftShader.Dispatch(kAssemble, groups, groups, level.TierCount);
-
-        // Mip 0 has just been overwritten; the rest of the chain is now stale.
-        derivatives.GenerateMips();
 
         FoamPass(time);
 

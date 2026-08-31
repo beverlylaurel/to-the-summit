@@ -1711,31 +1711,3 @@ pusun sisten mi bulutun kendi tonundan mı geldiği o anahtarla sorulamıyor.
 kar sisteminin izolasyon anahtarlarıydı, `SnowManager`'daki ölü dallarıyla birlikte gitti.
 "Göz uyumu" bölümü de silindi; pozlama zinciri ölçüldü, düzeltildi ve Play'de doğrulandı.
 
-
-## Deniz: ulaşım, eğrilik ve dip rampası (2026-08-31)
-
-**Deniz meshi kameraya bağlı bir clipmap.** Halka 0 dolu kare, sonraki her halka kendi dış
-yarıçapının yarısından dış yarıçapına kadar uzanır ve kare boyu ikiye katlanır. Yarıçap
-`64 · quad · 2^(halka−1)`; üç ayarda da 131 km, kameranın uzak düzlemi (harita × 3 = 90 km)
-kırpıyor.
-
-**Bilinçli kural — halka sınırları ızgarada tam olmalı.** Adımlar `RoundToInt` ile
-türetilirse 7. halkadan sonra kesir çıkıyor ve iki halka arasında hiç çizilmeyen bir şerit
-kalıyor. Adımlar sabit (iç 32, dış 64), yuvarlama yok.
-
-**Bilinçli kural — halka sınırı dikilir.** Köşe paylaşmak 2:1 kenarı kapatmaz; dış halkanın
-iç kenarına ortadaki köşe geri konur ve kare kendi merkezinden yelpazelenir.
-
-**Dalga geometrisi 2–3,5 km arasında sönümlenir.** Orada dalga pikselin altına iner; düz
-yüzeyin çatlayacak dikişi olmaz. Normal ayrıca kendi kuralıyla sönümleniyor
-(`SeaTierResolvable`), o mesafeye bağlı değil **piksel ayak izine** bağlı.
-
-**Türev dokusunun mip zinciri var.** Kademe içi örtüşmeyi donanım ortalıyor; olmadan
-battaniye sönümleme onu örtmek zorunda kalıyordu.
-
-**Eğrilik yalnız clip konumuna uygulanır**, `positionWS` düz kalır: parça köpük için tepe
-yüksekliğini oradan okuyor, eğrilseydi uzaktaki her tepe çukur okunurdu.
-
-**Batimetri kutusunun dışında derinlik `smoothstep` ile derin suya iner.** Doğrusal geçişte
-derinlik sürekli ama türevi sıçrıyordu; dip eğimi kırılma ölçütünü besliyor ve kutunun
-kenarı denizin üstünde parlak bir kare olarak görünüyordu (`SYMPTOMS.md`).
