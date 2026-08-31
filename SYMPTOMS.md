@@ -14,6 +14,43 @@ her seferinde belirtinin en çok göze çarptığı katman seçilmişti. Bulut k
 
 ---
 
+## Deniz açılınca bulut örtüsü kesik bir levhaya dönüyor (2026-08-31)
+
+**Belirti:** yukarıdan aşağı bakarken bulut katmanı dik kenarlı bir dörtgende bitiyor,
+ötesinde bulut yok. Kapsama %90-100 olsa bile. **Aşağıdan yukarı bakarken sorun yok.**
+
+**Ayırt eden ölçüm:** tek değişken deniz meshinin ulaşımı, kadraj ve her şey sabit.
+7 halka (4 km) → bulut tam. 13 halka (131 km) → kesik. 11 halka (33 km) → yine kesik,
+üstelik **zirveden** (6100 m) bile.
+
+**Gerçek sebep:** bulut ışın yürüyüşü deniz meshini engel sayıyor. Deniz `Transparent-1`
+kuyruğunda ama `DepthOnly` geçişi derinlik ön-geçişinde çalışıyor, yani buluttan önce.
+Deniz 4 km'yken ekranın küçük bir kısmını kaplıyor ve fark edilmiyor; alt yarım küreyi
+kapladığında bulut oradan siliniyor.
+
+**Mesafe ayarlayarak çözülmüyor** — zirvede 33 km de kesiyor. Sorun mesafe değil, denizin
+engel sayılması.
+
+**Şimdilik:** deniz ulaşımı 4,1 km'de bırakıldı. Bedeli, meshin kendi kenarının yüksekten
+kare olarak görünmesi. İkisi aynı anda çözülemiyor; önce bu etkileşim düzeltilmeli.
+
+---
+
+## Bulut kenarındaki siyah kontur — ÜÇÜNCÜ SEBEP: bulut derinliği sahneye yazılmıyordu (2026-08-31)
+
+**Belirti:** (B) ile aynı, siyah kontur. Ama (B)'nin çözümü (proxy + sınır) kodda duruyordu.
+
+**Gerçek sebep:** `PC_Renderer.asset` → `depthTexture: 0`. Bu anahtar bulut derinliğini
+kamera derinlik tamponuna yazar. Kapalıyken bulut, kendisinden sonra çizilen hiçbir şey
+tarafından görülmüyor.
+
+**Çözüm:** `depthTexture: 1`. Ölçüm: açıkken kontur yok, kapalıyken var.
+
+**Bu üçüncü sebep, (A) ve (B)'nin ikisi de doğruyken ortaya çıkıyor.** Shader'daki iki
+düzeltme yerinde olduğu hâlde kontur duruyorsa bakılacak yer ayar dosyasıdır, shader değil.
+
+---
+
 ## Denizin üstünde, kamerayla gelen kare bir çerçeve (2026-08-31)
 
 **Kullanıcının ağzından:** "çok yüksekten aşağıya baktığımda böyle tuhaf bir görüntü

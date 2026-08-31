@@ -70,7 +70,19 @@ public static class SeaQuality
     /// ring after it costs a FIXED 24576 while DOUBLING the radius:
     ///
     ///   Med (0.50 m,  7 rings) ->   2 km
-    ///   Med (0.50 m, 13 rings) -> 131 km, 328k tris
+    ///   Med (0.50 m, 11 rings) ->  33 km
+    ///   Med (0.50 m, 13 rings) -> 131 km
+    ///
+    /// IT STOPS AT 4 km, AND THAT IS NOT A CHOICE ABOUT THE HORIZON.
+    ///
+    /// The sea occludes the cloud ray march. Measured at one framing, everything else
+    /// held: 7 rings -> the cloud deck is whole; 13 rings -> it is cut into a hard-edged
+    /// sheet. Pulling back to 11 rings (33 km) did not help, and the cut was still there
+    /// from the SUMMIT at 6100 m -- so it is not a distance to be tuned, it is the sea
+    /// being treated as an occluder wherever it is.
+    ///
+    /// Until that interaction is fixed the sea cannot be extended, and the price is the
+    /// mesh's own edge showing as a square from altitude (`SYMPTOMS.md`).
     ///
     /// The radius is `64 * quad * 2^(rings-1)`: ring 0 is a solid square and
     /// every ring after it runs from half its outer radius to its outer radius.
@@ -86,9 +98,9 @@ public static class SeaQuality
     {
         switch (preset)
         {
-            case SeaQualityPreset.Low:    return new Levels(128, 7, 2, 12, 1.00f);
-            case SeaQualityPreset.High:   return new Levels(256, 8, 3, 14, 0.25f);
-            default:                      return new Levels(256, 8, 3, 13, 0.50f);
+            case SeaQualityPreset.Low:    return new Levels(128, 7, 2, 7, 1.00f);
+            case SeaQualityPreset.High:   return new Levels(256, 8, 3, 9, 0.25f);
+            default:                      return new Levels(256, 8, 3, 8, 0.50f);
         }
     }
 
