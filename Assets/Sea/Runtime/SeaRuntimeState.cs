@@ -17,9 +17,6 @@ public static class SeaRuntimeState
     /// Peak period Tp (s). The period carrying most of the spectrum's energy.
     public static float PeakPeriod { get; internal set; }
 
-    /// Fraction of open water covered by whitecap foam.
-    public static float WhitecapCoverage01 { get; internal set; }
-
     /// Current strength of the shore foam: the surge, 0 at the lowest point of
     /// the swash and 1 at the top of the run-up.
     public static float ShoreFoamIntensity01 { get; internal set; }
