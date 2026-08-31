@@ -115,9 +115,19 @@ Shader "ToTheSummit/SeaLit"
                 // written separately the two buffers would see different
                 // surfaces.
                 SeaSurfacePoint surf = SeaDeform(posWS);
+                surf.posWS = SeaFlattenFar(surf.posWS, posWS, _WorldSpaceCameraPos.xz);
+
+                // THE CURVATURE BENDS WHAT IS DRAWN, NOT WHAT IS SHADED.
+                //
+                // `positionWS` stays flat because the fragment reads crest
+                // height out of it (`positionWS.y - _SeaLevelY`); dropping it
+                // would make every distant crest read as a trough and kill the
+                // foam. Only what goes to clip space is curved.
+                float3 curvedWS = surf.posWS;
+                curvedWS.y -= SeaCurvatureDrop(curvedWS.xz, _WorldSpaceCameraPos.xz);
 
                 OUT.positionWS = surf.posWS;
-                OUT.positionCS = TransformWorldToHClip(surf.posWS);
+                OUT.positionCS = TransformWorldToHClip(curvedWS);
                 OUT.screenPos  = ComputeScreenPos(OUT.positionCS);
 
                 return OUT;
@@ -189,15 +199,27 @@ Shader "ToTheSummit/SeaLit"
                 //
                 // NO central difference: the slope already comes from the FFT
                 // and that is more accurate (spec 6.7).
-                float2 slopeSum = SeaSampleSlope(IN.positionWS.xz);
+                // EACH TIER FADES BY ITS OWN WAVELENGTH, NOT BY DISTANCE.
+                //
+                // The old rule zeroed every tier at 520 m and left the rest of the
+                // water -- 98% of the mesh -- a flat mirror. Measured: a 2 m wave
+                // spans 7.1 pixels at 520 m and does not shrink to one pixel until
+                // 4 km. Distance was the wrong quantity; what aliases is a wave
+                // shorter than a pixel, so the pixel's own footprint decides it and
+                // the long swell now runs to the horizon.
+                // THE FOOTPRINT IS A LENGTH, NOT THE LARGER OF TWO AXES.
+                //
+                // `max(fwidth(x), fwidth(z))` was tried first and drew itself on
+                // the water: its iso-contour is a SQUARE, so a square outline sat
+                // around the camera and travelled with it, and along the view axis
+                // -- where the winning axis swaps -- it left a straight crease.
+                // The real footprint is how far the world moves per pixel step.
+                float2 dx = ddx(IN.positionWS.xz);
+                float2 dy = ddy(IN.positionWS.xz);
+                float pixelSize = max(length(dx), length(dy));
+                float2 slopeSum = SeaSampleSlope(IN.positionWS.xz, pixelSize);
 
                 float3 N = normalize(float3(-slopeSum.x, 1.0, -slopeSum.y));
-
-                // NORMAL DETAIL FADES WITH DISTANCE. Without the fade, waves
-                // smaller than a texel get sampled and TAA turns the surface
-                // into a boiling mess (spec 10.5).
-                float normalFade = saturate(1.0 - (dist - 120.0) / 400.0);
-                N = normalize(lerp(float3(0, 1, 0), N, normalFade));
 
                 float2 screenUV = IN.screenPos.xy / IN.screenPos.w;
 
@@ -755,9 +777,16 @@ Shader "ToTheSummit/SeaLit"
                 // depth buffer would see a flat sea and the color buffer a
                 // wavy one, and the surface would catch on its own depth test.
                 SeaSurfacePoint surf = SeaDeform(posWS);
+                surf.posWS = SeaFlattenFar(surf.posWS, posWS, _WorldSpaceCameraPos.xz);
+
+                // THE SAME CURVATURE AS THE FORWARD PASS, for the same reason
+                // the deformation is shared: two passes bending differently
+                // would put the surface at war with its own depth test.
+                float3 curvedWS = surf.posWS;
+                curvedWS.y -= SeaCurvatureDrop(curvedWS.xz, _WorldSpaceCameraPos.xz);
 
                 OUT.positionWS = surf.posWS;
-                OUT.positionCS = TransformWorldToHClip(surf.posWS);
+                OUT.positionCS = TransformWorldToHClip(curvedWS);
 
                 return OUT;
             }
