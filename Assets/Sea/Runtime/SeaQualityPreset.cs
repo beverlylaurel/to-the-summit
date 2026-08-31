@@ -73,17 +73,21 @@ public static class SeaQuality
     ///   Med (0.50 m, 11 rings) ->  33 km
     ///   Med (0.50 m, 13 rings) -> 131 km
     ///
-    /// IT REACHES 131 km, AND THAT NEEDED THE CLOUD DEPTH TURNED ON FIRST.
+    /// IT STOPS AT 4 km, AND THE REASON IS NOT THE HORIZON.
     ///
-    /// Extending the sea used to cut the cloud deck into a hard-edged sheet. Measured,
-    /// same framing and cover: with the sea drawn the deck was cut, with the sea hidden
-    /// it was whole -- the sea was PAINTING OVER the clouds. The cloud composite runs at
+    /// Extending the sea cuts the cloud deck: the cloud composite runs at
     /// `BeforeRenderingTransparents` and the sea is `Transparent-1`, so the sea draws
-    /// afterwards; with no cloud depth in the buffer it had nothing to test against.
-    /// `depthTexture` on the renderer feature writes that depth, and the cut is gone.
+    /// afterwards and, with no cloud depth in the buffer, paints over it. Measured, same
+    /// framing and cover: sea drawn -> deck cut, sea hidden -> deck whole.
     ///
-    /// So the reach is a horizon question again: 131 km is past the camera's far plane
-    /// (map * 3 = 90 km), which does the clipping instead of the mesh's own edge.
+    /// Writing cloud depth (`depthTexture` on the renderer feature) removes the cut, but
+    /// then the sea and the cloud fight over the same depth and the sea wins in scattered
+    /// pixels -- green speckles across the sky, measured at 22 km. One artefact traded for
+    /// another.
+    ///
+    /// So the reach stays where it was until the sea and the clouds are ordered properly.
+    /// The price is the mesh's own edge showing as a square from altitude
+    /// (`SYMPTOMS.md`, "Denizin üstünde, kamerayla gelen kare bir çerçeve").
     ///
     /// The radius is `64 * quad * 2^(rings-1)`: ring 0 is a solid square and
     /// every ring after it runs from half its outer radius to its outer radius.
@@ -99,9 +103,9 @@ public static class SeaQuality
     {
         switch (preset)
         {
-            case SeaQualityPreset.Low:    return new Levels(128, 7, 2, 12, 1.00f);
-            case SeaQualityPreset.High:   return new Levels(256, 8, 3, 14, 0.25f);
-            default:                      return new Levels(256, 8, 3, 13, 0.50f);
+            case SeaQualityPreset.Low:    return new Levels(128, 7, 2, 7, 1.00f);
+            case SeaQualityPreset.High:   return new Levels(256, 8, 3, 9, 0.25f);
+            default:                      return new Levels(256, 8, 3, 8, 0.50f);
         }
     }
 
