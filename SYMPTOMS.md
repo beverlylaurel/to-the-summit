@@ -689,6 +689,45 @@ dolar (ölçüldü). O yolda mesafe bilinmiyor: sis uygulanmaz.
 
 ---
 
+---
+
+## (B) GERİ DÖNDÜ VE SEBEBİ NaN'MIŞ (2026-08-31)
+
+**Belirti:** aynı siyah kontur, ama (A) ve (B)'nin shader düzeltmeleri **ikisi de kodda
+duruyorken**. Yalnız seyrek bulutta görünüyor; kapsama %90'ın üstündeyken görünmüyor.
+
+**Gerçek sebep:** halkanın sahte mesafesiyle `FogPath` taşıyor ve **NaN** dönüyor.
+`Blend One SrcAlpha` onu her bulutun çevresine siyah olarak boyuyor.
+
+**NEDEN BU KADAR UZUN SÜRDÜ — ölçüm aracı yapısal olarak yalan söylüyordu:**
+
+```hlsl
+fogScattering *= _CloudFogEnabled;   // NaN * 0 = NaN
+```
+
+Bu satır bir NaN'ı **susturamaz**. Yani kaydın kendi ayırt edici testi olan "bulut sisini
+kapat" konturu kaldırmıyor ve ölçüm her seferinde "sis değil" diyor. O yanlış sonuçla
+sırayla büyütme filtresi, bulut gölgesi, bulut sahne-derinliği ve sis geçişi özelliği
+denendi — dördü de ölçümle elendi, çünkü dördü de suçsuzdu.
+
+**Ayırt eden şey kullanıcının bilgisi oldu:** *"yükseklik sisini kapattığımda düzeliyor."*
+`FogEnabled` çarpan koymuyor, **yoğunlukları sıfırlıyor**; integral hiç taşmıyor. İki
+anahtarın farkı buydu.
+
+**Çözüm:** halka uydurulmuş mesafe almıyor. Tek piksel geniş olduğu için gerçek mesafe
+hemen yanında: sekiz komşudan uzak değerden en çok sapan (en yakın yüzey) alınıyor.
+Hiçbiri geçerli değilse piksel uzak değerde kalıyor ve **hiç sislenmiyor** — sissiz halka
+(A), siyah halkadan çok daha küçük bir kusur, ve hiçbir yerde uydurma sayı yok.
+
+**İki kural:**
+
+1. **Bir değer NaN olabiliyorsa çarpanla kapatılamaz.** Sebep, sayının üretildiği yerde
+   düzeltilir. Bir anahtar "kapattım ama değişmedi" diyorsa, anahtarın o yolu gerçekten
+   kesip kesmediği ayrıca doğrulanır.
+2. **Belirtiyi gizleyen koşulda test etme.** Bu tur bir kez "çözüldü" denildi; doğrulama
+   %90 bulut kapsamasında yapılmıştı, yani konturun görünemediği koşulda.
+
+
 ## Neden bu ikisi birbirine karıştı — ve tekrarlanmaması için
 
 (B) çözülürken (A) ile aynı hata sanıldı. (B)'yi kapatmanın kolay yolu proxy'yi kaldırıp
