@@ -209,6 +209,7 @@ Shader "Hidden/Sky/VolumetricClouds"
             SAMPLER(s_point_clamp_sampler);
             float4 _ScreenResolution;
             TEXTURE2D_X_FLOAT(_VolumetricCloudsDepthTexture);
+            float4 _VolumetricCloudsDepthTexture_TexelSize;
 
             #pragma multi_compile_local_fragment _ _LOW_RESOLUTION_CLOUDS
             #pragma multi_compile_local_fragment _ _OUTPUT_CLOUDS_DEPTH
@@ -249,8 +250,39 @@ Shader "Hidden/Sky/VolumetricClouds"
                 // reason is gone". Its reason was not gone: the clamp is exactly what makes
                 // the finite proxy safe. Both halves are needed, and the older record said so
                 // — SYMPTOMS.md, "Bulutların çevresinde halka / bulut kenarında kontur".
+                // THE RING TAKES A REAL DISTANCE OR NONE AT ALL.
+                //
+                // It used to take a proxy just short of the far plane. That distance is a
+                // fiction, and the fog integral over it overflows: the ring came back NaN
+                // and `Blend One SrcAlpha` painted it black around every cloud.
+                //
+                // Silencing it downstream does not work and that is why this took so long
+                // to find. `fogScattering *= _CloudFogEnabled` cannot kill a NaN -- NaN
+                // times zero is still NaN -- so switching the cloud fog off left the
+                // outline exactly where it was and the measurement read "not the fog".
+                // Switching the height fog off DID clear it, because that zeroes the
+                // DENSITIES and the integral never overflows in the first place.
+                //
+                // The ring is one pixel wide, so a real distance is sitting next to it:
+                // whichever neighbour is furthest from the far value is the nearest
+                // surface. If none of them has one either, the pixel keeps the far value
+                // and takes no fog at all -- an unfogged ring, which is a far smaller
+                // artefact than a black one, and never an invented number.
                 bool edgeOfClouds = depth == UNITY_RAW_FAR_CLIP_VALUE && cloudsColor.a < 1.0;
-                depth = edgeOfClouds ? CLOUDS_RAW_FAR_CLIP_VALUE : depth;
+
+                if (edgeOfClouds)
+                {
+                    float2 tx = _VolumetricCloudsDepthTexture_TexelSize.xy;
+                    float best = 0.0;
+
+                    #define CLOUDS_BORROW(ox, oy) {                         float d = SAMPLE_TEXTURE2D_X_LOD(_VolumetricCloudsDepthTexture,                             s_point_clamp_sampler, screenUV + float2(ox, oy) * tx, 0).r;                         float s = abs(d - UNITY_RAW_FAR_CLIP_VALUE);                         if (s > best) { best = s; depth = d; } }
+
+                    CLOUDS_BORROW(-1.0,  0.0) CLOUDS_BORROW( 1.0,  0.0)
+                    CLOUDS_BORROW( 0.0, -1.0) CLOUDS_BORROW( 0.0,  1.0)
+                    CLOUDS_BORROW(-1.0, -1.0) CLOUDS_BORROW( 1.0, -1.0)
+                    CLOUDS_BORROW(-1.0,  1.0) CLOUDS_BORROW( 1.0,  1.0)
+                    #undef CLOUDS_BORROW
+                }
             #else
                 // Derinlik cikisi kapaliyken bulut mesafesi bilinmiyor. Uydurmak (eski
                 // hal) ekrani KOCAMAN siyah lekelerle dolduruyordu (olculdu). Mesafe
@@ -684,6 +716,7 @@ Shader "Hidden/Sky/VolumetricClouds"
         #endif
 
             TEXTURE2D_X_FLOAT(_VolumetricCloudsDepthTexture);
+            float4 _VolumetricCloudsDepthTexture_TexelSize;
 
             #pragma multi_compile_local_fragment _ _LOW_RESOLUTION_CLOUDS
             #pragma multi_compile_local_fragment _ _OUTPUT_CLOUDS_DEPTH
@@ -749,8 +782,39 @@ Shader "Hidden/Sky/VolumetricClouds"
                 // reason is gone". Its reason was not gone: the clamp is exactly what makes
                 // the finite proxy safe. Both halves are needed, and the older record said so
                 // — SYMPTOMS.md, "Bulutların çevresinde halka / bulut kenarında kontur".
+                // THE RING TAKES A REAL DISTANCE OR NONE AT ALL.
+                //
+                // It used to take a proxy just short of the far plane. That distance is a
+                // fiction, and the fog integral over it overflows: the ring came back NaN
+                // and `Blend One SrcAlpha` painted it black around every cloud.
+                //
+                // Silencing it downstream does not work and that is why this took so long
+                // to find. `fogScattering *= _CloudFogEnabled` cannot kill a NaN -- NaN
+                // times zero is still NaN -- so switching the cloud fog off left the
+                // outline exactly where it was and the measurement read "not the fog".
+                // Switching the height fog off DID clear it, because that zeroes the
+                // DENSITIES and the integral never overflows in the first place.
+                //
+                // The ring is one pixel wide, so a real distance is sitting next to it:
+                // whichever neighbour is furthest from the far value is the nearest
+                // surface. If none of them has one either, the pixel keeps the far value
+                // and takes no fog at all -- an unfogged ring, which is a far smaller
+                // artefact than a black one, and never an invented number.
                 bool edgeOfClouds = depth == UNITY_RAW_FAR_CLIP_VALUE && cloudsColor.a < 1.0;
-                depth = edgeOfClouds ? CLOUDS_RAW_FAR_CLIP_VALUE : depth;
+
+                if (edgeOfClouds)
+                {
+                    float2 tx = _VolumetricCloudsDepthTexture_TexelSize.xy;
+                    float best = 0.0;
+
+                    #define CLOUDS_BORROW(ox, oy) {                         float d = SAMPLE_TEXTURE2D_X_LOD(_VolumetricCloudsDepthTexture,                             s_point_clamp_sampler, screenUV + float2(ox, oy) * tx, 0).r;                         float s = abs(d - UNITY_RAW_FAR_CLIP_VALUE);                         if (s > best) { best = s; depth = d; } }
+
+                    CLOUDS_BORROW(-1.0,  0.0) CLOUDS_BORROW( 1.0,  0.0)
+                    CLOUDS_BORROW( 0.0, -1.0) CLOUDS_BORROW( 0.0,  1.0)
+                    CLOUDS_BORROW(-1.0, -1.0) CLOUDS_BORROW( 1.0, -1.0)
+                    CLOUDS_BORROW(-1.0,  1.0) CLOUDS_BORROW( 1.0,  1.0)
+                    #undef CLOUDS_BORROW
+                }
             #else
                 // Derinlik cikisi kapaliyken bulut mesafesi bilinmiyor. Uydurmak (eski
                 // hal) ekrani KOCAMAN siyah lekelerle dolduruyordu (olculdu). Mesafe
