@@ -56,13 +56,22 @@ public static class SeaMeshBuilder
         {
             float q = finestQuad * (1 << ring);
 
-            // Outer radius of this ring: inner radius + QuadPerSide/2 x quad
-            int step = QuadPerSide / 2;
-            float outerRadius = innerRadius + step * q;
-
-            // The ring surrounding the inner square: outer square minus inner.
-            int outerSteps = Mathf.RoundToInt(outerRadius / q);
-            int innerSteps = Mathf.RoundToInt(innerRadius / q);
+            // EACH RING DOUBLES THE RADIUS AND IS EXACT ON ITS OWN LATTICE.
+            //
+            // The steps used to be derived with `RoundToInt(innerRadius / q)`,
+            // and that ratio stops being a whole number at ring 7: the inner
+            // square was taken as 4096 m while the ring inside it ended at
+            // 4064 m, so a 32 m strip belonged to NO ring. It read as a square
+            // outline around the camera, 8.1 km across -- and it only appeared
+            // once the ring count went past 7, because before that the fraction
+            // never came up.
+            //
+            // Written this way the ring always runs from half its outer radius
+            // to its outer radius, so both numbers are whole in units of q and
+            // no rounding is involved at all.
+            const int innerSteps = QuadPerSide / 4;
+            const int outerSteps = QuadPerSide / 2;
+            float outerRadius = outerSteps * q;
 
             for (int z = -outerSteps; z < outerSteps; z++)
                 for (int x = -outerSteps; x < outerSteps; x++)
@@ -73,7 +82,18 @@ public static class SeaMeshBuilder
                         z >= -innerSteps && z < innerSteps)
                         continue;
 
-                    AddQuad(vertices, indices, lookup, x * q, z * q, q, q);
+                    // WHICH EDGES FACE THE FINER RING. Those are the ones that
+                    // need splitting: the ring inside steps at half this quad's
+                    // size, so it leaves a vertex in the middle of the shared
+                    // edge that this quad would otherwise ignore.
+                    bool zInside = z >= -innerSteps && z < innerSteps;
+                    bool xInside = x >= -innerSteps && x < innerSteps;
+
+                    AddQuad(vertices, indices, lookup, x * q, z * q, q, q,
+                            splitMinusX: x == innerSteps && zInside,
+                            splitPlusX:  x == -innerSteps - 1 && zInside,
+                            splitMinusZ: z == innerSteps && xInside,
+                            splitPlusZ:  z == -innerSteps - 1 && xInside);
                 }
 
             innerRadius = outerRadius;
@@ -107,19 +127,58 @@ public static class SeaMeshBuilder
         return mesh;
     }
 
-    /// Adds one quad as two triangles. Corners are shared: a vertex at a
-    /// given world position is created once and its index reused.
+    /// Adds one quad. Corners are shared: a vertex at a given world position is
+    /// created once and its index reused.
+    ///
+    /// THE SPLIT FLAGS ARE WHAT STITCHES THE RINGS. Sharing corner vertices does
+    /// NOT close a 2:1 edge, whatever the alignment note above says -- measured on
+    /// the ring 7 / ring 8 boundary, vertices sit 32 m apart along a line whose
+    /// outer quads are 64 m wide, so every outer edge skipped the vertex in its
+    /// middle. The wave lifts that vertex off the straight edge and the seam opens
+    /// as a bright square around the camera, which is exactly what was seen.
+    ///
+    /// A split edge gets its middle vertex back and the quad is woven from its own
+    /// centre, so the two sides share every vertex along the seam. Only the quads
+    /// on a boundary pay for it.
     static void AddQuad(List<Vector3> vertices, List<int> indices,
                         Dictionary<long, int> lookup,
-                        float x, float z, float w, float d)
+                        float x, float z, float w, float d,
+                        bool splitMinusX = false, bool splitPlusX = false,
+                        bool splitMinusZ = false, bool splitPlusZ = false)
     {
-        int a = VertexIndex(vertices, lookup, x, z);
-        int b = VertexIndex(vertices, lookup, x + w, z);
-        int c = VertexIndex(vertices, lookup, x + w, z + d);
-        int e = VertexIndex(vertices, lookup, x, z + d);
+        if (!splitMinusX && !splitPlusX && !splitMinusZ && !splitPlusZ)
+        {
+            int a = VertexIndex(vertices, lookup, x, z);
+            int b = VertexIndex(vertices, lookup, x + w, z);
+            int c = VertexIndex(vertices, lookup, x + w, z + d);
+            int e = VertexIndex(vertices, lookup, x, z + d);
 
-        indices.Add(a); indices.Add(e); indices.Add(b);
-        indices.Add(b); indices.Add(e); indices.Add(c);
+            indices.Add(a); indices.Add(e); indices.Add(b);
+            indices.Add(b); indices.Add(e); indices.Add(c);
+            return;
+        }
+
+        // The outline, walked once, with a middle vertex inserted on every side
+        // that faces the finer ring.
+        var outline = new List<int>(8);
+        outline.Add(VertexIndex(vertices, lookup, x, z));
+        if (splitMinusZ) outline.Add(VertexIndex(vertices, lookup, x + w * 0.5f, z));
+        outline.Add(VertexIndex(vertices, lookup, x + w, z));
+        if (splitPlusX) outline.Add(VertexIndex(vertices, lookup, x + w, z + d * 0.5f));
+        outline.Add(VertexIndex(vertices, lookup, x + w, z + d));
+        if (splitPlusZ) outline.Add(VertexIndex(vertices, lookup, x + w * 0.5f, z + d));
+        outline.Add(VertexIndex(vertices, lookup, x, z + d));
+        if (splitMinusX) outline.Add(VertexIndex(vertices, lookup, x, z + d * 0.5f));
+
+        int centre = VertexIndex(vertices, lookup, x + w * 0.5f, z + d * 0.5f);
+
+        // Wound the other way round from the walk, to match the two-triangle case
+        // above: that one faces +Y and a fan following the walk would face -Y.
+        for (int i = 0; i < outline.Count; i++)
+        {
+            int j = i + 1 == outline.Count ? 0 : i + 1;
+            indices.Add(centre); indices.Add(outline[j]); indices.Add(outline[i]);
+        }
     }
 
     /// Vertex index from a world position. Asking for the same position a

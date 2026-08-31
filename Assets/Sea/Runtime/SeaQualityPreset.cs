@@ -55,11 +55,28 @@ public static class SeaQuality
     ///
     /// Neither reaches the horizon; the sea would end with a cut edge two
     /// kilometres out (spec §10.6 check 6 catches exactly this). The ring
-    /// count was chosen to keep the radius near 4 km:
+    /// count was first chosen to keep the radius near 4 km.
     ///
-    ///   Low  (1.00 m, 6 rings) -> 4032 m
-    ///   Med  (0.50 m, 7 rings) -> 4064 m
-    ///   High (0.25 m, 8 rings) -> 4080 m
+    /// FOUR KILOMETRES WAS SIZED FOR EYE LEVEL, AND THE PLAYER CLIMBS.
+    /// The horizon is `3.57 * sqrt(h)` km:
+    ///
+    ///   2 m (standing)  ->   5 km  -- 4 km is enough only here
+    ///   45 m (the base) ->  24 km
+    ///   839 m           -> 103 km  -- the sea showed as a lake with a cut edge
+    ///   6028 m (summit) -> 277 km  -- and from higher, as a plain SQUARE
+    ///
+    /// The square is the mesh itself: a clipmap centred on the camera. Cost is
+    /// not the reason to keep it small -- ring 0 is 32768 triangles and every
+    /// ring after it costs a FIXED 24576 while DOUBLING the radius:
+    ///
+    ///   Med (0.50 m,  7 rings) ->   2 km
+    ///   Med (0.50 m, 13 rings) -> 131 km, 328k tris
+    ///
+    /// The radius is `64 * quad * 2^(rings-1)`: ring 0 is a solid square and
+    /// every ring after it runs from half its outer radius to its outer radius.
+    ///
+    /// So the radius is set past the camera's far plane (map * 3 = 90 km) and
+    /// the far plane clips the sea instead of the mesh's own edge.
     ///
     /// The triangle counts do not match the spec's 180k/480k/900k either: in
     /// a single grid the triangle count depends only on the RING count, not
@@ -69,9 +86,9 @@ public static class SeaQuality
     {
         switch (preset)
         {
-            case SeaQualityPreset.Low:    return new Levels(128, 7, 2, 6, 1.00f);
-            case SeaQualityPreset.High:   return new Levels(256, 8, 3, 8, 0.25f);
-            default:                      return new Levels(256, 8, 3, 7, 0.50f);
+            case SeaQualityPreset.Low:    return new Levels(128, 7, 2, 12, 1.00f);
+            case SeaQualityPreset.High:   return new Levels(256, 8, 3, 14, 0.25f);
+            default:                      return new Levels(256, 8, 3, 13, 0.50f);
         }
     }
 
@@ -81,7 +98,7 @@ public static class SeaQuality
     public static float OuterRadius(SeaQualityPreset preset)
     {
         Levels l = Of(preset);
-        return (SeaMeshBuilder.QuadPerSide / 2) * l.FinestQuad * ((1 << l.RingCount) - 1);
+        return (SeaMeshBuilder.QuadPerSide / 2) * l.FinestQuad * (1 << (l.RingCount - 1));
     }
 
     /// THE KEYWORD MUST MATCH A `multi_compile`.
