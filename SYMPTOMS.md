@@ -27,16 +27,37 @@ mesafeyle ilgili değildi, ölçüm de o yönde yapılmamıştı.
 Deniz açıkken kesik, deniz gizliyken bulut tam. Yani ışın kesilmiyor, **deniz bulutun
 üstüne çiziliyor**.
 
-**Gerçek sebep:** bulut birleştirmesi `BeforeRenderingTransparents`'ta, deniz ise
-`Transparent-1` kuyruğunda — yani denizden önce. Bulut derinlik tamponuna hiçbir şey
-yazmadığı için deniz test edecek bir şey bulamıyor ve üstüne biniyor.
+**Gerçek sebep:** deniz `Transparent-1` kuyruğundaydı — sayı olarak **2999**, opak sınırı
+olan 2500'ün ötesinde. Bu yüzden denizin `DepthOnly` geçişi hiç koşmuyor, deniz
+`_CameraDepthTexture`'a hiç girmiyordu. Bulut ışını o dokuya karşı yürüyor: denizi
+görmediği için içinden geçip çiziyor, sonra da bulut birleştirmesinden (
+`BeforeRenderingTransparents`) **sonra** çizilen deniz bulutu boyayıp siliyordu.
 
-**Çözüm:** `PC_Renderer.asset` → `depthTexture: 1`. Bulut derinliği sahne derinliğine
-yazılıyor, deniz onu görüyor. Deniz 131 km'ye açıldı, yeşil kare gitti.
+Deniz zaten opak: `RenderType Opaque`, `ZWrite On`, `Blend Off`, `_CameraOpaqueTexture`
+okumuyor. Saydam kuyrukta durmasının işlevsel bir gerekçesi yoktu.
 
-**Not:** bu anahtar bir kez de kontur için denenmiş ve "kontur düzeldi" sanılmıştı; o
-doğrulama %90 kapsamada yapıldığı için yanlıştı. Konturun sebebi ayrı (NaN, aşağıda).
-Aynı anahtar bu belirtinin gerçek çözümü, ötekinin değil.
+**Çözüm:** `SeaLit.shader` → `"Queue" = "Geometry+450"` (2450). Deniz bulut yürümeden
+önce derinlik yazıyor, bulut ona karşı örtülüyor, birleştirme paketin **kendi** geçişiyle
+denizin üstüne biniyor. Deniz 131 km'de, yeşil kare yok, örtü kesilmiyor.
+
+Araziden (2000) sonra çizilmeye devam ediyor. `SkyFog` denizi boyamıyor: derinliği uzak
+düzlem olmayan her pikseli `discard` ediyor, deniz artık derinlik yazdığı için elenmiş
+oluyor — sisini kendi shader'ında uyguluyor, eskisi gibi.
+
+**Maliyet ölçüldü:** deniz derinlik ön-geçişine de girdiği için üçgen sayısı 802k → 1139k
+(deniz mesh'i 337k), 17 km'de kare süresi 8,4 → 9,6 ms.
+
+**İki yanlış çözüm denendi ve geri alındı:**
+
+1. `PC_Renderer.asset` → `depthTexture: 1`. Bulut derinliği sahne derinliğine yazılınca
+   deniz ile bulut aynı değeri paylaşıp z-çakışmasına giriyor: 22 km'de gökyüzüne dağılmış
+   yeşil benekler.
+2. Denizin shader'ında `_VolumetricCloudsDepthTexture`'a karşı `clip`. Bulut derinliği
+   çeyrek çözünürlükte ve klip ikili olduğu için bulut siluetleri denizin üstünde
+   **basamak basamak** çıkıyor. Ölçüldü, kaldırıldı.
+
+**Not:** `depthTexture: 1` bir kez de kontur için denenmiş ve "kontur düzeldi" sanılmıştı;
+o doğrulama %90 kapsamada yapıldığı için yanlıştı. Konturun sebebi ayrı (NaN, aşağıda).
 
 ## Denizin üstünde, kamerayla gelen kare bir çerçeve (2026-08-31)
 

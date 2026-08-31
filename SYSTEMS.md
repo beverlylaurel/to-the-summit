@@ -1739,3 +1739,15 @@ yüksekliğini oradan okuyor, eğrilseydi uzaktaki her tepe çukur okunurdu.
 **Batimetri kutusunun dışında derinlik `smoothstep` ile derin suya iner.** Doğrusal geçişte
 derinlik sürekli ama türevi sıçrıyordu; dip eğimi kırılma ölçütünü besliyor ve kutunun
 kenarı denizin üstünde parlak bir kare olarak görünüyordu (`SYMPTOMS.md`).
+
+**Deniz opak kuyrukta (`Geometry+450`), saydam kuyrukta değil.** Deniz `_CameraDepthTexture`'a
+girmek zorunda: hacimsel bulut ışını o dokuya karşı yürüyor ve denizi görmezse içinden geçip
+çiziyor, sonra deniz bulutun üstüne biniyor. `Transparent-1` = 2999, opak sınırı 2500'ün
+ötesinde, orada denizin `DepthOnly` geçişi hiç koşmuyordu.
+
+**Deniz bulutu okumaz, bulut denizi okur.** Yön tek: deniz kendi derinliğini yazar, bulut
+ona karşı örtülür, birleştirme paketin kendi geçişiyle denizin üstüne biner. Denizin
+shader'ında bulut dokusu yok.
+
+**`SkyFog` denizi boyamaz.** Derinliği uzak düzlem olmayan her pikseli `discard` ediyor;
+deniz derinlik yazdığı için eleniyor ve sisini kendi shader'ında uyguluyor.
