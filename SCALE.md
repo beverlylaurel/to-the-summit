@@ -240,7 +240,9 @@ dağ ne kadar büyürse büyüsün kar tanesi büyümüyor.
 | `deepWaterDepth` = 200 m | **bilerek mutlak** | Arazi dışı varsayımı. Denizin ne kadar açıldığıyla ilgili değil. Artık kutunun kenarında zıplamıyor: `SEA_OFFSHORE_RAMP` (4000 m) boyunca iniliyor. |
 | `shoreSlope` = 0.058 | **elle bakılacak** | ARAZİNİN özelliği. Stockdon R2%'yi sürüyor, yani swash'ın ne kadar yukarı çıktığını. Ölçüm: su çizgisinden 1.68 m derinliğe 29 m. Arazi yeniden üretilirse yeniden ölçülmeli — aynı kesitten. |
 | `spectrumDepth` = 60 m | **bilerek mutlak** | FFT'nin varsaydığı ortalama derinlik; yerel derinlik mesh üzerinde uygulanıyor. |
-| Mesh halka yarıçapları (~4 km) | **bilerek mutlak** | Oyuncunun gözünden ufka olan mesafe. Dağın boyuyla ilgisi yok. |
+| Mesh yarıçapı (131 km) | **bilerek mutlak** | `64 · quad · 2^(halka−1)`. Göz hizasına göre değil **oyuncunun çıkabildiği irtifaya** göre: ufuk `3,57·√h` km, 6028 m zirvede 277 km. 4 km'ye ayarlıydı ve 839 m'den deniz kesik bir göl olarak görünüyordu. Kırpma düzlemi (90 km) zaten daha yakın; harita büyürse o da büyür, mesh sabit kalabilir. |
+| Halka adımları (iç 32, dış 64) | **bilerek mutlak** | Yuvarlamayla türetilemez. `RoundToInt(icYaricap/q)` 7. halkadan sonra kesir veriyordu ve iki halka arasında çizilmeyen 32 m'lik şerit kalıyordu (`SYMPTOMS.md`). |
+| Eğrilik düşüşü `d²/2R` | **bilerek mutlak** | R = 6371 km, dünyanın yarıçapı. 90 km'de 636 m. Haritanın boyuyla ilgisi yok. |
 | Bathymetry çözünürlüğü | **kendiliğinden ölçeklenir** | Arazi heightmap'inden geliyor (şu an 7.3 m/teksel). Arazi boyu değişince teksel boyu da değişir — su çizgisinin basamak boyu da. |
 
 ### Kıyı kumu

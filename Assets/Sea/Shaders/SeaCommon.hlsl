@@ -207,7 +207,23 @@ float4 SeaSampleDisplacement(float2 posXZ)
 /// Sum of the three tiers' slope. The normal is built from this — NO CENTRAL
 /// DIFFERENCE: the slope already comes from the FFT and that is more accurate
 /// (spec 6.7, 10.5).
-float2 SeaSampleSlope(float2 posXZ)
+/// HOW MUCH OF A TIER SURVIVES AT THIS PIXEL SIZE.
+///
+/// A tier whose waves are shorter than two pixels cannot be resolved; sampling it
+/// only feeds TAA noise. Same Nyquist rule the snow relief uses, and the same
+/// shape: nothing below two pixels, everything above four.
+///
+/// The tier's PATCH SIZE is its scale. The detail inside a tier is averaged by the
+/// derivative texture's mip chain, which is why that chain has to exist.
+float SeaTierResolvable(float wavelength, float pixelSize)
+{
+    return saturate(wavelength / max(pixelSize * 2.0, 1e-5) - 1.0);
+}
+
+/// `pixelSize` is the world width this pixel covers. It is passed in rather than
+/// taken from `fwidth` here: this file is included by the compute shaders too, and
+/// screen derivatives do not exist there.
+float2 SeaSampleSlope(float2 posXZ, float pixelSize)
 {
     float2 slope = 0.0;
 
@@ -215,6 +231,8 @@ float2 SeaSampleSlope(float2 posXZ)
     for (int s = 0; s < SEA_TIER_COUNT; ++s)
     {
         float2 uv = posXZ / _SeaPatchSizes[s];
+        float tierWeight = _SeaTierWeights[s]
+                         * SeaTierResolvable(_SeaPatchSizes[s], pixelSize);
 
         if (s >= SEA_HEX_TIER_MIN)
         {
@@ -227,13 +245,13 @@ float2 SeaSampleSlope(float2 posXZ)
             float2 s1 = SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives, sampler_SeaDerivatives, uv + o1, s).xy;
             float2 s2 = SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives, sampler_SeaDerivatives, uv + o2, s).xy;
 
-            slope += SeaHexBlend2(s0, s1, s2, w) * _SeaTierWeights[s];
+            slope += SeaHexBlend2(s0, s1, s2, w) * tierWeight;
         }
         else
         {
             slope += SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives,
                                             sampler_SeaDerivatives, uv, s).xy
-                   * _SeaTierWeights[s];
+                   * tierWeight;
         }
     }
 
@@ -510,7 +528,14 @@ float SeaSampleDepth(float2 posXZ)
     float2 outsideUV = max(max(-uv, uv - 1.0), 0.0);
     float  outside   = length(outsideUV * _SeaBathySizeXZ);
 
-    return lerp(bed, _SeaDeepWaterDepth, saturate(outside / SEA_OFFSHORE_RAMP));
+    // SMOOTHSTEP, NOT LERP. The depth was continuous across the box edge either
+    // way, but a straight lerp starts falling at its full rate the instant it
+    // leaves the box, so the SLOPE jumped there -- and the bottom slope is what
+    // the breaking criterion reads. The result was a bright line tracing the
+    // 30 km box, visible from altitude as a square sitting in open water.
+    // Measured: pushing the box out to 120 km moved the line with it.
+    return lerp(bed, _SeaDeepWaterDepth,
+                smoothstep(0.0, 1.0, saturate(outside / SEA_OFFSHORE_RAMP)));
 }
 
 /// Bottom slope (tan theta). The breaker index follows from it (spec 8.3).
@@ -567,6 +592,52 @@ struct SeaSurfacePoint
 ///
 /// Depth is read from the UNDISPLACED xz: horizontal displacement is the
 /// wave's own motion, it does not move the sea bed (spec 10.4).
+/// THE WAVE GEOMETRY STOPS WHERE IT STOPS BEING VISIBLE.
+///
+/// The mesh is a clipmap and every ring boundary is a T-JUNCTION: measured at
+/// x = 4064 m the vertices sit 32 m apart -- the INNER ring's step -- while the
+/// outer ring's quads there are 64 m wide, so each outer edge skips the vertex
+/// in its middle. Displacement lifts that vertex off the edge and the seam
+/// opens as a bright square. (`SeaMeshBuilder` claims sharing vertices makes
+/// this impossible; sharing corners does not stitch a 2:1 edge.)
+///
+/// Rather than stitch, the geometry is put to sleep where nobody can see it: a
+/// 2 m wave spans 1.0 pixel at 2 km and 0.6 at 3.5 km, so past that the surface
+/// may as well be flat -- and a flat surface has nothing to crack. The boundaries
+/// INSIDE 2 km keep their waves and never showed a seam.
+///
+/// The normal keeps fading by its own rule (`SeaTierResolvable`); this is only
+/// the geometry.
+float3 SeaFlattenFar(float3 displacedWS, float3 flatWS, float2 cameraXZ)
+{
+    const float FadeStart = 2000.0;
+    const float FadeEnd   = 3500.0;
+
+    float d = distance(displacedWS.xz, cameraXZ);
+    float keep = 1.0 - smoothstep(FadeStart, FadeEnd, d);
+    return lerp(float3(flatWS.x, _SeaLevelY, flatWS.z), displacedWS, keep);
+}
+
+/// HOW FAR THE SEA FALLS AWAY AT THIS DISTANCE.
+///
+/// The mesh is a flat plane; the planet is not. Without this the water keeps
+/// its level all the way out and rides UP into the sky -- at the camera's far
+/// plane (90 km) it stands 636 m above where the real surface would be, and the
+/// horizon reads as a wall rather than a curve.
+///
+/// `d^2 / 2R`, the standard drop, with R the Earth's radius.
+///
+/// The camera comes in as an ARGUMENT. `_WorldSpaceCameraPos` is declared only
+/// in the vertex/fragment stages; reaching for it here -- this file is included
+/// by the compute shaders too -- left every kernel SILENTLY invalid, exactly the
+/// failure the sampler note above this file already warned about.
+float SeaCurvatureDrop(float2 posXZ, float2 cameraXZ)
+{
+    const float EarthRadius = 6371000.0;
+    float2 d = posXZ - cameraXZ;
+    return dot(d, d) / (2.0 * EarthRadius);
+}
+
 SeaSurfacePoint SeaDeform(float3 posWS)
 {
     SeaSurfacePoint o;
