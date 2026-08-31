@@ -117,3 +117,6 @@ Assets/Terrain/Sculpts/_kurtarma.bytes*
 # Yagmur izi ara urunu: masaustundeki ham veritabanindan uretiliyor.
 # Pismis olan Assets/Rain/RainStreakDatabase.asset, o repoda duruyor.
 Tools/rain/packed/
+
+# Kullanicinin referans gorselleri: repoya girmez.
+Review/
