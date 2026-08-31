@@ -14,39 +14,6 @@ her seferinde belirtinin en çok göze çarptığı katman seçilmişti. Bulut k
 
 ---
 
-## Denizin üstünde, kamerayla gelen kare bir çerçeve (2026-08-31)
-
-**Kullanıcının ağzından:** "çok yüksekten aşağıya baktığımda böyle tuhaf bir görüntü
-çıkıyor", "kare devam ediyor. beni takip ediyor ayrıca." Yüksekten (14–16 km) denize
-bakınca suyun üstünde ince, dörtgen bir çizgi; içi ve dışı su, aradaki tek fark ton.
-
-**ÜÇ ŞÜPHELİ SIRAYLA YANLIŞ ÇIKTI.** Üçü de tahminle seçildi, hiçbiri ölçülmemişti:
-
-1. **Halka sınırındaki T-birleşimi.** Gerçekten vardı — `x = 4064 m` sınırında köşeler
-   32 m aralıkla duruyor, dış halkanın karesi 64 m. Ölçüldü, dikildi. **Kare gitmedi.**
-2. **`max(fwidth(x), fwidth(z))` piksel ayak izi.** Eş-değer eğrisi kare, ekran ortasında
-   da eksen değiştirme kırığı var. İkisi de gerçek kusurdu, düzeltildi. **Kare gitmedi.**
-3. **Hacimsel bulut.** Bulut kapatıldı, kare durdu.
-
-**Gerçek sebep:** `SeaSampleDepth`, batimetri kutusunun (30 km, araziyle çakışık) dışında
-derinliği `lerp` ile derin suya çekiyordu. Derinlik sınırda **sürekli** ama **türevi
-sıçrıyor**; `SeaSampleBottomSlope` türev alıyor ve kırılma/köpük ölçütü ona bağlı. Sonuç:
-kutunun kenarını izleyen ince parlak çizgi.
-
-**Ayırt eden ölçüm:** `_SeaBathySizeXZ` çalışma anında 30 km'den 120 km'ye çıkarıldı.
-Çizgi kutuyla birlikte kadraj dışına çıktı. Kutu değişmeseydi çizgi yerinde kalırdı.
-
-**Çözüm:** rampa `smoothstep` oldu; kutu kenarında türev sıfırdan başlıyor.
-
-**Kullanıcının anahtarı, üç turu birden kesti.** F1 tarzı beş anahtar (deniz/bulut/sis/
-gökyüzü/arazi) verildi, kullanıcı "1" dedi. Şüpheli listesi bir bakışta denize indi.
-Anahtarlar ilk turda verilseydi üç yanlış tahmin de yapılmazdı.
-
-**Karışmasın:** aynı manzarada, denizden bağımsız, **arazinin kendi 30 km kenarı** da
-dörtgen bir sınır olarak görünüyor. Deniz kapatıldığında o duruyor. Ayrı konu.
-
----
-
 ## Kayıtlar
 
 138 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
