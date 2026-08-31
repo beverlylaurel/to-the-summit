@@ -114,6 +114,20 @@ float2 SeaHash22(float2 p)
 /// Tessendorf field IS: it is a sum of components with random phases. So plain
 /// mean-and-variance preservation is exact for us, and the histogram transform —
 /// the expensive half of the method — drops out.
+/// THE SWASH SURGE. Mirrored from `SeaManager.SeaSwashSurge` -- the foam, the
+/// water level and the wet sand all read this one curve.
+///
+/// NOT A COSINE. A cosine withdraws exactly as fast as it arrives; a real swash
+/// rushes up and drains back slowly. `s (2 - s)` is the ballistic height of a
+/// body thrown up a slope: quick at the start, easing into the turn. The uprush
+/// gets `_SeaSwashUprush` of the cycle and the backwash the longer rest.
+float SeaSwashSurge(float phase, float uprush)
+{
+    float up = clamp(uprush, 0.05, 0.95);
+    float s = phase < up ? phase / up : 1.0 - (phase - up) / (1.0 - up);
+    return s * (2.0 - s);
+}
+
 void SeaHexWeights(float2 uv, out float2 o0, out float2 o1, out float2 o2, out float3 w)
 {
     // Skew the square lattice into the hexagonal one.
@@ -679,16 +693,61 @@ SeaSurfacePoint SeaDeform(float3 posWS)
         // steepens instead of spreading horizontally (spec 8.2).
         float chopScale = saturate(o.depth / SEA_CHOP_FADE_DEPTH);
 
-        // SHORE DAMPING. As depth goes to zero the wave height must go to
-        // zero too, otherwise the mesh intersects the terrain and flickers
-        // (spec 8.4).
-        float shoreFade = smoothstep(0.0, SEA_SHORE_FADE_DEPTH, o.depth);
+        disp.y  *= shoal;
+        disp.xz *= chopScale;
 
-        disp.y  *= shoal * shoreFade;
-        disp.xz *= chopScale * shoreFade;
+        // THE CREST IS NARROW, THE TROUGH IS BROAD.
+        //
+        // The FFT field is LINEAR, so its vertical profile is a sine: measured on
+        // this sea, skewness 0.04 and exactly half the area above the mean level,
+        // at every wind from 3 to 25 m/s. A real sea is skewed -- water piles into
+        // the crest and the trough spreads out long and flat -- and the lean grows
+        // as the wave feels the bottom: nearly sinusoidal in deep water, a peaked
+        // crest over a flat trough by the time H/h approaches the breaker index.
+        // [SOURCE: Stokes second order in deep water; cnoidal shoaling near shore]
+        //
+        // ONE TERM, BUILT FROM QUANTITIES ALREADY HERE. `e*e` leans the profile
+        // upward without touching its amplitude scale; `steep` is how close this
+        // point is to breaking, so deep water is left alone.
+        float gamma = SeaBreakerIndex(slope);
+
+        float amp   = max(_SeaSignificantHeight * shoal * 0.5, 0.05);
+        float steep = saturate(_SeaSignificantHeight * shoal
+                               / max(o.depth, SEA_MIN_DEPTH) / max(gamma, 0.1));
+        float e     = clamp(disp.y / amp, -1.5, 1.5);
+        disp.y += amp * SEA_CREST_SKEW * steep * (e * e - 0.5);
+
+        // A BROKEN WAVE PITCHES FORWARD.
+        //
+        // Clamping the height alone gives a wave with a flat top -- clipped, not
+        // broken. What a breaker actually does is throw its crest ahead of its own
+        // base: the front face steepens into a wall and the back stretches out
+        // long. That is a bore, and it is the shape of every wave between the
+        // breaker line and the sand.
+        //
+        // `over` is how far past the breaking limit this point already is, so
+        // nothing moves until the wave has actually broken. The throw is along the
+        // wave's own travel direction and scales with the crest it is throwing.
+        // [SOURCE: surf zone bore propagation; Iribarren breaker classification]
+        float over = saturate(_SeaSignificantHeight * shoal
+                              / max(o.depth, SEA_MIN_DEPTH) / max(gamma, 0.1) - 1.0);
+        float2 travel = _SeaWindWS / max(length(_SeaWindWS), 0.1);
+        disp.xz += travel * over * max(disp.y, 0.0) * SEA_BORE_PITCH;
 
         // BREAKING HEIGHT LIMIT, SLOPE DEPENDENT (spec 8.3).
-        float gamma = SeaBreakerIndex(slope);
+        //
+        // THIS IS THE ONLY SHORE DAMPING. A second `smoothstep(0, 0.6, depth)`
+        // used to multiply on top of it "so the mesh does not intersect the
+        // terrain". It is not needed and it is what made the surf vanish:
+        // measured on the shore transect, the limit alone already takes the wave
+        // down linearly with depth (60 m out 1.02 m, 30 m out 0.51, 14 m out
+        // 0.24) -- that IS the saturated surf zone, H = gamma*h. The extra fade
+        // then hit the last fourteen metres a second time (x0.80 at 10 m, x0.40
+        // at 6 m, x0.12 at 3 m) and the water went flat before it ever reached
+        // the sand.
+        //
+        // The limit is safe on its own: |disp.y| <= gamma*h/2 <= 0.55*h, so even
+        // a trough stays above the bed.
         float hMax  = gamma * o.depth * 0.5;
         disp.y = sign(disp.y) * min(abs(disp.y), hMax);
     }

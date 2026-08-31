@@ -74,6 +74,10 @@ public static class SeaShaderIDs
     public static readonly int PeakPeriod = Shader.PropertyToID("_SeaPeakPeriod");
     public static readonly int ShoreFoamPhase = Shader.PropertyToID("_SeaShoreFoamPhase");
 
+    /// Fraction of the swash cycle spent running up the beach. The rest is the
+    /// backwash, which is the longer half.
+    public static readonly int SwashUprush = Shader.PropertyToID("_SeaSwashUprush");
+
     // --- Optics (spec §12) ---
     public static readonly int ExtinctionRGB = Shader.PropertyToID("_SeaExtinctionRGB");
     public static readonly int UpwellingColor = Shader.PropertyToID("_SeaUpwellingColor");

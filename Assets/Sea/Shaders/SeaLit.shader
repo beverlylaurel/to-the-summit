@@ -95,6 +95,7 @@ Shader "ToTheSummit/SeaLit"
 
             float  _SeaRunupMaxDepth;
             float  _SeaShoreFoamPhase;
+            float  _SeaSwashUprush;
             float  _SeaShoreFoamDepth;
             float4 _SeaFoamColor;
             float  _SeaFoamRoughness;
@@ -585,7 +586,19 @@ Shader "ToTheSummit/SeaLit"
                     // climbed steadily and then snapped back, while the foam beside it
                     // followed the cosine. Two shapes for one wave. The water level and
                     // the foam now ride the SAME surge.
-                    float surge = 0.5 - 0.5 * cos(SEA_TWO_PI * phase);
+                    float surge = SeaSwashSurge(phase, _SeaSwashUprush);
+
+                    // NOT EVERY SWASH REACHES THE SAME LINE.
+                    //
+                    // With one curve and one period the water stopped at exactly the
+                    // same mark every time — the metronome look. The spectrum already
+                    // carries the answer: its two peaks beat against each other and
+                    // that beat is what a set of waves IS. A big set climbs the full
+                    // run-up, the lull falls short. No invented randomness; the same
+                    // `_SeaWaveGroups` the breaker line already breathes with.
+                    float swashSet = 0.5 - 0.5 * cos(_SeaWaveGroups.x * _SeaTime
+                                                     + alongShore * SEA_TWO_PI);
+                    surge *= 1.0 - _SeaWaveGroups.y * 0.45 * (1.0 - swashSet);
 
                     float runupDepth = _SeaRunupMaxDepth * surge;
                     float effDepth = depth + runupDepth;
