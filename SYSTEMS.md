@@ -1740,6 +1740,11 @@ yüksekliğini oradan okuyor, eğrilseydi uzaktaki her tepe çukur okunurdu.
 derinlik sürekli ama türevi sıçrıyordu; dip eğimi kırılma ölçütünü besliyor ve kutunun
 kenarı denizin üstünde parlak bir kare olarak görünüyordu (`SYMPTOMS.md`).
 
+**Altıgen karo okumaları mip'i ofsetsiz uv'den seçer.** Karo ofsetleri hücre sınırında
+sıçrıyor; donanım türevi onlarla sıçrayınca mip seçimi patlıyor ve ızgara boyunca tek
+piksellik dikiş kalıyor (`SYMPTOMS.md`). Eğim ve köpük okumaları `_GRAD` sürümünü
+kullanır. Yer değiştirme etkilenmiyor: o zaten `_LOD(0)` ile okuyor.
+
 **Deniz saydam kuyrukta (`Transparent-1`) kalır.** Opak olmasına rağmen: derinlik ve renk
 kopyaları (`_CameraDepthTexture`, `_CameraOpaqueTexture`) opak kuyruktan sonra alınıyor ve
 denizin su sütunu, kırılması, sığ su rengi o iki okumaya bağlı. Opak kuyruğa taşındığında

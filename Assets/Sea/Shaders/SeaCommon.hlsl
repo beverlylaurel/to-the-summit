@@ -241,9 +241,23 @@ float2 SeaSampleSlope(float2 posXZ, float pixelSize)
 
             // THE SAME WEIGHTS AS THE DISPLACEMENT. Blended differently, the normal
             // would stop describing the surface the geometry actually has.
-            float2 s0 = SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives, sampler_SeaDerivatives, uv + o0, s).xy;
-            float2 s1 = SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives, sampler_SeaDerivatives, uv + o1, s).xy;
-            float2 s2 = SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives, sampler_SeaDerivatives, uv + o2, s).xy;
+            // THE MIP IS CHOSEN FROM THE UNOFFSET UV.
+            //
+            // `o0/o1/o2` jump from hexagon to hexagon, so the hardware derivative of
+            // `uv + o` jumps with them and the mip choice jumps at every cell edge. That
+            // left a one-pixel dashed seam along the lattice: world-fixed, riding the
+            // waves, three directions meeting in a six-armed star at a cell corner.
+            // Measured: turning this blend off removed the seam and nothing else
+            // (frozen sea, mean difference 8.8); the explicit gradient removes the seam
+            // and leaves the image alone (mean difference 0.8, noise floor 0.7).
+            //
+            // The offsets only pick WHERE to read; the footprint is the same either way,
+            // so the unoffset derivative is the correct one, not an approximation.
+            float2 dUV0 = ddx(uv);
+            float2 dUV1 = ddy(uv);
+            float2 s0 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaDerivatives, sampler_SeaDerivatives, uv + o0, s, dUV0, dUV1).xy;
+            float2 s1 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaDerivatives, sampler_SeaDerivatives, uv + o1, s, dUV0, dUV1).xy;
+            float2 s2 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaDerivatives, sampler_SeaDerivatives, uv + o2, s, dUV0, dUV1).xy;
 
             slope += SeaHexBlend2(s0, s1, s2, w) * tierWeight;
         }
@@ -284,9 +298,14 @@ float SeaSampleFoam(float2 posXZ, out float2 foldDirection)
             // FOAM IS COVERAGE, SO THE LARGEST WINS — the same rule already used
             // across tiers. Blending it would average foam away where the hexagons
             // meet and draw a honeycomb.
-            float k0 = SAMPLE_TEXTURE2D_ARRAY(_SeaFoam, sampler_SeaFoam, uv + o0, s).r;
-            float k1 = SAMPLE_TEXTURE2D_ARRAY(_SeaFoam, sampler_SeaFoam, uv + o1, s).r;
-            float k2 = SAMPLE_TEXTURE2D_ARRAY(_SeaFoam, sampler_SeaFoam, uv + o2, s).r;
+            // THE SAME UNOFFSET GRADIENT AS THE SLOPE. The offsets jump at the cell
+            // edge and the mip would jump with them, drawing the same seam the normal
+            // used to draw.
+            float2 dF0 = ddx(uv);
+            float2 dF1 = ddy(uv);
+            float k0 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaFoam, sampler_SeaFoam, uv + o0, s, dF0, dF1).r;
+            float k1 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaFoam, sampler_SeaFoam, uv + o1, s, dF0, dF1).r;
+            float k2 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaFoam, sampler_SeaFoam, uv + o2, s, dF0, dF1).r;
 
             float2 best = o0;
             k = k0;
@@ -302,8 +321,9 @@ float SeaSampleFoam(float2 posXZ, out float2 foldDirection)
         if (k > f)
         {
             f = k;
-            foldDirection = SAMPLE_TEXTURE2D_ARRAY(_SeaDerivatives,
-                                                   sampler_SeaDerivatives, pick, s).zw;
+            foldDirection = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaDerivatives,
+                                                        sampler_SeaDerivatives, pick, s,
+                                                        ddx(uv), ddy(uv)).zw;
         }
     }
 

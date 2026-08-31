@@ -63,6 +63,52 @@ yanlıştı ama su için doğruydu; taşınması gereken buluttu.
 **Not:** `depthTexture: 1` bir kez de kontur için denenmiş ve "kontur düzeldi" sanılmıştı;
 o doğrulama %90 kapsamada yapıldığı için yanlıştı. Konturun sebebi ayrı (NaN, aşağıda).
 
+## Denizde altı kollu yıldız: ince kesikli çizgiler tek noktada kesişiyor (2026-08-31)
+
+**Kullanıcının ağzından:** *"denizde şöyle bir çizgi var. yıldız gibi. 6 yöne giden bir
+çizgi var tek noktada toplanıyor."* Tek piksel kalınlığında, kesikli, düz, açık renkli.
+
+**Ayırt eden ilk ölçüm kullanıcıdan geldi:** *"benimle gelmiyor. dalgayla birlikte
+dalgalanıyor ama yeri sabit."* Bu tek cümle kamera merkezli her şeyi eledi — deniz
+meshi clipmap, halka sınırları, ekran uzayı desenleri. Geriye dünyaya sabit olan kaldı:
+dokunun kendi karo düzeni.
+
+**İki şüpheli ölçümle çürüdü:**
+
+1. **Altıgen ızgaranın kendisi.** Izgara kenarları shader'dan ekrana basıldı ve çizgi
+   maskesiyle çakıştırıldı: **0,52×** — rastgeleden bile düşük. Çizgiler ızgaranın
+   üstünde durmuyor.
+2. **Doku sarma dikişi.** Aynı yöntemle 1,82× çıktı; maske dalga tepelerini de saydığı
+   için ayırt edici değil.
+
+**Ölçümü mümkün kılan şey `Time.timeScale = 0` oldu.** Ondan önce iki kare arasındaki
+taban gürültüsü (7,76) varyantlar arası farktan (3,09 / 6,93) büyüktü, yani izolasyon
+boğuluyordu. Deniz dondurulunca taban 0,70'e indi ve fark okunur oldu.
+
+**Gerçek sebep:** `SeaSampleSlope` içindeki altıgen harmanı, dokuyu `uv + o0/o1/o2` ile
+okuyor. Ofsetler hücreden hücreye **sıçrıyor**, dolayısıyla donanımın `uv + o` için
+hesapladığı türev de sıçrıyor ve **mip seçimi her hücre kenarında patlıyor**. Kalan iz:
+ızgara boyunca tek piksellik kesikli dikiş — dünyaya sabit, dalgayla dalgalanan, üç yönlü;
+bir hücre köşesinde üçü birleşince altı kollu yıldız.
+
+**Ayırt eden ölçüm (donmuş deniz, aynı kadraj):**
+
+| varyant | ortalama fark | çizgi |
+|---|---|---|
+| taban (aynı ayar, iki kare) | 0,70 | var |
+| normal altıgen harmanı kapalı | 8,80 | **yok** |
+| mip ofsetsiz uv'den (`_GRAD`) | 0,82 | **yok** |
+
+Harmanı kapatmak çizgiyi siliyor ama görüntüyü de değiştiriyor (8,80). Açık türev
+çizgiyi siliyor ve görüntüye dokunmuyor (0,82, taban 0,70). Doğru düzeltme ikincisi.
+
+**Çözüm:** `SAMPLE_TEXTURE2D_ARRAY_GRAD` ile mip'i **ofsetsiz** `uv`'nin türevinden seç.
+Ofsetler yalnız NEREDEN okunacağını seçiyor; ayak izi iki durumda da aynı, dolayısıyla
+ofsetsiz türev yaklaşık değil, doğru olan.
+
+Aynı hata köpük örneklemesinde de duruyordu (`SeaSampleFoam`, hem `k0/k1/k2` hem
+`foldDirection`) — aynı turda düzeltildi.
+
 ## Denizin üstünde, kamerayla gelen kare bir çerçeve (2026-08-31)
 
 **Kullanıcının ağzından:** "çok yüksekten aşağıya baktığımda böyle tuhaf bir görüntü
