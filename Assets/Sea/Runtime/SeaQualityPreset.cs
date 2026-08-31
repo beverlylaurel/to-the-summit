@@ -73,16 +73,17 @@ public static class SeaQuality
     ///   Med (0.50 m, 11 rings) ->  33 km
     ///   Med (0.50 m, 13 rings) -> 131 km
     ///
-    /// IT STOPS AT 4 km, AND THAT IS NOT A CHOICE ABOUT THE HORIZON.
+    /// IT REACHES 131 km, AND THAT NEEDED THE CLOUD DEPTH TURNED ON FIRST.
     ///
-    /// The sea occludes the cloud ray march. Measured at one framing, everything else
-    /// held: 7 rings -> the cloud deck is whole; 13 rings -> it is cut into a hard-edged
-    /// sheet. Pulling back to 11 rings (33 km) did not help, and the cut was still there
-    /// from the SUMMIT at 6100 m -- so it is not a distance to be tuned, it is the sea
-    /// being treated as an occluder wherever it is.
+    /// Extending the sea used to cut the cloud deck into a hard-edged sheet. Measured,
+    /// same framing and cover: with the sea drawn the deck was cut, with the sea hidden
+    /// it was whole -- the sea was PAINTING OVER the clouds. The cloud composite runs at
+    /// `BeforeRenderingTransparents` and the sea is `Transparent-1`, so the sea draws
+    /// afterwards; with no cloud depth in the buffer it had nothing to test against.
+    /// `depthTexture` on the renderer feature writes that depth, and the cut is gone.
     ///
-    /// Until that interaction is fixed the sea cannot be extended, and the price is the
-    /// mesh's own edge showing as a square from altitude (`SYMPTOMS.md`).
+    /// So the reach is a horizon question again: 131 km is past the camera's far plane
+    /// (map * 3 = 90 km), which does the clipping instead of the mesh's own edge.
     ///
     /// The radius is `64 * quad * 2^(rings-1)`: ring 0 is a solid square and
     /// every ring after it runs from half its outer radius to its outer radius.
@@ -98,9 +99,9 @@ public static class SeaQuality
     {
         switch (preset)
         {
-            case SeaQualityPreset.Low:    return new Levels(128, 7, 2, 7, 1.00f);
-            case SeaQualityPreset.High:   return new Levels(256, 8, 3, 9, 0.25f);
-            default:                      return new Levels(256, 8, 3, 8, 0.50f);
+            case SeaQualityPreset.Low:    return new Levels(128, 7, 2, 12, 1.00f);
+            case SeaQualityPreset.High:   return new Levels(256, 8, 3, 14, 0.25f);
+            default:                      return new Levels(256, 8, 3, 13, 0.50f);
         }
     }
 

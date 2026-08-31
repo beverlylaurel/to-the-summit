@@ -129,7 +129,7 @@ MonoBehaviour:
   sunAttenuation: 1
   resetOnStart: 1
   outputDepth: 1
-  depthTexture: 0
+  depthTexture: 1
 --- !u!114 &7833122117494664109
 MonoBehaviour:
   m_ObjectHideFlags: 1
