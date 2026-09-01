@@ -1480,6 +1480,13 @@ yayımlıyor.
 **Bu boşluğun tamamını kapatmıyor** (0,54× → ~0,77×). Kalanı kademelerin kendi bandındaki
 JONSWAP kuyruğu; ayrı bir düzeltme, buraya karıştırılmadı.
 
+**Bant sıfırdan üretilmiyor: en ince kademe 8× küçültülmüş koordinatta yeniden
+okunuyor.** 37 m'lik yama 4,6 m olur, onun 14 cm'lik detayı 1,8 cm'e iner — bandın
+bitmesi gereken yer. Denge bölgesinde spektrumun şekli oktavdan oktava aynı olduğu için
+kaydırılmış kopya doğru şekli ve doğru varyansı taşır. Kazanç
+`sqrt(hedef / kaynak varyansı)`; kaynak varyansı kademenin kendi dokusundan okundu.
+Alan FFT'nin kendisi — geniş bantlı, rastgele fazlı, hex döşemesi ve mip zinciri hazır.
+
 **Kıyıda ayrı bir dalga treni var.** Açık deniz alanı rüzgâr yönünde gider, yani kıyıya
 rastgele açıyla çarpar. Gerçek deniz bunu yapmaz: sığ suda tepe yavaşlar (c = √(gh)) ve
 kıyıya **paralel** dönene kadar kırılır. Bir Fourier alanı yer yer döndürülemez —

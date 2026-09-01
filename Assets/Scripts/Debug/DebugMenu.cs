@@ -68,13 +68,6 @@ public class DebugMenu : MonoBehaviour
 
     float lockedWorldStorm = 0.6f;
 
-    /// SEA PATTERN DIAGNOSIS. One switch per suspect for the regular ripple pattern in
-    /// shallow water. The section goes away the moment the cause is known.
-    bool seaMicroOn = true;
-    bool seaShoreWaveOn = true;
-    bool seaFineTierOn = true;
-    bool seaMidTierOn = true;
-
     bool windLocked;
     float lockedWindStrength = 0.5f;
     float lockedWindAngle;
@@ -186,28 +179,6 @@ public class DebugMenu : MonoBehaviour
     {
         float rho = Mathf.Lerp(50f, 550f, mgr.MeanRhoN);
         return mgr.MeanSwe * 1000000f / Mathf.Max(rho, 1f);
-    }
-
-    /// THE SEA SWITCHES ARE WRITTEN HERE, NOT IN `Update`.
-    ///
-    /// `SeaManager` writes the same globals in its own `Update`, and the order between two
-    /// components' `Update` is not defined — writing there, half the frames kept the value
-    /// and half did not. `LateUpdate` runs after every `Update`, so the switch always wins.
-    void LateUpdate()
-    {
-        Shader.SetGlobalFloat("_SeaDiagNoShoreWave", seaShoreWaveOn ? 0f : 1f);
-
-        if (!seaMicroOn) Shader.SetGlobalFloat("_SeaMicroSlopeVariance", 0f);
-
-        if (!seaFineTierOn || !seaMidTierOn)
-        {
-            // The manager has already written the real weights this frame; the switches only
-            // knock components out of what it wrote.
-            Vector4 w = Shader.GetGlobalVector("_SeaTierWeights");
-            if (!seaMidTierOn) w.y = 0f;
-            if (!seaFineTierOn) w.z = 0f;
-            Shader.SetGlobalVector("_SeaTierWeights", w);
-        }
     }
 
     void Update()
@@ -639,22 +610,6 @@ public class DebugMenu : MonoBehaviour
         GUILayout.Label($"Hs {SeaRuntimeState.SignificantWaveHeight:F2} m   " +
                         $"Tp {SeaRuntimeState.PeakPeriod:F1} s");
         GUILayout.Label($"kıyı köpüğü {SeaRuntimeState.ShoreFoamIntensity01:F2}");
-
-        GUILayout.Space(6f);
-        GUILayout.Label("Desen teşhisi — kapatınca kaybolan suçludur");
-
-        seaMicroOn = GUILayout.Toggle(seaMicroOn, "Kılcal katman (14 cm altı)");
-        seaShoreWaveOn = GUILayout.Toggle(seaShoreWaveOn, "Kıyı dalga treni");
-        seaFineTierOn = GUILayout.Toggle(seaFineTierOn, "En ince kademe (37 m)");
-        seaMidTierOn = GUILayout.Toggle(seaMidTierOn, "Orta kademe (191 m)");
-
-        if (GUILayout.Button("Ayarları geri al (desen teşhisi)"))
-        {
-            seaMicroOn = true;
-            seaShoreWaveOn = true;
-            seaFineTierOn = true;
-            seaMidTierOn = true;
-        }
 
         EndSection();
     }

@@ -110,29 +110,15 @@
 
 // ------------------------------------------------------- capillary tail
 
-/// The longest wave the micro layer carries: exactly where the finest FFT
-/// cascade stops (37 m patch / 256 samples).
-#define SEA_MICRO_LONGEST        0.14
+/// How far the finest cascade is shrunk to stand in for the band it cannot carry.
+/// 37 m / 8 = 4.6 m, whose finest detail is 1.8 cm -- the capillary cutoff, which is
+/// where the band is supposed to end.
+#define SEA_MICRO_PATCH_SHRINK   0.125
 
-/// Where surface tension takes over from gravity. Below this the sea has no
-/// more slope to give. [SOURCE: capillary-gravity crossover, k = 370 rad/m]
-#define SEA_MICRO_SHORTEST       0.017
-
-/// 0.14 m down to 0.017 m is log2(0.14/0.017) = 3.04 octaves.
-#define SEA_MICRO_OCTAVES        3
-
-/// Directions per octave, spread around the wind. One direction reads as a
-/// corduroy pattern; four is enough to lose the grid without paying for more.
-#define SEA_MICRO_DIRECTIONS     6
-
-/// Octave step. NOT 0.5 -- an exact halving makes every octave line up on the
-/// same lattice and the sum draws a visible cross-hatch. An irrational-ish ratio
-/// pushes the repeat far enough out that the eye never finds it.
-#define SEA_MICRO_OCTAVE_STEP    0.47
-
-/// Surface tension over density, for the capillary term of the dispersion
-/// relation w^2 = g k + (sigma/rho) k^3. [SOURCE: seawater at 10 C]
-#define SEA_CAPILLARY_SIGMA_RHO  7.28e-5
+/// The finest cascade's own per-axis slope variance, read straight off its texture at
+/// 3 m/s (0.0083 and 0.0070, measured 2026-09-01). The gain that turns the resampled
+/// copy into this band's Cox and Munk share divides by it.
+#define SEA_MICRO_SOURCE_VARIANCE 0.0077
 
 // ------------------------------------------------------ shore wave train
 

@@ -59,10 +59,6 @@ float _SeaSignificantHeight;
 float _SeaPeakPeriod;
 float _SeaShoreSlope;
 
-/// DIAGNOSTIC: 1 removes the shore-parallel wave train. Unset it is 0 and the surface
-/// behaves exactly as before. Written by the F1 panel; goes away with that panel section.
-float _SeaDiagNoShoreWave;
-
 /// `(beat angular frequency, beat depth, 0, 0)` — the two spectral peaks' interference.
 /// This is what a "set" is: the arriving waves grow and shrink over the beat period.
 float4 _SeaWaveGroups;
@@ -261,57 +257,57 @@ float SeaSwashSurge(float phase, float uprush)
 /// Cox and Munk value, computed once on the CPU where the peak period is known.
 /// [SOURCE: Cox & Munk 1954 sun-glitter slope variance; Phillips equilibrium range]
 ///
-/// SINE SUM, NOT NOISE. The variance of a sine slope is exactly A^2 k^2 / 2, so
-/// the layer can be built to hit a measured target without calibrating a noise
-/// function first. Four directions per octave, spread around the wind.
+/// NOT A SINE SUM. THE FINEST CASCADE, RESAMPLED SMALLER.
+///
+/// It was eighteen plane waves -- three octaves times six directions -- and eighteen
+/// plane waves crossing at fixed angles are a LATTICE. The surface carried a regular
+/// fish-scale pattern, plainly visible over the shallows; measured, switching this layer
+/// off removed it and nothing else did. Spreading the wavelengths did not break it,
+/// warping the phase along the long-wave slope did not break it, and twelve directions
+/// only softened it while taking the frame from 7.3 to 17.3 ms.
+///
+/// The band is taken from the finest cascade instead, read at an eighth of its patch
+/// size. That is exactly what the equilibrium range says it should look like: the slope
+/// spectrum goes as 1/k, so a band shifted down by three octaves has the SAME shape and
+/// the same slope variance. The field it delivers is the FFT's own -- broadband, random
+/// phase, already hex tiled and already mipped, and it costs three texture reads instead
+/// of eighteen sines.
 float2 SeaMicroSlope(float2 posXZ, float pixelSize)
 {
     if (_SeaMicroSlopeVariance <= 1e-6) return 0.0;
 
-    float2 wind = _SeaWindWS / max(length(_SeaWindWS), 0.1);
-    float2 slope = 0.0;
+    int fine = SEA_TIER_COUNT - 1;
 
-    // Each octave gets the same variance; four directions share it, and the
-    // variance of one sine is A^2 k^2 / 2, so (A k)^2 = 2 * var / directions.
-    float perDir = _SeaMicroSlopeVariance
-                 / (float)(SEA_MICRO_OCTAVES * SEA_MICRO_DIRECTIONS);
-    float ak = sqrt(2.0 * perDir);
+    // An eighth of the finest patch: 37 m becomes 4.6 m, so its 14 cm detail becomes
+    // 1.8 cm -- the capillary cutoff, which is where this band is supposed to end.
+    float patch = _SeaPatchSizes[fine] * SEA_MICRO_PATCH_SHRINK;
+    float2 uv = posXZ / patch;
 
-    float lambda = SEA_MICRO_LONGEST;
+    // The same Nyquist rule the cascades use, on the shrunk patch.
+    float live = SeaTierResolvable(patch, pixelSize);
+    if (live <= 0.0) return 0.0;
 
-    [unroll]
-    for (int o = 0; o < SEA_MICRO_OCTAVES; ++o)
-    {
-        // NYQUIST, THE SAME RULE THE CASCADES USE. An octave shorter than two
-        // pixels cannot be drawn, only aliased, so it is faded out instead.
-        float live = SeaTierResolvable(lambda, pixelSize);
-        if (live > 0.0)
-        {
-            float k = SEA_TWO_PI / lambda;
+    float2 o0, o1, o2; float3 w;
+    SeaHexWeights(uv, o0, o1, o2, w);
 
-            // Capillary waves are faster than gravity alone would make them.
-            float omega = sqrt(SEA_G * k + SEA_CAPILLARY_SIGMA_RHO * k * k * k);
+    float2 dUV0 = ddx(uv);
+    float2 dUV1 = ddy(uv);
 
-            [unroll]
-            for (int d = 0; d < SEA_MICRO_DIRECTIONS; ++d)
-            {
-                // Spread the four directions across a 120 degree fan about the
-                // wind, offset per octave so the octaves do not line up.
-                float a = ((float)d / (float)SEA_MICRO_DIRECTIONS - 0.5) * 2.618
-                        + (float)o * 0.917;
-                float2 dir = float2(wind.x * cos(a) - wind.y * sin(a),
-                                    wind.x * sin(a) + wind.y * cos(a));
+    float2 s0 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaDerivatives, sampler_SeaDerivatives, uv + o0, fine, dUV0, dUV1).xy;
+    float2 s1 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaDerivatives, sampler_SeaDerivatives, uv + o1, fine, dUV0, dUV1).xy;
+    float2 s2 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaDerivatives, sampler_SeaDerivatives, uv + o2, fine, dUV0, dUV1).xy;
 
-                float phase = k * dot(dir, posXZ) - omega * _SeaTime
-                            + (float)(o * SEA_MICRO_DIRECTIONS + d) * 1.7;
+    float2 slope = SeaHexBlend2(s0, s1, s2, w);
 
-                slope += dir * (ak * live * cos(phase));
-            }
-        }
-        lambda *= SEA_MICRO_OCTAVE_STEP;
-    }
+    // THE SOURCE CARRIES ITS OWN VARIANCE; THIS LAYER NEEDS THE TARGET.
+    //
+    // The cascade's per-axis slope variance was read straight off its own texture:
+    // 0.0083 and 0.0070, so 0.0077 per axis at 3 m/s (measured 2026-09-01). The target
+    // is `_SeaMicroSlopeVariance`, the Cox and Munk share the missing band should own.
+    // Amplitudes go as the square root of variance.
+    float gain = sqrt(_SeaMicroSlopeVariance / SEA_MICRO_SOURCE_VARIANCE);
 
-    return slope;
+    return slope * (gain * live);
 }
 
 /// `pixelSize` is the world width this pixel covers. It is passed in rather than
@@ -882,8 +878,7 @@ SeaSurfacePoint SeaDeform(float3 posWS)
             float breakDepth = max(_SeaSignificantHeight * shoalTake
                                    / max(gamma, 0.1) * SEA_SHORE_WAVE_BREAK_MULT, 1.0);
             float take = SEA_SHORE_WAVE_SHARE
-                       * (1.0 - saturate(o.depth / breakDepth))
-                       * (1.0 - _SeaDiagNoShoreWave);
+                       * (1.0 - saturate(o.depth / breakDepth));
             disp.y = lerp(disp.y, shoreH, saturate(take));
 
             // THE FORWARD THROW IS BOUNDED. Left free it grows with the crest and

@@ -164,8 +164,6 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ## Silinecek geçiciler
 
-- **F1 → Deniz → "Desen teşhisi" bölümü ve `_SeaDiagNoShoreWave`** — sığ sudaki düzenli
-  hortum deseninin suçlusu bulunur bulunmaz bölüm de shader'daki global de silinir
 - **Ova ve patika ölçüm araçları** (`ForelandProbe`, F1'deki kurulum süresi logu) — ova
   ve yol dokusu oturunca silinir
 - **Bisiklet maskesi yeniden seyreltmede silinecek** — malzeme maskesi köşe renginde duruyor;

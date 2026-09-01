@@ -4801,3 +4801,39 @@ geziyor.
 `fwidth`'ten değil. Prob küpü bunu taşıyacak çözünürlükte olmayabilir; o zaman soru
 "gökyüzünü probdan mı yoksa analitik modelden mi okumalı" hâline gelir. Kayıt
 `DECISIONS.md`'de.
+
+
+## Sığ suda düzenli balık pulu deseni — ÇÖZÜLDÜ (2026-09-01)
+
+**Belirti:** "denizdeki bu tuhaf desen ne?" — sığ suda, kameranın etrafında bir yay
+çizen, düzenli aralıklı ince desen. Kum zemin üstünde açıkça görünüyor.
+
+**Kadraj bulundu, tahmin edilmedi.** İlk denemelerim karanlık derin su verdi; kıyı
+çizgisi arazi yüksekliğinden tarandı (z=2000'de kıyı x≈13490), kamera oraya kondu ve
+kontrast gerdirilince desen aynen çıktı.
+
+**Ayırt eden ölçüm:** aynı kadraj, aynı ışık, şüpheliler tek tek kapatıldı — kılcal
+katman, kıyı dalga treni, en ince kademe, orta kademe. Yalnız **kılcal katman**
+kapatıldığında desen tamamen kayboldu.
+
+**Gerçek sebep:** `SeaMicroSlope` üç oktavda altı sabit yönde saf sinüs topluyordu.
+Sabit açılarla kesişen on sekiz düzlem dalgası bir **kafestir**, deniz değil. Balık pulu
+o kafesin ta kendisi.
+
+**Denenip yetmeyen üç yol** (hepsi ölçüldü, hepsi geri alındı):
+
+- **Dalga sayısı yayılımı** (altın oran, oktav içinde ortak kat yok) — kafes durdu.
+- **Faz burgusu** (örnek noktasını uzun dalga eğimi boyunca kaydırmak,
+  Longuet-Higgins 1963) — kafes durdu; sakin suda eğim küçük olduğu için kaydırma
+  dalga boyunun çok altında kalıyor.
+- **Yön sayısını 12'ye çıkarmak** — desen yumuşadı ama kare süresi 7,3 → **17,25 ms**.
+
+**Çözüm:** bant sıfırdan üretilmiyor. En ince kademe, yamasının **sekizde birinde**
+yeniden okunuyor: 37 m → 4,6 m, detayı 14 cm → 1,8 cm, yani tam kapiler kesim. Denge
+bölgesinde eğim spektrumu 1/k gittiği için üç oktav aşağı kaydırılmış kopya aynı şekli
+ve aynı varyansı taşır. Kazanç `sqrt(hedef / kaynak)`; kaynak varyansı kademenin kendi
+dokusundan okundu (eksen başına 0,0077).
+
+**Ölçülen sonuç:** desen gitti, kare süresi **7,55 ms** (katman kapalıyken 7,93 — fark
+gürültü içinde), uzak bant titremesi değişmedi (2,08/2,12 → 2,14/2,09), yakın planda
+uzamsal detay arttı (0,64 → 0,86) — katmanın işi zaten buydu.
