@@ -68,8 +68,35 @@ public class SeaSettings : ScriptableObject
     /// It is NOT a second weather source: the local wind still drives the
     /// wind sea and a storm still makes the sea rage. This is the sea's own
     /// physics, not the sky's.
-    [Tooltip("Swell peak period (s). 10 s = a 156 m wavelength in deep water.")]
-    [Range(4f, 20f)] public float swellPeriod = 10f;
+    /// THE PERIOD IS AN EVENT, NOT A CONSTANT.
+    ///
+    /// It was fixed at 10 s, and a fixed period fixes the breaker type: the Iribarren
+    /// number `tan(beta)/sqrt(H0/L0)` came out 0.32 on this shore and never moved, which
+    /// is a SPILLING breaker -- the surf never plunges, so it is never a wave anyone
+    /// could ride. The same beach with a 16 s swell gives 0.78, which plunges.
+    /// [SOURCE: Battjes 1974; thresholds 0.5 and 3.3, `RATIONALE.md`]
+    ///
+    /// A wind sea's own period is short; a groundswell that has travelled from a distant
+    /// storm is long. Both reach the same beach on different days, so the period wanders
+    /// between them.
+    [Tooltip("Kısa peryot ucu (s): yakın rüzgârın denizi.")]
+    [Range(4f, 12f)] public float swellPeriodShort = 8f;
+
+    [Tooltip("Uzun peryot ucu (s): uzaktan gelen ölü dalga. 16 s = 400 m dalga boyu.")]
+    [Range(8f, 22f)] public float swellPeriodLong = 16f;
+
+    [Tooltip("Ölü dalga olayının tam turu (s). Uzak fırtınanın kendi saati; " +
+             "yerel havayla ilgisi yok.")]
+    [Min(30f)] public float swellEventSeconds = 900f;
+
+    /// ENERGY RIDES WITH PERIOD, BECAUSE BOTH COME FROM THE SAME DISTANT STORM.
+    ///
+    /// A 16 s swell is not a long, small wave: it is the signature of a big storm far
+    /// away, and it arrives carrying that storm's energy. Measured without this, the
+    /// period wandered but the total spectrum's peak stayed on the WIND sea at 5.7 s,
+    /// so the shore never felt the swell at all.
+    [Tooltip("Olayın tepesinde ölü dalga enerjisi kaç katına çıkar.")]
+    [Range(1f, 12f)] public float swellEventGain = 6f;
 
     [Tooltip("Swell energy. 0 switches the partition off. [CALIBRATION]")]
     [Min(0f)] public float swellAlpha = 0.0075f;

@@ -1465,6 +1465,29 @@ eşitliği `Sea/Test Constant Parity` denetliyor.
 gitti; deniz bölümünde yalnız Hs / Tp / kıyı köpüğü okuması kaldı.
 
 
+## Deniz: ölü dalga olayı (2026-09-01)
+
+**Ölü dalga kendi saatinde gelir, yerel havadan bağımsız.** `SeaEnvironmentBridge` peryodu
+ve enerjisini yavaş bir olay eğrisinden üretir; `WindField`'a da `WeatherState`'e de
+bağlanmaz — bu deniz uzaktaki bir fırtınanın günler önce doğurduğu dalgadır. Bağlansaydı
+birinciyle çelişen ikinci bir hava kaynağı olurdu.
+
+**Peryot kırılma tipini belirler.** Iribarren `ξ₀ = tanβ/√(H₀/L₀)`; 0,5'in altı dökülen,
+üstü dalan. Ölçüldü:
+
+| U10 | olay | Tp | Hs | ξ₀ | tip |
+|---|---|---|---|---|---|
+| 5 m/s | 0,0 | 5,7 s | 1,53 m | 0,33 | dökülen |
+| 5 m/s | 0,5 | 12,0 s | 2,31 m | 0,57 | **dalan** |
+| 9 m/s | 0,0 | 6,9 s | 2,48 m | 0,32 | dökülen |
+| 14 m/s | 1,0 | 15,9 s | 5,00 m | 0,52 | **dalan** |
+
+**Enerji peryotla birlikte gelir.** Yalnız peryot gezdirildiğinde toplam spektrumun tepesi
+rüzgâr denizinde kalıyordu (ölçüldü: peryot 9–10,5 s gezerken Tp 5,7 s'de sabit). 16 s'lik
+bir dalga uzaktaki büyük bir fırtınanın imzasıdır ve o fırtınanın enerjisini taşır.
+
+---
+
 ## Deniz: kapiler kuyruk ve kıyı dalga treni (2026-09-01)
 
 **Kısa dalga eğimi ayrı bir katman.** FFT'nin en ince kademesi 14 cm'de bitiyor; gerçek

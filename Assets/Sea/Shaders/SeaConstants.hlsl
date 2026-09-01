@@ -12,6 +12,7 @@
 
 #define SEA_SQRT2                1.41421356
 #define SEA_TWO_PI               6.28318530718
+#define SEA_HALF_PI              1.57079632679
 
 /// Index of refraction of water. [SOURCE: Tessendorf 2004 6.1.2, 6.3 sample shader]
 #define SEA_WATER_IOR            1.34
@@ -139,6 +140,19 @@
 /// How much of the breaking limit the shore train claims. The rest stays with
 /// the open-sea field, which is still shoaling underneath it.
 #define SEA_SHORE_WAVE_SHARE     0.65
+
+/// THE SHAPE OF A SHOALING WAVE, FROM 30.000 FIELD MEASUREMENTS.
+///
+/// Ruessink et al. 2012 tie a wave's skewness (peaked crest, flat trough) and its
+/// asymmetry (steep front face, gentle back -- the sawtooth just before it breaks) to a
+/// single dimensionless number, the Ursell number. These six coefficients are their fit;
+/// they are not ours and nothing here is free to tune.
+/// [SOURCE: Ruessink, Ramaekers & van Rijn 2012; Abreu et al. 2010 waveform]
+#define SEA_RUESSINK_P2          0.857
+#define SEA_RUESSINK_P3         -0.471
+#define SEA_RUESSINK_P4          0.297
+#define SEA_RUESSINK_P5          0.815
+#define SEA_RUESSINK_P6          0.672
 
 /// BREAKER DEPTH INDEX, SLOPE DEPENDENT.
 ///

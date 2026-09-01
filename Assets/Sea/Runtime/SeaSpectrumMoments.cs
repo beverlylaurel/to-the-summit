@@ -63,14 +63,15 @@ public static class SeaSpectrumMoments
     const float OmegaMax = 8.0f;
     const float OmegaStep = 0.005f;
 
-    public static Result Integrate(float windSpeed, SeaSettings settings)
+    public static Result Integrate(float windSpeed, SeaSettings settings,
+                                   float swellPeriod, float swellEnergy)
     {
         float u = Mathf.Max(windSpeed, 0.1f);
         float fetch = settings.fetch;
         float depth = settings.spectrumDepth;
 
         float omegaPWind = PeakOmega(u, fetch);
-        float omegaPSwell = SeaConstants.TwoPi / Mathf.Max(settings.swellPeriod, 0.1f);
+        float omegaPSwell = SeaConstants.TwoPi / Mathf.Max(swellPeriod, 0.1f);
 
         // HOISTED OUT OF THE LOOP. `alpha` and the depth scale depend only on the
         // wind, the fetch and the depth; left inside, the integration cost was
@@ -79,7 +80,7 @@ public static class SeaSpectrumMoments
         float alpha = 0.076f * Mathf.Pow(Mathf.Max(u * u / (fetch * g), 1e-12f), 0.22f);
         float gg = g * g;
         float depthScale = Mathf.Sqrt(depth / g);
-        float swellAlpha = settings.swellAlpha;
+        float swellAlpha = settings.swellAlpha * swellEnergy;
         float swellGamma = settings.swellGamma;
 
         double m0 = 0.0, m0Wind = 0.0, m0Swell = 0.0;

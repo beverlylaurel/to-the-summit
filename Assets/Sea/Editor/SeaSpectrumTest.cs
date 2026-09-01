@@ -25,6 +25,12 @@ public static class SeaSpectrumTest
         public Vector3 WindDirection => direction;
         public float WindSpeed => speed;
 
+        /// PINNED LIKE THE WIND. The swell wanders in the game; a measurement that
+        /// wandered with it could not be compared with the one before it.
+        public float swellPeriod = 10f;
+        public float SwellPeriod => swellPeriod;
+        public float SwellEnergyScale => 1f;
+
         public Light Sun => null;
         public float SunElevation01 => 0.5f;
         public float CloudCover01 => 0f;
@@ -85,7 +91,7 @@ public static class SeaSpectrumTest
         // apart from the previous one.
         report.AppendLine($"fetch {settings.fetch:F0} m   patch {settings.patchSizes}   " +
                           $"windSpread {settings.swell:F2}");
-        report.AppendLine($"swell: period {settings.swellPeriod:F1} s   " +
+        report.AppendLine($"swell: period {settings.swellPeriodShort:F1}-{settings.swellPeriodLong:F1} s   " +
                           $"alpha {settings.swellAlpha:E3}   gamma {settings.swellGamma:F1}   " +
                           $"spread {settings.swellSpread:F0}   offset {settings.swellDirectionOffset:F0} deg");
         report.AppendLine();

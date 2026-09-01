@@ -57,14 +57,14 @@ public class SeaSimulation : MonoBehaviour
         readonly float swell, fetch, depth, cutoff;
         readonly float swellAlpha, swellOmega, swellGamma, swellSpread, swellDir;
 
-        public SpectrumInputs(SeaSettings s)
+        public SpectrumInputs(SeaSettings s, float swellPeriod, float swellEnergy)
         {
             swell = s.swell;
             fetch = s.fetch;
             depth = s.spectrumDepth;
             cutoff = s.smallWaveCutoff;
-            swellAlpha = s.swellAlpha;
-            swellOmega = s.swellPeriod;
+            swellAlpha = s.swellAlpha * swellEnergy;
+            swellOmega = swellPeriod;
             swellGamma = s.swellGamma;
             swellSpread = s.swellSpread;
             swellDir = s.swellDirectionOffset;
@@ -80,6 +80,10 @@ public class SeaSimulation : MonoBehaviour
 
         public override int GetHashCode() => swell.GetHashCode() ^ fetch.GetHashCode();
     }
+
+    /// The spectrum is rebuilt whenever an input changes, so the event's energy moves in
+    /// steps for the same reason its period does.
+    static float Quantized(float v) => Mathf.Round(v * 20f) * 0.05f;
 
     int builtFftSize = -1;
     float lastFoamTime = float.NaN;
@@ -304,7 +308,8 @@ public class SeaSimulation : MonoBehaviour
         // means changing swell from the Inspector does nothing — measured:
         // with swell 0 versus 1 the directional concentration came out
         // exactly the same.
-        var signature = new SpectrumInputs(settings);
+        var signature = new SpectrumInputs(settings, environment.SwellPeriod,
+                                          Quantized(environment.SwellEnergyScale));
 
         bool dirty = float.IsNaN(lastWindSpeed)
                   || Mathf.Abs(speed - lastWindSpeed) > 0.25f
@@ -421,9 +426,10 @@ public class SeaSimulation : MonoBehaviour
 
         // THE SWELL'S PEAK COMES FROM A PERIOD, NOT A FETCH. A swell is born in
         // a storm we do not simulate; its period is what survives the journey.
-        cs.SetFloat(SeaShaderIDs.SwellAlpha, settings.swellAlpha);
+        cs.SetFloat(SeaShaderIDs.SwellAlpha,
+                    settings.swellAlpha * Quantized(environment.SwellEnergyScale));
         cs.SetFloat(SeaShaderIDs.SwellPeakOmega,
-                    SeaConstants.TwoPi / Mathf.Max(1f, settings.swellPeriod));
+                    SeaConstants.TwoPi / Mathf.Max(1f, environment.SwellPeriod));
         cs.SetFloat(SeaShaderIDs.SwellGamma, settings.swellGamma);
         cs.SetFloat(SeaShaderIDs.SwellSpreadS, settings.swellSpread);
         cs.SetFloat(SeaShaderIDs.SwellDirOffset,

@@ -34,6 +34,10 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
     [SerializeField] TemperatureField temperature;
     [SerializeField] Light sunLight;
 
+    /// The swell event reads its range from here. The bridge is sea-side glue, so
+    /// holding the sea's own settings is not a foreign dependency.
+    [SerializeField] SeaSettings settings;
+
     [Header("Manual values until the bridge is wired (spec §3.2)")]
     [SerializeField] Vector3 manualWindDirection = new Vector3(1f, 0f, 0f);
     [SerializeField] float manualWindSpeed = 8f;
@@ -64,8 +68,9 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
     /// LIGHTNING light.
     public void Bind(WindField windField, WeatherState weatherState,
                      TimeOfDay time, AtmosphereController atmosphereController,
-                     TemperatureField temperatureField, Light sun)
+                     TemperatureField temperatureField, Light sun, SeaSettings seaSettings)
     {
+        settings = seaSettings;
         wind = windField;
         weather = weatherState;
         timeOfDay = time;
@@ -103,6 +108,47 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
     /// measured, Hs 1.18 m at the shore against 3.66 m from the summit, the same sea in the same
     /// second. The sea is at sea level and reads the wind there.
     public float WindSpeed => wind != null ? wind.SeaLevelSpeed : manualWindSpeed;
+
+    /// THE SWELL RUNS ON ITS OWN CLOCK.
+    ///
+    /// Deliberately not bound to `WindField` or `WeatherState`: the swell reaching this
+    /// beach was made by a storm hundreds of kilometres away, days ago, and a real coast
+    /// gets long groundswell under a windless sky as often as not. Tying it to the local
+    /// storm would be a second weather source that contradicts the first.
+    ///
+    /// QUANTIZED. The spectrum is rebuilt whenever this number changes, so it moves in
+    /// steps: a continuous value would re-dispatch the h0 pass every single frame.
+    public float SwellPeriod
+    {
+        get
+        {
+            if (settings == null) return 10f;
+
+            float period = Mathf.Lerp(settings.swellPeriodShort, settings.swellPeriodLong,
+                                      SwellEvent01);
+
+            return Mathf.Round(period * 4f) * 0.25f;
+        }
+    }
+
+    public float SwellEnergyScale =>
+        settings == null ? 1f : Mathf.Lerp(1f, settings.swellEventGain, SwellEvent01);
+
+    /// THE EVENT ITSELF, 0 to 1.
+    ///
+    /// STRETCHED, BECAUSE PERLIN NOISE DOES NOT REACH ITS OWN ENDS. Raw, it stays in
+    /// roughly 0.3 to 0.7, and measured that turned an 8 to 16 s range into 9 to 10.5 s
+    /// -- the long swell never actually arrived. The window below is the band the noise
+    /// really uses, remapped onto the whole range.
+    float SwellEvent01
+    {
+        get
+        {
+            float t = Time.time / Mathf.Max(settings.swellEventSeconds, 30f);
+            float roll = Mathf.PerlinNoise(t, 7.31f);
+            return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.32f, 0.68f, roll));
+        }
+    }
 
     // --------------------------------------------------------- day/night
 

@@ -18,7 +18,10 @@ MonoBehaviour:
   spectrumDepth: 60
   fetch: 150000
   swell: 0.18
-  swellPeriod: 10
+  swellPeriodShort: 8
+  swellPeriodLong: 16
+  swellEventSeconds: 900
+  swellEventGain: 6
   swellAlpha: 0.00012668107
   swellGamma: 7
   swellSpread: 26

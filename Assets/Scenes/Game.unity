@@ -2568,6 +2568,7 @@ MonoBehaviour:
   atmosphere: {fileID: 1805896809}
   temperature: {fileID: 1805896810}
   sunLight: {fileID: 410087040}
+  settings: {fileID: 11400000, guid: 15a1fd9f44116d64eb40d66e30db7a25, type: 2}
   manualWindDirection: {x: 1, y: 0, z: 0}
   manualWindSpeed: 12
   manualCloudCover: 0.3

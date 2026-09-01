@@ -1400,7 +1400,7 @@ public static class MountainSceneBootstrap
         var timeSo = new SerializedObject(time);
         var sun = timeSo.FindProperty("sun").objectReferenceValue as Light;
 
-        bridge.Bind(windField, weatherState, time, atmosphere, thermometer, sun);
+        bridge.Bind(windField, weatherState, time, atmosphere, thermometer, sun, seaSettings);
         EditorUtility.SetDirty(bridge);
 
         root.Bind(seaSettings, bridge, gen.GetComponent<Terrain>());

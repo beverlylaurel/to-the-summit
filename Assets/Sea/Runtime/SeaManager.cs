@@ -199,14 +199,15 @@ public class SeaManager : MonoBehaviour
     /// old spectrum with no error anywhere.
     readonly struct MomentInputs
     {
-        readonly float wind, fetch, depth, swellPeriod, swellAlpha, swellGamma;
+        readonly float wind, fetch, depth, swellPeriod, swellAlpha, swellGamma, swellEnergy;
 
-        public MomentInputs(float wind, SeaSettings s)
+        public MomentInputs(float wind, SeaSettings s, float swell, float swellEnergy)
         {
             this.wind = wind;
+            this.swellEnergy = swellEnergy;
             fetch = s.fetch;
             depth = s.spectrumDepth;
-            swellPeriod = s.swellPeriod;
+            swellPeriod = swell;
             swellAlpha = s.swellAlpha;
             swellGamma = s.swellGamma;
         }
@@ -223,6 +224,7 @@ public class SeaManager : MonoBehaviour
                 && fetch == other.fetch
                 && depth == other.depth
                 && swellPeriod == other.swellPeriod
+                && Mathf.Abs(swellEnergy - other.swellEnergy) < 0.02f
                 && swellAlpha == other.swellAlpha
                 && swellGamma == other.swellGamma;
         }
@@ -250,11 +252,12 @@ public class SeaManager : MonoBehaviour
     {
         float u = Mathf.Max(env.WindSpeed, 0.1f);
 
-        var inputs = new MomentInputs(u, settings);
+        var inputs = new MomentInputs(u, settings, env.SwellPeriod, env.SwellEnergyScale);
 
         if (!momentsValid || !momentInputs.Matches(inputs))
         {
-            SeaSpectrumMoments.Result m = SeaSpectrumMoments.Integrate(u, settings);
+            SeaSpectrumMoments.Result m = SeaSpectrumMoments.Integrate(u, settings, env.SwellPeriod,
+                                                                        env.SwellEnergyScale);
             SeaRuntimeState.SignificantWaveHeight = m.SignificantHeight;
             SeaRuntimeState.PeakPeriod = m.PeakPeriod;
             waveGroups = new Vector4(SeaConstants.TwoPi / Mathf.Max(m.BeatPeriod, 0.1f),

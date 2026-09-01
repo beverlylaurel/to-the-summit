@@ -23,6 +23,17 @@ public interface ISeaEnvironmentSource
     /// m/s at the 10 m reference height (U10).
     float WindSpeed { get; }
 
+    /// SWELL PEAK PERIOD (s) -- the sea's own slow clock, NOT today's wind.
+    ///
+    /// A groundswell was born in a storm that is far away and days old, so it does not
+    /// follow the local weather; that independence is the point. It decides the breaker
+    /// type at the shore: short period spills, long period plunges.
+    float SwellPeriod { get; }
+
+    /// How much the swell partition's energy is multiplied by right now. One is the
+    /// quiet background swell; the peak of an event is several times that.
+    float SwellEnergyScale { get; }
+
     // --- Day and night ---
 
     Light Sun { get; }
