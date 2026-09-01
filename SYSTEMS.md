@@ -1481,8 +1481,14 @@ açık deniz alanı su sığlaştıkça altında sönümleniyor.
 dibin her düzensizliğinde sıçrıyor ve tepeler konturları izleyen halkalar olarak çıkıyordu
 (ölçüldü, kare kayıtta).
 
+**Kıyı treni sörf kuşağında başlar, dibin hissedildiği yerde değil.** Devreye girme
+derinliği 'ye bağlandığında 37 m oluyordu — bu kıyıdan **1 km** açık demek, ve o
+bandın tamamında açık deniz alanı, yüksekliği  ile sınırlı bir trenle
+değiştiriliyordu: ölçüldü, 10 m suda dalganın **%48'i** siliniyor, büyük dalgalar
+kayboluyordu. Sınır artık kırılma derinliği: , burada ~5 m.
+
 **Öne atma sınırlı.** Serbest bırakılınca tepeyle birlikte büyüyor ve birkaç metre suda
-mesh'i kendi üstüne katlıyordu.
+meshi kendi üstüne katlıyordu.
 
 
 ## Deniz: swash tek fazdan türüyor (2026-08-29)

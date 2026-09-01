@@ -792,9 +792,12 @@ float SeaShoreWaveHeight(float2 posXZ, float depth, float slope, float gamma,
 
     float omega = SEA_TWO_PI / max(_SeaPeakPeriod, 1.0);
 
-    // Deep-water length, and the depth at which the bottom starts to be felt.
-    float l0 = SEA_G * _SeaPeakPeriod * _SeaPeakPeriod / SEA_TWO_PI;
-    float onset = l0 * SEA_SHORE_WAVE_DEPTH_FRAC;
+    // WHERE THE SURF ZONE STARTS, NOT WHERE THE BOTTOM IS FELT.
+    // The wave breaks when its height reaches gamma times the depth, so the
+    // breaking depth is h_b = H / gamma with H the shoaled height.
+    float shoalHere = min(SeaShoalingGain(depth, _SeaSpectrumDepth), _SeaMaxShoalingGain);
+    float hBreak = _SeaSignificantHeight * shoalHere / max(gamma, 0.1);
+    float onset = max(hBreak * SEA_SHORE_WAVE_BREAK_MULT, 1.0);
 
     if (depth <= SEA_MIN_DEPTH || depth >= onset) return 0.0;
 
@@ -870,10 +873,12 @@ SeaSurfacePoint SeaDeform(float3 posWS)
 
         if (shoreH != 0.0)
         {
+            float shoalTake = min(SeaShoalingGain(o.depth, _SeaSpectrumDepth),
+                                  _SeaMaxShoalingGain);
+            float breakDepth = max(_SeaSignificantHeight * shoalTake
+                                   / max(gamma, 0.1) * SEA_SHORE_WAVE_BREAK_MULT, 1.0);
             float take = SEA_SHORE_WAVE_SHARE
-                       * (1.0 - saturate(o.depth
-                                / max(SEA_G * _SeaPeakPeriod * _SeaPeakPeriod
-                                      / SEA_TWO_PI * SEA_SHORE_WAVE_DEPTH_FRAC, 1.0)));
+                       * (1.0 - saturate(o.depth / breakDepth));
             disp.y = lerp(disp.y, shoreH, saturate(take));
 
             // THE FORWARD THROW IS BOUNDED. Left free it grows with the crest and

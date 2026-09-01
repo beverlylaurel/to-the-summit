@@ -136,9 +136,19 @@
 
 // ------------------------------------------------------ shore wave train
 
-/// Depth below which the shore-parallel train takes over, as a multiple of the
-/// deep-water wavelength. A wave feels the bottom from about half its length.
-#define SEA_SHORE_WAVE_DEPTH_FRAC 0.5
+/// How far out the shore train reaches, as a multiple of the BREAKING depth.
+///
+/// This was tied to the deep-water wavelength (L0/2, "where a wave first feels
+/// the bottom") and that is far too far out: L0/2 is 37 m of water for a 6.9 s
+/// sea, which on this 3.4% shore is a kilometre offshore. Over that whole band
+/// the open-sea field was being replaced by a train whose height is capped at
+/// gamma*h/2 -- measured, 48% of the swell was erased in 10 m of water, and the
+/// big waves went missing.
+///
+/// A wave feeling the bottom is not the same as a wave breaking. The shore train
+/// belongs to the surf zone, so it starts where the wave actually breaks:
+/// h_b = Hs * shoal / gamma, about 5 m here, 140 m offshore.
+#define SEA_SHORE_WAVE_BREAK_MULT 1.5
 
 /// How much of the breaking limit the shore train claims. The rest stays with
 /// the open-sea field, which is still shoaling underneath it.
