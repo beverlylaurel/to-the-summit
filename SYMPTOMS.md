@@ -4773,7 +4773,31 @@ kaydırıyor ve uzak denizi %26 karartıyordu — ölçüldü, düzeltildi.
 | orta | 0,92 → **0,79** | 1,87 → **1,59** | 19,1 → 19,1 |
 | ön | 0,50 → 0,48 | 0,63 → 0,63 | değişmedi |
 
-**Açık kalan:** %21 gitti, kalan %79 normalin öteki terimlerinde — sıyırmada Fresnel çok
-dik, kırılma UV'si normalden geliyor, parıltı normalden geliyor. Hepsinin ortak çözümü
-aynı: nonlineer her adım pikselin normal belirsizliğine göre yumuşatılmalı. Kayıt
+**Kalan pay tek terimde toplandı.** Terimler tek tek kapatıldı (su donmuş, ufuk altı bant):
+
+| kapatılan | zamansal | uzamsal |
+|---|---|---|
+| hiçbiri | 2,06 | 2,26 |
+| kırılma | 2,12 | 2,27 |
+| parıltı | 2,06 | 2,29 |
+| **gökyüzü yansıması** | **0,95** | **0,96** |
+
+Kırılma ve parıltı sıfır etki. **Kalanın tamamı `GlossyEnvironmentReflection` aramasında:**
+gürültülü normal `R`'yi savuruyor, `R` de gökyüzünün ufka yakın dik gradyanı boyunca
+geziyor.
+
+**Denenip elenen iki yol:**
+
+- **Fresnel'i piksel üzerinde ortalamak** (üç örnek, `fwidth(cosI)`): 2,06 → 2,06. Hiç
+  etki yok, iki fazladan `acos/asin/tan` bedeli var. Geri alındı.
+- **Yansıma aramasını bulanıklaştırmak**: pürüzlülük 1,0 → 0,89, `fwidth(R)` eklemek →
+  0,84. İkisi de titremeyi bitiriyor **ama denizi karartıyor** (ufuk altı 38,5 → 33,4,
+  ön plan 6,3 → 4,6). `fwidth(R)` çözünmemiş detayın ölçüsü değil — dalga dik olduğu her
+  yerde büyük, yani çözünen yansımayı da bulandırıyor. Tam bulanıklık ise ufuk yakınının
+  parlak göğünü tüm göğün ortalamasıyla değiştiriyor. İkisi de geri alındı.
+
+**Doğru çözümün şekli belli:** yansıma, `R` etrafında **doğru genişlikte bir koni** ile
+örneklenmeli ve koninin genişliği pikselin **çözünmemiş** eğim varyansından gelmeli —
+`fwidth`'ten değil. Prob küpü bunu taşıyacak çözünürlükte olmayabilir; o zaman soru
+"gökyüzünü probdan mı yoksa analitik modelden mi okumalı" hâline gelir. Kayıt
 `DECISIONS.md`'de.
