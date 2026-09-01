@@ -2439,3 +2439,27 @@ payı yükseldikçe gruplaşma belirginleşmeli (dar spektrum → güçlü set).
 
 **Maliyet:** 1 ve 2 shader içi, birkaç satır. 3 hava sistemine bir alan ekler. 4 spektrum
 tarafında çalışma ister, en pahalısı.
+
+### Durum (2026-09-01 gecesi)
+
+**1 ve 3 yapıldı, ölçüldü, commit edildi.** Şekil artık Ursell'den geliyor; peryot ve
+enerji bir olay eğrisinden. Ölçüm tablosu `SYSTEMS.md` → "Deniz: ölü dalga olayı".
+
+**Dalan dalganın dudağı denendi ve GERİ ALINDI — doğrulanamadığı için.** Bugünkü öne
+fırlatma `min(|h|,1,5)·0,35` uydurma bir sınır; yerine doğrusal teorinin yatay yörünge
+genliği `A/tanh(kh)` kondu ve katlanma Tessendorf'un `kA = 1` tepe eşiğinin biraz üstünde
+(1,2) sınırlandı. Kod derlendi ve koştu, ama:
+
+- **Görsel doğrulama yapılamadı.** Kıyı hattını yakalayan kadraj kurulamadı ve sahne o
+  saatlerde ölçüm için fazla karanlık; kontrast gerdirilse bile dudağın önde mi arkada mı
+  olduğu okunmuyor.
+- **Kağıtta sayı büyük çıkıyor.** 1,5 m derinlikte, 16 s peryotla: `k = 0,102`, `amp` 0,38 m,
+  `A/tanh(kh) = 2,5 m`. 0,76 m yüksekliğinde bir dalga için 2,5 m öne fırlatma — fiziksel
+  olarak dalan bir dalga öyle davranır, ama bizim kıyı mesh çözünürlüğümüzde yırtılma
+  riski yüksek ve bu doğrulanmadan bırakılamaz. Üstelik seçtiğim `kA` tavanı sığ suda
+  `1,2/k = 11,7 m`'ye karşılık geliyor, yani tavan hiç devreye girmiyor — tavanın kendisi
+  yanlış büyüklükte.
+
+**Tetikleyici:** kıyı hattını gündüz ışığında yakalayan bir kadraj kurulduğunda geri
+gelir. O turda tavan `kA` yerine **mesh'in kendi üçgen boyuna** bağlanmalı: bir üçgenden
+fazla katlanan yüzey yırtılır, bir üçgenden az katlanan dudak zaten görünmez.
