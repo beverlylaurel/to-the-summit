@@ -4910,3 +4910,29 @@ kadrajında doğrulanamadı (benim kadrajlarım luma 11, onunki ~70).
 **Ölçülmüş açık borç:** yüzeyin eğim varyansı Cox-Munk'a göre 5 m/s'de 0,90×, 20 m/s'de
 0,54×. Eksik bant 14 cm → 1,7 cm. Doğru yol bir **dördüncü FFT kademesi** (küçük yama,
 kendi kapiler spektrumu) — yeniden örneklenmiş kopya değil. `DECISIONS.md`.
+
+
+## Kıyı hattında sert kenarlı kahverengi lekeler GERİ GELDİ — ÇÖZÜLDÜ (2026-09-01)
+
+**Belirti:** "su üstünde kahverengi leke var. belirli bir sınırda belirli bir düzende."
+Köpük hattı boyunca, keskin kenarlı, blok blok.
+
+**İlk şüpheli yanlıştı:** kılcal katman (aynı gün üç hata üretmişti). Katman silindi,
+lekeler kaldı.
+
+**Gerçek sebep:** ufuk bandı düzeltmem. Eski kayıt ("Denizde kayan kahverengi lekeler")
+prob'un ufuk altında ARAZİYİ tuttuğunu ve `smoothstep(0, 0.06, R.y)`'nin `R.y < 0`'da
+prob'u tamamen kestiğini yazıyor. Bandı `fwidth` ile iki yana genişletince alt kenar
+eksiye indi: ufkun bir tık altına düşen ışın prob'dan pay almaya başladı, prob orada
+kahverengi. Normalin en sert eğildiği yer köpük hattı; lekeler o yüzden orada ve o
+yüzden blok blok (normal blokları).
+
+**Düzeltme:** prob'a giden ışın ufka kenetlenir — `R.y = max(R.y, 0)` yalnız arama için.
+Prob'un verebileceği en kötü cevap artık göğün kendi en alçak rengi. Band olduğu gibi
+kaldı (uzak titreme kazancı korunuyor).
+
+**Ölçüm:** kullanıcının kadrajı (91 m, 08:23, %45), köpük hattı görünür: kahverengi
+piksel oranı %0,000. Kare 7,7 ms.
+
+**Ders:** bir eşiğin **iki yakasının anlamı farklıysa** simetrik genişletme yapılmaz;
+kestiği tarafın kaynağı önce kenetlenir.

@@ -327,7 +327,18 @@ Shader "ToTheSummit/SeaLit"
                 // (`SkyAmbientBaker` -> `DynamicGI.UpdateEnvironment()`), so the
                 // reflection probe is the sky that is really drawn. One source.
                 float3 R = reflect(-V, N);
-                float3 skyRefl = GlossyEnvironmentReflection(R, IN.positionWS,
+
+                // THE PROBE IS NEVER READ BELOW THE HORIZON.
+                //
+                // Under the horizon the probe holds the LAND -- a brown that has no business
+                // on water. The band further down keeps below-horizon rays on the water's own
+                // upwelling, but the band is now soft, and a soft band means a ray a hair
+                // under the horizon still takes a share of whatever the probe returns there.
+                // Measured: hard-edged brown patches came back along the surf line, where the
+                // normal tilts hardest. The ray that is looked up is clamped to the horizon,
+                // so the worst the probe can ever answer is the sky's own lowest colour.
+                float3 rLookup = normalize(float3(R.x, max(R.y, 0.0), R.z));
+                float3 skyRefl = GlossyEnvironmentReflection(rLookup, IN.positionWS,
                                                              perceptualRoughness,
                                                              1.0, screenUV);
 
