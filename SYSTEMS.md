@@ -1482,10 +1482,20 @@ dibin her düzensizliğinde sıçrıyor ve tepeler konturları izleyen halkalar 
 (ölçüldü, kare kayıtta).
 
 **Kıyı treni sörf kuşağında başlar, dibin hissedildiği yerde değil.** Devreye girme
-derinliği 'ye bağlandığında 37 m oluyordu — bu kıyıdan **1 km** açık demek, ve o
-bandın tamamında açık deniz alanı, yüksekliği  ile sınırlı bir trenle
-değiştiriliyordu: ölçüldü, 10 m suda dalganın **%48'i** siliniyor, büyük dalgalar
-kayboluyordu. Sınır artık kırılma derinliği: , burada ~5 m.
+derinliği `L0/2`'ye bağlandığında 37 m oluyordu — %3,4 eğimli kıyıda bu **1 km** açık
+demek, ve o bandın tamamında açık deniz alanı, yüksekliği `gamma*h/2` ile sınırlı bir
+trenle değiştiriliyordu. Ölçüldü:
+
+| derinlik | eski pay | yeni pay |
+|---|---|---|
+| 2 m | 0,62 | 0,47 |
+| 5 m | 0,56 | 0,20 |
+| 10 m | **0,48** | 0,00 |
+| 20 m | 0,30 | 0,00 |
+
+10 m suda dalganın yarısı siliniyordu; "büyük dalgalar yok" belirtisi buydu. Dibi
+hissetmek ile kırılmak aynı şey değil — sınır artık kırılma derinliği,
+`h_b = Hs * shoal / gamma`, burada ~5 m ve kıyıdan 140 m.
 
 **Öne atma sınırlı.** Serbest bırakılınca tepeyle birlikte büyüyor ve birkaç metre suda
 meshi kendi üstüne katlıyordu.
