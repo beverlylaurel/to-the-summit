@@ -1490,32 +1490,10 @@ bir dalga uzaktaki büyük bir fırtınanın imzasıdır ve o fırtınanın ener
 
 ## Deniz: kapiler kuyruk ve kıyı dalga treni (2026-09-01)
 
-**Kısa dalga eğimi ayrı bir katman.** FFT'nin en ince kademesi 14 cm'de bitiyor; gerçek
-deniz orada bitmiyor. Ölçüldü: yüzeyin eğim varyansı Cox & Munk'a göre 5 m/s'de 0,90×,
-20 m/s'de **0,54×** — açık rüzgârla büyüyor çünkü eksik olanlar kısa dalgalar. Katman
-14 cm ile kapiler geçişi (1,7 cm) arasını taşıyor.
-
-**Ne kadar taşıyacağı hesapla çıkıyor, ayarla değil.** Denge bölgesinde eğim spektrumu
-1/k gider → her oktav eşit varyans. Eksik bant 3 oktav; payı spektrum tepesi ile kapiler
-kesim arasındaki tüm oktavlara oranı. `SeaManager` bunu Cox-Munk değerinin payı olarak
-yayımlıyor.
-
-**Bu boşluğun tamamını kapatmıyor** (0,54× → ~0,77×). Kalanı kademelerin kendi bandındaki
-JONSWAP kuyruğu; ayrı bir düzeltme, buraya karıştırılmadı.
-
-**Bant sıfırdan üretilmiyor: en ince kademe küçültülmüş koordinatta yeniden okunuyor.**
-Yama boyu kopyanın **en uzun dalgası**dır, o yüzden 14 cm'e konur — bandın başlaması
-gereken yer. Denge bölgesinde spektrumun şekli oktavdan oktava aynı olduğu için
-kaydırılmış kopya doğru şekli ve doğru varyansı taşır. Kazanç
-`sqrt(hedef / kaynak varyansı)`; kaynak varyansı kademenin kendi dokusundan okundu.
-Alan FFT'nin kendisi — geniş bantlı, rastgele fazlı, hex döşemesi ve mip zinciri hazır.
-
-**Kopya bant-geçiren: mip farkı.** Kademenin enerjisi 0,5–5 m'de toplandığı için tek
-başına küçültmek bandı yanlış yere koyuyor: sekizde bir küçültme orta ölçeği iki kez
-ekledi (metre girdapları), 14 cm'e sığdırmak enerjiyi kapiler kesimin altına indirdi
-(buzlu cam). Yama 4,48 m — texel 1,75 cm kesim — ve 14 cm'lik mip 3 ortalaması
-çıkarılıyor; kalan tam 14 cm → 1,75 cm. Piksel 14 cm'i geçince iki örnek buluşur, katman
-söner. Kayıtlar `SYMPTOMS.md`.
+**14 cm altı eğim bandı şu an YOK.** Yüzeyin eğim varyansı Cox & Munk'a göre 5 m/s'de
+0,90×, 20 m/s'de 0,54×; eksik olan kısa dalgalar. Dört ayrı "kılcal katman" denemesi dört
+ayrı görsel hata üretti ve silindi (`SYMPTOMS.md`). Bant geldiğinde dördüncü FFT kademesi
+olarak gelir (`DECISIONS.md`).
 
 **Kıyıda ayrı bir dalga treni var.** Açık deniz alanı rüzgâr yönünde gider, yani kıyıya
 rastgele açıyla çarpar. Gerçek deniz bunu yapmaz: sığ suda tepe yavaşlar (c = √(gh)) ve

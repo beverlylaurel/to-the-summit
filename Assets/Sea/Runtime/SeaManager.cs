@@ -280,39 +280,6 @@ public class SeaManager : MonoBehaviour
         // draws the shoreline's own curve.
         Shader.SetGlobalVector(SeaShaderIDs.WaveGroups, waveGroups);
 
-        // THE SLOPE THE CASCADES CANNOT CARRY.
-        //
-        // Cox and Munk measured the sea's slope variance from sun glitter:
-        // sigma^2 = 0.003 + 0.00512 U10. Measured against it, this surface
-        // reaches 0.90x at 5 m/s and 0.54x at 20 m/s -- the gap grows with the
-        // wind because the missing waves are the SHORT ones, and a stronger wind
-        // puts more of its slope down there. That gap is what reads as jelly.
-        //
-        // WHAT THE MICRO LAYER OWES IS NOT A TASTE NUMBER. In the equilibrium
-        // range the slope spectrum goes as 1/k, so every octave carries the same
-        // slope variance. The band the cascades miss runs from 14 cm (the finest
-        // patch over its resolution) down to the capillary crossover at 1.7 cm --
-        // three octaves. Its share is those three out of every octave between the
-        // spectral peak and that crossover.
-        //
-        // This closes the measured gap only part of the way (0.54x -> 0.77x at
-        // 20 m/s). The rest sits in the JONSWAP tail inside the cascades' own
-        // band, which is a separate correction and is NOT smuggled in here.
-        const float MicroLongest = 0.14f;
-        const float MicroShortest = 0.017f;
-
-        float peakLength = SeaConstants.G * SeaRuntimeState.PeakPeriod
-                         * SeaRuntimeState.PeakPeriod / SeaConstants.TwoPi;
-
-        float octavesTotal = Mathf.Log(Mathf.Max(peakLength, MicroShortest * 2f)
-                                       / MicroShortest, 2f);
-        float octavesMissing = Mathf.Log(MicroLongest / MicroShortest, 2f);
-
-        float coxMunk = 0.003f + 0.00512f * Mathf.Max(env.WindSpeed, 0f);
-        float share = Mathf.Clamp01(octavesMissing / Mathf.Max(octavesTotal, 1f));
-
-        Shader.SetGlobalFloat(SeaShaderIDs.MicroSlopeVariance, coxMunk * share);
-
         // HOW HIGH THE SWASH REACHES — STOCKDON, NOT A FIXED NUMBER.
         //
         // `runupMaxDepth` was 1.1 m whatever the sea was doing; on the measured 5.8%

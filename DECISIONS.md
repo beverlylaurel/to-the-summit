@@ -339,6 +339,9 @@ olur.
 ---
 ## Bekleyen ölçümler
 
+- **Kapiler bant boş.** Kılcal katman kaldırıldı (`SYMPTOMS.md`); eğim varyansı 20 m/s'de
+  Cox-Munk'un 0,54'ü. Doğru yol dördüncü FFT kademesi.
+  → [Kapiler bant: dördüncü kademe olarak gelir, kopya olarak değil](#kapiler-bant-dorduncu-kademe-olarak-gelir-kopya-olarak-degil-2026-09-01)
 - **Uzak denizin takmasının %79'u duruyor.** Ufuk bandı pikselin kendi belirsizliğiyle
   yumuşatıldı ve %21 gitti (`SYMPTOMS.md` — "Denizde belli bir mesafeden sonra titreme").
   Kalanın **tamamı** gökyüzü yansıması aramasında — kırılma ve parıltı ölçüldü, sıfır
@@ -2463,3 +2466,22 @@ genliği `A/tanh(kh)` kondu ve katlanma Tessendorf'un `kA = 1` tepe eşiğinin b
 **Tetikleyici:** kıyı hattını gündüz ışığında yakalayan bir kadraj kurulduğunda geri
 gelir. O turda tavan `kA` yerine **mesh'in kendi üçgen boyuna** bağlanmalı: bir üçgenden
 fazla katlanan yüzey yırtılır, bir üçgenden az katlanan dudak zaten görünmez.
+
+
+## Kapiler bant: dördüncü kademe olarak gelir, kopya olarak değil (2026-09-01)
+
+**Karar:** 14 cm altı eğim bandı şimdilik yok. Dört deneme (sinüs toplamı, 8× kopya,
+14 cm kopya, mip-farklı bant-geçiren kopya) sırayla kafes, girdap, buzlu cam ve kahverengi
+leke üretti. Hepsi ölçüldü, hepsi silindi.
+
+**Gerekçe:** en ince kademe 256:1 aralık taşıyor ve enerjisi 0,5–5 m'de; ondan 8:1'lik bir
+kapiler bant türetmek her seferinde ya yanlış bandı kopyalıyor ya da sub-piksel gren
+bırakıyor. Bant kendi spektrumuyla, kendi yamasında üretilmeli — bu tam olarak dördüncü
+bir FFT kademesidir (`SEA_TIER_COUNT` 3 → 4, yama ~1,2 m, kapiler dispersiyon
+`ω² = gk + (σ/ρ)k³`, Elfouhaily kısa dalga tarafı). Maliyet: FFT +%33, hex örnekleme +3.
+
+**Tetikleyici:** kullanıcı açık denizde "jöle" görünümünü tekrar bildirirse, ya da
+Cox-Munk ölçümü yeniden istenirse.
+
+**Maliyet:** bir gün. Kalibrasyon ölçülebilir (Cox-Munk hedefi), görsel doğrulama
+kullanıcının kadrajında.

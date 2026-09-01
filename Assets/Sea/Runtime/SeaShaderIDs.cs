@@ -71,9 +71,6 @@ public static class SeaShaderIDs
     public static readonly int SignificantHeight = Shader.PropertyToID("_SeaSignificantHeight");
     public static readonly int WaveGroups = Shader.PropertyToID("_SeaWaveGroups");
 
-    /// Slope variance the capillary tail must supply.
-    public static readonly int MicroSlopeVariance =
-        Shader.PropertyToID("_SeaMicroSlopeVariance");
     public static readonly int RunupMaxDepth = Shader.PropertyToID("_SeaRunupMaxDepth");
     public static readonly int PeakPeriod = Shader.PropertyToID("_SeaPeakPeriod");
 

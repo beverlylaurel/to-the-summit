@@ -109,21 +109,6 @@
 /// wave steepens instead of spreading horizontally. [CALIBRATION]
 #define SEA_CHOP_FADE_DEPTH      8.00
 
-// ------------------------------------------------------- capillary tail
-
-/// The top of the band the cascades cannot carry: exactly where the finest one stops
-/// (37 m patch / 256 samples). Everything the copy delivers is shorter than this.
-#define SEA_MICRO_TOP            0.14
-
-/// How many mips the band spans: 14 cm down to the 1.75 cm capillary cutoff is
-/// log2(0.14 / 0.0175) = 3. The copy's texel is the cutoff; mip 3 is the top.
-#define SEA_MICRO_BAND_MIPS      3.0
-
-/// The finest cascade's slope variance INSIDE that band, both axes together, read off
-/// its own mip chain at 5.2 m/s (2026-09-01): mip 0 minus mip 3, 0.01488 - 0.00847.
-/// The gain that turns the band into its Cox and Munk share divides by it.
-#define SEA_MICRO_SOURCE_VARIANCE 0.0064
-
 // ------------------------------------------------------ shore wave train
 
 /// How far out the shore train reaches, as a multiple of the BREAKING depth.

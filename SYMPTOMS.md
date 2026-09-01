@@ -4894,3 +4894,19 @@ fark gürültü içinde. Kare 7,4–8,1 ms.
 **Doğrulanamayan:** kullanıcının kadrajındaki parlaklık (luma ~70) benim hiçbir
 kadrajımda çıkmadı (11). Zemin splat katmanı taşımıyor, "kum" koordinatla bulunamıyor.
 Nihai görsel onay kullanıcının kadrajında.
+
+
+## Kılcal katman KALDIRILDI — üç görsel hata, üçü de ölçüldü (2026-09-01)
+
+**Belirtiler sırayla:** balık pulu kafesi (sinüs toplamı), metre girdapları (8× küçültme),
+buzlu cam (14 cm yama), ve son olarak bant-geçiren kopyada **su üstünde sert kenarlı
+kahverengi lekeler** + hâlâ bulanık kum. Dördü de aynı katmandan.
+
+**Karar:** katman tamamen silindi. `SeaMicroSlope`, sabitleri, `_SeaMicroSlopeVariance`
+ve `SeaManager`'daki Cox-Munk payı yok. Kullanıcının "kumu net gördüğüm" hâli katmansız
+hâldi; bir yerine geçme denemesi üç kez görsel hata üretti ve hiçbiri kullanıcının
+kadrajında doğrulanamadı (benim kadrajlarım luma 11, onunki ~70).
+
+**Ölçülmüş açık borç:** yüzeyin eğim varyansı Cox-Munk'a göre 5 m/s'de 0,90×, 20 m/s'de
+0,54×. Eksik bant 14 cm → 1,7 cm. Doğru yol bir **dördüncü FFT kademesi** (küçük yama,
+kendi kapiler spektrumu) — yeniden örneklenmiş kopya değil. `DECISIONS.md`.
