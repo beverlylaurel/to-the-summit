@@ -2443,9 +2443,13 @@ payı yükseldikçe gruplaşma belirginleşmeli (dar spektrum → güçlü set).
 **Maliyet:** 1 ve 2 shader içi, birkaç satır. 3 hava sistemine bir alan ekler. 4 spektrum
 tarafında çalışma ister, en pahalısı.
 
-### Durum (2026-09-01 gecesi)
+### Durum (2026-09-02)
 
-**1 ve 3 yapıldı, ölçüldü, commit edildi.** Şekil artık Ursell'den geliyor; peryot ve
+**1 GERİ ALINDI.** Ursell/Abreu şekli kıyıda kahverengi leke üretti (`SYMPTOMS.md`);
+sebebi dikleşen dalga yüzünün gökyüzü probundaki araziyi yansıtması. Geri gelmesi için
+önce yansımanın araziyi okuyamaması gerekiyor.
+
+**3 duruyor.** Şekil artık Ursell'den geliyor; peryot ve
 enerji bir olay eğrisinden. Ölçüm tablosu `SYSTEMS.md` → "Deniz: ölü dalga olayı".
 
 **Dalan dalganın dudağı denendi ve GERİ ALINDI — doğrulanamadığı için.** Bugünkü öne

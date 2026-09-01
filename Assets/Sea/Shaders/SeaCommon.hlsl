@@ -744,35 +744,18 @@ float SeaShoreWaveHeight(float2 posXZ, float depth, float slope, float gamma,
     // Height is what the bottom allows: the breaking limit, and no more.
     float amp = gamma * depth * 0.5 * SEA_SHORE_WAVE_SHARE * grip;
 
-    // THE SHAPE COMES FROM THE URSELL NUMBER, NOT FROM A CURVE SOMEONE LIKED.
+    // A shoaling crest is not a sine. It stands up at the front and lies flat
+    // behind, and past the breaking point the front is a wall of white water.
     //
-    // It was `c * (1 + 0.45c)` -- a hand-picked skew that was the same at every depth,
-    // so a wave in 8 m of water and a wave about to break had the same profile.
-    //
-    // A real wave changes shape as it shoals, and the change is measured: first it goes
-    // SKEWED (peaked crest, long flat trough), then ASYMMETRIC (steep front face, gentle
-    // back -- a sawtooth). Ruessink et al. tie both to one dimensionless number, the
-    // Ursell number, from 30.000 field observations; Abreu et al. give the waveform that
-    // those two numbers select. The ends of the family: r = 0 is a pure sine (deep
-    // water), phi = -90 degrees is pure crest peaking, phi = 0 is the sawtooth.
-    //
-    // THE HEIGHT LAW IS UNTOUCHED. This waveform's peak-to-trough is exactly 2, the same
-    // as the sine it replaces (checked over the whole (r, phi) range), so the breaking
-    // limit `amp` still sets the wave height and nothing needs renormalising.
-    float k  = omega / sqrt(SEA_G * depth);
-    float kh = max(k * depth, 1e-4);
-    float Ur = max(0.375 * (2.0 * amp) * k / (kh * kh * kh), 1e-6);
-
-    // p1 is zero, so the sigmoid's lower end is a pure sine and the term drops out.
-    float B = SEA_RUESSINK_P2
-            / (1.0 + exp((SEA_RUESSINK_P3 - log(Ur)) / SEA_RUESSINK_P4));
-    float phi = -SEA_HALF_PI * tanh(SEA_RUESSINK_P5 / pow(Ur, SEA_RUESSINK_P6));
-
-    float r = tanh(0.931 * B);
-    float f = sqrt(max(1.0 - r * r, 1e-6));
-
-    float shaped = f * (sin(phase) + r * sin(phi) / (1.0 + f))
-                 / (1.0 - r * cos(phase + phi));
+    // THE URSELL-DRIVEN PROFILE WAS TRIED HERE AND TAKEN OUT AGAIN. Ruessink 2012 +
+    // Abreu 2010 give the measured shape (`RATIONALE.md`), and it worked: sine in deep
+    // water, peaked crest while shoaling, sawtooth before breaking. But it steepens the
+    // shore faces enough that their reflected ray swings onto the environment probe's
+    // LAND, and the probe is coarse -- the sea grew hard-edged brown blotches along the
+    // surf line. Bisected against the pre-change sea: the blotches follow this profile
+    // and nothing else (`SYMPTOMS.md`).
+    float c = cos(phase);
+    float shaped = c * (1.0 + 0.45 * c);
 
     crestFront = saturate(sin(phase)) * grip;
 

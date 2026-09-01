@@ -4990,3 +4990,30 @@ lekelerin altıgen bloklu kenarı bunu destekliyor.
    ölçtü. Global doğrudan `Step()` içinde yazılmalı, `beginCameraRendering`'te değil.
 
 **Durum:** kod değişmedi, ağaç temiz. `Cull Off` ve kesme denemeleri geri alındı.
+
+
+## Kahverengi lekelerin sebebi: Ursell dalga şekli — GERİ ALINDI (2026-09-02)
+
+**Kullanıcı yönü verdi:** "diffte yaptığın değişikliklerden sonra geldi bu leke." Doğruydu.
+
+**İkiye bölme, hep aynı donmuş karede** (339 m, `ForceWindow`, `timeScale = 0`):
+
+| deniz kodu | leke |
+|---|---|
+| oturum öncesi (`d127413`) | **yok** |
+| yalnız `SeaCommon` + `SeaConstants` (Ursell/Abreu şekli) geri konmuş | **var** |
+| ufuk bandı ve prob kenetlemesi ayrı ayrı geri alınmış | var (yani onlar değil) |
+
+**Sebep:** Ruessink/Abreu profili kıyıdaki dalga yüzlerini dikleştiriyor. Dikleşen yüzün
+yansıma ışını, gökyüzü probunun **arazi** tutan kısmına düşüyor; prob kaba olduğu için
+sonuç sert kenarlı, blok blok kahverengi çıkıyor. Terim terim kurulunca da aynı yeri
+göstermişti: `color = belowSurface` temiz, `lerp(belowSurface, skyRefl, F)` eklenince leke.
+
+**Çözüm:** şekil geri alındı, `c * (1 + 0.45c)` yerine kondu. Ruessink zinciri
+`RATIONALE.md`'de duruyor; geri gelirse yansımanın araziyi okuyamaması ÖNCE çözülmeli.
+
+**Dördüncü alet tuzağı:** shader düzenlemesi tek başına yeniden derletmiyor. Geri alma
+sonrası ilk iki kare hâlâ ESKİ derlenmiş varyantı gösterdi (düz turkuaz). Bir `.cs`
+dosyasına dokunup domain reload tetiklemek ve shader'ları `ImportAsset(ForceUpdate)` ile
+zorla içe aktarmak gerekti. Aynı reload eski `beginCameraRendering` aboneliklerini de
+temizliyor.
