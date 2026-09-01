@@ -4855,3 +4855,42 @@ Kopya oradan aşağı uzanıyor, kademelerin bandına hiç girmiyor.
 
 **Ders:** yeniden örneklemede yama boyu bir "küçültme oranı" değil, **kopyanın en uzun
 dalgası**dır. Bir bandı kaydırırken tepesi nereye oturuyor diye sorulur.
+
+
+## Sığ suda buzlu cam: kum pütürlü bulanıklığın altında — ÇÖZÜLDÜ (2026-09-01)
+
+**Belirti:** "sığ suda hala bulanık gözüküyor ve desen var. eskiden sığ suda net
+görüyordum kumu." Metre ölçekli girdaplar gittikten sonra kalan: piksel boyunda düzgün
+gren, buzlu cam.
+
+**İlk şüpheli yanlıştı:** "kopya çok güçlü, kazancı düşür." Kazanç zaten hedefe
+kalibreydi.
+
+**Ayırt eden ölçüm:** en ince kademenin eğim varyansı mip mip okundu (5,2 m/s):
+
+| dalga boyu | varyans |
+|---|---|
+| 14–29 cm | 0,00075 |
+| 29–58 cm | 0,0021 |
+| 58 cm–1,2 m | 0,0036 |
+| 1,2–2,3 m | 0,0041 |
+| 2,3–4,6 m | 0,0034 |
+
+Onda dokuzu yarım metre ile beş metre arasında. Kademe 14 cm'lik yamaya sığdırılınca o
+enerji **2–19 milimetreye** iniyor — kapiler kesimin (1,7 cm) altı, denizde olmayan dalga
+boyları. Hedef varyansın büyük kısmı piksel boyu gren oldu; buzlu cam o.
+
+İkinci hata: kaynak varyansı eksen başına (0,0077) ölçülüp toplam hedefle kıyaslanmıştı.
+
+**Çözüm:** kopya **mip farkıyla bant-geçiren.** Yama 4,48 m (texel = 1,75 cm kesim), mip 3
+(14 cm) ortalaması çıkarılıyor. Kalan tam 14 cm → 1,75 cm; üstü kademelerin bandı, altı
+yok. Piksel 14 cm'den kabalaşınca iki örnek buluşur ve katman kendiliğinden söner —
+Nyquist kuralı yapıdan düşüyor. Bant varyansı mip 0 − mip 3 = 0,0064, toplam; hedefle
+aynı birim.
+
+**Ölçüm:** sığ kum üstünde piksel-piksel gren: bantlı 0,595 / 0,567, katmansız 0,565 —
+fark gürültü içinde. Kare 7,4–8,1 ms.
+
+**Doğrulanamayan:** kullanıcının kadrajındaki parlaklık (luma ~70) benim hiçbir
+kadrajımda çıkmadı (11). Zemin splat katmanı taşımıyor, "kum" koordinatla bulunamıyor.
+Nihai görsel onay kullanıcının kadrajında.

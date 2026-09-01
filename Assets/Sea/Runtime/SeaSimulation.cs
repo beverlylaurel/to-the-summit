@@ -357,6 +357,10 @@ public class SeaSimulation : MonoBehaviour
         Shader.SetGlobalTexture(SeaShaderIDs.Displacement, displacement);
         Shader.SetGlobalTexture(SeaShaderIDs.Derivatives, derivatives);
         Shader.SetGlobalTexture(SeaShaderIDs.Foam, foamA);
+
+        // The surface shader picks explicit mips for the capillary band and needs the
+        // grid size to turn a UV footprint into a mip level.
+        Shader.SetGlobalInt(SeaShaderIDs.FftSize, level.FftSize);
     }
 
     /// FOAM DECAY FOLLOWS THE ACTUAL ELAPSED TIME.

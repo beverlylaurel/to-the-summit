@@ -1510,10 +1510,12 @@ kaydırılmış kopya doğru şekli ve doğru varyansı taşır. Kazanç
 `sqrt(hedef / kaynak varyansı)`; kaynak varyansı kademenin kendi dokusundan okundu.
 Alan FFT'nin kendisi — geniş bantlı, rastgele fazlı, hex döşemesi ve mip zinciri hazır.
 
-**Yama boyu bandın tepesidir, keyfî bir küçültme değil.** Sekizde bir denendi: kopya
-4,6 m'den başladı ve 4,6 m – 14 cm aralığı kademelerin zaten taşıdığı banttı, yani
-orta ölçek iki kez eklendi. Belirti: sığ suda kum, metre genişliğinde girdapların
-altında okunmaz oldu.
+**Kopya bant-geçiren: mip farkı.** Kademenin enerjisi 0,5–5 m'de toplandığı için tek
+başına küçültmek bandı yanlış yere koyuyor: sekizde bir küçültme orta ölçeği iki kez
+ekledi (metre girdapları), 14 cm'e sığdırmak enerjiyi kapiler kesimin altına indirdi
+(buzlu cam). Yama 4,48 m — texel 1,75 cm kesim — ve 14 cm'lik mip 3 ortalaması
+çıkarılıyor; kalan tam 14 cm → 1,75 cm. Piksel 14 cm'i geçince iki örnek buluşur, katman
+söner. Kayıtlar `SYMPTOMS.md`.
 
 **Kıyıda ayrı bir dalga treni var.** Açık deniz alanı rüzgâr yönünde gider, yani kıyıya
 rastgele açıyla çarpar. Gerçek deniz bunu yapmaz: sığ suda tepe yavaşlar (c = √(gh)) ve

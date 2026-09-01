@@ -278,43 +278,60 @@ float2 SeaMicroSlope(float2 posXZ, float pixelSize)
 
     int fine = SEA_TIER_COUNT - 1;
 
-    // THE COPY'S TOP MUST BE WHERE THE CASCADE'S BOTTOM IS.
+    // THE COPY IS BAND-PASSED, BECAUSE THE CASCADE'S ENERGY IS NOT WHERE IT LOOKS.
     //
-    // The patch is the copy's LONGEST wavelength, and the cascade spans 256:1 from its
-    // patch down to its finest detail. Shrunk by eight it ran from 4.6 m to 1.8 cm --
-    // and 4.6 m to 14 cm is the band the cascades already carry, so the mid-scale
-    // ripples were being added TWICE. Measured by eye over the shallows: the bottom
-    // stopped being readable under swirling metre-wide ripples.
+    // Read off the finest cascade's own mip chain (5.2 m/s, 2026-09-01), total slope
+    // variance by wavelength:
     //
-    // The patch is therefore the band's top, 14 cm, and the copy runs from there down.
-    float patch = SEA_MICRO_TOP;
+    //     14-29 cm   0.00075        1.2-2.3 m   0.0041
+    //     29-58 cm   0.0021         2.3-4.6 m   0.0034
+    //     58 cm-1.2 m 0.0036        4.6-9.3 m   0.0009
+    //
+    // Nine tenths of it sits between half a metre and five metres. Laid over a 14 cm
+    // patch that energy landed at 2 to 19 MILLIMETRES -- below the capillary cutoff,
+    // wavelengths the sea does not have -- and the shallows went to frosted glass:
+    // per-pixel grain that blurred the sand. Measured by the user, twice.
+    //
+    // So the copy is scaled so its texel is the capillary cutoff, 1.75 cm, and the
+    // band above 14 cm is SUBTRACTED as the mip-3 average. What survives is exactly
+    // 14 cm down to 1.75 cm: three octaves, nothing shorter, nothing that the cascades
+    // already carry. And where the pixel is coarser than 14 cm the two samples meet
+    // and the layer fades out by itself -- the Nyquist rule falls out of the
+    // construction instead of being applied on top.
+    float patch = SEA_MICRO_TOP * exp2(SEA_MICRO_BAND_MIPS);
     float2 uv = posXZ / patch;
-
-    // The same Nyquist rule the cascades use, on the shrunk patch.
-    float live = SeaTierResolvable(patch, pixelSize);
-    if (live <= 0.0) return 0.0;
-
-    float2 o0, o1, o2; float3 w;
-    SeaHexWeights(uv, o0, o1, o2, w);
 
     float2 dUV0 = ddx(uv);
     float2 dUV1 = ddy(uv);
 
-    float2 s0 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaDerivatives, sampler_SeaDerivatives, uv + o0, fine, dUV0, dUV1).xy;
-    float2 s1 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaDerivatives, sampler_SeaDerivatives, uv + o1, fine, dUV0, dUV1).xy;
-    float2 s2 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaDerivatives, sampler_SeaDerivatives, uv + o2, fine, dUV0, dUV1).xy;
+    // The mip the hardware would pick, so the explicit LODs below match it.
+    float texels = max(length(dUV0), length(dUV1)) * (float)_SeaFftSize;
+    float lod = log2(max(texels, 1e-4));
+    if (lod >= SEA_MICRO_BAND_MIPS) return 0.0;
 
-    float2 slope = SeaHexBlend2(s0, s1, s2, w);
+    float lodHi = max(lod, 0.0);
+    float lodLo = SEA_MICRO_BAND_MIPS;
 
-    // THE SOURCE CARRIES ITS OWN VARIANCE; THIS LAYER NEEDS THE TARGET.
-    //
-    // The cascade's per-axis slope variance was read straight off its own texture:
-    // 0.0083 and 0.0070, so 0.0077 per axis at 3 m/s (measured 2026-09-01). The target
-    // is `_SeaMicroSlopeVariance`, the Cox and Munk share the missing band should own.
-    // Amplitudes go as the square root of variance.
+    float2 o0, o1, o2; float3 w;
+    SeaHexWeights(uv, o0, o1, o2, w);
+
+    float2 h0 = SAMPLE_TEXTURE2D_ARRAY_LOD(_SeaDerivatives, sampler_SeaDerivatives, uv + o0, fine, lodHi).xy;
+    float2 h1 = SAMPLE_TEXTURE2D_ARRAY_LOD(_SeaDerivatives, sampler_SeaDerivatives, uv + o1, fine, lodHi).xy;
+    float2 h2 = SAMPLE_TEXTURE2D_ARRAY_LOD(_SeaDerivatives, sampler_SeaDerivatives, uv + o2, fine, lodHi).xy;
+
+    float2 l0 = SAMPLE_TEXTURE2D_ARRAY_LOD(_SeaDerivatives, sampler_SeaDerivatives, uv + o0, fine, lodLo).xy;
+    float2 l1 = SAMPLE_TEXTURE2D_ARRAY_LOD(_SeaDerivatives, sampler_SeaDerivatives, uv + o1, fine, lodLo).xy;
+    float2 l2 = SAMPLE_TEXTURE2D_ARRAY_LOD(_SeaDerivatives, sampler_SeaDerivatives, uv + o2, fine, lodLo).xy;
+
+    float2 slope = SeaHexBlend2(h0 - l0, h1 - l1, h2 - l2, w);
+
+    // THE BAND'S OWN VARIANCE IS THE MEASURED DIFFERENCE OF THE TWO MIPS:
+    // 0.01488 (mip 0) - 0.00847 (mip 3) = 0.0064, both axes together -- the same
+    // quantity `_SeaMicroSlopeVariance` is, so the ratio is unit-clean. Amplitudes go
+    // as the square root of variance.
     float gain = sqrt(_SeaMicroSlopeVariance / SEA_MICRO_SOURCE_VARIANCE);
 
-    return slope * (gain * live);
+    return slope * gain;
 }
 
 /// `pixelSize` is the world width this pixel covers. It is passed in rather than
