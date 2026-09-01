@@ -223,6 +223,21 @@ float SeaTierResolvable(float wavelength, float pixelSize)
     return saturate(wavelength / max(pixelSize * 2.0, 1e-5) - 1.0);
 }
 
+/// THE SWASH SURGE. Mirrored from `SeaManager.SeaSwashSurge` -- the foam, the
+/// water level and the wet sand all read this one curve.
+///
+/// NOT A COSINE. A cosine withdraws exactly as fast as it arrives; a real swash
+/// rushes up and drains back slowly. `s (2 - s)` is the ballistic height of a
+/// body thrown up a slope: quick at the start, easing into the turn. Flow
+/// reversal lands at `_SeaSwashUprush` of the cycle -- measured beaches put it
+/// at 40-50%. [SOURCE: Shen & Meyer 1963; Coastal Wiki, Swash zone dynamics]
+float SeaSwashSurge(float phase, float uprush)
+{
+    float up = clamp(uprush, 0.05, 0.95);
+    float s = phase < up ? phase / up : 1.0 - (phase - up) / (1.0 - up);
+    return s * (2.0 - s);
+}
+
 /// THE SLOPE THE FFT CANNOT CARRY.
 ///
 /// The finest cascade stops at 14 cm (37 m patch over 256 samples). A real sea

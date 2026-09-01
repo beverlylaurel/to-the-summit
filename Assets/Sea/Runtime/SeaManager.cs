@@ -344,12 +344,54 @@ public class SeaManager : MonoBehaviour
         // A linear 0..1 sawtooth goes out now, and the surge is built from it in ONE
         // place — the same expression the shader uses, so the wet band and the foam
         // cannot drift apart.
-        float t = Application.isPlaying ? Time.time : 0f;
-        float phase = Mathf.Repeat(t / Mathf.Max(SeaRuntimeState.PeakPeriod, 0.1f), 1f);
+        // THE SWASH DOES NOT RUN AT THE WAVE PERIOD.
+        //
+        // It used to: one swash per incoming wave, so the water went up and down
+        // like a metronome. Measured on real beaches the swash period is ONE TO
+        // THREE TIMES the incident period -- the backwash of one wave is still
+        // draining when the next bore arrives, the two collide, and the pair
+        // counts as a single swash. [SOURCE: Coastal Wiki, Swash zone dynamics]
+        //
+        // The period follows from the ballistic swash model, not a made-up
+        // multiplier. A bore that can climb to R leaves the shoreline at
+        // V = sqrt(2 g R) and decelerates at g*beta, so the run up takes
+        //
+        //     T_up = sqrt(2 R / g) / beta
+        //
+        // and the drain back is longer: field measurements put flow reversal at
+        // 40-50% of the swash cycle. Measured here: R = 0.89 m on a 5.8% shore
+        // gives T_up 7.3 s and a full swash of 16.9 s against a 6.9 s wave
+        // period -- a ratio of 2.4, inside the observed 1-3 band, and it moves
+        // with the sea state instead of being pinned to it.
+        const float BackwashRatio = 1.3f;
 
-        SeaRuntimeState.ShoreFoamIntensity01 =
-            0.5f - 0.5f * Mathf.Cos(SeaConstants.TwoPi * phase);
+        float tUp = Mathf.Sqrt(2f * SeaRuntimeState.RunupHeight / SeaConstants.G)
+                  / Mathf.Max(b, 1e-3f);
+        float swashPeriod = Mathf.Clamp(tUp * (1f + BackwashRatio), 2f, 40f);
+        float uprushFraction = 1f / (1f + BackwashRatio);
+
+        float t = Application.isPlaying ? Time.time : 0f;
+        float phase = Mathf.Repeat(t / swashPeriod, 1f);
+
+        SeaRuntimeState.ShoreFoamIntensity01 = SeaSwashSurge(phase, uprushFraction);
 
         Shader.SetGlobalFloat(SeaShaderIDs.ShoreFoamPhase, phase);
+        Shader.SetGlobalFloat(SeaShaderIDs.SwashUprush, uprushFraction);
+    }
+
+    /// THE SWASH IS NOT A COSINE. `0.5 - 0.5 cos(2pi phase)` is symmetric, so the
+    /// water withdrew exactly as fast as it arrived. A real swash rushes up and
+    /// drains back slowly, and the ballistic model says why: going up it is a body
+    /// thrown against gravity, so the height follows `s (2 - s)` -- quick at the
+    /// start, easing into the turn. [SOURCE: Shen & Meyer 1963 ballistic swash]
+    ///
+    /// MIRRORED IN `SeaCommon.hlsl`. The shader draws the foam and the wet sand
+    /// from the same curve; two copies that drift apart would put the foam and the
+    /// waterline in different places.
+    public static float SeaSwashSurge(float phase, float uprushFraction)
+    {
+        float up = Mathf.Clamp(uprushFraction, 0.05f, 0.95f);
+        float s = phase < up ? phase / up : 1f - (phase - up) / (1f - up);
+        return s * (2f - s);
     }
 }
