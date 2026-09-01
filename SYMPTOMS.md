@@ -63,48 +63,6 @@ yanlıştı ama su için doğruydu; taşınması gereken buluttu.
 **Not:** `depthTexture: 1` bir kez de kontur için denenmiş ve "kontur düzeldi" sanılmıştı;
 o doğrulama %90 kapsamada yapıldığı için yanlıştı. Konturun sebebi ayrı (NaN, aşağıda).
 
-## "Dalgalar kıyıya gelince bir anda sönüyor, kıyıya vuran dalga neredeyse yok" (2026-09-01)
-
-**Kullanıcının ağzından:** *"dalgalar kıyıya geldiğinde bi anda sönüyor gibi"*,
-*"kıyıya vuran dalgalar neredeyse yok gibi"*, *"dalga şeklini beğenmiyorum"*,
-*"alt katmandan gelen beyazlık çok düzenli aralıklarla ve düzenli hızlarda geliyor"*.
-
-**Dört ayrı sebep çıktı, dördü de ölçüldü.**
-
-**1. Kıyıda çift sönümleme.** Kıyı transekti (eğim %4,3, Hs 1,17 m, gamma 0,79):
-
-| kıyıdan | derinlik | hMax | eski ikinci çarpan | sonuç |
-|---|---|---|---|---|
-| 60 m | 2,58 m | 1,01 | 1,00 | 1,02 m |
-| 14 m | 0,60 m | 0,24 | 1,00 | 0,24 m |
-| 10 m | 0,43 m | 0,17 | **0,80** | 0,14 m |
-| 6 m | 0,26 m | 0,10 | **0,40** | 0,04 m |
-| 3 m | 0,13 m | 0,05 | **0,12** | 0,006 m |
-
-`hMax` zaten doygun sörf kuşağının kendisi. İkinci çarpan son 14 metreyi bir daha
-eziyordu. Kaldırıldı; `|disp.y| <= 0,55h` olduğu için mesh dibi delmiyor.
-
-**2. Profil sinüs.** Ölçüldü — çarpıklık 0,042–0,057 ve ortalama üstü alan %49,5–50,0,
-3/8/15/25 m/s'nin dördünde de. Sinüsün tanımı bu. Gerçek deniz 0,2–0,6.
-Alan-ağırlıklı (Jacobian) ölçüm de aynı sonucu verdi, yani yatay kaydırma dikey profili
-düzeltmiyor: FFT **doğrusal**, çarpıklık ikinci mertebeden gelir ve o terim yoktu.
-
-**3. Kırılma "kırpma"ydı.** `sign(y)*min(|y|, hMax)` simetrik kesme; tepeyi düzleştiriyor
-ama bore üretmiyor.
-
-**4. Swash metronom.** Periyot tam Tp, profil `0,5-0,5cos` (simetrik), her dalga bir swash.
-Gerçekte periyot Tp'nin 1–3 katı, geri çekiliş %20–40 uzun, ardışık swash'lar çarpışıyor.
-
-**Yol boyunca iki ölçüm aracı yalan söyledi:**
-
-- `SeaRuntimeState.WhitecapCoverage01` **hiçbir yerde yazılmıyor** — hep 0 okunuyor.
-  "Fırtınada köpük yok" diye kaydedilen şey buydu. Köpük dokusundan ölçülünce 12 m/s'de
-  alanın **%17,5**'i eşiğin altında çıktı; köpük çalışıyor.
-- Analitik `Hs` (CPU spektrum momenti) GPU'daki alanın yüksekliği değil. Doku okunarak
-  doğrulandı: 4·RMS 1,01 / 2,73 / 4,96 / 7,24 / 10,00 m — rüzgârla doğru büyüyor.
-  "Rüzgâr dalgayı büyütmüyor" sanısı, kameranın 4° eğimle **yalnız uzak denizi**
-  görmesindendi; orada geometri zaten bilerek düzleştiriliyor.
-
 ## Denizde altı kollu yıldız: ince kesikli çizgiler tek noktada kesişiyor (2026-08-31)
 
 **Kullanıcının ağzından:** *"denizde şöyle bir çizgi var. yıldız gibi. 6 yöne giden bir

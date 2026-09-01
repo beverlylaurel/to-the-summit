@@ -1453,37 +1453,6 @@ eşitliği `Sea/Test Constant Parity` denetliyor.
 gitti; deniz bölümünde yalnız Hs / Tp / kıyı köpüğü okuması kaldı.
 
 
-## Deniz: kıyı dalgası, kırılma ve swash (2026-09-01)
-
-**Kıyıda tek sönümleme var: kırılma sınırı.** `hMax = gamma*h/2` dalgayı derinlikle
-doğrusal indiriyor — doygun sörf kuşağının kendisi, `H = gamma*h`. Üstüne ikinci bir
-`smoothstep(0, 0.6, derinlik)` çarpanı vardı, o kaldırıldı: son 14 metreyi ikinci kez
-eziyor ve dalga kuma varmadan sönüyordu.
-
-**Tepe dar, çukur geniş.** FFT alanı doğrusal, yani profili sinüs (ölçüldü: çarpıklık
-0,04, alanın tam yarısı ortalama üstünde, 3–25 m/s arası her rüzgârda). `e*e` terimi
-profili tepeye doğru yatırıyor ve **yalnız dip hissedildikçe** açılıyor (`steep`), derin
-su sinüs kalıyor — orada da olması gereken bu.
-
-**Kırılan dalga öne devriliyor.** Yalnız yükseklik kesilirse tepe düzleşir, "kırpılmış"
-görünür. Kırılma sınırını aşan pay (`over`) kadar tepe kendi tabanının önüne atılıyor:
-dik ön yüz, uzun arka — bore.
-
-**Swash dalga periyodunda koşmuyor.** Balistik model: `T_up = sqrt(2R/g)/beta`, geri
-çekiliş %30 daha uzun. Ölçülen: R 0,89 m ve %5,8 kıyıda swash periyodu 16,9 s, dalga
-periyodu 6,9 s — oran 2,4, gözlenen 1–3 bandında ve deniz durumuyla birlikte kayıyor.
-
-**Swash simetrik değil.** `0,5 - 0,5cos` gitti; `s(2-s)` geldi — yukarı fırlayan bir
-cismin yüksekliği. Yükseliş kısa, çekiliş uzun.
-
-**Her swash aynı yere varmıyor.** Erişim `_SeaWaveGroups` vuruşuyla modüle ediliyor:
-büyük set tam çıkıyor, durgunlukta kısa kalıyor. Uydurma rastgelelik yok — kırılma
-çizgisinin zaten nefes aldığı aynı zarf.
-
-**Okur:** derinlik, dip eğimi, Hs, Tp, kıyı eğimi, dalga grupları.
-**Okumaz:** ikinci bir kıyı sönümlemesi — öyle bir çarpan artık yok.
-
-
 ## Deniz: swash tek fazdan türüyor (2026-08-29)
 
 `SeaManager` iki şey yayımlıyor:

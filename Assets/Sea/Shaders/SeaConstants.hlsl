@@ -108,17 +108,6 @@
 /// wave steepens instead of spreading horizontally. [CALIBRATION]
 #define SEA_CHOP_FADE_DEPTH      8.00
 
-/// How far the profile leans towards its crest at the breaking limit. A linear
-/// FFT field is a sine (measured: skewness 0.04, half the area above the mean);
-/// a real sea piles water into the crest and spreads the trough flat, and the
-/// lean grows as the wave feels the bottom.
-#define SEA_CREST_SKEW           0.55
-
-/// How far a broken crest is thrown forward, as a fraction of its own height.
-/// A bore has a steep front and a long back; the crest overtaking its own base
-/// is what makes that shape.
-#define SEA_BORE_PITCH           0.70
-
 /// BREAKER DEPTH INDEX, SLOPE DEPENDENT.
 ///
 /// McCowan's 0.78 is the most common first guess in engineering practice but
