@@ -324,6 +324,7 @@ public class SeaManager : MonoBehaviour
         float l0 = SeaConstants.G * SeaRuntimeState.PeakPeriod * SeaRuntimeState.PeakPeriod
                  / SeaConstants.TwoPi;
         float b = settings.shoreSlope;
+        Shader.SetGlobalFloat(SeaShaderIDs.ShoreSlope, b);
         float hsl0 = SeaRuntimeState.SignificantWaveHeight * l0;
 
         SeaRuntimeState.RunupHeight =

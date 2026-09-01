@@ -56,6 +56,8 @@ float _SeaMaxShoalingGain;
 /// criterion needs the wave's height, and a pixel does not know it: it only
 /// knows its own elevation. Published by `SeaManager`.
 float _SeaSignificantHeight;
+float _SeaPeakPeriod;
+float _SeaShoreSlope;
 
 /// `(beat angular frequency, beat depth, 0, 0)` — the two spectral peaks' interference.
 /// This is what a "set" is: the arriving waves grow and shrink over the beat period.
@@ -657,6 +659,20 @@ float SeaSampleBottomSlope(float2 posXZ)
     return length(float2(dx, dz)) / (2.0 * e);
 }
 
+/// WHICH WAY THE BOTTOM FALLS AWAY. Unit vector pointing from the shore towards
+/// deeper water; its opposite is the direction a shore wave travels.
+float2 SeaSampleDepthDirection(float2 posXZ)
+{
+    float e = _SeaBathySizeXZ.x / _SeaBathyResolution;
+
+    float dx = SeaSampleDepth(posXZ + float2(e, 0)) - SeaSampleDepth(posXZ - float2(e, 0));
+    float dz = SeaSampleDepth(posXZ + float2(0, e)) - SeaSampleDepth(posXZ - float2(0, e));
+
+    float2 g = float2(dx, dz);
+    float m = length(g);
+    return m > 1e-5 ? g / m : float2(0, 1);
+}
+
 // ------------------------------------------------- shallow water transform
 
 /// SHOALING — AMPLITUDE GROWTH.
@@ -746,6 +762,68 @@ float SeaCurvatureDrop(float2 posXZ, float2 cameraXZ)
     return dot(d, d) / (2.0 * EarthRadius);
 }
 
+/// THE WAVE TRAIN THAT ACTUALLY REACHES THE BEACH.
+///
+/// The open-sea field travels with the wind, so it hits the shore at whatever
+/// angle the wind happens to have. A real sea never does that. In shallow water
+/// the crest slows down -- c = sqrt(g h) -- and the end that reaches shallow
+/// water first falls behind, so the crest swings round until it runs very nearly
+/// PARALLEL to the shore. It is why every beach in the world has waves arriving
+/// square on, whatever the wind is doing offshore.
+/// [SOURCE: Snell's law for water waves, sin(theta)/c = constant]
+///
+/// Turning a Fourier field by a spatially varying angle tears it. So the shore
+/// train is its OWN wave, travelling straight up the depth gradient, and the
+/// open-sea field is faded out underneath it.
+///
+/// THE PHASE IS EXACT, NOT SCROLLED. On a shore of constant slope beta the depth
+/// is h = beta*x, the shallow-water wavenumber is k = omega/sqrt(g h), and the
+/// phase integral closes in the hand:
+///
+///     phase = INTEGRAL k dx = 2 omega sqrt(h) / (beta sqrt(g))  -  omega t
+///
+/// so the crests bunch up as the water shallows exactly as they should, with no
+/// scrolling texture and no tuned speed.
+float SeaShoreWaveHeight(float2 posXZ, float depth, float slope, float gamma,
+                         out float2 travel, out float crestFront)
+{
+    travel = -SeaSampleDepthDirection(posXZ);
+    crestFront = 0.0;
+
+    float omega = SEA_TWO_PI / max(_SeaPeakPeriod, 1.0);
+
+    // Deep-water length, and the depth at which the bottom starts to be felt.
+    float l0 = SEA_G * _SeaPeakPeriod * _SeaPeakPeriod / SEA_TWO_PI;
+    float onset = l0 * SEA_SHORE_WAVE_DEPTH_FRAC;
+
+    if (depth <= SEA_MIN_DEPTH || depth >= onset) return 0.0;
+
+    // Full strength at the waterline, nothing at the onset depth.
+    float grip = 1.0 - saturate(depth / max(onset, 1.0));
+    grip *= grip;
+
+    // THE SLOPE HERE IS THE BEACH'S, NOT THIS PIXEL'S.
+    //
+    // Feeding the local bathymetry gradient in made the phase jump wherever the
+    // sea bed did, and the crests came out as rings following every contour --
+    // measured, the frame is in the record. The beach gradient is one number for
+    // the whole shore and it is what the ballistic run-up already uses.
+    float b = max(_SeaShoreSlope, 0.005);
+    float phase = 2.0 * omega * sqrt(depth) / (b * sqrt(SEA_G)) - omega * _SeaTime;
+
+    // Height is what the bottom allows: the breaking limit, and no more.
+    float amp = gamma * depth * 0.5 * SEA_SHORE_WAVE_SHARE * grip;
+
+    // A shoaling crest is not a sine. It stands up at the front and lies flat
+    // behind, and past the breaking point the front is a wall of white water.
+    float c = cos(phase);
+    float shaped = c * (1.0 + 0.45 * c);
+
+    crestFront = saturate(sin(phase)) * grip;
+
+    return amp * shaped;
+}
+
 SeaSurfacePoint SeaDeform(float3 posWS)
 {
     SeaSurfacePoint o;
@@ -779,6 +857,30 @@ SeaSurfacePoint SeaDeform(float3 posWS)
         float gamma = SeaBreakerIndex(slope);
         float hMax  = gamma * o.depth * 0.5;
         disp.y = sign(disp.y) * min(abs(disp.y), hMax);
+
+        // THE SHORE TRAIN TAKES OVER AS THE BOTTOM COMES UP.
+        //
+        // Refraction turns real crests parallel to the beach; a Fourier field
+        // cannot be turned without tearing, so the shore wave is its own train
+        // and the open-sea field is faded out under it as the water shallows.
+        float2 travel;
+        float crestFront;
+        float shoreH = SeaShoreWaveHeight(posWS.xz, o.depth, slope, gamma,
+                                          travel, crestFront);
+
+        if (shoreH != 0.0)
+        {
+            float take = SEA_SHORE_WAVE_SHARE
+                       * (1.0 - saturate(o.depth
+                                / max(SEA_G * _SeaPeakPeriod * _SeaPeakPeriod
+                                      / SEA_TWO_PI * SEA_SHORE_WAVE_DEPTH_FRAC, 1.0)));
+            disp.y = lerp(disp.y, shoreH, saturate(take));
+
+            // THE FORWARD THROW IS BOUNDED. Left free it grows with the crest and
+            // in a few metres of water it folds the mesh over on itself.
+            float throwLen = min(abs(shoreH), 1.5) * 0.35;
+            disp.xz = lerp(disp.xz, travel * crestFront * throwLen, saturate(take));
+        }
     }
 
     posWS.xz += disp.xz;

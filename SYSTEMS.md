@@ -1453,6 +1453,38 @@ eşitliği `Sea/Test Constant Parity` denetliyor.
 gitti; deniz bölümünde yalnız Hs / Tp / kıyı köpüğü okuması kaldı.
 
 
+## Deniz: kapiler kuyruk ve kıyı dalga treni (2026-09-01)
+
+**Kısa dalga eğimi ayrı bir katman.** FFT'nin en ince kademesi 14 cm'de bitiyor; gerçek
+deniz orada bitmiyor. Ölçüldü: yüzeyin eğim varyansı Cox & Munk'a göre 5 m/s'de 0,90×,
+20 m/s'de **0,54×** — açık rüzgârla büyüyor çünkü eksik olanlar kısa dalgalar. Katman
+14 cm ile kapiler geçişi (1,7 cm) arasını taşıyor.
+
+**Ne kadar taşıyacağı hesapla çıkıyor, ayarla değil.** Denge bölgesinde eğim spektrumu
+1/k gider → her oktav eşit varyans. Eksik bant 3 oktav; payı spektrum tepesi ile kapiler
+kesim arasındaki tüm oktavlara oranı. `SeaManager` bunu Cox-Munk değerinin payı olarak
+yayımlıyor.
+
+**Bu boşluğun tamamını kapatmıyor** (0,54× → ~0,77×). Kalanı kademelerin kendi bandındaki
+JONSWAP kuyruğu; ayrı bir düzeltme, buraya karıştırılmadı.
+
+**Kıyıda ayrı bir dalga treni var.** Açık deniz alanı rüzgâr yönünde gider, yani kıyıya
+rastgele açıyla çarpar. Gerçek deniz bunu yapmaz: sığ suda tepe yavaşlar (c = √(gh)) ve
+kıyıya **paralel** dönene kadar kırılır. Bir Fourier alanı yer yer döndürülemez —
+yırtılır — o yüzden kıyı treni kendi dalgası, derinlik gradyanı yönünde ilerliyor, ve
+açık deniz alanı su sığlaştıkça altında sönümleniyor.
+
+**Fazı kaydırılan doku değil, integral.** Sabit eğimli kıyıda `phase = 2ω√h/(β√g) − ωt`
+— tepeler su sığlaştıkça olması gerektiği gibi sıkışıyor, ayarlanmış hız yok.
+
+**Eğim ayardan gelir, yerel dipten değil.** Yerel batimetri gradyanı verildiğinde faz
+dibin her düzensizliğinde sıçrıyor ve tepeler konturları izleyen halkalar olarak çıkıyordu
+(ölçüldü, kare kayıtta).
+
+**Öne atma sınırlı.** Serbest bırakılınca tepeyle birlikte büyüyor ve birkaç metre suda
+mesh'i kendi üstüne katlıyordu.
+
+
 ## Deniz: swash tek fazdan türüyor (2026-08-29)
 
 `SeaManager` iki şey yayımlıyor:

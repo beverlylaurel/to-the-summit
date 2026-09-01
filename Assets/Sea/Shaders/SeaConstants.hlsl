@@ -134,6 +134,16 @@
 /// relation w^2 = g k + (sigma/rho) k^3. [SOURCE: seawater at 10 C]
 #define SEA_CAPILLARY_SIGMA_RHO  7.28e-5
 
+// ------------------------------------------------------ shore wave train
+
+/// Depth below which the shore-parallel train takes over, as a multiple of the
+/// deep-water wavelength. A wave feels the bottom from about half its length.
+#define SEA_SHORE_WAVE_DEPTH_FRAC 0.5
+
+/// How much of the breaking limit the shore train claims. The rest stays with
+/// the open-sea field, which is still shoaling underneath it.
+#define SEA_SHORE_WAVE_SHARE     0.65
+
 /// BREAKER DEPTH INDEX, SLOPE DEPENDENT.
 ///
 /// McCowan's 0.78 is the most common first guess in engineering practice but

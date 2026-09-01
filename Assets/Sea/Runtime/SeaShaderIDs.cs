@@ -76,6 +76,9 @@ public static class SeaShaderIDs
         Shader.PropertyToID("_SeaMicroSlopeVariance");
     public static readonly int RunupMaxDepth = Shader.PropertyToID("_SeaRunupMaxDepth");
     public static readonly int PeakPeriod = Shader.PropertyToID("_SeaPeakPeriod");
+
+    /// The beach gradient the shore wave train marches up.
+    public static readonly int ShoreSlope = Shader.PropertyToID("_SeaShoreSlope");
     public static readonly int ShoreFoamPhase = Shader.PropertyToID("_SeaShoreFoamPhase");
 
     /// Fraction of the swash cycle spent running up the beach. The rest is the
