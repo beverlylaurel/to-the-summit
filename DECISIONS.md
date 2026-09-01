@@ -2401,3 +2401,41 @@ konfigürasyon ısınma sayılıp atılır).
 **Yan bulgu — TAA ayarları kısmi kaldıraç.** Varyans klamp'ı 1,0 → 4,0 titremeyi 1,75'ten
 1,31'e, harman 0,95 → 0,99 1,53'e indiriyor. İkisi de belirtiyi bitirmiyor ve ikisinin de
 bedeli var (klamp hayalet, harman bulanıklık). Değiştirilmedi.
+
+
+## Deniz dalgası şekli: dört adımlık plan, sırayla ve ölçülerek (2026-09-01)
+
+Gerekçe ve tüm formüller `RATIONALE.md` → "Dalganın şekli bir eğri seçimi değil".
+Sıra önemli: her adım tek başına ölçülür, beğenilmezse tek başına geri alınır.
+
+**1. Şekil — `Ur → (r, φ) → Abreu profili`.** Kıyı trenindeki `c*(1+0,45c)` elle seçilmiş
+eğri, yerine Ursell sayısından türeyen analitik profil. Derin suda kendiliğinden sinüse,
+sığda sivri tepeli çarpık dalgaya, kırılma öncesinde dik ön yüzlü testere dişine döner.
+Yeni ayar yok, yeni sabit yok — altı katsayı Ruessink 2012'den geliyor.
+**Ölçüm:** profilin çarpıklığı derinlikle artmalı; Elgar & Guza saha aralığı 0–1.
+
+**2. Soyulma — kırılma cephe boyunca gezmeli.** Faz bugün yalnız derinliğe bağlı, yani
+tüm kıyı aynı anda kırılıyor (soyulma açısı 0°, sörf edilemez). Kıyı boyunca yavaş değişen
+bir faz kayması eklenince kırılma bir noktadan başlayıp yana yürür. Hedef aralık 30°–70°.
+**Ölçüm:** aynı karede kırık ve kırılmamış cephe birlikte görünmeli.
+
+**3. Peryot — sabit 10 s yerine ölü dalga olayları.** `swellPeriod` sabit olduğu için
+Iribarren sayısı hiç 0,5'i geçmiyor, yani **dalan dalga hiç oluşmuyor**. Peryot dünya
+saatine bağlı yavaş bir olay dizisiyle 8–16 s arasında gezerse, uzun peryotlu günlerde
+aynı kıyı sörf dalgası verir. Hava sistemine bağlanır, kendi rastgeleliğini kurmaz.
+**Ölçüm:** ξ₀ zaman içinde 0,3–0,9 arasında gezmeli; 0,5 üstünde geçirilen süre kaydedilir.
+
+**4. Setler.** Dalgalar 3–10'luk gruplar hâlinde gelmeli, en büyüğü ortada. Ölü dalga
+payı yükseldikçe gruplaşma belirginleşmeli (dar spektrum → güçlü set).
+**Ölçüm:** ardışık dalga yüksekliklerinde grup uzunluğu sayılır.
+
+**Ayrıca, adımlardan bağımsız iki düzeltme:**
+- Şoaling katsayısı Green yasası yerine `K_sh = cosh(kh)/√(kh + sinh kh cosh kh)`; elle
+  konmuş `maxShoalingGain` tavanı gereksizleşir.
+- Kırılan dalganın öne fırlatması bugün `min(|h|,1,5)·0,35` ile sınırlı. Mesh Lagrange
+  noktalarıyla yer değiştirdiği için **katlanma aslında doğru görüntüyü verir** (dalan
+  dalganın dudağı). Sınır, katlanmayı bir hata sanarak konmuştu; dalan dalga adımında
+  yeniden bakılacak.
+
+**Maliyet:** 1 ve 2 shader içi, birkaç satır. 3 hava sistemine bir alan ekler. 4 spektrum
+tarafında çalışma ister, en pahalısı.

@@ -2987,3 +2987,99 @@ Oyuncu zirveye taşındığında deniz kıpırdamadı (9,5 m/s, Hs 2,64 m) — `
 **Elle ayar kaldıracı da dünyaya taşındı.** F1 paneli yerel yağışı kilitlerken deniz
 dünyanın saatini izlemeye devam ediyordu: gökyüzü sabit, dalga sönüyor. Kilit tek bir
 sayıyı — `WorldStormOverride` — tutuyor, gerisi ondan türüyor.
+
+
+## Dalganın şekli bir eğri seçimi değil, Ursell sayısının sonucudur (2026-09-01)
+
+Kullanıcı üç şeyi ayrı ayrı beğenmedi: açık denizdeki dalgaların şekli, kıyıya vuran
+dalgalar, ve "bazen sörf yapılacak dalga olmalı". Üçünün de tek bir kökü var ve
+literatürde kapalı formda çözülmüş.
+
+### Ölçüm: kıyımız hiçbir zaman sörf dalgası veremez
+
+Kırılma tipini **Iribarren sayısı** belirler: `ξ₀ = tanβ / √(H₀/L₀)`, `L₀ = gT²/2π`.
+Sınırlar: `ξ₀ < 0,5` dökülen (spilling), `0,5 < ξ₀ < 3,3` **dalan (plunging — sörf dalgası)**,
+`ξ₀ > 3,3` tırmanan (surging).
+
+Bizim sayılarımız: arazi eğimi z=2000'de 1:26 (0,038), ayar `shoreSlope` 0,058,
+`swellPeriod` **sabit 10 s**, Hs ~1,7 m.
+
+| eğim | T | L₀ | ξ₀ | tip |
+|---|---|---|---|---|
+| 0,038 (gerçek arazi) | 10 s | 156 m | 0,37 | dökülen |
+| 0,058 (ayar) | 10 s | 156 m | 0,56 | sınırda |
+| 0,038 | 14 s | 306 m | 0,52 | dalan |
+| 0,058 | 16 s | 400 m | 0,90 | **dalan** |
+
+Yani mevcut kurulumda dalan dalga **hiç** çıkmıyor, çünkü peryot sabit. "Bazen sörf
+dalgası" isteğinin karşılığı bir efekt değil: **uzun peryotlu bir ölü dalga (groundswell)
+olayının bazen gelmesi.** 10 s rüzgâr denizi dökülür, 14–16 s ölü dalga aynı kıyıda dalar.
+[KAYNAK: Battjes 1974 surf similarity; Coastal Wiki, Surf similarity parameter]
+
+### Şekil: Ursell → çarpıklık ve asimetri → analitik profil
+
+Dalga derinliğe girdikçe önce **çarpık** (skewed: sivri tepe, geniş düz çukur), sonra
+**asimetrik** (asymmetric: dik ön yüz, yatık arka — testere dişi) olur. İkisi ayrı
+şeylerdir [KAYNAK: Elgar & Guza 1985].
+
+Ruessink ve ark. 2012, 30.000'den fazla saha ölçümüne dayanarak bu ikisini tek bir
+boyutsuz sayıya, **Ursell sayısına** bağladı:
+
+```
+Ur = (3/8) · H·k / (k h)³
+B  = p₁ + (p₂ − p₁) / (1 + exp((p₃ − log Ur)/p₄))     p₁=0  p₂=0,857  p₃=−0,471  p₄=0,297
+φ  = −(π/2) · tanh(p₅ / Ur^p₆)                         p₅=0,815  p₆=0,672
+r  = tanh(0,931·B)
+```
+
+`(r, φ)` ikilisi Abreu ve ark. 2010'un analitik dalga formunu sürer:
+
+```
+u(t) = U f · [ sin(ωt) + r sinφ/(1+f) ] / [ 1 − r cos(ωt+φ) ],   f = √(1−r²)
+```
+
+Uçları: `r = 0` → saf sinüs (derin su). `φ = −π/2` → saf hız çarpıklığı (sivri tepe,
+düz çukur). `φ = 0` → saf ivme çarpıklığı (**testere dişi, dik ön yüz** — kırılmanın
+hemen öncesi). Aradaki her şey doğada birlikte bulunur.
+[KAYNAK: Abreu, Silva, Sancho & Temperville 2010, Coastal Engineering; Ruessink ve ark. 2012]
+
+Bugün shader'da bunun yerine `c * (1 + 0,45·c)` var — elle seçilmiş bir eğri, hiçbir şeyden
+türemiyor ve derinlikle değişmiyor. Bir dalga her derinlikte aynı şekle sahip.
+
+### Kırılma tek noktadan başlar, sonra yana soyulur
+
+Thürey ve ark. 2007 kırılmayı iki koşulla yakalıyor: `|∇H| > t_H` **ve** `∇H·u < 0` —
+yani yalnız **öne bakan yüz**, arka yüz değil. Eşik `t_H = p_H·g·Δt/Δx`, `p_H = 1/4`.
+Ve kritik gözlem: dalga tüm boyunca aynı anda kırılmıyor; bir noktada başlıyor, sonra
+cephe boyunca **yayılıyor**.
+
+Sörf literatürü aynı şeye **soyulma açısı** diyor: kırılmış beyaz suyun izi ile hâlâ
+kırılmamış cephe arasındaki açı. 0° = dalga bir anda tüm boyunca kırılır (sörf edilemez).
+Sörf edilebilir aralık **30°–70°**; 20–45° hızlı ve ileri seviye, 46–55° orta, 56–70°
+başlangıç. [KAYNAK: Scarfe 2002; Mead & Black]
+
+Bizim kıyı trenimizin fazı yalnız derinliğe bağlı: `phase = 2ω√h/(β√g) − ωt`. Aynı
+derinlikteki her nokta aynı anda kırılıyor, yani **soyulma açısı sıfır**. Sahteliğin
+büyük kısmı bu.
+
+### Setler
+
+Dalgalar tek tek değil **set** hâlinde gelir: tipik olarak 3–10 (bazen 12–16) dalgalık
+gruplar, aralarında durgunluk. Sebep farklı dalga boylarındaki trenlerin girişimi;
+spektrum dar oldukça gruplaşma belirginleşir, yani **ölü dalgada set yapısı en güçlüdür.**
+Setin en büyüğü ortalarda, 5.–8. dalga civarında. "Yedinci dalga" halk inanışı bunun
+kabaca doğru olan yanı. [KAYNAK: Longuet-Higgins 1984 zarf teorisi; Masson & Chandler 1993]
+
+### Şoaling katsayısı: Green yasası yerine tam ifade
+
+Bugün `SeaShoalingGain` Green yasasını (`h^(−1/4)`) kullanıyor; bu yalnız sığ su limitinde
+doğru. Doğrusal dalga teorisinin her derinlikte geçerli ifadesi:
+
+```
+K_sh = cosh(kh) / √(kh + sinh(kh)·cosh(kh))
+```
+
+Sığ limitte Green yasasına iner, derin suda 1'e gider — yani tavan (`maxShoalingGain 2,2`)
+elle konmuş bir sınır olmaktan çıkar. [KAYNAK: Abreu ve ark. 2012, denklem 2]
+
+Kırılma sınırı `H/h = 0,78` (McCowan 1894); eğime bağlı hâli zaten `SeaBreakerIndex`'te.
