@@ -59,6 +59,10 @@ float _SeaSignificantHeight;
 float _SeaPeakPeriod;
 float _SeaShoreSlope;
 
+/// DIAGNOSTIC: 1 removes the shore-parallel wave train. Unset it is 0 and the surface
+/// behaves exactly as before. Written by the F1 panel; goes away with that panel section.
+float _SeaDiagNoShoreWave;
+
 /// `(beat angular frequency, beat depth, 0, 0)` — the two spectral peaks' interference.
 /// This is what a "set" is: the arriving waves grow and shrink over the beat period.
 float4 _SeaWaveGroups;
@@ -878,7 +882,8 @@ SeaSurfacePoint SeaDeform(float3 posWS)
             float breakDepth = max(_SeaSignificantHeight * shoalTake
                                    / max(gamma, 0.1) * SEA_SHORE_WAVE_BREAK_MULT, 1.0);
             float take = SEA_SHORE_WAVE_SHARE
-                       * (1.0 - saturate(o.depth / breakDepth));
+                       * (1.0 - saturate(o.depth / breakDepth))
+                       * (1.0 - _SeaDiagNoShoreWave);
             disp.y = lerp(disp.y, shoreH, saturate(take));
 
             // THE FORWARD THROW IS BOUNDED. Left free it grows with the crest and
