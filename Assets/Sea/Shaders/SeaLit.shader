@@ -231,6 +231,11 @@ Shader "ToTheSummit/SeaLit"
                 float pixelSize = max(length(dx), length(dy));
                 float2 slopeSum = SeaSampleSlope(IN.positionWS.xz, pixelSize);
 
+                // THE CAPILLARY TAIL. Everything shorter than the finest cascade
+                // (14 cm) lives here; without it the surface has the right shapes
+                // and no skin. Measured against Cox & Munk, see `SeaMicroSlope`.
+                slopeSum += SeaMicroSlope(IN.positionWS.xz, pixelSize);
+
                 float3 N = normalize(float3(-slopeSum.x, 1.0, -slopeSum.y));
 
                 float2 screenUV = IN.screenPos.xy / IN.screenPos.w;

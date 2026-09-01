@@ -20,6 +20,9 @@
 /// writes it every frame. The sea DOES NOT build its own wind noise (spec 3.4).
 float2 _SeaWindWS;
 
+/// Slope variance the micro layer must supply, from `SeaManager`.
+float  _SeaMicroSlopeVariance;
+
 /// Loop-quantized time (s).
 float  _SeaTime;
 
@@ -218,6 +221,76 @@ float4 SeaSampleDisplacement(float2 posXZ)
 float SeaTierResolvable(float wavelength, float pixelSize)
 {
     return saturate(wavelength / max(pixelSize * 2.0, 1e-5) - 1.0);
+}
+
+/// THE SLOPE THE FFT CANNOT CARRY.
+///
+/// The finest cascade stops at 14 cm (37 m patch over 256 samples). A real sea
+/// does not stop there: 70% of its slope variance sits below 1.5 m and the
+/// capillary-gravity crossover is at 1.7 cm. Measured against Cox and Munk this
+/// surface reached 0.90x of the real slope variance at 5 m/s and only 0.54x at
+/// 20 m/s -- the gap grows with the wind, and that gap is what reads as jelly:
+/// the big shapes are there, the skin on top of them is not.
+///
+/// HOW MUCH TO ADD IS NOT A TASTE PARAMETER. In the equilibrium range the slope
+/// spectrum goes as 1/k, so every octave carries the SAME slope variance. The
+/// missing band is 14 cm down to 1.7 cm -- three octaves -- and the share it
+/// should own is those three octaves out of all the octaves between the spectral
+/// peak and the capillary cutoff. `_SeaMicroSlopeVariance` is that share of the
+/// Cox and Munk value, computed once on the CPU where the peak period is known.
+/// [SOURCE: Cox & Munk 1954 sun-glitter slope variance; Phillips equilibrium range]
+///
+/// SINE SUM, NOT NOISE. The variance of a sine slope is exactly A^2 k^2 / 2, so
+/// the layer can be built to hit a measured target without calibrating a noise
+/// function first. Four directions per octave, spread around the wind.
+float2 SeaMicroSlope(float2 posXZ, float pixelSize)
+{
+    if (_SeaMicroSlopeVariance <= 1e-6) return 0.0;
+
+    float2 wind = _SeaWindWS / max(length(_SeaWindWS), 0.1);
+    float2 slope = 0.0;
+
+    // Each octave gets the same variance; four directions share it, and the
+    // variance of one sine is A^2 k^2 / 2, so (A k)^2 = 2 * var / directions.
+    float perDir = _SeaMicroSlopeVariance
+                 / (float)(SEA_MICRO_OCTAVES * SEA_MICRO_DIRECTIONS);
+    float ak = sqrt(2.0 * perDir);
+
+    float lambda = SEA_MICRO_LONGEST;
+
+    [unroll]
+    for (int o = 0; o < SEA_MICRO_OCTAVES; ++o)
+    {
+        // NYQUIST, THE SAME RULE THE CASCADES USE. An octave shorter than two
+        // pixels cannot be drawn, only aliased, so it is faded out instead.
+        float live = SeaTierResolvable(lambda, pixelSize);
+        if (live > 0.0)
+        {
+            float k = SEA_TWO_PI / lambda;
+
+            // Capillary waves are faster than gravity alone would make them.
+            float omega = sqrt(SEA_G * k + SEA_CAPILLARY_SIGMA_RHO * k * k * k);
+
+            [unroll]
+            for (int d = 0; d < SEA_MICRO_DIRECTIONS; ++d)
+            {
+                // Spread the four directions across a 120 degree fan about the
+                // wind, offset per octave so the octaves do not line up.
+                float a = ((float)d / (float)SEA_MICRO_DIRECTIONS - 0.5) * 2.618
+                        + (float)o * 0.917;
+                float2 dir = float2(wind.x * cos(a) - wind.y * sin(a),
+                                    wind.x * sin(a) + wind.y * cos(a));
+
+                float phase = k * dot(dir, posXZ) - omega * _SeaTime
+                            + (float)(o * SEA_MICRO_DIRECTIONS + d) * 1.7;
+
+                slope += dir * (ak * live * cos(phase));
+            }
+        }
+        lambda *= SEA_MICRO_OCTAVE_STEP;
+    }
+
+    return slope;
 }
 
 /// `pixelSize` is the world width this pixel covers. It is passed in rather than

@@ -108,6 +108,32 @@
 /// wave steepens instead of spreading horizontally. [CALIBRATION]
 #define SEA_CHOP_FADE_DEPTH      8.00
 
+// ------------------------------------------------------- capillary tail
+
+/// The longest wave the micro layer carries: exactly where the finest FFT
+/// cascade stops (37 m patch / 256 samples).
+#define SEA_MICRO_LONGEST        0.14
+
+/// Where surface tension takes over from gravity. Below this the sea has no
+/// more slope to give. [SOURCE: capillary-gravity crossover, k = 370 rad/m]
+#define SEA_MICRO_SHORTEST       0.017
+
+/// 0.14 m down to 0.017 m is log2(0.14/0.017) = 3.04 octaves.
+#define SEA_MICRO_OCTAVES        3
+
+/// Directions per octave, spread around the wind. One direction reads as a
+/// corduroy pattern; four is enough to lose the grid without paying for more.
+#define SEA_MICRO_DIRECTIONS     6
+
+/// Octave step. NOT 0.5 -- an exact halving makes every octave line up on the
+/// same lattice and the sum draws a visible cross-hatch. An irrational-ish ratio
+/// pushes the repeat far enough out that the eye never finds it.
+#define SEA_MICRO_OCTAVE_STEP    0.47
+
+/// Surface tension over density, for the capillary term of the dispersion
+/// relation w^2 = g k + (sigma/rho) k^3. [SOURCE: seawater at 10 C]
+#define SEA_CAPILLARY_SIGMA_RHO  7.28e-5
+
 /// BREAKER DEPTH INDEX, SLOPE DEPENDENT.
 ///
 /// McCowan's 0.78 is the most common first guess in engineering practice but
