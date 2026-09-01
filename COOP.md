@@ -51,16 +51,15 @@ Yani bu madde **ağ katmanını beklemiyor** — şimşek spec'i başlarken aç�
 
 ---
 
-## 2. Havayı tek oyuncunun yüksekliği sürüyor
+## 2. Dünya fırtınasının saati her istemcide ayrı işliyor
 
-`AltitudeWeatherDriver` yağışı, karlılığı ve rüzgâr şiddetini `observer`'ın kotundan
-hesaplıyor. İkinci oyuncu vadideyken birincisi zirvedeyse ikisi ayrı havada olur.
+Fırtınanın kendisi artık oyuncuya bağlı değil: `WorldStorm` dünyanın durumu, kot yalnız
+payını veriyor. Ama sürücü o fırtınayı `Time.time` üzerinden Perlin ile örneklüyor —
+istemciler farklı anda bağlanırsa saatleri kaymış olur ve biri fırtına görürken öteki
+açık hava görür. Deniz de aynı sayıdan türediği için ayrışma denizde de görünür.
 
-Üstelik sürücü **kendi durumunu biriktiriyor**: `progressAltitude` ulaşılan en yüksek
-seviyeyi tutuyor ve aşağı inince yavaş geriliyor. Bu, oyuncuya değil **koşuya** ait bir
-sayı; her istemcide ayrı tutulursa aynı koşunun iki farklı ilerlemesi olur.
-
-**Olması gereken:** host sürer, istemciler okur. İlerleme ortak koşu durumunun parçası.
+**Olması gereken:** host fırtına saatini sürer, istemciler okur. Kot payı yerel kalabilir —
+zaten oyuncunun bulunduğu yerin havası odur.
 
 **Maliyet:** düşük. Sürücü zaten tek yerde ve dışarıya yalnızca `WeatherState` ile
 `WindField` üzerinden yazıyor.
@@ -96,7 +95,7 @@ bunun paylaşılmasına gerek yok.
 ## 5. Test paneli dünyayı yerel eziyor
 
 `DebugMenu` rüzgârı ve bulut kapsamasını doğrudan yazıyor, havayı ise sürücünün kendi
-hedef anahtarından (`AltitudeWeatherDriver.IntensityOverride`) veriyor; `LightningFlash.Held`
+dünya anahtarından (`AltitudeWeatherDriver.WorldStormOverride`) veriyor; `LightningFlash.Held`
 çakmayı donduruyor. Bunlar bilerek yerel: ölçüm ve hata ayıklama aracı.
 
 **Olması gereken:** co-op oturumunda ya kapalı olmalı ya da otoritedeki oyuncuda çalışıp

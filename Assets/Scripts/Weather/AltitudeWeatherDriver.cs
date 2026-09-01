@@ -1,8 +1,21 @@
 using System;
 using UnityEngine;
 
-/// The director of the weather. The only input is the player's **altitude** — not the distance
-/// covered. Walking around the mountain without gaining height does not harden the weather.
+/// The director of the weather.
+///
+/// THE WEATHER IS A STATE OF THE WORLD, NOT OF THE PLAYER.
+///
+/// It used to be a pure function of the player's altitude: a storm existed because the player had
+/// climbed into it, and it withdrew as they came back down (`TrackProgress` even remembered the
+/// highest point reached and eased off on the way home). `DESIGN.md` forbids exactly that --
+/// "the mountain does not target the player; a storm does not break out because the player is
+/// there" -- and the sea sat at the end of the same chain, so the swell rose while the player
+/// climbed and fell while they descended. Measured: Hs 1.18 m at the shore, 3.66 m from the
+/// summit, same moment, same sea.
+///
+/// Now a single world storm moves on its own clock. Altitude no longer DRIVES the weather; it
+/// says how hard that same weather bites at a given height -- fierce in the free air, softened
+/// at sea level by the land. Everything reads the same storm: the shore, the mountain, the sea.
 ///
 /// Bands:
 ///   opening     → very light rain, almost no wind
@@ -68,7 +81,6 @@ public class AltitudeWeatherDriver : MonoBehaviour
     float cloudMass;
     float windowRoll;
     float driftCombined;
-    float progressAltitude;
     bool initialized;
 
     /// The storm's raw severity: its state above the cloud ceiling, before the fade.
@@ -119,17 +131,21 @@ public class AltitudeWeatherDriver : MonoBehaviour
     /// only removes the wait when flying around freely to see the weather at some elevation.
     public bool Instant { get; set; }
 
-    /// Test switch: the target severity is supplied from outside. Negative = off.
+    /// Test switch: THE WORLD STORM is supplied from outside. Negative = off.
     ///
     /// This is used INSTEAD OF disabling the component. Disabled, `intensity` freezes but
     /// `AtmosphereController` keeps reading `StormIntensity` and `ClearWindow`: while the slider
     /// was dragged, precipitation, visibility, fog and colour followed, but cloud coverage,
     /// thickness, rain absorption and the high layer froze at the value they held at the moment
     /// of the lock. A single state was splitting into two channels and contradicting itself.
-    public float IntensityOverride { get; set; } = -1f;
+    ///
+    /// It holds the WORLD, not the reading at the player's height. Held at the local intensity,
+    /// the same split came back one level up: the sky was pinned while the sea kept following the
+    /// world's own clock, so a locked storm sat over a swell that was quietly dying down.
+    public float WorldStormOverride { get; set; } = -1f;
 
-    /// The altitude the weather looks at: not the instantaneous Y but the level the climb reached.
-    public float ProgressAltitude => progressAltitude;
+    /// The world's own weather, 0 calm to 1 full storm. It does not read the player.
+    public float WorldStorm { get; private set; }
 
     /// The altitude where the permanent storm begins.
     public float BlizzardAltitude => stormPeakAltitude;
@@ -184,13 +200,29 @@ public class AltitudeWeatherDriver : MonoBehaviour
 
     void Update()
     {
-        float altitude = TrackProgress(observer.position.y);
+        // The player's own height, for the LOCAL reading only. It no longer decides what the
+        // weather is doing -- see the note at the top of the file.
+        float altitude = observer.position.y;
 
         SampleNoise();
 
-        bool overridden = IntensityOverride >= 0f;
+        // THE WORLD STORM. One number for the whole map, on its own slow clock, with the
+        // existing drift riding on top so a storm is not a smooth swell but a real spell of
+        // weather. Nothing here reads the observer.
+        bool overridden = WorldStormOverride >= 0f;
 
-        float target = overridden ? IntensityOverride : Baseline(altitude) * Variation(altitude);
+        if (overridden)
+        {
+            WorldStorm = Mathf.Clamp01(WorldStormOverride);
+        }
+        else
+        {
+            float stormRoll = Mathf.PerlinNoise(Time.time * settings.worldStormFrequency, 4.11f);
+            WorldStorm = Mathf.Lerp(settings.worldStormLow, settings.worldStormHigh,
+                                    Mathf.SmoothStep(0f, 1f, stormRoll));
+        }
+
+        float target = IntensityAt(altitude);
 
         // However far the target jumps, the real value slides into place: going from a downpour to
         // calm weather in an instant would be physically impossible.
@@ -233,39 +265,36 @@ public class AltitudeWeatherDriver : MonoBehaviour
         // It is driven from the unfaded severity: above the clouds there is no precipitation but
         // there is still wind — the summit stays merciless even when nothing falls.
         wind.Severity = Mathf.Max(settings.windAtBase, intensity);
+
+        // THE SEA DOES NOT LIVE WHERE THE PLAYER STANDS. It reads the same storm at ITS OWN
+        // height, so the swell answers the weather instead of the climb.
+        wind.SeaLevelSeverity = Mathf.Max(settings.windAtBase, IntensityAt(groundAltitude));
     }
 
-    /// A mountain does not rise continuously: you cross a ridge, drop down its length, then climb
-    /// again. Looking at the instantaneous altitude, the weather would rewind on every descent.
-    /// Instead the level the climb reached is tracked: instantly upward, with a dead band and a lag downward.
-    float TrackProgress(float altitude)
+    /// HOW HARD THE WORLD STORM BITES AT A GIVEN HEIGHT.
+    ///
+    /// One storm, read at a height. The altitude profile that used to BE the weather is now only
+    /// its shape: gentle near the ground, hardening with height. Multiplying instead of replacing
+    /// is what makes a calm day calm everywhere and a storm a storm everywhere.
+    ///
+    /// The sea-level share is not zero: a storm that leaves the water flat is not a storm.
+    public float IntensityAt(float altitude)
     {
-        if (!initialized) progressAltitude = altitude;
+        // THE ALTITUDE PROFILE SCALES THE STORM, IT DOES NOT GATE IT.
+        //
+        // `Baseline` runs from `openingIntensity` at the foot to `stormPeak` at the top, and
+        // `openingIntensity` is 0 -- so multiplying by it erased the weather at sea level
+        // completely: measured, the shore intensity came out 0.00 whatever the world was doing,
+        // and the swell sat at Hs 1.17 m for ever. The profile is now a SHARE of the storm, from
+        // the sheltered value at the shore to the full thing up in the free air.
+        float span = Mathf.Max(settings.stormPeak - settings.openingIntensity, 1e-3f);
+        float profile01 = Mathf.Clamp01((Baseline(altitude) - settings.openingIntensity) / span);
 
-        // No tracking while the test switch is on: seeing the weather at some elevation should not
-        // require flying there and waiting out the dead band and the retreat
-        if (Instant)
-        {
-            progressAltitude = altitude;
-            return progressAltitude;
-        }
+        float share = Mathf.Lerp(settings.worldStormAtSeaLevel, 1f, profile01);
 
-        if (altitude > progressAltitude)
-        {
-            progressAltitude = altitude;
-            return progressAltitude;
-        }
-
-        // Descents within the dead band do not affect the weather at all
-        float floor = altitude + settings.descentDeadband;
-        if (progressAltitude <= floor) return progressAltitude;
-
-        // A real descent past the band too: the weather should soften when you come down for camp
-        float t = 1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(0.01f, settings.descentSeconds));
-        progressAltitude = Mathf.Lerp(progressAltitude, floor, t);
-
-        return progressAltitude;
+        return Mathf.Clamp01(WorldStorm * share * Variation(altitude));
     }
+
 
     /// The ground severity coming from the altitude. It passes linearly between the band corners.
     ///

@@ -66,7 +66,7 @@ public class DebugMenu : MonoBehaviour
 
     /// Diagnostic: wind transport and its shadow can be switched off separately.
 
-   float lockedPrecipitation = 0.6f;
+    float lockedWorldStorm = 0.6f;
 
     bool windLocked;
     float lockedWindStrength = 0.5f;
@@ -186,7 +186,7 @@ public class DebugMenu : MonoBehaviour
         var keyboard = Keyboard.current;
         if (keyboard != null && keyboard.f1Key.wasPressedThisFrame) Toggle();
 
-        if (weatherLocked) weatherDriver.IntensityOverride = lockedPrecipitation;
+        if (weatherLocked) weatherDriver.WorldStormOverride = lockedWorldStorm;
 
         // The snow fraction is driven INDEPENDENTLY of the lock: it must be possible to try
         // "is it snow or rain right now" while the precipitation lock is off too.
@@ -429,25 +429,27 @@ public class DebugMenu : MonoBehaviour
             weatherLocked = nextLock;
             if (!weatherLocked)
             {
-                weatherDriver.IntensityOverride = -1f;
+                weatherDriver.WorldStormOverride = -1f;
             }
         }
 
         using (new Disabled(!weatherLocked))
         {
-            // A SINGLE SLIDER. There used to be a separate "snow intensity" that turned
-            // on the precipitation and pushed the temperature below freezing; the
-            // snow/rain decision came from the temperature hysteresis.
+            // A SINGLE SLIDER, AND IT HOLDS THE WORLD. There used to be a separate "snow
+            // intensity" that turned on the precipitation and pushed the temperature below
+            // freezing; the snow/rain decision came from the temperature hysteresis.
             //
             // When precipitation was decoupled from temperature that slider became a
-            // LIAR: set to 0 it never touched `IntensityOverride`, the value written by
-            // the precipitation slider remained and the snow kept falling. The user
-            // reported it with a screenshot.
+            // LIAR: set to 0 it never touched the override, the value written by the
+            // precipitation slider remained and the snow kept falling. The user reported
+            // it with a screenshot.
             //
-            // Now if there is precipitation there is snow; a second slider has nothing
-            // left to say.
-            GUILayout.Label($"Yağış şiddeti {lockedPrecipitation:F2}");
-            lockedPrecipitation = GUILayout.HorizontalSlider(lockedPrecipitation, 0f, 1f);
+            // It used to pin the precipitation AT THE PLAYER. The sea reads the storm at
+            // its own height, so it went on following the world's clock while the sky was
+            // held: a locked storm over a swell that was quietly dying down. The slider
+            // now holds the world, and altitude does what it always does to it.
+            GUILayout.Label($"Dünya fırtınası {lockedWorldStorm:F2}");
+            lockedWorldStorm = GUILayout.HorizontalSlider(lockedWorldStorm, 0f, 1f);
 
             // SNOW FRACTION, NOT SNOW INTENSITY. The intensity comes from the slider
             // above; this one says how that precipitation splits into snow and rain.

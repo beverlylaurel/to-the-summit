@@ -85,8 +85,8 @@ public class ClimbHud : MonoBehaviour
         builder.AppendFormat("  Bulunduğun irtifa      {0:F0} m\n", altitude);
         builder.AppendFormat("  Zirve                  {0:F0} m   (%{1:F0} tamamlandı)\n",
             summit - ground, Mathf.Clamp01(altitude / (summit - ground)) * 100f);
-        builder.AppendFormat("  Havanın gördüğü irtifa {0:F0} m\n\n",
-            weatherDriver.ProgressAltitude - ground);
+        builder.AppendFormat("  Dünyanın havası        %{0:F0}   (irtifadan bağımsız)\n\n",
+            weatherDriver.WorldStorm * 100f);
 
         // TEMPERATURE. Measured and felt are printed separately: the wind does not change the
         // thermometer, it changes the person. The freezing level derives from the same source —

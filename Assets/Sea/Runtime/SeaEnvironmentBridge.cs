@@ -96,7 +96,13 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
     /// there is no shelter — this is the correct one. Using
     /// `Velocity.magnitude` would feed local gusts into the spectrum and
     /// spec §3.4 forbids that.
-    public float WindSpeed => wind != null ? wind.FreeAirSpeed : manualWindSpeed;
+    /// THE WIND AT THE WATER, NOT AT THE PLAYER.
+    ///
+    /// `FreeAirSpeed` is the wind where the observer stands, and the weather hardens with height,
+    /// so reading it made the swell rise while the player climbed and fall while they came down --
+    /// measured, Hs 1.18 m at the shore against 3.66 m from the summit, the same sea in the same
+    /// second. The sea is at sea level and reads the wind there.
+    public float WindSpeed => wind != null ? wind.SeaLevelSpeed : manualWindSpeed;
 
     // --------------------------------------------------------- day/night
 

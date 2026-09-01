@@ -56,6 +56,25 @@ public class WindField : MonoBehaviour
     public float FreeAirSpeed => Mathf.Lerp(settings.calmSpeed, settings.stormSpeed,
         ShapeSeverity(overrideActive ? overrideSeverity : Mathf.Clamp01(Severity)));
 
+    /// SEVERITY AT SEA LEVEL. `AltitudeWeatherDriver` writes it from the same world storm read at
+    /// the shore's height.
+    public float SeaLevelSeverity { get; set; } = 0.2f;
+
+    /// THE FREE-AIR SPEED DOWN AT THE WATER.
+    ///
+    /// The sea used to read `FreeAirSpeed`, which is the wind where the PLAYER is standing. So the
+    /// swell rose as the player climbed: measured, Hs 1.18 m at the shore and 3.66 m from the
+    /// summit at the same instant. The water lives at sea level and reads the wind there.
+    /// NO QUARTIC SHAPING HERE, AND THAT IS DELIBERATE.
+    ///
+    /// `ShapeSeverity` is a DISTRIBUTION choice made for the rain: it exists so a mid-range
+    /// severity does not throw drops sideways, and it says so in its own comment. Applied to the
+    /// water it flattens the sea instead -- measured, severity 0.55 came out as 4.0 m/s, which is
+    /// Beaufort 3, so a storm overhead still left the swell at about a metre. The sea reads the
+    /// severity straight: 0 is `calmSpeed`, 1 is `stormSpeed`.
+    public float SeaLevelSpeed => Mathf.Lerp(settings.calmSpeed, settings.stormSpeed,
+        overrideActive ? overrideSeverity : Mathf.Clamp01(SeaLevelSeverity));
+
     /// SEVERITY → SPEED CURVE. Not linear but quartic.
     ///
     /// This is not a law of physics but a DISTRIBUTION decision — openly so. The severity itself

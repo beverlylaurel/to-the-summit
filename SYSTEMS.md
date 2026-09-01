@@ -69,7 +69,7 @@ rastgeleliğini veya kendi hava kavramını kurmaz.
 
 | Kaynak | Ne üretir | Neye bakar |
 |---|---|---|
-| `AltitudeWeatherDriver` | Yağış şiddeti, rüzgâr şiddeti | Tırmanışın ulaştığı yükseklik |
+| `AltitudeWeatherDriver` | Dünya fırtınası, yağış şiddeti, rüzgâr şiddeti | Kendi saati (dünya fırtınası); kot yalnız o fırtınanın payını verir |
 | `TerrainWindShelter` | Rüzgârın arazi maruziyeti | Oyuncunun altındaki arazinin biçimi |
 | `TemperatureField` | Sıcaklık, hissedilen sıcaklık, donma seviyesi | Kot, saat, yağış, rüzgâr |
 | `TimeOfDay` | Saat, güneş yönü, gündüz katsayısı, ışığın rengi | Kendi saati |
@@ -80,8 +80,19 @@ tutar ve değiştiğinde olay yayar.
 
 **Rüzgâr iki sayıdır** — sürekli şiddet ve anlık esinti — ve ayrı yayımlanır. Yavaş tepki
 vermesi gereken sistemler sürekliyi, esintiyi duyması veya görmesi gerekenler toplamı okur;
-hangisinin hangisi olduğu §4'te. **Yükseklik "ulaşılan seviye"dir**, anlık Y değil: yukarı
-anında takip eder, aşağı bir ölü bant ve gecikmeyle iner. Gerekçeler `RATIONALE.md`.
+hangisinin hangisi olduğu §4'te. Gerekçeler `RATIONALE.md`.
+
+**Fırtına dünyanın durumudur, oyuncunun değil.** `AltitudeWeatherDriver.WorldStorm` kendi
+yavaş saatinde döner (Perlin, ~10 dk) ve oyuncuyu hiç okumaz. Kot **o fırtınanın payını**
+verir: deniz seviyesinde bir pay, serbest havada tamamı. Kot fırtınayı ne yaratır ne siler.
+
+**Deniz kendi kotunda okur.** `WindField.SeaLevelSeverity` sürücüden `IntensityAt(kıyı kotu)`
+ile gelir; `WindField.Severity` oyuncunun kotundan. Aynı fırtına, iki yükseklik. Oyuncu
+zirveye çıkınca deniz kabarmaz — ölçüldü, ikisi de Hs 2,64 m.
+
+**Deniz rüzgârı doğrusal, oyuncu rüzgârı dördüncü kuvvet.** `ShapeSeverity` yağış
+taneciklerinin sürüklenmesi için konmuş bir dağılım kararıdır; denizde orta bandı ezip
+dalgayı düzleştiriyordu, o yüzden `SeaLevelSpeed` şiddeti doğrudan hıza çeviriyor.
 
 ---
 
@@ -89,9 +100,10 @@ anında takip eder, aşağı bir ölü bant ve gecikmeyle iner. Gerekçeler `RAT
 
 ```mermaid
 graph TD
-    ALT[Tırmanış yüksekliği] --> DRV[AltitudeWeatherDriver]
+    ALT[Dünya fırtınası — kendi saati] --> DRV[AltitudeWeatherDriver]
     DRV -->|şiddet| WS[WeatherState]
-    DRV -->|şiddet| WF[WindField]
+    DRV -->|oyuncu kotunda şiddet| WF[WindField]
+    DRV -->|kıyı kotunda şiddet| WF
     DRV -->|açık pencere| ATM
     TOD[TimeOfDay]
 

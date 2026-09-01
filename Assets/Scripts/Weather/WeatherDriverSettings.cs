@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// The settings of the altitude-driven weather driver: the severity curve, the fluctuation, the
-/// clear window, the smoothing and the descent behaviour.
+/// clear window, the smoothing and the world storm.
 ///
 /// As long as they sat on the component as `[SerializeField]` there were three copies of each
 /// value: the default in code, the serialized copy in the scene, and the one actually running.
@@ -42,6 +42,30 @@ public class WeatherDriverSettings : ScriptableObject
     [Tooltip("The rate of the short gusts. 0.02 ≈ 50 seconds.")]
     public float fastFrequency = 0.02f;
 
+    [Header("Dunya havasi")]
+    /// HOW OFTEN A STORM CROSSES THE WORLD.
+    ///
+    /// The weather used to be a function of the player's altitude: a storm existed because the
+    /// player had climbed into it, and it withdrew when they came back down. `DESIGN.md` forbids
+    /// exactly that -- "the mountain does not target the player; a storm does not break out
+    /// because the player is there". The storm is now a state of the WORLD, moving on its own
+    /// clock, and altitude only says how hard that same weather bites at a given height.
+    [Tooltip("How fast the world's weather turns over. 0.0016 is about 10 minutes per cycle.")]
+    public float worldStormFrequency = 0.0016f;
+
+    [Tooltip("The calmest the world gets between storms.")]
+    [Range(0f, 1f)] public float worldStormLow = 0.10f;
+
+    [Tooltip("The hardest the world gets when a storm is over it.")]
+    [Range(0f, 1f)] public float worldStormHigh = 0.95f;
+
+    /// HOW MUCH OF THE WORLD STORM REACHES SEA LEVEL.
+    ///
+    /// Not all of it: the peak is in the free air and the shore is sheltered by the land mass.
+    /// But not none either -- a storm that leaves the sea flat is not a storm.
+    [Tooltip("The share of the world storm felt at sea level.")]
+    [Range(0f, 1f)] public float worldStormAtSeaLevel = 0.55f;
+
     [Tooltip("The share of the amplitude left in the summit band. Set to 0, the weather up " +
              "there pins to a single constant downpour and does not change for hours. With 0.3 " +
              "the range is 0.70-1.00: the summit is still merciless but not dead.")]
@@ -78,12 +102,6 @@ public class WeatherDriverSettings : ScriptableObject
     [Tooltip("The highest value coverage can rise to in dry weather. The sky can close without " +
              "precipitation too — overcast does not mean rainy.")]
     [Range(0f, 1f)] public float dryCoverageHigh = 0.85f;
-    [Tooltip("Descending this far below the reached level does not affect the weather (metres). " +
-             "Col crossings and route deviations should not take the storm back.")]
-    public float descentDeadband = 250f;
-    [Tooltip("How long the weather takes to retreat when the descent goes past the dead band (seconds).")]
-    public float descentSeconds = 90f;
-
     [Header("Wind")]
     [Tooltip("The wind severity during the opening.")]
     [Range(0f, 1f)] public float windAtBase = 0.2f;

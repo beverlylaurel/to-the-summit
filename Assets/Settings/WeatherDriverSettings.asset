@@ -26,6 +26,4 @@ MonoBehaviour:
   clearWindowResidueFrequency: 0.0009
   smoothingSeconds: 25
   cloudLagSeconds: 150
-  descentDeadband: 250
-  descentSeconds: 90
   windAtBase: 0.2

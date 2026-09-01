@@ -926,6 +926,11 @@ Kare eşleme uçları korur (0 → calmSpeed, 1 → stormSpeed) ve yalnız orta 
 Bu bir fizik yasası DEĞİL, dağılım kararıdır; öyle olduğu `WindField.ShapeSeverity`
 başında da yazılı.
 
+**Denize uygulanmıyor.** Karar damlanın sürüklenmesi için verildi; deniz spektrumu aynı
+şiddeti U10 olarak okuyor ve orta bandın ezilmesi dalgayı düzleştiriyordu — dünya
+fırtınası 0,55'teyken deniz rüzgârı 4,0 m/s'de kalıyordu. `SeaLevelSpeed` şiddeti doğrusal
+çeviriyor. Dağılım kararı tüketicisiyle birlikte gider; ortak sayıya yapıştırılmaz.
+
 **Tek yerde uygulanıyor.** `Strength` aynı hızdan türediği için sis kapanması, sürüklenen
 kar eşiği, girdap genliği, ses ve bulut hızı birlikte iniyor. Ayrı ayrı ayarlansaydı hava
 kendi içinde çelişirdi.
@@ -2958,3 +2963,27 @@ kendiliğinden yumuşak eğim verir. Normale giren kapı bu yüzden **varlık** 
 kar↔zemin albedosudur. Bu yüzden çözüm kabartmayı büyütmek değil, kar maskesine oyma
 terimini bağlamak oldu — sistemin dört sorusundan biri eksikti, beşincisi eklendi.
 
+
+
+## Kot fırtınayı kapı gibi tutamaz — payını verir (2026-09-01)
+
+`IntensityAt` önce kot profilini fırtınayla **çarpıyordu**. Profilin deniz seviyesindeki
+değeri `openingIntensity: 0` — yani çarpım kıyıda her zaman sıfır. Ölçüldü: dünya 0,40
+iken kıyı şiddeti 0,00, deniz rüzgârı `windAtBase` tabanında 3,0 m/s'ye çakılı, Hs 1,17 m
+ve hiç oynamıyor. "Büyük dalgalar yok" belirtisinin kaynağı buydu; dalga kodunda değil.
+
+Profil artık fırtınanın **payı**: kıyıda `worldStormAtSeaLevel` (0,55), serbest havada
+tamamı. Süpürme ölçümü:
+
+| dünya | kıyı şiddeti | deniz rüzgârı | Hs |
+|---|---|---|---|
+| 0,05 | 0,03 | 5,2 m/s (taban) | 1,66 m |
+| 0,70 | 0,41 | 7,5 m/s | 2,19 m |
+| 1,00 | 0,59 | 9,5 m/s | 2,64 m |
+
+Oyuncu zirveye taşındığında deniz kıpırdamadı (9,5 m/s, Hs 2,64 m) — `DESIGN.md`'nin
+"fırtına oyuncu orada olduğu için çıkmaz" kuralı artık ölçülebilir durumda.
+
+**Elle ayar kaldıracı da dünyaya taşındı.** F1 paneli yerel yağışı kilitlerken deniz
+dünyanın saatini izlemeye devam ediyordu: gökyüzü sabit, dalga sönüyor. Kilit tek bir
+sayıyı — `WorldStormOverride` — tutuyor, gerisi ondan türüyor.
