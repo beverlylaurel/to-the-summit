@@ -4936,3 +4936,57 @@ piksel oranı %0,000. Kare 7,7 ms.
 
 **Ders:** bir eşiğin **iki yakasının anlamı farklıysa** simetrik genişletme yapılmaz;
 kestiği tarafın kaynağı önce kenetlenir.
+
+
+## Kahverengi lekeler: kaynak daraltıldı, sebep henüz bulunamadı (2026-09-02)
+
+**Belirti:** kullanıcı, 339 m irtifadan kıyıya bakarken suyun üstünde sert kenarlı,
+altıgen bloklu kahverengi lekeler görüyor. Kıyıya paralel bir şerit boyunca diziliyorlar.
+Yakından (91 m ve altı) görünmüyorlar — kadraj bu yüzden uzun süre üretilemedi.
+
+**Kadraj nasıl üretildi:** irtifa 339 m, x=13900, z=2000, bakış 35° aşağı ve batıya,
+dünya fırtınası 0,40, `ForceWindow` açık (kullanıcının karesinde açık pencere vardı; benim
+sahnemde tepede %100 bulut olduğu için deniz gölgedeydi ve leke çıkmıyordu). Zaman
+`timeScale = 0` ile donduruldu — dondurulmadan aynı konfigürasyon iki turda %2,80 ve %1,41
+ölçüldü, yani bulut gölgeleri ölçümü yiyordu.
+
+**Ölçümle elenenler** (hepsi aynı donmuş karede, tek değişken):
+
+| kapatılan | leke |
+|---|---|
+| kırılma (`belowSurface = upwelling`) | duruyor |
+| gökyüzü yansıması (sabit renk) | duruyor |
+| kıyı karışımı (`lerp(refracted, …)`) | duruyor |
+| köpük (`foamAlpha = 0`) | duruyor |
+| alt yüzey parıltısı | duruyor |
+| `Cull Back` → `Cull Off` | duruyor |
+| su hattı kesmesi tamamen kapalı | duruyor |
+| **denizin renderer'ı kapalı** | **gidiyor** |
+
+Ayrıca: eğim ve normal NaN değil (`isnan` probu: %0,000).
+
+**Terim terim kurulunca** ortaya çıktığı adım bulundu:
+
+- `color = belowSurface` → düz turkuaz, **leke yok**
+- `color = lerp(belowSurface, skyRefl, F)` → **leke var**
+
+Yani leke `skyRefl` ile `F`'in (Fresnel, yani NORMAL) arasında doğuyor. `belowSurface`
+temiz. Sabit `skyRefl` ile de leke görüldü ama o karede parıltı/SSS/köpük açıktı, dolayısıyla
+`skyRefl` ile `F` arasındaki ayrım henüz yapılmadı.
+
+**Sıradaki test:** sabit `skyRefl` + parıltı/SSS/köpük kapalı, tek karede. Leke kalırsa
+suçlu normal; normalin altıgen döşemeden (`SeaHexWeights`) geldiği, 339 m'de yüksek mip'te
+üç hücrenin farklı düşmesiyle hücre şeklinde sabit normal alanları oluştuğu şüphesi var —
+lekelerin altıgen bloklu kenarı bunu destekliyor.
+
+**Ölçüm aracının üç tuzağı** (hepsi bu turda yaşandı, tekrar edilmesin):
+
+1. **Kahverengi sayacı gökyüzünü sayıyordu.** ROI daraltılmadan yapılan sayım
+   anlamsız çıktı.
+2. **Sahne kayıyordu.** Bulut gölgeleri aynı konfigürasyonu iki farklı sayıya
+   götürdü; `timeScale = 0` şart.
+3. **Eski RunCommand betikleri `beginCameraRendering`'e abone kalıyor.** Yeni betiğin
+   yazdığı shader globalini eskiler eziyor; iki ayrı prob turu bu yüzden yanlış değeri
+   ölçtü. Global doğrudan `Step()` içinde yazılmalı, `beginCameraRendering`'te değil.
+
+**Durum:** kod değişmedi, ağaç temiz. `Cull Off` ve kesme denemeleri geri alındı.
