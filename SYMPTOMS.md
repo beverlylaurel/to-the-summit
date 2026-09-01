@@ -4752,5 +4752,28 @@ titremesi koşudan koşuya 1,7–3,0 arasında oynuyor ve etki bu yayılmanın a
 TAA ayarları kısmi kaldıraç: varyans klamp'ı 1,0 → 4,0 titremeyi 1,75'ten 1,31'e indiriyor,
 harman 0,95 → 0,99 1,53'e. İkisi de belirtiyi bitirmiyor.
 
-**Açık:** kalan takma yüzeyin normalinde değil, sıyırma açısında örneklenen geometrinin
-kendisinde olabilir. Bir sonraki tur oraya bakacak — kaydın devamı `DECISIONS.md`.
+**Ayırt eden ikinci ölçüm — normal düzleştirildi, geometri bırakıldı:** ufuk altı bandın
+zamansal değişimi 2,60 → **0,60**, yani gökyüzünün gürültü tabanına indi. Uzamsal 2,86 →
+0,66. Geometri hiç değişmedi. **Takma normalde, mesh'te değil.**
+
+Sonra normalin hangi terimi diye soruldu. Yansımanın ufuk bandı — reflect ışını ufkun
+altına düşünce renk `upwelling`'e geçiyor, `smoothstep(0, 0.06, R.y)` — kapatılınca 2,63 →
+1,94. Payın dörtte biri. Sebep: uzakta bir piksel onlarca metre suyu kapsıyor, `R.y` o
+aralığın tamamında geziyor, sabit eşikli bir basamak komşu pikselleri iki yakaya atıyor.
+
+**Uygulanan düzeltme:** bandın fiziksel genişliği (0,06) korundu, üstüne pikselin kendi
+belirsizliği `fwidth(R.y)` **iki yana birden** eklendi. Tek yana eklemek bandın ortasını
+kaydırıyor ve uzak denizi %26 karartıyordu — ölçüldü, düzeltildi.
+
+Üç koşuda tekrarlanan sonuç:
+
+| bant | zamansal | uzamsal | parlaklık |
+|---|---|---|---|
+| ufuk altı | 2,61 → **2,06** | 2,87 → **2,28** | 38,8 → 38,7 |
+| orta | 0,92 → **0,79** | 1,87 → **1,59** | 19,1 → 19,1 |
+| ön | 0,50 → 0,48 | 0,63 → 0,63 | değişmedi |
+
+**Açık kalan:** %21 gitti, kalan %79 normalin öteki terimlerinde — sıyırmada Fresnel çok
+dik, kırılma UV'si normalden geliyor, parıltı normalden geliyor. Hepsinin ortak çözümü
+aynı: nonlineer her adım pikselin normal belirsizliğine göre yumuşatılmalı. Kayıt
+`DECISIONS.md`'de.

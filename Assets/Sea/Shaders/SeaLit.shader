@@ -361,7 +361,27 @@ Shader "ToTheSummit/SeaLit"
                 // upwelling — the same quantity the surface already computes for the volume
                 // below it. The band is narrow (0 to 0.06 in R.y, about 3.5 degrees) because
                 // a real horizon is sharp; wider than that and the whole sea flattens.
-                skyRefl = lerp(upwelling, skyRefl, smoothstep(0.0, 0.06, R.y));
+                // THE BAND IS AS WIDE AS THE PIXEL IS UNCERTAIN.
+                //
+                // 0.06 is the physical width -- a real horizon is sharp, and wider than
+                // about 3.5 degrees the whole sea flattens. But far from the camera one
+                // pixel covers tens of metres of water and `R.y` sweeps that whole range
+                // inside it, so a step at a fixed threshold flips neighbouring pixels
+                // between the dark upwelling and the bright sky. Measured with the water
+                // FROZEN and the camera still: removing the band dropped the band under
+                // the horizon from 2.63 to 1.94 luma of change per frame, a quarter of
+                // the shimmer, and the sky in the same frame changed 0.64.
+                //
+                // `fwidth` is not a tuning knob: it IS how much `R.y` moves across this
+                // pixel. Near the camera it is tiny and the band keeps its 0.06; far away
+                // it opens to cover the spread the pixel actually holds.
+                // IT OPENS BOTH WAYS. Growing only the upper edge moves the band's MIDDLE
+                // up, and the far sea went 26% darker because more of it fell on the dark
+                // side of a threshold that had quietly shifted. The middle stays at 0.03;
+                // the pixel's own spread is added to each side.
+                float horizonSlack = 0.5 * fwidth(R.y);
+                skyRefl = lerp(upwelling, skyRefl,
+                               smoothstep(-horizonSlack, 0.06 + horizonSlack, R.y));
 
                 // --- SUN GLITTER (spec 12.5) ---
                 //

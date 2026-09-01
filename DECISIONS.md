@@ -339,10 +339,10 @@ olur.
 ---
 ## Bekleyen ölçümler
 
-- **Uzak denizin takması kaynağında kalıyor.** Sebep ölçüldü (`SYMPTOMS.md` — "Denizde
-  belli bir mesafeden sonra titreme"), ama çözülmedi: yüzeyin sinyali ufka doğru piksel
-  altına düşüyor, TAA onu her karede farklı örnekliyor. Varyans→pürüzlülük denendi,
-  ölçülebilir kazanç vermedi, geri alındı.
+- **Uzak denizin takmasının %79'u duruyor.** Ufuk bandı pikselin kendi belirsizliğiyle
+  yumuşatıldı ve %21 gitti (`SYMPTOMS.md` — "Denizde belli bir mesafeden sonra titreme").
+  Kalan pay normalin öteki nonlineer terimlerinde: Fresnel, kırılma UV'si, parıltı.
+  Varyans→pürüzlülük bir kez denendi, ölçülebilir kazanç vermedi, geri alındı.
   → [Uzak deniz takması: varyans yolu denendi, geri alındı (2026-09-01)](#uzak-deniz-takmasi-varyans-yolu-denendi-geri-alindi-2026-09-01)
 - **Gökyüzü %36 parlaklaştı, Play'de bakılmadı.** Çift sönüm kalkınca öğlen zeniti
   0,0972 → 0,1319. Sahnenin gündüz aydınlatması bu kadar arttı; ekranda fazla mı, ölçülmedi.
@@ -2385,9 +2385,11 @@ doğru. Ama donmuş kare titremesi koşudan koşuya 1,7–3,0 luma arasında oyn
 etkisi bu yayılmanın altında kaldı. Ölçülemeyen bir kazanç için bir `RenderTexture` ve
 piksel başına üç ek örnekleme taşınmaz.
 
-**Tetikleyici:** kullanıcı titremeyi tekrar bildirirse, ya da sıyırma açısındaki geometri
-örneklemesi ölçülüp asıl payın orada olduğu gösterilirse. O turda varyans terimi geri
-gelmeye aday — ama tek başına değil, geometriyle birlikte.
+**Tetikleyici:** kullanıcı titremeyi tekrar bildirirse. Geometri şüphesi bu arada
+**ölçümle elendi** — normal düzleştirilip geometri bırakıldığında titreme gök gürültü
+tabanına indi. Yani varyans terimi geri gelirse pürüzlülüğe değil, Fresnel ve kırılma
+dahil **her nonlineer adıma** bağlanmalı; tek başına pürüzlülüğe bağlanması zaten
+ölçülmüş ve yetmemişti.
 
 **Maliyet:** yeniden yazmak yarım saat; ölçüm aracı `SYMPTOMS.md`'de tarif edildiği gibi
 kuruluyor (su `timeScale = 0` ile dondurulur, konum ve hava her kareye sabitlenir, ilk
