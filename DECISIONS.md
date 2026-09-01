@@ -339,6 +339,11 @@ olur.
 ---
 ## Bekleyen ölçümler
 
+- **Uzak denizin takması kaynağında kalıyor.** Sebep ölçüldü (`SYMPTOMS.md` — "Denizde
+  belli bir mesafeden sonra titreme"), ama çözülmedi: yüzeyin sinyali ufka doğru piksel
+  altına düşüyor, TAA onu her karede farklı örnekliyor. Varyans→pürüzlülük denendi,
+  ölçülebilir kazanç vermedi, geri alındı.
+  → [Uzak deniz takması: varyans yolu denendi, geri alındı (2026-09-01)](#uzak-deniz-takmasi-varyans-yolu-denendi-geri-alindi-2026-09-01)
 - **Gökyüzü %36 parlaklaştı, Play'de bakılmadı.** Çift sönüm kalkınca öğlen zeniti
   0,0972 → 0,1319. Sahnenin gündüz aydınlatması bu kadar arttı; ekranda fazla mı, ölçülmedi.
   → [Gökyüzü LUT'u yönü ana ışıktan alıyor](#gökyüzü-lutu-yönü-ana-ışıktan-alıyor--ertelendi-2026-08-29)
@@ -2367,3 +2372,27 @@ yüzeyinin çözünürlüğünü kabul edilemez şekilde bozarsa, kuşak fikri y
 o zaman siluetin neden "tuhaf" durduğu önce ölçülür. Kullanıcının tek cümlesi vardı,
 sebebi ayrıştırılmadı: masif şekli mi, ölçek mi, renk/kar çizgisi mi, arazinin bittiği
 yerdeki dikiş mi.
+
+
+## Uzak deniz takması: varyans yolu denendi, geri alındı (2026-09-01)
+
+**Karar:** ufka yakın bandın takması olduğu gibi bırakıldı; kaybolan eğim varyansını BRDF
+pürüzlülüğüne çeviren katman (eğimin ikinci momentleri + mip zinciri) geri alındı.
+
+**Gerekçe:** veri yolu çalışıyordu — kademe başına E[s²] okundu (0,0013 / 0,0056 / 0,0083)
+ve türetilen pürüzlülük yerine geçtiği uydurma mesafe rampasından fiziksel olarak daha
+doğru. Ama donmuş kare titremesi koşudan koşuya 1,7–3,0 luma arasında oynuyor; terimin
+etkisi bu yayılmanın altında kaldı. Ölçülemeyen bir kazanç için bir `RenderTexture` ve
+piksel başına üç ek örnekleme taşınmaz.
+
+**Tetikleyici:** kullanıcı titremeyi tekrar bildirirse, ya da sıyırma açısındaki geometri
+örneklemesi ölçülüp asıl payın orada olduğu gösterilirse. O turda varyans terimi geri
+gelmeye aday — ama tek başına değil, geometriyle birlikte.
+
+**Maliyet:** yeniden yazmak yarım saat; ölçüm aracı `SYMPTOMS.md`'de tarif edildiği gibi
+kuruluyor (su `timeScale = 0` ile dondurulur, konum ve hava her kareye sabitlenir, ilk
+konfigürasyon ısınma sayılıp atılır).
+
+**Yan bulgu — TAA ayarları kısmi kaldıraç.** Varyans klamp'ı 1,0 → 4,0 titremeyi 1,75'ten
+1,31'e, harman 0,95 → 0,99 1,53'e indiriyor. İkisi de belirtiyi bitirmiyor ve ikisinin de
+bedeli var (klamp hayalet, harman bulanıklık). Değiştirilmedi.

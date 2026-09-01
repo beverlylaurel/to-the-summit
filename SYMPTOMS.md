@@ -4703,3 +4703,54 @@ ayarlıydı, daha fazlası beyaz başlık alanını o yasanın altına iterdi. Y
 0,30 ince + 0,25 kaba.
 
 **Maliyet:** bir hücresel arama, yalnız `whitecap > 0` dalında. FPS değişmedi (142).
+
+
+## Denizde belli bir mesafeden sonra titreme — SEBEBİ ÖLÇÜLDÜ, ÇÖZÜMÜ AÇIK (2026-09-01)
+
+**Belirti:** "denizde belli bir mesafeden sonra titreme var." Ufkun hemen altındaki bantta,
+dalga sırtlarında kıvılcımlanma; öne doğru kayboluyor.
+
+**Ölçüm aracı üç kez yalan söyledi, üçü de düzeltildi** — kayıt bu yüzden değerli:
+
+1. Konfigürasyonlar arası deniz karardı (luma 11,4 → 4,3). Sebep: bulut kütlesinin 150 s
+   gecikmesi. `Instant` açıldı.
+2. Yine karardı. Sebep: **oyuncu batıyordu** — bir kez `Park` edilince kumanda kendi
+   yerçekimiyle 36 m'den 17 m'ye indi, deniz seviyesi 30 m. Konum her kareye sabitlendi.
+3. Pürüzlülük denemesi "etkisi yok" dedi. Sebep: `SeaManager` globalleri kendi
+   `Update`'inde yeniden yazıyor, editör tikinde yazılan değer render'a ulaşmıyordu.
+   Değer `beginCameraRendering`'te yazıldı.
+
+Ondan sonra alet doğrulandı: aynı konfigürasyon iki kez koşturuldu, ikisi eşit çıktı.
+
+**Ayırt eden ölçüm — su DONDURULDU (`timeScale = 0`), kamera sabit:**
+
+| | ufuk altı bant | gökyüzü (aynı kare) |
+|---|---|---|
+| TAA kapalı | zamansal %1–2 | — |
+| TAA açık | **zamansal %5–7** | %0,7 |
+
+Yani hiçbir şey hareket etmezken bile deniz her karede değişiyor, gök değişmiyor.
+
+**Elenen şüpheliler (hepsi ölçüldü):**
+
+- **Kılcal katman** (`SeaMicroSlope`) — kapatıldığında sayılar aynı kaldı.
+- **Pürüzlülük** — 0,02/0,14 → 0,60 yapıldı, titreme düşmedi (parlaklık düştü, yani
+  değer gerçekten ulaşmıştı).
+- **Köpük** — rengi sıfırlandı, fark yok.
+- **Bulutlar** — gök kendi başına %0,7, denizin beşte biri.
+
+**Gerçek sebep:** yüzeyin kendi sinyali ufka doğru piksel altına düşüyor (uzamsal gürültü
+TAA'sız %15–19). TAA her karede farklı bir alt-piksel örneğine düşüyor ve komşuluk
+klamplaması geçmişi reddediyor. **TAA haberci, sebep takma (aliasing).**
+
+**Denenip yetmeyen çözüm:** kaybolan eğim varyansı BRDF pürüzlülüğüne çevrildi (eğimin
+ikinci momentleri ayrı mip'li dokuda, Bruneton–Neyret–Holzschuch 2010 / LEAN). Veri yolu
+doğrulandı (kademe başına E[s²] okundu: 0,0013 / 0,0056 / 0,0083), ama donmuş kare
+titremesi koşudan koşuya 1,7–3,0 arasında oynuyor ve etki bu yayılmanın altında kaldı.
+**Geri alındı** — ölçülemeyen bir kazanç için bir doku ve üç örnekleme taşınmaz.
+
+TAA ayarları kısmi kaldıraç: varyans klamp'ı 1,0 → 4,0 titremeyi 1,75'ten 1,31'e indiriyor,
+harman 0,95 → 0,99 1,53'e. İkisi de belirtiyi bitirmiyor.
+
+**Açık:** kalan takma yüzeyin normalinde değil, sıyırma açısında örneklenen geometrinin
+kendisinde olabilir. Bir sonraki tur oraya bakacak — kaydın devamı `DECISIONS.md`.
