@@ -110,10 +110,10 @@
 
 // ------------------------------------------------------- capillary tail
 
-/// How far the finest cascade is shrunk to stand in for the band it cannot carry.
-/// 37 m / 8 = 4.6 m, whose finest detail is 1.8 cm -- the capillary cutoff, which is
-/// where the band is supposed to end.
-#define SEA_MICRO_PATCH_SHRINK   0.125
+/// The top of the band the cascades cannot carry: exactly where the finest one stops
+/// (37 m patch / 256 samples). The resampled copy is laid over this patch, so its
+/// longest wavelength is this and everything it holds is shorter.
+#define SEA_MICRO_TOP            0.14
 
 /// The finest cascade's own per-axis slope variance, read straight off its texture at
 /// 3 m/s (0.0083 and 0.0070, measured 2026-09-01). The gain that turns the resampled

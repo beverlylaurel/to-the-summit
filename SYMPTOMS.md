@@ -4828,8 +4828,8 @@ o kafesin ta kendisi.
   dalga boyunun çok altında kalıyor.
 - **Yön sayısını 12'ye çıkarmak** — desen yumuşadı ama kare süresi 7,3 → **17,25 ms**.
 
-**Çözüm:** bant sıfırdan üretilmiyor. En ince kademe, yamasının **sekizde birinde**
-yeniden okunuyor: 37 m → 4,6 m, detayı 14 cm → 1,8 cm, yani tam kapiler kesim. Denge
+**Çözüm:** bant sıfırdan üretilmiyor. En ince kademe **14 cm'lik bir yamada** yeniden
+okunuyor — yama boyu kopyanın en uzun dalgasıdır, bandın başladığı yer. Denge
 bölgesinde eğim spektrumu 1/k gittiği için üç oktav aşağı kaydırılmış kopya aynı şekli
 ve aynı varyansı taşır. Kazanç `sqrt(hedef / kaynak)`; kaynak varyansı kademenin kendi
 dokusundan okundu (eksen başına 0,0077).
@@ -4837,3 +4837,21 @@ dokusundan okundu (eksen başına 0,0077).
 **Ölçülen sonuç:** desen gitti, kare süresi **7,55 ms** (katman kapalıyken 7,93 — fark
 gürültü içinde), uzak bant titremesi değişmedi (2,08/2,12 → 2,14/2,09), yakın planda
 uzamsal detay arttı (0,64 → 0,86) — katmanın işi zaten buydu.
+
+
+## Sığ suda kum girdapların altında kayboldu — ÇÖZÜLDÜ (2026-09-01)
+
+**Belirti:** "eskiden sığ suda kum net gözüküyordu. artık böyle bi desen var suda?"
+Metre genişliğinde, dönen kırılma desenleri; zemin okunmuyor.
+
+**Sebep bendeydi ve tek satırdı.** Kapiler bandı en ince kademenin küçültülmüş
+kopyasından üretirken küçültmeyi **sekizde bir** seçmiştim. Yama boyu kopyanın en uzun
+dalgasıdır: 37 m / 8 = 4,6 m. Kademe 256:1 bir aralık taşıdığı için kopya 4,6 m'den
+1,8 cm'e uzandı — ve **4,6 m – 14 cm aralığı kademelerin zaten taşıdığı banttı.** Orta
+ölçekli dalgalar ikinci kez eklendi; girdaplar oydu.
+
+**Düzeltme:** yama boyu 14 cm — bandın tepesi, yani en ince kademenin bittiği yer.
+Kopya oradan aşağı uzanıyor, kademelerin bandına hiç girmiyor.
+
+**Ders:** yeniden örneklemede yama boyu bir "küçültme oranı" değil, **kopyanın en uzun
+dalgası**dır. Bir bandı kaydırırken tepesi nereye oturuyor diye sorulur.

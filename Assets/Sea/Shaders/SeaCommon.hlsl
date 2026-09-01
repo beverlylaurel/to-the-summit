@@ -278,9 +278,16 @@ float2 SeaMicroSlope(float2 posXZ, float pixelSize)
 
     int fine = SEA_TIER_COUNT - 1;
 
-    // An eighth of the finest patch: 37 m becomes 4.6 m, so its 14 cm detail becomes
-    // 1.8 cm -- the capillary cutoff, which is where this band is supposed to end.
-    float patch = _SeaPatchSizes[fine] * SEA_MICRO_PATCH_SHRINK;
+    // THE COPY'S TOP MUST BE WHERE THE CASCADE'S BOTTOM IS.
+    //
+    // The patch is the copy's LONGEST wavelength, and the cascade spans 256:1 from its
+    // patch down to its finest detail. Shrunk by eight it ran from 4.6 m to 1.8 cm --
+    // and 4.6 m to 14 cm is the band the cascades already carry, so the mid-scale
+    // ripples were being added TWICE. Measured by eye over the shallows: the bottom
+    // stopped being readable under swirling metre-wide ripples.
+    //
+    // The patch is therefore the band's top, 14 cm, and the copy runs from there down.
+    float patch = SEA_MICRO_TOP;
     float2 uv = posXZ / patch;
 
     // The same Nyquist rule the cascades use, on the shrunk patch.
