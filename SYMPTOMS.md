@@ -5358,3 +5358,13 @@ sıfıra iniyor ve `range` yalnız bot yarıçapından türüyor, batmadan deği
 2,69 → 1,43, ve artık **sert bir tavan var**: batma ne olursa olsun yarı genişlik 8,5 cm'yi
 geçemez. Kalan 1,00 → 1,43 farkı bilinçli — 1 cm karda 18 mm'lik bir etek olamaz, o kadar
 kar yok.
+
+**OYUN İÇİ DOĞRULAMA YAPILAMADI, SEBEBİ ARAÇTA.** Dört ayrı çekim düzeneği kuruldu, hiçbiri
+iz üretmedi. Sebep ölçüldü: betikten `cc.Move` çağrılarak 3,17 m yürüyüş yapıldığında
+`SnowStepRhythm.StepCount` **0** kalıyor. Ayak basmadığı için `SnowFootprintDeformer` hiçbir
+şey yazmıyor; iz dokusu dört kar derinliğinde de tamamen boş okundu (en derin 0,00000 m).
+
+Yani oyuncunun gerçek girdisiyle yürümesi gerekiyor; editör tikinden yapılan hareket adım
+ritmini sürmüyor. Yukarıdaki sayılar `KDeform`'un aritmetiğinin birebir CPU aynasından
+geliyor, ekrandan değil. Değişiklik yalnızca izi DARALTABİLİR — genişleten hiçbir terim
+kalmadı — o yüzden bırakıldı, ama gözle onaylanması gerekiyor.
