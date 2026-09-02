@@ -179,7 +179,12 @@ ova/silsile geçişi görünür bir dikiş yaratırsa halkanın dış sönümü 
   (`SYMPTOMS.md`). Çözüm erişimde: bir halka daha + uzak düzlem 300 km. Yapılmadı —
   değişiklik denizin dışına çıkıyor ve %5 için z-fighting riski açıyor.
 
-- **Yansıma filtrelemesi (LEADR) ERTELENDİ, üç belirti ona bağlı** — uzak denizin
+- **Uzak deniz titremesi KAPANDI — kusur kanıtı yok** (2026-09-02). Süperörnekli
+  referansa göre gerçek aliasing %1,6–3,0 ve mesafeyle artmıyor; TAA çalışıyor (−%39).
+  Eski "%11" rakamı geçersiz bir metrikten geliyordu (`SYMPTOMS.md`). Kalan tek boşluk
+  denizin `MotionVectors` geçişinin olmaması — kamera hareketliyken bakılacak.
+
+- **Yansıma filtrelemesi (LEADR) ERTELENDİ** — uzak denizin
   titremesi, şafaktaki kahverengi lekeler ve Ursell dalga şeklinin geri alınması aynı
   kökten geliyor: yansıma, kendisi de nokta örneklenmiş bir normalden nokta örnekleniyor.
   Ölçümler `SYMPTOMS.md` ve `RATIONALE.md`'de. Aşağıda, "Yansıma filtrelemesi ve dördüncü

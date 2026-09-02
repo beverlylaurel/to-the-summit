@@ -5081,9 +5081,51 @@ körlemesine denenen "50 kat"ın karşılığı. Uygulandı, ölçüldü: titre�
 (%3). Üstelik 2 m derinlikteki kare luma 21,06 → 8,70'e düştü, yani terim beklenmedik
 yerde büyük. Model yanlış; geri alındı.
 
-**Bir sonraki adım kod değil araç.** `SeaUnresolvedSlopeVariance`'ın mesafeye göre
-gerçekte ne ürettiği ekrana basılmadan yeni bir düzeltme yazılmayacak — iki denemede de
-sayının davranışı tahmin edildi ve ikisinde de yanlış çıktı.
+**ARAÇ KURULDU VE HATAYI ARAÇTA BULDU.**
+
+*Bir — varyans mesafeye göre ne yapıyor?* `SeaUnresolvedSlopeVariance` CPU'da birebir
+yeniden hesaplandı, piksel ayak izi komşu iki ışının deniz düzlemindeki aralığından
+çıkarıldı:
+
+| ekran satırı | mesafe | ayak izi | kayıp varyans |
+|---|---|---|---|
+| 0,52 | 1497 m | 1086 m | 0,01357 |
+| 0,50 | 177 m | 9,26 m | 0,00001 |
+| 0,47 | 76 m | 1,67 m | **0,00000** |
+| 0,43 | 43 m | 0,53 m | 0,00000 |
+
+**Ölçtüğüm bant 43–76 metredeydi.** "Uzak deniz" sandığım yerde kayıp varyans tam sıfır;
+terim orada zaten hiçbir şey yapmamalı. İki düzeltmenin de sonuç vermemesi bundan.
+
+*İki — metrik neyi sayıyordu?* O mesafede 9–48 m'lik dalgalar 1–5 piksel: çözünüyorlar
+ama 16 pikselik bloktan küçükler, yani **metrik dalganın dürüst hareketini titreşim
+sayıyordu.**
+
+*Üç — gerçek aliasing.* Tek geçerli ölçüt: aynı an, aynı kare, biri 1× biri 4×
+(`ScreenCapture.CaptureScreenshot(..., 4)`), 4× alan ortalamasıyla küçültülüp fark alındı.
+Fark **tam olarak** aliasing'tir:
+
+| bant | ortalama | aliasing |
+|---|---|---|
+| ufka en yakın | 105,2 | %1,65 |
+| hemen altı | 72,7 | %2,97 |
+| orta | 63,1 | %2,43 |
+| yakın | 18,7 | %2,30 |
+
+**%1,6 – %3,0, ve mesafeyle artmıyor.** Mesafeye bağlı bir aliasing sorunu yok.
+
+*Dört — TAA.* Zaten açık (`m_Antialiasing: 3`) ve çalışıyor: piksel zaman sapması TAA'sız
+16,07, TAA'lı 9,77 — %39 azalma.
+
+**SONUÇ: elde kusur kanıtı yok.** "%11 titreşim" geçersiz bir metriğin ürünüydü. Gerçek
+aliasing küçük ve düzgün, TAA çalışıyor, gök yansımasının taşıdığı %87 de büyük ölçüde
+denizin gerçekten hareket etmesi. Belirtinin ilk yarısı ufuk bandı düzeltmesiyle
+kapanmıştı; kalanı ölçülebilir bir kusur değil.
+
+**Açık kalan tek gerçek boşluk:** deniz shader'ında `MotionVectors` geçişi yok. Sabit
+kamerada TAA yine de çalışıyor (yukarıdaki ölçüm), ama kamera hareket ederken yer
+değiştiren dalga tepeleri için hareket vektörü "sabit" diyor — orada hayalet beklenir.
+Ölçülmedi; belirti görülürse ilk bakılacak yer burasıdır.
 
 ## Kahverengi lekelerin rengi: gök küpünün şafak ufku — ÖLÇÜLDÜ (2026-09-02)
 
