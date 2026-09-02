@@ -5316,3 +5316,45 @@ faz altı konumda da **−222,028**, değişim sıfır.
 
 Kural: ölçüm, ölçmeden önce çalışan kodun yeni olduğunu kanıtlamalı — yalnız yeni kodun
 üretebileceği bir değeri geri okuyup eski çıkarsa iptal etmeli.
+
+## Derin karda ayak izi dev gibi geniş — ÇÖZÜLDÜ (2026-09-02)
+
+**Kullanıcının ağzından:** "20cm ve 50cm'de sanki attack on titan devinin ayağı gibi
+kocaman bi iz çıkıyor. 1,5,20,50 cm'de genişlik aynı olmalı, sadece daha derin olmalı."
+
+**Ayırt eden ölçüm.** `KDeform`'un profili CPU'da birebir hesaplandı; görünür yarı
+genişlik, gözün seçebileceği en sığ çukur 2 mm alınarak (bot yarıçapı 5,5 cm):
+
+| kar | batma | etek genliği | yarı genişlik | bota oranı |
+|---|---|---|---|---|
+| 1 cm | 1,0 cm | 1,2 mm | 5,6 cm | 1,01 |
+| 5 cm | 4,6 cm | 5,5 mm | 9,1 cm | 1,66 |
+| 20 cm | 15,0 cm | 18,0 mm | 14,8 cm | **2,69** |
+| 50 cm | 15,0 cm | 18,0 mm | 14,8 cm | **2,69** |
+
+20 ve 50 cm'nin aynı çıkması tesadüf değil: ikisi de `SNOW_MAX_SINK`'e dayanıyor.
+Kullanıcının "20cm ve 50cm'de" demesi tam bu.
+
+**İki sebep, ikisi de genişliği derinliğe bağlıyordu.**
+
+1. Açıklık `radius + sink * SNOW_HOLE_FLARE` idi — batınca genişliyordu (+1,2 cm).
+2. Asıl suçlu: oturma eteği `exp(-outerDistance / range)` ile sönüyordu. **Üstel
+   fonksiyonun sonu yoktur.** Daha derin bir iz daha yüksek genlikli bir sinyaldir, o
+   yüzden gözün eşiğinin üstünde daha uzağa kadar kalır. Genişlik derinliğe doğrudan
+   değil, görünürlük üzerinden bağlanmıştı.
+
+**Çözüm.** Açıklık botun yarıçapı (flare terimi silindi, `SNOW_HOLE_FLARE` artık hiçbir
+yerde okunmuyor). Etek üstel yerine **sonlu destekli** bir smoothstep: `range`'de tam
+sıfıra iniyor ve `range` yalnız bot yarıçapından türüyor, batmadan değil. Eteğin
+**derinliği** hâlâ batmayı izliyor — değişmesi gereken kısım o.
+
+| kar | batma | yarı genişlik | oran |
+|---|---|---|---|
+| 1 cm | 1,0 cm | 5,5 cm | 1,00 |
+| 5 cm | 4,6 cm | 7,3 cm | 1,32 |
+| 20 cm | 15,0 cm | 7,9 cm | 1,43 |
+| 50 cm | 15,0 cm | 7,9 cm | 1,43 |
+
+2,69 → 1,43, ve artık **sert bir tavan var**: batma ne olursa olsun yarı genişlik 8,5 cm'yi
+geçemez. Kalan 1,00 → 1,43 farkı bilinçli — 1 cm karda 18 mm'lik bir etek olamaz, o kadar
+kar yok.

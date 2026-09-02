@@ -152,7 +152,7 @@ void KDeform(uint3 id : SV_DispatchThreadID)
     float radius, sinkMultiplier, axisDistance;
     float distance = SnowNearestSegment(worldXZ, radius, sinkMultiplier, axisDistance);
 
-    if (radius > 0.0 && distance <= (radius + SNOW_MAX_SINK * SNOW_HOLE_FLARE) * (1.0 + SNOW_SETTLE_TAIL_LEN * 2.5))
+    if (radius > 0.0 && distance <= radius * (1.0 + SNOW_SETTLE_TAIL_LEN * 1.55))
     {
         // A THIN LAYER IS PUSHED ASIDE, NOT COMPRESSED IN PLACE.
         //
@@ -205,18 +205,38 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         }
 
         float sink = min(SNOW_MAX_SINK * sinkScale * sinkMultiplier, maxCarve);
-        float flaredRadius = radius + sink * SNOW_HOLE_FLARE;
 
-        float subSurface = flaredRadius
-                       - sqrt(max(flaredRadius * flaredRadius - distance * distance, 0.0));
+        // THE PRINT'S WIDTH IS THE BOOT'S, AT EVERY DEPTH.
+        //
+        // The opening used to widen with the sinking (`radius + sink * flare`) and the
+        // settle skirt outside it used an EXPONENTIAL, which has no end: a deeper print is
+        // a taller signal, so it stayed above the eye's threshold further out. The two
+        // together made deep snow print a giant. Measured, half width against the boot's
+        // 5.5 cm, taking 2 mm as the shallowest dip the eye picks up:
+        //
+        //     1 cm snow ->  5.6 cm  (1.01x)
+        //     5 cm      ->  9.1 cm  (1.66x)
+        //    20 cm      -> 14.8 cm  (2.69x)
+        //    50 cm      -> 14.8 cm  (2.69x)   -- both pinned at SNOW_MAX_SINK
+        //
+        // A real print in deep snow IS deeper, not wider: the sole is the same sole. So the
+        // opening is the boot's radius, and the skirt is given COMPACT SUPPORT -- it reaches
+        // zero at a fixed multiple of that radius. Its depth still follows the sinking,
+        // which is the part that should change.
+        float subSurface = radius
+                       - sqrt(max(radius * radius - distance * distance, 0.0));
         float target    = max(0.0, sink - subSurface);
 
-        float outerDistance = max(0.0, distance - flaredRadius);
+        float outerDistance = max(0.0, distance - radius);
         float kuyrukGurultu = SnowValueNoise(worldXZ * SNOW_SETTLE_TAIL_SCALE);
-        float range = flaredRadius * SNOW_SETTLE_TAIL_LEN
+        float range = radius * SNOW_SETTLE_TAIL_LEN
                      * (0.45 + 1.10 * kuyrukGurultu);
 
-        float tail = sink * SNOW_SETTLE_TAIL * exp(-outerDistance / max(range, 1e-3));
+        // Smoothstep, not `exp`: it ENDS. The skirt's outer edge is `range` whatever the
+        // sinking is, so the mark's width no longer reads the snow's depth. The noise still
+        // swings that edge along the trail, which is where the irregularity comes from.
+        float t = saturate(1.0 - outerDistance / max(range, 1e-3));
+        float tail = sink * SNOW_SETTLE_TAIL * t * t * (3.0 - 2.0 * t);
         target = max(target, tail);
 
         float midRidge = saturate(1.0 - axisDistance / SNOW_MIDRIDGE_WIDTH);

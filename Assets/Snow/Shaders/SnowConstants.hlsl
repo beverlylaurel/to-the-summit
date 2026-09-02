@@ -48,7 +48,6 @@
 #define SNOW_SETTLE_TAIL             0.12
 #define SNOW_SETTLE_TAIL_LEN         0.55
 #define SNOW_SETTLE_TAIL_SCALE       5.0
-#define SNOW_HOLE_FLARE              0.08
 #define SNOW_MAX_SINK                0.15
 #define SNOW_LATERAL_ESCAPE          0.110
 #define SNOW_PACKED_SINK_SCALE       0.18
