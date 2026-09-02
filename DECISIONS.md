@@ -183,8 +183,10 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 - **Suya girme tetikleyicisi ateşlendi** — oyuncu denize yürüyebiliyor ve su altı düz
   siyah. Aşağıda, "Deniz: kapsam dışı bırakılanlar".
 
-- **Deniz bulut tabakasının üstüne boyuyor** — zirveden parlak bir dikdörtgen. Sıralama
-  sorunu, ölçüldü (`SYMPTOMS.md`). Düzeltmenin kendisi ikinci bir kusur üretiyor.
+- **Denizin uzak kenarı yükseklikten keskin bir çizgi** — 6028 m'de deniz 90 km'lik uzak
+  düzlemde kesiliyor, gerçek ufuk 277 km'de. Sıralama değil (bulut zaten denizden sonra
+  çiziliyor), yukarı örnekleme de değil; ikisi de ölçümle elendi (`SYMPTOMS.md`).
+  Çözüm hava perspektifinde: yükseklik sisi 90 km'lik eğik yolda doymuyor.
 
 - **Yansıma filtrelemesi (LEADR) ERTELENDİ, üç belirti ona bağlı** — uzak denizin
   titremesi, şafaktaki kahverengi lekeler ve Ursell dalga şeklinin geri alınması aynı

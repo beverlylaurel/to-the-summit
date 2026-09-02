@@ -5098,25 +5098,41 @@ nokta örnekleniyor.** Fiziksel eğim varyansını loba vermek yetmedi (%11,00 �
 çünkü bırakılan kademelerin varyansı veriliyor ama **korunan** kademelerin mip'inin
 sildiği varyans verilmiyor. Sıradaki adım LEADR; ölçülmeden yazılmayacak.
 
-## Yükseklikten deniz, bulut tabakasının üstüne parlak bir dikdörtgen basıyor — AÇIK (2026-09-02)
+## Yükseklikten denizin uzak kenarı tek piksellik keskin bir çizgi — AÇIK (2026-09-02)
 
 **Belirti:** zirveden (6028 m) bakıldığında bulut denizinin ortasında keskin kenarlı,
-parlak bir dikdörtgen. Ara irtifada (800 m) da var.
+parlak bir alan.
 
-**Yanlış çıkan ilk şüpheli:** deniz mesh'inin kendi kenarı. Kaynak yorumu "4 km'de
-duruyor" diyordu; ayar 13 halka, yani 131 km — yorum bayattı.
+**İKİ YANLIŞ ŞÜPHELİ, İKİSİ DE ÖLÇÜMLE ELENDİ.**
 
-**Ayırt eden ölçüm:** aynı kare, deniz renderer'ı açık ve kapalı. Açıkken üçgen sayısı
-343k ve dikdörtgen var; kapalıyken 6k ve bulut tabakası bütün. Yani dikdörtgen denizin
-kendisi.
+*Bir — "deniz bulutun üstüne boyuyor, sıralama yanlış".* Yanlış: bulut geçişi zaten
+`AfterRenderingTransparents`'ta, yani denizden **sonra** çiziliyor
+(`VolumetricCloudsURP.cs`, gerekçesi orada yazılı). Paketin varsayılanı
+`BeforeRenderingTransparents` ve o sorun daha önce çözülmüş.
 
-**Gerçek sebep:** sıralama. Bulut birleştirmesi `BeforeRenderingTransparents`'ta, deniz
-`Transparent-1`'de — deniz sonra çiziliyor ve derinlik tamponunda bulut olmadığı için
-üstüne boyuyor. Uzak düzlem (90 km) denizi kestiği için kenar düz bir çizgi oluyor.
+*İki — "yarı çözünürlüklü bulutun yukarı örneklemesi".* Yanlış: `resolutionScale`
+0,5 → 1,0 yapıldığında aynı bölgenin luma'sı 108,13 → 108,14. Hiç değişmiyor.
 
-**Neden düzeltilmedi:** bulut derinliği yazmak kesmeyi kaldırıyor ama bu sefer deniz ve
-bulut aynı derinlik için yarışıyor, gökyüzüne dağınık yeşil benekler çıkıyor (22 km'de
-ölçüldü). Bir kusur diğeriyle takas ediliyor; karar `DECISIONS.md`'de.
+**Ayırt eden ölçüm — deniz ve bulut çaprazlandı.** Aynı kare, dört kombinasyon:
+
+| bölge | deniz✓bulut✓ | deniz✗bulut✓ | deniz✓bulut✗ | deniz✗bulut✗ |
+|---|---|---|---|---|
+| parlak alanın içi | 148,08 | 118,05 | 142,88 | 118,06 |
+| hemen solu | 110,41 | 116,26 | 142,89 | 118,48 |
+
+Solda bulut açılınca deniz 110,41 → 142,89 aydınlanıyor: **bulut denizi doğru şekilde
+örtüyor.** İçeride bulut hiç fark etmiyor (148,08 / 142,88) çünkü orada bulut ince.
+Yani birleştirme çalışıyor; parlak alan, ince bulutun ardından görünen denizin kendisi.
+
+**Gerçek kusur kenarın kendisi.** Deniz mesh'i 131 km, kamera uzak düzlemi 90 km, ama
+6028 m'de gerçek ufuk 277 km'de. Deniz ufka varmadan uzak düzlemde kesiliyor. Satır satır
+ölçüldü: 331. satırda denizin kare genişliğindeki payı %0, 332. satırda **%100**, luma
+121 → 143. Tek piksellik, kare boyunca düz bir basamak.
+
+**Neden hava perspektifi kurtarmıyor:** deniz `ApplyHeightFog`'u zaten uyguluyor, ama
+90 km'lik eğik yolda doyuma ulaşmıyor — o mesafede denizin gökten ayırt edilememesi
+gerekirdi. Düzeltme buradadır: sisi doyurmak kenarı her irtifada kendiliğinden siler.
+Uzak düzlemi 277 km'ye çıkarmak derinlik hassasiyetini her yerde bozar, kötü takas.
 
 ## Su altında deniz dibi simsiyah — AÇIK (2026-09-02)
 

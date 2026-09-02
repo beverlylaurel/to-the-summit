@@ -77,17 +77,19 @@ public static class SeaQuality
     /// counts below put it at 131 km on Medium -- past the camera's far plane (map x 3 =
     /// 90 km), so the far plane clips the sea and the mesh's own edge is never reached.
     ///
-    /// THE PRICE IS PAID AGAINST THE CLOUD DECK, AND IT IS BEING PAID NOW.
+    /// THE PRICE IS THE FAR EDGE, AND IT IS NOT THE CLOUDS.
     ///
-    /// The cloud composite runs at `BeforeRenderingTransparents` and the sea is
-    /// `Transparent-1`, so the sea draws afterwards and, with no cloud depth in the
-    /// buffer, paints over it. Measured from the summit, same framing and cover: sea
-    /// drawn -> the deck is cut by a bright rectangle, sea hidden -> the deck is whole.
+    /// The clouds were the first suspect and they are innocent: the cloud pass was moved
+    /// to `AfterRenderingTransparents` for exactly this reason, and crossing sea on/off
+    /// with clouds on/off shows the deck occluding the water correctly wherever it is
+    /// thick (110.4 with clouds, 142.9 without). Where it is thin the water shows through,
+    /// which is what should happen.
     ///
-    /// Writing cloud depth (`depthTexture` on the renderer feature) removes the cut, but
-    /// then the sea and the cloud fight over the same depth and the sea wins in scattered
-    /// pixels -- green speckles across the sky, measured at 22 km. One artefact traded for
-    /// another, which is why neither is in yet (`DECISIONS.md`).
+    /// What is left is the cut itself. The far plane ends the sea at 90 km while the
+    /// horizon from the summit is 277 km, and the step is one pixel wide across the whole
+    /// frame -- row 331 has no water, row 332 is all water, luma 121 -> 143. Aerial
+    /// perspective should have swallowed the surface long before that; the height fog does
+    /// not saturate over a 90 km slant path (`SYMPTOMS.md`).
     ///
     /// The triangle counts do not match the spec's 180k/480k/900k either: in
     /// a single grid the triangle count depends only on the RING count, not
