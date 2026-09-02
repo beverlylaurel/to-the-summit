@@ -5186,7 +5186,9 @@ birebir aynı çıktı — "deniz zaten çizilmiyor" sanıldı. Sonra `mr.enable
 **Kapsam:** sualtı render yolu yazılmayacak — suya girme 2026-09-02'de kullanıcı kararıyla
 kapandı (`DECISIONS.md`). Belirti kalıyor çünkü oyuncu hâlâ oraya yürüyebiliyor: kuru
 kumdan (13440) suya doğru yürüyüş ölçüldü, hiçbir şey durdurmuyor. Kapanış, dibi çizmekle
-değil **oyuncuyu su kenarında durdurmakla** gelecek.
+değil **oyuncuyu belirli bir derinlikte durdurmakla** gelecek — su kenarında değil: sığ
+suda yürümek sorunsuz, sınır kameranın su yüzeyinin altına inmesi (`derinlik + dalga
+tepesi > 1,70 m`, yani su hattından ~35 m açık).
 
 ## Play sırasında deniz kalitesi değiştirilirse yüzey düz bir levhaya döner (2026-09-02)
 

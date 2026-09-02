@@ -169,10 +169,9 @@ ova/silsile geçişi görünür bir dikiş yaratırsa halkanın dış sönümü 
 
 ## Bekleyen kararlar
 
-- **Oyuncu su kenarında durdurulacak** — suya girme KAPANDI (2026-09-02, kullanıcı
-  kararı), ama oyuncu şu an denize yürüyebiliyor ve göz su seviyesinin altına inince
-  ekran karanlık. Sualtı render yolu yazılmayacağına göre oyuncunun oraya varmaması
-  gerekiyor. Aşağıda, "Deniz: kapsam dışı bırakılanlar".
+- **Oyuncu belirli bir DERİNLİKTE durdurulacak, su kenarında değil** — sığ suda yürümek
+  serbest; sınır kameranın su yüzeyinin altına inmesi. Aşağıda, "Deniz: kapsam dışı
+  bırakılanlar".
 
 - **Denizin uzak kenarı yükseklikten ~%5'lik bir basamak** — 6028 m'de deniz 90 km'lik
   uzak düzlemde, %27 görünürken kesiliyor. Dört şüpheli ölçümle elendi: bulut sırası,
@@ -2086,10 +2085,20 @@ Spec §2 bunları açıkça kapsam dışı sayıyor.
 aşağıdaki maliyetlerin hiçbiri ödenmeyecek ve tetikleyici artık geçersiz — bu satırlar
 kapanmış bir kararı kayıt için tutuyor, aksiyon gerektirmiyorlar.
 
-**Ama bir iş kaldı:** oyuncu şu an denize yürüyebiliyor. Ölçüldü, kuru kumdan
-(13440, 2000) denize doğru yürüyüşte zemin kesintisiz iniyor ve hiçbir şey durdurmuyor;
-göz su seviyesinin altına inince su çizgisinin altı düz siyah (`SYMPTOMS.md` → "Su altında
-deniz dibi simsiyah"). Sualtı yazılmayacağına göre oyuncunun oraya varmaması gerekiyor.
+**Ama bir iş kaldı, ve sınırı su kenarı DEĞİL.**
+
+Sığ suda yürümenin hiçbir sakıncası yok: kamera suyun üstünde kaldığı sürece sualtı
+yoluna ihtiyaç yok, ve swash, köpük, ıslak kum, kumun görünmesi orada zaten çalışıyor —
+bugünkü kum ölçümleri oyuncu tam orada dururken alındı (y = 31,5 ve 32,0, deniz seviyesi
+30).
+
+Sınır **kameranın su yüzeyinin altına inmesi**: göz zeminden 1,70 m yukarıda, yani
+`derinlik + dalga tepesi > 1,70 m` olduğunda ekran kararıyor. Ölçülmüş derinlik profili
+(z = 2000): su hattı x 13475, 1,0 m derinlik x 13500, 2,1 m derinlik x 13540. Yani su
+hattından yaklaşık **35 m açığa** kadar güvenli.
+
+Kural: oyuncu suya girer, belirli bir derinlikte ilerlemesi durur. Eşik ölçülür, sabit
+sayı yazılmaz — göz yüksekliği ve o anki dalga tepesi ikisi de değişken.
 
 
 | Ne | Geri döndüren belirti |
