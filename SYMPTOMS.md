@@ -5097,3 +5097,43 @@ alınması aynı şeyin üç yüzü: **yansıma, kendisi de nokta örneklenmiş 
 nokta örnekleniyor.** Fiziksel eğim varyansını loba vermek yetmedi (%11,00 → %11,07),
 çünkü bırakılan kademelerin varyansı veriliyor ama **korunan** kademelerin mip'inin
 sildiği varyans verilmiyor. Sıradaki adım LEADR; ölçülmeden yazılmayacak.
+
+## Yükseklikten deniz, bulut tabakasının üstüne parlak bir dikdörtgen basıyor — AÇIK (2026-09-02)
+
+**Belirti:** zirveden (6028 m) bakıldığında bulut denizinin ortasında keskin kenarlı,
+parlak bir dikdörtgen. Ara irtifada (800 m) da var.
+
+**Yanlış çıkan ilk şüpheli:** deniz mesh'inin kendi kenarı. Kaynak yorumu "4 km'de
+duruyor" diyordu; ayar 13 halka, yani 131 km — yorum bayattı.
+
+**Ayırt eden ölçüm:** aynı kare, deniz renderer'ı açık ve kapalı. Açıkken üçgen sayısı
+343k ve dikdörtgen var; kapalıyken 6k ve bulut tabakası bütün. Yani dikdörtgen denizin
+kendisi.
+
+**Gerçek sebep:** sıralama. Bulut birleştirmesi `BeforeRenderingTransparents`'ta, deniz
+`Transparent-1`'de — deniz sonra çiziliyor ve derinlik tamponunda bulut olmadığı için
+üstüne boyuyor. Uzak düzlem (90 km) denizi kestiği için kenar düz bir çizgi oluyor.
+
+**Neden düzeltilmedi:** bulut derinliği yazmak kesmeyi kaldırıyor ama bu sefer deniz ve
+bulut aynı derinlik için yarışıyor, gökyüzüne dağınık yeşil benekler çıkıyor (22 km'de
+ölçüldü). Bir kusur diğeriyle takas ediliyor; karar `DECISIONS.md`'de.
+
+## Su altında deniz dibi simsiyah — AÇIK (2026-09-02)
+
+**Belirti:** oyuncu kıyıdan denize yürüyebiliyor; göz su seviyesinin altına inince su
+çizgisinin altındaki her şey düz siyah.
+
+**Ölçüm:** kamera (13600, 29,0, 2000), deniz seviyesi 30. Işın izleme, ekranın karanlık
+bölgesindeki dört noktadan: dördü de **araziye çarpıyor**, 7,0 – 14,1 m mesafede, kot
+24,97 – 25,25 m. Yani deniz dibi orada ve yakın; çizilmiyor değil, **siyah çiziliyor**.
+
+Arazi kıyıdan sonra 15 km'de 5,62 m kotuna (24,4 m derinlik) oturup harita kenarına kadar
+düz gidiyor.
+
+**Aracın yalanı:** ilk izolasyonda deniz renderer'ı kapatılıp aynı kare alındı ve iki kare
+birebir aynı çıktı — "deniz zaten çizilmiyor" sanıldı. Sonra `mr.enabled` geri okundu:
+`True`. Anahtar tutmamış. Zirve testinde tuttuğu için (üçgen 343k → 6k) fark edildi.
+
+**Kapsam:** sualtı render yolu `DECISIONS.md` → "Deniz: kapsam dışı bırakılanlar"da,
+tetikleyicisi "oyuncu kıyıdan denize adım atabiliyorsa". **Tetikleyici ateşlendi:** kuru
+kumdan (13440) suya doğru yürüyüş ölçüldü, hiçbir şey durdurmuyor.

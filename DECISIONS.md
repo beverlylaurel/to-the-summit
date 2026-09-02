@@ -180,6 +180,12 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ## Bekleyen kararlar
 
+- **Suya girme tetikleyicisi ateşlendi** — oyuncu denize yürüyebiliyor ve su altı düz
+  siyah. Aşağıda, "Deniz: kapsam dışı bırakılanlar".
+
+- **Deniz bulut tabakasının üstüne boyuyor** — zirveden parlak bir dikdörtgen. Sıralama
+  sorunu, ölçüldü (`SYMPTOMS.md`). Düzeltmenin kendisi ikinci bir kusur üretiyor.
+
 - **Yansıma filtrelemesi (LEADR) ERTELENDİ, üç belirti ona bağlı** — uzak denizin
   titremesi, şafaktaki kahverengi lekeler ve Ursell dalga şeklinin geri alınması aynı
   kökten geliyor: yansıma, kendisi de nokta örneklenmiş bir normalden nokta örnekleniyor.
@@ -2081,7 +2087,15 @@ tip okunuyorsa — o zaman fotoğraf tabanlı doku gerekir.
 ## Deniz: kapsam dışı bırakılanlar
 
 Spec §2 bunları açıkça kapsam dışı sayıyor. Hepsinin **tetikleyicisi oyuncunun suya
-girebilir hâle gelmesi**:
+girebilir hâle gelmesi** — ve **bu tetikleyici 2026-09-02'de ateşlendi**: kuru kumdan
+(13440, 2000) denize doğru yürüyüş ölçüldü, zemin kesintisiz iniyor ve hiçbir şey
+durdurmuyor. Göz su seviyesinin altına inince su çizgisinin altı düz siyah; ışın izleme
+deniz dibinin 7 m ötede, 25 m kotunda **orada olduğunu** gösteriyor (`SYMPTOMS.md` → "Su
+altında deniz dibi simsiyah"). Yani eksik olan geometri değil, sualtı render yolu.
+
+Karar hâlâ kullanıcınındır: aşağıdaki maliyet ödenecek mi, yoksa oyuncu suya girmeden mi
+durdurulacak. İkisi de yapılmadan bırakıldı.
+
 
 | Ne | Geri döndüren belirti |
 |---|---|
