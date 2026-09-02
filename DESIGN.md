@@ -60,7 +60,7 @@ Oyunun yalnızca iki çıkışı var, **ikisi de dönmemek**:
 | yolda ölmek | deneme bitti | dağın |
 | zirveye varıp kalmak | deneme bitti | oyuncunun |
 
-**Aklimatizasyon rotasyonu YOK.** Gerçekte tırmanış "Kamp 1'e çık–in, Kamp 2'ye çık–in"
+**Aklimatizasyon rotasyonu YOK.** Gerçekte dağa çıkış "Kamp 1'e çık–in, Kamp 2'ye çık–in"
 diye ilerler. Gerçekçi ama **angarya**; burada gerçekçilik oynanışa düşman. Reddedildi.
 
 **Tekrar koşuların ARASINDA.** Sisifos döngüsü tek koşunun içinde değil, denemeler
@@ -103,10 +103,10 @@ Dengeyi **dağ** kurar, kural değil:
 |---|---|---|
 | aşağı | konaklar, insanlar, yemek, sıcaklık, kolay zemin | şaka, emoji, hırsızlık |
 | orta | kamp, buzul, yalnızlaşma | karışık |
-| yukarı | soğuk, ince hava, sessizlik, gerçek tırmanış | dikkat zorunlu |
+| yukarı | soğuk, ince hava, sessizlik | dikkat zorunlu |
 
 Yukarıda şaka **kendiliğinden** zorlaşır: oyun dikkat ister, etrafta kimse kalmaz. Ton
-geçişi tırmanışın kendisidir.
+geçişi yükselmenin kendisidir.
 
 **Aynı mekanik, yükseklikle değişen ağırlık.** Yeni sistem gerekmiyor:
 

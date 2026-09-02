@@ -84,7 +84,7 @@ geçirilir.
 | `descentDeadband` 250 m | — | İniş ölü bandı oransal daralır |
 | `VolumetricClouds.cloudMapSize` 48 000 m | dağın ~2.7 katı | Hava haritası dağı kapsamalı; dağ büyürse birlikte büyümeli. 512 texel → 94 m/texel |
 | `VolumetricClouds.shapeScale` 20 | bulut şekli dünyada 100 000 / 20 = **5 km** periyotta tekrarlıyor | Bulut kümesinin boyu. Dağ büyürse bulutlar orantısız küçük kalır; periyot dağın enine göre seçilmeli |
-| `VolumetricClouds.bottomAltitude` 1200 m / `altitudeRange` 2000 m | katman 1200–3200 m, zirve 5709 m | Katman MUTLAK kotta (`localClouds` açık). Zirvenin katmanın üstünde kalması bilinçli: tırmanırken bulut denizini aşmak görülüyor. Dağ küçülürse zirve katmanın içinde kalır, büyürse aradaki fark açılır — ikisinde de birlikte bakılmalı |
+| `VolumetricClouds.bottomAltitude` 1200 m / `altitudeRange` 2000 m | katman 1200–3200 m, zirve 5709 m | Katman MUTLAK kotta (`localClouds` açık). Zirvenin katmanın üstünde kalması bilinçli: yükselirken bulut denizini aşmak görülüyor. Dağ küçülürse zirve katmanın içinde kalır, büyürse aradaki fark açılır — ikisinde de birlikte bakılmalı |
 | `maxHazeDistance` 60 000 m | — | Görüş menzili dağı görebilmeli |
 | Bootstrap `SpawnPoint()` | eteğin dışı | Konum dağın boyundan türüyor, kontrol edilmeli |
 
@@ -111,7 +111,7 @@ yürünebilir kuşak.
 | `MountainRoute.asset` (3002 nokta) | konumlar **normalize**; aynı oran daha uzağa düşer | hepsi `0.5 + (u−0.5)×(eski/yeni)` ile yeniden ölçeklendi, dünya konumları korundu |
 | `HeightmapImporter.SpawnUv` | aynı sebep | metre cinsinden yeniden hesaplandı |
 | `bake_heightmap.SPAWN_UV` | aynı sebep | aynı |
-| örnek aralığı | 4097² sabit | 4.28 → 7.32 m/örnek kabalaştı; tırmanılan yüzeyler mesh modül olacağı için kabul edildi |
+| örnek aralığı | 4097² sabit | 4.28 → 7.32 m/örnek kabalaştı; sarp yüzeyler mesh modül olacağı için kabul edildi |
 | `region_profile.PLAY_KM`, `bake_heightmap.CROP_KM` | maske ve kırpma oyun alanına bağlı | 30.0 / 40.0 |
 
 Bu yüzden yukarıdaki üç tablonun bir kısmı risk altında. Kırılanlar iki yerde toplanıyor:

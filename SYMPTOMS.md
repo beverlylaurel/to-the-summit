@@ -1134,11 +1134,11 @@ Bu oturumda araç **iki kez yalan söyledi** ve ikisi de tur kaybettirdi.
 **Kural:** aracın çözünürlüğü, ayırmak istediğin iki hipotezi ayırabiliyor mu — önce bu
 sorulur. Ayıramıyorsa araç yalan söyler ve tur katlar.
 
-Üçüncü kez, arazi tarafında: **"ortalama eğim" tırmanılabilirliği ölçmez.** Oyun alanının
+Üçüncü kez, arazi tarafında: **"ortalama eğim" geçilebilirliği ölçmez.** Oyun alanının
 4–6 km bandı 48.7° ortanca verdi ve "duvar" diye okundu. Ama gerçek dağda da yüzler
 50°+'dır; rota yüzden değil **sırttan** gider. Doğru araç en-az-maliyetli hat aramasıydı
 (Dijkstra, maliyet `mesafe × (1 + (eğim/25)⁴)`): etekten zirveye **17.56 km** yol,
-ortanca **18.1°**, teknik tırmanış **%0**. Duvar yoktu.
+ortanca **18.1°**, sarp kesim **%0**. Duvar yoktu.
 
 **Kural:** bir soruyu alan ortalamasıyla cevaplamadan önce sor — cevap bir **yol** mu,
 bir **alan** mı? Yol soruluyorsa yol aranır.

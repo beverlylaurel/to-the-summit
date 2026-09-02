@@ -37,7 +37,7 @@ geçmez.
 
 Belgeler (`*.md`) ve commit mesajları Türkçe kalır; onlar kullanıcı için.
 
-**Ekranda kullanıcıya görünen metin de Türkçe.** F1 test paneli, tırmanış göstergesi,
+**Ekranda kullanıcıya görünen metin de Türkçe.** F1 test paneli, irtifa göstergesi,
 performans uyarıları — bölüm başlığı, etiket, buton, onay kutusu, durum satırı. Ayrım
 "kaynak mı, arayüz mü" değil: **kim okuyor?** Kod okuyan Claude, panel okuyan kullanıcı.
 Tanımlayıcı ve yorum bu satırların içinde de İngilizce kalır; yalnız görünen dize Türkçe.
@@ -50,7 +50,7 @@ Unity'deki karşılıkları:
 
 - **Bağımlılık Inspector'dan enjekte edilir.** `[SerializeField]` alanla dışarıdan verilir. `FindObjectOfType`, singleton, `GameObject.Find` kullanılmaz — bunlar gizli bağımlılık yaratır.
 - **Ayarlar `ScriptableObject`'e taşınır.** Bir sistemin ayarları koda gömülmez; asset olarak dışarıdan verilir. Aynı sistem farklı ayarla tekrar kullanılabilir olur.
-- **Sistemler birbirini doğrudan çağırmaz.** İletişim event/callback ile olur. Tırmanma sistemi kar sistemini bilmez, hava sistemi oyuncuyu bilmez.
+- **Sistemler birbirini doğrudan çağırmaz.** İletişim event/callback ile olur. Kar sistemi hava sistemini bilmez, hava sistemi oyuncuyu bilmez.
 - **Bir script tek iş yapar.** İki iş yapıyorsa ikiye bölünür.
 - **Public API dar tutulur.** Dışarıdan erişilmesi gerekmeyen her şey `private`.
 

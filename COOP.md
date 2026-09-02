@@ -162,7 +162,6 @@ yeniden kuruluyor.
 
 | Ne | Ne isteyecek | Ayrıntı |
 |---|---|---|
-| **Tırmanma ve ip** | Oyuncular arası fiziksel bağ; iki oyuncunun aynı ipe asılı olması | `DECISIONS.md` → "Oynanış mekaniği netleşmeden koda başlanmaz" |
 | **Envanter ve ekipman** | Oyuncu durumu, kayıp/ölüm senkronu | aynı madde |
 | **Kamp ve sığınak** | Paylaşılan etkileşimli obje, ortak koşu durumu | aynı madde |
 

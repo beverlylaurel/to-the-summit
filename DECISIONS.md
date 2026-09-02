@@ -141,7 +141,7 @@ etek + 6.6 km ova = 15 km yarı genişlik.
 | zirve spawn'dan görünür | 24 m açıklık (önce 124 m kapalı) |
 
 **Maliyet.** Örnek aralığı 4.28 → 7.32 m kabalaştı (4097² sabit, PNG 14.3 MB, repo boyutu
-değişmedi). Tırmanılan yüzeyler mesh modül olacağı için kabul edildi — arazi onların
+değişmedi). Sarp yüzeyler mesh modül olacağı için kabul edildi — arazi onların
 oturduğu zemin.
 
 **Yan etki, aynı adımda ödendi.** `terrainSize` normalize konum tutan her şeyi kaydırıyor:
@@ -258,7 +258,7 @@ ova/silsile geçişi görünür bir dikiş yaratırsa halkanın dış sönümü 
   duruyor, yani her akşam güneş batarken doğuyor ve hep dolu görünüyor. Gök
   paketi evreyi kendi hesaplıyor ama yön bu olduğu sürece hep dolunay çıkar.
   Ay yörüngesine bağımsız açısal ofset eklemek TASARIM kararı: gece
-  aydınlatması evreye göre değişir, tırmanışın gece bölümü etkilenir.
+  aydınlatması evreye göre değişir, yolun gece bölümü etkilenir.
   **Tetikleyici:** kullanıcı ay evreleri isterse. `DESIGN.md`'ye de bakılmalı.
 
 - **`fix.md`'nin kalan dört maddesi** — doğrulandı ama yapılmadı, hiçbiri
@@ -444,22 +444,21 @@ imkânsız.
 L1 baştan üretilse bile kamp yerinde kalır. Mutlak koordinat her yeniden üretimde tüm
 yerleştirme emeğini çöpe atardı; "ileride değiştirince patlar mı" sorusunun cevabı bu.
 
-**Mağara, tırmanış yüzeyi ve zirve MESH.** Yükseklik haritası her (x,z) için tek yükseklik
+**Mağara, sarp yüzey ve zirve MESH.** Yükseklik haritası her (x,z) için tek yükseklik
 tutar: mağara, çıkıntı, tavan temsil edilemez. Voksele geçmek arazi shader'ını ve
 çarpışmayı çöpe atardı. İkinci sonuç ölçüldü: 4097 çözünürlükte örnek başına 4.28 m;
-tırmanılacak çıkıntı ~1 m, Hillary Step ~12 m — **üç örnek**.
+bir çıkıntı ~1 m, bir basamak ~12 m — **üç örnek**.
 
 | kip | nerede | nasıl | alan payı |
 |---|---|---|---|
 | üretilen | yaklaşma, vadi, alt yamaç | yükseklik haritası | ~%90 |
-| üretilen + modül | orta dağ: tırmanış kesiti, mağara, kamp | harita + gömülü mesh | ~%9 |
+| üretilen + modül | orta dağ: sarp kesit, mağara, kamp | harita + gömülü mesh | ~%9 |
 | elle tasarlanan | son kol → zirve | tamamen mesh | ~%1 |
 
-Alanın %1'i dramanın yarısını taşıyor; zirve rastgeleliğe bırakılmaz. Tırmanma mekaniği
-**önce mesh üstünde** kurulur, arazi eğimi ikincildir.
+Alanın %1'i dramanın yarısını taşıyor; zirve rastgeleliğe bırakılmaz.
 
-**Zorluk yüzeyden türer, yükseklikten değil.** Mekanik eğimi ve zemini okur; alçakta dik
-bir duvar bulunursa o da tırmanıştır. Eşik yok, özel durum yok.
+**Zorluk yüzeyden türer, yükseklikten değil.** Hareket eğimi ve zemini okur; alçakta dik
+bir duvar bulunursa orada da aynı kural işler. Eşik yok, özel durum yok.
 
 **Co-op: tek oturum tohumu.** Host verir, çalışma zamanındaki her rastgelelik ondan türer.
 Tohumsuz `Random` ve birikimli durum yasak. Mevcut ihlaller `COOP.md` madde 1 ve 6.
@@ -525,7 +524,7 @@ kurulursa uzak dağlar ufuk çizgisinin üstünde yüzer. (270 km'deki 5715 m il
 5709 m'si örtüşüyor — zirveden tam 270 km görülmesi bu yüzden.)
 
 **Mesh, gökyüzü dokusu değil.** Oyuncu dikeyde 5.5 km yükseliyor, ufuk 49 → 270 km açılıyor;
-tırmandıkça ufkun ardından yeni dağlar doğuyor. Boyalı skybox bunu yapamaz.
+yükseldikçe ufkun ardından yeni dağlar doğuyor. Boyalı skybox bunu yapamaz.
 
 **Uzakta ağaç nesne değil renk** — ~2 km ötesinde orman arazi dokusunun tonudur. Bu kural
 konmazsa uzak bantlar ucuz olmaktan çıkar.
@@ -655,7 +654,7 @@ yükseklik haritasından geliyor; jeneratörün prosedürel çıktısı araziye 
 ## Ovanın kotu KAPANDI: 186 m kalıyor, sıcaklık değişti (2026-08-17)
 
 **Ölçüm.** Oyun alanı 4097², kot 517–5709 m, ortanca eğim **38.2°**, ova yok.
-Eğim payları: yürünür (0–15°) %6.7, dik yürünür %24.5, el-ayak %35.6, tırmanış %33.2.
+Eğim payları: yürünür (0–15°) %6.7, dik yürünür %24.5, el-ayak %35.6, sarp %33.2.
 
 **Çelişki.** Zirve 5709 m, ova 186 m, arası 9 km → ortalama iniş 32°. Gerçekte yok ve
 Argudo üretemez (istatistik gerçek dağlardan). Everest'te Base Camp 5364 m, en yakın ova
@@ -672,10 +671,10 @@ sabit sanılmıştı, oysa `seaLevelCelsius` tek bir serbest sayı.
 |---|---|---|
 | Gereken `seaLevelCelsius` | **+7.8** | +22.1 |
 | **Zirvede** | **−29.3 °C** | −15.0 °C |
-| **Tırmanılacak dikey** | **5 523 m** | 3 309 m |
+| **Toplam dikey** | **5 523 m** | 3 309 m |
 | Ortalama eğim | 33.3° | 21.5° |
 
-186 m tırmanışı %67 uzatıyor (oyunun adı bu), zirveyi gerçekten öldürücü yapıyor
+186 m dikey yolu %67 uzatıyor, zirveyi gerçekten öldürücü yapıyor
 (−29 °C, rüzgârla −38 °C hissedilen) ve mevcut hiçbir şeyi bozmuyor — spawn, yol, üç kol,
 kamplar, `SCALE.md` yerinde. **Ödenen:** oyun alanı ortalama 33°, Argudo'nun kendiliğinden
 üretmeyeceği bir diklik; ama oyun alanı bölgenin %0.1'i ve uzak bantlardan görünmez.
@@ -747,10 +746,10 @@ bir **koridor** — azimut sektörü değil, eksene uzaklık; sektör pasta dili
 
 Ova "hafif tepecikli düz" — istenen buydu; spawn 186 m'de, bisiklet turu bozulmadı.
 
-**Tırmanılabilirlik: rota VAR.** Alan ortalaması 4–6 km bandında 48.7° verip duvar
+**Geçilebilirlik: rota VAR.** Alan ortalaması 4–6 km bandında 48.7° verip duvar
 sandırdı — **yanlış araç**. En-az-maliyetli hat (Dijkstra, maliyet `mesafe × (1+(eğim/25)⁴)`):
 17.56 km yol (düz mesafe 8.41 km, %109 zikzak), ortanca **18.1°**, %90'lık dilim 26°, en dik
-adım 42.2°, teknik tırmanış (>45°) **%0**. Gerçek dağ da böyledir: yüzler dik, rota sırttan
+adım 42.2°, sarp kesim (>45°) **%0**. Gerçek dağ da böyledir: yüzler dik, rota sırttan
 gider ve iki katı yol yürür. Oyuncu rotayı **bulmak** zorunda, zorlanmak zorunda değil.
 
 **Geri alınan deneme.** Koridorun tepesi kütleye "otursun" diye doğrusal rampa yazıldı;
