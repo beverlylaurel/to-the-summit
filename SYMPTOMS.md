@@ -5137,3 +5137,17 @@ birebir aynı çıktı — "deniz zaten çizilmiyor" sanıldı. Sonra `mr.enable
 **Kapsam:** sualtı render yolu `DECISIONS.md` → "Deniz: kapsam dışı bırakılanlar"da,
 tetikleyicisi "oyuncu kıyıdan denize adım atabiliyorsa". **Tetikleyici ateşlendi:** kuru
 kumdan (13440) suya doğru yürüyüş ölçüldü, hiçbir şey durdurmuyor.
+
+## Play sırasında deniz kalitesi değiştirilirse yüzey düz bir levhaya döner (2026-09-02)
+
+**Belirti:** `SeaSettings.quality` Play sırasında değiştirildiğinde deniz dalgasız,
+detaysız tek renk bir yüzey oluyor (High'a geçişte ölçüldü: luma 142,9, detay 0,495 —
+kum bile görünmüyor).
+
+**Ayırt eden ölçüm:** aynı kalite ile Play'e **baştan** girildiğinde görüntü doğru
+(dalga, kum, köpük yerinde). Yani hata High'da değil, **geçişte** — mesh yeniden
+kuruluyor, doku dizileri yeniden ayrılıyor ve yüzey o arada boş okuyor.
+
+**Kapsam:** oyun içinden ulaşılamıyor — `Assets/Scripts` altında hiçbir yer sea
+kalitesini çalışırken değiştirmiyor. Yalnız Inspector'dan Play sırasında elle
+değiştirilirse görülür. Bir ayarlar menüsü eklenirse önce bu düzeltilir.
