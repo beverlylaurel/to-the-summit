@@ -1526,6 +1526,25 @@ bir dalga uzaktaki büyük bir fırtınanın imzasıdır ve o fırtınanın ener
 
 ---
 
+## Deniz: yağmur damlasının halkası (2026-09-03)
+
+**Her damla bir halka bırakır ve halkanın hızı SUYUN, yağmurun değil.** Kılcal-yerçekimi
+dalgasının minimum faz hızı `sqrt(2·sqrt(σg/ρ))` = 0,231 m/s, dalga boyu 1,73 cm. Bu hız
+her damla için aynı; suyun özelliği.
+
+**Damla sayısı yağıştan türer.** Projede şiddet 1,0 = 50 mm/h (`AtmosphereController`).
+Marshall-Palmer medyan çapı `D₀ = 0,9·R^0,21` mm veriyor, 50 mm/h'de 2,0 mm. Yağış debisi
+bölü damla hacmi = **3300 damla/m²/s**.
+
+**Bu yüzden halkalar ayrı çemberler değil.** Her biri ~1 s yaşayıp 23 cm'ye ulaşıyor; o
+hızda metrekare başına yüzden fazlası aynı anda üst üste biniyor. Suya yağan yağmur
+kaynayan bir benek dokusudur, ve onu üreten şey üç farklı hücre boyunda halka katmanı —
+tek katman kafes olarak okunuyor.
+
+**Yüksekliği değil EĞİMİ bozar.** Halka bir milimetre yüksekliğinde; göz onu tamamen
+parlamada görüyor. Piksel ayak izi 1,7 cm'yi geçtiğinde sönümleniyor — kademelerin
+kendi sönümüyle aynı kural, yoksa aynı aliasing geri gelir.
+
 ## Deniz: rüzgârını dünya fırtınasından doğrudan alır (2026-09-02)
 
 **Deniz karanın korunağını almaz.** `AltitudeWeatherDriver.IntensityAt` alçakta fırtınayı

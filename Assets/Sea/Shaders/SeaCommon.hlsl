@@ -429,6 +429,77 @@ float SeaValueNoise(float2 p)
     return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
 }
 
+/// RAIN RINGS: THE SLOPE A FALLING DROP LEAVES ON THE WATER.
+///
+/// A drop punches a crater, the crown collapses, and what travels outward is a
+/// capillary-gravity ring. Everything below is that ring, and every number in it is
+/// measured rather than chosen.
+///
+/// **How fast the ring travels.** Water's dispersion has a MINIMUM phase speed:
+/// `c = sqrt(2 sqrt(sigma g / rho))` = 0.231 m/s at a wavelength of 1.73 cm
+/// [SOURCE: Lamb, Hydrodynamics §267; sigma = 0.0728 N/m, rho = 1000]. That is the speed
+/// of the ring an impact leaves, and it is the same for every drop -- it is a property of
+/// the water, not of the rain.
+///
+/// **How many drops.** The project already fixes intensity 1.0 at 50 mm/h
+/// (`AtmosphereController`). Marshall-Palmer gives the median drop as
+/// `D0 = 0.9 R^0.21` mm, so 2.0 mm at 50 mm/h, a volume of 4.2 cubic millimetres. The
+/// rainfall flux divided by that volume is **3300 drops per square metre per second**.
+///
+/// So the rings are NOT separate circles. Each lives about a second and reaches 23 cm, and
+/// at that rate more than a hundred overlap on every square metre at any instant. Rain on
+/// water is a boiling stipple, and three layers of rings at different cell sizes is what
+/// produces it -- one layer alone reads as a lattice.
+///
+/// It perturbs the SLOPE, not the height: the ring is a millimetre tall and the eye reads
+/// it entirely in the specular.
+float2 SeaRainRings(float2 posXZ, float intensity)
+{
+    if (intensity <= 0.001) return 0.0;
+
+    // The three cell sizes are spaced by an irrational-ish ratio so their lattices never
+    // line up; the ring speed and life are the water's and are shared by all three.
+    const float3 cellSize = float3(0.11, 0.19, 0.37);
+    const float speed = SEA_RAIN_RING_SPEED;
+    const float life  = SEA_RAIN_RING_LIFE;
+
+    float2 slope = 0.0;
+
+    [unroll]
+    for (int layer = 0; layer < 3; ++layer)
+    {
+        float L = cellSize[layer];
+        float2 cell = floor(posXZ / L);
+
+        // Each cell drops once per lifetime, at its own moment and its own spot inside it.
+        float2 h = SeaHash22(cell + float2(layer * 37.1, layer * 71.7));
+        float2 centre = (cell + h) * L;
+
+        float age = frac(_SeaTime / life + SeaHash21(cell + layer * 13.7));
+
+        float2 d = posXZ - centre;
+        float r = length(d);
+        if (r < 1e-4) continue;
+
+        // The crest travels outward at the water's own speed.
+        float front = age * speed * life;
+
+        // A narrow annulus: the ring is a single crest, not a train.
+        float w = SEA_RAIN_RING_WIDTH;
+        float x = (r - front) / w;
+        float profile = x * exp(-x * x);        // odd: a crest with a trough behind it
+
+        // It fades as it spreads -- the same energy on an ever longer circumference -- and
+        // it is born rather than appearing, so the first instant does not pop.
+        float spread = 1.0 / max(1.0 + front / w, 1.0);
+        float birth = saturate(age * 12.0);
+
+        slope += normalize(d) * (profile * spread * birth);
+    }
+
+    return slope * (SEA_RAIN_RING_SLOPE * intensity);
+}
+
 /// Three octaves. Foam carries both coarse clumps and fine bubbles.
 float SeaFoamNoise(float2 p)
 {

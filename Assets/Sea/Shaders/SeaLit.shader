@@ -232,6 +232,17 @@ Shader "ToTheSummit/SeaLit"
                 float pixelSize = max(length(dx), length(dy));
                 float2 slopeSum = SeaSampleSlope(IN.positionWS.xz, pixelSize);
 
+                // RAIN LANDS ON THE WATER TOO. Every drop leaves a ring travelling at the
+                // water's own capillary-gravity speed; at 50 mm/h there are 3300 drops on
+                // every square metre every second, so what the eye sees is a boiling
+                // stipple rather than separate circles (`SeaCommon.hlsl`).
+                //
+                // FADED BY THE PIXEL, LIKE EVERY OTHER SCALE. The ring is 1.7 cm across; it
+                // has no business being drawn where a pixel covers more than that, and
+                // drawing it there would be the same aliasing the tiers already fade out.
+                slopeSum += SeaRainRings(IN.positionWS.xz, _SeaPrecipIntensity01)
+                          * SeaTierResolvable(SEA_RAIN_RING_WIDTH * 4.0, pixelSize);
+
                 float3 N = normalize(float3(-slopeSum.x, 1.0, -slopeSum.y));
 
                 float2 screenUV = IN.screenPos.xy / IN.screenPos.w;

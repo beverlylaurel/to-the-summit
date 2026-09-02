@@ -3309,3 +3309,38 @@ zaten küçük (`k·a/2`, yani genliğin %6'sı). Sayı "artır" demiyor, "artı
 
 Fırtınada choppiness 2,4 / 3,6 / 4,8 kareleri kullanıcıya gösterildi: fark görülmedi,
 **2,4 kaldı**. Mesh hiçbirinde bozulmadı, yani payın gerçek olduğu da doğrulandı.
+
+### Yağmur halkası: hız sudan, sayı yağıştan
+
+Denize (ve zemine) düşen damlanın bıraktığı halka hiçbir yerde yoktu — ölçüldü, `ripple`
+diye bir şey ne deniz ne arazi shader'ında geçiyor. Yağmurun denize tek etkisi pürüzlülüğü
+0,22'ye çekmek ve köpüğe 0,06 eklemekti.
+
+**İki sayı da uydurulmadı.**
+
+*Hız.* Kılcal-yerçekimi dalgasının minimum faz hızı `c = sqrt(2·sqrt(σg/ρ))`. σ = 0,0728
+N/m, ρ = 1000 → **0,231 m/s**, dalga boyu 1,73 cm [KAYNAK: Lamb, Hydrodynamics §267].
+Bir çarpmanın bıraktığı halka bu hızla gider ve her damla için aynıdır.
+
+*Sayı.* Projenin kendi çapası: şiddet 1,0 = 50 mm/h. Marshall-Palmer medyan hacim çapı
+`D₀ = 0,9·R^0,21` mm → 50 mm/h'de 2,0 mm, hacim 4,2 mm³. Debi (1,39×10⁻⁵ m³/m²s) bölü
+hacim = **3300 damla/m²/s**.
+
+**Sonuç tasarımı belirledi.** 3300 damla/m²/s, 1 s ömür ve 23 cm yarıçapla her metrekarede
+her an yüzden fazla halka üst üste biner. Yani ayrı ayrı çember çizmek yanlış olurdu;
+gerçek görüntü kaynayan bir benek dokusu. Üç katman (hücre 0,11 / 0,19 / 0,37 m) o dokuyu
+veriyor; tek katman kafes olarak okunuyor.
+
+**Ölçüldü.** Aynı donmuş kare, yağmur kapalı ve açık, fark:
+
+| şiddet | uzak su | yakın su | uzak suda %1'den fazla değişen |
+|---|---|---|---|
+| 0,3 | 1,59 luma | 0,64 | %47,7 |
+| 1,0 | 2,39 luma | 1,09 | %72,2 |
+
+Şiddetle doğru ölçekleniyor. **Kum berraklığı etkilenmedi** (yağmursuz karede detay
+0,550 → 0,551 ve 0,401 → 0,394), çünkü halka yağış sıfırken hiç hesaplanmıyor.
+
+Genlik (`SEA_RAIN_RING_SLOPE` 0,12) tek göz kararı sayı: 1 mm'lik bir tepe 1,7 cm dalga
+boyunda 0,37 eğim demek, üç katman bunu paylaşıyor. Gözle fazla ya da az bulunursa
+değişecek tek sayı budur.

@@ -149,6 +149,26 @@
 #define SEA_SHORE_WAVE_TAKE_MAX  0.65
 
 
+// --- Rain rings ---
+
+/// The speed of the ring a drop leaves, and it is the WATER'S, not the rain's: the minimum
+/// phase speed of a capillary-gravity wave, `sqrt(2 sqrt(sigma g / rho))`, at a wavelength
+/// of 1.73 cm. [SOURCE: Lamb, Hydrodynamics 267; sigma = 0.0728 N/m, rho = 1000]
+#define SEA_RAIN_RING_SPEED          0.231
+
+/// How long one ring is worth drawing (s). Viscous damping of a 1.7 cm ripple has an
+/// e-folding time of 3.7 s (`2 nu k^2`, nu = 1e-6), but the crest has spread over a
+/// circumference eight times longer by then and is no longer readable.
+#define SEA_RAIN_RING_LIFE           1.0
+
+/// The crest's own width (m): about one capillary wavelength.
+#define SEA_RAIN_RING_WIDTH          0.017
+
+/// Peak slope of a single ring at full rain. A 1 mm crest on a 1.7 cm wave is a slope of
+/// 0.37; three layers overlap, so each carries a share of it.
+#define SEA_RAIN_RING_SLOPE          0.12
+
+
 /// BREAKER DEPTH INDEX, SLOPE DEPENDENT.
 ///
 /// McCowan's 0.78 is the most common first guess in engineering practice but
