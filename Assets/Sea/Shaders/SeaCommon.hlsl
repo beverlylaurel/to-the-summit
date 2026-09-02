@@ -758,10 +758,6 @@ float SeaShoreWaveHeight(float2 posXZ, float depth, float slope, float gamma,
 
     if (depth <= SEA_MIN_DEPTH || depth >= onset) return 0.0;
 
-    // Full strength at the waterline, nothing at the onset depth.
-    float grip = 1.0 - saturate(depth / max(onset, 1.0));
-    grip *= grip;
-
     // THE SLOPE HERE IS THE BEACH'S, NOT THIS PIXEL'S.
     //
     // Feeding the local bathymetry gradient in made the phase jump wherever the
@@ -781,8 +777,22 @@ float SeaShoreWaveHeight(float2 posXZ, float depth, float slope, float gamma,
     // integrable and no contour rings come back.
     phase += dot(_SeaShorePeel, posXZ);
 
-    // Height is what the bottom allows: the breaking limit, and no more.
-    float amp = gamma * depth * 0.5 * SEA_SHORE_WAVE_SHARE * grip;
+    // HEIGHT IS WHAT THE BOTTOM ALLOWS, AND THE SHARE IS APPLIED ONCE.
+    //
+    // `amp` is a half-height, so `gamma * depth * 0.5` sits exactly on the breaking
+    // limit `H = gamma h`. The share pulls it back to the saturated inner surf zone:
+    // 0.65 of the limit is `H/h = 0.51`, which is what Thornton & Guza measured
+    // [SOURCE: Thornton & Guza 1982, saturated H_rms/h = 0.42 for H_rms; 0.5-0.55 for
+    // the significant height].
+    //
+    // IT USED TO BE APPLIED TWICE. The same share also weighted the crossfade in
+    // `SeaDeform`, so what reached the surface was 0.65^2 = 0.42 of the limit, and the
+    // same depth falloff was applied twice on top of it -- once squared as `grip`
+    // here, once linearly as `take` there. Measured, the train peaked at 0.53 m crest
+    // to trough while the open sea was running Hs 2.37 m; a beach with a half-metre
+    // shore break under a 2.4 m swell is not a beach. The falloff belongs to the
+    // crossfade alone, so `grip` is gone.
+    float amp = gamma * depth * 0.5 * SEA_SHORE_WAVE_SHARE;
 
     // A shoaling crest is not a sine. It stands up at the front and lies flat
     // behind, and past the breaking point the front is a wall of white water.
@@ -814,8 +824,10 @@ float SeaShoreWaveHeight(float2 posXZ, float depth, float slope, float gamma,
     float throwAmp = min(amp / max(tanh(k * depth), 0.02), SEA_SHORE_THROW_AK / max(k, 1e-4));
 
     // Signed: the crest sweeps forward, the trough sweeps back. That is what an orbit
-    // does, and it is what makes the face steep and the back gentle.
-    crestFront = -sin(phase) * throwAmp * grip;
+    // does, and it is what makes the face steep and the back gentle. It carries no
+    // falloff of its own: `SeaDeform` fades it in with the same crossfade as the height,
+    // so the throw and the crest it belongs to never come apart.
+    crestFront = -sin(phase) * throwAmp;
 
     return amp * shaped;
 }
@@ -870,12 +882,18 @@ SeaSurfacePoint SeaDeform(float3 posWS)
                                   _SeaMaxShoalingGain);
             float breakDepth = max(_SeaSignificantHeight * shoalTake
                                    / max(gamma, 0.1) * SEA_SHORE_WAVE_BREAK_MULT, 1.0);
-            float take = SEA_SHORE_WAVE_SHARE
+            // A CROSSFADE WITH ITS OWN CEILING, NOT A SECOND COPY OF THE HEIGHT SHARE.
+            //
+            // It runs from 0 at the onset depth towards the waterline, and stops at
+            // `SEA_SHORE_WAVE_TAKE_MAX` -- the short chop is barely refracted and has to
+            // survive into the surf zone. It used to be weighted by the height share
+            // instead, which applied that share twice and squared it.
+            float take = SEA_SHORE_WAVE_TAKE_MAX
                        * (1.0 - saturate(o.depth / breakDepth));
-            disp.y = lerp(disp.y, shoreH, saturate(take));
+            disp.y = lerp(disp.y, shoreH, take);
 
             // `crestFront` already carries the throw in metres, signed.
-            disp.xz = lerp(disp.xz, travel * crestFront, saturate(take));
+            disp.xz = lerp(disp.xz, travel * crestFront, take);
         }
     }
 

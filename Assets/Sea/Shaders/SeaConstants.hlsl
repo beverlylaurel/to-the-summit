@@ -132,7 +132,29 @@
 
 /// How much of the breaking limit the shore train claims. The rest stays with
 /// the open-sea field, which is still shoaling underneath it.
+///
+/// `amp` is a half-height, so the raw limit `gamma * h / 2` is a wave exactly at
+/// the point of breaking everywhere. The saturated inner surf zone does not run
+/// that hard: 0.65 of the limit puts the significant height at `H/h = 0.51`.
+/// [SOURCE: Thornton & Guza 1982; saturated H_rms/h = 0.42, and Hs = 1.41 H_rms]
+///
+/// APPLIED ONCE. It used to weight the crossfade in `SeaDeform` as well, so the
+/// surface saw 0.65^2 = 0.42 of the limit.
 #define SEA_SHORE_WAVE_SHARE     0.65
+
+/// How much of the SURFACE the shore train may claim at the waterline. Not the
+/// same question as the height share, and it took a measurement to separate them.
+///
+/// Refraction turns the long waves parallel to the beach, and the shore train is
+/// how that is drawn. It does not turn the short chop riding on top: refraction
+/// works on the ratio of wavelength to the depth scale, so a 30 m swell is turned
+/// where a 2 m wind wave barely is. Something of the open-sea field has to survive
+/// into the surf zone, and it is what carries the small detail there.
+///
+/// Measured: letting the crossfade reach 1.0 erased that field and the shallow
+/// water went flat -- the frame at 2 m depth dropped from luma 24.6 to 11.5 and the
+/// sand went with it. The ceiling is not decoration.
+#define SEA_SHORE_WAVE_TAKE_MAX  0.65
 
 
 /// BREAKER DEPTH INDEX, SLOPE DEPENDENT.

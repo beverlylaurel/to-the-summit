@@ -3179,3 +3179,53 @@ yazılmayacak.
 
 **Kum berraklığı korundu:** detay 0,547 → 0,559 (1 m) ve 0,406 → 0,409 (2 m). Terim
 yakında sıfır olduğu için sığ su tanım gereği etkilenmiyor.
+
+### Kıyı treninin ölçeği: pay iki kez, sönüm iki kez uygulanıyordu
+
+Belirti kullanıcıdan: "ayakta normal bir şekilde denize bakıyorum, deniz çok ince
+gözüküyor, sanki boyum 1 metre gibi."
+
+**Göz yüksekliği doğruydu.** Ölçüldü: kamera zeminden 1,70 m, dikey FOV 60°, en-boy 2,16.
+Düz denizde ufuk tam göz hizasındadır; berm'de duran oyuncunun gözü sudan 2,7 m yukarıda,
+ekranın alt kenarı 4,3 m öndeki su, 25 m ötesine ~90 piksel düşüyor. Perspektif doğru.
+
+**Eksik olan dalga yüksekliğiydi.** Deniz ölçeği ufku kesen tepelerden okunur. Hiçbir tepe
+göz hizasına ulaşmayınca deniz düz bir levha gibi görünüyor.
+
+**Sebep: iki ayrı çarpan iki kez uygulanıyordu.**
+
+- `SEA_SHORE_WAVE_SHARE` hem `amp`'ta hem `SeaDeform`'daki çapraz geçiş ağırlığında vardı
+  → yüzeye 0,65² = 0,42'si ulaşıyordu.
+- Aynı derinlik sönümü de iki kez: `amp` içinde kareli `grip`, `SeaDeform`'da doğrusal
+  `take`.
+
+Net genlik `0,1648 · h · (1 − h/D)³` idi. Düzeltilmişi `0,1648 · h · (1 − h/D)`:
+
+| dünya fırtınası | D (m) | eski tepe | eski t-ç | yeni tepe | yeni t-ç |
+|---|---|---|---|---|---|
+| 0,57 | 7,02 | h = 1,76 m | 0,24 m | h = 3,51 m | **0,58 m** |
+| 0,85 | 10,04 | h = 2,51 m | 0,35 m | h = 5,02 m | **0,83 m** |
+
+2,4 kat, ve tepe noktası kıyıdan uzaklaştı — dalga kırılmadan hemen önce en büyüktür,
+doğrusu budur.
+
+**Ama tavanı kaldırmak yanlıştı.** İlk denemede çapraz geçiş 1'e kadar açıldı: açık deniz
+alanı sığ suda tamamen silindi, yüzeyin kısa dalga detayı gitti. Ölçüldü, 2 m derinlikte
+luma 24,63 → 11,52, detay 0,406 → 0,388. İzolasyonla doğrulandı (`git stash`, aynı pin,
+aynı kare): eski kod 24,63, yeni kod 11,52.
+
+Doğrusu iki sabit: yükseklik payı 0,65 (Thornton & Guza'nın doygun sörf kuşağı,
+`H/h = 0,51`) ve geçiş tavanı 0,65 (kırılmaya uğramayan kısa çırpıntının payı). Sonuç:
+
+| kare | önce | sonra |
+|---|---|---|
+| kum1 (1 m) | luma 33,84 / detay 0,552 | luma 33,88 / detay 0,550 |
+| kum3 (2 m) | luma 24,63 / detay 0,406 | luma 22,04 / detay 0,401 |
+| kafes yoğunlaşması | %24,85 | %24,96 |
+
+Kum berraklığı korundu; 2 m'de %10 kararma, 2,4 kat büyüyen dalganın yüzeyi
+kırıştırmasının doğal sonucu.
+
+**`SEA_SHORE_WAVE_BREAK_MULT` 1,5'te bırakıldı.** Sörf kuşağı kırılma derinliğinde başlar;
+1,5 katı, kırılmadan önceki sığlaşma bandını da alan yumuşak bir devir teslim. Değiştirmek
+kuşağın genişliğini oynatır, yüksekliğini değil — sorun yükseklikteydi.

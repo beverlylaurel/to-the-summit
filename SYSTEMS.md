@@ -1581,6 +1581,13 @@ trenle değiştiriliyordu. Ölçüldü:
 hissetmek ile kırılmak aynı şey değil — sınır artık kırılma derinliği,
 `h_b = Hs * shoal / gamma`, burada ~5 m ve kıyıdan 140 m.
 
+**Pay bir kez uygulanır, sönüm bir kez uygulanır.** İki ayrı soru vardı, tek sabitle
+cevaplanıyordu: trenin *yüksekliği* (`SEA_SHORE_WAVE_SHARE`, kırılma sınırının payı) ve
+trenin *yüzeydeki payı* (`SEA_SHORE_WAVE_TAKE_MAX`, açık deniz alanıyla çapraz geçiş
+tavanı). İkincisi sıfır değil: kısa çırpıntı kırılmaya uğramadığı için sörf kuşağına
+girer, küçük detayı taşıyan odur. Tavan 1'e açıldığında 2 m derinlikte kare luma 24,6'dan
+11,5'e düştü ve kum gitti (`RATIONALE.md`).
+
 **Öne atma dalganın kendi yörüngesinden gelir.** Doğrusal teoride yüzey parçacığının
 yatay salınımı `A/tanh(kh)`; derin suda A'ya eşit, dip yükseldikçe `tanh(kh)` çöküyor ve
 yörünge yatay bir süpürmeye yassılıyor — sığlaşan tepenin öne eğilmesinin sebebi bu.
