@@ -5233,3 +5233,17 @@ vektörünün boş duran `zw`'sinde taşınıyor, yeni global yok.
 
 Çapa rüzgâr döndüğünde de koruyor: çapada faz peel ne olursa olsun sıfır, 100 m ötede
 %1'lik peel değişimi artık 0,09 radyan.
+
+**Çapanın kendisi iki kez yanlış bulundu.** İlk sürüm kıyıyı arazinin batı kenarından
+(x = −15000) aramaya başlıyordu; orası zaten açık deniz ve dibi düz, gradyan sıfır çıkıp
+erken çıkış tüm peel'i — çapa dahil — sıfırlıyordu. Arama arazinin ortasından denize doğru
+yapılıyor artık, ve erken çıkışlar çapayı koruyor.
+
+**Ölçüm iki kez eski kodu okudu.** `DisableDomainReload` açık olduğu için Play'e basmak
+assembly'yi yeniden yüklemiyor; Unity o an derlememişse eski kod çalışıyor. Birinci ölçüm
+çapayı (0, 0), ikincisi (−15000, 0) gösterdi — yani düzeltmenin ilk sürümü. Doğru sonuç
+ancak `AssetDatabase.Refresh(ForceSynchronousImport)` sonrası alındı: çapa (13850, 0),
+faz altı konumda da **−222,028**, değişim sıfır.
+
+Kural: ölçüm, ölçmeden önce çalışan kodun yeni olduğunu kanıtlamalı — yalnız yeni kodun
+üretebileceği bir değeri geri okuyup eski çıkarsa iptal etmeli.

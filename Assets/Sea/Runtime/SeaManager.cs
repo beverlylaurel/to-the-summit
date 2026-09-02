@@ -236,8 +236,11 @@ public class SeaManager : MonoBehaviour
         // hundred metres out a one percent peel change now moves it by 0.09 radians.
         EnsureShoreAnchor();
 
+        // A zero peel still has to carry the anchor: the shader subtracts it either way.
+        Vector4 flat = new Vector4(0f, 0f, shoreAnchor.x, shoreAnchor.y);
+
         Vector2 up = shoreNormal;
-        if (up.sqrMagnitude < 1e-8f) { Shader.SetGlobalVector(SeaShaderIDs.ShorePeel, Vector4.zero); return; }
+        if (up.sqrMagnitude < 1e-8f) { Shader.SetGlobalVector(SeaShaderIDs.ShorePeel, flat); return; }
 
         // THE SWELL'S HEADING, NOT THE WIND'S.
         //
@@ -248,7 +251,7 @@ public class SeaManager : MonoBehaviour
         // close-out. The offset is what puts the wave on the beach at an angle.
         Vector3 wd = env.WindDirection;
         Vector2 travel = new Vector2(wd.x, wd.z);
-        if (travel.sqrMagnitude < 1e-8f) { Shader.SetGlobalVector(SeaShaderIDs.ShorePeel, Vector4.zero); return; }
+        if (travel.sqrMagnitude < 1e-8f) { Shader.SetGlobalVector(SeaShaderIDs.ShorePeel, flat); return; }
         travel.Normalize();
 
         float off = settings.swellDirectionOffset * Mathf.Deg2Rad;
@@ -295,9 +298,17 @@ public class SeaManager : MonoBehaviour
         Vector3 size = terrain.terrainData.size;
         float z = origin.z + size.z * 0.5f;
 
-        float found = origin.x + size.x * 0.5f;
+        // FROM THE MIDDLE OUTWARD, NOT FROM THE EDGE.
+        //
+        // The map's western edge is already open water and its floor is flat, so a march
+        // that starts there stops on the first sample and reads a zero gradient -- and the
+        // early-out below then zeroed the whole peel. Measured: the anchor came back
+        // (0, 0). The mountain sits in the middle, so marching seaward from the centre
+        // finds the coast the player actually stands on.
+        float centre = origin.x + size.x * 0.5f;
+        float found = centre;
         const float March = 25f;
-        for (float x = origin.x; x < origin.x + size.x; x += March)
+        for (float x = centre; x < origin.x + size.x; x += March)
         {
             if (terrain.SampleHeight(new Vector3(x, 0f, z)) + origin.y < settings.seaLevelY)
             {
