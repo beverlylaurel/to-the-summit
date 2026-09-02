@@ -5057,9 +5057,33 @@ Fiziksel varyans lobla toplandığında ufka yakın bant %11,00 → %11,07. **De
 terim 50 katına çıkarıldığında %3,34'e iniyor: shader canlı, mekanizma doğru, büyüklük
 yetersiz. Eski elle ayarlanmış rampa zaten aynı değere (0,35) varıyormuş.
 
-**Gerçek sebep henüz bulunmadı.** Kanıtlanan: kalan titreme fiziksel eğim varyansıyla
-açıklanmıyor. Sıradaki hipotez, korunan kademelerin de nokta örneklenmesi — mip'in sildiği
-varyans da geri verilmiyor (LEADR). Ölçülmeden düzeltme yazılmayacak.
+**KAYNAK BULUNDU: GÖK YANSIMASI.** Terimler tek tek kapatılıp aynı bantta ölçüldü
+(mutlak titreşim, ufka yakın):
+
+| durum | titreşim |
+|---|---|
+| hepsi açık | 6,418 |
+| güneş parıltısı kapalı | 6,754 |
+| köpük kapalı | 6,699 |
+| **gök yansıması kapalı** | **0,830** |
+
+Parıltı ve köpük suçsuz; gök yansıması titreşimin **%87'sini** taşıyor.
+
+**AMA ÇÖZÜM HÂLÂ YOK, İKİ YOL DENENDİ VE İKİSİ DE ÖLDÜ.**
+
+*Bir — LEADR (sürekli dalga sayısı kesimi).* Kâğıtta elendi: uzak denizde piksel ayak izi
+~20 m, kesim `k = π/20 = 0,157`, o kesimin üstündeki varyans 0,0128. Bugünkü kaba kademe
+sönümü zaten 0,00932 veriyor — LEADR yalnız **1,4 kat** fazla, oysa gereken 50 kat.
+
+*İki — sıyırma açısı çarpanı.* Hipotez: eğim varyansı normallerin yayılımı, gökü örnekleyen
+ise yansıyan ışın; sıyırma açısında ayak izi `1/(N·V)` ile uzuyor ve ufukta bu 38 kat —
+körlemesine denenen "50 kat"ın karşılığı. Uygulandı, ölçüldü: titreşim 6,418 → **6,226**
+(%3). Üstelik 2 m derinlikteki kare luma 21,06 → 8,70'e düştü, yani terim beklenmedik
+yerde büyük. Model yanlış; geri alındı.
+
+**Bir sonraki adım kod değil araç.** `SeaUnresolvedSlopeVariance`'ın mesafeye göre
+gerçekte ne ürettiği ekrana basılmadan yeni bir düzeltme yazılmayacak — iki denemede de
+sayının davranışı tahmin edildi ve ikisinde de yanlış çıktı.
 
 ## Kahverengi lekelerin rengi: gök küpünün şafak ufku — ÖLÇÜLDÜ (2026-09-02)
 
