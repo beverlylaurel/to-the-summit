@@ -60,7 +60,7 @@ float _SeaShoreSlope;
 /// Along-shore wavenumber vector (rad/m). It tilts the shore train's crests off the
 /// depth contours by the residual angle refraction leaves, which is what makes a wave
 /// break progressively along its length instead of all at once. Written by `SeaManager`.
-float2 _SeaShorePeel;
+float4 _SeaShorePeel;   // xy: along-shore wavenumber, zw: the anchor it is measured from
 
 /// `(beat angular frequency, beat depth, 0, 0)` — the two spectral peaks' interference.
 /// This is what a "set" is: the arriving waves grow and shrink over the beat period.
@@ -775,7 +775,13 @@ float SeaShoreWaveHeight(float2 posXZ, float depth, float slope, float gamma,
     // a residual angle at the breaker line -- and `SeaManager` turns that residual into
     // this one global wavenumber vector. Linear in position, so the phase stays
     // integrable and no contour rings come back.
-    phase += dot(_SeaShorePeel, posXZ);
+    // MEASURED FROM THE SHORE'S OWN ANCHOR, NOT FROM THE WORLD ORIGIN.
+    //
+    // World coordinates here run to about 13500, so `dot(peel, posXZ)` turned a change of
+    // 0.001 in the peel into 13 radians of phase. The peel does change -- the wind turns --
+    // and the whole train jumped with it: measured, walking nine metres swung a fixed
+    // patch of water through 2.9 crest-to-trough cycles.
+    phase += dot(_SeaShorePeel.xy, posXZ - _SeaShorePeel.zw);
 
     // HEIGHT IS WHAT THE BOTTOM ALLOWS, AND THE SHARE IS APPLIED ONCE.
     //

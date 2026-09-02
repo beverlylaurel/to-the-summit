@@ -32,6 +32,11 @@ public class SeaManager : MonoBehaviour
     Vector4 waveGroups;
     Vector3 tierSlopeVariance;
 
+    /// The shore's own geometry: found once, because the terrain does not move.
+    Vector2 shoreAnchor;
+    Vector2 shoreNormal;
+    bool shoreAnchorValid;
+
     public SeaSettings Settings => settings;
 
     public void Bind(SeaSettings source, SeaEnvironmentBridge bridge, Terrain target)
@@ -215,23 +220,24 @@ public class SeaManager : MonoBehaviour
     /// plain linear phase.
     void PublishPeel(float slope)
     {
-        var cam = Camera.main;
-        Vector3 at = cam != null
-            ? cam.transform.position
-            : terrain.transform.position + new Vector3(terrain.terrainData.size.x * 0.5f,
-                                                       0f,
-                                                       terrain.terrainData.size.z * 0.5f);
+        // THE SHORE DOES NOT MOVE WITH THE PLAYER, AND NEITHER MAY ITS PHASE.
+        //
+        // Both halves of this were wrong and the symptom was one: walking nine metres
+        // along the beach swung the phase at a FIXED patch of water by 18.3 radians --
+        // 2.9 whole crest-to-trough cycles. Standing water rose and fell because the
+        // viewer walked.
+        //
+        //   * the normal was sampled UNDER THE CAMERA, so it changed as the player moved;
+        //   * the phase was `dot(peel, posXZ)` with no origin, and posXZ is about 13500,
+        //     so a change of 0.001 in the peel moved the phase by 13 radians.
+        //
+        // The anchor fixes the second even when the peel legitimately changes -- the wind
+        // does turn. Measured at the anchor the phase is zero whatever the peel is, and a
+        // hundred metres out a one percent peel change now moves it by 0.09 radians.
+        EnsureShoreAnchor();
 
-        // The shore normal from the bathymetry: the direction the bottom rises.
-        const float Step = 40f;
-        float hx0 = terrain.SampleHeight(at + new Vector3(-Step, 0f, 0f));
-        float hx1 = terrain.SampleHeight(at + new Vector3(+Step, 0f, 0f));
-        float hz0 = terrain.SampleHeight(at + new Vector3(0f, 0f, -Step));
-        float hz1 = terrain.SampleHeight(at + new Vector3(0f, 0f, +Step));
-
-        Vector2 up = new Vector2(hx1 - hx0, hz1 - hz0);
+        Vector2 up = shoreNormal;
         if (up.sqrMagnitude < 1e-8f) { Shader.SetGlobalVector(SeaShaderIDs.ShorePeel, Vector4.zero); return; }
-        up.Normalize();
 
         // THE SWELL'S HEADING, NOT THE WIND'S.
         //
@@ -268,7 +274,49 @@ public class SeaManager : MonoBehaviour
         if (Vector2.Dot(travel, along) < 0f) along = -along;
 
         Vector2 peel = along * (kb * sinB);
-        Shader.SetGlobalVector(SeaShaderIDs.ShorePeel, new Vector4(peel.x, peel.y, 0f, 0f));
+
+        // `zw` carries the anchor: the shader measures the along-shore phase from it.
+        Shader.SetGlobalVector(SeaShaderIDs.ShorePeel,
+                               new Vector4(peel.x, peel.y, shoreAnchor.x, shoreAnchor.y));
+    }
+
+    /// WHERE THE WATER MEETS THE LAND, FOUND ONCE.
+    ///
+    /// The terrain is static, so the shore's orientation is a constant of this world and
+    /// has no business being resampled every frame. Marched outward along +X at the
+    /// terrain's mid-Z until the ground drops under the sea; that crossing is the anchor,
+    /// and the bottom's gradient there is the shore normal.
+    void EnsureShoreAnchor()
+    {
+        if (shoreAnchorValid) return;
+        shoreAnchorValid = true;
+
+        Vector3 origin = terrain.transform.position;
+        Vector3 size = terrain.terrainData.size;
+        float z = origin.z + size.z * 0.5f;
+
+        float found = origin.x + size.x * 0.5f;
+        const float March = 25f;
+        for (float x = origin.x; x < origin.x + size.x; x += March)
+        {
+            if (terrain.SampleHeight(new Vector3(x, 0f, z)) + origin.y < settings.seaLevelY)
+            {
+                found = x;
+                break;
+            }
+        }
+
+        shoreAnchor = new Vector2(found, z);
+
+        const float Step = 40f;
+        Vector3 at = new Vector3(found, 0f, z);
+        float hx0 = terrain.SampleHeight(at + new Vector3(-Step, 0f, 0f));
+        float hx1 = terrain.SampleHeight(at + new Vector3(+Step, 0f, 0f));
+        float hz0 = terrain.SampleHeight(at + new Vector3(0f, 0f, -Step));
+        float hz1 = terrain.SampleHeight(at + new Vector3(0f, 0f, +Step));
+
+        Vector2 up = new Vector2(hx1 - hx0, hz1 - hz0);
+        shoreNormal = up.sqrMagnitude < 1e-8f ? Vector2.zero : up.normalized;
     }
 
     /// EVERY INPUT OF THE INTEGRATION, NOT JUST THE WIND. Cached on the wind

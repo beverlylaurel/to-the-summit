@@ -5200,3 +5200,36 @@ kuruluyor, doku dizileri yeniden ayrılıyor ve yüzey o arada boş okuyor.
 **Kapsam:** oyun içinden ulaşılamıyor — `Assets/Scripts` altında hiçbir yer sea
 kalitesini çalışırken değiştirmiyor. Yalnız Inspector'dan Play sırasında elle
 değiştirilirse görülür. Bir ayarlar menüsü eklenirse önce bu düzeltilir.
+
+## Yürürken deniz aşağı yukarı sağa sola oynuyor — ÇÖZÜLDÜ (2026-09-02)
+
+**Kullanıcının ağzından:** "hareket ederken deniz aşağı yukarı sağa sola hareket ediyor."
+
+**Yanlış çıkan ilk şüpheli:** mesh'in kameraya snap'lenmesi. Elendi — zaman donuk tutulup
+kamera 10 cm'lik adımlarla kaydırıldı, kare farkı her adımda 2,5–3,1 arası düzgün, snap
+sınırında (0,5 m) sıçrama yok.
+
+**Gerçek sebep — dünkü soyulma açısı, iki ayrı hata bir belirti.** `_SeaShorePeel`:
+
+1. Kıyı normali **kameranın altından** örnekleniyordu, oyuncu yürüdükçe değişiyordu.
+2. Faz `dot(peel, posXZ)` idi, **çapa yoktu**. Dünya koordinatı ~13500 olduğu için
+   peel'deki 0,001'lik değişim 13 radyan faz kaydırıyordu.
+
+**Ayırt eden ölçüm:** sabit bir su noktasındaki faz, oyuncu kıyı boyunca 9 m yürürken:
+
+| oyuncu | faz |
+|---|---|
+| z + 0 m | 175,8 rad |
+| z + 3 m | 194,1 rad |
+| z + 8 m | 184,3 rad |
+
+18,3 radyan = **2,9 tam tepe-çukur çevrimi**. Duran su, yalnız bakan kişi yürüdüğü için
+inip kalkıyordu.
+
+**Çözüm.** Kıyı normali ve çapa arazi statik olduğu için **bir kez** bulunuyor
+(`EnsureShoreAnchor`: terrain'in orta-Z hattı boyunca deniz seviyesinin altına inen ilk
+nokta). Faz o çapaya göre ölçülüyor: `dot(peel.xy, posXZ - peel.zw)`. Çapa `_SeaShorePeel`
+vektörünün boş duran `zw`'sinde taşınıyor, yeni global yok.
+
+Çapa rüzgâr döndüğünde de koruyor: çapada faz peel ne olursa olsun sıfır, 100 m ötede
+%1'lik peel değişimi artık 0,09 radyan.
