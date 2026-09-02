@@ -124,6 +124,12 @@
 /// h_b = Hs * shoal / gamma, about 5 m here, 140 m offshore.
 #define SEA_SHORE_WAVE_BREAK_MULT 1.5
 
+/// THE CUSP. For a trochoidal wave `kA < 1` is a sharp crest, `kA = 1` is a corner and
+/// beyond it the surface passes through itself. The shore train's forward throw is held
+/// at the corner: a pitched face, never a torn mesh.
+/// [SOURCE: Tessendorf 2004, section 4.1]
+#define SEA_SHORE_THROW_AK       1.0
+
 /// How much of the breaking limit the shore train claims. The rest stays with
 /// the open-sea field, which is still shoaling underneath it.
 #define SEA_SHORE_WAVE_SHARE     0.65

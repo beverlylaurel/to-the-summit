@@ -3083,3 +3083,57 @@ Sığ limitte Green yasasına iner, derin suda 1'e gider — yani tavan (`maxSho
 elle konmuş bir sınır olmaktan çıkar. [KAYNAK: Abreu ve ark. 2012, denklem 2]
 
 Kırılma sınırı `H/h = 0,78` (McCowan 1894); eğime bağlı hâli zaten `SeaBreakerIndex`'te.
+
+### Öne atma: yörünge genliği, uydurma kesir değil
+
+Kıyı treninin tepesi öne eğiliyor. Eskiden eğim `min(|h|, 1.5) * 0.35` idi — 1,5 m'lik
+sınırın da 0,35'in de arkasında bir ölçüm yoktu.
+
+Doğrusal dalga teorisinde yüzey parçacığının yatay salınım genliği `A / tanh(kh)`. Derin
+suda `tanh → 1` ve yörünge dairedir; dip yükseldikçe `tanh(kh)` çöküyor, yörünge yatay bir
+süpürmeye yassılıyor. Sığlaşan tepenin öne eğilmesi tam olarak budur.
+
+**Katlanma korkusu yanlış hesaptı.** Uygulamadan önce kağıtta bakıldı:
+
+| derinlik | periyot | k (rad/m) | A/tanh(kh) | kA |
+|---|---|---|---|---|
+| 0,3 m | 10 s | 0,366 | 0,71 m | 0,26 |
+| 3 m | 16 s | 0,072 | 3,6 m | 0,26 |
+
+Sivri uç `kA = 1`'de, ilmek `kA > 1`'de. İkisi de 0,26 — yüzey kendi içinden geçmiyor.
+Tavan (`SEA_SHORE_THROW_AK = 1`) kağıdın kapsamadığı durumlar için ve tam sivri uçta.
+
+**Oyunun kendi sayılarıyla ölçüldü** (dünya fırtınası 0,85, deniz seviyesi rüzgârı
+8,4 m/s, Hs 2,37 m, Tp 6,7 s): genliğin tepe yaptığı 2,5 m derinlikte `k = 0,19 rad/m`,
+atma 0,60 m, `kA = 0,11`. Eski kesir aynı noktada 0,135 m veriyordu — yani yörünge 4,4 kat
+büyük, ama hâlâ sivri ucun sekizde biri.
+
+**Kum berraklığına dokunmuyor.** Aynı pin altında (açık pencere, fırtına 0,57, sabah)
+atma açık/kapalı:
+
+| kare | luma açık | luma kapalı | kum detayı açık | kum detayı kapalı |
+|---|---|---|---|---|
+| kum1 (1 m) | 34,14 | 33,93 | 0,547 | 0,551 |
+| kum3 (2 m) | 24,31 | 24,53 | 0,406 | 0,403 |
+
+Fark gürültünün içinde. Kullanıcının koyduğu sınır — sığ suda kum net görünecek — korundu.
+
+### Kıyı treni açık denizin dörtte biri kadar
+
+Gözle doğrulanamadı, çünkü görülecek bir şey yok. Oyunun kendi sayılarıyla:
+
+| dünya fırtınası | deniz seviyesi rüzgârı | Hs | Tp | surf bandı | bant genişliği |
+|---|---|---|---|---|---|
+| 0,00 | 5,2 m/s | 1,64 m | 5,7 s | 0 – 6,3 m | 108 m |
+| 0,60 | 6,8 m/s | 2,00 m | 6,3 s | 0 – 7,6 m | 131 m |
+| 0,85 | 8,4 m/s | 2,37 m | 6,7 s | 0 – 9,0 m | 156 m |
+| 1,00 | 9,4 m/s | 2,60 m | 7,0 s | 0 – 9,9 m | 171 m |
+
+Kıyı treninin genliği `gamma*h/2 * SHARE * grip`, ve `grip` ile `take` aynı `1 − h/onset`
+sönümünü iki kez uyguluyor: `amp(h) = 0,2535 * h * (1 − h/10)³`. Tepesi 2,5 m derinlikte
+ve **0,27 m** — tepeden çukura 0,53 m. Açık denizde Hs 2,37 m iken kıyıya varan dalga
+yarım metre. Kırılan dalganın kendisi görünmediği için "kırılma dudağı" da görünmüyor:
+yörünge doğru, ölçek yanlış.
+
+Kaynak sabitler: `SEA_SHORE_WAVE_SHARE = 0.65`, `SEA_SHORE_WAVE_BREAK_MULT = 1.5`.
+Bir sonraki adım bu ikisidir, atma değil.

@@ -772,7 +772,25 @@ float SeaShoreWaveHeight(float2 posXZ, float depth, float slope, float gamma,
     float c = cos(phase);
     float shaped = c * (1.0 + 0.45 * c);
 
-    crestFront = saturate(sin(phase)) * grip;
+    // THE FORWARD THROW IS THE WAVE'S OWN ORBIT, NOT A FRACTION SOMEONE PICKED.
+    //
+    // Linear theory gives a surface particle's horizontal excursion as `A / tanh(kh)`
+    // along the direction of travel. In deep water that equals A and the orbit is a
+    // circle; as the bottom comes up `tanh(kh)` collapses and the orbit flattens into a
+    // long horizontal sweep -- which is exactly why a shoaling crest pitches FORWARD
+    // instead of merely rising. It replaces `min(|h|, 1.5) * 0.35`, a bound with nothing
+    // behind it.
+    //
+    // IT DOES NOT TEAR THE MESH. Worked on paper before it was written: at 0.3 m depth
+    // with a 10 s wave `kA` is 0.26, at 3 m with a 16 s wave 0.26 again -- far below the
+    // cusp, so the surface never passes through itself. The cap is there for the cases
+    // the paper did not cover, and it sits exactly at the cusp.
+    float k = omega / sqrt(SEA_G * depth);
+    float throwAmp = min(amp / max(tanh(k * depth), 0.02), SEA_SHORE_THROW_AK / max(k, 1e-4));
+
+    // Signed: the crest sweeps forward, the trough sweeps back. That is what an orbit
+    // does, and it is what makes the face steep and the back gentle.
+    crestFront = -sin(phase) * throwAmp * grip;
 
     return amp * shaped;
 }
@@ -831,10 +849,8 @@ SeaSurfacePoint SeaDeform(float3 posWS)
                        * (1.0 - saturate(o.depth / breakDepth));
             disp.y = lerp(disp.y, shoreH, saturate(take));
 
-            // THE FORWARD THROW IS BOUNDED. Left free it grows with the crest and
-            // in a few metres of water it folds the mesh over on itself.
-            float throwLen = min(abs(shoreH), 1.5) * 0.35;
-            disp.xz = lerp(disp.xz, travel * crestFront * throwLen, saturate(take));
+            // `crestFront` already carries the throw in metres, signed.
+            disp.xz = lerp(disp.xz, travel * crestFront, saturate(take));
         }
     }
 

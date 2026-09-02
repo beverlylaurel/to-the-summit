@@ -1562,8 +1562,11 @@ trenle değiştiriliyordu. Ölçüldü:
 hissetmek ile kırılmak aynı şey değil — sınır artık kırılma derinliği,
 `h_b = Hs * shoal / gamma`, burada ~5 m ve kıyıdan 140 m.
 
-**Öne atma sınırlı.** Serbest bırakılınca tepeyle birlikte büyüyor ve birkaç metre suda
-meshi kendi üstüne katlıyordu.
+**Öne atma dalganın kendi yörüngesinden gelir.** Doğrusal teoride yüzey parçacığının
+yatay salınımı `A/tanh(kh)`; derin suda A'ya eşit, dip yükseldikçe `tanh(kh)` çöküyor ve
+yörünge yatay bir süpürmeye yassılıyor — sığlaşan tepenin öne eğilmesinin sebebi bu.
+Eskiden `min(|h|, 1.5) * 0.35` idi; arkasında bir şey yoktu. Tavan `kA = 1`'de, yani tam
+sivri uçta duruyor. Ölçüldü: en kötü noktada `kA = 0,11`, katlanma yok (`RATIONALE.md`).
 
 
 ## Deniz: swash tek fazdan türüyor (2026-08-29)
