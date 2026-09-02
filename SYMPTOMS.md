@@ -5126,13 +5126,46 @@ Yani birleştirme çalışıyor; parlak alan, ince bulutun ardından görünen d
 
 **Gerçek kusur kenarın kendisi.** Deniz mesh'i 131 km, kamera uzak düzlemi 90 km, ama
 6028 m'de gerçek ufuk 277 km'de. Deniz ufka varmadan uzak düzlemde kesiliyor. Satır satır
-ölçüldü: 331. satırda denizin kare genişliğindeki payı %0, 332. satırda **%100**, luma
-121 → 143. Tek piksellik, kare boyunca düz bir basamak.
+ölçüldü: bulutsuz karede 331. satırda denizin kare genişliğindeki payı %0, 332. satırda
+**%100**. Kare boyunca düz, tek piksellik bir basamak.
 
-**Neden hava perspektifi kurtarmıyor:** deniz `ApplyHeightFog`'u zaten uyguluyor, ama
-90 km'lik eğik yolda doyuma ulaşmıyor — o mesafede denizin gökten ayırt edilememesi
-gerekirdi. Düzeltme buradadır: sisi doyurmak kenarı her irtifada kendiliğinden siler.
-Uzak düzlemi 277 km'ye çıkarmak derinlik hassasiyetini her yerde bozar, kötü takas.
+**ŞİDDETİ ABARTILMIŞTI.** İlk kayıt bulut kapalı bir kareden yazılmıştı, ki oyunda öyle
+bir durum yok. Bulut açıkken basamak çok daha küçük ve her havada 337. satırda:
+
+| durum | dikey basamak |
+|---|---|
+| bulut kapalı (oyunda olmaz) | 14,8 luma |
+| fırtına 0,00 | 5,9 |
+| fırtına 0,20 | 5,3 |
+| fırtına 0,40 | 5,1 |
+| deniz yok (referans gürültü) | 0,6 – 2,2 |
+
+114 luma zemin üstünde ~5 luma, yani %5. Kare boyunca dümdüz olduğu için göz yakalar
+(Mach bandı), ama "parlak dikdörtgen" değil — o görüntü ince bulutun ardından görünen
+**güneş parıltısıydı** ve o meşru.
+
+**SİSİ DOYURMAK YANLIŞ HEDEF — ÖLÇÜLDÜ.** İlk yazılan düzeltme buydu ve çürüdü. Canlı
+değerlerle optik derinlik (zeminde yatay görüş 37,6 km):
+
+| ışın | τ | geçirgenlik |
+|---|---|---|
+| zirveden denize 20 km | 0,30 | 0,74 |
+| 45 km | 0,68 | 0,51 |
+| **90 km (uzak düzlem)** | **1,32** | **0,27** |
+| 200 km | 3,03 | 0,05 |
+| 277 km (gerçek ufuk) | 4,20 | 0,015 |
+
+Shader'ın 8 örnekli integrali 4096 örnekli referansla %3 içinde uyuşuyor; ne model ne
+örnekleme bozuk. 6 km'den 90 km'deki denizi %27 görmek **doğru** — gerçekte de görülür.
+Sisi doyurmak dağları ve bütün uzak dünyayı da silerdi: gerekçesi olmayan telafi terimi.
+
+**Doğru çözüm erişimde.** Kesit, denizin zaten görünmez olduğu yere düşmeli:
+bir halka daha (14 halka = 262 km, geçirgenlik 0,02) artı uzak düzlem 300 km. Yalnız uzak
+düzlemi büyütmek yetmiyor — denendi, basamak 337. satırdan 323'e kaydı ve durdu, çünkü
+sınır mesh'in kendisi (131 km'de geçirgenlik hâlâ 0,15).
+
+Yapılmadı: değişiklik denizin dışına çıkıyor (sahnedeki kamera + kalite ayarı) ve
+%5'lik bir basamak için z-fighting riski açıyor. Karar kullanıcınındır (`DECISIONS.md`).
 
 ## Su altında deniz dibi simsiyah — AÇIK (2026-09-02)
 
