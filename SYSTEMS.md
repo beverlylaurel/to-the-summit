@@ -1465,6 +1465,23 @@ eşitliği `Sea/Test Constant Parity` denetliyor.
 gitti; deniz bölümünde yalnız Hs / Tp / kıyı köpüğü okuması kaldı.
 
 
+## Deniz: setler (ölçüldü, kod eklenmedi) (2026-09-02)
+
+**Dalgalar zaten set hâlinde geliyor** ve sebebi spektrumun iki bileşeni: rüzgâr denizi
+ile ölü dalga birbirine vurunca zarf modülasyonu çıkar — bir set tam olarak budur.
+Ölçüldü (tek noktada yüzey kotu, 223 dalga):
+
+| ölçü | bizde | gerçek deniz |
+|---|---|---|
+| grup uzunluğu (ortalama) | 3,8 dalga | 3–10 |
+| en uzun grup | 14 dalga | 12–16 (nadiren) |
+| gruplaşma katsayısı GF | 1,10 | 0,6–1,0 |
+
+Uydurma bir zarf eklenmedi ve eklenmeyecek: eklenirse spektrumun kendi gruplaşmasıyla
+çelişen ikinci bir kaynak olur. [KAYNAK: Longuet-Higgins 1984; Masson & Chandler 1993]
+
+---
+
 ## Deniz: kıyı dalgasının soyulma açısı (2026-09-02)
 
 **Bir dalga tüm boyunca aynı anda kırılmaz.** Kırılma bir noktadan başlar ve cephe boyunca

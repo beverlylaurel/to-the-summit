@@ -5017,3 +5017,27 @@ sonrası ilk iki kare hâlâ ESKİ derlenmiş varyantı gösterdi (düz turkuaz)
 dosyasına dokunup domain reload tetiklemek ve shader'ları `ImportAsset(ForceUpdate)` ile
 zorla içe aktarmak gerekti. Aynı reload eski `beginCameraRendering` aboneliklerini de
 temizliyor.
+
+
+## Ursell şekli ikinci kez denendi, leke geçmedi — AÇIK (2026-09-02)
+
+**İlk teşhis yanlıştı ve ölçümle çürüdü.** "Prob araziyi tutuyor" demiştim; ölçüldü:
+`defaultReflectionMode = Custom`, kaynak `_GlossyEnvironmentCubeMap_128x128`, sahnede
+**sıfır** yansıma probu, gökyüzü `Hidden/Skybox/PhysicallyBasedSky`. Yani yansımada sahne
+geometrisi yok — kahverengi, gökyüzü modelinin kendi **zemin** rengi.
+
+**İki düzeltme denendi, ikisi de yetmedi:**
+
+1. **Ufuk bandını pürüzlülükle açmak.** Kaba bir arama bir koni okur, koninin genişliği
+   yaklaşık `perceptualRoughness` radyandır; zemin o kadar yukarı sızar. Band
+   `max(0.06, pürüzlülük)` yapıldı — leke aynen kaldı.
+2. **Kırılmadan sonra doğrusalsızlığı düşürmek.** Elgar & Guza: çarpıklık kırılmada
+   tepe yapar, sonra %30–60 düşer. `r *= 1 - 0.45·grip` kondu — leke aynen kaldı.
+
+**Ölçülen ipucu:** blobların kenarları **altıgen**. Altıgen olan tek şey hex döşeme, yani
+FFT alanının örneklenmesi. Sonraki tur oraya bakmalı: kıyıda yüzey katlanıyor mu
+(Jacobian < 0), katlanan yüzler normali ters çevirip aramayı zeminin içine mi sokuyor?
+Bunun aracı hazır değil; kurulmadan üçüncü düzeltme yazılmayacak.
+
+**Şekil yine geri alındı.** Kum netliği korundu (`kum1` detay 0,556 → 0,550 aralığında,
+gürültü içinde).
