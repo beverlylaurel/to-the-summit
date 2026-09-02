@@ -437,33 +437,12 @@ public class SeaSimulation : MonoBehaviour
         cs.SetFloat(SeaShaderIDs.SmallWaveCutoff, settings.smallWaveCutoff);
         cs.SetFloat(SeaShaderIDs.LoopPeriod, settings.loopPeriod);
 
-        cs.SetVector(SeaShaderIDs.TierCutoffK, TierBandLimits());
+        // The long end of the coarsest tier is not limited: there is no tier above it.
+        Vector2 band = settings.TierBandLimits;
+        cs.SetVector(SeaShaderIDs.TierCutoffK, new Vector4(band.x, band.y, 1e9f, 0f));
 
         SeaQuality.Levels level = SeaQuality.Of(settings.quality);
         cs.SetInt(SeaShaderIDs.FftSize, level.FftSize);
         cs.SetInt(SeaShaderIDs.FftLog2, level.FftLog2);
-    }
-
-    /// TIER BAND LIMITS.
-    ///
-    /// If all three tiers carried the same `k` range the energy would be
-    /// counted three times. The rule: a tier carries a wavelength only if at
-    /// least four full periods fit in its patch (lambda <= L/4); anything
-    /// longer is handed to a coarser tier.
-    ///
-    ///   tier 0: lambda > 32 m     (k < 0.196)
-    ///   tier 1: lambda 6 – 32 m   (k 0.196 – 1.047)
-    ///   tier 2: lambda < 6 m      (k > 1.047)
-    ///
-    /// The long end of the coarsest tier is not limited — there is no tier
-    /// above it. The four is a [CALIBRATION].
-    Vector4 TierBandLimits()
-    {
-        Vector3 L = settings.patchSizes;
-
-        float b0 = 4f * SeaConstants.TwoPi / Mathf.Max(L.y, 1f);
-        float b1 = 4f * SeaConstants.TwoPi / Mathf.Max(L.z, 1f);
-
-        return new Vector4(b0, b1, 1e9f, 0f);
     }
 }

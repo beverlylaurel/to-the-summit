@@ -293,11 +293,25 @@ Shader "ToTheSummit/SeaLit"
                 perceptualRoughness = lerp(perceptualRoughness, 0.22,
                                            _SeaPrecipIntensity01 * 0.7);
 
-                // DISTANT GLITTER IS DIFFUSE. Far waves live below what the
-                // camera can resolve, so the glitter spreads out
-                // [SOURCE: Tessendorf 2004 6 introduction].
-                perceptualRoughness = lerp(perceptualRoughness, 0.35,
-                                           saturate((dist - 200.0) / 1500.0));
+                // DISTANT GLITTER IS DIFFUSE, AND THE AMOUNT IS NOT A GUESS.
+                //
+                // Far waves live below what the camera can resolve, so the glitter
+                // spreads out [SOURCE: Tessendorf 2004 6 introduction]. It used to be
+                // `lerp(rough, 0.35, (dist - 200) / 1500)` -- the right shape with three
+                // numbers behind it that nothing measured. The quantity it stood for is
+                // the slope variance of the waves this pixel had to drop, and the
+                // spectrum knows that exactly (`SeaSpectrumMoments`).
+                //
+                // GGX: widening the lobe by a slope variance is `a^2 += 2 sigma^2` per
+                // axis, and an isotropic surface splits the variance evenly between the
+                // two, so `a^2 += sigma^2` [SOURCE: Bruneton, Neyret & Holzschuch 2010].
+                // `a` is URP's `roughness`, the square of `perceptualRoughness`.
+                //
+                // Near the camera nothing is dropped, the term is zero, and the shallow
+                // water is left exactly as it was.
+                float roughA = perceptualRoughness * perceptualRoughness;
+                roughA = sqrt(roughA * roughA + SeaUnresolvedSlopeVariance(pixelSize));
+                perceptualRoughness = sqrt(roughA);
 
                 // --- THE WATER BODY'S OWN COLOUR ---
                 //

@@ -1,4 +1,4 @@
-// ROLE: integrates the two spectrum partitions on the CPU and returns Hs and Tp.
+// ROLE: integrates the two spectrum partitions on the CPU and returns Hs, Tp and the per-tier slope variance.
 // CALLED BY: SeaManager (UpdateState).
 
 using UnityEngine;
@@ -46,13 +46,24 @@ public static class SeaSpectrumMoments
         public readonly float BeatPeriod;
         public readonly float BeatDepth;
 
+        /// SLOPE VARIANCE PER TIER, `INTEGRAL k^2 S(w) dw` over that tier's own
+        /// wavenumber band.
+        ///
+        /// It is the surface roughness a tier CARRIES. When a tier's waves fall
+        /// below one pixel the shader stops sampling it, and the variance it was
+        /// carrying has to reappear as reflection lobe width or the far water turns
+        /// into a mirror that flickers. Cox & Munk 1954 give the total for a real
+        /// sea, `0.003 + 0.00512 U10`, which is what these three sum towards.
+        public readonly Vector3 TierSlopeVariance;
+
         public Result(float significantHeight, float peakPeriod,
-                      float beatPeriod, float beatDepth)
+                      float beatPeriod, float beatDepth, Vector3 tierSlopeVariance)
         {
             SignificantHeight = significantHeight;
             PeakPeriod = peakPeriod;
             BeatPeriod = beatPeriod;
             BeatDepth = beatDepth;
+            TierSlopeVariance = tierSlopeVariance;
         }
     }
 
@@ -64,7 +75,8 @@ public static class SeaSpectrumMoments
     const float OmegaStep = 0.005f;
 
     public static Result Integrate(float windSpeed, SeaSettings settings,
-                                   float swellPeriod, float swellEnergy)
+                                   float swellPeriod, float swellEnergy,
+                                   Vector2 tierBandLimits)
     {
         float u = Mathf.Max(windSpeed, 0.1f);
         float fetch = settings.fetch;
@@ -84,6 +96,11 @@ public static class SeaSpectrumMoments
         float swellGamma = settings.swellGamma;
 
         double m0 = 0.0, m0Wind = 0.0, m0Swell = 0.0;
+        double mss0 = 0.0, mss1 = 0.0, mss2 = 0.0;
+
+        // Waves shorter than the cutoff are not in the field at all, so their
+        // slope is not this surface's to carry.
+        float kCutoff = SeaConstants.TwoPi / Mathf.Max(settings.smallWaveCutoff, 1e-3f);
         float peakDensity = -1f;
         float peakOmega = omegaPSwell;
 
@@ -113,6 +130,21 @@ public static class SeaSpectrumMoments
                 peakDensity = total;
                 peakOmega = omega;
             }
+
+            // THE SLOPE MOMENT, SPLIT THE WAY THE TIERS ARE SPLIT.
+            //
+            // Deep-water dispersion puts this frequency at `k = w^2/g`, and the
+            // tier that carries that wavenumber is the one whose band contains it
+            // -- the same rule `SeaSettings.TierBandLimits` hands the compute
+            // shader, so no band is counted twice and none is missed.
+            float k = o2 / g;
+            if (k <= kCutoff)
+            {
+                double contribution = k * k * total * OmegaStep;
+                if (k < tierBandLimits.x) mss0 += contribution;
+                else if (k < tierBandLimits.y) mss1 += contribution;
+                else mss2 += contribution;
+            }
         }
 
         // Amplitudes of the two partitions, and their beat.
@@ -126,7 +158,8 @@ public static class SeaSpectrumMoments
 
         return new Result(4f * Mathf.Sqrt((float)m0),
                           SeaConstants.TwoPi / Mathf.Max(peakOmega, 1e-4f),
-                          beatPeriod, beatDepth);
+                          beatPeriod, beatDepth,
+                          new Vector3((float)mss0, (float)mss1, (float)mss2));
     }
 
     /// JONSWAP peak frequency (rad/s). Mirrors `SeaPeakOmega`.

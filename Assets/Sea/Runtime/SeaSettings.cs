@@ -150,6 +150,19 @@ public class SeaSettings : ScriptableObject
     [Tooltip("Summation weight of each tier.")]
     public Vector3 tierWeights = new Vector3(1f, 1f, 1f);
 
+    /// WHERE ONE TIER STOPS AND THE NEXT BEGINS, IN WAVENUMBER.
+    ///
+    /// If all three tiers carried the same `k` range the energy would be counted
+    /// three times. A tier carries a wavelength only if at least four full periods
+    /// fit in its patch (lambda <= L/4); anything longer is handed to a coarser
+    /// tier. The four is a [CALIBRATION].
+    ///
+    /// Both the GPU spectrum and the CPU slope moment read it here, so the two
+    /// cannot drift apart.
+    public Vector2 TierBandLimits => new Vector2(
+        4f * SeaConstants.TwoPi / Mathf.Max(patchSizes.y, 1f),
+        4f * SeaConstants.TwoPi / Mathf.Max(patchSizes.z, 1f));
+
     /// Choppy displacement scale. It sharpens the crests and broadens the
     /// troughs — the nonlinear behaviour that makes the FFT representation
     /// look real. [SOURCE: Tessendorf 2004 equation 44]

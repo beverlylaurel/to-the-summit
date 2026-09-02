@@ -1526,6 +1526,25 @@ bir dalga uzaktaki büyük bir fırtınanın imzasıdır ve o fırtınanın ener
 
 ---
 
+## Deniz: çözülemeyen eğim varyansı yansıma lobuna gider (2026-09-02)
+
+**Kademeler kendi dalga boyuyla sönümleniyor, mesafeyle değil.** Bir kademenin dalgaları
+bir pikselin altına düştüğünde `SeaSampleSlope` onu bırakır — nokta örneklemesi gürültüdür.
+
+**Bıraktığı pürüzlülük geri veriliyor.** Kaybolan eğim varyansı yansıma lobunu genişletir:
+GGX'te `a² += σ²` (izotropik yüzey varyansı iki eksene bölüştürür), `a` URP'nin
+`roughness`'ı. Varyans spektrumdan geliyor — `SeaSpectrumMoments` her kademenin kendi
+`k` bandı üzerinde `∫k²S(ω)dω` integralini Hs ile aynı döngüde alıyor.
+
+**Kademe bant kenarları tek yerde.** `SeaSettings.TierBandLimits` hem compute shader'ın
+`_SeaTierCutoffK`'sını hem CPU eğim momentini besliyor; ikisi ayrışamaz.
+
+**Bu titremeyi çözmedi.** Ölçüldü: terim öncesi/sonrası titreşim %11,00 / %11,07 — yani
+eski elle ayarlanmış rampa (`lerp(rough, 0.35, (dist−200)/1500)`) doğru değeri veriyormuş.
+Kazanç ayarlanmış üç sayının gitmesi: kapiler bant dördüncü kademe olarak geldiğinde
+pürüzlülük kendiliğinden takip edecek. Titremenin kaynağı **lob genişliği değil**
+(`RATIONALE.md`).
+
 ## Deniz: kapiler kuyruk ve kıyı dalga treni (2026-09-01)
 
 **14 cm altı eğim bandı şu an YOK.** Yüzeyin eğim varyansı Cox & Munk'a göre 5 m/s'de

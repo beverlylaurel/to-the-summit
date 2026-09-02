@@ -3137,3 +3137,45 @@ yörünge doğru, ölçek yanlış.
 
 Kaynak sabitler: `SEA_SHORE_WAVE_SHARE = 0.65`, `SEA_SHORE_WAVE_BREAK_MULT = 1.5`.
 Bir sonraki adım bu ikisidir, atma değil.
+
+### Uzak denizin titremesi lob genişliğinden gelmiyor
+
+Belirti: "denizde belli bir mesafeden sonra titreme var." Ufuk bandı %21 daraltılınca
+titreme %21 azaldı; kalanın kaynağı gök yansıması sanılıyordu.
+
+**Önce ölçüm aracı.** Sabit kamerayla 12 kare alınıyor. Kare farkının iki kaynağı var:
+dalganın gerçekten hareket etmesi ve piksel altı dalgaların örnekleme noktasından geçip
+yansımayı açıp kapatması. Ayıran şey ölçek — gerçek hareket 16×16 kutu ortalamasından
+sağ çıkar (bir tepe yüzlerce piksel), aliasing çıkmaz:
+
+    titreşim = (piksel zaman sapması) − (blok zaman sapması)
+
+Aracın kendisi gradyanıyla doğrulandı: yakın bantta %2,15, orta bantta %8,88, ufka yakın
+bantta %11,00. Belirti tam olarak bu — uzaklaştıkça artıyor.
+
+**Fiziksel terim eklendi, görüntü değişmedi.** Çözülemeyen eğim varyansı GGX lobuna
+verildi (`a² += σ²`, Bruneton ve ark. 2010). Spektrumdan gelen varyans, U10 = 5,2 m/s'de
+kademe başına 0,00088 / 0,00475 / 0,00793, toplam 0,0136.
+
+| bant | önce | sonra | 50 kat |
+|---|---|---|---|
+| ufka yakın | %11,00 | %11,07 | %3,34 |
+| orta | %8,88 | %9,12 | %3,53 |
+| yakın | %2,15 | %2,60 | %0,50 |
+
+Terimi 50 katına çıkarmak titremeyi üçte birine indiriyor — yani **shader canlı ve
+mekanizma doğru**, ama fiziksel büyüklük yetmiyor. Hesap da bunu söylüyor: taban
+pürüzlülük 0,051, tüm kademeler kaybolduğunda `sqrt(0,051⁴ + 0,0136)` = 0,117 → algısal
+pürüzlülük 0,342. Eski elle ayarlanmış rampanın vardığı yer 0,35 idi. **Ayar doğruymuş.**
+
+Terim yine de kalıyor: üç ayarlanmış sayı gitti ve pürüzlülük artık spektruma bağlı.
+Kapiler bant dördüncü kademe olarak geldiğinde kendiliğinden takip edecek.
+
+**Kalan titremenin kaynağı başka.** 50 katta düzelmesi lobun ilgili olduğunu söylüyor ama
+fiziksel varyansın yetmemesi şunu gösteriyor: kalan kademeler de **nokta örnekleniyor**,
+yani korunan kademelerin kendi mip filtresinin sildiği varyans da geri verilmiyor. Doğru
+adım LEADR/mip yolu — her kademe için mip seviyesinin altında kalan varyans. Ölçülmeden
+yazılmayacak.
+
+**Kum berraklığı korundu:** detay 0,547 → 0,559 (1 m) ve 0,406 → 0,409 (2 m). Terim
+yakında sıfır olduğu için sığ su tanım gereği etkilenmiyor.

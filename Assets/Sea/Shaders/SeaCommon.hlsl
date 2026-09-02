@@ -44,6 +44,7 @@ float  _SeaDeepWaterDepth;
 // --- Tier parameters (spec 6.6) ---
 float3 _SeaPatchSizes;
 float3 _SeaTierWeights;
+float3 _SeaTierSlopeVariance;
 float3 _SeaChoppinessPerTier;
 
 float _SeaSpectrumDepth;
@@ -225,6 +226,30 @@ float4 SeaSampleDisplacement(float2 posXZ)
 float SeaTierResolvable(float wavelength, float pixelSize)
 {
     return saturate(wavelength / max(pixelSize * 2.0, 1e-5) - 1.0);
+}
+
+/// THE SLOPE VARIANCE THIS PIXEL IS NOT ALLOWED TO SEE.
+///
+/// `SeaSampleSlope` drops a tier once its waves fall under one pixel, because a
+/// point sample of them is noise. The roughness they carried does not vanish with
+/// them in the real world -- it widens the reflection lobe. Handed back that way,
+/// the far water stays as rough as it is instead of turning into a flickering
+/// mirror [SOURCE: Bruneton, Neyret & Holzschuch 2010, section 4].
+///
+/// A tier whose weight is zero contributes nothing: those waves are not on the
+/// surface at all, so there is nothing of theirs to give back.
+float SeaUnresolvedSlopeVariance(float pixelSize)
+{
+    float lost = 0.0;
+
+    [unroll]
+    for (int s = 0; s < SEA_TIER_COUNT; ++s)
+    {
+        lost += _SeaTierSlopeVariance[s] * _SeaTierWeights[s]
+              * (1.0 - SeaTierResolvable(_SeaPatchSizes[s], pixelSize));
+    }
+
+    return lost;
 }
 
 /// THE SWASH SURGE. Mirrored from `SeaManager.SeaSwashSurge` -- the foam, the

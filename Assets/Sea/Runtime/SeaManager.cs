@@ -30,6 +30,7 @@ public class SeaManager : MonoBehaviour
 
     /// `(beat angular frequency, beat depth, 0, 0)`.
     Vector4 waveGroups;
+    Vector3 tierSlopeVariance;
 
     public SeaSettings Settings => settings;
 
@@ -333,11 +334,13 @@ public class SeaManager : MonoBehaviour
         if (!momentsValid || !momentInputs.Matches(inputs))
         {
             SeaSpectrumMoments.Result m = SeaSpectrumMoments.Integrate(u, settings, env.SwellPeriod,
-                                                                        env.SwellEnergyScale);
+                                                                        env.SwellEnergyScale,
+                                                                        settings.TierBandLimits);
             SeaRuntimeState.SignificantWaveHeight = m.SignificantHeight;
             SeaRuntimeState.PeakPeriod = m.PeakPeriod;
             waveGroups = new Vector4(SeaConstants.TwoPi / Mathf.Max(m.BeatPeriod, 0.1f),
                                      m.BeatDepth, 0f, 0f);
+            tierSlopeVariance = m.TierSlopeVariance;
             momentInputs = inputs;
             momentsValid = true;
         }
@@ -355,6 +358,15 @@ public class SeaManager : MonoBehaviour
         // spectrum has two peaks. Without it the edge sits on one depth contour and
         // draws the shoreline's own curve.
         Shader.SetGlobalVector(SeaShaderIDs.WaveGroups, waveGroups);
+
+        // WHAT THE PIXEL CANNOT SEE STILL HAS TO BE PAID FOR.
+        //
+        // A tier whose waves fall below one pixel is dropped from the normal, and the
+        // slope variance it carried leaves with it: the far water flattens into a
+        // mirror and then flickers as the sample point crosses crests it no longer
+        // resolves. The surface shader adds this variance back as reflection lobe
+        // width instead [SOURCE: Bruneton, Neyret & Holzschuch 2010].
+        Shader.SetGlobalVector(SeaShaderIDs.TierSlopeVariance, tierSlopeVariance);
 
         // HOW HIGH THE SWASH REACHES — STOCKDON, NOT A FIXED NUMBER.
         //

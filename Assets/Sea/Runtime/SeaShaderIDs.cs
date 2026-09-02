@@ -45,6 +45,7 @@ public static class SeaShaderIDs
 
     /// Upper bounds of the tier bands (rad/m).
     public static readonly int TierCutoffK = Shader.PropertyToID("_SeaTierCutoffK");
+    public static readonly int TierSlopeVariance = Shader.PropertyToID("_SeaTierSlopeVariance");
 
     public static readonly int PatchSizes = Shader.PropertyToID("_SeaPatchSizes");
     public static readonly int TierWeights = Shader.PropertyToID("_SeaTierWeights");

@@ -5041,3 +5041,22 @@ Bunun aracı hazır değil; kurulmadan üçüncü düzeltme yazılmayacak.
 
 **Şekil yine geri alındı.** Kum netliği korundu (`kum1` detay 0,556 → 0,550 aralığında,
 gürültü içinde).
+
+## Uzak denizde titreme: ilk şüpheli lob genişliğiydi, değilmiş — AÇIK (2026-09-02)
+
+**Kullanıcının ağzından:** "denizde belli bir mesafeden sonra titreme var."
+
+**Yanlış çıkan ilk şüpheli:** gök yansımasının lob genişliği. Ufuk bandı düzeltmesi
+titremenin %21'ini almıştı; kalanın çözülemeyen eğim varyansından geldiği düşünüldü.
+
+**Ayırt eden ölçüm:** sabit kamerayla 12 kare; piksel zaman sapmasından blok (16×16)
+zaman sapması çıkarılıyor — gerçek dalga hareketi blok ortalamasından sağ çıkar, aliasing
+çıkmaz. Bantlar: yakın %2,15, orta %8,88, ufka yakın %11,00.
+
+Fiziksel varyans lobla toplandığında ufka yakın bant %11,00 → %11,07. **Değişmedi.** Aynı
+terim 50 katına çıkarıldığında %3,34'e iniyor: shader canlı, mekanizma doğru, büyüklük
+yetersiz. Eski elle ayarlanmış rampa zaten aynı değere (0,35) varıyormuş.
+
+**Gerçek sebep henüz bulunmadı.** Kanıtlanan: kalan titreme fiziksel eğim varyansıyla
+açıklanmıyor. Sıradaki hipotez, korunan kademelerin de nokta örneklenmesi — mip'in sildiği
+varyans da geri verilmiyor (LEADR). Ölçülmeden düzeltme yazılmayacak.
