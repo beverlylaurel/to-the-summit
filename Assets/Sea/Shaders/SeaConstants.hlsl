@@ -10,15 +10,11 @@
 /// Gravity. [SOURCE: Tessendorf 2004 4.2]
 #define SEA_G                    9.81
 
-#define SEA_SQRT2                1.41421356
 #define SEA_TWO_PI               6.28318530718
 
 /// Index of refraction of water. [SOURCE: Tessendorf 2004 6.1.2, 6.3 sample shader]
 #define SEA_WATER_IOR            1.34
 
-/// Bulk reflectivity of the water volume, treated as a Lambertian reflector.
-/// [SOURCE: Tessendorf 2004 7.1]
-#define SEA_BULK_REFLECTIVITY    0.04
 
 // --- Spectrum (JONSWAP / TMA) ---
 
@@ -30,10 +26,6 @@
 #define SEA_JONSWAP_SIGMA_LO     0.07
 #define SEA_JONSWAP_SIGMA_HI     0.09
 
-/// Deep-water steepness limit. If the FFT output exceeds it the wave already
-/// produces foam through the Jacobian test; NO separate check is written.
-/// [SOURCE: Michell 1893]
-#define SEA_MICHELL_STEEPNESS    0.142
 
 // --- Shallow water and breaking ---
 
@@ -221,7 +213,6 @@
 /// [SOURCE: Tessendorf 2004 4.4 — "For many situations, values in the
 /// range 128 to 512 are sufficient"]
 #define SEA_FFT_SIZE             256
-#define SEA_FFT_LOG2             8
 
 /// UPPER BOUND on tiers. A preset may run fewer; the textures are always
 /// created at this depth.

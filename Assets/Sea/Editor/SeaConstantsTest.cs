@@ -36,14 +36,11 @@ public static class SeaConstantsTest
     {
         ("G", "SEA_G"),
         ("TwoPi", "SEA_TWO_PI"),
-        ("Sqrt2", "SEA_SQRT2"),
         ("WaterIor", "SEA_WATER_IOR"),
-        ("BulkReflectivity", "SEA_BULK_REFLECTIVITY"),
 
         ("JonswapGamma", "SEA_JONSWAP_GAMMA"),
         ("JonswapSigmaLo", "SEA_JONSWAP_SIGMA_LO"),
         ("JonswapSigmaHi", "SEA_JONSWAP_SIGMA_HI"),
-        ("MichellSteepness", "SEA_MICHELL_STEEPNESS"),
 
         ("HashPeriod", "SEA_HASH_PERIOD"),
 
@@ -61,13 +58,13 @@ public static class SeaConstantsTest
         ("FoamDecay", "SEA_FOAM_DECAY"),
 
         ("FftSize", "SEA_FFT_SIZE"),
-        ("FftLog2", "SEA_FFT_LOG2"),
         ("TierCount", "SEA_TIER_COUNT"),
     };
 
-    /// Deliberately C#-only constants. Currently none; if a constant the CPU
-    /// computes but the shader never reads appears, it goes here.
-    static readonly string[] CsharpOnly = { };
+    /// Deliberately C#-only constants: the CPU computes with them and the shader
+    /// never reads them, so a shader twin would be a value nothing can drift
+    /// against. The mirror image of the HLSL-only rule above.
+    static readonly string[] CsharpOnly = { "Sqrt2" };
 
     [MenuItem("To The Summit/Sea/Test Constant Parity", false, 80)]
     static void RunMenu() => Debug.Log(Run(out bool ok) + (ok ? "" : "\nPARITY BROKEN."));

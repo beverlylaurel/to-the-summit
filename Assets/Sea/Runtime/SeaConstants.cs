@@ -24,8 +24,6 @@ public static class SeaConstants
     /// Index of refraction of water. [SOURCE: Tessendorf 2004 §6.1.2]
     public const float WaterIor = 1.34f;
 
-    /// Bulk reflectivity of the water volume. [SOURCE: Tessendorf 2004 §7.1]
-    public const float BulkReflectivity = 0.04f;
 
     // --- Spectrum (JONSWAP / TMA) ---
 
@@ -37,8 +35,6 @@ public static class SeaConstants
     public const float JonswapSigmaLo = 0.07f;
     public const float JonswapSigmaHi = 0.09f;
 
-    /// Deep-water steepness limit. [SOURCE: Michell 1893]
-    public const float MichellSteepness = 0.142f;
 
     /// Period the procedural noise folds its coordinate into before hashing.
     /// The shore sits kilometres from the origin and a float stops carrying the
@@ -86,7 +82,6 @@ public static class SeaConstants
 
     /// FFT grid size. [SOURCE: Tessendorf 2004 §4.4]
     public const int FftSize = 256;
-    public const int FftLog2 = 8;
 
     /// Number of tiers. [SOURCE: Tessendorf 2004 §4.4; Dupuy & Bruneton 2012]
     public const int TierCount = 3;
