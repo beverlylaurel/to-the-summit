@@ -3267,3 +3267,45 @@ birden okuyan ikinci araç bunu ayırdı.
 
 **Kum berraklığı korundu:** detay 0,550 → 0,575 (1 m) ve 0,401 → 0,396 (2 m). Kafes
 yoğunlaşması %24,96 → %10,25, yani yüzey daha az düzenli.
+
+### Planın üç maddesi ölçüldü, ikisi düştü
+
+`Review/ultra_realistic_living_sea_master_plan.md` üç eksik sayıyordu. Ölçüm:
+
+**Okyanus ataleti — gereksiz.** Süre-sınırlı büyüme yasasıyla (CERC) simüle edildi: 6
+gerçek saatlik oyun, saniyede bir adım. Ataletli ve bugünkü Hs **birebir aynı** çıktı
+(1,73 – 3,15 m, salınım 1,42 m). Sebep: deniz bir kez gelişince fiziksel olarak sönmüyor —
+rüzgâr dinince ölü dalgaya dönüşüp binlerce km yol alıyor, 6 saatlik döngüde kaybı yok
+denecek kadar az. Büyüme yasası var, sönme yasası yok.
+
+Ayrıca oran ters: dalga gelişimi 9,5 – 15 oyun saati, fırtına döngüsü 6 saat. Deniz havayı
+yakalayamaz; fiziksel atalet çeşitliliği artırmaz, ortalamaya oturtur.
+
+Ve aranan şey zaten var: `SwellEvent01`, 9 oyun saatlik saatiyle ve yerel rüzgârdan
+bağımsız. Rüzgâr sabit tutulup yalnız o gezdirildiğinde Hs 1,57 → 3,79 m (U10 5,2) ve
+Tp 5,7 → 15,9 s. Rüzgârın oynattığından fazla. Üstüne atalet koymak ikinci bir yavaş
+kaynak olurdu.
+
+**Set modülasyonu — gereksiz.** Grup uzunluğu tayfın darlığından: enerji taşıyan bantta
+(3ωp'ye kadar, standart) `nu = 0,322`, yani **grup başına 3,1 dalga**. Literatür
+`nu 0,20 – 0,35` ve 3 – 5 dalga. Zaten doğru.
+
+İlk hesap 1,5 – 2,7 dalga demişti ve yanlıştı: kuyruğun tamamına (9× tepe frekansı) kadar
+integral alıyordu. `nu` kesim noktasına aşırı duyarlı — 1,5 rad/s'de 0,199, 8 rad/s'de
+0,384. Oşinografide enerji bandında ölçülür.
+
+**Stokes asimetrisi — iddia yanlış, ama pay var.** Plan "choppiness artırılınca mesh iç
+içe geçiyor" diyor. Ölçüldü, tepe dalga boyunda `lambda·k·a`:
+
+| fırtına | U10 | choppiness | k·a | lambda·k·a |
+|---|---|---|---|---|
+| 0,10 | 5,2 m/s | 1,19 | 0,099 | 0,118 |
+| 0,57 | 9,6 m/s | 1,73 | 0,108 | 0,187 |
+| 0,95 | 14,0 m/s | 2,27 | 0,116 | **0,263** |
+
+Sivri uç 1,0'da; yüzey sınırın %26'sında, dört kat pay var. Ama diklik `k·a ≈ 0,11` gerçek
+bir rüzgâr denizinin dikliği (0,05 – 0,15) ve o diklikte ikinci mertebe Stokes düzeltmesi
+zaten küçük (`k·a/2`, yani genliğin %6'sı). Sayı "artır" demiyor, "artırabilirsin" diyor.
+
+Fırtınada choppiness 2,4 / 3,6 / 4,8 kareleri kullanıcıya gösterildi: fark görülmedi,
+**2,4 kaldı**. Mesh hiçbirinde bozulmadı, yani payın gerçek olduğu da doğrulandı.
