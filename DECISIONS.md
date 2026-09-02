@@ -12,12 +12,11 @@ iş bitince buradan silinir.**
 
 ## Kayıtlar
 
-79 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
+78 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
 
 - [İz gövdesi damgalar arası yolu SÜPÜRMÜYOR — KAPANDI (2026-08-25)](#iz-govdesi-damgalar-arasi-yolu-supurmuyor-kapandi-2026-08-25)
 - [Ova kontrastı düzeltilmiyor — irtifadan geliyor](#ova-kontrasti-duzeltilmiyor-irtifadan-geliyor)
 - [Oyun alanı 17.5 → 30 km, ve yalıtım halkası](#oyun-alani-175-30-km-ve-yalitim-halkasi)
-- [Bloke eden açık sorular](#bloke-eden-acik-sorular)
 - [Silinecek geçiciler](#silinecek-geciciler)
 - [Bekleyen kararlar](#bekleyen-kararlar)
 - [Bekleyen ölçümler](#bekleyen-olcumler)
@@ -153,16 +152,6 @@ bozulmadı). Tam liste `SCALE.md` → "terrainSize değişince elle düzeltilece
 **Tetikleyici — geri dönülecek belirti:** uzak bantlar (18–60 km) gelince 15 km'deki
 ova/silsile geçişi görünür bir dikiş yaratırsa halkanın dış sönümü o banda taşınır.
 
-## Bloke eden açık sorular
-
-Cevaplanmadan ilgili sisteme kod yazılmaz.
-
-- **Ekipman ve kamp** — ekipmanın envanterde nasıl durduğu, kamp/sığınakta ne yapıldığı
-  → [Oynanış mekaniği netleşmeden koda başlanmaz](#oynanış-mekaniği-netleşmeden-koda-başlanmaz)
-- **Tırmanma ayrıntıları** — tutamak üretimi hangi veriden beslenir, düşüş hasarının
-  eğrisi, ip fizik olarak mı kural olarak mı
-  → [Tırmanma üç modlu, modu ZEMİN belirler](#tırmanma-üç-modlu-modu-zemin-belirler)
-
 ## Silinecek geçiciler
 
 - **Ova ve patika ölçüm araçları** (`ForelandProbe`, F1'deki kurulum süresi logu) — ova
@@ -180,8 +169,10 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
 
 ## Bekleyen kararlar
 
-- **Suya girme tetikleyicisi ateşlendi** — oyuncu denize yürüyebiliyor ve su altı düz
-  siyah. Aşağıda, "Deniz: kapsam dışı bırakılanlar".
+- **Oyuncu su kenarında durdurulacak** — suya girme KAPANDI (2026-09-02, kullanıcı
+  kararı), ama oyuncu şu an denize yürüyebiliyor ve göz su seviyesinin altına inince
+  ekran karanlık. Sualtı render yolu yazılmayacağına göre oyuncunun oraya varmaması
+  gerekiyor. Aşağıda, "Deniz: kapsam dışı bırakılanlar".
 
 - **Denizin uzak kenarı yükseklikten ~%5'lik bir basamak** — 6028 m'de deniz 90 km'lik
   uzak düzlemde, %27 görünürken kesiliyor. Dört şüpheli ölçümle elendi: bulut sırası,
@@ -2089,15 +2080,16 @@ tip okunuyorsa — o zaman fotoğraf tabanlı doku gerekir.
 
 ## Deniz: kapsam dışı bırakılanlar
 
-Spec §2 bunları açıkça kapsam dışı sayıyor. Hepsinin **tetikleyicisi oyuncunun suya
-girebilir hâle gelmesi** — ve **bu tetikleyici 2026-09-02'de ateşlendi**: kuru kumdan
-(13440, 2000) denize doğru yürüyüş ölçüldü, zemin kesintisiz iniyor ve hiçbir şey
-durdurmuyor. Göz su seviyesinin altına inince su çizgisinin altı düz siyah; ışın izleme
-deniz dibinin 7 m ötede, 25 m kotunda **orada olduğunu** gösteriyor (`SYMPTOMS.md` → "Su
-altında deniz dibi simsiyah"). Yani eksik olan geometri değil, sualtı render yolu.
+Spec §2 bunları açıkça kapsam dışı sayıyor.
 
-Karar hâlâ kullanıcınındır: aşağıdaki maliyet ödenecek mi, yoksa oyuncu suya girmeden mi
-durdurulacak. İkisi de yapılmadan bırakıldı.
+**SUYA GİRME KAPANDI (2026-09-02).** Kullanıcı kararı: oyuncu suya girmeyecek. Yani
+aşağıdaki maliyetlerin hiçbiri ödenmeyecek ve tetikleyici artık geçersiz — bu satırlar
+kapanmış bir kararı kayıt için tutuyor, aksiyon gerektirmiyorlar.
+
+**Ama bir iş kaldı:** oyuncu şu an denize yürüyebiliyor. Ölçüldü, kuru kumdan
+(13440, 2000) denize doğru yürüyüşte zemin kesintisiz iniyor ve hiçbir şey durdurmuyor;
+göz su seviyesinin altına inince su çizgisinin altı düz siyah (`SYMPTOMS.md` → "Su altında
+deniz dibi simsiyah"). Sualtı yazılmayacağına göre oyuncunun oraya varmaması gerekiyor.
 
 
 | Ne | Geri döndüren belirti |

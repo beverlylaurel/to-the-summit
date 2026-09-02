@@ -5183,9 +5183,10 @@ düz gidiyor.
 birebir aynı çıktı — "deniz zaten çizilmiyor" sanıldı. Sonra `mr.enabled` geri okundu:
 `True`. Anahtar tutmamış. Zirve testinde tuttuğu için (üçgen 343k → 6k) fark edildi.
 
-**Kapsam:** sualtı render yolu `DECISIONS.md` → "Deniz: kapsam dışı bırakılanlar"da,
-tetikleyicisi "oyuncu kıyıdan denize adım atabiliyorsa". **Tetikleyici ateşlendi:** kuru
-kumdan (13440) suya doğru yürüyüş ölçüldü, hiçbir şey durdurmuyor.
+**Kapsam:** sualtı render yolu yazılmayacak — suya girme 2026-09-02'de kullanıcı kararıyla
+kapandı (`DECISIONS.md`). Belirti kalıyor çünkü oyuncu hâlâ oraya yürüyebiliyor: kuru
+kumdan (13440) suya doğru yürüyüş ölçüldü, hiçbir şey durdurmuyor. Kapanış, dibi çizmekle
+değil **oyuncuyu su kenarında durdurmakla** gelecek.
 
 ## Play sırasında deniz kalitesi değiştirilirse yüzey düz bir levhaya döner (2026-09-02)
 
