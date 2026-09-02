@@ -56,6 +56,11 @@ float _SeaSignificantHeight;
 float _SeaPeakPeriod;
 float _SeaShoreSlope;
 
+/// Along-shore wavenumber vector (rad/m). It tilts the shore train's crests off the
+/// depth contours by the residual angle refraction leaves, which is what makes a wave
+/// break progressively along its length instead of all at once. Written by `SeaManager`.
+float2 _SeaShorePeel;
+
 /// `(beat angular frequency, beat depth, 0, 0)` — the two spectral peaks' interference.
 /// This is what a "set" is: the arriving waves grow and shrink over the beat period.
 float4 _SeaWaveGroups;
@@ -740,6 +745,16 @@ float SeaShoreWaveHeight(float2 posXZ, float depth, float slope, float gamma,
     // the whole shore and it is what the ballistic run-up already uses.
     float b = max(_SeaShoreSlope, 0.005);
     float phase = 2.0 * omega * sqrt(depth) / (b * sqrt(SEA_G)) - omega * _SeaTime;
+
+    // THE CREST IS NOT QUITE PARALLEL TO THE BEACH, AND THAT IS THE WHOLE POINT.
+    //
+    // With the phase depending on depth alone, every point at the same depth broke in
+    // the same instant: peel angle zero, the wave shuts down along its whole length and
+    // nothing about it reads as surf. Refraction never finishes the job -- Snell leaves
+    // a residual angle at the breaker line -- and `SeaManager` turns that residual into
+    // this one global wavenumber vector. Linear in position, so the phase stays
+    // integrable and no contour rings come back.
+    phase += dot(_SeaShorePeel, posXZ);
 
     // Height is what the bottom allows: the breaking limit, and no more.
     float amp = gamma * depth * 0.5 * SEA_SHORE_WAVE_SHARE * grip;

@@ -1465,6 +1465,27 @@ eşitliği `Sea/Test Constant Parity` denetliyor.
 gitti; deniz bölümünde yalnız Hs / Tp / kıyı köpüğü okuması kaldı.
 
 
+## Deniz: kıyı dalgasının soyulma açısı (2026-09-02)
+
+**Bir dalga tüm boyunca aynı anda kırılmaz.** Kırılma bir noktadan başlar ve cephe boyunca
+yürür; sörf literatürü aradaki açıya **soyulma açısı** der. 0° kapanan dalgadır (sörf
+edilemez), 20–70° sörf edilebilir aralıktır. [KAYNAK: Scarfe 2002; Mead & Black]
+
+**Açı uydurulmaz, kırılmadan artakalandır.** Snell `sin(θ)/c` sabit tutar; `c` derin suda
+`gT/2π`, kırılma hattında `√(gh)`. Ölü dalga kıyıya `θ₀` ile gelirse kırılırken `θ_b`
+kalır — soyulma açısı odur.
+
+**Rüzgârın değil ölü dalganın yönü.** Kıyıda kırılan ölü dalgadır ve `swellDirectionOffset`
+onu yerel rüzgârdan çevirir. Rüzgârla sürüldüğünde açı 5,2° çıkıyordu — hâlâ kapanan
+dalga. Ölü dalga yönüyle 21,8°.
+
+**Tek global vektör, piksel başına yön değil.** Faz integre edilebilir kalmalı: yerel
+bathymetri gradyanı bir kez faza sokulmuş ve crest'leri her kontura oturan halkalar
+hâline getirmişti (`SYMPTOMS.md`). Kıyı normali kare başına BİR kez, kameranın yanında
+örnekleniyor; ürettiği kıyı-boyu terim düz bir doğrusal faz.
+
+---
+
 ## Deniz: ölü dalga olayı (2026-09-01)
 
 **Ölü dalga kendi saatinde gelir, yerel havadan bağımsız.** `SeaEnvironmentBridge` peryodu

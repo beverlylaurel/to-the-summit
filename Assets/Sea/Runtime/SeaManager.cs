@@ -194,6 +194,82 @@ public class SeaManager : MonoBehaviour
         Shader.SetGlobalFloat(SeaShaderIDs.FoamBreakupTiling, settings.foamBreakupTiling);
     }
 
+    /// WHY A BREAKING WAVE DOES NOT BREAK ALL AT ONCE.
+    ///
+    /// A crest that meets the beach exactly parallel breaks along its whole length in the
+    /// same instant. Nothing on a real coast does that, and surfers have a name for the
+    /// difference: the PEEL ANGLE, between the trail of broken water and the crest still
+    /// standing. Zero degrees is the wave that shuts down in one go; 30 to 70 degrees is
+    /// the range anyone can ride. [SOURCE: Scarfe 2002; Mead & Black]
+    ///
+    /// The angle is not invented here, it is what survives refraction. Snell's law for
+    /// water waves keeps `sin(theta) / c` constant, and `c` collapses from `gT/2pi` in
+    /// deep water to `sqrt(g h)` at the breaker line, so a swell arriving at `theta_0`
+    /// still meets the shore at a small residual `theta_b`. That residual IS the peel.
+    ///
+    /// ONE GLOBAL VECTOR, NOT A PER-PIXEL DIRECTION. The phase has to stay integrable:
+    /// feeding the local bathymetry gradient into it once already drew the crests as
+    /// rings following every depth contour (`SYMPTOMS.md`). The shore normal is therefore
+    /// sampled ONCE per frame, near the viewer, and the along-shore term it produces is a
+    /// plain linear phase.
+    void PublishPeel(float slope)
+    {
+        var cam = Camera.main;
+        Vector3 at = cam != null
+            ? cam.transform.position
+            : terrain.transform.position + new Vector3(terrain.terrainData.size.x * 0.5f,
+                                                       0f,
+                                                       terrain.terrainData.size.z * 0.5f);
+
+        // The shore normal from the bathymetry: the direction the bottom rises.
+        const float Step = 40f;
+        float hx0 = terrain.SampleHeight(at + new Vector3(-Step, 0f, 0f));
+        float hx1 = terrain.SampleHeight(at + new Vector3(+Step, 0f, 0f));
+        float hz0 = terrain.SampleHeight(at + new Vector3(0f, 0f, -Step));
+        float hz1 = terrain.SampleHeight(at + new Vector3(0f, 0f, +Step));
+
+        Vector2 up = new Vector2(hx1 - hx0, hz1 - hz0);
+        if (up.sqrMagnitude < 1e-8f) { Shader.SetGlobalVector(SeaShaderIDs.ShorePeel, Vector4.zero); return; }
+        up.Normalize();
+
+        // THE SWELL'S HEADING, NOT THE WIND'S.
+        //
+        // What breaks on the beach is the swell, and the swell was born in a storm that
+        // is not today's weather -- the spectrum already says so, `swellDirectionOffset`
+        // turns it away from the local wind. Driving the peel off the wind instead made
+        // the crests almost shore-normal and the peel angle came out 5 degrees: still a
+        // close-out. The offset is what puts the wave on the beach at an angle.
+        Vector3 wd = env.WindDirection;
+        Vector2 travel = new Vector2(wd.x, wd.z);
+        if (travel.sqrMagnitude < 1e-8f) { Shader.SetGlobalVector(SeaShaderIDs.ShorePeel, Vector4.zero); return; }
+        travel.Normalize();
+
+        float off = settings.swellDirectionOffset * Mathf.Deg2Rad;
+        travel = new Vector2(travel.x * Mathf.Cos(off) - travel.y * Mathf.Sin(off),
+                             travel.x * Mathf.Sin(off) + travel.y * Mathf.Cos(off));
+
+        float cos0 = Mathf.Clamp(Vector2.Dot(travel, up), -1f, 1f);
+        float theta0 = Mathf.Acos(Mathf.Abs(cos0));
+
+        // Snell: sin(theta_b) = sin(theta_0) * c_b / c_0.
+        float tp = Mathf.Max(SeaRuntimeState.PeakPeriod, 1f);
+        float c0 = SeaConstants.G * tp / SeaConstants.TwoPi;
+        float hBreak = Mathf.Max(SeaRuntimeState.SignificantWaveHeight / 0.78f, 0.2f);
+        float cb = Mathf.Sqrt(SeaConstants.G * hBreak);
+
+        float sinB = Mathf.Clamp(Mathf.Sin(theta0) * cb / Mathf.Max(c0, 0.01f), -1f, 1f);
+
+        // The along-shore wavenumber at the breaker line.
+        float omega = SeaConstants.TwoPi / tp;
+        float kb = omega / Mathf.Max(cb, 0.01f);
+
+        Vector2 along = new Vector2(-up.y, up.x);
+        if (Vector2.Dot(travel, along) < 0f) along = -along;
+
+        Vector2 peel = along * (kb * sinB);
+        Shader.SetGlobalVector(SeaShaderIDs.ShorePeel, new Vector4(peel.x, peel.y, 0f, 0f));
+    }
+
     /// EVERY INPUT OF THE INTEGRATION, NOT JUST THE WIND. Cached on the wind
     /// alone, editing the swell in the Inspector would leave Hs and Tp on the
     /// old spectrum with no error anywhere.
@@ -295,6 +371,8 @@ public class SeaManager : MonoBehaviour
                  / SeaConstants.TwoPi;
         float b = settings.shoreSlope;
         Shader.SetGlobalFloat(SeaShaderIDs.ShoreSlope, b);
+
+        PublishPeel(b);
         float hsl0 = SeaRuntimeState.SignificantWaveHeight * l0;
 
         SeaRuntimeState.RunupHeight =

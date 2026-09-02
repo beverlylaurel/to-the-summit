@@ -76,6 +76,10 @@ public static class SeaShaderIDs
 
     /// The beach gradient the shore wave train marches up.
     public static readonly int ShoreSlope = Shader.PropertyToID("_SeaShoreSlope");
+
+    /// The along-shore wavenumber vector that makes a crest break progressively
+    /// instead of all at once (rad/m, world XZ).
+    public static readonly int ShorePeel = Shader.PropertyToID("_SeaShorePeel");
     public static readonly int ShoreFoamPhase = Shader.PropertyToID("_SeaShoreFoamPhase");
 
     /// Fraction of the swash cycle spent running up the beach. The rest is the

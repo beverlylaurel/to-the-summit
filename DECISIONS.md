@@ -2417,6 +2417,9 @@ sığda sivri tepeli çarpık dalgaya, kırılma öncesinde dik ön yüzlü test
 Yeni ayar yok, yeni sabit yok — altı katsayı Ruessink 2012'den geliyor.
 **Ölçüm:** profilin çarpıklığı derinlikle artmalı; Elgar & Guza saha aralığı 0–1.
 
+**2. Soyulma — YAPILDI (2026-09-02).** Ölçüldü: 21,8°, sörf edilebilir aralıkta.
+Kayıt `SYSTEMS.md`. Eski metin:
+
 **2. Soyulma — kırılma cephe boyunca gezmeli.** Faz bugün yalnız derinliğe bağlı, yani
 tüm kıyı aynı anda kırılıyor (soyulma açısı 0°, sörf edilemez). Kıyı boyunca yavaş değişen
 bir faz kayması eklenince kırılma bir noktadan başlayıp yana yürür. Hedef aralık 30°–70°.
