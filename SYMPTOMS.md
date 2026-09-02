@@ -5060,3 +5060,40 @@ yetersiz. Eski elle ayarlanmış rampa zaten aynı değere (0,35) varıyormuş.
 **Gerçek sebep henüz bulunmadı.** Kanıtlanan: kalan titreme fiziksel eğim varyansıyla
 açıklanmıyor. Sıradaki hipotez, korunan kademelerin de nokta örneklenmesi — mip'in sildiği
 varyans da geri verilmiyor (LEADR). Ölçülmeden düzeltme yazılmayacak.
+
+## Kahverengi lekelerin rengi: gök küpünün şafak ufku — ÖLÇÜLDÜ (2026-09-02)
+
+**Kullanıcının ağzından:** "suyun üstünde kahverengi lekeler çıktı", "belirli bir sınırda
+belirli bir düzende gözüküyor".
+
+**Yanlış çıkan ilk şüpheliler:** (1) probun karayı tutması — ölçüldü, sahnede tek bir
+yansıma probu yok, küp yalnız gökyüzünü içeriyor; (2) yüzeyin katlanması (Jacobian < 0) —
+altıgen kenarlı görünüm karo desenindendi, katlanma değil.
+
+**Ayırt eden ölçüm — iki adım.**
+
+*Bir:* yansıma ışını ufkun altına bakan piksellere macenta boyandı. Canlı: yüksek açıda
+kadranın %0,54'ü, alçak açıda %5,15'i. Yani yüzey normalinin o kadar yattığı gerçek bir
+piksel kümesi var ve hepsi ufuk halkasını okuyor.
+
+*İki:* deniz, o pikselin okuduğu şeyle — probun tam ufuktaki renginle — boyandı. Gün
+boyunca:
+
+| saat (0-1) | ufuk halkası RGB |
+|---|---|
+| 0,25 | **21,0 / 10,0 / 4,8** — R > G > B, doymuş turuncu |
+| 0,35 | 123,7 / 132,8 / 117,6 |
+| 0,50 | 83,0 / 97,1 / 89,9 |
+| 0,70 | 65,5 / 76,9 / 64,9 |
+| 0,85 | 6,7 / 9,1 / 10,4 |
+
+**Kahverengi budur.** Şafakta ufuk halkasının R/B oranı 4,4; diğer saatlerde nötr ya da
+maviye çalıyor. Ursell profili normalleri iki uca ayırıyor (dik ön yüz / yatık sırt), o
+yüzden pikseller "sıyırıyor" ile "sıyırmıyor" arasında ara değer olmadan atlıyor —
+lekelerin sert kenarı bu.
+
+**Üç belirti tek kök.** Uzak denizin titremesi, şafaktaki lekeler ve Ursell'in geri
+alınması aynı şeyin üç yüzü: **yansıma, kendisi de nokta örneklenmiş bir normal üzerinden
+nokta örnekleniyor.** Fiziksel eğim varyansını loba vermek yetmedi (%11,00 → %11,07),
+çünkü bırakılan kademelerin varyansı veriliyor ama **korunan** kademelerin mip'inin
+sildiği varyans verilmiyor. Sıradaki adım LEADR; ölçülmeden yazılmayacak.

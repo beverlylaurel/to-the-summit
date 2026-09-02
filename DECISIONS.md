@@ -12,7 +12,7 @@ iş bitince buradan silinir.**
 
 ## Kayıtlar
 
-78 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
+79 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
 
 - [İz gövdesi damgalar arası yolu SÜPÜRMÜYOR — KAPANDI (2026-08-25)](#iz-govdesi-damgalar-arasi-yolu-supurmuyor-kapandi-2026-08-25)
 - [Ova kontrastı düzeltilmiyor — irtifadan geliyor](#ova-kontrasti-duzeltilmiyor-irtifadan-geliyor)
@@ -21,6 +21,7 @@ iş bitince buradan silinir.**
 - [Silinecek geçiciler](#silinecek-geciciler)
 - [Bekleyen kararlar](#bekleyen-kararlar)
 - [Bekleyen ölçümler](#bekleyen-olcumler)
+- [Yansıma filtrelemesi ve dördüncü FFT kademesi (2026-09-02)](#yansima-filtrelemesi-ve-dorduncu-fft-kademesi-2026-09-02)
 - [Arazi mimarisi: dört katman, sembolik çapa (2026-08-17)](#arazi-mimarisi-dort-katman-sembolik-capa-2026-08-17)
 - [Arazi ölçeği: dağ ve oyun alanı korunur, çevre bölge eklenir (2026-08-17)](#arazi-olcegi-dag-ve-oyun-alani-korunur-cevre-bolge-eklenir-2026-08-17)
 - [L0 girdisi: Everest bölgesi, mesafeye göre prominence eşiği (2026-08-17)](#l0-girdisi-everest-bolgesi-mesafeye-gore-prominence-esigi-2026-08-17)
@@ -178,6 +179,20 @@ Cevaplanmadan ilgili sisteme kod yazılmaz.
   bu alanlar silinir
 
 ## Bekleyen kararlar
+
+- **Yansıma filtrelemesi (LEADR) ERTELENDİ, üç belirti ona bağlı** — uzak denizin
+  titremesi, şafaktaki kahverengi lekeler ve Ursell dalga şeklinin geri alınması aynı
+  kökten geliyor: yansıma, kendisi de nokta örneklenmiş bir normalden nokta örnekleniyor.
+  Ölçümler `SYMPTOMS.md` ve `RATIONALE.md`'de. Aşağıda, "Yansıma filtrelemesi ve dördüncü
+  FFT kademesi" başlığında.
+
+- **Kapiler bant (dördüncü FFT kademesi) ERTELENDİ** — aynı başlıkta; gerekçesi
+  doğrulama, karmaşıklık değil.
+
+- **Kıyı treni açık denizin dörtte biri kadar** — Hs 2,37 m iken kıyıya varan dalga
+  tepeden çukura 0,53 m. Sayılar ve sebep `RATIONALE.md` → "Kıyı treni açık denizin
+  dörtte biri kadar". Karar kullanıcınındır: `SEA_SHORE_WAVE_SHARE` ve
+  `SEA_SHORE_WAVE_BREAK_MULT` oynanış hissini değiştirir.
 
 - **Gezegen boşluğu hâlâ açık** — kuşak denendi ve kaldırıldı, arazi büyütülecek.
   Ölçümler ve maliyet kıyası aşağıda, "Uzak arazi kuşağı DENENDİ VE KALDIRILDI".
@@ -2492,3 +2507,32 @@ Cox-Munk ölçümü yeniden istenirse.
 
 **Maliyet:** bir gün. Kalibrasyon ölçülebilir (Cox-Munk hedefi), görsel doğrulama
 kullanıcının kadrajında.
+
+
+## Yansıma filtrelemesi ve dördüncü FFT kademesi (2026-09-02)
+
+**Karar:** ikisi de ertelendi. Sıra önce filtreleme, sonra kapiler bant.
+
+**Gerekçe — filtreleme.** Çözülemeyen eğim varyansı loba verildi ve ölçüldü: titreşim
+%11,00 → %11,07, yani hiç. Aynı terim 50 katında %3,34 veriyor — mekanizma doğru,
+büyüklük yetersiz. Eksik olan **korunan** kademelerin mip'inin sildiği varyans; doğru
+yol LEADR (mip seviyesi altındaki varyans, kademe başına). Bu, elde ölçüm aracı varken
+yapılacak bir iş: gece boyunca yazılıp sabaha doğrulanmamış bırakılmaz.
+
+**Gerekçe — kapiler bant.** Teknik olarak açık: `SEA_TIER_COUNT` 3 → 4, dördüncü yama
+~1,2 m, kendi dağılımı `ω² = gk + (σ/ρ)k³`, `smallWaveCutoff` 0,15 → 0,0175 m. Ama JONSWAP
+kısa dalgayı tarif etmiyor; kapiler kısım için ayrı bir tayf gerekiyor (Elfouhaily ve ark.
+1997). Ayrıca `Vector3` olan yedi ayar alanı ve yirmi shader referansı `Vector4` olacak.
+Bu genişlikte bir değişiklik, aynı özelliğin dört denemesi dört görsel hata üretmişken,
+kullanıcı doğrulaması olmadan bırakılmaz.
+
+**Tetikleyici:** filtreleme için LEADR'ın gerektirdiği ikinci doku (eğim karesi) ölçülüp
+maliyeti çıkarıldığında. Kapiler bant için filtreleme kapandığında.
+
+**Maliyet:** filtreleme ~yarım gün + bir doku dizisi daha; kapiler bant ~bir gün ve dördüncü
+FFT'nin kare süresi.
+
+**Elde hazır güvence:** kum berraklığı ölçeri (`kum_olc.py`, detay metriği), kafes deseni
+ölçeri (`desen.py`) ve titreşim ölçeri (`titreme.py`). Kafes ölçeri geçmişin gerçek
+hatasına karşı doğrulandı: kapiler bant açıkken kareler %40-41 yoğunlaşma / %1,0-1,2 tepe
+payı veriyor, katman kaldırılmış kare %7,6 / %0,065, bugünkü kareler %24,6 / %0,42.
