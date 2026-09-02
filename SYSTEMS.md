@@ -1526,6 +1526,21 @@ bir dalga uzaktaki büyük bir fırtınanın imzasıdır ve o fırtınanın ener
 
 ---
 
+## Deniz: rüzgârını dünya fırtınasından doğrudan alır (2026-09-02)
+
+**Deniz karanın korunağını almaz.** `AltitudeWeatherDriver.IntensityAt` alçakta fırtınayı
+`worldStormAtSeaLevel` ile ölçekliyor ve bunun tek gerekçesi yazılı: "kıyı, kara kütlesi
+tarafından korunuyor". Rüzgârın geldiği yön açık su; orada koruyacak kara yok, üstelik su
+zeminden pürüzsüz olduğu için rüzgâr daha güçlüdür.
+
+Payı yine de almak denizi fırtınanın %52'sine kilitliyordu: ölçüldü, dünya 0,95'e çıkarken
+su 8,7 m/s'yi hiç geçmiyordu — tam fırtına denizi yapı gereği erişilemezdi.
+
+**Değişen yalnız denizin şiddeti.** `wind.Severity` ve yağış hâlâ `IntensityAt(altitude)`
+okuyor; oyuncunun bulunduğu yerin rüzgârı ve yağışı etkilenmedi.
+
+**Salınım kaldı** — o fırtınanın kendi hamlesi, korunak değil.
+
 ## Deniz: çözülemeyen eğim varyansı yansıma lobuna gider (2026-09-02)
 
 **Kademeler kendi dalga boyuyla sönümleniyor, mesafeyle değil.** Bir kademenin dalgaları

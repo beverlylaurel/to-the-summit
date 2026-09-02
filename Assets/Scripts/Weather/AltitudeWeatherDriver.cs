@@ -268,7 +268,18 @@ public class AltitudeWeatherDriver : MonoBehaviour
 
         // THE SEA DOES NOT LIVE WHERE THE PLAYER STANDS. It reads the same storm at ITS OWN
         // height, so the swell answers the weather instead of the climb.
-        wind.SeaLevelSeverity = Mathf.Max(settings.windAtBase, IntensityAt(groundAltitude));
+        //
+        // AND IT DOES NOT TAKE THE LAND'S SHELTER. `IntensityAt` scales the storm by
+        // `worldStormAtSeaLevel` down low, and that factor exists for one stated reason:
+        // "the shore is sheltered by the land mass". Open water upwind has no land to
+        // shelter it -- if anything the wind is stronger there, because water is smoother
+        // than ground. Taking the share anyway capped the sea at 52% of the storm: measured,
+        // the world could run to 0.95 while the water never saw more than 8.7 m/s, so the
+        // full storm sea was unreachable by construction.
+        //
+        // The variation stays: it is the storm's own gusting, not a shelter.
+        wind.SeaLevelSeverity = Mathf.Max(settings.windAtBase,
+                                          Mathf.Clamp01(WorldStorm * Variation(groundAltitude)));
     }
 
     /// HOW HARD THE WORLD STORM BITES AT A GIVEN HEIGHT.

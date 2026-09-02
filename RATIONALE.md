@@ -3229,3 +3229,41 @@ kırıştırmasının doğal sonucu.
 **`SEA_SHORE_WAVE_BREAK_MULT` 1,5'te bırakıldı.** Sörf kuşağı kırılma derinliğinde başlar;
 1,5 katı, kırılmadan önceki sığlaşma bandını da alan yumuşak bir devir teslim. Değiştirmek
 kuşağın genişliğini oynatır, yüksekliğini değil — sorun yükseklikteydi.
+
+### Denizin rüzgârı: karanın korunağı denize uygulanıyordu
+
+Deniz seviyesi şiddeti `IntensityAt(groundAltitude)`'dan geliyordu ve o fonksiyon alçakta
+fırtınayı `worldStormAtSeaLevel = 0,55` ile çarpıyor. Bu çarpanın gerekçesi kendi
+yorumunda yazılı: kıyının kara kütlesi tarafından korunması. Ama denizin rüzgârı açık
+sudan geliyor; orada koruyacak kara yok.
+
+**Aynı karede iki formül, 400 kare boyunca** (dünya fırtınası 0,95):
+
+| | min | ortalama | max |
+|---|---|---|---|
+| eski (`IntensityAt`) | 0,541 | 0,545 | 0,549 |
+| yeni (`WorldStorm × Variation`) | 0,984 | 0,992 | 0,999 |
+
+Hız 9,0 → 13,9 m/s. Salınımın kendi aralığı 1,036 – 1,051, yani gürültü değil çarpan
+belirleyici.
+
+**Tam tarama, her aşamada bekleyerek:**
+
+| dünya fırtınası | rüzgâr | Hs | Tp |
+|---|---|---|---|
+| 0,10 | 5,20 m/s | 1,63 m | 5,7 s |
+| 0,35 | 7,03 m/s | 2,05 m | 6,3 s |
+| 0,57 | 9,60 m/s | 2,65 m | 7,0 s |
+| 0,80 | 12,30 m/s | 3,26 m | 7,7 s |
+| 0,95 | 14,00 m/s | 3,64 m | 8,0 s |
+
+Öncesi 5,2 – 9,4 m/s ve Hs 1,59 – 2,60 m idi. Deniz artık Beaufort 3'ten 7'ye kadar
+gidiyor.
+
+**İlk ölçüm yalan söyledi.** Aşamalar arası bekleme yoktu: `WorldStormOverride` aynı
+karede yazılıp okunuyordu, yani bir önceki aşamanın rüzgârı okunuyordu. Sayılar
+düşüşü gösterdi (5,2 – 6,0 m/s), yani değişikliğin tersini. Aynı karede iki formülü
+birden okuyan ikinci araç bunu ayırdı.
+
+**Kum berraklığı korundu:** detay 0,550 → 0,575 (1 m) ve 0,401 → 0,396 (2 m). Kafes
+yoğunlaşması %24,96 → %10,25, yani yüzey daha az düzenli.
