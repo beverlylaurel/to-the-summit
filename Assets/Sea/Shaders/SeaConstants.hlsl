@@ -164,9 +164,31 @@
 /// The crest's own width (m): about one capillary wavelength.
 #define SEA_RAIN_RING_WIDTH          0.017
 
-/// Peak slope of a single ring at full rain. A 1 mm crest on a 1.7 cm wave is a slope of
-/// 0.37; three layers overlap, so each carries a share of it.
-#define SEA_RAIN_RING_SLOPE          0.12
+/// The ring lattice is anchored to a world grid this coarse (m), not to the world origin.
+/// A crest is 17 mm wide but a float carries only about 1 mm of resolution 14 km out, so a
+/// lattice built on absolute coordinates degenerates there. MEASURED 2026-09-03, standing
+/// at x = 14000: only 45% of the water's pixels carried a ring at all and their mean
+/// strength was 41% of what the same code produced near the origin.
+///
+/// 256 is exact in binary, so the snapped origin is exact and `posXZ - origin` is exact
+/// too. The lattice re-rolls when the camera crosses a boundary; a ring lives one second,
+/// so a re-roll is a single frame of an already boiling stipple.
+#define SEA_RAIN_RING_ORIGIN_STEP    256.0
+
+/// Coefficient that sets a ring's peak surface slope. It is NOT the slope itself: the
+/// profile, the 1/r spread and the birth ramp all attenuate it before it reaches the
+/// surface, so the number is chosen from what has to come out the far end.
+///
+/// TARGET. A 1.5 mm drop leaves a crater about 0.5 mm deep; a 0.5 mm crest on the 1.73 cm
+/// capillary wavelength is a slope of `2 pi A / lambda` = 0.182, that is 10.5 degrees.
+///
+/// WHAT THE CHAIN TAKES. `profile` peaks at 0.4288 (`x exp(-x^2)` at `x = 1/sqrt(2)`), and
+/// `spread * birth` peaks at 0.469 when the birth ramp has just saturated (age 0.083, the
+/// crest one width out). Their product is 0.201, so 0.182 / 0.201 = 0.90.
+///
+/// MEASURED (2026-09-03): at 0.12 the peak reached the surface as a slope of 0.015 -- 0.9
+/// degrees -- and an A/B on identical frames could not separate rings from no rings.
+#define SEA_RAIN_RING_SLOPE          0.90
 
 
 /// BREAKER DEPTH INDEX, SLOPE DEPENDENT.

@@ -5404,9 +5404,52 @@ gerekçesi de aynen bu: "−3 donma seviyesini deniz seviyesinin 462 m ALTINA ko
 'başlangıçta yeşillik ve yağmur' imkânsız". Sahne bugün −2 taşıyor, yani karar geçerli
 ama uygulanmamış durumda.
 
-**Uygulanmadı, çünkü bedeli oyunun görüntüsünü değiştiriyor:** +7,8 donma seviyesini
-−94 m'den ~1200 m'ye çıkarır, yani 1200 m altında kar biter. Kullanıcının görüp karar
-vermesi gereken bir değişiklik.
+**Kullanıcı kararı verdi (2026-09-03): +7,8 uygulandı.** Donma seviyesi −94 m'den
+1159–1394 m'ye çıktı; 30 m'de sıcaklık 7,3–8,9 °C, yağış türü **Rain**, denize giden
+şiddet 0,114–0,570.
+
+**Gerçek sebep sahne dosyası değil, sahneyi kuran koddu.**
+`Assets/Editor/MountainSceneBootstrap.cs:282` `seaLevelCelsius`'a `-2f` yazıyordu ve dosya
+`[InitializeOnLoad]` — yani her assembly reload'da ve her Play geçişinde sahneyi tekrar
+eziyordu. Diskteki `Game.unity` elle 7,8'e çekildi, iki ölçüm arasında kendiliğinden −2'ye
+döndü; ayırt eden ölçüm sahnenin **bellekteki** değerini okumaktı (`SerializedObject`),
+diskteki değeri değil. İkisi çelişiyordu.
 
 **Ayrıca:** `SeaEnvironmentBridge.PrecipKind` sıcaklığı `transform.position.y`'den okuyor
 ve o nesne y = 0'da; deniz 30 m'de. Fark 0,2 °C, zararsız ama yanlış kotu okuyor.
+
+
+## Yağmur halkası denizde çizilmiyor (2026-09-03)
+
+**Kullanıcının ağzından:** "göremiyorum, sahne ezdi mi yine yaptıklarını?"
+
+**Yanlış çıkan ilk şüpheli: genlik.** `SEA_RAIN_RING_SLOPE` 0,12'nin ürettiği yüzey eğimi
+kâğıtta 0,015 (0,9°) çıktı; 0,90'a alındı (hesap sabitin yorumunda). Ölçüm: görüntü
+değişmedi. Katsayı **50**'ye çıkarıldı — yine değişmedi. Genlik değilmiş.
+
+**Yanlış çıkan ikinci şüpheli: bayat shader.** `SeaConstants.hlsl`'e bilerek sözdizimi
+hatası kondu; Unity hatayı `SeaCommon.hlsl:496`'da bildirdi. Shader taze derleniyormuş.
+
+**Ayırt eden ölçüm: üç renkli prob.** Fragment'in sonuna
+`return half4(halka_büyüklüğü, shader'a_ulaşan_yağmur, piksel_kapısı, 1)` konuldu. Tek
+karede üçü birden okundu: kırmızı 0,00 — mavi (kapı) 111/255, yani kapı açık. Halka
+fonksiyonu sıfır dönüyordu çünkü **girdisi sıfırdı**: yukarıdaki `seaLevelCelsius` kaydı.
+
+**İkinci kusur, aynı probun yan ürünü.** Kapı açıldıktan sonra aynı kare iki uzayda birden
+ölçüldü — kırmızı mutlak dünya koordinatı, yeşil kamera-göreli:
+
+| uzay | halka taşıyan piksel | ortalama güç |
+|---|---|---|
+| mutlak (x = 14000) | %45 | 9,8 |
+| kamera-göreli | %100 | 24,1 |
+
+Halka 17 mm genişliğinde, 14 km'de float çözünürlüğü ~1 mm: kafes bozuluyor. Kafes
+`SEA_RAIN_RING_ORIGIN_STEP` (256 m, ikilikte tam) ile çakıldı; çıkarma Sterbenz gereği
+tam, halka matematiği küçük sayılarda çalışıyor.
+
+**Doğrulandı:** halka açık/kapalı aynı karede yüksek frekans +%4, luma +%8–12. 7 m
+yürüyünce desen dünyayla birlikte değişiyor (fark 1,0–2,0, halkanın kendi farkının dört
+katı) — yani ekrana yapışmıyor.
+
+**Kalan:** fırtınada deniz yüzeyi luma 2–3/255 basıyor. Halka doğru çiziliyor ama üstünde
+durduğu su kapkara; gözle görülmesi bu ayrı kusura bağlı.

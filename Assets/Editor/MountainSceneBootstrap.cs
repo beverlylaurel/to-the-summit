@@ -278,8 +278,15 @@ public static class MountainSceneBootstrap
 
         thermometer.Bind(weatherState, windField, Object.FindAnyObjectByType<TimeOfDay>());
 
+        // SEA-LEVEL AIR TEMPERATURE. The freezing level, the snow line and whether the sea
+        // sees rain or snow all derive from this one number (`TemperatureField`), so the
+        // scene must not disagree with the component's own default.
+        //
+        // -2 was tried and put the freezing level BELOW sea level at every hour and every
+        // storm, which made the plain snow-covered year round and meant no rain ever reached
+        // the water. +7.8 puts it at 1163-1394 m. [DECISIONS.md, "Ovanin kotu"]
         var thermoSerialized = new SerializedObject(thermometer);
-        thermoSerialized.FindProperty("seaLevelCelsius").floatValue = -2f;
+        thermoSerialized.FindProperty("seaLevelCelsius").floatValue = 7.8f;
         thermoSerialized.ApplyModifiedProperties();
 
         EditorUtility.SetDirty(thermometer);

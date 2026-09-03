@@ -692,7 +692,14 @@ sulu kar 1200–1422 m, saf kar üstünde. Tam fırtına donma seviyesini 500 m 
 `Game.unity:2166` serileştirilmiş −3 taşıyordu, o da güncellendi. Mimari değişiklik
 gerekmedi (`AltitudeWeatherDriver.UpdateFreezingLevel` zaten `FreezingLevel` okuyor).
 
-**DOĞRULANMAMIŞ:** yağmur tavanı −368 m'ydi, yani oyunda bugüne kadar hiç yağmur yağmadı.
+**BU KAYIT 2026-09-03'E KADAR OYUNA İNMEDİ.** Sahne dosyası −2 taşıyordu ve elle
+düzeltmek yetmedi: `MountainSceneBootstrap.cs:282` değeri `-2f` olarak sabit yazıyordu ve
+dosya `[InitializeOnLoad]`, yani her assembly reload'da ve her Play geçişinde sahneyi geri
+eziyordu. Sayı bootstrap'te de 7,8'e alındı; artık iki yer de aynı şeyi söylüyor.
+
+Kullanıcı bedeli görüp onayladı (2026-09-03): 1200 m altında kar biter. Ölçülen sonuç —
+donma seviyesi 1159–1394 m, deniz seviyesinde 7,3–8,9 °C, yağış türü Rain.
+Belirti kaydı `SYMPTOMS.md` → "Denize hiç yağmur yağmamış".
 
 ---
 

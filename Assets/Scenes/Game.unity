@@ -3290,7 +3290,7 @@ MonoBehaviour:
   weather: {fileID: 1805896806}
   wind: {fileID: 1805896805}
   time: {fileID: 508855605}
-  seaLevelCelsius: -2
+  seaLevelCelsius: 7.8
   lapseRate: 6.5
   daytimeWarming: 1.63
   stormCooling: 3.25

@@ -453,7 +453,9 @@ float SeaValueNoise(float2 p)
 ///
 /// It perturbs the SLOPE, not the height: the ring is a millimetre tall and the eye reads
 /// it entirely in the specular.
-float2 SeaRainRings(float2 posXZ, float intensity)
+/// `localXZ` is a world position with `SEA_RAIN_RING_ORIGIN_STEP` snapped out of it: the
+/// ring is too fine to survive absolute coordinates far from the origin.
+float2 SeaRainRings(float2 localXZ, float intensity)
 {
     if (intensity <= 0.001) return 0.0;
 
@@ -469,7 +471,7 @@ float2 SeaRainRings(float2 posXZ, float intensity)
     for (int layer = 0; layer < 3; ++layer)
     {
         float L = cellSize[layer];
-        float2 cell = floor(posXZ / L);
+        float2 cell = floor(localXZ / L);
 
         // Each cell drops once per lifetime, at its own moment and its own spot inside it.
         float2 h = SeaHash22(cell + float2(layer * 37.1, layer * 71.7));
@@ -477,7 +479,7 @@ float2 SeaRainRings(float2 posXZ, float intensity)
 
         float age = frac(_SeaTime / life + SeaHash21(cell + layer * 13.7));
 
-        float2 d = posXZ - centre;
+        float2 d = localXZ - centre;
         float r = length(d);
         if (r < 1e-4) continue;
 

@@ -1545,6 +1545,17 @@ tek katman kafes olarak okunuyor.
 parlamada görüyor. Piksel ayak izi 1,7 cm'yi geçtiğinde sönümleniyor — kademelerin
 kendi sönümüyle aynı kural, yoksa aynı aliasing geri gelir.
 
+**Halka yalnız YAĞMURDA çizilir, karda değil.** Türü `SeaEnvironmentBridge.PrecipKind`
+söylüyor, o da `TemperatureField`'dan geliyor: donma seviyesi denizin altına inerse deniz
+kar alır ve `SeaManager` şiddeti sıfırlar. Yani halkanın görünmesi `seaLevelCelsius`'a
+bağlı; bu bağ bir kez koptu (`SYMPTOMS.md`).
+
+**Kafes dünyaya çakılı ama dünyanın SIFIR NOKTASINA değil.** Halka 17 mm; float 14 km'de
+yalnız ~1 mm taşıyor, mutlak koordinatta kafes bozuluyor (ölçüldü: piksellerin %45'i,
+gücün %41'i). Kamera konumu `SEA_RAIN_RING_ORIGIN_STEP` (256 m) ile aşağı yuvarlanıp
+çıkarılıyor. Kameraya doğrudan bağlamak deseni ekrana yapıştırırdı; 256 m'lik adım hem
+tam sayı hem yürürken desenin dünyada kalmasını sağlıyor.
+
 ## Deniz: rüzgârını dünya fırtınasından doğrudan alır (2026-09-02)
 
 **Deniz karanın korunağını almaz.** `AltitudeWeatherDriver.IntensityAt` alçakta fırtınayı
