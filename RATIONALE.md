@@ -3469,3 +3469,16 @@ kaldırılır.
 
 **Kapanmadı.** Sapma medyanı hâlâ ~24°. Daha da daraltmak damla boyu aralığının üst
 ucunu kısmayı gerektirir; o da uzun parlak izleri götürür. Bir sonraki tur oraya bakar.
+
+### Üst uç de denendi, alınmadı (aynı tur)
+
+1,0–2,5 mm aralığı ölçüldü: R rüzgâr 0'da 0,85 → 0,86, %55'te 0,78 → 0,80. Kazanç
+marjinal, bedeli iri damlaların uzun parlak izleri. Alınmadı.
+
+### Aletin çözünürlük sınırına gelindi
+
+Sapma medyanı üç ayarda da ~24°'de takıldı (23,5 / 24,0 / 24,2). Bu sayı artık fiziği
+değil **ölçüm hatasını** gösteriyor: 10 piksellik bir lekenin ana ekseni o hassasiyetle
+bulunamıyor. En uzun izlerde (14–58 px) sapma 13,3°'ye iniyor — gerçek yayılım oraya
+yakın. Daha ileri gitmek için önce daha büyük iz üreten bir kadraj (yakın damlalar,
+yüksek çözünürlük) gerekir.
