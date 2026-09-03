@@ -62,10 +62,18 @@ public class SnowFootprintDeformer : SnowDeformer
     ///   y = the section's length (a ratio of the length)
     ///   z = the radius (a ratio of half the width)
     ///   w = the sinking share
+    /// THE THREE MUST OVERLAP, NOT MEET. They are three capsules approximating ONE sole, so
+    /// any gap between them is a gap in the boot.
+    ///
+    /// MEASURED 2026-09-03: at length 0.26 the arch spanned -0.133 m and the heel ended at
+    /// -0.142 m -- a 9 mm hole between them. On a 2.3 cm texel grid that hole swallowed a
+    /// whole texel and the print came out as TWO separate blobs. The arch is lengthened
+    /// until it reaches under the heel; nothing else changes, and the sole's outline is
+    /// still set by the forefoot and the heel.
     static readonly Vector4[] Bolumler =
     {
         new(+0.30f, 0.44f, 1.00f, 1.00f),   // forefoot
-        new(+0.02f, 0.26f, 0.62f, 0.45f),   // arch — SHALLOW
+        new(+0.02f, 0.40f, 0.80f, 0.45f),   // arch — SHALLOW, and wide enough to be a sole
         new(-0.31f, 0.34f, 0.84f, 0.95f),   // topuk
     };
 
