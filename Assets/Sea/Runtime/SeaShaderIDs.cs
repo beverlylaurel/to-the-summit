@@ -27,6 +27,7 @@ public static class SeaShaderIDs
     // --- Wave field, read by the surface shader (spec §11.1) ---
     public static readonly int Displacement = Shader.PropertyToID("_SeaDisplacement");
     public static readonly int Derivatives = Shader.PropertyToID("_SeaDerivatives");
+    public static readonly int SlopeMoments = Shader.PropertyToID("_SeaSlopeMoments");
     public static readonly int Foam = Shader.PropertyToID("_SeaFoam");
 
     // --- Compute write targets (spec §11.1) ---
@@ -40,6 +41,7 @@ public static class SeaShaderIDs
     public static readonly int SpectrumSlopeRW = Shader.PropertyToID("_SeaSpectrumSlopeRW");
     public static readonly int DisplacementRW = Shader.PropertyToID("_SeaDisplacementRW");
     public static readonly int DerivativesRW = Shader.PropertyToID("_SeaDerivativesRW");
+    public static readonly int SlopeMomentsRW = Shader.PropertyToID("_SeaSlopeMomentsRW");
     public static readonly int FoamRW = Shader.PropertyToID("_SeaFoamRW");
     public static readonly int FoamPrevRW = Shader.PropertyToID("_SeaFoamPrevRW");
 

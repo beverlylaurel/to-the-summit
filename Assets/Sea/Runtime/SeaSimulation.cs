@@ -31,6 +31,7 @@ public class SeaSimulation : MonoBehaviour
     RenderTexture spectrumSlope;
     RenderTexture displacement;
     RenderTexture derivatives;
+    RenderTexture slopeMoments;
 
     // FOAM PING-PONG. The decay reads the previous frame's value; reading and
     // writing a single texture would create a race.
@@ -92,6 +93,7 @@ public class SeaSimulation : MonoBehaviour
     /// The Phase 2 numeric verification reads these textures.
     public RenderTexture Displacement => displacement;
     public RenderTexture Derivatives => derivatives;
+    public RenderTexture SlopeMoments => slopeMoments;
     public RenderTexture H0 => h0;
     public RenderTexture Foam => foamA;
 
@@ -215,6 +217,7 @@ public class SeaSimulation : MonoBehaviour
         spectrumSlope = Create("Sea_SpectrumSlope", RenderTextureFormat.ARGBHalf);
         displacement = Create("Sea_Displacement", RenderTextureFormat.ARGBHalf);
         derivatives = Create("Sea_Derivatives", RenderTextureFormat.ARGBHalf, mips: true);
+        slopeMoments = Create("Sea_SlopeMoments", RenderTextureFormat.ARGBHalf, mips: true);
 
         foamA = Create("Sea_FoamA", RenderTextureFormat.RHalf);
         foamB = Create("Sea_FoamB", RenderTextureFormat.RHalf);
@@ -246,6 +249,7 @@ public class SeaSimulation : MonoBehaviour
         Release(ref spectrumSlope);
         Release(ref displacement);
         Release(ref derivatives);
+        Release(ref slopeMoments);
         Release(ref foamA);
         Release(ref foamB);
     }
@@ -347,15 +351,21 @@ public class SeaSimulation : MonoBehaviour
         fftShader.SetTexture(kAssemble, SeaShaderIDs.SpectrumSlopeRW, spectrumSlope);
         fftShader.SetTexture(kAssemble, SeaShaderIDs.DisplacementRW, displacement);
         fftShader.SetTexture(kAssemble, SeaShaderIDs.DerivativesRW, derivatives);
+        fftShader.SetTexture(kAssemble, SeaShaderIDs.SlopeMomentsRW, slopeMoments);
         fftShader.Dispatch(kAssemble, groups, groups, level.TierCount);
 
         // Mip 0 has just been overwritten; the rest of the chain is now stale.
         derivatives.GenerateMips();
+        // The moments must be filtered by the SAME hardware that filters the slopes:
+        // the variance is the difference between the two, so a different filter on
+        // either side would not cancel.
+        slopeMoments.GenerateMips();
 
         FoamPass(time);
 
         Shader.SetGlobalTexture(SeaShaderIDs.Displacement, displacement);
         Shader.SetGlobalTexture(SeaShaderIDs.Derivatives, derivatives);
+        Shader.SetGlobalTexture(SeaShaderIDs.SlopeMoments, slopeMoments);
         Shader.SetGlobalTexture(SeaShaderIDs.Foam, foamA);
     }
 

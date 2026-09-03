@@ -1988,3 +1988,18 @@ durduruyordu (`DECISIONS.md`).
 Sınır su kenarı değil: sığ suda yürümek serbest, çünkü swash, köpük, ıslak kum ve kumun
 görünmesi orada zaten çalışıyor. Durdurulan tek şey kameranın su yüzeyinin altına
 inmesi — sualtı render yolu yok.
+
+
+## Deniz: mip'in aldığı pürüzlülük geri veriliyor (LEADR)
+
+`Sea_SlopeMoments` eğimin KARELERİNİ taşıyor ve `Sea_Derivatives` ile **aynı mip
+zincirinden** geçiyor. Shader ikisini aynı uv, aynı gradyan, aynı hex harmanıyla okuyor;
+`E[s²] − E[s]²` mip'in yok ettiği varyansı veriyor ve pürüzlülüğe ekleniyor.
+
+**İki geri verme birbirinin yerine geçmez, toplanır.** `SeaUnresolvedSlopeVariance`
+DÜŞÜRÜLEN kademeleri geri verir — yüzeyde artık olmayan dalgalar. LEADR terimi ise hâlâ
+tam ağırlıkta duran bir kademenin İÇİNDE kaybolanı verir. İkisi ayrık dalgaları tarif
+eder.
+
+Aynı zincirden geçmeleri şart: fark alınıyor, farklı filtreden geçselerdi fark hiç
+olmayan bir varyans üretirdi.

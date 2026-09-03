@@ -231,7 +231,9 @@ Shader "ToTheSummit/SeaLit"
                 float2 dx = ddx(IN.positionWS.xz);
                 float2 dy = ddy(IN.positionWS.xz);
                 float pixelSize = max(length(dx), length(dy));
-                float2 slopeSum = SeaSampleSlope(IN.positionWS.xz, pixelSize);
+                float2 slopeSum; float mipLostVariance;
+                SeaSampleSlopeAndMipVariance(IN.positionWS.xz, pixelSize,
+                                             slopeSum, mipLostVariance);
 
                 // RAIN LANDS ON THE WATER TOO. Every drop leaves a ring travelling at the
                 // water's own capillary-gravity speed; at 50 mm/h there are 3300 drops on
@@ -323,7 +325,15 @@ Shader "ToTheSummit/SeaLit"
                 // Near the camera nothing is dropped, the term is zero, and the shallow
                 // water is left exactly as it was.
                 float roughA = perceptualRoughness * perceptualRoughness;
-                roughA = sqrt(roughA * roughA + SeaUnresolvedSlopeVariance(pixelSize));
+                // TWO KINDS OF LOST ROUGHNESS, AND THEY DO NOT OVERLAP.
+                //
+                // `SeaUnresolvedSlopeVariance` gives back the tiers that were dropped --
+                // waves no longer on the surface at all. `mipLostVariance` gives back what
+                // the mip flattened INSIDE a tier that is still fully weighted, which is
+                // what bites at 100-300 m where a wave is one to three pixels across.
+                roughA = sqrt(roughA * roughA
+                            + SeaUnresolvedSlopeVariance(pixelSize)
+                            + mipLostVariance);
                 perceptualRoughness = sqrt(roughA);
 
                 // --- THE WATER BODY'S OWN COLOUR ---

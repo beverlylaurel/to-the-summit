@@ -189,12 +189,6 @@ ova/silsile geçişi görünür bir dikiş yaratırsa halkanın dış sönümü 
   O zaman `SeaSimulation`'a önceki kare yer değiştirme dokusu (+1,5 MB) ve `SeaLit`'e
   dördüncü geçiş yazılır; maliyet ~yarım gün.
 
-- **Yansıma filtrelemesi (LEADR) ERTELENDİ** — uzak denizin
-  titremesi, şafaktaki kahverengi lekeler ve Ursell dalga şeklinin geri alınması aynı
-  kökten geliyor: yansıma, kendisi de nokta örneklenmiş bir normalden nokta örnekleniyor.
-  Ölçümler `SYMPTOMS.md` ve `RATIONALE.md`'de. Aşağıda, "Yansıma filtrelemesi ve dördüncü
-  FFT kademesi" başlığında.
-
 - **Kapiler bant (dördüncü FFT kademesi) ERTELENDİ** — aynı başlıkta; gerekçesi
   doğrulama, karmaşıklık değil.
 
@@ -2587,6 +2581,31 @@ kullanıcının kadrajında.
 ## Yansıma filtrelemesi ve dördüncü FFT kademesi (2026-09-02)
 
 **Karar:** ikisi de ertelendi. Sıra önce filtreleme, sonra kapiler bant.
+
+**FİLTRELEME YAPILDI (2026-09-03).** LEADR uygulandı ve ölçüldü.
+
+**Önceki ölçüm geçersiz bir araçtan geliyordu.** "%11,00 → %11,07" rakamı `titreme.py`
+ile alınmıştı; o metrik bu oturumda çürütüldü (uzak bant varyansın sıfır olduğu yerde
+seçilmişti, ve 1–5 piksellik dalgalar 16 px'lik blok altında kaldığı için dürüst dalga
+hareketi titreme sayılıyordu). Geçerli araç: donmuş deniz, TAA kapalı, 1× kare 4×
+süperörneklinin kutu indirgemesine karşı.
+
+**Kusur uzak ufukta değil, ORTA ALANDA.** Mesafeye göre hata:
+
+| mesafe | önce | sonra |
+|---|---|---|
+| 10–40 m | %9,9 | %9,3 |
+| 40–100 m | %10,2 | %8,6 |
+| **100–300 m** | **%11,4** | **%9,7** |
+| 300–1000 m | %5,6 | %4,9 |
+| 1000–5000 m | %1,2 | %1,2 |
+
+Tepe 100–300 m'de, çünkü orada dalga 1–3 piksel: kademe hâlâ tam ağırlıkta duruyor ama
+mip onun içindeki eğimi düzleştiriyor. 1 km ötesinde `SeaUnresolvedSlopeVariance` zaten
+işini yapıyor, o yüzden orada değişim yok — beklenen davranış.
+
+**Maliyet ölçüldü: 9,20 → 9,46 ms (+0,26 ms, %2,8)**, deniz kareyi doldururken. Bellek
+bir doku dizisi daha (256², 3 dilim, mipli, ARGBHalf ≈ 2,6 MB).
 
 **Gerekçe — filtreleme.** Çözülemeyen eğim varyansı loba verildi ve ölçüldü: titreşim
 %11,00 → %11,07, yani hiç. Aynı terim 50 katında %3,34 veriyor — mekanizma doğru,

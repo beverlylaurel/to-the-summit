@@ -12,6 +12,7 @@ RWTexture2DArray<float4> _SeaSpectrumHtRW;
 RWTexture2DArray<float4> _SeaSpectrumSlopeRW;
 RWTexture2DArray<float4> _SeaDisplacementRW;
 RWTexture2DArray<float4> _SeaDerivativesRW;
+RWTexture2DArray<float4> _SeaSlopeMomentsRW;
 
 // NO PING-PONG TEXTURE.
 //
@@ -182,4 +183,16 @@ void KAssemble(uint3 id : SV_DispatchThreadID)
 
     _SeaDisplacementRW[uint3(id.xy, tier)] = float4(dx, h, dz, J);
     _SeaDerivativesRW[uint3(id.xy, tier)]  = float4(slopeX, slopeZ, em.x, em.y);
+
+    // THE SECOND MOMENTS OF THE SLOPE, FOR THE MIP TO AVERAGE.
+    //
+    // A mip level averages the slope, and an average slope is FLATTER than the surface
+    // it came from -- the roughness that was there is simply gone, and the reflection
+    // narrows into a mirror. Averaging the SQUARES too lets the shader recover exactly
+    // how much it lost: `variance = E[s^2] - E[s]^2`, both terms filtered by the same
+    // hardware that did the losing. [SOURCE: Dupuy et al. 2013, LEADR mapping]
+    _SeaSlopeMomentsRW[uint3(id.xy, tier)] = float4(slopeX * slopeX,
+                                                   slopeZ * slopeZ,
+                                                   slopeX * slopeZ,
+                                                   0.0);
 }
