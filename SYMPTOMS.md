@@ -5231,7 +5231,36 @@ düzlemi büyütmek yetmiyor — denendi, basamak 337. satırdan 323'e kaydı ve
 sınır mesh'in kendisi (131 km'de geçirgenlik hâlâ 0,15).
 
 Yapılmadı: değişiklik denizin dışına çıkıyor (sahnedeki kamera + kalite ayarı) ve
-%5'lik bir basamak için z-fighting riski açıyor. Karar kullanıcınındır (`DECISIONS.md`).
+%5'lik bir basamak için z-fighting riski açıyor.
+
+**KAPANDI (2026-09-03): kusur artık üretilemiyor, ve zaten oynanan kotlarda görülemezdi.**
+
+İki ayrı gerekçe, ikisi de ölçülmüş.
+
+**Bir — 636 m'nin altında fiziksel olarak imkânsız.** Kesit 90 km'de; onu görebilmek için
+ufkun 90 km'den uzak olması gerekiyor. `d = √(2Rh)`, R = 6 371 km (`SeaCurvatureDrop`'un
+kendi değeri) → h = 90²/(2·6371) = **636 m**. 200 m'de ufuk 50 km, 400 m'de 71 km: kesit
+ufkun ardında kalıyor.
+
+**İki — 636 m'nin üstünde de düz çizgi yok.** Ayırt eden ölçüm **düzlük**: mesh kenarı
+kare boyunca aynı satırda durur, arazi ve bulut kenarı durmaz. Açık hava, bulutlar
+kapatılmış (kaydın kendi en kötü koşulu), sütun sütun en büyük sıçramanın satırı:
+
+| kot | ufuk | sıçrama | aynı satırda kalan sütun |
+|---|---|---|---|
+| 640 m | 90 km | %16,1 | %2 |
+| 1000 m | 113 km | %11,1 | %10 |
+| 1500 m | 138 km | %7,2 | %4 |
+| 2500 m | 178 km | %7,6 | %9 |
+| 4000 m | 226 km | %4,2 | %10 |
+| 6028 m | 277 km | %4,7 | %8 |
+
+Mesh kenarı olsaydı son sütun ~%100 olurdu. %2–10 çıkıyor: ölçülen sıçramalar arazi ve
+tepe silueti kenarları, denizin kesiti değil.
+
+**Tetikleyici:** ufka paralel, kare boyunca kesintisiz düz bir çizgi görülürse. Ölçüm
+aracı hazır — sütun sütun en büyük sıçramanın satır dağılımı; %60'ın üstü mesh kenarı
+demektir.
 
 ## Su altında deniz dibi simsiyah — AÇIK (2026-09-02)
 

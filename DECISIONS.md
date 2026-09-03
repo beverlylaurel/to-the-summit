@@ -169,12 +169,6 @@ ova/silsile geçişi görünür bir dikiş yaratırsa halkanın dış sönümü 
 
 ## Bekleyen kararlar
 
-- **Denizin uzak kenarı yükseklikten ~%5'lik bir basamak** — 6028 m'de deniz 90 km'lik
-  uzak düzlemde, %27 görünürken kesiliyor. Dört şüpheli ölçümle elendi: bulut sırası,
-  yarı çözünürlüklü yukarı örnekleme, sisin zayıflığı, ve yalnız uzak düzlemi büyütmek
-  (`SYMPTOMS.md`). Çözüm erişimde: bir halka daha + uzak düzlem 300 km. Yapılmadı —
-  değişiklik denizin dışına çıkıyor ve %5 için z-fighting riski açıyor.
-
 - **Uzak deniz titremesi KAPANDI — kusur kanıtı yok** (2026-09-02). Süperörnekli
   referansa göre gerçek aliasing %1,6–3,0 ve mesafeyle artmıyor; TAA çalışıyor (−%39).
   Eski "%11" rakamı geçersiz bir metrikten geliyordu (`SYMPTOMS.md`).
