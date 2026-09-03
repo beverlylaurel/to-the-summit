@@ -181,10 +181,17 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         //   20 cm layer   unchanged throughout: SNOW_MAX_SINK binds long before this ceiling
         float refThickness = SnowBaseHeight(snow.r, _FallbackRhoN);
 
-        float lateral = saturate(refThickness / SNOW_LATERAL_ESCAPE);
-
-        float kalanPay = SnowDensity(SNOW_LOOSE_N) / max(SnowDensity(SNOW_PACKED_N), 1.0)
-                       * lateral;
+        // THE PACKING LIMIT ALWAYS APPLIES -- THE GROUND NEVER COMES THROUGH.
+        //
+        // It used to be scaled by `lateral = thickness / bootWidth`, on the argument that a
+        // layer thinner than the sole is wide escapes sideways instead of compressing, so
+        // the sole reaches the ground. That is true of real snow, and it is what made a
+        // print on 1 cm carve 9.3 of the 9.9 mm there and open onto bare terrain.
+        //
+        // The user's call: the ground is not to show. A print is a dish in the snow at every
+        // depth, so the loose-to-packed ratio binds on its own and 45.8% of the column
+        // always survives underfoot -- 4.6 mm of it on a 1 cm layer.
+        float kalanPay = SnowDensity(SNOW_LOOSE_N) / max(SnowDensity(SNOW_PACKED_N), 1.0);
         float maxCarve = refThickness * (1.0 - kalanPay);
 
         float crust  = trail.b;
@@ -233,10 +240,15 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         // print's wall: shallow snow gives a wall shorter than the roll and the print
         // fades out at the boot's edge, deep snow gives a wall taller than it and the
         // print stands with near vertical sides. Both are what a real print does.
-        float rimStart   = max(radius - SNOW_SOLE_EDGE, 0.0);
-        float rim        = min(max(0.0, distance - rimStart), SNOW_SOLE_EDGE);
-        float subSurface = SNOW_SOLE_EDGE
-                       - sqrt(max(SNOW_SOLE_EDGE * SNOW_SOLE_EDGE - rim * rim, 0.0));
+        // THE ROLL NEVER OUTRUNS THE SINKING. Fixed at 12 mm, a shallower print ran out of
+        // depth before it reached the sole's edge and came out narrower -- which is exactly
+        // the "1 cm is not the same width as 20 cm" the user reported. Tying the roll to
+        // `sink` makes the wall reach zero AT the boot's edge whatever the depth, so the
+        // print is the boot's width at 1 cm and at 50 cm alike, and only its depth moves.
+        float roll       = min(SNOW_SOLE_EDGE, sink);
+        float rimStart   = max(radius - roll, 0.0);
+        float rim        = min(max(0.0, distance - rimStart), roll);
+        float subSurface = roll - sqrt(max(roll * roll - rim * rim, 0.0));
         float target    = max(0.0, sink - subSurface);
 
         float outerDistance = max(0.0, distance - radius);

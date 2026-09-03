@@ -5644,3 +5644,38 @@ dörde katlar. Kullanıcı kararı.
 kamerayı zeminin içine soktu, öteki iz dokusunu kameranın takip ettiğini hesaba katmadan
 ortasından örnekledi). Kanıt shader'ın kendi aritmetiğinde; ekranda doğrulama kullanıcının.
 
+
+## 1 cm karda izde zemin görünüyordu, ve iz 20/50 cm'den dardı (2026-09-03)
+
+**Kullanıcının ağzından:** "1cm'de kar izinde zemin gözüküyor. gözükmesin. ayrıca, width
+olarak 20cm ve 50cm'den farklı."
+
+İki ayrı sebep, ikisi de ölçüldü.
+
+### Zemin: `lateral` terimi sıkışma sınırını kaldırıyordu
+
+`maxCarve = kalınlık × (1 − kalanPay)` ve `kalanPay` `lateral = kalınlık / bot genişliği`
+ile ölçekleniyordu. 1 cm'de `lateral` = 0,09, yani sınır neredeyse yok: oyma 9,3 mm, geriye
+0,6 mm kalıyor — ekranda çıplak zemin.
+
+Terim bilerek konmuştu ("ince katman yana kaçar, sıkışmaz") ve gerçek kar için doğru. Ama
+kullanıcı kararı: **zemin görünmeyecek.** Terim kaldırıldı, sınır her derinlikte geçerli.
+
+### Genişlik: kenar dönüşü batmadan derindi
+
+Taban kenarı sabit 12 mm dönüyordu. 1 cm'de batma bundan sığ kalınca duvar bot kenarına
+varmadan sıfıra iniyor, iz daralıyordu. Dönüş `min(SNOW_SOLE_EDGE, sink)` yapıldı: duvar
+artık **her derinlikte tam bot kenarında** kapanıyor.
+
+### Sonuç
+
+| kar | oyma | altta kalan kar | iz genişliği |
+|---|---|---|---|
+| 1 cm | 5,4 mm | **4,6 mm** | 11,0 cm |
+| 5 cm | 27,1 mm | 22,9 mm | 11,0 cm |
+| 20 cm | 108,4 mm | 91,6 mm | 11,0 cm |
+| 50 cm | 150,0 mm | 350,0 mm | 11,0 cm |
+
+Kalan pay %45,8, her derinlikte. Zemin hiçbir kalınlıkta açılmıyor, genişlik dördünde de
+botun kendisi, değişen tek şey derinlik.
+
