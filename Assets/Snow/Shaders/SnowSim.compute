@@ -278,11 +278,26 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         trail.a = 0.0;
     }
 
-    float compressible  = max(min(SnowBaseHeight(snow.r, _FallbackRhoN), SNOW_MAX_SINK), 1e-3);
+    // THE PRINT'S DENSITY IS MASS CONSERVATION, NOT A GAIN.
+    //
+    // The boot carries no snow away: the column under it goes from `h` to `h - carve` and
+    // the same mass is in it, so `rho_new = rho_old * h / (h - carve)`. Nothing to tune.
+    //
+    // It used to be `fallback + (packed - fallback) * (carve / compressible) * GAIN`, with
+    // GAIN 0.60 -- a made-up fraction of a made-up target. MEASURED 2026-09-03 it put the
+    // inside of a print at 167 kg/m3 against 104 outside, i.e. 4% of albedo: on white snow,
+    // invisible. Real footprint snow is 300-500 kg/m3 [SOURCE: snow density tables --
+    // fresh 50-150, wind slab 250-400, foot-packed 300-500].
+    //
+    // Mass conservation gives 229 kg/m3 on a 1 cm layer and 226 on a 20 cm one -- the same
+    // print at both depths, which is the point: only the DEPTH is supposed to change.
+    float column    = max(SnowBaseHeight(snow.r, _FallbackRhoN), 1e-4);
+    float remaining = max(column - trail.r, 1e-4);
 
-    float hedefN = _FallbackRhoN
-                 + (SNOW_PACKED_N - _FallbackRhoN)
-                   * saturate(trail.r / compressible) * SNOW_COMPACT_GAIN;
+    float rhoBefore = SnowDensity(_FallbackRhoN);
+    float rhoAfter  = min(rhoBefore * column / remaining, SnowDensity(SNOW_PACKED_N));
+
+    float hedefN = (rhoAfter - 50.0) / 450.0;
 
     snow.g = max(snow.g, min(hedefN, SNOW_PACKED_N));
 

@@ -65,7 +65,6 @@
 /// which is what a deep print actually looks like.
 #define SNOW_SOLE_EDGE               0.012
 #define SNOW_PACKED_SINK_SCALE       0.18
-#define SNOW_COMPACT_GAIN            0.60
 
 // --- Rim displacement (spec §10.2) ---
 #define SNOW_RIM_VELOCITY_BIAS       0.04

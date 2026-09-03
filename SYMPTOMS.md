@@ -5711,3 +5711,38 @@ Oyma maskeden düşülmüyor artık. Sönüm duruyor — kar bölgesi gerçekten
 
 İz artık her derinlikte kar; görünen şey rengi değil **derinliği**.
 
+
+## Sonra iz büsbütün kayboldu — sıkışma çok zayıftı (2026-09-03)
+
+Maske düzeltilince iz siyah olmaktan çıktı ama **görünmez** oldu. Sebep: ince karda izin
+tek ipucu kalmıştı ve o ipucu zayıftı.
+
+Ölçüldü. İzin içindeki karın yoğunluğu **167 kg/m³**, dışarısı 104 — albedo farkı **%4**.
+Beyaz kar üstünde %4 görünmez. Gerçek ayak izinde sıkışmış kar **300–500 kg/m³**.
+
+Kovuk karartması da işe yaramıyor: `trailDepth / SNOW_RELIEF_MAX_DEPTH` = 5,4 mm / 350 mm
+= 0,015, yani sıfır.
+
+**Sıkışma uydurma bir katsayıyla hesaplanıyordu:**
+
+    hedefN = fallback + (packed − fallback) × (carve / compressible) × SNOW_COMPACT_GAIN
+
+`SNOW_COMPACT_GAIN = 0,60` — uydurma bir hedefin uydurma bir kesri.
+
+**Doğrusu kütle korunumu.** Bot karı taşımıyor: sütun `h`'den `h − oyma`'ya iniyor ve
+içindeki kütle aynı kalıyor, yani `ρ_yeni = ρ_eski × h / (h − oyma)`. Ayarlanacak sayı yok.
+
+| kar | oyma | izin yoğunluğu | dışarıyla albedo farkı |
+|---|---|---|---|
+| 1 cm | 5,4 mm | 227 kg/m³ | **%7,8** |
+| 5 cm | 27,1 mm | 227 kg/m³ | %7,8 |
+| 20 cm | 108,4 mm | 227 kg/m³ | %7,8 |
+| 50 cm | 150,0 mm | 149 kg/m³ | %2,8 |
+
+Kontrast iki katına çıktı ve **1, 5, 20 cm'de aynı** — istenen buydu: iz her derinlikte
+aynı okunuyor, değişen yalnız derinliği. 50 cm'de daha düşük çünkü orada `SNOW_MAX_SINK`
+bağlıyor: yarım metrelik sütunun ancak 15 cm'i eziliyor, gerisi altta duruyor. Doğru
+davranış.
+
+`SNOW_COMPACT_GAIN` silindi — gerekçesini yitiren sabit kalmaz.
+

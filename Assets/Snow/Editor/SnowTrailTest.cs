@@ -177,7 +177,7 @@ public static class SnowTrailTest
                          rhoN.ToString("0.000"));
 
             r.AppendLine("  [i] Compaction          sink reached <18% threshold at pass " + passesTo18 +
-                         " (SNOW_COMPACT_GAIN).");
+                         " (mass conservation: rho * h / (h - carve)).");
 
             // --- 7. Trail fill-in with precipitation ---
             rig.ResetSnow(0.02f, 0.10f);
