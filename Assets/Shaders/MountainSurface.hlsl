@@ -6,6 +6,7 @@
 // come from URP's own files — so extra lights like a headlamp work for free.
 
 #include "MountainSurfaceInput.hlsl"
+#include "RainRings.hlsl"
 
 // World coordinates reach thousands of metres. A sin-based hash exhausts float precision
 // at that scale and turns into per-pixel noise; the cell index is first folded into a small
@@ -580,6 +581,23 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // carries its own dimples and grain, and adding the procedural rock bump on top would
     // leave the beach with two conflicting reliefs at two different scales.
     float2 shaped = lerp(gradient * rockRelief, sandSlopeXZ, sand);
+
+    // --- Rain rings ---
+    //
+    // THE SAME RING AS THE SEA'S, AND THE SAME FILE. A drop landing in a puddle leaves what
+    // it leaves in the ocean; only the amount of water it lands in differs.
+    //
+    // TWO TERMS, NOT ONE. `_SurfaceRainIntensity` is whether a drop is landing at all --
+    // it stops the instant the rain does. `wet` is whether there is a film for it to ring
+    // in: on dry rock a drop leaves a dark spot, not a ring, and here that is simply
+    // nothing. The film lags the rain by design, so the rings fade out with the shower and
+    // the darkening outlives them.
+    //
+    // Faded by the pixel like every other scale, or it is the aliasing all over again.
+    float2 ringPixel = float2(length(ddx(worldPos.xz)), length(ddy(worldPos.xz)));
+    float2 ringLocal = RainRingLocal(worldPos.xz, _WorldSpaceCameraPos.xz);
+    shaped += RainRings(ringLocal, _Time.y, _SurfaceRainIntensity * wet)
+            * RainRingResolvable(max(ringPixel.x, ringPixel.y));
 
     float3 shaded = normalize(normalWS + float3(shaped.x, 0.0, shaped.y));
 

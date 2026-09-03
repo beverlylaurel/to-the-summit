@@ -44,6 +44,10 @@ CBUFFER_START(UnityPerMaterial)
     float4 _TerrainSize;     // xyz boyut
 
     float _SurfaceWetness;
+
+    // The rain LANDING right now, snow excluded (`TerrainSurface`). Separate from
+    // `_SurfaceWetness`, which is the film that rain leaves and that dries slowly.
+    float _SurfaceRainIntensity;
     float4 _SurfaceWindDir;   // xyz direction, w sustained strength
     float4 _SurfaceSunDir;
 

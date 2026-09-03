@@ -1359,6 +1359,8 @@ public static class MountainSceneBootstrap
             Object.FindAnyObjectByType<WindField>(),
             Object.FindAnyObjectByType<TimeOfDay>(),
             Object.FindAnyObjectByType<AtmosphereController>(),
+            Object.FindAnyObjectByType<TemperatureField>(),
+            Object.FindAnyObjectByType<FirstPersonController>() is FirstPersonController fpc ? fpc.transform : null,
             maps,
             SurfaceMapBaker.LoadDrift(),
             SurfaceMapBaker.LoadNormals(),

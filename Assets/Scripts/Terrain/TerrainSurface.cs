@@ -9,6 +9,10 @@ public class TerrainSurface : MonoBehaviour
 {
     [SerializeField] TerrainMaterialSettings settings;
     [SerializeField] WeatherState weather;
+    [SerializeField] TemperatureField temperature;
+
+    [Tooltip("The rain/snow boundary depends on altitude — which point it is read at.")]
+    [SerializeField] Transform observer;
     [SerializeField] WindField wind;
     [SerializeField] TimeOfDay time;
 
@@ -99,6 +103,7 @@ public class TerrainSurface : MonoBehaviour
     /// second time here would split the two systems. `PrecipitationRenderer` reads the global
     /// for the same reason.
     static readonly int WetnessId = Shader.PropertyToID("_SurfaceWetness");
+    static readonly int RainIntensityId = Shader.PropertyToID("_SurfaceRainIntensity");
     static readonly int WindDirId = Shader.PropertyToID("_SurfaceWindDir");
     static readonly int SunDirId = Shader.PropertyToID("_SurfaceSunDir");
 
@@ -149,12 +154,15 @@ public class TerrainSurface : MonoBehaviour
 
     public void Bind(TerrainMaterialSettings source, WeatherState weatherState, WindField windField,
         TimeOfDay timeOfDay, AtmosphereController atmosphereController,
+        TemperatureField thermometer, Transform viewer,
         Texture2D maps, Texture2D windMap,
         Texture2D normals, Texture2DArray horizonMap, Texture2D heightMap,
         Shader shader)
     {
         settings = source;
         weather = weatherState;
+        temperature = thermometer;
+        observer = viewer;
         wind = windField;
         time = timeOfDay;
         atmosphere = atmosphereController;
@@ -197,11 +205,26 @@ public class TerrainSurface : MonoBehaviour
 
         float precipitation = weather != null ? weather.Precipitation : 0f;
 
+        // ONLY RAIN WETS THE ROCK. Snow lands on it and stays snow; it darkens nothing
+        // until it melts, and melting is the snow system's business, not this one's.
+        //
+        // The share comes from the thermometer, the same one the sky and the sea read, so
+        // "the rock is wet while snow falls on it" cannot happen. Before 2026-09-03 this
+        // line took `weather.Precipitation` whole and did exactly that.
+        float rainShare = temperature != null && observer != null
+            ? 1f - temperature.SnowFractionAt(observer.position.y)
+            : 1f;
+
         // Wetting is fast, drying is slow: when the rain stops the rock stays dark for a while
-        float target = precipitation;
+        float target = precipitation * rainShare;
         float duration = target > wetness ? 8f : Mathf.Max(1f, settings.dryingSeconds);
         wetness = Mathf.Lerp(wetness, target, 1f - Mathf.Exp(-Time.deltaTime / duration));
         material.SetFloat(WetnessId, wetness);
+
+        // THE RAIN ITSELF, NOT THE FILM IT LEAVES. `wetness` lags on purpose -- the rock
+        // stays dark long after the rain stops -- but a ring only exists while a drop is
+        // actually landing, so the rings read this instead.
+        Shader.SetGlobalFloat(RainIntensityId, precipitation * rainShare);
 
         // THE WETNESS IS PUBLISHED AS A GLOBAL TOO. The snow on objects
         // (`SnowCoverObject`) is on another material; if it does not see the same wetness,

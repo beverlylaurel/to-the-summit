@@ -144,6 +144,26 @@ public class TemperatureField : MonoBehaviour
     public float FeltAt(float altitude) =>
         At(altitude) - windChillPerSpeed * wind.Velocity.magnitude;
 
+    /// HOW MUCH OF THE PRECIPITATION IS SNOW AT THIS ELEVATION: 1 all snow, 0 all rain.
+    ///
+    /// A flake does not turn to water the instant it crosses 0 C -- it keeps falling while
+    /// it melts -- so the boundary is a narrow band rather than a line. The width is not a
+    /// new number: this project had already written it down twice and the two agree.
+    /// `DECISIONS.md` puts sleet at 1200-1422 m, which under the 6.5 C/km lapse rate is
+    /// 1.44 C, and the grain-wetness rule spans 0.5-2.0 C, which is 1.5 C.
+    ///
+    /// It stays NARROW on purpose: `SYSTEMS.md` section 3 asks the sleet belt to read as a
+    /// boundary, not as a belt. 1.5 C is about 230 m.
+    ///
+    /// IT LIVES HERE, NOT IN A CONSUMER. The sky, the sea and the rock all have to agree
+    /// about what is falling on them; they agree by reading one thermometer. They disagreed
+    /// once, in both directions at the same time (`SYMPTOMS.md`, 2026-09-03).
+    const float AllSnowCelsius = 0.5f;
+    const float AllRainCelsius = 2.0f;
+
+    public float SnowFractionAt(float altitude) =>
+        1f - Mathf.Clamp01((At(altitude) - AllSnowCelsius) / (AllRainCelsius - AllSnowCelsius));
+
     /// The elevation where the temperature falls to zero (metres). The boundary where rain turns
     /// to snow comes from here. Because the lapse rate is constant, the inverse is solved in closed form.
     public float FreezingLevel =>

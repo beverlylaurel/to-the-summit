@@ -453,54 +453,6 @@ float SeaValueNoise(float2 p)
 ///
 /// It perturbs the SLOPE, not the height: the ring is a millimetre tall and the eye reads
 /// it entirely in the specular.
-/// `localXZ` is a world position with `SEA_RAIN_RING_ORIGIN_STEP` snapped out of it: the
-/// ring is too fine to survive absolute coordinates far from the origin.
-float2 SeaRainRings(float2 localXZ, float intensity)
-{
-    if (intensity <= 0.001) return 0.0;
-
-    // The three cell sizes are spaced by an irrational-ish ratio so their lattices never
-    // line up; the ring speed and life are the water's and are shared by all three.
-    const float3 cellSize = float3(0.11, 0.19, 0.37);
-    const float speed = SEA_RAIN_RING_SPEED;
-    const float life  = SEA_RAIN_RING_LIFE;
-
-    float2 slope = 0.0;
-
-    [unroll]
-    for (int layer = 0; layer < 3; ++layer)
-    {
-        float L = cellSize[layer];
-        float2 cell = floor(localXZ / L);
-
-        // Each cell drops once per lifetime, at its own moment and its own spot inside it.
-        float2 h = SeaHash22(cell + float2(layer * 37.1, layer * 71.7));
-        float2 centre = (cell + h) * L;
-
-        float age = frac(_SeaTime / life + SeaHash21(cell + layer * 13.7));
-
-        float2 d = localXZ - centre;
-        float r = length(d);
-        if (r < 1e-4) continue;
-
-        // The crest travels outward at the water's own speed.
-        float front = age * speed * life;
-
-        // A narrow annulus: the ring is a single crest, not a train.
-        float w = SEA_RAIN_RING_WIDTH;
-        float x = (r - front) / w;
-        float profile = x * exp(-x * x);        // odd: a crest with a trough behind it
-
-        // It fades as it spreads -- the same energy on an ever longer circumference -- and
-        // it is born rather than appearing, so the first instant does not pop.
-        float spread = 1.0 / max(1.0 + front / w, 1.0);
-        float birth = saturate(age * 12.0);
-
-        slope += normalize(d) * (profile * spread * birth);
-    }
-
-    return slope * (SEA_RAIN_RING_SLOPE * intensity);
-}
 
 /// Three octaves. Foam carries both coarse clumps and fine bubbles.
 float SeaFoamNoise(float2 p)

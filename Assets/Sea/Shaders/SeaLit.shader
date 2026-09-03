@@ -79,6 +79,7 @@ Shader "ToTheSummit/SeaLit"
             // which is why the project never uses it. The bike hit the same wall once
             // (`BikeSurface.shader`) and this is the same fix.
             #include "../../Shaders/HeightFog.hlsl"
+            #include "../../Shaders/RainRings.hlsl"
 
             #include "SeaCommon.hlsl"
 
@@ -240,10 +241,9 @@ Shader "ToTheSummit/SeaLit"
                 // FADED BY THE PIXEL, LIKE EVERY OTHER SCALE. The ring is 1.7 cm across; it
                 // has no business being drawn where a pixel covers more than that, and
                 // drawing it there would be the same aliasing the tiers already fade out.
-                float2 ringOrigin = floor(_WorldSpaceCameraPos.xz / SEA_RAIN_RING_ORIGIN_STEP)
-                                  * SEA_RAIN_RING_ORIGIN_STEP;
-                slopeSum += SeaRainRings(IN.positionWS.xz - ringOrigin, _SeaPrecipIntensity01)
-                          * SeaTierResolvable(SEA_RAIN_RING_WIDTH * 4.0, pixelSize);
+                float2 ringLocal = RainRingLocal(IN.positionWS.xz, _WorldSpaceCameraPos.xz);
+                slopeSum += RainRings(ringLocal, _SeaTime, _SeaPrecipIntensity01)
+                          * RainRingResolvable(pixelSize);
 
                 float3 N = normalize(float3(-slopeSum.x, 1.0, -slopeSum.y));
 

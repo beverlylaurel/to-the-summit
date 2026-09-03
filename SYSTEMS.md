@@ -1554,13 +1554,29 @@ Band dar tutulur (§3): 6,5 °C/km altında 1,5 °C ≈ 230 m, yani geçiş bir 
 sınır gibi okunur. Ölçüldü 2026-09-03: yağmur ≤ 900 m, sulu kar ~1100 m (pay 0,87), saf
 kar ≥ 1200 m, donma seviyesi 1206 m.
 
-Kar sistemi bu sayıyı **yazmaz**, okur. Deniz aynı termometreden kendi kotunda okur; ikisi
-çelişemez çünkü kaynak tek.
+Kar sistemi bu sayıyı **yazmaz**, okur. Deniz ve ıslak kaya da aynı termometreden kendi
+kotlarında okur; üçü çelişemez çünkü kaynak tek — band `TemperatureField.SnowFractionAt`
+içinde, `FreezingLevel`'ın yanında.
+
+**Kayayı yalnız yağmur ıslatır.** `TerrainSurface` ıslaklığı `yağış × (1 − kar payı)`
+sürüyor. Kar kayanın üstüne düşer ve kar kalır; eriyene kadar hiçbir şeyi karartmaz, erime
+de kar sisteminin işidir. Önceden `weather.Precipitation` bütün alınıyordu, yani kar
+yağarken kaya ıslanıyordu.
 
 **Halka yalnız YAĞMURDA çizilir, karda değil.** Türü `SeaEnvironmentBridge.PrecipKind`
 söylüyor, o da `TemperatureField`'dan geliyor: donma seviyesi denizin altına inerse deniz
 kar alır ve `SeaManager` şiddeti sıfırlar. Yani halkanın görünmesi `seaLevelCelsius`'a
 bağlı; bu bağ bir kez koptu (`SYMPTOMS.md`).
+
+**Halka matematiği denizin malı değil, suyun malı.** `Assets/Shaders/RainRings.hlsl`'de
+durur; deniz de ıslak kaya da oradan okur. Bir damla su birikintisine de okyanusa da aynı
+halkayı bırakır — sabitler, hız, sönüm ortak, yalnız içine düştüğü suyun miktarı değişir.
+
+**Zeminde halka İKİ terime bağlı, bir değil.** `_SurfaceRainIntensity` damla düşüyor mu
+sorusudur ve yağmur kesildiği an sıfırlanır; `_SurfaceWetness` halkanın içinde
+titreşeceği film var mı sorusudur ve yağmurun 8 s gerisinden gelir, kuruması yavaştır.
+Kuru kayada damla halka değil koyu leke bırakır — burada bu, hiçbir şey demektir. Film
+gecikmeli olduğu için sağanak bitince halkalar sönüyor, kararma bir süre daha kalıyor.
 
 **Kafes dünyaya çakılı ama dünyanın SIFIR NOKTASINA değil.** Halka 17 mm; float 14 km'de
 yalnız ~1 mm taşıyor, mutlak koordinatta kafes bozuluyor (ölçüldü: piksellerin %45'i,

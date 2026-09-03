@@ -150,45 +150,9 @@
 
 
 // --- Rain rings ---
-
-/// The speed of the ring a drop leaves, and it is the WATER'S, not the rain's: the minimum
-/// phase speed of a capillary-gravity wave, `sqrt(2 sqrt(sigma g / rho))`, at a wavelength
-/// of 1.73 cm. [SOURCE: Lamb, Hydrodynamics 267; sigma = 0.0728 N/m, rho = 1000]
-#define SEA_RAIN_RING_SPEED          0.231
-
-/// How long one ring is worth drawing (s). Viscous damping of a 1.7 cm ripple has an
-/// e-folding time of 3.7 s (`2 nu k^2`, nu = 1e-6), but the crest has spread over a
-/// circumference eight times longer by then and is no longer readable.
-#define SEA_RAIN_RING_LIFE           1.0
-
-/// The crest's own width (m): about one capillary wavelength.
-#define SEA_RAIN_RING_WIDTH          0.017
-
-/// The ring lattice is anchored to a world grid this coarse (m), not to the world origin.
-/// A crest is 17 mm wide but a float carries only about 1 mm of resolution 14 km out, so a
-/// lattice built on absolute coordinates degenerates there. MEASURED 2026-09-03, standing
-/// at x = 14000: only 45% of the water's pixels carried a ring at all and their mean
-/// strength was 41% of what the same code produced near the origin.
-///
-/// 256 is exact in binary, so the snapped origin is exact and `posXZ - origin` is exact
-/// too. The lattice re-rolls when the camera crosses a boundary; a ring lives one second,
-/// so a re-roll is a single frame of an already boiling stipple.
-#define SEA_RAIN_RING_ORIGIN_STEP    256.0
-
-/// Coefficient that sets a ring's peak surface slope. It is NOT the slope itself: the
-/// profile, the 1/r spread and the birth ramp all attenuate it before it reaches the
-/// surface, so the number is chosen from what has to come out the far end.
-///
-/// TARGET. A 1.5 mm drop leaves a crater about 0.5 mm deep; a 0.5 mm crest on the 1.73 cm
-/// capillary wavelength is a slope of `2 pi A / lambda` = 0.182, that is 10.5 degrees.
-///
-/// WHAT THE CHAIN TAKES. `profile` peaks at 0.4288 (`x exp(-x^2)` at `x = 1/sqrt(2)`), and
-/// `spread * birth` peaks at 0.469 when the birth ramp has just saturated (age 0.083, the
-/// crest one width out). Their product is 0.201, so 0.182 / 0.201 = 0.90.
-///
-/// MEASURED (2026-09-03): at 0.12 the peak reached the surface as a slope of 0.015 -- 0.9
-/// degrees -- and an A/B on identical frames could not separate rings from no rings.
-#define SEA_RAIN_RING_SLOPE          0.90
+//
+// They live in `Assets/Shaders/RainRings.hlsl`: a drop leaves the same ring in a
+// puddle as it does in the ocean, so the sea does not own that maths.
 
 
 /// BREAKER DEPTH INDEX, SLOPE DEPENDENT.

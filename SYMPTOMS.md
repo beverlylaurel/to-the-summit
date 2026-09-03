@@ -5518,3 +5518,30 @@ genişliği veriyor: `DECISIONS.md` sulu karı 1200–1422 m'ye koyuyor (6,5 °C
 
 Donma seviyesi 1206 m, geçiş bandı ~240 m. Tanecik tarafından da doğrulandı:
 `SnowRuntimeState.IsSnowing` 400 m'de `False`, 1600 m'de `True`.
+
+
+## Kaya öğle vakti kapkara (2026-09-03) — AÇIK
+
+**Zemin halkası test edilirken görüldü, halkayla ilgisi yok.** 517 m'de, saat 12:00,
+gündüz katsayısı 1,00, görüş 15 656 m, hafif sağanak (yağış 0,23), kamera 60° aşağı:
+zemin luma **3,5/255**.
+
+**İlk şüpheli — "benim halkam bozdu" — yanlış çıktı.** `MountainSurface.hlsl` ve
+`MountainSurfaceInput.hlsl` `git stash`'e alınıp aynı pin tekrar çekildi:
+
+| | zemin luma |
+|---|---|
+| halkasız (değişiklik yok) | 3,65 |
+| halka kapalı | 3,55 |
+| halka açık | 3,41 |
+
+Aynı. Karanlık halkadan önce de vardı.
+
+**Denizin karanlığıyla da aynı şey değil.** Deniz ölçüldü ve gölgelemesi Fresnel'e
+oturuyordu; oradaki karanlığın sebebi suyun dike bakıldığında gökyüzünün %3–9'unu
+yansıtması. Kaya öyle değil: yayınık yansıtıcı, öğle vakti kapalı gökyüzünün altında
+belirgin şekilde aydınlık olmalı.
+
+**Ölçülmedi, sebep bilinmiyor.** Sıradaki adım kayanın aldığı ışığı lineerde okumak
+(tonemap kapalı, deniz için kurulan yöntemin aynısı) ve gökyüzü ışınımıyla oranlamak.
+Tahmin yazılmadı.
