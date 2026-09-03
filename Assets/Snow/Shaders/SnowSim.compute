@@ -247,8 +247,15 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         // Smoothstep, not `exp`: it ENDS. The skirt's outer edge is `range` whatever the
         // sinking is, so the mark's width no longer reads the snow's depth. The noise still
         // swings that edge along the trail, which is where the irregularity comes from.
+        // THE SKIRT'S DEPTH IS CAPPED, NOT ONLY ITS REACH.
+        //
+        // Its reach was already fixed, but its DEPTH still followed the sinking -- and a
+        // deeper signal stays above the eye's threshold further out, so the mark still read
+        // wider in deep snow even though its geometry did not change. Capping the amplitude
+        // at the sole's own roll makes every print past 12 mm of sinking leave the SAME
+        // skirt: same width, same length, and only the hole in the middle gets deeper.
         float t = saturate(1.0 - outerDistance / max(range, 1e-3));
-        float tail = sink * SNOW_SETTLE_TAIL * t * t * (3.0 - 2.0 * t);
+        float tail = min(sink, SNOW_SOLE_EDGE) * SNOW_SETTLE_TAIL * t * t * (3.0 - 2.0 * t);
         target = max(target, tail);
 
         float midRidge = saturate(1.0 - axisDistance / SNOW_MIDRIDGE_WIDTH);

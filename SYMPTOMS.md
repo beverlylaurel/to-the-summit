@@ -5615,6 +5615,26 @@ Kâğıtta sonuç, shader'ın kendi sabitleriyle:
 Sığ karda duvar dönüşten kısa kalıyor, iz botun kenarında sönüyor; derin karda duvar
 dönüşten uzun oluyor ve kenar dikleşiyor. İkisi de gerçek izin yaptığı şey.
 
+**İkinci yer: eteğin DERİNLİĞİ hâlâ batmayla büyüyordu.** Genişlik düzeldikten sonra da
+kullanıcı "en boy aynı olsun" kuralının çiğnendiğini bildirdi, haklıydı: eteğin ERİŞİMİ
+sabitti ama genliği `sink` ile ölçekleniyordu, ve daha derin bir sinyal gözün eşiğinin
+üstünde daha uzağa kadar kalıyor — yani geometri değişmese de iz derin karda daha geniş
+okunuyordu.
+
+Genlik tabanın kendi dönüşüyle sınırlandı (`min(sink, SNOW_SOLE_EDGE)`). Artık 12 mm'den
+derin her iz **aynı eteği** bırakıyor.
+
+2 mm eşiğinde görünür genişlik, shader'ın sabitleriyle:
+
+| kar | batma | görünür genişlik | bota oran |
+|---|---|---|---|
+| 1 cm | 9,6 mm | 11,0 cm | 1,00× |
+| 5 cm | 39,6 mm | 11,0 cm | 1,00× |
+| 20 cm | 108,4 mm | 11,0 cm | 1,00× |
+| 50 cm | 150,0 mm | 11,0 cm | 1,00× |
+
+Genişlik dördünde de aynı, derinlik 9,6 → 150 mm. İstenen buydu.
+
 **Kalan sınır — ölçüldü, düzeltilmedi:** texel 2,3 cm, yani 11 cm'lik iz **4,7 texel**.
 Blok görüntüsünün bir payı buradan geliyor ve ancak kar simülasyonunun çözünürlüğü
 (24 m / 1024) artırılarak düşer; 2048 texeli 1,15 cm'ye indirir ama simülasyon maliyetini
