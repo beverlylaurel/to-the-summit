@@ -3396,3 +3396,76 @@ oynuyor ve 16 bin adet 2×2 leke üretiyordu — sayılan şeylerin çoğu yağm
 Kamerayı göğe çevirdikten sonra da tek karede yüksek geçirgen süzgeçle sayınca medyan
 2×2 çıktı; o da dither gürültüsüydü. Ancak kırpılmış görüntüye bakınca anlaşıldı.
 **Ders: gürültü tabanı ölçülmeden eşik seçilmez.**
+
+## Yağmurun yelpazesi: damla boyu çeşitliliği, türbülans değil (2026-09-03)
+
+Kullanıcı, dikey çizilmiş bir izin yana kaydığını çizerek gösterdi: "böyle mi yağar
+yağmur", "kar tanesi gibi hareket etmemeli".
+
+### Önce alet kanıtlandı, çünkü üç kez yalan söylemişti
+
+Bu turda ölçüm aracı sırasıyla **deniz dalgasını**, **dither gürültüsünü** ve **arazi
+ufkunu** yağmur damlası saydı. Üçünde de sayılar tutarlı ve inandırıcıydı.
+
+Aleti düzelten şey **boş vaka sınaması** oldu: aynı kadraj, tek fark yağmurun açık/kapalı
+olması.
+
+| eşik | yağmur kapalı | yağmur açık |
+|---|---|---|
+| >3 | n=10, boy **96 px** | n=195, boy **12 px** |
+
+Ayırt eden şey uzunlukmuş: manzara kenarı 90–150 piksel, damla 12–14. Uzunluk penceresi
+(5–60 px) konunca boş vaka **n=6, R=0,11** (rastgele yön = gürültü), dolu vaka **n=288,
+R=0,83** verdi. Ancak bundan sonra ölçülen sayılara güvenildi.
+
+### Perspektif tuzağı
+
+Dikey dünya doğruları ekranda bir kaçış noktasında birleşir; yukarı bakarken izlerin
+ışınsal dağılması **doğrudur**. Tek bir "ortalama açı" bu yüzden anlamsız. Ölçülen şey
+**kalıntı**: her izin, kendi konumundan kaçış noktasına giden yönden sapması.
+Kaçış noktası kâğıtta bulundu: (960, −94).
+
+### Derleme tazeliği ayrıca kanıtlandı
+
+İki eleme yapıldıktan sonra "acaba eski kod mu koştu" diye durup türbülans **5,0**'a
+çekildi: R 0,79 → 0,38. Kod gerçekten yeniden derleniyordu, elemeler geçerli.
+
+### Elenen iki şüpheli
+
+- **Türbülans.** `RainTurbulenceCalm` sıfırlandı: sapma 23,5° → 24,1°. Etkisi yok.
+- **Rüzgârın sınır tabakası.** `profile` 1,0'a sabitlendi: 23,5° → 29,9°. Daha kötü.
+
+### Gerçek sebep
+
+Sapma, iz boyuyla monoton değişiyor:
+
+| iz boyu | dikeyden sapma |
+|---|---|
+| 6–8 px | 36,8° |
+| 8–10 px | 27,5° |
+| 10–14 px | 20,9° |
+| 14–58 px | 13,3° |
+
+Kısa iz = küçük ve yavaş damla. Eğim `atan(u_rüzgâr / v_düşüş)` ve `v_düşüş` 0,5 mm'de
+2,02 m/s, 5 mm'de 9,14 m/s. 1,9 m/s yatay rüzgârda bu 43,3°'ye karşı 11,7° demek —
+ekrandaki damlaların ortak yönü yok, göz bunu düşmek değil savrulmak diye okuyor.
+
+**Yelpaze gerçek fizik.** Gerçek olmayan, o damlaları çiziyor olmamız: 0,5 mm'lik damla
+24 m'den 5 mm'lik damlanın yüzde biri kadar ışık saçar, görünmez. Dosyanın kendi ilkesi
+zaten bunu söylüyordu ("damla sayımız gerçeğin binde biri, bütçe görünene harcanır");
+yalnız alt sınırda uygulanmamıştı. **Alt sınır 0,5 → 1,0 mm.**
+
+**Karartarak çözülmedi.** `widen` üzerinde tam ışık korunumu bir tur önce denenmiş ve
+kullanıcı "çok saydam" dediği için geri alınmıştı. Olmaması gereken damla soldurulmaz,
+kaldırılır.
+
+### Ölçülen sonuç
+
+| | önce | sonra |
+|---|---|---|
+| rüzgâr 0, yön birliği R | 0,79 | **0,85** |
+| rüzgâr %55, R | 0,66 | **0,78** |
+| rüzgâr %55, sapma | 34,2° | 30,8° |
+
+**Kapanmadı.** Sapma medyanı hâlâ ~24°. Daha da daraltmak damla boyu aralığının üst
+ucunu kısmayı gerektirir; o da uzun parlak izleri götürür. Bir sonraki tur oraya bakar.

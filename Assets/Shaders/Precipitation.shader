@@ -167,8 +167,30 @@ Shader "ToTheSummit/Precipitation"
                 float sum = -(log(max(u.x, 1e-4)) + log(max(u.y, 1e-4)) + log(max(u.z, 1e-4)));
                 float diameter = sum / lambda;                    // mm
 
-                // 0.5-5 mm: below that it is the fog's business, above it a drop breaks up as it falls.
-                return clamp(diameter, 0.5, 5.0) * 0.0005;        // radius, metres
+                // 1-5 mm. THE FLOOR USED TO BE 0.5 mm AND IT FANNED THE RAIN OUT.
+                //
+                // A drop's slant is `atan(u_wind / v_fall)` and `v_fall` runs from 2.02 m/s at
+                // 0.5 mm to 9.14 m/s at 5 mm. In a 1.9 m/s crosswind that is 43.3 degrees for
+                // the finest drop against 11.7 for the coarsest: the drops on screen shared no
+                // direction and the rain read as swirling rather than falling. The user drew it:
+                // a vertical streak with a sideways arrow.
+                //
+                // MEASURED, sorted by streak length (short streak = small slow drop):
+                //   6-8 px -> 36.8 deg off vertical,  8-10 -> 27.5,  10-14 -> 20.9,  14-58 -> 13.3
+                //
+                // THE FAN IS REAL PHYSICS. What is NOT real is that we draw those drops at all:
+                // a 0.5 mm drop at 24 m scatters a hundredth of what a 5 mm drop sends to the
+                // eye and is simply not seen. The same argument already governs the sampling
+                // above ("our drop count is a thousandth of reality's -- the budget has to be
+                // spent on what is visible"); the floor was the one place it was not applied.
+                //
+                // NOT FIXED BY DIMMING THEM. Full light conservation on `widen` was tried a
+                // round earlier and reverted -- it thinned ALL the rain and the user said the
+                // drops were far too transparent. A drop that should not be there is removed,
+                // not faded.
+                //
+                // Above 5 mm a drop breaks up as it falls; below 1 mm it is the fog's business.
+                return clamp(diameter, 1.0, 5.0) * 0.0005;        // radius, metres
             }
 
             /// Terminal velocity (m/s), the Atlas relation fitted to Gunn & Kinzer's
