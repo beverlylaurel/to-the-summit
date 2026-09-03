@@ -39,6 +39,16 @@ public class FirstPersonController : MonoBehaviour
     /// Speed multiplier for testing. 1 in normal play.
     public float SpeedMultiplier { get; set; } = 1f;
 
+    /// A LIMIT SOMEONE ELSE IMPOSES ON HORIZONTAL MOVEMENT.
+    ///
+    /// Given the player's position and the velocity they want, it answers with the velocity
+    /// they are allowed. The controller does not know or care what the reason is -- the sea
+    /// registers one of these to stop a wade before the water reaches the eyes, and nothing
+    /// about water is written here.
+    ///
+    /// Null means no limit, which is the normal case away from water.
+    public System.Func<Vector3, Vector3, Vector3> LimitHorizontal { get; set; }
+
     void Awake()
     {
         controller = GetComponent<CharacterController>();
@@ -95,7 +105,18 @@ public class FirstPersonController : MonoBehaviour
             velocity.y = -2f;
 
         velocity.y += gravity * Time.deltaTime;
-        controller.Move(velocity * Time.deltaTime);
+
+        // The limit is applied to the MOVE, not to `velocity`: written back into the state
+        // it would accumulate, and the player would stay stuck after stepping away.
+        Vector3 step = velocity;
+        if (LimitHorizontal != null)
+        {
+            Vector3 allowed = LimitHorizontal(transform.position, new Vector3(step.x, 0f, step.z));
+            step.x = allowed.x;
+            step.z = allowed.z;
+        }
+
+        controller.Move(step * Time.deltaTime);
 
     }
 

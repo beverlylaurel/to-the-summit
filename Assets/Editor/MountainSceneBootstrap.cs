@@ -1412,6 +1412,20 @@ public static class MountainSceneBootstrap
         bridge.Bind(windField, weatherState, time, atmosphere, thermometer, sun, seaSettings);
         EditorUtility.SetDirty(bridge);
 
+        // THE WADE LIMIT. The boundary is depth, not the waterline: shallow water is walkable
+        // and the camera must not go under (`DECISIONS.md`).
+        var wade = root.GetComponent<SeaWadeLimit>();
+        if (wade == null)
+        {
+            wade = root.gameObject.AddComponent<SeaWadeLimit>();
+            changed = true;
+        }
+        wade.Bind(Object.FindAnyObjectByType<FirstPersonController>(),
+                  seaSettings,
+                  gen.GetComponent<Terrain>(),
+                  camera != null ? camera.transform : null);
+        EditorUtility.SetDirty(wade);
+
         root.Bind(seaSettings, bridge, gen.GetComponent<Terrain>());
         EditorUtility.SetDirty(root);
 

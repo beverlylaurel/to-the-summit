@@ -169,10 +169,6 @@ ova/silsile geçişi görünür bir dikiş yaratırsa halkanın dış sönümü 
 
 ## Bekleyen kararlar
 
-- **Oyuncu belirli bir DERİNLİKTE durdurulacak, su kenarında değil** — sığ suda yürümek
-  serbest; sınır kameranın su yüzeyinin altına inmesi. Aşağıda, "Deniz: kapsam dışı
-  bırakılanlar".
-
 - **Denizin uzak kenarı yükseklikten ~%5'lik bir basamak** — 6028 m'de deniz 90 km'lik
   uzak düzlemde, %27 görünürken kesiliyor. Dört şüpheli ölçümle elendi: bulut sırası,
   yarı çözünürlüklü yukarı örnekleme, sisin zayıflığı, ve yalnız uzak düzlemi büyütmek
@@ -2136,6 +2132,36 @@ hattından yaklaşık **35 m açığa** kadar güvenli.
 
 Kural: oyuncu suya girer, belirli bir derinlikte ilerlemesi durur. Eşik ölçülür, sabit
 sayı yazılmaz — göz yüksekliği ve o anki dalga tepesi ikisi de değişken.
+
+**YAPILDI (2026-09-03).** `SeaWadeLimit`, `FirstPersonController.LimitHorizontal`
+kancasına takılıyor. Kontrolcü suyun ne olduğunu bilmiyor, deniz de kontrolcünün içine
+yazmıyor.
+
+Üç terimin üçü de ölçülüyor: göz yüksekliği her kare rig'den, derinlik araziden, tepe
+denizin kendi tayfından.
+
+**Tepe `Hs`'ten DEĞİL, derinlikten geliyor — ilk sürüm bunu yanlış yaptı.** `Hs` açık
+deniz yüksekliği; oyuncunun durduğu yere gelene kadar dalga çoktan kırılmış oluyor ve
+doygun kırılma bölgesinde yüksekliği fırtına değil derinlik belirliyor (`H ≈ 0,5 h`,
+Thornton & Guza 1982 — kıyı kırılmasının zaten kullandığı bağıntı). Ölçüldü: yalnız `Hs`
+ile oyuncu **34 cm** suda duruyordu, çünkü 2,06 m'lik açık deniz tepesi 34 cm'lik suya
+taşınıyordu.
+
+Doğrulandı (fırtına 0,35, Hs 2,05 m, göz 1,65 m):
+
+| x | derinlik | ilerlemesine izin |
+|---|---|---|
+| 13460 | −0,57 m (kara) | var |
+| 13500 | 1,01 m | var |
+| 13510 | 1,47 m | **yok** |
+| 13560 | 3,25 m | yok |
+
+Kâğıtta sınır `1,25·h > göz` → h > 1,32 m; ölçülen sınır 1,01–1,47 m arasında. Su hattı
+x ≈ 13470, duruş x ≈ 13505: **~35 m sığ su yürünebiliyor**, yukarıdaki profil ölçümüyle
+birebir.
+
+Kıyı boyunca yürümek serbest kalıyor: yalnız derinleştiren bileşen kesiliyor, adımın
+tamamı değil — yoksa oyuncu yerine yapışır ve yandan çıkamazdı.
 
 
 | Ne | Geri döndüren belirti |

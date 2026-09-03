@@ -1969,3 +1969,22 @@ kalınlık okuması düzleşiyor (ölçüldü, `SYMPTOMS.md`).
 `AfterRenderingTransparents`'ta; paketin kendi varsayılanı `BeforeRenderingTransparents` ve
 orada deniz birleştirilmiş bulutun üstüne biniyordu. Sıra tek yönlü: deniz çizer, bulut
 üstüne biner. Denizin shader'ında bulut dokusu yok, bulutun ışın yürüyüşünde deniz yok.
+
+
+## Oyuncu: suda derinlikle durur, su kenarında değil
+
+`SeaWadeLimit` → `FirstPersonController.LimitHorizontal`. Kontrolcü bir kısıt kancası
+açar ve kısıtın **neden** konduğunu bilmez; su mantığının tamamı deniz tarafında durur.
+Kancaya kimse takılmazsa hiçbir kısıt yoktur, yani sudan uzakta maliyeti sıfır.
+
+Kısıt üç şeyi okur, üçünü de ölçerek: göz yüksekliğini her kare rig'den (`eye` ile
+`transform` arasındaki fark), derinliği araziden, tepeyi denizin tayfından.
+
+**Tepe iki bağıntının küçüğü.** Açık suda fırtına belirler (`0,635·Hs`, Rayleigh onda bir
+dalga); kırılma bölgesinde derinlik belirler (`0,25·h`, Thornton & Guza doygun kırılma).
+Geçiş dalganın kırıldığı yerdedir. Yalnız `Hs` kullanmak oyuncuyu bilek boyu suda
+durduruyordu (`DECISIONS.md`).
+
+Sınır su kenarı değil: sığ suda yürümek serbest, çünkü swash, köpük, ıslak kum ve kumun
+görünmesi orada zaten çalışıyor. Durdurulan tek şey kameranın su yüzeyinin altına
+inmesi — sualtı render yolu yok.
