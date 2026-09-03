@@ -356,9 +356,6 @@ olur.
 - **Gökyüzü %36 parlaklaştı, Play'de bakılmadı.** Çift sönüm kalkınca öğlen zeniti
   0,0972 → 0,1319. Sahnenin gündüz aydınlatması bu kadar arttı; ekranda fazla mı, ölçülmedi.
   → [Gökyüzü LUT'u yönü ana ışıktan alıyor](#gökyüzü-lutu-yönü-ana-ışıktan-alıyor--ertelendi-2026-08-29)
-- **`SkyAmbientBaker` gereksiz mi ölçülmedi.** Paket probe'u zaten yazıyor olabilir; öyleyse
-  bileşenin her karedeki SH pişirmesi boşa gidiyor.
-  → [`SkyAmbientBaker` ile paketin `AmbientProbePass`'i aynı probe'a yazıyor](#skyambientbaker-ile-paketin-ambientprobepassi-aynı-probea-yazıyor--ölçülecek-2026-08-29)
 - **Kar taneciği sisinin kare maliyeti ölçülmedi.** `SnowfallParticle` artık
   `ApplyHeightFog` çağırıyor: parça başına 8 adımlı çözülmüş integral + bir 3B doku
   örneği. Tanecikler binlerce ve üst üste biniyor.
@@ -2341,10 +2338,25 @@ deyişiyle "her karede çağrılırsa kare süresini ikiye katlar" olan iş. Yan
 ayrı: `DynamicGI.UpdateEnvironment()` onu da yeniliyor ve `AmbientProbePass` yenilemiyor
 olabilir, o yüzden bileşen körlemesine silinmiyor.
 
-**Ölçüm:** Play'de `SkyAmbientBaker` kapalı/açık kare süresi ve probe değeri; kapalıyken
-probe hâlâ saati izliyorsa bileşen gereksiz.
+**ÖLÇÜLDÜ VE KAPANDI (2026-09-03): bileşen gereksiz değil, probe'u yazan TEK yer o.**
 
-**Tetikleyici:** performans turu, ya da ufuktaki gökyüzü deliğine dönüldüğünde.
+Play'de `SkyAmbientBaker` açık/kapalı, iki ayrı saatte:
+
+| baker | saat | probe SH0 (r, g, b) | kare |
+|---|---|---|---|
+| açık | 0,25 | 0,0246 / 0,0163 / 0,0111 | 7,64 ms |
+| açık | 0,50 | 0,1876 / 0,1892 / 0,2039 | 7,23 ms |
+| kapalı | 0,25 | **0,1876 / 0,1892 / 0,2039** | 7,66 ms |
+| kapalı | 0,50 | 0,1876 / 0,1892 / 0,2039 | 7,22 ms |
+
+Kapalıyken probe **donuyor**: saati değiştirmek onu kıpırdatmıyor, en son yazılan değerde
+kalıyor. Yani `skyAmbientMode = Dynamic` olmasına rağmen paketin `AmbientProbePass`'i bu
+probe'u yenilemiyor — varsayım yanlıştı.
+
+İkinci varsayım da yanlıştı: "her karede çağrılırsa kare süresini ikiye katlar" denen iş
+**ölçülemez** çıktı (7,64 / 7,66 ve 7,23 / 7,22 — fark gürültünün altında).
+
+Bileşen duruyor. Kaydın gerekçesi kalmadığı için tetikleyicisi de silindi.
 
 
 ## `adaptShare` iki eksende birden kullanılıyor (2026-08-29)
