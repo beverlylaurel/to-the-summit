@@ -3482,3 +3482,81 @@ değil **ölçüm hatasını** gösteriyor: 10 piksellik bir lekenin ana ekseni 
 bulunamıyor. En uzun izlerde (14–58 px) sapma 13,3°'ye iniyor — gerçek yayılım oraya
 yakın. Daha ileri gitmek için önce daha büyük iz üreten bir kadraj (yakın damlalar,
 yüksek çözünürlük) gerekir.
+
+## Yağmur rüzgâra yatmıyordu: sınır tabakası iki kez uygulanmış (2026-09-03)
+
+Kullanıcı: "yağmur tanesi rüzgâr yönüne göre eğilmiyor."
+
+### Ölçüm önce şunu söyledi: eğiliyor, ama az
+
+Gerçek oyun hâlinde (hiçbir sürücü kapatılmadan, irtifa 205 m, yağış 0,23,
+rüzgâr **3,08 m/s**), izler iki hipoteze karşı sınandı:
+
+| | dik düşüşe sapma | rüzgârlı yöne sapma |
+|---|---|---|
+| önce | 12,4° | 9,5° |
+
+Rüzgârlı hipotez daha iyi oturuyordu — yani bağ kopuk değildi. Ama fark yalnız 2,9°;
+eğimin kendisi ~14° ve bu gözde "yağmur yan yağıyor" diye okunmuyor.
+
+### Sebep: aynı azalma iki kez
+
+`WindField.Velocity` = sakin/fırtına hızı × **arazi barınaklılığı** × esinti. Yani
+**oyuncunun bulunduğu yerdeki** rüzgâr, bir yer seviyesi değeri.
+
+Shader ise onu 24 m'deki serbest akım sayıp üstüne logaritmik sınır tabakası uyguluyordu.
+Logaritmik profil, **bir yükseklikte ölçülmüş** rüzgârı başka yüksekliklere taşır; referans,
+değerin ait olduğu yükseklik olmak zorundadır. 24 m referansla oyuncunun kendi hizasında
+profil **0,55** çıkıyordu — damlalar, oyunun geri kalanının "orada esiyor" dediği rüzgârın
+ancak yarısını alıyordu.
+
+`WIND_REF_HEIGHT` 24 → 2 m. Türetilenler yeniden hesaplandı: `L = ln(20) = 2,9957`,
+lag integralinin tavanı `G(2) = 0,6675`. Kutunun tepesi ayrı bir sabite alındı
+(`WIND_MAX_HEIGHT`), çünkü o bir kırpma sınırı, referans değil.
+
+Artık profil oyuncu hizasında 1,00, 24 m'de 1,83 — gerçek bir sınır tabakasında olduğu
+gibi yukarı çıktıkça rüzgâr **artıyor**.
+
+### Ölçülen sonuç
+
+| | dik düşüşe sapma | rüzgârlı yöne sapma |
+|---|---|---|
+| önce (referans 24 m) | 12,4° | 9,5° |
+| **sonra (referans 2 m)** | **33,5°** | **16,4°** |
+
+Önce iki hipotez ayırt edilemiyordu; şimdi arada 17° var. İzler dik düşüşü açıkça
+reddediyor. Yanal rüzgârda ölçülen ekran eğimi **20,6°**, yön birliği rüzgâr boyunca
+bakıldığında **R = 0,97**.
+
+## Uzak damlanın yavaşlığı: kutuyu daraltmak ÇÖZMEDİ (2026-09-03)
+
+Kullanıcı: "uzak yağmur damlaları tüy gibi yavaş düşüyor."
+
+Bu bir **açısal hız** ve mesafenin sonucu, düşme hızının değil. 769 px/rad'da,
+5,82 m/s düşen ortalama damla:
+
+| mesafe | ekran hızı | 1920 pikseli geçme süresi |
+|---|---|---|
+| 24 m | 186 px/s | 10,3 s |
+| 12 m | 373 px/s | 5,1 s |
+| 5 m | 895 px/s | 2,1 s |
+
+**Hız değiştirilmez.** Abartılmış bir düşme hızı bir kez buradaydı, tam bu belirti için,
+ve haklı olarak kaldırıldı: iz, pozlama süresince süpürülen yoldur; başka hızda hareket
+edip başka hızda iz bırakan damla kendi yolundan kısa bir işaret bırakır.
+
+**Kutu 48 → 24 m denendi, ölçüldü, geri alındı:**
+
+| | iz sayısı | boy medyan | p90 |
+|---|---|---|---|
+| kutu 48 m | 517 | 10,3 px | 18 |
+| kutu 24 m | **124** | 10,0 px | 26 |
+
+Boy uzamadı, damla sayısı dörtte bire düştü. Sebep: hacim 8 kat küçülünce `OuterDensity`
+8 kat artıyor, temsil payı (`N = 1000/yoğunluk`) düşüyor, her damla soluyor. Yağmur
+seyreliyor.
+
+**Açık kalan.** Doğru yol muhtemelen 24 m'deki damlayı ayrı ayrı çizmeyi bırakmak: gerçekte
+o mesafede tek tek damla görülmez, perde görülür ve perde zaten modelde var
+(`AtmosphereController`, görüş 18000·R⁻⁰·⁷⁰). Mesafeyle sönüp perdeye karışan bir geçiş
+gerekiyor; bu ayrı bir iş.

@@ -50,11 +50,31 @@ Shader "ToTheSummit/Precipitation"
             #define RAIN_SPEED_CLASSES 8
 
             // THE WIND'S BOUNDARY LAYER. The reasoning is inside `vert`, where it is used.
+            //
+            // THE REFERENCE HEIGHT IS WHERE THE WIND VALUE IS DEFINED, NOT THE TOP OF THE BOX.
+            //
+            // A log profile converts a wind MEASURED AT ONE HEIGHT to other heights. It only
+            // works if the reference is the height the value belongs to. `WindField.Velocity`
+            // is calm/storm speed x TERRAIN SHELTER x gust -- the wind where the player is
+            // standing, a surface value. Referencing it to 24 m treated it as a free stream
+            // aloft and then cut it again on the way down: at the player's own height the
+            // profile came out 0.55, so the drops took barely half the wind that the rest of
+            // the game says is blowing there. The same reduction was applied twice.
+            //
+            // MEASURED, real play state at 205 m: wind 3.08 m/s, and the streaks fitted the
+            // wind-tilted direction (9.5 deg residual) better than pure vertical (12.4), so the
+            // tilt was there -- but only about 14 deg, which does not read as slanted rain.
+            // The user: "the drops do not lean into the wind".
+            //
+            // With the reference at the player, on paper: profile 0.55 -> 1.00 at his height,
+            // tilt 14 -> 25 deg, and above him the wind now RISES (1.83 at 24 m) as a real
+            // boundary layer does.
             #define WIND_Z0          0.1      // roughness length, metres (rocky terrain)
-            #define WIND_REF_HEIGHT  24.0     // free stream elevation = top of the visible volume
+            #define WIND_REF_HEIGHT  2.0      // where WindField.Velocity is defined: at the player
             #define WIND_MIN_HEIGHT  0.1      // = z0; the profile is exactly zero here, the wind stops at the ground
-            #define WIND_PROFILE_L   5.4806   // ln(24/0.1)
-            #define WIND_LAG_TOP     4.3791   // G(24), the upper limit of the lag integral
+            #define WIND_MAX_HEIGHT  24.0     // top of the visible volume; the profile is not read above it
+            #define WIND_PROFILE_L   2.9957   // ln(2/0.1)
+            #define WIND_LAG_TOP     0.6675   // G(2), the upper limit of the lag integral
 
             // The spatial wave number of the eddy octaves and their own temporal frequency.
             // A mirror of the coefficients inside `Turbulence`; the inertia filter reads them.
@@ -403,7 +423,7 @@ Shader "ToTheSummit/Precipitation"
                 float groundRef = TerrainHeightAt(cameraPos.xz);
 
                 float aboveGround = clamp(probe.y - groundRef,
-                                          WIND_MIN_HEIGHT, WIND_REF_HEIGHT);
+                                          WIND_MIN_HEIGHT, WIND_MAX_HEIGHT);
 
                 float profile = log(aboveGround / WIND_Z0) / WIND_PROFILE_L;
 
