@@ -5549,7 +5549,7 @@ Donma seviyesi 1206 m, geçiş bandı ~240 m. Tanecik tarafından da doğruland�
 `SnowRuntimeState.IsSnowing` 400 m'de `False`, 1600 m'de `True`.
 
 
-## Kaya öğle vakti kapkara (2026-09-03) — AÇIK
+## Kaya öğle vakti kapkara (2026-09-03) — SEBEP BULUNDU
 
 **Zemin halkası test edilirken görüldü, halkayla ilgisi yok.** 517 m'de, saat 12:00,
 gündüz katsayısı 1,00, görüş 15 656 m, hafif sağanak (yağış 0,23), kamera 60° aşağı:
@@ -5570,6 +5570,10 @@ Aynı. Karanlık halkadan önce de vardı.
 oturuyordu; oradaki karanlığın sebebi suyun dike bakıldığında gökyüzünün %3–9'unu
 yansıtması. Kaya öyle değil: yayınık yansıtıcı, öğle vakti kapalı gökyüzünün altında
 belirgin şekilde aydınlık olmalı.
+
+**Sonradan ölçüldü.** Aynı kusur: "Ayak izi görünmüyor çünkü gök zeminden
+karanlık" kaydına bak. Gök, zeminden açıkken 5 kat bulutluyken 12 kat karanlık çıktı;
+ambient Skybox'tan geldiği için bütün yüzeyler ondan pay alıyor.
 
 **Ölçülmedi, sebep bilinmiyor.** Sıradaki adım kayanın aldığı ışığı lineerde okumak
 (tonemap kapalı, deniz için kurulan yöntemin aynısı) ve gökyüzü ışınımıyla oranlamak.
@@ -5746,3 +5750,42 @@ davranış.
 
 `SNOW_COMPACT_GAIN` silindi — gerekçesini yitiren sabit kalmaz.
 
+
+---
+
+## Ayak izi görünmüyor çünkü gök zeminden karanlık — SEBEP BULUNDU (2026-09-03)
+
+**Belirti:** "1 cm karda hâlâ iz gözükmüyor." Arka arkaya dört düzeltmeden sonra da.
+
+**İlk şüpheli yanlıştı — dört kez.** Sırayla oyma derinliği, maske eşiği, sıkışma
+kazancı ve kenar seti suçlandı. Dördü de ayak izi katmanındaydı; dördü de aritmetikte
+düzeldi ve ekranda hiçbir şey değiştirmedi. Bir kez bile ekrana bakılmamıştı — bütün
+tur kâğıt üstünde dönmüştü.
+
+**Ayırt eden ölçüm:** kar izi hiç konu edilmeden, tek karede **gök ile zemin yan yana**.
+Kendini kalibre eder: kar, gök ve güneşin gönderdiğinin en fazla %90'ını geri verebilir,
+yani gökten parlak olamaz. 1903 m, saat 08:23, gündüz katsayısı 1,00, kar 20 cm:
+
+| durum | gök | zemin (kar) |
+|---|---|---|
+| bulutlu (kapsama %99) | **1,9** | **23,9** |
+| bulut kısık (kapsama %2, yoğunluk %2) | 34,2 | **178,0** |
+
+Güneşin kendisi sağlam: yoğunluk 2,699, yön 31° yukarıda, ambient Skybox 1,00.
+
+**Gerçek sebep:** gök her iki durumda da zeminden karanlık — açıkken 5 kat, bulutluyken
+12 kat ters. Ambient Skybox'tan geldiği için karanlık gök tüm sahnenin ışığını boşaltıyor.
+Bulutlu halde kar luma 24'te kalıyor; izin ölçülmüş %12 albedo kontrastı orada 3 luma
+eder ve göz onu ayırmaz. İz doğruydu, durduğu ışık yanlıştı.
+
+**Bu üç kaydı birleştiriyor:** "Kaya öğle vakti kapkara" (luma 3,5/255) ve
+`Review/gezegen_boslugu_analiz_ve_plan.md` Adım 2'nin "2000 m'de ufkun altı üstünden
+parlak, kâğıtta mümkün değil" maddesi aynı ters dönmenin başka kadrajlardaki hâli.
+
+**Bulutta değil.** `CLOUDS_REBUILD.md` madde 9 bu belirtiyi bir kez kapatmış (güneş
+geçirgenliğine taban) ve şunu yazmış: "Karanlık gelirse çözüm çift enerjiyi geri koymak
+değil, ışık seviyesine bakmaktır." Ölçüm o notu doğruluyor: bulut kalkınca zemin 178'e
+çıkıyor ama gök hâlâ 34'te — ters dönme bulutsuz da duruyor.
+
+**Açık kalan:** göğün radyansı hangi büyüklükten kuruluyor ve nerede eksik ölçekleniyor.
+Bir sonraki adım o zinciri adlandırmak, sürgü denemek değil.
