@@ -5679,3 +5679,35 @@ artık **her derinlikte tam bot kenarında** kapanıyor.
 Kalan pay %45,8, her derinlikte. Zemin hiçbir kalınlıkta açılmıyor, genişlik dördünde de
 botun kendisi, değişen tek şey derinlik.
 
+
+## 1 cm karda iz hâlâ siyahtı — ikinci yer maskedeydi (2026-09-03)
+
+Oyma sınırlandırıldıktan (%45,8 kar altta kalıyor) sonra da iz siyah çıkmaya devam etti.
+Sebep oyma değil, **kar örtüsü maskesi**.
+
+`MountainSurface.hlsl`:
+
+    remainingColumn = SnowBaseHeight(...) - carved
+    snowMask *= saturate((remainingColumn - SNOW_MIN_VISIBLE_HEIGHT) / SNOW_EDGE_FADE_RANGE)
+
+`SNOW_MIN_VISIBLE_HEIGHT` 4 mm, `SNOW_EDGE_FADE_RANGE` 6 mm — yani maske ancak **10 mm**
+sütunun üstünde tam. 1 cm kar zaten 9,9 mm; üstüne basılmadan bile sönümün içinde (0,98).
+5,4 mm oyulunca sütun 4,5 mm'ye iniyor ve maske **0,08**'e düşüyor: örtü kalkıyor, arazi
+görünüyor.
+
+**Kök sebep kavramsal:** maske izi *kar eksilmiş* gibi sayıyordu. Bot karı taşımaz,
+sıkıştırır. Kütle yerinde duruyor, sütun kısalıp yoğunlaşıyor, ve su eşdeğeri
+(`snowState.r`) hepsini hâlâ tutuyor. Oymayı düşmek aynı karı yok saymaktı.
+
+Oyma maskeden düşülmüyor artık. Sönüm duruyor — kar bölgesi gerçekten inceldiği yerde
+örtünün yumuşak bitmesi için gerekli.
+
+| kar | sütun | oyma | maske ÖNCE | maske SONRA |
+|---|---|---|---|---|
+| 1 cm | 10,0 mm | 5,4 mm | **0,10** | **1,00** |
+| 5 cm | 50,0 mm | 27,1 mm | 1,00 | 1,00 |
+| 20 cm | 200,0 mm | 108,4 mm | 1,00 | 1,00 |
+| 50 cm | 500,0 mm | 150,0 mm | 1,00 | 1,00 |
+
+İz artık her derinlikte kar; görünen şey rengi değil **derinliği**.
+

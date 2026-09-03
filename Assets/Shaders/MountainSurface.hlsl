@@ -784,12 +784,27 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // density: a 20 cm print reported a negative remainder and opened to bare ground, which
         // is exactly the artefact this term exists to avoid.
         //
-        // MEASURED, walking the same four metres, against the world's column:
-        //   1 cm layer  -> column 9.9 mm, carve 7.0 mm -> 2.9 mm left, under the 4 mm floor
-        //   20 cm layer -> column 200 mm, carve 108 mm -> 92 mm left, far above it
-        // so the thin print opens to the ground and the deep print is untouched.
-        float carved = SnowDentAt(trailUV);
-        float remainingColumn = max(0.0, SnowBaseHeight(snowState.r, _FallbackRhoN) - carved);
+        // A PRINT IS COMPACTED SNOW, NOT MISSING SNOW -- SO THE CARVE IS NOT SUBTRACTED.
+        //
+        // It used to be: `column - carve`, and a thin layer then fell under the 4 mm floor
+        // and the print opened onto bare terrain. That was deliberate once ("a boot print on
+        // 1 cm reads as bare ground"), and the user has overruled it: the ground is not to
+        // show at any depth.
+        //
+        // It is also the more honest quantity. A boot does not carry snow away; it presses
+        // it. The mass under the sole is unchanged, its column is merely shorter and denser,
+        // and `snowState.r` -- the water equivalent -- still holds all of it. Subtracting the
+        // carve counted the same snow as gone.
+        //
+        // MEASURED 2026-09-03, 1 cm layer: the column is 9.9 mm, which is already inside the
+        // 4-10 mm fade before anything steps on it (mask 0.98). Carving 5.4 mm of it took the
+        // mask to 0.08 -- the black print the user reported. Read without the carve it stays
+        // at 0.98, and what the eye sees in the print is its DEPTH, which is what should
+        // carry the shape.
+        //
+        // The fade itself is kept: where the snow region genuinely thins out to nothing, the
+        // cover still has to fade instead of ending on a line.
+        float remainingColumn = SnowBaseHeight(snowState.r, _FallbackRhoN);
 
         snowMask *= lerp(1.0, saturate((remainingColumn - SNOW_MIN_VISIBLE_HEIGHT)
                                        / SNOW_EDGE_FADE_RANGE), bolgeIci);
