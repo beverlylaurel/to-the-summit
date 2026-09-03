@@ -30,7 +30,7 @@ public class SeaManager : MonoBehaviour
 
     /// `(beat angular frequency, beat depth, 0, 0)`.
     Vector4 waveGroups;
-    Vector3 tierSlopeVariance;
+    Vector4 tierSlopeVariance;
 
     /// The shore's own geometry: found once, because the terrain does not move.
     Vector2 shoreAnchor;
@@ -169,7 +169,8 @@ public class SeaManager : MonoBehaviour
         // On Low the third tier is never computed; without zeroing its weight
         // the surface would read that tier's STALE texture and a frozen chop
         // layer would show.
-        Vector3 weight = settings.tierWeights;
+        Vector4 weight = settings.tierWeights;
+        if (level.TierCount < 4) weight.w = 0f;
         if (level.TierCount < 3) weight.z = 0f;
         if (level.TierCount < 2) weight.y = 0f;
 

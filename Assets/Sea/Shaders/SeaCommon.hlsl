@@ -42,10 +42,10 @@ float  _SeaBathyResolution;
 float  _SeaDeepWaterDepth;
 
 // --- Tier parameters (spec 6.6) ---
-float3 _SeaPatchSizes;
-float3 _SeaTierWeights;
-float3 _SeaTierSlopeVariance;
-float3 _SeaChoppinessPerTier;
+float4 _SeaPatchSizes;
+float4 _SeaTierWeights;
+float4 _SeaTierSlopeVariance;
+float4 _SeaChoppinessPerTier;
 
 float _SeaSpectrumDepth;
 float _SeaMaxShoalingGain;
@@ -617,7 +617,15 @@ float SeaOmega(float k, float depth)
     //
     // At 20 tanh is already within 1e-17 of 1 — the clamp changes nothing
     // physical, it only prevents the overflow.
-    return sqrt(SEA_G * k * tanh(min(k * depth, 20.0)));
+    // THE CAPILLARY TERM. Below 1.7 cm it is surface tension, not gravity, that pulls
+    // the surface flat, and the wave runs FASTER than gravity alone would carry it.
+    // Left out, the capillary tier's 1 cm waves would crawl at a tenth of their speed.
+    //
+    // For the gravity tiers it changes nothing measurable: at a 1.6 m wave (k = 4) the
+    // correction is `(4/370)^2` = 0.00012.
+    // [SOURCE: Elfouhaily et al. 1997 equation 24]
+    float kk = k / SEA_CAPILLARY_KM;
+    return sqrt(SEA_G * k * (1.0 + kk * kk) * tanh(min(k * depth, 20.0)));
 }
 
 /// LOOP QUANTIZATION.

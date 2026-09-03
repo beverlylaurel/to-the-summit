@@ -189,9 +189,6 @@ ova/silsile geçişi görünür bir dikiş yaratırsa halkanın dış sönümü 
   O zaman `SeaSimulation`'a önceki kare yer değiştirme dokusu (+1,5 MB) ve `SeaLit`'e
   dördüncü geçiş yazılır; maliyet ~yarım gün.
 
-- **Kapiler bant (dördüncü FFT kademesi) ERTELENDİ** — aynı başlıkta; gerekçesi
-  doğrulama, karmaşıklık değil.
-
 - **Kıyı treni açık denizin dörtte biri kadar** — Hs 2,37 m iken kıyıya varan dalga
   tepeden çukura 0,53 m. Sayılar ve sebep `RATIONALE.md` → "Kıyı treni açık denizin
   dörtte biri kadar". Karar kullanıcınındır: `SEA_SHORE_WAVE_SHARE` ve
@@ -2561,6 +2558,9 @@ fazla katlanan yüzey yırtılır, bir üçgenden az katlanan dudak zaten görü
 
 ## Kapiler bant: dördüncü kademe olarak gelir, kopya olarak değil (2026-09-01)
 
+**YAPILDI (2026-09-03), dördüncü kademe olarak.** Aşağısı kararın kendi tarihi;
+uygulanan hâli bu bölümün sonunda.
+
 **Karar:** 14 cm altı eğim bandı şimdilik yok. Dört deneme (sinüs toplamı, 8× kopya,
 14 cm kopya, mip-farklı bant-geçiren kopya) sırayla kafes, girdap, buzlu cam ve kahverengi
 leke üretti. Hepsi ölçüldü, hepsi silindi.
@@ -2576,6 +2576,47 @@ Cox-Munk ölçümü yeniden istenirse.
 
 **Maliyet:** bir gün. Kalibrasyon ölçülebilir (Cox-Munk hedefi), görsel doğrulama
 kullanıcının kadrajında.
+
+---
+
+### Uygulandı (2026-09-03)
+
+**Ölçülen açık:** eğim varyansı Cox-Munk'un yalnız üçte biriydi ve rüzgârla kötüleşiyordu
+— 5,4 m/s'de %45, 10,1'de %37, 14,0'te **%32**. İlk ölçüm oyuncunun yerel rüzgârıyla
+alınıp %84–113 çıkmıştı; o rüzgâr 2,6–4,2 m/s, denizin kendi rüzgârı değil. Doğru okuma
+`SeaEnvironmentBridge.WindSpeed`.
+
+**Bant kendi spektrumuyla geldi.** Dördüncü kademe JONSWAP kullanmıyor: JONSWAP frekansta
+bir rüzgâr denizi tayfıdır, kuyruğu yerçekimi denge bölgesidir ve yüzey gerilimiyle ayakta
+duran dalgalar hakkında hiçbir şey söylemez. Yerine Elfouhaily kısa dalga eğrilik
+spektrumu (`S(k) = B_h/k³`, `B_h = ½ α_m (c_m/c) F_m`, denklem 30/40/41/44).
+
+Dağılım da düzeltildi: `ω² = gk(1 + (k/k_m)²)`, `k_m = 370 rad/m`. Yerçekimi kademeleri
+etkilenmiyor — 1,6 m'lik dalgada düzeltme 0,00012.
+
+**İki sayı türetildi, uydurulmadı:**
+- yama 1,2 m → 256 ızgarada `k_max = 670 rad/m`, yani 370'teki kılcal tepe bandın
+  kenarında değil içinde
+- `smallWaveCutoff` = `1/k_nyq` = 0,0015. İki kez yanlış ölçüldü: 0,15'te (eski değer)
+  bant tamamen sıfırdı; 0,0047'de (en ince hücre) diz 210 rad/m'ye düşüp tepenin %5'ini
+  bırakıyordu — %59'da takıldı.
+
+**Sonuç:**
+
+| rüzgâr | önce | sonra |
+|---|---|---|
+| 5,4 m/s | %45 | **%70** |
+| 10,1 m/s | %37 | **%83** |
+| 14,0 m/s | %32 | **%83** |
+
+**Maliyet ölçüldü: 9,46 → 10,49 ms (+1,03 ms, %11)** — kâğıttaki +%33 FFT tahmininin
+altında, çünkü FFT kare süresinin tamamı değil. Kapiler bant yalnız **High** kalitede;
+düşerken ilk bırakılan o, ve yokluğu yalnız suyu biraz camlaştırır.
+
+**Kalan %17 nereden:** ızgara `k = 670`'te bitiyor, gerçek su 3000'e kadar eğim taşıyor.
+O kuyruk CPU momentinde sayılıyor ama geometride yok — yani pürüzlülüğe gidiyor, doğru
+yere. Ayrıca 0,68–20,9 bandında (30 cm – 9 m) JONSWAP kuyruğu az tahmin ediyor olabilir;
+ölçülmedi.
 
 
 ## Yansıma filtrelemesi ve dördüncü FFT kademesi (2026-09-02)

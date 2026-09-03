@@ -26,14 +26,14 @@ MonoBehaviour:
   swellGamma: 7
   swellSpread: 26
   swellDirectionOffset: 38
-  smallWaveCutoff: 0.15
+  smallWaveCutoff: 0.0015
   loopPeriod: 200
-  patchSizes: {x: 967, y: 191, z: 37}
-  tierWeights: {x: 1, y: 1, z: 1}
+  patchSizes: {x: 967, y: 191, z: 37, w: 1.2}
+  tierWeights: {x: 1, y: 1, z: 1, w: 1}
   choppinessCalm: 0.55
   choppinessStorm: 2.4
   choppinessWindFull: 15
-  choppinessPerTier: {x: 1, y: 0.85, z: 0.45}
+  choppinessPerTier: {x: 1, y: 0.85, z: 0.45, w: 0}
   maxShoalingGain: 2.2
   shoreSlope: 0.058
   extinctionRgb: {x: 0.346, y: 0.082, z: 0.154}

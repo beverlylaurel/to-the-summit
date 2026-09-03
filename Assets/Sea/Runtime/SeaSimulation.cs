@@ -448,8 +448,8 @@ public class SeaSimulation : MonoBehaviour
         cs.SetFloat(SeaShaderIDs.LoopPeriod, settings.loopPeriod);
 
         // The long end of the coarsest tier is not limited: there is no tier above it.
-        Vector2 band = settings.TierBandLimits;
-        cs.SetVector(SeaShaderIDs.TierCutoffK, new Vector4(band.x, band.y, 1e9f, 0f));
+        Vector3 band = settings.TierBandLimits;
+        cs.SetVector(SeaShaderIDs.TierCutoffK, new Vector4(band.x, band.y, band.z, 1e9f));
 
         SeaQuality.Levels level = SeaQuality.Of(settings.quality);
         cs.SetInt(SeaShaderIDs.FftSize, level.FftSize);

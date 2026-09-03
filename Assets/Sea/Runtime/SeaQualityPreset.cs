@@ -100,7 +100,7 @@ public static class SeaQuality
         switch (preset)
         {
             case SeaQualityPreset.Low:    return new Levels(128, 7, 2, 12, 1.00f);
-            case SeaQualityPreset.High:   return new Levels(256, 8, 3, 14, 0.25f);
+            case SeaQualityPreset.High:   return new Levels(256, 8, 4, 14, 0.25f);
             default:                      return new Levels(256, 8, 3, 13, 0.50f);
         }
     }

@@ -224,6 +224,16 @@
 /// created at this depth.
 /// A single patch cannot carry both a 200 m swell and a 20 cm chop.
 /// [SOURCE: Tessendorf 2004 4.4; Dupuy & Bruneton 2012]
-#define SEA_TIER_COUNT           3
+#define SEA_TIER_COUNT           4
+
+/// THE GRAVITY-CAPILLARY WAVENUMBER, `k_m = sqrt(rho g / T)` = 370 rad/m, a 1.7 cm wave.
+/// Below it gravity restores the surface, above it surface tension does; the phase speed
+/// has its minimum exactly here.
+/// [SOURCE: Elfouhaily et al. 1997 equation 24 and 43]
+#define SEA_CAPILLARY_KM         370.0
+
+/// The minimum phase speed, `c_m = sqrt(2g/k_m)` = 0.23 m/s -- the same number the rain
+/// ring travels at, because it is the same physics.
+#define SEA_CAPILLARY_CM         0.23
 
 #endif

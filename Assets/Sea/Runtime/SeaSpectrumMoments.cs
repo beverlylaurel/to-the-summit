@@ -54,10 +54,11 @@ public static class SeaSpectrumMoments
         /// carrying has to reappear as reflection lobe width or the far water turns
         /// into a mirror that flickers. Cox & Munk 1954 give the total for a real
         /// sea, `0.003 + 0.00512 U10`, which is what these three sum towards.
-        public readonly Vector3 TierSlopeVariance;
+        public readonly Vector4 TierSlopeVariance;
+
 
         public Result(float significantHeight, float peakPeriod,
-                      float beatPeriod, float beatDepth, Vector3 tierSlopeVariance)
+                      float beatPeriod, float beatDepth, Vector4 tierSlopeVariance)
         {
             SignificantHeight = significantHeight;
             PeakPeriod = peakPeriod;
@@ -74,9 +75,16 @@ public static class SeaSpectrumMoments
     const float OmegaMax = 8.0f;
     const float OmegaStep = 0.005f;
 
+    /// `k_m = sqrt(rho g / T)` and `c_m = sqrt(2 g / k_m)`; the same two numbers the
+    /// shader carries in `SeaConstants.hlsl`, so the CPU's capillary walk and the GPU's
+    /// cannot describe different water.
+    /// [SOURCE: Elfouhaily et al. 1997 equation 43]
+    const float CapillaryKm = 370f;
+    const float CapillaryCm = 0.23f;
+
     public static Result Integrate(float windSpeed, SeaSettings settings,
                                    float swellPeriod, float swellEnergy,
-                                   Vector2 tierBandLimits)
+                                   Vector3 tierBandLimits)
     {
         float u = Mathf.Max(windSpeed, 0.1f);
         float fetch = settings.fetch;
@@ -143,7 +151,53 @@ public static class SeaSpectrumMoments
                 double contribution = k * k * total * OmegaStep;
                 if (k < tierBandLimits.x) mss0 += contribution;
                 else if (k < tierBandLimits.y) mss1 += contribution;
-                else mss2 += contribution;
+                else if (k < tierBandLimits.z) mss2 += contribution;
+                // Past the third band this walk has nothing to say: it is a JONSWAP
+                // integral in frequency and it maps back with `k = w^2/g`, the GRAVITY
+                // dispersion. The capillary tier is integrated separately below, in
+                // wavenumber, with the spectrum that actually describes it.
+
+            }
+        }
+
+        // --- THE CAPILLARY TIER, IN WAVENUMBER ---
+        //
+        // Mean square slope from an omnidirectional elevation spectrum is
+        // `mss = integral k^2 S(k) dk`, and with Elfouhaily's `S(k) = B_h / k^3` that is
+        // `integral B_h / k dk`. Walked in log k because the band spans two decades.
+        double mss3 = 0.0;
+        {
+            float cutoffL = Mathf.Max(settings.smallWaveCutoff, 1e-4f);
+            float kLo = Mathf.Max(tierBandLimits.z, 1e-3f);
+            const float KHi = 3000f;
+            const int Steps = 400;
+            float logLo = Mathf.Log(kLo), logHi = Mathf.Log(KHi);
+            float dLog = (logHi - logLo) / Steps;
+
+            float cd = (0.8f + 0.065f * u) * 1e-3f;
+            float uStar = u * Mathf.Sqrt(cd);
+            float ratio = Mathf.Max(uStar / CapillaryCm, 1e-4f);
+            float alphaM = ratio <= 1f ? 1e-2f * (1f + Mathf.Log(ratio))
+                                       : 1e-2f * (1f + 3f * Mathf.Log(ratio));
+            alphaM = Mathf.Max(alphaM, 0f);
+
+            for (int i = 0; i < Steps; i++)
+            {
+                float kk = Mathf.Exp(logLo + (i + 0.5f) * dLog);
+                float dk = kk * dLog;
+
+                float rel = kk / CapillaryKm;
+                float omega = Mathf.Sqrt(g * kk * (1f + rel * rel));
+                float c = omega / kk;
+
+                float x = rel - 1f;
+                float bh = 0.5f * alphaM * (CapillaryCm / c) * Mathf.Exp(-0.25f * x * x);
+
+                // The same small-wave suppression the compute shader applies, or the
+                // number here would describe a surface the GPU never builds.
+                float suppress = Mathf.Exp(-kk * kk * cutoffL * cutoffL);
+
+                mss3 += bh / kk * suppress * dk;
             }
         }
 
@@ -159,7 +213,7 @@ public static class SeaSpectrumMoments
         return new Result(4f * Mathf.Sqrt((float)m0),
                           SeaConstants.TwoPi / Mathf.Max(peakOmega, 1e-4f),
                           beatPeriod, beatDepth,
-                          new Vector3((float)mss0, (float)mss1, (float)mss2));
+                          new Vector4((float)mss0, (float)mss1, (float)mss2, (float)mss3));
     }
 
     /// JONSWAP peak frequency (rad/s). Mirrors `SeaPeakOmega`.

@@ -84,5 +84,5 @@ public static class SeaConstants
     public const int FftSize = 256;
 
     /// Number of tiers. [SOURCE: Tessendorf 2004 §4.4; Dupuy & Bruneton 2012]
-    public const int TierCount = 3;
+    public const int TierCount = 4;
 }

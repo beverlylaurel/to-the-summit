@@ -116,7 +116,17 @@ public class SeaSettings : ScriptableObject
 
     /// [SOURCE: Tessendorf 2004 equation 41]
     [Tooltip("Small wave cutoff length (m).")]
-    [Min(0.01f)] public float smallWaveCutoff = 0.15f;
+    /// IT IS THE FINEST GRID'S NYQUIST, NOT A FREE NUMBER. Tessendorf's `exp(-k^2 l^2)`
+    /// has its knee at `k = 1/l`, and the only wavenumber worth putting it at is the one
+    /// past which the grid cannot represent a wave at all: `k_nyq = pi N / L`, which for
+    /// 256 samples over the 1.2 m patch is 670 rad/m. So `l = 1/670`.
+    ///
+    /// MEASURED TWICE ON THE WAY HERE. At 0.15 (the old value, from when the finest patch
+    /// was 37 m) the whole capillary band came out as `exp(-(370*0.15)^2)` = zero. At the
+    /// finest CELL, 0.0047, the knee landed at 210 rad/m -- below the capillary peak at
+    /// 370 -- and left 5% of it: slope variance reached 59% of Cox-Munk instead of 32%,
+    /// but the band it was meant to add was still being cut in half.
+    [Min(0.0005f)] public float smallWaveCutoff = 0.0015f;
 
     /// Every frequency is rounded to a multiple of this. MANDATORY: it
     /// prevents loss of float precision as `t` grows over a long session.
@@ -144,11 +154,19 @@ public class SeaSettings : ScriptableObject
     /// Tier 0 also GREW: at 512 m a 156 m swell had barely three periods per
     /// tile, i.e. three modes — that few modes is a periodic pattern by
     /// definition. At 967 m it has six.
+    /// THE FOURTH PATCH IS THE CAPILLARY BAND, AND ITS SIZE IS NOT A TASTE.
+    ///
+    /// The gravity-capillary peak sits at `k_m = 370 rad/m`, a 1.7 cm wave
+    /// [SOURCE: Elfouhaily et al. 1997 equation 24]. A 1.2 m patch on a 256 grid
+    /// reaches `k = 2 pi * 128 / 1.2 = 670 rad/m`, so the peak is inside the band
+    /// rather than at its edge; and the tier rule (four periods per patch) hands
+    /// it everything under 30 cm, which is exactly where JONSWAP stops describing
+    /// the water.
     [Tooltip("The square each tier covers in the world (m).")]
-    public Vector3 patchSizes = new Vector3(967f, 191f, 37f);
+    public Vector4 patchSizes = new Vector4(967f, 191f, 37f, 1.2f);
 
     [Tooltip("Summation weight of each tier.")]
-    public Vector3 tierWeights = new Vector3(1f, 1f, 1f);
+    public Vector4 tierWeights = new Vector4(1f, 1f, 1f, 1f);
 
     /// WHERE ONE TIER STOPS AND THE NEXT BEGINS, IN WAVENUMBER.
     ///
@@ -159,9 +177,10 @@ public class SeaSettings : ScriptableObject
     ///
     /// Both the GPU spectrum and the CPU slope moment read it here, so the two
     /// cannot drift apart.
-    public Vector2 TierBandLimits => new Vector2(
+    public Vector3 TierBandLimits => new Vector3(
         4f * SeaConstants.TwoPi / Mathf.Max(patchSizes.y, 1f),
-        4f * SeaConstants.TwoPi / Mathf.Max(patchSizes.z, 1f));
+        4f * SeaConstants.TwoPi / Mathf.Max(patchSizes.z, 1f),
+        4f * SeaConstants.TwoPi / Mathf.Max(patchSizes.w, 0.05f));
 
     /// Choppy displacement scale. It sharpens the crests and broadens the
     /// troughs — the nonlinear behaviour that makes the FFT representation
@@ -194,7 +213,10 @@ public class SeaSettings : ScriptableObject
     /// DIFFERENT PER TIER. Full choppiness at high wave numbers compresses
     /// the chop and leads to knotting (spec §6.7).
     [Tooltip("Choppiness multiplier per tier.")]
-    public Vector3 choppinessPerTier = new Vector3(1f, 0.85f, 0.45f);
+    /// The capillary tier gets NO choppiness. Choppy displacement sharpens crests
+    /// by moving water horizontally; at 1.7 cm that motion is smaller than the
+    /// grid cell and only folds the tier into itself.
+    public Vector4 choppinessPerTier = new Vector4(1f, 0.85f, 0.45f, 0f);
 
     [Header("Shallow water (spec §8)")]
     /// Green's law goes to infinity in very shallow water; in reality

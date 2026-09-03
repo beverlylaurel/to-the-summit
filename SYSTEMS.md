@@ -2003,3 +2003,22 @@ eder.
 
 Aynı zincirden geçmeleri şart: fark alınıyor, farklı filtreden geçselerdi fark hiç
 olmayan bir varyans üretirdi.
+
+
+## Deniz: dördüncü kademe kılcal banttır ve kendi tayfını kullanır
+
+Kademe 0–2 JONSWAP okur. **Kademe 3 okumaz.** JONSWAP frekansta bir rüzgâr denizi
+tayfıdır; kuyruğu yerçekimi denge bölgesidir ve yüzey gerilimiyle ayakta duran dalgaları
+tarif etmez. Kademe 3 Elfouhaily kısa dalga eğrilik spektrumunu kullanır ve dönüşümü de
+farklıdır: `S(k)` zaten dalga sayısında ve yönsüzdür, `dω/dk` gerekmez.
+
+Dağılım her kademe için ortaktır ve kılcal terimi taşır: `ω² = gk(1 + (k/k_m)²)`,
+`k_m = 370 rad/m`. Yerçekimi kademelerinde bu terim ölçülemez (1,6 m'lik dalgada 0,00012),
+ama onsuz 1 cm'lik dalga hızının onda birinde sürünürdü.
+
+**Kalibrasyon hedefi Cox-Munk'tur** (`mss = 10⁻³(3 + 5,12·U₁₀)`), ve okuma denizin kendi
+rüzgârıyla yapılır — oyuncunun yerel rüzgârıyla değil. İkisi karıştırıldığında açık
+görünmez oldu (`DECISIONS.md`).
+
+**`smallWaveCutoff` serbest bir sayı değil**, en ince ızgaranın Nyquist'idir: `l = 1/k_nyq`.
+Hücre boyuna bağlarsan diz kılcal tepenin altına düşer ve bandın yarısını keser.
