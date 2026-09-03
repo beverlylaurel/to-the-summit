@@ -354,9 +354,6 @@ olur.
 ---
 ## Bekleyen ölçümler
 
-- **Kapiler bant boş.** Kılcal katman kaldırıldı (`SYMPTOMS.md`); eğim varyansı 20 m/s'de
-  Cox-Munk'un 0,54'ü. Doğru yol dördüncü FFT kademesi.
-  → [Kapiler bant: dördüncü kademe olarak gelir, kopya olarak değil](#kapiler-bant-dorduncu-kademe-olarak-gelir-kopya-olarak-degil-2026-09-01)
 - **Uzak denizin takmasının %79'u duruyor.** Ufuk bandı pikselin kendi belirsizliğiyle
   yumuşatıldı ve %21 gitti (`SYMPTOMS.md` — "Denizde belli bir mesafeden sonra titreme").
   Kalanın **tamamı** gökyüzü yansıması aramasında — kırılma ve parıltı ölçüldü, sıfır
