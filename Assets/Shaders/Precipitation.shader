@@ -94,9 +94,12 @@ Shader "ToTheSummit/Precipitation"
 
             /// DIAGNOSTIC MODE. 0 off, 1 magnify, 2 raw pattern, 3 alpha.
             ///
-            /// At physical scale a streak is 0.4 x 12 pixels at 24 m with alpha ~ 0.02 — the
-            /// eye cannot tell "is it there or not". The three modes separate three different
-            /// questions: is the size too small, is the pattern empty, or is the alpha low.
+            /// At physical scale a distant streak is thinner than a pixel and only a few pixels
+            /// long, at an alpha of a few thousandths — the eye cannot tell "is it there or not".
+            /// MEASURED at 60° FOV / 888 px: the mean drop is 3.1 px at 24 m with `T_exp` 1/60 s
+            /// and 9.3 px at 1/20 s; the width sits on the `MinPixelWidth` floor either way.
+            /// The three modes separate three different questions: is the size too small, is the
+            /// pattern empty, or is the alpha low.
 
             /// RADIANCE OF THE SUN DISC — the source of the directional channel.
             ///
@@ -176,10 +179,12 @@ Shader "ToTheSummit/Precipitation"
             /// does not give its model; `rain-spec.md` §11.2-2 flags that gap and points to
             /// Gunn & Kinzer.
             ///
-            /// THIS IS NOT THE PARTICLES' VISUAL FALL SPEED. `_RainDirections` carries 16 m/s
-            /// because the particles sit 16-24 m away and at the real 9 m/s the angular speed
-            /// read far too slow. That deliberate deviation stays; transparency however wants
-            /// the physical speed, otherwise the alpha would be tied to a visual setting.
+            /// THIS IS ALSO THE PARTICLES' VISUAL FALL SPEED. `_RainDirections` used to carry an
+            /// exaggerated 16 m/s "because the particles sit 16-24 m away"; that belonged to the
+            /// old visual model and IS GONE — the CPU fills the array from this same relation.
+            /// Motion and streak length have to come from one speed: the streak is the path the
+            /// drop travelled during the exposure, so a drop moving at one speed and streaking at
+            /// another leaves a mark shorter than its own path (measured: 57%).
             float TerminalVelocity(float radius)
             {
                 float diameterMm = radius * 2000.0;
@@ -193,7 +198,7 @@ Shader "ToTheSummit/Precipitation"
 
             struct Attributes
             {
-                float4 positionOS : POSITION;   // x: 0 precipitation / 1 drifting snow, y: inner box
+                float4 positionOS : POSITION;   // y: inner box. x and z unused.
                 float2 corner     : TEXCOORD0;
                 float2 seedXY     : TEXCOORD1;
                 float2 seedZW     : TEXCOORD2;

@@ -22,10 +22,38 @@ public class PrecipitationRenderer : MonoBehaviour
              "direction — the paper's Scenario 1 shows the same scene noticeably different at 60° and 10° azimuth.")]
     [SerializeField] TimeOfDay timeOfDay;
 
-    /// The camera's exposure time (seconds). It sets both the streak's LENGTH (the database
-    /// crop) and its TRANSPARENCY: `α = 2r₀/(v·T_exp)`, a short exposure gives a more opaque streak.
+    /// The integration time the streak is drawn for (seconds). It sets both the streak's LENGTH
+    /// (the database crop) and its TRANSPARENCY: `α = 2r₀/(v·T_exp)`, a short exposure gives a
+    /// more opaque streak.
     /// It DOES NOT DERIVE from the frame time — if it did, the rain's look would change with fps.
-    const float ExposureTime = 1f / 60f;
+    ///
+    /// WHAT THIS QUANTITY IS: the RETINA's integration time, not a camera shutter. Nobody is
+    /// filming this scene; a person is standing in the rain. What makes rain read as streaks
+    /// rather than dots is the eye — Bloch's law puts the critical duration at 50-100 ms, and a
+    /// moving bright point persists about that long. Setting it to a shutter speed answers a
+    /// question nobody asked.
+    ///
+    /// IT USED TO BE 1/60 s AND THE RAIN READ AS DOTS (reported by the user: "the distant drops
+    /// are tiny and drift about like snowflakes"). MEASURED at 60° FOV / 888 px = 769 px/rad,
+    /// two frames differenced so only the drops remain: median blob 2.0 x 2.0 px, aspect 1.00.
+    /// The model was not wrong — it was obeyed. At 1/60 s the mean drop (1.65 mm, 5.82 m/s)
+    /// leaves 9.7 cm, i.e. 3.1 px at 24 m. A 3-pixel mark carries no direction, so its motion
+    /// reads as drifting rather than falling. The length WAS the whole complaint.
+    ///
+    /// The ends, on paper, at 50 ms:
+    ///
+    ///   0.5 mm   2.02 m/s   10.1 cm    3.3 px at 24 m   15.7 px at 5 m   alpha 0.0049
+    ///   1.65 mm  5.82 m/s   29.1 cm    9.3 px at 24 m   44.8 px at 5 m   alpha 0.0057
+    ///   5.0 mm   9.14 m/s   45.7 cm   14.6 px at 24 m   70.3 px at 5 m   alpha 0.0109
+    ///
+    /// THE FADING IS NOT A SIDE EFFECT, IT IS THE PHYSICS. The same light is spread over three
+    /// times the pixels, so alpha falls by the same factor — `[Garg 2006]`'s own relation. A long
+    /// exposure gives long faint streaks in a real photograph too. Do not "compensate" it.
+    ///
+    /// `DatabasePeriod` DOES NOT FOLLOW THIS. It is the drop's own oscillation period, a physical
+    /// constant; the two being equal at 1/60 was a coincidence. Above one period the texture
+    /// repeats — footnote 13 — and the shader already merges copies with `frac`.
+    const float ExposureTime = 1f / 20f;
 
     /// The oscillation period the database was baked at. `T_db = 1/60`, the `2π/ω₂` of an
     /// r₀ = 1.6 mm drop (`rain-spec.md` §5.3).
@@ -529,12 +557,10 @@ public class PrecipitationRenderer : MonoBehaviour
             var xy = new Vector2((float)random.NextDouble(), (float)random.NextDouble());
             var zw = new Vector2((float)random.NextDouble(), (float)random.NextDouble());
 
-            // The particle type is carried in the vertex position's x. The position channel was empty
-            // anyway (the shader produces the world position from the seed), so the flag can be
-            // carried without opening an extra vertex stream.
-            float kind = i < PrecipitationParticles ? 0f : 1f;
-
-            // The inner box flag is in `y`. `x` is already used for the type and `z` stays empty.
+            // The inner box flag is in `y`; `x` and `z` stay empty. `x` used to carry a particle
+            // TYPE (0 precipitation / 1 drifting snow), but `ParticleCount` equals
+            // `PrecipitationParticles`, so the second population was always empty and the shader
+            // never read the channel. Removed rather than left as a flag nothing sets.
             float near = i < NearParticles ? 1f : 0f;
 
             int v = i * 4;
@@ -545,7 +571,7 @@ public class PrecipitationRenderer : MonoBehaviour
 
             for (int c = 0; c < 4; c++)
             {
-                positions[v + c] = new Vector3(kind, near, 0f);
+                positions[v + c] = new Vector3(0f, near, 0f);
                 seedXY[v + c] = xy;
                 seedZW[v + c] = zw;
             }

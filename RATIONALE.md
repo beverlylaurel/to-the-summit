@@ -3344,3 +3344,55 @@ veriyor; tek katman kafes olarak okunuyor.
 Genlik (`SEA_RAIN_RING_SLOPE` 0,12) tek göz kararı sayı: 1 mm'lik bir tepe 1,7 cm dalga
 boyunda 0,37 eğim demek, üç katman bunu paylaşıyor. Gözle fazla ya da az bulunursa
 değişecek tek sayı budur.
+
+## Yağmurun iz boyunu obtüratör değil retina belirler (2026-09-03)
+
+Kullanıcı: "uzaktaki yağmur taneleri çok minikler ve kar tanesi gibi savrulup hareket
+ediyorlar."
+
+### Ölçüm: model yanlış değildi, harfi harfine uygulanmıştı
+
+60° FOV / 888 piksel → **769 px/rad**. Ortalama damla Marshall-Palmer'ın D²-ağırlıklı
+Gamma(3) örneklemesinden 1,65 mm, Atlas bağıntısıyla uç hız 5,82 m/s. `T_exp = 1/60 s`
+ile iz boyu 9,7 cm, yani **24 m'de 3,1 piksel**. Genişlik `MinPixelWidth` tabanında
+1,2 piksel. Üç piksellik bir işaretin yönü yoktur; hareketi düşmek değil savrulmak
+diye okunur. Şikâyetin tamamı boydan geliyordu.
+
+### Neden bu sayı serbest
+
+`T_exp` iki yere birden giriyor: iz boyu (`v·T_exp`) ve saydamlık (`α = 2r₀/(v·T_exp)`).
+İkisi aynı kaynaktan geldiği için ışık korunuyor — iz uzayınca aynı ışık daha çok piksele
+yayılıyor ve alfa aynı oranda düşüyor. Bu bir yan etki değil, `[Garg 2006]`'nın kendi
+bağıntısı; gerçek fotoğrafta da uzun pozlama uzun ve soluk iz verir. Telafi edilmez.
+
+### Büyüklüğün adı
+
+Bu bir **kamera obtüratörü değil**. Sahneyi kimse filme almıyor; yağmurun altında bir
+insan duruyor. Yağmuru nokta değil çizgi olarak gördüren şey gözün kendisi: Bloch
+yasasında kritik süre 50–100 ms, hareketli parlak bir nokta da o kadar iz bırakıyor.
+Seçilen değer **50 ms** — retina bütünleme süresi.
+
+Uçlar kâğıtta:
+
+| damla | uç hız | iz | 24 m | 5 m | alfa |
+|---|---|---|---|---|---|
+| 0,5 mm | 2,02 m/s | 10,1 cm | 3,3 px | 15,7 px | 0,0049 |
+| 1,65 mm | 5,82 m/s | 29,1 cm | 9,3 px | 44,8 px | 0,0057 |
+| 5,0 mm | 9,14 m/s | 45,7 cm | 14,6 px | 70,3 px | 0,0109 |
+
+**Ölçülen sonuç:** uzayan izlerin medyanı **9,2 piksel** — kâğıttaki 9,3 ile aynı.
+En uzunu 192 piksel.
+
+### Veri tabanı periyodu bunu takip etmez
+
+`DatabasePeriod` damlanın kendi salınım periyodu, bir fizik sabiti. İkisinin 1/60'ta
+eşit olması tesadüftü. Pozlama periyodu aşınca doku kendini tekrar ediyor (makale
+dipnot 13) ve shader kopyaları `frac` ile zaten birleştiriyor.
+
+### Aletin iki kez yalan söylediği yer
+
+Önce iki kareyi çıkararak ölçtüm: kamera denize bakıyordu, dalgalar da kareler arasında
+oynuyor ve 16 bin adet 2×2 leke üretiyordu — sayılan şeylerin çoğu yağmur değildi.
+Kamerayı göğe çevirdikten sonra da tek karede yüksek geçirgen süzgeçle sayınca medyan
+2×2 çıktı; o da dither gürültüsüydü. Ancak kırpılmış görüntüye bakınca anlaşıldı.
+**Ders: gürültü tabanı ölçülmeden eşik seçilmez.**
