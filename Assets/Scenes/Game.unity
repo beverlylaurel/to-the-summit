@@ -3038,6 +3038,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TerrainSurface
   settings: {fileID: 11400000, guid: 24a73e2a115e2634f8d2703ca2aaa145, type: 2}
   weather: {fileID: 1805896806}
+  temperature: {fileID: 1805896810}
+  observer: {fileID: 848219609}
   wind: {fileID: 1805896805}
   time: {fileID: 508855605}
   atmosphere: {fileID: 1805896809}

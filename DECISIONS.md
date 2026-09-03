@@ -1533,9 +1533,20 @@ birebir aynı işi yapıyordu — üçü birden gitti. Kaydırma spec §6.4'ün 
 `KScroll`'una döndü, yeni şerit `_NewEdgeValue`'dan doluyor.
 
 **İrtifa etkisi kaybolmuyor, tek kaynaktan geliyor.** `TemperatureField` kotla
-düşüyor; yağış §3.4 histerezisiyle (0.5 / 2.0 °C) kara dönüyor. Yüksekte kar
-daha çok tutuyor çünkü orası soğuk — ayrı bir irtifa terimi aynı şeyi ikinci
-kez söylerdi ve ikisi çelişebilirdi.
+düşüyor; yağış 0,5–2,0 °C bandında kara dönüyor. Yüksekte kar daha çok tutuyor
+çünkü orası soğuk — ayrı bir irtifa terimi aynı şeyi ikinci kez söylerdi ve
+ikisi çelişebilirdi.
+
+**DÜZELTME (2026-09-03): bu cümle yazıldığı gün doğru değildi.** Tarif edilen
+§3.4 histerezisi `SnowfallController`'dan zaten silinmişti ve yerine hiçbir şey
+konmamıştı; `SnowManager.SnowFraction01` sabit 1'de duruyordu, yani kar irtifaya
+değil hiçbir şeye bağlı değildi — her kotta, her sıcaklıkta kar yağıyordu. Kayıt
+mekanizmayı doğru tarif ediyordu ama mekanizma yoktu.
+
+Band bugün `TemperatureField.SnowFractionAt(kot)` olarak kuruldu ve kaydın
+söylediği yere oturdu. Kar sistemi, deniz ve ıslak kaya üçü de oradan okuyor.
+Ölçüm ve belirti kaydı `SYMPTOMS.md` → "Gökyüzü kar yağdırırken deniz yağmur
+alıyor".
 
 `defaultSwe = 0`: dünya çıplak başlıyor, kar yalnız yağdıkça birikiyor.
 
