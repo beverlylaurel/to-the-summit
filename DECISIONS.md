@@ -154,18 +154,11 @@ ova/silsile geçişi görünür bir dikiş yaratırsa halkanın dış sönümü 
 
 ## Silinecek geçiciler
 
-- **Ova ve patika ölçüm araçları** (`ForelandProbe`, F1'deki kurulum süresi logu) — ova
-  ve yol dokusu oturunca silinir
 - **Bisiklet maskesi yeniden seyreltmede silinecek** — malzeme maskesi köşe renginde duruyor;
   model yeniden seyreltilirse topoloji değişir ve boyama kaybolur. Seyreltme yapıldı
   (3.1 M → 200 bin), boyama artık güvenle yapılabilir; bütçe değişirse maske aktarımı
-  yazmak gerekir
-- **Kar Teşhisi'ndeki "Sınama karı" bölümü** — Play'de dünyayı elle karla
-  dolduran kontrol. Kar sistemi kabul edilince silinir; ayar dosyasına
-  yazmadığı için kalıntı bırakmıyor
-- **`SnowEnvironmentBridge` elle girilen değerler** — köprü şu an sabit sayılar
-  yayınlıyor (rüzgâr 3 m/s, sıcaklık −4 °C, yağış 0.5). Gerçek sistemlere bağlanınca
-  bu alanlar silinir
+  yazmak gerekir.
+  **Kod değil, model verisi** — bisiklet boyanana kadar duruyor (2026-09-03'te bakıldı).
 
 ## Bekleyen kararlar
 
