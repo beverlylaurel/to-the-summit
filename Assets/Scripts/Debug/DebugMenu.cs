@@ -60,8 +60,10 @@ public class DebugMenu : MonoBehaviour
     /// When the hysteresis was removed the slider became a liar: set to 0 it touched
     /// nothing and the snow kept falling.
     ///
-    /// It now drives `SnowManager.SnowFraction01` directly — temperature is not
-    /// involved and the decision comes from one place.
+    /// It now OVERRIDES `SnowManager.SnowFraction01`. In normal play that value comes from
+    /// the temperature through `SnowEnvironmentBridge`; the checkbox below takes it away
+    /// from the weather so "is it snow or rain right now" can be tried at any altitude.
+    bool snowFractionLocked;
     float lockedSnowFraction = 1f;
 
     /// Diagnostic: wind transport and its shadow can be switched off separately.
@@ -190,7 +192,13 @@ public class DebugMenu : MonoBehaviour
 
         // The snow fraction is driven INDEPENDENTLY of the lock: it must be possible to try
         // "is it snow or rain right now" while the precipitation lock is off too.
-        if (snowManager != null) snowManager.SnowFraction01 = lockedSnowFraction;
+        // IT ALSO RUNS WHEN THE LOCK IS OPEN -- that is the side that hands the value back
+        // to the weather.
+        if (snowManager != null)
+        {
+            if (snowFractionLocked) snowManager.ApplySnowFractionOverride(lockedSnowFraction);
+            else snowManager.ClearSnowFractionOverride();
+        }
         if (windLocked) wind.ApplyOverride(lockedWindStrength, lockedWindAngle);
 
         // IT HAS TO RUN WHEN THE LOCK OPENS TOO: this is the side that clears the override.
@@ -456,9 +464,18 @@ public class DebugMenu : MonoBehaviour
             // Two separate questions: "how much is falling" and "what is falling".
             // A SWITCH, NOT A SLIDER. The threshold is 0.5; there is no "mixed" state,
             // either snow falls or rain does (`SnowfallController`).
-            GUILayout.Label($"Yağış türü: {(lockedSnowFraction >= 0.5f ? "KAR" : "YAĞMUR")}" +
-                            $"   (kaydırıcı {lockedSnowFraction:F2}, eşik 0,50)   " + SnowStatus());
-            lockedSnowFraction = GUILayout.HorizontalSlider(lockedSnowFraction, 0f, 1f);
+            // UNLOCKED IT SHOWS, IT DOES NOT DRIVE. Off, the reading is the weather's own
+            // answer, so the panel can be used to check the temperature link rather than
+            // to replace it.
+            snowFractionLocked = GUILayout.Toggle(snowFractionLocked, "Yağış türünü sabitle");
+            float shownSnow = snowFractionLocked
+                ? lockedSnowFraction
+                : (snowManager != null ? snowManager.SnowFraction01 : 1f);
+            GUILayout.Label($"Yağış türü: {(shownSnow >= 0.5f ? "KAR" : "YAĞMUR")}" +
+                            $"   (kar payı {shownSnow:F2}, eşik 0,50)   " +
+                            (snowFractionLocked ? "sabit" : "sıcaklıktan") + "   " + SnowStatus());
+            if (snowFractionLocked)
+                lockedSnowFraction = GUILayout.HorizontalSlider(lockedSnowFraction, 0f, 1f);
             GUILayout.Label(SnowStateStatus());
 
             SnowManager mgr = snowManager;

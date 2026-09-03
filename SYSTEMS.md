@@ -1545,6 +1545,18 @@ tek katman kafes olarak okunuyor.
 parlamada görüyor. Piksel ayak izi 1,7 cm'yi geçtiğinde sönümleniyor — kademelerin
 kendi sönümüyle aynı kural, yoksa aynı aliasing geri gelir.
 
+**Yağışın türü tek yerde kararlaşır: `SnowEnvironmentBridge`.** Sıcaklığı
+`TemperatureField`'dan alır, kar payını 0,5–2,0 °C bandında türetir, `PrecipKind`'ı da
+aynı sayıdan verir. `SnowManager.SnowFraction01` bu kapıyı okur; F1 paneli yalnız
+`ApplySnowFractionOverride` ile geçici olarak elinden alır.
+
+Band dar tutulur (§3): 6,5 °C/km altında 1,5 °C ≈ 230 m, yani geçiş bir kuşak değil bir
+sınır gibi okunur. Ölçüldü 2026-09-03: yağmur ≤ 900 m, sulu kar ~1100 m (pay 0,87), saf
+kar ≥ 1200 m, donma seviyesi 1206 m.
+
+Kar sistemi bu sayıyı **yazmaz**, okur. Deniz aynı termometreden kendi kotunda okur; ikisi
+çelişemez çünkü kaynak tek.
+
 **Halka yalnız YAĞMURDA çizilir, karda değil.** Türü `SeaEnvironmentBridge.PrecipKind`
 söylüyor, o da `TemperatureField`'dan geliyor: donma seviyesi denizin altına inerse deniz
 kar alır ve `SeaManager` şiddeti sıfırlar. Yani halkanın görünmesi `seaLevelCelsius`'a

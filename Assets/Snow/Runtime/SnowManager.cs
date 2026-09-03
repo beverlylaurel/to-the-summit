@@ -116,7 +116,28 @@ public class SnowManager : MonoBehaviour
     public SnowSettings Settings => settings;
     public ISnowEnvironmentSource Environment => env;
 
-    public float SnowFraction01 { get; set; } = 1f;
+    /// HOW MUCH OF THE FALLING PRECIPITATION IS SNOW. It comes from the environment, not
+    /// from here: the snow system reads the weather, it does not decide it.
+    ///
+    /// It used to be a settable property defaulting to 1, and the only writer was the F1
+    /// slider -- so in normal play snow fell at every altitude and every temperature. The
+    /// sea meanwhile read its own answer from the same thermometer and got rain. Measured
+    /// 2026-09-03, `SYMPTOMS.md`.
+    public float SnowFraction01 =>
+        snowFractionOverrideActive ? snowFractionOverride
+                                   : (env != null ? Mathf.Clamp01(env.SnowFraction01) : 1f);
+
+    bool snowFractionOverrideActive;
+    float snowFractionOverride;
+
+    /// DIAGNOSTIC OVERRIDE -- the same pattern as `WindField.ApplyOverride`.
+    public void ApplySnowFractionOverride(float snowFraction01)
+    {
+        snowFractionOverrideActive = true;
+        snowFractionOverride = Mathf.Clamp01(snowFraction01);
+    }
+
+    public void ClearSnowFractionOverride() => snowFractionOverrideActive = false;
     public SnowGroundHeight GroundHeight => groundHeight;
 
     public bool CaptureActive => trailSegmentCount > 0;

@@ -229,6 +229,7 @@ public static class SnowCoverTest
         public float SunElevation01 { get; set; }
         public float TemperatureC { get; set; }
         public PrecipitationKind PrecipKind { get; set; }
+        public float SnowFraction01 { get; set; } = 1f;
         public float PrecipIntensity01 { get; set; }
         public float FogDensity01 { get; set; }
     }

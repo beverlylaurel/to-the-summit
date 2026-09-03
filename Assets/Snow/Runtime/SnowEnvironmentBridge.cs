@@ -62,9 +62,38 @@ public class SnowEnvironmentBridge : MonoBehaviour, ISnowEnvironmentSource
     /// `Rain` is reported; the decision that the snow is snow lives in
     /// `SnowfallController`'s temperature hysteresis (spec §3.4). Guessing the kind here
     /// would put two different decisions in two separate places.
-    public PrecipitationKind PrecipKind => weather != null
-        ? (PrecipIntensity01 > 0.001f ? PrecipitationKind.Rain : PrecipitationKind.None)
-        : manualPrecipKind;
+    /// THE RAIN/SNOW BOUNDARY IS A TEMPERATURE, AND IT IS READ ONCE.
+    ///
+    /// A flake does not turn to water the instant it crosses 0 C: it keeps falling while
+    /// it melts, so the boundary is a narrow band rather than a line. The band is the one
+    /// this project already wrote down twice and both records agree on its width:
+    /// `DECISIONS.md` puts sleet at 1200-1422 m, which under the 6.5 C/km lapse rate is
+    /// 1.44 C, and the grain-wetness rule spans 0.5-2.0 C, which is 1.5 C.
+    ///
+    /// It stays NARROW on purpose: `SYSTEMS.md` section 3 asks the sleet belt to read as a
+    /// boundary, not as a belt.
+    const float AllSnowCelsius = 0.5f;
+    const float AllRainCelsius = 2.0f;
+
+    public float SnowFraction01 => temperature != null
+        ? 1f - Mathf.Clamp01((TemperatureC - AllSnowCelsius) / (AllRainCelsius - AllSnowCelsius))
+        : (manualPrecipKind == PrecipitationKind.Rain ? 0f : 1f);
+
+    /// THE KIND AND THE FRACTION COME FROM THE SAME NUMBER, so the sky cannot drop snow
+    /// while the sea takes rain. That contradiction was measured on 2026-09-03: the
+    /// fraction was stuck at 1 and this property answered `Rain` to everyone who asked.
+    public PrecipitationKind PrecipKind
+    {
+        get
+        {
+            if (weather == null) return manualPrecipKind;
+            if (PrecipIntensity01 <= 0.001f) return PrecipitationKind.None;
+            float snow = SnowFraction01;
+            if (snow >= 0.999f) return PrecipitationKind.Snow;
+            if (snow <= 0.001f) return PrecipitationKind.Rain;
+            return PrecipitationKind.Sleet;
+        }
+    }
 
     public float PrecipIntensity01 => weather != null
         ? Mathf.Clamp01(weather.Precipitation)

@@ -51,6 +51,13 @@ public interface ISnowEnvironmentSource
 
     PrecipitationKind PrecipKind { get; }
 
+    /// HOW MUCH OF THE FALLING PRECIPITATION IS SNOW: 1 all snow, 0 all rain.
+    ///
+    /// It comes through this door rather than being decided inside the snow system, for
+    /// the same reason as everything else here: the sky and the sea must not be able to
+    /// disagree about what is falling on them.
+    float SnowFraction01 { get; }
+
     /// 0..1, the existing system's intensity value.
     float PrecipIntensity01 { get; }
 

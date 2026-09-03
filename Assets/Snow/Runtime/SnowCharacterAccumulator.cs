@@ -91,14 +91,18 @@ public class SnowCharacterAccumulator : MonoBehaviour
         // RAIN WIPES THE SNOW OFF FAST (spec §16.1) — but the condition DIFFERS from the
         // spec's, for a measured reason.
         //
-        // The spec says `env.PrecipKind == Rain`. This project has no precipitation KIND:
-        // the bridge always returns `Rain` while there is precipitation, and the snow
-        // decision is made by `SnowfallController`'s temperature hysteresis (§3.4). Applying
-        // the spec's condition would have kept cleaning the character while snow was falling —
-        // measured, the accumulation stayed at 0.000 for 20 seconds.
+        // The spec says `env.PrecipKind == Rain`. The condition here is wider, and stays
+        // wider now that the bridge answers Rain / Sleet / Snow properly (2026-09-03; it
+        // used to answer `Rain` to everyone).
         //
-        // The right condition: there IS precipitation but it is NOT snow. It also matches
-        // the user's decision: rain and snow are never visible at the same time (`DECISIONS.md`).
+        // SLEET IS THE REASON. The kind turns to `Sleet` anywhere in the 0.5-2.0 C band,
+        // but what actually FALLS is decided by one threshold at a snow share of 0.5
+        // (`SnowfallController` — the user's decision: never both at once). At a share of
+        // 0.3 the kind is Sleet while rain is what is falling, and `PrecipKind == Rain`
+        // would leave the character caked in snow through it.
+        //
+        // So the condition asks the question that matches what is drawn: there IS
+        // precipitation and snow is NOT the thing coming down.
         bool raining = env != null &&
                        env.PrecipKind != PrecipitationKind.None &&
                        !SnowRuntimeState.IsSnowing;

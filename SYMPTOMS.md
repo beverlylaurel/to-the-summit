@@ -5495,5 +5495,26 @@ tanesi düşüyordu.
 F1 panelinin kaydırıcısı. Oyunda hiçbir şey onu `TemperatureField.FreezingLevel`'dan
 sürmüyor: düşen yağış her irtifada, her sıcaklıkta **hep kar**.
 
-Denizin yağmuru açılana kadar çelişki görünmüyordu çünkü deniz de kar alıyordu. Bağ
-kurulmadı — dağın her yerindeki görünür havayı değiştirir, kullanıcı kararı.
+İkinci kopukluk aynı yerde: `SnowEnvironmentBridge.PrecipKind` yağış varsa **hep `Rain`**
+döndürüyordu, `Snow`'u hiç döndürmüyordu — sıcaklık enjekte edilmişti ama türe bakmıyordu.
+İki kopukluk birbirinin de tersiydi: biri "her şey kar", diğeri "her şey yağmur". Denizin
+yağmuru açılana kadar çelişki görünmüyordu çünkü deniz de kar alıyordu.
+
+**Kapandı (2026-09-03).** Tür artık tek yerde kararlaşıyor: köprü sıcaklıktan kar payını
+0,5–2,0 °C bandında türetiyor, `PrecipKind`'ı da aynı sayıdan veriyor, `SnowManager` o
+kapıyı okuyor. Band uydurulmadı — projede iki yerde zaten yazılıydı ve ikisi de aynı
+genişliği veriyor: `DECISIONS.md` sulu karı 1200–1422 m'ye koyuyor (6,5 °C/km altında
+1,44 °C) ve tanecik ıslaklığı kuralı 0,5–2,0 °C (1,5 °C).
+
+Ölçüldü, fırtına 0,6:
+
+| irtifa | hava | kar payı | gökyüzü | deniz |
+|---|---|---|---|---|
+| 30 m | 8,1 °C | 0,00 | Rain | Rain |
+| 900 m | 2,0 °C | 0,00 | Rain | Rain |
+| 1100 m | 0,7 °C | 0,87 | Sleet | Rain |
+| 1200 m | 0,0 °C | 1,00 | Snow | Rain |
+| 4000 m | −18,5 °C | 1,00 | Snow | Rain |
+
+Donma seviyesi 1206 m, geçiş bandı ~240 m. Tanecik tarafından da doğrulandı:
+`SnowRuntimeState.IsSnowing` 400 m'de `False`, 1600 m'de `True`.
