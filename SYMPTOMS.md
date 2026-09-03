@@ -5451,5 +5451,49 @@ tam, halka matematiği küçük sayılarda çalışıyor.
 yürüyünce desen dünyayla birlikte değişiyor (fark 1,0–2,0, halkanın kendi farkının dört
 katı) — yani ekrana yapışmıyor.
 
-**Kalan:** fırtınada deniz yüzeyi luma 2–3/255 basıyor. Halka doğru çiziliyor ama üstünde
-durduğu su kapkara; gözle görülmesi bu ayrı kusura bağlı.
+**"Deniz kapkara" ölçüldü, KUSUR DEĞİL.** Fırtınada yüzey luma 2–3/255 basıyor ve bunu
+ayrı bir kusur sandım; ölçüm aksini söyledi.
+
+Araç önce düzeltildi: luma tonemap sonrası, oran taşımıyor. Volume'ün **runtime profil
+kopyasında** Tonemapping ve Bloom kapatıldı (`v.profile`, `sharedProfile` değil) ve
+kapandığı geri okunarak doğrulandı. Kalan kare sRGB kodlu, yani tersine çevrilebilir.
+
+Sonra tek karede kendi kendini kalibre eden ölçüm: her ekran satırının çakılma açısı
+geometriden çıkıyor, suyun yansıttığı gök aynı karede aynadaki satırda duruyor. Sakin
+deniz (fırtına 0,05), ham kare, su/gök oranı Fresnel'e karşı:
+
+| geliş açısı | mesafe | ölçülen oran | Fresnel | ölçülen/beklenen |
+|---|---|---|---|---|
+| 89° | 221 m | 0,599 | 0,896 | 0,67 |
+| 87° | 74 m | 0,527 | 0,722 | 0,73 |
+| 82° | 27 m | 0,265 | 0,427 | 0,62 |
+| 78° | 18 m | 0,123 | 0,285 | 0,43 |
+| 72° | 12 m | 0,170 | 0,160 | 1,06 |
+| 65° | 8 m | 0,206 | 0,087 | **2,36** |
+
+Sıyırmada beklenenin altında (pürüzlülük yansıma lobunu yayıyor), dikte üstünde (gövde
+saçılımı ekleniyor) — ikisi de fiziğin beklediği yön. **Gölgelemede kusur yok.**
+
+Fırtınalı karede aynı ölçüm 72–82°'de 0,21–0,31 veriyordu; sebebi kusur değil, Hs 3,6 m'de
+dalga yüzlerinin "düz ayna" varsayımını bozması. Sakin denizde sapma kayboldu.
+
+Geriye kalan tek gerçek sayı: **tonemap parlak ucu 2,1× eziyor** (91/255 → 52/255). Bu bir
+görünüm kararı, hata değil.
+
+**Suyun karanlığı açıyı takip ediyor.** 20–41° çakılmada Fresnel 0,026–0,087, yani su
+gökyüzünün %3–9'unu yansıtıyor; kapalı havada bu gerçekten karadır. Halka o bantta
+görünmüyor, 8–18° bandında görünüyor (yüksek frekans +%11,6, gözle de benek dokusu
+seçiliyor). Gerçek denizde de yağmur halkası sığ açıda okunur, dike bakınca okunmaz.
+
+
+## Gökyüzü kar yağdırırken deniz yağmur alıyor (2026-09-03)
+
+**Ölçümün yan ürünü.** Deniz 30 m'de `PrecipKind = Rain` alırken aynı karede ekrandan kar
+tanesi düşüyordu.
+
+`SnowManager.SnowFraction01` **varsayılan 1f** ve tek yazan yer `DebugMenu.cs:193`, yani
+F1 panelinin kaydırıcısı. Oyunda hiçbir şey onu `TemperatureField.FreezingLevel`'dan
+sürmüyor: düşen yağış her irtifada, her sıcaklıkta **hep kar**.
+
+Denizin yağmuru açılana kadar çelişki görünmüyordu çünkü deniz de kar alıyordu. Bağ
+kurulmadı — dağın her yerindeki görünür havayı değiştirir, kullanıcı kararı.
