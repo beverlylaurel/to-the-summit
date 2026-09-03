@@ -181,8 +181,23 @@ ova/silsile geçişi görünür bir dikiş yaratırsa halkanın dış sönümü 
 
 - **Uzak deniz titremesi KAPANDI — kusur kanıtı yok** (2026-09-02). Süperörnekli
   referansa göre gerçek aliasing %1,6–3,0 ve mesafeyle artmıyor; TAA çalışıyor (−%39).
-  Eski "%11" rakamı geçersiz bir metrikten geliyordu (`SYMPTOMS.md`). Kalan tek boşluk
-  denizin `MotionVectors` geçişinin olmaması — kamera hareketliyken bakılacak.
+  Eski "%11" rakamı geçersiz bir metrikten geliyordu (`SYMPTOMS.md`).
+
+- **Denizin `MotionVectors` geçişi YAPILMADI — ölçüldü, kazancı 1,3 piksel** (2026-09-03).
+  Geçişin eklediği tek şey **dalga** hareketidir; kamera hareketi zaten doğru, çünkü yüzey
+  noktasının dünya konumu kamera hareketiyle değişmiyor ve URP'nin kamera geçişi onu
+  taşıyor. Kâğıtta dalganın büyüklüğü: Hs 3,6 m ve Tp 8 s'de yörünge hızı `πH/T` = 1,4 m/s,
+  20 m'de kare başına 2,8 cm, 1920 px'de **1,3 piksel**. Uzakta dalga zaten piksel altı,
+  orada sıfır. Donmuş denizde 4× süperörnekli gerçeğe karşı ölçüm: TAA açık hata %9,2 /
+  rms 6,61, kapalı %9,7 / rms 8,70 — TAA rms'i %24 düşürüyor, çalışıyor.
+
+  **Ödenecek risk kazançtan büyük.** Suda baskın sinyal spekülerdir ve geometriyle hareket
+  etmez; hareket vektörü geometriyi düzeltirken parlamayı bulaştırır. Crest'in (Unity'nin
+  referans okyanusu) aynı konudaki açık kaydının gerekçesi de bu.
+
+  **Tetikleyici:** yakın suda gerçekten görülen bir hayalet iz (ghosting) bildirilirse.
+  O zaman `SeaSimulation`'a önceki kare yer değiştirme dokusu (+1,5 MB) ve `SeaLit`'e
+  dördüncü geçiş yazılır; maliyet ~yarım gün.
 
 - **Yansıma filtrelemesi (LEADR) ERTELENDİ** — uzak denizin
   titremesi, şafaktaki kahverengi lekeler ve Ursell dalga şeklinin geri alınması aynı
