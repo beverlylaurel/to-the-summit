@@ -223,8 +223,20 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         // opening is the boot's radius, and the skirt is given COMPACT SUPPORT -- it reaches
         // zero at a fixed multiple of that radius. Its depth still follows the sinking,
         // which is the part that should change.
-        float subSurface = radius
-                       - sqrt(max(radius * radius - distance * distance, 0.0));
+        // THE SOLE IS FLAT, WITH A ROLLED RIM. It used to be a sphere of the boot's own
+        // half width, and a sphere only touches the ground at one point: at a 9.3 mm sink
+        // it reached out to 3.1 cm instead of the boot's 5.5, so the print came out barely
+        // half the boot wide and, at a 2.3 cm texel, two texels across -- a block.
+        //
+        // Under the flat part the whole sole presses to `sink`. Only the last
+        // `SNOW_SOLE_EDGE` of the radius rolls over, and that roll is what shapes the
+        // print's wall: shallow snow gives a wall shorter than the roll and the print
+        // fades out at the boot's edge, deep snow gives a wall taller than it and the
+        // print stands with near vertical sides. Both are what a real print does.
+        float rimStart   = max(radius - SNOW_SOLE_EDGE, 0.0);
+        float rim        = min(max(0.0, distance - rimStart), SNOW_SOLE_EDGE);
+        float subSurface = SNOW_SOLE_EDGE
+                       - sqrt(max(SNOW_SOLE_EDGE * SNOW_SOLE_EDGE - rim * rim, 0.0));
         float target    = max(0.0, sink - subSurface);
 
         float outerDistance = max(0.0, distance - radius);

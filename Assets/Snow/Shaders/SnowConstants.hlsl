@@ -50,6 +50,20 @@
 #define SNOW_SETTLE_TAIL_SCALE       5.0
 #define SNOW_MAX_SINK                0.15
 #define SNOW_LATERAL_ESCAPE          0.110
+
+/// HOW FAR THE SOLE'S EDGE IS ROLLED (m). A boot sole is FLAT with a rounded rim, not a
+/// ball. The rim is where the print's wall is, and it is about a centimetre of leather and
+/// rubber turning over.
+///
+/// MEASURED (2026-09-03) with the sole modelled as a sphere of the boot's own half width:
+/// in 1 cm of snow the sink is 9.3 mm, so the sphere only touched out to a radius of
+/// 3.1 cm -- the print came out 6.1 cm wide against an 11 cm boot, and at a 2.3 cm texel
+/// that is 2.6 texels across. On screen it read as an axis-aligned dark block, not a print.
+///
+/// With a flat sole the full width presses to `sink` and only the rim rolls off, so the
+/// print is the boot's width at every depth. In deep snow the wall stays near vertical,
+/// which is what a deep print actually looks like.
+#define SNOW_SOLE_EDGE               0.012
 #define SNOW_PACKED_SINK_SCALE       0.18
 #define SNOW_COMPACT_GAIN            0.60
 

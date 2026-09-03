@@ -5574,3 +5574,53 @@ belirgin şekilde aydınlık olmalı.
 **Ölçülmedi, sebep bilinmiyor.** Sıradaki adım kayanın aldığı ışığı lineerde okumak
 (tonemap kapalı, deniz için kurulan yöntemin aynısı) ve gökyüzü ışınımıyla oranlamak.
 Tahmin yazılmadı.
+
+
+## 1 cm karda ayak izi blok gibi çıkıyor (2026-09-03)
+
+**Kullanıcının ağzından:** "bu ne amk. 1cm'de karda çıkan ayak izine bak" — karede bota
+benzemeyen, eksen hizalı koyu dikdörtgenler.
+
+**Gerçek sebep: taban KÜRE olarak modellenmiş.** `KDeform`'daki
+
+    subSurface = radius - sqrt(radius² - distance²)
+
+botun kendi yarı genişliği yarıçaplı bir küre. Küre zemine tek noktadan değer: batma
+sığken sadece ortadaki küçük bir alan oyulur.
+
+Kâğıtta, 1 cm karda batma 9,3 mm ve yarıçap 5,5 cm iken oyma
+
+    sink - subSurface = 0  →  d = 3,1 cm
+
+yani iz **6,1 cm** geniş çıkıyor, bot 11 cm. Ve texel 2,3 cm (24 m alan / 1024) olduğu için
+bu **2,6 texel** — ekranda eksen hizalı bir blok. Görülen tam olarak bu.
+
+**Bu kusur eskiden beri vardı**, 2026-09-03'teki genişlik düzeltmesi onu getirmedi; o
+düzeltme yalnız `flare` terimini kaldırdığı için izi bir miktar daha daralttı ve kusuru
+görünür hâle getirdi.
+
+**Düzeltme: düz taban, yuvarlatılmış kenar.** Gerçek bot tabanı düzdür ve kenarı yaklaşık
+bir santim döner. Tabanın düz kısmı altındaki karı `sink` kadar bastırır; yalnız son
+`SNOW_SOLE_EDGE` (1,2 cm) yuvarlanır ve izin duvarını o oluşturur.
+
+Kâğıtta sonuç, shader'ın kendi sabitleriyle:
+
+| kar | batma | izin genişliği | bota oran |
+|---|---|---|---|
+| 1 cm | 9,6 mm | 11,0 cm | 1,00× |
+| 5 cm | 39,6 mm | 11,0 cm | 1,00× |
+| 20 cm | 108,4 mm | 11,0 cm | 1,00× |
+| 50 cm | 150,0 mm | 11,0 cm | 1,00× |
+
+Sığ karda duvar dönüşten kısa kalıyor, iz botun kenarında sönüyor; derin karda duvar
+dönüşten uzun oluyor ve kenar dikleşiyor. İkisi de gerçek izin yaptığı şey.
+
+**Kalan sınır — ölçüldü, düzeltilmedi:** texel 2,3 cm, yani 11 cm'lik iz **4,7 texel**.
+Blok görüntüsünün bir payı buradan geliyor ve ancak kar simülasyonunun çözünürlüğü
+(24 m / 1024) artırılarak düşer; 2048 texeli 1,15 cm'ye indirir ama simülasyon maliyetini
+dörde katlar. Kullanıcı kararı.
+
+**Oyun içi doğrulama yapılamadı:** iki ayrı yakalama düzeneği yanlış yere baktı (biri
+kamerayı zeminin içine soktu, öteki iz dokusunu kameranın takip ettiğini hesaba katmadan
+ortasından örnekledi). Kanıt shader'ın kendi aritmetiğinde; ekranda doğrulama kullanıcının.
+
