@@ -347,6 +347,15 @@ olur.
 ---
 ## Bekleyen ölçümler
 
+- **Gök zeminden karanlık — ayak izi işi bunu bekliyor.** 1903 m, 08:23, gündüz
+  katsayısı 1,00: bulutluyken gök luma 1,9 / kar 23,9; bulut kısılınca 34,2 / 178,0.
+  Kar, gök ve güneşin gönderdiğinin en fazla %90'ını geri verebilir, gökten parlak
+  olamaz — ters dönme bulutsuz da duruyor, yani bulutta değil. **1 cm kar izi bu
+  yüzden görünmüyor:** izin ölçülmüş %12 albedo kontrastı luma 24 üzerinde 3 luma
+  eder. İz tarafında yapılacak başka bir şey yok; sıradaki adım göğün radyansının hangi
+  büyüklükten kurulduğunu adlandırmak, sürgü denemek değil.
+  → `SYMPTOMS.md` — "Ayak izi görünmüyor çünkü gök zeminden karanlık"
+
 - **Uzak denizin takmasının %79'u duruyor.** Ufuk bandı pikselin kendi belirsizliğiyle
   yumuşatıldı ve %21 gitti (`SYMPTOMS.md` — "Denizde belli bir mesafeden sonra titreme").
   Kalanın **tamamı** gökyüzü yansıması aramasında — kırılma ve parıltı ölçüldü, sıfır
