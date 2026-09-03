@@ -5368,3 +5368,45 @@ Yani oyuncunun gerçek girdisiyle yürümesi gerekiyor; editör tikinden yapıla
 ritmini sürmüyor. Yukarıdaki sayılar `KDeform`'un aritmetiğinin birebir CPU aynasından
 geliyor, ekrandan değil. Değişiklik yalnızca izi DARALTABİLİR — genişleten hiçbir terim
 kalmadı — o yüzden bırakıldı, ama gözle onaylanması gerekiyor.
+
+## Denize hiç yağmur yağmıyor: halka görünmüyor — SEBEP BULUNDU (2026-09-03)
+
+**Kullanıcının ağzından:** "göremiyorum, sahne ezdi mi yine yaptıklarını?"
+
+**Cevap: sahne eziyor, ama shader'ı değil sıcaklığı.**
+
+`TemperatureField.seaLevelCelsius` kodda 7.8, `Game.unity`'de **−2**. Serileştirilmiş alan
+kazanıyor. Zincir:
+
+    At(30 m) = −2 − 6,5×0,03 + 1,63×gündüz − 3,25×yağış = −0,9 °C
+
+Ölçüldü, birebir tutuyor. Deniz seviyesi **her saatte ve her fırtınada −0,9 ile −2,5 °C**:
+
+| saat | fırtına 0,2 | 0,6 | 1,0 |
+|---|---|---|---|
+| 00:00 | −0,9 | −1,7 | −2,4 |
+| 06:00 | −0,9 | −1,7 | −2,5 |
+| 12:00 | −0,9 | −1,7 | −2,5 |
+| 18:00 | −0,9 | −1,7 | −2,5 |
+
+Sıfırın altı demek yağış türü hep **kar** demek, ve `SeaManager` yağmur olmayan her şeyi
+sıfırlıyor:
+
+    float rain = env.PrecipKind == SeaPrecipitationKind.Rain ? env.PrecipIntensity01 : 0f;
+
+Ölçüldü: `WeatherState.Precipitation` 0,114 → 0,581 arasında çalışıyor ama
+`_SeaPrecipIntensity01` dört fırtına seviyesinde de **0,000**. Yani denizin yağmura bağlı
+her etkisi — halka, pürüzlülük artışı, köpük payı — hiç çalışmamış.
+
+**Bu bir kararın sahneye inmemesi.** `DECISIONS.md` → "Ovanın kotu KAPANDI" kaydı
+`seaLevelCelsius`'un −3'ten +7,8'e alındığını ve sahnenin de güncellendiğini söylüyor;
+gerekçesi de aynen bu: "−3 donma seviyesini deniz seviyesinin 462 m ALTINA koyuyordu,
+'başlangıçta yeşillik ve yağmur' imkânsız". Sahne bugün −2 taşıyor, yani karar geçerli
+ama uygulanmamış durumda.
+
+**Uygulanmadı, çünkü bedeli oyunun görüntüsünü değiştiriyor:** +7,8 donma seviyesini
+−94 m'den ~1200 m'ye çıkarır, yani 1200 m altında kar biter. Kullanıcının görüp karar
+vermesi gereken bir değişiklik.
+
+**Ayrıca:** `SeaEnvironmentBridge.PrecipKind` sıcaklığı `transform.position.y`'den okuyor
+ve o nesne y = 0'da; deniz 30 m'de. Fark 0,2 °C, zararsız ama yanlış kotu okuyor.
