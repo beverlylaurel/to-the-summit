@@ -5944,3 +5944,16 @@ gök ve bulut radyans yolları ayrıldı; her yol atmosferik soğurmayı bir kez
 **Sebep ve düzeltme:** `SampleMainLightCookie` vertex aşamasına konmuştu; bu yol D3D11'de
 fragman türevleri istiyor. Ortam ve gölgelenmiş doğrudan terim vertex'ten ayrı taşındı,
 cookie yalnız fragmanda örneklendi ve doğrudan terime orada çarpıldı.
+
+
+## Fotoğraf zoom'u görünmüyor ve tekrar Play sonrası çekim kilitleniyor — ÇÖZÜLDÜ (2026-09-05)
+
+**Kök neden:** Input System `UniformAcrossAllPlatforms` zaten bir tekerlek adımını 1
+olarak veriyor. Yeniden 120'ye bölmek zoom'u görünmez düzeye indiriyordu. Önceki
+sentetik testin 1200 birim vermesi gerçek giriş ölçeğindeki hatayı gizledi.
+Bölme yalnız platforma özgü Windows giriş aralığında uygulanır. Canlı testte +1
+adımı görüş açısını 60 dereceden 54,23 dereceye indirdi; -1 yeniden 60'a döndürdü.
+
+**İkinci neden:** Domain/scene reload kapalıyken yok edilmiş Unity materyalinin
+managed referansı kalabiliyor; `??=` bunu null saymıyor. `OnEnable` başlatması ve
+Unity null kontrolü materyali yeniden kurar, eski çekim durumunu sıfırlar.

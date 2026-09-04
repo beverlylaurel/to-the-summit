@@ -95,7 +95,7 @@ public sealed class VintagePhotoMode : MonoBehaviour
         if (Application.isPlaying) Initialize();
     }
 
-    void Awake() => Initialize();
+    void OnEnable() => Initialize();
 
     void Initialize()
     {
@@ -103,7 +103,9 @@ public sealed class VintagePhotoMode : MonoBehaviour
             || captureCamera == null || placeholder == null || mouseLook == null || movement == null)
             throw new InvalidOperationException($"{nameof(VintagePhotoMode)}: dependencies are not assigned.");
 
-        processingMaterial ??= new Material(processingShader)
+        // Unity objects retain a managed wrapper after native destruction when domain
+        // reload is disabled. Use Unity's null check, not the C# null-coalescing operator.
+        if (processingMaterial == null) processingMaterial = new Material(processingShader)
         {
             name = "Vintage DSLR Processing (Runtime)",
             hideFlags = HideFlags.HideAndDontSave
@@ -111,6 +113,8 @@ public sealed class VintagePhotoMode : MonoBehaviour
 
         library ??= new VintagePhotoLibrary();
         exposureCompensation = profile.exposureCompensation;
+        capturing = false;
+        captureStage = "Idle";
         captureCamera.enabled = false;
         SetMode(Mode.Hidden);
     }
@@ -209,8 +213,13 @@ public sealed class VintagePhotoMode : MonoBehaviour
 
         if (!capturing)
         {
-            // Input System scroll is measured in wheel units (120 per conventional notch).
-            float wheel = mouse.scroll.ReadValue().y / 120f;
+            // Uniform scroll deltas already express wheel steps. Only native Windows
+            // deltas use 120 units per step; dividing uniform input again hides the zoom.
+            float wheel = mouse.scroll.ReadValue().y;
+            if (InputSystem.settings.scrollDeltaBehavior == InputSettings.ScrollDeltaBehavior.KeepPlatformSpecificInputRange
+                && (Application.platform == RuntimePlatform.WindowsEditor
+                    || Application.platform == RuntimePlatform.WindowsPlayer))
+                wheel /= 120f;
             targetZoom = Mathf.Clamp(targetZoom * Mathf.Exp(wheel * profile.zoomStep),
                 1f, profile.maximumZoom);
         }
