@@ -52,6 +52,7 @@ public sealed class VintagePhotoMode : MonoBehaviour
     float targetZoom = 1f;
     float zoomVelocity;
     bool ownsFieldOfView;
+    VintageZoomFocus zoomFocus;
     bool capturing;
     bool captureCameraRendered;
     string captureStage = "Idle";
@@ -112,6 +113,8 @@ public sealed class VintagePhotoMode : MonoBehaviour
         };
 
         library ??= new VintagePhotoLibrary();
+        zoomFocus?.Dispose();
+        zoomFocus = new VintageZoomFocus(viewCamera, profile);
         exposureCompensation = profile.exposureCompensation;
         capturing = false;
         captureStage = "Idle";
@@ -121,6 +124,8 @@ public sealed class VintagePhotoMode : MonoBehaviour
 
     void OnDisable()
     {
+        zoomFocus?.Dispose();
+        zoomFocus = null;
         RenderPipelineManager.endCameraRendering -= OnCaptureCameraRendered;
         if (captureCamera != null) captureCamera.enabled = false;
         if (placeholder != null) placeholder.enabled = false;
@@ -251,6 +256,7 @@ public sealed class VintagePhotoMode : MonoBehaviour
         }
         if (next == Mode.Hidden || next == Mode.Equipped) RestoreFieldOfView();
         mode = next;
+        if (next != Mode.Viewfinder) zoomFocus?.Reset();
         if (placeholder != null)
             placeholder.enabled = next == Mode.Equipped;
 
@@ -270,11 +276,16 @@ public sealed class VintagePhotoMode : MonoBehaviour
 
     void LateUpdate()
     {
-        if (!ownsFieldOfView || mode != Mode.Viewfinder || capturing) return;
+        if (!ownsFieldOfView || mode != Mode.Viewfinder || capturing)
+        {
+            zoomFocus?.Reset();
+            return;
+        }
         zoom = Mathf.SmoothDamp(zoom, targetZoom, ref zoomVelocity,
             profile.zoomSmoothSeconds, Mathf.Infinity, Time.unscaledDeltaTime);
         viewCamera.fieldOfView = 2f * Mathf.Atan(
             Mathf.Tan(baseFieldOfView * Mathf.Deg2Rad * 0.5f) / zoom) * Mathf.Rad2Deg;
+        zoomFocus?.Tick(Mathf.Abs(zoomVelocity) / Mathf.Max(zoom, 1f), Time.unscaledDeltaTime);
     }
 
     void RestoreFieldOfView()

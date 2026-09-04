@@ -2069,6 +2069,12 @@ Hücre boyuna bağlarsan diz kılcal tepenin altına düşer ve bandın yarısı
 aramaz. `4` kamerayı ele alır/bırakır, sağ tık 3:2 optik vizöre girer/çıkar, sol tık çeker.
 Tekerlek vizörde yumuşak optik zoom yapar; kamera indirildiğinde oyuncunun görüş açısı geri
 yüklenir. Zoom sınırı, adımı ve geçiş süresi profil üzerinden ayarlanır.
+`VintageZoomFocus` bağıl lens hızını kısa bir netlik kaybına çevirir. Geçici Bokeh
+volume yalnız ana kameranın render aralığında etkinleşir; UI, galeri ve ayrı JPEG
+kamerasına uygulanmaz. Şiddet, hız eşiği ve toparlanma süresi DSLR profilindedir.
+Lens durduğunda efekt sıfıra iner; bileşen kapanırken volume ve abonelikler temizlenir.
+Referanslı `VintageZoomFocusProfile` URP build elemesinde DOF shader'ını korur;
+yalnız çalışma zamanı kopyası değiştirilir.
 `Q/E` poz telafisini 1/3 EV değiştirir, `G` yalnız kamera eldeyken galeriye girer ve
 `A/D` veya ok tuşları kayıtlar arasında gezer. Geçici model ana kameranın altında duran küçük
 bir küptür; vizörde ve çekimde gizlenir.

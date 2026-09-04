@@ -20,9 +20,13 @@ MonoBehaviour:
   cardCapacity: 247
   jpegQuality: 92
   reviewSeconds: 2
+  zoomFocusProfile: {fileID: 11400000, guid: ffe17953d2294e74983831066eef1990, type: 2}
   maximumZoom: 4
   zoomStep: 0.12
   zoomSmoothSeconds: 0.18
+  zoomDefocusStrength: 0.65
+  zoomDefocusSpeed: 0.8
+  zoomFocusRecoverySeconds: 0.2
   metering: 0
   meteringGray: 0.18
   exposureCompensation: 0

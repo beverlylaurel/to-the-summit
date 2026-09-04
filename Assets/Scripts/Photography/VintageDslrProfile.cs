@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public enum PhotoMeteringMode
 {
@@ -31,9 +32,13 @@ public sealed class VintageDslrProfile : ScriptableObject
     [Min(0.1f)] public float reviewSeconds = 2f;
 
     [Header("Viewfinder zoom")]
+    public VolumeProfile zoomFocusProfile;
     [Range(1f, 10f)] public float maximumZoom = 4f;
     [Range(0.02f, 0.5f)] public float zoomStep = 0.12f;
     [Range(0.05f, 0.8f)] public float zoomSmoothSeconds = 0.18f;
+    [Range(0f, 1f)] public float zoomDefocusStrength = 0.65f;
+    [Min(0.1f)] public float zoomDefocusSpeed = 0.8f;
+    [Range(0.05f, 0.5f)] public float zoomFocusRecoverySeconds = 0.2f;
 
     [Header("Exposure")]
     public PhotoMeteringMode metering = PhotoMeteringMode.Evaluative;

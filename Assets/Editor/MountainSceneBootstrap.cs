@@ -1069,6 +1069,20 @@ public static class MountainSceneBootstrap
                                        ref bool changed)
     {
         var profile = LoadOrCreate<VintageDslrProfile>(VintageDslrProfilePath);
+        if (profile.zoomFocusProfile == null)
+        {
+            var focusProfile = LoadOrCreate<VolumeProfile>("Assets/Settings/VintageZoomFocusProfile.asset");
+            if (!focusProfile.TryGet<DepthOfField>(out var focus))
+            {
+                focus = focusProfile.Add<DepthOfField>(true);
+                AssetDatabase.AddObjectToAsset(focus, focusProfile);
+            }
+            focus.mode.Override(DepthOfFieldMode.Bokeh);
+            profile.zoomFocusProfile = focusProfile;
+            EditorUtility.SetDirty(focusProfile);
+            EditorUtility.SetDirty(profile);
+            changed = true;
+        }
         var shader = AssetDatabase.LoadAssetAtPath<Shader>(VintagePhotoShaderPath);
         if (shader == null)
             throw new System.InvalidOperationException(
