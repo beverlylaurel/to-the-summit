@@ -38,6 +38,10 @@ public class RainStreakDatabase : ScriptableObject
         [Tooltip("Ambient arrays, in the same order as `Sizes`. The slice index is osc.")]
         public Texture2DArray[] Ambient;
 
+        [Tooltip("Lighting-independent streak coverage arrays, in the same order as `Sizes`. " +
+                 "The slice index is osc. Built by normalizing the ambient source per slice.")]
+        public Texture2DArray[] Mask;
+
         [Tooltip("Presence table, 900 entries. A 0 means that (v,h,osc) is NOT in the " +
                  "database — at extreme vertical angles the streak degenerates and was " +
                  "not rendered. Interpolation skips that neighbour and renormalizes the weights.")]

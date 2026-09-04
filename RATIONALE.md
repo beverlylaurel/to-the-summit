@@ -3556,7 +3556,23 @@ Boy uzamadı, damla sayısı dörtte bire düştü. Sebep: hacim 8 kat küçül�
 8 kat artıyor, temsil payı (`N = 1000/yoğunluk`) düşüyor, her damla soluyor. Yağmur
 seyreliyor.
 
-**Açık kalan.** Doğru yol muhtemelen 24 m'deki damlayı ayrı ayrı çizmeyi bırakmak: gerçekte
-o mesafede tek tek damla görülmez, perde görülür ve perde zaten modelde var
-(`AtmosphereController`, görüş 18000·R⁻⁰·⁷⁰). Mesafeyle sönüp perdeye karışan bir geçiş
-gerekiyor; bu ayrı bir iş.
+**Çözüldü (2026-09-04).** Tekil damlalar 10 m'ye kadar tam çiziliyor, 10–18 m arasında
+sönüyor ve 18 m'den sonra atmosferik yağmur perdesine bırakılıyor. Terminal hız
+değişmedi: damla sınıfına göre 4,00–9,14 m/s. En uzak tekil damlanın hesaplanan ekran
+hızı 208–475 px/s; artık 24 m'deki yavaş taneyi göstermeye çalışmıyoruz.
+
+## Yağmurun gökyüzünde kesilmesi: çizim sırası ve fiziksel kontrast (2026-09-04)
+
+Dağın önündeki damlalar görünürken gökyüzündekilerin kaybolmasının nedeni sis ya da
+aydınlatma değildi. Kırmızı sabit çıktı ve `ZTest Always` ile yapılan ayırıcı deneyde
+aynı dağ silueti kaldı: yağmurdan **sonra** çalışan `VolumetricCloudsURP` geçişi,
+saydamlardan sonra gökyüzü piksellerini yeniden yazıyordu. Arazide derinlik bulunan
+pikselleri atladığı için damlalar yalnız dağın ve zeminin önünde kalıyordu.
+
+Bulut geçişi denizin saydamlığını korumak için yerinde bırakıldı. Yağmur,
+`PrecipitationRenderFeature` ile bulutlardan bir olay sonra çiziliyor. Kapsama artık
+ışıklandırmadan ayrılmış normalize maskeden geliyor; güneş/ay, `AirColor` ve şimşek
+yalnız saçılan radyansı belirliyor. Çıktı standart alfa ile bilinmeyen bulut arka planını
+çıkarmak yerine pozitif fiziksel kontrast ekliyor; `FogPath` bu ek kontrastı görüş
+mesafesiyle söndürüyor. Böylece yakın yağmur siste bütünüyle yok olmuyor, uzak yağmur
+ise ayrı taneler olarak değil atmosferik perdeye karışarak kayboluyor.

@@ -25,6 +25,7 @@ public class LightningFlash : MonoBehaviour
     static readonly int ScatterTId = Shader.PropertyToID("_LightningScatterT");
     static readonly int SourcesId = Shader.PropertyToID("_LightningSources");
     static readonly int SourceCountId = Shader.PropertyToID("_LightningSourceCount");
+    static readonly int RainRadianceId = Shader.PropertyToID("_LightningRainRadiance");
 
     /// HOW MANY POINT SOURCES ALONG THE CHANNEL. The paper uses 50, but for offline rendering
     /// `[Dobashi 2001, §5.1]`; for us that many table lookups per pixel is expensive.
@@ -281,6 +282,13 @@ public class LightningFlash : MonoBehaviour
 
         Color glow = settings.flashColor * (peakGlow * value);
         Shader.SetGlobalVector(FlashId, new Vector4(glow.r, glow.g, glow.b, peakGlow * value));
+
+        // DIRECT RADIANCE REACHING THE LOCAL RAIN. The directional light already carries the
+        // strike's inverse-square distance falloff, so the shader must not apply it a second time.
+        // Kept separate from `_LightningFlash`: that value is cloud/fog glow, not direct light.
+        Color rainRadiance = settings.flashColor * flash.intensity;
+        Shader.SetGlobalVector(RainRadianceId,
+            new Vector4(rainRadiance.r, rainRadiance.g, rainRadiance.b, flash.intensity));
 
         // The position and the patch's radius. The cloud glows according to the distance from here
         // of the world point it finds by intersecting the ray direction with the layer — so a real

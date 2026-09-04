@@ -175,64 +175,39 @@ Gerekçeler: `RATIONALE.md` → Kuşaklar ve hava dalgalanması.
 
 ### Yağış tanecikleri (`PrecipitationRenderer`, `Precipitation.shader`)
 
-**Okur:** şiddet (yoğunluk ve damla boyutu dağılımı), **tepedeki bulut kolonunun yağış payı**
-**ve girdap alanının sürüklenmesi**), rüzgârın **esintili** şiddeti (girdap genliği, tanenin
-dönme hızı), **arazi yüzeyini** (`TerrainHeightAt` — rüzgârın sınır tabakası), **günün
-saatini** (`TimeOfDay.CurrentSunColor × SunIntensity`, izin yönlü terimi) ve **göğün o
-yöndeki rengini** (`AirColor`, izin ambient terimi).
-**Okumaz:** hiçbir ışık kaynağını güneşten başka. Şimşek, fener ve lamba iz görünümüne
-girmiyor — Garg-Nayar'ın hale maskesi (`1/d²`) sonlu mesafedeki kaynağın işi ve şu an
-sahnede öyle bir kaynak yok. Şimşek eklendiğinde gerekecek (`DECISIONS.md`).
+**Okur:** şiddet, tepedeki bulut kolonunun kapsaması, `WindField`'ın ortak esintili hızı,
+`TerrainHeightAt` ile sınır tabakası, `TimeOfDay`'ın etkin ana ışığı (güneş veya ay),
+`AirColor` ile gök aydınlığı ve `_LightningRainRadiance` ile şimşek ışığı.
 
-- **İzin rengi iki terimden gelir:** güneşin radyansı (yönlü, veritabanının `point`
-  dokusu) + göğün radyansı (izotrop, `ambient` dokusu). İkisi ayrı örneklenip toplanır.
-  Gök terimi ALÇAK GÜNEŞTE tonundan arındırılır — `AirColor` tek bir bakış yönünün
-  rengini taşır ve şafakta damlaları maviye boyuyordu.
-
-- **Yağış gökten tek parça düşmez, kaynağı tepedeki buluttur.** `CloudLayerProbe` hava
-  haritasını oyuncunun konumunda CPU'dan okur; kapsama × kabarıklık (tip) yağış payını
-  verir, yayvan ince katman yağdırmaz. Kolonun tepesinin üstünde pay sıfırlanır. Pay
-  ~2.5 s'lik sabitle yumuşatılır.
-- **Türbülans yamalıdır:** genlik, rüzgârla akan alçak frekanslı bir zarfla yerel çarpılır;
-  (1–3 Hz); damla çırpmaz.
-- **Tane kendi rengini seçmez** — havanın rengini çarpanla parlatır.
-- **Tanenin biçimi kristal değil kümelenmedir.**
-  Dönme ve girdap **esintiye** bağlanır, sürekli şiddete değil.
-  bulunmasıdır.
-- **Damla boyutu hem düşme hızını hem rüzgâra direncini belirler**; dağılım şiddetle kayar.
-- **Tanecikler İKİ İÇ İÇE KUTUDA yaşar** (48 m ve 12 m), ikisi de kamerada merkezli,
-  ikisi de kendi kutusuna sarar. Kameranın etrafında sarma periyodik bir döşemedir ve
-  periyodik döşeme yoğunluk gradyanı taşıyamaz — "yakında sık" tek kutuyla kurulamaz.
-  İç kutunun kapsadığı yerde yoğunluklar TOPLANIR.
-- **Temsil payı konumdan türer, kutudan değil:** `N(r) = 1000 / yoğunluk(r)`. Aynı
-  noktadaki iki tanecik hangi kutudan geldiğine bakılmaksızın aynı sayıda gerçek damlayı
-  temsil etmek zorunda, yoksa aynı yerde iki farklı opaklık çıkar. İç kutunun payı kendi
-  sönüm eğrisiyle girer; ayrışsalardı sınırda opaklık sıçrardı.
-- **Yağış rüzgârın SINIR TABAKASINI okur** — yani `TerrainHeightAt`'ı, arazi yüzeyini.
-  Rüzgâr yerde sıfıra iner, yükseldikçe logaritmik açılır; damla da tane de kendi kotunun
-  payını yer. CPU yalnız SERBEST AKIŞ kaymasını integre eder; kotun getirdiği yavaşlama
-  shader'da, tanecik başına, **kapalı biçimli sınırlı bir gecikme** olarak eklenir. Kar da
-  aynı yasayı okur — yalnız damla düzeltilseydi aynı rüzgârda damla yavaşlar, tane
-  yavaşlamazdı.
-- **Tanecik girdabın her kıvrımını yemez: ATALET SÜZGECİ var.** Sürüklenme denklemi birinci
-  mertebeden, yani tanecik alçak geçiren bir süzgeç: gevşeme süresi `τ = v_t/g`, `ω`
-  frekanslı zorlamaya `1/√(1+(ωτ)²)` ile cevap verir. Frekans taneciğin alanın içinden
-  GEÇME hızından doğar (`ω ≈ k·|V| + ω_zaman`), o yüzden girdap oktavı başına ayrı hesaplanır.
-  **Yağmurla karı ayıran şey budur** — kar aynı alanda damladan altı kat fazla sapar. Eskiden
-  fark elle konmuş bir katsayıyla taklit ediliyordu; o telafi terimi silindi.
-- **Girdap ölçeği de kotla değişir.** Yüzey tabakasında girdap boyu `ℓ ≈ κz` ile büyür,
-  yere yakın büyük girdap sığmaz. Alanın dalga boyu sabit olduğu için ölçek değil ENERJİ
-  PAYI kaydırılır: kaba oktav sığdığı kadarını tutar, kalanı ince oktava geçer. Toplam hız
-  değişintisi korunur. Bandı kesmek denendi ve elendi — kesilen enerjinin nereye gittiği
-  yazılmadan hiçbir bant kapatılmaz (`RATIONALE.md`).
-- **İzin boyu, saydamlığı ve yönü tek bir hızdan türer: bileşke hız** (sınıftan gelen yatay
-  rüzgâr sürüklenmesi + damlanın kendi terminal hızı). Üçü ayrı hız okuyamaz — boy uzayıp
-  saydamlık sabit kalırsa enerji yoktan var olur. Dolayısıyla **iz geometrisi rüzgârı
-  okur**: rüzgâr sertleştikçe izler hem uzar hem yatar hem soluklaşır.
-- **Yön sekiz sınıfa kilitli değildir.** Rüzgâr sürüklenmesi CPU'da sınıf başına integre
-  edilir (konum ayrık kalmak zorunda), ama izin yönü damlanın kendi yarıçapından gelen
-  dikey bileşenle kurulur ve üstüne **girdap alanının kendi türevinden** çıkan damla başına
-  sapma binder. Sapma uydurulmaz: çizilen konumun tam türevi alınır.
+- **Çizim sırası fiziktir.** Volumetrik bulutlar denizi doğru örtebilmek için normal
+  şeffaf kuyruğundan sonra birleşir. `PrecipitationRenderFeature` yağmuru bulutlardan bir
+  kademe sonra çizer; aksi hâlde bulut tam ekran geçişi yalnız gökyüzü piksellerindeki
+  damlaları siler ve dağ siluetinde kesilen bir yağmur tabakası oluşur.
+- **Örtücülük ışık değildir.** İthalatçı ambient izden ışık bağımsız `Mask` dizilerini
+  üretir. Maske yalnız alfaya girer; radyansla tekrar çarpılmaz. Böylece loş ortamda izin
+  geometrisi kaybolmaz ve yumuşak kenarın görünürlüğü karesini almaz.
+- **Işık üç terimdir:** Garg-Nayar `point` dokusu × etkin güneş/ay, göğün hemisferik
+  ambient kontrastı ve şimşek. Fiziksel birleşim `(1-a)B + aI = B + a(I-B)` biçiminde,
+  pozitif kontrast olarak toplanır. Bu, bulutlu göğü shader'ın analitik gök renginden
+  çıkarma hatasını önler.
+- **Yağmur aynı sis yolundan geçer.** `FogPath(camera, drop)` yalnız kamerayla damla
+  arasındaki ek kontrastı söndürür. Yoğun siste yakın izler kalır, uzak izler arka plana
+  doğal olarak yaklaşır; sis sonrası sabit bir görünürlük tabanı yoktur.
+- **Damla başına yalancı türbülans yoktur.** Yön, fiziksel terminal hız ile filtrelenmiş
+  ortak `WindField` hızının bileşkesidir. Rüzgârın kendi esintisi bütün yağmuru tutarlı
+  büker; bağımsız damla salınımı yağmuru kar gibi süzdürmez.
+- **Boy, yön ve alfa aynı hızdan türer.** İz boyu `v·50 ms`, alfa
+  `2r/(v·50 ms)` ve yön bileşke hızdır. Damla çapı 1–5 mm bandında terminal hız
+  yaklaşık 4,00–9,14 m/s'dir.
+- **Yakın alan iki iç içe kutudur** (48 m ve 12 m); yoğunluklar iç bölgede toplanır ve
+  temsil payı konumdan türer. Bireysel izler 10 m'ye kadar tam, 10–18 m arasında sönümlü,
+  18 m'den sonra kapalıdır. Uzak yağış hissini atmosferik görüş taşır; yavaş kayan uzak
+  çubuklar taşımaz.
+- **Sınır tabakası araziyi izler.** CPU serbest akış kaymasını sınıf başına integre eder;
+  shader rüzgârı yerden yukarı logaritmik açar ve kapalı biçimli gecikmeyi damla başına
+  uygular.
+- **Yağış yerel bulut kolonundan gelir.** `CloudLayerProbe` hava haritasını oyuncunun
+  konumunda okur; kolon kapsaması çizim yoğunluğunu çarpar ve kolonun üstünde yağış kesilir.
 
 ### Hava sesi (`WeatherAudio`, `AudioBand`)
 

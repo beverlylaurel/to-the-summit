@@ -6,6 +6,8 @@ using UnityEngine.Rendering;
 /// CPU; the vertex shader produces them from time + the wind drift.
 public class PrecipitationRenderer : MonoBehaviour
 {
+    public static PrecipitationRenderer Active { get; private set; }
+
     [SerializeField] WeatherState weather;
     [SerializeField] WindField wind;
     [SerializeField] Shader shader;
@@ -231,16 +233,9 @@ public class PrecipitationRenderer : MonoBehaviour
     // wrap point would stop being a multiple of the box and make the drops jump. A separate drift
     // is kept per class.
     const int RainSpeedClasses = 8;
-    static readonly Color RainColor = new(0.78f, 0.83f, 0.92f, 0.42f);
-
-    // Vortex amplitudes. In calm air the particles come down almost straight; the amplitude is
-    // scaled from the wind and does not set up its own timer
-    const float RainTurbulenceCalm = 0.03f;
-    const float RainTurbulenceStorm = 0.25f;
-
     static readonly int BoxSizeId = Shader.PropertyToID("_BoxSize");
     static readonly int StreakPointId = Shader.PropertyToID("_StreakPoint");
-    static readonly int StreakAmbientId = Shader.PropertyToID("_StreakAmbient");
+    static readonly int StreakMaskId = Shader.PropertyToID("_StreakMask");
     static readonly int StreakCellBlendId = Shader.PropertyToID("_StreakCellBlend");
     static readonly int StreakCornerPresentId = Shader.PropertyToID("_StreakCornerPresent");
     static readonly int StreakMirrorId = Shader.PropertyToID("_StreakMirror");
@@ -261,17 +256,12 @@ public class PrecipitationRenderer : MonoBehaviour
     /// would split the two systems.
     static readonly int DensityId = Shader.PropertyToID("_Density");
     static readonly int PrecipitationId = Shader.PropertyToID("_Precipitation");
-    static readonly int RainTurbulenceId = Shader.PropertyToID("_RainTurbulence");
-    static readonly int WindSweepId = Shader.PropertyToID("_WindSweep");
-    static readonly int RainColorId = Shader.PropertyToID("_RainColor");
-
     Mesh mesh;
     Material material;
     readonly Vector4[] rainDrifts = new Vector4[RainSpeedClasses];
     readonly Vector4[] rainDriftsNear = new Vector4[RainSpeedClasses];
     readonly Vector4[] rainDirections = new Vector4[RainSpeedClasses];
     readonly Vector3[] rainVelocities = new Vector3[RainSpeedClasses];
-    Vector3 windSweep;
     float density;
     float precipitation;
 
@@ -310,6 +300,8 @@ public class PrecipitationRenderer : MonoBehaviour
         if (observer == null)
             throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(observer)} is not assigned.");
 
+        Active = this;
+
         RefreshDensity();
 
         // If the filtered speed starts from zero the direction vector normalizes to zero in the
@@ -322,13 +314,16 @@ public class PrecipitationRenderer : MonoBehaviour
         }
     }
 
+    void OnDisable()
+    {
+        if (Active == this) Active = null;
+    }
+
     /// The direction and the MAGNITUDE in one vector: `xyz` the unit direction, `w` the resultant
     /// speed (m/s).
     ///
-    /// The shader needs the magnitude because the per-drop direction deviation is a RATIO: the
-    /// turbulence is the ratio of the speed fluctuation to the resultant speed. A normalized
-    /// direction alone cannot form that ratio — the denominator is lost and the deviation would be
-    /// as large in calm air as in a storm.
+    /// The shader needs the magnitude because the boundary-layer lag is a distance derived from
+    /// wind speed. A normalized direction alone would lose that quantity.
     static Vector4 WithSpeed(Vector3 velocity)
     {
         float speed = velocity.magnitude;
@@ -354,22 +349,23 @@ public class PrecipitationRenderer : MonoBehaviour
             ? rainVelocity.normalized
             : Vector3.down;
 
-        streaks.Refresh(timeOfDay.SunDirection, fall, camera.transform.forward);
+        streaks.Refresh(timeOfDay.PrimaryLightDirection, fall, camera.transform.forward);
 
-        if (streaks.Point == null || streaks.Ambient == null) return;
+        if (streaks.Point == null || streaks.Mask == null) return;
 
         material.SetTexture(StreakPointId, streaks.Point);
-        material.SetTexture(StreakAmbientId, streaks.Ambient);
+        material.SetTexture(StreakMaskId, streaks.Mask);
         material.SetVector(StreakCellBlendId, streaks.CellBlend);
         material.SetVector(StreakCornerPresentId, streaks.CornerPresent);
         material.SetFloat(StreakMirrorId, streaks.MirroredAzimuth ? 1f : 0f);
         material.SetFloatArray(StreakDcamFractionId, streaks.DcamHeightFraction);
         material.SetFloat(StreakExposureId, ExposureTime);
         material.SetFloat(StreakDbPeriodId, DatabasePeriod);
-        // THE SUN DISC'S RADIANCE. `TimeOfDay` keeps the colour normalized to 1 and carries the
-        // intensity separately; their product is the real magnitude (written down inside `TimeOfDay`).
-        Color sun = timeOfDay.CurrentSunColor * timeOfDay.SunIntensity;
-        material.SetVector(StreakSunRadianceId, new Vector4(sun.r, sun.g, sun.b, 1f));
+        // DIRECT CELESTIAL RADIANCE. Day and night use the same light that illuminates the scene;
+        // continuing to read the sun after the moon handover made rain go black at night.
+        Color source = timeOfDay.PrimaryLightColor * timeOfDay.PrimaryLightIntensity;
+        material.SetVector(StreakSunRadianceId,
+            new Vector4(source.r, source.g, source.b, timeOfDay.PrimaryLightIntensity));
 
         material.SetFloat(StreakSourceScaleId, SourceScale);
     }
@@ -450,25 +446,6 @@ public class PrecipitationRenderer : MonoBehaviour
         // smaller, and settles on the air's speed instantly. There is no vertical drift, because a
         // grain's height above the ground derives from the terrain surface, not from the box.
 
-        // The particle takes the gust instantly: not the sustained severity but whatever the speed is
-        // at that moment. The speed already arrived with the gust through Velocity; with the rotation
-        // and the turbulence left on the sustained severity, the same grain sped up while its spin stayed fixed.
-        float felt = Mathf.Clamp01(wind.Strength * (1f + wind.Gust));
-
-        // The spin comes from the wind: in calm air it glides, in a storm it is thrown about and spins fast.
-        // The angle accumulates; multiplied by time in the shader, the grains would jump in phase
-        // every time the wind changed.
-        // No wrapping: because every grain multiplies the angle by a different coefficient, the wrap
-        // point falls somewhere different on every grain and the jump is visible. Even hours later
-        // the float precision is at the level of a thousandth of a radian, which is not noticeable.
-
-        // The vortex field's drift offset with the wind (Taylor: turbulence is carried by the mean
-        // flow). It is not wrapped: the field contains mixed frequency coefficients like 0.7-0.9 and
-        // no period is common to all of them, so the moment of wrapping visibly teleports the
-        // vortices. Not wrapping only grows the sin argument — the shader already uses an argument
-        // of the same magnitude with _Time.y.
-        windSweep += wind.Velocity * Time.deltaTime;
-
         material.SetVector(BoxSizeId, BoxSize);
         // UNCONDITIONAL: the representation share derives from here and there are four early exits
         // ahead of `UpdateStreaks`. If the uniform is not written the HLSL default is zero and the
@@ -482,12 +459,7 @@ public class PrecipitationRenderer : MonoBehaviour
         material.SetFloat(PrecipitationId, precipitation * localFactor);
 
         UpdateStreaks(rainVelocities[RainSpeedClasses / 2]);
-        material.SetFloat(RainTurbulenceId,
-            Mathf.Lerp(RainTurbulenceCalm, RainTurbulenceStorm, felt));
-        material.SetVector(WindSweepId, windSweep);
-        material.SetColor(RainColorId, RainColor);
 
-        Draw();
     }
 
     /// The drift accumulates; it wraps to a multiple of its own box to preserve float precision.
@@ -513,28 +485,15 @@ public class PrecipitationRenderer : MonoBehaviour
     /// shader. Drawn unconditionally, every particle of a system that is off was processed and then
     /// culled at zero size — the full cost of something invisible.
     ///
-    /// `Graphics.RenderMesh` rather than a `MeshRenderer`: a renderer component submits the mesh
-    /// every frame and cannot be told to skip it.
-    void Draw()
+    /// The renderer feature calls this after the volumetric cloud composite. Drawing through the
+    /// normal transparent queue puts the rain underneath that full-screen pass, which erases every
+    /// drop over sky pixels and leaves only drops backed by terrain visible.
+    public void DrawAfterClouds(RasterCommandBuffer command)
     {
-        var parameters = new RenderParams(material)
-        {
-            layer = gameObject.layer,
-            shadowCastingMode = ShadowCastingMode.Off,
-            receiveShadows = false,
-            lightProbeUsage = LightProbeUsage.Off,
-            reflectionProbeUsage = ReflectionProbeUsage.Off,
-            motionVectorMode = MotionVectorGenerationMode.ForceNoMotion,
+        if (!isActiveAndEnabled || material == null || mesh == null) return;
+        if (density * localFactor <= 0.0005f) return;
 
-            // The positions are produced in the shader; real bounds cannot be computed. Because they
-            // wrap around the camera they are always taken as visible.
-            worldBounds = new Bounds(Vector3.zero, Vector3.one * 100000f)
-        };
-
-        var transform = Matrix4x4.identity;
-
-        if (density * localFactor > 0.0005f)
-            Graphics.RenderMesh(parameters, mesh, PrecipitationSubMesh, transform);
+        command.DrawMesh(mesh, Matrix4x4.identity, material, PrecipitationSubMesh, 0);
     }
 
     /// Every particle is a quad. The corner information is in UV0, the particle seed in UV1/UV2, and

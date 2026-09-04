@@ -30,7 +30,7 @@ iş bitince buradan silinir.**
 - [Yaklaşma koridoru: ova oyun alanına giriyor (2026-08-17)](#yaklasma-koridoru-ova-oyun-alanina-giriyor-2026-08-17)
 - [L0 uygulandı — yöntemin ölçülmüş sınırları (2026-08-17)](#l0-uygulandi-yontemin-olculmus-sinirlari-2026-08-17)
 - [Şimşek kolu: R&W yükseltilir, DBM ERTELENDİ (2026-08-19)](#simsek-kolu-rw-yukseltilir-dbm-ertelendi-2026-08-19)
-- [Şimşek–yağış etkileşimi ERTELENDİ (2026-08-19)](#simsekyagis-etkilesimi-ertelendi-2026-08-19)
+- [Şimşek–yağış etkileşimi UYGULANDI (2026-09-04)](#simsekyagis-etkilesimi-uygulandi-2026-09-04)
 - [Gecedeki "fasulye" kapandı: sebep gökyüzü değil, gece ışık seviyesiydi (2026-08-16)](#gecedeki-fasulye-kapandi-sebep-gokyuzu-degil-gece-isik-seviyesiydi-2026-08-16)
 - [Gece seviyesi: ayı BULUT belirledi, sis yenilenince tekrar bakılacak](#gece-seviyesi-ayi-bulut-belirledi-sis-yenilenince-tekrar-bakilacak)
 - [Bulut ayı DOĞRUDAN alıyor — eski kayıt ölçümle çürüdü](#bulut-ayi-dogrudan-aliyor-eski-kayit-olcumle-curudu)
@@ -298,7 +298,7 @@ ova/silsile geçişi görünür bir dikiş yaratırsa halkanın dış sönümü 
 
 - **Şimşek yağan kar ve yağmuru aydınlatmalı** — kar/yağmur spec'lerine geçildiğinde
   ışık kaynağı listesine şimşek eklenecek
-  → [Şimşek–yağış etkileşimi ERTELENDİ](#şimşek-yağış-etkileşimi-ertelendi)
+  → [Şimşek–yağış etkileşimi UYGULANDI](#simsekyagis-etkilesimi-uygulandi-2026-09-04)
 - **Cepheyi ne sürecek** — yaklaşmanın yarısında kar başlaması isteniyor; şiddet şu an
   yalnız rakımdan geliyor ve ovada minimum
   → [Yaklaşmada kar bir CEPHEDEN gelir](#yaklaşmada-kar-bir-cepheden-gelir)
@@ -850,24 +850,13 @@ Adaptive Mesh*, TVCG 13:390-402.
 **Maliyet.** R&W yükseltmesi küçük: yalnız C# geometri, shader yok, bütçe riski yok.
 DBM büyük: ızgara, Laplace çözücü, ve gerçek zamanlı olmadığı için pişirme altyapısı.
 
-## Şimşek–yağış etkileşimi ERTELENDİ (2026-08-19)
+## Şimşek–yağış etkileşimi UYGULANDI (2026-09-04)
 
-Bilerek bırakıldı.
-
-**Gerekçe.** `lightning-spec.md` §9.3.5 bunu açık nokta olarak işaretliyor ve Dobashi
-makalesinde hiç ele alınmamış. Kar ve yağmur spec'leri yeniden yazılacak; şimdi
-bağlanırsa o yazımda ikinci kez sökülecek.
-
-kaynağı işleme yeri var — şimşek oraya ÜÇÜNCÜ kaynak olarak girer (güneş ve gök zaten
-var). Tane kendi rengini seçmiyor, üstüne düşen ışığı saçıyor; bu yüzden `_LightningFlash`
-globalini okumak yeterli, ayrı bir renk ayarı açılmayacak (`RATIONALE.md` → Yağış: "tane
-kendi rengini seçmez").
-
-**Tetikleyici.** Kar veya yağmur spec'ine geçildiği an. Fırtınada şimşek çakarken
-tanelerin kararması ya da flaşa hiç tepki vermemesi belirtisi de aynı kaydı açar.
-
-**Maliyet.** Küçük: tane aydınlatması zaten bir ışık toplamı, dördüncü terim eklemek.
-Asıl iş şimşeğin çakma anının o sistemlere ulaştırılması — global zaten yazılıyor.
+`LightningFlash`, flaş rengi ile şiddetini `_LightningRainRadiance` globaline yazıyor;
+yağmur shader'ı bunu güneş/ay ve gök radyansına ek bir doğrudan kaynak olarak katıyor.
+Bu değer `_LightningFlash` atmosfer pozlamasından ayrı tutuldu: biri damlaya gelen ışık,
+öteki sahnenin genel flaş cevabı. Tane yine kendi rengini seçmiyor, üstüne düşen ışığı
+saçıyor. Sonlu kaynak halesi ve lamba katkısı bu küçük bağlantının kapsamında değil.
 
 **Gerekçe — terrain önce:** `terrain-generation-spec.md` bir ekleme değil, **tam yeniden
 kalibrasyonu, gölge mesafesi, rota, ova — hepsi arazinin üstünde duruyor. Kar önce

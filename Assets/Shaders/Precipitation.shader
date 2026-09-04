@@ -26,18 +26,19 @@ Shader "ToTheSummit/Precipitation"
             // terrain are culled in the rasterizer.
             //
             // `ZWrite Off` — streaks must not occlude each other, transparents accumulate.
-            Blend SrcAlpha OneMinusSrcAlpha
+            // The physical composite `(1-a)B + aI` is evaluated in contrast form:
+            // `B + a(I-B)`. The shader outputs only the positive rain contrast and this blend
+            // adds it to the already-rendered scene. This avoids subtracting a cloud background
+            // that the analytic sky model cannot see.
+            Blend SrcAlpha One, Zero One
             ZWrite Off
+            ZTest LEqual
             Cull Off
 
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-
-            CBUFFER_START(UnityPerMaterial)
-                float4 _RainColor;
-            CBUFFER_END
 
             // Snow wraps in its own box: the same particle budget is packed more tightly
             // around the camera. A point-shaped flake does not cover as much screen area as an elongated drop.
@@ -76,23 +77,12 @@ Shader "ToTheSummit/Precipitation"
             #define WIND_PROFILE_L   2.9957   // ln(2/0.1)
             #define WIND_LAG_TOP     0.6675   // G(2), the upper limit of the lag integral
 
-            // The spatial wave number of the eddy octaves and their own temporal frequency.
-            // A mirror of the coefficients inside `Turbulence`; the inertia filter reads them.
-            #define TURB_COARSE_K    0.60
-            #define TURB_COARSE_W    1.30
-            #define TURB_FINE_K      1.80
-            #define TURB_FINE_W      2.60
-            #define TURB_COARSE_LAMBDA 10.472   // 2*pi/0.60, wavelength of the coarse octave
-            #define KARMAN           0.4        // von Karman; in the surface layer l = KARMAN*z
-
             float4 _RainDrifts[RAIN_SPEED_CLASSES];
             float4 _RainDriftsNear[RAIN_SPEED_CLASSES];   // the inner box's own drift
             float3 _NearBoxSize;
             float4 _RainDirections[RAIN_SPEED_CLASSES];
             float _Density;          // visual density, a bent version of the intensity
             float _Precipitation;    // raw intensity, for the drop size distribution
-            float _RainTurbulence;  // amplitude with which a drop is caught by an eddy, metres
-            float3 _WindSweep;      // accumulated wind-driven translation of the eddy field, metres
 
             // ---- GARG-NAYAR STREAK DATABASE `[Garg 2006, §5]`, `rain-spec.md` §6 ----
             //
@@ -100,7 +90,7 @@ Shader "ToTheSummit/Precipitation"
             // drop refracts light into speckles, smeared highlights and curved contours.
             // Because the pattern needs ray tracing it is baked offline and looked up here.
             TEXTURE2D_ARRAY(_StreakPoint);      SAMPLER(sampler_StreakPoint);
-            TEXTURE2D_ARRAY(_StreakAmbient);    SAMPLER(sampler_StreakAmbient);
+            TEXTURE2D_ARRAY(_StreakMask);       SAMPLER(sampler_StreakMask);
 
             // Slice layout in the working set: ((corner * 5) + dcam) * 10 + osc.
             // Corner order (vLow,hLow) (vLow,hHigh) (vHigh,hLow) (vHigh,hHigh).
@@ -132,6 +122,7 @@ Shader "ToTheSummit/Precipitation"
             /// The ambient channel still uses `_HeightFogColor` — that really is a sky color,
             /// and it is the illumination a drop receives from the dome.
             float3 _StreakSunRadiance;
+            float4 _LightningRainRadiance;
 
             /// The screen share of the cluster of drops one particle represents. The reasoning
             /// is where it is used: our density is a thousandth of reality's.
@@ -251,10 +242,10 @@ Shader "ToTheSummit/Precipitation"
                 float4 positionCS : SV_POSITION;
                 float2 corner     : TEXCOORD0;
                 float  alpha      : TEXCOORD1;
-                float3 color      : TEXCOORD3;
                 float3 streak     : TEXCOORD7;    // (osc, dcam lower index, dcam share)
                 float2 streakCrop : TEXCOORD8;    // (v scale, whether merging happened)
-                float3 airColor   : TEXCOORD9;    // radiance of the sky BEHIND the drop
+                float3 ambientColor : TEXCOORD9;  // hemispherical light collected by the drop
+                float3 worldPos   : TEXCOORD2;
             };
 
             // Shifts the particle grid around the camera by whole box multiples.
@@ -282,49 +273,6 @@ Shader "ToTheSummit/Precipitation"
             float PixelsPerRadian()
             {
                 return abs(UNITY_MATRIX_P._m11) * _ScreenParams.y * 0.5;
-            }
-
-            // The turbulence field: eddies in the air. Sampled from the particle's position
-            // rather than its own seed — particles in the same eddy have to be thrown together.
-            // Independent randomness looks like a swarm of ants, not precipitation.
-            //
-            // The field flows with the wind (Taylor's hypothesis: turbulence is carried by the
-            // mean flow). A coarse eddy follows the wind exactly, a fine one lags at partial
-            // speed. A world-fixed field made the particles shiver in place like taut wires as
-            // they passed through it — it read as the flake shaking, not the air turning.
-            //
-            // The vertical component is deliberately weak: real turbulence is horizontally
-            // dominated, and strong in the vertical the particles rise and break the physics.
-            /// `gainCoarse` / `gainFine`: the particle's INERTIA FILTER, per octave.
-            /// The reasoning and the numbers are where it is called.
-            float3 Turbulence(float3 worldPos, float t, float gainCoarse, float gainFine)
-            {
-                // THE SCALE MUST BE SMALLER THAN THE VISIBLE VOLUME.
-                //
-                // It used to be 0.15, i.e. a wavelength of 42 m. The visible rain volume is
-                // 32 m; the field did not complete even one period across the whole volume and
-                // two drops a metre apart were only 9 degrees of phase apart. The result was
-                // not eddies but the volume swinging AS A WHOLE — the user said "the eddies
-                // are all the same, I'm not sure it's working". It was working, but it produced
-                // no difference between neighbouring drops.
-                //
-                // 0.60 -> a wavelength of 10.5 m, 3.1 periods in the box, 34 degrees per metre.
-                float3 p = (worldPos - _WindSweep) * 0.60;
-                float3 coarse = float3(
-                    sin(p.y + t * 1.3) * cos(p.z * 0.7 + t * 0.9),
-                    sin(p.z + t * 1.1) * 0.35,
-                    cos(p.x + t * 1.7) * sin(p.y * 0.8 + t * 1.2));
-
-                // Second octave: small eddies, three times the frequency, a third of the
-                // amplitude. 1.80 -> a wavelength of 3.5 m, 9.2 periods in the box, 103 degrees
-                // per metre — neighbouring drops are inside different eddies.
-                float3 q = (worldPos - _WindSweep * 0.55) * 1.80;
-                float3 fine = float3(
-                    sin(q.z + t * 2.6) * cos(q.x * 0.8 + t * 2.1),
-                    cos(q.x + t * 2.3) * 0.35,
-                    sin(q.y + t * 3.1) * cos(q.z * 0.9 + t * 2.4));
-
-                return coarse * gainCoarse + fine * (0.33 * gainFine);
             }
 
             Varyings vert(Attributes IN)
@@ -450,142 +398,15 @@ Shader "ToTheSummit/Precipitation"
                 float variation = Hash(seed.xyz);
 
 
-                // ---- THE PARTICLE'S RESPONSE TO AN EDDY: THE INERTIA FILTER ----
-                //
-                // A particle cannot follow every twist of the air. The drag equation is first
-                // order, i.e. the particle is a low-pass filter: with a relaxation time
-                // `tau = v_t/g` it responds to a forcing of frequency `omega` with an amplitude
-                // ratio of `1/sqrt(1+(omega·tau)²)`. It AVERAGES the fast twists, it does not take them.
-                //
-                // Because the drop PASSES THROUGH the field the frequency it sees comes from the
-                // spatial scale: `omega ~ k·|V| + omega_time`. The eddy scale had been tightened
-                // fourfold a step earlier and the fine octave had risen to 27.5 rad/s ~ 4 Hz at
-                // 13.85 m/s — the drop's tau is 0.21 s and cannot follow 4 Hz. Because the model
-                // applied the full amplitude the drop fluttered like a leaf: "the rain drifts
-                // through the air like snow".
-                //
-                // MEASURED (wind 13.7 m/s):
-                //
-                //   0.5 mm drop   tau 0.206  coarse 0.451  fine 0.174
-                //   1.1 mm drop   tau 0.455  coarse 0.223  fine 0.080
-                //   5.0 mm drop   tau 0.932  coarse 0.111  fine 0.039
-                //   snowflake     tau 0.102  coarse 0.714  fine 0.336
-                //
-                // THIS IS WHAT SEPARATES RAIN FROM SNOW. A flake follows 1.6 times more than the
-                // finest drop and 9 times more than a large one — snow sifts, a drop comes down.
-                // Both used to take the same field at the same amplitude; the difference was
-                // imitated with a hand-placed `lerp(1.5, 0.4, dropSize)` coefficient. THAT
-                // COMPENSATION TERM WAS DELETED; the difference now comes from the physics.
                 float3 meanVelocity = classVelocity;
                 meanVelocity.xz *= profile;
 
                 float3 dropVelocity = float3(meanVelocity.x, -fallSpeed, meanVelocity.z);
                 float dropSpeed = length(dropVelocity);
 
-                float tau = fallSpeed / 9.81;
-                float wCoarse = TURB_COARSE_K * dropSpeed + TURB_COARSE_W;
-                float wFine   = TURB_FINE_K   * dropSpeed + TURB_FINE_W;
-                float gainCoarse = rsqrt(1.0 + wCoarse * tau * wCoarse * tau);
-                float gainFine   = rsqrt(1.0 + wFine   * tau * wFine   * tau);
-
-                // ---- EDDY SCALE SHRINKS WITH ELEVATION: ENERGY MOVES BETWEEN OCTAVES ----
-                //
-                // In the surface layer an eddy's SIZE grows with height (`l ~ kappa·z`) while
-                // the velocity variance stays roughly constant. Near the ground a 10.5 m eddy
-                // physically DOES NOT FIT — the ground cuts it.
-                //
-                // IT WAS FIRST CUT WITH `min(1, kappa·z/lambda)` AND ELIMINATED BY MEASUREMENT:
-                // that dropped the deviation eighteenfold (3.6 cm -> 0.2 cm), the rain flattened
-                // like a knife and snow stopped drifting on the ground entirely (40.8 cm ->
-                // 3.5 cm, i.e. the ground blizzard disappeared). The error was that the formula
-                // DESTROYS ENERGY: energy that does not fit is not lost, it moves to smaller scales.
-                //
-                // The right answer is to shift the share. Because the field's wavelength is
-                // fixed we cannot change the scale; what we can do is let the coarse octave hold
-                // only as much energy as fits and pass the rest to the fine octave. The total
-                // velocity variance is preserved and the displacement falls — because a small
-                // eddy's displacement is smaller by `1/k`.
-                //
-                // The base is 50/50: the field's existing octave weights (0.5 / 0.165) are
-                // already in the ratio `k_fine/k_coarse = 3`, i.e. the velocity variance is
-                // equal in the two octaves.
-                //
-                // MEASURED — the deviation/streak ratio in the extreme 10%:
-                //   moderate air  1.55 -> 0.75
-                //   storm         1.58 -> 0.42
-                // Snow at 2 m goes 40.8 -> 15.0 cm (streak length 11 cm), i.e. it keeps drifting.
-                float coarseShare = 0.5 * saturate(KARMAN * aboveGround / TURB_COARSE_LAMBDA);
-                gainCoarse *= sqrt(coarseShare / 0.5);
-                gainFine   *= sqrt((1.0 - coarseShare) / 0.5);
-
-                // The eddy share is scaled BY THE WIND: in still air there is no drift and no
-                // turbulence either. The scaling happens on the CPU (`RainTurbulenceCalm` 0.03 ->
-                // `RainTurbulenceStorm` 0.25, through `felt`). Scaling once more here would
-                // count it twice; the `response = response;` line that used to sit here did
-                // nothing and was deleted.
-                float response = _RainTurbulence;
-
-                // Turbulence arrives in patches (intermittency): energy passes in clumps, it
-                // does not spread evenly. The product of two waves at different frequencies
-                // breaks the repeat pattern; the clumps flow with the wind. Drop and flake read
-                // the same envelope — the same air.
-                float3 gustPos = worldPos - _WindSweep;
-                float patch = (sin(dot(gustPos.xz, float2(0.021, 0.017)) + _Time.y * 0.31) * 0.5 + 0.5)
-                            * (sin(dot(gustPos.xz, float2(-0.013, 0.024)) + _Time.y * 0.23) * 0.5 + 0.5);
-                response *= 0.5 + patch * 1.5;
-
-                // PER-DROP DIRECTION DEVIATION — from the eddy field's own derivative.
-                //
-                // The class has to stay discrete (wind drift is integrated per class on the
-                // CPU), so every drop in a class came down in exactly the same direction: there
-                // were only eight streak angles on screen.
-                //
-                // THE DEVIATION IS NOT INVENTED, IT IS DERIVED FROM WHAT ALREADY EXISTS. The
-                // drop's drawn position is `x + response·T(x,t)`; the real velocity of that
-                // position is the TOTAL DERIVATIVE of the composite velocity, i.e.
-                // `V + response·(dT/dt + (V·grad)T)`. The total derivative is taken with a single
-                // extra sample: the field is resampled where the drop will be `dt` later. The
-                // step is 0.28 m in a storm — well below the fine octave's 3.5 m wavelength
-                // (kh = 0.45 rad, a finite difference error of 0.8%).
-                //
-                // The filter enters here too: a twist that is not followed cannot deflect the direction either.
-                float3 turbHere = Turbulence(worldPos, _Time.y, gainCoarse, gainFine);
-
-                const float dt = 0.02;   // saniye
-                float3 turbNext = Turbulence(worldPos + meanVelocity * dt, _Time.y + dt,
-                                             gainCoarse, gainFine);
-                float3 velocityFluctuation = (turbNext - turbHere) * (response / dt);
-
-                worldPos += turbHere * response;
-
-                // Flutter: the vortex shedding behind a falling flake makes it sift from side
-                // to side like a leaf. The phase and frequency are per flake; a drop does not flutter.
-                //
-                // MEASURED AGAINST THE FALL, not against the second. Snow descends at 1 m/s: a
-                // 1-3 Hz oscillation means a full turn every 30-100 centimetres and read as a
-                // narrow sawtooth on screen. At 0.2-0.5 Hz a turn spreads over 2-5 metres and
-                // the flake looks like it is sifting.
-                //
-                // Two octaves, their ratio NOT an integer (2.7): a single sine is periodic and
-                // the eye catches the repeat. Two curves that never close never draw the same
-                // shape along the path. The second octave's amplitude is small — it adds
-                // irregularity, not a separate vibration.
-                float flutterFreq = 1.4 + 2.2 * variation;
-                float px = _Time.y * flutterFreq + seed.x * 12.57;
-                float pz = _Time.y * flutterFreq * 0.83 + seed.w * 12.57;
-
-                float2 glide = float2(sin(px), cos(pz)) * 0.22
-                             + float2(sin(px * 2.7 + seed.z * 6.28),
-                                      cos(pz * 2.7 + seed.y * 6.28)) * 0.06;
-
-                // Flutter belongs ONLY to a FALLING flake: it comes from the vortex shedding
-                // behind a sifting crystal. A flake lifted from the ground is not falling and
-                // does not flutter — it is carried by the wind. Applied, a 22 cm oscillation in
-                // light wind made the flake zigzag in place: it advanced slower than it swung.
-
-                // A real snowflake varies between 1 mm and 15 mm. A narrow distribution made
-                // them all the same size and gave a marble-like feel.
-                // For a drop the thickness comes from the same class as the speed: a large drop is both fast and thick
+                // Rain follows the filtered common wind directly. Per-drop eddy displacement was
+                // removed after the user still read the result as snow-like drifting; the global
+                // WindField already supplies coherent gusts and direction changes.
                 // ---- THE RAIN QUAD IS PHYSICAL `[Garg 2006, §5]` ----
                 //
                 // "Based on the drop's distance from the camera and the angle that
@@ -620,9 +441,8 @@ Shader "ToTheSummit/Precipitation"
                 float3 cameraRight = normalize(UNITY_MATRIX_I_V._m00_m10_m20);
                 float3 cameraUp = normalize(UNITY_MATRIX_I_V._m01_m11_m21);
 
-                // A drop stretches along the composite velocity + turbulence fluctuation
-                // (derived above); a flake turns to the camera and reads no direction.
-                float3 rainAxis = normalize(dropVelocity + velocityFluctuation);
+                // The streak and the particle use the same physical velocity.
+                float3 rainAxis = normalize(dropVelocity);
                 float3 fallAxis = normalize(rainAxis);
                 float3 streakRight = normalize(cross(fallAxis, viewDirection));
 
@@ -685,47 +505,33 @@ Shader "ToTheSummit/Precipitation"
                 // wrap in a cube around the camera and at its surface (0.5·box) the alpha has to
                 // be zero, otherwise a drop appears and disappears abruptly.
                 //
-                float fade = 1.0 - smoothstep(box.x * 0.45, box.x * 0.5, camDistance);
+                float boxFade = 1.0 - smoothstep(box.x * 0.45, box.x * 0.5, camDistance);
+
+                // Individual drops are a near-field representation. At long range their angular
+                // motion is read as slow drifting even though their world speed is correct. The
+                // atmosphere already carries the far rain through precipitation visibility.
+                float distanceFade = 1.0 - smoothstep(10.0, 18.0, centerDistance);
+                float fade = boxFade * distanceFade;
 
                 // As a crystal's flat faces turn they catch the light and release it. The
                 // sparkle of falling snow comes from here, not from the silhouette.
 
                 OUT.positionCS = TransformWorldToHClip(worldPos);
+                OUT.worldPos = worldPos;
                 OUT.corner = IN.corner;
                 OUT.streak = float3(oscIndex, floor(dcamPos), frac(dcamPos));
                 // Inclination from the horizontal: the drop's REAL trajectory angle, including
-                // the eddy deviation. In rain `fallAxis` is the unit of `dropVelocity + velocityFluctuation`.
+                // the wind tilt. In rain `fallAxis` is the unit of `dropVelocity`.
                 OUT.streakCrop = float2(vScale, vScale > 1.0 ? 1.0 : 0.0);
 
-                // THE SKY BEHIND THE DROP. A drop does not produce light, it refracts what
-                // comes from behind; the ambient channel's source is therefore the sky's
-                // radiance IN THAT DIRECTION.
-                //
-                // `_HeightFogColor` CANNOT BE USED: that is the fog's color, dimmer than the
-                // sky. Measured — with it the radiance stayed in the 0.08-0.32 band and the
-                // drops fell darker than the sky, reading as BLACK BLOBS. The function that
-                // draws the sky is `AirColor` (`Sky.shader` calls it too), the single source.
-                // TONE AND BRIGHTNESS ARE SEPARATE.
-                //
-                // A drop does not select a wavelength; its color comes from the light falling on
-                // it. But in daylight it cannot take the color of a single direction: what
-                // illuminates it is the WHOLE sky dome and the result is close to neutral.
-                // Passing raw `AirColor` through made the drops read blue — the same mistake was
-                // made with blowing snow in this project and its rule was written into
-                // `HeightFog.hlsl` ("carrying the horizon blue turned the slope fluorescent blue").
-                //
-                // The split comes from the sun's elevation: low down the light is directional and
-                // colored, and rain at dawn should be red; higher up it is diffuse and neutral.
-                //
-                // LUMINANCE IS PRESERVED — only the tone is pulled toward neutral. Brightness is
-                // a separately measured quantity (`SourceScale`) and is not touched.
+                // Hemispherical ambient light. AirColor is the shared analytic sky source. At a
+                // high sun only its luminance is retained so rain does not turn fluorescent blue;
+                // close to the horizon the warm directional hue is allowed back in.
                 float3 sky = AirColor(-viewDirection);
                 float skyLuma = dot(sky, float3(0.2126, 0.7152, 0.0722));
                 float3 skyHue = sky / max(1e-4, skyLuma);
                 float lowSun = 1.0 - smoothstep(0.02, 0.28, _SunHeight);
-                OUT.airColor = lerp(1.0, skyHue, lowSun * 0.9) * skyLuma;
-
-                OUT.color = _RainColor.rgb;
+                OUT.ambientColor = lerp(1.0, skyHue, lowSun * 0.9) * skyLuma;
 
                 // ---- TRANSPARENCY `[Garg 2006, §5]`, `[Garg & Nayar 2005]` ----
                 //
@@ -883,15 +689,13 @@ Shader "ToTheSummit/Precipitation"
                     SampleStreakAtDcam(streakUV, IN.streak.x, dcamHigh, cornerWeights),
                     IN.streak.z);
 
-                // AMBIENT IS SAMPLED SEPARATELY and added (`§5`: "we scale each of these
-                // textures individually with the corresponding source intensity and
-                // color. These scaled textures are added"). Because it has no light direction it
-                // is indexed only by `(theta_v, Osc)`.
-                float ambientStreak = lerp(
-                    SAMPLE_TEXTURE2D_ARRAY(_StreakAmbient, sampler_StreakAmbient,
+                // GEOMETRIC COVERAGE, independent of illumination. The importer recovers this
+                // normalized mask from the ambient source before its per-slice light factor.
+                float maskStreak = lerp(
+                    SAMPLE_TEXTURE2D_ARRAY(_StreakMask, sampler_StreakMask,
                         float2(streakU, streakV * _StreakDcamFraction[dcamLow]),
                         dcamLow * STREAK_OSC_COUNT + IN.streak.x).r,
-                    SAMPLE_TEXTURE2D_ARRAY(_StreakAmbient, sampler_StreakAmbient,
+                    SAMPLE_TEXTURE2D_ARRAY(_StreakMask, sampler_StreakMask,
                         float2(streakU, streakV * _StreakDcamFraction[dcamHigh]),
                         dcamHigh * STREAK_OSC_COUNT + IN.streak.x).r,
                     IN.streak.z);
@@ -914,9 +718,26 @@ Shader "ToTheSummit/Precipitation"
                 // `DECISIONS.md`.
                 //
                 // The anisotropic mask is missing for the same reason: the sun is isotropic.
-                float3 rainRadiance = (pointStreak * _StreakSunRadiance
-                                     + ambientStreak * IN.airColor)
-                                    * _StreakSourceScale;
+                // A DROP COLLECTS A HEMISPHERE, NOT THE SINGLE BACKGROUND RAY. Coverage belongs
+                // ONLY in alpha. Multiplying the ambient radiance by maskStreak as well made the
+                // soft edge darker than its background and effectively squared its visibility.
+                //
+                // The blend above uses the exact contrast form of the physical composite. This
+                // matters over volumetric clouds: they are not part of the opaque texture, so a
+                // straight-alpha source estimate subtracted a bright cloud color it never saw.
+                const float AmbientCollectionRatio = 2.0;
+                float3 directionalRadiance = pointStreak * _StreakSunRadiance
+                                           * _StreakSourceScale;
+                float3 lightningRadiance = _LightningRainRadiance.rgb;
+
+                // Only EXTRA radiance is output. As transmittance approaches zero the contrast
+                // vanishes, so dense fog still removes distant drops naturally.
+                float3 fogScattering;
+                float fogTransmittance;
+                FogPath(_WorldSpaceCameraPos, IN.worldPos, fogScattering, fogTransmittance);
+                float3 ambientContrast = IN.ambientColor * (AmbientCollectionRatio - 1.0);
+                float3 rainContrast = (ambientContrast + directionalRadiance + lightningRadiance)
+                                    * fogTransmittance;
 
                 // THE AREA THE DROP COVERS. The alpha cannot be constant over the WHOLE quad.
                 //
@@ -926,15 +747,9 @@ Shader "ToTheSummit/Precipitation"
                 // constant alpha every drop printed a SOLID RECTANGLE instead of a thin streak,
                 // and being dimmer than the sky it read as a black blob (reported by the user).
                 //
-                // The coverage comes from the texture itself: the ambient channel carries the
-                // drop's image streak across its full width, the directional channel is the
-                // bright filament on top of it. The larger of the two says whether the drop
-                // covers that pixel.
-                float coverage = saturate(max(ambientStreak, pointStreak));
+                float rainMask = saturate(maskStreak) * endFade;
 
-                float rainMask = coverage * endFade;
-
-                return half4(rainRadiance, IN.alpha * rainMask);
+                return half4(rainContrast, IN.alpha * rainMask);
             }
             ENDHLSL
         }

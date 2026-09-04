@@ -9,7 +9,8 @@ using UnityEngine.Experimental.Rendering;
 ///
 ///   4 neighbours (v,h) × 5 dcam × 10 osc = 200 slices
 ///
-/// 3.4 MB at `size16`. No copy is made while the sun's angular cell does not change.
+/// The directional set is refreshed only when the primary light's angular cell changes. The
+/// lighting-independent coverage set is built once.
 ///
 /// WHAT THE ANGLES ARE MEASURED AGAINST — confuse this and the streaks are lit wrong:
 ///
@@ -57,15 +58,14 @@ public class RainStreakWorkingSet : MonoBehaviour
     const int Corners = 4;
     const int Osc = 10;
 
-    Texture2DArray point, ambient;
+    Texture2DArray point, mask;
     int cachedV = int.MinValue, cachedH = int.MinValue;
 
     /// Directional source streaks, 200 slices.
     public Texture2DArray Point => point;
 
-    /// Ambient streaks, 50 slices (dcam × osc). There is no light direction, they do not depend
-    /// on the cell and are built once.
-    public Texture2DArray Ambient => ambient;
+    /// Lighting-independent streak coverage, 50 slices (dcam x osc).
+    public Texture2DArray Mask => mask;
 
     /// The corner weights of the `(v,h)` cell — the shader will use them in the bilinear blend.
     public Vector2 CellBlend { get; private set; }
@@ -99,14 +99,14 @@ public class RainStreakWorkingSet : MonoBehaviour
             throw new MissingReferenceException(
                 $"{name}: the streak database is not bound. It has to be set up from the menu and given to the Inspector.");
 
-        BuildAmbient();
+        BuildMask();
     }
 
     void OnDisable()
     {
         if (point != null) Destroy(point);
-        if (ambient != null) Destroy(ambient);
-        point = ambient = null;
+        if (mask != null) Destroy(mask);
+        point = mask = null;
         cachedV = cachedH = int.MinValue;
     }
 
@@ -161,25 +161,30 @@ public class RainStreakWorkingSet : MonoBehaviour
         return i;
     }
 
-    void BuildAmbient()
+    void BuildMask()
     {
         var angles = database.Angles;
-        var source = angles[0].Ambient[Level];
+        var maskSource = angles[0].Mask != null ? angles[0].Mask[Level] : null;
+        if (maskSource == null)
+            throw new MissingReferenceException(
+                $"{name}: rain streak masks are missing. Run To The Summit/Rain/Set Up Streak Database.");
 
-        ambient = new Texture2DArray(source.width, source.height, angles.Length * Osc,
-                                     source.graphicsFormat, TextureCreationFlags.None)
+        mask = new Texture2DArray(maskSource.width, maskSource.height, angles.Length * Osc,
+                                  maskSource.graphicsFormat, TextureCreationFlags.None)
         {
-            name = "RainStreakAmbient",
+            name = "RainStreakMask",
             wrapMode = TextureWrapMode.Clamp,
             filterMode = FilterMode.Bilinear,
         };
 
         for (int d = 0; d < angles.Length; d++)
         {
-            var src = angles[d].Ambient[Level];
+            var maskSrc = angles[d].Mask[Level];
             for (int osc = 0; osc < Osc; osc++)
-                Graphics.CopyTexture(src, osc, 0, 0, 0, src.width, src.height,
-                                     ambient, d * Osc + osc, 0, 0, 0);
+            {
+                Graphics.CopyTexture(maskSrc, osc, 0, 0, 0, maskSrc.width, maskSrc.height,
+                                     mask, d * Osc + osc, 0, 0, 0);
+            }
         }
 
         StoreHeightFractions();

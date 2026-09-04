@@ -23,14 +23,24 @@ public static class RainStreakImporter
     const string AssetPath = "Assets/Rain/RainStreakDatabase.asset";
 
     [MenuItem("To The Summit/Rain/Set Up Streak Database", false, 40)]
-    static void Import()
+    static void Import() => Rebuild();
+
+    /// Rebuilds the database in place so scene references keep the same asset GUID.
+    public static void Rebuild()
     {
         var indexFiles = Directory.GetFiles(SourceFolder, "*.index.txt");
         if (indexFiles.Length == 0)
             throw new FileNotFoundException(
                 $"No .index.txt found in {SourceFolder}. Run Tools/rain/pack_streaks.py first.");
 
-        var db = ScriptableObject.CreateInstance<RainStreakDatabase>();
+        var db = AssetDatabase.LoadAssetAtPath<RainStreakDatabase>(AssetPath);
+        if (db == null)
+            db = ScriptableObject.CreateInstance<RainStreakDatabase>();
+        else
+        {
+            foreach (var child in AssetDatabase.LoadAllAssetsAtPath(AssetPath))
+                if (child != db) Object.DestroyImmediate(child, true);
+        }
         var sizes = new SortedSet<int>();
         var dcams = new SortedSet<int>();
 
@@ -56,6 +66,7 @@ public static class RainStreakImporter
                 Dcam = dcam,
                 Point = new Texture2DArray[db.Sizes.Length],
                 Ambient = new Texture2DArray[db.Sizes.Length],
+                Mask = new Texture2DArray[db.Sizes.Length],
             };
 
             for (int s = 0; s < db.Sizes.Length; s++)
@@ -63,6 +74,7 @@ public static class RainStreakImporter
                 int size = db.Sizes[s];
                 angle.Point[s] = Build($"point_size{size}_dcam{dcam:00}", parsed);
                 angle.Ambient[s] = Build($"env_size{size}_dcam{dcam:00}", parsed);
+                angle.Mask[s] = BuildMask($"env_size{size}_dcam{dcam:00}", parsed);
             }
 
             // Occupancy table depends only on (dcam, v, h, osc) — resolution-independent, sampled once.
@@ -73,14 +85,13 @@ public static class RainStreakImporter
         db.Angles = angles.ToArray();
 
         Directory.CreateDirectory(Path.GetDirectoryName(AssetPath));
-        if (AssetDatabase.LoadAssetAtPath<RainStreakDatabase>(AssetPath) != null)
-            AssetDatabase.DeleteAsset(AssetPath);
-        AssetDatabase.CreateAsset(db, AssetPath);
+        if (!AssetDatabase.Contains(db)) AssetDatabase.CreateAsset(db, AssetPath);
 
         foreach (var angle in db.Angles)
         {
             foreach (var t in angle.Point) AssetDatabase.AddObjectToAsset(t, db);
             foreach (var t in angle.Ambient) AssetDatabase.AddObjectToAsset(t, db);
+            foreach (var t in angle.Mask) AssetDatabase.AddObjectToAsset(t, db);
         }
 
         AssetDatabase.SaveAssets();
@@ -128,6 +139,63 @@ public static class RainStreakImporter
         return array;
     }
 
+    /// Recovers the normalized streak image from the packed ambient radiance. Every packed
+    /// slice is `normalized PNG * scalar`; dividing by that slice's maximum removes illumination
+    /// while preserving the geometric footprint. This keeps the import reproducible without the
+    /// external 15,000-file source database.
+    static Texture2DArray BuildMask(string name, Dictionary<string, Index> parsed)
+    {
+        if (!parsed.TryGetValue(name, out var index))
+            throw new KeyNotFoundException($"Missing {name}.index.txt");
+
+        byte[] source = File.ReadAllBytes(Path.Combine(SourceFolder, name + ".bytes"));
+        int pixelsPerSlice = index.Width * index.Height;
+        int sliceBytes = pixelsPerSlice * 2;
+        var normalized = new byte[source.Length];
+
+        for (int slice = 0; slice < index.Slices; slice++)
+        {
+            int start = slice * sliceBytes;
+            float maximum = 0f;
+
+            for (int pixel = 0; pixel < pixelsPerSlice; pixel++)
+            {
+                int offset = start + pixel * 2;
+                ushort bits = (ushort)(source[offset] | source[offset + 1] << 8);
+                maximum = Mathf.Max(maximum, Mathf.HalfToFloat(bits));
+            }
+
+            if (maximum <= 1e-8f) continue;
+
+            for (int pixel = 0; pixel < pixelsPerSlice; pixel++)
+            {
+                int offset = start + pixel * 2;
+                ushort bits = (ushort)(source[offset] | source[offset + 1] << 8);
+                ushort mask = Mathf.FloatToHalf(Mathf.Clamp01(Mathf.HalfToFloat(bits) / maximum));
+                normalized[offset] = (byte)(mask & 0xff);
+                normalized[offset + 1] = (byte)(mask >> 8);
+            }
+        }
+
+        var array = new Texture2DArray(index.Width, index.Height, index.Slices,
+                                       TextureFormat.RHalf, false, true)
+        {
+            name = name.Replace("env_", "mask_"),
+            wrapMode = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Bilinear,
+        };
+
+        for (int slice = 0; slice < index.Slices; slice++)
+        {
+            var span = new byte[sliceBytes];
+            System.Array.Copy(normalized, slice * sliceBytes, span, 0, sliceBytes);
+            array.SetPixelData(span, 0, slice);
+        }
+
+        array.Apply(false, true);
+        return array;
+    }
+
     static void Report(RainStreakDatabase db)
     {
         long bytes = 0;
@@ -135,7 +203,7 @@ public static class RainStreakImporter
 
         foreach (var angle in db.Angles)
         {
-            foreach (var t in angle.Point.Concat(angle.Ambient))
+            foreach (var t in angle.Point.Concat(angle.Ambient).Concat(angle.Mask))
                 bytes += (long)t.width * t.height * t.depth * 2;
             missing += angle.Present.Count(p => p == 0);
         }

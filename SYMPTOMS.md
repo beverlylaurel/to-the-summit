@@ -5789,3 +5789,30 @@ değil, ışık seviyesine bakmaktır." Ölçüm o notu doğruluyor: bulut kalk�
 
 **Açık kalan:** göğün radyansı hangi büyüklükten kuruluyor ve nerede eksik ölçekleniyor.
 Bir sonraki adım o zinciri adlandırmak, sürgü denemek değil.
+
+## Yağmur dağ önünde var, gökyüzünde yok — SEBEP BULUNDU (2026-09-04)
+
+**Belirti:** "Dağın veya zeminin önünde kalan yağmur tanecikleri görünüyor; boş
+gökyüzündekiler görünmüyor." Kadraj doğrulamalarında kamera her seferinde dünya Euler
+`(0, 48, 0)` konumuna geri getirildi; Play sırasında kazara fare hareketi ölçümü
+değiştirmedi.
+
+**İlk şüpheliler yanlıştı:** damla radyansının göğe yakın olması, sis ve derinlik testi.
+Fragman çıktısı sabit kırmızıya zorlandığında ve `ZTest Always` kullanıldığında da aynı
+dağ silueti kaldı. Bu, geometrinin üretildiğini fakat daha sonraki tam ekran geçişinin
+gökyüzündeki sonucu örttüğünü ayırdı.
+
+**Gerçek sebep:** `VolumetricCloudsURP`, denizin saydamlığını görebilmek için
+`AfterRenderingTransparents` olayında birleşiyor. Normal saydam yağmur daha önce
+çizildiğinden bulut birleşimi onu yalnız derinliksiz gökyüzü piksellerinde eziyordu;
+arazi piksellerinde bulut geçişi çalışmadığı için yağmur orada kalıyordu.
+
+**Düzeltme:** bulutların sırası değiştirilmedi. Yeni `PrecipitationRenderFeature`,
+yağmuru `AfterRenderingTransparents + 1` olayında renk hedefi ve salt-okunur derinlikle
+çiziyor. Kapsama ışıklandırmadan ayrıldı, tekil taneler 10–18 m arasında söndürüldü,
+fiziksel pozitif kontrast ve `FogPath` geçirgenliği kullanıldı.
+
+**Ölçülen sonuç:** sabit gece kadrajında yağmurlu–kuru farkı gökyüzü piksellerinin
+%30,84'ünde 1/255'i geçti; dağda %37,43, zeminde %38,64. Analitik 60 m görüş testinde
+gökyüzü farkı hâlâ %19,70'ti ve uzak kontrast beklendiği gibi azaldı. Son gece ölçümü
+yaklaşık 147 FPS / 6,8 ms idi.

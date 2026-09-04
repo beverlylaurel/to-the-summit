@@ -122,6 +122,7 @@ public static class MountainSceneBootstrap
 
         EnsureSkyFeature();
         EnsureCloudFeature();
+        EnsurePrecipitationFeature();
         EnsureFogFeature();
         Phase("sky, cloud, fog features");
 
@@ -754,6 +755,26 @@ public static class MountainSceneBootstrap
         serialized.ApplyModifiedPropertiesWithoutUndo();
 
         SetCloudSunAttenuation(feature);
+        feature.Create();
+
+        renderer.rendererFeatures.Add(feature);
+        AssetDatabase.AddObjectToAsset(feature, renderer);
+        EditorUtility.SetDirty(renderer);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.ImportAsset(RendererPath);
+    }
+
+    static void EnsurePrecipitationFeature()
+    {
+        var renderer = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.ScriptableRendererData>(RendererPath);
+        if (renderer == null)
+            throw new System.InvalidOperationException($"Renderer not found: {RendererPath}");
+
+        foreach (var existing in renderer.rendererFeatures)
+            if (existing is PrecipitationRenderFeature) return;
+
+        var feature = ScriptableObject.CreateInstance<PrecipitationRenderFeature>();
+        feature.name = "Precipitation After Clouds";
         feature.Create();
 
         renderer.rendererFeatures.Add(feature);

@@ -156,6 +156,26 @@ public class TimeOfDay : MonoBehaviour
 
     public Vector3 SunDirection { get; private set; } = Vector3.up;
 
+    /// Direction toward the celestial light that currently contributes the most direct radiance.
+    /// Rain uses the same handover as the scene instead of continuing to read the sun at night.
+    public Vector3 PrimaryLightDirection => PrimaryLight == moon ? MoonDirection : SunDirection;
+
+    /// Linear source tone of the dominant celestial light. Brightness is carried separately.
+    public Color PrimaryLightColor => PrimaryLight != null ? PrimaryLight.color : Color.black;
+
+    /// Intensity of the dominant celestial light after horizon gating and atmospheric extinction.
+    public float PrimaryLightIntensity => PrimaryLight != null ? PrimaryLight.intensity : 0f;
+
+    Light PrimaryLight
+    {
+        get
+        {
+            if (sun == null) return moon;
+            if (moon == null) return sun;
+            return sun.intensity >= moon.intensity ? sun : moon;
+        }
+    }
+
     /// 1 = the sun is exactly on the horizon (dawn or sunset), 0 = at the zenith or deep night.
     /// The warm orange tones mix according to it.
     public float HorizonFactor { get; private set; }
@@ -164,8 +184,8 @@ public class TimeOfDay : MonoBehaviour
     public Color CurrentSunColor { get; private set; } = Color.white;
 
 
-    /// The moon is opposite the sun. Only this component uses it: nothing is left to be read
-    /// from outside, the moon's own light and celestial body data are driven from here.
+    /// The moon is opposite the sun. Consumers read the selected primary direction above; the
+    /// separate body still remains an implementation detail of the clock.
     Vector3 MoonDirection => -SunDirection;
 
     /// LIGHT REACHING FLAT GROUND. The two bodies' contributions are summed and each is
