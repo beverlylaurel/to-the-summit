@@ -12,7 +12,8 @@ public static class SnowShadingTest
     const string KernelPath = "Assets/Snow/Editor/SnowTestKernels.compute";
     const string SparklePath = "Assets/Snow/Shaders/SnowSparkle.hlsl";
     const string LightingPath = "Assets/Snow/Shaders/SnowLighting.hlsl";
-    const string ForwardPath = "Assets/Snow/Shaders/SnowLitForwardPass.hlsl";
+    const string SurfacePath = "Assets/Shaders/MountainSurface.hlsl";
+    const string ForwardPath = "Assets/Shaders/MountainSurface.shader";
     const string DetailPath = "Assets/Snow/Shaders/SnowDetailNormals.hlsl";
 
     [MenuItem("To The Summit/Snow/Shading Test", false, 55)]
@@ -156,9 +157,9 @@ public static class SnowShadingTest
             (LightingPath, "SnowSparkle(", "Sparkle evaluation missing"),
             (LightingPath, "_ShadowTint", "Shadow tinting missing"),
             (LightingPath, "DirectBRDFSpecular", "Specular evaluation missing"),
-            (ForwardPath, "MixFog", "Fog evaluation missing"),
-            (ForwardPath, "SnowApplyDetailNormals", "Detail normals not blended"),
-            (ForwardPath, "SNOW_MIN_VISIBLE_HEIGHT", "Missing edge clip threshold"),
+            (ForwardPath, "ApplyHeightFog", "Height fog evaluation missing"),
+            (SurfacePath, "SnowApplyDetailNormals", "Detail normals not blended"),
+            (SurfacePath, "SNOW_MIN_VISIBLE_HEIGHT", "Missing edge clip threshold"),
             (DetailPath, "SampleDetailSlope", "Slope accumulation missing"),
             (SparklePath, "log2", "Sparkle LOD calculation missing"),
             (LightingPath, "crustMask", "Crust shading missing"),

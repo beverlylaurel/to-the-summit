@@ -45,10 +45,25 @@ public static class SnowConstants
     /// Sink scale on fully packed snow.
     public const float PackedSinkScale = 0.18f;
 
+    /// Maximum vertical footprint carve, meters.
+    public const float MaxSink = 0.15f;
+
+    /// Width of the soft snow shoulder centered on the sole boundary, meters.
+    public const float SoleEdge = 0.035f;
+
     // --- Rim displacement (spec §10.2) ---
 
     /// Offset along velocity direction for rim calculation, seconds.
     public const float RimVelocityBias = 0.04f;
+
+    /// Share of displaced carve used to build the surrounding snow rim.
+    public const float RimStrength = 0.40f;
+
+    /// Maximum height of displaced snow around a footprint, meters.
+    public const float RimMax = 0.015f;
+
+    /// Absolute edge breakup applied to the sole silhouette, meters.
+    public const float EdgeBreakMeters = 0.003f;
 
     /// Layer thickness below which snow escapes sideways instead of compacting, meters.
     /// The boot sole's width: once the layer is as thick as the sole is wide, snow under
@@ -56,8 +71,8 @@ public static class SnowConstants
     /// than compressing and the packing limit takes over on its own.
     public const float LateralEscape = 0.110f;
 
-    /// Rim blur radius, texels.
-    public const float RimBlurTexels = 7f;
+    /// Physical radius used to gather displaced snow around the boot wall, meters.
+    public const float RimBlurMeters = 0.035f;
 
     // --- Trail infill (spec §10.3) ---
 
@@ -67,8 +82,10 @@ public static class SnowConstants
     /// Additional infill rate per m/s of wind above 4 m/s, m/s.
     public const float WindFill = 0.0012f;
 
-    /// Angle of repose relaxation iterations per frame.
-    public const int ReposeIterations = 10;
+    /// Angle-of-repose relaxation iterations per frame. The field converges over successive
+    /// frames; two iterations keep the visible response under 50 ms without repeatedly
+    /// sweeping the full high-resolution texture ten times every frame.
+    public const int ReposeIterations = 2;
 
     // --- Accumulation, settling, melting (spec §11) ---
 

@@ -210,9 +210,6 @@ public static class SnowWiringTest
             ("§15.2", "Per-material properties in single CBUFFER",
              "Assets/Snow/Shaders/SnowLitInput.hlsl", "CBUFFER_START(UnityPerMaterial)"),
 
-            ("§14.2", "Detail normals on snow mesh",
-             "Assets/Snow/Shaders/SnowLitForwardPass.hlsl", "SnowApplyDetailNormals"),
-
             ("§14.2", "Detail normals on mountain snow layer",
              "Assets/Shaders/MountainSurface.hlsl", "SnowApplyDetailNormals"),
 

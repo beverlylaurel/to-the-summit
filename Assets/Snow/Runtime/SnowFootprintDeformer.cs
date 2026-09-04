@@ -13,9 +13,9 @@ using UnityEngine;
 /// ground and the snow stays shallow there. A single uniform capsule therefore reads as
 /// artificial.
 ///
-/// Each foot is THREE CAPSULES:
+/// Each foot is the UNION of three strongly overlapping capsules:
 ///   forefoot — wide, deep
-///   arch     — narrow, SHALLOW
+///   core     — long and slightly narrower, joining the whole sole
 ///   heel     — medium width, deep
 ///
 /// THE THREE EARLIER ATTEMPTS AND WHY THEY FAILED:
@@ -53,7 +53,7 @@ public class SnowFootprintDeformer : SnowDeformer
     [Tooltip("The toe's outward angle from the direction of travel (degrees).")]
     [SerializeField, Range(0f, 20f)] float toeOut = 7f;
 
-    /// THE THREE SECTIONS OF THE BOOT SOLE.
+    /// THE THREE OVERLAPPING FIELDS OF THE BOOT SOLE.
     ///
     /// The values are ratios of the boot's length and width. The measures come from a real
     /// sole: the forefoot is the widest place, the arch markedly narrow, the heel between
@@ -62,19 +62,16 @@ public class SnowFootprintDeformer : SnowDeformer
     ///   y = the section's length (a ratio of the length)
     ///   z = the radius (a ratio of half the width)
     ///   w = the sinking share
-    /// THE THREE MUST OVERLAP, NOT MEET. They are three capsules approximating ONE sole, so
-    /// any gap between them is a gap in the boot.
     ///
-    /// MEASURED 2026-09-03: at length 0.26 the arch spanned -0.133 m and the heel ended at
-    /// -0.142 m -- a 9 mm hole between them. On a 2.3 cm texel grid that hole swallowed a
-    /// whole texel and the print came out as TWO separate blobs. The arch is lengthened
-    /// until it reaches under the heel; nothing else changes, and the sole's outline is
-    /// still set by the forefoot and the heel.
-    static readonly Vector4[] Bolumler =
+    /// The long core is deliberate. Three short, almost circular capsules made a chain of
+    /// lobes: forefoot, arch and heel read as snowballs joined by narrow necks. The core
+    /// spans nearly the full boot and the other two fields only shape its toe and heel. The
+    /// union is therefore one continuous sole before texture filtering is involved.
+    static readonly Vector4[] SoleSections =
     {
-        new(+0.30f, 0.44f, 1.00f, 1.00f),   // forefoot
-        new(+0.02f, 0.40f, 0.80f, 0.45f),   // arch — SHALLOW, and wide enough to be a sole
-        new(-0.31f, 0.34f, 0.84f, 0.95f),   // topuk
+        new(+0.30f, 0.48f, 1.00f, 1.00f),   // forefoot
+        new( 0.00f, 0.96f, 0.85f, 0.78f),   // continuous core / arch
+        new(-0.31f, 0.42f, 0.85f, 0.95f),   // heel
     };
 
     struct Ayak
@@ -86,17 +83,20 @@ public class SnowFootprintDeformer : SnowDeformer
 
     Ayak sol, sag;
 
-    public override int SegmentCount => Bolumler.Length * 2;
+    public override int SegmentCount => SoleSections.Length * 2;
 
     public override void GetSegment(int index, out Vector4 a, out Vector4 b)
     {
         // The base class supplies the path's fluctuation (width and depth).
-        base.GetSegment(index, out Vector4 baseA, out Vector4 baseB);
+        base.GetSegment(index, out _, out Vector4 baseB);
 
-        Ayak ayak = index < Bolumler.Length ? sol : sag;
-        Vector4 bol = Bolumler[index % Bolumler.Length];
+        Ayak ayak = index < SoleSections.Length ? sol : sag;
+        Vector4 bol = SoleSections[index % SoleSections.Length];
 
-        float radius = bootWidth * 0.5f * bol.z * (baseA.w / Mathf.Max(Radius, 1e-4f));
+        // A boot does not change width from one frame or section to the next. The base
+        // deformer width wobble is useful for dragged objects, but on a footprint it
+        // multiplied the sole silhouette by up to +/-16 percent and made the edge lumpy.
+        float radius = bootWidth * 0.5f * bol.z;
         float halfLen    = Mathf.Max(0f, bootLength * bol.y * 0.5f - radius);
 
         var ileri3 = new Vector3(ayak.ileri.x, 0f, ayak.ileri.y);

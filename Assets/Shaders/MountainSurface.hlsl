@@ -726,20 +726,16 @@ MountainSurface BuildMountainSurface(float3 worldPos)
 
     if (snowMask > 0.001)
     {
-        // THE TRAIL IS REAL GEOMETRY — NOT PARALLAX.
-        //
-        // RELIEF MAPPING WAS REMOVED. `SnowReliefOffset` marched the view ray to find
-        // where the hollow appeared, and every later read was taken from the SHIFTED
-        // position. Once the snow surface became real geometry through tessellation the
-        // same hollow was carved a second time inside `SnowTessYerDegistirme`: the trail
-        // looked TWICE as deep.
-        //
-        // The geometry already gives everything parallax gave — and it breaks the
-        // silhouette too, so neighbouring bumps really do occlude each other. The ray
-        // march's 12-32 steps went with it.
-        float3 trailPos = worldPos;
+        // Footprints are finer than the terrain geometry. At the maximum tessellation
+        // factor an 11 cm boot still spans only about one vertex, so geometry displacement
+        // turns the sole into a blob. View-ray relief evaluates the same trail texture per
+        // fragment and keeps its continuous shape. SnowTessellation deliberately excludes
+        // the trail, preventing the hollow from being applied twice.
+        float3 viewWS = normalize(_WorldSpaceCameraPos - worldPos);
+        float trailDepth;
+        float2 trailOffset = SnowReliefOffset(worldPos, viewWS, trailDepth);
+        float3 trailPos = worldPos + float3(trailOffset.x, 0.0, trailOffset.y);
         float2 trailUV = SnowWorldToUV(trailPos);
-        float trailDepth = SnowDentSmooth(trailUV);
 
         // THE INSIDE OF A TRAIL IS CRUSHED SNOW — THE DENSITY IS READ LOCALLY.
         //

@@ -727,12 +727,15 @@ bölgede deformer yoksa `KDeform`, `KRepose` ve `KRim` hiç koşmuyor. Zincir:
 `KRepose` (duvarın göçmesi) → `KRimBlurH`/`KRimBlurV` → `KRim` (kenar
 yığılması).
 
-**İz RASTERİZE EDİLMİYOR, HESAPLANIYOR.** Her deformer bir küre (merkez +
-yarıçap); iki kare arasındaki hareketi bir doğru parçası. `KDeform` tekselin
-parçaya yatay uzaklığını kapalı formülle bulup oymayı
-`batma − (R − √(R²−d²))` ile yazıyor. Yakalama kamerası, override materyali,
-`RT_Capture`, `RT_CaptureBlur` ve `KBlurCapture` **yok** — kenar üç ayrı yerde
-teksel ızgarasına takılıyordu.
+**İz RASTERİZE EDİLMİYOR, HESAPLANIYOR.** Her deformer bir veya daha çok
+kapsül parçası yayınlıyor. `SnowFootprintDeformer` bir botu kuvvetle örtüşen
+ön taban + uzun çekirdek + topuk kapsüllerinin birleşimi olarak veriyor.
+`KDeform` tekselin parçaya yatay uzaklığını kapalı formülle buluyor. Basılı
+taban düz; fiziksel bot sınırına ortalanmış 3,5 cm C2-sürekli quintic omuz tam
+derinlikten sıfıra iner. Yarı-derinlik konturu gerçek bot ölçüsünde kaldığı
+için yumuşatma izi daraltmaz. Böylece 15 cm çukurun kenarında tek teksellik bir uçurum kalmaz. Yakalama
+kamerası, override materyali, `RT_Capture`, `RT_CaptureBlur` ve
+`KBlurCapture` **yok**.
 
 **Batma taşıma gücünden geliyor, nesnenin yüksekliğinden değil.** Deformer
 yalnız NEREDE ve NE KADAR GENİŞ olduğunu yayınlıyor; Y'si ize hiç girmiyor.
@@ -752,8 +755,9 @@ aynı anda gelen ikinci çağrı sıfır adım alıyor.
 gürültüsü **kaldırıldı**: omzun bittiği yer duruş yüksekliğinin doğrudan
 fonksiyonu olduğu için kenar ±1.5 teksel dalgalanıyordu.
 Yalnız derinleştirdiği için idempotent: geçiş sayısı görünümü değil yakınsama
-hızını belirliyor. Omuz kendi kar sütununu delemiyor, sınır `KDeform`'un oyma
-sınırıyla aynı.
+hızını belirliyor. Kare başına iki geçiş yapılıyor; alan sonraki karelerde
+yakınsamaya devam ediyor. Omuz kendi kar sütununu delemiyor, sınır
+`KDeform`'un oyma sınırıyla aynı.
 
 **İz bölge dışında yok.** `SnowDentAt` `SnowInsideMask` ile çarpılıyor; kenet
 edilen teksel dünyaya şerit olarak yayılıp dikdörtgen bir plato üretiyordu.
@@ -767,11 +771,10 @@ süreye, kar sütununa veya anlık temasa bağlı DEĞİL. Üçü de denendi ve 
 yoğunluk alanına yürüyüş yönüne bağlı tarak deseni bastı (`SYMPTOMS.md`).
 Geçiş sayacı kaldırıldı: `snow.a` yalnız bozulma/tazelik.
 
-**Relief derinliği yalnız oyma kanalı (`trail.r`).** Sırt (`trail.g`) karın
-yukarı itilmiş kısmı; çukurun derinliğinden çıkarılırsa izin omzunu siliyor
-(ölçüldü: `r` genişliği sabit, `r - g` genişliği 19'dan 12'ye periyodik
-çöküyor). Sırdın kendi geometrisi bugün relief yolunda ÇİZİLMİYOR — kabarma
-görünmüyor, kayıt `DECISIONS.md`'de.
+**Relief ofseti yalnız pozitif oyma tarafını izliyor.** `trail.r` çukur,
+`trail.g` dışarı itilmiş kardır. `SnowDentSmooth` ikisini `r − 0,25g` olarak
+kübik yeniden kurar; pozitif bölüm görüş ofsetini, işaretli alan ise normal
+eğimini verir. Set böylece gölgede görünür fakat çukuru geri itmez.
 
 **Kalıcılık ize DOKUNMUYOR.** Blok deposu 4 m başına 64x64, yani teksel
 başına 6.25 cm; izin çizildiği çözünürlüğün üçte biri. O depo izi taşıyamıyor
@@ -843,9 +846,11 @@ tepecikleri (yuvarlak, 30 cm), açıkta erozyon sırtları (keskin, 20 cm). Ayn�
 noktada ikisi birden olmuyor; yüzeyin toplam eğimi bu yüzden ölçülen 5-15°
 bandında kalırken yerel olarak 40-50°'ye çıkabiliyor.
 
-**Ayak izi de geometri.** `SnowReliefOffset` (doku uzayında paralaks) kalktı;
-aynı çukur iki kez oyulurdu. İz `SnowDentSmooth` ile yer değiştirmeye giriyor,
-yani izin yanındaki kabarma da gerçek geometri.
+**Ayak izi geometri değil, fragman rölyefi.** En ince tessellation köşe aralığı
+11,4 cm; 11 cm'lik bot yalnız bir köşeye denk geldiği için geometri yolu izi
+loblu bir lekeye çeviriyordu. Büyük kar yer şekilleri tessellation'da kalır;
+ayak izi `SnowReliefOffset` ile fragman başına, kübik yeniden kurulmuş alandan
+okunur. Tessellation izi özellikle dışlar; aynı çukur iki kez uygulanmaz.
 
 **Fizik aynı fonksiyonu okuyor.** `SnowGroundOffset` karakteri
 `SnowSurfaceHeight`'a göre kaldırıyor; o sınıf `SnowYuzeyRolyef`'in C# ikizi
@@ -894,21 +899,22 @@ maviye çalıyor; arazide GÖK GÖRÜNÜRLÜĞÜYLE kısılıyor (`SampleSkyVisi
 Bu gerekli çünkü sahnenin ortam probe'u YÖNSÜZ: PBSky'ın yer terimi yok,
 gökyüzü ufkun altında da çiziliyor ve `SampleSH` yukarı ile aşağı için aynı
 değeri veriyor. Yönsüz ortam kara hiç şekil vermiyor (ölçüldü: güneş
-kapatıldığında zemin sapması 0.0023). Sis URP'nin `MixFog`'undan — kendi sis hesabı yok.
+kapatıldığında zemin sapması 0.0023). Sis ortak `ApplyHeightFog` yolundan —
+izin kendi sis hesabı yok.
 
-**İz TEK gövdeden besleniyor ve gövde DÖNEL SİMETRİK.** Oyuncunun altında
-tek bir küre (`SnowTrailBody`, 15 cm yarıçap) deformer olarak duruyor. Kesit
-daire olduğu için gidiş yönü izi hiç etkilemiyor. Önce oval denendi (22×12×40,
-sonra 15×24×34) ve ikisi de yön değiştikçe ize farklı profil bırakıp kenarda
-balık pulu deseni üretti. Gövdenin mesh'i, ölçeği ve yüksekliği yok: yalnız
-bir transform ve `SnowDeformer`.
+**İz iki ayrı, dünyaya sabitlenen bot tabanından besleniyor.**
+`SnowStepRhythm` basan ayağı değiştiriyor; basan ayak o anda dünyaya sabitlenip
+yerden kalkana kadar her kare yazılıyor. Böylece tek karelik damganın gecikmesi
+yok, iki ayağı birleştiren sürekli oluk da yok. Bot yönü bakıştan değil gerçek
+yatay hızdan gelir; yan yürüyüşte iz yanlış yöne dönmez.
 
 **İZ ARAZİNİN KENDİ YÜZEYİNDE ÇİZİLİYOR — İKİNCİ YÜZEY YOK.**
 
 Kar mesh'i (`SnowSurface`, `SnowLit.shader` ve mesh kurucusu) tamamen
-kaldırıldı. İz, `MountainSurface`'in fragman'ında relief mapping ile veriliyor:
-`SnowReliefOffset` bakış ışınını yüzeyin altına yürütüyor, çukurun görünen
-yerini buluyor, ve doku/normal/gölgeleme o kaydırılmış konumdan okunuyor.
+kaldırıldı. İz `MountainSurface` fragmanında veriliyor. `SnowReliefOffset`,
+kübik `SnowDentSmooth` derinliğinden tek kararlı görüş ofseti çıkarıyor;
+doku/normal/gölgeleme kaydırılmış konumdan okunuyor. Uzun ışın yürüyüşü yok:
+derinlik tamponu arazinin gerçek yüzeyi olarak kalıyor.
 
 Gerekçe ve ölçümler `RATIONALE.md` → "İz neden ikinci bir yüzeyle çizilmiyor".
 Kısaca: yamanın nereye konduğu fark etmiyordu — araziyle aynı kotta olunca
@@ -1110,7 +1116,9 @@ tarama ile bulmak ayı seçiyordu.
 **Adım ritmi ayak fazını yayınlıyor.** `SnowStepRhythm` alınan yoldan adım
 üretiyor (zamandan değil — hız değişince ritim kaymasın), ayak proxy'lerini
 basıyor ve `Stepped` olayını yayınlıyor. `SnowFootstepAudio` ve
-`SnowPuffEmitter` bu olaya ABONE; ritim onları tanımıyor.
+`SnowPuffEmitter` bu olaya ABONE; ritim onları tanımıyor. W bırakıldığında
+birikmiş yol silinmiyor: 8,25 cm ve üstü yarım adım son basış olarak yayınlanıyor,
+daha küçük pay sonraki kısa harekete devrediliyor.
 
 **Oyuncu tarafı kar örneğini OKUYOR, yazmıyor.** `SnowFootstepAudio` (§19.1),
 `SnowMovementModifier` (§19.2), `SnowPuffEmitter` (§19.3),
@@ -1121,9 +1129,10 @@ takılı; hepsi `SnowSampler`'dan okuyor. Kar sistemi oyuncuyu bilmiyor.
 değil konumu da sürüyor: saltasyon rüzgâr yönünde 15 m ileri, süspansiyon rüzgâr
 üstünde 35 m ve 2.5 m yukarı, ikisi de 1 m ızgarasına snap'li (spec §18.7).
 
-**Ayak proxy'si karda iz bırakıyor.** Oyuncunun altında tek bir `SnowDeformer`
-(`SnowTrailBody`, 15 cm yarıçap) `SnowDebugWindow.SetupScene`'den kuruluyor.
-Mesh'i yok: yalnız konum ve yarıçap yayınlıyor. Kar sistemi oyuncuyu bilmiyor.
+**Ayak proxy'leri karda iz bırakıyor.** `SnowFootprintDeformer`, basan ayağı
+dünyaya sabitlenen üç kapsüllü bot tabanı olarak yayınlıyor. Durunca havadaki
+ayak da mevcut konuma basıyor. Mesh yok; yalnız kapsül parçaları ve basınç payı
+yayınlanıyor. Kar sistemi oyuncuyu bilmiyor.
 
 **Quad perde YOK — iki kez denendi, ikisi de silindi.** Ne `SnowfallCurtains`
 (§17.2 uzak yağış) ne `SnowCurtainController` (§18.7 süspansiyon) duruyor.

@@ -47,6 +47,38 @@ float SnowDentSmooth(float2 uv)
     return lerp(lerp(a, b, s1.x), lerp(c, d, s1.x), s1.y);
 }
 
+// Offsets the trail lookup along the view ray. The carve is reconstructed cubically before
+// the offset is calculated; this keeps the apparent wall continuous instead of following
+// the source texture's texel staircase. It is intentionally a single stable offset rather
+// than a long ray march: the terrain keeps its real depth buffer while the footprint gains
+// the near-field depth cue it needs.
+float2 SnowReliefOffset(float3 posWS, float3 viewDirWS, out float dentOut)
+{
+    dentOut = 0.0;
+
+    float2 uv0 = SnowWorldToUV(posWS);
+    if (SnowInsideMask(uv0) < 0.01) return (float2)0.0;
+
+    // Nearly every snow fragment is outside a footprint. A single raw lookup rejects those
+    // pixels before cubic reconstruction; the threshold is sub-millimetre, below the
+    // visible relief, so it does not trim the reconstructed wall.
+    if (SnowDentAt(uv0) < 0.0002) return (float2)0.0;
+
+    // Horizontal travel per metre of vertical descent. Clamp vector length rather than
+    // components so diagonal views retain their direction.
+    float vertical = max(viewDirWS.y, 0.15);
+    float2 rayXZ = -viewDirWS.xz / vertical;
+    float rayLength = length(rayXZ);
+    rayXZ *= min(1.0, SNOW_RELIEF_MAX_STRETCH / max(rayLength, 1e-5));
+    rayLength = min(rayLength, SNOW_RELIEF_MAX_STRETCH);
+
+    // SnowDentSmooth already reconstructs the signed carve-plus-rim field cubically. The
+    // offset only follows its positive (depressed) side; the raised rim still enters the
+    // final normal but cannot push the lookup backwards.
+    dentOut = min(max(0.0, SnowDentSmooth(uv0)), SNOW_RELIEF_MAX_DEPTH);
+    return rayXZ * dentOut;
+}
+
 half SnowReliefShadow(float3 lightDirWS, float dent, float skyAmount)
 {
     float horizonTan = dent / max(_SnowCavityRadius, 1e-3);

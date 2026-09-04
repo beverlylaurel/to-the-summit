@@ -506,7 +506,9 @@ public class SnowManager : MonoBehaviour
         if (ground == null) return;
 
         cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.SnowDeltaTime, simDeltaTime);
-        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.RimBlurTexels, SnowConstants.RimBlurTexels);
+        SnowQualityData quality = settings.QualityData;
+        float rimBlurTexels = SnowConstants.RimBlurMeters / Mathf.Max(quality.TexelSize, 1e-4f);
+        cmd.SetComputeFloatParam(simCompute, SnowShaderIDs.RimBlurTexels, rimBlurTexels);
 
         cmd.SetComputeTextureParam(simCompute, deformKernel, SnowShaderIDs.GroundHeightTex, ground);
         cmd.SetComputeBufferParam(simCompute, deformKernel, SnowShaderIDs.TrailSegments, trailSegmentBuffer);

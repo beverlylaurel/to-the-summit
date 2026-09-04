@@ -24,6 +24,7 @@
 
 // --- Relief normalization ---
 #define SNOW_RELIEF_MAX_DEPTH          0.35
+#define SNOW_RELIEF_MAX_STRETCH          3.0
 #define SNOW_SHADOW_BOUNCE             0.43
 #define SNOW_LATERAL_BOUNCE            0.43
 #define SNOW_TERRAIN_VERTEX_SPACING    7.32
@@ -51,29 +52,31 @@
 #define SNOW_MAX_SINK                0.15
 #define SNOW_LATERAL_ESCAPE          0.110
 
-/// HOW FAR THE SOLE'S EDGE IS ROLLED (m). A boot sole is FLAT with a rounded rim, not a
-/// ball. The rim is where the print's wall is, and it is about a centimetre of leather and
-/// rubber turning over.
+/// WIDTH OF THE SOFT SHOULDER BETWEEN THE PRESSED SOLE AND UNDISTURBED SNOW (m).
+/// This is deliberately wider than the rubber's physical bevel: loose snow yields beside
+/// the sole, so the visible transition is a small compression/shear zone rather than the
+/// sharp edge of the boot itself.
 ///
 /// MEASURED (2026-09-03) with the sole modelled as a sphere of the boot's own half width:
 /// in 1 cm of snow the sink is 9.3 mm, so the sphere only touched out to a radius of
 /// 3.1 cm -- the print came out 6.1 cm wide against an 11 cm boot, and at a 2.3 cm texel
 /// that is 2.6 texels across. On screen it read as an axis-aligned dark block, not a print.
 ///
-/// With a flat sole the full width presses to `sink` and only the rim rolls off, so the
-/// print is the boot's width at every depth. In deep snow the wall stays near vertical,
-/// which is what a deep print actually looks like.
-#define SNOW_SOLE_EDGE               0.012
+/// With a 35 mm shoulder the 2048 deformation grid resolves the transition with about
+/// three source texels. It is centered on the physical sole boundary, so the half-depth
+/// contour retains the boot's real width. The quintic profile in KDeform has zero slope
+/// and curvature at both ends, joining the flat snow without a visible step.
+#define SNOW_SOLE_EDGE               0.035
 #define SNOW_PACKED_SINK_SCALE       0.18
 
 // --- Rim displacement (spec §10.2) ---
 #define SNOW_RIM_VELOCITY_BIAS       0.04
-#define SNOW_RIM_STRENGTH            0.55
-#define SNOW_RIM_SHADE               0.35
-#define SNOW_RIM_MAX                 0.04
-#define SNOW_RIM_CLUMP_SCALE         7.0
-#define SNOW_RIM_CLUMP_FLOOR         0.35
-#define SNOW_RIM_BLUR_TEXELS         7.0
+#define SNOW_RIM_STRENGTH            0.40
+#define SNOW_RIM_SHADE               0.25
+#define SNOW_RIM_MAX                 0.015
+#define SNOW_RIM_CLUMP_SCALE        18.0
+#define SNOW_RIM_CLUMP_FLOOR         0.70
+#define SNOW_RIM_BLUR_METERS         0.035
 #define SNOW_DENT_SLOPE_TEXELS       2.0
 
 // --- Infill & Angle of repose (spec §10.3) ---
@@ -83,10 +86,8 @@
 #define SNOW_STAND_PACKED            0.200
 #define SNOW_STAND_NOISE             0.50
 #define SNOW_STAND_NOISE_SCALE       8.0
-#define SNOW_EDGE_BREAK              0.18
+#define SNOW_EDGE_BREAK_METERS       0.003
 #define SNOW_EDGE_BREAK_SCALE        9.0
-#define SNOW_MIDRIDGE                0.26
-#define SNOW_MIDRIDGE_WIDTH          0.085
 
 // --- Micro-relief ---
 #define SNOW_MICRO_AMP_A             0.0022

@@ -61,17 +61,31 @@ public class SnowStepRhythm : MonoBehaviour
     public float Speed { get; private set; }
 
     float travelled;
+    bool wasMoving;
+
+    // A stopped character plants a foot after moving this share of the minimum stride.
+    // 0.55 m * 0.15 = 8.25 cm: large enough to reject controller/input jitter, small
+    // enough that a deliberate short W tap still leaves evidence in the snow.
+    const float StopPlantStrideFraction = 0.15f;
 
     void LateUpdate()
     {
         if (body == null) return;
 
         Vector3 v = body.velocity;
-        Speed = new Vector2(v.x, v.z).magnitude;
+        ProcessMotion(new Vector2(v.x, v.z).magnitude, Time.deltaTime);
+    }
+
+    // Kept separate from CharacterController sampling so the distance/event state machine
+    // can be regression-tested deterministically without synthesising keyboard input.
+    void ProcessMotion(float horizontalSpeed, float deltaTime)
+    {
+        Speed = horizontalSpeed;
 
         if (Speed > minSpeed)
         {
-            travelled += Speed * Time.deltaTime;
+            wasMoving = true;
+            travelled += Speed * deltaTime;
 
             // THE STRIDE LENGTH DERIVES FROM THE SPEED, IT IS NOT FIXED.
             //
@@ -97,18 +111,40 @@ public class SnowStepRhythm : MonoBehaviour
             while (travelled >= half)
             {
                 travelled -= half;
-                PlantedFoot = 1 - PlantedFoot;
-                StepCount++;
-                Stepped?.Invoke(PlantedFoot);
+                PlantNextFoot();
             }
 
             Phase01 = travelled / half;
         }
         else
         {
-            // THE PHASE RESETS ON STOPPING; a new walk starts from the beginning of a step.
-            travelled = 0f;
+            // RELEASING W MUST NOT ERASE DISTANCE.
+            //
+            // The old code zeroed `travelled` on every stopped frame. Repeated short
+            // press-release movements could therefore move the character metres while
+            // never reaching one half-stride in any individual press; no Stepped event was
+            // raised and SnowFootprintDeformer quite correctly had nothing new to stamp.
+            //
+            // On the moving -> stopped edge, plant the unfinished step once it is deliberate
+            // movement rather than sub-centimetre controller jitter. Smaller remnants stay
+            // accumulated across taps and eventually cross the same threshold instead of
+            // being discarded.
+            float stopPlantDistance = Mathf.Max(0.04f, minStride * StopPlantStrideFraction);
+            if (wasMoving && travelled >= stopPlantDistance)
+            {
+                PlantNextFoot();
+                travelled = 0f;
+            }
+
+            wasMoving = false;
             Phase01 = 0f;
         }
+    }
+
+    void PlantNextFoot()
+    {
+        PlantedFoot = 1 - PlantedFoot;
+        StepCount++;
+        Stepped?.Invoke(PlantedFoot);
     }
 }

@@ -21,11 +21,10 @@ using UnityEngine;
 /// Had the object's Y been read and had that Y been derived from the snow's state, a loop
 /// would close — it closed once (`SYMPTOMS.md`).
 ///
-/// SEPARATE FOOTPRINTS WERE TRIED AND REVERTED. The step event falls every half stride
-/// (39 cm) and the mark appeared ALL AT ONCE at that moment — the user reported it as
-/// "like placing a block in Minecraft, delayed". On top of that, separate left/right stamps
-/// read as a zigzag on screen. The irregularity has to come from a CONTINUOUS field, not
-/// from a discrete stamp.
+/// This base class also supports continuous dragged objects. Player boots use the derived
+/// SnowFootprintDeformer instead: each planted foot is frozen in world space and writes on
+/// every frame of its stance. That preserves separate prints without the delayed one-frame
+/// stamp or the two permanent grooves produced by continuously dragging both feet.
 [ExecuteAlways]
 [DisallowMultipleComponent]
 public class SnowDeformer : MonoBehaviour

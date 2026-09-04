@@ -1312,6 +1312,15 @@ hız arttıkça kendiliğinden sıklaşıyor.
 **Ayak fazı ve adım olayı aynı sayıdan.** İki ayrı bileşene bölünseydi ikisinin
 fazı kayabilirdi — ses bir ayakta, iz öbüründe düşerdi.
 
+**Dur-kalk mesafeyi silmez.** Hareketten duruşa geçerken tamamlanmamış yol en az
+minimum adımın %15'i ise (varsayılan 8,25 cm) son ayak basılır. Daha küçük pay
+girdi titreşimi sayılmaz ama sonraki basışa devredilir. Önceden W bırakılan her
+karede sayaç sıfırlanıyordu; art arda kısa basışlarla karakter ilerliyor fakat
+tek bir `Stepped` olayı bile çıkmıyordu.
+
+**Ölçüm:** altı ayrı 6 cm bas-çek, toplam 35,9 cm hareket → 3 basılı adım.
+Eski sonuç 0. Dört ayrı 1 cm titreşim → 0 adım.
+
 
 ## Sakin hava 0.6 m/s, bulutlar 2 m/s — iki ayrı taban
 
@@ -1676,11 +1685,51 @@ F1 → "Kar yok" ile kayboluyor, çünkü o düğme kar derinliğini sıfırlıy
 (bölge dışı dünyanın genel değerine harmanlanıyor). İzin dünya karşılığı yok,
 o yüzden harman değil sıfır.
 
+## Ayak izi sınırı neden quintic omuz
+
+**Kural:** basılı taban düz kalır; bot sınırının iki yanına ortalanmış 3,5 cm
+bantta oyma quintic smootherstep ile tam derinlikten sıfıra iner. Böylece
+yarı-derinlik konturu botun gerçek ölçüsünde kalır. Set için aynı fiziksel
+yarıçapta ayrılabilir Gaussian filtre kullanılır.
+
+**Neden yalnız kübik doku filtresi yetmez:** filtre süreksiz bir kaynağı ancak
+bulanıklaştırır, sürekli yapmaz. Eski profil 1,2 cm'lik dairesel kenarda en çok
+1,2 cm yükseliyordu; 15 cm derin izde sınırın hemen içinde hâlâ yaklaşık
+13,8 cm oyma vardı, hemen dışında sıfır. Kaynak alandaki bu sıçrama ekranda
+birkaç açık-koyu teras olarak okunuyordu.
+
+Quintic `6t^5 - 15t^4 + 10t^3` iki uçta da değer, eğim ve eğriliği eşler.
+Bu yüzden düz tabandan omuza ve omuzdan bozulmamış kara normal dikişi olmadan
+geçer. 2048² / 24 m alanda 3,5 cm yaklaşık üç teksel; `SnowDentSmooth`'un
+kübik yeniden kurması alt-teksel sürekliliği verir.
+
+**Neden daha geniş değil:** 11 cm botun yarıçapı 5,5 cm. Omuz 3,5 cm olduğunda
+7,5 cm tam derinlik çekirdeği, 11 cm yarı-derinlik konturu ve 14,5 cm sıfıra
+ulaşan dış destek alanı kalır; bütün izi Gaussian lekeye çevirmeden sınırı
+çözmeye yeter. Organik pütür ana profili bozmaz: yalnız ±3 mm mutlak kenar
+kırılması ve dışarı itilmiş sette küçük topaklanma olarak eklenir.
+
+**Bir kez yanlış yapıldı:** omuz bütünüyle sınırın içine kondu. Görünen koyu
+çekirdek `11 − 2×3,5 = 4 cm` oldu; kullanıcı ekrandan aynı sayıyı verdi.
+Omuz sınırın iki yanına ortalanınca fiziksel yarıçaptaki otomatik prob merkez
+derinliğinin %53'ünü ölçtü; hedef %50.
+
+**Ölçüm:** 20 cm kar, 3,8 m gerçek yürüyüş, kilitli `(52, 180, 0)` kamera.
+Eski görüntüdeki sert açık halka ve kademeli duvar yok oldu; son çekim
+116 FPS / 8,6 ms. Simülasyon kabul testi oyma, kalıcılık, set, yoğunluk,
+dolma ve rüzgâr eşiklerinin tümünde geçti.
+
+**Tabanın içinde ek profil yok:** `SNOW_MIDRIDGE` silindi. Bu terim kapsül
+eksenine göre oyuk derinliğini azaltıp izin ortasında yapay, dümdüz bir çizgi
+oluşturuyordu. Gerçek taban ayrıntısı ileride istenirse yönlü bir lastik dişi
+yükseklik alanından gelmeli; geometrinin sonsuz merkez ekseninden değil.
+
 ## İz rasterize edilmiyor, hesaplanıyor
 
-**Kural:** iz bırakan nesne bir küre olarak tanımlanır; `KDeform` tekselin iki
-kare arasında süpürülen doğru parçasına yatay uzaklığını kapalı formülle bulup
-oymayı `batma − (R − √(R²−d²))` ile yazar.
+**Kural:** iz bırakan nesne bir veya daha çok kapsül parçasıyla tanımlanır;
+`KDeform` tekselin doğru parçasına yatay uzaklığını kapalı formülle bulur.
+Oyuncu botu üç örtüşen kapsülün birleşimidir; oyma düz çekirdek + quintic
+yumuşak omuz profilidir.
 
 **Neden:** eski yol nesnenin alt yüzeyini aşağıdan bakan ortografik bir
 yakalamaya rasterize ediyor, sonucu 4-tap Poisson ile bulanıklaştırıyor ve

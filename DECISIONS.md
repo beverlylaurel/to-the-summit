@@ -1866,14 +1866,56 @@ gerekli; Faz 1–7 kullanmıyor. Kullanıcı "şimdi kur" dedi — Faz 8'e gelin
 indirme beklemesi olmasın diye.
 
 
+## Ayak izi fragman rölyefinde, sınırı C2-sürekli (2026-09-04)
+
+**Karar.** Büyük kar yer şekilleri tessellation geometrisinde kalıyor; 11 cm'lik
+bot izi geometriye girmiyor. İz 2048² yakın alanında tutulup
+`MountainSurface` fragmanında kübik yeniden kurulan tek görüş ofsetiyle çiziliyor.
+Fiziksel bot sınırına ortalanmış **3,5 cm** bant quintic smootherstep omuz:
+tam oyuktan sıfıra giderken birinci ve ikinci türevleri de sıfır, %50 derinlik
+konturu ise gerçek bot genişliğinde. Dışarı itilen karın 3,5 cm filtresi kutu
+değil Gaussian.
+
+**Ayırt eden ölçüm.** Medium 24 m / 1024 = 2,34 cm/teksel, en ince tessellation
+köşe aralığı 11,44 cm; 11 cm bot hem dokuda 4,7 örnek hem geometride yaklaşık
+bir köşeydi. Eski 1,2 cm dairesel kenar, 15 cm çukurun bot sınırında yaklaşık
+13,8 cm'den sıfıra atlıyordu. Bu, kullanıcının yakın görüntüde gördüğü katmanlı
+duvardı. Medium/High 2048 ile 1,17 cm/teksel; 3,5 cm omuz yaklaşık üç kaynak
+tekseli kaplıyor ve kübik okuma alt-teksel sürekliliği tamamlıyor.
+
+**Görsel kabul.** 20 cm kar, 3,8 m gerçek CharacterController yürüyüşü, kamera
+her kare dünya Euler `(52, 180, 0)` konumuna kilitli: sert açık halka ve basamaklı
+duvar kayboldu, iz düz zemine sürekli eğimle bağlandı. Ölçüm yaklaşık
+116 FPS / 8,6 ms. `SnowTrailTest` geçti.
+
+**Pütür nerede kalır.** Botun ana siluetinde santimetrelik genişlik salınımı yok.
+Kırılma yalnız ±3 mm kenar malzeme ölçeğinde ve setin küçük topaklanmasında kalır;
+yumuşak omzun sürekliliğini bozmaz.
+
+**Merkez sırtı yok.** Eski `SNOW_MIDRIDGE`, her kapsülün sonsuz eksenine göre
+oymayı %26 azaltıyor ve üç parçalı botun ortasında dümdüz boyuna çizgi bırakıyordu.
+Kullanıcının yakın kırpması bunu ayırdı. Terim ve iki sabiti silindi; taban içi
+tek sürekli sıkışmış yüzey.
+
+**Daraltma düzeltmesi.** İlk yumuşatma omzun tamamını bot sınırının içine koydu;
+11 cm − 2×3,5 cm = **4 cm** koyu çekirdek bıraktı. Kullanıcının ekrandan verdiği
+ölçü formülü birebir teşhis etti. Omuz sınırın iki yanına ortalandı; otomatik
+prob fiziksel yarıçapta merkez derinliğinin %53'ünü ölçtü (hedef %50).
+
+**Kısa W bas-çek de adımdır.** Duruş artık birikmiş mesafeyi sıfırlamıyor.
+Hareket→duruş kenarında en az `minStride × 0,15` (varsayılan 8,25 cm) varsa
+tamamlanmamış adım basılıyor; daha azı sonraki basışa devrediliyor. Altı 6 cm
+bas-çek testinde toplam 35,9 cm hareket 3 adım üretti (eski 0); dört 1 cm
+titreşim 0 adım üretti.
+
 ## İzin silueti yok — relief mapping'in bilinçli sınırı
 
-**Karar.** Kar izi arazi yüzeyinde relief mapping ile çiziliyor; geometri
+**Karar (güncel ayrıntı üstteki 2026-09-04 kaydında).** Kar izi arazi yüzeyinde relief mapping ile çiziliyor; geometri
 deforme edilmiyor. İki sınır kabul edildi:
 
 1. **Siluet vermiyor.** İzin kenarı ufka karşı bakıldığında çıkıntı yapmaz;
    yalnız yüzeyin içinde derinlik olarak okunur.
-2. **Çok sıyırtma açıda çözünürlük düşer.** Işın yürüyüşü sekiz adım; kayma
+2. **Çok sıyırtma açıda çözünürlük düşer.** Tek görüş ofsetinin kayması
    `SNOW_RELIEF_MAX_STRETCH` ile 3 birimde kırpılıyor, yoksa iz metrelerce
    uzayıp bulaşıyor.
 
@@ -1882,7 +1924,7 @@ deforme edilmiyor. İki sınır kabul edildi:
 oyunlarının konsol yolu da bu: Batman Arkham Origins relief mapping kullanıyor
 ve ayak izini açıkça "yarı-düşük frekanslı detay" sayıyor.
 
-**Maliyeti.** Adım başına bir doku okuması; sekiz adım + iki ikili bölme.
+**Maliyeti.** Ham boşluk kapısı ve yalnız izin yakınında dört ikili kübik örnek.
 
 **Tetikleyici — geri dönülecek belirti:** iz, ufka karşı bakışta yüzeyin
 içinde eriyip kayboluyorsa veya derin çukurda (>35 cm) kenarı yalanlıyorsa,
@@ -1927,9 +1969,12 @@ etmiyor.
 **Tetikleyici:** bir düzeltme "dosyada doğru ama ekranda eski" görünüyorsa ilk
 bakılacak yer budur — `SerializedObject` ile canlı değeri oku, dosyaya güvenme.
 
-## Ayrı ayak izleri — İKİ KEZ DENENDİ, İKİSİ DE GERİ ALINDI (2026-08-25)
+## Ayrı ayak izleri — TARİHSEL, 2026-09-04'TE GEÇERSİZ KILINDI (2026-08-25)
 
-**Karar.** İz tek bir sürekli oluk olarak açılıyor; ayrı ayak izleri yok.
+**Eski karar.** İz tek bir sürekli oluk olarak açılıyordu. 2026-09-04'te
+`SnowFootprintDeformer` ile ayrı ayak izleri geri geldi: ayak basışta dünyaya
+sabitleniyor, havalanana kadar her kare yazılıyor ve arada yarma/plough çizgisi
+yok. Böylece aşağıdaki üç başarısızlığın ortak gecikme ve halter biçimi kapandı.
 
 **Denenen 1 — adım olayında damga.** `SnowStepRhythm.Stepped`'e abone olup her
 adımda bir bot izi basan bir bileşen yazıldı. İz yarım adımda bir (39 cm)
@@ -2000,9 +2045,9 @@ Terrain heightmap çözünürlüğünü artırmak (4097 → 8193, köşe aralı�
 en ince geometri 5.7 cm); bellek dört katına çıkar ve `SCALE.md`'deki iki
 sabit elden geçer.
 
-## Relief mapping silindi, iz geometriye taşındı
+## Relief mapping silindi, iz geometriye taşındı — TARİHSEL, 2026-09-04'TE GERİ ALINDI
 
-**Karar (2026-08-27).** `SnowReliefOffset` ve ışın yürüyüşü kaldırıldı; ayak
+**Eski karar (2026-08-27).** `SnowReliefOffset` ve ışın yürüyüşü kaldırıldı; ayak
 izi `SnowTessYerDegistirme` içinde gerçek geometri olarak oyuluyor.
 
 **Gerekçe.** Çevresindeki kar 20-30 cm tepecikler hâlinde yükselirken iz düz

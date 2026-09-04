@@ -5388,15 +5388,9 @@ sıfıra iniyor ve `range` yalnız bot yarıçapından türüyor, batmadan deği
 geçemez. Kalan 1,00 → 1,43 farkı bilinçli — 1 cm karda 18 mm'lik bir etek olamaz, o kadar
 kar yok.
 
-**OYUN İÇİ DOĞRULAMA YAPILAMADI, SEBEBİ ARAÇTA.** Dört ayrı çekim düzeneği kuruldu, hiçbiri
-iz üretmedi. Sebep ölçüldü: betikten `cc.Move` çağrılarak 3,17 m yürüyüş yapıldığında
-`SnowStepRhythm.StepCount` **0** kalıyor. Ayak basmadığı için `SnowFootprintDeformer` hiçbir
-şey yazmıyor; iz dokusu dört kar derinliğinde de tamamen boş okundu (en derin 0,00000 m).
-
-Yani oyuncunun gerçek girdisiyle yürümesi gerekiyor; editör tikinden yapılan hareket adım
-ritmini sürmüyor. Yukarıdaki sayılar `KDeform`'un aritmetiğinin birebir CPU aynasından
-geliyor, ekrandan değil. Değişiklik yalnızca izi DARALTABİLİR — genişleten hiçbir terim
-kalmadı — o yüzden bırakıldı, ama gözle onaylanması gerekiyor.
+**TARİHSEL ARAÇ NOTU:** İlk eşzamanlı `cc.Move` denemeleri kareler arasında
+CharacterController hızı üretmediği için `StepCount` 0 kaldı. Sonraki kontrollü
+çekim sürücüsü hareketi gerçek karelere yaydı; adım olayı ve iz birlikte doğrulandı.
 
 ## Denize hiç yağmur yağmıyor: halka görünmüyor — SEBEP BULUNDU (2026-09-03)
 
@@ -5789,6 +5783,47 @@ değil, ışık seviyesine bakmaktır." Ölçüm o notu doğruluyor: bulut kalk�
 
 **Açık kalan:** göğün radyansı hangi büyüklükten kuruluyor ve nerede eksik ölçekleniyor.
 Bir sonraki adım o zinciri adlandırmak, sürgü denemek değil.
+
+## W bas-çek ile karakter ilerliyor ama iz çıkmıyor — ÇÖZÜLDÜ (2026-09-04)
+
+**Belirti:** W'ye kısa kısa basıp bırakınca karakter ilerliyor, karda yeni ayak
+izi oluşmuyor.
+
+**Gerçek sebep:** `SnowStepRhythm`, hız eşik altına indiği her karede `travelled`
+mesafesini sıfırlıyordu. Her basış normal yarım adımdan kısa kalınca toplam yol
+metreleri bulsa bile hiçbir tekil basış eşiğe ulaşmıyor, `Stepped` hiç
+yayınlanmıyordu. `SnowFootprintDeformer` veri almadığı için doğru biçimde izsizdi.
+
+**Düzeltme:** Hareket→duruş geçişinde en az 8,25 cm birikmişse son ayak basılıyor.
+Daha küçük hareket silinmeyip sonraki basışa devrediliyor; böylece mikro girdi
+titreşimi tek başına iz üretmiyor.
+
+**Doğrulama:** Her biri 6 cm olan altı bas-çek, toplam 35,9 cm hareket ve 3
+`Stepped` olayı üretti; eski sonuç 0. Dört 1 cm titreşim 0 olay üretti. Aynı
+senaryo kalıcı `SnowTrailTest` regresyonuna eklendi.
+
+## Ayak izi sınırı katmanlı ve içinde düz çizgi var — ÇÖZÜLDÜ (2026-09-04)
+
+**Belirti:** Yakın 20 cm çekiminde iz ile düz kar arasında açık renkli, birkaç
+basamaklı sert duvar; izin ortasında da boyuna cetvel çizgisi.
+
+**Ayırt eden ölçüm:** 11 cm bot, 24 m / 2048 yakın alanında 1,17 cm/teksel.
+Eski `SNOW_SOLE_EDGE` yalnız 1,2 cm iken oyuk 15 cm olabiliyordu: sınırın hemen
+içinde yaklaşık 13,8 cm oyma, dışında sıfır. Yani sorun çözünürlükten önce kaynak
+profildeki gerçek süreksizlikti. İç çizgi ise açıkça `SNOW_MIDRIDGE = 0,26`:
+kapsül ekseninde oymayı azaltan tasarlanmış terimdi.
+
+**Düzeltme:** Bot sınırına ortalanmış 3,5 cm bant C2-sürekli quintic omuzla
+sıfıra bağlandı; set filtresi kutudan Gaussian'a geçti. İlk denemede omuz yalnız
+içeri konup 11 cm botu `11 − 2×3,5 = 4 cm` görünür çekirdeğe daralttı; kullanıcının
+4 cm ölçümü bunu doğrudan yakaladı. Bant iki yana ortalanınca fiziksel sınırdaki
+derinlik %53 ölçüldü (hedef %50). `SNOW_MIDRIDGE` ve eksen uzaklığı hesabı tamamen
+silindi. ±3 mm kenar kırılması ve küçük set topakları korunuyor.
+
+**Doğrulama:** 20 cm kar, 3,8 m gerçek CharacterController yürüyüşü, kamera her
+kare dünya Euler `(52, 180, 0)` konumuna kilitli. İlk düzeltme çekimi
+116 FPS / 8,6 ms; merkez çizgisi kaldırılmış son çekim 122 FPS / 8,2 ms.
+Yakın izde sert teras ve boyuna merkez çizgisi yok. `SnowTrailTest` geçti.
 
 ## Yağmur dağ önünde var, gökyüzünde yok — SEBEP BULUNDU (2026-09-04)
 

@@ -41,24 +41,25 @@ StructuredBuffer<float4> _TrailSegments;
 uint   _TrailSegmentCount;
 float2 _TrailVelocityXZ;
 
-float SnowKemirilmisYaricap(float2 worldXZ, float radius)
+float SnowBrokenEdgeRadius(float2 worldXZ, float radius)
 {
     float n1 = SnowValueNoise(worldXZ * SNOW_EDGE_BREAK_SCALE) * 2.0 - 1.0;
     float n2 = SnowValueNoise(worldXZ * (SNOW_EDGE_BREAK_SCALE * 2.0) + 61.7) * 2.0 - 1.0;
     float n3 = SnowValueNoise(worldXZ * (SNOW_EDGE_BREAK_SCALE * 4.0) + 13.1) * 2.0 - 1.0;
 
-    float k = (n1 + n2 * 0.5 + n3 * 0.25) * SNOW_EDGE_BREAK;
-    return radius * (1.0 + k);
+    // Edge breakup is a material length, not a percentage of the deformer. Percentage
+    // noise made an 11 cm boot vary by centimetres and destroyed its silhouette. Three
+    // millimetres leaves small snow grains at the wall while the sole stays recognisable.
+    float noise = (n1 + n2 * 0.5 + n3 * 0.25) / 1.75;
+    return max(radius + noise * SNOW_EDGE_BREAK_METERS, 0.001);
 }
 
-float SnowNearestSegment(float2 worldXZ, out float radius, out float sinkMultiplier,
-                        out float axisDistance)
+float SnowNearestSegment(float2 worldXZ, out float radius, out float sinkMultiplier)
 {
     float enIyiFark = 1e9;
     float enIyiUzak = 1e9;
     radius = 0.0;
     sinkMultiplier = 1.0;
-    axisDistance = 1e9;
 
     for (uint i = 0; i < _TrailSegmentCount; ++i)
     {
@@ -71,11 +72,7 @@ float SnowNearestSegment(float2 worldXZ, out float radius, out float sinkMultipl
         float  t = saturate(tHam);
 
         float d = distance(worldXZ, a.xz + ab * t);
-        float r = SnowKemirilmisYaricap(worldXZ, a.w);
-
-        float dEksen = uzunlukKare > 1e-8
-                     ? distance(worldXZ, a.xz + ab * tHam)
-                     : 1e9;
+        float r = SnowBrokenEdgeRadius(worldXZ, a.w);
 
         float fark = d - r;
         if (fark < enIyiFark)
@@ -84,7 +81,6 @@ float SnowNearestSegment(float2 worldXZ, out float radius, out float sinkMultipl
             enIyiUzak     = d;
             radius       = r;
             sinkMultiplier  = b.w;
-            axisDistance = dEksen;
         }
     }
 
@@ -149,8 +145,8 @@ void KDeform(uint3 id : SV_DispatchThreadID)
 
     float2 worldXZ = SnowTexelToWorld(id.xy);
 
-    float radius, sinkMultiplier, axisDistance;
-    float distance = SnowNearestSegment(worldXZ, radius, sinkMultiplier, axisDistance);
+    float radius, sinkMultiplier;
+    float distance = SnowNearestSegment(worldXZ, radius, sinkMultiplier);
 
     if (radius > 0.0 && distance <= radius * (1.0 + SNOW_SETTLE_TAIL_LEN * 1.55))
     {
@@ -230,26 +226,28 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         // opening is the boot's radius, and the skirt is given COMPACT SUPPORT -- it reaches
         // zero at a fixed multiple of that radius. Its depth still follows the sinking,
         // which is the part that should change.
-        // THE SOLE IS FLAT, WITH A ROLLED RIM. It used to be a sphere of the boot's own
+        // THE SOLE IS FLAT, WITH A SOFT SNOW SHOULDER. It used to be a sphere of the boot's own
         // half width, and a sphere only touches the ground at one point: at a 9.3 mm sink
         // it reached out to 3.1 cm instead of the boot's 5.5, so the print came out barely
         // half the boot wide and, at a 2.3 cm texel, two texels across -- a block.
         //
-        // Under the flat part the whole sole presses to `sink`. Only the last
-        // `SNOW_SOLE_EDGE` of the radius rolls over, and that roll is what shapes the
-        // print's wall: shallow snow gives a wall shorter than the roll and the print
-        // fades out at the boot's edge, deep snow gives a wall taller than it and the
-        // print stands with near vertical sides. Both are what a real print does.
-        // THE ROLL NEVER OUTRUNS THE SINKING. Fixed at 12 mm, a shallower print ran out of
-        // depth before it reached the sole's edge and came out narrower -- which is exactly
-        // the "1 cm is not the same width as 20 cm" the user reported. Tying the roll to
-        // `sink` makes the wall reach zero AT the boot's edge whatever the depth, so the
-        // print is the boot's width at 1 cm and at 50 cm alike, and only its depth moves.
-        float roll       = min(SNOW_SOLE_EDGE, sink);
-        float rimStart   = max(radius - roll, 0.0);
-        float rim        = min(max(0.0, distance - rimStart), roll);
-        float subSurface = roll - sqrt(max(roll * roll - rim * rim, 0.0));
-        float target    = max(0.0, sink - subSurface);
+        // The old circular roll subtracted at most 12 mm from a cavity as deep as 150 mm.
+        // At the boot boundary the field therefore jumped from roughly 138 mm to zero in
+        // one texel: cubic sampling could only turn that discontinuity into several visible
+        // terraces. A footprint needs a YIELD ZONE in the snow, not a mathematical cliff.
+        //
+        // The inner sole remains flat. A SNOW_SOLE_EDGE-wide quintic shoulder is CENTERED
+        // on the physical boot boundary. Its 50% depth contour therefore stays exactly at
+        // `radius`: smoothing does not make an 11 cm boot look 4 cm wide. The first AND
+        // second derivatives are zero at both ends, so the pressed floor, shoulder and
+        // untouched surface still join without a shading seam. At 2048 this shoulder spans
+        // about three simulation texels; cubic reconstruction in SnowDentSmooth supplies
+        // the final sub-texel continuity.
+        float shoulder = min(SNOW_SOLE_EDGE, radius);
+        float edgeT = saturate((radius + shoulder * 0.5 - distance) /
+                               max(shoulder, 1e-4));
+        edgeT = edgeT * edgeT * edgeT * (edgeT * (edgeT * 6.0 - 15.0) + 10.0);
+        float target = sink * edgeT;
 
         float outerDistance = max(0.0, distance - radius);
         float kuyrukGurultu = SnowValueNoise(worldXZ * SNOW_SETTLE_TAIL_SCALE);
@@ -269,10 +267,6 @@ void KDeform(uint3 id : SV_DispatchThreadID)
         float t = saturate(1.0 - outerDistance / max(range, 1e-3));
         float tail = min(sink, SNOW_SOLE_EDGE) * SNOW_SETTLE_TAIL * t * t * (3.0 - 2.0 * t);
         target = max(target, tail);
-
-        float midRidge = saturate(1.0 - axisDistance / SNOW_MIDRIDGE_WIDTH);
-        midRidge = midRidge * midRidge * (3.0 - 2.0 * midRidge);
-        target *= 1.0 - SNOW_MIDRIDGE * midRidge;
 
         trail.r = max(trail.r, target);
         trail.a = 0.0;
@@ -313,12 +307,18 @@ void KRimBlurH(uint3 id : SV_DispatchThreadID)
     int radius = (int)round(_RimBlurTexels);
     int last   = (int)_Resolution - 1;
     float sum = 0.0;
+    float weightSum = 0.0;
+    float sigma = max((float)radius * 0.5, 0.75);
 
     [loop]
     for (int k = -radius; k <= radius; ++k)
-        sum += _Src[int2(clamp((int)id.x + k, 0, last), id.y)].r;
+    {
+        float weight = exp(-0.5 * (float)(k * k) / (sigma * sigma));
+        sum += _Src[int2(clamp((int)id.x + k, 0, last), id.y)].r * weight;
+        weightSum += weight;
+    }
 
-    _Dst[id.xy] = float4(sum / (2.0 * radius + 1.0), 0.0, 0.0, 0.0);
+    _Dst[id.xy] = float4(sum / max(weightSum, 1e-4), 0.0, 0.0, 0.0);
 }
 
 [numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]
@@ -329,12 +329,18 @@ void KRimBlurV(uint3 id : SV_DispatchThreadID)
     int radius = (int)round(_RimBlurTexels);
     int last   = (int)_Resolution - 1;
     float sum = 0.0;
+    float weightSum = 0.0;
+    float sigma = max((float)radius * 0.5, 0.75);
 
     [loop]
     for (int k = -radius; k <= radius; ++k)
-        sum += _Src[int2(id.x, clamp((int)id.y + k, 0, last))].r;
+    {
+        float weight = exp(-0.5 * (float)(k * k) / (sigma * sigma));
+        sum += _Src[int2(id.x, clamp((int)id.y + k, 0, last))].r * weight;
+        weightSum += weight;
+    }
 
-    _CarveOut[id.xy] = sum / (2.0 * radius + 1.0);
+    _CarveOut[id.xy] = sum / max(weightSum, 1e-4);
 }
 
 [numthreads(SNOW_GROUP_SIZE, SNOW_GROUP_SIZE, 1)]

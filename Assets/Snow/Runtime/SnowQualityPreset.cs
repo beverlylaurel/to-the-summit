@@ -108,10 +108,14 @@ public static class SnowQuality
                 return new SnowQualityData(512, 24f, 256, 512, 1, 0, 8, 0.35f, 0, 0, KeywordLow);
 
             case SnowQualityPreset.High:
-                return new SnowQualityData(1024, 24f, 1024, 1024, 4, 2, 4, 1f, 8, 3, KeywordHigh);
+                return new SnowQualityData(2048, 24f, 1024, 1024, 4, 2, 4, 1f, 8, 3, KeywordHigh);
 
             default:
-                return new SnowQualityData(1024, 24f, 512, 1024, 2, 1, 4, 0.65f, 4, 2, KeywordMedium);
+                // Footprints are roughly 11 cm wide. At 1024 this field had 2.34 cm
+                // texels, leaving fewer than five samples across a boot and visible stair
+                // steps even with cubic reconstruction. 2048 gives 1.17 cm texels while
+                // preserving the same 24 m tracking region.
+                return new SnowQualityData(2048, 24f, 512, 1024, 2, 1, 4, 0.65f, 4, 2, KeywordMedium);
         }
     }
 }

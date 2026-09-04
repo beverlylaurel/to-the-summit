@@ -102,17 +102,11 @@ float SnowTessYerDegistirme(float3 posWS)
     float h = SnowSurfaceRelief(posWS.xz, vertexSpacing, SnowWorldCoverHeight(),
                               true, exposure);
 
-    // IZ DE GEOMETRIYE GIRIYOR.
-    //
-    // Cevresindeki kar 20-30 cm tepecikler halinde yukselirken iz DUZ kalirsa
-    // gorunmez oluyor: 10 cm'lik bir cukur 30 cm'lik tepeciklerin arasinda
-    // secilmiyor. Iz de ayni geometriye girmek zorunda.
-    //
-    // BU YUZDEN `SnowReliefOffset` KALKTI (`MountainSurface.hlsl`). O
-    // fonksiyon ayni cukuru doku uzayinda paralaksla oyuyordu; ikisi birlikte
-    // kalsaydi iz IKI KAT derin gorunurdu. Gercek geometri paralaksin
-    // verdigi her seyi zaten veriyor ve ustune silueti de kiriyor.
-    h -= SnowDentSmooth(SnowWorldToUV(posWS));
+    // Footprints are intentionally NOT displaced here. At maximum tessellation the
+    // terrain vertices are still about 11.4 cm apart, approximately one vertex across an
+    // 11 cm boot. That geometry can only produce blobs. MountainSurface evaluates the
+    // trail as fragment-level relief instead, while this path remains responsible for the
+    // much larger snow bedforms.
 
     return h;
 }
