@@ -105,6 +105,7 @@ public class ClimbHud : MonoBehaviour
 
         builder.AppendFormat("YAĞIŞ\n");
         builder.AppendFormat("  Şiddet                 {0:F2}\n", weather.Precipitation);
+        builder.AppendFormat("  Zemin ıslaklığı        {0:F2}\n", surface.DebugWetness);
         builder.AppendFormat("  Açık pencere           {0:F2}   (1 = hava açtı)\n\n",
             weatherDriver.ClearWindow);
 

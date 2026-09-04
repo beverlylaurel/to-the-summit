@@ -588,16 +588,17 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // it leaves in the ocean; only the amount of water it lands in differs.
     //
     // TWO TERMS, NOT ONE. `_SurfaceRainIntensity` is whether a drop is landing at all --
-    // it stops the instant the rain does. `wet` is whether there is a film for it to ring
-    // in: on dry rock a drop leaves a dark spot, not a ring, and here that is simply
-    // nothing. The film lags the rain by design, so the rings fade out with the shower and
-    // the darkening outlives them.
+    // it stops the instant the rain does. `rainFilm` is a GATE, not an amplitude multiply:
+    // once a continuous millimetric film exists, its capillary response has the drop's
+    // strength. The old `rain * wet` squared light rain (0.19 -> 0.036) and made the exact
+    // same ring plainly visible at sea but absent on wet ground.
     //
     // Faded by the pixel like every other scale, or it is the aliasing all over again.
     float2 ringPixel = float2(length(ddx(worldPos.xz)), length(ddy(worldPos.xz)));
     float2 ringLocal = RainRingLocal(worldPos.xz, _WorldSpaceCameraPos.xz);
-    shaped += RainRings(ringLocal, _Time.y, _SurfaceRainIntensity * wet)
-            * RainRingResolvable(max(ringPixel.x, ringPixel.y));
+    float rainFilm = smoothstep(0.015, 0.08, wet);
+    shaped += RainRings(ringLocal, _Time.y, _SurfaceRainIntensity)
+            * rainFilm * RainRingResolvable(max(ringPixel.x, ringPixel.y));
 
     float3 shaded = normalize(normalWS + float3(shaped.x, 0.0, shaped.y));
 
@@ -613,11 +614,11 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     surface.albedo = albedo;
     surface.emission = Alpenglow(worldPos, normalWS, altitude, albedo, exposure);
     surface.normalWS = shaded;
-    surface.smoothness = lerp(_RockSmoothness, _WetSmoothness, wet);
-
-    // The sand's own roughness map replaces the rock's; the sea wetness below then makes the
-    // wet strip glossier on top of it, which is the order it happens in reality too.
-    surface.smoothness = lerp(surface.smoothness, sandSmoothness, sand);
+    // Choose the dry material first, then put the rain film over it. The old
+    // order applied wet rock and subsequently replaced it with DRY sand, so the
+    // beach ignored precipitation wetness entirely.
+    surface.smoothness = lerp(_RockSmoothness, sandSmoothness, sand);
+    surface.smoothness = lerp(surface.smoothness, _WetSmoothness, wet);
 
     // WET SAND IS GLOSSIER. Spec §14 cuts the roughness to 0.35 of its value; this code
     // holds smoothness, so it is converted to roughness and back — multiplying smoothness

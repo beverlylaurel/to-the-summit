@@ -32,6 +32,11 @@ public class SeaManager : MonoBehaviour
     Vector4 waveGroups;
     Vector4 tierSlopeVariance;
 
+    /// Continuous swash-cycle clock. It is integrated instead of recomputed from
+    /// `time / currentPeriod`: when Hs or Tp changes, division by the new period
+    /// would move the whole shoreline in one frame.
+    float swashClock;
+
     /// The shore's own geometry: found once, because the terrain does not move.
     Vector2 shoreAnchor;
     Vector2 shoreNormal;
@@ -246,18 +251,13 @@ public class SeaManager : MonoBehaviour
         // THE SWELL'S HEADING, NOT THE WIND'S.
         //
         // What breaks on the beach is the swell, and the swell was born in a storm that
-        // is not today's weather -- the spectrum already says so, `swellDirectionOffset`
-        // turns it away from the local wind. Driving the peel off the wind instead made
-        // the crests almost shore-normal and the peel angle came out 5 degrees: still a
-        // close-out. The offset is what puts the wave on the beach at an angle.
-        Vector3 wd = env.WindDirection;
-        Vector2 travel = new Vector2(wd.x, wd.z);
+        // is not today's weather. `SeaStateController` therefore provides an absolute
+        // remote heading. Driving the peel from the local wind made the crests almost
+        // shore-normal and the peel angle came out 5 degrees: still a close-out.
+        Vector3 swell = env.SwellDirection;
+        Vector2 travel = new Vector2(swell.x, swell.z);
         if (travel.sqrMagnitude < 1e-8f) { Shader.SetGlobalVector(SeaShaderIDs.ShorePeel, flat); return; }
         travel.Normalize();
-
-        float off = settings.swellDirectionOffset * Mathf.Deg2Rad;
-        travel = new Vector2(travel.x * Mathf.Cos(off) - travel.y * Mathf.Sin(off),
-                             travel.x * Mathf.Sin(off) + travel.y * Mathf.Cos(off));
 
         float cos0 = Mathf.Clamp(Vector2.Dot(travel, up), -1f, 1f);
         float theta0 = Mathf.Acos(Mathf.Abs(cos0));
@@ -398,6 +398,12 @@ public class SeaManager : MonoBehaviour
                                                                         settings.TierBandLimits);
             SeaRuntimeState.SignificantWaveHeight = m.SignificantHeight;
             SeaRuntimeState.PeakPeriod = m.PeakPeriod;
+            // Open-water whitecap coverage from the measured wind-speed law.
+            // This is a published diagnostic target, not a replacement for the
+            // spatial Jacobian mask: it tells us whether the amount on screen is
+            // plausible for the current U10.
+            SeaRuntimeState.WhitecapCoverage01 = Mathf.Clamp01(
+                3.84e-6f * Mathf.Pow(u, 3.41f));
             waveGroups = new Vector4(SeaConstants.TwoPi / Mathf.Max(m.BeatPeriod, 0.1f),
                                      m.BeatDepth, 0f, 0f);
             tierSlopeVariance = m.TierSlopeVariance;
@@ -492,7 +498,24 @@ public class SeaManager : MonoBehaviour
         float uprushFraction = 1f / (1f + BackwashRatio);
 
         float t = Application.isPlaying ? Time.time : 0f;
-        float phase = Mathf.Repeat(t / swashPeriod, 1f);
+
+        // A BEACH DOES NOT RECEIVE A BORE ON A METRONOME.
+        //
+        // A fixed `t / period` makes every run-up interval identical even when its
+        // height is modulated by the spectral beat. The result is still visibly
+        // procedural: the white swash returns from the bottom of the frame at the
+        // same cadence. The spectrum already gives us the grouping clock, so its
+        // beat modulates the RATE of the swash clock. The clock is stateful: deriving
+        // it again from absolute time and the CURRENT period made a gradual Hs/Tp
+        // change move the whole beach in one frame. The rate stays positive, so the
+        // phase cannot reverse or teleport.
+        if (Application.isPlaying)
+            swashClock = SeaSwashClockStep(swashClock, Time.deltaTime, t, swashPeriod,
+                                           waveGroups.x, waveGroups.y);
+        else
+            swashClock = 0f;
+
+        float phase = Mathf.Repeat(swashClock, 1f);
 
         SeaRuntimeState.ShoreFoamIntensity01 = SeaSwashSurge(phase, uprushFraction);
 
@@ -500,11 +523,10 @@ public class SeaManager : MonoBehaviour
         Shader.SetGlobalFloat(SeaShaderIDs.SwashUprush, uprushFraction);
     }
 
-    /// THE SWASH IS NOT A COSINE. `0.5 - 0.5 cos(2pi phase)` is symmetric, so the
-    /// water withdrew exactly as fast as it arrived. A real swash rushes up and
-    /// drains back slowly, and the ballistic model says why: going up it is a body
-    /// thrown against gravity, so the height follows `s (2 - s)` -- quick at the
-    /// start, easing into the turn. [SOURCE: Shen & Meyer 1963 ballistic swash]
+    /// ASYMMETRIC BUT SMOOTH AT BOTH TURNS. A single cosine withdraws exactly as fast
+    /// as it arrives. Two cubic half-curves retain the measured short uprush / long
+    /// backwash split, while zero slope at the top and bottom prevents the white line
+    /// from changing direction in one frame.
     ///
     /// MIRRORED IN `SeaCommon.hlsl`. The shader draws the foam and the wet sand
     /// from the same curve; two copies that drift apart would put the foam and the
@@ -512,7 +534,37 @@ public class SeaManager : MonoBehaviour
     public static float SeaSwashSurge(float phase, float uprushFraction)
     {
         float up = Mathf.Clamp(uprushFraction, 0.05f, 0.95f);
-        float s = phase < up ? phase / up : 1f - (phase - up) / (1f - up);
-        return s * (2f - s);
+        float t;
+
+        if (phase < up)
+        {
+            t = Mathf.Clamp01(phase / up);
+            return t * t * (3f - 2f * t);
+        }
+
+        t = Mathf.Clamp01((phase - up) / (1f - up));
+        return 1f - t * t * (3f - 2f * t);
+    }
+
+    /// One integration step of the irregular but always-forward bore clock.
+    /// The dimensionless rate is `1 + a sin(w0 t) + b sin(w1 t + p)`; because
+    /// a+b is below one, time never reverses. Integrating `dt / period` rather
+    /// than dividing absolute time by period keeps a changing sea state continuous.
+    public static float SeaSwashClockStep(float clock, float deltaTime, float time,
+                                          float swashPeriod,
+                                          float beatAngularFrequency, float beatDepth)
+    {
+        float period = Mathf.Max(swashPeriod, 0.1f);
+        float w0 = Mathf.Max(beatAngularFrequency, SeaConstants.TwoPi / (period * 8f));
+        float w1 = w0 * 0.61803398875f;
+        float a = Mathf.Lerp(0.18f, 0.32f, Mathf.Clamp01(beatDepth));
+        const float B = 0.14f;
+        const float Phase1 = 1.7f;
+
+        float rate = 1f
+                   + a * Mathf.Sin(w0 * time)
+                   + B * Mathf.Sin(w1 * time + Phase1);
+
+        return clock + Mathf.Max(deltaTime, 0f) * rate / period;
     }
 }

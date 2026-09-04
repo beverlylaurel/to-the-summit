@@ -10,6 +10,7 @@ public static class RainRenderingTest
 {
     const string DatabasePath = "Assets/Rain/RainStreakDatabase.asset";
     const string ShaderPath = "Assets/Shaders/Precipitation.shader";
+    const string TerrainShaderPath = "Assets/Shaders/MountainSurface.hlsl";
     const string FeaturePath = "Assets/Scripts/Weather/PrecipitationRenderFeature.cs";
     const string RendererPath = "Assets/Settings/PC_Renderer.asset";
     const string RendererSourcePath = "Assets/Scripts/Weather/PrecipitationRenderer.cs";
@@ -27,6 +28,7 @@ public static class RainRenderingTest
         ok &= ShaderContractTest(report);
         ok &= RenderOrderTest(report);
         ok &= MotionTest(report);
+        ok &= WetSurfaceTest(report);
 
         report.AppendLine();
         report.AppendLine(ok ? "RESULT: PASSED" : "RESULT: FAILED");
@@ -42,7 +44,10 @@ public static class RainRenderingTest
         bool afterClouds = source.Contains("RenderPassEvent.AfterRenderingTransparents + 1");
         bool renderGraph = source.Contains("AddRasterRenderPass<PassData>")
                         && source.Contains("DrawAfterClouds(context.cmd)");
-        bool noEarlySubmission = !File.ReadAllText(RendererSourcePath).Contains("Graphics.RenderMesh");
+        string rendererSource = File.ReadAllText(RendererSourcePath);
+        bool noEarlySubmission = !rendererSource.Contains("Graphics.RenderMesh");
+        bool noEmptyPass = source.Contains("!PrecipitationRenderer.Active.CanDrawAfterClouds")
+                        && rendererSource.Contains("if (!CanDrawAfterClouds) return;");
 
         var renderer = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.ScriptableRendererData>(RendererPath);
         bool installed = false;
@@ -55,8 +60,9 @@ public static class RainRenderingTest
         report.AppendLine("  [" + Mark(afterClouds) + "] precipitation runs after cloud compositing");
         report.AppendLine("  [" + Mark(renderGraph) + "] RenderGraph pass submits the rain mesh");
         report.AppendLine("  [" + Mark(noEarlySubmission) + "] no normal transparent-queue submission");
+        report.AppendLine("  [" + Mark(noEmptyPass) + "] no uncullable pass when rain draws nothing");
         report.AppendLine("  [" + Mark(installed) + "] feature is installed in PC_Renderer");
-        return afterClouds && renderGraph && noEarlySubmission && installed;
+        return afterClouds && renderGraph && noEarlySubmission && noEmptyPass && installed;
     }
 
     static bool DatabaseTest(StringBuilder report)
@@ -157,6 +163,52 @@ public static class RainRenderingTest
             + slowAtLimit.ToString("F0") + "-" + fastAtLimit.ToString("F0") + " px/s");
 
         return range && readable;
+    }
+
+    static bool WetSurfaceTest(StringBuilder report)
+    {
+        report.AppendLine();
+        report.AppendLine("## Wet terrain and impact rings");
+
+        float drizzleAfterMinute = TerrainSurface.AdvanceWetness(0f, 0.2f, 60f, 120f);
+        float fullRainAfterEight = TerrainSurface.AdvanceWetness(0f, 1f, 8f, 120f);
+        float dryAfterTwoMinutes = TerrainSurface.AdvanceWetness(1f, 0f, 120f, 120f);
+        bool accumulation = drizzleAfterMinute > 0.7f
+                         && Mathf.Abs(fullRainAfterEight - 0.6321f) < 0.001f;
+        bool drying = Mathf.Abs(dryAfterTwoMinutes - 0.3679f) < 0.001f;
+
+        string terrainShader = File.ReadAllText(TerrainShaderPath);
+        bool filmGate = terrainShader.Contains("float rainFilm = smoothstep(0.015, 0.08, wet);")
+                     && terrainShader.Contains("RainRings(ringLocal, _Time.y, _SurfaceRainIntensity)")
+                     && terrainShader.Contains("* rainFilm * RainRingResolvable");
+        string terrainSource = File.ReadAllText("Assets/Scripts/Terrain/TerrainSurface.cs");
+        bool materialRainBinding = terrainSource.Contains(
+            "material.SetFloat(RainIntensityId, rainIntensity);")
+                                && !terrainSource.Contains(
+            "Shader.SetGlobalFloat(RainIntensityId, rainIntensity);");
+        string sharedRings = File.ReadAllText("Assets/Shaders/RainRings.hlsl");
+        bool intensityControlsDensity = sharedRings.Contains("float eventRank =")
+                                     && sharedRings.Contains("float eventWeight = smoothstep")
+                                     && sharedRings.Contains("birth * eventWeight");
+        int dryMaterial = terrainShader.IndexOf(
+            "surface.smoothness = lerp(_RockSmoothness, sandSmoothness, sand);");
+        int rainFilm = terrainShader.IndexOf(
+            "surface.smoothness = lerp(surface.smoothness, _WetSmoothness, wet);");
+        bool wetAfterMaterial = dryMaterial >= 0 && rainFilm > dryMaterial;
+
+        report.AppendLine("  [" + Mark(accumulation) + "] rain accumulates to saturation: drizzle60="
+                        + drizzleAfterMinute.ToString("F3") + ", full8="
+                        + fullRainAfterEight.ToString("F3"));
+        report.AppendLine("  [" + Mark(drying) + "] configured drying half-life curve: "
+                        + dryAfterTwoMinutes.ToString("F3"));
+        report.AppendLine("  [" + Mark(filmGate) + "] wet-film gate does not square rain intensity");
+        report.AppendLine("  [" + Mark(materialRainBinding)
+                        + "] rain intensity reaches the terrain material buffer");
+        report.AppendLine("  [" + Mark(intensityControlsDensity)
+                        + "] rain intensity controls ring event density");
+        report.AppendLine("  [" + Mark(wetAfterMaterial) + "] rain film is applied after rock/sand selection");
+        return accumulation && drying && filmGate && materialRainBinding
+            && intensityControlsDensity && wetAfterMaterial;
     }
 
     static float TerminalVelocity(float diameterMm) =>

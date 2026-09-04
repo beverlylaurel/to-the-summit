@@ -22,6 +22,7 @@ public class DebugMenu : MonoBehaviour
     [SerializeField] TemperatureField temperature;
     [SerializeField] SnowfallRenderer snowfall;
     [SerializeField] SnowManager snowManager;
+    [SerializeField] SeaStateController seaState;
     [SerializeField] PerformanceHud hud;
     [SerializeField] ClimbHud climbHud;
     [SerializeField] CursorLock cursorLock;
@@ -105,7 +106,8 @@ public class DebugMenu : MonoBehaviour
         AtmosphereController atmosphereRef, PrecipitationRenderer precipitationRef,
         PerformanceHud hudRef, ClimbHud climbHudRef,
         CursorLock cursorLockRef,
-        RouteOverlay routeOverlayRef, Volume cloudVolumeRef, CloudWeatherDriver cloudDriverRef)
+        RouteOverlay routeOverlayRef, Volume cloudVolumeRef, CloudWeatherDriver cloudDriverRef,
+        SeaStateController seaStateRef)
     {
         cloudVolume = cloudVolumeRef;
         cloudDriver = cloudDriverRef;
@@ -123,6 +125,7 @@ public class DebugMenu : MonoBehaviour
         hud = hudRef;
         climbHud = climbHudRef;
         routeOverlay = routeOverlayRef;
+        seaState = seaStateRef;
     }
 
     void OnEnable()
@@ -132,7 +135,7 @@ public class DebugMenu : MonoBehaviour
             || atmosphere == null
             || precipitation == null || hud == null || climbHud == null
             || cursorLock == null || routeOverlay == null
-            || cloudVolume == null || cloudDriver == null)
+            || cloudVolume == null || cloudDriver == null || seaState == null)
             throw new InvalidOperationException($"{nameof(DebugMenu)}: dependencies are not assigned.");
 
         // The speed multiplier was applied only while the panel was being drawn; if the panel was
@@ -626,7 +629,20 @@ public class DebugMenu : MonoBehaviour
 
         GUILayout.Label($"Hs {SeaRuntimeState.SignificantWaveHeight:F2} m   " +
                         $"Tp {SeaRuntimeState.PeakPeriod:F1} s");
-        GUILayout.Label($"kıyı köpüğü {SeaRuntimeState.ShoreFoamIntensity01:F2}");
+        GUILayout.Label($"U10 {seaState.WindSpeed:F1} m/s   " +
+                        $"swell ×{seaState.SwellEnergyScale:F2}");
+        GUILayout.Label($"açık köpük %{SeaRuntimeState.WhitecapCoverage01 * 100f:F1}   " +
+                        $"kıyı köpüğü {SeaRuntimeState.ShoreFoamIntensity01:F2}   " +
+                        $"durum {seaState.TestPreset}");
+
+        string[] labels =
+        {
+            "Doğal", "Sakin", "Rüzgâr denizi", "Groundswell",
+            "Çapraz deniz", "Fırtına", "Dev dalga",
+        };
+        int selected = GUILayout.SelectionGrid((int)seaState.TestPreset, labels, 2);
+        if (selected != (int)seaState.TestPreset)
+            seaState.SetTestPreset((SeaTestPreset)selected);
 
         EndSection();
     }

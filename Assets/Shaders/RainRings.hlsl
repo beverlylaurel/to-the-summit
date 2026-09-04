@@ -85,6 +85,8 @@ float RainRingResolvable(float pixelSize)
 }
 
 /// The slope the rings add to a water surface. `time` is seconds; `intensity` is 0..1.
+/// Intensity primarily controls HOW MANY drop events survive. Scaling only the final
+/// slope leaves the same frantic number of circles in drizzle, merely fainter.
 float2 RainRings(float2 localXZ, float time, float intensity)
 {
     if (intensity <= 0.001) return 0.0;
@@ -115,6 +117,13 @@ float2 RainRings(float2 localXZ, float time, float intensity)
 
         float age = frac(time / life + RainRingHash21(cell + layer * 13.7));
 
+        // Rain amount is chiefly a drop ARRIVAL RATE. Each cell has a stable rank;
+        // drizzle admits only the lowest-ranked events, while a downpour admits all.
+        // The narrow ramp keeps a cell from popping when weather intensity drifts.
+        float eventRank = RainRingHash21(cell + layer * 19.7 + 103.5);
+        float eventWeight = smoothstep(eventRank, min(eventRank + 0.03, 1.0), intensity);
+        if (eventWeight <= 0.001) continue;
+
         float2 d = localXZ - centre;
         float r = length(d);
         if (r < 1e-4) continue;
@@ -132,10 +141,13 @@ float2 RainRings(float2 localXZ, float time, float intensity)
         float spread = 1.0 / max(1.0 + front / w, 1.0);
         float birth = saturate(age * 12.0);
 
-        slope += normalize(d) * (profile * spread * birth);
+        slope += normalize(d) * (profile * spread * birth * eventWeight);
     }
 
-    return slope * (RAIN_RING_SLOPE * intensity);
+    // Individual drops remain readable in drizzle; heavier rain also carries somewhat
+    // larger drops. Density supplies the main intensity response, this modest gain the rest.
+    float dropStrength = lerp(0.65, 1.0, saturate(intensity));
+    return slope * (RAIN_RING_SLOPE * dropStrength);
 }
 
 #endif

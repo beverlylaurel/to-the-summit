@@ -26,9 +26,16 @@ MonoBehaviour:
   swellGamma: 7
   swellSpread: 26
   swellDirectionOffset: 38
+  seaStateSeed: 7319
+  seaStateSegmentSeconds: 360
+  swellDirectionSegmentSeconds: 1200
+  swellEnergyMin: 0.55
+  swellEnergyMax: 8
+  windSeaRiseSeconds: 45
+  windSeaFallSeconds: 120
   smallWaveCutoff: 0.0015
-  loopPeriod: 200
-  patchSizes: {x: 967, y: 191, z: 37, w: 1.2}
+  loopPeriod: 3600
+  patchSizes: {x: 4093, y: 509, z: 61, w: 1.2}
   tierWeights: {x: 1, y: 1, z: 1, w: 1}
   choppinessCalm: 0.55
   choppinessStorm: 2.4

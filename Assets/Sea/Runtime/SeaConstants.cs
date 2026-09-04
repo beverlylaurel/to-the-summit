@@ -51,8 +51,13 @@ public static class SeaConstants
     /// Floor depth that prevents division by zero (m). [CALIBRATION]
     public const float MinDepth = 0.05f;
 
-    /// Wave damping at the shoreline (m). [CALIBRATION]
-    public const float ShoreFadeDepth = 0.60f;
+    /// Geometry damping at the waterline (m). The previous shared 0.60 m
+    /// value erased the wave over roughly ten horizontal metres on this beach;
+    /// optics retain that wider transition independently. [CALIBRATION]
+    public const float ShoreGeometryFadeDepth = 0.18f;
+
+    /// Optical hand-off into the refracted ground (m). [CALIBRATION]
+    public const float ShoreOpticalFadeDepth = 0.60f;
 
     /// Waterline displacement by the foam noise (m of depth). [CALIBRATION]
     public const float ShoreEdgeNoise = 0.06f;
@@ -72,11 +77,21 @@ public static class SeaConstants
     // --- Foam (Jacobian) ---
 
     /// Jacobian threshold and transition range. [SOURCE: Tessendorf 2004 §4.6]
-    public const float FoamJThreshold = 0.85f;
-    public const float FoamJRange = 0.85f;
+    public const float FoamJThreshold = 0.62f;
+    public const float FoamJRange = 0.22f;
 
-    /// Foam decay rate (1/s). [CALIBRATION]
-    public const float FoamDecay = 0.15f;
+    /// Bright whitecap decay rate (1/s). [CALIBRATION]
+    public const float FoamDecay = 0.42f;
+
+    /// Aerated residue decay rate (1/s). The second, slower lifetime keeps a
+    /// broken crest visible after its bright cap has collapsed. [CALIBRATION]
+    public const float FoamResidueDecay = 0.10f;
+
+    /// Share of vanished bright foam transferred into the residue channel.
+    public const float FoamResidueTransfer = 0.65f;
+
+    /// Surface drift as a fraction of the local 10 m wind speed.
+    public const float FoamWindDrift = 0.018f;
 
     // --- FFT and grid ---
 

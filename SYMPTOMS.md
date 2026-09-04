@@ -4157,7 +4157,7 @@ onları üreten ifade.
    tek piksele düşüyordu ve "kesik kenar" görüntüsünü veren şey oydu.
 
    Milimetrelik bir su filmi ayna değildir — arayüzü kuracak ortam yok.
-   `SEA_SHORE_FADE_DEPTH` (0,60 m) boyunca yansıma ve parıltı sönüyor; geriye sudan
+   `SEA_SHORE_OPTICAL_FADE_DEPTH` (0,60 m) boyunca yansıma ve parıltı sönüyor; geriye sudan
    görünen zemin kalıyor, ki çizginin öbür yanındaki piksel zaten onu gösteriyor. İki
    yaka aynı renkte buluşuyor.
 
@@ -4167,7 +4167,7 @@ bir yanda beyaz, öbür yanda kum, arada hiçbir şey. Yansımayı kısmak ona d
 
 **Kapatan terim, en sonda, tek:**
 
-    color = lerp(refracted, color, smoothstep(0, SEA_SHORE_FADE_DEPTH, depth));
+    color = lerp(refracted, color, smoothstep(0, SEA_SHORE_OPTICAL_FADE_DEPTH, edgeDepth));
 
 `refracted` bu pikselin arkasındaki sahne rengi — üstüne deniz çizilmeseydi zeminin
 görüneceği renk. Kıyıda kaydırma koruması kırılma sapmasını iptal ettiği için TAM O
@@ -4180,6 +4180,14 @@ Bu, "su yoksa suyun rengi de yok" cümlesinin kendisi.
 
 Ölçülen %5,8 kıyı eğiminde devir bandı kumda **10 m**: 0,9 m'de %2, 5,2 m'de %50,
 10,4 m'de %100. Su çizgisini oradan arazinin danteli devralıyor.
+
+**2026-09-04 gerilemesi ve kökü:** dalganın kıyıdan 10 m önce ölmesini önlemek için aynı
+sabit 0,60 → 0,18 m indirilmişti. Fakat bu değer optik deviri de yönetiyordu; renk geçişi
+3,1 m'ye sıkışınca kullanıcı sınırı yeniden keskin gördü. Tek bir sayı iki farklı şeyi
+temsil edemez. Geometri `SEA_SHORE_GEOMETRY_FADE_DEPTH = 0,18 m`, optik devir
+`SEA_SHORE_OPTICAL_FADE_DEPTH = 0,60 m` olarak ayrıldı. Devir ayrıca ham `depth` yerine
+kesmenin kullandığı aynı `edgeDepth`'i okuyor; gürültünün içe ve dışa ittiği kenarlar artık
+farklı yerde sönmüyor. Depth pass de aynı maskeyi okuyor.
 
 **Dalga boyu denetimi:** kenar gürültüsünün genliği 0,06 m derinlik; ölçülen %5 kıyı
 eğiminde su çizgisini 1,2 m oynatıyor. Onu üreten gürültünün kendi özellik boyu
@@ -4227,6 +4235,23 @@ gidiyordu. Stockdon R2% deniz durumunu okuyor:
 **Üçüncü tutarsızlık, aynı adımda:** shader su seviyesini `max * phase` ile yükseltiyordu,
 yani düzgün tırmanıp geri kopan bir testere; yanındaki köpük ise kosinüsü izliyordu. Bir
 dalga için iki şekil. İkisi de artık `surge`'ü okuyor.
+
+**2026-09-04 kalan düzenlilik:** biçim ve ortalama süre düzelmişti ama saat hâlâ
+`phase = frac(t / swashPeriod)` idi. Dolayısıyla her bore farklı yükseklikte olsa bile tam
+aynı aralıkla alttan geliyordu; göz bunu metronom olarak okuyordu. Faz artık spektrumun
+iki tepesinden çıkan mevcut set frekansıyla hızlandırılıp yavaşlatılan pozitif bir hızın
+integrali. İki eşevresiz bileşenin toplam modülasyonu birden küçük: ölçümde saat monoton,
+16,9 s nominal durumda geliş aralıkları **12,37–24,34 s**. Yeni rastgele/hava kaynağı yok.
+
+**2026-09-04 "bir anda ileri, bir anda geri" sıçraması:** genel faz 1200 kare izlendi;
+en büyük dairesel adım yalnız **0,008698**, yani saat suçsuzdu. Shader'daki kalıntı köpüğü
+ise kosinüsün `acos` tersini kullanıyordu, surge eğrisi kosinüs değildi. Yanlış bırakma
+anındaki `frac` sarımı üst kıyıda köpüğü bir karede **0,11 → 0,55** çıkarıyordu. Ayrıca
+surge alt noktada sıfır olmayan hızla yön değiştiriyordu. Surge artık iki kübik yarım
+eğriyle iki dönüşte de sıfır türevli; kalıntının bırakma anı aynı eğrinin doğru tersinden
+geliyor ve doğum değeri fresh maskenin 5/32 değeriyle birleşiyor. 120 FPS / 16,9 s çevrim /
+1001 kıyı derinliği taramasında en büyük köpük adımı **0,44419 → 0,00638**, en büyük
+surge adımı **0,001701** oldu. `SeaShoreContinuityTest` bu sınırları koruyor.
 
 
 ## "Köpükler niye düzenli desenlere ve aralıklara sahip?"
@@ -5851,3 +5876,30 @@ fiziksel pozitif kontrast ve `FogPath` geçirgenliği kullanıldı.
 %30,84'ünde 1/255'i geçti; dağda %37,43, zeminde %38,64. Analitik 60 m görüş testinde
 gökyüzü farkı hâlâ %19,70'ti ve uzak kontrast beklendiği gibi azaldı. Son gece ölçümü
 yaklaşık 147 FPS / 6,8 ms idi.
+
+## Yağmur zemini ıslatmıyor ve yerde halka oluşturmuyor — ÇÖZÜLDÜ (2026-09-04)
+
+**Belirti:** Yağmur denizde çarpma halkası oluştururken normal zeminde ne kalıcı ıslaklık
+ne de okunabilir halka vardı.
+
+**Üç ayrı sebep vardı.** Islaklığın hedefi doğrudan yağmur şiddetiydi; 0,2'lik sürekli
+yağmur zemini sonsuza kadar en fazla %20 ıslatabiliyordu. Halka genliği `yağmur × ıslaklık`
+ile sürüldüğü için hafif yağmur ikinci kez küçülüyordu (0,19 → 0,036). Kum pürüzlülüğü de
+yağış filmi uygulandıktan sonra yazılıp ıslak kumun parlaklığını geri siliyordu.
+
+**Asıl bağlantı hatası canlı ölçümde çıktı.** `_SurfaceRainIntensity`, shader'ın
+`UnityPerMaterial` tamponundaydı; C# yalnız `Shader.SetGlobalFloat` yazıyordu. Önce:
+global yağmur **0,235**, fakat arazi materyalinde özellik yoktu (`hasRain=False`) ve shader
+sıfır okuyordu. Materyale yazıldıktan sonra aynı canlı oturumda `hasRain=True`, materyal
+yağmuru **0,167** ölçüldü.
+
+**Düzeltme:** yağmur ıslaklığın tavanını değil birikme hızını sürüyor; 0,2 şiddette 60 s
+sonra W=0,777, tam yağmurda 8 s sonra W=0,632. Halka için ıslaklık yalnız 0,015–0,08
+arasında açılan film kapısı. Şiddet ortak `RainRings.hlsl` içinde hücre olaylarını seçiyor:
+0,2 yağmurda adayların %18,49'u, 0,5'te %48,58'i, 1,0'da tamamı. Böylece çiseleme aynı
+sayıda soluk çember değil, gerçekten daha seyrek damla üretir. Kum/kaya kuru materyali
+önce seçilir, yağış filmi ikisinin de üstüne en son uygulanır.
+
+**Doğrulama:** `Rain Rendering Test` 21 sözleşmenin tamamında geçti; Unity derlemesi ve
+shader importu hatasız. Karanlık gökyüzü/ambient sorunu ayrı ve önceden kayıtlıdır
+(`Kaya öğle vakti kapkara`); bu bağın çalışıp çalışmadığıyla karıştırılmaz.

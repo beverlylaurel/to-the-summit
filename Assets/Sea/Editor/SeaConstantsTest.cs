@@ -46,7 +46,8 @@ public static class SeaConstantsTest
 
         ("OffshoreRamp", "SEA_OFFSHORE_RAMP"),
         ("MinDepth", "SEA_MIN_DEPTH"),
-        ("ShoreFadeDepth", "SEA_SHORE_FADE_DEPTH"),
+        ("ShoreGeometryFadeDepth", "SEA_SHORE_GEOMETRY_FADE_DEPTH"),
+        ("ShoreOpticalFadeDepth", "SEA_SHORE_OPTICAL_FADE_DEPTH"),
         ("ShoreEdgeNoise", "SEA_SHORE_EDGE_NOISE"),
         ("ChopFadeDepth", "SEA_CHOP_FADE_DEPTH"),
         ("GammaMild", "SEA_GAMMA_MILD"),
@@ -56,6 +57,9 @@ public static class SeaConstantsTest
         ("FoamJThreshold", "SEA_FOAM_J_THRESHOLD"),
         ("FoamJRange", "SEA_FOAM_J_RANGE"),
         ("FoamDecay", "SEA_FOAM_DECAY"),
+        ("FoamResidueDecay", "SEA_FOAM_RESIDUE_DECAY"),
+        ("FoamResidueTransfer", "SEA_FOAM_RESIDUE_TRANSFER"),
+        ("FoamWindDrift", "SEA_FOAM_WIND_DRIFT"),
 
         ("FftSize", "SEA_FFT_SIZE"),
         ("TierCount", "SEA_TIER_COUNT"),

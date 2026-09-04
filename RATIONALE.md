@@ -2527,6 +2527,11 @@ dantel bırakır. O kısmı **arazi** çiziyor artık. İkinci kaynak değil: de
 kabarma kotunu yayınlıyor (`_SeaWetLevelY` fazı taşıyor), kum da onun altına kalıntıyı
 çiziyor. Gürültü kaplamayı alttan yiyor, böylece dantel kendi kenarında bitmiyor.
 
+Dalga yüksekliğinin sönmesiyle su renginin zemine karışması aynı uzunluk değildir.
+Birincisi mesh'in araziyi kesmemesi için son 0,18 m'de, ikincisi ayna/köpük/su renginin
+kumla sert birleşmemesi için son 0,60 m'de olur. Tek sabit kullanıldığında bu iki kabul
+kriterinden yalnız biri sağlanabiliyor; bu yüzden geometri ve optik sabitleri ayrıdır.
+
 `runupMaxDepth` 0.45 → 1.1 m: ıslak şerit de kumsalda yukarı çıkıyor.
 
 ## Denizin rengi: kırmızısı sıfır olan bir turkuaz
@@ -2709,6 +2714,18 @@ Bandın tabanı silinmedi, kapsamı düzeltildi: tabanın işi sudan YUKARIDAKİ
 sayılmasını durdurmaktı (eklendiği belirti oydu) ve o işi yapmaya devam ediyor. Su
 altındaki zemin ayrı bir terimle ıslak. Danteli ve ıslak parlamayı yalnız swash sürüyor:
 su altında ne dantel var ne de yüzeydeki su filmi.
+
+## Swash neden iki kübik yarım eğri
+
+Tek kosinüs iki yönde eşit süre verir; kıyıda uprush kısa, backwash uzundur. Önceki
+`s(2-s)` balistik yüksekliği üst dönüşte yumuşaktı ama çevrim sınırında sıfır olmayan
+hızla geri çekilmeden ilerlemeye dönüyordu. Kullanıcının gördüğü beyaz çizgi hareketi
+orada aniden yön değiştiriyordu.
+
+Her yarıda `smoothstep(t)` kullanmak iki koşulu birlikte sağlar: yarıların süreleri yine
+ayrı (`_SeaSwashUprush`), hem alt hem üst dönüşte türev sıfır. Kalıntı köpüğünün bırakma
+anı da bu eğrinin analitik tersinden hesaplanır. Başka bir hareket eğrisi ile başka bir
+tersi eşleştirmek, `frac` sarımını parlaklık sıçramasına çevirir.
 
 
 ## Hs ve Tp neden formülden değil spektrumdan okunuyor
@@ -3378,7 +3395,15 @@ hacim = **3300 damla/m²/s**.
 **Sonuç tasarımı belirledi.** 3300 damla/m²/s, 1 s ömür ve 23 cm yarıçapla her metrekarede
 her an yüzden fazla halka üst üste biner. Yani ayrı ayrı çember çizmek yanlış olurdu;
 gerçek görüntü kaynayan bir benek dokusu. Üç katman (hücre 0,11 / 0,19 / 0,37 m) o dokuyu
-veriyor; tek katman kafes olarak okunuyor.
+veriyor; tek katman kafes olarak okunuyor. Ancak bu yoğunluk yalnız tam yağmur içindir:
+şiddeti yalnız son eğime çarpmak çiselemeyi de aynı sayıda, yalnız daha soluk çemberle
+dolduruyordu. Her hücreye sabit bir 0..1 olay sırası verildi; şiddet bu sırayı eşikleyerek
+olay sıklığını seçiyor. Dar `smoothstep` geçişi hava yavaş değişirken hücrenin pat diye
+açılmasını önlüyor.
+
+Ölçülen etkin aday oranı: şiddet 0,05 → %3,50; 0,10 → %8,46; 0,20 → %18,49;
+0,50 → %48,58; 1,00 → %100. Tekil damla kuvveti ayrıca yalnız 0,65→1,0 aralığında
+büyüyor; ana yoğunluk sinyali halka **sayısı**.
 
 **Ölçüldü.** Aynı donmuş kare, yağmur kapalı ve açık, fark:
 
@@ -3387,7 +3412,8 @@ veriyor; tek katman kafes olarak okunuyor.
 | 0,3 | 1,59 luma | 0,64 | %47,7 |
 | 1,0 | 2,39 luma | 1,09 | %72,2 |
 
-Şiddetle doğru ölçekleniyor. **Kum berraklığı etkilenmedi** (yağmursuz karede detay
+Şiddetle doğru ölçekleniyordu fakat eski ölçümde sayı sabit, yalnız genlik değişiyordu;
+yukarıdaki olay sıklığı düzeltmesi bu ayrımı kapattı. **Kum berraklığı etkilenmedi** (yağmursuz karede detay
 0,550 → 0,551 ve 0,401 → 0,394), çünkü halka yağış sıfırken hiç hesaplanmıyor.
 
 Genlik (`SEA_RAIN_RING_SLOPE` 0,12) tek göz kararı sayı: 1 mm'lik bir tepe 1,7 cm dalga

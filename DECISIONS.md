@@ -1781,6 +1781,15 @@ açıkça "64×64 küçültülmüş state" diyor ama kernel'i adlandırmıyor. E
 tam çözünürlükte geri okuma 8 MB, indirgenmiş hâli 64 KB ve aynı iki sayıyı
 veriyor.
 
+**2026-09-04 performans deneyi — `RequestIntoNativeArray` REDDEDİLDİ.** `SnowSampler`ın
+iki 64×64 okuması için kalıcı NativeArray hedefleriyle aynı doku, pencere, format ve
+dört-kare kadansı korundu. D3D12 `Gfx.RequestAsyncReadbackData` aktif kare ortalaması
+eski yöntemde **3,1431 ms**, önceden ayrılmış yöntemde **3,2066 ms** çıktı; staging
+kaynağını sürücü yine oluşturuyor. Görüntüye etkisiz olsa da kazanç göstermeyen ek ömür
+yönetimi bırakılmadı, eski yöntem geri kondu. Bu maliyeti azaltmak ancak iki state'i GPU'da
+tek paketli okumaya çevirmekle mümkün görünüyor; callback zamanlaması ve oyun örneği
+değişebileceği için "görüntüye sıfır etki" kapsamında uygulanmayacak.
+
 ### Birikme tek şeridi yazıyor, ping-pong yerine şerit kopyası
 
 `KAccumulate` döşeme döndürmesiyle karenin 1/4'ünü işliyor (§15.2). Ping-pong

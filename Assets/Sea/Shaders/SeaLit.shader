@@ -1,6 +1,7 @@
 // ROLE: drawing the sea surface. Shallow water transform (vertex) + optics
 // (fragment).
 // CALLED BY: SeaSurface (as its material).
+// rain-rings-rev: 2
 
 Shader "ToTheSummit/SeaLit"
 {
@@ -203,8 +204,15 @@ Shader "ToTheSummit/SeaLit"
                 // `_SeaFoamBreakupTiling` the features are about 2.9 m across, and
                 // `SEA_SHORE_EDGE_NOISE` on the measured 5% shore slope moves the line
                 // by 1.2 m. A bend larger than the feature that makes it would smear.
-                float edgeNoise = SeaFoamNoise(IN.positionWS.xz * _SeaFoamBreakupTiling) - 0.5;
-                clip(depth + edgeNoise * SEA_SHORE_EDGE_NOISE);
+                // The same three-octave value is used again by the shore-foam
+                // breakup. Keep the raw result: evaluating it twice cost about
+                // 0.11 ms GPU in a frozen, fixed-camera A/B and cannot change a
+                // pixel because both former calls had the exact same input.
+                float2 breakupXZ = IN.positionWS.xz * _SeaFoamBreakupTiling;
+                float edgeNoiseRaw = SeaFoamNoise(breakupXZ);
+                float edgeNoise = edgeNoiseRaw - 0.5;
+                float edgeDepth = depth + edgeNoise * SEA_SHORE_EDGE_NOISE;
+                clip(edgeDepth);
 
                 float3 V = normalize(_WorldSpaceCameraPos - IN.positionWS);
                 float  dist = length(_WorldSpaceCameraPos - IN.positionWS);
@@ -633,9 +641,26 @@ Shader "ToTheSummit/SeaLit"
                     // of depth alone: a clean strip parallel to the shore that never
                     // moves. Breaking happens at the crest and the trough behind it
                     // is clear water.
-                    float crest = saturate((IN.positionWS.y - _SeaLevelY)
-                                           / max(0.25 * waveH, 0.02));
-                    breakT *= crest;
+                    float crestHeight01 = (IN.positionWS.y - _SeaLevelY)
+                                        / max(0.25 * waveH, 0.02);
+
+                    // Breaking water is born on the narrow FRONT of the crest,
+                    // not over every positive half of the wave.  The previous
+                    // saturate started at zero and painted a broad grey sheet.
+                    float crest = smoothstep(0.38, 0.92, crestHeight01);
+
+                    // Fragment the breaker at metre and several-metre scales.
+                    // A minimum remains so the crest reads continuously in
+                    // motion, while the alpha is no longer a solid rectangle.
+                    float breakerFine = SeaFoamBubbles(IN.positionWS.xz
+                                                       * _SeaFoamTiling * 0.75);
+                    float breakerLace = SeaFoamBubbles(IN.positionWS.xz
+                                                       * _SeaFoamTiling * 0.16
+                                                       + 19.4);
+                    float breakerPattern = smoothstep(0.18, 0.82,
+                                                       breakerFine * 0.58
+                                                     + breakerLace * 0.42);
+                    breakT *= crest * lerp(0.12, 1.0, breakerPattern);
 
                     // 3. SHORE FOAM (spec 13.3). The run-up band makes the
                     //    water level look raised (spec 8.5).
@@ -698,10 +723,8 @@ Shader "ToTheSummit/SeaLit"
                     // the waterline's own steps are the terrain heightmap's resolution
                     // (4097 texels / 30 km = 7.3 m), and noise finer than that hides
                     // nothing there.
-                    float2 breakupXZ = IN.positionWS.xz * _SeaFoamBreakupTiling;
-
                     float breakup =
-                          SeaFoamNoise(breakupXZ) * 0.55
+                          edgeNoiseRaw * 0.55
                         + SeaValueNoise(breakupXZ * 0.18) * 0.45
                         + (SeaValueNoise(breakupXZ * 0.0292) - 0.5) * 0.6
                         + (SeaValueNoise(breakupXZ * 0.0117 + float2(51.3, 17.7)) - 0.5) * 0.5;
@@ -733,9 +756,7 @@ Shader "ToTheSummit/SeaLit"
                     // A residue needs history, and history normally needs a
                     // persistent texture. It is not needed here: the swash is
                     // PERIODIC, so "how long ago was this point last under
-                    // water" is known in closed form. For a cosine surge the
-                    // covered window is symmetric about the peak, so the phase
-                    // at which the water leaves a point follows from an acos.
+                    // water" is known in closed form.
                     float reach = saturate(depth / max(_SeaShoreFoamDepth, 1e-3));
 
                     // Fresh foam: where the bore stands right now.
@@ -743,17 +764,51 @@ Shader "ToTheSummit/SeaLit"
 
                     // Residue: time since the water drained off this point,
                     // measured in swash cycles.
-                    float halfWindow = acos(clamp(1.0 - 2.0 * reach, -1.0, 1.0)) / SEA_TWO_PI;
-                    float since = frac(phase - (1.0 - halfWindow));
-                    float residue = exp(-since * 2.4);
+                    //
+                    // The old `acos(1 - 2 reach)` inverse belonged to a cosine,
+                    // but the actual surge was asymmetric. Its `frac` therefore
+                    // wrapped while the fresh mask was already dim: measured at
+                    // the upper edge, foam jumped 0.11 -> 0.55 in one frame.
+                    // This is the exact inverse of cubic smoothstep on the
+                    // BACKWASH half. At `leavePhase`, `surge == reach`.
+                    float leaveT = 0.5 - sin(asin(clamp(2.0 * reach - 1.0, -1.0, 1.0)) / 3.0);
+                    float leavePhase = _SeaSwashUprush
+                                     + (1.0 - _SeaSwashUprush) * leaveT;
+                    float since = frac(phase - leavePhase);
 
-                    float shoreFoam = band * max(fresh, residue * 0.55);
+                    // At the leave point the fresh mask is exactly 5/32. Begin
+                    // there, then let the aerated residue build over 8% of a
+                    // cycle. Both sides of the `frac` boundary now meet at the
+                    // same value; `max` hides the old-cycle tail before the new
+                    // residue takes over, so neither brightness nor position pops.
+                    float residueBirth = 0.15625;
+                    float residueGain = lerp(residueBirth, 0.55,
+                                             smoothstep(0.0, 0.08, since));
+                    float residue = residueGain * exp(-since * 2.4);
+
+                    float shoreFoam = band * max(fresh, residue);
 
                     // Bubbles inside the band, at the whitecap's scale. Outside the
                     // band `shoreFoam` is already 0 and the multiply cannot revive it,
                     // so the second cellular pair is skipped there. Bit-identical.
                     if (shoreFoam > 0.0)
-                        shoreFoam *= 0.55 + 0.65 * SeaFoamBubbles(IN.positionWS.xz * _SeaFoamTiling * 1.7);
+                    {
+                        float shoreFine = SeaFoamBubbles(IN.positionWS.xz
+                                                         * _SeaFoamTiling * 1.7);
+                        float shoreLace = SeaFoamBubbles(IN.positionWS.xz
+                                                         * _SeaFoamTiling * 0.24
+                                                         + 47.3);
+                        float shoreMacro = SeaValueNoise(IN.positionWS.xz * 0.018
+                                                         + float2(73.1, 11.9));
+                        float shorePattern = smoothstep(0.24, 0.76,
+                                                        shoreFine * 0.45
+                                                      + shoreLace * 0.35
+                                                      + shoreMacro * 0.20);
+                        // Zero is intentional: wash lines contain open water
+                        // and sand gaps.  Keeping a non-zero floor was enough
+                        // to reconnect every clump into one bright contour.
+                        shoreFoam *= shorePattern;
+                    }
 
                     foam = max(whitecap, max(breakT * SEA_BREAK_FOAM_GAIN, shoreFoam));
 
@@ -800,7 +855,7 @@ Shader "ToTheSummit/SeaLit"
                 // foam equally opaque, so the faint edges came out as solid
                 // white paper. Squaring the coverage lets thin foam show the
                 // water through it and keeps thick foam opaque.
-                float foamAlpha = foam * foam * (3.0 - 2.0 * foam) * 0.80;
+                float foamAlpha = foam * foam * (3.0 - 2.0 * foam) * 0.68;
                 color = lerp(color, _SeaFoamColor.rgb * foamLight, foamAlpha);
 
                 // THE WATER FADES OUT INSTEAD OF BEING CUT OFF.
@@ -824,7 +879,8 @@ Shader "ToTheSummit/SeaLit"
                 //
                 // The terrain carries the waterline onward from here — the swash lace it
                 // draws on the sand starts where this ends.
-                color = lerp(refracted, color, smoothstep(0.0, SEA_SHORE_FADE_DEPTH, depth));
+                color = lerp(refracted, color,
+                             smoothstep(0.0, SEA_SHORE_OPTICAL_FADE_DEPTH, edgeDepth));
 
                 // THE SEA STANDS IN THE SAME AIR AS THE TERRAIN. Every layer is fogged
                 // once with ITS OWN distance — the terrain in its own shader, the cloud
@@ -851,6 +907,8 @@ Shader "ToTheSummit/SeaLit"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "SeaCommon.hlsl"
+
+            float _SeaFoamBreakupTiling;
 
             struct Attributes { float4 positionOS : POSITION; };
             struct Varyings
@@ -888,7 +946,9 @@ Shader "ToTheSummit/SeaLit"
             {
                 // The SAME mask as the forward pass — otherwise the depth
                 // buffer and the color buffer would see different shorelines.
-                clip(SeaSampleDepth(IN.positionWS.xz));
+                float depth = SeaSampleDepth(IN.positionWS.xz);
+                float edgeNoise = SeaFoamNoise(IN.positionWS.xz * _SeaFoamBreakupTiling) - 0.5;
+                clip(depth + edgeNoise * SEA_SHORE_EDGE_NOISE);
                 return 0;
             }
             ENDHLSL

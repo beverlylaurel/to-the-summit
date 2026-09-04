@@ -1436,14 +1436,19 @@ eşitliği `Sea/Test Constant Parity` denetliyor.
 
 ## Deniz: su çizgisi (2026-08-29)
 
-İki terim birlikte kuruyor, ikisi de aynı derinlik alanından:
+İki terim birlikte kuruyor, ikisi de gürültüyle kaydırılmış aynı `edgeDepth` alanından:
 
-- **Kesme** — `clip(depth + gürültü * SEA_SHORE_EDGE_NOISE)`. Gürültü köpüğünkiyle
+- **Kesme** — `clip(edgeDepth)`, burada `edgeDepth = depth + gürültü * SEA_SHORE_EDGE_NOISE`.
+  Gürültü köpüğünkiyle
   AYNI (`SeaFoamNoise`, `_SeaFoamBreakupTiling`); ikinci bir kaynak yok.
-- **Devir** — `lerp(refracted, color, smoothstep(0, SEA_SHORE_FADE_DEPTH, depth))`,
+- **Devir** — `lerp(refracted, color, smoothstep(0, SEA_SHORE_OPTICAL_FADE_DEPTH, edgeDepth))`,
   en sonda ve TEK terim. Yansıma, parıltı, su rengi ve köpük hepsi birlikte sönüyor;
   ölçülen kıyı eğiminde bandın kumdaki genişliği 10 m. Su çizgisini oradan arazinin
   danteli (`laceBand`) devralıyor — iki sistem aynı `_SeaWetLevelY`'den besleniyor.
+
+Dalga geometrisinin sönümü ayrı: `SEA_SHORE_GEOMETRY_FADE_DEPTH` 0,18 m. Optik devirle
+paylaşılmaz; paylaşılırsa ya dalga kıyıdan 10 m önce ölür ya renk geçişi 3 m'ye sıkışıp
+yeniden keskin görünür.
 
 **Teşhis anahtarları silindi.** `_SeaDbgNo*` globalleri, shader dalları ve panel bölümü
 gitti; deniz bölümünde yalnız Hs / Tp / kıyı köpüğü okuması kaldı.
@@ -1542,10 +1547,12 @@ Kar sistemi bu sayıyı **yazmaz**, okur. Deniz ve ıslak kaya da aynı termomet
 kotlarında okur; üçü çelişemez çünkü kaynak tek — band `TemperatureField.SnowFractionAt`
 içinde, `FreezingLevel`'ın yanında.
 
-**Kayayı yalnız yağmur ıslatır.** `TerrainSurface` ıslaklığı `yağış × (1 − kar payı)`
-sürüyor. Kar kayanın üstüne düşer ve kar kalır; eriyene kadar hiçbir şeyi karartmaz, erime
-de kar sisteminin işidir. Önceden `weather.Precipitation` bütün alınıyordu, yani kar
-yağarken kaya ıslanıyordu.
+**Kayayı yalnız yağmur ıslatır.** `TerrainSurface` yağmur girdisini
+`yağış × (1 − kar payı)` olarak kurar. Bu sayı ıslaklığın tavanı değil, birikme hızıdır:
+`dW/dt = (1 − W) × yağmur / 8 s`. Bu yüzden hafif ama sürekli yağmur da sonunda zemini
+tam ıslatır; yalnız daha uzun sürer (0,2 şiddette 60 s sonra W=0,777). Yağmur kesilince
+`dryingSeconds` ile yavaşça kurur. Kar kayanın üstüne düşer ve kar kalır; eriyene kadar
+hiçbir şeyi karartmaz, erime de kar sisteminin işidir.
 
 **Halka yalnız YAĞMURDA çizilir, karda değil.** Türü `SeaEnvironmentBridge.PrecipKind`
 söylüyor, o da `TemperatureField`'dan geliyor: donma seviyesi denizin altına inerse deniz
@@ -1558,9 +1565,17 @@ halkayı bırakır — sabitler, hız, sönüm ortak, yalnız içine düştüğ�
 
 **Zeminde halka İKİ terime bağlı, bir değil.** `_SurfaceRainIntensity` damla düşüyor mu
 sorusudur ve yağmur kesildiği an sıfırlanır; `_SurfaceWetness` halkanın içinde
-titreşeceği film var mı sorusudur ve yağmurun 8 s gerisinden gelir, kuruması yavaştır.
-Kuru kayada damla halka değil koyu leke bırakır — burada bu, hiçbir şey demektir. Film
-gecikmeli olduğu için sağanak bitince halkalar sönüyor, kararma bir süre daha kalıyor.
+titreşeceği film var mı sorusudur. Yağmur şiddeti halkaların esas olarak **sayısını**
+sürer: her hücrenin sabit rastgele sırası vardır, 0,2 yağmur adayların yaklaşık %18,5'ini,
+0,5 yağmur %48,6'sını, 1,0 yağmur tamamını geçirir. Tekil damla gücü yalnız 0,65→1,0
+arasında büyür. Böylece çiseleme sağanak kadar çok soluk çember üretmez. Film yalnız
+0,015–0,08 arasında açılan bir kapıdır; şiddetle çarpılıp yağmuru ikinci kez küçültmez.
+Kuru kayada damla halka değil koyu leke bırakır — burada bu, hiçbir şey demektir.
+
+Her iki değer de arazi shader'ının `UnityPerMaterial` tamponundadır ve
+`TerrainSurface` tarafından **materyale** yazılır. `Shader.SetGlobalFloat` bu alanı
+beslemez; global debug sayısı doğru görünürken arazi halkasının sıfır okumasına izin
+verilmez. Yağmur bitince halkalar anında söner, kararma ise yavaş kurur.
 
 **Kafes dünyaya çakılı ama dünyanın SIFIR NOKTASINA değil.** Halka 17 mm; float 14 km'de
 yalnız ~1 mm taşıyor, mutlak koordinatta kafes bozuluyor (ölçüldü: piksellerin %45'i,
@@ -1652,15 +1667,27 @@ Eskiden `min(|h|, 1.5) * 0.35` idi; arkasında bir şey yoktu. Tavan `kA = 1`'de
 sivri uçta duruyor. Ölçüldü: en kötü noktada `kA = 0,11`, katlanma yok (`RATIONALE.md`).
 
 
-## Deniz: swash tek fazdan türüyor (2026-08-29)
+## Deniz: swash tek fazdan, düzensiz hızla türüyor (2026-09-04)
 
 `SeaManager` iki şey yayımlıyor:
 
-- **`_SeaShoreFoamPhase`** — doğrusal 0..1 testere dişi, periyodu Tp.
+- **`_SeaShoreFoamPhase`** — kesintisiz ve hep ileri giden 0..1 fazı. Ortalama periyodu
+  balistik swash periyodu; anlık hızı spektrumun mevcut set vuruşuyla yumuşakça değişir.
 - **`_SeaRunupMaxDepth`** — Stockdon R2%, `Hs`, `Tp` ve `settings.shoreSlope`'tan.
 
-`surge = 0.5 - 0.5 cos(2pi * phase)` **tek ifade**: shader'da köpük ve su seviyesi,
-`SeaWetnessDriver`'da ıslak bandın tepesi — üçü de onu okuyor.
+`SeaSwashSurge(phase)` **tek ifade**: shader'da köpük ve su seviyesi,
+`SeaWetnessDriver`'da ıslak bandın tepesi — üçü de onu okuyor. Geliş aralıkları eşit
+değil; hız iki eşevresiz bileşenle modüle edilir ve toplam hızın alt sınırı pozitif olduğu
+için faz geri yürümez, kıyı sıçramaz.
+
+Saat mutlak zamanın o karedeki periyoda bölümü değildir; kare kare `dt / period` entegre
+edilir. Böylece Hs/Tp yavaşça değişirken geçmiş zaman yeni periyotla yeniden yorumlanıp
+bütün kıyıyı bir karede taşımaz. Surge, kısa uprush ve uzun backwash için iki ayrı kübik
+yarım eğri kullanır; alt ve üst dönüşlerde türevi sıfırdır.
+
+Kalıntı köpüğünün bırakma anı aynı kübik eğrinin backwash tersinden bulunur. `frac` sınırında
+eski ve yeni değer 5/32'de birleşir, ardından kalıntı yumuşakça güçlenip söner. Bu eşleşme
+olmazsa üst kıyı köpüğü tek karede 0,11 → 0,55 sıçrar.
 `SeaRuntimeState.ShoreFoamIntensity01` aynı ifadenin CPU'daki karşılığı.
 
 **Okur:** Hs ve Tp (spektrumdan), kıyı eğimi (ayar).

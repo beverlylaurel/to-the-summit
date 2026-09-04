@@ -34,6 +34,10 @@ public interface ISeaEnvironmentSource
     /// quiet background swell; the peak of an event is several times that.
     float SwellEnergyScale { get; }
 
+    /// Absolute world-space direction the remote swell travels towards. It is not derived
+    /// from today's local wind; two storms separated by an ocean do not share a compass.
+    Vector3 SwellDirection { get; }
+
     // --- Day and night ---
 
     Light Sun { get; }

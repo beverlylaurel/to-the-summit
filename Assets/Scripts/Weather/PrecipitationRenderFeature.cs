@@ -25,7 +25,8 @@ public class PrecipitationRenderFeature : ScriptableRendererFeature
     {
         CameraType type = renderingData.cameraData.cameraType;
         if (type == CameraType.Preview || type == CameraType.Reflection) return;
-        if (PrecipitationRenderer.Active == null) return;
+        if (PrecipitationRenderer.Active == null
+            || !PrecipitationRenderer.Active.CanDrawAfterClouds) return;
 
         renderer.EnqueuePass(pass);
     }
@@ -40,7 +41,7 @@ public class PrecipitationRenderFeature : ScriptableRendererFeature
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
             PrecipitationRenderer rain = PrecipitationRenderer.Active;
-            if (rain == null) return;
+            if (rain == null || !rain.CanDrawAfterClouds) return;
 
             UniversalResourceData resources = frameData.Get<UniversalResourceData>();
             using var builder = renderGraph.AddRasterRenderPass<PassData>(

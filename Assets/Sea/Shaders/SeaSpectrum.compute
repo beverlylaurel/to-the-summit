@@ -104,7 +104,8 @@ float SeaJonswap(float omega, float omegaP, float u10, float fetch)
     float w4 = omegaP / omega;
     w4 = w4 * w4 * w4 * w4;
 
-    return alpha * (SEA_G * SEA_G / pow(omega, 5.0))
+    float omega5 = omega * omega * omega * omega * omega;
+    return alpha * (SEA_G * SEA_G / max(omega5, 1e-20))
          * exp(-1.25 * w4)
          * pow(SEA_JONSWAP_GAMMA, r);
 }
@@ -198,9 +199,10 @@ float SeaSwellSpectrum(float omega, float omegaP, float gamma)
     float w4 = omegaP / omega;
     w4 = w4 * w4 * w4 * w4;
 
-    return (SEA_G * SEA_G / pow(omega, 5.0))
+    float omega5 = omega * omega * omega * omega * omega;
+    return (SEA_G * SEA_G / max(omega5, 1e-20))
          * exp(-1.25 * w4)
-         * pow(gamma, r);
+         * pow(max(gamma, 1e-5), r);
 }
 
 /// Cosine-2s spreading around a given direction, with a FIXED exponent.
@@ -376,10 +378,14 @@ void KInitialSpectrum(uint3 id : SV_DispatchThreadID)
     float2 xiA = SeaGauss(seedA);
     float2 xiB = SeaGauss(seedB);
 
-    // h0(k) = (1/sqrt(2)) (xi_r + i xi_i) sqrt(Ph(k))   (spec 6.1)
-    float2 h0       = (1.0 / sqrt(2.0)) * xiA
+    // `Ph` is the complete two-sided directional power. The time spectrum below
+    // adds the independent +k and -k coefficients, so each h0 must carry HALF
+    // the amplitude. `1/sqrt(2)` counted the pair twice: a fixed U10=8 m/s test
+    // measured Hs=3.32 m on the GPU while the integrated spectrum was 2.31 m.
+    // With 1/2 the variances, rather than the amplitudes, add to Ph.
+    float2 h0       = 0.5 * xiA
                     * sqrt(SeaSpectrumPower(k,       patchSize, _SeaWindWS, tier));
-    float2 h0Mirror = (1.0 / sqrt(2.0)) * xiB
+    float2 h0Mirror = 0.5 * xiB
                     * sqrt(SeaSpectrumPower(kMirror, patchSize, _SeaWindWS, tier));
 
     _SeaH0RW[uint3(id.xy, tier)] = float4(h0, SeaConj(h0Mirror));

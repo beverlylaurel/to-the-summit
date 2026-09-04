@@ -78,6 +78,10 @@ public static class MountainSceneBootstrap
 
     public static void Rebuild() => RegenerateTerrain();
 
+    /// Re-applies component wiring without regenerating terrain data. Editor diagnostics and
+    /// migrations use this when a new runtime dependency is introduced.
+    public static void RefreshSceneBindings() => Run();
+
     [MenuItem("To The Summit/Terrain/Regenerate Terrain", false, 20)]
     static void RegenerateTerrain()
     {
@@ -1283,7 +1287,8 @@ public static class MountainSceneBootstrap
             player.GetComponent<CursorLock>(),
             Object.FindAnyObjectByType<RouteOverlay>(FindObjectsInactive.Include),
             cloudVolume,
-            Object.FindAnyObjectByType<CloudWeatherDriver>());
+            Object.FindAnyObjectByType<CloudWeatherDriver>(),
+            Object.FindAnyObjectByType<SeaStateController>());
 
         EditorUtility.SetDirty(menu);
     }
@@ -1426,11 +1431,21 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
+        var seaState = root.GetComponent<SeaStateController>();
+        if (seaState == null)
+        {
+            seaState = root.gameObject.AddComponent<SeaStateController>();
+            changed = true;
+        }
+        seaState.Bind(seaSettings, windField);
+        EditorUtility.SetDirty(seaState);
+
         var time = Object.FindAnyObjectByType<TimeOfDay>();
         var timeSo = new SerializedObject(time);
         var sun = timeSo.FindProperty("sun").objectReferenceValue as Light;
 
-        bridge.Bind(windField, weatherState, time, atmosphere, thermometer, sun, seaSettings);
+        bridge.Bind(windField, weatherState, time, atmosphere, thermometer, sun, seaSettings,
+                    seaState);
         EditorUtility.SetDirty(bridge);
 
         // THE WADE LIMIT. The boundary is depth, not the waterline: shallow water is walkable
@@ -1482,7 +1497,7 @@ public static class MountainSceneBootstrap
         wetness.Bind(seaSettings);
         EditorUtility.SetDirty(wetness);
 
-        foreach (var b in new Behaviour[] { root, sim, surface, wetness })
+        foreach (var b in new Behaviour[] { seaState, root, sim, surface, wetness })
         {
             b.enabled = false;
             b.enabled = true;

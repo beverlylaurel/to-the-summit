@@ -56,9 +56,11 @@ public class SeaSimulation : MonoBehaviour
     readonly struct SpectrumInputs : System.IEquatable<SpectrumInputs>
     {
         readonly float swell, fetch, depth, cutoff;
-        readonly float swellAlpha, swellOmega, swellGamma, swellSpread, swellDir;
+        readonly float swellAlpha, swellOmega, swellGamma, swellSpread;
+        readonly int swellHeadingBucket;
 
-        public SpectrumInputs(SeaSettings s, float swellPeriod, float swellEnergy)
+        public SpectrumInputs(SeaSettings s, float swellPeriod, float swellEnergy,
+                              Vector3 swellDirection)
         {
             swell = s.swell;
             fetch = s.fetch;
@@ -68,14 +70,15 @@ public class SeaSimulation : MonoBehaviour
             swellOmega = swellPeriod;
             swellGamma = s.swellGamma;
             swellSpread = s.swellSpread;
-            swellDir = s.swellDirectionOffset;
+            float heading = Mathf.Atan2(swellDirection.z, swellDirection.x) * Mathf.Rad2Deg;
+            swellHeadingBucket = Mathf.RoundToInt(heading / 3f);
         }
 
         public bool Equals(SpectrumInputs o) =>
             swell == o.swell && fetch == o.fetch && depth == o.depth
             && cutoff == o.cutoff && swellAlpha == o.swellAlpha
             && swellOmega == o.swellOmega && swellGamma == o.swellGamma
-            && swellSpread == o.swellSpread && swellDir == o.swellDir;
+            && swellSpread == o.swellSpread && swellHeadingBucket == o.swellHeadingBucket;
 
         public override bool Equals(object o) => o is SpectrumInputs i && Equals(i);
 
@@ -219,8 +222,9 @@ public class SeaSimulation : MonoBehaviour
         derivatives = Create("Sea_Derivatives", RenderTextureFormat.ARGBHalf, mips: true);
         slopeMoments = Create("Sea_SlopeMoments", RenderTextureFormat.ARGBHalf, mips: true);
 
-        foamA = Create("Sea_FoamA", RenderTextureFormat.RHalf);
-        foamB = Create("Sea_FoamB", RenderTextureFormat.RHalf);
+        // R = short-lived bright cap, G = slowly fading aerated residue.
+        foamA = Create("Sea_FoamA", RenderTextureFormat.RGHalf);
+        foamB = Create("Sea_FoamB", RenderTextureFormat.RGHalf);
 
         // FOAM ACCUMULATES: the first frame's "previous" value must be
         // defined. A fresh `RenderTexture` has undefined contents; without
@@ -312,8 +316,9 @@ public class SeaSimulation : MonoBehaviour
         // means changing swell from the Inspector does nothing — measured:
         // with swell 0 versus 1 the directional concentration came out
         // exactly the same.
-        var signature = new SpectrumInputs(settings, environment.SwellPeriod,
-                                          Quantized(environment.SwellEnergyScale));
+        var signature = new SpectrumInputs(settings, env.SwellPeriod,
+                                           Quantized(env.SwellEnergyScale),
+                                           env.SwellDirection);
 
         bool dirty = float.IsNaN(lastWindSpeed)
                   || Mathf.Abs(speed - lastWindSpeed) > 0.25f
@@ -382,12 +387,17 @@ public class SeaSimulation : MonoBehaviour
         // When the loop wraps the difference goes negative; the `Max` above
         // clamps it to zero and foam only jumps to its target that frame.
         foamShader.SetFloat(SeaShaderIDs.DeltaTime, dt);
+        Vector3 wind = env.WindDirection * env.WindSpeed;
+        foamShader.SetVector(SeaShaderIDs.SeaWindWS,
+                             new Vector4(wind.x, wind.z, 0f, 0f));
+        foamShader.SetVector(SeaShaderIDs.PatchSizes, settings.patchSizes);
 
         foamShader.SetTexture(kFoam, SeaShaderIDs.DisplacementRW, displacement);
         foamShader.SetTexture(kFoam, SeaShaderIDs.FoamRW, foamB);
         foamShader.SetTexture(kFoam, SeaShaderIDs.FoamPrevRW, foamA);
 
         SeaQuality.Levels level = SeaQuality.Of(settings.quality);
+        foamShader.SetInt(SeaShaderIDs.FftSize, level.FftSize);
         int groups = level.FftSize / 8;
         foamShader.Dispatch(kFoam, groups, groups, level.TierCount);
 
@@ -437,13 +447,19 @@ public class SeaSimulation : MonoBehaviour
         // THE SWELL'S PEAK COMES FROM A PERIOD, NOT A FETCH. A swell is born in
         // a storm we do not simulate; its period is what survives the journey.
         cs.SetFloat(SeaShaderIDs.SwellAlpha,
-                    settings.swellAlpha * Quantized(environment.SwellEnergyScale));
+                     settings.swellAlpha * Quantized(env.SwellEnergyScale));
         cs.SetFloat(SeaShaderIDs.SwellPeakOmega,
-                    SeaConstants.TwoPi / Mathf.Max(1f, environment.SwellPeriod));
+                    SeaConstants.TwoPi / Mathf.Max(1f, env.SwellPeriod));
         cs.SetFloat(SeaShaderIDs.SwellGamma, settings.swellGamma);
         cs.SetFloat(SeaShaderIDs.SwellSpreadS, settings.swellSpread);
-        cs.SetFloat(SeaShaderIDs.SwellDirOffset,
-                    settings.swellDirectionOffset * Mathf.Deg2Rad);
+        Vector3 swellDirection = env.SwellDirection;
+        float swellHeading = Mathf.Atan2(swellDirection.z, swellDirection.x) * Mathf.Rad2Deg;
+        swellHeading = Mathf.Round(swellHeading / 3f) * 3f;
+        Vector3 quantizedSwell = new Vector3(Mathf.Cos(swellHeading * Mathf.Deg2Rad), 0f,
+                                              Mathf.Sin(swellHeading * Mathf.Deg2Rad));
+        float swellOffset = Vector3.SignedAngle(direction, quantizedSwell, Vector3.up)
+                          * Mathf.Deg2Rad;
+        cs.SetFloat(SeaShaderIDs.SwellDirOffset, swellOffset);
         cs.SetFloat(SeaShaderIDs.SmallWaveCutoff, settings.smallWaveCutoff);
         cs.SetFloat(SeaShaderIDs.LoopPeriod, settings.loopPeriod);
 

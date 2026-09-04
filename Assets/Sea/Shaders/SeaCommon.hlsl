@@ -257,16 +257,21 @@ float SeaUnresolvedSlopeVariance(float pixelSize)
 /// THE SWASH SURGE. Mirrored from `SeaManager.SeaSwashSurge` -- the foam, the
 /// water level and the wet sand all read this one curve.
 ///
-/// NOT A COSINE. A cosine withdraws exactly as fast as it arrives; a real swash
-/// rushes up and drains back slowly. `s (2 - s)` is the ballistic height of a
-/// body thrown up a slope: quick at the start, easing into the turn. Flow
-/// reversal lands at `_SeaSwashUprush` of the cycle -- measured beaches put it
-/// at 40-50%. [SOURCE: Shen & Meyer 1963; Coastal Wiki, Swash zone dynamics]
+/// ASYMMETRIC BUT SMOOTH AT BOTH TURNS. Two cubic half-curves retain the short
+/// uprush / long backwash timing while reaching zero velocity at the top and
+/// bottom. A hard derivative reversal at phase wrap reads as a one-frame jump.
 float SeaSwashSurge(float phase, float uprush)
 {
     float up = clamp(uprush, 0.05, 0.95);
-    float s = phase < up ? phase / up : 1.0 - (phase - up) / (1.0 - up);
-    return s * (2.0 - s);
+
+    if (phase < up)
+    {
+        float t = saturate(phase / up);
+        return t * t * (3.0 - 2.0 * t);
+    }
+
+    float t = saturate((phase - up) / (1.0 - up));
+    return 1.0 - t * t * (3.0 - 2.0 * t);
 }
 
 /// `pixelSize` is the world width this pixel covers. It is passed in rather than
@@ -392,9 +397,12 @@ float SeaSampleFoam(float2 posXZ, out float2 foldDirection)
             // used to draw.
             float2 dF0 = ddx(uv);
             float2 dF1 = ddy(uv);
-            float k0 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaFoam, sampler_SeaFoam, uv + o0, s, dF0, dF1).r;
-            float k1 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaFoam, sampler_SeaFoam, uv + o1, s, dF0, dF1).r;
-            float k2 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaFoam, sampler_SeaFoam, uv + o2, s, dF0, dF1).r;
+            float2 foam0 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaFoam, sampler_SeaFoam, uv + o0, s, dF0, dF1).rg;
+            float2 foam1 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaFoam, sampler_SeaFoam, uv + o1, s, dF0, dF1).rg;
+            float2 foam2 = SAMPLE_TEXTURE2D_ARRAY_GRAD(_SeaFoam, sampler_SeaFoam, uv + o2, s, dF0, dF1).rg;
+            float k0 = saturate(foam0.x + foam0.y * 0.55);
+            float k1 = saturate(foam1.x + foam1.y * 0.55);
+            float k2 = saturate(foam2.x + foam2.y * 0.55);
 
             float2 best = o0;
             k = k0;
@@ -404,7 +412,8 @@ float SeaSampleFoam(float2 posXZ, out float2 foldDirection)
         }
         else
         {
-            k = SAMPLE_TEXTURE2D_ARRAY(_SeaFoam, sampler_SeaFoam, uv, s).r;
+            float2 foam = SAMPLE_TEXTURE2D_ARRAY(_SeaFoam, sampler_SeaFoam, uv, s).rg;
+            k = saturate(foam.x + foam.y * 0.55);
         }
 
         if (k > f)
@@ -817,10 +826,11 @@ float SeaCurvatureDrop(float2 posXZ, float2 cameraXZ)
 /// so the crests bunch up as the water shallows exactly as they should, with no
 /// scrolling texture and no tuned speed.
 float SeaShoreWaveHeight(float2 posXZ, float depth, float slope, float gamma,
-                         out float2 travel, out float crestFront)
+                         out float2 travel, out float crestFront, out float active)
 {
     travel = -SeaSampleDepthDirection(posXZ);
     crestFront = 0.0;
+    active = 0.0;
 
     float omega = SEA_TWO_PI / max(_SeaPeakPeriod, 1.0);
 
@@ -832,6 +842,7 @@ float SeaShoreWaveHeight(float2 posXZ, float depth, float slope, float gamma,
     float onset = max(hBreak * SEA_SHORE_WAVE_BREAK_MULT, 1.0);
 
     if (depth <= SEA_MIN_DEPTH || depth >= onset) return 0.0;
+    active = 1.0;
 
     // THE SLOPE HERE IS THE BEACH'S, NOT THIS PIXEL'S.
     //
@@ -873,7 +884,14 @@ float SeaShoreWaveHeight(float2 posXZ, float depth, float slope, float gamma,
     // to trough while the open sea was running Hs 2.37 m; a beach with a half-metre
     // shore break under a 2.4 m swell is not a beach. The falloff belongs to the
     // crossfade alone, so `grip` is gone.
-    float amp = gamma * depth * 0.5 * SEA_SHORE_WAVE_SHARE;
+    // REAL SURF ARRIVES IN SETS.  The already-published wave-group phase is
+    // used on geometry as well as foam, so a quiet interval really has smaller
+    // breakers instead of merely less white paint.  The gain never exceeds the
+    // breaker limit; it only creates lulls between sets.
+    float groupPhase = _SeaWaveGroups.x * (_SeaTime - depth * 0.35);
+    float group01 = 0.5 + 0.5 * cos(groupPhase);
+    float groupGain = 1.0 - saturate(_SeaWaveGroups.y) * 0.38 * (1.0 - group01);
+    float amp = gamma * depth * 0.5 * SEA_SHORE_WAVE_SHARE * groupGain;
 
     // A shoaling crest is not a sine. It stands up at the front and lies flat
     // behind, and past the breaking point the front is a wall of white water.
@@ -885,8 +903,19 @@ float SeaShoreWaveHeight(float2 posXZ, float depth, float slope, float gamma,
     // LAND, and the probe is coarse -- the sea grew hard-edged brown blotches along the
     // surf line. Bisected against the pre-change sea: the blotches follow this profile
     // and nothing else (`SYMPTOMS.md`).
-    float c = cos(phase);
-    float shaped = c * (1.0 + 0.45 * c);
+    // A SHORE BREAK IS A NARROW-BAND GROUP, NOT ONE PERFECT COSINE.
+    // Three nearby, incommensurate components preserve a dominant period while
+    // continually changing the spacing and height of individual crests.  Their
+    // weights sum to one, so the breaking-height calibration above remains true.
+    float p0 = phase;
+    float p1 = phase * 1.173 + 1.37;
+    float p2 = phase * 0.827 + 4.11;
+    float carrier = 0.72 * cos(p0) + 0.20 * cos(p1) + 0.08 * cos(p2);
+
+    // Second-order skew: sharper crests and broader troughs, with the expected
+    // variance subtracted so it does not silently raise the mean sea level.
+    const float carrierVariance = 0.5 * (0.72 * 0.72 + 0.20 * 0.20 + 0.08 * 0.08);
+    float shaped = carrier + 0.45 * (carrier * carrier - carrierVariance);
 
     // THE FORWARD THROW IS THE WAVE'S OWN ORBIT, NOT A FRACTION SOMEONE PICKED.
     //
@@ -908,7 +937,10 @@ float SeaShoreWaveHeight(float2 posXZ, float depth, float slope, float gamma,
     // does, and it is what makes the face steep and the back gentle. It carries no
     // falloff of its own: `SeaDeform` fades it in with the same crossfade as the height,
     // so the throw and the crest it belongs to never come apart.
-    crestFront = -sin(phase) * throwAmp;
+    float forward = -(0.72 * sin(p0)
+                    + 0.20 * 1.173 * sin(p1)
+                    + 0.08 * 0.827 * sin(p2));
+    crestFront = forward * throwAmp;
 
     return amp * shaped;
 }
@@ -937,7 +969,7 @@ SeaSurfacePoint SeaDeform(float3 posWS)
         // SHORE DAMPING. As depth goes to zero the wave height must go to
         // zero too, otherwise the mesh intersects the terrain and flickers
         // (spec 8.4).
-        float shoreFade = smoothstep(0.0, SEA_SHORE_FADE_DEPTH, o.depth);
+        float shoreFade = smoothstep(0.0, SEA_SHORE_GEOMETRY_FADE_DEPTH, o.depth);
 
         disp.y  *= shoal * shoreFade;
         disp.xz *= chopScale * shoreFade;
@@ -954,10 +986,11 @@ SeaSurfacePoint SeaDeform(float3 posWS)
         // and the open-sea field is faded out under it as the water shallows.
         float2 travel;
         float crestFront;
+        float shoreActive;
         float shoreH = SeaShoreWaveHeight(posWS.xz, o.depth, slope, gamma,
-                                          travel, crestFront);
+                                          travel, crestFront, shoreActive);
 
-        if (shoreH != 0.0)
+        if (shoreActive > 0.0)
         {
             float shoalTake = min(SeaShoalingGain(o.depth, _SeaSpectrumDepth),
                                   _SeaMaxShoalingGain);
@@ -969,8 +1002,11 @@ SeaSurfacePoint SeaDeform(float3 posWS)
             // `SEA_SHORE_WAVE_TAKE_MAX` -- the short chop is barely refracted and has to
             // survive into the surf zone. It used to be weighted by the height share
             // instead, which applied that share twice and squared it.
+            // Smooth at BOTH ends.  The old linear take changed derivative at
+            // the hand-off depth, which read as a seam even when the heights
+            // happened to match on that frame.
             float take = SEA_SHORE_WAVE_TAKE_MAX
-                       * (1.0 - saturate(o.depth / breakDepth));
+                       * (1.0 - smoothstep(0.0, breakDepth, o.depth));
             disp.y = lerp(disp.y, shoreH, take);
 
             // `crestFront` already carries the throw in metres, signed.

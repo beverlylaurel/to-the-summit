@@ -6,12 +6,29 @@
 #include "SeaCommon.hlsl"
 
 RWTexture2DArray<float4> _SeaDisplacementRW;
-RWTexture2DArray<float>  _SeaFoamRW;
-RWTexture2DArray<float>  _SeaFoamPrevRW;
+RWTexture2DArray<float2> _SeaFoamRW;
+RWTexture2DArray<float2> _SeaFoamPrevRW;
 
 float _SeaDeltaTime;
 
-/// FOAM APPEARS INSTANTLY AND FADES SLOWLY.
+float2 SeaLoadFoamWrapped(int2 p, uint slice, int n)
+{
+    p -= (int2)floor((float2)p / (float)n) * n;
+    return _SeaFoamPrevRW[uint3((uint2)p, slice)];
+}
+
+float2 SeaLoadFoamBilinear(float2 p, uint slice, int n)
+{
+    int2 i = (int2)floor(p);
+    float2 f = frac(p);
+    float2 a = lerp(SeaLoadFoamWrapped(i, slice, n),
+                    SeaLoadFoamWrapped(i + int2(1, 0), slice, n), f.x);
+    float2 b = lerp(SeaLoadFoamWrapped(i + int2(0, 1), slice, n),
+                    SeaLoadFoamWrapped(i + int2(1, 1), slice, n), f.x);
+    return lerp(a, b, f.y);
+}
+
+/// FOAM APPEARS INSTANTLY, DRIFTS, THEN AGES IN TWO STAGES.
 ///
 /// NO direct assignment (spec 18 pitfall table: "foam disappears instantly /
 /// a direct assignment was used instead of decay"). The new value is the
@@ -32,8 +49,23 @@ void KFoam(uint3 id : SV_DispatchThreadID)
     // EXPONENTIAL, NOT LINEAR. A linear fade has one lifetime; a real whitecap has
     // two — bright for a second or two, then a residue that drifts and fades for
     // tens of seconds. `exp` gives both from one rate.
-    float previous = _SeaFoamPrevRW[id];
-    float next     = max(target, previous * exp(-SEA_FOAM_DECAY * _SeaDeltaTime));
+    // Backtrace by the wind-driven surface drift.  Keeping the history at its
+    // birth texel made old foam look painted onto the Fourier tile while the
+    // crest moved through it.  Coordinates are wrapped explicitly because RW
+    // texture loads do not honour the texture's Repeat sampler state.
+    float metresPerTexel = _SeaPatchSizes[id.z] / max((float)N, 1.0);
+    float2 driftTexels = _SeaWindWS * SEA_FOAM_WIND_DRIFT * _SeaDeltaTime
+                       / max(metresPerTexel, 1e-5);
+    float2 previous = SeaLoadFoamBilinear((float2)id.xy - driftTexels,
+                                          id.z, (int)N);
 
-    _SeaFoamRW[id] = saturate(next);
+    float brightSurvival = exp(-SEA_FOAM_DECAY * _SeaDeltaTime);
+    float residueSurvival = exp(-SEA_FOAM_RESIDUE_DECAY * _SeaDeltaTime);
+    float bright = max(target, previous.x * brightSurvival);
+    float collapsed = previous.x * (1.0 - brightSurvival);
+    float residue = max(target * 0.22,
+                        previous.y * residueSurvival
+                      + collapsed * SEA_FOAM_RESIDUE_TRANSFER);
+
+    _SeaFoamRW[id] = saturate(float2(bright, residue));
 }

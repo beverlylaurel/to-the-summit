@@ -114,6 +114,28 @@ public class SeaSettings : ScriptableObject
              "them is what breaks the corduroy look.")]
     [Range(-180f, 180f)] public float swellDirectionOffset = 38f;
 
+    [Header("Sea-state evolution")]
+    [Tooltip("Seed of the remote sea-state sequence. The local weather has its own seed.")]
+    public int seaStateSeed = 7319;
+
+    [Tooltip("Duration of one remote swell state keyframe (s). Adjacent states blend smoothly.")]
+    [Min(60f)] public float seaStateSegmentSeconds = 360f;
+
+    [Tooltip("How slowly the remote swell direction wanders (s per keyframe).")]
+    [Min(120f)] public float swellDirectionSegmentSeconds = 1200f;
+
+    [Tooltip("Minimum multiplier of the background swell energy.")]
+    [Range(0.1f, 2f)] public float swellEnergyMin = 0.55f;
+
+    [Tooltip("Maximum multiplier reached by a strong remote swell event.")]
+    [Range(2f, 12f)] public float swellEnergyMax = 8f;
+
+    [Tooltip("Response time while the local wind sea is growing (s).")]
+    [Min(1f)] public float windSeaRiseSeconds = 45f;
+
+    [Tooltip("Response time while the local wind sea is calming down (s).")]
+    [Min(1f)] public float windSeaFallSeconds = 120f;
+
     /// [SOURCE: Tessendorf 2004 equation 41]
     [Tooltip("Small wave cutoff length (m).")]
     /// IT IS THE FINEST GRID'S NYQUIST, NOT A FREE NUMBER. Tessendorf's `exp(-k^2 l^2)`
@@ -131,29 +153,29 @@ public class SeaSettings : ScriptableObject
     /// Every frequency is rounded to a multiple of this. MANDATORY: it
     /// prevents loss of float precision as `t` grows over a long session.
     /// [SOURCE: Tessendorf 2004 §4.2]
-    [Tooltip("Loop period (s). The simulation repeats over this interval.")]
-    [Min(10f)] public float loopPeriod = 200f;
+    [Tooltip("Loop period (s). Kept beyond a normal observation window so recurrence is not visible.")]
+    [Min(10f)] public float loopPeriod = 3600f;
 
     [Header("Tiers (spec §6.6)")]
-    /// THREE TIERS. A single patch cannot carry both a 200 m swell and a
+    /// FOUR TIERS. A single patch cannot carry both a 400 m swell and a
     /// 20 cm chop. The `dx` values must be 10–1000 times smaller than `U²/g`
     /// (spec §6.6); for U = 8 m/s, U²/g = 6.52 m.
     ///
-    ///   tier 0: 967 m / 256 = 3.78 m  (deliberately coarse, it only carries
-    ///                                   long waves — the swell lives here)
-    ///   tier 1: 191 m / 256 = 0.75 m
-    ///   tier 2:  37 m / 256 = 0.145 m
+    ///   tier 0: 4093 m / 256 = 15.99 m (long swell; 10 periods even at 16 s)
+    ///   tier 1:  509 m / 256 =  1.99 m
+    ///   tier 2:   61 m / 256 =  0.24 m
+    ///   tier 3:  1.2 m / 256 =  0.0047 m (capillary band)
     ///
-    /// THE THREE LENGTHS ARE PAIRWISE COPRIME. 512 / 128 / 24 shared a factor
+    /// THE THREE GRAVITY LENGTHS ARE PAIRWISE COPRIME. 512 / 128 / 24 shared a factor
     /// of 128 between the first two, so their tiles lined up and the repeat
     /// was visible on the water. All three are primes now, so no two tiles
     /// come back into phase within the drawn sea.
     /// [SOURCE: rtryan98, "Ocean Rendering" — "if a common factor for any two
     ///  values of L exists, then the tiling will be visible"]
     ///
-    /// Tier 0 also GREW: at 512 m a 156 m swell had barely three periods per
-    /// tile, i.e. three modes — that few modes is a periodic pattern by
-    /// definition. At 967 m it has six.
+    /// Tier 0 grew again after the swell became event-driven. A 16 s wave is about
+    /// 400 m long; the old 967 m patch held only 2.4 periods and therefore could
+    /// only look like a repeating train. 4093 m holds more than ten.
     /// THE FOURTH PATCH IS THE CAPILLARY BAND, AND ITS SIZE IS NOT A TASTE.
     ///
     /// The gravity-capillary peak sits at `k_m = 370 rad/m`, a 1.7 cm wave
@@ -163,7 +185,7 @@ public class SeaSettings : ScriptableObject
     /// it everything under 30 cm, which is exactly where JONSWAP stops describing
     /// the water.
     [Tooltip("The square each tier covers in the world (m).")]
-    public Vector4 patchSizes = new Vector4(967f, 191f, 37f, 1.2f);
+    public Vector4 patchSizes = new Vector4(4093f, 509f, 61f, 1.2f);
 
     [Tooltip("Summation weight of each tier.")]
     public Vector4 tierWeights = new Vector4(1f, 1f, 1f, 1f);

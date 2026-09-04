@@ -271,6 +271,14 @@ public class PrecipitationRenderer : MonoBehaviour
     public float DebugDensity => density;
     float localFactor = 1f;
 
+    /// Whether the existing draw guard will submit geometry this frame. The
+    /// renderer feature reads the same predicate so it can avoid constructing an
+    /// uncullable RenderGraph pass whose render function would immediately return.
+    public bool CanDrawAfterClouds => isActiveAndEnabled
+                                   && material != null
+                                   && mesh != null
+                                   && density * localFactor > 0.0005f;
+
     /// The precipitation no longer falls from the sky as one sheet: its source is the cloud column
     /// overhead. A one-way, read-only link to the cloud system — the precipitation does not ask
     /// which cloud is raining, it only reads "how much is above me right now".
@@ -490,8 +498,7 @@ public class PrecipitationRenderer : MonoBehaviour
     /// drop over sky pixels and leaves only drops backed by terrain visible.
     public void DrawAfterClouds(RasterCommandBuffer command)
     {
-        if (!isActiveAndEnabled || material == null || mesh == null) return;
-        if (density * localFactor <= 0.0005f) return;
+        if (!CanDrawAfterClouds) return;
 
         command.DrawMesh(mesh, Matrix4x4.identity, material, PrecipitationSubMesh, 0);
     }

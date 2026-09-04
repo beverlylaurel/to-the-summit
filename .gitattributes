@@ -21,4 +21,5 @@ Assets/Textures/**/*.png filter=lfs diff=lfs merge=lfs -text
 # Blender kaynak dosyalari ve disa aktarilan modeller: ikili, diff edilmiyor,
 # her surumu tam kopya olarak birikir
 Blender/**/*.blend filter=lfs diff=lfs merge=lfs -text
+Blender/textures/** filter=lfs diff=lfs merge=lfs -text
 Assets/Models/**/*.fbx filter=lfs diff=lfs merge=lfs -text

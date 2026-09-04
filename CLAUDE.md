@@ -103,6 +103,7 @@ Her görevde bütün belgeler okunmaz. Önce görevle ilgili olan seçilir:
 - `SCALE.md`: dağ ölçeğine bağlı sayı ya da davranış
 - `COOP.md`: ağ katmanı geldiğinde yeniden yazılacak yeni borç
 - `CLOUDS_REBUILD.md`: bulut modeline veya shader zincirine dokunan değişiklik
+- `BLENDER.md`: Blender'da varlık üretimi — geometri, UV, doku, denetim kuralları
 
 Yalnızca değişiklik gerçekten o belgenin sorumluluğunu etkiliyorsa belge güncellenir.
 Sayılar ve ayar değerleri belgelerde çoğaltılmaz; kod veya ayar asset'i otoritedir.

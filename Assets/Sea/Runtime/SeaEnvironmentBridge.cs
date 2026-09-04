@@ -37,6 +37,7 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
     /// The swell event reads its range from here. The bridge is sea-side glue, so
     /// holding the sea's own settings is not a foreign dependency.
     [SerializeField] SeaSettings settings;
+    [SerializeField] SeaStateController seaState;
 
     [Header("Manual values until the bridge is wired (spec §3.2)")]
     [SerializeField] Vector3 manualWindDirection = new Vector3(1f, 0f, 0f);
@@ -68,9 +69,11 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
     /// LIGHTNING light.
     public void Bind(WindField windField, WeatherState weatherState,
                      TimeOfDay time, AtmosphereController atmosphereController,
-                     TemperatureField temperatureField, Light sun, SeaSettings seaSettings)
+                     TemperatureField temperatureField, Light sun, SeaSettings seaSettings,
+                     SeaStateController stateController)
     {
         settings = seaSettings;
+        seaState = stateController;
         wind = windField;
         weather = weatherState;
         timeOfDay = time;
@@ -85,6 +88,7 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
     {
         get
         {
+            if (seaState != null) return seaState.WindDirection;
             if (wind == null) return manualWindDirection.normalized;
 
             Vector3 d = wind.PrevailingDirection;
@@ -107,7 +111,24 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
     /// so reading it made the swell rise while the player climbed and fall while they came down --
     /// measured, Hs 1.18 m at the shore against 3.66 m from the summit, the same sea in the same
     /// second. The sea is at sea level and reads the wind there.
-    public float WindSpeed => wind != null ? wind.SeaLevelSpeed : manualWindSpeed;
+    public float WindSpeed => seaState != null
+        ? seaState.WindSpeed
+        : wind != null ? wind.SeaLevelSpeed : manualWindSpeed;
+
+    public Vector3 SwellDirection
+    {
+        get
+        {
+            if (seaState != null) return seaState.SwellDirection;
+
+            Vector3 local = WindDirection;
+            float radians = settings != null ? settings.swellDirectionOffset * Mathf.Deg2Rad : 0f;
+            float c = Mathf.Cos(radians);
+            float s = Mathf.Sin(radians);
+            return new Vector3(local.x * c - local.z * s, 0f,
+                               local.x * s + local.z * c).normalized;
+        }
+    }
 
     /// THE SWELL RUNS ON ITS OWN CLOCK.
     ///
@@ -122,6 +143,7 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
     {
         get
         {
+            if (seaState != null) return seaState.SwellPeriod;
             if (settings == null) return 10f;
 
             float period = Mathf.Lerp(settings.swellPeriodShort, settings.swellPeriodLong,
@@ -132,7 +154,9 @@ public class SeaEnvironmentBridge : MonoBehaviour, ISeaEnvironmentSource
     }
 
     public float SwellEnergyScale =>
-        settings == null ? 1f : Mathf.Lerp(1f, settings.swellEventGain, SwellEvent01);
+        seaState != null ? seaState.SwellEnergyScale
+                         : settings == null ? 1f
+                                            : Mathf.Lerp(1f, settings.swellEventGain, SwellEvent01);
 
     /// THE EVENT ITSELF, 0 to 1.
     ///

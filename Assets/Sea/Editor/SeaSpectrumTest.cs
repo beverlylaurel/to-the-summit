@@ -30,6 +30,7 @@ public static class SeaSpectrumTest
         public float swellPeriod = 10f;
         public float SwellPeriod => swellPeriod;
         public float SwellEnergyScale => 1f;
+        public Vector3 SwellDirection => direction;
 
         public Light Sun => null;
         public float SunElevation01 => 0.5f;
@@ -97,6 +98,27 @@ public static class SeaSpectrumTest
         report.AppendLine();
 
         int failures = 0;
+        int activeTiers = SeaQuality.Of(settings.quality).TierCount;
+
+        // --- 0. The longest swell must not expose the spatial or temporal tile ---
+        float longestWave = SeaConstants.G * settings.swellPeriodLong
+                          * settings.swellPeriodLong / SeaConstants.TwoPi;
+        float longCycles = settings.patchSizes.x / longestWave;
+        report.AppendLine($"repeat budget: longest wave {longestWave:F1} m, " +
+                          $"tier-0 cycles {longCycles:F1}, time loop {settings.loopPeriod:F0} s");
+        if (longCycles < 8f)
+        {
+            report.AppendLine("  RED: tier 0 contains fewer than eight longest-period waves; " +
+                              "the swell tile will read as a repeating train.");
+            failures++;
+        }
+        if (settings.loopPeriod < 1800f)
+        {
+            report.AppendLine("  RED: the exact time loop is shorter than 30 minutes and can " +
+                              "be learned during normal play.");
+            failures++;
+        }
+        report.AppendLine();
 
         // --- 1. Conjugate symmetry and energy, U10 = 8 m/s ---
         env.speed = 8f;
@@ -106,7 +128,7 @@ public static class SeaSpectrumTest
         report.AppendLine("U10 = 8 m/s, direction = +X");
         report.AppendLine("tier |  mean(h)  |  rms(h)  | rms(slope) |  J<0   | wind band");
 
-        for (int k = 0; k < SeaConstants.TierCount; k++)
+        for (int k = 0; k < activeTiers; k++)
         {
             Measurement m = Measure(sim, k);
             report.AppendLine($"  {k}  | {m.meanH,9:F6} | {m.rmsH,8:F4} | {m.rmsSlope,10:F4} |" +
@@ -132,12 +154,36 @@ public static class SeaSpectrumTest
 
         report.AppendLine();
 
+        // --- 1b. The CPU sea state and the rendered field must use one normalization ---
+        //
+        // Breaking, run-up and the HUD read the CPU moments, while the player sees the
+        // GPU field. A sqrt(2) amplitude error once made the rendered Hs 3.32 m while
+        // every shore decision was made with 2.31 m. Both halves can be individually
+        // plausible and still form one visibly wrong coast, so parity is asserted here.
+        float gpuHs8 = 4f * TotalRms(sim, activeTiers);
+        SeaSpectrumMoments.Result cpu8 = SeaSpectrumMoments.Integrate(
+            env.speed, settings, env.SwellPeriod, env.SwellEnergyScale,
+            settings.TierBandLimits);
+        float hsError = Mathf.Abs(gpuHs8 - cpu8.SignificantHeight)
+                      / Mathf.Max(cpu8.SignificantHeight, 1e-4f);
+
+        report.AppendLine($"Hs parity at U10=8: GPU {gpuHs8:F3} m, CPU " +
+                          $"{cpu8.SignificantHeight:F3} m, error {hsError:P1}");
+        if (hsError > 0.08f)
+        {
+            report.AppendLine("  RED: GPU and CPU significant wave height differ by more " +
+                              "than 8%. Shore physics is not seeing the rendered sea.");
+            failures++;
+        }
+
+        report.AppendLine();
+
         // --- 2. Stronger wind must raise the wave height ---
         env.speed = 3f; sim.Step(0f);
-        float rms3 = TotalRms(sim);
+        float rms3 = TotalRms(sim, activeTiers);
 
         env.speed = 15f; sim.Step(0f);
-        float rms15 = TotalRms(sim);
+        float rms15 = TotalRms(sim, activeTiers);
 
         // FOLDING IS MEASURED IN A STORM.
         //
@@ -145,7 +191,7 @@ public static class SeaSpectrumTest
         // Choppiness only shows it is doing work on a steep wave.
         float fold15 = 0f;
         float minJ15 = float.MaxValue;
-        for (int k = 0; k < SeaConstants.TierCount; k++)
+        for (int k = 0; k < activeTiers; k++)
         {
             Measurement m = Measure(sim, k);
             fold15 = Mathf.Max(fold15, m.foldFraction);
@@ -246,10 +292,10 @@ public static class SeaSpectrumTest
         return request.GetData<Color>().ToArray();
     }
 
-    static float TotalRms(SeaSimulation sim)
+    static float TotalRms(SeaSimulation sim, int tierCount)
     {
         float sumSquares = 0f;
-        for (int k = 0; k < SeaConstants.TierCount; k++)
+        for (int k = 0; k < tierCount; k++)
         {
             float r = Measure(sim, k).rmsH;
             sumSquares += r * r;

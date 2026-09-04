@@ -247,12 +247,6 @@ MonoBehaviour:
   observer: {fileID: 848219609}
   fogFullVisibility: 60
   fogClearVisibility: 20000
-  manualWindDirection: {x: 1, y: 0, z: 0}
-  manualWindSpeed: 3
-  manualTemperatureC: -4
-  manualPrecipKind: 2
-  manualPrecipIntensity: 0.5
-  manualFogDensity: 0.2
 --- !u!114 &76489726
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1531,6 +1525,7 @@ MonoBehaviour:
   temperature: {fileID: 1805896810}
   snowfall: {fileID: 76489734}
   snowManager: {fileID: 76489726}
+  seaState: {fileID: 1259083610}
   hud: {fileID: 1780705007}
   climbHud: {fileID: 1780705011}
   cursorLock: {fileID: 848219610}
@@ -2529,6 +2524,7 @@ GameObject:
   - component: {fileID: 1259083607}
   - component: {fileID: 1259083608}
   - component: {fileID: 1259083609}
+  - component: {fileID: 1259083610}
   m_Layer: 0
   m_Name: Sea
   m_TagString: Untagged
@@ -2570,6 +2566,7 @@ MonoBehaviour:
   temperature: {fileID: 1805896810}
   sunLight: {fileID: 410087040}
   settings: {fileID: 11400000, guid: 15a1fd9f44116d64eb40d66e30db7a25, type: 2}
+  seaState: {fileID: 1259083610}
   manualWindDirection: {x: 1, y: 0, z: 0}
   manualWindSpeed: 12
   manualCloudCover: 0.3
@@ -2642,6 +2639,21 @@ MonoBehaviour:
   settings: {fileID: 11400000, guid: 15a1fd9f44116d64eb40d66e30db7a25, type: 2}
   terrain: {fileID: 1738276033}
   eye: {fileID: 330585546}
+--- !u!114 &1259083610
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1259083603}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87405d672a4685d4083324e5a193d8ea, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::SeaStateController
+  settings: {fileID: 11400000, guid: 15a1fd9f44116d64eb40d66e30db7a25, type: 2}
+  wind: {fileID: 1805896805}
+  testPreset: 0
 --- !u!1 &1268737626
 GameObject:
   m_ObjectHideFlags: 0

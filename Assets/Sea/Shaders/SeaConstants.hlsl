@@ -41,31 +41,17 @@
 /// holding that would need 28.6 km, far past anything the mesh draws (4064 m).
 #define SEA_OFFSHORE_RAMP        4000.0
 
-/// The first tier that gets the hexagonal tiling; every tier from here up is
-/// tiled. Measured repeats inside the visible sea (4064 m):
-///
-///     tier 2   L =  37 m   110 repeats   tiled
-///     tier 1   L = 191 m    21 repeats   tiled
-///     tier 0   L = 967 m     4 repeats   NOT tiled
-///
-/// Tier 0 stays whole for two reasons, and the second is the important one: four
-/// repeats across the whole visible sea is at the edge of noticing, and tier 0
-/// carries the long swell whose crests run for hundreds of metres. Cutting those
-/// into 280 m hexagons is exactly how the big waves were lost once before.
-#define SEA_HEX_TIER_MIN         1
+/// The first tier that gets the hexagonal de-tiling; every tier from here up is
+/// de-tiled. All tiers now participate. The former 967 m long-wave patch had to
+/// stay whole because its cells were shorter than the swell. At 4093 m a tier-0
+/// hex cell is about two kilometres wide, still five 16 s wavelengths, so the
+/// transform no longer cuts the long crests. Removing the raw patch repeat also
+/// matters from altitude.
+#define SEA_HEX_TIER_MIN         0
 
-/// Hexagons per patch, along one axis. Chosen by measurement on the REAL field
-/// (read back from the GPU, 1200 m of line across the crests at 8 m/s):
-///
-///     tiles   tier1 cell   peak repeat
-///     none         -       0.489 @ 190 m     <- tier 1's own patch
-///     2.00        96 m     0.322 @  61 m
-///     3.46        55 m     0.343 @  64 m
-///     5.50        35 m     0.419 @  61 m
-///     8.00        24 m     0.372 @  61 m
-///
-/// 2.0 wins, and the big cells are also the safest for the wave shape: a hexagon
-/// smaller than the waves it carries would cut them up.
+/// Hexagons per patch, along one axis. Two keeps every cell at least twice as
+/// wide as the longest wavelength assigned to that tier; smaller cells would
+/// disguise repetition by cutting coherent waves into unrelated pieces.
 #define SEA_HEX_TILES            2.0
 
 /// SUBSURFACE GLOW — the forward-scattering lobe's sharpness.
@@ -87,9 +73,17 @@
 #define SEA_MIN_DEPTH            0.05
 
 /// Wave damping at the shoreline (m). Below this depth the wave height goes
-/// to zero; otherwise the mesh intersects the terrain and flickers.
+/// to zero; otherwise the mesh intersects the terrain and flickers. This is
+/// deliberately narrower than the optical fade: geometry must survive almost
+/// to the beach without making the water/ground colour hand-off abrupt.
 /// [CALIBRATION]
-#define SEA_SHORE_FADE_DEPTH     0.60
+#define SEA_SHORE_GEOMETRY_FADE_DEPTH 0.18
+
+/// Depth over which every visible water layer fades into the refracted ground.
+/// On the measured 5.8% beach this is about ten metres of horizontal transition.
+/// Sharing the 0.18 m geometry fade here compressed that hand-off to about three
+/// metres and made the waterline read as a cut polygon again. [CALIBRATION]
+#define SEA_SHORE_OPTICAL_FADE_DEPTH 0.60
 
 /// How far the waterline is displaced by the foam's own noise (m of depth).
 /// On the measured 5% shore slope this moves the line about 1.2 m, which stays
@@ -173,37 +167,25 @@
 /// Jacobian threshold and transition range. J < 0 means the surface has
 /// folded; the threshold starts before that so foam enters smoothly.
 /// [SOURCE: Tessendorf 2004 4.6 — folding test] [CALIBRATION: threshold value]
-/// WHERE FOAM STARTS, ON THE JACOBIAN. Solved from a measured law, not chosen.
-///
-/// Monahan & O'Muircheartaigh 1980 give the whitecap coverage of a real sea as
-/// `W = 3.84e-6 * U10^3.41`. Ours was 10 to 30 times short of it:
-///
-///     U10    bizim     Monahan
-///       8    0.00%      0.46%
-///      12    0.06%      1.84%
-///      15    0.23%      3.93%
-///      20    0.37%     10.49%
-///
-/// Solving for the threshold that reproduces `W` at each wind gives 0.837, 0.835,
-/// 0.842, 0.866, 1.023 — very nearly the SAME number. That is the finding: the
-/// Jacobian's statistics already carry the right wind dependence, and the only
-/// thing wrong was where the line was drawn. 0.85 covers 6 to 20 m/s; the storm end
-/// stays slightly conservative on purpose.
-#define SEA_FOAM_J_THRESHOLD     0.85
-#define SEA_FOAM_J_RANGE         0.85
+/// WHERE FOAM STARTS, ON THE JACOBIAN. After the spectrum normalization fix,
+/// the old 0.85 threshold activated 22.08% of tier 1 at U10=14 and the long
+/// residue eventually covered 92.13%: a grey sheet. At 0.62 only the steepest
+/// roughly two percent births foam; persistence and procedural breakup build the
+/// visible coverage from that sparse source. [CALIBRATION]
+#define SEA_FOAM_J_THRESHOLD     0.62
+#define SEA_FOAM_J_RANGE         0.22
 
-/// Foam decay rate (1/s). Foam appears INSTANTLY and fades SLOWLY; with a
-/// direct assignment foam would disappear instantly. [CALIBRATION]
-/// FOAM FADES EXPONENTIALLY, NOT LINEARLY (1/s).
+/// Foam fades exponentially, not linearly (1/s). [CALIBRATION]
 ///
 /// A real whitecap has two stages: the active crest is bright for one to three
-/// seconds, then a residue of bubbles drifts and fades for tens of seconds. A
-/// linear decay cannot be both — at 0.28/s foam went from full to nothing in 3.6 s
-/// and the sea never looked used.
-///
-/// An exponential does both with one number. At 0.15/s the foam stays bright
-/// (over 0.7) for 2.4 s and stays visible (over 0.05) for 20 s.
-#define SEA_FOAM_DECAY           0.15
+/// seconds, then a residue of bubbles drifts and fades for tens of seconds.
+/// Separate channels make both possible: the bright cap has a 2.38 s time
+/// constant and the residue a 10 s time constant, with part of the collapsed
+/// cap transferred between them.
+#define SEA_FOAM_DECAY           0.42
+#define SEA_FOAM_RESIDUE_DECAY   0.10
+#define SEA_FOAM_RESIDUE_TRANSFER 0.65
+#define SEA_FOAM_WIND_DRIFT      0.018
 
 // --- FFT and grid ---
 

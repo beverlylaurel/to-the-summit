@@ -127,6 +127,28 @@ public class TerrainSurface : MonoBehaviour
     }
 
     public TerrainMaterialSettings Settings => settings;
+    public float DebugWetness => wetness;
+
+    /// Rain intensity controls HOW FAST the surface approaches saturation, not
+    /// the saturation ceiling. A steady drizzle eventually wets rock and sand;
+    /// the old `target = rain` could never make a 0.2 shower more than 20% wet.
+    public static float AdvanceWetness(float current, float rainIntensity,
+                                       float deltaTime, float dryingSeconds)
+    {
+        current = Mathf.Clamp01(current);
+        float rain = Mathf.Clamp01(rainIntensity);
+        float dt = Mathf.Max(0f, deltaTime);
+
+        if (rain > 0.001f)
+        {
+            const float FullRainWettingSeconds = 8f;
+            float blend = 1f - Mathf.Exp(-dt * rain / FullRainWettingSeconds);
+            return Mathf.Lerp(current, 1f, blend);
+        }
+
+        float dryBlend = 1f - Mathf.Exp(-dt / Mathf.Max(1f, dryingSeconds));
+        return Mathf.Lerp(current, 0f, dryBlend);
+    }
 
     /// The terrain's wind weight at the given world position, 0.67-2.0. 1 is neutral.
     /// On windward and convex surfaces the wind speeds up, on leeward and concave ones it slows
@@ -215,16 +237,21 @@ public class TerrainSurface : MonoBehaviour
             ? 1f - temperature.SnowFractionAt(observer.position.y)
             : 1f;
 
-        // Wetting is fast, drying is slow: when the rain stops the rock stays dark for a while
-        float target = precipitation * rainShare;
-        float duration = target > wetness ? 8f : Mathf.Max(1f, settings.dryingSeconds);
-        wetness = Mathf.Lerp(wetness, target, 1f - Mathf.Exp(-Time.deltaTime / duration));
+        // Wetting is fast, drying is slow. Rain controls the deposition RATE;
+        // even a light but persistent shower eventually saturates the surface.
+        // When it stops, the film drains and evaporates over the configured time.
+        float rainIntensity = precipitation * rainShare;
+        wetness = AdvanceWetness(wetness, rainIntensity, Time.deltaTime,
+                                 settings.dryingSeconds);
         material.SetFloat(WetnessId, wetness);
 
         // THE RAIN ITSELF, NOT THE FILM IT LEAVES. `wetness` lags on purpose -- the rock
         // stays dark long after the rain stops -- but a ring only exists while a drop is
         // actually landing, so the rings read this instead.
-        Shader.SetGlobalFloat(RainIntensityId, precipitation * rainShare);
+        // `_SurfaceRainIntensity` lives in UnityPerMaterial beside the rest of the
+        // mountain inputs. A global write cannot populate that constant-buffer slot:
+        // the shader kept reading zero even while the global debugger showed rain.
+        material.SetFloat(RainIntensityId, rainIntensity);
 
         // THE WETNESS IS PUBLISHED AS A GLOBAL TOO. The snow on objects
         // (`SnowCoverObject`) is on another material; if it does not see the same wetness,
