@@ -14,6 +14,10 @@ public class MouseLook : MonoBehaviour
 
     float pitch;
 
+    /// Temporarily blocked by full-screen interactions such as reviewing a photograph.
+    /// The component remains enabled so its pitch state is not reconstructed mid-frame.
+    public bool InputEnabled { get; set; } = true;
+
     public void Bind(Transform pivot) => cameraPivot = pivot;
 
     void OnEnable()
@@ -28,7 +32,7 @@ public class MouseLook : MonoBehaviour
     void Update()
     {
         // While the cursor is free the input belongs to the UI, not the game
-        if (Cursor.lockState != CursorLockMode.Locked) return;
+        if (!InputEnabled || Cursor.lockState != CursorLockMode.Locked) return;
 
         var mouse = Mouse.current;
         if (mouse == null) return;

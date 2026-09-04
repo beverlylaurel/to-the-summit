@@ -2062,3 +2062,30 @@ görünmez oldu (`DECISIONS.md`).
 
 **`smallWaveCutoff` serbest bir sayı değil**, en ince ızgaranın Nyquist'idir: `l = 1/k_nyq`.
 Hücre boyuna bağlarsan diz kılcal tepenin altına düşer ve bandın yarısını keser.
+
+## Vintage DSLR fotoğraf modu (2026-09-04)
+
+`VintagePhotoMode` oyuncuya bootstrap tarafından açıkça bağlanır; çalışma zamanında nesne
+aramaz. `4` kamerayı ele alır/bırakır, sağ tık 3:2 optik vizöre girer/çıkar, sol tık çeker.
+Tekerlek vizörde yumuşak optik zoom yapar; kamera indirildiğinde oyuncunun görüş açısı geri
+yüklenir. Zoom sınırı, adımı ve geçiş süresi profil üzerinden ayarlanır.
+`Q/E` poz telafisini 1/3 EV değiştirir, `G` yalnız kamera eldeyken galeriye girer ve
+`A/D` veya ok tuşları kayıtlar arasında gezer. Geçici model ana kameranın altında duran küçük
+bir küptür; vizörde ve çekimde gizlenir.
+
+Çekim ekran görüntüsü değildir. Normalde kapalı duran `Vintage DSLR Capture Camera`, ana
+kameranın konumunu ve render ayarlarını kopyalayıp yalnız bir URP render'ı boyunca
+`R16G16B16A16_SFloat` hedefe çizer. Post-process, TAA, MSAA ve dithering kapalıdır; buna
+karşılık Game kamera türünde çalışan gerçek sis, bulut, deniz, yağış ve ışık geçişleri aynen
+kalır. SRP `endCameraRendering` bildirimi gelmeden tampon okunmaz. Vizör fotoğrafın merkez
+%95'ini gösterir; kadraj hesabı ekrandaki vizör yüksekliğini ve zoom açısını içerir.
+Merkez odak halkası ile amber poz skalası optik vizörü temsil eder. Alt metinler ekran
+boşluğuna göre ölçeklenir. Kayıt 1944×1296 scene-linear kaynaktan 3888×2592'ye işlenir.
+
+`VintagePhoto.shader` sırasıyla log-luminans ölçümü, poz, beyaz ayarı, hafif lens distorsiyonu,
+lateral renk sapması, cos4/mekanik vignette, ISO'ya bağlı shot/read noise, sabit PRNU ve hot
+pixel, 12-bit nicemleme, nötr CCM, white-point Reinhard eğrisi ve ton sonrası keskinleştirme
+uygular. JPEG gerçekten `quality=92` ile kodlandığı için ikinci bir sahte DCT/4:2:0 katmanı
+yoktur. Her fotoğraf ve JSON poz metadatası
+`Application.persistentDataPath/Photos` altında saklanır; galeri yalnız gösterilen JPEG'i RAM'e
+açar.

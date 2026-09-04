@@ -12,9 +12,10 @@ iş bitince buradan silinir.**
 
 ## Kayıtlar
 
-78 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
+79 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
 
 - [İz gövdesi damgalar arası yolu SÜPÜRMÜYOR — KAPANDI (2026-08-25)](#iz-govdesi-damgalar-arasi-yolu-supurmuyor-kapandi-2026-08-25)
+- [Fotoğraf modu: ayrı HDR çekim ve gerçek JPEG (2026-09-04)](#fotograf-modu-ayri-hdr-cekim-ve-gercek-jpeg-2026-09-04)
 - [Ova kontrastı düzeltilmiyor — irtifadan geliyor](#ova-kontrasti-duzeltilmiyor-irtifadan-geliyor)
 - [Oyun alanı 17.5 → 30 km, ve yalıtım halkası](#oyun-alani-175-30-km-ve-yalitim-halkasi)
 - [Silinecek geçiciler](#silinecek-geciciler)
@@ -2722,3 +2723,29 @@ FFT'nin kare süresi.
 ölçeri (`desen.py`) ve titreşim ölçeri (`titreme.py`). Kafes ölçeri geçmişin gerçek
 hatasına karşı doğrulandı: kapiler bant açıkken kareler %40-41 yoğunlaşma / %1,0-1,2 tepe
 payı veriyor, katman kaldırılmış kare %7,6 / %0,065, bugünkü kareler %24,6 / %0,42.
+
+## Fotoğraf modu: ayrı HDR çekim ve gerçek JPEG (2026-09-04)
+
+**Spec'ten korunan omurga:** 2005–2010 APS-C karakteri, 3:2 10 MP çıktı, %95 optik vizör,
+scene-linear kaynak, post-process'i çekime almama, ölçümlü poz, 12-bit sensör davranışı,
+renk matrisi, lens kusurları, iki saniyelik inceleme ve kalıcı galeri.
+
+**Ana karardan sapma yok:** çekim ana ekran tamponundan yapılmıyor. Ana kameranın oyun için
+uygulanan ACES/renk ayarı/göz adaptasyonunu geri sökmek sayısal olarak mümkün değil ve çift
+tone-map üretir. Bunun yerine normalde kapalı ayrı Game kamera tek kare HDR hedefe render eder.
+Bu kamera sürekli açık tutulmadığı için bulut/sis gibi pahalı özelliklerin normal FPS bedeli
+yoktur.
+
+**Bilinçli spec uyarlaması:** ayrı bir GPU DCT ve 4:2:0 taklidi ardından quality-95 JPEG yerine,
+Unity'nin gerçek JPEG kodlayıcısı doğrudan quality 92 kullanır. İki kez nicemleme blokları
+gereksiz yere büyütür ve fotoğrafı gerçekte olmayan kadar bozar. Sensör/demosaic zinciri de tam
+RGGB ara tampon yerine yarım çözünürlüklü scene-linear yakalama, kanal-bağımlı optik örnekleme,
+shot/read/fixed-pattern noise ve 12-bit ADC nicemlemesiyle temsil edilir; sonuç 10 MP'ye
+çıkarılır. Tam Bayer/Malvar zinciri ancak moire test kartlarında bu yaklaşımın gözle görülür
+şekilde yetersiz kaldığı ölçülürse açılacak.
+
+**Scene luminance scale uydurulmadı.** Projenin radyansı cd/m2 kalibrasyonunda değil; spece bir
+sayı yazıyor diye 1.0 kabul etmek pozlamayı fiziksel yapmaz. Geometrik ortalama scene-linear
+luminans 18% griye ölçülür, poz telafisi stop cinsinden uygulanır. ISO ve diyafram fotoğrafın
+sensör karakteri/metadatasıdır; gerçek fiziksel ışık birimi kalibre edilirse EV100 denklemine
+geçiş için `VintageDslrProfile` tek ayar noktasıdır.

@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5bca0e374b73c1143a0f6fccb082b5f2, type: 3}
+  m_Name: VintageDslrProfile
+  m_EditorClassIdentifier: Assembly-CSharp::VintageDslrProfile
+  captureWidth: 1944
+  captureHeight: 1296
+  outputWidth: 3888
+  outputHeight: 2592
+  viewfinderCoverage: 0.95
+  cardCapacity: 247
+  jpegQuality: 92
+  reviewSeconds: 2
+  maximumZoom: 4
+  zoomStep: 0.12
+  zoomSmoothSeconds: 0.18
+  metering: 0
+  meteringGray: 0.18
+  exposureCompensation: 0
+  aperture: 8
+  iso: 200
+  referenceShutterSeconds: 0.008
+  whiteBalance: 0
+  contrast: 0.35
+  sharpen: 0.32
+  barrelDistortion: -0.018
+  lateralChromaticAberration: 0.00115
+  vignetteStrength: 0.58
+  grainStrength: 0.32
+  purpleFringe: 0.22

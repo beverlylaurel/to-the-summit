@@ -39,6 +39,10 @@ public class FirstPersonController : MonoBehaviour
     /// Speed multiplier for testing. 1 in normal play.
     public float SpeedMultiplier { get; set; } = 1f;
 
+    /// Full-screen interactions can stop deliberate movement while gravity and grounding keep
+    /// running. Disabling the whole component would freeze an airborne player.
+    public bool InputEnabled { get; set; } = true;
+
     /// A LIMIT SOMEONE ELSE IMPOSES ON HORIZONTAL MOVEMENT.
     ///
     /// Given the player's position and the velocity they want, it answers with the velocity
@@ -64,7 +68,7 @@ public class FirstPersonController : MonoBehaviour
         if (!controller.enabled) return;
 
         // While the cursor is free the input belongs to the UI, not the game
-        if (Cursor.lockState == CursorLockMode.Locked) Move();
+        if (InputEnabled && Cursor.lockState == CursorLockMode.Locked) Move();
 
         ApplyGravity();
     }

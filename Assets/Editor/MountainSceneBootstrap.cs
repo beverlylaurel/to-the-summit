@@ -60,6 +60,9 @@ public static class MountainSceneBootstrap
     const string CloudMaterialPath = "Assets/Settings/VolumetricClouds.mat";
     const string CloudWeatherPath = "Assets/Settings/CloudWeatherSettings.asset";
     const string SkyWeatherPath = "Assets/Settings/SkyWeatherSettings.asset";
+    const string VintageDslrProfilePath = "Assets/Settings/VintageDslrProfile.asset";
+    const string VintagePhotoShaderPath = "Assets/Shaders/VintagePhoto.shader";
+    const string VintageCameraMaterialPath = "Assets/Settings/VintageCameraPlaceholder.mat";
     const string MoonLightName = "Moon Light";
 
     /// Volume where `EnsureCloudVolume` writes volumetric cloud component.
@@ -214,7 +217,9 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
-        var camera = player.GetComponentInChildren<Camera>();
+        var camera = FindPlayerCamera(player);
+        if (camera == null)
+            throw new System.InvalidOperationException("Player has no MainCamera-tagged camera.");
         float farClip = current.terrainSize * FarClipFactor;
         if (!Mathf.Approximately(camera.farClipPlane, farClip))
         {
@@ -468,7 +473,8 @@ public static class MountainSceneBootstrap
         EnsureRouteOverlay(gen, ref changed);
         EnsureClimbHud(player, gen, ref changed);
         EnsureDebugMenu(player, ref changed);
-        Phase("route, HUD");
+        EnsureVintagePhotoMode(player, camera, ref changed);
+        Phase("route, HUD, photography");
 
         if (changed)
         {
@@ -1050,6 +1056,117 @@ public static class MountainSceneBootstrap
         player.AddComponent<CursorLock>();
 
         return player.AddComponent<FirstPersonController>();
+    }
+
+    static Camera FindPlayerCamera(FirstPersonController player)
+    {
+        foreach (Camera candidate in player.GetComponentsInChildren<Camera>(true))
+            if (candidate.CompareTag("MainCamera")) return candidate;
+        return null;
+    }
+
+    static void EnsureVintagePhotoMode(FirstPersonController player, Camera viewCamera,
+                                       ref bool changed)
+    {
+        var profile = LoadOrCreate<VintageDslrProfile>(VintageDslrProfilePath);
+        var shader = AssetDatabase.LoadAssetAtPath<Shader>(VintagePhotoShaderPath);
+        if (shader == null)
+            throw new System.InvalidOperationException(
+                $"Photo processing shader not found: {VintagePhotoShaderPath}");
+
+        Transform pivot = viewCamera.transform.parent;
+        Transform captureTransform = pivot.Find("Vintage DSLR Capture Camera");
+        Camera captureCamera;
+        if (captureTransform == null)
+        {
+            var captureObject = new GameObject("Vintage DSLR Capture Camera");
+            captureObject.transform.SetParent(pivot, false);
+            captureCamera = captureObject.AddComponent<Camera>();
+            captureCamera.enabled = false;
+            captureObject.tag = "Untagged";
+            captureCamera.GetUniversalAdditionalCameraData();
+            changed = true;
+        }
+        else
+        {
+            captureCamera = captureTransform.GetComponent<Camera>();
+            if (captureCamera == null)
+            {
+                captureCamera = captureTransform.gameObject.AddComponent<Camera>();
+                changed = true;
+            }
+            captureCamera.enabled = false;
+            captureTransform.gameObject.tag = "Untagged";
+            captureCamera.GetUniversalAdditionalCameraData();
+        }
+
+        Transform placeholderTransform = viewCamera.transform.Find("Vintage Camera Placeholder");
+        Renderer placeholder;
+        if (placeholderTransform == null)
+        {
+            // Do not use CreatePrimitive here: Unity 6 may serialize the temporary collider's
+            // generated PhysicsMaterial into the scene even after the collider is destroyed.
+            var placeholderObject = new GameObject("Vintage Camera Placeholder",
+                typeof(MeshFilter), typeof(MeshRenderer));
+            placeholderObject.transform.SetParent(viewCamera.transform, false);
+            placeholderObject.GetComponent<MeshFilter>().sharedMesh =
+                Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+            placeholderTransform = placeholderObject.transform;
+            placeholder = placeholderObject.GetComponent<Renderer>();
+            changed = true;
+        }
+        else
+        {
+            placeholder = placeholderTransform.GetComponent<Renderer>();
+        }
+
+        if (placeholder == null)
+            throw new System.InvalidOperationException("Vintage camera placeholder has no Renderer.");
+
+        Vector3 cameraPosition = new(0.28f, -0.24f, 0.48f);
+        Quaternion cameraRotation = Quaternion.Euler(8f, -11f, 4f);
+        Vector3 cameraScale = new(0.24f, 0.15f, 0.13f);
+        if (placeholderTransform.localPosition != cameraPosition
+            || placeholderTransform.localRotation != cameraRotation
+            || placeholderTransform.localScale != cameraScale)
+        {
+            placeholderTransform.SetLocalPositionAndRotation(cameraPosition, cameraRotation);
+            placeholderTransform.localScale = cameraScale;
+            changed = true;
+        }
+
+        Material placeholderMaterial = AssetDatabase.LoadAssetAtPath<Material>(
+            VintageCameraMaterialPath);
+        if (placeholderMaterial == null)
+        {
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit");
+            if (lit == null) throw new System.InvalidOperationException("URP Lit shader not found.");
+            placeholderMaterial = new Material(lit) { name = "Vintage Camera Placeholder" };
+            placeholderMaterial.SetColor("_BaseColor", new Color(0.045f, 0.05f, 0.055f, 1f));
+            placeholderMaterial.SetFloat("_Metallic", 0.12f);
+            placeholderMaterial.SetFloat("_Smoothness", 0.28f);
+            AssetDatabase.CreateAsset(placeholderMaterial, VintageCameraMaterialPath);
+            changed = true;
+        }
+        if (placeholder.sharedMaterial != placeholderMaterial)
+        {
+            placeholder.sharedMaterial = placeholderMaterial;
+            changed = true;
+        }
+        placeholder.enabled = false;
+
+        VintagePhotoMode photoMode = player.GetComponent<VintagePhotoMode>();
+        if (photoMode == null)
+        {
+            photoMode = player.gameObject.AddComponent<VintagePhotoMode>();
+            changed = true;
+        }
+
+        photoMode.Bind(profile, shader, viewCamera, captureCamera, placeholder,
+            player.GetComponent<MouseLook>(), player);
+        EditorUtility.SetDirty(photoMode);
+        EditorUtility.SetDirty(captureCamera);
+        EditorUtility.SetDirty(placeholder);
     }
 
     static void CreateWeather()
