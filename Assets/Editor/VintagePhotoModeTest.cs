@@ -21,12 +21,13 @@ public static class VintagePhotoModeTest
         bool profileValid = profile != null
                          && profile.captureWidth == 1944 && profile.captureHeight == 1296
                          && profile.outputWidth == 3888 && profile.outputHeight == 2592
-                         && Mathf.Abs(profile.viewfinderCoverage - 0.95f) < 0.001f;
+                         && profile.previewWidth >= 648 && profile.meterIntervalSeconds > 0f;
 
         Shader shader = AssetDatabase.LoadAssetAtPath<Shader>(ShaderPath);
         bool shaderValid = shader != null && shader.isSupported;
         bool shaderBlit = ShaderBlitTest(shader, out Color whiteResponse);
         string shaderSource = File.ReadAllText(ShaderPath);
+        bool liveShader = LiveShaderTest(shader);
         bool sensor = shaderSource.Contains("4095.0")
                    && shaderSource.Contains("shotSigma")
                    && shaderSource.Contains("fixedPattern")
@@ -45,9 +46,10 @@ public static class VintagePhotoModeTest
                         && source.Contains("VintagePhotoLibrary");
 
         VintagePhotoMode mode = Object.FindAnyObjectByType<VintagePhotoMode>(FindObjectsInactive.Include);
-        bool scene = mode != null;
+        bool scene = mode != null && new SerializedObject(mode)
+            .FindProperty("previewFeature").objectReferenceValue != null;
 
-        report.AppendLine($"  [{Mark(profileValid)}] 1944x1296 capture, 3888x2592 output, 95% viewfinder");
+        report.AppendLine($"  [{Mark(profileValid)}] 1944x1296 capture, 3888x2592 output, live metering profile");
         report.AppendLine($"  [{Mark(shaderValid)}] processing shader imported and supported");
         report.AppendLine($"  [{Mark(shaderBlit)}] Graphics.Blit source is bound: "
                         + $"{whiteResponse.r:F3}/{whiteResponse.g:F3}/{whiteResponse.b:F3}");
@@ -57,8 +59,10 @@ public static class VintagePhotoModeTest
         report.AppendLine($"  [{Mark(persistence)}] JPEG and metadata are persisted");
         report.AppendLine($"  [{Mark(scene)}] photo mode is bound in Game scene");
 
+        report.AppendLine($"  [{Mark(liveShader)}] linear meter, live exposure and focus zero/active controls");
+
         ok = profileValid && shaderValid && shaderBlit && sensor && controls
-          && noScreenshot && persistence && scene;
+          && noScreenshot && persistence && scene && liveShader;
         report.AppendLine(ok ? "RESULT: PASSED" : "RESULT: FAILED");
         return report.ToString();
     }
@@ -103,4 +107,71 @@ public static class VintagePhotoModeTest
 
         return response.r > 0.5f && response.g > 0.5f && response.b > 0.5f;
     }
+    static bool LiveShaderTest(Shader shader)
+    {
+        if (shader == null || !shader.isSupported) return false;
+        var material = new Material(shader);
+        var source = new Texture2D(64, 64, TextureFormat.RGBAFloat, false, true);
+        var target = new RenderTexture(64, 64, 0, RenderTextureFormat.ARGBFloat,
+            RenderTextureReadWrite.Linear);
+        var read = new Texture2D(64, 64, TextureFormat.RGBAFloat, false, true);
+        RenderTexture previous = RenderTexture.active;
+        try
+        {
+            target.Create();
+            var colors = new Color[64 * 64];
+            for (int i = 0; i < colors.Length; i++) colors[i] = new Color(0.25f, 0.25f, 0.25f, 1f);
+            source.SetPixels(colors);
+            source.Apply();
+            Graphics.Blit(source, target, material, 1);
+            ReadTarget(target, read);
+            bool meter = Mathf.Abs(read.GetPixel(32, 32).r + 2f) < 0.002f;
+
+            material.SetVector("_WhiteBalance", Vector4.one);
+            material.SetFloat("_IsoScale", 1f);
+            material.SetFloat("_Exposure", 0.5f);
+            Graphics.Blit(source, target, material, 0);
+            ReadTarget(target, read);
+            float low = read.GetPixel(32, 32).r;
+            material.SetFloat("_Exposure", 1f);
+            Graphics.Blit(source, target, material, 0);
+            ReadTarget(target, read);
+            bool exposure = read.GetPixel(32, 32).r > low * 1.5f;
+
+            for (int y = 0; y < 64; y++)
+            for (int x = 0; x < 64; x++)
+                colors[y * 64 + x] = (x / 4) % 2 == 0 ? Color.white : Color.black;
+            source.SetPixels(colors);
+            source.Apply();
+            material.SetVector("_FocusStep", Vector4.zero);
+            Graphics.Blit(source, target, material, 2);
+            ReadTarget(target, read);
+            bool clear = Mathf.Abs(read.GetPixel(32, 32).r - 1f) < 0.002f
+                      && read.GetPixel(36, 32).r < 0.002f;
+            material.SetVector("_FocusStep", new Vector4(8f / 64f, 0f, 0f, 0f));
+            Graphics.Blit(source, target, material, 2);
+            ReadTarget(target, read);
+            float softened = read.GetPixel(32, 32).r;
+            bool focus = softened > 0.15f && softened < 0.85f;
+            Debug.Log($"Live shader controls: meter={meter}, exposure={exposure}, clear={clear}, focus={focus} ({softened:F3})");
+            return meter && exposure && clear && focus;
+        }
+        finally
+        {
+            RenderTexture.active = previous;
+            target.Release();
+            Object.DestroyImmediate(target);
+            Object.DestroyImmediate(source);
+            Object.DestroyImmediate(read);
+            Object.DestroyImmediate(material);
+        }
+    }
+
+    static void ReadTarget(RenderTexture target, Texture2D pixels)
+    {
+        RenderTexture.active = target;
+        pixels.ReadPixels(new Rect(0, 0, target.width, target.height), 0, 0);
+        pixels.Apply();
+    }
+
 }

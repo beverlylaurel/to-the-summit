@@ -28,6 +28,7 @@ Shader "Hidden/ToTheSummit/VintagePhoto"
         float _GrainStrength;
         float _PurpleFringe;
         float3 _WhiteBalance;
+        float2 _FocusStep;
 
         struct Attributes
         {
@@ -170,6 +171,29 @@ Shader "Hidden/ToTheSummit/VintagePhoto"
                 c += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv - d).rgb;
                 float logLuminance = log2(max(PhotoLuminance(c * 0.2), 0.00001));
                 return logLuminance.xxxx;
+            }
+            ENDHLSL
+        }
+
+        // A separable focus transition applied only to the live view, after camera colour.
+        Pass
+        {
+            Name "LiveFocus"
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment FragFocus
+            float4 FragFocus(Varyings input) : SV_Target
+            {
+                float2 uv = input.uv;
+                #if UNITY_UV_STARTS_AT_TOP
+                if (_MainTex_TexelSize.y < 0.0) uv.y = 1.0 - uv.y;
+                #endif
+                float4 color = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv) * 0.227027;
+                color += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv + _FocusStep * 0.346154) * 0.316216;
+                color += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv - _FocusStep * 0.346154) * 0.316216;
+                color += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv + _FocusStep * 0.807692) * 0.070270;
+                color += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv - _FocusStep * 0.807692) * 0.070270;
+                return color;
             }
             ENDHLSL
         }

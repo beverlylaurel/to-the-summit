@@ -2069,24 +2069,30 @@ Hücre boyuna bağlarsan diz kılcal tepenin altına düşer ve bandın yarısı
 aramaz. `4` kamerayı ele alır/bırakır, sağ tık 3:2 optik vizöre girer/çıkar, sol tık çeker.
 Tekerlek vizörde yumuşak optik zoom yapar; kamera indirildiğinde oyuncunun görüş açısı geri
 yüklenir. Zoom sınırı, adımı ve geçiş süresi profil üzerinden ayarlanır.
-`VintageZoomFocus` bağıl lens hızını kısa bir netlik kaybına çevirir. Geçici Bokeh
-volume yalnız ana kameranın render aralığında etkinleşir; UI, galeri ve ayrı JPEG
-kamerasına uygulanmaz. Şiddet, hız eşiği ve toparlanma süresi DSLR profilindedir.
-Lens durduğunda efekt sıfıra iner; bileşen kapanırken volume ve abonelikler temizlenir.
-Referanslı `VintageZoomFocusProfile` URP build elemesinde DOF shader'ını korur;
-yalnız çalışma zamanı kopyası değiştirilir.
-`Q/E` poz telafisini 1/3 EV değiştirir, `G` yalnız kamera eldeyken galeriye girer ve
-`A/D` veya ok tuşları kayıtlar arasında gezer. Geçici model ana kameranın altında duran küçük
-bir küptür; vizörde ve çekimde gizlenir.
+`VintageZoomFocus` bağıl lens hızını geçici bir netlik kaybına çevirir. Canlı görüntü,
+renk işlemesinden sonra ayrılabilir bir blur geçişinden geçer; UI ve JPEG net kalır.
+Hızlı iki yönlü zoom'da şiddet yükselir, lens durunca sıfıra iner. Şiddet, piksel
+ölçeği ve toparlanma süresi DSLR profilindedir.
+`Q/E` poz telafisini 1/3 EV değiştirir; etkisi canlı görüntüde görünür. `G` yalnız
+kamera eldeyken galeriye girer, `A/D` veya ok tuşları kayıtlar arasında gezer.
+Geçici model vizörde ve çekimde gizlenir.
 
-Çekim ekran görüntüsü değildir. Normalde kapalı duran `Vintage DSLR Capture Camera`, ana
-kameranın konumunu ve render ayarlarını kopyalayıp yalnız bir URP render'ı boyunca
-`R16G16B16A16_SFloat` hedefe çizer. Post-process, TAA, MSAA ve dithering kapalıdır; buna
-karşılık Game kamera türünde çalışan gerçek sis, bulut, deniz, yağış ve ışık geçişleri aynen
-kalır. SRP `endCameraRendering` bildirimi gelmeden tampon okunmaz. Vizör fotoğrafın merkez
-%95'ini gösterir; kadraj hesabı ekrandaki vizör yüksekliğini ve zoom açısını içerir.
-Merkez odak halkası ile amber poz skalası optik vizörü temsil eder. Alt metinler ekran
-boşluğuna göre ölçeklenir. Kayıt 1944×1296 scene-linear kaynaktan 3888×2592'ye işlenir.
+`VintagePhotoPreviewFeature`, yalnız açıkça kayıtlı ana kameranın HDR rengini oyun
+post-process'inden önce alır. Atmosfer, bulutlar ve yağış tamamlanmıştır. Görüntünün
+3:2 kadrajı kalıcı düşük çözünürlüklü bir tamponda tutulur; ikinci dünya render'ı yoktur.
+`VintagePhotoPreview` küçük log-luminans tamponunu asenkron okur. Ölçüm hedefi EV
+cinsinden yumuşatılır; aydınlığa ve karanlığa geçiş süreleri ayrı ayarlanır. Poz telafisi
+bu adaptasyona eklenir; renk/lens/sensör ayarları `VintagePhotoProcessing` üzerinden
+JPEG ile aynı shader'a gider. Ölçüm geri çağrıları mod değişimiyle geçersiz kılınır.
+
+Çekim ekran görüntüsü değildir. Kapalı duran `Vintage DSLR Capture Camera`, deklanşörde
+ana kameranın pozunu/kadrajını kopyalayıp yalnız bir URP render'ı boyunca
+`R16G16B16A16_SFloat` hedefe çizer. Oyun post-process'i, TAA, MSAA ve dithering kapalıdır.
+Deklanşörde vizörde görülen pozlama ve sensör seed'i kilitlenir; yüksek çözünürlüklü
+kare yeniden ölçülmez. SRP `endCameraRendering` bildirimi gelmeden tampon okunmaz.
+Kadraj artık canlı görünümle tam eşleşir; eski optik %95 kapsama payı kaldırılmıştır.
+Kayıt 1944×1296 kaynaktan 3888×2592'ye işlenir. Önizleme daha düşük çözünürlüklüdür;
+JPEG sıkıştırması, örnekleme ve hareketli yağış nedeniyle piksel düzeyinde özdeşlik beklenmez.
 
 `VintagePhoto.shader` sırasıyla log-luminans ölçümü, poz, beyaz ayarı, hafif lens distorsiyonu,
 lateral renk sapması, cos4/mekanik vignette, ISO'ya bağlı shot/read noise, sabit PRNU ve hot

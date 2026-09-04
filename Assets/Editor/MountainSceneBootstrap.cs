@@ -1069,18 +1069,18 @@ public static class MountainSceneBootstrap
                                        ref bool changed)
     {
         var profile = LoadOrCreate<VintageDslrProfile>(VintageDslrProfilePath);
-        if (profile.zoomFocusProfile == null)
+        var renderer = AssetDatabase.LoadAssetAtPath<ScriptableRendererData>(RendererPath);
+        VintagePhotoPreviewFeature liveFeature = null;
+        foreach (var existing in renderer.rendererFeatures)
+            if (existing is VintagePhotoPreviewFeature found) { liveFeature = found; break; }
+        if (liveFeature == null)
         {
-            var focusProfile = LoadOrCreate<VolumeProfile>("Assets/Settings/VintageZoomFocusProfile.asset");
-            if (!focusProfile.TryGet<DepthOfField>(out var focus))
-            {
-                focus = focusProfile.Add<DepthOfField>(true);
-                AssetDatabase.AddObjectToAsset(focus, focusProfile);
-            }
-            focus.mode.Override(DepthOfFieldMode.Bokeh);
-            profile.zoomFocusProfile = focusProfile;
-            EditorUtility.SetDirty(focusProfile);
-            EditorUtility.SetDirty(profile);
+            liveFeature = ScriptableObject.CreateInstance<VintagePhotoPreviewFeature>();
+            liveFeature.name = "Vintage Live Preview";
+            renderer.rendererFeatures.Add(liveFeature);
+            AssetDatabase.AddObjectToAsset(liveFeature, renderer);
+            renderer.SetDirty();
+            EditorUtility.SetDirty(renderer);
             changed = true;
         }
         var shader = AssetDatabase.LoadAssetAtPath<Shader>(VintagePhotoShaderPath);
@@ -1176,7 +1176,7 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
-        photoMode.Bind(profile, shader, viewCamera, captureCamera, placeholder,
+        photoMode.Bind(profile, shader, liveFeature, viewCamera, captureCamera, placeholder,
             player.GetComponent<MouseLook>(), player);
         EditorUtility.SetDirty(photoMode);
         EditorUtility.SetDirty(captureCamera);

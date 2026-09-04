@@ -7,7 +7,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-/// Equips a physical camera, presents its optical viewfinder and records a separate,
+/// Equips a physical camera, presents an exposure-simulated live view and records a separate,
 /// pre-post-process HDR exposure. The game's eye adaptation and cinematic grade never become
 /// part of the JPEG; the camera's own lens, sensor and ISP response is applied exactly once.
 [DisallowMultipleComponent]
@@ -33,6 +33,7 @@ public sealed class VintagePhotoMode : MonoBehaviour
 
     [SerializeField] VintageDslrProfile profile;
     [SerializeField] Shader processingShader;
+    [SerializeField] VintagePhotoPreviewFeature previewFeature;
     [SerializeField] Camera viewCamera;
     [SerializeField] Camera captureCamera;
     [SerializeField] Renderer placeholder;
@@ -53,6 +54,7 @@ public sealed class VintagePhotoMode : MonoBehaviour
     float zoomVelocity;
     bool ownsFieldOfView;
     VintageZoomFocus zoomFocus;
+    VintagePhotoPreview preview;
     bool capturing;
     bool captureCameraRendered;
     string captureStage = "Idle";
@@ -71,6 +73,14 @@ public sealed class VintagePhotoMode : MonoBehaviour
     public int PhotoCount => library?.Count ?? 0;
 
 #if UNITY_EDITOR
+    public bool EditorPreviewReady => preview?.Ready ?? false;
+    public float EditorPreviewExposure => preview?.Exposure ?? 0f;
+    public float EditorPreviewLuminance => preview?.Luminance ?? 0f;
+    public Texture EditorPreviewImage => preview?.Image;
+    public float EditorFocusAmount => zoomFocus?.Amount ?? 0f;
+    public void EditorViewfinderForTest(bool active) => SetMode(active ? Mode.Viewfinder : Mode.Hidden);
+    public void EditorZoomForTest(float steps) => ChangeZoom(steps);
+
     /// Integration-test entry point. It is absent from player builds and uses the same capture
     /// coroutine as the real left-click path.
     public void EditorCaptureForTest()
@@ -81,10 +91,11 @@ public sealed class VintagePhotoMode : MonoBehaviour
     }
 #endif
 
-    public void Bind(VintageDslrProfile cameraProfile, Shader photoShader, Camera playerCamera,
+    public void Bind(VintageDslrProfile cameraProfile, Shader photoShader, VintagePhotoPreviewFeature liveFeature, Camera playerCamera,
                      Camera hdrCaptureCamera, Renderer cameraPlaceholder, MouseLook look,
                      FirstPersonController controller)
     {
+        previewFeature = liveFeature;
         profile = cameraProfile;
         processingShader = photoShader;
         viewCamera = playerCamera;
@@ -100,7 +111,7 @@ public sealed class VintagePhotoMode : MonoBehaviour
 
     void Initialize()
     {
-        if (profile == null || processingShader == null || viewCamera == null
+        if (profile == null || processingShader == null || previewFeature == null || viewCamera == null
             || captureCamera == null || placeholder == null || mouseLook == null || movement == null)
             throw new InvalidOperationException($"{nameof(VintagePhotoMode)}: dependencies are not assigned.");
 
@@ -113,8 +124,12 @@ public sealed class VintagePhotoMode : MonoBehaviour
         };
 
         library ??= new VintagePhotoLibrary();
-        zoomFocus?.Dispose();
-        zoomFocus = new VintageZoomFocus(viewCamera, profile);
+        preview?.Dispose();
+        preview = new VintagePhotoPreview(profile, processingShader);
+        previewFeature.Register(viewCamera, preview);
+        RenderPipelineManager.endCameraRendering -= OnViewCameraRendered;
+        RenderPipelineManager.endCameraRendering += OnViewCameraRendered;
+        zoomFocus = new VintageZoomFocus(profile);
         exposureCompensation = profile.exposureCompensation;
         capturing = false;
         captureStage = "Idle";
@@ -124,7 +139,10 @@ public sealed class VintagePhotoMode : MonoBehaviour
 
     void OnDisable()
     {
-        zoomFocus?.Dispose();
+        RenderPipelineManager.endCameraRendering -= OnViewCameraRendered;
+        if (preview != null) previewFeature.Unregister(preview);
+        preview?.Dispose();
+        preview = null;
         zoomFocus = null;
         RenderPipelineManager.endCameraRendering -= OnCaptureCameraRendered;
         if (captureCamera != null) captureCamera.enabled = false;
@@ -225,12 +243,11 @@ public sealed class VintagePhotoMode : MonoBehaviour
                 && (Application.platform == RuntimePlatform.WindowsEditor
                     || Application.platform == RuntimePlatform.WindowsPlayer))
                 wheel /= 120f;
-            targetZoom = Mathf.Clamp(targetZoom * Mathf.Exp(wheel * profile.zoomStep),
-                1f, profile.maximumZoom);
+            ChangeZoom(wheel);
         }
 
-        if (keyboard.qKey.wasPressedThisFrame) ChangeCompensation(-1f / 3f);
-        if (keyboard.eKey.wasPressedThisFrame) ChangeCompensation(1f / 3f);
+        if (!capturing && keyboard.qKey.wasPressedThisFrame) ChangeCompensation(-1f / 3f);
+        if (!capturing && keyboard.eKey.wasPressedThisFrame) ChangeCompensation(1f / 3f);
 
         if (mouse.leftButton.wasPressedThisFrame && !capturing)
         {
@@ -247,6 +264,12 @@ public sealed class VintagePhotoMode : MonoBehaviour
             Mathf.Round((exposureCompensation + delta) * 3f) / 3f, -3f, 3f);
     }
 
+    void ChangeZoom(float steps)
+    {
+        targetZoom = Mathf.Clamp(targetZoom * Mathf.Exp(steps * profile.zoomStep),
+            1f, profile.maximumZoom);
+    }
+
     void SetMode(Mode next)
     {
         if (next == Mode.Viewfinder && !ownsFieldOfView)
@@ -255,7 +278,9 @@ public sealed class VintagePhotoMode : MonoBehaviour
             ownsFieldOfView = true;
         }
         if (next == Mode.Hidden || next == Mode.Equipped) RestoreFieldOfView();
+        if (mode != next && next != Mode.Viewfinder) preview?.Reset();
         mode = next;
+        if (preview != null) preview.Enabled = next == Mode.Viewfinder;
         if (next != Mode.Viewfinder) zoomFocus?.Reset();
         if (placeholder != null)
             placeholder.enabled = next == Mode.Equipped;
@@ -276,6 +301,13 @@ public sealed class VintagePhotoMode : MonoBehaviour
 
     void LateUpdate()
     {
+        if (preview != null)
+        {
+            preview.Enabled = mode == Mode.Viewfinder && (!capturing || !preview.Ready);
+            Rect frame = FitRect(3f / 2f, 0.82f);
+            preview.Crop = new Vector4(frame.width / Screen.width, frame.height / Screen.height,
+                frame.x / Screen.width, frame.y / Screen.height);
+        }
         if (!ownsFieldOfView || mode != Mode.Viewfinder || capturing)
         {
             zoomFocus?.Reset();
@@ -299,6 +331,19 @@ public sealed class VintagePhotoMode : MonoBehaviour
     IEnumerator Capture()
     {
         capturing = true;
+        captureStage = "WaitingForPreview";
+        int previewFrames = 0;
+        while ((preview == null || !preview.Ready) && previewFrames++ < 60) yield return null;
+        if (preview == null || !preview.Ready)
+        {
+            capturing = false;
+            captureStage = "PreviewUnavailable";
+            ShowNotice("Vizör hazırlanıyor; tekrar dene");
+            yield break;
+        }
+        float exposure = preview.Exposure;
+        float sceneLuminance = preview.Luminance;
+        float seed = preview.Seed;
         captureStage = "WaitingForCamera";
         if (placeholder != null) placeholder.enabled = false;
 
@@ -330,18 +375,10 @@ public sealed class VintagePhotoMode : MonoBehaviour
             yield break;
         }
 
-        RenderTexture meter = CreateTarget(96, 64, GraphicsFormat.R32G32B32A32_SFloat,
-            0, "Vintage DSLR Meter");
-        Graphics.Blit(scene, meter, processingMaterial, 1);
-        float sceneLuminance = ReadMeter(meter, profile.metering);
+        // Lock the exposure/colour response that was visible at shutter time. Do not
+        // re-meter the high-resolution capture and surprise the player with a new exposure.
         captureStage = "Processing";
-        ReleaseTarget(meter);
-
-        float exposure = Mathf.Clamp(
-            profile.meteringGray / Mathf.Max(sceneLuminance, 0.00001f)
-            * Mathf.Pow(2f, exposureCompensation), 1f / 128f, 128f);
-
-        ConfigureProcessing(exposure);
+        VintagePhotoProcessing.Configure(processingMaterial, profile, exposure, seed);
         RenderTexture output = CreateTarget(profile.outputWidth, profile.outputHeight,
             GraphicsFormat.R8G8B8A8_SRGB, 0, "Vintage DSLR JPEG Source");
         Graphics.Blit(scene, output, processingMaterial, 0);
@@ -424,7 +461,7 @@ public sealed class VintagePhotoMode : MonoBehaviour
         float halfFov = viewCamera.fieldOfView * Mathf.Deg2Rad * 0.5f;
         captureCamera.fieldOfView = 2f * Mathf.Atan(
             Mathf.Tan(halfFov) * FitRect(3f / 2f, 0.82f).height
-            / Screen.height / profile.viewfinderCoverage) * Mathf.Rad2Deg;
+            / Screen.height) * Mathf.Rad2Deg;
         captureCamera.depth = viewCamera.depth + 1f;
         captureCamera.allowHDR = true;
         captureCamera.allowMSAA = false;
@@ -445,19 +482,11 @@ public sealed class VintagePhotoMode : MonoBehaviour
             captureCameraRendered = true;
     }
 
-    void ConfigureProcessing(float exposure)
+    void OnViewCameraRendered(ScriptableRenderContext context, Camera camera)
     {
-        processingMaterial.SetFloat("_Exposure", exposure);
-        processingMaterial.SetFloat("_IsoScale", profile.iso / 100f);
-        processingMaterial.SetFloat("_FrameSeed", Time.unscaledTime * 173.17f);
-        processingMaterial.SetFloat("_VignetteStrength", profile.vignetteStrength);
-        processingMaterial.SetFloat("_ChromaticAberration", profile.lateralChromaticAberration);
-        processingMaterial.SetFloat("_Distortion", profile.barrelDistortion);
-        processingMaterial.SetFloat("_Contrast", profile.contrast);
-        processingMaterial.SetFloat("_Sharpen", profile.sharpen);
-        processingMaterial.SetFloat("_GrainStrength", profile.grainStrength);
-        processingMaterial.SetFloat("_PurpleFringe", profile.purpleFringe);
-        processingMaterial.SetVector("_WhiteBalance", profile.WhiteBalanceMultipliers);
+        if (camera != viewCamera || preview == null || mode != Mode.Viewfinder) return;
+        if (capturing && preview.Ready) return;
+        preview.Render(exposureCompensation, zoomFocus?.Amount ?? 0f);
     }
 
     static RenderTexture CreateTarget(int width, int height, GraphicsFormat format,
@@ -488,39 +517,6 @@ public sealed class VintagePhotoMode : MonoBehaviour
         if (texture == null) return;
         texture.Release();
         Destroy(texture);
-    }
-
-    static float ReadMeter(RenderTexture meter, PhotoMeteringMode meteringMode)
-    {
-        RenderTexture previous = RenderTexture.active;
-        RenderTexture.active = meter;
-        var pixels = new Texture2D(meter.width, meter.height, TextureFormat.RGBAFloat, false, true);
-        pixels.ReadPixels(new Rect(0f, 0f, meter.width, meter.height), 0, 0, false);
-        pixels.Apply(false, false);
-        Color[] values = pixels.GetPixels();
-        Destroy(pixels);
-        RenderTexture.active = previous;
-
-        double weightedLog = 0.0;
-        double totalWeight = 0.0;
-        for (int y = 0; y < meter.height; y++)
-        for (int x = 0; x < meter.width; x++)
-        {
-            float nx = (x + 0.5f) / meter.width * 2f - 1f;
-            float ny = (y + 0.5f) / meter.height * 2f - 1f;
-            float radius = Mathf.Sqrt(nx * nx + ny * ny);
-            float weight = meteringMode switch
-            {
-                PhotoMeteringMode.Spot => radius < 0.13f ? 1f : 0f,
-                PhotoMeteringMode.CenterWeighted => Mathf.Lerp(0.12f, 1f,
-                    Mathf.Clamp01(1f - radius)),
-                _ => Mathf.Lerp(0.35f, 1f, Mathf.Clamp01(1f - radius * 0.72f))
-            };
-            weightedLog += values[y * meter.width + x].r * weight;
-            totalWeight += weight;
-        }
-
-        return Mathf.Pow(2f, (float)(weightedLog / Math.Max(totalWeight, 0.0001)));
     }
 
     void WriteMetadata(string jpegPath, float sceneLuminance, float exposure)
@@ -612,6 +608,8 @@ public sealed class VintagePhotoMode : MonoBehaviour
     {
         Rect frame = FitRect(3f / 2f, 0.82f);
         DrawOutsideMask(frame, 1f);
+        GUI.DrawTexture(frame, preview != null && preview.Ready ? preview.Image : Texture2D.blackTexture,
+            ScaleMode.StretchToFill, false);
         Color etched = new Color(0.91f, 0.86f, 0.72f, 0.48f);
         DrawOutline(frame, new Color(0.19f, 0.17f, 0.13f), 2f);
 
@@ -638,12 +636,13 @@ public sealed class VintagePhotoMode : MonoBehaviour
         DrawLine(new Vector2(needleX, meterY - 6f), new Vector2(needleX, meterY + 10f),
             new Color(0.94f, 0.66f, 0.29f));
 
-        float shutter = Mathf.Clamp(profile.referenceShutterSeconds, 1f / 4000f, 30f);
+        float shutter = Mathf.Clamp(profile.referenceShutterSeconds * (preview?.Exposure ?? 1f), 1f / 4000f, 30f);
         int remaining = Mathf.Max(0, profile.cardCapacity - library.Count);
         string ev = exposureCompensation >= 0f
             ? $"+{exposureCompensation:0.0}" : exposureCompensation.ToString("0.0");
+        string shutterText = shutter < 1f ? $"1/{Mathf.RoundToInt(1f / shutter)}" : $"{shutter:0.0} sn";
         string status = capturing ? "KAYDEDİLİYOR…" :
-            $"Av   f/{profile.aperture:0.#}   1/{Mathf.RoundToInt(1f / shutter)}   "
+            $"Av   f/{profile.aperture:0.#}   {shutterText}   "
             + $"ISO {profile.iso}   EV {ev}   [{remaining}]";
         GUI.Label(new Rect(frame.x, frame.yMax + footerHeight * 0.30f, frame.width, footerHeight * 0.30f),
             status + $"   {zoom:0.0}×", hudStyle);

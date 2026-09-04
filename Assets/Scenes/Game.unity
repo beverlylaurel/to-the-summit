@@ -2329,6 +2329,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VintagePhotoMode
   profile: {fileID: 11400000, guid: e94bc5de7eeb388408ee5d48a9b4f680, type: 2}
   processingShader: {fileID: 4800000, guid: 1d6c40cbe2bfe9e4eb9dd84271a857f2, type: 3}
+  previewFeature: {fileID: -638289221029664235, guid: f288ae1f4751b564a96ac7587541f7a2, type: 2}
   viewCamera: {fileID: 330585545}
   captureCamera: {fileID: 825709761}
   placeholder: {fileID: 1277213491}

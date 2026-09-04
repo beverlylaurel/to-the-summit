@@ -2749,3 +2749,17 @@ sayı yazıyor diye 1.0 kabul etmek pozlamayı fiziksel yapmaz. Geometrik ortala
 luminans 18% griye ölçülür, poz telafisi stop cinsinden uygulanır. ISO ve diyafram fotoğrafın
 sensör karakteri/metadatasıdır; gerçek fiziksel ışık birimi kalibre edilirse EV100 denklemine
 geçiş için `VintageDslrProfile` tek ayar noktasıdır.
+
+
+### Canlı pozlama önizlemesi güncellemesi (2026-09-05)
+
+Kullanıcı çekimden önce JPEG'in pozunu ve vintage renklerini görmeyi istedi. Bu nedenle
+%95 optik vizör davranışı yerini tam kadrajlı pozlama simülasyonuna bıraktı. JPEG hâlâ
+ayrı HDR render kullanır; vizör ise ana render'ın oyun renkleri uygulanmamış tamponunu
+kopyalar. İkinci sürekli dünya kamerasının maliyeti oluşmaz. Deklanşörde görülen poz
+kilitlenir; JPEG için yeniden ölçüm yapılmaz. Zoom netlik kaybı yalnız canlı önizlemede,
+renk sonrasında uygulanır; eski geçici DOF volume/profiline gerek kalmadı.
+
+Kontrol: canlı görüntü ve hemen ardından kaydedilen JPEG 96×64'e indirildiğinde
+ortalama mutlak RGB farkı yaklaşık 0,004 bulundu. Bu bir karelik karşılaştırmadır;
+yağışın hareketi, sensör örneklemesi ve JPEG kaybı nedeniyle sıfır fark hedeflenmez.
