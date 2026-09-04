@@ -120,3 +120,8 @@ Tools/rain/packed/
 
 # Kullanicinin referans gorselleri: repoya girmez.
 Review/
+
+# Blender otomatik yedekleri: her kayitta uzerine yazilir, surumlenmez
+*.blend1
+*.blend2
+*.blend3
