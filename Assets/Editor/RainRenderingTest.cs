@@ -128,6 +128,15 @@ public static class RainRenderingTest
                           && !source.Contains("maskStreak * IN.ambientColor");
         bool noPerDropTurbulence = !source.Contains("float3 Turbulence(")
                                 && !source.Contains("velocityFluctuation");
+        bool projectedMotionAxis = source.Contains(
+                                       "previousFreeDrift = freeDrift - classVelocity * exposure")
+                                && source.Contains("trajectory = worldPos - previousWorldPos")
+                                && source.Contains(
+                                       "trajectory -= box * floor(trajectory / box + 0.5)")
+                                && source.Contains("float3 projectedTrajectory = trajectory")
+                                && source.Contains("projectedTrajectory / projectedLength")
+                                && source.Contains("float rainLength = max(rainWidth, projectedLength);")
+                                && !source.Contains("float3 up = fallAxis;");
 
         report.AppendLine("  [" + Mark(mask) + "] coverage is sampled from the mask");
         report.AppendLine("  [" + Mark(noRadianceCoverage) + "] radiance does not drive coverage");
@@ -136,9 +145,11 @@ public static class RainRenderingTest
         report.AppendLine("  [" + Mark(fog) + "] rain uses the shared fog path");
         report.AppendLine("  [" + Mark(lod) + "] individual drops end at 18 m");
         report.AppendLine("  [" + Mark(noPerDropTurbulence) + "] no per-drop turbulence displacement");
+        report.AppendLine("  [" + Mark(projectedMotionAxis)
+                        + "] streak is built from the centre's swept trajectory");
 
         return mask && fog && lod && noRadianceCoverage && noRedundantAmbientSample
-            && contrastBlend && noPerDropTurbulence;
+            && contrastBlend && noPerDropTurbulence && projectedMotionAxis;
     }
 
     static bool MotionTest(StringBuilder report)
@@ -157,12 +168,19 @@ public static class RainRenderingTest
         float fastAtLimit = pixelsPerRadian * downpour / 18f;
         bool readable = slowAtLimit > 200f && fastAtLimit > slowAtLimit;
 
+        const float crosswind = 3f;
+        float slowTilt = Mathf.Atan2(crosswind, drizzle) * Mathf.Rad2Deg;
+        float fastTilt = Mathf.Atan2(crosswind, downpour) * Mathf.Rad2Deg;
+        bool windLean = slowTilt > 35f && fastTilt > 18f && fastTilt < slowTilt;
+
         report.AppendLine("  [" + Mark(range) + "] terminal speed: "
             + drizzle.ToString("F2") + "-" + downpour.ToString("F2") + " m/s");
         report.AppendLine("  [" + Mark(readable) + "] speed at 18 m: "
             + slowAtLimit.ToString("F0") + "-" + fastAtLimit.ToString("F0") + " px/s");
+        report.AppendLine("  [" + Mark(windLean) + "] 3 m/s crosswind tilt: "
+            + fastTilt.ToString("F1") + "-" + slowTilt.ToString("F1") + " deg from vertical");
 
-        return range && readable;
+        return range && readable && windLean;
     }
 
     static bool WetSurfaceTest(StringBuilder report)
@@ -180,7 +198,14 @@ public static class RainRenderingTest
         string terrainShader = File.ReadAllText(TerrainShaderPath);
         bool filmGate = terrainShader.Contains("float rainFilm = smoothstep(0.015, 0.08, wet);")
                      && terrainShader.Contains("RainRings(ringLocal, _Time.y, _SurfaceRainIntensity)")
-                     && terrainShader.Contains("* rainFilm * RainRingResolvable");
+                     && terrainShader.Contains("* rainFilm * ringVisibility;");
+        string terrainLighting = File.ReadAllText("Assets/Shaders/MountainSurface.shader");
+        bool reflectiveFilm = terrainShader.Contains("surface.rainFilmNormalWS")
+                           && terrainShader.Contains("surface.rainFilm =")
+                           && terrainLighting.Contains("if (surface.rainFilm > 0.001h)")
+                           && terrainLighting.Contains("AirColor(filmReflectionVector)")
+                           && terrainLighting.Contains("const half WaterF0 = 0.0204h;")
+                           && terrainLighting.Contains("* (1.0h - surface.snowMask);");
         string terrainSource = File.ReadAllText("Assets/Scripts/Terrain/TerrainSurface.cs");
         bool materialRainBinding = terrainSource.Contains(
             "material.SetFloat(RainIntensityId, rainIntensity);")
@@ -189,7 +214,12 @@ public static class RainRenderingTest
         string sharedRings = File.ReadAllText("Assets/Shaders/RainRings.hlsl");
         bool intensityControlsDensity = sharedRings.Contains("float eventRank =")
                                      && sharedRings.Contains("float eventWeight = smoothstep")
-                                     && sharedRings.Contains("birth * eventWeight");
+                                     && sharedRings.Contains("spatialSupport * eventWeight");
+        bool continuousCells = sharedRings.Contains("float2 RainRingCell(")
+                            && sharedRings.Contains("cell + float2(side.x, 0.0)")
+                            && sharedRings.Contains("cell + float2(0.0, side.y)")
+                            && sharedRings.Contains("cell + side")
+                            && sharedRings.Contains("float spatialSupport = 1.0 - smoothstep");
         int dryMaterial = terrainShader.IndexOf(
             "surface.smoothness = lerp(_RockSmoothness, sandSmoothness, sand);");
         int rainFilm = terrainShader.IndexOf(
@@ -202,13 +232,17 @@ public static class RainRenderingTest
         report.AppendLine("  [" + Mark(drying) + "] configured drying half-life curve: "
                         + dryAfterTwoMinutes.ToString("F3"));
         report.AppendLine("  [" + Mark(filmGate) + "] wet-film gate does not square rain intensity");
+        report.AppendLine("  [" + Mark(reflectiveFilm)
+                        + "] resolvable ground rings reflect the shared sky through a water film");
         report.AppendLine("  [" + Mark(materialRainBinding)
                         + "] rain intensity reaches the terrain material buffer");
         report.AppendLine("  [" + Mark(intensityControlsDensity)
                         + "] rain intensity controls ring event density");
+        report.AppendLine("  [" + Mark(continuousCells)
+                        + "] rings cross cell boundaries without square clipping");
         report.AppendLine("  [" + Mark(wetAfterMaterial) + "] rain film is applied after rock/sand selection");
-        return accumulation && drying && filmGate && materialRainBinding
-            && intensityControlsDensity && wetAfterMaterial;
+        return accumulation && drying && filmGate && reflectiveFilm && materialRainBinding
+            && intensityControlsDensity && continuousCells && wetAfterMaterial;
     }
 
     static float TerminalVelocity(float diameterMm) =>

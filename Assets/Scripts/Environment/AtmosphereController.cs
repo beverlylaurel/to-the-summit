@@ -55,6 +55,8 @@ public class AtmosphereController : MonoBehaviour
     static readonly int HeightFogZenithId = Shader.PropertyToID("_HeightFogZenith");
     static readonly int HeightFogSunColorId = Shader.PropertyToID("_HeightFogSunColor");
     static readonly int SunDirectionId = Shader.PropertyToID("_SunDirection");
+    static readonly int FogLightDirectionId = Shader.PropertyToID("_FogLightDirection");
+    static readonly int FogLightColorId = Shader.PropertyToID("_FogLightColor");
     static readonly int SunColorId = Shader.PropertyToID("_SunColor");
 
     static readonly int PlanetRadiusId = Shader.PropertyToID("_PlanetRadius");
@@ -471,6 +473,14 @@ public class AtmosphereController : MonoBehaviour
         // `Sky.shader` read it, and that is no longer the skybox.
         Shader.SetGlobalVector(SunDirectionId, time.SunDirection);
 
+        // The dusk palette remains tied to the real sun, but directional scattering follows
+        // whichever celestial body actually lights the scene. Previously the analytic fog tail
+        // had no lunar lobe at all, while the near froxel volume was moonlit by URP's main light.
+        Shader.SetGlobalVector(FogLightDirectionId, time.PrimaryLightDirection);
+        Color fogLight = time.PrimaryLightColor.linear * time.PrimaryLightIntensity;
+        fogLight.a = time.PrimaryLightDirection.y > 0f ? 1f : 0f;
+        Shader.SetGlobalColor(FogLightColorId, fogLight);
+
         // The shear is a fixed distance: the lateral offset as a share of the layer thickness is
         // DIMENSIONLESS — the shader multiplies it by the layer thickness. It was being multiplied
         // here as well, and with a 5.3 km layer the offset came to 2927 m — wider than a typical
@@ -501,13 +511,9 @@ public class AtmosphereController : MonoBehaviour
         // Colour and intensity are combined: the transmittance carries both the reddening and the fade.
         Vector3 cloudBeam = Atmosphere.BeamTransmittance(activeCloudBottom, time.SunDirection);
 
-        // THE CLOUD'S WARMING OPENS LATE. Direct light is deep red with a low sun; the cloud's
-        // ambient light, coming from the zenith, is bluish. Superposed, they read PINK on screen and
-        // the clouds went pink in the first quarter of dawn. With the limiter squared the warming
-        // starts after three degrees: the pink window closes and the transition stays continuous.
-        float cloudWarm = Atmosphere.LowSunFade(activeCloudBottom, time.SunDirection);
-        cloudWarm *= cloudWarm;
-        cloudBeam *= cloudWarm;
+        // BeamTransmittance already includes the continuous low-sun limiter. Multiplying it here
+        // again caused cloud illumination to lag behind the sky and introduced another squared
+        // dawn curve.
 
 
         // The cloud perspective changes together with the visibility. A fixed distance showed the

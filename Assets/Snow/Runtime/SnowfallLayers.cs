@@ -18,9 +18,6 @@ public class SnowfallLayers : MonoBehaviour
     [Tooltip("VFX graph wind force property name.")]
     [SerializeField] string windProperty = "WindForce";
 
-    [Tooltip("VFX graph flake emissive color property name.")]
-    [SerializeField] string emissiveProperty = "FlakeEmissive";
-
     [Tooltip("VFX graph ground Y plane property name.")]
     [SerializeField] string groundProperty = "GroundY";
 
@@ -41,12 +38,7 @@ public class SnowfallLayers : MonoBehaviour
     /// Diagnostics: Current near layer spawn rate.
     public float NearRate { get; private set; }
 
-    /// Diagnostics: Flake emissive color sent to graph.
-    public Color NearEmissive { get; private set; }
-
     const float FlakeDrag = 9.81f;
-    const float EmissiveScale = 1.6f;
-    static readonly Color FlakeTint = new Color(0.86f, 0.92f, 1f);
 
     public bool NearDriven => nearLayer != null;
 
@@ -91,14 +83,5 @@ public class SnowfallLayers : MonoBehaviour
         if (groundReference != null && nearLayer.HasFloat(groundProperty))
             nearLayer.SetFloat(groundProperty, groundReference.position.y);
 
-        if (nearLayer.HasVector4(emissiveProperty))
-        {
-            Color light = environment != null && environment.Sun != null
-                ? environment.Sun.color * environment.Sun.intensity
-                : Color.white;
-
-            NearEmissive = FlakeTint * light * EmissiveScale;
-            nearLayer.SetVector4(emissiveProperty, NearEmissive);
-        }
     }
 }

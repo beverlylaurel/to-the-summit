@@ -22,6 +22,8 @@ float4 _HeightFogShadowColor; // the anti-solar horizon: Earth's shadow, shared 
 float4 _HeightFogZenith;   // the sky's zenith color: the air darkens toward it as the ray steepens
 float4 _HeightFogSunColor; // the sky toward the sun, 2° above the horizon
 float3 _SunDirection;      // AtmosphereController writes it globally; sky and clouds read it too
+float3 _FogLightDirection; // actual dominant direct source: sun by day, moon by night
+float4 _FogLightColor;     // rgb = ground-reaching linear radiance, a = source above horizon
 
 // Lightning: LightningFlash writes it, cloud and sky read the same value.
 //
@@ -410,8 +412,8 @@ float3 AirColor(float3 direction)
     // Forward scattering, a double lobe: a broad haze glow plus a narrow bright core. Through
     // fog the sun appears not as a sharp disc but as a glowing ball — that is the sun in dawn
     // fog; climb above the fog sea and the real disc returns.
-    float sunUp = smoothstep(-0.08, 0.12, _SunDirection.y);
-    float alignment = saturate(dot(direction, normalize(_SunDirection + 0.0001)));
+    float sourceUp = _FogLightColor.a;
+    float alignment = saturate(dot(direction, normalize(_FogLightDirection + 0.0001)));
     // The narrow lobe is kept measured: enlarged it filled the place the disc sits in and the
     // sun itself disappeared inside its own glow
     // THE NARROW LOBE DIES IN FOG, THE BROAD HALO REMAINS. The narrow lobe is the direct image
@@ -428,7 +430,9 @@ float3 AirColor(float3 direction)
 
     float forward = pow(alignment, 8.0) * 0.05
                   + pow(alignment, 64.0) * 0.12 * discVisibility;
-    air += _HeightFogSunColor.rgb * (forward * sunUp);
+    // Use direct-light energy rather than the ambient dusk palette. This makes the far analytic
+    // tail agree with the shadowed froxel volume and gives moonlight its own restrained halo.
+    air += _FogLightColor.rgb * (forward * sourceUp * 0.35);
 
     return air;
 }

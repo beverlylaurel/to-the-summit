@@ -491,18 +491,21 @@ kalıyor, kar maskesi her kotta kapalı okunuyordu.
 
 ## Gökyüzü ve gök cisimleri
 
-**Soğurmanın tek sahibi paket.** Bizimki de uygulansaydı aynı atmosfer iki kez soğururdu.
-Ölçülmüştü: öğlen ışığa `şiddet 2.55 · renk 1.00 0.88 0.70` yazılıyordu, mavi kanal
-kaynakta 0.70'e iniyordu ve gökyüzü lacivert kalıyordu.
+**Soğurma bir kaynaktan değil bir ışın yolundan sahiplenilir.** Arazi yönlü ışığı yer
+seviyesine kadar `TimeOfDay` süzer; gök LUT'u atmosfer üstü kaynağı, bulut ise aynı
+kaynağı kendi irtifasına kadar süzer. Zemine ulaşmış rengi buluta verip shader'da tekrar
+süzmek aynı hava sütununu iki kez sayıyordu. `LowSunFade` de `BeamTransmittance` içinde
+olduğu hâlde renk ve şiddete yeniden çarpılmıştı; şafak enerjisi eğrinin karesine düşüyordu.
 
 **Güneşin bandı −12°'de bitiyor.** Paket göğü ışığın yönünden ve şiddetinden hesapladığı
 için güneş ufkun altında sıfırlanırsa ALACAKARANLIK DA SÖNÜYOR — 18:10'da gece yarısı
 karanlığı çıkıyordu. Arazi bundan yanlış aydınlanmaz: ışık neredeyse yatay geldiği için düz
 zeminde `N·L` negatif, yalnız güneşe bakan dik yamaçlar ışık alır.
 
-**Ay ayrı ışık olmak zorunda.** Tek yönlü ışığa iki cisim sığmıyordu: ay güneşin tam
-karşısında (`MoonDirection = −SunDirection`), yön bir tanedir ve devir anında disk 180°
-atlıyordu. Yapısal, ölçmeye gerek yok.
+**Ay ayrı ışık ve ayrı yörünge olmak zorunda.** Tek yönlü ışığa iki cisim sığmaz. Ayı
+`−SunDirection` yapmak yalnız dolunay geometrisini bütün aya yayar; hilal, dördün ve
+ay doğuşunun günlük kayması kaybolur. Düşük dereceli efemeris tarih/konum/saatten iki
+yönü ayrı hesaplar; evre de bu iki gerçek yönün uzanım açısından çıkar.
 
 **Ay gökyüzünü de aydınlatmalı.** Tek cisimken sıçrama kaçınılmazdı ve ölçüldü: 19:12'de
 probe `0.00000`, 19:22'de `0.00228` — atlama tam güneşin şiddetinin sıfırlandığı anda,
@@ -530,10 +533,23 @@ yakın).
 **`(1 − skyOpacity)` gündüzü kapatmıyor** — bir dönem öyle varsayıldı, ölçüm çürüttü:
 zenitte gündüz opaklık ~0.2, yıldızların %80'i geçiyordu ve sabah 8'de gökyüzü yıldızlıydı.
 
-**Ay şiddeti 0.0199, albedosu 0.586 0.653 0.818.** Doğan ay uzun atmosfer yolundan geçip
-sarıya kayıyor; taban soğutuldu ki soğurma sonrası sonuç nötre yaklaşsın. Doygunluk bir kez
-düşürüldü ve ton lineer uzayda eski ışımaya ölçeklendi (Y = 0.3844): 10°'de eski renk
-`1.00 0.80 0.43`, yeni renk `1.00 0.87 0.56`.
+**Ay şiddeti 0.002, albedosu 0.586 0.653 0.818.** Fiziksel güneş/ay oranını bir tüketici
+ekranında eksiksiz taşımak oynanabilir geceyi yok eder; kaynak yine güneşten on duraktan
+fazla aşağıda, kalan okunabilirliği yavaş göz uyumu getiriyor. Evre ışık enerjisini
+değiştirir; disk yüzey radyansı ayrı kaldığı için hilal küçülür, gri bir dolunay gibi
+tek parça kararmaz. Doğan ayın rengi yer seviyesine kadar atmosferden geçer.
+
+**Lens etkisi ekran filtresi değil optik görünürlüktür.** Exposure'u güneşe bakınca
+değiştirmek bütün kareyi zıplatırdı. SRP lens flare geometri derinliğiyle örtülüyor;
+yoğunluğu ayrıca görüş doğrultusu, ufuk, bulut optik kapağı ve sis geçirgenliğiyle çarpılır.
+Bu yüzden güneş dağın veya yoğun bulutun arkasındayken parıltı kendi kendine kapanır.
+
+**Yağış ve deniz doğrudan ışığın örtülmesini paylaşır.** Yağmur/kar tanesinin veya deniz
+köpüğünün gölgede kendi ışığını üretmesi, ortam aydınlığı ile yönlü aydınlığı karıştırmaktı.
+Arazi gölgesi ile bulut cookie'si yalnız doğrudan terime uygulanır; SH ortamına uygulanmaz.
+Kar quad'ının normalini kameraya çevirmek ortam rengini bakışla değiştirdiği için yukarı ve
+aşağı hemisfer ortalaması kullanılır. Deniz parıltısında güneş yüksekliği kapısı kaldırılır;
+gece görünürlüğünü ayın zaten küçük olan kaynak enerjisi belirler.
 
 **Güneşin yönü/rengi hava sürücüsünden geçmez.** İkinci bir yol "gökyüzü kızardı ama
 gölgeler öğle yönünde" çelişkisini üretirdi.

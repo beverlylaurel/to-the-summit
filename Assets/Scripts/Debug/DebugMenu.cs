@@ -428,7 +428,7 @@ public class DebugMenu : MonoBehaviour
     {
         BeginSection("Hava durumu");
 
-        GUILayout.Label($"Yağış {weather.Precipitation:F2}");
+        GUILayout.Label($"Yerel yağış (oyuncu) {weather.Precipitation:F2}");
 
         // The driver is NOT DISABLED, its target is supplied from outside. Disabled,
         // `StormIntensity` and `ClearWindow` froze but the atmosphere kept reading them: while the

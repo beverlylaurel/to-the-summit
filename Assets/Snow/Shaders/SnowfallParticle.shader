@@ -7,7 +7,7 @@ Shader "ToTheSummit/SnowfallParticle"
     {
         [NoScaleOffset] _FlakeAtlas ("Flake Atlas (4x4)", 2D) = "white" {}
         _FlakeTint ("Color Tint", Color) = (1, 1, 1, 1)
-        _FlakeEmissive ("Emissive", Float) = 1.0
+        _FlakeEmissive ("Ambient Lift", Float) = 0.0
 
         _MinPixelSize ("Minimum Pixel Size (px)", Float) = 1.3
         _SoftFade ("Soft Particle Fade Distance (m)", Float) = 0.4
@@ -41,7 +41,7 @@ Shader "ToTheSummit/SnowfallParticle"
             #pragma target 4.5
             #pragma vertex Vertex
             #pragma fragment Fragment
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _SHADOWS_SOFT
             #pragma multi_compile _ _LIGHT_COOKIES
 
@@ -91,6 +91,7 @@ Shader "ToTheSummit/SnowfallParticle"
                 float4 screenPos  : TEXCOORD2;
                 float3 positionWS : TEXCOORD3;
                 float  viewDepth  : TEXCOORD4;
+                float3 directLight : TEXCOORD5;
             };
 
             static const float2 kCorners[6] =
@@ -165,12 +166,13 @@ Shader "ToTheSummit/SnowfallParticle"
                 float hg = (1.0 - g * g) / pow(max(1.0 + g * g - 2.0 * g * cosT, 1e-4), 1.5);
                 half phase = (half)(0.18 + 0.42 * hg);
 
-                half3 N = (half3)forward;
-                half3 lit = SampleSH(N)
-                          + mainLight.color * mainLight.shadowAttenuation * phase;
-                half3 emissive = mainLight.color * _FlakeEmissive * 0.04h;
+                // A tumbling flake is not a camera-facing Lambert plane. Average sky and ground
+                // hemispheres so rotating the view cannot change its ambient illumination.
+                half3 ambient = (SampleSH(half3(0, 1, 0)) + SampleSH(half3(0, -1, 0))) * 0.5h;
+                ambient *= 1.0h + _FlakeEmissive * 0.04h;
 
-                OUT.color = float4(_FlakeTint.rgb * lit + emissive, alpha);
+                OUT.color = float4(_FlakeTint.rgb * ambient, alpha);
+                OUT.directLight = _FlakeTint.rgb * mainLight.color * mainLight.shadowAttenuation * phase;
                 OUT.positionWS = positionWS;
 
                 return OUT;
@@ -187,7 +189,10 @@ Shader "ToTheSummit/SnowfallParticle"
                 alpha *= saturate((sceneDepth - IN.viewDepth) / max(_SoftFade, 1e-3));
                 clip(alpha - 0.002);
 
-                half3 color = IN.color.rgb * tex.rgb;
+                // Cookie sampling needs fragment derivatives on D3D11, so only the already
+                // shadowed direct term is carried from the vertex stage.
+                half cookie = SampleMainLightCookie(IN.positionWS);
+                half3 color = (IN.color.rgb + IN.directLight * cookie) * tex.rgb;
                 // THE COST IS NOT MEASURED. `ApplyHeightFog` is an eight step UNROLLED
                 // integral plus one 3D sample, paid per pixel on up to 250 000 quads
                 // with overdraw. It was taken because a flake that ignores the air is

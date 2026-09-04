@@ -196,9 +196,12 @@ Gerekçeler: `RATIONALE.md` → Kuşaklar ve hava dalgalanması.
 - **Damla başına yalancı türbülans yoktur.** Yön, fiziksel terminal hız ile filtrelenmiş
   ortak `WindField` hızının bileşkesidir. Rüzgârın kendi esintisi bütün yağmuru tutarlı
   büker; bağımsız damla salınımı yağmuru kar gibi süzdürmez.
-- **Boy, yön ve alfa aynı hızdan türer.** İz boyu `v·50 ms`, alfa
-  `2r/(v·50 ms)` ve yön bileşke hızdır. Damla çapı 1–5 mm bandında terminal hız
-  yaklaşık 4,00–9,14 m/s'dir.
+- **Boy, yön ve alfa aynı YOLDAN türer.** Shader merkezi üreten sarılmış, sınır-tabakası
+  düzeltilmiş konum fonksiyonunu şimdi ve 50 ms önce örnekler. Quad'ın uzun ekseni bu iki
+  konum arasındaki yolun kamera düzlemindeki izdüşümü; boyu izdüşümün uzunluğudur. Böylece
+  merkez sola giderken izin `|` kalması matematiksel olarak mümkün değildir; periyodik kutu
+  geçişinde de en kısa yol seçilir. Alfa aynı yolun tam 3B hızından `2r/(v·50 ms)` gelir.
+  Damla çapı 1–5 mm bandında terminal hız yaklaşık 4,00–9,14 m/s'dir.
 - **Yakın alan iki iç içe kutudur** (48 m ve 12 m); yoğunluklar iç bölgede toplanır ve
   temsil payı konumdan türer. Bireysel izler 10 m'ye kadar tam, 10–18 m arasında sönümlü,
   18 m'den sonra kapalıdır. Uzak yağış hissini atmosferik görüş taşır; yavaş kayan uzak
@@ -546,20 +549,25 @@ besliyor: gökyüzü, hava perspektifi, ambient probe.
 ve hava perspektifini gökyüzünden alır. Gök yansıması bulut materyalini de alıyor.
 
 **Kurallar**
-- **SOĞURMANIN TEK SAHİBİ PAKET.** Yönlü ışığa HAM güneş yazılır; `TimeOfDay`'in kendi
-  süzmesi (`Tint`, `BeamLevel`, `LowSunFade`) ışığa uygulanmaz.
+- **SOĞURMA HER IŞIN YOLUNDA BİR KEZ.** `TimeOfDay`, araziye ulaşan güneş/ay yönlü
+  ışığını yer seviyesine kadar süzer. PBSky ve bulutlar ise atmosfer üstü radyansı ayrı
+  kanaldan alır; bulut shader'ı onu kendi örnek yüksekliğine kadar yalnız bir kez süzer.
 - Işıktaki tek kısıcı geometrik: **güneşin bandı +3° → −12°, ayınki ±3°**; asimetri
   bilinçli, çünkü paket göğü ışığın yönünden ve şiddetinden hesaplıyor.
 - `Atmosphere` modeli **silinmedi** — ışığa değil başka tüketicilere bakıyor: sis rengi,
   bulut tonu, arazi şafak rengi, pozlama uyumu.
-- **GÜNEŞ VE AY AYRI IŞIK, AY İKİNCİ GÖK CİSMİ.** `TimeOfDay` ikisini ayrı sürer; güneş
-  bandı **+3° → −18°** (gökyüzünü o sürüyor), ay **±3°**.
-- **Ay gölge düşürmez** — paketin `GetMainLight`'ı gölgesiz cismi ana ışık saymayıp
-  `RenderSettings.sun`'a düşüyor.
-- Paket ayı **ikinci gök cismi** olarak çizer; evre ve dünya parıltısı kendi hesabından.
+- **GÜNEŞ VE AY AYRI IŞIK, İKİ AYRI YÖN.** `CelestialEphemeris` tarih, yer ve saatten
+  gerçekçi yönleri; mevsimsel güneş yolunu ve 29,53 günlük ay evresini çıkarır. Ay artık
+  güneşin mekanik olarak tam karşısına bağlanmaz.
+- `RenderSettings.sun`, sabit bir irtifa eşiğiyle değil o karedeki **daha güçlü doğrudan
+  kaynağa** geçer. Böylece şafak/akşamda sönmüş güneşe takılı ana ışık penceresi yoktur.
+- Ay ana ışık olduğunda yumuşak gölge düşürür. Evre yönlü ışığın enerjisini değiştirir;
+  ay diskinin aydınlık kısmının yüzey radyansı ayrıca tutulur, hilal gri bir dolunay gibi
+  bütünüyle kısılmaz.
 - **AY GÖKYÜZÜNÜ DE AYDINLATIR** — LUT'lar `_CelestialBodyCount` üzerinden iki cismi de
   topluyor.
-- **Bulutlar ayı YALNIZ ortam ışığından alır** (ayda gümüş kenar yok).
+- **Bulutlar etkin güneş/ayı doğrudan alır.** Kaynak rengi atmosfer üstündendir; yükseklik
+  soğurmasını bulut ışın yürüyüşü yapar.
 - **Ortam probe'u GERÇEK gökyüzünden pişer** (`SkyAmbientBaker`, `DynamicGI`); paketin
   analitik probe'u devre dışı. Pişirme kısık, ve **sıçramada iki kez** yapılır.
 - **Ortam kipi `Skybox` olmak zorunda**; kipi sahne kurulumu yazar.
@@ -574,6 +582,15 @@ ve hava perspektifini gökyüzünden alır. Gök yansıması bulut materyalini d
   yoksa `SurfaceLightLevel` üzerinden pozlama da kayar.
 - **Hava bağı tek çeviri:** yağış şiddeti → `aerosolDensity`. Güneşin yönü ve rengi buradan
   **geçmez**.
+- **Sis yönlü lobu etkin kaynağı okur.** Renk paleti yine gerçek güneşten şafak/akşam
+  tonunu alır; analitik uzak kuyrukta güneş ya da ayın kendi yönü kullanılır.
+- **Yağmur, kar ve deniz aynı gölge zincirini okur.** Ana ışığın arazi gölgesi ve bulut
+  cookie'si doğrudan terimlere bir kez uygulanır. Karın ortamı kamera-facing quad
+  normalinden değil yukarı/aşağı hemisfer ortalamasından gelir; denizde ay parıltısı
+  güneş yüksekliğiyle zorla kesilmez.
+- **Güneş lens etkisi medyaya bağlıdır.** SRP derinlik örtmesi geometriyi; `SunLensEffects`
+  bulut kapsaması, sis görüşü, ufuk ve bakış açısını söndürür. Büyük düşük yoğunluklu
+  çember ve küçük çekirdek veiling glare'dir; hayalet halka bilinçli olarak çok zayıftır.
 
 Gerekçeler: `RATIONALE.md` → Gökyüzü ve gök cisimleri.
 
@@ -1105,10 +1122,10 @@ düzenlenmiyor, üretim tekrar koşturulabilir. Tane düşüşü grafikte fizikt
 `WindForce = rüzgârYönü × hız × sürükleme` yazıyor; denge hızı `F / drag` tam
 rüzgâr hızını veriyor, düşey terminal hız bozulmuyor.
 
-**Tane emissive'i ana ışıktan türüyor.** `SnowfallLayers` `FlakeTint × ışık ×
-ölçek` hesaplayıp grafiğe yolluyor — tane gece parlamıyor. Ana ışık
-`TimeOfDay`'in `sun` alanından geliyor; sahnede üç directional ışık var ve
-tarama ile bulmak ayı seçiyordu.
+**Tane kendi ışığını üretmiyor.** Yakın VFX katmanı URP lit output kullanır,
+`receiveShadows` açıktır ve emissive kapalıdır; ana ışık, arazi/bulut gölgesi ve ortam
+aydınlığı renderer zincirinden gelir. Compute yedeği de emissive eklemez; yönlü terimi
+cookie/gölgeyle, ortamı kamera yönünden bağımsız hemisfer ortalamasıyla hesaplar.
 
 **Tane zemine değince ölüyor.** Kot `SnowfallLayers`'tan YEREL uzayda gidiyor
 (`zeminKotu − kutuKonumu`); grafikteki `position` VFX'in kendi uzayında.
@@ -1572,6 +1589,13 @@ arasında büyür. Böylece çiseleme sağanak kadar çok soluk çember üretmez
 0,015–0,08 arasında açılan bir kapıdır; şiddetle çarpılıp yağmuru ikinci kez küçültmez.
 Kuru kayada damla halka değil koyu leke bırakır — burada bu, hiçbir şey demektir.
 
+Arazi aydınlatma yolu elle yazıldığı için URP'nin dolaylı speküler aşamasından geçmez.
+Bu nedenle halka normalinin ayrıca ince su filminin yansıma normali olarak taşınması
+gerekir. Yakın ve çözülebilir piksellerde film, reflection probe'a değil gök ve sisin de
+kullandığı `AirColor` radyansına bakar; arazi renderer'ına geçerli probe bağlanmadığında
+probe örneği hata rengi döndürür. Fresnel suyun `F0 = 0,0204` değeridir ve kar maskesi
+filmi kapatır. Böylece halka albedo ile çizilmiş bir çember değil, göğü büken su yüzeyidir.
+
 Her iki değer de arazi shader'ının `UnityPerMaterial` tamponundadır ve
 `TerrainSurface` tarafından **materyale** yazılır. `Shader.SetGlobalFloat` bu alanı
 beslemez; global debug sayısı doğru görünürken arazi halkasının sıfır okumasına izin
@@ -1582,6 +1606,11 @@ yalnız ~1 mm taşıyor, mutlak koordinatta kafes bozuluyor (ölçüldü: piksel
 gücün %41'i). Kamera konumu `SEA_RAIN_RING_ORIGIN_STEP` (256 m) ile aşağı yuvarlanıp
 çıkarılıyor. Kameraya doğrudan bağlamak deseni ekrana yapıştırırdı; 256 m'lik adım hem
 tam sayı hem yürürken desenin dünyada kalmasını sağlıyor.
+
+**Hücre sınırı halka sınırı değildir.** Her katman pikselin kendi hücresiyle en yakın X/Y
+komşularını birlikte değerlendirir; halkanın desteği yarım hücreden önce yumuşakça sıfıra
+iner. Böylece aynı dairesel normal iki tarafta da hesaplanır ve hücre kenarında kare olarak
+kesilmez. Uzakta 17 mm'lik tepe çözülemiyorsa komşuluk hesabı bütünüyle atlanır.
 
 ## Deniz: rüzgârını dünya fırtınasından doğrudan alır (2026-09-02)
 

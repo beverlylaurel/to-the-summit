@@ -80,14 +80,14 @@ iş bitince buradan silinir.**
 - [Deniz: çoklu terrain DESTEKLENMİYOR](#deniz-coklu-terrain-desteklenmiyor)
 - [Deniz köpüğü DOKUSUZ — hücresel gürültüyle](#deniz-kopugu-dokusuz-hucresel-gurultuyle)
 - [Deniz: kapsam dışı bırakılanlar](#deniz-kapsam-disi-birakilanlar)
-- [Deniz yansımasında bulut telafisi — geçici](#deniz-yansimasinda-bulut-telafisi-gecici)
+- [Deniz yansımasında bulut telafisi — KAPANDI (2026-09-04)](#deniz-yansimasinda-bulut-telafisi-kapandi-2026-09-04)
 - [Gökyüzü yedeğinin yıldızları ve ayı KESİLDİ (2026-08-29)](#gokyuzu-yedeginin-yildizlari-ve-ayi-kesildi-2026-08-29)
 - [Kar taneciği sis maliyeti ölçülmedi (2026-08-29)](#kar-tanecigi-sis-maliyeti-olculmedi-2026-08-29)
 - [Kıyı için EŞEVRELİ dalga treni kurulmayacak — denendi, geri alındı (2026-08-29)](#kiyi-icin-esevreli-dalga-treni-kurulmayacak-denendi-geri-alindi-2026-08-29)
 - [Göz uyumu havaya kör — KAPANDI (2026-08-29)](#goz-uyumu-havaya-kor-kapandi-2026-08-29)
-- [Gökyüzü LUT'u yönü ana ışıktan alıyor — ERTELENDİ (2026-08-29)](#gokyuzu-lutu-yonu-ana-isiktan-aliyor-ertelendi-2026-08-29)
+- [Gökyüzü LUT'u yönü ana ışıktan alıyor — KAPANDI (2026-09-04)](#gokyuzu-lutu-yonu-ana-isiktan-aliyor-kapandi-2026-09-04)
 - [Ufuktaki gökyüzü deliği — KAPANDI (2026-08-29)](#ufuktaki-gokyuzu-deligi-kapandi-2026-08-29)
-- [`SkyAmbientBaker` ile paketin `AmbientProbePass`'i aynı probe'a yazıyor — ÖLÇÜLECEK (2026-08-29)](#skyambientbaker-ile-paketin-ambientprobepassi-ayni-probea-yaziyor-olculecek-2026-08-29)
+- [`SkyAmbientBaker` ile paketin `AmbientProbePass`'i aynı probe'a yazıyor — KAPANDI (2026-09-03)](#skyambientbaker-ile-paketin-ambientprobepassi-ayni-probea-yaziyor-kapandi-2026-09-03)
 - [`adaptShare` iki eksende birden kullanılıyor (2026-08-29)](#adaptshare-iki-eksende-birden-kullaniliyor-2026-08-29)
 - [`WindField` NRE'si tekrarlamadı — ÖLÇÜLDÜ, KAPANDI (2026-08-29)](#windfield-nresi-tekrarlamadi-olculdu-kapandi-2026-08-29)
 - [5 cm karda ayak izi zayıf kalıyor — malzeme karşıtlığı yok](#5-cm-karda-ayak-izi-zayif-kaliyor-malzeme-karsitligi-yok)
@@ -934,6 +934,11 @@ kaldırıyordu.
 
 Seviye artık probe'dan geliyor, sabit yalnız ton taşıyor (`SYSTEMS.md` → sis rengi).
 `MoonIntensity` 0.0199'a DOKUNULMADI: ölçüm ayın değil sisin yanlış olduğunu gösterdi.
+
+**YENİ ASTRONOMİ ZİNCİRİNDE YENİDEN AÇILDI VE KAPANDI (2026-09-04).** Eski değer
+dolunay enerjisini her gece veriyor ve ayı güneşin tam karşısında tutuyordu. Evre gerçek
+yörüngeden sürülünce tepe değer 0.002'ye indi; gece okunabilirliğinin sahibi ayı yapay
+olarak büyütmek değil mevcut yavaş göz uyumudur.
 
 ## Bulut ayı DOĞRUDAN alıyor — eski kayıt ölçümle çürüdü
 
@@ -2203,20 +2208,18 @@ simülasyon katmanı.
 
 
 
-## Deniz yansımasında bulut telafisi — geçici
+## Deniz yansımasında bulut telafisi — KAPANDI (2026-09-04)
 
-**Karar:** deniz yüzeyi ortam probe'unu yansıtıyor, ama probe'da hacimsel
-bulutlar yok (skybox'tan sonra çizilen bir render özelliği). Kapsamaya göre
-yansıma gri ve sönük bir kubbeye çekiliyor (`SeaLit.shader`, `overcast` terimi).
+**Kapandı.** PBSky dinamik yansıma geçişinin hacimsel bulutu küpe birleştirdiği kodda
+doğrulandı. `SeaLit.shader` içindeki kapsama temelli `overcast` terimi bu nedenle silindi;
+aynı bulut örtüsünü ikinci kez uygulayıp yönlü gök yansımasını griye eziyordu.
 
 **Gerekçe:** aksi hâlde fırtınada deniz mavi gökyüzü yansıtıyor. Terim tek
 satır ve fiziksel karşılığı var: bulut katmanı gökyüzünü gri difüz bir kubbeyle
 değiştirir.
 
-**Tetikleyici:** bulutlar bir yansıma probe'una ya da bir gökyüzü küpüne
-girdiğinde terim SİLİNİR — telafi teriminin gerekçesi ortadan kalkar.
-
-**Maliyet:** bir `dot` ve bir `lerp`.
+**Geri açma tetikleyicisi:** dinamik yansıma geçişi kaldırılır veya bulut birleştirmesi
+kapatılırsa fırtınada denizin açık mavi göğü yansıttığı yeniden ölçülür.
 
 
 ## Gökyüzü yedeğinin yıldızları ve ayı KESİLDİ (2026-08-29)
@@ -2325,23 +2328,17 @@ aydınlatmasını değiştirmek demek — pozlama işi değil.
 girmesi. Yarım gün.
 
 
-## Gökyüzü LUT'u yönü ana ışıktan alıyor — ERTELENDİ (2026-08-29)
+## Gökyüzü LUT'u yönü ana ışıktan alıyor — KAPANDI (2026-09-04)
 
-**Karar:** gökyüzü LUT'unun ışık YÖNÜ, URP'nin seçtiği ana ışıktan geliyor; ufkun altında o
-ay oluyor. Alacakaranlık doğru enerjiyi yanlış yönden taşıyor. Bu tur kapatılmadı.
+**Kapandı.** PBSky artık birinci gök cismini her zaman gerçek güneşten kuruyor; URP'nin
+ana ışığı aya geçtiğinde güneş yönü ve diski sıçramıyor. Ay ikinci ışık/gök cismi olarak
+ayrı yön ve radyansla aynı analitik saçılım döngüsüne giriyor.
 
 **Ölçüm:** radyans ayrıldıktan sonra zenit 18:00'de 0,0205, 18:30'da 0,0398 — ufukta iki
 katlık bir çukur kalıyor. Öncesindeki 690 katlık çöküşün yanında görünmez.
 
-**Neden şimdi değil:** yön override'ı diski de taşır (`celestialBodyData.forward` hem LUT'a
-hem diske gidiyor) ve gece diskin ay olması gerekiyor. Doğru çözüm paketin tek-ışık
-varsayımını açmak; radyans ayrımının üstüne aynı turda ikinci bir paket değişikliği
-yığılmıyor.
-
-**Tetikleyici:** gün batımında ufkun yanlış tarafı aydınlık görünüyorsa, ya da altın saatte
-gökyüzü kısa bir an sönüyorsa.
-
-**Maliyet:** paketin `celestialBodyData` kurulumunu LUT ve disk için ayırmak. Yarım gün.
+**Güvence:** ay evresinin güneş yönü de `RenderSettings.sun`'dan değil aynı gerçek güneş
+cisminden okunuyor. Böylece gece ana ışık ay olduğunda faz hesabı kendi yönüne çökmez.
 
 
 ## Ufuktaki gökyüzü deliği — KAPANDI (2026-08-29)
@@ -2378,7 +2375,7 @@ doğru açılıyor ama `tanh` doyumu ve 2,5 s zaman sabiti yüzünden savrulma g
 gözden geçirilmesi.
 
 
-## `SkyAmbientBaker` ile paketin `AmbientProbePass`'i aynı probe'a yazıyor — ÖLÇÜLECEK (2026-08-29)
+## `SkyAmbientBaker` ile paketin `AmbientProbePass`'i aynı probe'a yazıyor — KAPANDI (2026-09-03)
 
 **Bulgu:** sahnede `VisualEnvironment.skyAmbientMode = Dynamic`, yani paket her karede
 `AmbientProbePass`'i kuyruğa alıp probe'u kendisi yazıyor. `SkyAmbientBaker` de

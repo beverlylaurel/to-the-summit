@@ -25,6 +25,10 @@ ton kararları için `DESIGN.md` otoritedir.
 ## Unity çalışma ortamı
 
 - Unity açıkken konsol, Play modu ve editör işlemlerinde Unity MCP kullanılır.
+- Unity açıkken `.unity`, `.prefab` ve `.asset` dosyaları metin editörüyle ya da
+  dış araçlarla değiştirilmez. Değişiklik Unity MCP üzerinden Unity API'si,
+  `SerializedObject` ve `Undo` ile yapılır; Unity'ye kaydettirilir. Böylece açık
+  sahnenin dışarıdan değiştiğini bildiren ve editörü kilitleyen modal oluşmaz.
 - Derlemeyi tetiklemek için `Logs/refresh.trigger` dosyasının zamanı güncellenebilir.
 - Ana sahne `Assets/Scenes/Game.unity`, test sahnesi `Assets/Scenes/TestGround.unity`.
 - Sahne kurulumu `Assets/Editor/MountainSceneBootstrap.cs` tarafından yönetilir;
@@ -112,6 +116,9 @@ Sayılar ve ayar değerleri belgelerde çoğaltılmaz; kod veya ayar asset'i oto
 
 - `Assets/Terrain/MountainTerrainData.asset` elle yontulmuş, git dışında tutulan kritik
   veridir. Üzerine yazmadan önce yedek alınır.
+- `Blender/` altındaki çalışmalar ile `.blend` ve bunlara bağlı model/doku dosyaları
+  ayrı bir yapay zekânın devam eden üretimidir. Kullanıcı açıkça istemedikçe
+  değiştirilmez, taşınmaz, temizlenmez veya commit kapsamına alınmaz.
 - Arazi yüksekliği değişirse yüzey, normal, ufuk, yükseklik ve rüzgâr haritaları aynı
   iş kapsamında geçersiz kılınıp yeniden pişirilir; ayrıntılar `SCALE.md` ve ilgili
   editör araçlarından doğrulanır.

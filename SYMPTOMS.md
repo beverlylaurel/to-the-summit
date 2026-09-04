@@ -5903,3 +5903,44 @@ sayıda soluk çember değil, gerçekten daha seyrek damla üretir. Kum/kaya kur
 **Doğrulama:** `Rain Rendering Test` 21 sözleşmenin tamamında geçti; Unity derlemesi ve
 shader importu hatasız. Karanlık gökyüzü/ambient sorunu ayrı ve önceden kayıtlıdır
 (`Kaya öğle vakti kapkara`); bu bağın çalışıp çalışmadığıyla karıştırılmaz.
+
+**İkinci canlı belirti:** zemin artık ıslak ve iki shader girdisi de doğru olduğu hâlde
+oyuncu halkayı göremiyordu. Canlı ölçümde materyal `wet=0,699`, `rain=0,228`, kar örtüsü
+`0,000` idi; yani bağlantı kopuk değildi. Kök neden arazi fragment'inin elle yazılmış
+aydınlatma yolunda dolaylı speküler/gök yansımasının bulunmamasıydı. Kapalı havada doğrudan
+ışık zayıf, SH ambient de yaklaşık yönsüz olduğundan halka normali ışığı değiştirmiyordu.
+
+**Düzeltme ve ayırt eden test:** halka eğimi ince su filminin ayrı normaline taşındı;
+yalnız yakın/çözülebilir yağmur alanı `AirColor` gök radyansını su Fresnel'iyle yansıtıyor.
+Terrain üzerinde reflection probe örneği denenip reddedildi: bu sahnede terrain renderer'a
+geçerli probe gelmediği için yüzey hata rengine döndü. Geçici hava override'ıyla canlı
+fırtınada materyal `wet=1,000`, `rain=0,490` ölçüldü ve aynı oyuncu karesinde zemin boyunca
+dağınık, hücre karesine kesilmeyen halkalar görüldü; yaklaşık 159 FPS / 6,3 ms. Override
+hemen kaldırıldı. Shader importu sıfır mesajla destekli ve `Rain Rendering Test` geçti.
+
+## Şafakta ana ışık sönüyor, ay/güneş yönü sıçrıyor — ÇÖZÜLDÜ (2026-09-04)
+
+**Belirti ailesi:** gün doğumu/batımında URP ana ışığı bir süre neredeyse sıfır enerjili
+güneşte kalıyor; gece ay diski güneş yerine birinci cisim oluyor; gök, sis ve gölgeler
+aynı kaynağın yönünde buluşmuyor. Ay her gün güneşin tam karşısında olduğu için hilal ve
+ay doğuşu kayması da oluşmuyor.
+
+**Sebep:** `RenderSettings.sun` sabit güneş yüksekliği eşiğiyle seçiliyordu ve seçim o
+karenin ışık şiddetleri hesaplanmadan önce yapılıyordu. PBSky birinci gök cismi için URP
+ana ışığını kullanıyor, ay yönü de doğrudan `-SunDirection` üretiliyordu. Üstelik
+`LowSunFade` iki kez uygulanıyor, bulut da yer seviyesine kadar süzülmüş ışığı yeniden
+kendi yüksekliğine kadar süzüyordu.
+
+**Düzeltme:** tarih/konum/saat tabanlı `CelestialEphemeris` güneş ve ayı bağımsız üretir;
+ana ışık güncel enerjiler hesaplandıktan sonra daha güçlü kaynağa geçer. PBSky gerçek
+güneşi birinci, ayı ikinci cisim olarak sabit tutar ve ikisini saçılımda toplar. Yer,
+gök ve bulut radyans yolları ayrıldı; her yol atmosferik soğurmayı bir kez uygular.
+
+## Kar tanesi shader'ı D3D11'de cookie ile derlenmiyor — ÇÖZÜLDÜ (2026-09-04)
+
+**Belirti:** `cannot map expression to vs_5_0 instruction set`, hata
+`LightCookieInput.hlsl` içindeki cookie örneklemesine işaret ediyor.
+
+**Sebep ve düzeltme:** `SampleMainLightCookie` vertex aşamasına konmuştu; bu yol D3D11'de
+fragman türevleri istiyor. Ortam ve gölgelenmiş doğrudan terim vertex'ten ayrı taşındı,
+cookie yalnız fragmanda örneklendi ve doğrudan terime orada çarpıldı.

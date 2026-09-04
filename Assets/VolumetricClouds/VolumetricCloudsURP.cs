@@ -722,23 +722,47 @@ public class VolumetricCloudsURP : ScriptableRendererFeature
 
         private void UpdateClouds(Light mainLight, Camera camera)
         {
-            // When using PBSky, we already applied the sun attenuation to "_MainLightColor"
+            // _PHYSICALLY_BASED_SUN applies atmospheric attenuation at the sampled cloud
+            // altitude. Therefore _SunColor must be top-of-atmosphere radiance, not the already
+            // extinguished ground light; feeding the latter counted the same air twice.
             if (sunAttenuation)
             {
                 bool isLinearColorSpace = QualitySettings.activeColorSpace == ColorSpace.Linear;
                 Color mainLightColor = Color.black;
-                if (mainLight != null)
-                    mainLightColor = (isLinearColorSpace ? mainLight.color.linear : mainLight.color.gamma) * (mainLight.useColorTemperature ? Mathf.CorrelatedColorTemperatureToRGB(mainLight.colorTemperature) : Color.white) * mainLight.intensity;
+                bool hasSourceRadiance = false;
 
-            #if URP_PHYSICAL_LIGHT
-                bool isPhysicalLight = mainLight.GetComponent<AdditionalLightData>() != null;
+            #if URP_PBSKY
+                Color? sourceRadiance = mainLight == PhysicallyBasedSkyURP.SunLight
+                    ? PhysicallyBasedSkyURP.SkySunRadiance
+                    : mainLight == PhysicallyBasedSkyURP.MoonLight
+                        ? PhysicallyBasedSkyURP.SkyMoonRadiance
+                        : null;
 
-                mainLightColor = isPhysicalLight ? mainLightColor : mainLightColor * PI;
-            #else
-                mainLightColor *= PI;
+                if (sourceRadiance.HasValue)
+                {
+                    mainLightColor = sourceRadiance.Value;
+                    hasSourceRadiance = true; // already includes PI
+                }
             #endif
 
-                // Pass the actual main light color to volumetric clouds shader.
+                if (!hasSourceRadiance && mainLight != null)
+                {
+                    mainLightColor = (isLinearColorSpace ? mainLight.color.linear : mainLight.color.gamma)
+                                   * (mainLight.useColorTemperature
+                                       ? Mathf.CorrelatedColorTemperatureToRGB(mainLight.colorTemperature)
+                                       : Color.white)
+                                   * mainLight.intensity;
+
+            #if URP_PHYSICAL_LIGHT
+                    bool isPhysicalLight = mainLight.GetComponent<AdditionalLightData>() != null;
+
+                    mainLightColor = isPhysicalLight ? mainLightColor : mainLightColor * PI;
+            #else
+                    mainLightColor *= PI;
+            #endif
+                }
+
+                // Pass source radiance; the shader attenuates it exactly once at cloud height.
                 cloudsMaterial.SetVector(sunColor, mainLightColor);
             }
 

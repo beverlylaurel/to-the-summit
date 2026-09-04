@@ -39,6 +39,10 @@ Shader "ToTheSummit/Precipitation"
             #pragma vertex vert
             #pragma fragment frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #pragma multi_compile_fragment _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile_fragment _ _LIGHT_COOKIES
 
             // Snow wraps in its own box: the same particle budget is packed more tightly
             // around the camera. A point-shaped flake does not cover as much screen area as an elongated drop.
@@ -323,9 +327,15 @@ Shader "ToTheSummit/Precipitation"
                 float3 box = isNear > 0.5
                            ? _NearBoxSize
                            : _BoxSize;
-                float3 drift = isNear > 0.5
-                             ? _RainDriftsNear[dropClass].xyz
-                             : _RainDrifts[dropClass].xyz;
+                float3 freeDrift = isNear > 0.5
+                                 ? _RainDriftsNear[dropClass].xyz
+                                 : _RainDrifts[dropClass].xyz;
+
+                // The CPU integrates this exact class velocity into `freeDrift`. Keep it beside
+                // the position source: the streak below is reconstructed from two positions on
+                // this same trajectory, not from a second, merely similar direction formula.
+                float3 classVelocity = _RainDirections[dropClass].xyz
+                                     * _RainDirections[dropClass].w;
 
                 // ---- THE WIND'S BOUNDARY LAYER ----
                 //
@@ -351,7 +361,7 @@ Shader "ToTheSummit/Precipitation"
                 // `L = ln(z_ref/z0)`. L is single-variable, smooth and MONOTONIC — its
                 // derivative is `dL/dt = U(1 - f(z))`, i.e. the drop's horizontal velocity is
                 // exactly `U·f(z)`. There is neither a random jump nor unbounded accumulation.
-                float3 probe = WrapAroundCamera(seed.xyz * box + drift, cameraPos, box);
+                float3 probe = WrapAroundCamera(seed.xyz * box + freeDrift, cameraPos, box);
 
                 // THE HEIGHT IS RELATIVE TO THE CAMERA'S TERRAIN, NOT THE DROP'S.
                 //
@@ -373,8 +383,6 @@ Shader "ToTheSummit/Precipitation"
                 float aboveGround = clamp(probe.y - groundRef,
                                           WIND_MIN_HEIGHT, WIND_MAX_HEIGHT);
 
-                float profile = log(aboveGround / WIND_Z0) / WIND_PROFILE_L;
-
                 // `G(z_ref)` sabit: 24 − 24·(ln240 − 1)/ln240 = 4.3789
                 float integral = WIND_LAG_TOP
                                - (aboveGround - aboveGround
@@ -386,22 +394,45 @@ Shader "ToTheSummit/Precipitation"
                 // the inertia filter compute a RATIO. With a normalized vector snow reads as if
                 // it were travelling at 1.4 m/s, the wind's share is lost and the flake never
                 // sees the boundary layer.
-                float3 classVelocity = _RainDirections[dropClass].xyz * _RainDirections[dropClass].w;
                 float2 windFlat = classVelocity.xz;
                 float windSpeed = length(windFlat);
                 float2 windUnit = windSpeed > 1e-4 ? windFlat / windSpeed : float2(0.0, 0.0);
 
                 float lag = (windSpeed / max(fallSpeed, 0.1)) * integral;
-                drift.xz -= windUnit * lag;
-                float3 worldPos = WrapAroundCamera(seed.xyz * box + drift, cameraPos, box);
+                float3 correctedDrift = freeDrift;
+                correctedDrift.xz -= windUnit * lag;
+                float3 worldPos = WrapAroundCamera(seed.xyz * box + correctedDrift,
+                                                   cameraPos, box);
 
                 float variation = Hash(seed.xyz);
 
+                // Reconstruct the ACTUAL path swept during the retinal exposure. Previously the
+                // centre came from the wrapped, boundary-layer-corrected drift above, while the
+                // quad angle came from an analytic velocity approximation. The approximation can
+                // remain nearly vertical while the procedural centre visibly translates sideways:
+                // exactly the user's `|  <-` symptom. Sampling the same position function one
+                // exposure earlier makes that disagreement impossible.
+                float exposure = max(_StreakExposure, 1e-4);
+                float3 previousFreeDrift = freeDrift - classVelocity * exposure;
+                float3 previousProbe = WrapAroundCamera(seed.xyz * box + previousFreeDrift,
+                                                        cameraPos, box);
+                float previousAboveGround = clamp(previousProbe.y - groundRef,
+                                                  WIND_MIN_HEIGHT, WIND_MAX_HEIGHT);
+                float previousIntegral = WIND_LAG_TOP
+                    - (previousAboveGround - previousAboveGround
+                       * (log(previousAboveGround / WIND_Z0) - 1.0) / WIND_PROFILE_L);
+                float previousLag = (windSpeed / max(fallSpeed, 0.1)) * previousIntegral;
+                float3 previousCorrectedDrift = previousFreeDrift;
+                previousCorrectedDrift.xz -= windUnit * previousLag;
+                float3 previousWorldPos = WrapAroundCamera(
+                    seed.xyz * box + previousCorrectedDrift, cameraPos, box);
 
-                float3 meanVelocity = classVelocity;
-                meanVelocity.xz *= profile;
+                // Crossing a periodic box boundary is not a 48 m streak. Select the shortest
+                // periodic displacement, which is the continuous path the eye actually saw.
+                float3 trajectory = worldPos - previousWorldPos;
+                trajectory -= box * floor(trajectory / box + 0.5);
 
-                float3 dropVelocity = float3(meanVelocity.x, -fallSpeed, meanVelocity.z);
+                float3 dropVelocity = trajectory / exposure;
                 float dropSpeed = length(dropVelocity);
 
                 // Rain follows the filtered common wind directly. Per-drop eddy displacement was
@@ -413,9 +444,8 @@ Shader "ToTheSummit/Precipitation"
                 // drop's velocity vector makes with the camera's optical axis, we scale
                 // the final streak texture to its projected size in the image."
                 //
-                // The projected size is not computed separately: the quad is built in WORLD
-                // units and the perspective projection does the scaling itself. The length is
-                // the distance travelled during the exposure, the width is the drop's diameter.
+                // The reconstructed path is projected onto the per-pixel camera plane. Direction
+                // and length therefore come from the SAME displacement as the particle centre.
                 //
                 // IT USED TO BE `_RainSize` x `_RainStretch`, i.e. it came from a visual
                 // setting. That setting belonged to a model that did not take the streak's
@@ -425,7 +455,6 @@ Shader "ToTheSummit/Precipitation"
                 float radius = dropRadius;
 
                 float rainWidth = 2.0 * radius;
-                float rainLength = dropSpeed * _StreakExposure;
 
                 float sizeSpread = 0.4 + 1.4 * variation;
                 float size = rainWidth;
@@ -441,13 +470,32 @@ Shader "ToTheSummit/Precipitation"
                 float3 cameraRight = normalize(UNITY_MATRIX_I_V._m00_m10_m20);
                 float3 cameraUp = normalize(UNITY_MATRIX_I_V._m01_m11_m21);
 
-                // The streak and the particle use the same physical velocity.
+                // Velocity-aligned billboard. Projecting first makes the sprite's long axis
+                // exactly parallel to the drop centre's apparent motion. Its length uses the
+                // same projected speed, so looking along the trajectory naturally foreshortens
+                // the streak instead of leaving a vertical texture that slides sideways.
                 float3 rainAxis = normalize(dropVelocity);
                 float3 fallAxis = normalize(rainAxis);
-                float3 streakRight = normalize(cross(fallAxis, viewDirection));
+                float3 projectedTrajectory = trajectory
+                    - viewDirection * dot(trajectory, viewDirection);
+                float projectedLength = length(projectedTrajectory);
 
-                float3 right = streakRight;
-                float3 up = fallAxis;
+                float3 fallbackUp = cameraUp
+                                  - viewDirection * dot(cameraUp, viewDirection);
+                float fallbackLength = length(fallbackUp);
+                fallbackUp = fallbackLength > 1e-4
+                    ? fallbackUp / fallbackLength
+                    : cameraRight;
+
+                float3 up = projectedLength > 1e-4
+                    ? projectedTrajectory / projectedLength
+                    : fallbackUp;
+                float3 right = normalize(cross(up, viewDirection));
+
+                // A drop seen end-on still occupies its physical diameter. Otherwise the long
+                // dimension is precisely the distance travelled across the image plane during
+                // the exposure interval.
+                float rainLength = max(rainWidth, projectedLength);
 
                 // The stretch is no longer a free setting: the length/width ratio is the ratio
                 // of the distance the drop travels during the exposure to its diameter. A large
@@ -727,7 +775,13 @@ Shader "ToTheSummit/Precipitation"
                 // straight-alpha source estimate subtracted a bright cloud color it never saw.
                 const float AmbientCollectionRatio = 2.0;
                 float3 directionalRadiance = pointStreak * _StreakSunRadiance
-                                           * _StreakSourceScale;
+                                            * _StreakSourceScale;
+
+                // Rain shares the scene's actual light field. A drop in terrain shadow no longer
+                // glows as though the mountain were transparent, and the volumetric-cloud cookie
+                // attenuates the same streaks it attenuates on the ground.
+                float shadow = MainLightRealtimeShadow(TransformWorldToShadowCoord(IN.worldPos));
+                directionalRadiance *= shadow * SampleMainLightCookie(IN.worldPos);
                 float3 lightningRadiance = _LightningRainRadiance.rgb;
 
                 // Only EXTRA radiance is output. As transmittance approaches zero the contrast

@@ -52,8 +52,9 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
     /// çiziliyordu; ışık güneşten aya döndüğü an disk 180° atlıyordu. Ay buraya ayrıca
     /// verilince kendi yönünde, kendi fazıyla çiziliyor ve atlama ortadan kalkıyor.
     ///
-    /// Ay gökyüzünü AYDINLATMIYOR: sky-view LUT tek ışıktan pişiyor. Ay yalnız diski ve
-    /// (ayrı bir yönlü ışık olarak) araziyi sürüyor.
+    /// The sun and moon remain independent even when URP selects one as its main light.
+    /// Both contribute to atmospheric scattering; the moon also keeps its phase-aware disc.
+    public static Light SunLight { get; set; }
     public static Light MoonLight { get; set; }
 
     /// ATMOSFER USTU GUNES — gokyuzunu aydinlatan radyans.
@@ -71,6 +72,14 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
     /// sahne isigindan gelir, cunku diske bakarken atmosferi gercekten arasindan goruyorsun ve
     /// batan gunes kirmizi kalmali.
     public static Color? SkySunRadiance { get; set; }
+
+    /// Top-of-atmosphere moon radiance used by scattering. It is phase-scaled by TimeOfDay,
+    /// whereas the disc's lit surface keeps its intrinsic radiance.
+    public static Color? SkyMoonRadiance { get; set; }
+
+    /// Intrinsic radiance of the illuminated lunar surface. Kept separate from directional
+    /// moonlight so a crescent becomes smaller, not a uniformly dim grey full moon.
+    public static Color? MoonSurfaceRadiance { get; set; }
 
     /// AY DİSKİNİN PARLAKLIĞI, IŞIĞINDAN AYRI. İkisi ayrı fiziksel büyüklük: biri yüzey
     /// radyansı, diğeri yerdeki aydınlık. Tek sayıdan türetilince disk absürt parlak
@@ -868,7 +877,8 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             material.SetMatrix(_PlanetRotation, planetRotationMatrix);
             material.SetMatrix(_SpaceRotation, Matrix4x4.Rotate(spaceRotation));
 
-            if (mainLight != null)
+            Light sunBody = SunLight != null ? SunLight : mainLight;
+            if (sunBody != null)
             {
                 // Celestial Body Data
                 material.SetInt(_CelestialLightCount, 1);
@@ -883,15 +893,15 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 float rcpSolidAngle = 1.0f / (Mathf.PI * 2.0f * (1 - flareCosInner));
 
             #if URP_PHYSICAL_LIGHT
-                var color = mainLight.color.linear * mainLight.intensity;
+                var color = sunBody.color.linear * sunBody.intensity;
 
-                bool isPhysicalLight = mainLight.GetComponent<AdditionalLightData>() != null;
+                bool isPhysicalLight = sunBody.GetComponent<AdditionalLightData>() != null;
                 color = isPhysicalLight ? color : color * PI;
             #else
-                var color = mainLight.color.linear * mainLight.intensity * PI;
+                var color = sunBody.color.linear * sunBody.intensity * PI;
             #endif
 
-                color = mainLight.useColorTemperature ? color * Mathf.CorrelatedColorTemperatureToRGB(mainLight.colorTemperature) : color;
+                color = sunBody.useColorTemperature ? color * Mathf.CorrelatedColorTemperatureToRGB(sunBody.colorTemperature) : color;
                 var surfaceColor = Vector4.one;
                 var flareColor = Vector4.one;
 
@@ -908,17 +918,17 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 surfaceColor = Vector4.Scale(color, surfaceColor);
                 flareColor = Vector4.Scale(color, flareColor);
 
-                celestialBodyData.forward = mainLight.transform.forward;
+                celestialBodyData.forward = sunBody.transform.forward;
                 celestialBodyData.distanceFromCamera = distanceFromCamera;
-                celestialBodyData.right = mainLight.transform.right.normalized;
+                celestialBodyData.right = sunBody.transform.right.normalized;
                 celestialBodyData.angularRadius = angularRadius;
                 celestialBodyData.radius = Mathf.Tan(angularRadius) * distanceFromCamera;
-                celestialBodyData.up = mainLight.transform.up.normalized;
+                celestialBodyData.up = sunBody.transform.up.normalized;
                 celestialBodyData.type = 0; // sun
                 celestialBodyData.surfaceColor = surfaceColor;
                 celestialBodyData.earthshine = 1.0f * 0.01f;  // earth reflects about 0.01% of sun light
                 celestialBodyData.surfaceTextureScaleOffset = Vector4.zero;
-                celestialBodyData.sunDirection = mainLight != null ? mainLight.transform.forward : Vector3.forward;
+                celestialBodyData.sunDirection = sunBody.transform.forward;
 
                 // Flare
                 celestialBodyData.flareSize = flareSize;
@@ -963,7 +973,7 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             // (güneş parametreleriyle: 0.5° disk, 2° parıltı) hem ikinci cisim olarak
             // çiziliyordu — diskin yanında ayrı bir parıltı beliriyordu.
             bool hasMoon = MoonLight != null && MoonLight.isActiveAndEnabled
-                        && MoonLight.intensity > 0.0f && mainLight != MoonLight;
+                        && MoonLight != sunBody;
 
             // SAYAÇ VE İKİNCİ CİSMİN TÜM ALANLARI GLOBAL. `AtmosphericScattering.hlsl`'i
             // bulut birleştirme geçişi de kullanıyor ve o materyalde bu alanlar yok.
@@ -973,8 +983,11 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
             // vektörü normalize edip NaN üretiyor, ekranın büyük bölümü bozuluyordu ve
             // yıldızlar da o çöpün altında kalıyordu. Tek mantıksal yapının alanları iki
             // ayrı kapsamda olamaz.
-            material.SetInt(_CelestialBodyCount, hasMoon ? 2 : 1);
-            Shader.SetGlobalInt(_CelestialBodyCount, hasMoon ? 2 : 1);
+            int celestialCount = hasMoon ? 2 : 1;
+            material.SetInt(_CelestialLightCount, celestialCount);
+            material.SetInt(_CelestialBodyCount, celestialCount);
+            Shader.SetGlobalInt(_CelestialLightCount, celestialCount);
+            Shader.SetGlobalInt(_CelestialBodyCount, celestialCount);
 
             if (hasMoon)
             {
@@ -987,10 +1000,12 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 float moonFlareCosInner = Mathf.Cos(moonAngularRadius);
                 float moonRcpSolidAngle = 1.0f / (Mathf.PI * 2.0f * (1 - moonFlareCosInner));
 
-                var moonColor = MoonLight.color.linear * MoonLight.intensity * PI;
-                moonColor = MoonLight.useColorTemperature
-                    ? moonColor * Mathf.CorrelatedColorTemperatureToRGB(MoonLight.colorTemperature)
-                    : moonColor;
+                var moonLightColor = MoonLight.color.linear * MoonLight.intensity * PI;
+                moonLightColor = MoonLight.useColorTemperature
+                    ? moonLightColor * Mathf.CorrelatedColorTemperatureToRGB(MoonLight.colorTemperature)
+                    : moonLightColor;
+                Color moonScatterColor = SkyMoonRadiance ?? moonLightColor;
+                Color moonSurfaceRadiance = MoonSurfaceRadiance ?? moonLightColor;
 
                 // PARILTI DİSKİN LAMBERT ÖLÇEĞİNE BAĞLI. Shader diski `type != 0` iken
                 // `evre × 1/π + earthshine` ile çarpıyor, parıltıyı ÇARPMIYOR — güneşte
@@ -1011,14 +1026,15 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 Vector4 moonSurfaceColor = Vector4.one * moonRcpSolidAngle * MoonDiskBrightness;
                 Vector4 moonFlareColor = moonSurfaceColor * moonDiskAverage;
 
-                Shader.SetGlobalVector(_CelestialBody2_Color, new Vector4(moonColor.r, moonColor.g, moonColor.b, 0.0f));
+                Shader.SetGlobalVector(_CelestialBody2_Color, new Vector4(
+                    moonScatterColor.r, moonScatterColor.g, moonScatterColor.b, 0.0f));
                 Shader.SetGlobalVector(_CelestialBody2_Forward, MoonLight.transform.forward);
 
                 const float moonLightingUnitsMultiplier = 50.0f;
-                moonColor *= 1.0f / moonLightingUnitsMultiplier;
+                moonSurfaceRadiance *= 1.0f / moonLightingUnitsMultiplier;
 
-                moonSurfaceColor = Vector4.Scale(moonColor, moonSurfaceColor);
-                moonFlareColor = Vector4.Scale(moonColor, moonFlareColor);
+                moonSurfaceColor = Vector4.Scale(moonSurfaceRadiance, moonSurfaceColor);
+                moonFlareColor = Vector4.Scale(moonSurfaceRadiance, moonFlareColor);
 
                 Shader.SetGlobalFloat(_CelestialBody2_DistanceFromCamera, moonDistanceFromCamera);
                 Shader.SetGlobalVector(_CelestialBody2_Right, MoonLight.transform.right.normalized);
@@ -1032,7 +1048,7 @@ public class PhysicallyBasedSkyURP : ScriptableRendererFeature
                 // EVRE GÜNEŞİN YÖNÜNDEN, ANA IŞIĞINKİNDEN DEĞİL. Ana ışık aya çözülünce
                 // `sunDirection` ayın kendi yönü oluyor, `ComputeMoonPhase` sıfıra
                 // düşüyor ve diskin çekirdeği simsiyah kalıyordu.
-                Light sunForPhase = RenderSettings.sun != null ? RenderSettings.sun : mainLight;
+                Light sunForPhase = sunBody;
                 Shader.SetGlobalVector(_CelestialBody2_SunDirection,
                     sunForPhase != null ? sunForPhase.transform.forward : Vector3.forward);
                 Shader.SetGlobalFloat(_CelestialBody2_FlareCosInner, moonFlareCosInner);

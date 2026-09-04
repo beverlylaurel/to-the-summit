@@ -173,11 +173,9 @@ void EvaluatePbrAtmosphere(float3 positionPS, half3 V, float distAlongRay, bool 
         // yalnız güneşi görüyordu; ölçüldü, 19:17'de `probe tepe` tam sıfır (güneş 0.022),
         // 19:20'de 0.0154 (güneş 0.003). Zemin bloğu ayı zaten sayıyordu, o yüzden
         // `probe taban` hep aydınlıktı — fark tam olarak buradaydı.
-        // SAÇILIM TEK CİSİMDEN. İki cisme açılması gece zenit çevresinde keskin
-                    // sınırlı siyah bir bölge üretiyordu ve sebebi bulunamadı; bilinen
-                    // çalışan hâle dönüldü. Ayın göğü aydınlatması ana ışık olmasından
-                    // geliyor. Diskler AYRI, `RenderSunDisk` iki cismi de çiziyor.
-                    for (uint bi = 0; bi < 1u; bi++)
+        // Sun and moon are independent scattering sources. All body fields and both counters
+        // are now published in one scope, so the second source cannot read stale/zero vectors.
+        for (uint bi = 0; bi < _CelestialLightCount; bi++)
         {
             CelestialBodyData light = GetCelestialBody(bi);
             half3 L = -light.forward.xyz;

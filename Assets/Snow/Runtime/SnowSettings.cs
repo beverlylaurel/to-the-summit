@@ -112,9 +112,6 @@ public class SnowSettings : ScriptableObject
     [Tooltip("Flake flutter amplitude, meters.")]
     [SerializeField] float flutterAmplitude = 0.35f;
 
-    [Tooltip("Flake emissive brightness under night lighting.")]
-    [SerializeField] float flakeEmissive = 1f;
-
     [Tooltip("Spindrift blowing snow spawn rate, flakes/second.")]
     [SerializeField] float spindriftRate = 6000f;
 
@@ -173,7 +170,6 @@ public class SnowSettings : ScriptableObject
     public float MinPixelSize => minPixelSize;
     public float FlutterFrequency => flutterFrequency;
     public float FlutterAmplitude => flutterAmplitude;
-    public float FlakeEmissive => flakeEmissive;
     public float SpindriftRate => spindriftRate;
 
     [System.NonSerialized] float testSweOverride = -1f;

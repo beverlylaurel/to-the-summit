@@ -87,6 +87,52 @@ float RainRingResolvable(float pixelSize)
 /// The slope the rings add to a water surface. `time` is seconds; `intensity` is 0..1.
 /// Intensity primarily controls HOW MANY drop events survive. Scaling only the final
 /// slope leaves the same frantic number of circles in drizzle, merely fainter.
+float2 RainRingCell(float2 localXZ, float time, float intensity,
+                    int layer, float cellSize, float2 cell)
+{
+    float2 h = RainRingHash22(cell + float2(layer * 37.1, layer * 71.7));
+    float2 centre = (cell + h) * cellSize;
+
+    // A pixel evaluates its own cell and the one across its nearest X/Y boundary. To make
+    // that four-cell footprint exact, a ring must be zero before half a cell: at the middle
+    // of a cell the omitted cell on the opposite side is at least 0.5 L away. The small gap
+    // is the smooth support band, not a hard clip.
+    float support = cellSize * 0.45;
+    float maxFront = max(RAIN_RING_WIDTH, support - RAIN_RING_WIDTH * 2.0);
+    float life = min(RAIN_RING_LIFE, maxFront / RAIN_RING_SPEED);
+
+    float age01 = frac(time / life + RainRingHash21(cell + layer * 13.7));
+    float age = age01 * life;
+
+    // Rain amount is chiefly a drop ARRIVAL RATE. Each cell has a stable rank;
+    // drizzle admits only the lowest-ranked events, while a downpour admits all.
+    float eventRank = RainRingHash21(cell + layer * 19.7 + 103.5);
+    float eventWeight = smoothstep(eventRank, min(eventRank + 0.03, 1.0), intensity);
+    if (eventWeight <= 0.001) return 0.0;
+
+    float2 d = localXZ - centre;
+    float r = length(d);
+    if (r < 1e-4) return 0.0;
+
+    float front = age * RAIN_RING_SPEED;
+    float w = RAIN_RING_WIDTH;
+    float x = (r - front) / w;
+    float profile = x * exp(-x * x);
+
+    float spread = 1.0 / max(1.0 + front / w, 1.0);
+    float birth = saturate(age * 12.0);
+
+    // Both ends are compact and smooth. `temporalTail` makes the old event reach zero before
+    // its phase wraps to the newborn event; `spatialSupport` makes cells outside the selected
+    // four provably irrelevant. There is therefore no cell edge at which a non-zero normal can
+    // be cut into the square seen in the game.
+    float temporalTail = 1.0 - smoothstep(max(life - 0.08, life * 0.65), life, age);
+    float spatialSupport = 1.0 - smoothstep(support - w, support, r);
+
+    return normalize(d) * (profile * spread * birth * temporalTail
+                          * spatialSupport * eventWeight);
+}
+
 float2 RainRings(float2 localXZ, float time, float intensity)
 {
     if (intensity <= 0.001) return 0.0;
@@ -97,11 +143,10 @@ float2 RainRings(float2 localXZ, float time, float intensity)
     // wrapping there changes no ring's phase and hands the division small numbers.
     time = fmod(time, 4096.0);
 
-    // The three cell sizes are spaced by an irrational-ish ratio so their lattices never
-    // line up; the ring speed and life are the water's and are shared by all three.
-    const float3 cellSize = float3(0.11, 0.19, 0.37);
-    const float speed = RAIN_RING_SPEED;
-    const float life  = RAIN_RING_LIFE;
+    // The three cell sizes are deliberately incommensurate enough that their lattices do not
+    // line up. They are larger than the old cells because each cell now represents one compact
+    // event whose full visible support fits inside the four-candidate neighbourhood.
+    const float3 cellSize = float3(0.22, 0.34, 0.52);
 
     float2 slope = 0.0;
 
@@ -109,39 +154,20 @@ float2 RainRings(float2 localXZ, float time, float intensity)
     for (int layer = 0; layer < 3; ++layer)
     {
         float L = cellSize[layer];
-        float2 cell = floor(localXZ / L);
+        float2 grid = localXZ / L;
+        float2 cell = floor(grid);
 
-        // Each cell drops once per lifetime, at its own moment and its own spot inside it.
-        float2 h = RainRingHash22(cell + float2(layer * 37.1, layer * 71.7));
-        float2 centre = (cell + h) * L;
-
-        float age = frac(time / life + RainRingHash21(cell + layer * 13.7));
-
-        // Rain amount is chiefly a drop ARRIVAL RATE. Each cell has a stable rank;
-        // drizzle admits only the lowest-ranked events, while a downpour admits all.
-        // The narrow ramp keeps a cell from popping when weather intensity drifts.
-        float eventRank = RainRingHash21(cell + layer * 19.7 + 103.5);
-        float eventWeight = smoothstep(eventRank, min(eventRank + 0.03, 1.0), intensity);
-        if (eventWeight <= 0.001) continue;
-
-        float2 d = localXZ - centre;
-        float r = length(d);
-        if (r < 1e-4) continue;
-
-        // The crest travels outward at the water's own speed.
-        float front = age * speed * life;
-
-        // A narrow annulus: the ring is a single crest, not a train.
-        float w = RAIN_RING_WIDTH;
-        float x = (r - front) / w;
-        float profile = x * exp(-x * x);        // odd: a crest with a trough behind it
-
-        // It fades as it spreads -- the same energy on an ever longer circumference -- and
-        // it is born rather than appearing, so the first instant does not pop.
-        float spread = 1.0 / max(1.0 + front / w, 1.0);
-        float birth = saturate(age * 12.0);
-
-        slope += normalize(d) * (profile * spread * birth * eventWeight);
+        // Pick the neighbour across the nearest boundary on each axis. With support below
+        // 0.5 L these are the only four cells that can affect the pixel. Crucially the SAME
+        // neighbour's ring is evaluated from both sides of a cell boundary, so the circular
+        // normal continues instead of being clipped to a square.
+        float2 side = step(0.5, frac(grid)) * 2.0 - 1.0;
+        slope += RainRingCell(localXZ, time, intensity, layer, L, cell);
+        slope += RainRingCell(localXZ, time, intensity, layer, L,
+                              cell + float2(side.x, 0.0));
+        slope += RainRingCell(localXZ, time, intensity, layer, L,
+                              cell + float2(0.0, side.y));
+        slope += RainRingCell(localXZ, time, intensity, layer, L, cell + side);
     }
 
     // Individual drops remain readable in drizzle; heavier rain also carries somewhat

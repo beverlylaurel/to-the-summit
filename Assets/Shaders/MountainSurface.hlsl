@@ -160,6 +160,13 @@ struct MountainSurface
     half  snowSurfaceHeight;
     float3 normalWS;
 
+    /// The rain film has its own smooth optical interface. The terrain's ordinary PBR
+    /// normal still carries the impact slope for direct light, while this normal is used
+    /// to reflect the sky. Without that reflection an overcast scene has no directional
+    /// light strong enough to reveal the ring, even though the ring reaches the shader.
+    float3 rainFilmNormalWS;
+    half rainFilm;
+
     /// The snow's share at this point. The sparkle is weighted by it: with the snow mesh
     /// sparkling and the terrain not, the boundary showed up as a line.
     half  snowMask;
@@ -595,10 +602,22 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     //
     // Faded by the pixel like every other scale, or it is the aliasing all over again.
     float2 ringPixel = float2(length(ddx(worldPos.xz)), length(ddy(worldPos.xz)));
-    float2 ringLocal = RainRingLocal(worldPos.xz, _WorldSpaceCameraPos.xz);
     float rainFilm = smoothstep(0.015, 0.08, wet);
-    shaped += RainRings(ringLocal, _Time.y, _SurfaceRainIntensity)
-            * rainFilm * RainRingResolvable(max(ringPixel.x, ringPixel.y));
+    float ringVisibility = RainRingResolvable(max(ringPixel.x, ringPixel.y));
+    float2 ringSlope = 0.0;
+    if (ringVisibility > 0.0 && rainFilm > 0.0 && _SurfaceRainIntensity > 0.001)
+    {
+        float2 ringLocal = RainRingLocal(worldPos.xz, _WorldSpaceCameraPos.xz);
+        ringSlope = RainRings(ringLocal, _Time.y, _SurfaceRainIntensity)
+                  * rainFilm * ringVisibility;
+        // Three overlapping impacts can align. A water surface cannot sustain an
+        // arbitrarily steep millimetric capillary crest; bound the summed slope before it
+        // enters normalize/reflection, and reject the only invalid floating-point value
+        // without paying for an extra texture or pass. (`NaN != NaN` by definition.)
+        ringSlope = clamp(ringSlope, -0.45, 0.45);
+        if (any(ringSlope != ringSlope)) ringSlope = 0.0;
+        shaped += ringSlope;
+    }
 
     float3 shaded = normalize(normalWS + float3(shaped.x, 0.0, shaped.y));
 
@@ -614,6 +633,12 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     surface.albedo = albedo;
     surface.emission = Alpenglow(worldPos, normalWS, altitude, albedo, exposure);
     surface.normalWS = shaded;
+    // A millimetric water film follows the geometric ground, not every grain in the rock
+    // normal. Keeping the impact slope while leaving the coarse material relief underneath
+    // gives the ring a continuous reflective surface instead of burying it in bump noise.
+    surface.rainFilmNormalWS = normalize(normalWS + float3(ringSlope.x, 0.0, ringSlope.y));
+    surface.rainFilm = (half)(rainFilm * ringVisibility
+                            * step(0.001, _SurfaceRainIntensity));
     // Choose the dry material first, then put the rain film over it. The old
     // order applied wet rock and subsequently replaced it with DRY sand, so the
     // beach ignored precipitation wetness entirely.

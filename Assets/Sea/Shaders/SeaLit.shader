@@ -50,7 +50,7 @@ Shader "ToTheSummit/SeaLit"
             #pragma fragment SeaFragment
             #pragma target 4.5
 
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
 
             // THE CLOUD SHADOW ARRIVES THROUGH THIS KEYWORD. The cloud system writes
@@ -251,9 +251,13 @@ Shader "ToTheSummit/SeaLit"
                 // FADED BY THE PIXEL, LIKE EVERY OTHER SCALE. The ring is 1.7 cm across; it
                 // has no business being drawn where a pixel covers more than that, and
                 // drawing it there would be the same aliasing the tiers already fade out.
-                float2 ringLocal = RainRingLocal(IN.positionWS.xz, _WorldSpaceCameraPos.xz);
-                slopeSum += RainRings(ringLocal, _SeaTime, _SeaPrecipIntensity01)
-                          * RainRingResolvable(pixelSize);
+                float ringVisibility = RainRingResolvable(pixelSize);
+                if (ringVisibility > 0.0 && _SeaPrecipIntensity01 > 0.001)
+                {
+                    float2 ringLocal = RainRingLocal(IN.positionWS.xz, _WorldSpaceCameraPos.xz);
+                    slopeSum += RainRings(ringLocal, _SeaTime, _SeaPrecipIntensity01)
+                              * ringVisibility;
+                }
 
                 float3 N = normalize(float3(-slopeSum.x, 1.0, -slopeSum.y));
 
@@ -302,6 +306,7 @@ Shader "ToTheSummit/SeaLit"
             #endif
 
                 float3 L = mainLight.direction;
+                float3 directLightColor = mainLight.color * mainLight.shadowAttenuation;
 
                 // --- SURFACE ROUGHNESS ---
                 //
@@ -352,7 +357,7 @@ Shader "ToTheSummit/SeaLit"
                 // light behind it. It is now treated as an albedo: the sky
                 // irradiance and the sun lay on top of it.
                 float3 waterLight = SampleSH(float3(0, 1, 0))
-                                  + mainLight.color * saturate(L.y);
+                                  + directLightColor * saturate(L.y);
                 float3 upwelling = _SeaUpwellingColor.rgb * waterLight;
 
                 float3 volume = SeaVolumeColor(thickness);
@@ -387,14 +392,9 @@ Shader "ToTheSummit/SeaLit"
                                                              perceptualRoughness,
                                                              1.0, screenUV);
 
-                // THE PROBE CARRIES THE SKY BUT NOT THE CLOUDS. The volumetric
-                // clouds are a render feature drawn after the skybox, so they never
-                // enter the baked cube and an overcast sky still arrives here as
-                // blue. Coverage pulls the reflection towards a grey, dimmer dome —
-                // which is what a cloud layer physically is. The term goes away the
-                // day the clouds reach a probe (`DECISIONS.md`).
-                float3 overcast = dot(skyRefl, float3(0.299, 0.587, 0.114)) * 0.85;
-                skyRefl = lerp(skyRefl, overcast, _SeaCloudCover01 * 0.85);
+                // The PBSky dynamic reflection pass now composites volumetric clouds into this
+                // cubemap. Do not grey it again from scalar coverage: that counted the cloud deck
+                // twice and erased real directional variation from the reflected sky.
 
                 // A REFLECTED RAY THAT POINTS DOWN NEVER REACHES THE SKY.
                 //
@@ -455,10 +455,9 @@ Shader "ToTheSummit/SeaLit"
 
                 float spec = D * Vis * NoL;
 
-                // NO GLITTER AT NIGHT (spec 12.5, 18 pitfall).
-                spec *= saturate(_SeaSunElevation01 * 20.0);
-
-                float3 glitter = mainLight.color * spec;
+                // The source's own energy controls visibility. A moon highlight is faint but
+                // physically valid; the old sun-elevation gate removed it completely.
+                float3 glitter = directLightColor * spec;
 
                 // --- COMBINE (spec 12.6) ---
                 //
@@ -505,7 +504,7 @@ Shader "ToTheSummit/SeaLit"
                                            / max(0.5 * _SeaSignificantHeight, 0.05));
                 float forward = pow(saturate(dot(V, -L)), SEA_SSS_POWER);
 
-                color += mainLight.color * through
+                color += directLightColor * through
                        * (crestMask * forward * SEA_SSS_GAIN * (1.0 - F));
 
                 // --- FOAM (spec 13) — THREE SOURCES ---
@@ -846,10 +845,11 @@ Shader "ToTheSummit/SeaLit"
                 //
                 // The sky now enters as irradiance (`SampleSH`), the way it does for
                 // any other diffuse surface, and the sum is clamped before the albedo.
-                float3 foamIrradiance = mainLight.color * NoL * mainLight.shadowAttenuation
+                float3 foamIrradiance = directLightColor * NoL
                                       + SampleSH(N);
 
-                float3 foamLight = min(foamIrradiance + foamSpec * 0.12, 1.0);
+                float3 foamLight = min(foamIrradiance
+                                     + directLightColor * (foamSpec * 0.12), 1.0);
 
                 // THIN FOAM IS TRANSLUCENT. A linear blend made every trace of
                 // foam equally opaque, so the faint edges came out as solid

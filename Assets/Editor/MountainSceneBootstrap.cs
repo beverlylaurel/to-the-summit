@@ -32,6 +32,7 @@ public static class MountainSceneBootstrap
     const string TerrainDataPath = "Assets/Terrain/MountainTerrainData.asset";
     const string SettingsPath = "Assets/Settings/MountainSettings.asset";
     const string LookSettingsPath = "Assets/Settings/LookSettings.asset";
+    const string SunLensFlarePath = "Assets/Settings/SunLensFlare.asset";
     const string TerrainMaterialPath = "Assets/Settings/TerrainMaterialSettings.asset";
     const string AtmospherePath = "Assets/Settings/AtmosphereSettings.asset";
     const string ThunderPath = "Assets/Settings/ThunderSettings.asset";
@@ -410,7 +411,9 @@ public static class MountainSceneBootstrap
     #if URP_PBSKY
         var timeOfDay = Object.FindAnyObjectByType<TimeOfDay>();
         timeOfDay.SunIntensity = 3.030782f;
-        timeOfDay.MoonIntensity = 0.0199f;
+        // A gameplay exposure still amplifies night vision, but the source itself must remain
+        // orders of magnitude below the sun. The old 0.0199 made moonlit snow nearly daylight.
+        timeOfDay.MoonIntensity = 0.002f;
         timeOfDay.MoonColor = new Color(0.586f, 0.653f, 0.818f, 1f);
     #endif
 
@@ -423,6 +426,9 @@ public static class MountainSceneBootstrap
             camera,
             LoadOrCreateSkyMaterial());
         EditorUtility.SetDirty(atmosphere);
+
+        EnsureSunLensEffects(Object.FindAnyObjectByType<TimeOfDay>(), atmosphere, camera,
+            ref changed);
 
         var lookController = Object.FindAnyObjectByType<LookController>();
         if (lookController == null)
@@ -1227,6 +1233,14 @@ public static class MountainSceneBootstrap
             throw new System.InvalidOperationException(
                 "Sun light not found in scene.");
 
+        // TimeOfDay and the physical atmosphere own spectral colour. Keeping Unity's colour
+        // temperature enabled multiplies a second warm filter into the same sun.
+        if (sun.useColorTemperature)
+        {
+            sun.useColorTemperature = false;
+            changed = true;
+        }
+
         EnsureLightData(sun, ref changed);
         EnsureLightData(moon, ref changed);
 
@@ -1260,6 +1274,102 @@ public static class MountainSceneBootstrap
         AssetDatabase.SaveAssets();
 
         return settings;
+    }
+
+    static void EnsureSunLensEffects(TimeOfDay time, AtmosphereController atmosphere,
+                                     Camera camera, ref bool changed)
+    {
+        if (time == null || time.SunLight == null) return;
+
+        Light sun = time.SunLight;
+        var flare = sun.GetComponent<LensFlareComponentSRP>();
+        if (flare == null)
+        {
+            flare = sun.gameObject.AddComponent<LensFlareComponentSRP>();
+            changed = true;
+        }
+
+        LensFlareDataSRP data = LoadOrCreateSunLensFlare();
+        if (flare.lensFlareData != data)
+        {
+            flare.lensFlareData = data;
+            changed = true;
+        }
+
+        flare.useOcclusion = true;
+        flare.environmentOcclusion = true;
+        flare.occlusionRadius = 0.075f;
+        flare.sampleCount = 32;
+        flare.occlusionOffset = 0f;
+        flare.allowOffScreen = false;
+        flare.attenuationByLightShape = true;
+        flare.radialScreenAttenuationCurve = new AnimationCurve(
+            new Keyframe(0f, 1f), new Keyframe(0.82f, 0.8f), new Keyframe(1f, 0f));
+
+        var effects = sun.GetComponent<SunLensEffects>();
+        if (effects == null)
+        {
+            effects = sun.gameObject.AddComponent<SunLensEffects>();
+            changed = true;
+        }
+
+        effects.Bind(time, atmosphere, camera, flare);
+        EditorUtility.SetDirty(flare);
+        EditorUtility.SetDirty(effects);
+    }
+
+    static LensFlareDataSRP LoadOrCreateSunLensFlare()
+    {
+        var data = AssetDatabase.LoadAssetAtPath<LensFlareDataSRP>(SunLensFlarePath);
+        if (data != null) return data;
+
+        Directory.CreateDirectory(Path.GetDirectoryName(SunLensFlarePath));
+        data = ScriptableObject.CreateInstance<LensFlareDataSRP>();
+
+        var veiling = new LensFlareDataElementSRP
+        {
+            flareType = SRPLensFlareType.Circle,
+            blendMode = SRPLensFlareBlendMode.Screen,
+            position = 0f,
+            uniformScale = 6f,
+            localIntensity = 0.10f,
+            tint = new Color(1f, 0.82f, 0.58f, 0.055f),
+            modulateByLightColor = true,
+            fallOff = 1f,
+            edgeOffset = 0.02f
+        };
+
+        var core = new LensFlareDataElementSRP
+        {
+            flareType = SRPLensFlareType.Circle,
+            blendMode = SRPLensFlareBlendMode.Screen,
+            position = 0f,
+            uniformScale = 0.65f,
+            localIntensity = 0.20f,
+            tint = new Color(1f, 0.91f, 0.72f, 0.12f),
+            modulateByLightColor = true,
+            fallOff = 0.72f,
+            edgeOffset = 0.08f
+        };
+
+        var ghost = new LensFlareDataElementSRP
+        {
+            flareType = SRPLensFlareType.Ring,
+            blendMode = SRPLensFlareBlendMode.Screen,
+            position = 0.42f,
+            uniformScale = 0.22f,
+            localIntensity = 0.025f,
+            tint = new Color(0.66f, 0.82f, 1f, 0.08f),
+            modulateByLightColor = false,
+            ringThickness = 0.18f,
+            fallOff = 0.9f,
+            edgeOffset = 0.12f
+        };
+
+        data.elements = new[] { veiling, core, ghost };
+        AssetDatabase.CreateAsset(data, SunLensFlarePath);
+        AssetDatabase.SaveAssets();
+        return data;
     }
 
     static void EnsureDebugMenu(FirstPersonController player, ref bool changed)

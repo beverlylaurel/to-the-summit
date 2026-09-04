@@ -124,8 +124,10 @@ Shader "ToTheSummit/MountainSurface"
             /// UniversalFragmentPBR written out — because our own march provides the main
             /// light's shadow and there is no way to inject a shadow from outside into the
             /// ready-made function. The parts are still URP's own functions: BRDF,
-            /// per-light contribution, SSAO combination. The only thing lost is reflection
-            /// probe sampling — there is no reflection probe in the scene and the surface is matte.
+            /// per-light contribution, SSAO combination. Wet terrain also evaluates the
+            /// shared analytic sky along the reflected ray: an impact ring is a water-film
+            /// normal and is visible primarily by reflection, especially when clouds
+            /// suppress the direct sun.
             half4 Fragment(Varyings IN) : SV_Target
             {
                 MountainSurface surface = BuildMountainSurface(IN.positionWS);
@@ -181,6 +183,37 @@ Shader "ToTheSummit/MountainSurface"
                 half3 lit = inputData.bakedGI * aoFactor.indirectAmbientOcclusion * brdfData.diffuse;
                 lit += LightingPhysicallyBased(brdfData, mainLight,
                     inputData.normalWS, inputData.viewDirectionWS) * aoFactor.directAmbientOcclusion;
+
+                // RAIN IMPACTS ARE READ IN REFLECTION, NOT AS PAINTED CIRCLES.
+                //
+                // The ring slope already reached `surface.normalWS`, but this hand-written
+                // lighting path deliberately omitted URP's environment specular. During rain
+                // the sun is cloud-attenuated and SampleSH is almost directionless, so changing
+                // the normal changed virtually no light: the ground got wet, yet the rings were
+                // invisible. The sea did not have the bug because it evaluates a sky
+                // reflection for every water normal.
+                //
+                // Only the near, resolvable rain-film region evaluates the reflection. Terrain
+                // renderers do not receive a valid per-object reflection probe in this scene,
+                // so sampling `unity_SpecCube0` here returns the error colour. `AirColor` is
+                // the shared sky/fog source and remains valid for every terrain draw. The top
+                // interface uses water's F0 (n = 1.333 -> 0.0204); no albedo circle or
+                // lighting-independent glow is introduced.
+                if (surface.rainFilm > 0.001h)
+                {
+                    half3 filmNormal = normalize((half3)surface.rainFilmNormalWS);
+                    half3 filmReflectionVector = reflect(-inputData.viewDirectionWS, filmNormal);
+                    half3 filmSky = (half3)AirColor(filmReflectionVector)
+                                  * (half)surface.occlusion;
+
+                    half NoV = saturate(dot(filmNormal, inputData.viewDirectionWS));
+                    const half WaterF0 = 0.0204h;
+                    half oneMinusNoV = 1.0h - NoV;
+                    half filmFresnel = WaterF0 + (1.0h - WaterF0)
+                                     * Pow4(oneMinusNoV) * oneMinusNoV;
+                    lit += filmSky * filmFresnel * surface.rainFilm
+                         * (1.0h - surface.snowMask);
+                }
 
                 // THE TERRAIN'S SNOW ALSO USES THE SNOW'S OWN LIGHTING.
                 //

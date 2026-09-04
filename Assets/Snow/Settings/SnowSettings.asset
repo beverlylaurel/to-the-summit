@@ -49,7 +49,6 @@ MonoBehaviour:
   minPixelSize: 2.4
   flutterFrequency: 5.5
   flutterAmplitude: 0.35
-  flakeEmissive: 1
   spindriftRate: 6000
   defaultSwe: 0
   defaultRhoN: 0.12

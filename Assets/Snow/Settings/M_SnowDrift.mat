@@ -30,7 +30,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _AlphaScale: 0.12
-    - _FlakeEmissive: 1
+    - _FlakeEmissive: 0
     - _MinPixelSize: 1.3
     - _SoftFade: 0.4
     - _StretchAlongVelocity: 1

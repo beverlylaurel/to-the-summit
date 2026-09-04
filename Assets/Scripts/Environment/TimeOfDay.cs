@@ -12,15 +12,25 @@ public class TimeOfDay : MonoBehaviour
     [SerializeField, Range(0f, 1f)] float normalized = 0.3f;
     [Tooltip("Real duration of a full day (minutes). 0 = time does not flow.")]
     [SerializeField] float dayLengthMinutes = 40f;
-    [Tooltip("South/north tilt of the arc. 0 = straight overhead, larger values give a lower arc.")]
-    [SerializeField, Range(0f, 60f)] float arcTilt = 28f;
-    [Tooltip("Compass angle of east (degrees). The arc rotates with it.")]
+    [Tooltip("Compass angle of east (degrees). The astronomical horizon rotates with it.")]
     [SerializeField] float eastHeading;
+
+    [Header("Astronomy")]
+    [Tooltip("Simulated calendar year. The date advances when the game clock crosses midnight.")]
+    [SerializeField, Range(1901, 2099)] int calendarYear = 2026;
+    [Tooltip("Day of year (1-365/366). Controls solar declination, day length and lunar phase.")]
+    [SerializeField, Range(1, 366)] int calendarDayOfYear = 247;
+    [Tooltip("Observer latitude. Default is central Turkey; change this if the mountain moves.")]
+    [SerializeField, Range(-89f, 89f)] float latitudeDegrees = 39.0f;
+    [Tooltip("Observer longitude, east positive. Used with the UTC offset for true local solar time.")]
+    [SerializeField, Range(-180f, 180f)] float longitudeDegrees = 35.0f;
+    [Tooltip("Local time offset from UTC. Turkey uses UTC+3 year-round.")]
+    [SerializeField, Range(-12f, 14f)] float utcOffsetHours = 3.0f;
 
     [Header("Light")]
     [Tooltip("Raw sun color outside the atmosphere. The dawn tone derives from it, it is not " +
              "chosen separately — a filtering computation does that.")]
-    [SerializeField] Color sunColor = new(1f, 0.97f, 0.92f);
+    [SerializeField] Color sunColor = Color.white;
     // MOON ALBEDO — its state BEFORE passing through the atmosphere. The rising moon being
     // too orange came from here, and the computation is this:
     //
@@ -42,21 +52,15 @@ public class TimeOfDay : MonoBehaviour
     // 3.030782 is the sky package's calibration: 100000 lux of ground illuminance. The scene
     // setup writes it too, and the default was updated here so the two do not diverge.
     [SerializeField] float sunIntensity = 3.030782f;
-    // While the ambient probe was frozen the night filled with a fake blue and the moon
-    // looked unnecessary. Once the probe became honest the night fell to its real value and
-    // the moon was left as the only source lighting the sky. The value was found by eye.
-    //
-    // THE DEFAULT MATCHES THE SCENE. It used to be 0.204 here while the setup script wrote
-    // 0.0199 — a factor of 10.25. The scene wins in practice, so nothing looked wrong; but
-    // a `TimeOfDay` dropped into a fresh scene, or one opened before the bootstrap ran, lit
-    // the night ten times too brightly. Same rule as `sunIntensity` above.
-    [SerializeField] float moonIntensity = 0.0199f;
+    // The physical sun/full-moon illuminance ratio is far beyond the display's usable range.
+    // 0.002 keeps the source more than ten stops below the sun; LookController's slow rod
+    // adaptation then recovers a readable, still recognisably dark moonlit landscape.
+    [SerializeField] float moonIntensity = 0.002f;
 
-    [Tooltip("The moon's own directional light. IT DOES CAST A SHADOW: at night the moon " +
-             "becomes the main light (`MarkAsSun`'s night handover) and the scene setup gives " +
+    [Tooltip("The moon's own directional light. IT DOES CAST A SHADOW: when its current energy " +
+             "exceeds the sun it becomes the main light, and the scene setup gives " +
              "it soft shadows, so moonlight throws the mountain's shadow the way daylight does. " +
-             "The sky itself is still always driven by the sun — the package draws the moon " +
-             "separately, as a second celestial body.")]
+             "The sky package scatters it separately and draws its real phase.")]
     [SerializeField] Light moon;
 
     /// The sun's peak intensity. Because the sky package derives its own brightness from the
@@ -100,10 +104,9 @@ public class TimeOfDay : MonoBehaviour
         set => sunIntensity = value;
     }
 
-    /// The moon's peak intensity. It is written to the SAME light as the sun, so at night the
-    /// sky package puts the moon in the sun's place and lights the atmosphere from it. The
-    /// value was tuned while the light chain was being filtered; moving to raw light dropped
-    /// the `LowSunFade` multiplier and the night brightened.
+    /// The full-moon peak intensity before phase and atmospheric extinction. It remains a
+    /// separate directional source; phase changes its irradiance without dimming the lit pixels
+    /// of the rendered lunar disc.
     public float MoonIntensity
     {
         get => moonIntensity;
@@ -125,6 +128,11 @@ public class TimeOfDay : MonoBehaviour
     public event Action<TimeOfDay> Changed;
 
     public float Normalized => normalized;
+
+    public int CalendarYear => calendarYear;
+    public int CalendarDayOfYear => calendarDayOfYear;
+    public float MoonIlluminatedFraction { get; private set; }
+    public float MoonAgeDays { get; private set; }
 
     /// Freezes time for testing.
     public bool Paused { get; set; }
@@ -165,6 +173,8 @@ public class TimeOfDay : MonoBehaviour
 
     /// Intensity of the dominant celestial light after horizon gating and atmospheric extinction.
     public float PrimaryLightIntensity => PrimaryLight != null ? PrimaryLight.intensity : 0f;
+    public float SunLightIntensity => sun != null ? sun.intensity : 0f;
+    public Light SunLight => sun;
 
     Light PrimaryLight
     {
@@ -184,9 +194,9 @@ public class TimeOfDay : MonoBehaviour
     public Color CurrentSunColor { get; private set; } = Color.white;
 
 
-    /// The moon is opposite the sun. Consumers read the selected primary direction above; the
-    /// separate body still remains an implementation detail of the clock.
-    Vector3 MoonDirection => -SunDirection;
+    /// Unit vector pointing toward the moon. It comes from an independent lunar orbit; only a
+    /// full moon is approximately opposite the sun.
+    public Vector3 MoonDirection { get; private set; } = Vector3.down;
 
     /// LIGHT REACHING FLAT GROUND. The two bodies' contributions are summed and each is
     /// multiplied by ITS OWN elevation: the intensity of a body below the horizon does not
@@ -215,25 +225,32 @@ public class TimeOfDay : MonoBehaviour
 
     /// The sun's direction at noon. Permanent properties of the surface look at this: lichen
     /// settles according to annual sun exposure, and tied to the instantaneous sun position it would blink through the day.
-    public Vector3 NoonSunDirection => DirectionAt(0.5f);
+    public Vector3 NoonSunDirection => DirectionAt(0.5f).SunDirection;
 
-    /// THE CELESTIAL POLE — the axis the star field rotates about. The sun's arc turns about
-    /// the same axis (in `DirectionAt` `local` rotates in the XY plane, i.e. the axis is +Z put
-    /// through the same transform). Given the stars a separate axis, the sun and the stars
-    /// would turn in different directions.
-    public Vector3 CelestialPole =>
-        Quaternion.Euler(0f, eastHeading, 0f)
-        * (Quaternion.AngleAxis(arcTilt, Vector3.right) * Vector3.forward);
+    /// The celestial north pole has an elevation equal to observer latitude. The star field
+    /// rotates around the same physical axis used by the ephemeris.
+    public Vector3 CelestialPole
+    {
+        get
+        {
+            Quaternion heading = Quaternion.Euler(0f, eastHeading, 0f);
+            Vector3 north = heading * Vector3.back;
+            float latitude = latitudeDegrees * Mathf.Deg2Rad;
+            return (north * Mathf.Cos(latitude) + Vector3.up * Mathf.Sin(latitude)).normalized;
+        }
+    }
 
     public void Bind(Light directional, Light moonLight)
     {
         sun = directional;
         moon = moonLight;
+        // Atmospheric extinction owns the sun's chromatic shift. A second 5000 K filter on
+        // the already warm source multiplied the noon spectrum into an orange light.
+        if (sun != null) sun.useColorTemperature = false;
         MarkAsSun();
 
 #if URP_PBSKY
-        // The moon is given to the sky package as a SECOND CELESTIAL BODY: its disc is drawn
-        // independently of the main light, and its phase and earthshine come from the package's own computation.
+        PhysicallyBasedSkyURP.SunLight = directional;
         PhysicallyBasedSkyURP.MoonLight = moonLight;
 #endif
     }
@@ -253,24 +270,27 @@ public class TimeOfDay : MonoBehaviour
         // brighter than the sun, Unity's "pick the brightest" behaviour handed the main
         // light to the lightning for a frame. The explicit assignment still pins that
         // choice; only which one it pins to now depends on the time of day.
-        Light wanted = sun;
-
-        if (moon != null && SunHeight <= NightHandoverHeight)
-            wanted = moon;
+        Light wanted = PrimaryLight;
 
         // The equality check avoids an unnecessary write: this is a scene setting and written
         // every frame it keeps the scene permanently dirty.
         if (wanted != null && RenderSettings.sun != wanted) RenderSettings.sun = wanted;
     }
 
-    /// Below this elevation the main light is the moon. Not zero: with the sun exactly on the
-    /// horizon its intensity is already near zero and its shadows stretch meaninglessly.
-    const float NightHandoverHeight = -0.05f;
-
     /// Sets the time directly, for tests and previews
     public void SetNormalized(float value)
     {
         normalized = Mathf.Repeat(value, 1f);
+        Apply();
+    }
+
+    /// Sets the simulated date without touching the clock. Useful for seasonal previews and
+    /// deterministic validation.
+    public void SetCalendarDate(int year, int dayOfYear)
+    {
+        calendarYear = Mathf.Clamp(year, 1901, 2099);
+        calendarDayOfYear = Mathf.Clamp(dayOfYear, 1,
+            DateTime.IsLeapYear(calendarYear) ? 366 : 365);
         Apply();
     }
 
@@ -283,36 +303,43 @@ public class TimeOfDay : MonoBehaviour
     void Update()
     {
         if (Application.isPlaying && !Paused && dayLengthMinutes > 0f)
-            normalized = Mathf.Repeat(normalized + Time.deltaTime / (dayLengthMinutes * 60f), 1f);
+        {
+            float next = normalized + Time.deltaTime / (dayLengthMinutes * 60f);
+            int elapsedDays = Mathf.FloorToInt(next);
+            normalized = Mathf.Repeat(next, 1f);
+            if (elapsedDays > 0) AdvanceCalendar(elapsedDays);
+        }
 
         Apply();
     }
 
-    /// The sun's direction at a given time. The sun traces an arc: it rises in the east,
-    /// passes through a peak tilted to the south and sets in the west. Change only the tilt and
-    /// it rises and sets at the same point — that is not an arc.
-    Vector3 DirectionAt(float clock)
+    CelestialEphemeris.Sample DirectionAt(float clock) => CelestialEphemeris.Evaluate(
+        calendarYear, calendarDayOfYear, clock, latitudeDegrees, longitudeDegrees,
+        utcOffsetHours, eastHeading);
+
+    void AdvanceCalendar(int days)
     {
-        float angle = (clock - 0.25f) * 360f;
-        var local = new Vector3(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad), 0f);
+        while (days-- > 0)
+        {
+            calendarDayOfYear++;
+            int daysInYear = DateTime.IsLeapYear(calendarYear) ? 366 : 365;
+            if (calendarDayOfYear <= daysInYear) continue;
 
-        // Tilt the arc south, then turn it by the compass
-        Vector3 direction = Quaternion.Euler(0f, eastHeading, 0f)
-                            * (Quaternion.AngleAxis(arcTilt, Vector3.right) * local);
-
-        return direction.normalized;
+            calendarDayOfYear = 1;
+            calendarYear = Mathf.Min(2099, calendarYear + 1);
+        }
     }
 
     void Apply()
     {
-        SunDirection = DirectionAt(normalized);
+        CelestialEphemeris.Sample celestial = DirectionAt(normalized);
+        SunDirection = celestial.SunDirection;
+        MoonDirection = celestial.MoonDirection;
+        MoonIlluminatedFraction = celestial.MoonIlluminatedFraction;
+        MoonAgeDays = celestial.MoonAgeDays;
         float elevation = SunDirection.y;
 
         SunHeight = elevation;
-
-        // The main light handover depends on the time of day, it is not a one-time setup.
-        // Left in `Bind` and `OnEnable` the night would stay on the sun forever.
-        MarkAsSun();
 
         // Let it soften over a wide band: twilight must not end abruptly.
         // Kept narrow, 8 in the morning looked as bright as noon.
@@ -329,9 +356,9 @@ public class TimeOfDay : MonoBehaviour
         // leaves violet. There is NO normalization — a reddening beam has to DIM. The old form
         // always pulled the brightest channel to 1: the sunset locked into a red that never
         // dimmed and hurt the eye.
-        // THE SUN BEAM IS FOR COLOR ONLY. The intensity no longer comes from here — absorption
-        // is owned by the sky package and the raw sun is written to the light. `CurrentSunColor`
-        // is still consumed: the fog color, the cloud tone and the terrain's dawn color feed on it.
+        // Ground-reaching direct sunlight: its normalized tone goes to the directional light,
+        // while the brightest channel carries the matching energy in intensity. The sky and
+        // clouds receive separate top-of-atmosphere radiance below.
         Vector3 beam = Atmosphere.BeamTransmittance(0f, SunDirection);
 
         // Color and intensity are carried separately: most consumers use the color as a TONE
@@ -339,14 +366,12 @@ public class TimeOfDay : MonoBehaviour
         // THE DIMMER IS APPLIED TO THE COLOR TOO. Because `Tint()` pulls the brightest channel
         // to 1, the color stayed fully saturated while the beam dimmed: applied only to the
         // intensity, clouds turned pink all at once under a low sun. Color and intensity have to follow the same curve.
-        float sunFade = Atmosphere.LowSunFade(0f, SunDirection);
         CurrentSunColor = Tint(Vector3.Scale(beam,
-            new Vector3(sunColor.r, sunColor.g, sunColor.b))) * sunFade;
+            new Vector3(sunColor.r, sunColor.g, sunColor.b)));
 
-        // TWO BODIES, TWO LIGHTS. Fitting them into one light was structurally impossible: the
-        // moon is exactly opposite the sun, a direction is a single thing, and at the handover
-        // the disc jumped 180°. Each body now drives its own light; the sky package draws the
-        // moon separately as a second CELESTIAL BODY (`PhysicallyBasedSkyURP.MoonLight`).
+        // TWO BODIES, TWO LIGHTS. Fitting them into one light is structurally impossible and a
+        // real lunar orbit is antipodal only near full moon. Each body drives its own light; the
+        // sky package draws the moon separately as a second celestial body.
         //
         // The band asymmetry stays: the sun's reaches -18° (the end of astronomical twilight)
         // because it drives the sky; the moon's is ±3°, and we do not model a twilight for a
@@ -354,7 +379,7 @@ public class TimeOfDay : MonoBehaviour
         if (sun != null)
         {
             sun.transform.rotation = Quaternion.LookRotation(-SunDirection);
-            sun.color = sunColor;
+            sun.color = CurrentSunColor;
 
             // AIR MASS EXTINCTION IS APPLIED TO THE LIGHT TOO. For a while it was not, with the
             // reasoning "absorption is owned by the sky package" — but the package cannot dim a
@@ -372,57 +397,43 @@ public class TimeOfDay : MonoBehaviour
             // The BRIGHTEST CHANNEL is taken, not the luminance: `Tint()` normalizes the color
             // by the same channel, so the color and the intensity follow the same curve.
             //
-            // THE PRODUCT IS NOT THE RAW BEAM. `LowSunFade` is applied TWICE on purpose —
-            // once to the color (above) and once here to the intensity — so
-            // `CurrentSunColor x intensity` comes to `beam x sunFade^2`. The comment used to
-            // claim the two multiplied back to the real beam; they do not, and the squaring
-            // is deliberate: a low sun is dimmed once as a color decision and once as a light
-            // decision. The cloud side squares the same fade for the same reason
-            // (`AtmosphereController`, `cloudWarm *= cloudWarm`).
-            float extinction = Mathf.Max(beam.x, Mathf.Max(beam.y, beam.z)) * sunFade;
+            // BeamTransmittance already contains the continuous low-sun limiter. Applying it
+            // again squared the fade and caused the direct light to jump by orders of magnitude
+            // in the first few degrees after sunrise.
+            float extinction = Mathf.Max(beam.x, Mathf.Max(beam.y, beam.z));
             sun.intensity = sunIntensity * SunBlend(SunDirection.y) * extinction;
 
-            // THE SKY IS NOT LIT BY THE LIGHT THE GROUND GETS.
-            //
-            // Everything above this line dims and reddens the sun BECAUSE THAT IS WHAT A SLOPE
-            // RECEIVES at sunset. The sky package computes its own atmosphere, so handing it the
-            // same value applies the absorption twice more — the light already carries it in the
-            // colour and again in the intensity.
-            //
-            // MEASURED: as the sun goes from +0.058 to 0 the light's intensity falls 0.725 ->
-            // EXACTLY ZERO and the sky's zenith follows it down, 0.0101 -> 0.0000295. Sunset was
-            // coming out THIRTEEN TIMES DARKER than a moonlit midnight, which is backwards by
-            // about four orders of magnitude.
-            //
-            // `SunBlend` STAYS. It is not absorption, it is the gate that ends astronomical
-            // twilight at -18 degrees; without it the LUT would be lit by a sun pointing through
-            // the planet all night. At the horizon it is still 0.98, so the sky gets its sun.
-            //
-            // THE MOON HAS TO SURVIVE THE HAND-OVER. Written as the sun's radiance alone this
-            // zeroed the night sky: past -18 degrees the gate closes, and the override was still
-            // in force, so it replaced the moonlight the package had been lighting the LUT with.
-            // Measured: the night zenith went from 0.00039 to EXACTLY ZERO. Taking the larger of
-            // the two hands the sky over without a seam — the sun wins until twilight ends, the
-            // moon from then on, and neither is ever switched off under the other.
-            //
-            // WHAT THIS DOES NOT FIX: the LUT still takes its DIRECTION from whichever light URP
-            // calls the main one, and past the horizon that is the moon. So twilight carries the
-            // right amount of energy from the wrong direction. Pre-existing, and the package's
-            // own note says why (one light per LUT). DECISIONS.md.
+            // The sky is not fed the ground light. It performs its own path integration, so it
+            // receives source radiance above the atmosphere and only the geometric twilight gate.
+            // Sun and moon remain separate inputs; no max/handover discards one under the other.
             float skySun = sunIntensity * SunBlend(SunDirection.y);
-            float skyMoon = moonIntensity * MoonBlend(MoonDirection.y);
-
-            PhysicallyBasedSkyURP.SkySunRadiance = skySun >= skyMoon
-                ? sunColor.linear * (skySun * Mathf.PI)
-                : moonColor.linear * (skyMoon * Mathf.PI);
+            PhysicallyBasedSkyURP.SkySunRadiance = sunColor.linear * (skySun * Mathf.PI);
         }
 
         if (moon != null)
         {
             moon.transform.rotation = Quaternion.LookRotation(-MoonDirection);
-            moon.color = moonColor;
-            moon.intensity = moonIntensity * MoonBlend(MoonDirection.y);
+            Vector3 moonBeam = Atmosphere.BeamTransmittance(0f, MoonDirection);
+            moon.color = Tint(Vector3.Scale(moonBeam,
+                new Vector3(moonColor.r, moonColor.g, moonColor.b)));
+
+            float moonExtinction = Mathf.Max(moonBeam.x, Mathf.Max(moonBeam.y, moonBeam.z));
+            // Ground illumination follows lunar phase. A small earthshine floor keeps the new
+            // moon from becoming a discontinuous on/off source.
+            float phaseLight = Mathf.Lerp(0.01f, 1f,
+                Mathf.Pow(MoonIlluminatedFraction, 1.35f));
+            float skyMoon = moonIntensity * MoonBlend(MoonDirection.y) * phaseLight;
+            moon.intensity = skyMoon * moonExtinction;
+
+#if URP_PBSKY
+            PhysicallyBasedSkyURP.SkyMoonRadiance = moonColor.linear * (skyMoon * Mathf.PI);
+            PhysicallyBasedSkyURP.MoonSurfaceRadiance = moonColor.linear * (moonIntensity * Mathf.PI);
+#endif
         }
+
+        // Pick the actual strongest direct source only after both lights have their current-frame
+        // energy. This removes the dawn/dusk interval where URP was pinned to an extinguished sun.
+        MarkAsSun();
 
         // The sun elevation is published GLOBALLY as well. The version carried as a material
         // property did not close the night gate in the terrain shader (the snow sparkle kept

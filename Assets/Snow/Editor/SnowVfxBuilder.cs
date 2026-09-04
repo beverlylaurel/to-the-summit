@@ -133,12 +133,10 @@ public static class SnowVfxBuilder
             r.AppendLine("           [!] T_Flake_Atlas missing — keeping DefaultDot");
         }
 
-        SetSetting(output, "useEmissive", true, r);
-
-        object emisParam = AddParameter(graph, "FlakeEmissive", typeof(Color),
-                                        new Color(0.55f, 0.60f, 0.70f),
-                                        new Vector2(-300, 820), r);
-        LinkParameter(emisParam, output, "emissiveColor", r);
+        // The URP lit output already receives the main light, shadows and environment.
+        // An emissive copy of the sun remained visible in terrain/cloud shadow and made flakes
+        // look self-lit, so the graph deliberately has no emissive channel.
+        SetSetting(output, "useEmissive", false, r);
 
         SetSlot(output, "smoothness", 0.2f, r);
         SetSlot(output, "metallic", 0f, r);
