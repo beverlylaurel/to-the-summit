@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
@@ -11,8 +12,17 @@ using UnityEngine.Rendering.Universal;
 /// pre-post-process HDR exposure. The game's eye adaptation and cinematic grade never become
 /// part of the JPEG; the camera's own lens, sensor and ISP response is applied exactly once.
 [DisallowMultipleComponent]
-public sealed class VintagePhotoMode : MonoBehaviour
+public sealed class VintagePhotoMode : EquippableItem
 {
+    const string ViewfinderAction = "viewfinder";
+    const string GalleryAction = "gallery";
+    static readonly HeldItemAction[] EquippedActions =
+    {
+        new(ViewfinderAction, "VİZÖR", HeldItemInput.ForPointer(
+            HeldItemPointerButton.Right, ThinTripleIconId.MouseRight)),
+        new(GalleryAction, "GALERİ", HeldItemInput.ForKey(Key.G, "G"))
+    };
+
     enum Mode { Hidden, Equipped, Viewfinder, Review, Gallery }
 
     [Serializable]
@@ -61,17 +71,27 @@ public sealed class VintagePhotoMode : MonoBehaviour
     VintagePhotoPreview preview;
     bool capturing;
     bool captureCameraRendered;
+    int sharedActionFrame = -1;
     string captureStage = "Idle";
     string notice;
     float noticeUntil;
 
     [NonSerialized] VintagePhotoHud hud;
 
-    public bool IsEquipped => mode != Mode.Hidden;
     public bool IsCapturing => capturing;
     public string CaptureStage => captureStage;
     public string PhotoDirectory => library?.DirectoryPath ?? string.Empty;
     public int PhotoCount => library?.Count ?? 0;
+
+    public override string ItemId => "vintage-dslr";
+    public override string DisplayName => "VINTAGE DSLR";
+    public override string StatusText => $"HAZIR · {Mathf.Max(0, (profile?.cardCapacity ?? 0) - (library?.Count ?? 0))} POZ";
+    public override ThinTripleIconId DisplayIcon => ThinTripleIconId.Camera;
+    public override Key EquipKey => Key.Digit4;
+    public override string EquipKeyLabel => "4";
+    public override bool IsEquipped => mode != Mode.Hidden;
+    public override bool ShowHeldCard => mode == Mode.Equipped;
+    public override IReadOnlyList<HeldItemAction> SharedActions => EquippedActions;
 
 #if UNITY_EDITOR
     public bool EditorPreviewReady => preview?.Ready ?? false;
@@ -182,18 +202,10 @@ public sealed class VintagePhotoMode : MonoBehaviour
         Mouse mouse = Mouse.current;
         if (keyboard == null || mouse == null) return;
 
-        if (keyboard.digit4Key.wasPressedThisFrame)
-        {
-            if (capturing)
-            {
-                ShowNotice("Fotoğraf kaydediliyor");
-                return;
-            }
-            SetMode(mode == Mode.Hidden ? Mode.Equipped : Mode.Hidden);
-            return;
-        }
-
-        if (mode == Mode.Hidden) return;
+        if (mode == Mode.Hidden || mode == Mode.Equipped) return;
+        // HeldItemSystem may run before this component. Do not let the same right-click/G
+        // that opened a modal state immediately close it again in this component's Update.
+        if (Time.frameCount == sharedActionFrame) return;
 
         if (keyboard.gKey.wasPressedThisFrame)
         {
@@ -270,6 +282,32 @@ public sealed class VintagePhotoMode : MonoBehaviour
     {
         exposureCompensation = Mathf.Clamp(
             Mathf.Round((exposureCompensation + delta) * 3f) / 3f, -3f, 3f);
+    }
+
+    public override bool CanUnequip(out string reason)
+    {
+        reason = capturing ? "Fotoğraf kaydediliyor" : string.Empty;
+        return !capturing;
+    }
+
+    public override void SetEquipped(bool equipped)
+    {
+        SetMode(equipped ? Mode.Equipped : Mode.Hidden);
+    }
+
+    public override void ExecuteSharedAction(string actionId)
+    {
+        if (mode != Mode.Equipped || capturing) return;
+        sharedActionFrame = Time.frameCount;
+        if (actionId == ViewfinderAction)
+        {
+            SetMode(Mode.Viewfinder);
+        }
+        else if (actionId == GalleryAction)
+        {
+            galleryReturnMode = Mode.Equipped;
+            OpenGallery();
+        }
     }
 
     void ChangeZoom(float steps)
@@ -601,7 +639,6 @@ public sealed class VintagePhotoMode : MonoBehaviour
         if (profile == null) return;
         GUI.depth = -100;
         hud ??= new VintagePhotoHud(regularFont, mediumFont, semiboldFont, iconSet);
-        hud.SetHeldVisible(mode == Mode.Equipped);
         int remaining = Mathf.Max(0, profile.cardCapacity - library.Count);
 
         if (mode == Mode.Viewfinder)
@@ -625,14 +662,6 @@ public sealed class VintagePhotoMode : MonoBehaviour
                 ? Path.GetFileName(library.Files[galleryIndex]) : string.Empty;
             hud.DrawGallery(displayedPhoto, fileName, galleryIndex, library.Count);
         }
-        else if (mode == Mode.Equipped)
-        {
-            hud.DrawEquipped(remaining);
-        }
-
-        if (mode != Mode.Equipped && hud.HeldVisible)
-            hud.DrawEquipped(remaining);
-
         hud.DrawNotice(notice);
     }
 }

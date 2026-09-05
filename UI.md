@@ -50,6 +50,12 @@ Elde tutulan eşyanın kısa tanıtımı için seçilen ortak kalıp **Saplı Ka
 kimliği üst kartta, yalnız mevcut eylemler alt sırada ve aralarında kısa bir dikey bağ
 bulunur. Kamera bu kalıbın ilk uygulamasıdır. Başka eşya yeni bir panel dili üretmez.
 
+Runtime uygulaması `Assets/Scripts/Items/UI/HeldItemHud.cs` dosyasındadır. Aktif eşya
+adını, durumunu, İnce Üçlü ikonunu ve o anda kullanılabilen eylemleri `EquippableItem`
+sözleşmesiyle verir. Eylemin girdi tanımı hem `HeldItemSystem` yönlendirmesinin hem karttaki
+görselin kaynağıdır; kısayol metni ikinci bir yerde elle kurulmaz. `KALDIR` kartı aktif
+eşyanın ele alma tuşundan ortak kontrolcü tarafından eklenir.
+
 ## Hareket
 
 - Ortak giriş/çıkış yönü **Kısa Soldan + Ağır Cam**dır: panel grubu 4 px soldan

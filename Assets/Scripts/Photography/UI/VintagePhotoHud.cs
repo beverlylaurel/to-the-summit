@@ -2,9 +2,6 @@ using UnityEngine;
 
 public sealed class VintagePhotoHud
 {
-    const float HeldTransitionSeconds = 0.22f;
-    const float HeldOffsetPixels = -4f;
-
     static readonly Color Ink = RainGlassUi.Ink;
     static readonly Color MutedInk = RainGlassUi.MutedInk;
     static readonly Color Rule = RainGlassUi.Border;
@@ -19,14 +16,6 @@ public sealed class VintagePhotoHud
     GUIStyle keyStyle;
     GUIStyle titleStyle;
     GUIStyle centeredStyle;
-    GUIStyle heldNameStyle;
-    GUIStyle heldMetaStyle;
-
-    bool heldTransitionInitialized;
-    bool heldTargetVisible;
-    float heldTransitionStartedAt;
-    float heldTransitionFrom;
-    float heldAmount;
 
     public VintagePhotoHud(Font regular, Font medium, Font semibold, ThinTripleIconSet iconSet)
     {
@@ -52,34 +41,6 @@ public sealed class VintagePhotoHud
         return frame;
     }
 
-    public bool HeldVisible
-    {
-        get
-        {
-            UpdateHeldTransition();
-            return heldTargetVisible || heldAmount > 0.001f;
-        }
-    }
-
-    public void SetHeldVisible(bool visible)
-    {
-        if (!heldTransitionInitialized)
-        {
-            heldTransitionInitialized = true;
-            heldTargetVisible = visible;
-            heldTransitionFrom = 0f;
-            heldAmount = 0f;
-            heldTransitionStartedAt = Time.unscaledTime;
-            return;
-        }
-
-        UpdateHeldTransition();
-        if (heldTargetVisible == visible) return;
-        heldTargetVisible = visible;
-        heldTransitionFrom = heldAmount;
-        heldTransitionStartedAt = Time.unscaledTime;
-    }
-
     public void DrawViewfinder(Texture preview, bool ready, bool capturing, float aperture,
         string shutter, int iso, string ev, float zoom, int remaining)
     {
@@ -94,38 +55,6 @@ public sealed class VintagePhotoHud
         DrawFocus(frame);
         DrawCameraReadout(frame, aperture, shutter, iso, ev, zoom);
         DrawControls(controls);
-    }
-
-    public void DrawEquipped(int remaining)
-    {
-        EnsureStyles();
-        UpdateHeldTransition();
-        if (heldAmount <= 0.001f) return;
-
-        Color previousColor = GUI.color;
-        GUI.color = new Color(previousColor.r, previousColor.g, previousColor.b,
-            previousColor.a * heldAmount);
-        float safe = 30f + Mathf.Lerp(HeldOffsetPixels, 0f, heldAmount);
-        Rect panel = PixelRect(safe, Screen.height - 138f, 232f, 52f);
-        RainGlassUi.DrawSurface(panel, 0.54f);
-        ThinTripleIconRenderer.Draw(icons, ThinTripleIconId.Camera,
-            PixelRect(panel.x + 10f, panel.y + 10f, 32f, 32f), Ink);
-        GUI.Label(new Rect(panel.x + 52f, panel.y + 7f, panel.width - 62f, 22f),
-            "VINTAGE DSLR", heldNameStyle);
-        GUI.Label(new Rect(panel.x + 52f, panel.y + 27f, panel.width - 62f, 18f),
-            $"HAZIR · {remaining} POZ", heldMetaStyle);
-
-        float actionY = Screen.height - 68f;
-        RainGlassUi.DrawStem(new Vector2(panel.x + 23f, panel.yMax),
-            new Vector2(panel.x + 23f, actionY));
-        const float actionWidth = 120f;
-        Rect viewfinder = PixelRect(safe, actionY, actionWidth, 34f);
-        Rect gallery = PixelRect(viewfinder.xMax + 7f, actionY, actionWidth, 34f);
-        Rect stow = PixelRect(gallery.xMax + 7f, actionY, actionWidth, 34f);
-        DrawHeldIconAction(viewfinder, ThinTripleIconId.MouseRight, "VİZÖR");
-        DrawHeldKeyAction(gallery, "G", "GALERİ");
-        DrawHeldKeyAction(stow, "4", "KALDIR");
-        GUI.color = previousColor;
     }
 
     public void DrawReview(Texture photo) => DrawPhoto(photo, "ÖN İZLEME", "2 SN");
@@ -279,26 +208,6 @@ public sealed class VintagePhotoHud
             rect.xMax - keyRect.xMax - 8f, 30f), action, labelStyle);
     }
 
-    void DrawHeldIconAction(Rect rect, ThinTripleIconId icon, string action)
-    {
-        RainGlassUi.DrawSurface(rect, 0.54f);
-        ThinTripleIconRenderer.Draw(icons, icon,
-            PixelRect(rect.x + 7f, rect.y + 7f, 20f, 20f), Ink);
-        GUI.Label(new Rect(rect.x + 35f, rect.y, rect.width - 42f, rect.height),
-            action, labelStyle);
-    }
-
-    void DrawHeldKeyAction(Rect rect, string key, string action)
-    {
-        RainGlassUi.DrawSurface(rect, 0.54f);
-        Rect keyRect = PixelRect(rect.x + 6f, rect.y + 6f, 22f, 22f);
-        RainGlassUi.Fill(keyRect, RainGlassUi.KeyFill);
-        RainGlassUi.DrawOutline(keyRect, Rule, 1f);
-        GUI.Label(keyRect, key, keyStyle);
-        GUI.Label(new Rect(rect.x + 36f, rect.y, rect.width - 42f, rect.height),
-            action, labelStyle);
-    }
-
     void DrawPhoto(Texture photo, string heading, string detail)
     {
         EnsureStyles();
@@ -318,17 +227,6 @@ public sealed class VintagePhotoHud
         keyStyle ??= Style(mediumFont, 13, TextAnchor.MiddleCenter, Ink);
         titleStyle ??= Style(semiboldFont, 22, TextAnchor.MiddleCenter, Ink);
         centeredStyle ??= Style(regularFont, 15, TextAnchor.MiddleCenter, Ink);
-        heldNameStyle ??= Style(semiboldFont, 14, TextAnchor.MiddleLeft, Ink);
-        heldMetaStyle ??= Style(regularFont, 12, TextAnchor.MiddleLeft, MutedInk);
-    }
-
-    void UpdateHeldTransition()
-    {
-        if (!heldTransitionInitialized) return;
-        float t = Mathf.Clamp01((Time.unscaledTime - heldTransitionStartedAt)
-            / HeldTransitionSeconds);
-        float eased = t * t * (3f - 2f * t);
-        heldAmount = Mathf.Lerp(heldTransitionFrom, heldTargetVisible ? 1f : 0f, eased);
     }
 
     static GUIStyle Style(Font font, int size, TextAnchor alignment, Color color) =>

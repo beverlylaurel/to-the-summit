@@ -36,7 +36,8 @@ public static class HeadlampTest
         bool optics = hotspot != null && spill != null
                    && hotspot.type == LightType.Spot && spill.type == LightType.Spot
                    && hotspot.lightUnit == LightUnit.Lumen && spill.lightUnit == LightUnit.Lumen
-                   && hotspot.useColorTemperature && spill.useColorTemperature
+                   && !hotspot.useColorTemperature && !spill.useColorTemperature
+                   && hotspot.color.b < hotspot.color.r && spill.color.b < spill.color.r
                    && hotspot.shadows == LightShadows.Soft
                    && spill.shadows == LightShadows.None;
 
@@ -54,7 +55,7 @@ public static class HeadlampTest
 
         report.AppendLine($"  [{Mark(tuning)}] output is restrained and beam angles form hotspot plus spill");
         report.AppendLine($"  [{Mark(hierarchy)}] mount inherits the rendered camera's head and gait motion");
-        report.AppendLine($"  [{Mark(optics)}] physical lumen units, color temperature and one soft shadow cone are active");
+        report.AppendLine($"  [{Mark(optics)}] physical lumen units, explicit warm LED tint and one soft shadow cone are active");
         report.AppendLine($"  [{Mark(switching)}] LED output switches fully within the input frame");
         ok = tuning && hierarchy && optics && switching;
         report.AppendLine(ok ? "RESULT: PASSED" : "RESULT: FAILED");

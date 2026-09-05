@@ -13,6 +13,8 @@ public static class VintagePhotoModeTest
     const string SemiboldFontPath = "Assets/UI/Fonts/Inconsolata/Inconsolata-SemiBold.ttf";
     const string IconSetPath = "Assets/UI/Icons/ThinTriple/ThinTripleIconSet.asset";
     const string HudSourcePath = "Assets/Scripts/Photography/UI/VintagePhotoHud.cs";
+    const string HeldSystemSourcePath = "Assets/Scripts/Items/HeldItemSystem.cs";
+    const string HeldHudSourcePath = "Assets/Scripts/Items/UI/HeldItemHud.cs";
     const string IconSourcePath = "Assets/Scripts/UI/Icons/ThinTripleIconSet.cs";
     const string RainGlassSourcePath = "Assets/Scripts/UI/Style/RainGlassUi.cs";
 
@@ -41,10 +43,13 @@ public static class VintagePhotoModeTest
                    && shaderSource.Contains("MeterLogLuminance");
 
         string source = File.ReadAllText(SourcePath);
-        bool controls = source.Contains("digit4Key.wasPressedThisFrame")
+        bool controls = !source.Contains("digit4Key.wasPressedThisFrame")
+                     && source.Contains("public sealed class VintagePhotoMode : EquippableItem")
+                     && source.Contains("HeldItemInput.ForPointer")
                      && source.Contains("mouse.rightButton.wasPressedThisFrame")
                      && source.Contains("mouse.leftButton.wasPressedThisFrame")
-                     && source.Contains("keyboard.gKey.wasPressedThisFrame");
+                     && source.Contains("keyboard.gKey.wasPressedThisFrame")
+                     && source.Contains("Time.frameCount == sharedActionFrame");
         bool noScreenshot = !source.Contains("ScreenCapture.CaptureScreenshot")
                          && source.Contains("data.renderPostProcessing = false")
                          && source.Contains("GraphicsFormat.R16G16B16A16_SFloat");
@@ -63,15 +68,19 @@ public static class VintagePhotoModeTest
                       && cameraIcon.medium != null && cameraIcon.medium.width == 32
                       && cameraIcon.large != null && cameraIcon.large.width == 48;
         string hudSource = File.ReadAllText(HudSourcePath);
+        string heldSystemSource = File.ReadAllText(HeldSystemSourcePath);
+        string heldHudSource = File.ReadAllText(HeldHudSourcePath);
         string iconSource = File.ReadAllText(IconSourcePath);
         string rainGlassSource = File.ReadAllText(RainGlassSourcePath);
         bool uiSource = source.Contains("VintagePhotoHud")
                      && hudSource.Contains("DrawCameraReadout")
                      && hudSource.Contains("DrawControls")
                      && hudSource.Contains("RainGlassUi.DrawSurface")
-                     && hudSource.Contains("DrawEquipped(int remaining)")
-                     && hudSource.Contains("HeldTransitionSeconds = 0.22f")
-                     && hudSource.Contains("HeldOffsetPixels = -4f")
+                     && !hudSource.Contains("DrawEquipped(int remaining)")
+                     && heldHudSource.Contains("TransitionSeconds = 0.22f")
+                     && heldHudSource.Contains("OffsetPixels = -4f")
+                     && heldHudSource.Contains("IReadOnlyList<HeldItemAction> actions")
+                     && heldSystemSource.Contains("activeItem.SharedActions")
                      && hudSource.Contains("ThinTripleIconId.MouseRight, \"KAPAT\"")
                      && !hudSource.Contains("A / D  GEZİN")
                      && iconSource.Contains("ThinTripleIconId")
@@ -81,8 +90,13 @@ public static class VintagePhotoModeTest
 
         VintagePhotoMode mode = Object.FindAnyObjectByType<VintagePhotoMode>(FindObjectsInactive.Include);
         var serializedMode = mode != null ? new SerializedObject(mode) : null;
+        HeldItemSystem itemSystem = Object.FindAnyObjectByType<HeldItemSystem>(FindObjectsInactive.Include);
+        var serializedItems = itemSystem != null ? new SerializedObject(itemSystem) : null;
+        SerializedProperty registeredItems = serializedItems?.FindProperty("items");
         bool scene = serializedMode != null
-                  && serializedMode.FindProperty("previewFeature").objectReferenceValue != null;
+                  && serializedMode.FindProperty("previewFeature").objectReferenceValue != null
+                  && registeredItems != null && registeredItems.arraySize == 1
+                  && registeredItems.GetArrayElementAtIndex(0).objectReferenceValue == mode;
         bool typography = regularFont != null && mediumFont != null && semiboldFont != null
                        && iconSet != null && iconTiers
                        && serializedMode != null
@@ -96,10 +110,10 @@ public static class VintagePhotoModeTest
         report.AppendLine($"  [{Mark(shaderBlit)}] Graphics.Blit source is bound: "
                         + $"{whiteResponse.r:F3}/{whiteResponse.g:F3}/{whiteResponse.b:F3}");
         report.AppendLine($"  [{Mark(sensor)}] metering, shot/read noise, fixed pattern and 12-bit quantisation");
-        report.AppendLine($"  [{Mark(controls)}] 4/right-click/left-click/gallery controls");
+        report.AppendLine($"  [{Mark(controls)}] common equip plus camera modal controls");
         report.AppendLine($"  [{Mark(noScreenshot)}] scene-linear HDR capture bypasses gameplay post processing");
         report.AppendLine($"  [{Mark(persistence)}] JPEG and metadata are persisted");
-        report.AppendLine($"  [{Mark(scene)}] photo mode is bound in Game scene");
+        report.AppendLine($"  [{Mark(scene)}] photo mode is registered in the common item system");
         report.AppendLine($"  [{Mark(typography)}] Inconsolata and native 20/32/48 px icon tiers are bound");
         report.AppendLine($"  [{Mark(uiSource)}] camera HUD uses shared Rain Glass and icon layers");
 

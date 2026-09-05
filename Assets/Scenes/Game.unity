@@ -1306,7 +1306,7 @@ Light:
   m_Enabled: 0
   serializedVersion: 13
   m_Type: 0
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 1, g: 0.8180391, b: 0.6395841, a: 1}
   m_Intensity: 0
   m_Range: 26
   m_SpotAngle: 84
@@ -1351,7 +1351,7 @@ Light:
   m_AreaSize: {x: 1, y: 1}
   m_BounceIntensity: 0
   m_ColorTemperature: 4000
-  m_UseColorTemperature: 1
+  m_UseColorTemperature: 0
   m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
@@ -2065,6 +2065,7 @@ GameObject:
   - component: {fileID: 848219623}
   - component: {fileID: 848219624}
   - component: {fileID: 848219625}
+  - component: {fileID: 848219626}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -2511,6 +2512,24 @@ MonoBehaviour:
   mount: {fileID: 1974724303}
   hotspot: {fileID: 1433441636}
   spill: {fileID: 497075599}
+--- !u!114 &848219626
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 848219606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b5244f60a725604ebd546e080991470, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HeldItemSystem
+  items:
+  - {fileID: 848219623}
+  regularFont: {fileID: 12800000, guid: cb9e2d7ede4c9124d9120105876a6ad3, type: 3}
+  mediumFont: {fileID: 12800000, guid: 1c8a20a45e595ff40a17608b8ad87a7d, type: 3}
+  semiboldFont: {fileID: 12800000, guid: 6c9e5ca20db00e74db134254c415a10d, type: 3}
+  iconSet: {fileID: 11400000, guid: 9dc83f6266528ba49b1a663081aff364, type: 2}
 --- !u!1 &852782904
 GameObject:
   m_ObjectHideFlags: 0
@@ -3428,7 +3447,7 @@ Light:
   m_Enabled: 0
   serializedVersion: 13
   m_Type: 0
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 1, g: 0.8180391, b: 0.6395841, a: 1}
   m_Intensity: 0
   m_Range: 68
   m_SpotAngle: 42
@@ -3473,7 +3492,7 @@ Light:
   m_AreaSize: {x: 1, y: 1}
   m_BounceIntensity: 0
   m_ColorTemperature: 4000
-  m_UseColorTemperature: 1
+  m_UseColorTemperature: 0
   m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1

@@ -2060,7 +2060,8 @@ hareket kanallarıyla çakışmaz. Sayısal regresyon testi `To The Summit/Playe
 `HeadlampController`, `F` ile açılıp kapanan, modelsiz kafa fenerini yönetir. Işık kaynağı
 ekran üstü bir leke değil, URP'nin gerçek ek ışık yoluna giren iki spot ışıktır: dar ve uzun
 menzilli odak ile geniş, düşük güçlü çevre dolgusu. Akı lümen, renk sıcaklığı Kelvin olarak
-tanımlanır; yalnız odak ışığı yumuşak gölge üretir.
+tanımlanır ve boru hattından bağımsız görünmesi için karşılık gelen nötr-sıcak LED tonu ışık
+rengine açıkça yazılır; yalnız odak ışığı yumuşak gölge üretir.
 
 `Headlamp Mount`, `Main Camera`nın çocuğudur. Böylece `CameraPivot`ın kafa yönünü ve
 `PlayerViewMotion`ın yürüyüş, koşu, dönüş, iniş ve basamak hareketini aynı dönüşüm zincirinden
@@ -2123,10 +2124,31 @@ görünmez oldu (`DECISIONS.md`).
 **`smallWaveCutoff` serbest bir sayı değil**, en ince ızgaranın Nyquist'idir: `l = 1/k_nyq`.
 Hücre boyuna bağlarsan diz kılcal tepenin altına düşer ve bandın yarısını keser.
 
+## Ortak elde tutulan eşya ve etkileşim sistemi (2026-09-05)
+
+`HeldItemSystem`, oyuncuya bootstrap tarafından açıkça verilen `EquippableItem` listesinin
+tek sahibidir. Aynı anda yalnız bir eşya aktiftir. Ele alma tuşu, eşyanın kimliği, Saplı Kart
+adı/durumu/ikonu ve kartta kullanılabilen eylemler eşyanın sözleşmesinden okunur; kontrolcü
+eşya türü veya `4` gibi özel bir tuş bilmez. Aynı tuşa tekrar basmak aktif eşyayı kaldırır;
+başka kayıtlı bir eşya seçilirse önce aktif eşyanın `CanUnequip` denetimi çalışır.
+
+Bir `HeldItemAction`, eylem kimliği ve etiketiyle birlikte klavye ya da fare girdisini taşır.
+`HeldItemSystem` girdiyi bu listeden yönlendirir, `HeldItemHud` aynı listeyi Saplı Kart'a çizer.
+Böylece ekranda gösterilen eylem ile çalışan eylem ayrı tablolar halinde sapamaz. Evrensel
+`KALDIR` eylemini kontrolcü aktif eşyanın ele alma tuşundan üretir. Modal ve eşyaya özgü
+girdiler eşyanın içinde kalır; örneğin kamera vizörde çekim, zoom ve pozlamayı kendi yönetir.
+
+Ortak arayüz `Assets/Scripts/Items/UI/HeldItemHud.cs` içindedir ve `RainGlassUi`, Inconsolata
+ile `ThinTripleIconSet` kullanır. Şu anda yalnız Vintage DSLR kayıtlıdır; mimariyi kanıtlamak
+için pusula, dürbün veya başka geçici eşya eklenmez. Regresyon testi
+`To The Summit/Items/Common Item System Test` menüsündedir.
+
 ## Vintage DSLR fotoğraf modu (2026-09-04)
 
-`VintagePhotoMode` oyuncuya bootstrap tarafından açıkça bağlanır; çalışma zamanında nesne
-aramaz. `4` kamerayı ele alır/bırakır, sağ tık 3:2 optik vizöre girer/çıkar, sol tık çeker.
+`VintagePhotoMode` oyuncuya bootstrap tarafından açıkça bağlanır ve `EquippableItem` olarak
+ortak eşya sistemine kaydedilir; çalışma zamanında nesne aramaz. `4`, kameranın bildirdiği
+ele alma tuşudur ve `HeldItemSystem` tarafından işlenir. Sağ tık 3:2 optik vizöre girer/çıkar,
+sol tık çeker.
 Tekerlek vizörde yumuşak optik zoom yapar; kamera indirildiğinde oyuncunun görüş açısı geri
 yüklenir. Zoom sınırı, adımı ve geçiş süresi profil üzerinden ayarlanır.
 `VintageZoomFocus` bağıl lens hızını geçici bir netlik kaybına çevirir. Canlı görüntü,
@@ -2138,8 +2160,9 @@ kamera eldeyken galeriye girer, `A/D` veya ok tuşları kayıtlar arasında geze
 Geçici model vizörde ve çekimde gizlenir.
 
 Vizör arayüzü, bootstrap tarafından açıkça bağlanan yerel Inconsolata Regular, Medium ve
-SemiBold font varlıklarını kullanır. `VintagePhotoHud`, sunumu fotoğraf çekim mantığından
-ayırır. Diyafram, enstantane, duyarlılık, poz telafisi ve zoom göstergeleri ikonlarıyla birlikte
+SemiBold font varlıklarını kullanır. `VintagePhotoHud`, kameranın modal sunumunu fotoğraf
+çekim mantığından ayırır; indirilen eşyanın Saplı Kart'ını `HeldItemHud` çizer. Diyafram,
+enstantane, duyarlılık, poz telafisi ve zoom göstergeleri ikonlarıyla birlikte
 3:2 kadrajın içinde durur; tuş ve fare kontrolleri kadrajın dışındaki güvenli şeritte kalır.
 Bu ayrım düşük ekran yüksekliklerinde taşmayı önler. İkonlar ortak `ThinTripleIconSet`
 varlığından gelir ve `ThinTripleIconRenderer` tarafından `ICONS.md` boyut kademelerine göre
@@ -2149,8 +2172,8 @@ Panel çizimi ortak `Assets/Scripts/UI/Style/RainGlassUi.cs` katmanından gelir.
 vizöründeki ölçüm yüzeyi, üst durum kartları, dış kontrol yüzeyi, bildirim ve galeri
 başlığı aynı Yağmur Camı renk/kontur/opaklık tokenlarını kullanır. Kamera eldeyken ortak
 Saplı Kart kalıbı eşya kimliğini eylemlerden ayırır. Başka bir elde tutulan eşya kendi
-panel renklerini veya kontur yordamını üretmez; `UI.md` sözleşmesini ve bu ortak katmanı
-kullanır.
+panel renklerini, kontur yordamını veya kısayol tablosunu üretmez; `EquippableItem`
+sözleşmesini, `HeldItemHud`, `UI.md` ve bu ortak katmanı kullanır.
 
 `VintagePhotoPreviewFeature`, yalnız açıkça kayıtlı ana kameranın HDR rengini oyun
 post-process'inden önce alır. Atmosfer, bulutlar ve yağış tamamlanmıştır. Görüntünün

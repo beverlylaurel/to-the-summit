@@ -82,22 +82,29 @@ public sealed class HeadlampController : MonoBehaviour
 
         mount.localPosition = settings.mountOffset;
         mount.localRotation = Quaternion.Euler(settings.mountEulerAngles);
+        // Unity returns this approximation in linear space while Light.color is authored as
+        // a display color. Convert once so 4000 K reads as neutral-warm instead of amber.
+        Color beamTint = Mathf.CorrelatedColorTemperatureToRGB(
+            settings.colorTemperatureKelvin).gamma;
         ConfigureSpot(hotspot, settings.hotspotRange, settings.hotspotOuterAngle,
-            settings.hotspotInnerAngle, LightShadows.Soft, settings.hotspotShadowStrength);
+            settings.hotspotInnerAngle, beamTint, LightShadows.Soft,
+            settings.hotspotShadowStrength);
         ConfigureSpot(spill, settings.spillRange, settings.spillOuterAngle,
-            settings.spillInnerAngle, LightShadows.None, 0f);
+            settings.spillInnerAngle, beamTint, LightShadows.None, 0f);
     }
 
     static void ConfigureSpot(Light light, float range, float outerAngle, float innerAngle,
-                              LightShadows shadows, float shadowStrength)
+                              Color beamTint, LightShadows shadows, float shadowStrength)
     {
         light.type = LightType.Spot;
         light.lightUnit = LightUnit.Lumen;
         light.range = range;
         light.spotAngle = outerAngle;
         light.innerSpotAngle = Mathf.Min(innerAngle, outerAngle);
-        light.color = Color.white;
-        light.useColorTemperature = true;
+        // Apply the correlated LED tint explicitly. Relying on the inspector temperature
+        // flag alone can render as plain white in pipelines that do not evaluate it.
+        light.color = beamTint;
+        light.useColorTemperature = false;
         light.bounceIntensity = 0f;
         light.shadows = shadows;
         light.shadowStrength = shadowStrength;
@@ -112,14 +119,12 @@ public sealed class HeadlampController : MonoBehaviour
 
         if (hotspot != null)
         {
-            hotspot.colorTemperature = settings.colorTemperatureKelvin;
             hotspot.intensity = settings.hotspotLumens * output;
             hotspot.enabled = enabled;
         }
 
         if (spill != null)
         {
-            spill.colorTemperature = settings.colorTemperatureKelvin;
             spill.intensity = settings.spillLumens * output;
             spill.enabled = enabled;
         }

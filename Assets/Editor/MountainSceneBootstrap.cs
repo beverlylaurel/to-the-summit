@@ -1251,7 +1251,18 @@ public static class MountainSceneBootstrap
 
         photoMode.Bind(profile, shader, liveFeature, viewCamera, captureCamera, placeholder,
             player.GetComponent<MouseLook>(), player, regularFont, mediumFont, semiboldFont, iconSet);
+
+        HeldItemSystem heldItems = player.GetComponent<HeldItemSystem>();
+        if (heldItems == null)
+        {
+            heldItems = player.gameObject.AddComponent<HeldItemSystem>();
+            changed = true;
+        }
+        heldItems.Bind(new EquippableItem[] { photoMode }, regularFont, mediumFont,
+            semiboldFont, iconSet);
+
         EditorUtility.SetDirty(photoMode);
+        EditorUtility.SetDirty(heldItems);
         EditorUtility.SetDirty(captureCamera);
         EditorUtility.SetDirty(placeholder);
     }

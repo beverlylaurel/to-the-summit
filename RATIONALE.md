@@ -20,7 +20,7 @@ silinir — telafi terimi geri eklenmez.
 
 ## Kayıtlar
 
-101 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
+102 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
 
 - [Bulutlar](#bulutlar)
 - [Kuşaklar ve hava dalgalanması](#kusaklar-ve-hava-dalgalanmasi)
@@ -3762,3 +3762,21 @@ oyuncunun algılayacağı bir ısınma süresi taşımadığı için tuş işlen
 Temiz havada kaynaktan yüzeye uzanan parlak bir koni çizilmedi: böyle bir koni ışığın kendisi
 değil, havadaki parçacık saçılımıdır. Hacimsel sis ek ışıkları fiziksel olarak örneklediğinde
 bu görünüm sis yoğunluğundan türetilmeli.
+
+## Ortak eşya sistemi: ekranda yazan eylem çalışan eylemdir (2026-09-05)
+
+Her eşyanın kendi `Update` döngüsünde ele alma tuşunu dinlemesi ilk eşya için kısa görünür,
+fakat ikinci eşya geldiğinde aynı anda iki aktif nesne, birbirini bilmeyen kaldırma engelleri
+ve her eşyanın UI içinde yeniden yazılmış kısayolları oluşur. Kamera içindeki sabit `4`
+okuması bu büyüme noktasındaydı.
+
+Tek aktif eşya yaşam döngüsü bu nedenle `HeldItemSystem`a taşındı. Eşya kimliği, ele alma
+tuşu ve yalnız indirildiğinde ortaklaşa kullanılabilen eylemler `EquippableItem` sözleşmesidir.
+Eylemin girdi tanımını hem yönlendirme hem Saplı Kart okur. Böylece tuş değiştiğinde çalışan
+girdi ile ekrandaki rozetin ayrı güncellenmesi gerekmez. Kamera vizörü gibi modal durumların
+çekim, zoom ve pozlama ayrıntıları yine kamerada kalır; ortak katman eşyanın uzman davranışını
+tanımaya başlamaz.
+
+Yalnız mevcut kamera taşındı. Mimariyi örneklemek için sahte pusula veya dürbün eklemek temiz
+bir dikişi kanıtlamaz; kullanılmayan içerik ve ayar borcu üretir. Yeni gerçek eşya geldiğinde
+aynı sözleşmeyi uygulayıp bootstrap kayıt listesine girmesi yeterlidir.
