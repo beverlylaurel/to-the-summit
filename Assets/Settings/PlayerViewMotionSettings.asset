@@ -28,6 +28,9 @@ MonoBehaviour:
   landingDip: 0.014
   landingMinimumSpeed: 2.5
   landingReturnSeconds: 0.18
+  stepDetectionThreshold: 0.015
+  terrainStepMaxOffset: 0.035
+  terrainStepReturnSeconds: 0.11
   movementFadeSeconds: 0.16
   sprintBlendSeconds: 0.28
   movingThreshold: 0.12

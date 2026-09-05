@@ -22,7 +22,8 @@ public static class PlayerMotionTest
                        && settings.sprintVertical <= 0.02f
                        && settings.walkVertical <= 0.012f
                        && settings.turnLateral <= 0.005f
-                       && settings.turnRollDegrees + settings.sprintRollDegrees <= 0.4f;
+                       && settings.turnRollDegrees + settings.sprintRollDegrees <= 0.4f
+                       && settings.terrainStepMaxOffset <= 0.04f;
 
         MethodInfo stepHorizontal = typeof(FirstPersonController).GetMethod(
             "StepHorizontal", BindingFlags.Static | BindingFlags.NonPublic);
@@ -38,6 +39,24 @@ public static class PlayerMotionTest
                        && stopped.z > 0f && stopped.z < 4f
                        && Vector3.Distance(sixty, thirty) < 0.0001f
                        && Mathf.Approximately(sixty.z, 4f);
+
+        var slopeObject = new GameObject("Slope Response Test")
+            { hideFlags = HideFlags.HideAndDontSave };
+        slopeObject.SetActive(false);
+        slopeObject.AddComponent<CharacterController>();
+        var slopeController = slopeObject.AddComponent<FirstPersonController>();
+        MethodInfo slopeSpeed = typeof(FirstPersonController).GetMethod(
+            "SlopeAdjustedSpeed", BindingFlags.Instance | BindingFlags.NonPublic);
+        float flatSprint = SlopeSpeed(slopeSpeed, slopeController, true, 0f, 1f);
+        float steepUphillSprint = SlopeSpeed(slopeSpeed, slopeController, true, 45f, 1f);
+        float steepAcrossSprint = SlopeSpeed(slopeSpeed, slopeController, true, 45f, 0f);
+        float steepUphillWalk = SlopeSpeed(slopeSpeed, slopeController, false, 45f, 1f);
+        bool slopeResponse = Mathf.Approximately(flatSprint, slopeController.sprintSpeed)
+                          && steepUphillSprint > slopeController.walkSpeed
+                          && steepUphillSprint < flatSprint
+                          && steepAcrossSprint > steepUphillSprint
+                          && steepUphillWalk >= slopeController.walkSpeed * 0.8f;
+        Object.DestroyImmediate(slopeObject);
 
         PlayerViewMotion sceneMotion = Object.FindAnyObjectByType<PlayerViewMotion>(
             FindObjectsInactive.Include);
@@ -58,16 +77,19 @@ public static class PlayerMotionTest
         float maxWalkOffset = float.NaN;
         float maxTurnRoll = float.NaN;
         float landingDip = float.NaN;
+        float terrainCorrection = float.NaN;
         bool response = settings != null && ExerciseViewMotion(settings,
-            out maxWalkOffset, out maxTurnRoll, out landingDip);
+            out maxWalkOffset, out maxTurnRoll, out landingDip, out terrainCorrection);
 
         report.AppendLine($"  [{Mark(locomotion)}] acceleration/braking are gradual and frame-rate stable");
+        report.AppendLine($"  [{Mark(slopeResponse)}] slope response stays gradual; steep sprint remains above walk speed");
         report.AppendLine($"  [{Mark(restrained)}] camera limits stay inside the restrained motion budget");
         report.AppendLine($"  [{Mark(response)}] measured walk={maxWalkOffset * 100f:F2} cm, "
-                        + $"turn={maxTurnRoll:F2} deg, landing={landingDip * 100f:F2} cm");
+                        + $"turn={maxTurnRoll:F2} deg, landing={landingDip * 100f:F2} cm, "
+                        + $"step correction={terrainCorrection * 100f:F2} cm");
         report.AppendLine($"  [{Mark(sceneBound)}] view motion and bike use separate camera transform layers in {ScenePath}");
 
-        ok = locomotion && restrained && response && sceneBound;
+        ok = locomotion && slopeResponse && restrained && response && sceneBound;
         report.AppendLine(ok ? "RESULT: PASSED" : "RESULT: FAILED");
         return report.ToString();
     }
@@ -77,9 +99,14 @@ public static class PlayerMotionTest
         method == null ? new Vector3(float.NaN, 0f, 0f) :
         (Vector3)method.Invoke(null, new object[] { current, target, rate, deltaTime });
 
+    static float SlopeSpeed(MethodInfo method, FirstPersonController controller,
+                            bool sprinting, float slope, float uphillAlignment) =>
+        method == null ? float.NaN : (float)method.Invoke(controller,
+            new object[] { sprinting, slope, uphillAlignment });
+
     static bool ExerciseViewMotion(PlayerViewMotionSettings settings,
                                    out float maxWalkOffset, out float maxTurnRoll,
-                                   out float landingDip)
+                                   out float landingDip, out float terrainCorrection)
     {
         var root = new GameObject("Player Motion Test") { hideFlags = HideFlags.HideAndDontSave };
         root.SetActive(false);
@@ -99,7 +126,7 @@ public static class PlayerMotionTest
         if (step == null)
         {
             Object.DestroyImmediate(root);
-            maxWalkOffset = maxTurnRoll = landingDip = float.NaN;
+            maxWalkOffset = maxTurnRoll = landingDip = terrainCorrection = float.NaN;
             return false;
         }
 
@@ -115,6 +142,18 @@ public static class PlayerMotionTest
                 new Vector2(3f, 0f), -2f, 1f / 60f });
         maxTurnRoll = Mathf.Abs(Mathf.DeltaAngle(0f, view.localEulerAngles.z));
 
+        MethodInfo terrainStep = typeof(PlayerViewMotion).GetMethod(
+            "StepTerrainContact", BindingFlags.Instance | BindingFlags.NonPublic);
+        FieldInfo terrainOffset = typeof(PlayerViewMotion).GetField(
+            "terrainOffset", BindingFlags.Instance | BindingFlags.NonPublic);
+        root.transform.position += Vector3.up * 0.2f;
+        terrainStep?.Invoke(motion, new object[]
+            { true, Vector3.zero, Vector3.up, 1f / 60f });
+        terrainCorrection = terrainOffset != null
+            ? Mathf.Abs((float)terrainOffset.GetValue(motion))
+            : float.NaN;
+        terrainOffset?.SetValue(motion, 0f);
+
         step.Invoke(motion, new object[] { 0f, false, false, Vector2.zero, -6f, 1f / 60f });
         step.Invoke(motion, new object[] { 0f, true, false, Vector2.zero, 0f, 1f / 60f });
         landingDip = Mathf.Max(0f, -view.localPosition.y);
@@ -122,7 +161,9 @@ public static class PlayerMotionTest
         bool result = maxWalkOffset > 0.004f
                    && maxWalkOffset <= settings.walkVertical + settings.walkLateral + 0.001f
                    && maxTurnRoll > 0.03f && maxTurnRoll <= settings.turnRollDegrees + 0.01f
-                   && landingDip > 0.001f && landingDip <= settings.landingDip + 0.001f;
+                   && landingDip > 0.001f && landingDip <= settings.landingDip + 0.001f
+                   && terrainCorrection > 0.005f
+                   && terrainCorrection <= settings.terrainStepMaxOffset + 0.001f;
         Object.DestroyImmediate(root);
         return result;
     }

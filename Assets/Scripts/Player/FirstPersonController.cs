@@ -16,6 +16,18 @@ public class FirstPersonController : MonoBehaviour
     [Tooltip("Air control while airborne (0 = none, 1 = full control).")]
     [Range(0f, 1f)] public float airControl = 0.4f;
 
+    [Header("Slope response")]
+    [Tooltip("Below this angle the ground behaves like flat terrain.")]
+    [Range(0f, 30f)] public float slopeEffectStart = 8f;
+    [Tooltip("Maximum uphill speed loss at the controller slope limit.")]
+    [Range(0f, 0.4f)] public float uphillSpeedLoss = 0.18f;
+    [Tooltip("Maximum across-slope speed loss at the controller slope limit.")]
+    [Range(0f, 0.25f)] public float sideSlopeSpeedLoss = 0.08f;
+    [Tooltip("Share of the sprint bonus retained at the controller slope limit.")]
+    [Range(0f, 1f)] public float steepSprintRetention = 0.45f;
+    [Tooltip("Share of normal braking retained while moving down the steepest slope.")]
+    [Range(0.5f, 1f)] public float downhillBrakeRetention = 0.88f;
+
     [Header("Girdi toleransi")]
     [Tooltip("A jump pressed this shortly before landing is remembered (seconds).")]
     [Range(0f, 0.25f)] public float jumpBufferSeconds = 0.12f;
@@ -48,6 +60,12 @@ public class FirstPersonController : MonoBehaviour
     readonly RaycastHit[] groundHits = new RaycastHit[4];
     /// WHETHER THEY ARE ON THE GROUND.
     public bool OnGround => controller != null && controller.isGrounded;
+
+    /// Filtered only by the ground query; consumers use it to distinguish a step from a slope.
+    public Vector3 GroundNormal { get; private set; } = Vector3.up;
+
+    /// Current ground angle in degrees. Zero when no reliable ground contact was found.
+    public float GroundSlopeDegrees { get; private set; }
 
     /// Whether the current deliberate movement target is the sprint speed.
     public bool IsSprinting { get; private set; }
@@ -107,8 +125,20 @@ public class FirstPersonController : MonoBehaviour
 
         IsSprinting = acceptsInput && kb != null && kb.leftShiftKey.isPressed
                    && input.sqrMagnitude > 0.001f;
-        float speed = (IsSprinting ? sprintSpeed : walkSpeed) * SpeedMultiplier;
-        Vector3 wish = (transform.right * input.x + transform.forward * input.y) * speed;
+        Vector3 wishDirection = transform.right * input.x + transform.forward * input.y;
+
+        UpdateGroundSlope();
+        float uphillAlignment = 0f;
+        if (wishDirection.sqrMagnitude > 0.001f && GroundSlopeDegrees > 0f)
+        {
+            Vector3 downhill = Vector3.ProjectOnPlane(Vector3.down, GroundNormal);
+            if (downhill.sqrMagnitude > 0.0001f)
+                uphillAlignment = Vector3.Dot(wishDirection.normalized, -downhill.normalized);
+        }
+
+        float speed = SlopeAdjustedSpeed(IsSprinting, GroundSlopeDegrees, uphillAlignment)
+                    * SpeedMultiplier;
+        Vector3 wish = wishDirection * speed;
 
         if (controller.isGrounded) lastGroundedTime = Time.time;
 
@@ -116,6 +146,18 @@ public class FirstPersonController : MonoBehaviour
         float response = wish.sqrMagnitude > 0.001f
             ? groundAcceleration
             : groundDeceleration;
+        if (wish.sqrMagnitude <= 0.001f && GroundSlopeDegrees > slopeEffectStart)
+        {
+            float slopeWeight = Mathf.InverseLerp(slopeEffectStart, slopeLimit,
+                GroundSlopeDegrees);
+            Vector3 downhill = Vector3.ProjectOnPlane(Vector3.down, GroundNormal);
+            float downhillTravel = downhill.sqrMagnitude > 0.0001f
+                && horizontal.sqrMagnitude > 0.0001f
+                ? Mathf.Max(0f, Vector3.Dot(horizontal.normalized, downhill.normalized))
+                : 0f;
+            response *= Mathf.Lerp(1f, downhillBrakeRetention,
+                slopeWeight * downhillTravel);
+        }
 
         if (controller.isGrounded)
         {
@@ -143,6 +185,50 @@ public class FirstPersonController : MonoBehaviour
     // Kept separate so acceleration and braking can be verified without synthesising keyboard input.
     static Vector3 StepHorizontal(Vector3 current, Vector3 target, float rate, float deltaTime) =>
         Vector3.MoveTowards(current, target, Mathf.Max(0f, rate) * Mathf.Max(0f, deltaTime));
+
+    float SlopeAdjustedSpeed(bool sprinting, float slopeDegrees, float uphillAlignment)
+    {
+        float slopeWeight = Mathf.InverseLerp(slopeEffectStart,
+            Mathf.Max(slopeEffectStart + 0.01f, slopeLimit), slopeDegrees);
+        float sprintShare = sprinting
+            ? Mathf.Lerp(1f, steepSprintRetention, slopeWeight)
+            : 0f;
+        float flatSpeed = Mathf.Lerp(walkSpeed, sprintSpeed, sprintShare);
+
+        float uphill = Mathf.Max(0f, uphillAlignment);
+        float across = 1f - Mathf.Abs(uphillAlignment);
+        float directionalLoss = uphill * uphillSpeedLoss + across * sideSlopeSpeedLoss;
+        return flatSpeed * (1f - directionalLoss * slopeWeight);
+    }
+
+    void UpdateGroundSlope()
+    {
+        if (!controller.isGrounded)
+        {
+            GroundNormal = Vector3.up;
+            GroundSlopeDegrees = 0f;
+            return;
+        }
+
+        Vector3 origin = transform.position + Vector3.up * 0.35f;
+        int count = Physics.RaycastNonAlloc(origin, Vector3.down, groundHits,
+            stepOffset + 0.75f, ~0, QueryTriggerInteraction.Ignore);
+        float nearest = float.PositiveInfinity;
+        Vector3 normal = Vector3.up;
+        for (int i = 0; i < count; i++)
+        {
+            RaycastHit hit = groundHits[i];
+            if (hit.collider == null || hit.collider == controller || hit.distance >= nearest)
+                continue;
+            nearest = hit.distance;
+            normal = hit.normal;
+        }
+
+        GroundNormal = normal;
+        GroundSlopeDegrees = nearest < float.PositiveInfinity
+            ? Vector3.Angle(normal, Vector3.up)
+            : 0f;
+    }
 
     void ApplyGravity()
     {

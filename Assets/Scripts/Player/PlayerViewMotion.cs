@@ -29,6 +29,10 @@ public sealed class PlayerViewMotion : MonoBehaviour
     float landingVelocity;
     float previousVerticalSpeed;
     bool wasGrounded;
+    float terrainOffset;
+    float terrainOffsetVelocity;
+    float previousParentHeight;
+    bool hasParentHeight;
 
     public void Bind(FirstPersonController movementSource, CharacterController bodySource,
                      MouseLook lookSource, Transform renderedView,
@@ -40,6 +44,7 @@ public sealed class PlayerViewMotion : MonoBehaviour
         view = renderedView;
         settings = sharedSettings;
         CaptureRestPose();
+        ResetTerrainTracking();
     }
 
     void OnEnable()
@@ -55,6 +60,7 @@ public sealed class PlayerViewMotion : MonoBehaviour
         CaptureRestPose();
         wasGrounded = movement.OnGround;
         previousVerticalSpeed = body.velocity.y;
+        ResetTerrainTracking();
     }
 
     void OnDisable() => RestoreRestPose();
@@ -76,7 +82,10 @@ public sealed class PlayerViewMotion : MonoBehaviour
         {
             RestoreRestPose();
             movementWeight = sprintWeight = turnWeight = landingOffset = 0f;
+            terrainOffset = 0f;
             movementWeightVelocity = sprintWeightVelocity = turnWeightVelocity = landingVelocity = 0f;
+            terrainOffsetVelocity = 0f;
+            ResetTerrainTracking();
             return;
         }
 
@@ -91,6 +100,7 @@ public sealed class PlayerViewMotion : MonoBehaviour
             ? look.LastFrameDeltaDegrees
             : Vector2.zero;
 
+        StepTerrainContact(grounded, body.velocity, movement.GroundNormal, Time.deltaTime);
         StepMotion(horizontalSpeed, grounded, sprinting, lookDelta,
             body != null ? body.velocity.y : 0f, Time.deltaTime);
     }
@@ -148,7 +158,7 @@ public sealed class PlayerViewMotion : MonoBehaviour
         float lateral = Mathf.Sin(gaitPhase) * lateralAmplitude * movementWeight
                       - turnWeight * settings.turnLateral;
         float vertical = -Mathf.Cos(gaitPhase * 2f) * verticalAmplitude * movementWeight
-                       + landingOffset;
+                       + landingOffset + terrainOffset;
         float roll = -Mathf.Sin(gaitPhase) * gaitRollAmplitude * movementWeight
                    - turnWeight * settings.turnRollDegrees;
 
@@ -157,6 +167,44 @@ public sealed class PlayerViewMotion : MonoBehaviour
 
         wasGrounded = grounded;
         previousVerticalSpeed = verticalSpeed;
+    }
+
+    void StepTerrainContact(bool grounded, Vector3 bodyVelocity, Vector3 groundNormal,
+                            float deltaTime)
+    {
+        float parentHeight = view.parent != null ? view.parent.position.y : view.position.y;
+        if (!hasParentHeight)
+        {
+            previousParentHeight = parentHeight;
+            hasParentHeight = true;
+        }
+
+        float dt = Mathf.Max(0.0001f, deltaTime);
+        if (grounded)
+        {
+            float expectedVerticalSpeed = -(groundNormal.x * bodyVelocity.x
+                                          + groundNormal.z * bodyVelocity.z)
+                                        / Mathf.Max(0.2f, groundNormal.y);
+            float unexpectedStep = parentHeight - previousParentHeight
+                                 - expectedVerticalSpeed * dt;
+            if (Mathf.Abs(unexpectedStep) > settings.stepDetectionThreshold)
+            {
+                terrainOffset = Mathf.Clamp(terrainOffset - unexpectedStep,
+                    -settings.terrainStepMaxOffset, settings.terrainStepMaxOffset);
+                terrainOffsetVelocity = 0f;
+            }
+        }
+
+        terrainOffset = Mathf.SmoothDamp(terrainOffset, 0f, ref terrainOffsetVelocity,
+            settings.terrainStepReturnSeconds, Mathf.Infinity, dt);
+        previousParentHeight = parentHeight;
+    }
+
+    void ResetTerrainTracking()
+    {
+        if (view == null) return;
+        previousParentHeight = view.parent != null ? view.parent.position.y : view.position.y;
+        hasParentHeight = true;
     }
 
     void RestoreRestPose()

@@ -1960,6 +1960,11 @@ MonoBehaviour:
   groundAcceleration: 11
   groundDeceleration: 15
   airControl: 0.4
+  slopeEffectStart: 8
+  uphillSpeedLoss: 0.18
+  sideSlopeSpeedLoss: 0.08
+  steepSprintRetention: 0.45
+  downhillBrakeRetention: 0.88
   jumpBufferSeconds: 0.12
   coyoteSeconds: 0.1
   gravity: -9.81

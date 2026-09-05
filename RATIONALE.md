@@ -3725,3 +3725,24 @@ bir roll kullanılır.
 **0,88 cm** çıktı. Ayar tavanları koşuda 2 cm düşey hareketin, toplam 0,4° roll'ün ve
 5 mm dönüş kaymasının altında tutuluyor. FOV değişimi özellikle yok; optik zoom ve fotoğraf
 önizlemesi kendi sistemlerinin tek sahibi olmaya devam ediyor.
+
+### Eğim ceza değil, temas bilgisidir
+
+Dağ oyununda düz zemin hızı her yönde korunduğunda arazi yalnız görsel kalır. Tersi uçta,
+her eğimi stamina ve kaymayla cezalandırmak ana eylemi işkenceye çevirir. İlk katman bu
+nedenle yalnız kinematiktir: küçük açılarda etkisiz, dikleştikçe kademeli ve sınırlı.
+Çıkış hızı en fazla mütevazı ölçüde düşer; dik zeminde bile koşu yürüyüşten hızlı kalır.
+Yan geçiş yalnız hafifçe yavaşlar. İnişte yerçekiminden uydurma bir hız eklenmez; yalnız
+tuş bırakıldığında durma mesafesi biraz uzar. Kayma, düşme ve stamina ayrı oynanış kararları
+olarak kalır.
+
+Eğim Unity terrain verisinden okunmaz. Controller tabanındaki fizik ışını temas normalini
+verir; böylece kaya, yol ve ileride gelecek başka collider'lar aynı davranışı alır. Kendi
+kapsülü sonuçlardan çıkarılır. Karın hız etkisi son çarpan olarak kalır, dolayısıyla eğim
+kar sistemini tanımaz ve aynı yavaşlama iki kez uygulanmaz.
+
+Basamak yumuşatma sürekli bir yükseklik filtresi değildir. Sürekli filtre yamaç çıkarken
+kamerayı gövdenin arkasından sürükler. Bunun yerine yüzey normalinden beklenen düşey hareket
+hesaplanır; yalnız bundan kalan ani fark basamak kabul edilir. Karşı ofset **3,5 cm** ile
+sınırlı ve kısa sürede sıfıra döner. 20 cm'lik yapay basamak testinde ilk karşılık **3,37 cm**
+ölçüldü; arazi okunurken çarpma hissi kesildi ama kamera zeminden kopmadı.

@@ -2033,6 +2033,12 @@ Girdi tam ekran etkileşime geçtiğinde yatay hız frenlenmeye devam eder. Zıp
 ayrıldıktan sonraki kısa toleransı ve yere değmeden hemen önce basılan kısa tamponu aynı
 controller içinde tutar.
 
+Yerdeyken controller tabanından aşağı atılan, kendi kapsülünü dışlayan ışın yüzey normalini
+okur. Eğim etkisi küçük açılarda sıfırdır ve `slopeLimit`e kadar kademeli açılır. Çıkışta
+hız, yan geçişte tutunma ve dik zeminde koşu bonusu ayrı ağırlıklardır. İniş hedef hızı
+artmaz; yalnız giriş bırakıldığında fren mesafesi az miktarda uzar. Sistem kendiliğinden
+kayma üretmez ve karın `SpeedMultiplier` değerini ikinci kez uygulamaz.
+
 `MouseLook` yalnız gövde yaw'ını ve `CameraPivot` pitch'ini yazar. Tükettiği açısal fare
 hareketini derece olarak `PlayerViewMotion`a verir. `PlayerViewMotion` yalnız ana kameranın
 yerel konumu ile roll kanalını kullanır:
@@ -2041,6 +2047,8 @@ yerel konumu ile roll kanalını kullanır:
 - yürüyüşten koşuya genlik ve stride yumuşak karışır;
 - sağa/sola hızlı bakış, birkaç milimetre yanal atalet ve derece altı ters roll üretir;
 - iniş yalnız düşey hız eşiği aşılırsa kısa bir aşağı tepki verir;
+- yüzey normalinden beklenen yükseliş çıkarıldıktan sonra kalan basamak sıçraması birkaç
+  santimetrelik karşı ofsetle yumuşatılır;
 - FOV, yaw ve pitch oynatılmaz; havada, giriş kapalıyken ve dururken hareket söner.
 
 Ayarların tek kaynağı `PlayerViewMotionSettings.asset`; ana sahne ve test sahnesi aynı

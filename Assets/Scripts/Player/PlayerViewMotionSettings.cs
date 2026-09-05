@@ -29,6 +29,13 @@ public sealed class PlayerViewMotionSettings : ScriptableObject
     [Min(0f)] public float landingMinimumSpeed = 2.5f;
     [Min(0.01f)] public float landingReturnSeconds = 0.18f;
 
+    [Header("Terrain contact")]
+    [Tooltip("Vertical discontinuities below this size are treated as continuous ground.")]
+    [Min(0f)] public float stepDetectionThreshold = 0.015f;
+    [Tooltip("Maximum camera counter-offset applied to an abrupt terrain step.")]
+    [Min(0f)] public float terrainStepMaxOffset = 0.035f;
+    [Min(0.01f)] public float terrainStepReturnSeconds = 0.11f;
+
     [Header("Blending")]
     [Min(0.01f)] public float movementFadeSeconds = 0.16f;
     [Min(0.01f)] public float sprintBlendSeconds = 0.28f;
