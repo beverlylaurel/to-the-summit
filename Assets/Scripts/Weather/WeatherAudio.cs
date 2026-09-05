@@ -92,11 +92,15 @@ public class WeatherAudio : MonoBehaviour
         // place the player hears drizzle without seeing a single drop.
         rain *= Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.05f, rain));
 
-        float master = rain * masterVolume
+        ShelterExposure shelter = ShelterExposure.Active;
+        float transmission = shelter != null ? shelter.RainTransmission : 1f;
+        float shelterBrightness = shelter != null ? shelter.RainBrightness : 1f;
+
+        float master = rain * masterVolume * transmission
                        * (1f + felt * windRainBoost);
 
         // Drizzle is muffled, a downpour is bright
-        float brightness = Mathf.Lerp(0.55f, 1f, rain);
+        float brightness = Mathf.Lerp(0.55f, 1f, rain) * shelterBrightness;
 
         light.Drive(master * Mathf.Sqrt(1f - rain), brightness, 1f);
         heavy.Drive(master * Mathf.Sqrt(rain), brightness, 1f);
@@ -107,10 +111,14 @@ public class WeatherAudio : MonoBehaviour
     /// seconds; what you would hear is not the wind hardening but the sound sliding around.
     void DriveWind(float sustained, float felt)
     {
-        float master = Mathf.Lerp(WindFloor, 1f, felt) * masterVolume * WindVolume;
+        ShelterExposure shelter = ShelterExposure.Active;
+        float transmission = shelter != null ? shelter.WindTransmission : 1f;
+        float master = Mathf.Lerp(WindFloor, 1f, felt) * masterVolume * WindVolume
+                       * transmission;
 
         // As the air speeds up, turbulence produces high frequencies
-        float brightness = Mathf.Lerp(windCalmBrightness, 1f, felt);
+        float brightness = Mathf.Lerp(windCalmBrightness, 1f, felt)
+                           * Mathf.Lerp(0.18f, 1f, transmission);
         float pitch = 1f + (felt - 0.5f) * 2f * windPitchRange;
 
         calm.Drive(master * Mathf.Sqrt(1f - sustained), brightness, pitch);

@@ -82,6 +82,8 @@ Shader "ToTheSummit/SnowfallParticle"
 
             float _FogDensity01;
             float _WindSpeed;
+            float4 _ShelterCenterRadius;
+            float _ShelterVisualBlock;
 
             struct Varyings
             {
@@ -156,6 +158,10 @@ Shader "ToTheSummit/SnowfallParticle"
                 float fogCut = lerp(120.0, 35.0, saturate(_FogDensity01));
                 float fogFade = 1.0 - saturate(dist / max(fogCut, 1.0));
                 float alpha = f.alpha * fogFade * _AlphaScale * subPixel;
+                float shelterDistance = distance(positionWS, _ShelterCenterRadius.xyz);
+                float shelterOutside = smoothstep(_ShelterCenterRadius.w * 0.78,
+                                                   _ShelterCenterRadius.w, shelterDistance);
+                alpha *= lerp(1.0, shelterOutside, _ShelterVisualBlock);
 
                 Light mainLight = GetMainLight(TransformWorldToShadowCoord(positionWS));
 
@@ -191,7 +197,7 @@ Shader "ToTheSummit/SnowfallParticle"
 
                 // Cookie sampling needs fragment derivatives on D3D11, so only the already
                 // shadowed direct term is carried from the vertex stage.
-                half cookie = SampleMainLightCookie(IN.positionWS);
+                half cookie = SampleMainLightCookie(IN.positionWS).r;
                 half3 color = (IN.color.rgb + IN.directLight * cookie) * tex.rgb;
                 // THE COST IS NOT MEASURED. `ApplyHeightFog` is an eight step UNROLLED
                 // integral plus one 3D sample, paid per pixel on up to 250 000 quads

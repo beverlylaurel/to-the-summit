@@ -164,11 +164,14 @@ public class SnowfallRenderer : MonoBehaviour
     /// sources it would be "it is snowing but nothing accumulates".
     void UpdateCounts()
     {
-        aliveFlakes = FlakeCountFor(SnowRuntimeState.SnowfallIntensity01,
+        ShelterExposure shelter = ShelterExposure.Active;
+        float exposure = shelter != null ? shelter.PrecipitationExposure : 1f;
+
+        aliveFlakes = FlakeCountFor(SnowRuntimeState.SnowfallIntensity01 * exposure,
                                     settings.QualityData.VfxCapacityScale);
 
         aliveDrift = DriftCountFor(env.WindSpeed, SnowRuntimeState.LooseSnowFraction,
-                                   spindriftRate, settings.QualityData.VfxCapacityScale);
+                                   spindriftRate * exposure, settings.QualityData.VfxCapacityScale);
 
     }
 

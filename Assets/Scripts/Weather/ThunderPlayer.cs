@@ -37,6 +37,7 @@ public class ThunderPlayer : MonoBehaviour
     float pendingPitch;
     float pendingPan;
     float pendingCutoff;
+    float outdoorCutoff = 22000f;
 
     public void Bind(WeatherState state, ThunderSettings tuning,
         AudioClip[] distantClips, AudioClip[] closeClips)
@@ -71,6 +72,12 @@ public class ThunderPlayer : MonoBehaviour
 
     void Update()
     {
+        ShelterExposure shelter = ShelterExposure.Active;
+        float transmission = shelter != null ? shelter.ThunderTransmission : 1f;
+        source.volume = transmission;
+        filter.cutoffFrequency = Mathf.Min(outdoorCutoff,
+            Mathf.Lerp(900f, outdoorCutoff, transmission));
+
         if (pendingClip != null)
         {
             pendingDelay -= Time.deltaTime;
@@ -146,7 +153,7 @@ public class ThunderPlayer : MonoBehaviour
     /// The moment the sound arrives
     void Boom()
     {
-        filter.cutoffFrequency = pendingCutoff;
+        outdoorCutoff = pendingCutoff;
         source.pitch = pendingPitch;
         source.panStereo = pendingPan;
         source.PlayOneShot(pendingClip, pendingVolume);

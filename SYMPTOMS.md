@@ -6089,6 +6089,25 @@ Mahzen ve avcı kapısı, istasyon kapısı, kule platformu ile merdiveni gerçe
 ölçeğine getirildi. `check_outposts.py` artık kullanılan modellerde geçit yüksekliği,
 kapı genişliği, açık platform net genişliği ve merdiven genişliğini de denetliyor.
 
+## Yapı içinde yağış ve dış hava sesi devam ediyor — ÇÖZÜLDÜ (2026-09-06)
+
+**Belirti:** Çatının altında yağmur ve kar oyuncunun çevresinde doğmaya devam ediyor;
+rüzgar ile yağmur sesi dışarıdaki kadar açık çalıyor. Kapının açık ya da kapalı olması
+işitsel sonucu değiştirmiyor ve rüzgar soğutması içeride de tam uygulanıyordu.
+
+**Sebep:** Görsel yağış, ses ve sıcaklık yalnız küresel hava durumunu okuyordu. Yapı
+prefablarının collider'ları bulunmasına rağmen oyuncunun gökyüzüne ve açıklıklara gerçek
+maruziyetini yayımlayan ortak bir ölçüm yoktu. Yalnız bir `inside` tetikleyicisi eklemek de
+açık kapı, pencere, saçak ve yarı açık kulübeleri aynı sonuca mahkum edecekti.
+
+**Düzeltme:** `ShelterExposure` çatı örtüsünü ve yatay açıklık payını ayrı ölçüyor. Yakın
+yağmur/kar kuru hacimde sönerken dışarıdaki parçacıklar açıklıklardan görünür kalıyor.
+Yağmur içeride düşük seviyeli ve boğuk çatı darbesine dönüşüyor; açık kapı sınırlı doğrudan
+ses geçiriyor. Rüzgar sesi, gök gürültüsü filtresi ve oyuncunun rüzgar soğutması aynı
+açıklık ölçümünü kullanıyor. Sensörün sentetik kapalı oda/açık kapı/dış ortam testi geçti;
+sekiz oyun prefabi Play Mode fizik taramasında barınak hacmi üretti. Yağmur ve kar regresyon
+testleri ile iki shader derlemesi temiz tamamlandı.
+
 ## Karakol yüzeyleri tekrarlı, kabuk aralıkları ışık sızdırıyor — ÇÖZÜLDÜ (2026-09-05)
 
 **Belirti:** Uzun duvarlarda aynı doku lekesi düzenli aralıklarla tekrar ediyor, renk izi

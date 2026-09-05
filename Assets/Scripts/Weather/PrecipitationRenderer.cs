@@ -264,6 +264,7 @@ public class PrecipitationRenderer : MonoBehaviour
     readonly Vector3[] rainVelocities = new Vector3[RainSpeedClasses];
     float density;
     float precipitation;
+    ShelterExposure shelter;
 
     /// FOR THE F1 PANEL. The intensity and the density are read separately: with something on
     /// screen there is no other way to tell which of the two it came from.
@@ -309,6 +310,16 @@ public class PrecipitationRenderer : MonoBehaviour
             throw new InvalidOperationException($"{nameof(PrecipitationRenderer)}: {nameof(observer)} is not assigned.");
 
         Active = this;
+
+        // The precipitation renderer already owns the explicit player observer. Creating the
+        // shared exposure sensor here keeps scene and prefab wiring free of a second, potentially
+        // divergent listener reference.
+        if (Application.isPlaying)
+        {
+            shelter = GetComponent<ShelterExposure>();
+            if (shelter == null) shelter = gameObject.AddComponent<ShelterExposure>();
+            shelter.Bind(observer);
+        }
 
         RefreshDensity();
 

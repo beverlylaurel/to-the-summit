@@ -37,6 +37,7 @@ public class SnowfallLayers : MonoBehaviour
 
     /// Diagnostics: Current near layer spawn rate.
     public float NearRate { get; private set; }
+    bool wasSheltered;
 
     const float FlakeDrag = 9.81f;
 
@@ -56,10 +57,17 @@ public class SnowfallLayers : MonoBehaviour
     void LateUpdate()
     {
         float i01 = SnowRuntimeState.SnowfallIntensity01;
+        ShelterExposure shelter = ShelterExposure.Active;
+        float exposure = shelter != null ? shelter.PrecipitationExposure : 1f;
 
-        NearRate = Mathf.Lerp(0f, SnowConstants.MaxFlakeRate, i01);
+        NearRate = Mathf.Lerp(0f, SnowConstants.MaxFlakeRate, i01 * exposure);
 
         if (nearLayer == null) return;
+
+        bool sheltered = exposure < 0.08f;
+        if (sheltered && !wasSheltered)
+            nearLayer.Reinit(); // remove flakes that were already inside before the roof was detected
+        wasSheltered = sheltered;
 
         if (followTarget != null)
         {

@@ -87,6 +87,8 @@ Shader "ToTheSummit/Precipitation"
             float4 _RainDirections[RAIN_SPEED_CLASSES];
             float _Density;          // visual density, a bent version of the intensity
             float _Precipitation;    // raw intensity, for the drop size distribution
+            float4 _ShelterCenterRadius; // xyz listener, w dry interior radius
+            float _ShelterVisualBlock;
 
             // ---- GARG-NAYAR STREAK DATABASE `[Garg 2006, §5]`, `rain-spec.md` §6 ----
             //
@@ -559,7 +561,13 @@ Shader "ToTheSummit/Precipitation"
                 // motion is read as slow drifting even though their world speed is correct. The
                 // atmosphere already carries the far rain through precipitation visibility.
                 float distanceFade = 1.0 - smoothstep(10.0, 18.0, centerDistance);
-                float fade = boxFade * distanceFade;
+                // A roof makes the volume around the listener dry, while particles beyond the
+                // enclosing walls stay alive and remain visible through a door or window.
+                float shelterDistance = distance(worldPos, _ShelterCenterRadius.xyz);
+                float shelterOutside = smoothstep(_ShelterCenterRadius.w * 0.78,
+                                                   _ShelterCenterRadius.w, shelterDistance);
+                float shelterFade = lerp(1.0, shelterOutside, _ShelterVisualBlock);
+                float fade = boxFade * distanceFade * shelterFade;
 
                 // As a crystal's flat faces turn they catch the light and release it. The
                 // sparkle of falling snow comes from here, not from the silhouette.

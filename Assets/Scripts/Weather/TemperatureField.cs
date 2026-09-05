@@ -141,8 +141,12 @@ public class TemperatureField : MonoBehaviour
 
     /// The felt temperature: the wind carries heat away from the skin, the thermometer does not
     /// see this. Chill, breath and later stamina will read this number.
-    public float FeltAt(float altitude) =>
-        At(altitude) - windChillPerSpeed * wind.Velocity.magnitude;
+    public float FeltAt(float altitude)
+    {
+        ShelterExposure shelter = ShelterExposure.Active;
+        float exposure = shelter != null ? shelter.WindTransmission : 1f;
+        return At(altitude) - windChillPerSpeed * wind.Velocity.magnitude * exposure;
+    }
 
     /// HOW MUCH OF THE PRECIPITATION IS SNOW AT THIS ELEVATION: 1 all snow, 0 all rain.
     ///

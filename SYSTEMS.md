@@ -2197,6 +2197,29 @@ Kaydedilmiş Blender kaynaklarının topoloji, malzeme, UV, insan ölçeği ve k
 tomruklarının arkasındaki ince rüzgar tahtaları, kapı boşluğunu korurken çatı birleşiminden
 iç mekan ışığı sızmasını engeller.
 
+## Yapı içi barınak maruziyeti (2026-09-06)
+
+`ShelterExposure`, oyuncunun göz noktasından yukarı yönlü bir ışın demetiyle çatı örtüsünü,
+yatay 16 yönde ise açık kapı/pencere payını ölçer. Bir trigger hacmi veya yapı adına bağlı
+değildir; prefab collider'ları ölçüm geometrisidir. İthal tek yüzlü çatılar içeriden ışın
+kaçırmasın diye aynı parça hem dinleyiciden dışarı hem dışarıdan dinleyiciye sorgulanır.
+Ölçüm 0,12 saniyede bir yapılır ve eşik titreşimini önlemek için kısa bir zaman zarfıyla
+yumuşatılır.
+
+Çatı örtüsü, oyuncunun çevresinde kuru bir yarıçap üretir. Yağmur shader'ı ile compute kar
+shader'ı bu hacimdeki parçacıkları söndürür; hacmin dışındaki yağış kapı ve pencereden
+görünmeye devam eder. Etkin VFX kar katmanı içeride doğumu sıfırlar ve giriş anında mevcut
+yakın parçacıkları temizler. Açıklık payı yağmur, rüzgar ve gök gürültüsü sesinin hem
+seviyesini hem düşük geçiren filtresini belirler: kapalı yapıda yağmur, düşük frekanslı çatı
+darbesi olarak kalır; açık kapı yalnız sınırlı doğrudan ses geçirir. Aynı rüzgar geçirimi
+oyuncunun hissedilen sıcaklığındaki rüzgar soğutmasını azaltır. Dış dünyadaki rüzgar,
+yağış hareketi ve arazi ıslaklığı değişmez.
+
+Sensör, sahnede ikinci bir dinleyici referansı taşımamak için çalışma zamanında
+`PrecipitationRenderer` tarafından kendi açıkça bağlı oyuncu göz noktasıyla oluşturulur.
+Sayısal sözleşme `To The Summit/Weather/Shelter Exposure Test`; bütün sekiz karakol prefabi
+ayrıca Play Mode fizik taramasından geçer.
+
 ## Ortak elde tutulan eşya ve etkileşim sistemi (2026-09-05)
 
 `HeldItemSystem`, oyuncuya bootstrap tarafından açıkça verilen `EquippableItem` listesinin
