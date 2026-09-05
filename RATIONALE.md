@@ -3827,6 +3827,14 @@ bankta siyaha dönmesi de yukarı yönlü gökyüzü SH ışınımıyla giderild
 döngüsüyle kararır, emisyon değildir. Yeni doku, ikinci zaman kaynağı veya düz yükseklik
 konturu eklenmedi.
 
+Sonraki oyun testi ikinci bir sınırı görünür kıldı: ileri-geri giden ıslaklık cephesi düz
+`_SeaWetLevelY` kotuna bağlı kaldığından, sığ bir terrain üçgeninde ekran boyunca uzanan
+diyagonal koyu leke oluşuyordu. Mevcut `laceNoise` hesabı swash'tan önceye alınarak hem
+yerel ıslaklık kotunu birkaç santimetre büktü hem köpükte aynen yeniden kullanıldı; ek gürültü
+maliyeti doğmadı. Metre tabanlı `_SeaWetFadeM` korunurken `10 × fwidth(localWetHeight)`
+ekran alt sınırı eklendi. Dört saniye arayla alınan iki fazda cephe ilerledi, fakat düz
+üçgen sınırı geri dönmedi.
+
 Deniz saydam kuyrukta olduğu için URP'nin standart opak hareket vektörü geçişine girmez.
 Kuyruğu değiştirmek kırılma ve su kalınlığı okumalarını bozar; sabit görüntüde de bulunan bu
 eşik hatası çözülmüşken ayrı bir saydam hareket vektörü yolu eklenmedi.

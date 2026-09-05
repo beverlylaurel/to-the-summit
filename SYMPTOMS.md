@@ -6040,3 +6040,10 @@ iki yanında buluşur. Arazi bandı dik yüzeyde piksel altına düşmemek için
 `10 × fwidth(worldPos.y)` alt sınırı alır. Dik bankanın normali köpüğü neredeyse siyaha
 çevirmesin diye yalnız bu maskede yukarı yönlü gökyüzü SH ışınımı okunur; gece ve hava
 durumuyla birlikte kararır. Geometri sınırı ve kıyı gürültüsünün dünya konumu değişmedi.
+
+**Takip belirtisi:** Temas çizgisi giderilince alttan ileri-geri hareket eden ıslaklık bandı,
+ekranı çapraz kesen sert ve düz bir üçgen gibi görünüyordu. Bunun sebebi swash tepesinin
+yalnız dünya Y kotundan türemesi ve `_SeaWetFadeM` genişliğinin eğik görünüşte piksel altına
+düşmesiydi. Mevcut dantel gürültüsü yerel tepe/taban kotunu birlikte bükecek biçimde yeniden
+kullanıldı; `10 × fwidth(localWetHeight)` ekran alt sınırı geçişi koruyor. Aynı gürültüyü
+köpük de okuduğu için hareket eden ıslaklık ile dantel birbirinden kopmuyor.

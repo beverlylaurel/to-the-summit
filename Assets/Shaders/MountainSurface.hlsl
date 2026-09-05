@@ -502,10 +502,6 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // a warm beige, i.e. dark grey, and the roughness to 0.35 of 0.67 = 0.23, which
     // is lacquer, not wet sand. The whole beach came out grey and plastic.
     //
-    // A swash zone is a band: from the run-up line down to about where the water
-    // stands.
-    float seaWetBottom = _SeaWetLevelY - max(_SeaWetBandM, 1e-3);
-
     // ABOVE THE WATER'S REACH THIS WHOLE BLOCK PRODUCES ZERO, SO IT IS NOT RUN.
     //
     // `swash` is `1 - smoothstep(level - fade, level, y)`, which is 0 for every point at or
@@ -522,11 +518,26 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     float swash = 0.0;
     float waterlineContact = 0.0;
 
-    if (worldPos.y < max(_SeaWetLevelY, _SeaLevelY))
+    // Leave one fade width above the published level inside the gate: the local
+    // procedural run-up edge can reach into that margin.
+    if (worldPos.y < max(_SeaWetLevelY, _SeaLevelY) + _SeaWetFadeM)
     {
-        swash = (1.0 - smoothstep(_SeaWetLevelY - _SeaWetFadeM,
-                                        _SeaWetLevelY, worldPos.y))
-                    * smoothstep(seaWetBottom - _SeaWetFadeM,
+        // The same field later breaks the foam lace. Reuse it for the wet front so
+        // the moving darkening and the residue cannot expose two unrelated edges.
+        float laceNoise = MountainFbm(worldPos * 0.75, 3)
+                        + MountainFbm(worldPos * 3.1, 2) * 0.5;
+        float swashEdgeOffset = (laceNoise - 0.625) * min(_SeaWetFadeM * 0.70, 0.22);
+        float localWetLevel = _SeaWetLevelY + swashEdgeOffset;
+        float localWetHeight = worldPos.y - localWetLevel;
+
+        // A metre-only fade becomes the straight triangle seen on shallow terrain.
+        // Preserve the authored physical width, but guarantee ten screen pixels at
+        // oblique angles and zoomed views. fwidth also covers the noisy local edge.
+        float swashFadeWidth = max(_SeaWetFadeM,
+                                   fwidth(localWetHeight) * 10.0);
+        float seaWetBottom = localWetLevel - max(_SeaWetBandM, 1e-3);
+        swash = (1.0 - smoothstep(-swashFadeWidth, 0.0, localWetHeight))
+                    * smoothstep(seaWetBottom - swashFadeWidth,
                                  seaWetBottom, worldPos.y);
 
         // BELOW THE WATERLINE THE GROUND IS WET, FULL STOP.
@@ -562,9 +573,6 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // The lace rides on the SWASH band only. On the submerged part there is no
         // swash — the sea draws its own foam there.
         float laceBand = swash;
-
-        float laceNoise = MountainFbm(worldPos * 0.75, 3)
-                        + MountainFbm(worldPos * 3.1, 2) * 0.5;
 
         float lace = saturate((laceBand - (1.25 - laceNoise) * 0.7) * 2.2);
 

@@ -44,6 +44,8 @@ public static class SeaOpticsTest
             && source.Contains("float contactWash = contactBand")
             && source.Contains("shorePresence")
             && terrainSource.Contains("fwidth(worldPos.y) * 10.0")
+            && terrainSource.Contains("float swashEdgeOffset =")
+            && terrainSource.Contains("fwidth(localWetHeight) * 10.0")
             && terrainSource.Contains("float waterlineContact = 0.0")
             && terrainSource.Contains("lace = max(lace, waterlineContact)")
             && terrainShader.Contains("half shoreContact = surface.shoreContact")

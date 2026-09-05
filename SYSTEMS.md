@@ -1482,6 +1482,12 @@ gökyüzü yayılımını karartsa bile köpük siyaha dönmez: yalnız temas ma
 `SampleSH` ışınımı kullanılır. Bu ışık zamana ve havaya bağlıdır; bağımsız emisyon değildir.
 Böylece opak derinlik sınırının iki tarafı da aynı kesintili köpük diliyle kapanır.
 
+Swash'ın ileri-geri giden ıslaklık cephesi de düz `_SeaWetLevelY` kotunu doğrudan çizmez.
+Arazi dantelinin mevcut `laceNoise` alanı tepe ve taban kotunu birlikte yerel olarak büker;
+böylece ıslak bant kalınlığı değişmez ve köpük ile ıslaklık ayrı sınırlar üretmez. Geçiş
+genişliği `max(_SeaWetFadeM, 10 × fwidth(localWetHeight))` olduğu için sığ arazi üçgenlerinde
+ve eğik kamerada ekranı kesen sert bir diyagonal oluşmaz.
+
 Dalga geometrisinin sönümü ayrı: `SEA_SHORE_GEOMETRY_FADE_DEPTH` 0,18 m. Optik devirle
 paylaşılmaz; paylaşılırsa ya dalga kıyıdan 10 m önce ölür ya renk geçişi 3 m'ye sıkışıp
 yeniden keskin görünür.
