@@ -15,6 +15,10 @@ using UnityEngine.Rendering;
 [DisallowMultipleComponent]
 public class SeaSimulation : MonoBehaviour
 {
+#if UNITY_EDITOR
+    /// Fixed spectral clock used only by deterministic editor validation scenarios.
+    public float EditorTimeOverride { get; set; } = -1f;
+#endif
     [SerializeField] SeaSettings settings;
     [SerializeField] SeaEnvironmentBridge environment;
     [SerializeField] ComputeShader spectrumShader;
@@ -292,7 +296,11 @@ public class SeaSimulation : MonoBehaviour
 
         SeaRuntimeState.SimulationActive = true;
 
-        Step(Application.isPlaying ? Time.time : 0f);
+        float simulationTime = Application.isPlaying ? Time.time : 0f;
+#if UNITY_EDITOR
+        if (EditorTimeOverride >= 0f) simulationTime = EditorTimeOverride;
+#endif
+        Step(simulationTime);
     }
 
     /// One simulation step. The editor test calls this too.

@@ -2244,3 +2244,24 @@ uygular. JPEG gerçekten `quality=92` ile kodlandığı için ikinci bir sahte D
 yoktur. Her fotoğraf ve JSON poz metadatası
 `Application.persistentDataPath/Photos` altında saklanır; galeri yalnız gösterilen JPEG'i RAM'e
 açar.
+
+## Deterministik çevre kabul senaryoları (2026-09-05)
+
+`To The Summit/Validation/Environment Scenarios` penceresi, görsel sistemleri aynı
+koşullarda tekrar karşılaştırmak için yedi kod-sahipli kabul noktası çalıştırır: açık öğlen
+kıyısı, yağmurlu sabah kıyısı, karlı kıyıda uprush ve backwash, dar FOV uzak ufuk, gece kafa
+feneri ve canlı kamera vizörü. Seçili senaryolar ya da katalogdaki tüm senaryolar tek koşuda
+çalıştırılabilir.
+
+Koşucu Edit Mode'dan Play Mode'a geçer; oyuncu konumunu ve bakışını, takvim/saat, hava,
+rüzgâr, sıcaklık, kar kalınlığı, deniz zamanı, swash fazı, kamera FOV'u ve araç modunu
+sabitler. `SeaManager`, `SeaSimulation` ve `WindField` içindeki zaman kancaları yalnız
+`UNITY_EDITOR` derlemesinde bulunur; oyunun normal çalışma yolunu veya build API'sini
+genişletmez. Senaryo durumu `SessionState` ile domain reload boyunca korunur. Koşu sahneyi
+kaydetmez ve bitince Play Mode'dan çıkar.
+
+Her senaryo `Temp/Validation/Environment/<timestamp>/` altında bir PNG üretir. Aynı klasördeki
+`report.md`, kareleri saat, hava, rüzgâr, kar, deniz/swash ölçümleri, FOV, vizör hazırlığı ve
+senaryo sırasında yakalanan konsol uyarı/hatalarıyla birlikte sıralar. Bu klasör geçici test
+çıktısıdır ve commit edilmez. Katalog ve rapor sözleşmesi
+`To The Summit/Validation/Test Environment Scenarios` ile sayısal olarak denetlenir.

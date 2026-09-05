@@ -123,6 +123,11 @@ public class WindField : MonoBehaviour
     float overrideSeverity;
     float overrideAngle;
 
+#if UNITY_EDITOR
+    /// Fixed noise clock used only by deterministic editor validation scenarios.
+    public float EditorTimeOverride { get; set; } = -1f;
+#endif
+
     public void Bind(WindSettings tuning) => settings = tuning;
 
     /// A MISSING BINDING STOPS THE COMPONENT, IT DOES NOT DROWN THE CONSOLE.
@@ -162,6 +167,9 @@ public class WindField : MonoBehaviour
     void Update()
     {
         float t = Time.time;
+#if UNITY_EDITOR
+        if (EditorTimeOverride >= 0f) t = EditorTimeOverride;
+#endif
 
         // The sustained speed comes from Severity alone. The noise no longer produces this value,
         // it produces the deviation riding on top: a full storm regardless of what Perlin gives

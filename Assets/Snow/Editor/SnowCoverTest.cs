@@ -175,7 +175,7 @@ public static class SnowCoverTest
             float beforeRain = accumulator.Accumulation;
 
             env.TemperatureC = 10f;
-            snowfall.Tick(env, 1f);
+            snowfall.Tick(env, 0f);
 
             for (int i = 0; i < 50; i++) accumulator.Step(0.1f, 0f);
             float afterRain = accumulator.Accumulation;
@@ -360,6 +360,7 @@ public static class SnowCoverTest
         static void Rel(ref RenderTexture rt)
         {
             if (rt == null) return;
+            if (RenderTexture.active == rt) RenderTexture.active = null;
             rt.Release();
             Object.DestroyImmediate(rt);
             rt = null;

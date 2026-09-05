@@ -44,6 +44,23 @@ public class SeaManager : MonoBehaviour
 
     public SeaSettings Settings => settings;
 
+#if UNITY_EDITOR
+    /// Fixed clocks used only by the environment validation runner. Negative releases the lock.
+    public float EditorTimeOverride { get; set; } = -1f;
+    public float EditorSwashPhaseOverride { get; set; } = -1f;
+#endif
+
+    float SimulationTime
+    {
+        get
+        {
+#if UNITY_EDITOR
+            if (EditorTimeOverride >= 0f) return EditorTimeOverride;
+#endif
+            return Application.isPlaying ? Time.time : 0f;
+        }
+    }
+
     public void Bind(SeaSettings source, SeaEnvironmentBridge bridge, Terrain target)
     {
         settings = source;
@@ -136,7 +153,7 @@ public class SeaManager : MonoBehaviour
 
         // LOOP-QUANTIZED TIME. Handing over `Time.time` directly would lose
         // float precision over a long session (spec §6.5).
-        float t = Application.isPlaying ? Time.time : 0f;
+        float t = SimulationTime;
         Shader.SetGlobalFloat(SeaShaderIDs.SeaTime, Mathf.Repeat(t, settings.loopPeriod));
 
         Shader.SetGlobalFloat(SeaShaderIDs.SunElevation01, env.SunElevation01);
@@ -497,7 +514,7 @@ public class SeaManager : MonoBehaviour
         float swashPeriod = Mathf.Clamp(tUp * (1f + BackwashRatio), 2f, 40f);
         float uprushFraction = 1f / (1f + BackwashRatio);
 
-        float t = Application.isPlaying ? Time.time : 0f;
+        float t = SimulationTime;
 
         // A BEACH DOES NOT RECEIVE A BORE ON A METRONOME.
         //
@@ -516,6 +533,11 @@ public class SeaManager : MonoBehaviour
             swashClock = 0f;
 
         float phase = Mathf.Repeat(swashClock, 1f);
+
+#if UNITY_EDITOR
+        if (EditorSwashPhaseOverride >= 0f)
+            phase = Mathf.Repeat(EditorSwashPhaseOverride, 1f);
+#endif
 
         SeaRuntimeState.ShoreFoamIntensity01 = SeaSwashSurge(phase, uprushFraction);
 
