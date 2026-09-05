@@ -259,11 +259,11 @@ public class SeaSettings : ScriptableObject
     /// Red decays fastest, blue slowest — the reason water looks blue.
     /// Tuned for coastal water. [CALIBRATION]
     [Tooltip("Extinction coefficient per channel (1/m).")]
-    public Vector3 extinctionRgb = new Vector3(0.30f, 0.08f, 0.05f);
+    public Vector3 extinctionRgb = new Vector3(0.30f, 0.075f, 0.05f);
 
-    /// [SOURCE: Tessendorf 2004 §6.3 sample shader — upwelling = (0, 0.2, 0.3)]
+    /// Blue-dominant coastal upwelling; calibrated against the open and shallow-water views.
     [Tooltip("Upwelling color.")]
-    public Color upwellingColor = new Color(0.00f, 0.20f, 0.30f);
+    public Color upwellingColor = new Color(0.08f, 0.45f, 0.65f);
 
     [Tooltip("Refraction offset strength.")]
     [Range(0f, 2f)] public float refractionStrength = 0.35f;

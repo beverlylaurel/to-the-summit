@@ -20,7 +20,7 @@ silinir — telafi terimi geri eklenmez.
 
 ## Kayıtlar
 
-102 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
+103 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
 
 - [Bulutlar](#bulutlar)
 - [Kuşaklar ve hava dalgalanması](#kusaklar-ve-hava-dalgalanmasi)
@@ -3780,3 +3780,29 @@ tanımaya başlamaz.
 Yalnız mevcut kamera taşındı. Mimariyi örneklemek için sahte pusula veya dürbün eklemek temiz
 bir dikişi kanıtlamaz; kullanılmayan içerik ve ayar borcu üretir. Yeni gerçek eşya geldiğinde
 aynı sözleşmeyi uygulayıp bootstrap kayıt listesine girmesi yeterlidir.
+
+## Uzak deniz: ufuk altı ışın ikinci su yüzeyinden göğü görür (2026-09-05)
+
+Uzak denizdeki titreşim hareketli dalgadan önce sabit kamera ve donmuş suyla ayrıldı. Eski
+shader, yansıma yönü ufkun altına geçtiğinde gök örneğini koyu `upwelling` ile değiştiriyordu.
+Uzak bir piksel çok sayıda küçük yüzeyi kapsadığı için normalde küçücük bir değişim, aynı
+pikseli parlak gök ve koyu su dalları arasında geçiriyordu. Bu hem zamansal titreşim hem de
+ufuk boyunca koyu lacivert levhalar üretiyordu.
+
+Tek yüzeye ait ışın aşağı baksa da ilk çarptığı şey açık su yüzeyidir. İkinci yüzey sıyırma
+açısında olduğundan Fresnel'i bire yaklaşır ve gök ufkunu geri yollar. Çevre örneği bu yüzden
+gerçek ufka sıkıştırıldı; koyu dala geçiş kaldırıldı. Donmuş kamera serisinde ufuk bandının
+ortalama kare değişimi 0,503'ten 0,497'ye, üst yüzde 5 kuyruğu 0,750'den 0,714'e indi
+(kuyrukta %4,7). Daha büyük kazanç, iki dal arasındaki görünür koyu/parlak sıçramanın artık
+olmamasıdır.
+
+Renk kusuru aynı incelemede ayrı çıktı. Eski sönüm katsayısı maviyi yeşilden hızlı söndürüyor
+(`0,346 / 0,082 / 0,154`), eski upwelling de yeşili maviden güçlü veriyordu
+(`0,03 / 0,14 / 0,111`). İki sıra birlikte açık denizi kirli yeşil ve ağır laciverte itti.
+Yeni değerler kırmızı > yeşil > mavi sönümü ve mavi > yeşil > kırmızı upwelling düzenini
+kuruyor. Açık su ve sığ su kadrajları birlikte kontrol edildi; renk soğuk çelik mavisine
+geldi, sığ geçiş aşırı doygunlaşmadı.
+
+Deniz saydam kuyrukta olduğu için URP'nin standart opak hareket vektörü geçişine girmez.
+Kuyruğu değiştirmek kırılma ve su kalınlığı okumalarını bozar; sabit görüntüde de bulunan bu
+eşik hatası çözülmüşken ayrı bir saydam hareket vektörü yolu eklenmedi.

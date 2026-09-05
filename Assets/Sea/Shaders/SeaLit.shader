@@ -403,44 +403,18 @@ Shader "ToTheSummit/SeaLit"
                 // cubemap. Do not grey it again from scalar coverage: that counted the cloud deck
                 // twice and erased real directional variation from the reflected sky.
 
-                // A REFLECTED RAY THAT POINTS DOWN NEVER REACHES THE SKY.
+                // A RAY BELOW THE GEOMETRIC HORIZON HITS THE NEXT WATER FACET.
                 //
-                // `GlossyEnvironmentReflection` answers for every direction, including the
-                // ones below the horizon, and returns whatever the environment holds down
-                // there. On a wave face tilted towards the viewer the reflected ray dips
-                // under the horizon and the sea came back carrying DARK BROWN BLOTCHES —
-                // hard-edged patches that slid over the water and read as dirt on glass.
+                // That second surface is seen at a grazing angle, so its Fresnel term is
+                // almost one and it returns the horizon sky. Replacing the ray with dark
+                // upwelling ignored this second bounce. It split the daytime sea into
+                // near-black blue slabs and made tiny normal changes flip between a bright
+                // sky sample and a dark body sample. The lookup is already clamped to the
+                // real sky horizon above; keep that filtered result on both sides of R.y.
                 //
-                // MEASURED: painting `skyRefl` magenta put the magenta exactly on those
-                // blotches, in the same shapes and the same places. It was the reflection,
-                // not the refraction (disabling that left them) and not the sea bed.
-                //
-                // Physically the ray hits WATER, so what comes back is the water's own
-                // upwelling — the same quantity the surface already computes for the volume
-                // below it. The band is narrow (0 to 0.06 in R.y, about 3.5 degrees) because
-                // a real horizon is sharp; wider than that and the whole sea flattens.
-                // THE BAND IS AS WIDE AS THE PIXEL IS UNCERTAIN.
-                //
-                // 0.06 is the physical width -- a real horizon is sharp, and wider than
-                // about 3.5 degrees the whole sea flattens. But far from the camera one
-                // pixel covers tens of metres of water and `R.y` sweeps that whole range
-                // inside it, so a step at a fixed threshold flips neighbouring pixels
-                // between the dark upwelling and the bright sky. Measured with the water
-                // FROZEN and the camera still: removing the band dropped the band under
-                // the horizon from 2.63 to 1.94 luma of change per frame, a quarter of
-                // the shimmer, and the sky in the same frame changed 0.64.
-                //
-                // `fwidth` is not a tuning knob: it IS how much `R.y` moves across this
-                // pixel. Near the camera it is tiny and the band keeps its 0.06; far away
-                // it opens to cover the spread the pixel actually holds.
-                // IT OPENS BOTH WAYS. Growing only the upper edge moves the band's MIDDLE
-                // up, and the far sea went 26% darker because more of it fell on the dark
-                // side of a threshold that had quietly shifted. The middle stays at 0.03;
-                // the pixel's own spread is added to each side.
-                float horizonSlack = 0.5 * fwidth(R.y);
-                skyRefl = lerp(upwelling, skyRefl,
-                               smoothstep(-horizonSlack, 0.06 + horizonSlack, R.y));
-
+                // This is also the stable unresolved-surface limit: a pixel near the horizon
+                // covers many mutually occluding facets, not one isolated face with open
+                // water below it.
                 // --- SUN GLITTER (spec 12.5) ---
                 //
                 // GGX, NOT A BLINN LOBE. `pow(dot(N,H), 2/r^2)` is a shape with no

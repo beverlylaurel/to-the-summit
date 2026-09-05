@@ -1811,6 +1811,23 @@ atmıyor.
 Öncesi: her rüzgârda tek kontur, nefes 0 m.
 
 
+## Deniz: açık deniz rengi ve ufuk yansıması (2026-09-05)
+
+`SeaSettings.extinctionRgb` su içindeki ışığın kanal başına sönümüdür ve sırası
+**R > G > B** kalır: `(0,300 / 0,075 / 0,050) m⁻¹`. Kırmızı en hızlı, mavi en yavaş
+söner. `upwellingColor` aynı yönü izler; mavi > yeşil > kırmızı
+`(0,08 / 0,45 / 0,65)`. Bu iki ayar birbirine ters çevrilmez; ters sıra açık denizi
+çamurlu yeşile iter.
+
+Yansıma ışını geometrik ufkun altına baktığında çevre haritasının alt yarısı veya koyu
+`upwelling` okunmaz. Işın komşu su yüzeyine çarpar; o yüzey sıyırma açısında gök ufkunu
+neredeyse tam Fresnel ile geri verir. `rLookup.y` bu nedenle sıfırda tutulur ve filtrelenmiş
+gök sonucu `R.y`'nin iki yanında da kullanılır. Ufuk boyunca koyu su ile parlak gök arasında
+`smoothstep` geçişi eklenmez: piksel altı eğim değişimi bu eşiği titreştirir.
+
+Bu optik kural, 2–3,5 km geometri/eğim sönümünün ve 2,5–4,5 km son gök birleşiminin yerine
+geçmez; üçü aynı uzak denizin farklı hata kaynaklarını kapatır.
+
 ## Deniz: dalganın içinden geçen ışık (2026-08-29)
 
 Shader'da bu yol **yoktu**. Her terim ya yüzeyin ÜSTÜNDEN gelen ışığı döndürüyordu

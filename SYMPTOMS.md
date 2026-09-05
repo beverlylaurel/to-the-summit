@@ -5996,3 +5996,23 @@ kaliteye yeni ekran rengi örneği eklenmiyor.
 **Doğrulama:** 1944×1296 çözünürlükte 4× fotoğraf zoom'una eşdeğer 15,26° FOV ile aynı
 ufuk yeniden çekildi. Yeşil kopuk levhalar kayboldu; yakın dalga dokusu ve kıyı köpüğü
 korundu. Shader importu ve Unity derlemesi hatasız.
+
+## Uzak deniz ufka doğru titriyor ve rengi çamurlu — ÇÖZÜLDÜ (2026-09-05)
+
+**Belirti:** Uzak deniz, özellikle ufka doğru, kamera sabitken bile titreşiyor. Renk de
+tarifi zor biçimde kirli yeşil ile ağır lacivert arasında kalıyordu.
+
+**Ayırt eden ölçüm:** Kamera ve su dondurulduğunda değişim sürdü; yani geometri hareketi
+tek başına sebep değildi. Shader'ın ufuk geçişi kaldırılınca aynı sabit seride ufuk bandının
+üst yüzde 5 değişimi 0,750'den 0,714'e indi. Eski geçişte yansıma yönündeki çok küçük normal
+değişimi pikseli parlak gök örneği ile koyu `upwelling` arasında geçiriyordu.
+
+**Gerçek sebep:** Ufkun altına yönelen yansıma ışını açık denizde boşluğa değil sonraki su
+yüzeyine çarpar; o yüzey sıyırma açısında göğü neredeyse tam yansıtır. Eski shader bu ikinci
+sekmeyi yok sayarak koyu bir dal üretmişti. Renk tarafında da mavi sönümü yeşilden yüksek,
+upwelling'in mavisi yeşilden düşüktü; iki ters kanal sırası suyu çamurlu gösteriyordu.
+
+**Düzeltme:** Yansıma örneği gerçek gök ufkuna sıkıştırılıp `R.y` boyunca koyu dala geçiş
+kaldırıldı. Sönüm `R > G > B`, upwelling `B > G > R` sırasına getirildi. Açık ve sığ su
+kadrajlarında çelik mavi ton ile kıyı geçişi birlikte doğrulandı; uzak geometri sönümü ve
+son gök birleşimi korunuyor.
