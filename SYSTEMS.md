@@ -2055,6 +2055,21 @@ Ayarların tek kaynağı `PlayerViewMotionSettings.asset`; ana sahne ve test sah
 asset'i okur. Bisiklet baş hareketini `CameraPivot` üzerinde tuttuğu için kamera çocuğunun
 hareket kanallarıyla çakışmaz. Sayısal regresyon testi `To The Summit/Player/Motion Test`.
 
+### Kafa feneri
+
+`HeadlampController`, `F` ile açılıp kapanan, modelsiz kafa fenerini yönetir. Işık kaynağı
+ekran üstü bir leke değil, URP'nin gerçek ek ışık yoluna giren iki spot ışıktır: dar ve uzun
+menzilli odak ile geniş, düşük güçlü çevre dolgusu. Akı lümen, renk sıcaklığı Kelvin olarak
+tanımlanır; yalnız odak ışığı yumuşak gölge üretir.
+
+`Headlamp Mount`, `Main Camera`nın çocuğudur. Böylece `CameraPivot`ın kafa yönünü ve
+`PlayerViewMotion`ın yürüyüş, koşu, dönüş, iniş ve basamak hareketini aynı dönüşüm zincirinden
+devralır. Fener için ikinci bir gürültü veya salınım üretilmez; huzme görüntüden bağımsız
+kayamaz. Açılış/kapanış çok kısa, kare hızından bağımsız bir optik tepkiyle yumuşatılır.
+
+Ayarların tek kaynağı `HeadlampSettings.asset`; ana sahne ve test sahnesi aynı asset'i okur.
+Sayısal ve sahne bağı regresyon testi `To The Summit/Player/Headlamp Test`.
+
 
 ## Oyuncu: suda derinlikle durur, su kenarında değil
 

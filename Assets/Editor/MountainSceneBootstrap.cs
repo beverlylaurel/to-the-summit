@@ -62,6 +62,7 @@ public static class MountainSceneBootstrap
     const string SkyWeatherPath = "Assets/Settings/SkyWeatherSettings.asset";
     const string VintageDslrProfilePath = "Assets/Settings/VintageDslrProfile.asset";
     const string PlayerViewMotionSettingsPath = "Assets/Settings/PlayerViewMotionSettings.asset";
+    const string HeadlampSettingsPath = "Assets/Settings/HeadlampSettings.asset";
     const string VintagePhotoShaderPath = "Assets/Shaders/VintagePhoto.shader";
     const string VintageCameraMaterialPath = "Assets/Settings/VintageCameraPlaceholder.mat";
     const string InconsolataRegularPath = "Assets/UI/Fonts/Inconsolata/Inconsolata-Regular.ttf";
@@ -403,6 +404,8 @@ public static class MountainSceneBootstrap
         viewMotion.Bind(player, player.GetComponent<CharacterController>(), look, camera.transform,
             LoadOrCreate<PlayerViewMotionSettings>(PlayerViewMotionSettingsPath));
         EditorUtility.SetDirty(viewMotion);
+
+        EnsureHeadlamp(player, camera.transform, ref changed);
 
         var flyer = player.GetComponent<FreeFlyMovement>();
         if (flyer == null)
@@ -1078,6 +1081,54 @@ public static class MountainSceneBootstrap
         foreach (Camera candidate in player.GetComponentsInChildren<Camera>(true))
             if (candidate.CompareTag("MainCamera")) return candidate;
         return null;
+    }
+
+    static void EnsureHeadlamp(FirstPersonController player, Transform renderedView,
+                               ref bool changed)
+    {
+        HeadlampSettings settings = LoadOrCreate<HeadlampSettings>(HeadlampSettingsPath);
+        Transform mount = renderedView.Find("Headlamp Mount");
+        if (mount == null)
+        {
+            mount = new GameObject("Headlamp Mount").transform;
+            mount.SetParent(renderedView, false);
+            changed = true;
+        }
+
+        Light hotspot = EnsureHeadlampSpot(mount, "Headlamp Hotspot", ref changed);
+        Light spill = EnsureHeadlampSpot(mount, "Headlamp Spill", ref changed);
+        HeadlampController controller = player.GetComponent<HeadlampController>();
+        if (controller == null)
+        {
+            controller = player.gameObject.AddComponent<HeadlampController>();
+            changed = true;
+        }
+
+        controller.Bind(settings, mount, hotspot, spill);
+        EditorUtility.SetDirty(mount);
+        EditorUtility.SetDirty(hotspot);
+        EditorUtility.SetDirty(spill);
+        EditorUtility.SetDirty(controller);
+    }
+
+    static Light EnsureHeadlampSpot(Transform mount, string name, ref bool changed)
+    {
+        Transform child = mount.Find(name);
+        if (child == null)
+        {
+            child = new GameObject(name).transform;
+            child.SetParent(mount, false);
+            changed = true;
+        }
+
+        Light light = child.GetComponent<Light>();
+        if (light == null)
+        {
+            light = child.gameObject.AddComponent<Light>();
+            changed = true;
+        }
+        EnsureLightData(light, ref changed);
+        return light;
     }
 
     static void EnsureVintagePhotoMode(FirstPersonController player, Camera viewCamera,

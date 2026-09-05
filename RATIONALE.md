@@ -20,7 +20,7 @@ silinir — telafi terimi geri eklenmez.
 
 ## Kayıtlar
 
-100 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
+101 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
 
 - [Bulutlar](#bulutlar)
 - [Kuşaklar ve hava dalgalanması](#kusaklar-ve-hava-dalgalanmasi)
@@ -3746,3 +3746,17 @@ kamerayı gövdenin arkasından sürükler. Bunun yerine yüzey normalinden bekl
 hesaplanır; yalnız bundan kalan ani fark basamak kabul edilir. Karşı ofset **3,5 cm** ile
 sınırlı ve kısa sürede sıfıra döner. 20 cm'lik yapay basamak testinde ilk karşılık **3,37 cm**
 ölçüldü; arazi okunurken çarpma hissi kesildi ama kamera zeminden kopmadı.
+## Kafa feneri kamera hareketini neden doğrudan miras alıyor? (2026-09-05)
+
+Kafa fenerine ayrı sinüs, gürültü veya gecikmeli takip eklemek daha görünür bir hareket
+üretirdi; fakat ışık huzmesi oyuncunun gördüğü kafa hareketinden ayrılır ve özellikle koşuda
+yapay salınım ile mide bulantısı doğururdu. Fener montajı bu yüzden `Main Camera`nın çocuğu:
+mevcut, ölçülmüş ve derece altı görüş hareketini birebir taşır. Daha sonra gelecek 3B model de
+aynı monta bağlanabilir.
+
+Tek, eşit yoğunluklu spot yapay bir projektör lekesi veriyor. Gerçek dış mekân kafa
+fenerlerindeki odak ve taşma iki fiziksel spotla ayrıldı. Toplam çıkış 440 lümen; dar odak
+68 metreye erişip yumuşak gölge üretirken geniş dolgu 26 metrede söner ve gölge üretmez.
+Temiz havada kaynaktan yüzeye uzanan parlak bir koni çizilmedi: böyle bir koni ışığın kendisi
+değil, havadaki parçacık saçılımıdır. Hacimsel sis ek ışıkları fiziksel olarak örneklediğinde
+bu görünüm sis yoğunluğundan türetilmeli.

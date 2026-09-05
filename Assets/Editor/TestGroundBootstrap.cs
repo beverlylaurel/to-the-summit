@@ -18,6 +18,7 @@ public static class TestGroundBootstrap
     const string ScenePath = "Assets/Scenes/TestGround.unity";
     const string MaterialPath = "Assets/Settings/TestGround.mat";
     const string ViewMotionSettingsPath = "Assets/Settings/PlayerViewMotionSettings.asset";
+    const string HeadlampSettingsPath = "Assets/Settings/HeadlampSettings.asset";
 
     /// Arena side length (meters). 200 m: traversable by sprinting in 20 seconds,
     /// sufficient for scale perception without getting lost.
@@ -190,6 +191,24 @@ public static class TestGroundBootstrap
         player.AddComponent<PlayerViewMotion>().Bind(
             player.GetComponent<FirstPersonController>(), controller, look, camera.transform,
             viewSettings);
+
+        var headlampSettings = AssetDatabase.LoadAssetAtPath<HeadlampSettings>(
+            HeadlampSettingsPath);
+        if (headlampSettings == null)
+        {
+            headlampSettings = ScriptableObject.CreateInstance<HeadlampSettings>();
+            AssetDatabase.CreateAsset(headlampSettings, HeadlampSettingsPath);
+        }
+        var headlampMount = new GameObject("Headlamp Mount").transform;
+        headlampMount.SetParent(camera.transform, false);
+        var hotspot = new GameObject("Headlamp Hotspot").AddComponent<Light>();
+        hotspot.transform.SetParent(headlampMount, false);
+        hotspot.gameObject.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalLightData>();
+        var spill = new GameObject("Headlamp Spill").AddComponent<Light>();
+        spill.transform.SetParent(headlampMount, false);
+        spill.gameObject.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalLightData>();
+        player.AddComponent<HeadlampController>().Bind(
+            headlampSettings, headlampMount, hotspot, spill);
 
         // Free fly movement starts disabled.
         var flyer = player.AddComponent<FreeFlyMovement>();
