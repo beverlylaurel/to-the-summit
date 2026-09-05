@@ -835,7 +835,7 @@ rolyef degil, tonlama ve olcek uyumuydu.
 
 ## Insan olcegi ve FBX guvenligi
 
-Butun karakollar 1,80 m boyunda ve 0,70 m capinda oyuncu kapsulu ile denetlenir.
+Kalan yedi karakol 1,80 m boyunda ve 0,70 m capinda oyuncu kapsulu ile denetlenir.
 Kullanilan alt sinirlar: gecit yuksekligi 1,88 m, standart kapi kanadi 0,78 m,
 acik platform net yuruyecek alan 0,85 m, merdiven 0,88 m ve sundurma bas
 boslugu 2,20 m. Binayi topluca buyutmek yerine kapi, merdiven ve dolasim alani

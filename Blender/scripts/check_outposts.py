@@ -28,7 +28,6 @@ from mathutils.bvhtree import BVHTree
 OUTPOSTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "outposts")
 
 FILES = ["Outpost_Trapper", "Outpost_Cellar", "Outpost_Shed", "Outpost_Tower",
-         "Outpost_Homestead", "Outpost_Collier", "Outpost_Adit",
          "Outpost_Station", "Outpost_Chapel", "Outpost_Mill"]
 
 # On izleme sahnesine ait yardimci nesneler modelin parcasi degil.
@@ -38,7 +37,7 @@ SKIP_PREFIX = ("PVW_",)
 GROUND_PARTS = ("Sta_Anchor", "Sta_Pad", "Sta_MastBase", "Shed_Bearer",
                 "Shed_Pad", "Chp_Plinth", "Mil_Stone", "Mil_Race",
                 "Cell_Mound", "Cell_Wing", "Cell_Threshold",
-                "Cell_Facade", "Tow_Pad", "Adit_Spoil")
+                "Cell_Facade", "Tow_Pad")
 
 
 def _mesh_objects(scene):
@@ -105,7 +104,7 @@ def _human_scale_issues(name, objs, bb):
     issues = []
     by_name = {o.name: o for o in objs}
     for o in objs:
-        if "DoorLeaf" not in o.name or name == "Outpost_Collier":
+        if "DoorLeaf" not in o.name:
             continue
         lo, hi = bb[o.name]
         width = max(hi.x - lo.x, hi.y - lo.y)
@@ -113,10 +112,6 @@ def _human_scale_issues(name, objs, bb):
         if width < 0.78 or height < 1.88:
             issues.append((o.name, "door", round(width, 3), round(height, 3)))
 
-    if name == "Outpost_Adit" and "Adit_Sets" in bb:
-        lo, hi = bb["Adit_Sets"]
-        if hi.x - lo.x < 1.20 or hi.z - lo.z < 2.10:
-            issues.append(("Adit_Sets", "portal", round(hi.x-lo.x, 3), round(hi.z-lo.z, 3)))
     if name == "Outpost_Shed":
         posts = [o for o in objs if o.name.startswith("Shed_Post")]
         if posts and min(bb[o.name][1].z - bb[o.name][0].z for o in posts) < 2.20:

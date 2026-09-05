@@ -26,8 +26,8 @@ public static class OutpostDiagnostics
             .OrderBy(path => path)
             .ToList();
 
-        if (prefabPaths.Count != 11)
-            failures.Add($"11 outpost prefab bekleniyordu, {prefabPaths.Count} bulundu.");
+        if (prefabPaths.Count != 8)
+            failures.Add($"8 outpost prefab bekleniyordu, {prefabPaths.Count} bulundu.");
 
         foreach (string path in prefabPaths)
         {

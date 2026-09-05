@@ -6063,7 +6063,7 @@ katıyordu.
 
 **Düzeltme:** Bake taşma payı 1 piksele indirildi ve yalnız bu iki düşük frekanslı atlasın
 mipmap üretimi kapatıldı. Karolu taban, normal ve roughness dokularının mipmap'leri
-korundu. On modelin nötr ışıkta çok açılı çekiminde renk saçağı görülmedi.
+korundu. Modellerin nötr ışıkta çok açılı çekiminde renk saçağı görülmedi.
 
 ## Kabin zemini bir adımda aydınlanıyor ve pencere erişilemez görünüyor — ÇÖZÜLDÜ (2026-09-05)
 
@@ -6086,5 +6086,5 @@ oyuncu ile 0,70 m kapsül için işlevsel eşiklerin altındaydı.
 
 **Düzeltme:** Mahzen cephesi iki ayak ve üst kuşaktan oluşan basit yüzlere ayrıldı.
 Mahzen ve avcı kapısı, istasyon kapısı, kule platformu ile merdiveni gerçek insan
-ölçeğine getirildi. `check_outposts.py` artık on modelin tamamında geçit yüksekliği,
+ölçeğine getirildi. `check_outposts.py` artık kullanılan modellerde geçit yüksekliği,
 kapı genişliği, açık platform net genişliği ve merdiven genişliğini de denetliyor.
