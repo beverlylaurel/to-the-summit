@@ -103,8 +103,7 @@ public static class OutpostImportSetup
                     mat.SetTexture("_RoughMetalMap", rm);
                     mat.SetTextureScale("_BaseMap", new Vector2(m.tiling, m.tiling));
                     mat.SetVector("_DetileOffset", new Vector4(m.detX, m.detY, 0f, 0f));
-                    mat.SetFloat("_BumpScale", 1f);
-                    mat.SetFloat("_RoughnessScale", 1f);
+                    ApplySurfaceProfile(mat, item.name, m);
                 }
                 EditorUtility.SetDirty(mat);
                 remap[m.mat] = mat;
@@ -141,14 +140,10 @@ public static class OutpostImportSetup
         var root = new GameObject("ZZ_OutpostCheck");
         Undo.RegisterCreatedObjectUndo(root, "Outpost check row");
         float x = 0f;
-        // Ana siginak da satira girer: atlaslari yeniden pisirildi, karakollarla
-        // AYNI isikta yan yana gorulmeden "bozulmadi" denemez.
+        // Ana siginak da bu klasorde kendi prefabiyla durur. FBX'i ayrica eklemek
+        // collider ve prefab ayarlarini atlar ve ayni yapidan ikinci bir ham kopya uretir.
         var paths = AssetDatabase.FindAssets("t:Prefab", new[] { PrefabDir })
                                  .Select(AssetDatabase.GUIDToAssetPath).ToList();
-        string cabin = AssetDatabase.FindAssets("t:Model", new[] { "Assets/Models/Cabin" })
-                                    .Select(AssetDatabase.GUIDToAssetPath)
-                                    .FirstOrDefault(p => p.EndsWith(".fbx"));
-        if (cabin != null) paths.Insert(0, cabin);
         foreach (var p in paths)
         {
             var pf = AssetDatabase.LoadAssetAtPath<GameObject>(p);
@@ -249,8 +244,11 @@ public static class OutpostImportSetup
             bool srgb = !normal && !data;
             bool atlas = f.EndsWith("_Tint.png") || f.EndsWith("_RoughMetal.png");
             bool wantMipmaps = !atlas;
+            var wantedFilter = atlas ? FilterMode.Bilinear : FilterMode.Trilinear;
+            int wantedAniso = atlas ? 1 : 6;
             if (ti.textureType == want && ti.sRGBTexture == srgb
-                && ti.mipmapEnabled == wantMipmaps) continue;
+                && ti.mipmapEnabled == wantMipmaps && ti.filterMode == wantedFilter
+                && ti.anisoLevel == wantedAniso) continue;
 
             ti.textureType = want;
             ti.sRGBTexture = srgb;
@@ -261,7 +259,60 @@ public static class OutpostImportSetup
             ti.wrapMode = atlas
                 ? TextureWrapMode.Clamp     // atlas: kenar tekrar etmemeli
                 : TextureWrapMode.Repeat;
+            // Floors, roofs and long walls are frequently viewed at grazing angles. Six is
+            // enough to preserve their 2K detail without paying the global cost of level 16.
+            ti.filterMode = wantedFilter;
+            ti.anisoLevel = wantedAniso;
             ti.SaveAndReimport();
+        }
+    }
+
+    static void ApplySurfaceProfile(Material mat, string building, MatEntry entry)
+    {
+        string source = (entry.baseTex ?? string.Empty).ToLowerInvariant();
+        bool metal = source.Contains("metal") || source.Contains("iron") || source.Contains("container");
+        bool stone = source.Contains("stone") || source.Contains("rock") || source.Contains("concrete")
+                     || source.Contains("grass");
+
+        // Relief is calibrated by material family. Strong metal normals made thin sheet look
+        // melted; stone needs slightly more relief than sawn timber to keep its joints legible.
+        mat.SetFloat("_BumpScale", metal ? 0.78f : stone ? 1.12f : 1.0f);
+        mat.SetFloat("_RoughnessScale", metal ? 0.96f : stone ? 1.05f : 1.01f);
+        mat.SetFloat("_RoughnessVariation", metal ? 0.045f : stone ? 0.075f : 0.06f);
+
+        uint seed = StableHash(building + "/" + entry.mat);
+        mat.SetFloat("_MaterialSeed", (seed & 0xffffu) / 65535f * 19.0f);
+        mat.SetFloat("_MacroScale", 4.5f + ((seed >> 16) & 0xffu) / 255f * 3.5f);
+        mat.SetFloat("_MacroStrength", metal ? 0.035f : stone ? 0.055f : 0.045f);
+        mat.SetFloat("_ThirdPhaseStrength", 0.34f);
+        mat.SetColor("_BaseColor", BuildingIdentityTint(building));
+    }
+
+    static uint StableHash(string value)
+    {
+        unchecked
+        {
+            uint hash = 2166136261u;
+            foreach (char c in value) hash = (hash ^ c) * 16777619u;
+            return hash;
+        }
+    }
+
+    static Color BuildingIdentityTint(string building)
+    {
+        // One cold-mountain palette, seven restrained identities. The authored texture and
+        // weathering atlas still do the visible work; these 2-4% shifts stop adjacent buildings
+        // converging on the same brown-grey without turning them into unrelated props.
+        switch (building)
+        {
+            case "Trapper": return new Color(1.025f, 0.995f, 0.955f, 1f);
+            case "Cellar":  return new Color(0.975f, 1.005f, 0.955f, 1f);
+            case "Shed":    return new Color(0.970f, 0.995f, 1.025f, 1f);
+            case "Tower":   return new Color(0.985f, 1.020f, 0.975f, 1f);
+            case "Station": return new Color(0.955f, 0.995f, 1.035f, 1f);
+            case "Chapel":  return new Color(1.025f, 1.005f, 0.965f, 1f);
+            case "Mill":    return new Color(1.015f, 0.980f, 0.945f, 1f);
+            default:         return Color.white;
         }
     }
 

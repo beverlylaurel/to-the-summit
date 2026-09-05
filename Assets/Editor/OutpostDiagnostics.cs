@@ -48,16 +48,53 @@ public static class OutpostDiagnostics
                 failures.Add($"Collider eksik: {path} ({colliders.Length}/{filters.Length})");
         }
 
+        // ModelImporter assets are model prefabs too, so the hierarchy can look legitimate
+        // while bypassing the collider-backed project prefab. Runtime scenes may only use the
+        // authored prefab layer; raw FBX is an import source, not a placement source.
+        foreach (var transform in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include,
+                                                                      FindObjectsSortMode.None))
+        {
+            var go = transform.gameObject;
+            if (!PrefabUtility.IsOutermostPrefabInstanceRoot(go)) continue;
+            string source = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(go);
+            if (source.StartsWith("Assets/Models/Outposts/") || source.StartsWith("Assets/Models/Cabin/"))
+                failures.Add($"Sahnede ham FBX ornegi var: {go.name} -> {source}");
+        }
+
         foreach (string guid in AssetDatabase.FindAssets("t:Texture2D", new[] { TextureDirectory }))
         {
             string path = AssetDatabase.GUIDToAssetPath(guid);
             string name = System.IO.Path.GetFileNameWithoutExtension(path);
-            if (!name.EndsWith("_Tint") && !name.EndsWith("_RoughMetal"))
-                continue;
-
-            if (AssetImporter.GetAtPath(path) is TextureImporter importer && importer.mipmapEnabled)
+            bool atlas = name.EndsWith("_Tint") || name.EndsWith("_RoughMetal");
+            if (AssetImporter.GetAtPath(path) is not TextureImporter importer) continue;
+            if (atlas && importer.mipmapEnabled)
                 failures.Add($"Atlas mipmap acik: {path}");
+            if (!atlas && (importer.filterMode != FilterMode.Trilinear || importer.anisoLevel < 4))
+                failures.Add($"Doseme dokusu egik goruse hazir degil: {path} " +
+                             $"({importer.filterMode}, aniso {importer.anisoLevel})");
         }
+
+        var outpostMaterials = AssetDatabase.FindAssets("t:Material", new[] { "Assets/Materials/Outposts" })
+            .Select(AssetDatabase.GUIDToAssetPath)
+            .Select(AssetDatabase.LoadAssetAtPath<Material>)
+            .Where(material => material != null && material.shader != null
+                               && material.shader.name == "Cabin/WeatheredLit")
+            .ToArray();
+        foreach (var material in outpostMaterials)
+        {
+            foreach (string property in new[] { "_MaterialSeed", "_MacroScale", "_MacroStrength",
+                                                "_RoughnessVariation", "_ThirdPhaseStrength" })
+                if (!material.HasProperty(property))
+                    failures.Add($"Yuzey profili eksik: {material.name}/{property}");
+            if (material.HasProperty("_ThirdPhaseStrength")
+                && material.GetFloat("_ThirdPhaseStrength") < 0.25f)
+                failures.Add($"Tekrar kirma profili uygulanmamis: {material.name}");
+        }
+        int distinctSeeds = outpostMaterials.Select(material => material.GetFloat("_MaterialSeed"))
+                                            .Distinct().Count();
+        if (distinctSeeds < outpostMaterials.Length - 1)
+            failures.Add($"Materyal kimlik tohumlari yeterince ayri degil: " +
+                         $"{distinctSeeds}/{outpostMaterials.Length}");
 
         const string floorMaterialPath = "Assets/Materials/Cabin/weathered_planks.mat";
         var floorMaterial = AssetDatabase.LoadAssetAtPath<Material>(floorMaterialPath);
@@ -71,7 +108,8 @@ public static class OutpostDiagnostics
                                                        string.Join("\n- ", failures));
 
         Debug.Log($"Outpost asset denetimi gecti: {prefabPaths.Count} prefab collider'li, " +
-                  "tint/roughness atlas mipmap'leri kapali ve kabin zemini dengeli.");
+                  $"{outpostMaterials.Length} yuzey profilli; atlas mipmap'leri kapali, " +
+                  "doseme dokulari egik goruse hazir ve kabin zemini dengeli.");
     }
 
     [MenuItem("To The Summit/Outposts/Diagnose Import")]
@@ -110,13 +148,13 @@ public static class OutpostDiagnostics
             report.ToString());
     }
 
-    /// Renders every outpost from the same three-quarter angle the Blender previews
-    /// use, on a neutral ground, so the two sheets can be laid side by side. A model
+    /// Renders every gameplay prefab from the same three-quarter angle the Blender previews
+    /// use, on a neutral ground, so the two sheets can be laid side by side. A prefab
     /// judged against a different camera and a different sky is not judged at all.
     [MenuItem("To The Summit/Outposts/Capture Model Sheet")]
     public static void Sheet()
     {
-        var paths = AssetDatabase.FindAssets("t:Model", new[] { "Assets/Models/Outposts" })
+        var paths = AssetDatabase.FindAssets("t:Prefab", new[] { PrefabDirectory })
             .Select(AssetDatabase.GUIDToAssetPath).OrderBy(p => p).ToList();
 
         var stage = new GameObject("ZZ_Sheet");
@@ -194,7 +232,7 @@ public static class OutpostDiagnostics
         RenderSettings.ambientMode = ambientMode;
         RenderSettings.ambientLight = ambientLight;
         RenderSettings.ambientIntensity = ambientIntensity;
-        Debug.Log($"Model sheet: {tiles.Count} outposts rendered to Logs/OutpostSheet.png " +
+        Debug.Log($"Prefab sheet: {tiles.Count} tiles rendered to Logs/OutpostSheet.png " +
                   $"({string.Join(", ", paths.Select(System.IO.Path.GetFileNameWithoutExtension))}).");
     }
 

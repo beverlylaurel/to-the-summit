@@ -43,9 +43,14 @@ Material:
     m_Floats:
     - _BumpScale: 1
     - _Cutoff: 0.5
-    - _RoughnessScale: 1
+    - _MacroScale: 4.692157
+    - _MacroStrength: 0.045
+    - _MaterialSeed: 5.4174714
+    - _RoughnessScale: 1.01
+    - _RoughnessVariation: 0.06
+    - _ThirdPhaseStrength: 0.34
     m_Colors:
-    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BaseColor: {r: 0.985, g: 1.02, b: 0.975, a: 1}
     - _DetileOffset: {r: 4.73, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

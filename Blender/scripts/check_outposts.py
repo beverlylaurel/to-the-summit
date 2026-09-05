@@ -218,6 +218,14 @@ def check_file(name):
 
     out["insan_olcegi"] = _human_scale_issues(name, objs, BB)
 
+    # A-frame'in tomruk kalkanlari parca parca ve yuvarlaktir; manifold birer
+    # obje olmalari bina kabugunun isik sizdirmadigi anlamina gelmez. Kayitli
+    # modelde iki ic ruzgar tahtasi yoksa bunu yeniden acik kabul et.
+    out["kabuk_eksigi"] = []
+    if name == "Outpost_Trapper":
+        required = ("Trap_GableBackingF", "Trap_GableBackingB")
+        out["kabuk_eksigi"] = [part for part in required if part not in BB]
+
     out["cakisik"] = _coplanar_pairs(objs)[:5]
 
     # CATIYI DELEN parca: yapisal parcalarin birbirine gecmesi normaldir
@@ -308,7 +316,8 @@ def check_all(verbose=True):
             if any(t.values()):
                 bad.append("topo %s" % t)
             for k in ("malzemesiz", "uvsiz", "olcekli", "ters_normal",
-                      "eksik_doku", "havada", "cati_delen", "insan_olcegi"):
+                      "eksik_doku", "havada", "cati_delen", "insan_olcegi",
+                      "kabuk_eksigi"):
                 if r[k]:
                     bad.append("%s=%s" % (k, r[k]))
             if r["cakisik"]:

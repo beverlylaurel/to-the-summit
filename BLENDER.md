@@ -852,3 +852,25 @@ UV1 adalari yaklasik 1,5 piksel aralikli oldugu icin tint ve roughness/metallic
 bake payi 1 pikseldir. Birbirinden ilgisiz renk adalarinin mip seviyelerinde
 karismamasi icin bu iki dusuk frekansli atlas Unity'de mipmap kullanmaz; taban,
 normal ve karolu roughness dokulari mipmap kullanmaya devam eder.
+
+Bir parcanin manifold olmasi, bina kabugunun kapali oldugunu kanitlamaz. Yuvarlak
+tomrukla egimli cati gibi yalniz teget duran parcalar arasindaki milimetrik aralik,
+uzaktan ic mekani gosteren bir yariga donusebilir. Dis silueti sisirmek yerine ic
+yuze ince ve surekli bir ruzgar tahtasi konur; kapi ve pencere bosluklari bu ikinci
+kabukta da acik birakilir. Avci Siginagi icin on ve arka kalkan tahtalari kayitli
+model denetiminin zorunlu parcasidir.
+
+FBX yalniz **ithal kaynak**, `Assets/Prefabs/Outposts` altindaki prefab ise oyuna
+yerlestirilen varliktir. Sahne, test halkasi ve tanitim paftasi ham FBX'i dogrudan
+orneklendirmez. Bu ayrim collider, malzeme esleme ve ileride eklenecek davranislarin
+tek kaynaktan gelmesini saglar; Unity denetimi sahnedeki ham model prefablarini hata
+sayar.
+
+Unity'deki `Cabin/WeatheredLit` karolu albedo ve normal dokusunu ayni fazlarla
+karistirir. Renk tekrarini kirarken normalin baska bir damar veya tas izi gostermesine
+izin verilmez. Ucuncu faz malzemenin yonunu dondurmez; yalniz UV boyunca kayar. Metre
+olcekli ton ve puruz degisimi dusuk tutulur, asil kimlik UV1 yipranma atlasinda kalir.
+Her yapi ayni soguk dag paletinde cok kucuk bir renk kaymasi ve ayri bir karisim tohumu
+alir; ortak dunyaya ait kalir ama yan yana duran evler ayni kahve-gri yuzeye donusmez.
+Karolu 2K dokular egik cati ve dosemede ayrintiyi korumak icin trilinear ve 6x
+anisotropic filtrelenir; UV1 atlaslarinda bilinear, mipmapsiz yol korunur.

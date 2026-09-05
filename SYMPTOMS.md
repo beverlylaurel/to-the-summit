@@ -6089,6 +6089,38 @@ Mahzen ve avcı kapısı, istasyon kapısı, kule platformu ile merdiveni gerçe
 ölçeğine getirildi. `check_outposts.py` artık kullanılan modellerde geçit yüksekliği,
 kapı genişliği, açık platform net genişliği ve merdiven genişliğini de denetliyor.
 
+## Karakol yüzeyleri tekrarlı, kabuk aralıkları ışık sızdırıyor — ÇÖZÜLDÜ (2026-09-05)
+
+**Belirti:** Uzun duvarlarda aynı doku lekesi düzenli aralıklarla tekrar ediyor, renk izi
+ile normal kabartısı yer yer uyuşmuyor ve Avcı Sığınağı'nın yuvarlak kalkan tomrukları ile
+eğimli çatısı arasından iç mekan görülebiliyordu. Bazı yeniden ithallerde okunamaz bina
+mesh'inin vertex renklerine erişilmeye çalışıldığı için Unity konsolu da hata üretiyordu.
+
+**Sebep:** Shader iki albedo fazını harmanlarken normal haritasını yalnız ilk UV fazından
+okuyordu. Büyük ölçekli varyasyon ve yapı kimliği yoktu. Kalkan tomrukları ayrı ayrı temiz
+ve manifold olsa da bina kabuğu yalnız teğet birleşimlere dayanıyordu. Genel model import
+kuralı ise CPU kopyası kapalı bina mesh'lerinde gereksiz vertex renk temizliği yapıyordu.
+
+**Düzeltme:** Albedo ve normal aynı üç UV fazıyla eşlendi; düşük genlikli dünya uzayı ton ve
+pürüz varyasyonu ile yapı başına sabit tohum/renk profili eklendi. Ana 2K yüzey dokuları
+trilinear ve 6x anisotropic filtreye geçirildi. Avcı Sığınağı'nın ön ve arka kalkanına,
+kapıyı kapatmayan iç rüzgar tahtası eklendi ve kaydedilmiş model denetiminde zorunlu
+kılındı. Bina modeli vertex renk postprocess'inden çıkarıldı. Yedi `.blend` dosyası Blender
+üzerinden topoloji, UV, malzeme, ölçek, dolaşım ve kabuk açısından geçti; Unity'de sekiz
+oyun prefabı ham FBX kullanılmadan Play Mode'da kuruldu, shader/import/prefab denetimi ve
+konsol kontrolü temiz sonuç verdi.
+
+## Test paftasında silinmiş modeller ve ham FBX görünüyor — ÇÖZÜLDÜ (2026-09-05)
+
+**Sebep:** Diskteki eski pafta güncel varlık kümesini göstermiyordu. Ayrıca tanılama satırı
+ana kabinin oyun prefabını kullanmak yerine Cabin klasöründeki FBX'i ikinci kez ekliyordu;
+bu kopya collider ve prefab ayarlarını atlıyordu.
+
+**Düzeltme:** Satır ve pafta yalnız `Assets/Prefabs/Outposts` dizininden üretiliyor. Sahne
+denetimi artık `Assets/Models/Outposts` veya `Assets/Models/Cabin` altındaki ham model
+prefablarının en dış örneklerini reddediyor. Güncel pafta sekiz oyun prefabını içeriyor;
+silinen Adit, Collier ve Homestead kaynakları listede veya paftada yok.
+
 ## Yağmur halkalarının sonunda mavimsi sis sınırı görünüyor — ÇÖZÜLDÜ (2026-09-05)
 
 **Belirti:** Islak zemindeki damla çarpma halkaları belirli bir mesafede bitiyor; aynı

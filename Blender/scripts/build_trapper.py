@@ -181,6 +181,30 @@ def build(col):
                 segs.append(K.log("gl", (-xw, ycen, zc), (xw, ycen, zc), R_GLOG, 12, col))
         K.join("Trap_Gable%s" % tag, segs, col)
 
+    # Tomruklar ile egimli cati kenari birbirine yalnız teget kalirsa, milimetrik
+    # model toleransi uzaktan ic mekani gosteren parlak bir yariga donusur. Dis
+    # geometriyi sisirmek yerine kalkanin ic yuzune ince, surekli bir ruzgar
+    # tahtasi konur. On yuz kapi boslugunu korumak icin uc parcadir.
+    zbase = ZFLOOR - 0.015
+    xbase = max(0.0, (H - d_off() - zbase) / SLOPE)
+    xdoor = jamb_out - 0.010
+    zdoor = DOOR_TOP + 0.010
+    zpeak = gable_top(0.0) - 0.010
+    front_y0, front_y1 = 2 * R_GLOG + 0.052, 2 * R_GLOG + 0.072
+    back_y0, back_y1 = DEPTH - 2 * R_GLOG - 0.072, DEPTH - 2 * R_GLOG - 0.052
+
+    front = [
+        K.prism("gb", [(-xbase, zbase), (-xdoor, zbase),
+                         (-xdoor, gable_top(xdoor) - 0.010)], front_y0, front_y1, col),
+        K.prism("gb", [(xdoor, zbase), (xbase, zbase),
+                         (xdoor, gable_top(xdoor) - 0.010)], front_y0, front_y1, col),
+        K.prism("gb", [(-xdoor, zdoor), (xdoor, zdoor), (0.0, zpeak)],
+                front_y0, front_y1, col),
+    ]
+    K.join("Trap_GableBackingF", front, col)
+    K.prism("Trap_GableBackingB", [(-xbase, zbase), (xbase, zbase), (0.0, zpeak)],
+            back_y0, back_y1, col)
+
     # --- rake kusagi: mertegin ic yuzunde, kalkan boyunca. Yuvarlak tomrugun
     # ucu dik kesildigi icin 55 derecelik rakiyla arasinda ucgen bosluk kaliyor
     # ve disari isik siziyordu. Tomruk uclari bu kusaga dayanir.
@@ -261,6 +285,7 @@ LONG_AXIS = [
     ("Trap_Purlin", "Y"), ("Trap_Deck", "Y"), ("Trap_Shakes", "Z"),
     ("Trap_Sheathing", "Z"), ("Trap_Barge", "Z"), ("Trap_Gable", "X"),
     ("Trap_RakePlate", "Z"), ("Trap_RidgeBoard", "Y"), ("Trap_DoorJamb", "Z"),
+    ("Trap_GableBacking", "Z"),
     ("Trap_DoorLeaf", "Z"), ("Trap_DoorBrace", "X"), ("Trap_DoorHandle", "Y"),
     ("Trap_Flue_Riser", "Z"), ("Trap_Flue_Cap", "Z"), ("Trap_Flue_Flash", "X"),
 ]

@@ -2176,6 +2176,27 @@ görünmez oldu (`DECISIONS.md`).
 **`smallWaveCutoff` serbest bir sayı değil**, en ince ızgaranın Nyquist'idir: `l = 1/k_nyq`.
 Hücre boyuna bağlarsan diz kılcal tepenin altına düşer ve bandın yarısını keser.
 
+## Karakol model ve yüzey hattı (2026-09-05)
+
+`Blender/outposts` altındaki yedi `.blend` dosyası düzenlenebilir kaynak, karşılık gelen
+FBX'ler Unity ithal kaynağıdır. Oyun sahneleri ve test araçları yalnız
+`Assets/Prefabs/Outposts` altındaki sekiz oyun prefabını kullanır: yedi karakol ve ana
+kabin. `OutpostDiagnostics` sahnedeki ham FBX örneğini, eksik collider'ı ve eksik yüzey
+profilini hata sayar. `OutpostImportSetup` malzeme eşlemesini, doku import ayarlarını ve
+yapıya özgü yüzey profilini yeniden üretilebilir biçimde uygular.
+
+`Cabin/WeatheredLit`, karolu albedo ile normal haritasını aynı iki ana ve bir düşük
+ağırlıklı üçüncü UV fazında harmanlar. UV1 atlası büyük ölçekli yıpranma, roughness ve
+metal kimliğini taşır; dünya uzayındaki düşük genlikli makro gürültü yalnız uzun yüzey
+tekrarını kırar. Yapı başına sabit tohum ve aynı dağ paleti içindeki küçük renk kayması,
+evleri birbirinden ayırırken ortak çevre kimliğini korur. Karolu yüzey dokuları trilinear
+ve 6x anisotropic, UV1 tint/roughmetal atlasları bilinear ve mipmapsiz ithal edilir.
+
+Kaydedilmiş Blender kaynaklarının topoloji, malzeme, UV, insan ölçeği ve kabuk sürekliliği
+`Blender/scripts/check_outposts.py` ile denetlenir. Avcı Sığınağı'nın yuvarlak kalkan
+tomruklarının arkasındaki ince rüzgar tahtaları, kapı boşluğunu korurken çatı birleşiminden
+iç mekan ışığı sızmasını engeller.
+
 ## Ortak elde tutulan eşya ve etkileşim sistemi (2026-09-05)
 
 `HeldItemSystem`, oyuncuya bootstrap tarafından açıkça verilen `EquippableItem` listesinin

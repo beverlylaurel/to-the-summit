@@ -29,7 +29,7 @@ public class ModelImportRules : AssetPostprocessor
     /// Unity detects model reimport requirement when rules change via this version number.
     /// Without incrementing, files retain stale settings requiring manual "Reimport" which gets forgotten.
     /// Increment whenever rule logic changes.
-    public override uint GetVersion() => 5;
+    public override uint GetVersion() => 6;
 
     void OnPreprocessModel()
     {
@@ -106,7 +106,10 @@ public class ModelImportRules : AssetPostprocessor
     /// A zeroed stream closes this trap.
     void OnPostprocessModel(GameObject model)
     {
-        if (!InScope || IsCharacter) return;
+        // Buildings intentionally discard their CPU mesh copy after import. They do not use
+        // vertex colours, so touching that stream both wastes work and throws on unreadable FBX
+        // meshes. This clearing step belongs only to procedural props such as the bicycle.
+        if (!InScope || IsCharacter || IsBuilding) return;
 
         foreach (MeshFilter filter in model.GetComponentsInChildren<MeshFilter>())
         {
