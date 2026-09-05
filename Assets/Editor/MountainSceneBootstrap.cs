@@ -61,6 +61,7 @@ public static class MountainSceneBootstrap
     const string CloudWeatherPath = "Assets/Settings/CloudWeatherSettings.asset";
     const string SkyWeatherPath = "Assets/Settings/SkyWeatherSettings.asset";
     const string VintageDslrProfilePath = "Assets/Settings/VintageDslrProfile.asset";
+    const string PlayerViewMotionSettingsPath = "Assets/Settings/PlayerViewMotionSettings.asset";
     const string VintagePhotoShaderPath = "Assets/Shaders/VintagePhoto.shader";
     const string VintageCameraMaterialPath = "Assets/Settings/VintageCameraPlaceholder.mat";
     const string InconsolataRegularPath = "Assets/UI/Fonts/Inconsolata/Inconsolata-Regular.ttf";
@@ -392,6 +393,16 @@ public static class MountainSceneBootstrap
         }
         look.Bind(camera.transform.parent);
         EditorUtility.SetDirty(look);
+
+        var viewMotion = player.GetComponent<PlayerViewMotion>();
+        if (viewMotion == null)
+        {
+            viewMotion = player.gameObject.AddComponent<PlayerViewMotion>();
+            changed = true;
+        }
+        viewMotion.Bind(player, player.GetComponent<CharacterController>(), look, camera.transform,
+            LoadOrCreate<PlayerViewMotionSettings>(PlayerViewMotionSettingsPath));
+        EditorUtility.SetDirty(viewMotion);
 
         var flyer = player.GetComponent<FreeFlyMovement>();
         if (flyer == null)

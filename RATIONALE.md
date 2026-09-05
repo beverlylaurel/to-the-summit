@@ -3700,3 +3700,28 @@ yalnız saçılan radyansı belirliyor. Çıktı standart alfa ile bilinmeyen bu
 çıkarmak yerine pozitif fiziksel kontrast ekliyor; `FogPath` bu ek kontrastı görüş
 mesafesiyle söndürüyor. Böylece yakın yağmur siste bütünüyle yok olmuyor, uzak yağmur
 ise ayrı taneler olarak değil atmosferik perdeye karışarak kayboluyor.
+
+## Karakter kamerası: hareket hissi ufuktan değil bedenden gelir (2026-09-05)
+
+Birinci şahıs kamerada büyük periyodik bob, FOV pompalaması veya pitch salınımı hareketi
+güçlü gösterir fakat oyuncunun görsel ufkunu sürekli yeniden yönlendirir. Bu oyunda uzun
+yürüyüş ana eylem olduğu için aynı yöntem kısa bir aksiyon sahnesinden daha hızlı yorucu
+ve mide bulandırıcı olur. Görüş yönü bu nedenle `MouseLook`ta kalır; sunum katmanı yalnız
+kameranın milimetre ölçekli yerel konumunu ve derece altı roll'ünü değiştirir.
+
+Adım salınımının saati gerçek yatay mesafedir. Sabit frekans hızlanırken ayak ile görüntüyü
+ayırır; yalnız W/Shift durumunu okumak da çarpışma, karın hız çarpanı ve sudaki kısıtın
+etkisini görmez. `CharacterController.velocity` bütün bu sonuçları zaten taşıdığı için faz
+ondan ilerler. Koşu bir anda başka eğriye geçmez; stride ve genlik ayrı bir yumuşak ağırlıkla
+karışır.
+
+Fare ataleti ham piksel sayısından türetilmez. `MouseLook` kendi hassasiyetini uyguladıktan
+sonra tükettiği dereceyi paylaşır; `PlayerViewMotion` bunu açısal hıza çevirir. Böylece DPI
+ve kare süresi değişince efektin karakteri korunur. Hızlı dönüşte bile yaw geciktirilmez:
+nişan ile görüntü ayrılmaz, yalnız birkaç milimetrelik ters yanal kayma ve en fazla küçük
+bir roll kullanılır.
+
+Ölçüm testinde yürüme ofseti **1,17 cm**, hızlı dönüş roll'ü **0,12°**, iniş çökmesi
+**0,88 cm** çıktı. Ayar tavanları koşuda 2 cm düşey hareketin, toplam 0,4° roll'ün ve
+5 mm dönüş kaymasının altında tutuluyor. FOV değişimi özellikle yok; optik zoom ve fotoğraf
+önizlemesi kendi sistemlerinin tek sahibi olmaya devam ediyor.

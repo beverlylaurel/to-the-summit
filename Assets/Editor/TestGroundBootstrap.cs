@@ -17,6 +17,7 @@ public static class TestGroundBootstrap
 {
     const string ScenePath = "Assets/Scenes/TestGround.unity";
     const string MaterialPath = "Assets/Settings/TestGround.mat";
+    const string ViewMotionSettingsPath = "Assets/Settings/PlayerViewMotionSettings.asset";
 
     /// Arena side length (meters). 200 m: traversable by sprinting in 20 seconds,
     /// sufficient for scale perception without getting lost.
@@ -176,7 +177,19 @@ public static class TestGroundBootstrap
         camera.transform.SetParent(head.transform, false);
         camera.GetComponent<Camera>().farClipPlane = 600f;
 
-        player.AddComponent<MouseLook>().Bind(head.transform);
+        var look = player.AddComponent<MouseLook>();
+        look.Bind(head.transform);
+
+        var viewSettings = AssetDatabase.LoadAssetAtPath<PlayerViewMotionSettings>(
+            ViewMotionSettingsPath);
+        if (viewSettings == null)
+        {
+            viewSettings = ScriptableObject.CreateInstance<PlayerViewMotionSettings>();
+            AssetDatabase.CreateAsset(viewSettings, ViewMotionSettingsPath);
+        }
+        player.AddComponent<PlayerViewMotion>().Bind(
+            player.GetComponent<FirstPersonController>(), controller, look, camera.transform,
+            viewSettings);
 
         // Free fly movement starts disabled.
         var flyer = player.AddComponent<FreeFlyMovement>();

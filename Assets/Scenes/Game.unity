@@ -1935,6 +1935,7 @@ GameObject:
   - component: {fileID: 848219616}
   - component: {fileID: 848219622}
   - component: {fileID: 848219623}
+  - component: {fileID: 848219624}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1956,9 +1957,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FirstPersonController
   walkSpeed: 2.2
   sprintSpeed: 4
+  groundAcceleration: 11
+  groundDeceleration: 15
   airControl: 0.4
-  gravity: -20
-  jumpHeight: 1.1
+  jumpBufferSeconds: 0.12
+  coyoteSeconds: 0.1
+  gravity: -9.81
+  jumpHeight: 0.4
   slopeLimit: 45
   stepOffset: 0.4
 --- !u!143 &848219608
@@ -2076,7 +2081,7 @@ MonoBehaviour:
   walker: {fileID: 848219607}
   look: {fileID: 848219613}
   body: {fileID: 848219608}
-  cameraPivot: {fileID: 330585546}
+  cameraPivot: {fileID: 651637589}
   bike: {fileID: 1268737630}
   bikeInput: {fileID: 1268737629}
   seat: {x: 0.0005255652, y: 0.9146052, z: -0.29054448}
@@ -2339,6 +2344,23 @@ MonoBehaviour:
   mediumFont: {fileID: 12800000, guid: 1c8a20a45e595ff40a17608b8ad87a7d, type: 3}
   semiboldFont: {fileID: 12800000, guid: 6c9e5ca20db00e74db134254c415a10d, type: 3}
   iconSet: {fileID: 11400000, guid: 9dc83f6266528ba49b1a663081aff364, type: 2}
+--- !u!114 &848219624
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 848219606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aca29576dc265dd4b996a7e9eff6f79a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerViewMotion
+  movement: {fileID: 848219607}
+  body: {fileID: 848219608}
+  look: {fileID: 848219613}
+  view: {fileID: 330585546}
+  settings: {fileID: 11400000, guid: 1755e3968f92c814c8533612ee3d7439, type: 2}
 --- !u!1 &852782904
 GameObject:
   m_ObjectHideFlags: 0

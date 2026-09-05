@@ -311,7 +311,9 @@ public static class BikeBootstrap
         var rider = walker.GetComponent<BikeRider>();
         if (rider == null) rider = walker.gameObject.AddComponent<BikeRider>();
 
-        rider.Bind(walker, look, body, camera.transform, bike, input, seat);
+        // MouseLook owns pitch on the camera's parent pivot. Passing the camera child here
+        // made riding write pitch to a different transform and conflicted with view motion.
+        rider.Bind(walker, look, body, camera.transform.parent, bike, input, seat);
         EditorUtility.SetDirty(rider);
     }
 

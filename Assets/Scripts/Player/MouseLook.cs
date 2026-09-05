@@ -14,6 +14,10 @@ public class MouseLook : MonoBehaviour
 
     float pitch;
 
+    /// Angular input consumed this frame, in degrees. Camera presentation can respond to the
+    /// same physical turn without reading and interpreting raw device pixels a second time.
+    public Vector2 LastFrameDeltaDegrees { get; private set; }
+
     /// Temporarily blocked by full-screen interactions such as reviewing a photograph.
     /// The component remains enabled so its pitch state is not reconstructed mid-frame.
     public bool InputEnabled { get; set; } = true;
@@ -31,6 +35,8 @@ public class MouseLook : MonoBehaviour
 
     void Update()
     {
+        LastFrameDeltaDegrees = Vector2.zero;
+
         // While the cursor is free the input belongs to the UI, not the game
         if (!InputEnabled || Cursor.lockState != CursorLockMode.Locked) return;
 
@@ -38,6 +44,7 @@ public class MouseLook : MonoBehaviour
         if (mouse == null) return;
 
         Vector2 delta = mouse.delta.ReadValue() * sensitivity;
+        LastFrameDeltaDegrees = delta;
 
         transform.Rotate(Vector3.up, delta.x, Space.World);
 

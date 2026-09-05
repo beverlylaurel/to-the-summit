@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a3b0c73d175c8e743b982e94da4924d0, type: 3}
+  m_Name: PlayerViewMotionSettings
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerViewMotionSettings
+  walkStride: 1.7
+  walkVertical: 0.01
+  walkLateral: 0.006
+  walkRollDegrees: 0.08
+  sprintStride: 2.25
+  sprintVertical: 0.018
+  sprintLateral: 0.01
+  sprintRollDegrees: 0.14
+  fullTurnSpeedDegrees: 320
+  turnLateral: 0.0035
+  turnRollDegrees: 0.22
+  turnResponseSeconds: 0.09
+  turnReturnSeconds: 0.16
+  landingDip: 0.014
+  landingMinimumSpeed: 2.5
+  landingReturnSeconds: 0.18
+  movementFadeSeconds: 0.16
+  sprintBlendSeconds: 0.28
+  movingThreshold: 0.12

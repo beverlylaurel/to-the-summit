@@ -2025,6 +2025,29 @@ orada deniz birleştirilmiş bulutun üstüne biniyordu. Sıra tek yönlü: deni
 üstüne biner. Denizin shader'ında bulut dokusu yok, bulutun ışın yürüyüşünde deniz yok.
 
 
+## Oyuncu hareketi ve görüş hareketi (2026-09-05)
+
+`FirstPersonController` hedef hızı doğrudan yazmaz. Yerde hızlanma ve frenleme ayrı
+ivmelerle `MoveTowards` üzerinden ilerler; havada aynı yol `airControl` ile zayıflatılır.
+Girdi tam ekran etkileşime geçtiğinde yatay hız frenlenmeye devam eder. Zıplama, kenardan
+ayrıldıktan sonraki kısa toleransı ve yere değmeden hemen önce basılan kısa tamponu aynı
+controller içinde tutar.
+
+`MouseLook` yalnız gövde yaw'ını ve `CameraPivot` pitch'ini yazar. Tükettiği açısal fare
+hareketini derece olarak `PlayerViewMotion`a verir. `PlayerViewMotion` yalnız ana kameranın
+yerel konumu ile roll kanalını kullanır:
+
+- adım fazı zamandan değil `CharacterController.velocity` ile gidilen mesafeden ilerler;
+- yürüyüşten koşuya genlik ve stride yumuşak karışır;
+- sağa/sola hızlı bakış, birkaç milimetre yanal atalet ve derece altı ters roll üretir;
+- iniş yalnız düşey hız eşiği aşılırsa kısa bir aşağı tepki verir;
+- FOV, yaw ve pitch oynatılmaz; havada, giriş kapalıyken ve dururken hareket söner.
+
+Ayarların tek kaynağı `PlayerViewMotionSettings.asset`; ana sahne ve test sahnesi aynı
+asset'i okur. Bisiklet baş hareketini `CameraPivot` üzerinde tuttuğu için kamera çocuğunun
+hareket kanallarıyla çakışmaz. Sayısal regresyon testi `To The Summit/Player/Motion Test`.
+
+
 ## Oyuncu: suda derinlikle durur, su kenarında değil
 
 `SeaWadeLimit` → `FirstPersonController.LimitHorizontal`. Kontrolcü bir kısıt kancası
