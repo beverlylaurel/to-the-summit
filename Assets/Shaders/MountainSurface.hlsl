@@ -667,7 +667,14 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // normal. Keeping the impact slope while leaving the coarse material relief underneath
     // gives the ring a continuous reflective surface instead of burying it in bump noise.
     surface.rainFilmNormalWS = normalize(normalWS + float3(ringSlope.x, 0.0, ringSlope.y));
-    surface.rainFilm = (half)(rainFilm * ringVisibility
+    // The extra analytic-sky reflection exists to reveal the IMPACT SLOPE. Multiplying
+    // a broad, otherwise flat water film by ringVisibility painted the whole near field
+    // slightly blue, then stopped it at the detail LOD boundary like a mist wall. Wet
+    // material smoothness already represents the continuous film. Restrict this added
+    // reflection to pixels where a ring actually perturbs the normal; because ringSlope
+    // already carries the smooth resolvability fade, no second distance contour remains.
+    float ringResponse = smoothstep(0.002, 0.025, length(ringSlope));
+    surface.rainFilm = (half)(rainFilm * ringResponse
                             * step(0.001, _SurfaceRainIntensity));
     // Choose the dry material first, then put the rain film over it. The old
     // order applied wet rock and subsequently replaced it with DRY sand, so the

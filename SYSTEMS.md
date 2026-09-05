@@ -1640,6 +1640,13 @@ komşularını birlikte değerlendirir; halkanın desteği yarım hücreden önc
 iner. Böylece aynı dairesel normal iki tarafta da hesaplanır ve hücre kenarında kare olarak
 kesilmez. Uzakta 17 mm'lik tepe çözülemiyorsa komşuluk hesabı bütünüyle atlanır.
 
+**Görsel LOD yalnız darbe ayrıntısını söndürür.** Halka tam çözünürlüğünü piksel ayak izi
+17 mm'ye ulaşana kadar korur, sonra üç tepe genişliğine kadar `smoothstep` ile söner. Bu,
+eski iki genişlik sınırına göre zemindeki kullanılır mesafeyi yaklaşık yüzde 50 artırır.
+Analitik gök yansıması geniş bir yakın alan maskesine değil, yalnız hesaplanan darbe
+eğiminin büyüklüğüne bağlıdır. Sürekli ıslak film zaten materyalin smoothness yolundadır;
+ek yansımayı LOD maskesine bağlamak zeminde mavimsi bir mesafe sınırı oluşturur.
+
 **Hücre damlanın kimliği değildir.** Hücre yalnız aynı anda çizilebilecek olay bütçesini
 belirler. Her yaşam çevriminde olay sayacı merkezin hücre içindeki konumunu, yağış
 yoğunluğu sırasını ve darbe gücünü yeniden hash'ler. Önceki olay zaman kuyruğunda sıfıra

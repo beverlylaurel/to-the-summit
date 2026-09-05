@@ -77,11 +77,16 @@ float2 RainRingLocal(float2 posXZ, float2 cameraXZ)
     return posXZ - floor(cameraXZ / RAIN_RING_ORIGIN_STEP) * RAIN_RING_ORIGIN_STEP;
 }
 
-/// How much of the ring this pixel is allowed to see. Below one crest per two pixels the
-/// ring is noise, and drawing it there is the aliasing every other scale already fades out.
+/// How much of the ring this pixel is allowed to see. Full detail lasts until one pixel
+/// covers the 17 mm crest, then eases out over the next two crest widths. The old rational
+/// falloff ended at two widths and changed curvature abruptly enough to expose its contour
+/// on a grazing terrain plane. Three widths extends the useful ground range by 50 percent;
+/// the smooth derivative keeps the new limit from becoming another visible ring boundary.
 float RainRingResolvable(float pixelSize)
 {
-    return saturate(RAIN_RING_WIDTH * 4.0 / max(pixelSize * 2.0, 1e-5) - 1.0);
+    return 1.0 - smoothstep(RAIN_RING_WIDTH,
+                            RAIN_RING_WIDTH * 3.0,
+                            max(pixelSize, 1e-5));
 }
 
 /// The slope the rings add to a water surface. `time` is seconds; `intensity` is 0..1.

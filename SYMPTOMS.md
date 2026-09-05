@@ -6088,3 +6088,19 @@ oyuncu ile 0,70 m kapsül için işlevsel eşiklerin altındaydı.
 Mahzen ve avcı kapısı, istasyon kapısı, kule platformu ile merdiveni gerçek insan
 ölçeğine getirildi. `check_outposts.py` artık kullanılan modellerde geçit yüksekliği,
 kapı genişliği, açık platform net genişliği ve merdiven genişliğini de denetliyor.
+
+## Yağmur halkalarının sonunda mavimsi sis sınırı görünüyor — ÇÖZÜLDÜ (2026-09-05)
+
+**Belirti:** Islak zemindeki damla çarpma halkaları belirli bir mesafede bitiyor; aynı
+mesafede bütün zemini kesen hafif mavi, sis benzeri bir bant görülüyordu.
+
+**Sebep:** Çözünürlüğü düşen halka normalini kapatan `ringVisibility`, darbe yansımasının
+yanında bütün yakın alan su filmi yansımasını da çarpıyordu. Böylece tek tek halkalar
+yerine geniş bir gök rengi tabakası aynı LOD konturunda sona eriyordu.
+
+**Düzeltme:** Halka ayrıntısının tam–sıfır aralığı iki tepe genişliğinden üçe çıkarıldı
+ve rasyonel düşüş yerine yumuşak `smoothstep` kullanıldı; görülebilir darbe mesafesi
+yaklaşık yüzde 50 arttı. Ek `AirColor` yansıması artık mesafe maskesine değil yalnız
+gerçek `ringSlope` büyüklüğüne bağlı. Islak zeminin genel parlaklığı kendi smoothness
+yolunda kaldığı için uzakta renk perdesi oluşmuyor. `Rain Rendering Test` yeni mesafe ve
+yansıma ayrımı sözleşmeleriyle geçti; Play Mode yakın–uzak zemin karesinde mavi kontur yok.

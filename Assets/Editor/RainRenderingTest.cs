@@ -212,6 +212,13 @@ public static class RainRenderingTest
                                 && !terrainSource.Contains(
             "Shader.SetGlobalFloat(RainIntensityId, rainIntensity);");
         string sharedRings = File.ReadAllText("Assets/Shaders/RainRings.hlsl");
+        bool extendedSmoothRange = sharedRings.Contains("RAIN_RING_WIDTH * 3.0")
+                                && sharedRings.Contains("1.0 - smoothstep(RAIN_RING_WIDTH,");
+        bool noFilmLodBoundary = terrainShader.Contains(
+                                     "float ringResponse = smoothstep(0.002, 0.025, length(ringSlope));")
+                              && terrainShader.Contains("rainFilm * ringResponse")
+                              && !terrainShader.Contains(
+                                     "surface.rainFilm = (half)(rainFilm * ringVisibility");
         bool intensityControlsDensity = sharedRings.Contains("float eventRank =")
                                      && sharedRings.Contains("float eventWeight = smoothstep")
                                      && sharedRings.Contains("spatialSupport * eventWeight");
@@ -237,6 +244,10 @@ public static class RainRenderingTest
         report.AppendLine("  [" + Mark(drying) + "] configured drying half-life curve: "
                         + dryAfterTwoMinutes.ToString("F3"));
         report.AppendLine("  [" + Mark(filmGate) + "] wet-film gate does not square rain intensity");
+        report.AppendLine("  [" + Mark(extendedSmoothRange)
+                        + "] impact detail has a smooth three-crest render range");
+        report.AppendLine("  [" + Mark(noFilmLodBoundary)
+                        + "] analytic sky reflection follows impacts, not the LOD boundary");
         report.AppendLine("  [" + Mark(reflectiveFilm)
                         + "] resolvable ground rings reflect the shared sky through a water film");
         report.AppendLine("  [" + Mark(materialRainBinding)
@@ -248,7 +259,8 @@ public static class RainRenderingTest
         report.AppendLine("  [" + Mark(continuousCells)
                         + "] rings cross cell boundaries without square clipping");
         report.AppendLine("  [" + Mark(wetAfterMaterial) + "] rain film is applied after rock/sand selection");
-        return accumulation && drying && filmGate && reflectiveFilm && materialRainBinding
+        return accumulation && drying && filmGate && extendedSmoothRange && noFilmLodBoundary
+            && reflectiveFilm && materialRainBinding
             && intensityControlsDensity && temporalVariation && continuousCells && wetAfterMaterial;
     }
 
