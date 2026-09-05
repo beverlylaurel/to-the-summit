@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 40" width="144" height="40">
+  <title>To The Summit — İnce Üçlü kanonik ikon kaynak sayfası</title>
+  <desc>32 birimlik dört ana yol; orta katman yüzde 75, iç katman yüzde 56,25.</desc>
+  <rect width="144" height="40" fill="#151714"/>
+  <defs>
+    <style>
+      .outer,.middle,.inner{fill:none;stroke:#d0cbb8;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+      .outer{stroke-width:1;opacity:1}
+      .middle{stroke-width:.75;opacity:.55}
+      .inner{stroke-width:.625;opacity:.25}
+    </style>
+    <path id="camera" d="M5 11h5l2-3h8l2 3h5v15H5z M11 18a5 5 0 1 0 10 0 5 5 0 0 0-10 0z"/>
+    <path id="pack" d="M7 12h18v15H7z M11 12V8h10v4 M11 18h10v5H11z M4 16v8 M28 16v8"/>
+    <path id="temperature" d="M14 4h4v15a6 6 0 1 1-4 0z M16 9h6 M16 14h4"/>
+    <path id="summit" d="M2 27 12 9l5 9 4-7 9 16z M8 27l5-10 4 7 4-8 6 11"/>
+  </defs>
+
+  <g id="icon-camera" transform="translate(4 4)">
+    <use href="#camera" class="outer"/>
+    <use href="#camera" class="middle" transform="translate(16 16) scale(.75) translate(-16 -16)"/>
+    <use href="#camera" class="inner" transform="translate(16 16) scale(.5625) translate(-16 -16)"/>
+  </g>
+  <g id="icon-pack" transform="translate(40 4)">
+    <use href="#pack" class="outer"/>
+    <use href="#pack" class="middle" transform="translate(16 16) scale(.75) translate(-16 -16)"/>
+    <use href="#pack" class="inner" transform="translate(16 16) scale(.5625) translate(-16 -16)"/>
+  </g>
+  <g id="icon-temperature" transform="translate(76 4)">
+    <use href="#temperature" class="outer"/>
+    <use href="#temperature" class="middle" transform="translate(16 16) scale(.75) translate(-16 -16)"/>
+    <use href="#temperature" class="inner" transform="translate(16 16) scale(.5625) translate(-16 -16)"/>
+  </g>
+  <g id="icon-summit" transform="translate(112 4)">
+    <use href="#summit" class="outer"/>
+    <use href="#summit" class="middle" transform="translate(16 16) scale(.75) translate(-16 -16)"/>
+    <use href="#summit" class="inner" transform="translate(16 16) scale(.5625) translate(-16 -16)"/>
+  </g>
+</svg>

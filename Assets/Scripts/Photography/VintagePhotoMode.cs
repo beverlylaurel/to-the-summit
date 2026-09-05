@@ -39,6 +39,10 @@ public sealed class VintagePhotoMode : MonoBehaviour
     [SerializeField] Renderer placeholder;
     [SerializeField] MouseLook mouseLook;
     [SerializeField] FirstPersonController movement;
+    [SerializeField] Font regularFont;
+    [SerializeField] Font mediumFont;
+    [SerializeField] Font semiboldFont;
+    [SerializeField] ThinTripleIconSet iconSet;
 
     Mode mode;
     Mode galleryReturnMode = Mode.Equipped;
@@ -61,10 +65,7 @@ public sealed class VintagePhotoMode : MonoBehaviour
     string notice;
     float noticeUntil;
 
-    [NonSerialized] GUIStyle hudStyle;
-    [NonSerialized] GUIStyle smallStyle;
-    [NonSerialized] GUIStyle centerStyle;
-    [NonSerialized] GUIStyle galleryStyle;
+    [NonSerialized] VintagePhotoHud hud;
 
     public bool IsEquipped => mode != Mode.Hidden;
     public bool IsCapturing => capturing;
@@ -93,7 +94,8 @@ public sealed class VintagePhotoMode : MonoBehaviour
 
     public void Bind(VintageDslrProfile cameraProfile, Shader photoShader, VintagePhotoPreviewFeature liveFeature, Camera playerCamera,
                      Camera hdrCaptureCamera, Renderer cameraPlaceholder, MouseLook look,
-                     FirstPersonController controller)
+                     FirstPersonController controller, Font uiRegularFont, Font uiMediumFont,
+                     Font uiSemiboldFont, ThinTripleIconSet uiIconSet)
     {
         previewFeature = liveFeature;
         profile = cameraProfile;
@@ -103,6 +105,11 @@ public sealed class VintagePhotoMode : MonoBehaviour
         placeholder = cameraPlaceholder;
         mouseLook = look;
         movement = controller;
+        regularFont = uiRegularFont;
+        mediumFont = uiMediumFont;
+        semiboldFont = uiSemiboldFont;
+        iconSet = uiIconSet;
+        hud = null;
 
         if (Application.isPlaying) Initialize();
     }
@@ -112,7 +119,8 @@ public sealed class VintagePhotoMode : MonoBehaviour
     void Initialize()
     {
         if (profile == null || processingShader == null || previewFeature == null || viewCamera == null
-            || captureCamera == null || placeholder == null || mouseLook == null || movement == null)
+            || captureCamera == null || placeholder == null || mouseLook == null || movement == null
+            || regularFont == null || mediumFont == null || semiboldFont == null || iconSet == null)
             throw new InvalidOperationException($"{nameof(VintagePhotoMode)}: dependencies are not assigned.");
 
         // Unity objects retain a managed wrapper after native destruction when domain
@@ -304,7 +312,7 @@ public sealed class VintagePhotoMode : MonoBehaviour
         if (preview != null)
         {
             preview.Enabled = mode == Mode.Viewfinder && (!capturing || !preview.Ready);
-            Rect frame = FitRect(3f / 2f, 0.82f);
+            Rect frame = VintagePhotoHud.GetViewfinderFrame(out _);
             preview.Crop = new Vector4(frame.width / Screen.width, frame.height / Screen.height,
                 frame.x / Screen.width, frame.y / Screen.height);
         }
@@ -460,7 +468,7 @@ public sealed class VintagePhotoMode : MonoBehaviour
 
         float halfFov = viewCamera.fieldOfView * Mathf.Deg2Rad * 0.5f;
         captureCamera.fieldOfView = 2f * Mathf.Atan(
-            Mathf.Tan(halfFov) * FitRect(3f / 2f, 0.82f).height
+            Mathf.Tan(halfFov) * VintagePhotoHud.GetViewfinderFrame(out _).height
             / Screen.height) * Mathf.Rad2Deg;
         captureCamera.depth = viewCamera.depth + 1f;
         captureCamera.allowHDR = true;
@@ -592,174 +600,36 @@ public sealed class VintagePhotoMode : MonoBehaviour
     {
         if (mode == Mode.Hidden || profile == null) return;
         GUI.depth = -100;
-        EnsureStyles();
+        hud ??= new VintagePhotoHud(regularFont, mediumFont, semiboldFont, iconSet);
 
-        if (mode == Mode.Viewfinder) DrawViewfinder();
-        else if (mode == Mode.Review) DrawPhoto("ÖN İZLEME  ·  2 sn");
-        else if (mode == Mode.Gallery) DrawGallery();
-        else GUI.Label(new Rect(0f, Screen.height - 55f, Screen.width, 40f),
-            "KAMERA  ·  Sağ tık: vizör  ·  G: fotoğraflar  ·  4: kaldır", centerStyle);
-
-        if (!string.IsNullOrEmpty(notice))
-            GUI.Label(new Rect(0f, 24f, Screen.width, 40f), notice, centerStyle);
-    }
-
-    void DrawViewfinder()
-    {
-        Rect frame = FitRect(3f / 2f, 0.82f);
-        DrawOutsideMask(frame, 1f);
-        GUI.DrawTexture(frame, preview != null && preview.Ready ? preview.Image : Texture2D.blackTexture,
-            ScaleMode.StretchToFill, false);
-        Color etched = new Color(0.91f, 0.86f, 0.72f, 0.48f);
-        DrawOutline(frame, new Color(0.19f, 0.17f, 0.13f), 2f);
-
-        // A quiet etched focusing screen: concentric arcs and a split-image centre.
-        float radius = Mathf.Clamp(frame.height * 0.055f, 20f, 42f);
-        DrawFocusRing(frame.center, radius, etched);
-        DrawFocusRing(frame.center, radius * 0.82f,
-            new Color(0.91f, 0.86f, 0.72f, 0.2f));
-        DrawLine(frame.center + Vector2.left * radius * 0.72f,
-            frame.center + Vector2.right * radius * 0.72f, etched);
-
-        float footerHeight = Screen.height - frame.yMax;
-        float meterY = frame.yMax + footerHeight * 0.12f;
-        hudStyle.fontSize = Mathf.Max(9, Mathf.FloorToInt(Mathf.Min(18f, footerHeight * 0.23f, frame.width / 44f)));
-        smallStyle.fontSize = Mathf.Max(8, Mathf.FloorToInt(Mathf.Min(14f, footerHeight * 0.19f, Screen.width / 65f)));
-        float tickSpacing = Mathf.Min(18f, frame.width / 30f);
-        for (int i = -9; i <= 9; i++)
+        if (mode == Mode.Viewfinder)
         {
-            float x = frame.center.x + i * tickSpacing;
-            DrawLine(new Vector2(x, meterY), new Vector2(x,
-                meterY + (i % 3 == 0 ? 9f : 4f)), etched);
+            float shutter = Mathf.Clamp(profile.referenceShutterSeconds
+                * (preview?.Exposure ?? 1f), 1f / 4000f, 30f);
+            int remaining = Mathf.Max(0, profile.cardCapacity - library.Count);
+            string ev = exposureCompensation >= 0f
+                ? $"+{exposureCompensation:0.0}" : exposureCompensation.ToString("0.0");
+            string shutterText = shutter < 1f
+                ? $"1/{Mathf.RoundToInt(1f / shutter)}" : $"{shutter:0.0} sn";
+            hud.DrawViewfinder(preview?.Image, preview?.Ready ?? false, capturing,
+                profile.aperture, shutterText, profile.iso, ev, zoom, remaining);
         }
-        float needleX = frame.center.x + exposureCompensation * 3f * tickSpacing;
-        DrawLine(new Vector2(needleX, meterY - 6f), new Vector2(needleX, meterY + 10f),
-            new Color(0.94f, 0.66f, 0.29f));
-
-        float shutter = Mathf.Clamp(profile.referenceShutterSeconds * (preview?.Exposure ?? 1f), 1f / 4000f, 30f);
-        int remaining = Mathf.Max(0, profile.cardCapacity - library.Count);
-        string ev = exposureCompensation >= 0f
-            ? $"+{exposureCompensation:0.0}" : exposureCompensation.ToString("0.0");
-        string shutterText = shutter < 1f ? $"1/{Mathf.RoundToInt(1f / shutter)}" : $"{shutter:0.0} sn";
-        string status = capturing ? "KAYDEDİLİYOR…" :
-            $"Av   f/{profile.aperture:0.#}   {shutterText}   "
-            + $"ISO {profile.iso}   EV {ev}   [{remaining}]";
-        GUI.Label(new Rect(frame.x, frame.yMax + footerHeight * 0.30f, frame.width, footerHeight * 0.30f),
-            status + $"   {zoom:0.0}×", hudStyle);
-        GUI.Label(new Rect(4f, frame.yMax + footerHeight * 0.65f, Screen.width - 8f, footerHeight * 0.30f),
-            "Sol tık: çek  ·  Tekerlek: zoom  ·  Q/E: poz telafisi  ·  G: fotoğraflar  ·  Sağ tık: çık",
-            smallStyle);
-    }
-
-    void DrawGallery()
-    {
-        DrawPhoto($"FOTOĞRAFLAR  ·  {galleryIndex + 1}/{library.Count}");
-        if (library.Count > 0)
+        else if (mode == Mode.Review)
         {
-            string name = Path.GetFileName(library.Files[galleryIndex]);
-            GUI.Label(new Rect(0f, Screen.height - 82f, Screen.width, 28f), name, smallStyle);
+            hud.DrawReview(displayedPhoto);
         }
-        GUI.Label(new Rect(0f, Screen.height - 52f, Screen.width, 34f),
-            "A/D veya ←/→: gezin  ·  G/Sağ tık: kapat", centerStyle);
-    }
-
-    void DrawPhoto(string heading)
-    {
-        Color previous = GUI.color;
-        GUI.color = Color.black;
-        GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
-        GUI.color = Color.white;
-        if (displayedPhoto != null)
-            GUI.DrawTexture(FitRect(3f / 2f, 0.88f), displayedPhoto, ScaleMode.ScaleToFit, false);
-        GUI.Label(new Rect(0f, 15f, Screen.width, 36f), heading, galleryStyle);
-        GUI.color = previous;
-    }
-
-    static Rect FitRect(float aspect, float heightShare)
-    {
-        float height = Screen.height * heightShare;
-        float width = height * aspect;
-        if (width > Screen.width * 0.96f)
+        else if (mode == Mode.Gallery)
         {
-            width = Screen.width * 0.96f;
-            height = width / aspect;
+            string fileName = library.Count > 0
+                ? Path.GetFileName(library.Files[galleryIndex]) : string.Empty;
+            hud.DrawGallery(displayedPhoto, fileName, galleryIndex, library.Count);
         }
-        return new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f,
-            width, height);
-    }
-
-    static void DrawOutsideMask(Rect frame, float alpha)
-    {
-        Color previous = GUI.color;
-        GUI.color = new Color(0f, 0f, 0f, alpha);
-        GUI.DrawTexture(new Rect(0f, 0f, Screen.width, frame.y), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(0f, frame.yMax, Screen.width, Screen.height - frame.yMax),
-            Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(0f, frame.y, frame.x, frame.height), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(frame.xMax, frame.y, Screen.width - frame.xMax, frame.height),
-            Texture2D.whiteTexture);
-        GUI.color = previous;
-    }
-
-    static void DrawFocusRing(Vector2 center, float radius, Color color)
-    {
-        const int segments = 64;
-        for (int i = 0; i < segments; i++)
+        else
         {
-            float a = i * Mathf.PI * 2f / segments;
-            float b = (i + 1) * Mathf.PI * 2f / segments;
-            DrawLine(center + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * radius,
-                center + new Vector2(Mathf.Cos(b), Mathf.Sin(b)) * radius, color);
+            int remaining = Mathf.Max(0, profile.cardCapacity - library.Count);
+            hud.DrawEquipped(remaining);
         }
-    }
 
-    static void DrawLine(Vector2 from, Vector2 to, Color color)
-    {
-        Matrix4x4 matrix = GUI.matrix;
-        Color previous = GUI.color;
-        GUI.color = color;
-        Vector2 delta = to - from;
-        GUIUtility.RotateAroundPivot(Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg, from);
-        GUI.DrawTexture(new Rect(from.x, from.y, delta.magnitude, 1f), Texture2D.whiteTexture);
-        GUI.matrix = matrix;
-        GUI.color = previous;
-    }
-
-    static void DrawOutline(Rect rect, Color color, float thickness)
-    {
-        Color previous = GUI.color;
-        GUI.color = color;
-        GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, thickness), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(rect.x, rect.yMax - thickness, rect.width, thickness),
-            Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(rect.x, rect.y, thickness, rect.height), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(rect.xMax - thickness, rect.y, thickness, rect.height),
-            Texture2D.whiteTexture);
-        GUI.color = previous;
-    }
-
-    void EnsureStyles()
-    {
-        hudStyle ??= new GUIStyle(GUI.skin.label)
-        {
-            alignment = TextAnchor.MiddleCenter,
-            fontSize = 18,
-            fontStyle = FontStyle.Bold,
-            normal = { textColor = new Color(0.89f, 0.68f, 0.36f) }
-        };
-        smallStyle ??= new GUIStyle(GUI.skin.label)
-        {
-            alignment = TextAnchor.MiddleCenter,
-            fontSize = 14,
-            normal = { textColor = new Color(0.82f, 0.82f, 0.78f) }
-        };
-        centerStyle ??= new GUIStyle(GUI.skin.label)
-        {
-            alignment = TextAnchor.MiddleCenter,
-            fontSize = 18,
-            fontStyle = FontStyle.Bold,
-            normal = { textColor = Color.white }
-        };
-        galleryStyle ??= new GUIStyle(centerStyle) { fontSize = 20 };
+        hud.DrawNotice(notice);
     }
 }

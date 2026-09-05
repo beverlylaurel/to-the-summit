@@ -99,6 +99,9 @@ koddur. Belge ile kod çelişirse kod ölçülür ve ilgili belge düzeltilir.
 Her görevde bütün belgeler okunmaz. Önce görevle ilgili olan seçilir:
 
 - `DESIGN.md`: oynanış, anlatı, yapı veya ton değişikliği
+- `ICONS.md`: ikon çizmek, değiştirmek veya arayüzde ikon kullanımını belirlemek
+- `TYPOGRAPHY.md`: arayüz yazısı, font varlığı, metin hiyerarşisi veya ikon–metin düzeni
+- `UI.md`: arayüz paneli, zemin, kontur, opaklık, ortak yüzey veya Saplı Kart kullanımı
 - `SYSTEMS.md`: sistemler arası bağ ekleme, kaldırma veya değiştirme
 - `RATIONALE.md`: önemli teknik karar, ölçüm, reddedilen yaklaşım veya kural gerekçesi
 - `SYMPTOMS.md`: daha önce görülmüş belirti; yeni kayıt yalnız ölçülmüş kök neden

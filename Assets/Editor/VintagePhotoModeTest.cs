@@ -8,6 +8,13 @@ public static class VintagePhotoModeTest
     const string ProfilePath = "Assets/Settings/VintageDslrProfile.asset";
     const string ShaderPath = "Assets/Shaders/VintagePhoto.shader";
     const string SourcePath = "Assets/Scripts/Photography/VintagePhotoMode.cs";
+    const string RegularFontPath = "Assets/UI/Fonts/Inconsolata/Inconsolata-Regular.ttf";
+    const string MediumFontPath = "Assets/UI/Fonts/Inconsolata/Inconsolata-Medium.ttf";
+    const string SemiboldFontPath = "Assets/UI/Fonts/Inconsolata/Inconsolata-SemiBold.ttf";
+    const string IconSetPath = "Assets/UI/Icons/ThinTriple/ThinTripleIconSet.asset";
+    const string HudSourcePath = "Assets/Scripts/Photography/UI/VintagePhotoHud.cs";
+    const string IconSourcePath = "Assets/Scripts/UI/Icons/ThinTripleIconSet.cs";
+    const string RainGlassSourcePath = "Assets/Scripts/UI/Style/RainGlassUi.cs";
 
     [MenuItem("To The Summit/Photography/System Test", false, 70)]
     static void RunMenu() => Debug.Log(Run(out _));
@@ -45,9 +52,40 @@ public static class VintagePhotoModeTest
                         && source.Contains("WriteMetadata")
                         && source.Contains("VintagePhotoLibrary");
 
+        Font regularFont = AssetDatabase.LoadAssetAtPath<Font>(RegularFontPath);
+        Font mediumFont = AssetDatabase.LoadAssetAtPath<Font>(MediumFontPath);
+        Font semiboldFont = AssetDatabase.LoadAssetAtPath<Font>(SemiboldFontPath);
+        ThinTripleIconSet iconSet = AssetDatabase.LoadAssetAtPath<ThinTripleIconSet>(IconSetPath);
+        ThinTripleIconSet.Icon cameraIcon = iconSet != null
+            ? iconSet.Get(ThinTripleIconId.Camera) : null;
+        bool iconTiers = cameraIcon != null
+                      && cameraIcon.small != null && cameraIcon.small.width == 20
+                      && cameraIcon.medium != null && cameraIcon.medium.width == 32
+                      && cameraIcon.large != null && cameraIcon.large.width == 48;
+        string hudSource = File.ReadAllText(HudSourcePath);
+        string iconSource = File.ReadAllText(IconSourcePath);
+        string rainGlassSource = File.ReadAllText(RainGlassSourcePath);
+        bool uiSource = source.Contains("VintagePhotoHud")
+                     && hudSource.Contains("DrawCameraReadout")
+                     && hudSource.Contains("DrawControls")
+                     && hudSource.Contains("RainGlassUi.DrawSurface")
+                     && hudSource.Contains("DrawEquipped(int remaining)")
+                     && iconSource.Contains("ThinTripleIconId")
+                     && rainGlassSource.Contains("public static class RainGlassUi")
+                     && rainGlassSource.Contains("BorderSoft")
+                     && !source.Contains("DrawThinTripleIcon");
+
         VintagePhotoMode mode = Object.FindAnyObjectByType<VintagePhotoMode>(FindObjectsInactive.Include);
-        bool scene = mode != null && new SerializedObject(mode)
-            .FindProperty("previewFeature").objectReferenceValue != null;
+        var serializedMode = mode != null ? new SerializedObject(mode) : null;
+        bool scene = serializedMode != null
+                  && serializedMode.FindProperty("previewFeature").objectReferenceValue != null;
+        bool typography = regularFont != null && mediumFont != null && semiboldFont != null
+                       && iconSet != null && iconTiers
+                       && serializedMode != null
+                       && serializedMode.FindProperty("regularFont").objectReferenceValue == regularFont
+                       && serializedMode.FindProperty("mediumFont").objectReferenceValue == mediumFont
+                       && serializedMode.FindProperty("semiboldFont").objectReferenceValue == semiboldFont
+                       && serializedMode.FindProperty("iconSet").objectReferenceValue == iconSet;
 
         report.AppendLine($"  [{Mark(profileValid)}] 1944x1296 capture, 3888x2592 output, live metering profile");
         report.AppendLine($"  [{Mark(shaderValid)}] processing shader imported and supported");
@@ -58,11 +96,13 @@ public static class VintagePhotoModeTest
         report.AppendLine($"  [{Mark(noScreenshot)}] scene-linear HDR capture bypasses gameplay post processing");
         report.AppendLine($"  [{Mark(persistence)}] JPEG and metadata are persisted");
         report.AppendLine($"  [{Mark(scene)}] photo mode is bound in Game scene");
+        report.AppendLine($"  [{Mark(typography)}] Inconsolata and native 20/32/48 px icon tiers are bound");
+        report.AppendLine($"  [{Mark(uiSource)}] camera HUD uses shared Rain Glass and icon layers");
 
         report.AppendLine($"  [{Mark(liveShader)}] linear meter, live exposure and focus zero/active controls");
 
         ok = profileValid && shaderValid && shaderBlit && sensor && controls
-          && noScreenshot && persistence && scene && liveShader;
+          && noScreenshot && persistence && scene && typography && uiSource && liveShader;
         report.AppendLine(ok ? "RESULT: PASSED" : "RESULT: FAILED");
         return report.ToString();
     }

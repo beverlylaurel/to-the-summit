@@ -63,6 +63,10 @@ public static class MountainSceneBootstrap
     const string VintageDslrProfilePath = "Assets/Settings/VintageDslrProfile.asset";
     const string VintagePhotoShaderPath = "Assets/Shaders/VintagePhoto.shader";
     const string VintageCameraMaterialPath = "Assets/Settings/VintageCameraPlaceholder.mat";
+    const string InconsolataRegularPath = "Assets/UI/Fonts/Inconsolata/Inconsolata-Regular.ttf";
+    const string InconsolataMediumPath = "Assets/UI/Fonts/Inconsolata/Inconsolata-Medium.ttf";
+    const string InconsolataSemiboldPath = "Assets/UI/Fonts/Inconsolata/Inconsolata-SemiBold.ttf";
+    const string ThinTripleIconSetPath = "Assets/UI/Icons/ThinTriple/ThinTripleIconSet.asset";
     const string MoonLightName = "Moon Light";
 
     /// Volume where `EnsureCloudVolume` writes volumetric cloud component.
@@ -1176,8 +1180,15 @@ public static class MountainSceneBootstrap
             changed = true;
         }
 
+        Font regularFont = AssetDatabase.LoadAssetAtPath<Font>(InconsolataRegularPath);
+        Font mediumFont = AssetDatabase.LoadAssetAtPath<Font>(InconsolataMediumPath);
+        Font semiboldFont = AssetDatabase.LoadAssetAtPath<Font>(InconsolataSemiboldPath);
+        ThinTripleIconSet iconSet = AssetDatabase.LoadAssetAtPath<ThinTripleIconSet>(ThinTripleIconSetPath);
+        if (regularFont == null || mediumFont == null || semiboldFont == null || iconSet == null)
+            throw new System.InvalidOperationException("UI font or Thin Triple icon assets are missing.");
+
         photoMode.Bind(profile, shader, liveFeature, viewCamera, captureCamera, placeholder,
-            player.GetComponent<MouseLook>(), player);
+            player.GetComponent<MouseLook>(), player, regularFont, mediumFont, semiboldFont, iconSet);
         EditorUtility.SetDirty(photoMode);
         EditorUtility.SetDirty(captureCamera);
         EditorUtility.SetDirty(placeholder);

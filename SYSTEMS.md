@@ -2077,6 +2077,21 @@ Hızlı iki yönlü zoom'da şiddet yükselir, lens durunca sıfıra iner. Şidd
 kamera eldeyken galeriye girer, `A/D` veya ok tuşları kayıtlar arasında gezer.
 Geçici model vizörde ve çekimde gizlenir.
 
+Vizör arayüzü, bootstrap tarafından açıkça bağlanan yerel Inconsolata Regular, Medium ve
+SemiBold font varlıklarını kullanır. `VintagePhotoHud`, sunumu fotoğraf çekim mantığından
+ayırır. Diyafram, enstantane, duyarlılık, poz telafisi ve zoom göstergeleri ikonlarıyla birlikte
+3:2 kadrajın içinde durur; tuş ve fare kontrolleri kadrajın dışındaki güvenli şeritte kalır.
+Bu ayrım düşük ekran yüksekliklerinde taşmayı önler. İkonlar ortak `ThinTripleIconSet`
+varlığından gelir ve `ThinTripleIconRenderer` tarafından `ICONS.md` boyut kademelerine göre
+çizilir; hiçbir özellik kendi ikon yolunun kopyasını taşımaz.
+
+Panel çizimi ortak `Assets/Scripts/UI/Style/RainGlassUi.cs` katmanından gelir. Kamera
+vizöründeki ölçüm yüzeyi, üst durum kartları, dış kontrol yüzeyi, bildirim ve galeri
+başlığı aynı Yağmur Camı renk/kontur/opaklık tokenlarını kullanır. Kamera eldeyken ortak
+Saplı Kart kalıbı eşya kimliğini eylemlerden ayırır. Başka bir elde tutulan eşya kendi
+panel renklerini veya kontur yordamını üretmez; `UI.md` sözleşmesini ve bu ortak katmanı
+kullanır.
+
 `VintagePhotoPreviewFeature`, yalnız açıkça kayıtlı ana kameranın HDR rengini oyun
 post-process'inden önce alır. Atmosfer, bulutlar ve yağış tamamlanmıştır. Görüntünün
 3:2 kadrajı kalıcı düşük çözünürlüklü bir tamponda tutulur; ikinci dünya render'ı yoktur.

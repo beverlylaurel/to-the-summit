@@ -135,7 +135,38 @@ an oyun ölümü **ödül** olarak sunmuş olur; ucuz versiyon budur.
 
 Kural: oyun sonları **notlandırmaz**. Olan şey olur.
 
-## 7. Bekleyen — karar verilmedi
+## 7. Arayüz ikonları: ölçeğe uyarlanan İnce Üçlü
+
+Oyunun genel ikon dili **İnce Üçlü**dür: ince gravür hassasiyeti ile topoğrafik iç
+katmanlar birleşir. Dil kamera moduna özel değildir; HUD, envanter, etkileşim istemleri,
+galeri ve ayarlarda aynıdır.
+
+İkon kimliği katmanlı konturdur fakat ayrıntı ölçeğe göre azalır. Böylece parlak kar,
+sis ve hareketli kamera üzerinde okunurluk estetiğin önüne geçmez. Çizim, ölçek, yasaklar
+ve kabul kurallarının otoritesi `ICONS.md`'dir.
+
+## 8. Arayüz tipografisi: Inconsolata
+
+Oyunun genel arayüz yazı ailesi **Inconsolata**dır. Monospace ritmi ölçüm ve kamera
+verilerini kararlı tutar; teknik fakat gösterişsiz karakteri İnce Üçlü ikon diliyle
+aynı sistemde çalışır. Bu karar dünya içindeki el yazısı ve basılı nesneleri kapsamaz.
+
+Ağırlık, hiyerarşi, Türkçe glif, sayı ve ikon hizalama kurallarının otoritesi
+`TYPOGRAPHY.md`'dir.
+
+## 9. Arayüz yüzeyi: Yağmur Camı
+
+Oyunun ortak panel dili **Yağmur Camı**dır: çevreyi hafifçe gösteren soğuk koyu cam,
+ince açık dış kontur, silik iç kontur ve kırık beyaz içerik. Bu dil kamera moduna özel
+değildir; elde tutulan eşya istemleri, HUD, galeri, envanter ve ayarlar aynı yüzey
+sisteminden türetilir.
+
+Yağmur Camı dekoratif yağmur çizgisi ya da hareketli damla kullanmaz. Ad, yüzeyin
+saydam ve soğuk karakterini tarif eder. Büyük kesintisiz siyah barlar yerine yalnız
+bilginin ihtiyaç duyduğu kadar alan kaplayan parçalar kullanılır. Panel sözleşmesinin
+otoritesi `UI.md`'dir.
+
+## 10. Bekleyen — karar verilmedi
 
 - **"Otur" her yerde mi?** Yolun herhangi bir yerinde oturup koşuyu bitirme eylemi.
   *Gerekçesi:* şu an oyuncunun hiçbir kararı yok — ya devam eder ya dağ onu öldürür,

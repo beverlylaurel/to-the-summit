@@ -12,10 +12,12 @@ iş bitince buradan silinir.**
 
 ## Kayıtlar
 
-79 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
+81 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
 
 - [İz gövdesi damgalar arası yolu SÜPÜRMÜYOR — KAPANDI (2026-08-25)](#iz-govdesi-damgalar-arasi-yolu-supurmuyor-kapandi-2026-08-25)
 - [Fotoğraf modu: ayrı HDR çekim ve gerçek JPEG (2026-09-04)](#fotograf-modu-ayri-hdr-cekim-ve-gercek-jpeg-2026-09-04)
+- [Genel ikon dili: ölçeğe uyarlanan İnce Üçlü (2026-09-05)](#genel-ikon-dili-olcege-uyarlanan-ince-uclu-2026-09-05)
+- [Genel arayüz fontu: Inconsolata (2026-09-05)](#genel-arayuz-fontu-inconsolata-2026-09-05)
 - [Ova kontrastı düzeltilmiyor — irtifadan geliyor](#ova-kontrasti-duzeltilmiyor-irtifadan-geliyor)
 - [Oyun alanı 17.5 → 30 km, ve yalıtım halkası](#oyun-alani-175-30-km-ve-yalitim-halkasi)
 - [Silinecek geçiciler](#silinecek-geciciler)
@@ -2763,3 +2765,46 @@ renk sonrasında uygulanır; eski geçici DOF volume/profiline gerek kalmadı.
 Kontrol: canlı görüntü ve hemen ardından kaydedilen JPEG 96×64'e indirildiğinde
 ortalama mutlak RGB farkı yaklaşık 0,004 bulundu. Bu bir karelik karşılaştırmadır;
 yağışın hareketi, sensör örneklemesi ve JPEG kaybı nedeniyle sıfır fark hedeflenmez.
+
+## Genel ikon dili: ölçeğe uyarlanan İnce Üçlü (2026-09-05)
+
+**Karar:** Fotoğraf modu dahil oyunun bütün arayüzlerinde ortak ikon dili **İnce Üçlü**.
+İnce gravürün hassas dış çizgisi, ana silüeti takip eden topoğrafik iç konturlarla
+birleşir. Stil bir efekt değil çizim sistemidir.
+
+Üç kontur küçük boyuta zorlanmaz. Küçük ikon tek, orta ikon çift, yeterince büyük ikon
+üç kontur kullanır. Bunun nedeni parlak kar ve hareketli kamera üzerinde eşit üç ince
+çizginin birleşip bulanık, titreşen bir lekeye dönüşmesidir. Ayrıntı azaltıldığında ana
+silüet ve sistem kimliği korunur.
+
+İkon dışında dekoratif çizgi, ölçüm çentiği, tarama veya anlamsız teknik işaret bulunmaz.
+Yeni ikonların üretim ve kabul sözleşmesi `ICONS.md`'dedir; sonraki ikon çalışmaları bu
+dosya okunmadan yapılmaz.
+
+## Genel arayüz fontu: Inconsolata (2026-09-05)
+
+**Karar:** Kamera modu dahil oyunun bütün arayüzlerinde temel yazı ailesi
+**Inconsolata**dır. Teknik monospace ritmi değişen sayısal değerleri sabit tutar ve İnce
+Üçlü ikonların ince, katmanlı çizgileriyle rekabet etmez.
+
+Seçim dünya içindeki el yazısı, basılı belge ve mezar taşı gibi diegetik metinleri
+kapsamaz. Arayüzde sahte kalın/italik kullanılmaz; gerçek Regular, Medium ve SemiBold
+ağırlıkları kullanılır. Türkçe karakter kapsamı, sayı yazımı, hiyerarşi ve ikon hizalama
+sözleşmesi `TYPOGRAPHY.md`'dedir.
+
+## Genel arayüz yüzeyi: Yağmur Camı ve Saplı Kart (2026-09-05)
+
+**Karar:** Oyunun ortak panel dili **Yağmur Camı**dır. Soğuk koyu yarı saydam zemin,
+ince açık dış kontur, silik iç kontur, kısa koyu gölge ve kırık beyaz içerik kullanılır.
+Kamera bu sistemin ilk runtime uygulamasıdır; HUD, galeri, envanter ve diğer arayüzler
+aynı tokenlardan türeyecektir.
+
+Elde tutulan eşya tanıtımının ortak kalıbı **Saplı Kart**tır. Eşya kimliği üst kartta,
+mevcut eylemler alt sırada ve ikisi kısa dikey bağla ilişkilidir. Yerleşim ile yüzey dili
+ayrı kararlardır: farklı ekranlar farklı düzen kurabilir fakat yeni renk, kontur ve panel
+opaklığı icat etmez.
+
+Yağmur Camı adı hareketli yağmur süslemesi anlamına gelmez. Damla, akıntı, tarama,
+glow ve canlı vurgu renkleri reddedildi; bunlar okunurluğu düşürür ve İnce Üçlü ikonların
+hassas çizgileriyle yarışır. Uygulama ve kabul sözleşmesi `UI.md`, runtime token otoritesi
+`Assets/Scripts/UI/Style/RainGlassUi.cs` dosyasıdır.

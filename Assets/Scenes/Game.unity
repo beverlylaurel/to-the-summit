@@ -2335,6 +2335,10 @@ MonoBehaviour:
   placeholder: {fileID: 1277213491}
   mouseLook: {fileID: 848219613}
   movement: {fileID: 848219607}
+  regularFont: {fileID: 12800000, guid: cb9e2d7ede4c9124d9120105876a6ad3, type: 3}
+  mediumFont: {fileID: 12800000, guid: 1c8a20a45e595ff40a17608b8ad87a7d, type: 3}
+  semiboldFont: {fileID: 12800000, guid: 6c9e5ca20db00e74db134254c415a10d, type: 3}
+  iconSet: {fileID: 11400000, guid: 9dc83f6266528ba49b1a663081aff364, type: 2}
 --- !u!1 &852782904
 GameObject:
   m_ObjectHideFlags: 0
