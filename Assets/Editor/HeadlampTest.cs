@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
@@ -29,7 +28,7 @@ public static class HeadlampTest
                    && settings.hotspotOuterAngle < settings.spillOuterAngle
                    && settings.hotspotInnerAngle < settings.hotspotOuterAngle
                    && settings.spillInnerAngle < settings.spillOuterAngle
-                   && settings.switchResponseSeconds <= 0.1f;
+                   && settings.colorTemperatureKelvin <= 4500f;
         bool hierarchy = controller != null && camera != null && mount != null
                       && mount.parent == camera.transform
                       && hotspot != null && hotspot.transform.parent == mount
@@ -41,26 +40,23 @@ public static class HeadlampTest
                    && hotspot.shadows == LightShadows.Soft
                    && spill.shadows == LightShadows.None;
 
-        MethodInfo step = typeof(HeadlampController).GetMethod(
-            "StepLevel", BindingFlags.Static | BindingFlags.NonPublic);
-        float sixty = 0f;
-        float thirty = 0f;
-        if (step != null && settings != null)
-        {
-            for (int i = 0; i < 60; i++)
-                sixty = (float)step.Invoke(null,
-                    new object[] { sixty, 1f, settings.switchResponseSeconds, 1f / 60f });
-            for (int i = 0; i < 30; i++)
-                thirty = (float)step.Invoke(null,
-                    new object[] { thirty, 1f, settings.switchResponseSeconds, 1f / 30f });
-        }
-        bool response = step != null && sixty > 0.999f && Mathf.Abs(sixty - thirty) < 0.0001f;
+        controller?.SetOn(true);
+        bool switchOn = hotspot != null && spill != null
+                     && hotspot.enabled && spill.enabled
+                     && settings != null
+                     && Mathf.Approximately(hotspot.intensity, settings.hotspotLumens)
+                     && Mathf.Approximately(spill.intensity, settings.spillLumens);
+        controller?.SetOn(false);
+        bool switching = switchOn && hotspot != null && spill != null
+                      && !hotspot.enabled && !spill.enabled
+                      && Mathf.Approximately(hotspot.intensity, 0f)
+                      && Mathf.Approximately(spill.intensity, 0f);
 
         report.AppendLine($"  [{Mark(tuning)}] output is restrained and beam angles form hotspot plus spill");
         report.AppendLine($"  [{Mark(hierarchy)}] mount inherits the rendered camera's head and gait motion");
         report.AppendLine($"  [{Mark(optics)}] physical lumen units, color temperature and one soft shadow cone are active");
-        report.AppendLine($"  [{Mark(response)}] switch response is smooth and frame-rate independent");
-        ok = tuning && hierarchy && optics && response;
+        report.AppendLine($"  [{Mark(switching)}] LED output switches fully within the input frame");
+        ok = tuning && hierarchy && optics && switching;
         report.AppendLine(ok ? "RESULT: PASSED" : "RESULT: FAILED");
         return report.ToString();
     }

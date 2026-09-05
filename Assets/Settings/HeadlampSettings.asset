@@ -14,15 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HeadlampSettings
   mountOffset: {x: 0, y: 0.065, z: 0.045}
   mountEulerAngles: {x: 2.5, y: 0, z: 0}
-  colorTemperatureKelvin: 5000
-  switchResponseSeconds: 0.065
+  colorTemperatureKelvin: 4000
   startsOn: 0
-  hotspotLumens: 320
+  hotspotLumens: 220
   hotspotRange: 68
   hotspotOuterAngle: 42
   hotspotInnerAngle: 25
   hotspotShadowStrength: 0.82
-  spillLumens: 120
+  spillLumens: 80
   spillRange: 26
   spillOuterAngle: 84
   spillInnerAngle: 58

@@ -17,12 +17,10 @@ public sealed class HeadlampController : MonoBehaviour
     [SerializeField] Light hotspot;
     [SerializeField] Light spill;
 
-    float level;
     bool isOn;
     bool started;
 
     public bool IsOn => isOn;
-    public float OutputLevel => level;
 
     public void Bind(HeadlampSettings sharedSettings, Transform lampMount,
                      Light focusedBeam, Light peripheralSpill)
@@ -42,15 +40,13 @@ public sealed class HeadlampController : MonoBehaviour
         ValidateDependencies();
         ApplyConfiguration();
         started = true;
-        isOn = settings.startsOn;
-        level = isOn ? 1f : 0f;
-        SetLightOutput(level, isOn);
+        SetOn(settings.startsOn);
     }
 
     void OnEnable()
     {
         if (!Application.isPlaying || !started) return;
-        SetLightOutput(level, level > 0.001f || isOn);
+        SetLightOutput(isOn ? 1f : 0f, isOn);
     }
 
     void OnDisable()
@@ -74,30 +70,10 @@ public sealed class HeadlampController : MonoBehaviour
             SetOn(!isOn);
     }
 
-    void LateUpdate()
-    {
-        if (!started || settings == null) return;
-
-        float target = isOn ? 1f : 0f;
-        level = StepLevel(level, target, settings.switchResponseSeconds, Time.deltaTime);
-        if (Mathf.Abs(level - target) < 0.001f) level = target;
-        SetLightOutput(level, level > 0.001f || isOn);
-    }
-
     public void SetOn(bool value)
     {
         isOn = value;
-        if (value)
-        {
-            if (hotspot != null) hotspot.enabled = true;
-            if (spill != null) spill.enabled = true;
-        }
-    }
-
-    static float StepLevel(float current, float target, float responseSeconds, float deltaTime)
-    {
-        float tau = Mathf.Max(0.005f, responseSeconds);
-        return Mathf.Lerp(current, target, 1f - Mathf.Exp(-Mathf.Max(0f, deltaTime) / tau));
+        SetLightOutput(value ? 1f : 0f, value);
     }
 
     void ApplyConfiguration()

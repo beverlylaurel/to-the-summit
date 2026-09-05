@@ -3755,8 +3755,10 @@ mevcut, ölçülmüş ve derece altı görüş hareketini birebir taşır. Daha 
 aynı monta bağlanabilir.
 
 Tek, eşit yoğunluklu spot yapay bir projektör lekesi veriyor. Gerçek dış mekân kafa
-fenerlerindeki odak ve taşma iki fiziksel spotla ayrıldı. Toplam çıkış 440 lümen; dar odak
-68 metreye erişip yumuşak gölge üretirken geniş dolgu 26 metrede söner ve gölge üretmez.
+fenerlerindeki odak ve taşma iki fiziksel spotla ayrıldı. Toplam çıkış 300 lümen ve renk
+sıcaklığı karlı/sisli arazide daha rahat ayrım veren nötr-sıcak 4000 K; dar odak 68 metreye
+erişip yumuşak gölge üretirken geniş dolgu 26 metrede söner ve gölge üretmez. LED sürücüsü
+oyuncunun algılayacağı bir ısınma süresi taşımadığı için tuş işlendiği karede tam çıkışa geçer.
 Temiz havada kaynaktan yüzeye uzanan parlak bir koni çizilmedi: böyle bir koni ışığın kendisi
 değil, havadaki parçacık saçılımıdır. Hacimsel sis ek ışıkları fiziksel olarak örneklediğinde
 bu görünüm sis yoğunluğundan türetilmeli.

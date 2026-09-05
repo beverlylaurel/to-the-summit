@@ -2065,7 +2065,7 @@ tanımlanır; yalnız odak ışığı yumuşak gölge üretir.
 `Headlamp Mount`, `Main Camera`nın çocuğudur. Böylece `CameraPivot`ın kafa yönünü ve
 `PlayerViewMotion`ın yürüyüş, koşu, dönüş, iniş ve basamak hareketini aynı dönüşüm zincirinden
 devralır. Fener için ikinci bir gürültü veya salınım üretilmez; huzme görüntüden bağımsız
-kayamaz. Açılış/kapanış çok kısa, kare hızından bağımsız bir optik tepkiyle yumuşatılır.
+kayamaz. LED çıkışı tuşun işlendiği karede tam açılır veya kapanır.
 
 Ayarların tek kaynağı `HeadlampSettings.asset`; ana sahne ve test sahnesi aynı asset'i okur.
 Sayısal ve sahne bağı regresyon testi `To The Summit/Player/Headlamp Test`.
