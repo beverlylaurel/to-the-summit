@@ -75,9 +75,10 @@ public sealed class VintagePhotoHud
         float actionY = Screen.height - 68f;
         RainGlassUi.DrawStem(new Vector2(panel.x + 23f, panel.yMax),
             new Vector2(panel.x + 23f, actionY));
-        Rect viewfinder = PixelRect(safe, actionY, 132f, 34f);
-        Rect gallery = PixelRect(viewfinder.xMax + 7f, actionY, 103f, 34f);
-        Rect stow = PixelRect(gallery.xMax + 7f, actionY, 108f, 34f);
+        const float actionWidth = 120f;
+        Rect viewfinder = PixelRect(safe, actionY, actionWidth, 34f);
+        Rect gallery = PixelRect(viewfinder.xMax + 7f, actionY, actionWidth, 34f);
+        Rect stow = PixelRect(gallery.xMax + 7f, actionY, actionWidth, 34f);
         DrawHeldIconAction(viewfinder, ThinTripleIconId.MouseRight, "VİZÖR");
         DrawHeldKeyAction(gallery, "G", "GALERİ");
         DrawHeldKeyAction(stow, "4", "KALDIR");
