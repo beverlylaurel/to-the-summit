@@ -13,14 +13,23 @@ public class ModelImportRules : AssetPostprocessor
 {
     const string Root = "Assets/Models/";
     const string Character = Root + "ArcticExplorer/";
+    const string Cabin = Root + "Cabin/";
+    const string Outposts = Root + "Outposts/";
 
     bool InScope => assetPath.StartsWith(Root);
     bool IsCharacter => assetPath.StartsWith(Character);
+    bool IsCabin => assetPath.StartsWith(Cabin);
+    bool IsOutpost => assetPath.StartsWith(Outposts);
+
+    /// Cabin and outposts both carry normal maps and authored URP materials.
+    /// Their high-frequency surfaces stay tiled while a second UV channel carries
+    /// the low-frequency weathering atlases.
+    bool IsBuilding => IsCabin || IsOutpost;
 
     /// Unity detects model reimport requirement when rules change via this version number.
     /// Without incrementing, files retain stale settings requiring manual "Reimport" which gets forgotten.
     /// Increment whenever rule logic changes.
-    public override uint GetVersion() => 3;
+    public override uint GetVersion() => 5;
 
     void OnPreprocessModel()
     {
@@ -43,7 +52,19 @@ public class ModelImportRules : AssetPostprocessor
 
         // DO NOT import material from FBX. Embedded materials link to Standard shader,
         // rendering magenta in URP. Custom materials are assigned by the bootstrap script.
-        importer.materialImportMode = ModelImporterMaterialImportMode.None;
+        //
+        // CABIN IS THE EXCEPTION. It ships ten authored URP materials that are bound by
+        // name through the importer's remap table; with None the table is never consulted
+        // and every part falls back to the default Lit material.
+        importer.materialImportMode = IsBuilding
+            ? ModelImporterMaterialImportMode.ImportStandard
+            : ModelImporterMaterialImportMode.None;
+        if (IsBuilding)
+        {
+            importer.materialLocation = ModelImporterMaterialLocation.InPrefab;
+            importer.materialName = ModelImporterMaterialName.BasedOnMaterialName;
+            importer.materialSearch = ModelImporterMaterialSearch.Everywhere;
+        }
 
         importer.importCameras = false;
         importer.importLights = false;
@@ -51,13 +72,25 @@ public class ModelImportRules : AssetPostprocessor
 
         // Non-character models read from CPU: part measurement and zoning tools
         // access mesh data. Not needed on character, where readability keeps a duplicate mesh copy in memory.
-        importer.isReadable = !character;
+        // Cabin is measured in Blender, not at runtime, so it stays unreadable.
+        importer.isReadable = !character && !IsBuilding;
 
         // Tangents only necessary on models with normal maps. Bike surface is procedural
         // and three million triangles — tangent arrays are not free.
-        importer.importTangents = character
+        // Cabin carries normal maps on every wood and metal material; without tangents the
+        // surface reads perfectly flat.
+        importer.importTangents = (character || IsBuilding)
             ? ModelImporterTangents.CalculateMikk
             : ModelImporterTangents.None;
+
+        // Outposts carry a second UV set for tint, roughness, metallic and detile data.
+        // Unity must keep it or every surface samples the same atlas texel.
+        if (IsOutpost)
+        {
+            importer.secondaryUVAngleDistortion = 8;
+            importer.secondaryUVAreaDistortion = 15;
+            importer.generateSecondaryUV = false;
+        }
 
         // File scale arrives in meters; Unity's 0.01 default converted model to centimeters, shrinking to miniature.
         importer.useFileScale = true;

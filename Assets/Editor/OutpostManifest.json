@@ -1,0 +1,397 @@
+{
+  "items": [
+    {
+      "name": "Trapper",
+      "atlas": 2048,
+      "mats": [
+        {
+          "mat": "Trap_Bark",
+          "proc": false,
+          "tiling": 1.7999999523162842,
+          "detX": 0.0,
+          "detY": 4.730000019073486,
+          "baseTex": "pine_bark_diff_2k.jpg",
+          "nrmTex": "pine_bark_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Trap_Iron",
+          "proc": false,
+          "tiling": 3.0,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "rusty_metal_02_diff_2k.jpg",
+          "nrmTex": "rusty_metal_02_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Trap_Timber",
+          "proc": false,
+          "tiling": 1.6699999570846558,
+          "detX": 0.0,
+          "detY": 4.730000019073486,
+          "baseTex": "rough_wood_diff_2k.jpg",
+          "nrmTex": "rough_wood_nor_gl_2k.jpg"
+        }
+      ]
+    },
+    {
+      "name": "Cellar",
+      "atlas": 1024,
+      "mats": [
+        {
+          "mat": "Cell_Iron",
+          "proc": false,
+          "tiling": 3.4000000953674316,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "rusty_metal_02_diff_2k.jpg",
+          "nrmTex": "rusty_metal_02_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Cell_Stone",
+          "proc": false,
+          "tiling": 1.149999976158142,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "stacked_stone_wall_diff_2k.jpg",
+          "nrmTex": "stacked_stone_wall_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Cell_Timber",
+          "proc": false,
+          "tiling": 0.6200000047683716,
+          "detX": 0.0,
+          "detY": 4.730000019073486,
+          "baseTex": "rough_pine_door_diff_2k.jpg",
+          "nrmTex": "rough_pine_door_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Cell_Turf",
+          "proc": false,
+          "tiling": 1.5499999523162842,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "aerial_grass_rock_diff_2k.jpg",
+          "nrmTex": "aerial_grass_rock_nor_gl_2k.jpg"
+        }
+      ]
+    },
+    {
+      "name": "Shed",
+      "atlas": 1024,
+      "mats": [
+        {
+          "mat": "Shed_Frame",
+          "proc": false,
+          "tiling": 1.4500000476837158,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "wooden_planks_diff_2k.jpg",
+          "nrmTex": "wooden_planks_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Shed_Iron",
+          "proc": false,
+          "tiling": 2.1500000953674316,
+          "detX": 0.0,
+          "detY": 4.730000019073486,
+          "baseTex": "worn_corrugated_iron_diff_2k.jpg",
+          "nrmTex": "worn_corrugated_iron_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Shed_Lumber",
+          "proc": false,
+          "tiling": 1.2999999523162842,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "planks_brown_10_Diffuse.jpg",
+          "nrmTex": "planks_brown_10_nor_gl.jpg"
+        },
+        {
+          "mat": "Shed_Stone",
+          "proc": false,
+          "tiling": 2.200000047683716,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "stacked_stone_wall_diff_2k.jpg",
+          "nrmTex": "stacked_stone_wall_nor_gl_2k.jpg"
+        }
+      ]
+    },
+    {
+      "name": "Tower",
+      "atlas": 1024,
+      "mats": [
+        {
+          "mat": "Tow_Glass",
+          "proc": true,
+          "tiling": 1.0,
+          "detX": 0.0,
+          "detY": 0.0,
+          "baseTex": "",
+          "nrmTex": ""
+        },
+        {
+          "mat": "Tow_Metal",
+          "proc": false,
+          "tiling": 2.299999952316284,
+          "detX": 0.0,
+          "detY": 4.730000019073486,
+          "baseTex": "metal_grate_rusty_Diffuse.jpg",
+          "nrmTex": "metal_grate_rusty_nor_gl.jpg"
+        },
+        {
+          "mat": "Tow_Paint",
+          "proc": false,
+          "tiling": 1.2999999523162842,
+          "detX": 0.0,
+          "detY": 4.730000019073486,
+          "baseTex": "distressed_painted_planks_diff_2k.jpg",
+          "nrmTex": "distressed_painted_planks_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Tow_Roof",
+          "proc": false,
+          "tiling": 1.25,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "dark_planks_Diffuse.jpg",
+          "nrmTex": "dark_planks_nor_gl.jpg"
+        },
+        {
+          "mat": "Tow_Timber",
+          "proc": false,
+          "tiling": 1.5499999523162842,
+          "detX": 0.0,
+          "detY": 4.730000019073486,
+          "baseTex": "weathered_peeling_timber_diff_2k.jpg",
+          "nrmTex": "weathered_peeling_timber_nor_gl_2k.jpg"
+        }
+      ]
+    },
+    {
+      "name": "Homestead",
+      "atlas": 1024,
+      "mats": [
+        {
+          "mat": "Home_Board",
+          "proc": false,
+          "tiling": 1.2999999523162842,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "weathered_plank_siding_Diffuse.jpg",
+          "nrmTex": "weathered_plank_siding_nor_gl.jpg"
+        },
+        {
+          "mat": "Home_Logs",
+          "proc": false,
+          "tiling": 1.0499999523162842,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "beam_wall_01_diff_2k.jpg",
+          "nrmTex": "beam_wall_01_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Home_Slate",
+          "proc": false,
+          "tiling": 3.9000000953674316,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "roof_slates_03_diff_2k.jpg",
+          "nrmTex": "roof_slates_03_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Home_Stone",
+          "proc": false,
+          "tiling": 1.0499999523162842,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "rustic_stone_wall_02_diff_2k.jpg",
+          "nrmTex": "rustic_stone_wall_02_nor_gl_2k.jpg"
+        }
+      ]
+    },
+    {
+      "name": "Collier",
+      "atlas": 1024,
+      "mats": [
+        {
+          "mat": "Col_Char",
+          "proc": false,
+          "tiling": 5.800000190734863,
+          "detX": 0.0,
+          "detY": 4.730000019073486,
+          "baseTex": "forrest_ground_01_diff_2k.jpg",
+          "nrmTex": "forrest_ground_01_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Col_Earth",
+          "proc": false,
+          "tiling": 5.400000095367432,
+          "detX": 0.0,
+          "detY": 4.730000019073486,
+          "baseTex": "forrest_ground_01_diff_2k.jpg",
+          "nrmTex": "forrest_ground_01_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Col_Poles",
+          "proc": false,
+          "tiling": 2.299999952316284,
+          "detX": 0.0,
+          "detY": 4.730000019073486,
+          "baseTex": "bark_brown_02_diff_2k.jpg",
+          "nrmTex": "bark_brown_02_nor_gl_2k.jpg"
+        }
+      ]
+    },
+    {
+      "name": "Adit",
+      "atlas": 1024,
+      "mats": [
+        {
+          "mat": "Adit_Iron",
+          "proc": false,
+          "tiling": 2.5999999046325684,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "rusty_metal_02_diff_2k.jpg",
+          "nrmTex": "rusty_metal_02_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Adit_Rock_M",
+          "proc": false,
+          "tiling": 0.800000011920929,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "rock_04_diff_2k.jpg",
+          "nrmTex": "rock_04_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Adit_Spoil_M",
+          "proc": false,
+          "tiling": 2.5999999046325684,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "rock_04_diff_2k.jpg",
+          "nrmTex": "rock_04_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Adit_Timber",
+          "proc": false,
+          "tiling": 1.350000023841858,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "raw_plank_wall_diff_2k.jpg",
+          "nrmTex": "raw_plank_wall_nor_gl_2k.jpg"
+        }
+      ]
+    },
+    {
+      "name": "Station",
+      "atlas": 1024,
+      "mats": [
+        {
+          "mat": "Sta_Clad",
+          "proc": false,
+          "tiling": 1.100000023841858,
+          "detX": 0.0,
+          "detY": 4.730000019073486,
+          "baseTex": "container_side_diff_2k.jpg",
+          "nrmTex": "container_side_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Sta_Concrete",
+          "proc": false,
+          "tiling": 1.600000023841858,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "concrete_wall_007_diff_2k.jpg",
+          "nrmTex": "concrete_wall_007_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Sta_Steel",
+          "proc": false,
+          "tiling": 2.4000000953674316,
+          "detX": 0.0,
+          "detY": 4.730000019073486,
+          "baseTex": "metal_plate_02_diff_2k.jpg",
+          "nrmTex": "metal_plate_02_nor_gl_2k.jpg"
+        }
+      ]
+    },
+    {
+      "name": "Chapel",
+      "atlas": 1024,
+      "mats": [
+        {
+          "mat": "Chp_Metal",
+          "proc": false,
+          "tiling": 3.200000047683716,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "rusty_metal_02_diff_2k.jpg",
+          "nrmTex": "rusty_metal_02_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Chp_Plaster",
+          "proc": false,
+          "tiling": 1.149999976158142,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "plastered_stone_wall_diff_2k.jpg",
+          "nrmTex": "plastered_stone_wall_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Chp_Stone",
+          "proc": false,
+          "tiling": 1.5,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "rock_wall_05_diff_2k.jpg",
+          "nrmTex": "rock_wall_05_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Chp_Wood",
+          "proc": false,
+          "tiling": 1.5499999523162842,
+          "detX": 0.0,
+          "detY": 4.730000019073486,
+          "baseTex": "old_planks_02_diff_2k.jpg",
+          "nrmTex": "old_planks_02_nor_gl_2k.jpg"
+        }
+      ]
+    },
+    {
+      "name": "Mill",
+      "atlas": 1024,
+      "mats": [
+        {
+          "mat": "Mil_StoneM",
+          "proc": false,
+          "tiling": 1.100000023841858,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "rustic_stone_wall_diff_2k.jpg",
+          "nrmTex": "rustic_stone_wall_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Mil_Timber_M",
+          "proc": false,
+          "tiling": 1.399999976158142,
+          "detX": 4.730000019073486,
+          "detY": 0.0,
+          "baseTex": "brown_planks_07_diff_2k.jpg",
+          "nrmTex": "brown_planks_07_nor_gl_2k.jpg"
+        },
+        {
+          "mat": "Mil_WheelM",
+          "proc": false,
+          "tiling": 1.850000023841858,
+          "detX": 0.0,
+          "detY": 4.730000019073486,
+          "baseTex": "medieval_wood_diff_2k.jpg",
+          "nrmTex": "medieval_wood_nor_gl_2k.jpg"
+        }
+      ]
+    }
+  ]
+}
