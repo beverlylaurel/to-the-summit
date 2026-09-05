@@ -2808,3 +2808,7 @@ Yağmur Camı adı hareketli yağmur süslemesi anlamına gelmez. Damla, akınt�
 glow ve canlı vurgu renkleri reddedildi; bunlar okunurluğu düşürür ve İnce Üçlü ikonların
 hassas çizgileriyle yarışır. Uygulama ve kabul sözleşmesi `UI.md`, runtime token otoritesi
 `Assets/Scripts/UI/Style/RainGlassUi.cs` dosyasıdır.
+
+**Hareket kararı:** Ortak giriş ve çıkış **Kısa Soldan + Ağır Cam**dır. Grup 4 px
+soldan 220 ms'de sakin bir `smoothstep` eğrisiyle gelir; çıkış aynı yolu tersine izler.
+Ölçek sıçraması, glow, sekme, overshoot ve döngüsel hareket kullanılmaz.

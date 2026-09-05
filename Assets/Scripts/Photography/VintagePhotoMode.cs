@@ -598,15 +598,16 @@ public sealed class VintagePhotoMode : MonoBehaviour
 
     void OnGUI()
     {
-        if (mode == Mode.Hidden || profile == null) return;
+        if (profile == null) return;
         GUI.depth = -100;
         hud ??= new VintagePhotoHud(regularFont, mediumFont, semiboldFont, iconSet);
+        hud.SetHeldVisible(mode == Mode.Equipped);
+        int remaining = Mathf.Max(0, profile.cardCapacity - library.Count);
 
         if (mode == Mode.Viewfinder)
         {
             float shutter = Mathf.Clamp(profile.referenceShutterSeconds
                 * (preview?.Exposure ?? 1f), 1f / 4000f, 30f);
-            int remaining = Mathf.Max(0, profile.cardCapacity - library.Count);
             string ev = exposureCompensation >= 0f
                 ? $"+{exposureCompensation:0.0}" : exposureCompensation.ToString("0.0");
             string shutterText = shutter < 1f
@@ -624,11 +625,13 @@ public sealed class VintagePhotoMode : MonoBehaviour
                 ? Path.GetFileName(library.Files[galleryIndex]) : string.Empty;
             hud.DrawGallery(displayedPhoto, fileName, galleryIndex, library.Count);
         }
-        else
+        else if (mode == Mode.Equipped)
         {
-            int remaining = Mathf.Max(0, profile.cardCapacity - library.Count);
             hud.DrawEquipped(remaining);
         }
+
+        if (mode != Mode.Equipped && hud.HeldVisible)
+            hud.DrawEquipped(remaining);
 
         hud.DrawNotice(notice);
     }

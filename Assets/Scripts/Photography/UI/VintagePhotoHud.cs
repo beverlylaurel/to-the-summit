@@ -2,6 +2,9 @@ using UnityEngine;
 
 public sealed class VintagePhotoHud
 {
+    const float HeldTransitionSeconds = 0.22f;
+    const float HeldOffsetPixels = -4f;
+
     static readonly Color Ink = RainGlassUi.Ink;
     static readonly Color MutedInk = RainGlassUi.MutedInk;
     static readonly Color Rule = RainGlassUi.Border;
@@ -18,6 +21,12 @@ public sealed class VintagePhotoHud
     GUIStyle centeredStyle;
     GUIStyle heldNameStyle;
     GUIStyle heldMetaStyle;
+
+    bool heldTransitionInitialized;
+    bool heldTargetVisible;
+    float heldTransitionStartedAt;
+    float heldTransitionFrom;
+    float heldAmount;
 
     public VintagePhotoHud(Font regular, Font medium, Font semibold, ThinTripleIconSet iconSet)
     {
@@ -43,6 +52,34 @@ public sealed class VintagePhotoHud
         return frame;
     }
 
+    public bool HeldVisible
+    {
+        get
+        {
+            UpdateHeldTransition();
+            return heldTargetVisible || heldAmount > 0.001f;
+        }
+    }
+
+    public void SetHeldVisible(bool visible)
+    {
+        if (!heldTransitionInitialized)
+        {
+            heldTransitionInitialized = true;
+            heldTargetVisible = visible;
+            heldTransitionFrom = 0f;
+            heldAmount = 0f;
+            heldTransitionStartedAt = Time.unscaledTime;
+            return;
+        }
+
+        UpdateHeldTransition();
+        if (heldTargetVisible == visible) return;
+        heldTargetVisible = visible;
+        heldTransitionFrom = heldAmount;
+        heldTransitionStartedAt = Time.unscaledTime;
+    }
+
     public void DrawViewfinder(Texture preview, bool ready, bool capturing, float aperture,
         string shutter, int iso, string ev, float zoom, int remaining)
     {
@@ -62,7 +99,13 @@ public sealed class VintagePhotoHud
     public void DrawEquipped(int remaining)
     {
         EnsureStyles();
-        const float safe = 30f;
+        UpdateHeldTransition();
+        if (heldAmount <= 0.001f) return;
+
+        Color previousColor = GUI.color;
+        GUI.color = new Color(previousColor.r, previousColor.g, previousColor.b,
+            previousColor.a * heldAmount);
+        float safe = 30f + Mathf.Lerp(HeldOffsetPixels, 0f, heldAmount);
         Rect panel = PixelRect(safe, Screen.height - 138f, 232f, 52f);
         RainGlassUi.DrawSurface(panel, 0.54f);
         ThinTripleIconRenderer.Draw(icons, ThinTripleIconId.Camera,
@@ -82,6 +125,7 @@ public sealed class VintagePhotoHud
         DrawHeldIconAction(viewfinder, ThinTripleIconId.MouseRight, "VİZÖR");
         DrawHeldKeyAction(gallery, "G", "GALERİ");
         DrawHeldKeyAction(stow, "4", "KALDIR");
+        GUI.color = previousColor;
     }
 
     public void DrawReview(Texture photo) => DrawPhoto(photo, "ÖN İZLEME", "2 SN");
@@ -99,12 +143,16 @@ public sealed class VintagePhotoHud
                 filePanel.width - 24f, filePanel.height), fileName, labelStyle);
         }
 
-        const string controls = "A / D  GEZİN     G / SAĞ TIK  KAPAT";
-        float controlsWidth = centeredStyle.CalcSize(new GUIContent(controls)).x + 34f;
+        const float controlsWidth = 440f;
         Rect controlsPanel = PixelRect((Screen.width - controlsWidth) * 0.5f,
-            Screen.height - 48f, controlsWidth, 34f);
+            Screen.height - 58f, controlsWidth, 44f);
         RainGlassUi.DrawSurface(controlsPanel, 0.62f);
-        GUI.Label(controlsPanel, controls, centeredStyle);
+        DrawKeyControl(new Rect(controlsPanel.x, controlsPanel.y, 160f, controlsPanel.height),
+            "A / D", "GEZİN");
+        DrawKeyControl(new Rect(controlsPanel.x + 160f, controlsPanel.y, 126f, controlsPanel.height),
+            "G", "KAPAT");
+        DrawIconControl(new Rect(controlsPanel.x + 286f, controlsPanel.y,
+            controlsPanel.width - 286f, controlsPanel.height), ThinTripleIconId.MouseRight, "KAPAT");
     }
 
     public void DrawNotice(string text)
@@ -272,6 +320,15 @@ public sealed class VintagePhotoHud
         centeredStyle ??= Style(regularFont, 15, TextAnchor.MiddleCenter, Ink);
         heldNameStyle ??= Style(semiboldFont, 14, TextAnchor.MiddleLeft, Ink);
         heldMetaStyle ??= Style(regularFont, 12, TextAnchor.MiddleLeft, MutedInk);
+    }
+
+    void UpdateHeldTransition()
+    {
+        if (!heldTransitionInitialized) return;
+        float t = Mathf.Clamp01((Time.unscaledTime - heldTransitionStartedAt)
+            / HeldTransitionSeconds);
+        float eased = t * t * (3f - 2f * t);
+        heldAmount = Mathf.Lerp(heldTransitionFrom, heldTargetVisible ? 1f : 0f, eased);
     }
 
     static GUIStyle Style(Font font, int size, TextAnchor alignment, Color color) =>

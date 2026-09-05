@@ -52,11 +52,25 @@ bulunur. Kamera bu kalıbın ilk uygulamasıdır. Başka eşya yeni bir panel di
 
 ## Hareket
 
-- Panel belirişi 120–180 ms aralığında kısa bir opaklık ve en fazla 4 px konum geçişidir.
+- Ortak giriş/çıkış yönü **Kısa Soldan + Ağır Cam**dır: panel grubu 4 px soldan
+  yerine gelir ve çıkarken aynı yöne döner.
+- Geçiş 220 ms sürer. Opaklık ve konum aynı sakin `smoothstep` eğrisini kullanır.
+- Giriş ve çıkış birbirinin uzamsal tersidir; ayrı bir çıkış efekti icat edilmez.
 - Sürekli salınım, parıltı, nefes alma ve dikkat isteyen döngüsel animasyon yoktur.
 - Bilgi değişirken panel ölçüsü oynamaz; sayısal alanlar sabit kalır.
 - Kamera hareketi sırasında arayüz keskin kalır. Lens odak kaybı yalnız dünya görüntüsüne
   uygulanır.
+
+## Kısayol gösterimi
+
+- Klavye kısayolu düz cümle metni olarak yazılmaz. `G`, `4`, `Q / E` ve `A / D` gibi
+  girdiler her zaman ortak tuş rozeti içinde gösterilir; eylem adı rozetin yanında durur.
+- Fare düğmesi `SAĞ TIK`, `SOL TIK` veya benzeri düz metinle tarif edilmez. Karşılığı
+  olan İnce Üçlü fare ikonu kullanılır.
+- Bir eylemin iki girdisi varsa iki ayrı girdi–eylem çifti gösterilir. `G / SAĞ TIK
+  KAPAT` gibi metin içinde eğik çizgiyle birleştirilmez.
+- Tuş rozeti ve eylem adı optik olarak aynı satıra ortalanır; bütün rozetler kendi
+  grubunda aynı yüksekliği kullanır.
 
 ## Kabul kontrolü
 

@@ -65,6 +65,8 @@ yerine `ICONS.md` kurallarındaki küçük kademe ikon kullanılır veya düzen 
 - İkon ile ilk harf arasındaki boşluk küçük kullanımda en az 8 px, orta kullanımda en
   az 10 px olur.
 - İkonun katman çizgileriyle rekabet eden metin dış çizgisi, gölgesi veya glow kullanılmaz.
+- Klavye girdileri gövde metnine yazılmaz; ortak UI tuş rozeti içinde gösterilir.
+- Fare girdileri metinle adlandırılmaz; `ICONS.md` içindeki ilgili fare ikonu kullanılır.
 
 ## Renk ve zemin
 

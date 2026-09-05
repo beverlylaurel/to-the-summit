@@ -40,7 +40,7 @@ public static class RainGlassUi
     public static void Fill(Rect rect, Color color)
     {
         Color previous = GUI.color;
-        GUI.color = color;
+        GUI.color = Multiply(color, previous);
         GUI.DrawTexture(rect, Texture2D.whiteTexture);
         GUI.color = previous;
     }
@@ -55,6 +55,9 @@ public static class RainGlassUi
 
     public static Color WithAlpha(Color color, float alpha) =>
         new(color.r, color.g, color.b, alpha);
+
+    public static Color Multiply(Color color, Color tint) =>
+        new(color.r * tint.r, color.g * tint.g, color.b * tint.b, color.a * tint.a);
 
     public static Rect PixelRect(Rect rect) => PixelRect(rect.x, rect.y, rect.width, rect.height);
 
