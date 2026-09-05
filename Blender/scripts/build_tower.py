@@ -19,7 +19,7 @@ import outpost_kit as K
 BASE, TOPS = 2.20, 1.55        # ayak yari acikligi: tabanda / platformda
 ZP = 4.80                      # platform ust kotu
 DECK = 0.10
-CAT = 2.32                     # yurume yolu yari genisligi
+CAT = 2.68                     # korkuluk icinde 0.93 m net yurume yolu
 CAB = 1.70                     # kabin yari genisligi
 Z_CAB0 = ZP + DECK
 Z_EAVE = Z_CAB0 + 2.30
@@ -168,16 +168,16 @@ def build(col):
     # --- merdiven: -Y cephesinde dusey, platformdaki bosluga cikar
     lad = []
     for s in (1, -1):
-        lad.append(K.box("ld", (s * 0.32, -(CAT - 0.06), (Z_CAB0 - 0.02) * 0.5),
+        lad.append(K.box("ld", (s * 0.42, -(CAT - 0.06), (Z_CAB0 - 0.02) * 0.5),
                          (0.075, 0.055, Z_CAB0 - 0.02), col))
     z = 0.30
     while z < Z_CAB0 - 0.20:
-        lad.append(K.box("ld", (0, -(CAT - 0.06), z), (0.72, 0.045, 0.045), col))
+        lad.append(K.box("ld", (0, -(CAT - 0.06), z), (0.92, 0.045, 0.045), col))
         z += 0.30
     K.join("Tow_Ladder", lad, col)
 
-    # Dis kabugu tas pabuclar belirler: yurume yolundan 11 cm disari tasarlar.
-    ext = BASE + 0.23 + 0.005
+    # Genisletilen yurume yolu artik taban pabuclarindan disari tasar.
+    ext = max(BASE + 0.23, CAT) + 0.005
     return dict(envelope=(-ext, ext, -ext, ext))
 
 

@@ -13,6 +13,67 @@ using UnityEngine;
 /// culled from outside and shows its interior instead.
 public static class OutpostDiagnostics
 {
+    const string PrefabDirectory = "Assets/Prefabs/Outposts";
+    const string TextureDirectory = "Assets/Textures/Outposts";
+
+    [MenuItem("To The Summit/Outposts/Validate Assets")]
+    public static void ValidateAssets()
+    {
+        var failures = new List<string>();
+        var prefabPaths = AssetDatabase.FindAssets("t:Prefab", new[] { PrefabDirectory })
+            .Select(AssetDatabase.GUIDToAssetPath)
+            .Where(path => System.IO.Path.GetFileNameWithoutExtension(path).StartsWith("Outpost_"))
+            .OrderBy(path => path)
+            .ToList();
+
+        if (prefabPaths.Count != 11)
+            failures.Add($"11 outpost prefab bekleniyordu, {prefabPaths.Count} bulundu.");
+
+        foreach (string path in prefabPaths)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null)
+            {
+                failures.Add($"Prefab yuklenemedi: {path}");
+                continue;
+            }
+
+            var filters = prefab.GetComponentsInChildren<MeshFilter>(true)
+                .Where(filter => filter.sharedMesh != null).ToArray();
+            var colliders = prefab.GetComponentsInChildren<MeshCollider>(true)
+                .Where(collider => collider.sharedMesh != null).ToArray();
+            if (filters.Length == 0)
+                failures.Add($"Mesh bulunamadi: {path}");
+            if (colliders.Length < filters.Length)
+                failures.Add($"Collider eksik: {path} ({colliders.Length}/{filters.Length})");
+        }
+
+        foreach (string guid in AssetDatabase.FindAssets("t:Texture2D", new[] { TextureDirectory }))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            string name = System.IO.Path.GetFileNameWithoutExtension(path);
+            if (!name.EndsWith("_Tint") && !name.EndsWith("_RoughMetal"))
+                continue;
+
+            if (AssetImporter.GetAtPath(path) is TextureImporter importer && importer.mipmapEnabled)
+                failures.Add($"Atlas mipmap acik: {path}");
+        }
+
+        const string floorMaterialPath = "Assets/Materials/Cabin/weathered_planks.mat";
+        var floorMaterial = AssetDatabase.LoadAssetAtPath<Material>(floorMaterialPath);
+        if (floorMaterial == null || !floorMaterial.HasProperty("_RoughnessScale"))
+            failures.Add($"Kabin zemin roughness ayari bulunamadi: {floorMaterialPath}");
+        else if (floorMaterial.GetFloat("_RoughnessScale") < 1.15f)
+            failures.Add($"Kabin zemini fazla parlak: roughness {floorMaterial.GetFloat("_RoughnessScale"):0.00}");
+
+        if (failures.Count > 0)
+            throw new System.InvalidOperationException("Outpost asset denetimi basarisiz:\n- " +
+                                                       string.Join("\n- ", failures));
+
+        Debug.Log($"Outpost asset denetimi gecti: {prefabPaths.Count} prefab collider'li, " +
+                  "tint/roughness atlas mipmap'leri kapali ve kabin zemini dengeli.");
+    }
+
     [MenuItem("To The Summit/Outposts/Diagnose Import")]
     public static void Diagnose()
     {

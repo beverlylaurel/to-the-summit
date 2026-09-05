@@ -21,7 +21,7 @@ MY0, MY1 = 0.38, 4.20
 HM = 2.62          # tumsek tepe yuksekligi
 FACE_Y = 0.40      # cephe kalinligi
 FX = 2.20          # cephe yari genisligi
-OPEN_X, SPRING = 0.55, 1.35     # kemer acikligi ve kemer basi
+OPEN_X, SPRING = 0.55, 1.45     # 1.8 m kapsule ustte 20 cm gercek gecis payi
 VOUS = 0.22        # kemer bilezigi derinligi
 
 
@@ -61,15 +61,27 @@ def build(col):
     # --- giris cephesi. Kapi acikligi alt kenardan bir CENTIK oldugu icin
     # profil delikli degil, tek kapali poligon: K.prism yeterli.
     n = 12
-    prof = [(-FX, 0.0), (-OPEN_X, 0.0), (-OPEN_X, SPRING)]
-    for i in range(n + 1):                       # kemer icyuzu
+    # Kapi centigini tek bir konkav n-gon olarak kurmak FBX ucgenlemesinde
+    # kemerin boslugunu caprazlayan uzun bir tas ucgen uretiyordu. Oyunda bu
+    # ucgen toprak ortuyu delip gecen tek bir kaya gibi gorunuyordu. Cepheyi
+    # iki ayak ve kemerin ustundeki basit spandrel olarak bolmek ucgenlemeyi
+    # tek anlamli yapar.
+    facade = []
+    for s in (-1, 1):
+        xa, xb = (-FX, -OPEN_X) if s < 0 else (OPEN_X, FX)
+        prof = [(xa, 0.0), (xb, 0.0), (xb, face_top(xb)),
+                (xa, face_top(xa))]
+        facade.append(K.prism("fac", prof, 0.0, FACE_Y, col))
+    upper = []
+    for i in range(n + 1):
         a = math.pi - math.pi * i / n
-        prof.append((OPEN_X * math.cos(a), SPRING + OPEN_X * math.sin(a)))
-    prof += [(OPEN_X, 0.0), (FX, 0.0)]
-    for i in range(n * 2 + 1):                   # cephe tepesi
-        x = FX - 2 * FX * i / (n * 2)
-        prof.append((x, face_top(x)))
-    K.prism("Cell_Facade", prof, 0.0, FACE_Y, col)
+        upper.append((OPEN_X * math.cos(a),
+                      SPRING + OPEN_X * math.sin(a)))
+    for i in range(n + 1):
+        x = OPEN_X - 2 * OPEN_X * i / n
+        upper.append((x, face_top(x)))
+    facade.append(K.prism("fac", upper, 0.0, FACE_Y, col))
+    K.join("Cell_Facade", facade, col)
 
     # --- kemer bilezigi: cephenin 6 cm onunde, kemeri okunur kilar
     ring = []

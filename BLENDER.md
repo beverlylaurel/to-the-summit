@@ -832,3 +832,23 @@ Cerceveleme elendikten sonra kalan GERCEK farklar sunlardi ve duzeltildi:
 
 Geometrik rolyef zaten vardi (kusak 20 mm, cati sirasi 31 mm); eksik olan
 rolyef degil, tonlama ve olcek uyumuydu.
+
+## Insan olcegi ve FBX guvenligi
+
+Butun karakollar 1,80 m boyunda ve 0,70 m capinda oyuncu kapsulu ile denetlenir.
+Kullanilan alt sinirlar: gecit yuksekligi 1,88 m, standart kapi kanadi 0,78 m,
+acik platform net yuruyecek alan 0,85 m, merdiven 0,88 m ve sundurma bas
+boslugu 2,20 m. Binayi topluca buyutmek yerine kapi, merdiven ve dolasim alani
+islevine gore boyutlandirilir; pencere parapeti de bitmis ic dosemeden olculur.
+
+Kapi veya kemer boslugu acan konkav tek bir n-gon FBX'e birakilmaz. Disari
+aktarici bu yuzu acikligin uzerinden uzun bir ucgenle bolebilir ve duvar/tas
+boslugu delmis gibi gorunur. Cephe iki yan ayak ve ust lento gibi basit, konveks
+yuzlere bolunur. `check_outposts.py` topoloji kadar bu insan olcegi kosullarini
+da kaydedilmis `.blend` dosyalarinda denetler.
+
+UV atlasinda paketleme araligi ile bake tasma payi birlikte belirlenir. Mevcut
+UV1 adalari yaklasik 1,5 piksel aralikli oldugu icin tint ve roughness/metallic
+bake payi 1 pikseldir. Birbirinden ilgisiz renk adalarinin mip seviyelerinde
+karismamasi icin bu iki dusuk frekansli atlas Unity'de mipmap kullanmaz; taban,
+normal ve karolu roughness dokulari mipmap kullanmaya devam eder.

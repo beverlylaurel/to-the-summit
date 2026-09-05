@@ -6050,3 +6050,41 @@ yalnız dünya Y kotundan türemesi ve `_SeaWetFadeM` genişliğinin eğik gör�
 düşmesiydi. Mevcut dantel gürültüsü yerel tepe/taban kotunu birlikte bükecek biçimde yeniden
 kullanıldı; `10 × fwidth(localWetHeight)` ekran alt sınırı geçişi koruyor. Aynı gürültüyü
 köpük de okuduğu için hareket eden ıslaklık ile dantel birbirinden kopmuyor.
+
+## Karakol model kenarları yeşil/mor yanıp sönüyor — ÇÖZÜLDÜ (2026-09-05)
+
+**Belirti:** Özellikle sac kaplı istasyonda kamera hareket ederken kenarlarda komşu
+olmayan yeşil ve mor renkler kısa aralıklarla görünüyordu.
+
+**Sebep:** UV1 atlas adaları yaklaşık 1,5 piksel aralıklıydı; bake işleminin 10 piksellik
+taşma payı komşu adaların alanını eziyordu. Unity'nin tint ve roughness/metallic atlasları
+için ürettiği mip seviyeleri de uzaklık değiştikçe ilgisiz renk adalarını aynı örneğe
+katıyordu.
+
+**Düzeltme:** Bake taşma payı 1 piksele indirildi ve yalnız bu iki düşük frekanslı atlasın
+mipmap üretimi kapatıldı. Karolu taban, normal ve roughness dokularının mipmap'leri
+korundu. On modelin nötr ışıkta çok açılı çekiminde renk saçağı görülmedi.
+
+## Kabin zemini bir adımda aydınlanıyor ve pencere erişilemez görünüyor — ÇÖZÜLDÜ (2026-09-05)
+
+**İki ayrı sebep:** Test halkası ana kabini prefab yerine ham FBX olarak yerleştiriyordu;
+bu örnekte hiç collider yoktu. Oyuncu gerçek döşeme yerine alttaki araziye basınca pencere
+gereğinden yüksek görünüyordu. Zemindeki ani parlaklık değişiminin kalan kısmı gölge
+kademesi veya otomatik pozlama değil, pürüzlü ahşabın doğrudan güneşteki fazla güçlü
+sıyırma açılı yansımasıydı.
+
+**Düzeltme:** Kabin 14 mesh collider içeren `Outpost_CabinRefuge` prefabına alındı ve test
+yerleşimi bu prefabı kullanıyor. Pencere parapeti bitmiş iç döşemeden yaklaşık 0,85 m.
+`weathered_planks` roughness ölçeği 1,18'e çıkarıldı; aynı hedefe beş oyuncu konumundan
+ölçülen parlaklık yayılımı yüzde 61'den yüzde 18'e düştü.
+
+## Mahzen taşı açıklığı deliyor ve karakollar oyuncuya dar geliyor — ÇÖZÜLDÜ (2026-09-05)
+
+**Sebep:** Mahzen cephesi kapı oyuklu tek bir konkav n-gon idi; FBX üçgenlemesi açıklığın
+üzerinden uzun bir yüz geçiriyordu. Bazı kapı, merdiven ve kule geçiş ölçüleri de 1,80 m
+oyuncu ile 0,70 m kapsül için işlevsel eşiklerin altındaydı.
+
+**Düzeltme:** Mahzen cephesi iki ayak ve üst kuşaktan oluşan basit yüzlere ayrıldı.
+Mahzen ve avcı kapısı, istasyon kapısı, kule platformu ile merdiveni gerçek insan
+ölçeğine getirildi. `check_outposts.py` artık on modelin tamamında geçit yüksekliği,
+kapı genişliği, açık platform net genişliği ve merdiven genişliğini de denetliyor.

@@ -27,7 +27,7 @@ MAST_TOP = 10.60
 LEG = 0.075
 GUY_Z = (4.10, 7.60)
 GUY_R = 4.55
-DOOR_W, DOOR_H = 0.86, 1.98
+DOOR_W, DOOR_H = 0.92, 2.04
 
 
 def roof_z(x, y):

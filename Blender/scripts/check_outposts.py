@@ -96,6 +96,45 @@ def _coplanar_pairs(objs):
     return found
 
 
+def _human_scale_issues(name, objs, bb):
+    """Player is 1.80 m high with a 0.70 m collision diameter.
+
+    These are passage dimensions, not a global model scale. Historic buildings
+    may be compact, but a usable opening still needs head and shoulder margin.
+    """
+    issues = []
+    by_name = {o.name: o for o in objs}
+    for o in objs:
+        if "DoorLeaf" not in o.name or name == "Outpost_Collier":
+            continue
+        lo, hi = bb[o.name]
+        width = max(hi.x - lo.x, hi.y - lo.y)
+        height = hi.z - lo.z
+        if width < 0.78 or height < 1.88:
+            issues.append((o.name, "door", round(width, 3), round(height, 3)))
+
+    if name == "Outpost_Adit" and "Adit_Sets" in bb:
+        lo, hi = bb["Adit_Sets"]
+        if hi.x - lo.x < 1.20 or hi.z - lo.z < 2.10:
+            issues.append(("Adit_Sets", "portal", round(hi.x-lo.x, 3), round(hi.z-lo.z, 3)))
+    if name == "Outpost_Shed":
+        posts = [o for o in objs if o.name.startswith("Shed_Post")]
+        if posts and min(bb[o.name][1].z - bb[o.name][0].z for o in posts) < 2.20:
+            issues.append(("Shed_Post", "headroom"))
+    if name == "Outpost_Tower":
+        if "Tow_Catwalk" in bb and "Tow_Cab" in bb:
+            cat = bb["Tow_Catwalk"]; cab = bb["Tow_Cab"]
+            clear = 0.5 * min((cat[1].x-cat[0].x)-(cab[1].x-cab[0].x),
+                              (cat[1].y-cat[0].y)-(cab[1].y-cab[0].y)) - 0.09
+            if clear < 0.85:
+                issues.append(("Tow_Catwalk", "clear_width", round(clear, 3)))
+        if "Tow_Ladder" in bb:
+            lo, hi = bb["Tow_Ladder"]
+            if hi.x - lo.x < 0.88:
+                issues.append(("Tow_Ladder", "width", round(hi.x-lo.x, 3)))
+    return issues
+
+
 def check_file(name):
     path = os.path.normpath(os.path.join(OUTPOSTS, name + ".blend"))
     bpy.ops.wm.open_mainfile(filepath=path)
@@ -181,6 +220,8 @@ def check_file(name):
             continue
         floating.append(o.name)
     out["havada"] = floating
+
+    out["insan_olcegi"] = _human_scale_issues(name, objs, BB)
 
     out["cakisik"] = _coplanar_pairs(objs)[:5]
 
@@ -272,7 +313,7 @@ def check_all(verbose=True):
             if any(t.values()):
                 bad.append("topo %s" % t)
             for k in ("malzemesiz", "uvsiz", "olcekli", "ters_normal",
-                      "eksik_doku", "havada", "cati_delen"):
+                      "eksik_doku", "havada", "cati_delen", "insan_olcegi"):
                 if r[k]:
                     bad.append("%s=%s" % (k, r[k]))
             if r["cakisik"]:

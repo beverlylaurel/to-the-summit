@@ -24,6 +24,7 @@ public static class OutpostImportSetup
 {
     const string Manifest = "Assets/Editor/OutpostManifest.json";
     const string ModelDir = "Assets/Models/Outposts";
+    const string CabinModelDir = "Assets/Models/Cabin";
     const string TexDir = "Assets/Textures/Outposts";
     const string TilingDir = TexDir + "/Tiling";
     const string MatDir = "Assets/Materials/Outposts";
@@ -113,6 +114,16 @@ public static class OutpostImportSetup
             if (!ApplyRemap(fbx, remap)) continue;
             if (BuildPrefab(fbx, item.name)) madePrefab++;
         }
+
+        // The main refuge used to enter the walkable test ring as a raw FBX, unlike
+        // every outpost. It consequently had no floor collision: the player walked
+        // on the terrain beneath it, half a metre below the authored floor, making
+        // windows feel too high and camera height change with the hidden terrain.
+        string cabinFbx = AssetDatabase.FindAssets("t:Model", new[] { CabinModelDir })
+            .Select(AssetDatabase.GUIDToAssetPath)
+            .FirstOrDefault(p => p.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrEmpty(cabinFbx) && BuildPrefab(cabinFbx, "CabinRefuge"))
+            madePrefab++;
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
@@ -236,12 +247,18 @@ public static class OutpostImportSetup
 
             var want = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
             bool srgb = !normal && !data;
-            if (ti.textureType == want && ti.sRGBTexture == srgb && ti.mipmapEnabled) continue;
+            bool atlas = f.EndsWith("_Tint.png") || f.EndsWith("_RoughMetal.png");
+            bool wantMipmaps = !atlas;
+            if (ti.textureType == want && ti.sRGBTexture == srgb
+                && ti.mipmapEnabled == wantMipmaps) continue;
 
             ti.textureType = want;
             ti.sRGBTexture = srgb;
-            ti.mipmapEnabled = true;
-            ti.wrapMode = f.EndsWith("_Tint.png") || f.EndsWith("_RoughMetal.png")
+            // UV1 atlases contain unrelated islands. A mip footprint can cross an
+            // island boundary and flash a neighbour's tint as distance changes.
+            // Their signal is deliberately low frequency, so base-level sampling is stable.
+            ti.mipmapEnabled = wantMipmaps;
+            ti.wrapMode = atlas
                 ? TextureWrapMode.Clamp     // atlas: kenar tekrar etmemeli
                 : TextureWrapMode.Repeat;
             ti.SaveAndReimport();
@@ -272,7 +289,8 @@ public static class OutpostImportSetup
         foreach (var r in inst.GetComponentsInChildren<MeshRenderer>())
         {
             var f = r.GetComponent<MeshFilter>();
-            if (f != null && f.sharedMesh != null) r.gameObject.AddComponent<MeshCollider>();
+            if (f != null && f.sharedMesh != null && r.GetComponent<Collider>() == null)
+                r.gameObject.AddComponent<MeshCollider>();
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
         }
         string path = $"{PrefabDir}/Outpost_{name}.prefab";

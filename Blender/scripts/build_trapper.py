@@ -41,7 +41,7 @@ R_SILL, R_JOIST, R_RAFT, R_PUR, R_GLOG = 0.145, 0.08, 0.075, 0.055, 0.1040
 
 ZFLOOR = 0.27                      # doseme ust yuzu
 GLOG0, GLOG_STEP, GLOG_N = 0.3675, 0.195, 15
-DOOR_LINTEL = 9                    # bu seviyedeki tomruk kapi lentosu
+DOOR_LINTEL = 10                   # 1.8 m oyuncuya 14 cm dikey gecis payi
 DOOR_X, JAMB_W = 0.45, 0.12
 DOOR_TOP = GLOG0 + DOOR_LINTEL * GLOG_STEP - R_GLOG
 ZR_TOP, ZR_BOT = (C - TH_SHAKE) / NZ - 0.003, 2.90

@@ -19,7 +19,6 @@ public static class OutpostTestPlacement
 {
     const string RootName = "TestOutposts";
     const string PrefabDir = "Assets/Prefabs/Outposts";
-    const string CabinDir = "Assets/Models/Cabin";
     const string RoutePath = "Assets/Settings/MountainRoute.asset";
 
     [MenuItem("To The Summit/Outposts/Place Around Spawn")]
@@ -133,16 +132,6 @@ public static class OutpostTestPlacement
             .Select(AssetDatabase.LoadAssetAtPath<GameObject>)
             .Where(g => g != null).ToList();
 
-        // Ana siginak prefab degil, dogrudan model: karakollarla ayni cemberde
-        // durmali ki olcegi ve tonu yan yana karsilastirilabilsin.
-        var cabin = AssetDatabase.FindAssets("t:Model", new[] { CabinDir })
-            .Select(AssetDatabase.GUIDToAssetPath)
-            .FirstOrDefault(p => p.EndsWith(".fbx"));
-        if (cabin != null)
-        {
-            var go = AssetDatabase.LoadAssetAtPath<GameObject>(cabin);
-            if (go != null) list.Insert(0, go);
-        }
         return list;
     }
 

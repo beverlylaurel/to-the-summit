@@ -164,7 +164,7 @@ def _clean_targets(objs):
             o.data.uv_layers.active = o.data.uv_layers["UVMap"]
 
 
-def bake_tint_rm(objs, name, out_dir, size=1024, margin=10, eps=2e-3, K=0.25):
+def bake_tint_rm(objs, name, out_dir, size=1024, margin=1, eps=2e-3, K=0.25):
     """Ana siginakla AYNI yontem: atlas yalniz YAVAS DEGISEN yipranma katsayisini
     tasir, yuzeyin kendi dokusu Unity'de doseme olarak gelir.
 
@@ -173,7 +173,10 @@ def bake_tint_rm(objs, name, out_dir, size=1024, margin=10, eps=2e-3, K=0.25):
     atlasta ada basina ~30x8 piksel dusuyor ve kenar payi adadan buyuk kaliyor.
     Sonucta filtreleme adalar arasindaki siyahi iceri cekiyor: cati lekeli
     cikiyor. Tint atlasi ayni kotu paketlemeye DAYANIKLI, cunku tasidigi deger
-    bir carpan ve komsu texel farki gozle secilmiyor.
+    bir carpan ve komsu texel farki gozle secilmiyor. UV adalari arasinda
+    yaklasik 1.5 piksel vardir; 10 piksellik bake margin komsu adalarin renk
+    oranlarini birbirinin ustune yazip Unity'de uzaklik degistikce yesil/mor
+    kenar parlamasi uretiyordu. Bir piksel bu pakete gore guvenli sinirdir.
 
     tint       = son_renk / (doseme_rengi + eps) * K      (K ile depolanir)
     roughmetal = R puruz, G metaliklik, B detile karisim maskesi
