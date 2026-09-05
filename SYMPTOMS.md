@@ -5971,3 +5971,28 @@ adımı görüş açısını 60 dereceden 54,23 dereceye indirdi; -1 yeniden 60'
 **İkinci neden:** Domain/scene reload kapalıyken yok edilmiş Unity materyalinin
 managed referansı kalabiliyor; `??=` bunu null saymıyor. `OnEnable` başlatması ve
 Unity null kontrolü materyali yeniden kurar, eski çekim durumunu sıfırlar.
+
+## Uzak deniz ufkun üstünde kopuk yatay levhalar gösteriyor — ÇÖZÜLDÜ (2026-09-05)
+
+**Belirti:** Deniz, özellikle dar görüş açısında, ana yüzeyden ayrılmış uzun yatay parçalar
+olarak gökyüzünün içinde yeniden görünüyordu. Kamera yalnız büyütüyordu; hata fotoğraf
+sisteminde değildi.
+
+**Ayırt eden ölçüm:** Deniz kapatılınca parçalar kayboldu; arazi kapatılınca kaldı. FFT
+ağırlıkları ve kıyı dalgası sıfırlandığında şekil yine kaldı. Mesafe kodlu shader karesi,
+ana görünen yüzeyi yaklaşık 1,1 km'de, kopuk parçayı yaklaşık **4,7 km**'de ölçtü.
+Geometri 3,5 km'den sonra düz olduğu için yakındaki dalga çukurlarının arasından görünen
+uzak yüzey, seyrek dış halka üçgenleri boyunca uzun yatay levha okuyordu. Normalin uzun
+dalga eğimini taşımaya devam etmesi renk farkını artırıyordu; fakat eğim sıfırlanınca da
+şeklin kalması, asıl kusurun uzak yüzeyin gökyüzü önünde parça parça görünmesi olduğunu
+ayırt etti.
+
+**Düzeltme:** `SeaFarGeometryKeep` hem vertex yer değiştirmesini hem toplam fragment
+eğimini aynı 2–3,5 km zarfıyla söndürüyor. Ayrıca Medium/High kalitede yalnız arkasında
+gökyüzü olan, 2,5 km ötesindeki sıyırma açılı son parçalar gerçek ekran arka planına optik
+olarak birleşiyor. Kara arkasındaki su, yakın dalga ve kıyı geçişi etkilenmiyor; Low
+kaliteye yeni ekran rengi örneği eklenmiyor.
+
+**Doğrulama:** 1944×1296 çözünürlükte 4× fotoğraf zoom'una eşdeğer 15,26° FOV ile aynı
+ufuk yeniden çekildi. Yeşil kopuk levhalar kayboldu; yakın dalga dokusu ve kıyı köpüğü
+korundu. Shader importu ve Unity derlemesi hatasız.

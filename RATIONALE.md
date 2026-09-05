@@ -2260,6 +2260,28 @@ olamıyor.
 kalite tablosundaki üçgen sayıları (180k/480k/900k) bu mesh'te tutmuyor; kalite
 kademesi neyin ne kadar yakından çözüldüğünü değiştiriyor, kaç üçgen çizildiğini değil.
 
+### Uzakta düzleşen geometri ile normal birlikte sönmeli
+
+Deniz geometrisi 2–3,5 km arasında düzleşiyor; amaç, dış halkaların seyrek üçgenlerinde
+dalga siluetinin levhalaşmasını önlemek. Sıyırma açısında bu uzak düz yüzey, yakındaki
+dalga çukurlarının arasından yalnız bazı ekran aralıklarında görünüyordu. Uzak üçgenler
+geniş olduğu için görünen parçalar doğal bir dalga yerine uzun yatay levha okuyordu.
+Eğim dokusunun ayrı ekran ayak izi filtresi de uzun ölü dalgayı bu mesafenin ötesinde
+çözünür sayıp bu parçaların renk farkını artırıyordu: aynı nokta geometrik olarak dümdüz,
+ışıklandırmada ise eğimliydi.
+
+Dar açılı ölçüm bunu ayırdı: kopuk şeritlerin dünya uzaklığı yaklaşık **4,7 km** idi;
+FFT ağırlıkları ve kıyı dalgası sıfırlanınca şekil kaldı. Geometri sönümü kaldırılınca
+şeritler büyüdü. Geometri eski 2–3,5 km zarfında bırakıldı ve toplam eğim de aynı zarfla
+eşlendi. Asıl görünür düzeltme, opak tamponda arkasında gökyüzü bulunan uzak ve sıyırma
+açılı parçayı doğrudan o arka planla birleştirmek oldu. Kara arkasındaki deniz bu
+birleşime girmez; sahil ve sualtı okunurluğu korunur.
+
+Bu son optik birleşme Medium/High kalitede ve yalnız üç koşul birlikteyken çalışır: arka
+plan gerçekten uzak düzlem/gökyüzü, yüzey 2,5 km'den uzak ve bakış sıyırma açısında.
+Böylece Low kaliteye yeni ekran rengi örneği eklenmez, genel uzaklık sisi kuvvetlendirilmez
+ve yakındaki dalga kontrastı kaybolmaz.
+
 ## Deniz: FFT boyutu keyword değil uniform
 
 `numthreads` bir shader keyword'üne bağlansaydı her varyant için ayrı

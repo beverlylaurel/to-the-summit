@@ -259,6 +259,13 @@ Shader "ToTheSummit/SeaLit"
                               * ringVisibility;
                 }
 
+                // Geometry is flattened before coarse outer rings can expose
+                // their facets. Its lighting normal must describe that same
+                // surface; retaining the swell slope on flat geometry made
+                // distant horizon fragments reflect green water instead of sky.
+                slopeSum *= SeaFarGeometryKeep(IN.positionWS.xz,
+                                               _WorldSpaceCameraPos.xz);
+
                 float3 N = normalize(float3(-slopeSum.x, 1.0, -slopeSum.y));
 
                 float2 screenUV = IN.screenPos.xy / IN.screenPos.w;
@@ -886,6 +893,19 @@ Shader "ToTheSummit/SeaLit"
                 // once with ITS OWN distance — the terrain in its own shader, the cloud
                 // in the compositing pass, the sky in `SkyFog`, and the sea here.
                 color = ApplyHeightFog(color, _WorldSpaceCameraPos, IN.positionWS);
+
+                // At a grazing angle the coarse, already-flat far mesh can show
+                // through troughs in the nearer waves as isolated horizontal
+                // plates. When the opaque buffer behind that pixel is the sky,
+                // dissolve only that distant grazing fragment into the exact
+                // background it covers. Water over terrain is untouched.
+            #if !defined(_SEA_QUALITY_LOW)
+                float skyBehind = step(_ProjectionParams.z * 0.999, sceneEyeDepth);
+                float grazingHorizon = 1.0 - smoothstep(0.002, 0.012, V.y);
+                float farHorizon = smoothstep(2500.0, 4500.0, dist);
+                color = lerp(color, SampleSceneColor(screenUV),
+                             skyBehind * grazingHorizon * farHorizon);
+            #endif
 
                 return half4(color, 1.0);
             }

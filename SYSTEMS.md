@@ -1988,8 +1988,16 @@ kalıyor. Adımlar sabit (iç 32, dış 64), yuvarlama yok.
 iç kenarına ortadaki köşe geri konur ve kare kendi merkezinden yelpazelenir.
 
 **Dalga geometrisi 2–3,5 km arasında sönümlenir.** Orada dalga pikselin altına iner; düz
-yüzeyin çatlayacak dikişi olmaz. Normal ayrıca kendi kuralıyla sönümleniyor
-(`SeaTierResolvable`), o mesafeye bağlı değil **piksel ayak izine** bağlı.
+yüzeyin çatlayacak dikişi olmaz. Aydınlatma normali de aynı `SeaFarGeometryKeep` zarfını
+uygular. Yalnız `SeaTierResolvable` yeterli değildir: uzun ölü dalga piksel ayak izinden
+geçse bile geometri düzleştikten sonra eğimini korursa, yakın çukurların arasından görünen
+uzak düz parçanın kontrastını artırır. Kaybolan küçük ölçek enerjisi pürüzlülük varyansına
+geri verilmeye devam eder.
+
+**Uzak ufuk optik birleşimi Medium/High içindir.** Arkasında opak geometri bulunmayan,
+2,5 km ötesindeki sıyırma açılı deniz parçası ekranın gerçek gökyüzü rengine yumuşakça
+birleşir. Üç kapı birlikte çalışır; kara arkasındaki suyu veya yakın dalgayı açmaz. Low
+kaliteye ek `_CameraOpaqueTexture` örneği konmaz.
 
 **Türev dokusunun mip zinciri var.** Kademe içi örtüşmeyi donanım ortalıyor; olmadan
 battaniye sönümleme onu örtmek zorunda kalıyordu.

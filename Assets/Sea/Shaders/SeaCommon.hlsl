@@ -771,15 +771,25 @@ struct SeaSurfacePoint
 /// may as well be flat -- and a flat surface has nothing to crack. The boundaries
 /// INSIDE 2 km keep their waves and never showed a seam.
 ///
-/// The normal keeps fading by its own rule (`SeaTierResolvable`); this is only
-/// the geometry.
-float3 SeaFlattenFar(float3 displacedWS, float3 flatWS, float2 cameraXZ)
+/// THE LIGHTING NORMAL MUST USE THE SAME ENVELOPE. `SeaTierResolvable` filters
+/// texture detail by pixel footprint, but it can legitimately keep the long
+/// swell after this geometry has become flat. Leaving that slope alive increases
+/// the contrast of a coarse far fragment that peeks through nearer troughs.
+/// `SeaLit` multiplies the assembled slope by `SeaFarGeometryKeep` before building N.
+/// Lost sub-pixel slope energy still returns through the roughness variance.
+float SeaFarGeometryKeep(float2 posXZ, float2 cameraXZ)
 {
     const float FadeStart = 2000.0;
     const float FadeEnd   = 3500.0;
 
-    float d = distance(displacedWS.xz, cameraXZ);
-    float keep = 1.0 - smoothstep(FadeStart, FadeEnd, d);
+    float d = distance(posXZ, cameraXZ);
+    return 1.0 - smoothstep(FadeStart, FadeEnd, d);
+}
+
+float3 SeaFlattenFar(float3 displacedWS, float3 flatWS, float2 cameraXZ)
+{
+    float keep = SeaFarGeometryKeep(displacedWS.xz, cameraXZ);
+
     return lerp(float3(flatWS.x, _SeaLevelY, flatWS.z), displacedWS, keep);
 }
 
