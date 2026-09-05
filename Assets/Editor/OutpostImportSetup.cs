@@ -304,7 +304,9 @@ public static class OutpostImportSetup
         m.SetOverrideTag("RenderType", "Transparent");
         m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
         m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-        m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        // Current URP Lit uses premultiplied colour for transparent surfaces so
+        // specular highlights survive low alpha; its stable serialized source is One.
+        m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
         m.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
     }
 }
