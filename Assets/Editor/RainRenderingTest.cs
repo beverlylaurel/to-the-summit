@@ -215,6 +215,11 @@ public static class RainRenderingTest
         bool intensityControlsDensity = sharedRings.Contains("float eventRank =")
                                      && sharedRings.Contains("float eventWeight = smoothstep")
                                      && sharedRings.Contains("spatialSupport * eventWeight");
+        bool temporalVariation = sharedRings.Contains("float eventCycle =")
+                              && sharedRings.Contains("float2 eventSalt =")
+                              && sharedRings.Contains("float2 eventKey = cell + eventSalt")
+                              && sharedRings.Contains("float impactStrength = lerp")
+                              && sharedRings.Contains("eventWeight * impactStrength");
         bool continuousCells = sharedRings.Contains("float2 RainRingCell(")
                             && sharedRings.Contains("cell + float2(side.x, 0.0)")
                             && sharedRings.Contains("cell + float2(0.0, side.y)")
@@ -238,11 +243,13 @@ public static class RainRenderingTest
                         + "] rain intensity reaches the terrain material buffer");
         report.AppendLine("  [" + Mark(intensityControlsDensity)
                         + "] rain intensity controls ring event density");
+        report.AppendLine("  [" + Mark(temporalVariation)
+                        + "] each cell re-rolls impact position and strength every cycle");
         report.AppendLine("  [" + Mark(continuousCells)
                         + "] rings cross cell boundaries without square clipping");
         report.AppendLine("  [" + Mark(wetAfterMaterial) + "] rain film is applied after rock/sand selection");
         return accumulation && drying && filmGate && reflectiveFilm && materialRainBinding
-            && intensityControlsDensity && continuousCells && wetAfterMaterial;
+            && intensityControlsDensity && temporalVariation && continuousCells && wetAfterMaterial;
     }
 
     static float TerminalVelocity(float diameterMm) =>

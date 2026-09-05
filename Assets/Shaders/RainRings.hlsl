@@ -90,9 +90,6 @@ float RainRingResolvable(float pixelSize)
 float2 RainRingCell(float2 localXZ, float time, float intensity,
                     int layer, float cellSize, float2 cell)
 {
-    float2 h = RainRingHash22(cell + float2(layer * 37.1, layer * 71.7));
-    float2 centre = (cell + h) * cellSize;
-
     // A pixel evaluates its own cell and the one across its nearest X/Y boundary. To make
     // that four-cell footprint exact, a ring must be zero before half a cell: at the middle
     // of a cell the omitted cell on the opposite side is at least 0.5 L away. The small gap
@@ -101,14 +98,28 @@ float2 RainRingCell(float2 localXZ, float time, float intensity,
     float maxFront = max(RAIN_RING_WIDTH, support - RAIN_RING_WIDTH * 2.0);
     float life = min(RAIN_RING_LIFE, maxFront / RAIN_RING_SPEED);
 
-    float age01 = frac(time / life + RainRingHash21(cell + layer * 13.7));
+    float eventClock = time / life + RainRingHash21(cell + layer * 13.7);
+    float eventCycle = fmod(floor(eventClock), 4096.0);
+    float age01 = frac(eventClock);
     float age = age01 * life;
 
+    // A cell is only an event budget, not a permanent drop location. Reusing one stable
+    // cell hash made every cycle land at the same point with the same strength. The cycle
+    // salt re-rolls those properties only when the previous event wraps; temporalTail has
+    // already brought that event to zero, so the new centre cannot pop while visible.
+    float2 eventSalt = float2(eventCycle * 17.17, eventCycle * 43.13);
+    float2 eventKey = cell + eventSalt;
+    float2 h = RainRingHash22(eventKey + float2(layer * 37.1, layer * 71.7));
+    float2 centre = (cell + h) * cellSize;
+
     // Rain amount is chiefly a drop ARRIVAL RATE. Each cell has a stable rank;
-    // drizzle admits only the lowest-ranked events, while a downpour admits all.
-    float eventRank = RainRingHash21(cell + layer * 19.7 + 103.5);
+    // drizzle admits only the lowest-ranked events, while a downpour admits all. Rank and
+    // impact strength belong to this event, so neither repeats with the cell.
+    float eventRank = RainRingHash21(eventKey + layer * 19.7 + 103.5);
     float eventWeight = smoothstep(eventRank, min(eventRank + 0.03, 1.0), intensity);
     if (eventWeight <= 0.001) return 0.0;
+    float impactStrength = lerp(0.75, 1.25,
+        RainRingHash21(eventKey + layer * 29.3 + 211.7));
 
     float2 d = localXZ - centre;
     float r = length(d);
@@ -130,18 +141,12 @@ float2 RainRingCell(float2 localXZ, float time, float intensity,
     float spatialSupport = 1.0 - smoothstep(support - w, support, r);
 
     return normalize(d) * (profile * spread * birth * temporalTail
-                          * spatialSupport * eventWeight);
+                          * spatialSupport * eventWeight * impactStrength);
 }
 
 float2 RainRings(float2 localXZ, float time, float intensity)
 {
     if (intensity <= 0.001) return 0.0;
-
-    // THE CLOCK IS WRAPPED, NOT USED RAW. `age` is `frac(time / life + hash)`, and after an
-    // hour of play a float holds only about a millisecond of `time` -- the ring ages in
-    // visible steps. 4096 is an exact multiple of the lifetime and exact in binary, so
-    // wrapping there changes no ring's phase and hands the division small numbers.
-    time = fmod(time, 4096.0);
 
     // The three cell sizes are deliberately incommensurate enough that their lattices do not
     // line up. They are larger than the old cells because each cell now represents one compact

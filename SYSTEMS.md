@@ -1612,6 +1612,12 @@ komşularını birlikte değerlendirir; halkanın desteği yarım hücreden önc
 iner. Böylece aynı dairesel normal iki tarafta da hesaplanır ve hücre kenarında kare olarak
 kesilmez. Uzakta 17 mm'lik tepe çözülemiyorsa komşuluk hesabı bütünüyle atlanır.
 
+**Hücre damlanın kimliği değildir.** Hücre yalnız aynı anda çizilebilecek olay bütçesini
+belirler. Her yaşam çevriminde olay sayacı merkezin hücre içindeki konumunu, yağış
+yoğunluğu sırasını ve darbe gücünü yeniden hash'ler. Önceki olay zaman kuyruğunda sıfıra
+indikten sonra sayaç değiştiği için görünür bir merkez sıçraması oluşmaz. Dalga hızı ve
+tepe genişliği sudan gelir ve olaylar arasında değişmez.
+
 ## Deniz: rüzgârını dünya fırtınasından doğrudan alır (2026-09-02)
 
 **Deniz karanın korunağını almaz.** `AltitudeWeatherDriver.IntensityAt` alçakta fırtınayı

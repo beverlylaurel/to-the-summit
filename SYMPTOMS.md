@@ -144,6 +144,20 @@ dörtgen bir sınır olarak görünüyor. Deniz kapatıldığında o duruyor. Ay
 
 ## Kayıtlar
 
+### Yere vuran damla halkası hep aynı yerde ve aynı güçte tekrarlanıyor (2026-09-05)
+
+**Belirti:** Islak yüzeydeki çemberler prosedürel görünmüyor; aynı nokta aynı halka ve
+aynı şiddetle düzenli olarak yeniden oynuyor.
+
+**Kök neden:** `RainRingCell` merkez, olay sırası ve gücü yalnız sabit hücre hash'inden
+üretiyordu. Zaman yalnız yaşı `frac` ile döndürdüğü için her hücre tek bir animasyonu
+sonsuz kez tekrarlıyordu.
+
+**Çözüm:** Yaşam çevrimi sayacı hash köküne eklendi. Her yeni olay hücre içinde yeni
+merkez, yeni yoğunluk sırası ve yeni darbe gücü alıyor; eski olay sıfıra indikten sonra
+değiştiği için görünür sıçrama oluşmuyor. `RainRenderingTest` bu üç zamansal değişkenin
+ortak shader'da kalmasını koruyor.
+
 138 kayıt. Başlığa tıkla, ya da başlıkta ara — dosyanın tamamını okuma.
 
 - [Oyuncunun çevresinde büyük bir kare, onunla birlikte hareket ediyor](#oyuncunun-cevresinde-buyuk-bir-kare-onunla-birlikte-hareket-ediyor)

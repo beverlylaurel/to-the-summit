@@ -3421,6 +3421,17 @@ açılmasını önlüyor.
 0,50 → %48,58; 1,00 → %100. Tekil damla kuvveti ayrıca yalnız 0,65→1,0 aralığında
 büyüyor; ana yoğunluk sinyali halka **sayısı**.
 
+**Zamansal tekrar düzeltmesi (2026-09-05).** İlk sürüm hücre merkezini, olay sırasını
+ve gücünü yalnız hücre koordinatından hash'liyordu. Yaş `frac(time / life + phase)` ile
+sıfırlanınca aynı hücre her çevrimde aynı noktaya aynı darbeyi tekrar vuruyordu. Uzayda
+rastgele görünen alan zamanda kısa bir animasyon döngüsüydü.
+
+Hücre kalıcı damla kimliği olmaktan çıkarıldı. `floor(eventClock)` olay sayacı merkeze,
+yoğunluk sırasına ve 0,75–1,25 darbe katsayısına salt olur. Merkez yalnız yaş çevrimi
+sararken değişir; o anda eski halkanın `temporalTail` değeri sıfırdır. Hız ve halka
+genişliği değiştirilmedi, çünkü onlar rastgele darbeden değil suyun kılcal-yerçekimi
+dağılımından gelir.
+
 **Ölçüldü.** Aynı donmuş kare, yağmur kapalı ve açık, fark:
 
 | şiddet | uzak su | yakın su | uzak suda %1'den fazla değişen |
