@@ -263,7 +263,7 @@ public class SeaSettings : ScriptableObject
 
     /// Blue-dominant coastal upwelling; calibrated against the open and shallow-water views.
     [Tooltip("Upwelling color.")]
-    public Color upwellingColor = new Color(0.08f, 0.45f, 0.65f);
+    public Color upwellingColor = new Color(0.02f, 0.18f, 0.26f);
 
     [Tooltip("Refraction offset strength.")]
     [Range(0f, 2f)] public float refractionStrength = 0.35f;

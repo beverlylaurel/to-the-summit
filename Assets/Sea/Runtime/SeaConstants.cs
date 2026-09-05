@@ -59,6 +59,10 @@ public static class SeaConstants
     /// Optical hand-off into the refracted ground (m). [CALIBRATION]
     public const float ShoreOpticalFadeDepth = 0.60f;
 
+    /// Minimum screen-space width of the optical hand-off on a steep bank (pixels).
+    /// Gentle beaches remain governed by ShoreOpticalFadeDepth. [CALIBRATION]
+    public const float ShoreOpticalMinPixels = 2.00f;
+
     /// Waterline displacement by the foam noise (m of depth). [CALIBRATION]
     public const float ShoreEdgeNoise = 0.06f;
 

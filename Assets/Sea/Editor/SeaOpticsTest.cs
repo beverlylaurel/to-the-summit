@@ -28,17 +28,19 @@ public static class SeaOpticsTest
         bool blueUpwelling = settingsFound
             && settings.upwellingColor.b > settings.upwellingColor.g
             && settings.upwellingColor.g > settings.upwellingColor.r
-            && Approximately(settings.upwellingColor, new Color(0.08f, 0.45f, 0.65f, 1f));
+            && Approximately(settings.upwellingColor, new Color(0.02f, 0.18f, 0.26f, 1f));
         bool horizonContract = source.Contains(
                 "float3 rLookup = normalize(float3(R.x, max(R.y, 0.0), R.z));")
             && source.Contains("A RAY BELOW THE GEOMETRIC HORIZON HITS THE NEXT WATER FACET")
             && !source.Contains("skyRefl = lerp(upwelling, skyRefl")
             && source.Contains("SeaFarGeometryKeep");
+        bool shoreContract = source.Contains("fwidth(edgeDepth) * SEA_SHORE_OPTICAL_MIN_PIXELS")
+            && source.Contains("smoothstep(0.0, shoreOpticalWidth, edgeDepth)");
         bool shaderClean = shader != null && shader.isSupported
             && ShaderUtil.GetShaderMessages(shader).Length == 0;
 
         ok = settingsFound && physicalExtinction && blueUpwelling
-            && horizonContract && shaderClean;
+            && horizonContract && shoreContract && shaderClean;
 
         var report = new StringBuilder(512);
         report.AppendLine("# Sea Optics Test");
@@ -46,6 +48,7 @@ public static class SeaOpticsTest
         report.AppendLine("  [" + Mark(physicalExtinction) + "] extinction keeps R > G > B");
         report.AppendLine("  [" + Mark(blueUpwelling) + "] upwelling keeps B > G > R");
         report.AppendLine("  [" + Mark(horizonContract) + "] horizon uses the filtered sky limit without a dark branch");
+        report.AppendLine("  [" + Mark(shoreContract) + "] steep shore keeps a two-pixel optical hand-off");
         report.AppendLine("  [" + Mark(shaderClean) + "] shader is supported and has no import messages");
         report.AppendLine(ok ? "RESULT: PASSED" : "RESULT: FAILED");
         return report.ToString();

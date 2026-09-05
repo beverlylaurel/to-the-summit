@@ -6013,6 +6013,20 @@ sekmeyi yok sayarak koyu bir dal üretmişti. Renk tarafında da mavi sönümü 
 upwelling'in mavisi yeşilden düşüktü; iki ters kanal sırası suyu çamurlu gösteriyordu.
 
 **Düzeltme:** Yansıma örneği gerçek gök ufkuna sıkıştırılıp `R.y` boyunca koyu dala geçiş
-kaldırıldı. Sönüm `R > G > B`, upwelling `B > G > R` sırasına getirildi. Açık ve sığ su
-kadrajlarında çelik mavi ton ile kıyı geçişi birlikte doğrulandı; uzak geometri sönümü ve
-son gök birleşimi korunuyor.
+kaldırıldı. Sönüm `R > G > B`, upwelling `B > G > R` sırasına getirildi. İlk upwelling
+şiddeti 11:03 sığ su testinde fazla camgöbeği bulundu; enerji `(0,02 / 0,18 / 0,26)` değerine
+indirildi. Açık ve sığ su birlikte doğrulandı; uzak geometri sönümü ve son gök birleşimi
+korunuyor.
+
+## Deniz dik kıyıda bıçak gibi kesiliyor — ÇÖZÜLDÜ (2026-09-05)
+
+**Belirti:** Su/zemin sınırı yatık kumsalda kabul edilebilirken dik kıyıda tek piksellik,
+keskin bir çizgiye dönüşüyordu.
+
+**Sebep:** Optik geçiş yalnız 0,60 m batimetri derinliğine bağlıydı. Dik bankta bu derinlik
+bir ekran pikselinden kısa mesafede geçiliyor; son renk devri görünmeden `clip` sınırına
+varıyordu.
+
+**Düzeltme:** Fiziksel 0,60 m bant korunup genişliğe `2 × fwidth(edgeDepth)` alt sınırı
+eklendi. Yatık sahilin 10 m'lik geçişi değişmiyor; yalnız dik veya kaba örneklenmiş kıyıda
+iki piksellik optik temas oluşuyor. Geometri sınırı, kıyı gürültüsü ve köpük yeri değişmedi.

@@ -3800,8 +3800,15 @@ Renk kusuru aynı incelemede ayrı çıktı. Eski sönüm katsayısı maviyi ye�
 (`0,346 / 0,082 / 0,154`), eski upwelling de yeşili maviden güçlü veriyordu
 (`0,03 / 0,14 / 0,111`). İki sıra birlikte açık denizi kirli yeşil ve ağır laciverte itti.
 Yeni değerler kırmızı > yeşil > mavi sönümü ve mavi > yeşil > kırmızı upwelling düzenini
-kuruyor. Açık su ve sığ su kadrajları birlikte kontrol edildi; renk soğuk çelik mavisine
-geldi, sığ geçiş aşırı doygunlaşmadı.
+kuruyor. İlk denemedeki `(0,08 / 0,45 / 0,65)` oranı doğru, enerjisi yanlıştı: 11:03'te
+yüksek gök ışığıyla çarpılınca sığ su çeşme suyu kadar açık camgöbeği oldu. Aynı saat ve
+aynı kıyı kadrajında `(0,02 / 0,18 / 0,26)` kumun rengini korurken açık suyu gri çamura
+döndürmeden mavi tuttu.
+
+İkinci kadraj, sabit 0,60 m optik kıyı bandının dik arazide ekranda bir pikselin altına
+sıkıştığını gösterdi. Fiziksel bant yatık sahilde korunuyor; `fwidth(edgeDepth)` yalnız
+gerekli olduğunda iki piksellik alt sınır veriyor. Suyun kesildiği dünya konumu değişmedi,
+yalnız son su pikselleri arkalarındaki kırılmış arazi rengine daha yumuşak devrediliyor.
 
 Deniz saydam kuyrukta olduğu için URP'nin standart opak hareket vektörü geçişine girmez.
 Kuyruğu değiştirmek kırılma ve su kalınlığı okumalarını bozar; sabit görüntüde de bulunan bu

@@ -85,6 +85,10 @@
 /// metres and made the waterline read as a cut polygon again. [CALIBRATION]
 #define SEA_SHORE_OPTICAL_FADE_DEPTH 0.60
 
+/// Minimum visible hand-off on steep terrain. fwidth(edgeDepth) converts this
+/// pixel count back into the bathymetry's metre-valued depth domain.
+#define SEA_SHORE_OPTICAL_MIN_PIXELS 2.00
+
 /// How far the waterline is displaced by the foam's own noise (m of depth).
 /// On the measured 5% shore slope this moves the line about 1.2 m, which stays
 /// under the 2.9 m feature size of the noise that produces it.

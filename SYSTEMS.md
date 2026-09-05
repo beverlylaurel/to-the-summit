@@ -1458,10 +1458,16 @@ eşitliği `Sea/Test Constant Parity` denetliyor.
 - **Kesme** — `clip(edgeDepth)`, burada `edgeDepth = depth + gürültü * SEA_SHORE_EDGE_NOISE`.
   Gürültü köpüğünkiyle
   AYNI (`SeaFoamNoise`, `_SeaFoamBreakupTiling`); ikinci bir kaynak yok.
-- **Devir** — `lerp(refracted, color, smoothstep(0, SEA_SHORE_OPTICAL_FADE_DEPTH, edgeDepth))`,
+- **Devir** — `lerp(refracted, color, smoothstep(0, shoreOpticalWidth, edgeDepth))`,
   en sonda ve TEK terim. Yansıma, parıltı, su rengi ve köpük hepsi birlikte sönüyor;
   ölçülen kıyı eğiminde bandın kumdaki genişliği 10 m. Su çizgisini oradan arazinin
   danteli (`laceBand`) devralıyor — iki sistem aynı `_SeaWetLevelY`'den besleniyor.
+
+
+Dik kıyıda 0,60 m'lik derinlik bandı ekranda bir pikselin altına düşebilir. Devir genişliği
+bu nedenle `max(0,60 m, 2 × fwidth(edgeDepth))` okur. Ölçülen yatık sahilde metre tabanlı
+10 m geçiş değişmez; yalnız dik bankta en az iki piksellik optik temas korunur. Bu terim
+geometriyi veya su çizgisinin yerini oynatmaz.
 
 Dalga geometrisinin sönümü ayrı: `SEA_SHORE_GEOMETRY_FADE_DEPTH` 0,18 m. Optik devirle
 paylaşılmaz; paylaşılırsa ya dalga kıyıdan 10 m önce ölür ya renk geçişi 3 m'ye sıkışıp
@@ -1816,7 +1822,7 @@ atmıyor.
 `SeaSettings.extinctionRgb` su içindeki ışığın kanal başına sönümüdür ve sırası
 **R > G > B** kalır: `(0,300 / 0,075 / 0,050) m⁻¹`. Kırmızı en hızlı, mavi en yavaş
 söner. `upwellingColor` aynı yönü izler; mavi > yeşil > kırmızı
-`(0,08 / 0,45 / 0,65)`. Bu iki ayar birbirine ters çevrilmez; ters sıra açık denizi
+`(0,02 / 0,18 / 0,26)`. Bu iki ayar birbirine ters çevrilmez; ters sıra açık denizi
 çamurlu yeşile iter.
 
 Yansıma ışını geometrik ufkun altına baktığında çevre haritasının alt yarısı veya koyu

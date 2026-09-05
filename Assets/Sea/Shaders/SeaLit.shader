@@ -860,8 +860,14 @@ Shader "ToTheSummit/SeaLit"
                 //
                 // The terrain carries the waterline onward from here — the swash lace it
                 // draws on the sand starts where this ends.
+                // A fixed depth width becomes sub-pixel where a bank rises steeply. Keep the
+                // measured 0.60 m hand-off on a gentle beach, but guarantee a two-pixel optical
+                // hand-off at a cliff or a coarse bathymetry step. This widens colour only; the
+                // waterline geometry and its shared noise remain in the same physical place.
+                float shoreOpticalWidth = max(SEA_SHORE_OPTICAL_FADE_DEPTH,
+                    fwidth(edgeDepth) * SEA_SHORE_OPTICAL_MIN_PIXELS);
                 color = lerp(refracted, color,
-                             smoothstep(0.0, SEA_SHORE_OPTICAL_FADE_DEPTH, edgeDepth));
+                             smoothstep(0.0, shoreOpticalWidth, edgeDepth));
 
                 // THE SEA STANDS IN THE SAME AIR AS THE TERRAIN. Every layer is fogged
                 // once with ITS OWN distance — the terrain in its own shader, the cloud
