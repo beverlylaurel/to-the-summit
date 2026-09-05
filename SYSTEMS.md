@@ -1061,11 +1061,14 @@ Nesne maskesi bu terimi almaz — nesnede iz yok.
 
 **Arazi kar maskesi DENİZİ DE OKUR (2026-08-30).** Aynı maske deniz kotunu da sormuyordu;
 kar çizgisi sahilden aşağı devam edip su altında sürüyordu (`SYMPTOMS.md` → "Deniz dibinde
-kar birikiyor"). `MountainSurface.hlsl` maskeyi `smoothstep(seaReach, seaReach +
-_SeaWetFadeM, worldPos.y)` ile çarpıyor; `seaReach = max(_SeaWetLevelY, _SeaLevelY)`.
-Sınır **ıslak kum bandının astığı çizginin ta kendisi** — ikinci bir eşik yok, kar tam
-olarak kumun ıslak olmayı bıraktığı yerde başlıyor. Yağan tanecikler dokunulmadı: denize
-kar yağar, sadece birikmez. Kar → deniz yönünde tek bağ budur; deniz karı hiç okumaz.
+kar birikiyor"). Kar anlık `_SeaWetLevelY`'yi izlemiyor: o değer swash fazıyla ileri geri
+gittiğinde karı her dalgada silip yeniden üretiyordu. `SeaWetnessDriver`, Stockdon R2% maksimum
+tırmanışına yerel kıyı gürültüsü payını ekleyip sabit `_SeaSnowReachY` yayınlıyor;
+`MountainSurface.hlsl` karı bu kot ile onun `_SeaWetFadeM` üstü arasında açıyor. Islaklık ve
+köpük bu sabit koridor içinde hareket etmeye devam ediyor. Bu yüksek-su izi aktif deniz
+oturumu boyunca yalnız yükselebilir; hava sakinleşince yıkanmış zeminde kar aniden yeniden
+doğmaz. Deniz sistemi kapanınca sıfırlanır. Yağan tanecikler dokunulmadı:
+denize kar yağar, sadece birikmez. Kar → deniz yönünde tek bağ budur; deniz karı hiç okumaz.
 
 **Parıltının ayarı TEK yerde.** Parıltı per-materyal kalsaydı farklı sayılarla
 parıldarlardı. `_SparkleCellSize/Density/Sharpness/Intensity` global,
@@ -1285,13 +1288,13 @@ WindField ──► SeaEnvironmentBridge ──► SeaSimulation ──► RT_Di
 Terrain ──► SeaBathymetry ──► _SeaBathyTex ──┬─► SeaLit vertex (sığ su)
                                              └─► SeaLit fragment (kıyı maskesi, köpük)
 SeaSurface ──► görünürlük ──► SeaSimulation (görünmüyorsa compute kapalı)
-SeaManager ──► SeaWetnessDriver ──► MountainSurface.hlsl (ıslak kum)
+SeaManager ──► SeaWetnessDriver ──► MountainSurface.hlsl (ıslak kum + sabit karsız koridor)
 SeaManager ──► _SeaLevelY ──────────► MountainSurface.hlsl (kum bandı)
 ```
 
-**Yeni bağ (kar ↔ deniz):** arazi materyali artık İKİ ıslaklık kaynağı okuyor —
-yağış (`_SurfaceWetness`) ve deniz (`_SeaWetLevelY`). İkisi ayrı değişkende;
-çarpışsalardı yağmurlu havada kıyı iki kez koyulurdu.
+**Yeni bağ (kar ↔ deniz):** arazi materyali İKİ ıslaklık kaynağını ayrı okur — yağış
+(`_SurfaceWetness`) ve deniz (`_SeaWetLevelY`). Kar için hareketli seviyeyi yeniden kullanmaz;
+denizin o durumdaki maksimum erişimini `_SeaSnowReachY` üzerinden okur.
 
 ## 5. Bilinçli kurallar
 

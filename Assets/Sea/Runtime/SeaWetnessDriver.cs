@@ -7,8 +7,8 @@ using UnityEngine;
 
 /// THE SEA DOES NOT PAINT THE TERRAIN, IT PUBLISHES A LEVEL.
 ///
-/// Spec §14. All that leaves this component is two floats: the top elevation
-/// of the wet band and the band's thickness. The terrain material reads them
+/// Spec §14. All that leaves this component is a small set of global scalars: the
+/// animated wet band and the stable high-water mark used by snow. The terrain reads them
 /// and adjusts its own albedo and roughness. The sea system writes nothing
 /// into the terrain material — the other way round the two systems would
 /// overwrite each other.
@@ -21,6 +21,7 @@ using UnityEngine;
 public class SeaWetnessDriver : MonoBehaviour
 {
     [SerializeField] SeaSettings settings;
+    float snowReachY = -100000f;
 
     /// Fade thickness of the wet band (m). Wetness reaches zero this far
     /// above the level. [CALIBRATION]
@@ -67,7 +68,7 @@ public class SeaWetnessDriver : MonoBehaviour
         Disable();
     }
 
-    static void Disable()
+    void Disable()
     {
         // An elevation below the terrain: `smoothstep` then returns 0
         // everywhere.
@@ -75,6 +76,8 @@ public class SeaWetnessDriver : MonoBehaviour
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetFadeM, 1f);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetBandM, 1f);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetDarkening, 1f);
+        Shader.SetGlobalFloat(SeaShaderIDs.SeaSnowReachY, -100000f);
+        snowReachY = -100000f;
     }
 
     void Update()
@@ -95,5 +98,21 @@ public class SeaWetnessDriver : MonoBehaviour
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetFadeM, fadeMeters);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetBandM, bandMeters);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetDarkening, darkening);
+
+        // SNOW MUST NOT FOLLOW THE CURRENT SWASH PHASE. If it used the moving wet
+        // level, every uprush erased snow and every backwash regenerated it. Reserve
+        // the whole reach of the current sea state instead: Stockdon R2% is already
+        // the maximum run-up, and the final margin covers the terrain shader's local
+        // noise displacement of that edge.
+        float edgeNoiseMargin = Mathf.Min(fadeMeters * 0.70f, 0.22f);
+        float currentSnowReach = settings.seaLevelY
+                               + SeaRuntimeState.RunupHeight
+                               + edgeNoiseMargin;
+
+        // A calmer sea must not procedurally regrow snow on ground already washed
+        // during this active session. The high-water mark can rise, never fall; it
+        // resets only when the sea system is disabled.
+        snowReachY = Mathf.Max(snowReachY, currentSnowReach);
+        Shader.SetGlobalFloat(SeaShaderIDs.SeaSnowReachY, snowReachY);
     }
 }

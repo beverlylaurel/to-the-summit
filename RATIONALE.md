@@ -3835,6 +3835,15 @@ maliyeti doğmadı. Metre tabanlı `_SeaWetFadeM` korunurken `10 × fwidth(local
 ekran alt sınırı eklendi. Dört saniye arayla alınan iki fazda cephe ilerledi, fakat düz
 üçgen sınırı geri dönmedi.
 
+Aynı anlık `_SeaWetLevelY` kar maskesinde kullanıldığında başka bir zamansal hata üretiyordu:
+uprush karı siliyor, backwash aynı prosedürel karı yeniden açıyordu. Kar birikimi bir dalganın
+fazını değil, o deniz durumunun erişebildiği koridoru bilmelidir. `SeaWetnessDriver` bu yüzden
+Stockdon `RunupHeight` maksimumuna yerel kıyı gürültüsünün pozitif payını ekleyerek
+`_SeaSnowReachY` yayınlar. Islaklık hareketli kalır; kar yalnız bu sabit yüksek-su kotunun
+üstünde başlar. Deniz durumu sakinleştiğinde prosedürel karın geri doğmaması için bu değer
+aktif oturum boyunca `max(eski, yeni)` olarak tutulur ve yalnız deniz sistemi kapanınca
+sıfırlanır.
+
 Deniz saydam kuyrukta olduğu için URP'nin standart opak hareket vektörü geçişine girmez.
 Kuyruğu değiştirmek kırılma ve su kalınlığı okumalarını bozar; sabit görüntüde de bulunan bu
 eşik hatası çözülmüşken ayrı bir saydam hareket vektörü yolu eklenmedi.

@@ -78,6 +78,10 @@ float _SeaWetFadeM;
 float _SeaWetBandM;
 float _SeaWetDarkening;
 
+// Highest point the current sea state can wet, published separately from the
+// animated swash level. Snow uses this stable high-water mark.
+float _SeaSnowReachY;
+
 // STILL-WATER LEVEL, published by `SeaManager`. The sand band hangs from this, not
 // from `_SeaWetLevelY`: that one carries the run-up and rises and falls with every
 // wave, and a beach does not move at that rate.

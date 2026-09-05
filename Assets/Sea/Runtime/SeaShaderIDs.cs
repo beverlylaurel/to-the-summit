@@ -108,6 +108,7 @@ public static class SeaShaderIDs
     public static readonly int SeaWetFadeM = Shader.PropertyToID("_SeaWetFadeM");
     public static readonly int SeaWetBandM = Shader.PropertyToID("_SeaWetBandM");
     public static readonly int SeaWetDarkening = Shader.PropertyToID("_SeaWetDarkening");
+    public static readonly int SeaSnowReachY = Shader.PropertyToID("_SeaSnowReachY");
 
     // --- Diagnostics ---
 }

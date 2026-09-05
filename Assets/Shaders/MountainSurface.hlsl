@@ -772,13 +772,13 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // reaches the water melts; the sea bed never accumulates. The same is true of the swash
     // zone, which every run-up wets with that water.
     //
-    // The boundary is NOT a second invented line: it is `_SeaWetLevelY`, the run-up level the
-    // sea already publishes and the wet-sand band already hangs from, and it fades over
-    // `_SeaWetFadeM`, the same fade. Snow stops exactly where the sand stops being wet.
-    // `max` with the still level because the run-up is dragged far below the world when the
-    // sea is switched off, and the still level is the honest floor in that case.
-    float seaReach = max(_SeaWetLevelY, _SeaLevelY);
-    snowMask *= smoothstep(seaReach, seaReach + max(_SeaWetFadeM, 1e-3), worldPos.y);
+    // THIS BOUNDARY IS THE MAXIMUM REACH, NOT THE ANIMATED WET FRONT. Following
+    // `_SeaWetLevelY` made snow disappear under an uprush and procedurally regrow as
+    // the same wave withdrew. `SeaWetnessDriver` publishes Stockdon R2% plus the
+    // local edge-noise margin, so the entire in/out corridor stays snow-free while
+    // the wetness and foam remain free to move inside it.
+    snowMask *= smoothstep(_SeaSnowReachY,
+                           _SeaSnowReachY + max(_SeaWetFadeM, 1e-3), worldPos.y);
 
     if (snowMask > 0.001)
     {

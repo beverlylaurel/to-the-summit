@@ -12,6 +12,7 @@ public static class SeaOpticsTest
     const string ShaderPath = "Assets/Sea/Shaders/SeaLit.shader";
     const string TerrainSurfacePath = "Assets/Shaders/MountainSurface.hlsl";
     const string TerrainShaderPath = "Assets/Shaders/MountainSurface.shader";
+    const string WetnessDriverPath = "Assets/Sea/Runtime/SeaWetnessDriver.cs";
 
     [MenuItem("To The Summit/Sea/Test Optics", false, 83)]
     static void RunMenu() => Debug.Log(Run(out _));
@@ -23,6 +24,7 @@ public static class SeaOpticsTest
         string source = File.ReadAllText(ShaderPath);
         string terrainSource = File.ReadAllText(TerrainSurfacePath);
         string terrainShader = File.ReadAllText(TerrainShaderPath);
+        string wetnessDriver = File.ReadAllText(WetnessDriverPath);
 
         bool settingsFound = settings != null;
         bool physicalExtinction = settingsFound
@@ -48,6 +50,11 @@ public static class SeaOpticsTest
             && terrainSource.Contains("fwidth(localWetHeight) * 10.0")
             && terrainSource.Contains("float waterlineContact = 0.0")
             && terrainSource.Contains("lace = max(lace, waterlineContact)")
+            && terrainSource.Contains("smoothstep(_SeaSnowReachY,")
+            && !terrainSource.Contains("float seaReach = max(_SeaWetLevelY")
+            && wetnessDriver.Contains("SeaRuntimeState.RunupHeight")
+            && wetnessDriver.Contains("Mathf.Max(snowReachY, currentSnowReach)")
+            && wetnessDriver.Contains("SeaShaderIDs.SeaSnowReachY")
             && terrainShader.Contains("half shoreContact = surface.shoreContact")
             && terrainShader.Contains("max(lit, shoreSky)");
         bool shaderClean = shader != null && shader.isSupported

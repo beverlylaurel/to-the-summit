@@ -4689,9 +4689,12 @@ kıyı), kar kaplaması 1'e zorlanıp aynı kadraj iki kez çekildi:
 indirir ve denizin ısı sığası yüzey katmanını orada tutar; suya ulaşan tane erir, dip
 biriktirmez. Aynısı her tırmanışta o suyla ıslanan swash bölgesi için de geçerli.
 
-Maske artık `_SeaWetLevelY` — denizin zaten yayınladığı tırmanma kotu, ıslak kum bandının da
-astığı çizgi — üstünde `_SeaWetFadeM` ile açılıyor. **İkinci bir sınır uydurulmadı**: kar tam
-olarak kumun ıslak olmayı bıraktığı yerde başlıyor.
+**Takip belirtisi:** Maske hareketli `_SeaWetLevelY`'yi izlediğinde swash ilerlerken karı
+eziyor, gerilerken aynı yerde yeniden kar üretiyordu. Anlık faz yerine deniz durumunun
+Stockdon `RunupHeight` maksimumu kullanılıyor. `SeaWetnessDriver` yerel kenar gürültüsü payını
+da ekleyip `_SeaSnowReachY` yayınlıyor; kar bu sabit kotun üstünde yumuşakça başlıyor.
+Yüksek-su izi aktif deniz oturumu boyunca azalmaz; hava sakinleşince yıkanmış koridorda kar
+kendiliğinden geri oluşmaz.
 
 **Yağan tanecikler değiştirilmedi.** Denize kar yağar, sadece birikmez.
 
