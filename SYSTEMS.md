@@ -1458,16 +1458,29 @@ eşitliği `Sea/Test Constant Parity` denetliyor.
 - **Kesme** — `clip(edgeDepth)`, burada `edgeDepth = depth + gürültü * SEA_SHORE_EDGE_NOISE`.
   Gürültü köpüğünkiyle
   AYNI (`SeaFoamNoise`, `_SeaFoamBreakupTiling`); ikinci bir kaynak yok.
-- **Devir** — `lerp(refracted, color, smoothstep(0, shoreOpticalWidth, edgeDepth))`,
+- **Devir** — `lerp(refracted, color, shorePresence)`, burada `shorePresence` batimetrik
+  `edgeDepth` devri ile ekranda görünen opak yüzeye kalan `thickness` devrinin küçüğüdür.
   en sonda ve TEK terim. Yansıma, parıltı, su rengi ve köpük hepsi birlikte sönüyor;
   ölçülen kıyı eğiminde bandın kumdaki genişliği 10 m. Su çizgisini oradan arazinin
   danteli (`laceBand`) devralıyor — iki sistem aynı `_SeaWetLevelY`'den besleniyor.
 
 
-Dik kıyıda 0,60 m'lik derinlik bandı ekranda bir pikselin altına düşebilir. Devir genişliği
-bu nedenle `max(0,60 m, 2 × fwidth(edgeDepth))` okur. Ölçülen yatık sahilde metre tabanlı
-10 m geçiş değişmez; yalnız dik bankta en az iki piksellik optik temas korunur. Bu terim
-geometriyi veya su çizgisinin yerini oynatmaz.
+Dik kıyıda 0,60 m'lik dikey derinlik bandı ekranda bir pikselin altına düşebilir. Üstelik
+eğik bakışta görünen sınırı suyun altındaki batimetri değil, suyun önünde derinlik testini
+kazanan arazi silueti kurar. Batimetrik genişlik `max(0,60 m, 2 × fwidth(edgeDepth))`, görünür
+temas genişliği `max(0,35 m, 16 × fwidth(thickness))` okur. Ölçülen yatık sahilde metre tabanlı
+10 m geçiş değişmez; dik bankta su aynı pikselin gerçek opak sahne rengine 16 piksel içinde
+devredilir. Geometri veya su çizgisinin dünya konumu oynatılmaz.
+
+Görünür temasın içinde ince bir yıkama köpüğü bulunur. Bant `thickness` devrinin ortasında
+doğar ve iki dünya-uzayı gürültüsüyle parçalanır; kesintisiz beyaz kontur çizmez. Rengi ve
+parlaklığı yeni bir sabitten değil denizin mevcut `_SeaFoamColor` ve `foamLight` yolundan gelir.
+Arazi tarafı aynı teması `_SeaLevelY` çevresindeki dar, aynı `laceNoise` ile parçalanmış
+kalıntıdan devralır. Bu bandın metre genişliği dik yüzeyde tekrar bir pikselin altına
+düşmesin diye `10 × fwidth(worldPos.y)` ekran alt sınırı vardır. Dik bankanın yüzey normali
+gökyüzü yayılımını karartsa bile köpük siyaha dönmez: yalnız temas maskesinde yukarı yönlü
+`SampleSH` ışınımı kullanılır. Bu ışık zamana ve havaya bağlıdır; bağımsız emisyon değildir.
+Böylece opak derinlik sınırının iki tarafı da aynı kesintili köpük diliyle kapanır.
 
 Dalga geometrisinin sönümü ayrı: `SEA_SHORE_GEOMETRY_FADE_DEPTH` 0,18 m. Optik devirle
 paylaşılmaz; paylaşılırsa ya dalga kıyıdan 10 m önce ölür ya renk geçişi 3 m'ye sıkışıp

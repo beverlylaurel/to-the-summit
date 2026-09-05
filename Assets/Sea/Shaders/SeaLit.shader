@@ -866,8 +866,34 @@ Shader "ToTheSummit/SeaLit"
                 // waterline geometry and its shared noise remain in the same physical place.
                 float shoreOpticalWidth = max(SEA_SHORE_OPTICAL_FADE_DEPTH,
                     fwidth(edgeDepth) * SEA_SHORE_OPTICAL_MIN_PIXELS);
+
+                // `edgeDepth` describes the ground vertically below the water. An oblique
+                // camera can instead meet a bank in front of the water, where that bathymetry
+                // is still deep and the terrain wins the depth test in one hard silhouette.
+                // `thickness` is the view-space gap to the opaque scene, so it identifies the
+                // contact actually visible on screen. Fade through the exact scene colour over
+                // a stable screen-space span; unlike alpha blending this keeps the opaque/TAA contract.
+                float contactOpticalWidth = max(SEA_SHORE_CONTACT_MIN_PATH,
+                    fwidth(thickness) * SEA_SHORE_CONTACT_PIXELS);
+                float shorePresence = min(
+                    smoothstep(0.0, shoreOpticalWidth, edgeDepth),
+                    smoothstep(0.0, contactOpticalWidth, thickness));
                 color = lerp(refracted, color,
-                             smoothstep(0.0, shoreOpticalWidth, edgeDepth));
+                             shorePresence);
+
+                // A REAL CONTACT IS NOT A NAKED COLOUR SILHOUETTE. The water pushes a thin,
+                // aerated wash against the bank. It follows the same screen-space thickness
+                // that found the visible terrain contact, then two world-space noise scales
+                // remove any continuous white contour. The existing foam irradiance keeps it
+                // dark in shadow and bright under an open sky.
+                float contactT = saturate(thickness / contactOpticalWidth);
+                float contactBand = smoothstep(0.02, 0.22, contactT)
+                                  * (1.0 - smoothstep(0.62, 1.0, contactT));
+                float contactNoise = edgeNoiseRaw * 0.65
+                                   + SeaValueNoise(IN.positionWS.xz * 0.12 + 13.7) * 0.35;
+                float contactBreakup = smoothstep(0.30, 0.72, contactNoise);
+                float contactWash = contactBand * lerp(0.12, 0.42, contactBreakup);
+                color = lerp(color, _SeaFoamColor.rgb * foamLight, contactWash);
 
                 // THE SEA STANDS IN THE SAME AIR AS THE TERRAIN. Every layer is fogged
                 // once with ITS OWN distance — the terrain in its own shader, the cloud

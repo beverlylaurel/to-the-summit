@@ -335,6 +335,16 @@ Shader "ToTheSummit/MountainSurface"
                 LIGHT_LOOP_END
                 #endif
 
+                // FOAM AT A VERTICAL BANK STILL SEES THE SKY. The terrain BRDF uses the
+                // bank normal, so a shadowed face can turn even off-white contact foam
+                // nearly black and reveal the polygon silhouette again. Use the upward sky
+                // irradiance for the aerated residue only; it follows the time and weather,
+                // and therefore does not become a lighting-independent glow at night.
+                half shoreContact = surface.shoreContact * (1.0h - surface.snowMask);
+                half3 shoreSky = SampleSH(half3(0.0h, 1.0h, 0.0h))
+                               * half3(0.78h, 0.80h, 0.82h);
+                lit = lerp(lit, max(lit, shoreSky), shoreContact * 0.72h);
+
                 lit += surface.emission;
 
                 half4 color = half4(lit, 1.0);

@@ -49,6 +49,8 @@ public static class SeaConstantsTest
         ("ShoreGeometryFadeDepth", "SEA_SHORE_GEOMETRY_FADE_DEPTH"),
         ("ShoreOpticalFadeDepth", "SEA_SHORE_OPTICAL_FADE_DEPTH"),
         ("ShoreOpticalMinPixels", "SEA_SHORE_OPTICAL_MIN_PIXELS"),
+        ("ShoreContactMinPath", "SEA_SHORE_CONTACT_MIN_PATH"),
+        ("ShoreContactPixels", "SEA_SHORE_CONTACT_PIXELS"),
         ("ShoreEdgeNoise", "SEA_SHORE_EDGE_NOISE"),
         ("ChopFadeDepth", "SEA_CHOP_FADE_DEPTH"),
         ("GammaMild", "SEA_GAMMA_MILD"),

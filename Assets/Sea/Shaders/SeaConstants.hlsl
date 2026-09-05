@@ -89,6 +89,12 @@
 /// pixel count back into the bathymetry's metre-valued depth domain.
 #define SEA_SHORE_OPTICAL_MIN_PIXELS 2.00
 
+/// Minimum view-space water path used by the terrain-contact hand-off (m).
+#define SEA_SHORE_CONTACT_MIN_PATH 0.35
+
+/// Visible terrain-contact hand-off width (pixels).
+#define SEA_SHORE_CONTACT_PIXELS 16.00
+
 /// How far the waterline is displaced by the foam's own noise (m of depth).
 /// On the measured 5% shore slope this moves the line about 1.2 m, which stays
 /// under the 2.9 m feature size of the noise that produces it.

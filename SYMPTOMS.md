@@ -6023,10 +6023,20 @@ korunuyor.
 **Belirti:** Su/zemin sınırı yatık kumsalda kabul edilebilirken dik kıyıda tek piksellik,
 keskin bir çizgiye dönüşüyordu.
 
-**Sebep:** Optik geçiş yalnız 0,60 m batimetri derinliğine bağlıydı. Dik bankta bu derinlik
-bir ekran pikselinden kısa mesafede geçiliyor; son renk devri görünmeden `clip` sınırına
-varıyordu.
+**İlk düzeltme yetersizdi:** Optik geçişin batimetrik genişliğine
+`2 × fwidth(edgeDepth)` eklendi, fakat gönderilen doğrulama karesinde çizgi hâlâ keskindi.
+Bu alan suyun dikey altı değil, kameraya eğik duran arazi siluetiydi; `edgeDepth` yanlış
+mesafeyi ölçüyordu.
 
-**Düzeltme:** Fiziksel 0,60 m bant korunup genişliğe `2 × fwidth(edgeDepth)` alt sınırı
-eklendi. Yatık sahilin 10 m'lik geçişi değişmiyor; yalnız dik veya kaba örneklenmiş kıyıda
-iki piksellik optik temas oluşuyor. Geometri sınırı, kıyı gürültüsü ve köpük yeri değişmedi.
+**Gerçek sebep ve düzeltme:** Görünür sınır, su yüzeyi ile opak sahne derinliği arasındaki
+`thickness` sıfıra inerken oluşuyor. Son renk devri hem `edgeDepth` hem `thickness` okuyor.
+İki ve sekiz piksellik temas 1944 genişlikte hâlâ çizgi okunduğu için batimetri alt sınırı iki,
+görünür arazi teması 16 piksel tutuluyor. Yatık sahilin 10 m'lik geçişi değişmiyor; eğik veya dik
+temas aynı pikselin gerçek arazi rengine yumuşakça devrediyor.
+Çıplak geometri siluetinin yine okunmaması için aynı temasın ortasında mevcut köpük ışığını
+okuyan, iki dünya-uzayı gürültüsüyle parçalanmış ince yıkama bulunuyor. Opak arazi tarafı da
+mevcut `laceNoise` ile kesilen dar su çizgisi kalıntısını çizer; köpük dili derinlik sınırının
+iki yanında buluşur. Arazi bandı dik yüzeyde piksel altına düşmemek için
+`10 × fwidth(worldPos.y)` alt sınırı alır. Dik bankanın normali köpüğü neredeyse siyaha
+çevirmesin diye yalnız bu maskede yukarı yönlü gökyüzü SH ışınımı okunur; gece ve hava
+durumuyla birlikte kararır. Geometri sınırı ve kıyı gürültüsünün dünya konumu değişmedi.

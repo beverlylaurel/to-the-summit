@@ -3806,9 +3806,26 @@ aynı kıyı kadrajında `(0,02 / 0,18 / 0,26)` kumun rengini korurken açık su
 döndürmeden mavi tuttu.
 
 İkinci kadraj, sabit 0,60 m optik kıyı bandının dik arazide ekranda bir pikselin altına
-sıkıştığını gösterdi. Fiziksel bant yatık sahilde korunuyor; `fwidth(edgeDepth)` yalnız
-gerekli olduğunda iki piksellik alt sınır veriyor. Suyun kesildiği dünya konumu değişmedi,
-yalnız son su pikselleri arkalarındaki kırılmış arazi rengine daha yumuşak devrediliyor.
+sıkıştığını gösterdi. İlk düzeltme yalnız `fwidth(edgeDepth)` ekledi ve yeterli olmadı;
+gönderilen doğrulama karesinde sınır hâlâ keskindi. Çünkü eğik bakıştaki çizgiyi dikey
+batimetri değil, suyun önünde derinlik testini kazanan arazi silueti kuruyordu. Gerçek ekran
+teması, opak sahne derinliği ile su derinliği arasındaki `thickness` üzerinden ayrıca
+ölçülüyor. İki ve sekiz piksellik görünür temas 1944 piksel genişliğindeki doğrulama karesinde
+çizgi gibi kaldı; kullanıcının aynı kare üzerindeki kontrolü bunu yakaladı. Fiziksel bant
+yatık sahilde korunurken batimetri iki, görünür arazi teması 16 piksellik alt sınır alıyor;
+son su pikselleri aynı pikselin gerçek opak sahne rengine devrediliyor.
+
+Renk devri tek başına siyah arazi ile hareketli su arasındaki gerçek geometri siluetini
+saklayamaz. Son eksik işaret temas köpüğüydü. Aynı `thickness` bandının ortasına, iki ölçekte
+dünya-uzayı gürültüsüyle kesilen düşük örtücülüklü yıkama eklendi. Mevcut foam irradiance
+okunduğu için gölgede beyaz boya gibi yanmıyor; sürekli kontur yerine kopuk aerasyon bırakıyor.
+Su yalnız kendi pikselini boyayabildiği için opak arazi tarafında hâlâ çıplak bir yarım sınır
+kalabilirdi. Terrain'in zaten var olan `laceNoise` alanı, `_SeaLevelY` çevresindeki dar temas
+kalıntısını da parçalar. Metre tabanlı ilk arazi kalıntısı dik yüzeyde yine piksel altına
+düştüğü için genişlik `10 × fwidth(worldPos.y)` ile ekrana bağlandı. Köpüğün dik ve gölgeli
+bankta siyaha dönmesi de yukarı yönlü gökyüzü SH ışınımıyla giderildi; bu değer hava ve gün
+döngüsüyle kararır, emisyon değildir. Yeni doku, ikinci zaman kaynağı veya düz yükseklik
+konturu eklenmedi.
 
 Deniz saydam kuyrukta olduğu için URP'nin standart opak hareket vektörü geçişine girmez.
 Kuyruğu değiştirmek kırılma ve su kalınlığı okumalarını bozar; sabit görüntüde de bulunan bu

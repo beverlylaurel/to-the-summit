@@ -63,6 +63,14 @@ public static class SeaConstants
     /// Gentle beaches remain governed by ShoreOpticalFadeDepth. [CALIBRATION]
     public const float ShoreOpticalMinPixels = 2.00f;
 
+    /// Shortest view-space water path that can carry a fully visible surface (m).
+    /// Nearer opaque geometry is the actual on-screen shore contact. [CALIBRATION]
+    public const float ShoreContactMinPath = 0.35f;
+
+    /// Visible terrain-contact hand-off width (pixels). Two and eight pixels still read as
+    /// a geometric cut at the 1944-wide game view. [CALIBRATION]
+    public const float ShoreContactPixels = 16.00f;
+
     /// Waterline displacement by the foam noise (m of depth). [CALIBRATION]
     public const float ShoreEdgeNoise = 0.06f;
 

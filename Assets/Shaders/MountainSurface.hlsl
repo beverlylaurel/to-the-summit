@@ -154,6 +154,10 @@ struct MountainSurface
     half  smoothness;
     half  occlusion;
 
+    /// Broken sky-lit residue at the still-water contact. Carried to the lighting
+    /// pass because a vertical bank's ordinary normal can receive almost no sky diffuse.
+    half  shoreContact;
+
     /// Local height of the snow surface (m). `SnowSurfaceSlope` returns it together with the
     /// gradient; ambient occlusion reads it. A separate call would have meant six more
     /// noise samples per pixel.
@@ -516,6 +520,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // Bit-identical: every term below is multiplied into `albedo` through a weight that is
     // exactly 0 up there, and `seaRough` further down reads `swash`, which is initialised to 0.
     float swash = 0.0;
+    float waterlineContact = 0.0;
 
     if (worldPos.y < max(_SeaWetLevelY, _SeaLevelY))
     {
@@ -562,6 +567,22 @@ MountainSurface BuildMountainSurface(float3 worldPos)
                         + MountainFbm(worldPos * 3.1, 2) * 0.5;
 
         float lace = saturate((laceBand - (1.25 - laceNoise) * 0.7) * 2.2);
+
+        // THE ACTUAL WATER CONTACT MUST EXIST ON BOTH SIDES OF THE DEPTH EDGE.
+        // The moving swash lace above can contain a wide open gap exactly where opaque
+        // terrain wins over the sea, exposing the geometric silhouette. Keep a narrow,
+        // broken residue around the still-water level. The same noise supplies the gaps;
+        // this is not a continuous elevation contour.
+        // A metre-only width collapses below one pixel on a steep bank. Convert a
+        // ten-pixel minimum back into world height with the fragment derivative so
+        // the contact remains a soft, readable band at every shore angle and zoom.
+        float waterlineWidth = max(max(_SeaWetFadeM * 0.55, 0.08),
+                                   fwidth(worldPos.y) * 10.0);
+        float waterlineBand = 1.0 - smoothstep(0.03, waterlineWidth,
+                                               abs(worldPos.y - _SeaLevelY));
+        float waterlineBreakup = smoothstep(0.45, 0.90, laceNoise);
+        waterlineContact = waterlineBand * lerp(0.10, 0.82, waterlineBreakup);
+        lace = max(lace, waterlineContact);
 
         // Foam is a scattering surface: it takes the light but shows none of the
         // sand under it. The colour is the sea's foam colour, kept off-white.
@@ -632,6 +653,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     surface.snowDentDepth = 0;
     surface.albedo = albedo;
     surface.emission = Alpenglow(worldPos, normalWS, altitude, albedo, exposure);
+    surface.shoreContact = (half)waterlineContact;
     surface.normalWS = shaded;
     // A millimetric water film follows the geometric ground, not every grain in the rock
     // normal. Keeping the impact slope while leaving the coarse material relief underneath
