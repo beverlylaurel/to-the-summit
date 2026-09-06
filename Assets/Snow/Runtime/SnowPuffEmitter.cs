@@ -15,6 +15,8 @@ public class SnowPuffEmitter : MonoBehaviour
     [Tooltip("Ayak konumu.")]
     [SerializeField] Transform footAnchor;
 
+    GroundSurfaceContact surfaceContact;
+
 
     [Header("Tetik")]
     [Tooltip("The source of the step event. Left empty, this component does nothing " +
@@ -25,6 +27,7 @@ public class SnowPuffEmitter : MonoBehaviour
     // this class; the walking system can change without this changing.
     void OnEnable()
     {
+        surfaceContact = GroundSurfaceContact.Require(this);
         if (rhythm != null) rhythm.Stepped += OnStep;
     }
 
@@ -61,6 +64,7 @@ public class SnowPuffEmitter : MonoBehaviour
 
         Vector3 p = footAnchor != null ? footAnchor.position : transform.position;
 
+        if (surfaceContact == null || !surfaceContact.SupportsSnow) return;
         if (sampler == null || particles == null) return;
         if (!sampler.TrySampleSnow(p, out SnowSample sample)) return;
 

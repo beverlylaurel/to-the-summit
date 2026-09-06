@@ -82,6 +82,7 @@ public class SnowFootprintDeformer : SnowDeformer
     }
 
     Ayak sol, sag;
+    GroundSurfaceContact surfaceContact;
 
     public override int SegmentCount => SoleSections.Length * 2;
 
@@ -107,7 +108,9 @@ public class SnowFootprintDeformer : SnowDeformer
 
         // A foot in the air leaves no mark: the sinking multiplier is zero and `KDeform`
         // writes nothing there.
-        float pressure = ayak.basili ? baseB.w * bol.w : 0f;
+        float pressure = ayak.basili && surfaceContact != null && surfaceContact.SupportsSnow
+            ? baseB.w * bol.w
+            : 0f;
 
         a = new Vector4(pa.x, pa.y, pa.z, radius);
         b = new Vector4(pb.x, pb.y, pb.z, pressure);
@@ -116,6 +119,8 @@ public class SnowFootprintDeformer : SnowDeformer
     protected override void OnEnable()
     {
         base.OnEnable();
+
+        surfaceContact = GroundSurfaceContact.Require(this);
 
         Yerlestir(ref sol, true);
         Yerlestir(ref sag, false);

@@ -39,12 +39,14 @@ public class SnowSprayController : MonoBehaviour
 
     Vector3 prevPos;
     float carry;
+    GroundSurfaceContact surfaceContact;
 
     public float LastRate { get; private set; }
     public float LastSpeed { get; private set; }
 
     void OnEnable()
     {
+        surfaceContact = GroundSurfaceContact.Require(this);
         Transform source = velocitySource != null ? velocitySource : transform;
         prevPos = source.position;
         carry = 0f;
@@ -81,7 +83,12 @@ public class SnowSprayController : MonoBehaviour
         LastSpeed = delta.magnitude / dt;
         LastRate = 0f;
 
-        if (sampler == null || particles == null) return;
+        if (surfaceContact == null || !surfaceContact.SupportsSnow
+            || sampler == null || particles == null)
+        {
+            carry = 0f;
+            return;
+        }
 
         Vector3 foot = footAnchor != null ? footAnchor.position : transform.position;
 

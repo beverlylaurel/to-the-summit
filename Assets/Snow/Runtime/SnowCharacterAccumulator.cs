@@ -54,8 +54,8 @@ public class SnowCharacterAccumulator : MonoBehaviour
     /// code uses this.
     public void SetEnvironment(ISnowEnvironmentSource source) => env = source;
 
-    /// The sky visibility is on the GPU; it is supplied to the CPU side from here.
-    /// Once `SnowSampler` (Phase 9) arrives it will be fed from there.
+    /// Optional per-character visibility supplied by tests or a future body occlusion probe.
+    /// Runtime shelter exposure is combined with it rather than replaced by it.
     public void SetSkyVisibility(float value) => skyVisibility = Mathf.Clamp01(value);
 
     void OnEnable()
@@ -83,10 +83,14 @@ public class SnowCharacterAccumulator : MonoBehaviour
     /// accumulation logic is callable from outside so it can be tested without entering Play.
     public void Step(float dt, float speed)
     {
-        accum += SnowRuntimeState.SnowfallIntensity01 * accumulationRate * dt * skyVisibility;
+        ShelterExposure shelter = ShelterExposure.Active;
+        float shelterExposure = shelter != null ? shelter.PrecipitationExposure : 1f;
+        float exposedSky = Mathf.Min(skyVisibility, shelterExposure);
+
+        accum += SnowRuntimeState.SnowfallIntensity01 * accumulationRate * dt * exposedSky;
         accum -= speed * shakeOffRate * dt;
 
-        if (skyVisibility < shelteredBelow) accum -= shelterClearRate * dt;
+        if (exposedSky < shelteredBelow) accum -= shelterClearRate * dt;
 
         // RAIN WIPES THE SNOW OFF FAST (spec §16.1) — but the condition DIFFERS from the
         // spec's, for a measured reason.
@@ -107,7 +111,7 @@ public class SnowCharacterAccumulator : MonoBehaviour
                        env.PrecipKind != PrecipitationKind.None &&
                        !SnowRuntimeState.IsSnowing;
 
-        if (raining) accum -= rainClearRate * dt;
+        if (raining) accum -= rainClearRate * dt * exposedSky;
 
         accum = Mathf.Clamp01(accum);
 

@@ -34,6 +34,8 @@ public class SnowFootstepAudio : MonoBehaviour
     [Tooltip("Ayak konumu.")]
     [SerializeField] Transform footAnchor;
 
+    GroundSurfaceContact surfaceContact;
+
 
     [Header("Tetik")]
     [Tooltip("The source of the step event. Left empty, this component does nothing " +
@@ -44,6 +46,7 @@ public class SnowFootstepAudio : MonoBehaviour
     // this class; the walking system can change without this changing.
     void OnEnable()
     {
+        surfaceContact = GroundSurfaceContact.Require(this);
         if (rhythm != null) rhythm.Stepped += OnStep;
     }
 
@@ -100,6 +103,12 @@ public class SnowFootstepAudio : MonoBehaviour
     public bool PlayFootstep()
     {
         Vector3 p = footAnchor != null ? footAnchor.position : transform.position;
+
+        if (surfaceContact == null || !surfaceContact.SupportsSnow)
+        {
+            LastSurface = SnowFootstepSurface.None;
+            return false;
+        }
 
         if (sampler == null || !sampler.TrySampleSnow(p, out SnowSample sample))
         {

@@ -33,7 +33,8 @@ public static class ShelterExposureTest
             bool sealedInterior = sensor.IsIndoors && sensor.Opening01 < 0.01f
                                && sensor.PrecipitationExposure < 0.05f
                                && sensor.WindTransmission < 0.05f
-                               && sensor.RainTransmission > 0.05f;
+                               && sensor.RainTransmission > 0.05f
+                               && sensor.LightningDirectTransmission < 0.05f;
             report.AppendLine("  [" + M(sealedInterior) + "] sealed room: cover="
                 + sensor.Cover01.ToString("F2") + ", opening=" + sensor.Opening01.ToString("F2")
                 + ", dry radius=" + sensor.DryRadius.ToString("F2") + " m");

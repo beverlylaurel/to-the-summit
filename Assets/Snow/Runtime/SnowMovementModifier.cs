@@ -15,11 +15,15 @@ public class SnowMovementModifier : MonoBehaviour
     [Tooltip("Ayak konumu.")]
     [SerializeField] Transform footAnchor;
 
+    GroundSurfaceContact surfaceContact;
+
     /// 1 = yavaslama yok. Kar yoksa veya veri gelmediyse hep 1.
     public float SpeedMultiplier { get; private set; } = 1f;
 
     /// Son okunan ornek — tesis ve pusskurtme bunu da kullaniyor.
     public SnowSample LastSample { get; private set; }
+
+    void OnEnable() => surfaceContact = GroundSurfaceContact.Require(this);
 
     /// Spec 19.2 birebir. Sig karda yavaslama yok; derin ve GEVSEK karda en
     /// cok yavaslama var. Sikismis patikada kar derin olsa bile yavaslatmiyor
@@ -36,7 +40,8 @@ public class SnowMovementModifier : MonoBehaviour
     {
         Vector3 p = footAnchor != null ? footAnchor.position : transform.position;
 
-        if (sampler == null || !sampler.TrySampleSnow(p, out SnowSample sample))
+        if (surfaceContact == null || !surfaceContact.SupportsSnow || sampler == null
+            || !sampler.TrySampleSnow(p, out SnowSample sample))
         {
             SpeedMultiplier = 1f;
             LastSample = default;

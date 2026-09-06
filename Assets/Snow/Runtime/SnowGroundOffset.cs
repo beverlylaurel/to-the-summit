@@ -33,12 +33,17 @@ public class SnowGroundOffset : MonoBehaviour
     [SerializeField, Min(0f)] float smoothing = 0.06f;
 
     CharacterController controller;
+    GroundSurfaceContact surfaceContact;
 
     /// The correction currently applied. As the character walks the surface height
     /// changes; applied INSTANTLY the camera jumps.
     float uygulanan;
 
-    void Awake() => controller = GetComponent<CharacterController>();
+    void Awake()
+    {
+        controller = GetComponent<CharacterController>();
+        surfaceContact = GroundSurfaceContact.Require(this);
+    }
 
     void OnEnable() => uygulanan = 0f;
 
@@ -47,6 +52,14 @@ public class SnowGroundOffset : MonoBehaviour
     void LateUpdate()
     {
         if (snowManager == null) return;
+
+        // A constructed floor may sit over snowy terrain. In that case the previous snow
+        // correction is no longer meaningful; normal controller gravity settles onto the floor.
+        if (surfaceContact == null || !surfaceContact.SupportsSnow)
+        {
+            uygulanan = 0f;
+            return;
+        }
 
         // No surface correction while airborne: the character must not be pulled up while
         // jumping. The correction returns to zero slowly so the landing is soft.

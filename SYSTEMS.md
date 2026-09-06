@@ -2220,6 +2220,20 @@ Sensör, sahnede ikinci bir dinleyici referansı taşımamak için çalışma za
 Sayısal sözleşme `To The Summit/Weather/Shelter Exposure Test`; bütün sekiz karakol prefabi
 ayrıca Play Mode fizik taramasından geçer.
 
+Oyuncunun ayağındaki dünya koordinatı tek başına yüzey türü değildir. `GroundSurfaceContact`
+ayağın altındaki en yakın gerçek collider'ı ölçer. `TerrainCollider` varsayılan olarak kar
+taşır; yapı döşemesi gibi diğer collider'lar, açıkça `GroundSurfaceProperties` ile aksi
+belirtilmedikçe alttaki arazi karını keser. Kar yüksekliği, hareket yavaşlaması, ayak sesi,
+ayak izi, adım pufu ve koşu püskürtmesi bu ortak kapıyı kullanır. Böylece döşemenin altında
+kar simülasyonu bulunsa bile oyuncu içeride yükselmez, yavaşlamaz veya kara iz yazmaz.
+
+Barınak maruziyeti ayrıca karakter üstündeki kar birikimini ve sürüklenen kar katmanlarını
+azaltır; kapalı alana girildiğinde mevcut sürüklenme parçacıkları temizlenir. Yıldırımın
+gökyüzü ve bulut parlaması açıklıklardan görünür kalırken gölgesiz yönlü ışığın iç mekana
+doğrudan katkısı açıklık payıyla kısılır. `GroundSnap` önce oyuncunun yakınındaki döşemeyi
+arar; yalnız yerel zemin bulunamazsa yukarıdan dünya taramasına geçer, böylece yapı içi
+başlangıç noktası çatının üstüne taşınmaz.
+
 ## Ortak elde tutulan eşya ve etkileşim sistemi (2026-09-05)
 
 `HeldItemSystem`, oyuncuya bootstrap tarafından açıkça verilen `EquippableItem` listesinin

@@ -274,7 +274,15 @@ public class LightningFlash : MonoBehaviour
 
     void Apply(float value)
     {
-        flash.intensity = peakIntensity * value;
+        ShelterExposure shelter = ShelterExposure.Active;
+        float directTransmission = shelter != null
+            ? shelter.LightningDirectTransmission
+            : 1f;
+
+        // Cloud and sky glow remain visible through openings. Only direct, shadowless light
+        // reaching local geometry is attenuated indoors; otherwise closed walls light up as
+        // though they were absent.
+        flash.intensity = peakIntensity * value * directTransmission;
 
         // rgb is premultiplied: the sky and the cloud read the same value and do not pick the
         // colour separately. w gives the intensity on its own if needed.

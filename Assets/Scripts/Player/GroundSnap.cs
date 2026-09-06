@@ -12,11 +12,15 @@ public class GroundSnap : MonoBehaviour
     [SerializeField] Terrain terrain;
     [Tooltip("Height the ray starts from (metres).")]
     [SerializeField] float probeHeight = 500f;
+    [Tooltip("Distance above and below the current position used to prefer the local floor.")]
+    [SerializeField] float localProbeAbove = 0.5f;
+    [SerializeField] float localProbeBelow = 3f;
     [SerializeField] float clearance = 0.1f;
     [Tooltip("Falling this far below the ground triggers another placement.")]
     [SerializeField] float rescueDepth = 30f;
 
     CharacterController controller;
+    readonly RaycastHit[] hits = new RaycastHit[24];
 
     public void Bind(Terrain target) => terrain = target;
 
@@ -27,27 +31,39 @@ public class GroundSnap : MonoBehaviour
         if (terrain == null)
             throw new InvalidOperationException($"{nameof(GroundSnap)}: {nameof(terrain)} is not assigned.");
 
-        Snap();
+        SnapNow();
     }
 
     void Update()
     {
         // Rescue if they slipped under the terrain. A fall must not go on forever unnoticed.
         float floor = terrain.transform.position.y - rescueDepth;
-        if (transform.position.y < floor) Snap();
+        if (transform.position.y < floor) SnapNow();
     }
 
-    void Snap()
+    public void SnapNow()
     {
+        if (controller == null) controller = GetComponent<CharacterController>();
+
         Vector3 position = ClampInsideTerrain(transform.position);
 
         // Do not let their own capsule block the ray: it is measured with the controller
         // disabled. While enabled the ray hit the player's own collider first and the ground was never seen.
         controller.enabled = false;
 
-        var origin = new Vector3(position.x, position.y + probeHeight, position.z);
-        if (Physics.Raycast(origin, Vector3.down, out var hit, probeHeight * 4f,
-                ~0, QueryTriggerInteraction.Ignore))
+        Vector3 localOrigin = position + Vector3.up * localProbeAbove;
+        bool found = TryNearestGround(localOrigin, localProbeAbove + localProbeBelow,
+                                      out RaycastHit hit);
+
+        // The local probe preserves a floor inside a building. A ray beginning hundreds of
+        // metres above would encounter the roof first and teleport an indoor spawn onto it.
+        if (!found)
+        {
+            Vector3 worldOrigin = new(position.x, position.y + probeHeight, position.z);
+            found = TryNearestGround(worldOrigin, probeHeight * 4f, out hit);
+        }
+
+        if (found)
         {
             position.y = hit.point.y + clearance;
         }
@@ -59,6 +75,28 @@ public class GroundSnap : MonoBehaviour
 
         transform.position = position;
         controller.enabled = true;
+    }
+
+    bool TryNearestGround(Vector3 origin, float distance, out RaycastHit nearestHit)
+    {
+        nearestHit = default;
+        int count = Physics.RaycastNonAlloc(origin, Vector3.down, hits, distance, ~0,
+                                            QueryTriggerInteraction.Ignore);
+        float nearest = float.PositiveInfinity;
+        bool found = false;
+
+        for (int i = 0; i < count; i++)
+        {
+            Collider candidate = hits[i].collider;
+            if (candidate == null || candidate.transform.IsChildOf(transform)) continue;
+            if (hits[i].distance >= nearest) continue;
+
+            nearest = hits[i].distance;
+            nearestHit = hits[i];
+            found = true;
+        }
+
+        return found;
     }
 
     /// A position outside the terrain finds no ground below it; it is pulled inside the bounds

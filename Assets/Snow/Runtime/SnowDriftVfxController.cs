@@ -66,6 +66,8 @@ public class SnowDriftVfxController : MonoBehaviour
     /// Diagnostic: the saltation rate.
     public float SpindriftRate { get; private set; }
 
+    bool wasSheltered;
+
     /// Spec §18.7: saltation is born in the strip DOWNWIND of the camera.
     /// The strip is 30 m; the box centre is half that far ahead.
     const float SpindriftLead = 15f;
@@ -98,8 +100,18 @@ public class SnowDriftVfxController : MonoBehaviour
 
         FollowTarget();
 
+        ShelterExposure shelter = ShelterExposure.Active;
+        float exposure = shelter != null ? shelter.PrecipitationExposure : 1f;
+        bool sheltered = exposure < 0.08f;
+        if (sheltered && !wasSheltered)
+        {
+            if (spindrift != null) spindrift.Reinit();
+            if (curtain != null) curtain.Reinit();
+        }
+        wasSheltered = sheltered;
+
         DriftActive01 = DriftActiveFor(
-            environment.WindSpeed, SnowRuntimeState.LooseSnowFraction);
+            environment.WindSpeed, SnowRuntimeState.LooseSnowFraction) * exposure;
 
         // Spec §18.7 System A: `_SpindriftRate * DriftActive01² * LooseSnowFraction`.
         //

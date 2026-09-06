@@ -6108,6 +6108,25 @@ açıklık ölçümünü kullanıyor. Sensörün sentetik kapalı oda/açık kap
 sekiz oyun prefabi Play Mode fizik taramasında barınak hacmi üretti. Yağmur ve kar regresyon
 testleri ile iki shader derlemesi temiz tamamlandı.
 
+## Yapı döşemesinde alttaki arazi karı oyuncuyu etkiliyor — ÇÖZÜLDÜ (2026-09-06)
+
+**Belirti:** Yapı içinde görünen yüzey kuru bir döşeme olsa da dünya koordinatının altındaki
+arazi karı karakter yüksekliğini ve hızını değiştirebilir; kar ayak sesi, iz, puf ve koşu
+püskürtmesi üretebilirdi. Karakter üstünde kar birikimi ile sürüklenen kar da çatı maruziyetini
+okumuyordu. Başlangıç yerleştirmesinin yüzlerce metre yukarıdan gönderdiği ışın, yapı içi
+zeminden önce çatıyı bulabiliyordu.
+
+**Sebep:** Kar tüketicileri gerçek temas collider'ını değil yalnız XZ konumundaki GPU kar
+örneğini okuyordu. `SnowCharacterAccumulator.SetSkyVisibility` çalışma zamanında beslenmiyor,
+varsayılan değer açık gökyüzü olarak kalıyordu. `SnowDriftVfxController` ve yıldırımın
+gölgesiz yönlü ışığı da yerel barınak ölçümüne bağlı değildi.
+
+**Düzeltme:** `GroundSurfaceContact` gerçek yüzeyi tek noktadan yayımlar; bütün karakter-kar
+etkileşimleri yalnız kar taşıyan yüzeyde çalışır. Karakter birikimi, sürüklenen kar ve doğrudan
+yıldırım ışığı `ShelterExposure` ile bağlandı. `GroundSnap` yakın döşemeyi yukarıdan yapılan
+dünya taramasından önce seçer. Sentetik test, arazi karını kabul eden açık zemin, karı kesen
+yapı döşemesi ve çatının altında kalan yerel başlangıç zemini vakalarını kapsar.
+
 ## Karakol yüzeyleri tekrarlı, kabuk aralıkları ışık sızdırıyor — ÇÖZÜLDÜ (2026-09-05)
 
 **Belirti:** Uzun duvarlarda aynı doku lekesi düzenli aralıklarla tekrar ediyor, renk izi

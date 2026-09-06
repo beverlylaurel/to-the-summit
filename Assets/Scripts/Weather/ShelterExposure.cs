@@ -53,6 +53,8 @@ public sealed class ShelterExposure : MonoBehaviour
         0.015f + 0.12f * Opening01, Interior01);
     public float ThunderTransmission => Mathf.Lerp(1f,
         0.42f + 0.20f * Mathf.Sqrt(Opening01), Interior01);
+    public float LightningDirectTransmission => Mathf.Lerp(1f,
+        0.025f + 0.22f * Mathf.Sqrt(Opening01), Interior01);
 
     public void Bind(Transform listener)
     {
