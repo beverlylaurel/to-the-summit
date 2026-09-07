@@ -12,9 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6adea758486df9e438a44dc3532269fa, type: 3}
   m_Name: MountainRoute
   m_EditorClassIdentifier: Assembly-CSharp::MountainRoute
-  spawn: {x: 0.25020507, y: 0.35575387}
-  spawnYaw: 41.424496
+  spawn: {x: 0.110139325, y: 0.32087365}
+  spawnYaw: 24.862349
   spawnSet: 1
+  basePosition: {x: 0.11050224, y: 0.32104182}
+  baseYaw: -155.13765
+  baseSet: 1
   road: []
   branches:
   - name: "T\u0131rman\u0131\u015F rotas\u0131"

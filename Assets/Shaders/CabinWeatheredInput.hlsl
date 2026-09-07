@@ -11,6 +11,8 @@
                 float  _MacroStrength;
                 float  _RoughnessVariation;
                 float  _ThirdPhaseStrength;
+                float  _TextureMipBias;
+                float  _AtlasStrength;
                 float  _Cutoff;
             CBUFFER_END
 #endif

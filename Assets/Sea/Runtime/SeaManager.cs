@@ -36,6 +36,8 @@ public class SeaManager : MonoBehaviour
     /// `time / currentPeriod`: when Hs or Tp changes, division by the new period
     /// would move the whole shoreline in one frame.
     float swashClock;
+    float smoothedRunupHeight;
+    bool runupInitialized;
 
     /// The shore's own geometry: found once, because the terrain does not move.
     Vector2 shoreAnchor;
@@ -470,10 +472,26 @@ public class SeaManager : MonoBehaviour
         PublishPeel(b);
         float hsl0 = SeaRuntimeState.SignificantWaveHeight * l0;
 
-        SeaRuntimeState.RunupHeight =
+        float physicalRunup =
             1.1f * (0.35f * b * Mathf.Sqrt(hsl0)
                   + Mathf.Sqrt(hsl0 * (0.563f * b * b + 0.004f)) * 0.5f);
 
+        float targetRunup = physicalRunup * settings.runupReachScale;
+        if (!runupInitialized || !Application.isPlaying)
+        {
+            smoothedRunupHeight = targetRunup;
+            runupInitialized = true;
+        }
+        else
+        {
+            // Spectrum moments update in 0.1 m/s wind steps. Applying each new result
+            // directly moved the foam edge several ground pixels in one frame. A real
+            // wave field also cannot acquire a new run-up height instantly.
+            smoothedRunupHeight = SmoothRunupHeight(smoothedRunupHeight, targetRunup,
+                                                    Time.deltaTime);
+        }
+
+        SeaRuntimeState.RunupHeight = smoothedRunupHeight;
         Shader.SetGlobalFloat(SeaShaderIDs.RunupMaxDepth, SeaRuntimeState.RunupHeight);
 
         // THE PHASE IS A PHASE, NOT AN AMOUNT.
@@ -509,7 +527,7 @@ public class SeaManager : MonoBehaviour
         // with the sea state instead of being pinned to it.
         const float BackwashRatio = 1.3f;
 
-        float tUp = Mathf.Sqrt(2f * SeaRuntimeState.RunupHeight / SeaConstants.G)
+        float tUp = Mathf.Sqrt(2f * physicalRunup / SeaConstants.G)
                   / Mathf.Max(b, 1e-3f);
         float swashPeriod = Mathf.Clamp(tUp * (1f + BackwashRatio), 2f, 40f);
         float uprushFraction = 1f / (1f + BackwashRatio);
@@ -543,6 +561,16 @@ public class SeaManager : MonoBehaviour
 
         Shader.SetGlobalFloat(SeaShaderIDs.ShoreFoamPhase, phase);
         Shader.SetGlobalFloat(SeaShaderIDs.SwashUprush, uprushFraction);
+    }
+
+    /// Smooths sea-state run-up changes. Spectrum moments are intentionally
+    /// recalculated in coarse wind steps, while the visible waterline must remain
+    /// continuous from frame to frame.
+    public static float SmoothRunupHeight(float current, float target, float deltaTime)
+    {
+        const float ResponseSeconds = 3f;
+        float blend = 1f - Mathf.Exp(-Mathf.Max(deltaTime, 0f) / ResponseSeconds);
+        return Mathf.Lerp(current, target, blend);
     }
 
     /// ASYMMETRIC BUT SMOOTH AT BOTH TURNS. A single cosine withdraws exactly as fast

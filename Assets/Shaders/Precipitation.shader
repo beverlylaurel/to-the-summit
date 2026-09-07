@@ -86,6 +86,7 @@ Shader "ToTheSummit/Precipitation"
             float3 _NearBoxSize;
             float4 _RainDirections[RAIN_SPEED_CLASSES];
             float _Density;          // visual density, a bent version of the intensity
+            float _RainFallSpeedScale; // Same rain-only trajectory scale used by CPU drift.
             float _Precipitation;    // raw intensity, for the drop size distribution
             float4 _ShelterCenterRadius; // xyz listener, w dry interior radius
             float _ShelterVisualBlock;
@@ -320,7 +321,7 @@ Shader "ToTheSummit/Precipitation"
                 // THE INERTIA FILTER'S RELAXATION TIME COMES FROM THE FALL SPEED: `tau = v_t/g`.
                 // All three populations differ: a drop 2-9 m/s, a snowflake 1.4, a broken
                 // particle lifted from the ground ~0.5 (small and irregular, it settles into the air at once).
-                float fallSpeed = physicalSpeed;
+                float fallSpeed = physicalSpeed * _RainFallSpeedScale;
 
                 // THE INNER BOX. A separate particle population; it wraps in its own box with
                 // its own drift. Snow can enter the inner box too — there is no representation

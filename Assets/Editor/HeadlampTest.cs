@@ -45,8 +45,10 @@ public static class HeadlampTest
         bool switchOn = hotspot != null && spill != null
                      && hotspot.enabled && spill.enabled
                      && settings != null
-                     && Mathf.Approximately(hotspot.intensity, settings.hotspotLumens)
-                     && Mathf.Approximately(spill.intensity, settings.spillLumens);
+                     && Mathf.Approximately(LightUnitUtils.ConvertIntensity(hotspot, hotspot.intensity,
+                         LightUnit.Candela, LightUnit.Lumen), settings.hotspotLumens)
+                     && Mathf.Approximately(LightUnitUtils.ConvertIntensity(spill, spill.intensity,
+                         LightUnit.Candela, LightUnit.Lumen), settings.spillLumens);
         controller?.SetOn(false);
         bool switching = switchOn && hotspot != null && spill != null
                       && !hotspot.enabled && !spill.enabled

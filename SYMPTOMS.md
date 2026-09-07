@@ -6216,3 +6216,27 @@ kesip dış sesi koruyor; kapalı oda ve tek açık duvar kontrolleri geçiyor.
 Yağmur sesi global şiddeti okuyup görseldeki bulut sütunu kapısını atlıyordu.
 Artık görsel kaynaktan yerel yağmur girdisini alıyor. Global 0,60/bulutsuz, kısmi
 bulut, parçacık çizim eşiği ve yalnız kar vakaları Play modu testinden geçti.
+
+## Yaklaşırken kabin duvarının parçalanması, kapı çizgileri ve çatı deseni — ÇÖZÜLDÜ (2026-09-07)
+
+**Sebep:** Mipmap'siz UV1 renk atlasının küçük adacıkları uzakta siyah atlas boşluğuyla
+aynı piksele düşüyordu. Kapıda döndürülmüş ana tahta dokusunun koyu derzleri atlas
+kararmasıyla birleşiyordu. Yüksek frekanslı albedo/normal ayrıntısı ve büyük dünya
+koordinatındaki gölge kırpması çatıdaki deseni kamera hareketine duyarlı yapıyordu.
+
+**Düzeltme:** Çözünemeyen atlas örneği türev tabanlı olarak nötrleştirildi, karolu
+dokular daha erken mip seviyesine geçirildi ve URP ışık/gölge kırpması kamera göreli
+yapıldı. Kapıya atlas kullanmayan, güçlü süzülen ayrı prefab malzemesi bağlandı. Sabit
+hava ve kamera altında cephenin 45, 28 ve 16 metre karelerinde siyah panel oluşmadı;
+kapı ışık altında yeniden görüntülendi. `OutpostDiagnostics` özel kapı bağını denetler.
+
+## Yer seviyesinde açık deniz ve swash'ın anlık sıçraması — ÇÖZÜLDÜ (2026-09-07)
+
+**Sebep:** Çok eğik bakışta dynamic probe'un parlak ufuk satırı Fresnel nedeniyle deniz
+rengini kaplıyordu. Run-up yüksekliği ise kademeli spektrum momentleri yenilenince bir
+karede yeni hedefe atlıyordu.
+
+**Düzeltme:** Yalnız ufka yakın yansıma, atmosfer ile koyu su katkısının süzülmüş
+karışımına alınarak tepeden görünüş korundu. Run-up hedefi üç saniyelik üstel yanıtla
+izleniyor. `SeaOpticsTest` shader sözleşmesini, `SeaShoreContinuityTest` 120 FPS faz
+sürekliliğini ve ilk karede 1 cm'den küçük run-up değişimini doğruladı.

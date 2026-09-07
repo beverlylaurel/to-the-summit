@@ -103,6 +103,20 @@ public static class OutpostDiagnostics
         else if (floorMaterial.GetFloat("_RoughnessScale") < 1.15f)
             failures.Add($"Kabin zemini fazla parlak: roughness {floorMaterial.GetFloat("_RoughnessScale"):0.00}");
 
+        const string cabinPrefabPath = "Assets/Prefabs/Outposts/Outpost_CabinRefuge.prefab";
+        var cabinPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(cabinPrefabPath);
+        var doorRenderer = cabinPrefab == null ? null : cabinPrefab.GetComponentsInChildren<Renderer>(true)
+            .FirstOrDefault(renderer => renderer.name == "Hut_DoorLeaf");
+        var doorMaterial = doorRenderer == null ? null : doorRenderer.sharedMaterials
+            .FirstOrDefault(material => material != null && material.name == "door_weathered_wood");
+        if (doorMaterial == null)
+            failures.Add("Kabin kapisi titremeyi onleyen ozel malzemeyi kullanmiyor.");
+        else if (!doorMaterial.HasProperty("_TextureMipBias")
+                 || !doorMaterial.HasProperty("_AtlasStrength")
+                 || doorMaterial.GetFloat("_TextureMipBias") < 3.5f
+                 || doorMaterial.GetFloat("_AtlasStrength") > 0.001f)
+            failures.Add("Kabin kapisi filtre/atlas profili eksik.");
+
         if (failures.Count > 0)
             throw new System.InvalidOperationException("Outpost asset denetimi basarisiz:\n- " +
                                                        string.Join("\n- ", failures));

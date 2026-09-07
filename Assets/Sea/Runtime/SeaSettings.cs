@@ -255,6 +255,9 @@ public class SeaSettings : ScriptableObject
     [Tooltip("Mean slope of the beach face (rise over run).")]
     [Range(0.005f, 0.4f)] public float shoreSlope = 0.058f;
 
+    [Tooltip("Art-directed fraction of the physical run-up reach; shared by foam and wet sand.")]
+    [Range(0.1f, 1f)] public float runupReachScale = 0.5f;
+
     [Header("Optics (spec §12)")]
     /// Red decays fastest, blue slowest — the reason water looks blue.
     /// Tuned for coastal water. [CALIBRATION]
@@ -263,7 +266,7 @@ public class SeaSettings : ScriptableObject
 
     /// Blue-dominant coastal upwelling; calibrated against the open and shallow-water views.
     [Tooltip("Upwelling color.")]
-    public Color upwellingColor = new Color(0.02f, 0.18f, 0.26f);
+    public Color upwellingColor = new Color(0.018f, 0.055f, 0.075f);
 
     [Tooltip("Refraction offset strength.")]
     [Range(0f, 2f)] public float refractionStrength = 0.35f;

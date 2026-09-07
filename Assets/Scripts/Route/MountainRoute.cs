@@ -56,6 +56,17 @@ public class MountainRoute : ScriptableObject
              "a point computed outside the foot of the mountain.")]
     public bool spawnSet;
 
+    [Header("Us")]
+    [Tooltip("Where the base stands, normalized (0-1).")]
+    public Vector2 basePosition = new(0.5f, 0.5f);
+
+    [Tooltip("Which way the base faces (degrees, counter-clockwise from +X). Marked from the " +
+             "player's own heading, so the recorded direction is the one the door was seen from.")]
+    public float baseYaw;
+
+    [Tooltip("Whether the base position is marked. Until it is, nothing is placed.")]
+    public bool baseSet;
+
     [Header("Yol")]
     [Tooltip("The road the bus arrives on and returns along. A single line: out and back are the same. "
              + "The radius is the road's width — if a vehicle passes it has to be wider than a path.")]

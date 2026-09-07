@@ -410,6 +410,23 @@ Shader "ToTheSummit/SeaLit"
                                                              perceptualRoughness,
                                                              1.0, screenUV);
 
+                // At eye level the reflected ray hugs the exact probe horizon. The dynamic
+                // cubemap's broad cloud/sun footprint is much brighter there than the sky
+                // actually drawn behind the water, producing a pale cyan-beige wall. Blend
+                // that unresolved grazing limit toward the shared atmospheric sky sample.
+                // Overhead views keep the detailed cubemap reflection unchanged.
+                float reflectionNoV = saturate(dot(N, V));
+                float grazingLimit = 1.0 - smoothstep(0.025, 0.18, reflectionNoV);
+                float3 horizonAir = AirColor(normalize(float3(rLookup.x,
+                                                               max(rLookup.y, 0.02),
+                                                               rLookup.z)));
+                // A real low-angle view still integrates darker water facets between
+                // the sky-facing facets. Keeping that unresolved body contribution
+                // prevents a bright cloud layer from turning the entire horizon into
+                // pale cyan, while the separate GGX sun path remains intact.
+                float3 horizonSea = lerp(upwelling, horizonAir, 0.35);
+                skyRefl = lerp(skyRefl, horizonSea, grazingLimit * 0.82);
+
                 // The PBSky dynamic reflection pass now composites volumetric clouds into this
                 // cubemap. Do not grey it again from scalar coverage: that counted the cloud deck
                 // twice and erased real directional variation from the reflected sky.

@@ -157,10 +157,12 @@ public static class RainRenderingTest
         report.AppendLine();
         report.AppendLine("## Physical motion bounds");
 
-        float drizzle = TerminalVelocity(1f);
-        float downpour = TerminalVelocity(5f);
-        bool range = Mathf.Abs(drizzle - 4.00f) < 0.05f
-                  && Mathf.Abs(downpour - 9.14f) < 0.05f
+        var motion = AssetDatabase.LoadAssetAtPath<RainMotionSettings>("Assets/Settings/RainMotionSettings.asset");
+        if (motion == null) return false;
+        float drizzle = TerminalVelocity(1f) * motion.fallSpeedScale;
+        float downpour = TerminalVelocity(5f) * motion.fallSpeedScale;
+        bool range = Mathf.Abs(drizzle - 5.60f) < 0.05f
+                  && Mathf.Abs(downpour - 12.79f) < 0.05f
                   && downpour > drizzle;
 
         const float pixelsPerRadian = 935.31f; // 1080 px, 60 degree vertical FOV
@@ -169,9 +171,9 @@ public static class RainRenderingTest
         bool readable = slowAtLimit > 200f && fastAtLimit > slowAtLimit;
 
         const float crosswind = 3f;
-        float slowTilt = Mathf.Atan2(crosswind, drizzle) * Mathf.Rad2Deg;
-        float fastTilt = Mathf.Atan2(crosswind, downpour) * Mathf.Rad2Deg;
-        bool windLean = slowTilt > 35f && fastTilt > 18f && fastTilt < slowTilt;
+        float slowTilt = Mathf.Atan2(crosswind * motion.windResponseScale, drizzle) * Mathf.Rad2Deg;
+        float fastTilt = Mathf.Atan2(crosswind * 0.85f * motion.windResponseScale, downpour) * Mathf.Rad2Deg;
+        bool windLean = slowTilt < 5f && fastTilt < 2f && fastTilt < slowTilt;
 
         report.AppendLine("  [" + Mark(range) + "] terminal speed: "
             + drizzle.ToString("F2") + "-" + downpour.ToString("F2") + " m/s");
@@ -180,7 +182,13 @@ public static class RainRenderingTest
         report.AppendLine("  [" + Mark(windLean) + "] 3 m/s crosswind tilt: "
             + fastTilt.ToString("F1") + "-" + slowTilt.ToString("F1") + " deg from vertical");
 
-        return range && readable && windLean;
+        string cpu = File.ReadAllText(RendererSourcePath);
+        string gpu = File.ReadAllText(ShaderPath);
+        bool synchronized = cpu.Contains("TerminalVelocity(t) * FallSpeedScale")
+                         && cpu.Contains("material.SetFloat(FallSpeedScaleId, FallSpeedScale)")
+                         && gpu.Contains("physicalSpeed * _RainFallSpeedScale");
+        report.AppendLine("  [" + Mark(synchronized) + "] CPU drift and GPU exposure share the rain-only speed scale");
+        return range && readable && windLean && synchronized;
     }
 
     static bool WetSurfaceTest(StringBuilder report)
@@ -198,7 +206,9 @@ public static class RainRenderingTest
         string terrainShader = File.ReadAllText(TerrainShaderPath);
         bool filmGate = terrainShader.Contains("float rainFilm = smoothstep(0.015, 0.08, wet);")
                      && terrainShader.Contains("RainRings(ringLocal, _Time.y, _SurfaceRainIntensity)")
-                     && terrainShader.Contains("* rainFilm * ringVisibility;");
+                     && terrainShader.Contains("* rainFilm * ringVisibility * standingWater * 0.25;")
+                     && terrainShader.Contains("RainGroundImpacts(ringLocal, _Time.y,")
+                     && terrainShader.Contains("groundImpact * rainFilm * (1.0 - standingWater)");
         string terrainLighting = File.ReadAllText("Assets/Shaders/MountainSurface.shader");
         bool reflectiveFilm = terrainShader.Contains("surface.rainFilmNormalWS")
                            && terrainShader.Contains("surface.rainFilm =")
@@ -243,7 +253,7 @@ public static class RainRenderingTest
                         + fullRainAfterEight.ToString("F3"));
         report.AppendLine("  [" + Mark(drying) + "] configured drying half-life curve: "
                         + dryAfterTwoMinutes.ToString("F3"));
-        report.AppendLine("  [" + Mark(filmGate) + "] wet-film gate does not square rain intensity");
+        report.AppendLine("  [" + Mark(filmGate) + "] solid-ground impacts are separate from water waves");
         report.AppendLine("  [" + Mark(extendedSmoothRange)
                         + "] impact detail has a smooth three-crest render range");
         report.AppendLine("  [" + Mark(noFilmLodBoundary)

@@ -59,7 +59,14 @@ public static class SeaShoreContinuityTest
         bool motionContinuous = maxSurgeStep < 0.01f;
         bool clockContinuous = normalClockStep > 0f && normalClockStep < 0.002f
                             && changedPeriodStep > 0f && changedPeriodStep < 0.005f;
-        ok = shaderContract && foamContinuous && motionContinuous && clockContinuous;
+        float runup = 0.5f;
+        float firstRunup = SeaManager.SmoothRunupHeight(runup, 1.5f, 1f / 60f);
+        for (int i = 1; i < 180; i++)
+            runup = SeaManager.SmoothRunupHeight(runup, 1.5f, 1f / 60f);
+        bool runupContinuous = firstRunup > 0.5f && firstRunup - 0.5f < 0.01f
+                            && runup > 1.1f && runup < 1.2f;
+        ok = shaderContract && foamContinuous && motionContinuous && clockContinuous
+          && runupContinuous;
 
         var report = new StringBuilder(512);
         report.AppendLine("# Sea Shore Continuity Test");
@@ -70,6 +77,7 @@ public static class SeaShoreContinuityTest
         report.AppendLine("  [" + Mark(clockContinuous) + "] clock steps, normal / changed period: "
                         + normalClockStep.ToString("F6") + " / "
                         + changedPeriodStep.ToString("F6"));
+        report.AppendLine("  [" + Mark(runupContinuous) + "] stepped sea state is eased over three seconds");
         report.AppendLine("  [" + Mark(shaderContract) + "] shader uses the matched backwash inverse");
         report.AppendLine(ok ? "RESULT: PASSED" : "RESULT: FAILED");
         return report.ToString();

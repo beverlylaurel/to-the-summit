@@ -34,6 +34,12 @@ public class DebugMenu : MonoBehaviour
     [Tooltip("Bulut ayarlarini havadan suren bilesen; \"Havadan ayir\" bunu kapatiyor.")]
     [SerializeField] CloudWeatherDriver cloudDriver;
 
+    [Tooltip("Isaretlenen dogma ve us noktalarinin yazildigi rota varligi.")]
+    [SerializeField] MountainRoute route;
+
+    [Tooltip("Konumu normalize etmek icin gereken arazi; oran araziye goredir.")]
+    [SerializeField] Terrain terrain;
+
     const float PanelWidth = 960f;
     const float ColumnWidth = 300f;
     const float Margin = 24f;
@@ -107,8 +113,10 @@ public class DebugMenu : MonoBehaviour
         PerformanceHud hudRef, ClimbHud climbHudRef,
         CursorLock cursorLockRef,
         RouteOverlay routeOverlayRef, Volume cloudVolumeRef, CloudWeatherDriver cloudDriverRef,
-        SeaStateController seaStateRef)
+        SeaStateController seaStateRef, MountainRoute routeRef, Terrain terrainRef)
     {
+        route = routeRef;
+        terrain = terrainRef;
         cloudVolume = cloudVolumeRef;
         cloudDriver = cloudDriverRef;
         cursorLock = cursorLockRef;
@@ -248,6 +256,7 @@ public class DebugMenu : MonoBehaviour
         DrawClouds();
         DrawSea();
         DrawOverlays();
+        DrawSpawnMarks();
         EndColumn();
 
         GUILayout.EndHorizontal();
@@ -674,6 +683,90 @@ public class DebugMenu : MonoBehaviour
         if (showLines != lines.activeSelf) lines.SetActive(showLines);
 
         EndSection();
+    }
+
+    /// MARKING PLACES BY STANDING IN THEM. Coordinates typed into an inspector are guesses;
+    /// walking to the spot, turning to face the view that should greet the player, and pressing
+    /// a button records the thing that was actually judged by eye.
+    ///
+    /// The heading is stored along with the position because both marks answer a directional
+    /// question: the spawn decides what the player sees on the first frame, and the base decides
+    /// which way its door faces.
+    ///
+    /// POSITIONS ARE WRITTEN NORMALIZED, matching the rest of the route: world coordinates go
+    /// stale the moment the terrain is regenerated, and elevation is always read from the ground.
+    void DrawSpawnMarks()
+    {
+        BeginSection("Konum işaretleri");
+
+        if (route == null || terrain == null || walker == null)
+        {
+            GUILayout.Label("Rota varlığı ya da arazi bağlı değil.");
+            EndSection();
+            return;
+        }
+
+        Vector3 here = walker.transform.position;
+        Vector2 spot = MountainRoute.ToNormalized(here, terrain);
+        float heading = Heading(walker.transform.forward);
+
+        GUILayout.Label($"Buradasın  {here.x:F0}, {here.z:F0}   ({spot.x:F4}, {spot.y:F4})");
+        GUILayout.Label($"Yükseklik {here.y:F0} m · bakış {heading:F0}°");
+        GUILayout.Space(4f);
+
+        if (GUILayout.Button("Oyuncu doğma noktasını kaydet"))
+        {
+            route.spawn = spot;
+            route.spawnYaw = heading;
+            route.spawnSet = true;
+            Persist($"Doğma noktası ({spot.x:F4}, {spot.y:F4}), bakış {heading:F1}°");
+        }
+
+        if (GUILayout.Button("Üs noktasını kaydet"))
+        {
+            route.basePosition = spot;
+            route.baseYaw = heading;
+            route.baseSet = true;
+            Persist($"Üs ({spot.x:F4}, {spot.y:F4}), bakış {heading:F1}°");
+        }
+
+        GUILayout.Space(4f);
+        GUILayout.Label(route.spawnSet
+            ? $"Doğma: ({route.spawn.x:F4}, {route.spawn.y:F4})  {route.spawnYaw:F0}°"
+            : "Doğma: işaretlenmemiş");
+        GUILayout.Label(route.baseSet
+            ? $"Üs: ({route.basePosition.x:F4}, {route.basePosition.y:F4})  {route.baseYaw:F0}°"
+            : "Üs: işaretlenmemiş");
+
+        if (GUILayout.Button("Ayarları geri al (işaretleri sil)"))
+        {
+            route.spawnSet = false;
+            route.baseSet = false;
+            Persist("İşaretler silindi");
+        }
+
+        EndSection();
+    }
+
+    /// Degrees counter-clockwise from +X — the convention the scene setup reads the spawn with.
+    static float Heading(Vector3 forward)
+    {
+        var flat = new Vector2(forward.x, forward.z);
+        return flat.sqrMagnitude < 1e-6f ? 0f : Mathf.Atan2(flat.y, flat.x) * Mathf.Rad2Deg;
+    }
+
+    /// Writes the asset to disk. A ScriptableObject changed in play mode keeps the change in
+    /// memory but loses it on the next import unless it is saved, and a mark that vanishes
+    /// after a session is worse than no mark at all.
+    void Persist(string what)
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorUtility.SetDirty(route);
+        UnityEditor.AssetDatabase.SaveAssetIfDirty(route);
+        Debug.Log($"[Rota] {what} kaydedildi.");
+#else
+        Debug.LogWarning($"[Rota] {what} yalnizca editorde kaydedilir.");
+#endif
     }
 
     /// Helper that disables GUI.enabled for the scope

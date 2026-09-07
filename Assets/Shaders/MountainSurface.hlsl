@@ -639,34 +639,25 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // leave the beach with two conflicting reliefs at two different scales.
     float2 shaped = lerp(gradient * rockRelief, sandSlopeXZ, sand);
 
-    // --- Rain rings ---
-    //
-    // THE SAME RING AS THE SEA'S, AND THE SAME FILE. A drop landing in a puddle leaves what
-    // it leaves in the ocean; only the amount of water it lands in differs.
-    //
-    // TWO TERMS, NOT ONE. `_SurfaceRainIntensity` is whether a drop is landing at all --
-    // it stops the instant the rain does. `rainFilm` is a GATE, not an amplitude multiply:
-    // once a continuous millimetric film exists, its capillary response has the drop's
-    // strength. The old `rain * wet` squared light rain (0.19 -> 0.036) and made the exact
-    // same ring plainly visible at sea but absent on wet ground.
-    //
-    // Faded by the pixel like every other scale, or it is the aliasing all over again.
+    // Wetness is not standing water. Solid rock/sand gets a small, short impact;
+    // spreading capillary waves belong only to the swash water layer.
     float2 ringPixel = float2(length(ddx(worldPos.xz)), length(ddy(worldPos.xz)));
+    float pixelSize = max(ringPixel.x, ringPixel.y);
     float rainFilm = smoothstep(0.015, 0.08, wet);
-    float ringVisibility = RainRingResolvable(max(ringPixel.x, ringPixel.y));
+    float standingWater = smoothstep(0.3, 0.85, swash);
+    float ringVisibility = RainRingResolvable(pixelSize);
     float2 ringSlope = 0.0;
-    if (ringVisibility > 0.0 && rainFilm > 0.0 && _SurfaceRainIntensity > 0.001)
+    if (rainFilm > 0.0 && _SurfaceRainIntensity > 0.001)
     {
         float2 ringLocal = RainRingLocal(worldPos.xz, _WorldSpaceCameraPos.xz);
-        ringSlope = RainRings(ringLocal, _Time.y, _SurfaceRainIntensity)
-                  * rainFilm * ringVisibility;
-        // Three overlapping impacts can align. A water surface cannot sustain an
-        // arbitrarily steep millimetric capillary crest; bound the summed slope before it
-        // enters normalize/reflection, and reject the only invalid floating-point value
-        // without paying for an extra texture or pass. (`NaN != NaN` by definition.)
-        ringSlope = clamp(ringSlope, -0.45, 0.45);
+        if (standingWater > 0.0 && ringVisibility > 0.0)
+            ringSlope = RainRings(ringLocal, _Time.y, _SurfaceRainIntensity)
+                      * rainFilm * ringVisibility * standingWater * 0.25;
+        ringSlope = clamp(ringSlope, -0.12, 0.12);
         if (any(ringSlope != ringSlope)) ringSlope = 0.0;
-        shaped += ringSlope;
+        float2 groundImpact = RainGroundImpacts(ringLocal, _Time.y,
+                                               _SurfaceRainIntensity, pixelSize);
+        shaped += ringSlope + groundImpact * rainFilm * (1.0 - standingWater);
     }
 
     float3 shaded = normalize(normalWS + float3(shaped.x, 0.0, shaped.y));
@@ -695,7 +686,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // reflection to pixels where a ring actually perturbs the normal; because ringSlope
     // already carries the smooth resolvability fade, no second distance contour remains.
     float ringResponse = smoothstep(0.002, 0.025, length(ringSlope));
-    surface.rainFilm = (half)(rainFilm * ringResponse
+    surface.rainFilm = (half)(rainFilm * ringResponse * standingWater
                             * step(0.001, _SurfaceRainIntensity));
     // Choose the dry material first, then put the rain film over it. The old
     // order applied wet rock and subsequently replaced it with DRY sand, so the

@@ -1604,25 +1604,17 @@ söylüyor, o da `TemperatureField`'dan geliyor: donma seviyesi denizin altına 
 kar alır ve `SeaManager` şiddeti sıfırlar. Yani halkanın görünmesi `seaLevelCelsius`'a
 bağlı; bu bağ bir kez koptu (`SYMPTOMS.md`).
 
-**Halka matematiği denizin malı değil, suyun malı.** `Assets/Shaders/RainRings.hlsl`'de
-durur; deniz de ıslak kaya da oradan okur. Bir damla su birikintisine de okyanusa da aynı
-halkayı bırakır — sabitler, hız, sönüm ortak, yalnız içine düştüğü suyun miktarı değişir.
+**Su dalgası ile katı zemindeki darbe farklıdır.** `RainRings.hlsl` deniz ve kıyının
+su kaplı swash alanı için genişleyen kapiler dalga üretir. Genel ıslaklık, durgun su
+birikintisi değildir; normal kaya/kum bu dalgayı çalıştırmaz. `RainGroundImpacts`
+santimetre ölçeğinde kısa bir normal değişimi üretir, olayın yeri her çevrimde değişir.
+Ek beyaz renk veya gök yansıması eklemez. Mevcut sahnede ayrı bir birikinti maskesi
+yoktur; genel ıslak zemini birikinti saymak yerine su dalgası swash ile sınırlandırılır.
 
-**Zeminde halka İKİ terime bağlı, bir değil.** `_SurfaceRainIntensity` damla düşüyor mu
-sorusudur ve yağmur kesildiği an sıfırlanır; `_SurfaceWetness` halkanın içinde
-titreşeceği film var mı sorusudur. Yağmur şiddeti halkaların esas olarak **sayısını**
-sürer: her hücrenin sabit rastgele sırası vardır, 0,2 yağmur adayların yaklaşık %18,5'ini,
-0,5 yağmur %48,6'sını, 1,0 yağmur tamamını geçirir. Tekil damla gücü yalnız 0,65→1,0
-arasında büyür. Böylece çiseleme sağanak kadar çok soluk çember üretmez. Film yalnız
-0,015–0,08 arasında açılan bir kapıdır; şiddetle çarpılıp yağmuru ikinci kez küçültmez.
-Kuru kayada damla halka değil koyu leke bırakır — burada bu, hiçbir şey demektir.
-
-Arazi aydınlatma yolu elle yazıldığı için URP'nin dolaylı speküler aşamasından geçmez.
-Bu nedenle halka normalinin ayrıca ince su filminin yansıma normali olarak taşınması
-gerekir. Yakın ve çözülebilir piksellerde film, reflection probe'a değil gök ve sisin de
-kullandığı `AirColor` radyansına bakar; arazi renderer'ına geçerli probe bağlanmadığında
-probe örneği hata rengi döndürür. Fresnel suyun `F0 = 0,0204` değeridir ve kar maskesi
-filmi kapatır. Böylece halka albedo ile çizilmiş bir çember değil, göğü büken su yüzeyidir.
+`_SurfaceRainIntensity` olay sayısını, `_SurfaceWetness` ıslak yüzey tepkisini sürer.
+Pikselden küçük darbeler yumuşakça söner. Kıyı su halkasının gök yansıması yalnız
+halka eğiminde açılır; normal zemine yayılıp mesafe sınırında mavi bir kuşak oluşturmaz.
+Kar kaplaması su filmi yansımasını kapatır.
 
 Her iki değer de arazi shader'ının `UnityPerMaterial` tamponundadır ve
 `TerrainSurface` tarafından **materyale** yazılır. `Shader.SetGlobalFloat` bu alanı
@@ -2114,6 +2106,8 @@ ekran üstü bir leke değil, URP'nin gerçek ek ışık yoluna giren iki spot �
 menzilli odak ile geniş, düşük güçlü çevre dolgusu. Akı lümen, renk sıcaklığı Kelvin olarak
 tanımlanır ve boru hattından bağımsız görünmesi için karşılık gelen nötr-sıcak LED tonu ışık
 rengine açıkça yazılır; yalnız odak ışığı yumuşak gölge üretir.
+`Light.lightUnit` etiketine güvenilmez: akı, spot katı açısıyla `LightUnitUtils` üzerinden
+kandelaya çevrilip native `Light.intensity` alanına yazılır.
 
 `Headlamp Mount`, `Main Camera`nın çocuğudur. Böylece `CameraPivot`ın kafa yönünü ve
 `PlayerViewMotion`ın yürüyüş, koşu, dönüş, iniş ve basamak hareketini aynı dönüşüm zincirinden
@@ -2365,3 +2359,29 @@ PC pipeline kırılma için tam çözünürlüklü opaque görüntüyü kullanı
 Doğrulama: `EnvironmentIntegrationTest` Play modunda yerel yağış ve kamera açıklığı;
 `ShelterExposureTest` veranda/oda; `LightningOcclusionTest.RunHeadlamp` gerçek piksel
 aydınlatması; `OutpostDiagnostics.ValidateAssets` iki doku klasörü ve prefab bağları.
+
+## Yağmur hareketi ve kıyı erişim ayarı
+
+`RainMotionSettings` yalnız `PrecipitationRenderer` tarafından tüketilir; bootstrap
+asset'i sahneye bağlar. Düşme ölçeği CPU konumu ile GPU iz uzunluğuna birlikte gider,
+rüzgâr tepkisi ayrı ayarlanır. Kar parçacıklarının hareket kaynağı değişmez.
+`SeaSettings.runupReachScale` fiziksel run-up sonucunu ölçekler; periyot fiziksel
+sonuçtan hesaplanmaya devam eder. Kıyı köpüğü, ıslak kum ve kar dışlama sınırı aynı
+ölçeklenmiş erişimi kullanır.
+
+## Uzak yapı ve alçak bakış deniz kararlılığı
+
+`Cabin/WeatheredLit`, çözülemeyen UV1 atlas adacıklarını ekran türevinden ölçer ve
+adacık bir pikselin altına inmeden önce atlas rengini nötr değere geçirir. Atlasın
+siyah boşluğu bu yüzden uzaktan duvar yüzeyini parça parça söndüremez. Karolu albedo
+ve normal örnekleri pozitif mip sapmasıyla süzülür; eğik çatıdaki yüksek frekanslı
+desen kamera hareketinde moiré üretmez. Kapı kendi prefab malzemesini kullanır;
+döndürülmüş tahta derzleri güçlü mip süzmesiyle birleşir ve UV1 atlası kapıda
+uygulanmaz. Büyük dünya koordinatlarındaki ek ışık ve gölge kırpması kamera göreli
+hesaplanır.
+
+Deniz yansıması yalnız çok düşük bakış açısında, atmosfer örneğiyle koyu su
+upwelling katkısının süzülmüş karışımına yaklaşır. Tepeden görünüşün ayrıntılı
+reflection probe sonucu korunur. Spektrumun kademeli güncellenen run-up yüksekliği
+görsel kıyıya doğrudan verilmez; üç saniyelik üstel yanıtla ilerletilir. Böylece köpük,
+ıslaklık ve kar dışlama sınırı deniz durumu değişirken tek karede sıçramaz.

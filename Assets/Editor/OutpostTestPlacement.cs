@@ -118,6 +118,71 @@ public static class OutpostTestPlacement
                   $"height range {b.min.y:0.0}-{b.max.y:0.0} m.");
     }
 
+    /// THE FIRST FRAME. Renders the marked spawn pose exactly — eye height, heading and
+    /// field of view — so "is the base actually in front of the player" is answered by
+    /// looking at what the player will look at, not by comparing two sets of coordinates.
+    [MenuItem("To The Summit/Scene/Capture Spawn View")]
+    public static void CaptureSpawn()
+    {
+        var terrain = Object.FindAnyObjectByType<Terrain>();
+        var route = AssetDatabase.LoadAssetAtPath<MountainRoute>(RoutePath);
+        if (terrain == null || route == null || !route.spawnSet)
+        { Debug.LogError("No terrain, or the spawn is not marked."); return; }
+
+        Ground(terrain, MountainRoute.ToWorld(route.spawn, terrain), out Vector3 spawn);
+        float yaw = route.spawnYaw * Mathf.Deg2Rad;
+        var look = new Vector3(Mathf.Cos(yaw), 0f, Mathf.Sin(yaw));
+
+        var camGo = new GameObject("ZZ_SpawnCam", typeof(Camera));
+        var cam = camGo.GetComponent<Camera>();
+        cam.fieldOfView = 60f;
+        cam.nearClipPlane = 0.1f;
+        cam.farClipPlane = 3000f;
+        camGo.transform.position = spawn + Vector3.up * 1.7f;   // eye height
+        camGo.transform.rotation = Quaternion.LookRotation(look, Vector3.up);
+
+        var lightGo = new GameObject("ZZ_SpawnLight", typeof(Light));
+        var li = lightGo.GetComponent<Light>();
+        li.type = LightType.Directional;
+        li.intensity = 1.3f;
+        // Sun over the player's shoulder; aimed the other way it flares straight into
+        // the lens and the subject reads as a white silhouette.
+        lightGo.transform.rotation = Quaternion.Euler(38f, route.spawnYaw + 205f, 0f);
+
+        Save(cam, 1280, 720, "SpawnView.png");
+
+        var baseGo = GameObject.Find("Base");
+        string where = "no Base object";
+        if (baseGo != null)
+        {
+            Vector3 d = baseGo.transform.position - spawn;
+            float ahead = Vector3.Dot(d, look);
+            float side = Vector3.Dot(d, Vector3.Cross(Vector3.up, look));
+            var bb = Bounds(baseGo);
+            // Two different faults look the same from outside — an origin that is not at
+            // the floor, and ground that rises under the footprint — so both are measured.
+            float sill = bb.min.y - baseGo.transform.position.y;
+            float lowGround = float.MaxValue, highGround = float.MinValue;
+            for (int i = 0; i < 4; i++)
+            {
+                var corner = new Vector3(i < 2 ? bb.min.x : bb.max.x, 0f,
+                                         i % 2 == 0 ? bb.min.z : bb.max.z);
+                Ground(terrain, corner, out Vector3 g);
+                lowGround = Mathf.Min(lowGround, g.y);
+                highGround = Mathf.Max(highGround, g.y);
+            }
+            where = $"base {d.magnitude:0.0} m away — {ahead:0.0} m ahead, {side:0.0} m aside; " +
+                    $"floor sits {sill:0.00} m from its own origin; ground under the footprint " +
+                    $"runs {lowGround:0.00}..{highGround:0.00} m against an origin at " +
+                    $"{baseGo.transform.position.y:0.00} m, so it is buried by " +
+                    $"{highGround - (baseGo.transform.position.y + sill):0.00} m at the worst corner";
+        }
+        Object.DestroyImmediate(camGo);
+        Object.DestroyImmediate(lightGo);
+        Debug.Log($"Spawn view at {spawn}, heading {route.spawnYaw:0.0}°. {where}. " +
+                  $"Written to Logs/SpawnView.png.");
+    }
+
     [MenuItem("To The Summit/Outposts/Remove Test Placement")]
     public static void Remove()
     {

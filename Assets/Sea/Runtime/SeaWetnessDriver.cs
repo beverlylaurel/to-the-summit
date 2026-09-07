@@ -92,11 +92,12 @@ public class SeaWetnessDriver : MonoBehaviour
 
         // The band's top rides the swash: how high it reaches (`RunupHeight`, from
         // Stockdon) times where it is in its cycle right now.
+        float reachFade = fadeMeters * settings.runupReachScale;
         float runup = SeaRuntimeState.RunupHeight * SeaRuntimeState.ShoreFoamIntensity01;
 
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetLevelY, settings.seaLevelY + runup);
-        Shader.SetGlobalFloat(SeaShaderIDs.SeaWetFadeM, fadeMeters);
-        Shader.SetGlobalFloat(SeaShaderIDs.SeaWetBandM, bandMeters);
+        Shader.SetGlobalFloat(SeaShaderIDs.SeaWetFadeM, reachFade);
+        Shader.SetGlobalFloat(SeaShaderIDs.SeaWetBandM, bandMeters * settings.runupReachScale);
         Shader.SetGlobalFloat(SeaShaderIDs.SeaWetDarkening, darkening);
 
         // SNOW MUST NOT FOLLOW THE CURRENT SWASH PHASE. If it used the moving wet
@@ -104,7 +105,7 @@ public class SeaWetnessDriver : MonoBehaviour
         // the whole reach of the current sea state instead: Stockdon R2% is already
         // the maximum run-up, and the final margin covers the terrain shader's local
         // noise displacement of that edge.
-        float edgeNoiseMargin = Mathf.Min(fadeMeters * 0.70f, 0.22f);
+        float edgeNoiseMargin = Mathf.Min(reachFade * 0.70f, 0.22f);
         float currentSnowReach = settings.seaLevelY
                                + SeaRuntimeState.RunupHeight
                                + edgeNoiseMargin;

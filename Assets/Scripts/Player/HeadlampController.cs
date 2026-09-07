@@ -98,6 +98,7 @@ public sealed class HeadlampController : MonoBehaviour
     {
         light.type = LightType.Spot;
         light.lightUnit = LightUnit.Lumen;
+        light.enableSpotReflector = true;
         light.range = range;
         light.spotAngle = outerAngle;
         light.innerSpotAngle = Mathf.Min(innerAngle, outerAngle);
@@ -119,13 +120,15 @@ public sealed class HeadlampController : MonoBehaviour
 
         if (hotspot != null)
         {
-            hotspot.intensity = settings.hotspotLumens * output;
+            hotspot.intensity = LightUnitUtils.ConvertIntensity(hotspot,
+                settings.hotspotLumens * output, LightUnit.Lumen, LightUnit.Candela);
             hotspot.enabled = enabled;
         }
 
         if (spill != null)
         {
-            spill.intensity = settings.spillLumens * output;
+            spill.intensity = LightUnitUtils.ConvertIntensity(spill,
+                settings.spillLumens * output, LightUnit.Lumen, LightUnit.Candela);
             spill.enabled = enabled;
         }
     }

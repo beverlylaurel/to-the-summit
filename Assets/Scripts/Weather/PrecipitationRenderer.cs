@@ -263,6 +263,17 @@ public class PrecipitationRenderer : MonoBehaviour
     readonly Vector4[] rainDirections = new Vector4[RainSpeedClasses];
     readonly Vector3[] rainVelocities = new Vector3[RainSpeedClasses];
     float density;
+    [SerializeField] RainMotionSettings motionSettings;
+    public bool BindMotion(RainMotionSettings value)
+    {
+        if (motionSettings == value) return false;
+        motionSettings = value;
+        return true;
+    }
+    float FallSpeedScale => motionSettings != null ? motionSettings.fallSpeedScale : 1f;
+    float WindResponseScale => motionSettings != null ? motionSettings.windResponseScale : 1f;
+    static readonly int FallSpeedScaleId = Shader.PropertyToID("_RainFallSpeedScale");
+
     float precipitation;
     ShelterExposure shelter;
 
@@ -330,7 +341,7 @@ public class PrecipitationRenderer : MonoBehaviour
         for (int i = 0; i < RainSpeedClasses; i++)
         {
             float t = i / (RainSpeedClasses - 1f);
-            rainVelocities[i] = Vector3.down * TerminalVelocity(t);
+            rainVelocities[i] = Vector3.down * TerminalVelocity(t) * FallSpeedScale;
             rainDirections[i] = WithSpeed(rainVelocities[i]);
         }
     }
@@ -453,9 +464,9 @@ public class PrecipitationRenderer : MonoBehaviour
         for (int i = 0; i < RainSpeedClasses; i++)
         {
             float t = i / (RainSpeedClasses - 1f);
-            float fallSpeed = TerminalVelocity(t);
+            float fallSpeed = TerminalVelocity(t) * FallSpeedScale;
             Vector3 target = Vector3.down * fallSpeed
-                             + wind.Velocity * Mathf.Lerp(RainWindLightFactor, RainWindFactor, t);
+                             + wind.Velocity * (Mathf.Lerp(RainWindLightFactor, RainWindFactor, t) * WindResponseScale);
 
             float blend = 1f - Mathf.Exp(-Time.deltaTime * 9.81f / fallSpeed);
             rainVelocities[i] = Vector3.Lerp(rainVelocities[i], target, blend);
@@ -467,6 +478,7 @@ public class PrecipitationRenderer : MonoBehaviour
         // smaller, and settles on the air's speed instantly. There is no vertical drift, because a
         // grain's height above the ground derives from the terrain surface, not from the box.
 
+        material.SetFloat(FallSpeedScaleId, FallSpeedScale);
         material.SetVector(BoxSizeId, BoxSize);
         // UNCONDITIONAL: the representation share derives from here and there are four early exits
         // ahead of `UpdateStreaks`. If the uniform is not written the HLSL default is zero and the

@@ -186,4 +186,27 @@ float2 RainRings(float2 localXZ, float time, float intensity)
     return slope * (RAIN_RING_SLOPE * dropStrength);
 }
 
+// Impacts on solid wet ground are short local disturbances, not travelling water waves.
+// Event centres change each cycle. The Gaussian support dies inside its cell; it cannot
+// expose a tiled edge. Radius is centimetric and filtered before entering the normal.
+float2 RainGroundImpacts(float2 localXZ, float time, float intensity, float pixelSize)
+{
+    const float cellSize = 0.18;
+    const float life = 0.14;
+    const float radius = 0.012;
+    float visible = 1.0 - smoothstep(radius, radius * 3.0, pixelSize);
+    if (visible <= 0.0 || intensity <= 0.001) return 0.0;
+    float2 cell = floor(localXZ / cellSize);
+    float clock = time / life + RainRingHash21(cell);
+    float cycle = fmod(floor(clock), 4096.0);
+    float2 key = cell + float2(cycle * 17.17, cycle * 43.13);
+    float rank = RainRingHash21(key + 103.5);
+    float weight = smoothstep(rank, min(rank + 0.03, 1.0), intensity);
+    float2 centre = (cell + lerp(0.25, 0.75, RainRingHash22(key))) * cellSize;
+    float2 d = (localXZ - centre) / radius;
+    float age = frac(clock);
+    float envelope = smoothstep(0.0, 0.12, age) * (1.0 - smoothstep(0.12, 1.0, age));
+    return d * exp(-dot(d, d) * 2.0) * (0.055 * weight * envelope * visible);
+}
+
 #endif

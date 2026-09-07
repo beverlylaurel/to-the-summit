@@ -18,6 +18,8 @@ Shader "Cabin/WeatheredLit"
         _MacroStrength("Buyuk ton siddeti", Range(0,0.15)) = 0.0
         _RoughnessVariation("Puruz mikro degisimi", Range(0,0.2)) = 0.0
         _ThirdPhaseStrength("Ucuncu tekrar kirma", Range(0,0.5)) = 0.0
+        _TextureMipBias("Surface texture mip bias", Range(0,5)) = 0.75
+        _AtlasStrength("Authored atlas strength", Range(0,1)) = 1.0
         _Cutoff("Kirpma esigi", Range(0,1)) = 0.5
     }
 
@@ -58,6 +60,7 @@ Shader "Cabin/WeatheredLit"
             TEXTURE2D(_BumpMap);        SAMPLER(sampler_BumpMap);
             TEXTURE2D(_TintMap);        SAMPLER(sampler_TintMap);
             TEXTURE2D(_RoughMetalMap);  SAMPLER(sampler_RoughMetalMap);
+            float4 _TintMap_TexelSize;
 
             float Hash31(float3 p)
             {
@@ -153,8 +156,11 @@ Shader "Cabin/WeatheredLit"
 
                 // Doseme albedosu Blender'daki gibi iki ornegin karisimi: ayni olcek,
                 // damar boyunca kaydirilmis ikinci ornek, karisim maskesi UV1'den pismis.
-                half3 sampA = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, IN.uv0).rgb;
-                half3 sampB = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, IN.uv0 + _DetileOffset.xy).rgb;
+                half3 sampA = SAMPLE_TEXTURE2D_BIAS(_BaseMap, sampler_BaseMap, IN.uv0,
+                                                    _TextureMipBias).rgb;
+                half3 sampB = SAMPLE_TEXTURE2D_BIAS(_BaseMap, sampler_BaseMap,
+                                                    IN.uv0 + _DetileOffset.xy,
+                                                    _TextureMipBias).rgb;
                 half3 baseTex = lerp(sampA, sampB, detileFac);
 
                 // A restrained third phase breaks the remaining long repeat without rotating
@@ -162,19 +168,33 @@ Shader "Cabin/WeatheredLit"
                 // below, so visible colour detail and perceived relief cannot drift apart.
                 half thirdFac = smoothstep(0.62h, 0.90h, (half)macro) * (half)_ThirdPhaseStrength;
                 float2 uvC = IN.uv0 - _DetileOffset.xy * 0.613;
-                half3 sampC = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uvC).rgb;
+                half3 sampC = SAMPLE_TEXTURE2D_BIAS(_BaseMap, sampler_BaseMap, uvC,
+                                                    _TextureMipBias).rgb;
                 baseTex = lerp(baseTex, sampC, thirdFac);
 
                 // Tint atlasi 1/4 olcekle pisirildi: kaplama x tint carpimi 1'i asabildigi
                 // icin depolamada bolundu, burada geri acilir.
-                half3 tint    = SAMPLE_TEXTURE2D(_TintMap, sampler_TintMap, IN.uv1).rgb * 4.0h;
+                float2 atlasUvPixels = IN.uv1 * _TintMap_TexelSize.zw;
+                float atlasFootprint = max(length(ddx(atlasUvPixels)),
+                                           length(ddy(atlasUvPixels)));
+                half atlasTrust = 1.0h - smoothstep(0.75h, 2.0h, (half)atlasFootprint);
+                half3 atlasTint = SAMPLE_TEXTURE2D(_TintMap, sampler_TintMap, IN.uv1).rgb * 4.0h;
+                // Atlas islands are surrounded by black padding. Once an island becomes
+                // smaller than a pixel, base-level bilinear sampling used to flash that
+                // padding as missing wall panels. The authored tint fades to neutral before
+                // it becomes unresolved; a floor also makes padding incapable of erasing a face.
+                atlasTint = max(atlasTint, 0.18h);
+                half3 tint = lerp(1.0h.xxx, atlasTint, atlasTrust * (half)_AtlasStrength);
                 half macroTone = 1.0h + ((half)macro - 0.5h) * (2.0h * (half)_MacroStrength);
                 half3 albedo  = baseTex * _BaseColor.rgb * tint * macroTone;
 
-                half3 nA = UnpackNormalScale(SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, IN.uv0), _BumpScale);
-                half3 nB = UnpackNormalScale(SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap,
-                                                               IN.uv0 + _DetileOffset.xy), _BumpScale);
-                half3 nC = UnpackNormalScale(SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, uvC), _BumpScale);
+                half3 nA = UnpackNormalScale(SAMPLE_TEXTURE2D_BIAS(_BumpMap, sampler_BumpMap,
+                                                                   IN.uv0, _TextureMipBias), _BumpScale);
+                half3 nB = UnpackNormalScale(SAMPLE_TEXTURE2D_BIAS(_BumpMap, sampler_BumpMap,
+                                                                   IN.uv0 + _DetileOffset.xy,
+                                                                   _TextureMipBias), _BumpScale);
+                half3 nC = UnpackNormalScale(SAMPLE_TEXTURE2D_BIAS(_BumpMap, sampler_BumpMap,
+                                                                   uvC, _TextureMipBias), _BumpScale);
                 half3 nTS = normalize(lerp(normalize(lerp(nA, nB, detileFac)), nC, thirdFac));
 
                 float  sgn       = IN.tangentWS.w;

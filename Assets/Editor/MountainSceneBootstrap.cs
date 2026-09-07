@@ -90,6 +90,10 @@ public static class MountainSceneBootstrap
 
     /// Re-applies component wiring without regenerating terrain data. Editor diagnostics and
     /// migrations use this when a new runtime dependency is introduced.
+    ///
+    /// Reachable from the menu because a newly serialized field arrives null on the components
+    /// already in the scene, and the automatic pass only runs on a domain reload.
+    [MenuItem("To The Summit/Scene/Refresh Bindings", false, 10)]
     public static void RefreshSceneBindings() => Run();
 
     [MenuItem("To The Summit/Terrain/Regenerate Terrain", false, 20)]
@@ -355,6 +359,14 @@ public static class MountainSceneBootstrap
         precipitationRenderer.Bind(weatherState, windField, precipitationShader,
             Object.FindAnyObjectByType<CloudLayerProbe>(), player.transform,
             streakSet, Object.FindAnyObjectByType<TimeOfDay>());
+        const string rainMotionPath = "Assets/Settings/RainMotionSettings.asset";
+        var rainMotion = AssetDatabase.LoadAssetAtPath<RainMotionSettings>(rainMotionPath);
+        if (rainMotion == null)
+        {
+            rainMotion = ScriptableObject.CreateInstance<RainMotionSettings>();
+            AssetDatabase.CreateAsset(rainMotion, rainMotionPath);
+        }
+        if (precipitationRenderer.BindMotion(rainMotion)) changed = true;
         EditorUtility.SetDirty(precipitationRenderer);
 
         var staleRenderer = precipitationRenderer.GetComponent<MeshRenderer>();
@@ -505,6 +517,7 @@ public static class MountainSceneBootstrap
         EnsureRouteOverlay(gen, ref changed);
         EnsureClimbHud(player, gen, ref changed);
         EnsureDebugMenu(player, ref changed);
+        EnsureBase(ref changed);
         EnsureVintagePhotoMode(player, camera, ref changed);
         Phase("route, HUD, photography");
 
@@ -1601,6 +1614,56 @@ public static class MountainSceneBootstrap
         return data;
     }
 
+    /// The prefab, not the raw model: it carries the colliders and the material bindings.
+    const string RefugePath = "Assets/Prefabs/Outposts/Outpost_CabinRefuge.prefab";
+    const string BaseName = "Base";
+
+    /// THE BASE STANDS WHERE IT WAS MARKED. The spot and the heading come from the route asset,
+    /// written by the F1 panel while standing on the ground and looking at the view that should
+    /// greet the player — not from coordinates typed into an inspector.
+    ///
+    /// The elevation is not stored with the mark: it is read from the collider here, so the
+    /// building follows the ground if the terrain is ever reshaped.
+    static void EnsureBase(ref bool changed)
+    {
+        var route = AssetDatabase.LoadAssetAtPath<MountainRoute>(RoutePath);
+        var terrain = Object.FindAnyObjectByType<Terrain>();
+        var existing = GameObject.Find(BaseName);
+
+        if (route == null || !route.baseSet || terrain == null)
+        {
+            if (existing != null) { Object.DestroyImmediate(existing); changed = true; }
+            return;
+        }
+
+        var model = AssetDatabase.LoadAssetAtPath<GameObject>(RefugePath);
+        if (model == null) { ToolLog.Write($"Base model missing: {RefugePath}"); return; }
+
+        var go = existing;
+        if (go == null || PrefabUtility.GetCorrespondingObjectFromSource(go) != model)
+        {
+            if (go != null) Object.DestroyImmediate(go);
+            go = (GameObject)PrefabUtility.InstantiatePrefab(model);
+            go.name = BaseName;
+            changed = true;
+        }
+
+        Vector3 flat = MountainRoute.ToWorld(route.basePosition, terrain);
+        Vector3 pose = GroundAt(flat);
+        float yaw = route.baseYaw * Mathf.Deg2Rad;
+        var facing = new Vector3(Mathf.Cos(yaw), 0f, Mathf.Sin(yaw));
+        var rotation = Quaternion.LookRotation(facing, Vector3.up);
+
+        if (go.transform.position != pose || go.transform.rotation != rotation)
+        {
+            go.transform.SetPositionAndRotation(pose, rotation);
+            changed = true;
+        }
+
+        if (go.GetComponentInChildren<MeshCollider>() == null)
+            ToolLog.Write("Base prefab has no collider — the player will walk through it.");
+    }
+
     static void EnsureDebugMenu(FirstPersonController player, ref bool changed)
     {
         var menu = Object.FindAnyObjectByType<DebugMenu>();
@@ -1627,7 +1690,9 @@ public static class MountainSceneBootstrap
             Object.FindAnyObjectByType<RouteOverlay>(FindObjectsInactive.Include),
             cloudVolume,
             Object.FindAnyObjectByType<CloudWeatherDriver>(),
-            Object.FindAnyObjectByType<SeaStateController>());
+            Object.FindAnyObjectByType<SeaStateController>(),
+            AssetDatabase.LoadAssetAtPath<MountainRoute>(RoutePath),
+            Object.FindAnyObjectByType<Terrain>());
 
         EditorUtility.SetDirty(menu);
     }

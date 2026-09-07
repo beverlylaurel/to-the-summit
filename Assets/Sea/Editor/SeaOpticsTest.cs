@@ -34,20 +34,23 @@ public static class SeaOpticsTest
         bool blueUpwelling = settingsFound
             && settings.upwellingColor.b > settings.upwellingColor.g
             && settings.upwellingColor.g > settings.upwellingColor.r
-            && Approximately(settings.upwellingColor, new Color(0.02f, 0.18f, 0.26f, 1f));
+            && settings.upwellingColor.maxColorComponent <= 0.1f;
         bool horizonContract = source.Contains(
                 "float3 rLookup = normalize(float3(R.x, max(R.y, 0.0), R.z));")
             && source.Contains("A RAY BELOW THE GEOMETRIC HORIZON HITS THE NEXT WATER FACET")
             && !source.Contains("skyRefl = lerp(upwelling, skyRefl")
+            && source.Contains("float grazingLimit = 1.0 - smoothstep(0.025, 0.18, reflectionNoV);")
+            && source.Contains("float3 horizonSea = lerp(upwelling, horizonAir, 0.35);")
+            && source.Contains("skyRefl = lerp(skyRefl, horizonSea, grazingLimit * 0.82);")
             && source.Contains("SeaFarGeometryKeep");
         bool shoreContract = source.Contains("fwidth(edgeDepth) * SEA_SHORE_OPTICAL_MIN_PIXELS")
             && source.Contains("fwidth(thickness) * SEA_SHORE_CONTACT_PIXELS")
             && source.Contains("smoothstep(0.0, contactOpticalWidth, thickness)")
             && source.Contains("float contactWash = contactBand")
             && source.Contains("shorePresence")
-            && terrainSource.Contains("fwidth(worldPos.y) * 10.0")
+            && terrainSource.Contains("float shoreHeightWidth = fwidth(worldPos.y)")
             && terrainSource.Contains("float swashEdgeOffset =")
-            && terrainSource.Contains("fwidth(localWetHeight) * 10.0")
+            && terrainSource.Contains("shoreHeightWidth * 10.0")
             && terrainSource.Contains("float waterlineContact = 0.0")
             && terrainSource.Contains("lace = max(lace, waterlineContact)")
             && terrainSource.Contains("smoothstep(_SeaSnowReachY,")

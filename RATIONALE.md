@@ -3894,3 +3894,40 @@ kıyı hücre filtresi kapalı iki karenin ortalama kanal farkı 0,475/255, aç�
 0,374/255 ölçüldü. Sekiz kod değerini aşan piksel payı yüzde 0,20'den yüzde 0,026'ya
 indi. Bunlar tek kıyı açısındaki zamansal örneklemedir; tüm dalga durumlarında
 sıfır titreme veya performans garantisi değildir. TAA genel olarak kapatılmadı.
+
+
+## Yağmur darbesi, kıyı erişimi ve kafa feneri — 2026-09-07
+
+Islak zemini su birikintisi sayan halka kapısı, normal kum ve kayada belirgin çift
+çemberler üretiyordu. Katı zeminin tepkisi kısa yerel normal değişimine ayrıldı;
+genişleyen dalga yalnız su kaplı kıyı ve denizde kaldı. Katı zemine halka seçici gök
+radyansı eklenmiyor. Canlı gece kadrajı ve RainRenderingTest ile kontrol edildi.
+
+Deniz renk kontrolünde aynı kadrajda upwelling katkısı kapatılınca belirgin camgöbeği
+şeridi kayboldu. Nihai asset'te bu katkının parlaklığı ve doygunluğu azaltıldı.
+Kıyı erişimi kullanıcının isteğiyle yarıya indirildi; hareketin periyodu korunuyor.
+Yağmur düşüşü ve rüzgâr tepkisi yalnız yağmur ayarında değişti; kar yolu değiştirilmedi.
+
+Fenerin lümen etiketi native intensity birimini değiştirmiyordu. Akı/kandela dönüşümü
+spot açısına göre açıkça yapıldı; daha yumuşak odak-çevre geçişi ve sıcak LED tonu
+ayarlandı. Gece sahnesinde görüntülendi, HeadlampTest ve SeaOpticsTest geçti.
+Gece pozlamasına ilişkin ilk şüphe için ayrı kontrol yapıldı; LookController'a
+kanıtlanmamış bir fener telafisi eklenmedi.
+
+## Yapı atlası, çatı moiré'si ve kıyı sıçraması — 2026-09-07
+
+Kabin UV1 renk atlasının adacıkları geniş siyah boşluklarla çevrili ve mipmap kapalıdır.
+Uzakta tek pikselin içine düşen adacık kenarı bilinear örneklemede siyah boşluğu seçince
+duvar parçaları kayboluyor gibi görünüyordu. Atlas mipmap'ini açmak komşu adacıkların
+renklerini birbirine taşırdı. Shader bunun yerine atlas ayak izini türevle ölçüyor,
+çözünemeyen ayrıntıyı nötr tona geçiriyor ve sıfıra yaklaşan atlas rengini tabanlıyor.
+Karolu dokuların daha erken mip seçmesi çatı ve cephe tekrarının kamera hareketiyle
+moire üretmesini azaltıyor. Kapı, koyu tahta eklerinin UV yönü yüzünden ayrı ve daha
+güçlü süzülen bir prefab malzemesine ayrıldı.
+
+Denizin yer seviyesindeki açık camgöbeği duvarı, probe'un tam ufuk satırındaki parlak
+bulut izinin Fresnel ile bütün yüzeyi kaplamasıydı. Yalnız çok eğik bakışta çözünemeyen
+yüzey limitine koyu su katkısı eklendi; tepeden bakış değiştirilmedi. Swash sıçramasının
+kaynağı faz eğrisi değil, spektrum momentlerinin 0,1 m/s rüzgâr basamaklarında yenilenip
+run-up yüksekliğini tek karede değiştirmesiydi. Fiziksel hedef korunarak görünür yükseklik
+üç saniyede üstel olarak yaklaşır.
