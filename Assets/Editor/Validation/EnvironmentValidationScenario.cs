@@ -74,7 +74,7 @@ public static class EnvironmentValidationCatalog
             new("coast-snow-backwash", "Karlı kıyı · çekilen swash", Coast, 0f, 12f,
                 9f, 0.68f, -6f, 0.55f, 35f, 0.35f, 260f, 0.72f, 60f),
 
-            new("sea-distant-horizon", "Uzak deniz · dar görüş", Coast, 0f, 1f,
+            new("sea-distant-horizon", "Uzak deniz · dar görüş", Coast, 90f, 1f,
                 11.05f, 0.35f, 8f, 0.35f, 35f, 0f, 640f, 0.32f, 25f),
 
             new("night-headlamp", "Gece · kafa feneri", Coast, 180f, 8f,

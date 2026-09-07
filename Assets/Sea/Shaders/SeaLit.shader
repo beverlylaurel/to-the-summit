@@ -44,7 +44,6 @@ Shader "ToTheSummit/SeaLit"
         {
             Name "SeaForward"
             Tags { "LightMode" = "UniversalForward" }
-
             HLSLPROGRAM
             #pragma vertex SeaVertex
             #pragma fragment SeaFragment
@@ -870,9 +869,19 @@ Shader "ToTheSummit/SeaLit"
                 // a stable screen-space span; unlike alpha blending this keeps the opaque/TAA contract.
                 float contactOpticalWidth = max(SEA_SHORE_CONTACT_MIN_PATH,
                     fwidth(thickness) * SEA_SHORE_CONTACT_PIXELS);
+                // `thickness` also jumps where the submerged terrain mesh ends at
+                // the 30 km world boundary. From altitude that bed is kilometres
+                // below the water and is not a shoreline, but the screen-space
+                // derivative alone used to classify the jump as contact and draw a
+                // dotted diagonal foam line. A real bank contact is physically close
+                // to the water surface; ignore opaque geometry farther below it.
+                float nearSurfaceContact = 1.0 - smoothstep(2.0, 8.0, thickness);
+                float contactPresence = lerp(1.0,
+                    smoothstep(0.0, contactOpticalWidth, thickness),
+                    nearSurfaceContact);
                 float shorePresence = min(
                     smoothstep(0.0, shoreOpticalWidth, edgeDepth),
-                    smoothstep(0.0, contactOpticalWidth, thickness));
+                    contactPresence);
                 color = lerp(refracted, color,
                              shorePresence);
 
@@ -887,7 +896,8 @@ Shader "ToTheSummit/SeaLit"
                 float contactNoise = edgeNoiseRaw * 0.65
                                    + SeaValueNoise(IN.positionWS.xz * 0.12 + 13.7) * 0.35;
                 float contactBreakup = smoothstep(0.30, 0.72, contactNoise);
-                float contactWash = contactBand * lerp(0.12, 0.42, contactBreakup);
+                float contactWash = contactBand * nearSurfaceContact
+                                  * lerp(0.12, 0.42, contactBreakup);
                 color = lerp(color, _SeaFoamColor.rgb * foamLight, contactWash);
 
                 // THE SEA STANDS IN THE SAME AIR AS THE TERRAIN. Every layer is fogged

@@ -40,6 +40,7 @@ public static class EnvironmentValidationTest
         string seaManager = File.ReadAllText("Assets/Sea/Runtime/SeaManager.cs");
         string seaSimulation = File.ReadAllText("Assets/Sea/Runtime/SeaSimulation.cs");
         string wind = File.ReadAllText("Assets/Scripts/Weather/WindField.cs");
+        string cloudShader = File.ReadAllText("Assets/VolumetricClouds/VolumetricClouds.shader");
         bool outputContract = runner.Contains("ScreenCapture.CaptureScreenshot")
                            && runner.Contains("report.md")
                            && runner.Contains("\"Temp\", \"Validation\", \"Environment\"")
@@ -48,9 +49,12 @@ public static class EnvironmentValidationTest
                                && seaManager.Contains("float t = SimulationTime")
                                && seaSimulation.Contains("EditorTimeOverride")
                                && wind.Contains("EditorTimeOverride");
+        const string cloudContrastContract =
+            "cloudsColor.w = 1.0 - cloudCover * fogTransmittance;";
+        bool cloudHorizonContrast = cloudShader.Split(cloudContrastContract).Length - 1 == 2;
 
         ok = scenarios.Count >= 7 && unique && ranges && snowPair
-          && outputContract && deterministicHooks;
+          && outputContract && deterministicHooks && cloudHorizonContrast;
 
         var report = new StringBuilder();
         report.AppendLine("# Environment Validation Test");
@@ -60,6 +64,7 @@ public static class EnvironmentValidationTest
         report.AppendLine($"  [{Mark(snowPair)}] snow pair changes phase while holding the environment");
         report.AppendLine($"  [{Mark(outputContract)}] PNG plus Markdown report contract");
         report.AppendLine($"  [{Mark(deterministicHooks)}] sea, swash and wind clocks can be pinned in Editor");
+        report.AppendLine($"  [{Mark(cloudHorizonContrast)}] both cloud composite paths attenuate distant coverage");
         report.AppendLine(ok ? "RESULT: PASSED" : "RESULT: FAILED");
         return report.ToString();
     }

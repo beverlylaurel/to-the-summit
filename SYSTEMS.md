@@ -438,6 +438,9 @@ canlı "yeniden pişir" düğmesi (`AtmosphereController.SetWeatherMap`). Kanall
 - **Bulut ortamı IŞINIM değil RADYANS ister** (dönüşüm π).
 - **Gezegen yarıçapı gerçek değeriyle durur**; bulutun ufuk kenarını **sönüm** saklar,
   geometri değil. Şimşek shader'ı aynı küreyi kestiği için aynı globali okur.
+- **Uzak bulutun radyansı ve örtücülük kontrastı aynı hava geçirgenliğiyle söner.** Bulut
+  katmanı önceden sislenmiş sahnenin üstüne premultiplied birleşir; yalnız rengi söndürmek,
+  kısmi kapsamda opak alt sınırı deniz ufkunda kopuk koyu levhalar olarak bırakır.
 - **Sanat yönü haritayı ezebilir, ama pişirmede.** Pişmiş harita adı boyanan dosyanın
   **içerik** hash'ini taşır.
 

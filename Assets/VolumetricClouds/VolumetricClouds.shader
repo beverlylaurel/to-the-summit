@@ -326,31 +326,15 @@ Shader "Hidden/Sky/VolumetricClouds"
                     fogScattering *= _CloudFogEnabled;
                     fogTransmittance = lerp(1.0, fogTransmittance, _CloudFogEnabled);
 
-                    // THE ATTENUATION IS FULL, THE FILL IS BY COVERAGE. The two are not the
-                    // same question and they used to share one weight.
-                    //
-                    // `cloudsColor.xyz` carries ONLY the cloud's own radiance, already
-                    // premultiplied by its coverage — the surface behind is composited later
-                    // (`Blend One SrcAlpha`) and takes the fog along its own path, in its own
-                    // pass. So the cloud's light crosses the whole distance to the camera no
-                    // matter how thin the cloud is: `fogTransmittance`, not a coverage lerp.
-                    //
-                    // The fill keeps `cloudCover`, and for the opposite reason: airlight may
-                    // only be added for the part of the pixel the cloud actually covers, or the
-                    // rest of the pixel gets it twice.
-                    //
-                    // WHAT THE SHARED WEIGHT DID: `lerp(1, fogTransmittance, cloudCover)` left
-                    // the thin edge UNATTENUATED while the body beside it was washed to airlight
-                    // — at 37 km the transmittance is near zero, so the body lost its own colour
-                    // entirely and the edge kept all of it. A bright rim traced every distant
-                    // cloud. It could only show far away: up close the transmittance is near 1
-                    // and both forms agree. The bilateral upscale made it worse — the colour
-                    // bleeds past the silhouette while the depth is point sampled, so the bled
-                    // bright value landed exactly on the pixels that were not being attenuated.
                     half cloudCover = 1.0 - cloudsColor.w;
 
-                    cloudsColor.xyz = cloudsColor.xyz * fogTransmittance
-                                    + fogScattering * cloudCover;
+                    // This is a premultiplied layer over a scene that has already crossed the
+                    // same atmosphere. Extinction therefore reduces both the cloud radiance
+                    // and its contrast (coverage) against that scene. Keeping coverage opaque
+                    // after radiance vanished left the cloud volume's lower boundary as dark,
+                    // disconnected slabs on the sea horizon at partial cover.
+                    cloudsColor.xyz *= fogTransmittance;
+                    cloudsColor.w = 1.0 - cloudCover * fogTransmittance;
                 }
 
                 return half4(cloudsColor.xyz, cloudsColor.w);
@@ -873,31 +857,13 @@ Shader "Hidden/Sky/VolumetricClouds"
                     fogScattering *= _CloudFogEnabled;
                     fogTransmittance = lerp(1.0, fogTransmittance, _CloudFogEnabled);
 
-                    // THE ATTENUATION IS FULL, THE FILL IS BY COVERAGE. The two are not the
-                    // same question and they used to share one weight.
-                    //
-                    // `cloudsColor.xyz` carries ONLY the cloud's own radiance, already
-                    // premultiplied by its coverage — the surface behind is composited later
-                    // (`Blend One SrcAlpha`) and takes the fog along its own path, in its own
-                    // pass. So the cloud's light crosses the whole distance to the camera no
-                    // matter how thin the cloud is: `fogTransmittance`, not a coverage lerp.
-                    //
-                    // The fill keeps `cloudCover`, and for the opposite reason: airlight may
-                    // only be added for the part of the pixel the cloud actually covers, or the
-                    // rest of the pixel gets it twice.
-                    //
-                    // WHAT THE SHARED WEIGHT DID: `lerp(1, fogTransmittance, cloudCover)` left
-                    // the thin edge UNATTENUATED while the body beside it was washed to airlight
-                    // — at 37 km the transmittance is near zero, so the body lost its own colour
-                    // entirely and the edge kept all of it. A bright rim traced every distant
-                    // cloud. It could only show far away: up close the transmittance is near 1
-                    // and both forms agree. The bilateral upscale made it worse — the colour
-                    // bleeds past the silhouette while the depth is point sampled, so the bled
-                    // bright value landed exactly on the pixels that were not being attenuated.
                     half cloudCover = 1.0 - cloudsColor.w;
 
-                    cloudsColor.xyz = cloudsColor.xyz * fogTransmittance
-                                    + fogScattering * cloudCover;
+                    // Match the non-aerial-perspective path above. The destination already
+                    // contains atmospheric scattering, so only this layer's remaining contrast
+                    // is composited here.
+                    cloudsColor.xyz *= fogTransmittance;
+                    cloudsColor.w = 1.0 - cloudCover * fogTransmittance;
                 }
 
                 return half4(cloudsColor.xyz, cloudsColor.w);

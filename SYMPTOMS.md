@@ -4564,6 +4564,11 @@ Bu, aynı satırdaki İKİNCİ kontur hatası. Birincisi siyahtı ve sebebi uydu
 (kenara uzak düzleme yakın bir derinlik yazılıyordu, sis doyuyordu); kaydı shader'ın kendi
 yorumunda duruyor.
 
+**2026-09-08 devamı:** Bu formül parlak konturu kaldırdı fakat uzak bulutun örtücülüğünü
+tam bıraktığı için kısmi kapsamda alt hacim sınırı koyu levhalar olarak görünüyordu. Nihai
+premultiplied sözleşme aşağıdaki yeni kayıttadır: radyans ve kapsama kontrastı aynı hava
+geçirgenliğiyle söner; önceden sislenmiş hedefe ayrıca hava ışığı eklenmez.
+
 
 ## Uzak bulutlar sise gömülüyor — ve bunu bir ikinci hata gizliyormuş
 
@@ -6260,3 +6265,26 @@ kalıntı en çok 0,22 kapsama ile 4,8 katsayısında söner. Kum tarafındaki d
 swash gradyanında görünür. 120 FPS taramasında en büyük köpük adımı `0,009629`; shaderlarda
 derleme mesajı yok. Tepeden ve 1,72 m göz hizasından kontrollü kıyı karelerinde balıksırtı,
 beyaz halı ve geometrik su/kum kesimi görülmedi.
+
+## Kısmi bulutta deniz ufkunun üstünde kopuk koyu levhalar — ÇÖZÜLDÜ (2026-09-08)
+
+**Belirti:** Bulut kapsamı yaklaşık 0,57 iken deniz ufkunun hemen üstünde kesik yatay
+parçalar görünüyordu; kapsam 1,0 olduğunda birleşip görünmez oluyordu. Doğru doğu bakışında
+aynı sabit kareyle sınandı.
+
+**Ayırıcı ölçümler:** Deniz yüzeyi tamamen düzleştirildiğinde parçalar kaldı; bulut renderer
+özelliği kapatıldığında tamamen gitti. Bulut ışın adımı 96'dan 128 ve 192'ye çıkarıldığında,
+yarım çözünürlük 1,0'a yükseltildiğinde ve kompozitin kenar derinliği ödünç alma yolu
+kapatıldığında şekil değişmedi. Sorun deniz geometrisi, örnek menzili, yükseltme ya da kenar
+derinliği değildi.
+
+**Gerçek sebep:** Kompozit, uzak bulut radyansını hava geçirgenliğiyle söndürüyor fakat
+`Blend One SrcAlpha` katmanının örtücülüğünü olduğu gibi bırakıyordu. Işığı sise karışmış
+bulut, arka plandaki göğü hâlâ opak biçimde kapattığı için küresel bulut hacminin alt sınırı
+kısmi kapsamda koyu levhalar halinde kalıyordu.
+
+**Düzeltme:** Her iki bulut birleşim geçişinde premultiplied radyans ve kapsama kontrastı
+aynı `fogTransmittance` ile azaltılıyor. `%56` oyun içi kapsama, 25° FOV ve doğru ufuk
+açısındaki tekrarlı doğrulamada levhalar kayboldu. Açık öğlen ve yağmurlu sabah kıyı
+karelerinde yakın/orta bulut biçimi ile deniz-kıyı birleşimi korundu; Unity konsolu temizdi.
+`EnvironmentValidationTest` iki kompozit geçişin de bu sözleşmeyi koruduğunu denetler.
