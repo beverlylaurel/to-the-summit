@@ -147,7 +147,20 @@ Shader "Cabin/WeatheredLit"
             {
                 UNITY_SETUP_INSTANCE_ID(IN);
 
-                half3 rmd       = SAMPLE_TEXTURE2D(_RoughMetalMap, sampler_RoughMetalMap, IN.uv1).rgb;
+                float2 atlasUvPixels = IN.uv1 * _TintMap_TexelSize.zw;
+                float atlasFootprint = max(length(ddx(atlasUvPixels)),
+                                           length(ddy(atlasUvPixels)));
+                half atlasTrust = 1.0h - smoothstep(0.75h, 2.0h, (half)atlasFootprint);
+                half atlasWeight = atlasTrust * (half)_AtlasStrength;
+
+                half3 authoredRmd = SAMPLE_TEXTURE2D(_RoughMetalMap,
+                                                      sampler_RoughMetalMap, IN.uv1).rgb;
+                // The atlas also carries roughness and metallic. Falling into its black
+                // padding made the door locally mirror-smooth even after the colour tint
+                // had been disabled, which produced a bright vertical headlamp streak.
+                // A neutral rough wood response preserves the tiled surface when the atlas
+                // is disabled or too small to resolve.
+                half3 rmd       = lerp(half3(0.82h, 0.0h, 0.0h), authoredRmd, atlasWeight);
                 float macro     = MaterialMacro(IN.positionWS);
                 half  roughness = saturate(rmd.r * _RoughnessScale
                                            + (macro - 0.5) * _RoughnessVariation);
@@ -174,17 +187,13 @@ Shader "Cabin/WeatheredLit"
 
                 // Tint atlasi 1/4 olcekle pisirildi: kaplama x tint carpimi 1'i asabildigi
                 // icin depolamada bolundu, burada geri acilir.
-                float2 atlasUvPixels = IN.uv1 * _TintMap_TexelSize.zw;
-                float atlasFootprint = max(length(ddx(atlasUvPixels)),
-                                           length(ddy(atlasUvPixels)));
-                half atlasTrust = 1.0h - smoothstep(0.75h, 2.0h, (half)atlasFootprint);
                 half3 atlasTint = SAMPLE_TEXTURE2D(_TintMap, sampler_TintMap, IN.uv1).rgb * 4.0h;
                 // Atlas islands are surrounded by black padding. Once an island becomes
                 // smaller than a pixel, base-level bilinear sampling used to flash that
                 // padding as missing wall panels. The authored tint fades to neutral before
                 // it becomes unresolved; a floor also makes padding incapable of erasing a face.
                 atlasTint = max(atlasTint, 0.18h);
-                half3 tint = lerp(1.0h.xxx, atlasTint, atlasTrust * (half)_AtlasStrength);
+                half3 tint = lerp(1.0h.xxx, atlasTint, atlasWeight);
                 half macroTone = 1.0h + ((half)macro - 0.5h) * (2.0h * (half)_MacroStrength);
                 half3 albedo  = baseTex * _BaseColor.rgb * tint * macroTone;
 

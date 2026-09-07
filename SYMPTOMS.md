@@ -6226,9 +6226,14 @@ koordinatındaki gölge kırpması çatıdaki deseni kamera hareketine duyarlı 
 
 **Düzeltme:** Çözünemeyen atlas örneği türev tabanlı olarak nötrleştirildi, karolu
 dokular daha erken mip seviyesine geçirildi ve URP ışık/gölge kırpması kamera göreli
-yapıldı. Kapıya atlas kullanmayan, güçlü süzülen ayrı prefab malzemesi bağlandı. Sabit
-hava ve kamera altında cephenin 45, 28 ve 16 metre karelerinde siyah panel oluşmadı;
-kapı ışık altında yeniden görüntülendi. `OutpostDiagnostics` özel kapı bağını denetler.
+yapıldı. Kapıya atlas kullanmayan ayrı prefab malzemesi bağlandı. İlk denemede mip bias 4
+seçilerek çizgiler bastırıldı fakat tahta ayrıntısı da silindi; ayrıca UV1 roughness atlası
+okunmaya devam ettiği için siyah dolgu kapıda ayna gibi dikey bir parlama bıraktı. Nihai
+ayar albedoyu 0,75 bias ile korur ve atlas kapalıyken roughness/metallic'i nötr ahşap değerine
+çevirir. Böylece ayrıntı geri gelirken parlak dikiş yeniden doğmaz. Sabit hava ve kamera
+altında cephenin 45, 28 ve 16 metre karelerinde siyah panel oluşmadı; kapı gece kafa feneri
+altında yeniden görüntülendi. `OutpostDiagnostics` özel kapı bağını ve ayrıntıyı koruyan mip
+sınırını denetler.
 
 ## Yer seviyesinde açık deniz ve swash'ın anlık sıçraması — ÇÖZÜLDÜ (2026-09-07)
 
@@ -6240,3 +6245,18 @@ karede yeni hedefe atlıyordu.
 karışımına alınarak tepeden görünüş korundu. Run-up hedefi üç saniyelik üstel yanıtla
 izleniyor. `SeaOpticsTest` shader sözleşmesini, `SeaShoreContinuityTest` 120 FPS faz
 sürekliliğini ve ilk karede 1 cm'den küçük run-up değişimini doğruladı.
+
+**İkinci sebep ve düzeltme (köpük deseni):** Kabarcık alanı her pikselin fold özvektörüne
+göre döndürülüp bir eksende 0,35'e sıkıştırılıyordu. Yönün zayıf tanımlandığı komşu
+pikseller farklı tarama yönleri seçerek uzaktan balıksırtı lekeleri oluşturuyordu. Kabarcık
+alanı dünya uzayında kararlı ve izotropik oldu; fiziksel Jacobian maskesi köpüğü yine dalga
+tepesinde taşır.
+
+**İkinci sebep ve düzeltme (beyaz swash tabakası):** Kıyı boyunca gürültü doğrudan zaman
+fazına 0,6 çevrim ekliyordu; komşu kıyı parçaları zıt yönde hareket ediyor ve `frac` sınırı
+sıçrıyordu. Taze köpük de cephenin arkasındaki bütün alanı dolduruyordu. Su ve kum artık aynı
+global fazı okur, gürültü yalnız sınır biçimini kırar. Parlak köpük dar bore cephesinde doğar;
+kalıntı en çok 0,22 kapsama ile 4,8 katsayısında söner. Kum tarafındaki dantel yalnız yumuşak
+swash gradyanında görünür. 120 FPS taramasında en büyük köpük adımı `0,009629`; shaderlarda
+derleme mesajı yok. Tepeden ve 1,72 m göz hizasından kontrollü kıyı karelerinde balıksırtı,
+beyaz halı ve geometrik su/kum kesimi görülmedi.

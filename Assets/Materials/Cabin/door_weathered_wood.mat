@@ -49,7 +49,7 @@ Material:
     - _MaterialSeed: 0
     - _RoughnessScale: 1.18
     - _RoughnessVariation: 0
-    - _TextureMipBias: 4
+    - _TextureMipBias: 0.75
     - _ThirdPhaseStrength: 0
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}

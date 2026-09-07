@@ -87,7 +87,7 @@
 
 /// Minimum visible hand-off on steep terrain. fwidth(edgeDepth) converts this
 /// pixel count back into the bathymetry's metre-valued depth domain.
-#define SEA_SHORE_OPTICAL_MIN_PIXELS 2.00
+#define SEA_SHORE_OPTICAL_MIN_PIXELS 4.00
 
 /// Minimum view-space water path used by the terrain-contact hand-off (m).
 #define SEA_SHORE_CONTACT_MIN_PATH 0.35

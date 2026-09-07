@@ -520,39 +520,17 @@ Shader "ToTheSummit/SeaLit"
                 float foam = 0.0;
 
                 {
-                    // 1. WHITECAP FOAM, STRETCHED ALONG THE FOLD DIRECTION.
+                    // 1. WHITECAP FOAM IN A STABLE WORLD-SPACE DOMAIN.
                     //
-                    // The `e-` eigenvector says which horizontal direction the
-                    // surface folds along (spec 13.2, Tessendorf equation 48).
-                    // Without stretching the pattern along it the foam looks
-                    // identical in every direction and unrelated to the wave.
+                    // The Jacobian already keeps coverage on the physical wave fold.
+                    // Rotating the bubble domain by the per-pixel fold eigenvector made
+                    // neighbouring pixels choose visibly different brush directions.
+                    // At distance those direction islands became herringbone patches.
+                    // Keep the internal lace isotropic and world-locked; the moving fold
+                    // still supplies its location and motion.
                     float2 foldDir;
                     float whitecap = SeaSampleFoam(IN.positionWS.xz, foldDir);
-
-                    // DIRECTION STRETCH DISABLED ON LOW (spec 15.3): the
-                    // pattern is not rotated, it is read straight from world
-                    // coordinates.
-                #if defined(_SEA_QUALITY_LOW)
                     float2 foamUV = IN.positionWS.xz * _SeaFoamTiling;
-                #else
-                    // THE FOLD DIRECTION IS ONLY TRUSTED WHERE THERE IS A FOLD.
-                    //
-                    // `foldDir` is the derivative texture's zw; on a nearly flat sea
-                    // it is numerical noise, so `atan2` gave a DIFFERENT rotation per
-                    // pixel and the stretched pattern smeared into streaks that had
-                    // nothing to do with the waves. In calm water the fold falls back
-                    // to the wind axis, which is the direction real streaks line up on.
-                    float foldLen = length(foldDir);
-                    float2 axis = foldLen > 1e-3 ? foldDir / foldLen
-                                                 : normalize(_SeaWindWS.xy + float2(1e-4, 0.0));
-                    axis = normalize(lerp(normalize(_SeaWindWS.xy + float2(1e-4, 0.0)),
-                                          axis, saturate(foldLen * 40.0)));
-
-                    float2x2 rot = float2x2(axis.x, -axis.y, axis.y, axis.x);
-
-                    float2 foamUV = mul(rot, IN.positionWS.xz * _SeaFoamTiling);
-                    foamUV.x *= 0.35;
-                #endif
 
                     // BUBBLE STRUCTURE, NOT A FLAT WASH. The noise used to
                     // scale the coverage between 0.55 and 1.30, i.e. it only
@@ -643,7 +621,7 @@ Shader "ToTheSummit/SeaLit"
 
                     float waveH  = _SeaSignificantHeight * shoal * setSize;
                     float ratio  = waveH / max(depth, SEA_MIN_DEPTH);
-                    float breakT = saturate((ratio - gamma * 0.7) / (gamma * 0.3));
+                    float breakT = smoothstep(gamma * 0.62, gamma * 1.04, ratio);
 
                     // THE FOAM RIDES THE CREST. Without this the band is a function
                     // of depth alone: a clean strip parallel to the shore that never
@@ -655,7 +633,7 @@ Shader "ToTheSummit/SeaLit"
                     // Breaking water is born on the narrow FRONT of the crest,
                     // not over every positive half of the wave.  The previous
                     // saturate started at zero and painted a broad grey sheet.
-                    float crest = smoothstep(0.38, 0.92, crestHeight01);
+                    float crest = smoothstep(0.30, 1.02, crestHeight01);
 
                     // Fragment the breaker at metre and several-metre scales.
                     // A minimum remains so the crest reads continuously in
@@ -665,21 +643,20 @@ Shader "ToTheSummit/SeaLit"
                     float breakerLace = FilteredShoreBubbles(IN.positionWS.xz
                                                        * _SeaFoamTiling * 0.16
                                                        + 19.4, pixelSize * _SeaFoamTiling * 0.16);
-                    float breakerPattern = smoothstep(0.18, 0.82,
+                    float breakerPattern = smoothstep(0.10, 0.90,
                                                        breakerFine * 0.58
                                                      + breakerLace * 0.42);
-                    breakT *= crest * lerp(0.12, 1.0, breakerPattern);
+                    breakT *= crest * lerp(0.04, 1.0, breakerPattern);
 
                     // 3. SHORE FOAM (spec 13.3). The run-up band makes the
                     //    water level look raised (spec 8.5).
                     //
-                    // THE SWASH DOES NOT ADVANCE AS ONE STRAIGHT LINE. The
-                    // run-up phase was global, so the whole coastline surged
-                    // and drained together — a band that slides in and out as
-                    // a single piece. A slow field shifts the phase along the
-                    // shore, so one bay is filling while the next is draining.
-                    float alongShore = SeaValueNoise(IN.positionWS.xz * 0.0035);
-                    float phase = frac(_SeaShoreFoamPhase + alongShore * 0.6);
+                    // ONE PHYSICAL SWASH PHASE DRIVES WATER AND FOAM. Spatial noise used
+                    // to offset the phase by more than half a cycle. Adjacent shoreline
+                    // patches therefore advanced and drained in opposite directions, and
+                    // `frac` turned the boundary into a visible jump. The edge breakup
+                    // below already gives bays and fingers without desynchronising time.
+                    float phase = _SeaShoreFoamPhase;
 
                     // THE SURGE IS BUILT ONCE AND USED FOR BOTH.
                     //
@@ -688,18 +665,6 @@ Shader "ToTheSummit/SeaLit"
                     // followed the cosine. Two shapes for one wave. The water level and
                     // the foam now ride the SAME surge.
                     float surge = SeaSwashSurge(phase, _SeaSwashUprush);
-
-                    // NOT EVERY SWASH REACHES THE SAME LINE.
-                    //
-                    // With one curve and one period the water stopped at exactly the
-                    // same mark every time -- the metronome. The spectrum already
-                    // carries the answer: its two peaks beat against each other and
-                    // that beat is what a set of waves IS. A big set climbs the full
-                    // run-up, the lull falls short. No invented randomness; the same
-                    // `_SeaWaveGroups` the breaker line already breathes with.
-                    float swashSet = 0.5 - 0.5 * cos(_SeaWaveGroups.x * _SeaTime
-                                                     + alongShore * SEA_TWO_PI);
-                    surge *= 1.0 - _SeaWaveGroups.y * 0.45 * (1.0 - swashSet);
 
                     float runupDepth = _SeaRunupMaxDepth * surge;
                     float effDepth = depth + runupDepth;
@@ -767,8 +732,10 @@ Shader "ToTheSummit/SeaLit"
                     // water" is known in closed form.
                     float reach = saturate(depth / max(_SeaShoreFoamDepth, 1e-3));
 
-                    // Fresh foam: where the bore stands right now.
-                    float fresh = 1.0 - smoothstep(surge - 0.30, surge + 0.10, reach);
+                    // Fresh foam belongs to the narrow moving BORE FRONT. The old mask
+                    // was one for every point behind the front, so a thin wash became a
+                    // broad white carpet stretching from the sea to the run-up limit.
+                    float fresh = 1.0 - smoothstep(0.025, 0.29, abs(reach - surge));
 
                     // Residue: time since the water drained off this point,
                     // measured in swash cycles.
@@ -789,10 +756,10 @@ Shader "ToTheSummit/SeaLit"
                     // cycle. Both sides of the `frac` boundary now meet at the
                     // same value; `max` hides the old-cycle tail before the new
                     // residue takes over, so neither brightness nor position pops.
-                    float residueBirth = 0.15625;
-                    float residueGain = lerp(residueBirth, 0.55,
-                                             smoothstep(0.0, 0.08, since));
-                    float residue = residueGain * exp(-since * 2.4);
+                    float residueBirth = 0.08;
+                    float residueGain = lerp(residueBirth, 0.22,
+                                             smoothstep(0.0, 0.10, since));
+                    float residue = residueGain * exp(-since * 4.8);
 
                     float shoreFoam = band * max(fresh, residue);
 

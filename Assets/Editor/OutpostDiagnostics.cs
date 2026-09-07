@@ -113,9 +113,9 @@ public static class OutpostDiagnostics
             failures.Add("Kabin kapisi titremeyi onleyen ozel malzemeyi kullanmiyor.");
         else if (!doorMaterial.HasProperty("_TextureMipBias")
                  || !doorMaterial.HasProperty("_AtlasStrength")
-                 || doorMaterial.GetFloat("_TextureMipBias") < 3.5f
+                 || doorMaterial.GetFloat("_TextureMipBias") > 1.0f
                  || doorMaterial.GetFloat("_AtlasStrength") > 0.001f)
-            failures.Add("Kabin kapisi filtre/atlas profili eksik.");
+            failures.Add("Kabin kapisi ayrinti/atlas profili eksik.");
 
         if (failures.Count > 0)
             throw new System.InvalidOperationException("Outpost asset denetimi basarisiz:\n- " +

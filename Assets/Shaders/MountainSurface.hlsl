@@ -593,9 +593,13 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // so the lace breaks into patches instead of ending on an edge of its own.
         // The lace rides on the SWASH band only. On the submerged part there is no
         // swash — the sea draws its own foam there.
-        float laceBand = swash;
-
-        float lace = saturate((laceBand - (1.25 - laceNoise) * 0.7) * 2.2);
+        // Only the moving front carries bright aerated foam. Filling the whole
+        // swash mask painted every already-wet fragment white and produced the broad
+        // artificial layer that appeared to slide under the sea. 4x(1-x) peaks only
+        // at the soft transition and is zero on both fully dry and fully wet sand.
+        float laceBand = saturate(4.0 * swash * (1.0 - swash));
+        float laceBreakup = smoothstep(0.24, 0.86, laceNoise);
+        float lace = smoothstep(0.06, 0.78, laceBand) * laceBreakup;
 
         // THE ACTUAL WATER CONTACT MUST EXIST ON BOTH SIDES OF THE DEPTH EDGE.
         // The moving swash lace above can contain a wide open gap exactly where opaque
@@ -610,12 +614,12 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         float waterlineBand = 1.0 - smoothstep(0.03, waterlineWidth,
                                                abs(worldPos.y - _SeaLevelY));
         float waterlineBreakup = smoothstep(0.45, 0.90, laceNoise);
-        waterlineContact = waterlineBand * lerp(0.10, 0.82, waterlineBreakup);
+        waterlineContact = waterlineBand * lerp(0.04, 0.38, waterlineBreakup);
         lace = max(lace, waterlineContact);
 
         // Foam is a scattering surface: it takes the light but shows none of the
         // sand under it. The colour is the sea's foam colour, kept off-white.
-        albedo = lerp(albedo, float3(0.78, 0.80, 0.82), lace * 0.6);
+        albedo = lerp(albedo, float3(0.78, 0.80, 0.82), lace * 0.42);
     }
 
     // --- Bump noise: the raw material of the procedural normal; without it the surface

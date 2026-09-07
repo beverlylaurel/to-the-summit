@@ -51,8 +51,9 @@ public static class SeaShoreContinuityTest
         float changedPeriodStep = clock - before;
 
         string shader = File.ReadAllText(ShaderPath);
-        bool shaderContract = shader.Contains("float leaveT = 0.5 - sin(asin(")
-                           && shader.Contains("float residueBirth = 0.15625;")
+        bool shaderContract = shader.Contains("float phase = _SeaShoreFoamPhase;")
+                           && shader.Contains("abs(reach - surge)")
+                           && shader.Contains("float residueBirth = 0.08;")
                            && shader.Contains("float shoreFoam = band * max(fresh, residue);");
 
         bool foamContinuous = maxFoamStep < 0.01f;
@@ -78,7 +79,7 @@ public static class SeaShoreContinuityTest
                         + normalClockStep.ToString("F6") + " / "
                         + changedPeriodStep.ToString("F6"));
         report.AppendLine("  [" + Mark(runupContinuous) + "] stepped sea state is eased over three seconds");
-        report.AppendLine("  [" + Mark(shaderContract) + "] shader uses the matched backwash inverse");
+        report.AppendLine("  [" + Mark(shaderContract) + "] shader uses one phase and a narrow bore front");
         report.AppendLine(ok ? "RESULT: PASSED" : "RESULT: FAILED");
         return report.ToString();
     }
@@ -89,15 +90,15 @@ public static class SeaShoreContinuityTest
     {
         float surge = SeaManager.SeaSwashSurge(phase, uprush);
         float fresh = 1f - Mathf.SmoothStep(0f, 1f,
-            Mathf.InverseLerp(surge - 0.30f, surge + 0.10f, reach));
+            Mathf.InverseLerp(0.025f, 0.29f, Mathf.Abs(reach - surge)));
 
         float leaveT = 0.5f
                      - Mathf.Sin(Mathf.Asin(Mathf.Clamp(2f * reach - 1f, -1f, 1f)) / 3f);
         float leavePhase = uprush + (1f - uprush) * leaveT;
         float since = Mathf.Repeat(phase - leavePhase, 1f);
-        float residueGain = Mathf.Lerp(0.15625f, 0.55f,
-            Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.08f, since)));
-        float residue = residueGain * Mathf.Exp(-since * 2.4f);
+        float residueGain = Mathf.Lerp(0.08f, 0.22f,
+            Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.10f, since)));
+        float residue = residueGain * Mathf.Exp(-since * 4.8f);
         return Mathf.Max(fresh, residue);
     }
 

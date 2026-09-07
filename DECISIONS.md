@@ -2826,3 +2826,14 @@ render değişikliğinden bağımsız kalır.
 konumu atmosfer, damlalar ve görünür kolda korunur. İkinci bir yönlü gölge haritası
 ve özel shader yolu eklemenin maliyeti şimdilik alınmadı. Tetikleyici, gerçek yıldırım
 yönünden gölge atan yüzey aydınlatmasının oynanış veya görsel gereksinim olmasıdır.
+
+## Kıyı köpüğü zamanı uzamsal gürültüden ayrıdır (2026-09-07)
+
+**Karar:** Su meshindeki shore foam, arazideki ıslaklık ve kumdaki dantel aynı
+`_SeaShoreFoamPhase` ile hareket eder. Dünya uzayı gürültüsü zamanı kaydırmaz; yalnız cephenin
+kenarını ve iç boşluklarını biçimlendirir. Taze köpük cephenin arkasındaki bütün ıslak alanı
+doldurmaz, hareketli bore çevresindeki dar ve türev güvenli bir banttır.
+
+Bu karar kıyının tek parça mekanik çizgi olmasını gerektirmez: çok ölçekli breakup kenarı
+metreler ve yüzlerce metre boyunca büker. Aynı kıyının komşu parçalarına yarım çevrime varan
+farklı zaman vermek ise fiziksel çeşitlilik değil, kopuk hareket ve `frac` sıçraması üretir.

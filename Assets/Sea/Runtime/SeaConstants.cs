@@ -61,7 +61,7 @@ public static class SeaConstants
 
     /// Minimum screen-space width of the optical hand-off on a steep bank (pixels).
     /// Gentle beaches remain governed by ShoreOpticalFadeDepth. [CALIBRATION]
-    public const float ShoreOpticalMinPixels = 2.00f;
+    public const float ShoreOpticalMinPixels = 4.00f;
 
     /// Shortest view-space water path that can carry a fully visible surface (m).
     /// Nearer opaque geometry is the actual on-screen shore contact. [CALIBRATION]

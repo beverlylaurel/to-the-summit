@@ -1470,7 +1470,7 @@ eşitliği `Sea/Test Constant Parity` denetliyor.
 
 Dik kıyıda 0,60 m'lik dikey derinlik bandı ekranda bir pikselin altına düşebilir. Üstelik
 eğik bakışta görünen sınırı suyun altındaki batimetri değil, suyun önünde derinlik testini
-kazanan arazi silueti kurar. Batimetrik genişlik `max(0,60 m, 2 × fwidth(edgeDepth))`, görünür
+kazanan arazi silueti kurar. Batimetrik genişlik `max(0,60 m, 4 × fwidth(edgeDepth))`, görünür
 temas genişliği `max(0,35 m, 16 × fwidth(thickness))` okur. Ölçülen yatık sahilde metre tabanlı
 10 m geçiş değişmez; dik bankta su aynı pikselin gerçek opak sahne rengine 16 piksel içinde
 devredilir. Geometri veya su çizgisinin dünya konumu oynatılmaz.
@@ -1484,6 +1484,14 @@ düşmesin diye `10 × fwidth(worldPos.y)` ekran alt sınırı vardır. Dik bank
 gökyüzü yayılımını karartsa bile köpük siyaha dönmez: yalnız temas maskesinde yukarı yönlü
 `SampleSH` ışınımı kullanılır. Bu ışık zamana ve havaya bağlıdır; bağımsız emisyon değildir.
 Böylece opak derinlik sınırının iki tarafı da aynı kesintili köpük diliyle kapanır.
+
+Batimetrik devir 2026-09-07'de yakın ve tepeden kadraj için **4 piksel** alt sınıra çıkarıldı.
+Köpük kabarcığı dünya uzayında izotropik örneklenir; Jacobian yalnız kapsama ve dalga konumunu
+belirler. Piksel başına fold yönüyle döndürme kullanılmaz, çünkü çözülemeyen özvektör yönleri
+balıksırtı adaları üretir. Swash'ın su ve kum tarafı tek `_SeaShoreFoamPhase` okur. Uzamsal
+gürültü yalnız sınırın biçimini bozar; zamanı değiştirmez. Parlak köpük tüm ıslak alanı
+doldurmaz, `4s(1-s)` ile yalnız hareketli geçiş cephesinde doğar; gerideki kalıntı zayıf ve
+hızlı sönümlüdür.
 
 Swash'ın ileri-geri giden ıslaklık cephesi de düz `_SeaWetLevelY` kotunu doğrudan çizmez.
 Arazi dantelinin mevcut `laceNoise` alanı tepe ve taban kotunu birlikte yerel olarak büker;
