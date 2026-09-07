@@ -2223,16 +2223,25 @@ ayrıca Play Mode fizik taramasından geçer.
 Oyuncunun ayağındaki dünya koordinatı tek başına yüzey türü değildir. `GroundSurfaceContact`
 ayağın altındaki en yakın gerçek collider'ı ölçer. `TerrainCollider` varsayılan olarak kar
 taşır; yapı döşemesi gibi diğer collider'lar, açıkça `GroundSurfaceProperties` ile aksi
-belirtilmedikçe alttaki arazi karını keser. Kar yüksekliği, hareket yavaşlaması, ayak sesi,
+belirtilmedikçe alttaki arazi karını keser. Kar yüksekliği, hareket çarpanı hesabı, ayak sesi,
 ayak izi, adım pufu ve koşu püskürtmesi bu ortak kapıyı kullanır. Böylece döşemenin altında
-kar simülasyonu bulunsa bile oyuncu içeride yükselmez, yavaşlamaz veya kara iz yazmaz.
+kar simülasyonu bulunsa bile oyuncu içeride yükselmez veya kara iz yazmaz.
+Hareket çarpanının hesabı bu kapıyı kullanır; normal yürüyüş hızına bağlı değildir.
 
 Barınak maruziyeti ayrıca karakter üstündeki kar birikimini ve sürüklenen kar katmanlarını
 azaltır; kapalı alana girildiğinde mevcut sürüklenme parçacıkları temizlenir. Yıldırımın
-gökyüzü ve bulut parlaması açıklıklardan görünür kalırken gölgesiz yönlü ışığın iç mekana
-doğrudan katkısı açıklık payıyla kısılır. `GroundSnap` önce oyuncunun yakınındaki döşemeyi
+gökyüzü ve bulut parlaması açıklıklardan görünür kalır. Yüzey ışığı, kamera çizimi boyunca
+gölgeli ana ışığa eklenip çizim sonunda geri alınır; oyuncunun içeride olması dış dünyayı
+karartmaz. Yüzey flaşının gölge yönü ana ışığın yönüdür (sınır: `DECISIONS.md`). `GroundSnap` önce oyuncunun yakınındaki döşemeyi
 arar; yalnız yerel zemin bulunamazsa yukarıdan dünya taramasına geçer, böylece yapı içi
 başlangıç noktası çatının üstüne taşınmaz.
+
+`GroundSurfaceContact` yüzey türünü ve yere basma durumunu ayrı bildirir. Havada kalan
+oyuncu için kar tüketicileri kapanır, adım mesafesi sıfırlanır. İnişte ayaklar yeni konuma
+basılır. `FirstPersonController`, hareket sonrasında `SnowGroundOffset.Resolve` çağırır;
+kar desteği collider kapatılmadan çözülür. Döşemeye geçişte eski bir ofset çıkarılmaz,
+normal yerçekimi fiziksel döşemeye oturtur. Adım ve kamera hareketi, bu dikey düzeltmeden
+önce kaydedilen `MotionVelocity` değerini okur.
 
 ## Ortak elde tutulan eşya ve etkileşim sistemi (2026-09-05)
 

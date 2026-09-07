@@ -104,7 +104,7 @@ public class SnowFootstepAudio : MonoBehaviour
     {
         Vector3 p = footAnchor != null ? footAnchor.position : transform.position;
 
-        if (surfaceContact == null || !surfaceContact.SupportsSnow)
+        if (surfaceContact == null || !surfaceContact.SupportsSnow || !surfaceContact.IsGrounded)
         {
             LastSurface = SnowFootstepSurface.None;
             return false;

@@ -3847,3 +3847,23 @@ sıfırlanır.
 Deniz saydam kuyrukta olduğu için URP'nin standart opak hareket vektörü geçişine girmez.
 Kuyruğu değiştirmek kırılma ve su kalınlığı okumalarını bozar; sabit görüntüde de bulunan bu
 eşik hatası çözülmüşken ayrı bir saydam hareket vektörü yolu eklenmedi.
+
+
+## Kar desteğini hareket çözümünün parçası yapmak (2026-09-07)
+
+Yüzey türü ile temas aynı bilgi değildir: uzun bir aşağı ışın havadaki oyuncunun
+altında da karlı arazi bulur. Adım ritmi yalnız yatay mesafeyi sayınca zıplama
+boyunca adım olayları oluşuyordu. Temas kapısı artık fiziksel veya çözümlenmiş kar
+desteğini ister; havada kalan mesafe sonraki inişe taşınmaz ve iz basıncı sıfırlanır.
+
+Eski kar düzeltmesi collider'ı kapatarak hatırlanan ofsetin farkını ekliyordu.
+Yerçekimi her kare yeniden uygulandığından ofseti yumuşatmak gerçek yüzey
+penetrasyonunu gideremiyordu. Düzeltme artık hareketten sonra, collider açıkken
+görünür kar kotuna çarpışma desteği sağlar. Döşemeye geçince birikmiş bir değeri
+çıkarmak yerine yerçekimi fiziksel yüzeye oturtur. Görsel yumuşatma kamera
+katmanında kalır. Kamera ve adım ritmi dikey destek hareketinin yazdığı hızı değil,
+oyuncunun esas hareket hızını kullanır.
+
+`IndoorTransitionTest` gerçek CharacterController ile kar–döşeme–kar yürüyüşünü,
+yükseliş/tepe/düşüş/inişi ve ayak izi basıncını sınar. `PlayerMotionTest.RunIsolated`
+hareket davranışını sınar; ana sahnenin bağlarını doğruladığı anlamına gelmez.

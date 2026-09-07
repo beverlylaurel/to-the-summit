@@ -11,7 +11,11 @@ public static class PlayerMotionTest
     [MenuItem("To The Summit/Player/Motion Test", false, 60)]
     static void RunMenu() => Debug.Log(Run(out _));
 
-    public static string Run(out bool ok)
+    public static string Run(out bool ok) => RunCore(out ok, true);
+
+    public static string RunIsolated(out bool ok) => RunCore(out ok, false);
+
+    static string RunCore(out bool ok, bool checkSceneBindings)
     {
         var report = new StringBuilder();
         report.AppendLine("# Player Motion Test");
@@ -87,9 +91,12 @@ public static class PlayerMotionTest
         report.AppendLine($"  [{Mark(response)}] measured walk={maxWalkOffset * 100f:F2} cm, "
                         + $"turn={maxTurnRoll:F2} deg, landing={landingDip * 100f:F2} cm, "
                         + $"step correction={terrainCorrection * 100f:F2} cm");
-        report.AppendLine($"  [{Mark(sceneBound)}] view motion and bike use separate camera transform layers in {ScenePath}");
+        if (checkSceneBindings)
+            report.AppendLine($"  [{Mark(sceneBound)}] view motion and bike use separate camera transform layers in {ScenePath}");
+        else
+            report.AppendLine("  [SKIPPED] scene bindings: isolated behavioural test");
 
-        ok = locomotion && slopeResponse && restrained && response && sceneBound;
+        ok = locomotion && slopeResponse && restrained && response && (!checkSceneBindings || sceneBound);
         report.AppendLine(ok ? "RESULT: PASSED" : "RESULT: FAILED");
         return report.ToString();
     }

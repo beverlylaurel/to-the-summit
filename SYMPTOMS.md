@@ -6174,3 +6174,29 @@ yaklaşık yüzde 50 arttı. Ek `AirColor` yansıması artık mesafe maskesine d
 gerçek `ringSlope` büyüklüğüne bağlı. Islak zeminin genel parlaklığı kendi smoothness
 yolunda kaldığı için uzakta renk perdesi oluşmuyor. `Rain Rendering Test` yeni mesafe ve
 yansıma ayrımı sözleşmeleriyle geçti; Play Mode yakın–uzak zemin karesinde mavi kontur yok.
+
+
+## Havada kar adımları ve yapı eşiğinde kar ofseti — ÇÖZÜLDÜ (2026-09-07)
+
+**Sebep:** Aşağıdaki karlı collider ile yere basma aynı kabul ediliyordu; adım ritmi
+havadaki yatay mesafeyi de biriktiriyordu. Yükseklik düzeltmesi collider'ı kapatıp
+hatırlanan ofset farkını ekliyor, döşemede bu değeri doğrudan siliyordu.
+
+**Düzeltme:** Fiziksel/kar desteği ayrı temas kapısı oldu; havada adım birikimi ve
+iz basıncı kesildi. Kar yüksekliği, karakter hareketinden sonra collider açıkken
+çözülüyor. Hareketli testte döşemeye oturma, aynı kar kotuna geri dönme ve zıplama
+boyunca sıfır adım/iz basıncı doğrulandı. Kamera hareket testinin davranış bölümü de
+geçti; açık ana sahnede yürüyüş testi bu doğrulamanın kapsamında değildir.
+
+
+## İçeri girince dışarıdaki yıldırım ışığının da kısılması — ÇÖZÜLDÜ (2026-09-07)
+
+**Sebep:** Oyuncunun barınak açıklık payı, dünyayı aydınlatan yönlü flaş ışığının
+şiddetine uygulanıyordu. Bu, duvar gölgesi üretmek yerine dışarıyı da karartıyordu.
+
+**Düzeltme:** Yüzey flaşı, kamera çizimi sırasında mevcut gölgeli ana ışığa eklenir;
+gün döngüsü değerleri çizim sonunda geri yüklenir. İzole URP piksel testinde hem
+standart Lit hem Cabin/WeatheredLit ile dış ışık artışı ve çatı gölgesi doğrulandı;
+kabin shader'ı gündüz ve gece kaynak şiddetinde sınandı. Yüzey gölgesinin yönüne
+ilişkin bilinçli sınır `DECISIONS.md` içinde kayıtlıdır. Bu test ana sahnenin canlı
+oyun testi yerine geçmez.

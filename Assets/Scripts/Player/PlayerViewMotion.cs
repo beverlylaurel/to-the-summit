@@ -59,7 +59,7 @@ public sealed class PlayerViewMotion : MonoBehaviour
 
         CaptureRestPose();
         wasGrounded = movement.OnGround;
-        previousVerticalSpeed = body.velocity.y;
+        previousVerticalSpeed = movement.MotionVelocity.y;
         ResetTerrainTracking();
     }
 
@@ -92,7 +92,7 @@ public sealed class PlayerViewMotion : MonoBehaviour
         bool acceptsMotion = movement.InputEnabled
                           && Cursor.lockState == CursorLockMode.Locked;
         float horizontalSpeed = acceptsMotion
-            ? new Vector2(body.velocity.x, body.velocity.z).magnitude
+            ? new Vector2(movement.MotionVelocity.x, movement.MotionVelocity.z).magnitude
             : 0f;
         bool grounded = acceptsMotion && movement.OnGround;
         bool sprinting = acceptsMotion && movement.IsSprinting;
@@ -100,9 +100,9 @@ public sealed class PlayerViewMotion : MonoBehaviour
             ? look.LastFrameDeltaDegrees
             : Vector2.zero;
 
-        StepTerrainContact(grounded, body.velocity, movement.GroundNormal, Time.deltaTime);
+        StepTerrainContact(grounded, movement.MotionVelocity, movement.GroundNormal, Time.deltaTime);
         StepMotion(horizontalSpeed, grounded, sprinting, lookDelta,
-            body != null ? body.velocity.y : 0f, Time.deltaTime);
+            body != null ? movement.MotionVelocity.y : 0f, Time.deltaTime);
     }
 
     // A single deterministic step keeps the camera response measurable in editor regression tests.

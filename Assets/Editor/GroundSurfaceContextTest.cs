@@ -13,9 +13,11 @@ public static class GroundSurfaceContextTest
         string report = Run(out bool groundOk);
         report += "\n" + ShelterExposureTest.Run(out bool shelterOk);
         report += "\n" + SnowGameplayTest.Run(out bool snowOk);
+        report += "\n" + IndoorTransitionTest.Run(out bool transitionOk);
+        report += "\n" + PlayerMotionTest.RunIsolated(out bool motionOk);
         Debug.Log(report);
 
-        if (!groundOk || !shelterOk || !snowOk)
+        if (!groundOk || !shelterOk || !snowOk || !transitionOk || !motionOk)
             throw new System.InvalidOperationException("Indoor interaction regression tests failed.");
     }
 
@@ -34,7 +36,9 @@ public static class GroundSurfaceContextTest
 
         GameObject player = new GameObject("ZZ_SurfacePlayer");
         player.transform.position = new Vector3(50f, 0.1f, 50f);
-        player.AddComponent<CharacterController>();
+        var body = player.AddComponent<CharacterController>();
+        body.center = Vector3.up;
+        body.height = 2f;
         GroundSurfaceContact contact = player.AddComponent<GroundSurfaceContact>();
 
         GameObject floor = null;
@@ -119,13 +123,10 @@ public static class GroundSurfaceContextTest
             .Contains("shelter.PrecipitationExposure");
         bool drift = File.ReadAllText("Assets/Snow/Runtime/SnowDriftVfxController.cs")
             .Contains("shelter.PrecipitationExposure");
-        bool lightning = File.ReadAllText("Assets/Scripts/Weather/LightningFlash.cs")
-            .Contains("shelter.LightningDirectTransmission");
 
         report.AppendLine("  [" + M(allConsumers) + "] all snow contact consumers use the shared surface gate");
         report.AppendLine("  [" + M(accumulation && drift) + "] body accumulation and drifting snow use shelter exposure");
-        report.AppendLine("  [" + M(lightning) + "] direct lightning light uses shelter transmission");
-        return allConsumers && accumulation && drift && lightning;
+        return allConsumers && accumulation && drift;
     }
 
     static string M(bool value) => value ? "+" : "-";

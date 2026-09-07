@@ -48,18 +48,18 @@ public class FirstPersonController : MonoBehaviour
     public float stepOffset = 0.4f;
 
     CharacterController controller;
+    SnowGroundOffset snowSupport;
+    public Vector3 MotionVelocity { get; private set; }
     Vector3 velocity;
     float lastGroundedTime = float.NegativeInfinity;
     float lastJumpPressedTime = float.NegativeInfinity;
-
-    /// The controller is hanging above the snow: because the capsule is not touching bare
-    /// terrain, `isGrounded` returns false. Walking and jumping have to count this flag too.
 
     /// For filtering out its own capsule: the ground ray starts inside the player and,
     /// unfiltered, the first thing it hits is their own collision volume.
     readonly RaycastHit[] groundHits = new RaycastHit[4];
     /// WHETHER THEY ARE ON THE GROUND.
-    public bool OnGround => controller != null && controller.isGrounded;
+    public bool OnGround => controller != null && controller.enabled &&
+        (controller.isGrounded || (snowSupport != null && snowSupport.IsSupporting));
 
     /// Filtered only by the ground query; consumers use it to distinguish a step from a slope.
     public Vector3 GroundNormal { get; private set; } = Vector3.up;
@@ -90,6 +90,7 @@ public class FirstPersonController : MonoBehaviour
     void Awake()
     {
         controller = GetComponent<CharacterController>();
+        snowSupport = GetComponent<SnowGroundOffset>();
         controller.slopeLimit = slopeLimit;
         controller.stepOffset = stepOffset;
     }
@@ -140,7 +141,7 @@ public class FirstPersonController : MonoBehaviour
                     * SpeedMultiplier;
         Vector3 wish = wishDirection * speed;
 
-        if (controller.isGrounded) lastGroundedTime = Time.time;
+        if (OnGround) lastGroundedTime = Time.time;
 
         Vector3 horizontal = new Vector3(velocity.x, 0f, velocity.z);
         float response = wish.sqrMagnitude > 0.001f
@@ -159,7 +160,7 @@ public class FirstPersonController : MonoBehaviour
                 slopeWeight * downhillTravel);
         }
 
-        if (controller.isGrounded)
+        if (OnGround)
         {
             horizontal = StepHorizontal(horizontal, wish, response, Time.deltaTime);
         }
@@ -203,7 +204,7 @@ public class FirstPersonController : MonoBehaviour
 
     void UpdateGroundSlope()
     {
-        if (!controller.isGrounded)
+        if (!OnGround)
         {
             GroundNormal = Vector3.up;
             GroundSlopeDegrees = 0f;
@@ -232,7 +233,7 @@ public class FirstPersonController : MonoBehaviour
 
     void ApplyGravity()
     {
-        if (controller.isGrounded && velocity.y < 0f)
+        if (OnGround && velocity.y < 0f)
             velocity.y = -2f;
 
         velocity.y += gravity * Time.deltaTime;
@@ -248,6 +249,8 @@ public class FirstPersonController : MonoBehaviour
         }
 
         controller.Move(step * Time.deltaTime);
+        MotionVelocity = controller.velocity;
+        if (snowSupport != null) snowSupport.Resolve(velocity.y > 0f);
 
     }
 

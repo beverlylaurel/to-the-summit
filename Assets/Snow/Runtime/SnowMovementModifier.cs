@@ -40,7 +40,7 @@ public class SnowMovementModifier : MonoBehaviour
     {
         Vector3 p = footAnchor != null ? footAnchor.position : transform.position;
 
-        if (surfaceContact == null || !surfaceContact.SupportsSnow || sampler == null
+        if (surfaceContact == null || !surfaceContact.SupportsSnow || !surfaceContact.IsGrounded || sampler == null
             || !sampler.TrySampleSnow(p, out SnowSample sample))
         {
             SpeedMultiplier = 1f;

@@ -14,10 +14,10 @@ using UnityEngine;
 /// IT DOES NOT DRIVE THE BODY, IT ONLY PRODUCES A PHASE.
 ///
 /// It used to raise and lower the foot proxies with a half sine. Once we moved to a single
-/// body that lost its meaning — there is no "foot in the air" — and it became harmful:
+/// body that lost its meaning â€” there is no "foot in the air" â€” and it became harmful:
 /// it overwrote the body's `localPosition.y` together with another component. With two
 /// writers colliding the body height oscillated frame to frame and the groove depth turned
-/// into saw teeth (measured: expected localY 0.27, actual 0.402 → 0.556).
+/// into saw teeth (measured: expected localY 0.27, actual 0.402 â†’ 0.556).
 ///
 /// The body's height no longer enters the trail AT ALL: the sinking depth is told by the
 /// snow (`KDeform`, the bearing capacity).
@@ -60,6 +60,8 @@ public class SnowStepRhythm : MonoBehaviour
     /// Diagnostic: horizontal speed (m/s).
     public float Speed { get; private set; }
 
+    GroundSurfaceContact surfaceContact;
+    FirstPersonController movement;
     float travelled;
     bool wasMoving;
 
@@ -68,12 +70,34 @@ public class SnowStepRhythm : MonoBehaviour
     // enough that a deliberate short W tap still leaves evidence in the snow.
     const float StopPlantStrideFraction = 0.15f;
 
+    void OnEnable()
+    {
+        surfaceContact = GroundSurfaceContact.Require(this);
+        movement = body != null ? body.GetComponent<FirstPersonController>() : null;
+        travelled = 0f;
+        wasMoving = false;
+        Speed = Phase01 = 0f;
+    }
+
     void LateUpdate()
     {
         if (body == null) return;
 
-        Vector3 v = body.velocity;
-        ProcessMotion(new Vector2(v.x, v.z).magnitude, Time.deltaTime);
+        Vector3 v = movement != null ? movement.MotionVelocity : body.velocity;
+        TickMotion(new Vector2(v.x, v.z).magnitude, Time.deltaTime,
+            body.enabled && surfaceContact != null && surfaceContact.IsGrounded);
+    }
+
+    void TickMotion(float speed, float deltaTime, bool grounded)
+    {
+        if (!grounded)
+        {
+            travelled = 0f;
+            wasMoving = false;
+            Speed = Phase01 = 0f;
+            return;
+        }
+        ProcessMotion(speed, deltaTime);
     }
 
     // Kept separate from CharacterController sampling so the distance/event state machine
@@ -96,11 +120,11 @@ public class SnowStepRhythm : MonoBehaviour
             //
             // At 2.2 m/s a real stride is ~1.1 m; with a fixed 0.78 the marks fall 39 cm
             // apart while a footprint's total length (a 30 cm boot plus the shoulder and
-            // tail at both ends) is 62 cm — the marks overlapped (the user reported it:
+            // tail at both ends) is 62 cm â€” the marks overlapped (the user reported it:
             // "the steps are too close together, there is no gap between them").
             // THE FREQUENCY RISES WITH THE SPEED TOO, NOT ONLY THE LENGTH.
             //
-            // At a fixed frequency the stride comes out 2.3 m at 2.2 m/s — absurd. In real
+            // At a fixed frequency the stride comes out 2.3 m at 2.2 m/s â€” absurd. In real
             // walking the speeding up goes to BOTH: the stride lengthens and quickens.
             // At 1.4 m/s the cycle is 1.1 Hz and the stride 1.3 m; at 2.2 m/s
             // 1.3 Hz and 1.7 m.

@@ -11,11 +11,18 @@ public sealed class GroundSurfaceContact : MonoBehaviour
     const float ProbeDistance = 1.6f;
 
     readonly RaycastHit[] hits = new RaycastHit[24];
+    CharacterController body;
+    SnowGroundOffset snowSupport;
     public Collider Collider { get; private set; }
     public Vector3 Point { get; private set; }
     public Vector3 Normal { get; private set; } = Vector3.up;
     public bool HasContact => Collider != null;
     public bool SupportsSnow { get; private set; }
+    public bool IsGrounded => body != null && body.enabled &&
+        (body.isGrounded || (snowSupport != null && snowSupport.IsSupporting));
+    public float FootHeight => body != null
+        ? transform.TransformPoint(body.center).y - body.height * transform.lossyScale.y * 0.5f
+        : transform.position.y;
 
     public static GroundSurfaceContact Require(Component owner)
     {
@@ -28,7 +35,12 @@ public sealed class GroundSurfaceContact : MonoBehaviour
         return contact != null ? contact : body.gameObject.AddComponent<GroundSurfaceContact>();
     }
 
-    void OnEnable() => RefreshNow();
+    void OnEnable()
+    {
+        body = GetComponent<CharacterController>();
+        snowSupport = GetComponent<SnowGroundOffset>();
+        RefreshNow();
+    }
 
     void LateUpdate() => RefreshNow();
 
@@ -39,7 +51,7 @@ public sealed class GroundSurfaceContact : MonoBehaviour
         Point = transform.position;
         Normal = Vector3.up;
 
-        Vector3 origin = transform.position + Vector3.up * ProbeLift;
+        Vector3 origin = new Vector3(transform.position.x, FootHeight + ProbeLift, transform.position.z);
         int count = Physics.RaycastNonAlloc(origin, Vector3.down, hits, ProbeDistance,
                                             Physics.DefaultRaycastLayers,
                                             QueryTriggerInteraction.Ignore);

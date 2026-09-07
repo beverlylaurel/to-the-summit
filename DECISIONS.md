@@ -2812,3 +2812,17 @@ hassas çizgileriyle yarışır. Uygulama ve kabul sözleşmesi `UI.md`, runtime
 **Hareket kararı:** Ortak giriş ve çıkış **Kısa Soldan + Ağır Cam**dır. Grup 4 px
 soldan 220 ms'de sakin bir `smoothstep` eğrisiyle gelir; çıkış aynı yolu tersine izler.
 Ölçek sıçraması, glow, sekme, overshoot ve döngüsel hareket kullanılmaz.
+
+
+## Yıldırım yüzey ışığında mevcut gölge yönünü koruma (2026-09-07)
+
+URP ikinci yönlü ışık için ayrı gölge haritası üretmez. İçerideyken gölgesiz flaşı
+oyuncunun açıklık payıyla kısmak, pencereden görülen dış dünyayı da karartıyordu.
+Yüzey katkısı kamera çizimi sırasında ana gölgeli ışığa eklenir ve çizim sonunda
+ışığın gün döngüsü değerleri geri yüklenir. Atmosfer ve yağmur radyansı bu geçici
+render değişikliğinden bağımsız kalır.
+
+**Sınır:** Yüzeyde flaş gölgeleri güneş/ayın ana ışık yönünü izler; yıldırımın gerçek
+konumu atmosfer, damlalar ve görünür kolda korunur. İkinci bir yönlü gölge haritası
+ve özel shader yolu eklemenin maliyeti şimdilik alınmadı. Tetikleyici, gerçek yıldırım
+yönünden gölge atan yüzey aydınlatmasının oynanış veya görsel gereksinim olmasıdır.

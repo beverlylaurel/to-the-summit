@@ -108,7 +108,7 @@ public class SnowFootprintDeformer : SnowDeformer
 
         // A foot in the air leaves no mark: the sinking multiplier is zero and `KDeform`
         // writes nothing there.
-        float pressure = ayak.basili && surfaceContact != null && surfaceContact.SupportsSnow
+        float pressure = ayak.basili && surfaceContact != null && surfaceContact.SupportsSnow && surfaceContact.IsGrounded
             ? baseB.w * bol.w
             : 0f;
 
@@ -143,6 +143,17 @@ public class SnowFootprintDeformer : SnowDeformer
     {
         base.LateUpdate();
 
+        if (surfaceContact == null || !surfaceContact.IsGrounded || !surfaceContact.SupportsSnow)
+        {
+            sol.basili = sag.basili = false;
+            return;
+        }
+        if (!sol.basili && !sag.basili)
+        {
+            Yerlestir(ref sol, true);
+            Yerlestir(ref sag, false);
+            sol.basili = sag.basili = true;
+        }
         if (rhythm == null) return;
 
         // ON STOPPING BOTH FEET COME DOWN. The rhythm resets the phase below the speed

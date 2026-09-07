@@ -83,7 +83,7 @@ public class SnowSprayController : MonoBehaviour
         LastSpeed = delta.magnitude / dt;
         LastRate = 0f;
 
-        if (surfaceContact == null || !surfaceContact.SupportsSnow
+        if (surfaceContact == null || !surfaceContact.SupportsSnow || !surfaceContact.IsGrounded
             || sampler == null || particles == null)
         {
             carry = 0f;

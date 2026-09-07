@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 /// Places the lightning in the world and drives its lighting: it writes its own directional light
 /// and the glow values the sky and the cloud read.
@@ -71,6 +72,54 @@ public class LightningFlash : MonoBehaviour
     public float Glow { get; private set; }
 
     Light flash;
+    Light litPrimary;
+    Color primaryColor;
+    float primaryIntensity;
+    float unshadowedIntensity;
+    int lightingDepth;
+
+    // URP shadows only its main directional light. Add the flash to that shadowed
+    // source for rendering, then restore time-of-day state. Its direction remains
+    // stable; the bolt, rain and atmospheric glow retain the actual strike direction.
+    void BeginCameraLighting(ScriptableRenderContext context, Camera camera) => BeginLighting();
+    void EndCameraLighting(ScriptableRenderContext context, Camera camera) => EndLighting();
+
+    void BeginLighting()
+    {
+        if (lightingDepth++ > 0) return;
+        if (flash == null || flash.intensity <= 0f) return;
+        litPrimary = RenderSettings.sun;
+        if (litPrimary == null || litPrimary == flash) { litPrimary = null; return; }
+        primaryIntensity = litPrimary.intensity;
+        primaryColor = litPrimary.color;
+        unshadowedIntensity = flash.intensity;
+        float total = primaryIntensity + unshadowedIntensity;
+        bool linear = QualitySettings.activeColorSpace == ColorSpace.Linear;
+        Color baseColor = linear ? primaryColor.linear : primaryColor;
+        Color flashColor = linear ? flash.color.linear : flash.color;
+        Color mixed = (baseColor * primaryIntensity + flashColor * unshadowedIntensity) / total;
+        litPrimary.color = linear ? mixed.gamma : mixed;
+        litPrimary.intensity = total;
+        flash.intensity = 0f;
+    }
+
+    void EndLighting()
+    {
+        if (lightingDepth == 0 || --lightingDepth > 0) return;
+        RestoreLighting();
+    }
+
+    void RestoreLighting()
+    {
+        if (litPrimary != null)
+        {
+            litPrimary.intensity = primaryIntensity;
+            litPrimary.color = primaryColor;
+            if (flash != null) flash.intensity = unshadowedIntensity;
+        }
+        litPrimary = null;
+        lightingDepth = 0;
+    }
 
     readonly float[] strokeTime = new float[MaxStrokes];
     readonly float[] strokeAmplitude = new float[MaxStrokes];
@@ -105,9 +154,7 @@ public class LightningFlash : MonoBehaviour
         var light = GetComponent<Light>();
         light.type = LightType.Directional;
 
-        // Shadows off. URP picks the main directional light by whichever is brightest; at the
-        // moment of a strike this light, brighter than the sun, takes over as the main light and
-        // the mountain's shadows shift for a frame. Without shadows it is only summed as an extra light.
+        // Direct surface illumination is routed through the shadowed main light.
         light.shadows = LightShadows.None;
         light.color = tuning.flashColor;
         light.intensity = 0f;
@@ -123,6 +170,8 @@ public class LightningFlash : MonoBehaviour
         flash.color = settings.flashColor;
 
         thunder.Struck += OnStruck;
+        RenderPipelineManager.beginCameraRendering += BeginCameraLighting;
+        RenderPipelineManager.endCameraRendering += EndCameraLighting;
 
         PublishLut();
         Apply(0f);
@@ -130,7 +179,10 @@ public class LightningFlash : MonoBehaviour
 
     void OnDisable()
     {
-        thunder.Struck -= OnStruck;
+        RenderPipelineManager.beginCameraRendering -= BeginCameraLighting;
+        RenderPipelineManager.endCameraRendering -= EndCameraLighting;
+        RestoreLighting();
+        if (thunder != null) thunder.Struck -= OnStruck;
         active = false;
 
         Apply(0f);
@@ -274,15 +326,7 @@ public class LightningFlash : MonoBehaviour
 
     void Apply(float value)
     {
-        ShelterExposure shelter = ShelterExposure.Active;
-        float directTransmission = shelter != null
-            ? shelter.LightningDirectTransmission
-            : 1f;
-
-        // Cloud and sky glow remain visible through openings. Only direct, shadowless light
-        // reaching local geometry is attenuated indoors; otherwise closed walls light up as
-        // though they were absent.
-        flash.intensity = peakIntensity * value * directTransmission;
+        flash.intensity = peakIntensity * value;
 
         // rgb is premultiplied: the sky and the cloud read the same value and do not pick the
         // colour separately. w gives the intensity on its own if needed.
