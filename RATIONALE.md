@@ -3867,3 +3867,30 @@ oyuncunun esas hareket hızını kullanır.
 `IndoorTransitionTest` gerçek CharacterController ile kar–döşeme–kar yürüyüşünü,
 yükseliş/tepe/düşüş/inişi ve ayak izi basıncını sınar. `PlayerMotionTest.RunIsolated`
 hareket davranışını sınar; ana sahnenin bağlarını doğruladığı anlamına gelmez.
+
+## Yapı aydınlatması ve kıyı örneklemesi (2026-09-07)
+
+Fener hatası, aktif Forward+ renderer altında aynı test düzlemine URP Lit ve
+Cabin/WeatheredLit atanarak ayrıldı. Cabin shader'ında `_CLUSTER_LIGHT_LOOP`
+varyantı yoktu; düzeltme öncesi spot ışık piksel testi başarısız, sonrasında başarılı.
+Shader'a standart MotionVectors geçişi de eklendi; yalnız bu eklemenin durağan
+cephe titremesini çözdüğü iddia edilmiyor.
+
+Cabin klasörü, önceki Outpost doku ithal politikasının dışında kalmıştı. Canlı
+materyalde karolu dokular bilinear, UV1 atlasları mipmap'liydi. Aynı atlas sınırı
+sızıntısını tekrar üretmemek için mevcut politika iki klasöre genişletildi;
+varlık denetiminin kapsamı da birlikte genişletildi.
+
+Köpük hücreleri texture mip zincirine sahip değil. Deniz tarafında çözülemeyen
+hücresel ayrıntı, alan örneklemesiyle bulunan ortalama örtüye geçer; arazi tarafında
+fbm oktavları kendi ortalamalarına geçer. Yükseklik kapısının içindeki türev yerine
+kapıdan önce hesaplanan fiziksel ayak izi kullanılır. Bu, hareketli gürültünün kendi
+kenar genişliğini her kare değiştirmesini önler. Kırılma görüntüsünün PC'de tam
+çözünürlüğe alınması ayrıca kıyıdaki yarım çözünürlük basamaklarını kaldırır;
+karşılığında opaque kopyanın piksel/bellek maliyeti artar.
+
+Canlı sahnede sabit kamera, donmuş deniz zamanı ve dithering kapalı kontrolünde,
+kıyı hücre filtresi kapalı iki karenin ortalama kanal farkı 0,475/255, açıkken
+0,374/255 ölçüldü. Sekiz kod değerini aşan piksel payı yüzde 0,20'den yüzde 0,026'ya
+indi. Bunlar tek kıyı açısındaki zamansal örneklemedir; tüm dalga durumlarında
+sıfır titreme veya performans garantisi değildir. TAA genel olarak kapatılmadı.

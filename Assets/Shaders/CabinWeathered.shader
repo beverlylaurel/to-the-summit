@@ -38,6 +38,7 @@ Shader "Cabin/WeatheredLit"
 
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
             #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
             #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
@@ -51,19 +52,7 @@ Shader "Cabin/WeatheredLit"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            CBUFFER_START(UnityPerMaterial)
-                float4 _BaseMap_ST;
-                float4 _BaseColor;
-                float4 _DetileOffset;
-                float  _BumpScale;
-                float  _RoughnessScale;
-                float  _MaterialSeed;
-                float  _MacroScale;
-                float  _MacroStrength;
-                float  _RoughnessVariation;
-                float  _ThirdPhaseStrength;
-                float  _Cutoff;
-            CBUFFER_END
+            #include "CabinWeatheredInput.hlsl"
 
             TEXTURE2D(_BaseMap);        SAMPLER(sampler_BaseMap);
             TEXTURE2D(_BumpMap);        SAMPLER(sampler_BumpMap);
@@ -229,19 +218,7 @@ Shader "Cabin/WeatheredLit"
             #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
             #pragma multi_compile_instancing
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            CBUFFER_START(UnityPerMaterial)
-                float4 _BaseMap_ST;
-                float4 _BaseColor;
-                float4 _DetileOffset;
-                float  _BumpScale;
-                float  _RoughnessScale;
-                float  _MaterialSeed;
-                float  _MacroScale;
-                float  _MacroStrength;
-                float  _RoughnessVariation;
-                float  _ThirdPhaseStrength;
-                float  _Cutoff;
-            CBUFFER_END
+            #include "CabinWeatheredInput.hlsl"
             TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
             #include "Packages/com.unity.render-pipelines.universal/Shaders/ShadowCasterPass.hlsl"
             ENDHLSL
@@ -257,19 +234,7 @@ Shader "Cabin/WeatheredLit"
             #pragma fragment DepthOnlyFragment
             #pragma multi_compile_instancing
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            CBUFFER_START(UnityPerMaterial)
-                float4 _BaseMap_ST;
-                float4 _BaseColor;
-                float4 _DetileOffset;
-                float  _BumpScale;
-                float  _RoughnessScale;
-                float  _MaterialSeed;
-                float  _MacroScale;
-                float  _MacroStrength;
-                float  _RoughnessVariation;
-                float  _ThirdPhaseStrength;
-                float  _Cutoff;
-            CBUFFER_END
+            #include "CabinWeatheredInput.hlsl"
             TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
             #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
             ENDHLSL
@@ -285,22 +250,22 @@ Shader "Cabin/WeatheredLit"
             #pragma fragment DepthNormalsFragment
             #pragma multi_compile_instancing
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            CBUFFER_START(UnityPerMaterial)
-                float4 _BaseMap_ST;
-                float4 _BaseColor;
-                float4 _DetileOffset;
-                float  _BumpScale;
-                float  _RoughnessScale;
-                float  _MaterialSeed;
-                float  _MacroScale;
-                float  _MacroStrength;
-                float  _RoughnessVariation;
-                float  _ThirdPhaseStrength;
-                float  _Cutoff;
-            CBUFFER_END
+            #include "CabinWeatheredInput.hlsl"
             TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
             TEXTURE2D(_BumpMap); SAMPLER(sampler_BumpMap);
             #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthNormalsPass.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "MotionVectors"
+            Tags { "LightMode"="MotionVectors" }
+            ColorMask RG
+            HLSLPROGRAM
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "CabinWeatheredInput.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ObjectMotionVectors.hlsl"
             ENDHLSL
         }
     }

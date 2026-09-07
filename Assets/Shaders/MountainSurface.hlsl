@@ -111,6 +111,24 @@ float MountainFbm(float3 p, int octaves)
     return sum;
 }
 
+// Fade unresolved shoreline octaves to their mean, preserving foam coverage.
+// The footprint is computed before the height branch so quad derivatives stay valid.
+float MountainShoreFbm(float3 p, float footprint, int octaves)
+{
+    float sum = 0.0, amp = 0.5;
+    [unroll]
+    for (int i = 0; i < 3; i++)
+    {
+        if (i >= octaves) break;
+        float keep = 1.0 - smoothstep(0.25, 1.0, footprint);
+        sum += lerp(0.5, MountainNoise(p), keep) * amp;
+        p *= 2.03;
+        footprint *= 2.03;
+        amp *= 0.5;
+    }
+    return sum;
+}
+
 /// Geological banding: horizontal layers bent by tectonics. Without the bending they come
 /// out as straight lines and the mountain looks like a slice of cake.
 float MountainBand(float3 worldPos)
@@ -517,6 +535,8 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     // exactly 0 up there, and `seaRough` further down reads `swash`, which is initialised to 0.
     float swash = 0.0;
     float waterlineContact = 0.0;
+    float shoreFootprint = max(length(ddx(worldPos)), length(ddy(worldPos)));
+    float shoreHeightWidth = fwidth(worldPos.y);
 
     // Leave one fade width above the published level inside the gate: the local
     // procedural run-up edge can reach into that margin.
@@ -524,17 +544,18 @@ MountainSurface BuildMountainSurface(float3 worldPos)
     {
         // The same field later breaks the foam lace. Reuse it for the wet front so
         // the moving darkening and the residue cannot expose two unrelated edges.
-        float laceNoise = MountainFbm(worldPos * 0.75, 3)
-                        + MountainFbm(worldPos * 3.1, 2) * 0.5;
+        float laceNoise = MountainShoreFbm(worldPos * 0.75, shoreFootprint * 0.75, 3)
+                        + MountainShoreFbm(worldPos * 3.1, shoreFootprint * 3.1, 2) * 0.5;
         float swashEdgeOffset = (laceNoise - 0.625) * min(_SeaWetFadeM * 0.70, 0.22);
         float localWetLevel = _SeaWetLevelY + swashEdgeOffset;
         float localWetHeight = worldPos.y - localWetLevel;
 
         // A metre-only fade becomes the straight triangle seen on shallow terrain.
         // Preserve the authored physical width, but guarantee ten screen pixels at
-        // oblique angles and zoomed views. fwidth also covers the noisy local edge.
+        // oblique angles and zoomed views. Use the physical height footprint,
+        // not the derivative of the moving noisy edge inside a divergent branch.
         float swashFadeWidth = max(_SeaWetFadeM,
-                                   fwidth(localWetHeight) * 10.0);
+                                   shoreHeightWidth * 10.0);
         float seaWetBottom = localWetLevel - max(_SeaWetBandM, 1e-3);
         swash = (1.0 - smoothstep(-swashFadeWidth, 0.0, localWetHeight))
                     * smoothstep(seaWetBottom - swashFadeWidth,
@@ -585,7 +606,7 @@ MountainSurface BuildMountainSurface(float3 worldPos)
         // ten-pixel minimum back into world height with the fragment derivative so
         // the contact remains a soft, readable band at every shore angle and zoom.
         float waterlineWidth = max(max(_SeaWetFadeM * 0.55, 0.08),
-                                   fwidth(worldPos.y) * 10.0);
+                                   shoreHeightWidth * 10.0);
         float waterlineBand = 1.0 - smoothstep(0.03, waterlineWidth,
                                                abs(worldPos.y - _SeaLevelY));
         float waterlineBreakup = smoothstep(0.45, 0.90, laceNoise);

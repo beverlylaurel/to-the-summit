@@ -226,6 +226,13 @@ public static class MountainSceneBootstrap
         var camera = FindPlayerCamera(player);
         if (camera == null)
             throw new System.InvalidOperationException("Player has no MainCamera-tagged camera.");
+        // Keep the near plane inside the head capsule even at oblique wall angles.
+        if (!Mathf.Approximately(camera.nearClipPlane, 0.05f))
+        {
+            camera.nearClipPlane = 0.05f;
+            EditorUtility.SetDirty(camera);
+            changed = true;
+        }
         float farClip = current.terrainSize * FarClipFactor;
         if (!Mathf.Approximately(camera.farClipPlane, farClip))
         {
@@ -367,6 +374,13 @@ public static class MountainSceneBootstrap
         if (Object.FindAnyObjectByType<WeatherAudio>() == null)
         {
             CreateWeatherAudio();
+            changed = true;
+        }
+
+        var weatherAudio = Object.FindAnyObjectByType<WeatherAudio>();
+        if (weatherAudio.BindPrecipitation(precipitationRenderer))
+        {
+            EditorUtility.SetDirty(weatherAudio);
             changed = true;
         }
 

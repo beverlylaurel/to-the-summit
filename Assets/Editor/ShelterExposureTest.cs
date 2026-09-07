@@ -56,8 +56,17 @@ public static class ShelterExposureTest
                          && sensor.RainTransmission > 0.95f && sensor.WindTransmission > 0.95f;
             report.AppendLine("  [" + M(outdoors) + "] no roof restores exterior weather");
 
+            Box(root.transform, "PorchRoof", new Vector3(9, 3, 0), new Vector3(6, .25f, 6));
+            Box(root.transform, "PorchBack", new Vector3(6, 1.5f, 0), new Vector3(.25f, 3, 6));
+            listener.transform.position = new Vector3(9, 1.65f, 0);
+            Physics.SyncTransforms();
+            sensor.EditorSampleNow();
+            bool porch = !sensor.IsIndoors && sensor.PrecipitationExposure < 0.05f
+                && sensor.RainTransmission > 0.8f && sensor.WindTransmission > 0.8f;
+            report.AppendLine("  [" + M(porch) + "] porch blocks drops but preserves outdoor audio: opening="
+                + sensor.Opening01.ToString("F2") + ", rain=" + sensor.RainTransmission.ToString("F2"));
             bool integrations = IntegrationContracts(report);
-            ok = sealedInterior && openDoor && outdoors && integrations;
+            ok = sealedInterior && openDoor && outdoors && porch && integrations;
         }
         finally
         {

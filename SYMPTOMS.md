@@ -6200,3 +6200,19 @@ standart Lit hem Cabin/WeatheredLit ile dış ışık artışı ve çatı gölge
 kabin shader'ı gündüz ve gece kaynak şiddetinde sınandı. Yüzey gölgesinin yönüne
 ilişkin bilinçli sınır `DECISIONS.md` içinde kayıtlıdır. Bu test ana sahnenin canlı
 oyun testi yerine geçmez.
+
+## Fenerin zemini aydınlatıp evi aydınlatmaması (2026-09-07)
+
+Aktif Forward+ renderer ile standart Lit kontrolü aydınlanırken Cabin shader'ı
+aydınlanmıyordu. Eksik `_CLUSTER_LIGHT_LOOP` varyantı eklendi. Negatif kontrolü
+başarısız olan `LightningOcclusionTest.RunHeadlamp` artık geçiyor; oyun sahnesinde
+fener açıkken cephe aydınlatması ayrıca görüntülendi.
+
+## Verandada iç mekân sesi ve bulutsuz yağmur sesi (2026-09-07)
+
+Üst örtü tek başına iç mekân sayılıyordu. Damlaların kesilmesi üst örtüye bağlı
+kalırken akustik iç mekân hesabı yatay kapanmayı da ister. Test verandası damlaları
+kesip dış sesi koruyor; kapalı oda ve tek açık duvar kontrolleri geçiyor.
+Yağmur sesi global şiddeti okuyup görseldeki bulut sütunu kapısını atlıyordu.
+Artık görsel kaynaktan yerel yağmur girdisini alıyor. Global 0,60/bulutsuz, kısmi
+bulut, parçacık çizim eşiği ve yalnız kar vakaları Play modu testinden geçti.

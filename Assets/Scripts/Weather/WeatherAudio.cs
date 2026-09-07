@@ -7,6 +7,14 @@ public class WeatherAudio : MonoBehaviour
 {
     [SerializeField] WeatherState weather;
     [SerializeField] WindField wind;
+    [SerializeField] PrecipitationRenderer precipitationSource;
+
+    public bool BindPrecipitation(PrecipitationRenderer source)
+    {
+        if (precipitationSource == source) return false;
+        precipitationSource = source;
+        return true;
+    }
 
     [Header("Klipler")]
     [SerializeField] AudioClip rainLight;
@@ -66,7 +74,7 @@ public class WeatherAudio : MonoBehaviour
     {
         EnsureBands();
 
-        float precipitation = weather.Precipitation;
+        float precipitation = precipitationSource != null ? precipitationSource.LocalRainIntensity : 0f;
 
         // The sustained intensity decides which sound is playing, the gust how far that sound
         // rises. The two are read separately because the ear hears them separately.
@@ -79,13 +87,9 @@ public class WeatherAudio : MonoBehaviour
 
     void DriveRain(float precipitation, float felt)
     {
-        // THE RAIN SOUND PLAYS IF RAIN IS BEING DRAWN.
-        //
-        // `SnowRuntimeState.RainWeight01` is the rain's visual weight;
-        // `PrecipitationRenderer` multiplies the drop density by it. If the audio does
-        // not read the same number, rain is heard while snow falls — which is exactly
-        // what happened when the snow system came online.
-        float rain = precipitation * SnowRuntimeState.RainWeight01;
+        // The visual source already includes phase (rain/snow) and cloud coverage at
+        // the listener. Multiplying phase again would make mixed rain too quiet.
+        float rain = precipitation;
 
         // THE SAME AS THE VISUAL CUTOFF THRESHOLD. `PrecipitationRenderer` drops the
         // drop count to zero below 0.05; if the audio does not go quiet at the same

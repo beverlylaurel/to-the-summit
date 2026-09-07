@@ -39,8 +39,11 @@ public sealed class ShelterExposure : MonoBehaviour
     public float Cover01 { get; private set; }
     public float Opening01 { get; private set; } = 1f;
     public float DryRadius { get; private set; }
-    public float Interior01 => Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.42f, 0.72f, Cover01));
-    public float PrecipitationExposure => 1f - Interior01;
+    public float OverheadShelter01 => Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.42f, 0.72f, Cover01));
+    // An awning blocks rain from above but does not enclose the outdoor sound field.
+    public float Interior01 => OverheadShelter01 *
+        (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.35f, 0.55f, Opening01)));
+    public float PrecipitationExposure => 1f - OverheadShelter01;
     public bool IsIndoors => Interior01 > 0.5f;
 
     // Rain remains audible as low-frequency roof impacts. Openings admit a little more direct
@@ -178,7 +181,7 @@ public sealed class ShelterExposure : MonoBehaviour
         Vector3 center = observer != null ? observer.position : transform.position;
         Shader.SetGlobalVector(ShelterCenterRadiusId,
             new Vector4(center.x, center.y, center.z, Mathf.Max(DryRadius, 0.01f)));
-        Shader.SetGlobalFloat(ShelterVisualBlockId, Interior01);
+        Shader.SetGlobalFloat(ShelterVisualBlockId, OverheadShelter01);
     }
 
 #if UNITY_EDITOR

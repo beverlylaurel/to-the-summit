@@ -104,6 +104,17 @@ Shader "ToTheSummit/SeaLit"
             float  _SeaFoamTiling;
             float  _SeaFoamBreakupTiling;
 
+            // The cellular field has no texture mip chain. Integrate unresolved
+            // bubbles to its sampled mean (100k points over 800 x 800 cells).
+            // Footprint comes from the unconditional world derivatives in frag.
+            float FilteredShoreBubbles(float2 p, float footprint)
+            {
+                const float meanCoverage = 0.4653;
+                if (footprint >= 1.0) return meanCoverage;
+                float keep = 1.0 - smoothstep(0.25, 1.0, footprint);
+                return lerp(meanCoverage, SeaFoamBubbles(p), keep);
+            }
+
             struct Attributes
             {
                 float4 positionOS : POSITION;
@@ -632,11 +643,11 @@ Shader "ToTheSummit/SeaLit"
                     // Fragment the breaker at metre and several-metre scales.
                     // A minimum remains so the crest reads continuously in
                     // motion, while the alpha is no longer a solid rectangle.
-                    float breakerFine = SeaFoamBubbles(IN.positionWS.xz
-                                                       * _SeaFoamTiling * 0.75);
-                    float breakerLace = SeaFoamBubbles(IN.positionWS.xz
+                    float breakerFine = FilteredShoreBubbles(IN.positionWS.xz
+                                                       * _SeaFoamTiling * 0.75, pixelSize * _SeaFoamTiling * 0.75);
+                    float breakerLace = FilteredShoreBubbles(IN.positionWS.xz
                                                        * _SeaFoamTiling * 0.16
-                                                       + 19.4);
+                                                       + 19.4, pixelSize * _SeaFoamTiling * 0.16);
                     float breakerPattern = smoothstep(0.18, 0.82,
                                                        breakerFine * 0.58
                                                      + breakerLace * 0.42);
@@ -773,11 +784,11 @@ Shader "ToTheSummit/SeaLit"
                     // so the second cellular pair is skipped there. Bit-identical.
                     if (shoreFoam > 0.0)
                     {
-                        float shoreFine = SeaFoamBubbles(IN.positionWS.xz
-                                                         * _SeaFoamTiling * 1.7);
-                        float shoreLace = SeaFoamBubbles(IN.positionWS.xz
+                        float shoreFine = FilteredShoreBubbles(IN.positionWS.xz
+                                                         * _SeaFoamTiling * 1.7, pixelSize * _SeaFoamTiling * 1.7);
+                        float shoreLace = FilteredShoreBubbles(IN.positionWS.xz
                                                          * _SeaFoamTiling * 0.24
-                                                         + 47.3);
+                                                         + 47.3, pixelSize * _SeaFoamTiling * 0.24);
                         float shoreMacro = SeaValueNoise(IN.positionWS.xz * 0.018
                                                          + float2(73.1, 11.9));
                         float shorePattern = smoothstep(0.24, 0.76,

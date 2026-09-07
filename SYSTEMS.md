@@ -2339,3 +2339,29 @@ Her senaryo `Temp/Validation/Environment/<timestamp>/` altında bir PNG üretir.
 senaryo sırasında yakalanan konsol uyarı/hatalarıyla birlikte sıralar. Bu klasör geçici test
 çıktısıdır ve commit edilmez. Katalog ve rapor sözleşmesi
 `To The Summit/Validation/Test Environment Scenarios` ile sayısal olarak denetlenir.
+
+## Yapı, kıyı ve yerel yağış doğrulaması (2026-09-07)
+
+`WeatherAudio`, `MountainSceneBootstrap` üzerinden aktif `PrecipitationRenderer`a
+bağlanır. Sesin yağmur girdisi global hava şiddeti değil, yağmur/kar fazı ile göz
+noktasındaki bulut örtüsünü içeren `LocalRainIntensity`dir. Çizim yoğunluğu kapısının
+altındaki parçacıklar sesi de beslemez. Çatı darbelerinin içeriden duyulması için
+barınak geçirimi bu girdiden sonra uygulanır.
+
+`ShelterExposure.OverheadShelter01` yalnız üst örtüyü, `Interior01` ise üst örtüyle
+birlikte yatay kapanmayı temsil eder. Verandada üst örtü damlaları keserken açık
+yanlar dış ortam sesini korur; kapalı odanın açıklıkları sınırlı ses geçirir.
+
+Yapı shader'ı Forward+ ek ışık varyantını ve URP hareket vektörü geçişini içerir.
+Ortak material buffer bütün geçişlerde tek include dosyasından gelir. Doku ithal
+ve doğrulama kapsamı hem `Assets/Textures/Outposts` hem `Assets/Textures/Cabin`dir.
+Ana kameranın ön kesme düzlemi karakter kapsülünün göz yüksekliğindeki açıklığına
+sığar; fotoğraf kamerası bu ayarı ana kameradan kopyalar.
+
+Kıyıda arazi köpüğü ve deniz tarafındaki hücresel köpük, pikselin dünya uzayındaki
+ayak izine göre süzülür. Arazi yükseklik türevleri kıyı koşulundan önce hesaplanır.
+PC pipeline kırılma için tam çözünürlüklü opaque görüntüyü kullanır.
+
+Doğrulama: `EnvironmentIntegrationTest` Play modunda yerel yağış ve kamera açıklığı;
+`ShelterExposureTest` veranda/oda; `LightningOcclusionTest.RunHeadlamp` gerçek piksel
+aydınlatması; `OutpostDiagnostics.ValidateAssets` iki doku klasörü ve prefab bağları.

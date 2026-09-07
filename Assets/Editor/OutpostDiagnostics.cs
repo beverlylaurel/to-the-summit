@@ -61,7 +61,7 @@ public static class OutpostDiagnostics
                 failures.Add($"Sahnede ham FBX ornegi var: {go.name} -> {source}");
         }
 
-        foreach (string guid in AssetDatabase.FindAssets("t:Texture2D", new[] { TextureDirectory }))
+        foreach (string guid in AssetDatabase.FindAssets("t:Texture2D", new[] { TextureDirectory, "Assets/Textures/Cabin" }))
         {
             string path = AssetDatabase.GUIDToAssetPath(guid);
             string name = System.IO.Path.GetFileNameWithoutExtension(path);

@@ -269,6 +269,8 @@ public class PrecipitationRenderer : MonoBehaviour
     /// FOR THE F1 PANEL. The intensity and the density are read separately: with something on
     /// screen there is no other way to tell which of the two it came from.
     public float DebugRainIntensity => precipitation;
+    // Listener-local precipitation before shelter: roof impacts remain audible indoors.
+    public float LocalRainIntensity => CanDrawAfterClouds ? precipitation * localFactor : 0f;
     public float DebugDensity => density;
     float localFactor = 1f;
 

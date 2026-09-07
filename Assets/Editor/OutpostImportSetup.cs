@@ -228,9 +228,10 @@ public static class OutpostImportSetup
 
     /// Texture roles are decided by file name because the Blender bake names them:
     /// atlases and roughness carry data, not colour, and must not pass through sRGB.
-    static void ConfigureTextures()
+    [MenuItem("To The Summit/Outposts/Configure Surface Textures")]
+    public static void ConfigureTextures()
     {
-        foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { TexDir }))
+        foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { TexDir, "Assets/Textures/Cabin" }))
         {
             string p = AssetDatabase.GUIDToAssetPath(guid);
             var ti = AssetImporter.GetAtPath(p) as TextureImporter;

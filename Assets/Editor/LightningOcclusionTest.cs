@@ -10,7 +10,10 @@ using Object = UnityEngine.Object;
 /// Renders actual URP shadow receivers with post-processing disabled.
 public static class LightningOcclusionTest
 {
-    public static void RunBatch()
+    public static void RunBatch() => Run(false);
+    public static void RunHeadlamp() => Run(true);
+
+    static void Run(bool headlamp)
     {
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
         var root = new GameObject("ZZ_LightningRenderTest");
@@ -92,6 +95,32 @@ public static class LightningOcclusionTest
             RenderPipelineManager.beginCameraRendering += begin;
             RenderPipelineManager.endCameraRendering += end;
             target.Create();
+            if (headlamp)
+            {
+                camera.cullingMask = 1 << 31;
+                ground.layer = roof.layer = 31;
+                sun.intensity = 0f;
+                var spotObject = new GameObject("ZZ_TestHeadlamp");
+                spotObject.transform.SetParent(root.transform);
+                spotObject.transform.position = new Vector3(2.5f, 3f, 0f);
+                spotObject.transform.rotation = Quaternion.LookRotation(Vector3.down, Vector3.forward);
+                var spot = spotObject.AddComponent<Light>();
+                spot.type = LightType.Spot;
+                spot.range = 8f;
+                spot.spotAngle = 70f;
+                spot.intensity = 25f;
+                Capture(camera, target, pixels);
+                Capture(camera, target, pixels);
+                float reference = Sample(camera, pixels, new Vector3(2.5f, 0f, 0f));
+                material.shader = Shader.Find("Cabin/WeatheredLit");
+                Capture(camera, target, pixels);
+                Capture(camera, target, pixels);
+                float cabin = Sample(camera, pixels, new Vector3(2.5f, 0f, 0f));
+                bool lit = reference > 0.01f && cabin > reference * 0.1f;
+                Debug.Log($"Headlamp pixels: Lit={reference:F5}, Cabin={cabin:F5}; RESULT: {(lit ? "PASSED" : "FAILED")}");
+                if (!lit) throw new InvalidOperationException("Cabin does not receive the Forward+ spotlight.");
+                return;
+            }
             flashLight.intensity = 0f;
             Capture(camera, target, pixels);
             float outsideBase = Sample(camera, pixels, new Vector3(2.5f, 0f, 0f));

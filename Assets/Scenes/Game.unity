@@ -652,6 +652,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeatherAudio
   weather: {fileID: 1805896806}
   wind: {fileID: 1805896805}
+  precipitationSource: {fileID: 75784308}
   rainLight: {fileID: 8300000, guid: 2b89bad38a368cc47bf925c862652e27, type: 3}
   rainHeavy: {fileID: 8300000, guid: dcaea97392962b14f8b857bbe4933b3f, type: 3}
   windCalm:
@@ -761,7 +762,7 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.3
+  near clip plane: 0.05
   far clip plane: 90000
   field of view: 60
   orthographic: 0
